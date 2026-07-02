@@ -105,6 +105,14 @@ DISTILL_MODEL = os.environ.get("CONTEXT_AGENT_MODEL", "")  # empty = let provide
 DISTILL_MAX_TOKENS = 2000
 
 
+def _env_flag(name: str, default: bool = True) -> bool:
+    """Parse an operator feature flag from the environment."""
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 # ---------------------------------------------------------------------------
 # NervousSystem — pure Python, always on
 # ---------------------------------------------------------------------------
@@ -787,12 +795,23 @@ class ContextAgent:
     Call run_cycle() from the daemon loop.
     """
 
-    def __init__(self, signal_bus: SignalBus | None = None, base_path: Path | None = None) -> None:
+    def __init__(
+        self,
+        signal_bus: SignalBus | None = None,
+        base_path: Path | None = None,
+        *,
+        intelligence_enabled: bool | None = None,
+    ) -> None:
         self._base = base_path or _DHARMA
         self.nervous = NervousSystem(base_path=self._base)
         self.intelligence = Intelligence(base_path=self._base)
         self.bus = signal_bus or SignalBus.get()
         self.store = StigmergyStore()
+        self._intelligence_enabled = (
+            _env_flag("DGC_CONTEXT_AGENT_INTELLIGENCE", True)
+            if intelligence_enabled is None
+            else bool(intelligence_enabled)
+        )
         self._cycle_count = 0
         self._last_distill_time = 0.0
         self._last_cross_pollinate_time = 0.0
@@ -817,67 +836,70 @@ class ContextAgent:
         # 3. ACT — based on what needs attention
         actions: list[str] = []
 
-        # Distill bloated notes (at most every 30 min)
-        if time.time() - self._last_distill_time > 1800:
-            bloated = self.nervous.find_bloated_notes()
-            if bloated:
-                for role, path, size_kb in bloated[:2]:  # max 2 per cycle
-                    result = await self.intelligence.distill_notes(role, path)
-                    if result:
-                        actions.append(f"distilled:{role}({size_kb}KB)")
-                        await self.store.leave_mark(StigmergicMark(
-                            agent="context-agent",
-                            file_path=str(result),
-                            action="write",
-                            observation=f"Distilled {role} notes: {size_kb}KB → {result.stat().st_size // 1024}KB",
-                            salience=0.7,
-                        ))
-                self._last_distill_time = time.time()
+        if self._intelligence_enabled:
+            # Distill bloated notes (at most every 30 min)
+            if time.time() - self._last_distill_time > 1800:
+                bloated = self.nervous.find_bloated_notes()
+                if bloated:
+                    for role, path, size_kb in bloated[:2]:  # max 2 per cycle
+                        result = await self.intelligence.distill_notes(role, path)
+                        if result:
+                            actions.append(f"distilled:{role}({size_kb}KB)")
+                            await self.store.leave_mark(StigmergicMark(
+                                agent="context-agent",
+                                file_path=str(result),
+                                action="write",
+                                observation=f"Distilled {role} notes: {size_kb}KB → {result.stat().st_size // 1024}KB",
+                                salience=0.7,
+                            ))
+                    self._last_distill_time = time.time()
 
-        # Cross-pollinate (at most every 2 hours)
-        if time.time() - self._last_cross_pollinate_time > 7200:
-            bridge = await self.intelligence.cross_pollinate()
-            if bridge:
-                actions.append(f"bridge:{bridge.name}")
-                await self.store.leave_mark(StigmergicMark(
-                    agent="context-agent",
-                    file_path=str(bridge),
-                    action="connect",
-                    observation=f"Cross-pollination bridge note: {bridge.name}",
-                    salience=0.8,
-                    connections=[str(p) for p in AGENT_NOTES.values() if p.exists()],
-                ))
-            self._last_cross_pollinate_time = time.time()
+            # Cross-pollinate (at most every 2 hours)
+            if time.time() - self._last_cross_pollinate_time > 7200:
+                bridge = await self.intelligence.cross_pollinate()
+                if bridge:
+                    actions.append(f"bridge:{bridge.name}")
+                    await self.store.leave_mark(StigmergicMark(
+                        agent="context-agent",
+                        file_path=str(bridge),
+                        action="connect",
+                        observation=f"Cross-pollination bridge note: {bridge.name}",
+                        salience=0.8,
+                        connections=[str(p) for p in AGENT_NOTES.values() if p.exists()],
+                    ))
+                self._last_cross_pollinate_time = time.time()
 
-        # Generate questions (at most every 4 hours)
-        if self._cycle_count % 12 == 0:  # ~every 12 cycles
-            questions = await self.intelligence.generate_questions(freshness)
-            if questions:
-                actions.append(f"questions:{len(questions)}")
-                # Write questions to a signal file
-                q_path = self._base / "context" / "latent_inquiries.md"
-                q_path.write_text(
-                    f"# Latent Inquiries\n"
-                    f"*Generated {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}*\n\n"
-                    + "\n".join(f"- {q}" for q in questions) + "\n"
-                )
+            # Generate questions (at most every 4 hours)
+            if self._cycle_count % 12 == 0:  # ~every 12 cycles
+                questions = await self.intelligence.generate_questions(freshness)
+                if questions:
+                    actions.append(f"questions:{len(questions)}")
+                    # Write questions to a signal file
+                    q_path = self._base / "context" / "latent_inquiries.md"
+                    q_path.write_text(
+                        f"# Latent Inquiries\n"
+                        f"*Generated {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}*\n\n"
+                        + "\n".join(f"- {q}" for q in questions) + "\n"
+                    )
 
-        # Dream during quiet hours (at most once per night)
-        if time.time() - self._last_dream_time > 86400:  # 24h
-            dream = await self.intelligence.dream()
-            if dream:
-                actions.append(f"dream:{dream.name}")
-                await self.store.leave_mark(StigmergicMark(
-                    agent="context-agent",
-                    file_path=str(dream),
-                    action="dream",
-                    observation=f"Quiet-hours dream: {dream.name}",
-                    salience=0.6,
-                ))
-                self._last_dream_time = time.time()
+            # Dream during quiet hours (at most once per night)
+            if time.time() - self._last_dream_time > 86400:  # 24h
+                dream = await self.intelligence.dream()
+                if dream:
+                    actions.append(f"dream:{dream.name}")
+                    await self.store.leave_mark(StigmergicMark(
+                        agent="context-agent",
+                        file_path=str(dream),
+                        action="dream",
+                        observation=f"Quiet-hours dream: {dream.name}",
+                        salience=0.6,
+                    ))
+                    self._last_dream_time = time.time()
+        else:
+            actions.append("intelligence:disabled")
 
         report["actions"] = actions
-
+        report["intelligence_enabled"] = self._intelligence_enabled
         # 4. SERVE — pre-assemble packages
         recipes = [
             "session-start", "rv-paper", "dharma-swarm",

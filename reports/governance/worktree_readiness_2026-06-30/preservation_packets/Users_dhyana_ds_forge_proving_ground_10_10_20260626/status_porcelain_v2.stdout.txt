@@ -1,0 +1,29 @@
+# branch.oid 50c8e2b7556258d80839e9860065dad488d855cc
+# branch.head codex/dharma-forge-proving-ground-10-10-20260626
+# branch.upstream origin/main
+# branch.ab +0 -10
+1 .M N... 100644 100644 100644 778026c1a8b43b8d2f6a8702f2ccb01715547713 778026c1a8b43b8d2f6a8702f2ccb01715547713 Makefile
+1 .M N... 100644 100644 100644 598dfcb227412a0cba7d4683616cb2c7e57b7f36 598dfcb227412a0cba7d4683616cb2c7e57b7f36 docs/ontology/SEMANTIC_COMMONS.md
+1 .M N... 100644 100644 100644 96bf235439a85f119de5171acbd88b7cf5f0de5b 96bf235439a85f119de5171acbd88b7cf5f0de5b docs/ontology/semantic_aliases.yaml
+1 .M N... 100644 100644 100644 23939c2d733ae96c6b79d3af832e9508a765b43c 23939c2d733ae96c6b79d3af832e9508a765b43c docs/ontology/semantic_objects.yaml
+? benchmarks/fixtures/
+? benchmarks/forge_real_benchmark_adapter.py
+? docs/agent_tasks/2026-06-26_dharma_forge_proving_ground_10_10_readiness_goal.md
+? docs/governance/FORGE_NAMING_BOUNDARY.md
+? docs/governance/proposed_tracks/dharma-forge-proving-ground-10-10-2026-06.yaml
+? scripts/runtime/forge_external_benchmark_proof.py
+? scripts/runtime/forge_provider_oracle.py
+? scripts/runtime/forge_proving_ground_autoresearch.py
+? scripts/runtime/forge_proving_ground_lib.py
+? scripts/runtime/forge_proving_ground_patch_sandbox.py
+? scripts/runtime/forge_proving_ground_readiness.py
+? scripts/runtime/forge_proving_ground_run.py
+? scripts/runtime/forge_proving_ground_verifier.py
+? tests/test_forge_external_benchmark_proof.py
+? tests/test_forge_provider_oracle.py
+? tests/test_forge_proving_ground_autoresearch.py
+? tests/test_forge_proving_ground_patch_sandbox.py
+? tests/test_forge_proving_ground_readiness.py
+? tests/test_forge_proving_ground_run.py
+? tests/test_forge_proving_ground_verifier.py
+? tests/test_forge_real_benchmark_adapter.py

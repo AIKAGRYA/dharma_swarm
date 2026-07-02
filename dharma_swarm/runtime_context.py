@@ -298,4 +298,3 @@ def _route_key(provider: Any, model: Any) -> str:
 
 def packet_json(packet: dict[str, Any]) -> str:
     return json.dumps(packet, sort_keys=True, indent=2)
-

@@ -55,6 +55,7 @@ export function buildDashboardNavSections(): DashboardNavSection[] {
         { label: "Cockpit", href: "/dashboard/cockpit", icon: "Shield", level: 1 },
         ...canonicalOperatorDeckItems(),
         { label: "Conv. Log", href: "/dashboard/log", icon: "MessageSquare", level: 1 },
+        { label: "Livelihood Loom", href: "/dashboard/livelihood-loom", icon: "HeartPulse", level: 1 },
         { label: "Truth Map", href: "/dashboard/modules", icon: "Activity", level: 1 },
         { label: "Semantic Graph", href: "/dashboard/claude", icon: "Globe", level: 1 },
         { label: "Models", href: "/dashboard/models", icon: "Sparkles", level: 1 },

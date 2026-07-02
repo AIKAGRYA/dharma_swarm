@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import os
 import re
@@ -26,6 +27,11 @@ from dharma_swarm.operator_core.semantic_receipt import (  # noqa: E402
     semantic_receipt_json_schema,
     validate_semantic_receipt,
     utc_now_iso,
+)
+from dharma_swarm.models import LLMRequest, ProviderType  # noqa: E402
+from dharma_swarm.runtime_provider import (  # noqa: E402
+    create_runtime_provider,
+    resolve_runtime_provider_config,
 )
 
 DEFAULT_OUT_DIR = REPO_ROOT / "reports" / "agentops" / "semantic_receipts"
@@ -191,6 +197,49 @@ def _call_ollama(
     return str(body.get("response") or ""), body, latency_ms
 
 
+def _call_runtime_provider(
+    *,
+    provider: str,
+    model: str,
+    prompt: str,
+    timeout_seconds: int,
+) -> tuple[str, dict[str, Any], int]:
+    """Call a configured dharma runtime provider without exposing credentials."""
+    try:
+        provider_type = ProviderType(provider)
+    except ValueError as exc:
+        raise RuntimeError(f"provider is not supported by runtime_provider: {provider}") from exc
+    cfg = resolve_runtime_provider_config(
+        provider_type,
+        model=model,
+        timeout_seconds=timeout_seconds,
+    )
+    if not cfg.available:
+        raise RuntimeError(f"provider is not available: {provider}")
+    runtime = create_runtime_provider(cfg)
+    request = LLMRequest(
+        model=cfg.default_model or model,
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=4096,
+        temperature=0.2,
+    )
+
+    async def complete() -> Any:
+        return await asyncio.wait_for(runtime.complete(request), timeout=timeout_seconds)
+
+    started = time.perf_counter()
+    response = asyncio.run(complete())
+    latency_ms = int((time.perf_counter() - started) * 1000)
+    raw_payload = {
+        "runtime_provider": cfg.provider.value,
+        "requested_provider": provider,
+        "requested_model": model,
+        "resolved_model": response.model,
+        "usage_keys": sorted((response.usage or {}).keys()),
+    }
+    return str(response.content or ""), raw_payload, latency_ms
+
+
 def _failure_receipt(
     *,
     provider: str,
@@ -338,7 +387,21 @@ def run_model_critic(
             if not response_text.strip():
                 raise RuntimeError("empty model response")
         else:
-            raise RuntimeError(f"provider is not supported by this runner: {provider}")
+            strict = _strict_prompt(
+                user_prompt=user_prompt,
+                provider=provider,
+                model=model,
+                agent_uid=agent_uid,
+                review_target=review_target,
+            )
+            response_text, raw_payload, latency_ms = _call_runtime_provider(
+                provider=provider,
+                model=model,
+                prompt=strict,
+                timeout_seconds=timeout_seconds,
+            )
+            if not response_text.strip():
+                raise RuntimeError("empty model response")
 
         while True:
             try:

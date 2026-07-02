@@ -1,0 +1,188 @@
+{
+  "blockers": [
+    "kimi27code: CriticResponseError invalid critic JSON from ollama:kimi-k2.7-code:cloud; actual_model=kimi-k2.7-code; content_len=19489; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=We need act as strict JSON-only production review critic. User provided prompt/evidence to review. We must return JSON only, no markdown fences, no prose outside JSON. Need evaluate claim: 100/100 for local/offline NATS substrate hardening slice. Nee ... cil evidence says \"a2a_cloud_contact.py: A2ANatsTransport, publish_task, JETSTREAM_PUBLISH_CONTRACT, operator_transport_required.\" It doesn't say the runtime scripts use A2ANatsTransport. The original rejection production risk #6: \"Several production",
+    "kimi27code: disagreement=invalid critic JSON from ollama:kimi-k2.7-code:cloud; actual_model=kimi-k2.7-code; content_len=19489; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=We need act as strict JSON-only production review critic. ",
+    "minimaxm3: CriticResponseError invalid critic JSON from ollama:minimax-m3:cloud; actual_model=minimax-m3; content_len=17837; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=The user wants me to act as an independent external reviewer and return a JSON-only verdict on a NATS substrate hardening track. Let me carefully review the evidence provided.\\n\\nThe claim is 100/100 for the local/offline NATS substrate hardening sli ... ests proving the contract checker catches wiring failures\\n- Canonical envelope with Nats-Msg-Id\\n- Durable topology with MaxDeliver and DLQ\\n- Identity boundary enforcement\\n- Executable active-track gates (command_passes, not string checks)\\n- Real",
+    "minimaxm3: disagreement=invalid critic JSON from ollama:minimax-m3:cloud; actual_model=minimax-m3; content_len=17837; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=The user wants me to act as an independent external reviewer and r"
+  ],
+  "conviction_gate": "hold_blockers",
+  "critic_count": 6,
+  "critics": [
+    {
+      "actual_model": "glm-5.2",
+      "lane_id": "glm52",
+      "latency_ms": 48368,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "Original 55/100 rejection packet (pasted-text-1.txt) listing 10 required_changes_before_graduation",
+          "reports/governance/runtime_truth_nats_council_evidence_2026-07-01.md \u2014 scope boundary, current owned surfaces, executable gates, behavioral test inventory, verification commands",
+          "reports/governance/active_track_evidence.md \u2014 runtime-truth-nats-2026-06 SHIPPABLE with 2/2 command_passes criteria passing, 5 file_exists prerequisites, no stale owned-surface declarations",
+          "reports/governance/runtime_truth_nats_closeout_packet_2026-07-01.md \u2014 implemented gates covering canonical envelope, publish/consume idempotency retry, DLQ behavior, durable topology, identity boundary, lifecycle boundary",
+          "Cross-check: stale file names a2a_nats_contact.py and a2a_core_contact.py are absent from current owned surfaces",
+          "Cross-check: closeout packet explicitly states no fresh live broker HANDLER_ACKED/DOMAIN_RECEIPTED was collected, satisfying requirement 10 via explicit local/offline scoping",
+          "Cross-check: track remains ACTIVE/SHIPPABLE; closeout packet instructs not to move to closed_tracks without operator lifecycle review"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "All 10 original rejection requirements are satisfied for the explicitly scoped local/offline NATS substrate hardening slice. The closeout packet correctly bounds the claim to local/offline substrate, does not claim fresh live broker contact, and keeps the track ACTIVE pending operator lifecycle review. Executable behavioral gates (2 command_passes criteria) replace the prior cosmetic string-matching gate. Owned surfaces no longer reference stale missing files. The contract checker and transport regression tests pass with reported outputs. Negative contract tests exist and are listed as owned surfaces. Canonical envelope, idempotency retry semantics, DLQ/MaxDeliver behavior, durable topology, and A2A identity boundary are all described in the closeout packet and corroborated by the evidence index and active-track gate outputs.",
+        "verdict": "approve"
+      },
+      "provider": "ollama",
+      "raw_response": "```json\n{\n  \"verdict\": \"approve\",\n  \"score\": 100,\n  \"summary\": \"All 10 original rejection requirements are satisfied for the explicitly scoped local/offline NATS substrate hardening slice. The closeout packet correctly bounds the claim to local/offline substrate, does not claim fresh live broker contact, and keeps the track ACTIVE pending operator lifecycle review. Executable behavioral gates (2 command_passes criteria) replace the prior cosmetic string-matching gate. Owned surfaces no longer reference stale missing files. The contract checker and transport regression tests pass with reported outputs. Negative contract tests exist and are listed as owned surfaces. Canonical envelope, idempotency retry semantics, DLQ/MaxDeliver behavior, durable topology, and A2A identity boundary are all described in the closeout packet and corroborated by the evidence index and active-track gate outputs.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"Original 55/100 rejection packet (pasted-text-1.txt) listing 10 required_changes_before_graduation\",\n    \"reports/governance/runtime_truth_nats_council_evidence_2026-07-01.md \u2014 scope boundary, current owned surfaces, executable gates, behavioral test inventory, verification commands\",\n    \"reports/governance/active_track_evidence.md \u2014 runtime-truth-nats-2026-06 SHIPPABLE with 2/2 command_passes criteria passing, 5 file_exists prerequisites, no stale owned-surface declarations\",\n    \"reports/governance/runtime_truth_nats_closeout_packet_2026-07-01.md \u2014 implemented gates covering canonical envelope, publish/consume idempotency retry, DLQ behavior, durable topology, identity boundary, lifecycle boundary\",\n    \"Cross-check: stale file names a2a_nats_contact.py and a2a_core_contact.py are absent from current owned surfaces\",\n    \"Cross-check: closeout packet explicitly states no fresh live broker HANDLER_ACKED/DOMAIN_RECEIPTED was collected, satisfying requirement 10 via explicit local/offline scoping\",\n    \"Cross-check: track remains ACTIVE/SHIPPABLE; closeout packet instructs not to move to closed_tracks without operator lifecycle review\"\n  ],\n  \"explicit_disagreement\": \"\"\n}\n```",
+      "requested_model": "glm-5.2:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "kimi-k2.7-code",
+      "failure_reason": "invalid critic JSON from ollama:kimi-k2.7-code:cloud; actual_model=kimi-k2.7-code; content_len=19489; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=We need act as strict JSON-only production review critic. User provided prompt/evidence to review. We must return JSON only, no markdown fences, no prose outside JSON. Need evaluate claim: 100/100 for local/offline NATS substrate hardening slice. Nee ... cil evidence says \"a2a_cloud_contact.py: A2ANatsTransport, publish_task, JETSTREAM_PUBLISH_CONTRACT, operator_transport_required.\" It doesn't say the runtime scripts use A2ANatsTransport. The original rejection production risk #6: \"Several production",
+      "failure_type": "CriticResponseError",
+      "lane_id": "kimi27code",
+      "latency_ms": 49133,
+      "ok": false,
+      "parsed": {
+        "blockers": [
+          "invalid critic JSON from ollama:kimi-k2.7-code:cloud; actual_model=kimi-k2.7-code; content_len=19489; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=We need act as strict JSON-only production review critic. User provided prompt/evidence to review. We must return JSON only, no markdown fences, no prose outside JSON. Need evaluate claim: 100/100 for local/offline NATS substrate hardening slice. Nee ... cil evidence says \"a2a_cloud_contact.py: A2ANatsTransport, publish_task, JETSTREAM_PUBLISH_CONTRACT, operator_transport_required.\" It doesn't say the runtime scripts use A2ANatsTransport. The original rejection production risk #6: \"Several production"
+        ],
+        "evidence_checked": [],
+        "explicit_disagreement": "invalid critic JSON from ollama:kimi-k2.7-code:cloud; actual_model=kimi-k2.7-code; content_len=19489; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=We need act as strict JSON-only production review critic. User provided prompt/evidence to review. We must return JSON only, no markdown fences, no prose outside JSON. Need evaluate claim: 100/100 for local/offline NATS substrate hardening slice. Nee ... cil evidence says \"a2a_cloud_contact.py: A2ANatsTransport, publish_task, JETSTREAM_PUBLISH_CONTRACT, operator_transport_required.\" It doesn't say the runtime scripts use A2ANatsTransport. The original rejection production risk #6: \"Several production",
+        "required_changes": [
+          "Make ollama:kimi-k2.7-code:cloud reachable or mark the lane optional with justification."
+        ],
+        "score": 0,
+        "summary": "kimi27code could not run.",
+        "verdict": "blocked"
+      },
+      "provider": "ollama",
+      "raw_response_preview": "We need act as strict JSON-only production review critic. User provided prompt/evidence to review. We must return JSON only, no markdown fences, no prose outside JSON. Need evaluate claim: 100/100 for local/offline NATS substrate hardening slice. Nee ... cil evidence says \"a2a_cloud_contact.py: A2ANatsTransport, publish_task, JETSTREAM_PUBLISH_CONTRACT, operator_transport_required.\" It doesn't say the runtime scripts use A2ANatsTransport. The original rejection production risk #6: \"Several production",
+      "requested_model": "kimi-k2.7-code:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "qwen3-coder:480b-cloud",
+      "lane_id": "qwen3coder",
+      "latency_ms": 9857,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "reports/governance/runtime_truth_nats_council_evidence_2026-07-01.md",
+          "reports/governance/active_track_evidence.md",
+          "reports/governance/runtime_truth_nats_closeout_packet_2026-07-01.md",
+          "tests/test_nats_transport.py",
+          "tests/test_nats_substrate_contract.py",
+          "scripts/governance/check_nats_substrate_contract.py",
+          "dharma_swarm/a2a/nats_transport.py",
+          "ACTIVE_TRACK.yaml surfaces verified against real modules"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "The runtime-truth-nats-2026-06 track successfully addresses all original rejection requirements through a local/offline substrate hardening approach. All ten required changes from the original rejection have been implemented, verified through behavioral tests, executable gates, and updated documentation. The implementation correctly scopes itself as local/offline, avoiding overclaiming live production readiness while maintaining active-track status pending operator lifecycle review.",
+        "verdict": "pass"
+      },
+      "provider": "ollama",
+      "raw_response": "{\n  \"verdict\": \"pass\",\n  \"score\": 100,\n  \"summary\": \"The runtime-truth-nats-2026-06 track successfully addresses all original rejection requirements through a local/offline substrate hardening approach. All ten required changes from the original rejection have been implemented, verified through behavioral tests, executable gates, and updated documentation. The implementation correctly scopes itself as local/offline, avoiding overclaiming live production readiness while maintaining active-track status pending operator lifecycle review.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"reports/governance/runtime_truth_nats_council_evidence_2026-07-01.md\",\n    \"reports/governance/active_track_evidence.md\",\n    \"reports/governance/runtime_truth_nats_closeout_packet_2026-07-01.md\",\n    \"tests/test_nats_transport.py\",\n    \"tests/test_nats_substrate_contract.py\",\n    \"scripts/governance/check_nats_substrate_contract.py\",\n    \"dharma_swarm/a2a/nats_transport.py\",\n    \"ACTIVE_TRACK.yaml surfaces verified against real modules\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "qwen3-coder:480b-cloud",
+      "required": true
+    },
+    {
+      "actual_model": "deepseek-v4-pro",
+      "lane_id": "deepseekv4pro",
+      "latency_ms": 19851,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "reports/governance/runtime_truth_nats_council_evidence_2026-07-01.md",
+          "reports/governance/active_track_evidence.md",
+          "reports/governance/runtime_truth_nats_closeout_packet_2026-07-01.md",
+          "Original rejection packet (pasted-text-1.txt)",
+          "Verification commands and test results as described in evidence"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "All 10 original rejection requirements are satisfied with concrete evidence: idempotency retry semantics, behavioral tests, canonical envelope, durable topology and DLQ, governed abstraction, negative contract tests, executable gates, updated owned surfaces, closeout packet, and explicit local/offline scope. No blockers remain.",
+        "verdict": "pass"
+      },
+      "provider": "ollama",
+      "raw_response": "{\n  \"verdict\": \"pass\",\n  \"score\": 100,\n  \"summary\": \"All 10 original rejection requirements are satisfied with concrete evidence: idempotency retry semantics, behavioral tests, canonical envelope, durable topology and DLQ, governed abstraction, negative contract tests, executable gates, updated owned surfaces, closeout packet, and explicit local/offline scope. No blockers remain.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"reports/governance/runtime_truth_nats_council_evidence_2026-07-01.md\",\n    \"reports/governance/active_track_evidence.md\",\n    \"reports/governance/runtime_truth_nats_closeout_packet_2026-07-01.md\",\n    \"Original rejection packet (pasted-text-1.txt)\",\n    \"Verification commands and test results as described in evidence\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "deepseek-v4-pro:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "minimax-m3",
+      "failure_reason": "invalid critic JSON from ollama:minimax-m3:cloud; actual_model=minimax-m3; content_len=17837; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=The user wants me to act as an independent external reviewer and return a JSON-only verdict on a NATS substrate hardening track. Let me carefully review the evidence provided.\\n\\nThe claim is 100/100 for the local/offline NATS substrate hardening sli ... ests proving the contract checker catches wiring failures\\n- Canonical envelope with Nats-Msg-Id\\n- Durable topology with MaxDeliver and DLQ\\n- Identity boundary enforcement\\n- Executable active-track gates (command_passes, not string checks)\\n- Real",
+      "failure_type": "CriticResponseError",
+      "lane_id": "minimaxm3",
+      "latency_ms": 39513,
+      "ok": false,
+      "parsed": {
+        "blockers": [
+          "invalid critic JSON from ollama:minimax-m3:cloud; actual_model=minimax-m3; content_len=17837; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=The user wants me to act as an independent external reviewer and return a JSON-only verdict on a NATS substrate hardening track. Let me carefully review the evidence provided.\\n\\nThe claim is 100/100 for the local/offline NATS substrate hardening sli ... ests proving the contract checker catches wiring failures\\n- Canonical envelope with Nats-Msg-Id\\n- Durable topology with MaxDeliver and DLQ\\n- Identity boundary enforcement\\n- Executable active-track gates (command_passes, not string checks)\\n- Real"
+        ],
+        "evidence_checked": [],
+        "explicit_disagreement": "invalid critic JSON from ollama:minimax-m3:cloud; actual_model=minimax-m3; content_len=17837; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=The user wants me to act as an independent external reviewer and return a JSON-only verdict on a NATS substrate hardening track. Let me carefully review the evidence provided.\\n\\nThe claim is 100/100 for the local/offline NATS substrate hardening sli ... ests proving the contract checker catches wiring failures\\n- Canonical envelope with Nats-Msg-Id\\n- Durable topology with MaxDeliver and DLQ\\n- Identity boundary enforcement\\n- Executable active-track gates (command_passes, not string checks)\\n- Real",
+        "required_changes": [
+          "Make ollama:minimax-m3:cloud reachable or mark the lane optional with justification."
+        ],
+        "score": 0,
+        "summary": "minimaxm3 could not run.",
+        "verdict": "blocked"
+      },
+      "provider": "ollama",
+      "raw_response_preview": "The user wants me to act as an independent external reviewer and return a JSON-only verdict on a NATS substrate hardening track. Let me carefully review the evidence provided.\\n\\nThe claim is 100/100 for the local/offline NATS substrate hardening sli ... ests proving the contract checker catches wiring failures\\n- Canonical envelope with Nats-Msg-Id\\n- Durable topology with MaxDeliver and DLQ\\n- Identity boundary enforcement\\n- Executable active-track gates (command_passes, not string checks)\\n- Real",
+      "requested_model": "minimax-m3:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "nvidia/nemotron-3-ultra-550b-a55b-20260604:free",
+      "lane_id": "nemotron3ultra",
+      "latency_ms": 49444,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "reports/governance/runtime_truth_nats_council_evidence_2026-07-01.md",
+          "reports/governance/active_track_evidence.md",
+          "reports/governance/runtime_truth_nats_closeout_packet_2026-07-01.md",
+          "Original rejection packet (pasted-text-1.txt)"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "All 10 original rejection requirements for the local/offline NATS substrate hardening slice are satisfied. The implementation provides: (1) retry/DLQ semantics for failed/stale attempts with no duplicate ack success, (2) behavioral tests covering all required failure modes, (3) canonical envelope with dharma.nats.envelope.v1 and Nats-Msg-Id, (4) durable stream/consumer topology with MaxDeliver and typed DLQ, (5) A2A routes through governed transport with identity boundary enforcement, (6) test_nats_substrate_contract.py with negative checker tests, (7) executable behavioral gates as active-track criteria, (8) ACTIVE_TRACK.yaml owned surfaces pointing to real modules, (9) real closeout packet keeping track ACTIVE pending operator lifecycle review, (10) explicit local/offline scope with no live broker claim. All verification commands pass (17 substrate tests, 36 portfolio tests, contract checker OK, track status SHIPPABLE, 70 make nats-substrate-contract, 174 A2A suite tests).",
+        "verdict": "approve"
+      },
+      "provider": "openrouter_free",
+      "raw_response": "{\n\"verdict\": \"approve\",\n  \"score\": 100,\n  \"summary\": \"All 10 original rejection requirements for the local/offline NATS substrate hardening slice are satisfied. The implementation provides: (1) retry/DLQ semantics for failed/stale attempts with no duplicate ack success, (2) behavioral tests covering all required failure modes, (3) canonical envelope with dharma.nats.envelope.v1 and Nats-Msg-Id, (4) durable stream/consumer topology with MaxDeliver and typed DLQ, (5) A2A routes through governed transport with identity boundary enforcement, (6) test_nats_substrate_contract.py with negative checker tests, (7) executable behavioral gates as active-track criteria, (8) ACTIVE_TRACK.yaml owned surfaces pointing to real modules, (9) real closeout packet keeping track ACTIVE pending operator lifecycle review, (10) explicit local/offline scope with no live broker claim. All verification commands pass (17 substrate tests, 36 portfolio tests, contract checker OK, track status SHIPPABLE, 70 make nats-substrate-contract, 174 A2A suite tests).\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"reports/governance/runtime_truth_nats_council_evidence_2026-07-01.md\",\n    \"reports/governance/active_track_evidence.md\",\n    \"reports/governance/runtime_truth_nats_closeout_packet_2026-07-01.md\",\n    \"Original rejection packet (pasted-text-1.txt)\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "required": true
+    }
+  ],
+  "generated_at": "20260630T221727Z",
+  "max_evidence_chars": 0,
+  "max_output_tokens": 4000,
+  "persistent_agent_witness": {
+    "agent": "palantir-pilot",
+    "blocker": "",
+    "fresh": true,
+    "heartbeat_age_seconds": 17,
+    "heartbeat_timestamp": "2026-06-30T22:17:10Z",
+    "max_heartbeat_age_seconds": 300,
+    "raw_status": "status=running session=dharma_palantir_pilot_a2a_worker\nsubject=dharma.a2a.palantir-pilot\nconsumer=palantir_pilot_a2a\nstream=DHARMA_FLEET\nheartbeat=/Users/dhyana/.dharma/a2a_bus/worker_heartbeats/palantir-pilot.json\nlog=/Users/dhyana/.dharma/logs/palantir_pilot_a2a_worker/dharma_palantir_pilot_a2a_worker.log\n--- heartbeat ---\n{\n    \"agent_id\": \"palantir_pilot\",\n    \"callsign\": \"palantir-pilot\",\n    \"consumer\": \"palantir_pilot_a2a\",\n    \"cycle\": 877,\n    \"last_receipt_path\": \"\",\n    \"receipt_count\": 0,\n    \"schema_version\": \"dharma.a2a.palantir_pilot.worker_heartbeat.v1\",\n    \"status\": \"IDLE\",\n    \"stream\": \"DHARMA_FLEET\",\n    \"subject\": \"dharma.a2a.palantir-pilot\",\n    \"suppress_no_messages\": true,\n    \"timestamp\": \"2026-06-30T22:17:10Z\"\n}\n--- consumer ---\n{\n  \"stream_name\": \"DHARMA_FLEET\",\n  \"name\": \"palantir_pilot_a2a\",\n  \"config\": {\n    \"ack_policy\": \"explicit\",\n    \"ack_wait\": 30000000000,\n    \"deliver_policy\": \"all\",\n    \"durable_name\": \"palantir_pilot_a2a\",\n    \"name\": \"palantir_pilot_a2a\",\n    \"filter_subject\": \"dharma.a2a.palantir-pilot\",\n    \"max_ack_pending\": 1000,\n    \"max_deliver\": -1,\n    \"max_waiting\": 512,\n    \"replay_policy\": \"instant\",\n    \"num_replicas\": 0,\n    \"metadata\": {\n      \"_nats.level\": \"3\",\n      \"_nats.req.level\": \"0\",\n      \"_nats.ver\": \"2.12.6\"\n    },\n    \"pause_until\": \"0001-01-01T00:00:00Z\"\n  },\n  \"created\": \"2026-06-15T16:08:32.524099Z\",\n  \"delivered\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"ack_floor\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"num_ack_pending\": 0,\n  \"num_redelivered\": 0,\n  \"num_waiting\": 1,\n  \"num_pending\": 0,\n  \"ts\": \"2026-06-30T22:17:27.163503Z\"\n}\n--- latest worker receipts ---\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260618T014416Z-palantir-pilot-codex_hardened_spec_notice_20260618T0155Z_palantir-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260618T013101Z-palantir-pilot-palantir_a2a_hardening_20260618T0001Z-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260617T135931Z-palantir-pilot-longrun_spec_95_vote_20260617T135751Z-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260617T131705Z-palantir-pilot-7215f005165f-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260617T130349Z-palantir-pilot-761445fa892d-PALANTIR_PILOT_REPLIED.json\n",
+    "status": "running"
+  },
+  "prompt_chars": 43411,
+  "prompt_file": "/Users/dhyana/dharma_swarm/reports/agentops/decorrelated_review_council/prompts/runtime_truth_nats_20260701_rerun_strict.md",
+  "prompt_words_estimate": 3932,
+  "required_critic_count": 6,
+  "schema_version": "codex.decorrelated_review_council.v1",
+  "score_avg": 66.67,
+  "score_min": 0,
+  "target_score": 100,
+  "timeout_seconds": 900
+}

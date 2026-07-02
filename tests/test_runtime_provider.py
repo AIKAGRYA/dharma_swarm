@@ -51,6 +51,19 @@ def test_resolve_runtime_provider_config_for_ollama_prefers_cloud_with_api_key(m
     assert cfg.default_model == DEFAULT_MODELS[ProviderType.OLLAMA]
 
 
+def test_resolve_runtime_provider_config_aliases_local_to_ollama_local(monkeypatch) -> None:
+    monkeypatch.setenv("OLLAMA_API_KEY", "ollama-key")
+    monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
+
+    cfg = resolve_runtime_provider_config(ProviderType.LOCAL, model="llama3.2")
+
+    assert cfg.provider == ProviderType.OLLAMA
+    assert cfg.base_url == "http://localhost:11434"
+    assert cfg.transport_mode == "local_api"
+    assert cfg.default_model == "llama3.2"
+    assert cfg.available is True
+
+
 def test_resolve_runtime_provider_config_for_openrouter_uses_canonical_base(monkeypatch) -> None:
     monkeypatch.setenv("OPENROUTER_API_KEY", "or-key")
 
@@ -226,6 +239,56 @@ def test_resolve_runtime_provider_config_for_fireworks_uses_default_model(monkey
     assert cfg.default_model == DEFAULT_FIREWORKS_MODEL
 
 
+@pytest.mark.parametrize(
+    ("provider_type", "env", "expected_provider"),
+    (
+        (ProviderType.ANTHROPIC, {}, ProviderType.CLAUDE_CODE),
+        (
+            ProviderType.ANTHROPIC,
+            {"DHARMA_FORCE_ANTHROPIC_API": "1"},
+            ProviderType.ANTHROPIC,
+        ),
+        (ProviderType.OPENAI, {}, ProviderType.OPENAI),
+        (ProviderType.OPENROUTER, {}, ProviderType.OPENROUTER),
+        (ProviderType.OPENROUTER_FREE, {}, ProviderType.OPENROUTER_FREE),
+        (ProviderType.NVIDIA_NIM, {}, ProviderType.NVIDIA_NIM),
+        (ProviderType.LOCAL, {}, ProviderType.OLLAMA),
+        (ProviderType.OLLAMA, {}, ProviderType.OLLAMA),
+        (ProviderType.CLAUDE_CODE, {}, ProviderType.CLAUDE_CODE),
+        (ProviderType.CODEX, {}, ProviderType.CODEX),
+        (ProviderType.GROQ, {}, ProviderType.GROQ),
+        (ProviderType.CEREBRAS, {}, ProviderType.CEREBRAS),
+        (ProviderType.SILICONFLOW, {}, ProviderType.SILICONFLOW),
+        (ProviderType.TOGETHER, {}, ProviderType.TOGETHER),
+        (ProviderType.FIREWORKS, {}, ProviderType.FIREWORKS),
+        (ProviderType.GOOGLE_AI, {}, ProviderType.GOOGLE_AI),
+        (ProviderType.SAMBANOVA, {}, ProviderType.SAMBANOVA),
+        (ProviderType.MISTRAL, {}, ProviderType.MISTRAL),
+        (ProviderType.CHUTES, {}, ProviderType.CHUTES),
+    ),
+)
+def test_resolve_runtime_provider_config_preserves_timeout_seconds(
+    monkeypatch,
+    provider_type,
+    env,
+    expected_provider,
+) -> None:
+    monkeypatch.setattr(
+        "dharma_swarm.runtime_provider._resolve_cli_binary",
+        lambda name: f"/usr/bin/{name}",
+    )
+
+    cfg = resolve_runtime_provider_config(
+        provider_type,
+        api_key="test-key",
+        timeout_seconds=77,
+        env=env,
+    )
+
+    assert cfg.provider == expected_provider
+    assert cfg.timeout_seconds == 77
+
+
 def test_create_default_provider_map_includes_expected_runtime_providers() -> None:
     provider_map = create_default_provider_map(env={})
 
@@ -252,6 +315,66 @@ def test_create_runtime_provider_attaches_runtime_provider_metadata() -> None:
 
     assert provider.runtime_provider_type == "nvidia_nim"
     assert provider.runtime_default_model == "nim-model"
+    assert provider.runtime_available is True
+    assert provider.available is True
+
+
+@pytest.mark.parametrize(
+    "provider_type",
+    (
+        ProviderType.OPENAI,
+        ProviderType.OPENROUTER,
+        ProviderType.OPENROUTER_FREE,
+        ProviderType.GROQ,
+        ProviderType.CEREBRAS,
+        ProviderType.SILICONFLOW,
+        ProviderType.TOGETHER,
+        ProviderType.FIREWORKS,
+        ProviderType.GOOGLE_AI,
+        ProviderType.SAMBANOVA,
+        ProviderType.MISTRAL,
+        ProviderType.CHUTES,
+    ),
+)
+def test_create_runtime_provider_passes_openai_compatible_base_url(provider_type) -> None:
+    provider = create_runtime_provider(
+        RuntimeProviderConfig(
+            provider=provider_type,
+            available=True,
+            api_key="test-key",
+            base_url="https://router.internal/v1/",
+            default_model=DEFAULT_MODELS[provider_type],
+            timeout_seconds=42,
+        )
+    )
+
+    assert provider._base_url == "https://router.internal/v1"
+    assert provider._timeout_seconds == 42.0
+
+
+def test_create_runtime_provider_passes_http_timeout_to_nim_and_ollama() -> None:
+    nim = create_runtime_provider(
+        RuntimeProviderConfig(
+            provider=ProviderType.NVIDIA_NIM,
+            available=True,
+            api_key="nim-key",
+            base_url="https://nim.internal/v1",
+            default_model=DEFAULT_MODELS[ProviderType.NVIDIA_NIM],
+            timeout_seconds=17,
+        )
+    )
+    ollama = create_runtime_provider(
+        RuntimeProviderConfig(
+            provider=ProviderType.OLLAMA,
+            available=True,
+            base_url="http://localhost:11434",
+            default_model="mistral:latest",
+            timeout_seconds=19,
+        )
+    )
+
+    assert nim._timeout_seconds == 17.0
+    assert ollama._timeout_seconds == 19.0
 
 
 def test_preferred_runtime_provider_configs_prioritizes_ollama_nim_before_openrouter(

@@ -1,0 +1,100 @@
+{
+  "beneficiary": "cash-heavy micro-merchants and independent sellers",
+  "candidate_partners": [
+    {
+      "company_id": "enabler_8adee02c31f1",
+      "country": "India",
+      "evidence_refs": [
+        "http://www.wikidata.org/entity/Q22907148",
+        "http://mypoolin.com/"
+      ],
+      "flags": [],
+      "name": "MyPoolin",
+      "prioritization_score": 0.984,
+      "rank": 1,
+      "safety_status": "allowed",
+      "wedge_id": "payment_acceptance_cashflow"
+    },
+    {
+      "company_id": "enabler_108de5b4fe4d",
+      "country": "Pakistan",
+      "evidence_refs": [
+        "http://www.wikidata.org/entity/Q48816527",
+        "https://1link.net.pk/paypak/"
+      ],
+      "flags": [],
+      "name": "PayPak",
+      "prioritization_score": 0.982,
+      "rank": 2,
+      "safety_status": "allowed",
+      "wedge_id": "payment_acceptance_cashflow"
+    },
+    {
+      "company_id": "enabler_06370289a0a9",
+      "country": "Philippines",
+      "evidence_refs": [
+        "http://www.wikidata.org/entity/Q120755794",
+        "https://www.bayad.com/"
+      ],
+      "flags": [],
+      "name": "Bayad Center",
+      "prioritization_score": 0.982,
+      "rank": 3,
+      "safety_status": "allowed",
+      "wedge_id": "payment_acceptance_cashflow"
+    },
+    {
+      "company_id": "enabler_a762fddb96ce",
+      "country": "India",
+      "evidence_refs": [
+        "http://www.wikidata.org/entity/Q6886937"
+      ],
+      "flags": [],
+      "name": "Mobile Payments in India",
+      "prioritization_score": 0.873,
+      "rank": 12,
+      "safety_status": "allowed",
+      "wedge_id": "payment_acceptance_cashflow"
+    },
+    {
+      "company_id": "enabler_9d6ef0c65fc6",
+      "country": "Pakistan",
+      "evidence_refs": [
+        "http://www.wikidata.org/entity/Q65090336"
+      ],
+      "flags": [],
+      "name": "JazzCash",
+      "prioritization_score": 0.872,
+      "rank": 13,
+      "safety_status": "allowed",
+      "wedge_id": "payment_acceptance_cashflow"
+    }
+  ],
+  "cell_id": "livelihood_loom",
+  "evidence_refs": [
+    "http://www.wikidata.org/entity/Q22907148",
+    "http://mypoolin.com/",
+    "http://www.wikidata.org/entity/Q48816527",
+    "https://1link.net.pk/paypak/",
+    "http://www.wikidata.org/entity/Q120755794",
+    "https://www.bayad.com/",
+    "http://www.wikidata.org/entity/Q6886937",
+    "http://www.wikidata.org/entity/Q65090336",
+    "http://www.wikidata.org/entity/Q107299057",
+    "http://www.wikidata.org/entity/Q15113520",
+    "http://www.fortumo.com",
+    "http://www.wikidata.org/entity/Q5475100"
+  ],
+  "friction": "lost sales and slow settlement from weak payment acceptance",
+  "generated_at": "2026-06-29T16:06:44.889679+00:00",
+  "next_safe_action": "Draft-only internal sponsor review packet; do not contact partners or publish claims without human_governor approval.",
+  "packet_id": "packet_01",
+  "risks": [
+    "No credit decisioning or income/debt fields.",
+    "Payment partners need fee and grievance-path review."
+  ],
+  "schema_version": "livelihood_loom.enablement_packet.v1",
+  "sponsor_value": "sponsor funds a public-source partner map for payment enablement",
+  "target_wedge": "payment_acceptance_cashflow",
+  "welfare_metric": "aggregate count of merchants with safer payment options"
+}

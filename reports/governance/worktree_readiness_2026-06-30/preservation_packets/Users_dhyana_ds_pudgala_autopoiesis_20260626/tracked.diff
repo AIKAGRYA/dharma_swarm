@@ -1,0 +1,230 @@
+diff --git a/docs/docops/AUTO_INVENTORY.md b/docs/docops/AUTO_INVENTORY.md
+index 561f6b06c..669d27a5e 100644
+--- a/docs/docops/AUTO_INVENTORY.md
++++ b/docs/docops/AUTO_INVENTORY.md
+@@ -10,9 +10,9 @@ Do not hand-edit the generated block.
+ | Top-level Dharma Python modules | 413 |
+ | Dharma Python LOC | 320,713 |
+ | Test files | 762 |
+-| Test function occurrences | 11,988 |
++| Test function occurrences | 11,989 |
+ | Markdown files | 1,089 |
+-| Markdown total lines | 252,490 |
++| Markdown total lines | 252,508 |
+ | Bridge files | 26 |
+ | Adapter files | 25 |
+ | Orchestrator files | 6 |
+diff --git a/docs/governance/FORGE_NAMING_BOUNDARY.md b/docs/governance/FORGE_NAMING_BOUNDARY.md
+index 8299abafc..d789efae7 100644
+--- a/docs/governance/FORGE_NAMING_BOUNDARY.md
++++ b/docs/governance/FORGE_NAMING_BOUNDARY.md
+@@ -1,15 +1,23 @@
+-# Forge Naming Boundary
++# Dharma Forge Proving Ground Naming Boundary
+ 
+-This repository uses `Forge` for the whole-swarm evolution and hardening arena.
+-Do not reuse that name for anti-slop governance mechanisms.
++This repository uses `Dharma Forge Proving Ground` for the whole-swarm
++evolution, benchmark-hardening, and external reality-test umbrella. Do not
++reuse Forge-family names for anti-slop governance mechanisms.
+ 
+-## Dharma Forge
++## Dharma Forge Proving Ground
+ 
+-`Dharma Forge` is the whole-swarm reality-reward and benchmark-hardening system.
+-It pits the swarm, candidate agents, and control arms against measured tasks,
+-external receipts, verifier loops, and arena-style benchmark runs. Its concrete
+-surfaces include `Dharma Forge / Hydra`, `Forge Reality Arena Hydra`, and the
+-`Forge Swarm Evolution Arena v0` runtime family.
++`Dharma Forge Proving Ground` is the canonical whole-swarm reality-reward,
++benchmark-hardening, and external test system. It pits the swarm, candidate
++agents, and control arms against measured tasks, external receipts, verifier
++loops, and arena-style benchmark runs. Its concrete surfaces include the legacy
++`Dharma Forge / Hydra` lineage, `Forge Reality Arena Hydra`, and the `Forge
++Swarm Evolution Arena v0` runtime family.
++
++`Dharma Forge` remains an active legacy/root machinery alias. It names the
++reward membrane, receipt scoring, Hydra lineage, and historical Forge
++mechanisms. It is not the preferred umbrella phrase for new operator commands.
++The `Forge Swarm Evolution Arena` name is a concrete measurement generation
++inside the Proving Ground lineage.
+ 
+ Use this name for:
+ 
+@@ -18,6 +26,15 @@ Use this name for:
+ - candidate-vs-control arenas
+ - long-run Hydra patterns around swarm hardening
+ 
++Preferred operator phrases:
++
++- `run the Dharma Forge Proving Ground`
++- `run the Forge Proving Ground`
++- `run the canonical Forge Proving Ground external loop`
++
++Legacy phrases such as `run Forge` may be normalized to the Proving Ground, but
++new receipts should prefer the explicit Proving Ground wording.
++
+ Canonical entry points include:
+ 
+ - `docs/ops/DHARMA_FORGE_HYDRA_ARCHAEOLOGY_2026-06-11.md`
+@@ -51,7 +68,7 @@ Canonical entry points include:
+ ## Rule
+ 
+ If a surface runs the swarm against tasks, benchmarks, external receipts, or
+-candidate controls, it belongs to `Dharma Forge`.
++candidate controls, it belongs to `Dharma Forge Proving Ground`.
+ 
+ If a surface grades whether a governance claim is backed by independent,
+ machine-checkable evidence, it belongs to `Pudgala Autopoiesis Protostar`.
+diff --git a/docs/governance/SOVEREIGN_MANIFEST.md b/docs/governance/SOVEREIGN_MANIFEST.md
+index 4f0d50f83..a22f37fd6 100644
+--- a/docs/governance/SOVEREIGN_MANIFEST.md
++++ b/docs/governance/SOVEREIGN_MANIFEST.md
+@@ -519,11 +519,11 @@ These are the ground-truth metrics. All other documents citing different numbers
+ | Top-level (flat) modules | **413 (52.7%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+ | Total Python LOC | **320,713** | wc -l across dharma_swarm Python modules |
+ | Test files | **762** | find tests -name "*.py" -type f |
+-| Test functions | **11,988 `def test_` occurrences under tests/** | rg "def test_" tests |
++| Test functions | **11,989 `def test_` occurrences under tests/** | rg "def test_" tests |
+ | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
+ | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
+ | Markdown files | **1089** | find . -name "*.md" -type f |
+-| Markdown total lines | **252,490** | wc -l across all .md |
++| Markdown total lines | **252,508** | wc -l across all .md |
+ | Bridge files | **26** | find dharma_swarm -name "*bridge*.py" -type f |
+ | Adapter files | **25** | find dharma_swarm -type f | rg -i "adapter" |
+ | Router files | **16** | find dharma_swarm -type f | rg -i "rout" |
+diff --git a/docs/ontology/semantic_aliases.yaml b/docs/ontology/semantic_aliases.yaml
+index 96bf23543..ce64e22e6 100644
+--- a/docs/ontology/semantic_aliases.yaml
++++ b/docs/ontology/semantic_aliases.yaml
+@@ -30,6 +30,51 @@ aliases:
+   routing_memory:
+     canonical: RoutingMemory
+     kind: routing_telemetry_alias
++  dharma_forge_proving_ground:
++    canonical: DharmaForgeProvingGround
++    kind: system_alias
++  dharma-forge-proving-ground:
++    canonical: DharmaForgeProvingGround
++    kind: system_alias
++  forge_proving_ground:
++    canonical: DharmaForgeProvingGround
++    kind: system_alias
++  forge-proving-ground:
++    canonical: DharmaForgeProvingGround
++    kind: system_alias
++  "Dharma Forge Proving Ground":
++    canonical: DharmaForgeProvingGround
++    kind: display_alias
++  "Forge Proving Ground":
++    canonical: DharmaForgeProvingGround
++    kind: operator_alias
++  "run the Dharma Forge Proving Ground":
++    canonical: DharmaForgeProvingGround
++    kind: preferred_operator_phrase
++  "run the Forge Proving Ground":
++    canonical: DharmaForgeProvingGround
++    kind: preferred_operator_phrase
++  "run the canonical Forge Proving Ground external loop":
++    canonical: DharmaForgeProvingGround
++    kind: preferred_operator_phrase
++  dharma_forge:
++    canonical: DharmaForgeProvingGround
++    kind: legacy_alias
++  dharma-forge:
++    canonical: DharmaForgeProvingGround
++    kind: legacy_alias
++  "Dharma Forge":
++    canonical: DharmaForgeProvingGround
++    kind: legacy_alias
++  forge:
++    canonical: DharmaForgeProvingGround
++    kind: legacy_alias
++  Forge:
++    canonical: DharmaForgeProvingGround
++    kind: legacy_alias
++  "run Forge":
++    canonical: DharmaForgeProvingGround
++    kind: deprecated_operator_phrase
+   "parallel model routing layer":
+     canonical: ModelKeyRouting
+     kind: deprecated_pattern
+diff --git a/docs/ontology/semantic_objects.yaml b/docs/ontology/semantic_objects.yaml
+index 23939c2d7..13ba2c373 100644
+--- a/docs/ontology/semantic_objects.yaml
++++ b/docs/ontology/semantic_objects.yaml
+@@ -75,6 +75,24 @@ objects:
+     kind: routing_telemetry
+     owner: dharma_swarm/routing_memory.py
+     description: Provider-learning evidence store for route outcomes; telemetry, not semantic canon.
++  DharmaForgeProvingGround:
++    kind: evolution_proving_ground
++    owner: docs/governance/FORGE_NAMING_BOUNDARY.md
++    description: Canonical external swarm evolution and benchmark-hardening system that folds the Dharma Forge lineage into a measured Proving Ground.
++    preferred_operator_phrases:
++      - run the Dharma Forge Proving Ground
++      - run the Forge Proving Ground
++      - run the canonical Forge Proving Ground external loop
++    legacy_aliases:
++      - Dharma Forge
++      - Forge
++      - run Forge
++    subsystems:
++      - Forge Arena
++      - Forge Swarm Evolution Arena v0
++      - External Benchmark Loop
++    forbidden_merges:
++      - Pudgala Autopoiesis Protostar
+   IntelligenceSupplyChainRawReceipt:
+     kind: evidence_receipt
+     owner: dharma_swarm.world_radar.bronze
+diff --git a/tests/test_forge_naming_boundary.py b/tests/test_forge_naming_boundary.py
+index 43ada38bc..c5501868f 100644
+--- a/tests/test_forge_naming_boundary.py
++++ b/tests/test_forge_naming_boundary.py
+@@ -1,12 +1,16 @@
+-"""Guard the naming boundary between Dharma Forge and the anti-slop mechanism."""
++"""Guard the Forge Proving Ground and anti-slop naming boundary."""
+ from __future__ import annotations
+ 
+ import subprocess
+ from pathlib import Path
+ 
++import yaml
++
+ 
+ REPO_ROOT = Path(__file__).resolve().parents[1]
+ BOUNDARY_DOC = REPO_ROOT / "docs/governance/FORGE_NAMING_BOUNDARY.md"
++OBJECTS = REPO_ROOT / "docs/ontology/semantic_objects.yaml"
++ALIASES = REPO_ROOT / "docs/ontology/semantic_aliases.yaml"
+ 
+ 
+ def _tracked_files() -> list[Path]:
+@@ -22,10 +26,26 @@ def _tracked_files() -> list[Path]:
+ 
+ def test_forge_boundary_doc_names_both_surfaces() -> None:
+     text = BOUNDARY_DOC.read_text(encoding="utf-8")
++    assert "Dharma Forge Proving Ground" in text
+     assert "Dharma Forge" in text
+     assert "Pudgala Autopoiesis Protostar" in text
+     assert "Forge Swarm Evolution Arena" in text
+     assert "graded claim/evidence binding" in text
++    assert "run the Forge Proving Ground" in text
++
++
++def test_forge_proving_ground_registered_in_semantic_commons() -> None:
++    objects = yaml.safe_load(OBJECTS.read_text(encoding="utf-8"))
++    aliases = yaml.safe_load(ALIASES.read_text(encoding="utf-8"))
++
++    forge = objects["objects"]["DharmaForgeProvingGround"]
++    assert forge["kind"] == "evolution_proving_ground"
++    assert "Pudgala Autopoiesis Protostar" in forge["forbidden_merges"]
++    assert (
++        aliases["aliases"]["run the Forge Proving Ground"]["canonical"]
++        == "DharmaForgeProvingGround"
++    )
++    assert aliases["aliases"]["run Forge"]["kind"] == "deprecated_operator_phrase"
+ 
+ 
+ def test_old_pudgala_quality_name_is_not_reintroduced() -> None:

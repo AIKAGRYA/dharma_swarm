@@ -11,10 +11,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from dharma_swarm.fractal.fractal_room import (
-    FractalRoom,
     RoomKind,
-    RoomRegistry,
-    RoomStatus,
     VentureCellV1,
     WorkPacket,
     evaluate_kill_conditions,
@@ -27,6 +24,7 @@ from dharma_swarm.fractal.room_configs import (
     bootstrap_registry,
     make_agentops_room,
     make_core_ops_room,
+    make_livelihood_loom_cell,
     make_revenue_wedge_cell,
 )
 from dharma_swarm.fractal.room_health import room_runtime_kpis, run_room_health_watcher
@@ -123,33 +121,55 @@ class TestAgentOpsRoom:
         assert room.parent_id == "core-ops"
 
 
+class TestLivelihoodLoomCell:
+
+    def test_valid(self):
+        cell = make_livelihood_loom_cell()
+        validate_venture_cell(cell)
+
+    def test_is_separate_jagat_kalyan_venture_cell(self):
+        cell = make_livelihood_loom_cell()
+        assert cell.id == "livelihood-loom"
+        assert cell.kind == RoomKind.VENTURE_CELL
+        assert cell.parent_id == "core-ops"
+        assert "vulnerability into alpha" in cell.jagat_kalyan_constraint
+
+    def test_has_livelihood_specific_safety_boundaries(self):
+        cell = make_livelihood_loom_cell()
+        assert "worker surveillance" in cell.forbidden_work
+        assert "raw data sale" in cell.forbidden_work
+        assert "trading alpha extraction" in cell.forbidden_work
+        assert "publication" in cell.approval_required_for
+        assert "payment" in cell.approval_required_for
+
+
 # -----------------------------------------------------------------------
 # Registry bootstrap
 # -----------------------------------------------------------------------
 
 class TestBootstrapRegistry:
 
-    def test_creates_3_rooms(self):
+    def test_creates_4_rooms(self):
         registry = bootstrap_registry()
-        assert len(registry.all_rooms()) == 3
+        assert len(registry.all_rooms()) == 4
 
     def test_hierarchy(self):
         registry = bootstrap_registry()
         children = registry.children_of("core-ops")
         child_ids = {c.id for c in children}
         assert "revenue-wedge" in child_ids
+        assert "livelihood-loom" in child_ids
         assert "agentops" in child_ids
 
     def test_all_active(self):
         registry = bootstrap_registry()
         active = registry.active_rooms()
-        assert len(active) == 3
+        assert len(active) == 4
 
     def test_venture_cells_count(self):
         registry = bootstrap_registry()
         vcs = registry.venture_cells()
-        assert len(vcs) == 1
-        assert vcs[0].id == "revenue-wedge"
+        assert {vc.id for vc in vcs} == {"revenue-wedge", "livelihood-loom"}
 
 
 # -----------------------------------------------------------------------
@@ -226,8 +246,8 @@ class TestRevenueWedgeBrief:
     def test_summary_line(self):
         registry = bootstrap_registry()
         line = render_room_summary_line(registry)
-        assert "3 active" in line
-        assert "1 venture cells" in line
+        assert "4 active" in line
+        assert "2 venture cells" in line
 
     def test_room_section_includes_revenue_wedge(self):
         registry = bootstrap_registry()
@@ -235,6 +255,12 @@ class TestRevenueWedgeBrief:
         assert "revenue-wedge" in section
         assert "venture_cell" in section
         assert "self-funding" in section.lower()
+
+    def test_room_section_includes_livelihood_loom(self):
+        registry = bootstrap_registry()
+        section = render_room_section(registry)
+        assert "livelihood-loom" in section
+        assert "livelihood" in section.lower()
 
     def test_room_section_shows_core_ops(self):
         registry = bootstrap_registry()

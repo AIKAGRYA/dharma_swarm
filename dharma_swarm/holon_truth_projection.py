@@ -17,6 +17,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.holon_canonical_state import (
+    CANONICAL_STATE_SCHEMA_VERSION,
+    L4_SERVICE_ID,
+    SEMANTIC_RESPONDER_LAUNCHD_LABEL,
+    build_canonical_holon_state,
+    project_canonical_holon_state,
+)
 from dharma_swarm.living_dock_verifier import verify_living_dock
 from dharma_swarm.runtime_state import (
     ArtifactRecord,
@@ -28,6 +35,7 @@ from dharma_swarm.spine.identity import ExecutionIdentity
 
 PROJECTION_SCHEMA_VERSION = "dharma.holon_receipt_projection.v1"
 SOURCE_RECEIPT_SCHEMA_VERSION = "holon.runtime_receipt.v1"
+CODEX_COMPOSER_AGENT_UID = "codex_composer"
 
 _SAFE_ID_RE = re.compile(r"[^A-Za-z0-9_.:-]+")
 
@@ -49,6 +57,105 @@ class HolonReceiptProjection:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+def codex_composer_canonical_state_path(
+    *,
+    dharma_home: Path | str | None = None,
+    state_root: Path | str | None = None,
+) -> Path:
+    """Return the canonical fleet state path for ``codex_composer``."""
+
+    root = _state_root(dharma_home=dharma_home, state_root=state_root)
+    return root / f"{CODEX_COMPOSER_AGENT_UID}.json"
+
+
+def build_codex_composer_canonical_state(
+    *,
+    dharma_home: Path | str | None = None,
+    repo_root: Path | str | None = None,
+    state_root: Path | str | None = None,
+    agents_root: Path | str | None = None,
+    bridge_heartbeat_path: Path | str | None = None,
+    responder_heartbeat_path: Path | str | None = None,
+    responder_receipt_dir: Path | str | None = None,
+    domain_reply_receipt_dir: Path | str | None = None,
+    semantic_drain_receipt_dir: Path | str | None = None,
+    now: datetime | None = None,
+    bridge_fresh_after_seconds: int = 3600,
+    responder_fresh_after_seconds: int = 300,
+    l4_fresh_after_seconds: int = 3600,
+    launchd_label: str = SEMANTIC_RESPONDER_LAUNCHD_LABEL,
+    launchd_pid: int | None = None,
+    service_id: str = L4_SERVICE_ID,
+) -> dict[str, Any]:
+    """Build Codex Composer state through the shared canonical writer."""
+
+    del repo_root, bridge_heartbeat_path, responder_heartbeat_path
+    del domain_reply_receipt_dir, semantic_drain_receipt_dir
+    a2a_bus = _a2a_bus_from_roots(dharma_home=dharma_home, state_root=state_root)
+    agent_root = _agents_root(dharma_home=dharma_home, agents_root=agents_root)
+    return build_canonical_holon_state(
+        CODEX_COMPOSER_AGENT_UID,
+        agents_root=agent_root,
+        a2a_bus=a2a_bus,
+        semantic_responder_state_dir=_responder_state_dir(
+            responder_receipt_dir,
+            dharma_home=dharma_home,
+        ),
+        service_id=service_id,
+        launchd_label=launchd_label,
+        pid=launchd_pid,
+        now=now,
+        bridge_fresh_after_seconds=bridge_fresh_after_seconds,
+        responder_fresh_after_seconds=responder_fresh_after_seconds,
+        l4_fresh_after_seconds=l4_fresh_after_seconds,
+        live_model_call_claimed=False,
+    )
+
+
+def write_codex_composer_canonical_state(
+    *,
+    dharma_home: Path | str | None = None,
+    repo_root: Path | str | None = None,
+    state_root: Path | str | None = None,
+    agents_root: Path | str | None = None,
+    bridge_heartbeat_path: Path | str | None = None,
+    responder_heartbeat_path: Path | str | None = None,
+    responder_receipt_dir: Path | str | None = None,
+    domain_reply_receipt_dir: Path | str | None = None,
+    semantic_drain_receipt_dir: Path | str | None = None,
+    now: datetime | None = None,
+    bridge_fresh_after_seconds: int = 3600,
+    responder_fresh_after_seconds: int = 300,
+    l4_fresh_after_seconds: int = 3600,
+    launchd_label: str = SEMANTIC_RESPONDER_LAUNCHD_LABEL,
+    launchd_pid: int | None = None,
+    service_id: str = L4_SERVICE_ID,
+) -> dict[str, Any]:
+    """Write Codex Composer state through the shared canonical writer."""
+
+    del repo_root, bridge_heartbeat_path, responder_heartbeat_path
+    del domain_reply_receipt_dir, semantic_drain_receipt_dir
+    a2a_bus = _a2a_bus_from_roots(dharma_home=dharma_home, state_root=state_root)
+    agent_root = _agents_root(dharma_home=dharma_home, agents_root=agents_root)
+    return project_canonical_holon_state(
+        CODEX_COMPOSER_AGENT_UID,
+        agents_root=agent_root,
+        a2a_bus=a2a_bus,
+        semantic_responder_state_dir=_responder_state_dir(
+            responder_receipt_dir,
+            dharma_home=dharma_home,
+        ),
+        service_id=service_id,
+        launchd_label=launchd_label,
+        pid=launchd_pid,
+        now=now,
+        bridge_fresh_after_seconds=bridge_fresh_after_seconds,
+        responder_fresh_after_seconds=responder_fresh_after_seconds,
+        l4_fresh_after_seconds=l4_fresh_after_seconds,
+        live_model_call_claimed=False,
+    )
 
 
 def project_holon_receipt(
@@ -255,6 +362,67 @@ def project_holon_receipt_dir(
             )
         )
     return projections
+
+
+def _state_root(
+    *,
+    dharma_home: Path | str | None = None,
+    state_root: Path | str | None = None,
+) -> Path:
+    if state_root is not None:
+        return Path(state_root).expanduser().resolve()
+    home = (
+        Path(dharma_home).expanduser().resolve()
+        if dharma_home
+        else Path.home() / ".dharma"
+    )
+    return home / "a2a_bus" / "state"
+
+
+def _a2a_bus_from_roots(
+    *,
+    dharma_home: Path | str | None = None,
+    state_root: Path | str | None = None,
+) -> Path | None:
+    if state_root is not None:
+        return Path(state_root).expanduser().resolve().parent
+    if dharma_home is not None:
+        return Path(dharma_home).expanduser().resolve() / "a2a_bus"
+    return None
+
+
+def _agents_root(
+    *,
+    dharma_home: Path | str | None = None,
+    agents_root: Path | str | None = None,
+) -> Path | None:
+    if agents_root is not None:
+        return Path(agents_root).expanduser().resolve()
+    if dharma_home is not None:
+        return Path(dharma_home).expanduser().resolve() / "agents"
+    return None
+
+
+def _responder_state_dir(
+    responder_receipt_dir: Path | str | None,
+    *,
+    dharma_home: Path | str | None = None,
+) -> Path | None:
+    if responder_receipt_dir is None:
+        home = (
+            Path(dharma_home).expanduser().resolve()
+            if dharma_home
+            else Path.home() / ".dharma"
+        )
+        return (
+            home
+            / "external_agents"
+            / CODEX_COMPOSER_AGENT_UID
+            / "nest"
+            / "semantic_responder"
+        )
+    path = Path(responder_receipt_dir).expanduser().resolve()
+    return path.parent if path.name == "receipts" else path
 
 
 def _read_receipt(path: Path) -> dict[str, Any]:
@@ -474,8 +642,13 @@ def _runtime_receipt_exists(store: RuntimeStateStore, receipt_id: str) -> bool:
 
 
 __all__ = [
+    "CANONICAL_STATE_SCHEMA_VERSION",
+    "CODEX_COMPOSER_AGENT_UID",
     "HolonReceiptProjection",
     "PROJECTION_SCHEMA_VERSION",
+    "build_codex_composer_canonical_state",
+    "codex_composer_canonical_state_path",
     "project_holon_receipt",
     "project_holon_receipt_dir",
+    "write_codex_composer_canonical_state",
 ]

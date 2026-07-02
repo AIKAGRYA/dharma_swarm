@@ -486,6 +486,76 @@ aliases:
     status: active
     kind: phrase
 
+  - alias: Operator Idea Spark
+    canonical_id: semobj.operator_idea_spark
+    status: active
+    kind: display
+  - alias: operator idea spark
+    canonical_id: semobj.operator_idea_spark
+    status: active
+    kind: phrase
+  - alias: idea spark
+    canonical_id: semobj.operator_idea_spark
+    status: active
+    kind: phrase
+  - alias: idea-spark
+    canonical_id: semobj.operator_idea_spark
+    status: active
+    kind: slug
+  - alias: idea_spark
+    canonical_id: semobj.operator_idea_spark
+    status: active
+    kind: token
+  - alias: IdeaSparkCandidate
+    canonical_id: semobj.operator_idea_spark
+    status: active
+    kind: display
+  - alias: OperatorInputReceipt
+    canonical_id: semobj.operator_idea_spark
+    status: active
+    kind: display
+  - alias: operator input receipt
+    canonical_id: semobj.operator_idea_spark
+    status: active
+    kind: phrase
+  - alias: idea spark ingest
+    canonical_id: semobj.operator_idea_spark
+    status: active
+    kind: phrase
+
+  - alias: RevenueWedgePipeline
+    canonical_id: semobj.revenue_wedge_pipeline
+    status: active
+    kind: display
+  - alias: Revenue Wedge Pipeline
+    canonical_id: semobj.revenue_wedge_pipeline
+    status: active
+    kind: phrase
+  - alias: revenue wedge pipeline
+    canonical_id: semobj.revenue_wedge_pipeline
+    status: active
+    kind: phrase
+  - alias: revenue-wedge-pipeline
+    canonical_id: semobj.revenue_wedge_pipeline
+    status: active
+    kind: slug
+  - alias: revenue_wedge_pipeline
+    canonical_id: semobj.revenue_wedge_pipeline
+    status: active
+    kind: token
+  - alias: Revenue Wedge
+    canonical_id: semobj.revenue_wedge_pipeline
+    status: active
+    kind: phrase
+  - alias: revenue wedge
+    canonical_id: semobj.revenue_wedge_pipeline
+    status: active
+    kind: phrase
+  - alias: wedge pipeline
+    canonical_id: semobj.revenue_wedge_pipeline
+    status: active
+    kind: phrase
+
   - alias: OpenClaw
     canonical_id: semobj.openclaw_integration
     status: active
@@ -593,6 +663,23 @@ aliases:
     kind: slug
   - alias: codex_telos
     canonical_id: semobj.codex_telos
+    status: active
+    kind: token
+
+  - alias: LivelihoodLoomCEO
+    canonical_id: semobj.livelihood_loom_ceo
+    status: active
+    kind: display
+  - alias: Livelihood Loom CEO
+    canonical_id: semobj.livelihood_loom_ceo
+    status: active
+    kind: phrase
+  - alias: livelihood-loom-ceo
+    canonical_id: semobj.livelihood_loom_ceo
+    status: active
+    kind: slug
+  - alias: livelihood_loom_ceo
+    canonical_id: semobj.livelihood_loom_ceo
     status: active
     kind: token
 
@@ -862,6 +949,47 @@ aliases:
     status: active
     kind: command
 
+  - alias: A2AConsumerLivenessProjection
+    canonical_id: semobj.a2a_consumer_liveness_projection
+    status: active
+    kind: display
+  - alias: A2A Consumer Liveness Projection
+    canonical_id: semobj.a2a_consumer_liveness_projection
+    status: active
+    kind: phrase
+  - alias: a2a consumer liveness projection
+    canonical_id: semobj.a2a_consumer_liveness_projection
+    status: active
+    kind: phrase
+  - alias: a2a-consumer-liveness-projection
+    canonical_id: semobj.a2a_consumer_liveness_projection
+    status: active
+    kind: slug
+  - alias: a2a_consumer_liveness_projection
+    canonical_id: semobj.a2a_consumer_liveness_projection
+    status: active
+    kind: token
+  - alias: consumer-liveness projection
+    canonical_id: semobj.a2a_consumer_liveness_projection
+    status: active
+    kind: phrase
+  - alias: consumer-liveness-projection
+    canonical_id: semobj.a2a_consumer_liveness_projection
+    status: active
+    kind: slug
+  - alias: consumer_liveness_projection
+    canonical_id: semobj.a2a_consumer_liveness_projection
+    status: active
+    kind: token
+  - alias: write-only bus
+    canonical_id: semobj.a2a_consumer_liveness_projection
+    status: active
+    kind: phrase
+  - alias: dark inboxes
+    canonical_id: semobj.a2a_consumer_liveness_projection
+    status: active
+    kind: phrase
+
   - alias: DharmaForgeProvingGround
     canonical_id: semobj.dharma_forge_proving_ground
     status: active
@@ -1039,3 +1167,12 @@ forbidden_aliases:
   - alias: Pudgala Forge
     canonical_id: semobj.dharma_forge_proving_ground
     reason: Do not merge the Forge Proving Ground benchmark/evolution contract with Pudgala anti-slop governance.
+  - alias: autonomous livelihood lender
+    canonical_id: semobj.livelihood_loom_ceo
+    reason: Livelihood Loom CEO cannot make lending or investment decisions.
+  - alias: informal economy alpha desk
+    canonical_id: semobj.livelihood_loom_ceo
+    reason: Livelihood Loom exists for jagat_kalyan and public welfare proof, not trading alpha.
+  - alias: worker data monetization agent
+    canonical_id: semobj.livelihood_loom_ceo
+    reason: The CEO cannot sell data or use private worker records for capital extraction.

@@ -26,19 +26,32 @@ import httpx
 
 from dharma_swarm.api_keys import (
     ANTHROPIC_API_KEY_ENV,
+    CEREBRAS_BASE_URL_ENV,
     CEREBRAS_API_KEY_ENV,
+    CHUTES_BASE_URL_ENV,
     CHUTES_API_KEY_ENV,
+    FIREWORKS_BASE_URL_ENV,
     FIREWORKS_API_KEY_ENV,
+    GOOGLE_AI_BASE_URL_ENV,
     GOOGLE_AI_API_KEY_ENV,
+    GROQ_BASE_URL_ENV,
     GROQ_API_KEY_ENV,
+    MISTRAL_BASE_URL_ENV,
     MISTRAL_API_KEY_ENV,
+    NVIDIA_NIM_BASE_URL_ENV,
     NVIDIA_NIM_API_KEY_ENV,
     OLLAMA_API_KEY_ENV,
+    OPENAI_BASE_URL_ENV,
     OPENAI_API_KEY_ENV,
+    OPENROUTER_BASE_URL_ENV,
     OPENROUTER_API_KEY_ENV,
+    SAMBANOVA_BASE_URL_ENV,
     SAMBANOVA_API_KEY_ENV,
+    SILICONFLOW_BASE_URL_ENV,
     SILICONFLOW_API_KEY_ENV,
+    TOGETHER_BASE_URL_ENV,
     TOGETHER_API_KEY_ENV,
+    env_value,
 )
 from dharma_swarm.base_provider import BaseProvider, ProviderCapabilities
 from dharma_swarm.codex_cli import dgc_codex_exec_prefix
@@ -85,6 +98,41 @@ from dharma_swarm.telemetry_plane import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+OPENAI_COMPATIBLE_BASE_URLS: dict[ProviderType, str] = {
+    ProviderType.OPENAI: "https://api.openai.com/v1",
+    ProviderType.OPENROUTER: "https://openrouter.ai/api/v1",
+    ProviderType.OPENROUTER_FREE: "https://openrouter.ai/api/v1",
+    ProviderType.GROQ: "https://api.groq.com/openai/v1",
+    ProviderType.CEREBRAS: "https://api.cerebras.ai/v1",
+    ProviderType.SILICONFLOW: "https://api.siliconflow.cn/v1",
+    ProviderType.TOGETHER: "https://api.together.xyz/v1",
+    ProviderType.FIREWORKS: "https://api.fireworks.ai/inference/v1",
+    ProviderType.GOOGLE_AI: "https://generativelanguage.googleapis.com/v1beta/openai/",
+    ProviderType.SAMBANOVA: "https://api.sambanova.ai/v1",
+    ProviderType.MISTRAL: "https://api.mistral.ai/v1",
+    ProviderType.CHUTES: "https://api.chutes.ai/v1",
+}
+
+
+def _configured_value(explicit: str | None, env_var: str) -> str | None:
+    return explicit or env_value(env_var)
+
+
+def _configured_base_url(
+    explicit: str | None,
+    env_var: str,
+    default: str,
+) -> str:
+    return str(explicit or env_value(env_var) or default).rstrip("/")
+
+
+def _configured_timeout(
+    timeout_seconds: float | int | None,
+    default: float = 120.0,
+) -> float:
+    return float(timeout_seconds if timeout_seconds is not None else default)
 
 
 class ProviderChainExecutionError(RuntimeError):
@@ -266,7 +314,7 @@ class AnthropicProvider(LLMProvider):
     )
 
     def __init__(self, api_key: str | None = None) -> None:
-        self._api_key = api_key or os.environ.get(ANTHROPIC_API_KEY_ENV)
+        self._api_key = _configured_value(api_key, ANTHROPIC_API_KEY_ENV)
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -332,8 +380,19 @@ class OpenAIProvider(LLMProvider):
         max_context_tokens=128_000, provider_family="openai",
     )
 
-    def __init__(self, api_key: str | None = None) -> None:
-        self._api_key = api_key or os.environ.get(OPENAI_API_KEY_ENV)
+    def __init__(
+        self,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        timeout_seconds: float | int | None = None,
+    ) -> None:
+        self._api_key = _configured_value(api_key, OPENAI_API_KEY_ENV)
+        self._base_url = _configured_base_url(
+            base_url,
+            OPENAI_BASE_URL_ENV,
+            OPENAI_COMPATIBLE_BASE_URLS[ProviderType.OPENAI],
+        )
+        self._timeout_seconds = _configured_timeout(timeout_seconds)
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -345,7 +404,11 @@ class OpenAIProvider(LLMProvider):
             from openai import AsyncOpenAI
         except ImportError as exc:
             raise ImportError("pip install openai") from exc
-        self._client = AsyncOpenAI(api_key=self._api_key)
+        self._client = AsyncOpenAI(
+            api_key=self._api_key,
+            base_url=self._base_url,
+            timeout=self._timeout_seconds,
+        )
         return self._client
 
     @staticmethod
@@ -412,8 +475,19 @@ class OpenRouterProvider(LLMProvider):
         max_context_tokens=128_000, provider_family="openrouter",
     )
 
-    def __init__(self, api_key: str | None = None) -> None:
-        self._api_key = api_key or os.environ.get(OPENROUTER_API_KEY_ENV)
+    def __init__(
+        self,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        timeout_seconds: float | int | None = None,
+    ) -> None:
+        self._api_key = _configured_value(api_key, OPENROUTER_API_KEY_ENV)
+        self._base_url = _configured_base_url(
+            base_url,
+            OPENROUTER_BASE_URL_ENV,
+            OPENAI_COMPATIBLE_BASE_URLS[ProviderType.OPENROUTER],
+        )
+        self._timeout_seconds = _configured_timeout(timeout_seconds)
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -427,7 +501,8 @@ class OpenRouterProvider(LLMProvider):
             raise ImportError("pip install openai") from exc
         self._client = AsyncOpenAI(
             api_key=self._api_key,
-            base_url="https://openrouter.ai/api/v1",
+            base_url=self._base_url,
+            timeout=self._timeout_seconds,
         )
         return self._client
 
@@ -496,14 +571,16 @@ class NVIDIANIMProvider(LLMProvider):
         api_key: str | None = None,
         base_url: str | None = None,
         default_model: str | None = None,
+        timeout_seconds: float | int | None = None,
     ) -> None:
-        self._api_key = api_key or os.environ.get(NVIDIA_NIM_API_KEY_ENV)
+        self._api_key = _configured_value(api_key, NVIDIA_NIM_API_KEY_ENV)
         self._base_url = (
             base_url
-            or os.environ.get("NVIDIA_NIM_BASE_URL")
+            or env_value(NVIDIA_NIM_BASE_URL_ENV)
             or "https://integrate.api.nvidia.com/v1"
         ).rstrip("/")
         self._default_model = default_model or canonical_default_model(ProviderType.NVIDIA_NIM)
+        self._timeout_seconds = _configured_timeout(timeout_seconds)
         self._client: httpx.AsyncClient | None = None
 
     @staticmethod
@@ -525,7 +602,7 @@ class NVIDIANIMProvider(LLMProvider):
     def _get_client(self) -> httpx.AsyncClient:
         """Return a persistent httpx client, creating one if needed."""
         if self._client is None or self._client.is_closed:
-            self._client = httpx.AsyncClient(timeout=120.0)
+            self._client = httpx.AsyncClient(timeout=self._timeout_seconds)
         return self._client
 
     async def close(self) -> None:
@@ -830,9 +907,21 @@ class OpenRouterFreeProvider(LLMProvider):
             await cls._discover_free_models()
         return list(cls._discovered_models)
 
-    def __init__(self, api_key: str | None = None, model: str | None = None) -> None:
-        self._api_key = api_key or os.environ.get(OPENROUTER_API_KEY_ENV)
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str | None = None,
+        base_url: str | None = None,
+        timeout_seconds: float | int | None = None,
+    ) -> None:
+        self._api_key = _configured_value(api_key, OPENROUTER_API_KEY_ENV)
         self._preferred_model = model  # May be None — resolved at call time
+        self._base_url = _configured_base_url(
+            base_url,
+            OPENROUTER_BASE_URL_ENV,
+            OPENAI_COMPATIBLE_BASE_URLS[ProviderType.OPENROUTER_FREE],
+        )
+        self._timeout_seconds = _configured_timeout(timeout_seconds)
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -846,7 +935,8 @@ class OpenRouterFreeProvider(LLMProvider):
             raise ImportError("pip install openai") from exc
         self._client = AsyncOpenAI(
             api_key=self._api_key,
-            base_url="https://openrouter.ai/api/v1",
+            base_url=self._base_url,
+            timeout=self._timeout_seconds,
         )
         return self._client
 
@@ -951,11 +1041,13 @@ class OllamaProvider(LLMProvider):
         base_url: str | None = None,
         model: str | None = None,
         api_key: str | None = None,
+        timeout_seconds: float | int | None = None,
     ) -> None:
-        self._api_key = api_key or os.environ.get(OLLAMA_API_KEY_ENV)
+        self._api_key = _configured_value(api_key, OLLAMA_API_KEY_ENV)
         self._base_url = resolve_ollama_base_url(base_url=base_url, api_key=self._api_key)
         self._model = resolve_ollama_model(model, base_url=self._base_url, api_key=self._api_key)
         self._transport_mode = ollama_transport_mode(base_url=self._base_url, api_key=self._api_key)
+        self._timeout_seconds = _configured_timeout(timeout_seconds)
         self._client: httpx.AsyncClient | None = None
 
     @property
@@ -973,7 +1065,7 @@ class OllamaProvider(LLMProvider):
     def _get_client(self) -> httpx.AsyncClient:
         """Return a persistent httpx client, creating one if needed."""
         if self._client is None or self._client.is_closed:
-            self._client = httpx.AsyncClient(timeout=120.0)
+            self._client = httpx.AsyncClient(timeout=self._timeout_seconds)
         return self._client
 
     async def close(self) -> None:
@@ -1195,8 +1287,19 @@ class GroqProvider(LLMProvider):
         max_context_tokens=131_072, provider_family="groq",
     )
 
-    def __init__(self, api_key: str | None = None) -> None:
-        self._api_key = api_key or os.environ.get(GROQ_API_KEY_ENV)
+    def __init__(
+        self,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        timeout_seconds: float | int | None = None,
+    ) -> None:
+        self._api_key = _configured_value(api_key, GROQ_API_KEY_ENV)
+        self._base_url = _configured_base_url(
+            base_url,
+            GROQ_BASE_URL_ENV,
+            OPENAI_COMPATIBLE_BASE_URLS[ProviderType.GROQ],
+        )
+        self._timeout_seconds = _configured_timeout(timeout_seconds)
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -1210,7 +1313,8 @@ class GroqProvider(LLMProvider):
             raise ImportError("pip install openai") from exc
         self._client = AsyncOpenAI(
             api_key=self._api_key,
-            base_url="https://api.groq.com/openai/v1",
+            base_url=self._base_url,
+            timeout=self._timeout_seconds,
         )
         return self._client
 
@@ -1269,8 +1373,19 @@ class CerebrasProvider(LLMProvider):
         max_context_tokens=131_072, provider_family="cerebras",
     )
 
-    def __init__(self, api_key: str | None = None) -> None:
-        self._api_key = api_key or os.environ.get(CEREBRAS_API_KEY_ENV)
+    def __init__(
+        self,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        timeout_seconds: float | int | None = None,
+    ) -> None:
+        self._api_key = _configured_value(api_key, CEREBRAS_API_KEY_ENV)
+        self._base_url = _configured_base_url(
+            base_url,
+            CEREBRAS_BASE_URL_ENV,
+            OPENAI_COMPATIBLE_BASE_URLS[ProviderType.CEREBRAS],
+        )
+        self._timeout_seconds = _configured_timeout(timeout_seconds)
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -1284,7 +1399,8 @@ class CerebrasProvider(LLMProvider):
             raise ImportError("pip install openai") from exc
         self._client = AsyncOpenAI(
             api_key=self._api_key,
-            base_url="https://api.cerebras.ai/v1",
+            base_url=self._base_url,
+            timeout=self._timeout_seconds,
         )
         return self._client
 
@@ -1343,8 +1459,19 @@ class SiliconFlowProvider(LLMProvider):
         max_context_tokens=262_144, provider_family="siliconflow",
     )
 
-    def __init__(self, api_key: str | None = None) -> None:
-        self._api_key = api_key or os.environ.get(SILICONFLOW_API_KEY_ENV)
+    def __init__(
+        self,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        timeout_seconds: float | int | None = None,
+    ) -> None:
+        self._api_key = _configured_value(api_key, SILICONFLOW_API_KEY_ENV)
+        self._base_url = _configured_base_url(
+            base_url,
+            SILICONFLOW_BASE_URL_ENV,
+            OPENAI_COMPATIBLE_BASE_URLS[ProviderType.SILICONFLOW],
+        )
+        self._timeout_seconds = _configured_timeout(timeout_seconds)
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -1358,7 +1485,8 @@ class SiliconFlowProvider(LLMProvider):
             raise ImportError("pip install openai") from exc
         self._client = AsyncOpenAI(
             api_key=self._api_key,
-            base_url="https://api.siliconflow.cn/v1",
+            base_url=self._base_url,
+            timeout=self._timeout_seconds,
         )
         return self._client
 
@@ -1417,8 +1545,19 @@ class TogetherProvider(LLMProvider):
         max_context_tokens=262_144, provider_family="together",
     )
 
-    def __init__(self, api_key: str | None = None) -> None:
-        self._api_key = api_key or os.environ.get(TOGETHER_API_KEY_ENV)
+    def __init__(
+        self,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        timeout_seconds: float | int | None = None,
+    ) -> None:
+        self._api_key = _configured_value(api_key, TOGETHER_API_KEY_ENV)
+        self._base_url = _configured_base_url(
+            base_url,
+            TOGETHER_BASE_URL_ENV,
+            OPENAI_COMPATIBLE_BASE_URLS[ProviderType.TOGETHER],
+        )
+        self._timeout_seconds = _configured_timeout(timeout_seconds)
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -1432,7 +1571,8 @@ class TogetherProvider(LLMProvider):
             raise ImportError("pip install openai") from exc
         self._client = AsyncOpenAI(
             api_key=self._api_key,
-            base_url="https://api.together.xyz/v1",
+            base_url=self._base_url,
+            timeout=self._timeout_seconds,
         )
         return self._client
 
@@ -1491,8 +1631,19 @@ class FireworksProvider(LLMProvider):
         max_context_tokens=262_144, provider_family="fireworks",
     )
 
-    def __init__(self, api_key: str | None = None) -> None:
-        self._api_key = api_key or os.environ.get(FIREWORKS_API_KEY_ENV)
+    def __init__(
+        self,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        timeout_seconds: float | int | None = None,
+    ) -> None:
+        self._api_key = _configured_value(api_key, FIREWORKS_API_KEY_ENV)
+        self._base_url = _configured_base_url(
+            base_url,
+            FIREWORKS_BASE_URL_ENV,
+            OPENAI_COMPATIBLE_BASE_URLS[ProviderType.FIREWORKS],
+        )
+        self._timeout_seconds = _configured_timeout(timeout_seconds)
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -1506,7 +1657,8 @@ class FireworksProvider(LLMProvider):
             raise ImportError("pip install openai") from exc
         self._client = AsyncOpenAI(
             api_key=self._api_key,
-            base_url="https://api.fireworks.ai/inference/v1",
+            base_url=self._base_url,
+            timeout=self._timeout_seconds,
         )
         return self._client
 
@@ -1565,8 +1717,19 @@ class GoogleAIProvider(LLMProvider):
         max_context_tokens=1_000_000, provider_family="google_ai",
     )
 
-    def __init__(self, api_key: str | None = None) -> None:
-        self._api_key = api_key or os.environ.get(GOOGLE_AI_API_KEY_ENV)
+    def __init__(
+        self,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        timeout_seconds: float | int | None = None,
+    ) -> None:
+        self._api_key = _configured_value(api_key, GOOGLE_AI_API_KEY_ENV)
+        self._base_url = _configured_base_url(
+            base_url,
+            GOOGLE_AI_BASE_URL_ENV,
+            OPENAI_COMPATIBLE_BASE_URLS[ProviderType.GOOGLE_AI],
+        )
+        self._timeout_seconds = _configured_timeout(timeout_seconds)
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -1580,7 +1743,8 @@ class GoogleAIProvider(LLMProvider):
             raise ImportError("pip install openai") from exc
         self._client = AsyncOpenAI(
             api_key=self._api_key,
-            base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+            base_url=self._base_url,
+            timeout=self._timeout_seconds,
         )
         return self._client
 
@@ -1639,8 +1803,19 @@ class SambaNovaProvider(LLMProvider):
         max_context_tokens=128_000, provider_family="sambanova",
     )
 
-    def __init__(self, api_key: str | None = None) -> None:
-        self._api_key = api_key or os.environ.get(SAMBANOVA_API_KEY_ENV)
+    def __init__(
+        self,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        timeout_seconds: float | int | None = None,
+    ) -> None:
+        self._api_key = _configured_value(api_key, SAMBANOVA_API_KEY_ENV)
+        self._base_url = _configured_base_url(
+            base_url,
+            SAMBANOVA_BASE_URL_ENV,
+            OPENAI_COMPATIBLE_BASE_URLS[ProviderType.SAMBANOVA],
+        )
+        self._timeout_seconds = _configured_timeout(timeout_seconds)
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -1654,7 +1829,8 @@ class SambaNovaProvider(LLMProvider):
             raise ImportError("pip install openai") from exc
         self._client = AsyncOpenAI(
             api_key=self._api_key,
-            base_url="https://api.sambanova.ai/v1",
+            base_url=self._base_url,
+            timeout=self._timeout_seconds,
         )
         return self._client
 
@@ -1713,8 +1889,19 @@ class MistralProvider(LLMProvider):
         max_context_tokens=128_000, provider_family="mistral",
     )
 
-    def __init__(self, api_key: str | None = None) -> None:
-        self._api_key = api_key or os.environ.get(MISTRAL_API_KEY_ENV)
+    def __init__(
+        self,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        timeout_seconds: float | int | None = None,
+    ) -> None:
+        self._api_key = _configured_value(api_key, MISTRAL_API_KEY_ENV)
+        self._base_url = _configured_base_url(
+            base_url,
+            MISTRAL_BASE_URL_ENV,
+            OPENAI_COMPATIBLE_BASE_URLS[ProviderType.MISTRAL],
+        )
+        self._timeout_seconds = _configured_timeout(timeout_seconds)
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -1728,7 +1915,8 @@ class MistralProvider(LLMProvider):
             raise ImportError("pip install openai") from exc
         self._client = AsyncOpenAI(
             api_key=self._api_key,
-            base_url="https://api.mistral.ai/v1",
+            base_url=self._base_url,
+            timeout=self._timeout_seconds,
         )
         return self._client
 
@@ -1787,8 +1975,19 @@ class ChutesProvider(LLMProvider):
         max_context_tokens=64_000, provider_family="chutes",
     )
 
-    def __init__(self, api_key: str | None = None) -> None:
-        self._api_key = api_key or os.environ.get(CHUTES_API_KEY_ENV)
+    def __init__(
+        self,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        timeout_seconds: float | int | None = None,
+    ) -> None:
+        self._api_key = _configured_value(api_key, CHUTES_API_KEY_ENV)
+        self._base_url = _configured_base_url(
+            base_url,
+            CHUTES_BASE_URL_ENV,
+            OPENAI_COMPATIBLE_BASE_URLS[ProviderType.CHUTES],
+        )
+        self._timeout_seconds = _configured_timeout(timeout_seconds)
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -1802,7 +2001,8 @@ class ChutesProvider(LLMProvider):
             raise ImportError("pip install openai") from exc
         self._client = AsyncOpenAI(
             api_key=self._api_key,
-            base_url="https://api.chutes.ai/v1",
+            base_url=self._base_url,
+            timeout=self._timeout_seconds,
         )
         return self._client
 

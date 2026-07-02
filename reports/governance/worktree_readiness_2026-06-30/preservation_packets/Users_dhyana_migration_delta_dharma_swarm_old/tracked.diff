@@ -1,0 +1,4319 @@
+diff --git a/.gitignore b/.gitignore
+index a6f13ed..0818d27 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -57,9 +57,13 @@ reports/psmv_hyperfiles_20260313/graphs/*.json
+ results.tsv
+ run.log
+ synthesizer_memory.json
++dashboard/audit-data/
++dashboard/audit-screenshots/
++dashboard/smoke-test-*.png
+ dashboard/playwright-report/
+ dashboard/playwright/
+ dashboard/test-results/
+ desktop-shell/src-tauri/target/
+ spec-forge/
++references/adjacent/
+ .superpowers/
+diff --git a/README.md b/README.md
+index 3c52b03..2cef828 100644
+--- a/README.md
++++ b/README.md
+@@ -54,6 +54,7 @@ That report is the fastest way to answer:
+ - The codebase is split across active runtime code and a large documentation/spec corpus; not every markdown file describes shipped behavior.
+ - The most coupled runtime surfaces currently sit in the Python core, especially `dharma_swarm/dgc_cli.py`, `dharma_swarm/swarm.py`, `dharma_swarm/agent_runner.py`, and `dharma_swarm/evolution.py`.
+ - Dashboard and API development are active; expect local changes in `dashboard/`, `api/`, and resident-operator code during ongoing work.
++- `Dockerfile` and `docker-compose.yml` are the legacy Ginko/Swarmlens deploy path.
+ 
+ ## First Places To Look
+ 
+diff --git a/dashboard/src/app/dashboard/catalytic/page.tsx b/dashboard/src/app/dashboard/catalytic/page.tsx
+index 08c6d8d..b7351fc 100644
+--- a/dashboard/src/app/dashboard/catalytic/page.tsx
++++ b/dashboard/src/app/dashboard/catalytic/page.tsx
+@@ -146,6 +146,9 @@ export default function CatalyticPage() {
+             nodes={cosmoNodes}
+             links={cosmoLinks}
+             height={560}
++            linkDirectionalParticles={2}
++            linkDirectionalParticleSpeed={0.004}
++            linkDirectionalParticleColor={colors.kinpaku}
+           />
+         ) : (
+           <div className="flex h-full items-center justify-center">
+diff --git a/dashboard/src/app/dashboard/ecosystem/page.tsx b/dashboard/src/app/dashboard/ecosystem/page.tsx
+index 631e0b3..fc588a5 100644
+--- a/dashboard/src/app/dashboard/ecosystem/page.tsx
++++ b/dashboard/src/app/dashboard/ecosystem/page.tsx
+@@ -338,6 +338,9 @@ export default function EcosystemPage() {
+                 nodes={cosmoNodes}
+                 links={cosmoLinks}
+                 height={graphExpanded ? 760 : 520}
++                linkDirectionalParticles={2}
++                linkDirectionalParticleSpeed={0.004}
++                linkDirectionalParticleColor={colors.aozora}
+                 onClick={(n) => { if (n) setSelectedFile(n.id); }}
+                 onZoom={setZoomLevel}
+               />
+diff --git a/dashboard/src/app/layout.tsx b/dashboard/src/app/layout.tsx
+index 50d4861..1dd9652 100644
+--- a/dashboard/src/app/layout.tsx
++++ b/dashboard/src/app/layout.tsx
+@@ -1,74 +1,29 @@
+ import type { Metadata } from "next";
+ import { Inter, Space_Grotesk, JetBrains_Mono } from "next/font/google";
+ import { Providers } from "./providers";
+-import { Sidebar } from "@/components/layout/Sidebar";
++import { SidebarLayout } from "@/components/layout/SidebarLayout";
+ import { AmbientParticles } from "@/components/layout/AmbientParticles";
+ import { ChatOverlayWrapper } from "@/components/chat/ChatOverlayWrapper";
+ import { CommandPalette } from "@/components/ui/CommandPalette";
+ import "./globals.css";
+ 
+-// ---------------------------------------------------------------------------
+-// Google Fonts
+-// ---------------------------------------------------------------------------
+-
+-const inter = Inter({
+-  subsets: ["latin"],
+-  variable: "--font-inter",
+-  display: "swap",
+-});
+-
+-const spaceGrotesk = Space_Grotesk({
+-  subsets: ["latin"],
+-  variable: "--font-space-grotesk",
+-  display: "swap",
+-});
+-
+-const jetbrainsMono = JetBrains_Mono({
+-  subsets: ["latin"],
+-  variable: "--font-jetbrains-mono",
+-  display: "swap",
+-});
+-
+-// ---------------------------------------------------------------------------
+-// Metadata
+-// ---------------------------------------------------------------------------
++const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
++const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-space-grotesk", display: "swap" });
++const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains-mono", display: "swap" });
+ 
+ export const metadata: Metadata = {
+   title: "DHARMA COMMAND",
+   description: "Neo-Tokyo swarm visualization dashboard",
+ };
+ 
+-// ---------------------------------------------------------------------------
+-// Root layout
+-// ---------------------------------------------------------------------------
+-
+-export default function RootLayout({
+-  children,
+-}: Readonly<{
+-  children: React.ReactNode;
+-}>) {
++export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+   return (
+-    <html
+-      lang="en"
+-      className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
+-    >
++    <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}>
+       <body className="min-h-screen bg-sumi-950 font-body text-torinoko antialiased">
+         <Providers>
+-          {/* Ambient effects */}
+           <AmbientParticles />
+-
+-          {/* Layout shell: sidebar + main */}
+-          <div className="flex min-h-screen">
+-            <Sidebar />
+-            <main className="ml-[260px] flex-1">
+-              {children}
+-            </main>
+-          </div>
+-
+-          {/* Command palette (Cmd+K) */}
++          <SidebarLayout>{children}</SidebarLayout>
+           <CommandPalette />
+-
+-          {/* Floating chat overlay */}
+           <ChatOverlayWrapper />
+         </Providers>
+       </body>
+diff --git a/dashboard/src/components/layout/AmbientParticles.tsx b/dashboard/src/components/layout/AmbientParticles.tsx
+index 6faada2..47a5092 100644
+--- a/dashboard/src/components/layout/AmbientParticles.tsx
++++ b/dashboard/src/components/layout/AmbientParticles.tsx
+@@ -1,13 +1,16 @@
+ "use client";
+ 
+ /**
+- * DHARMA COMMAND -- 20 CSS-animated vertical drift particles.
+- * No canvas -- pure CSS. Pointer-events disabled.
++ * DHARMA COMMAND -- Ambient drift particles.
++ * Phase 2: Particle count and speed driven by real agent activity.
++ * More active agents = more particles, faster drift.
+  */
+ 
+ import { useMemo } from "react";
++import { useOverview } from "@/hooks/useOverview";
+ 
+-const PARTICLE_COUNT = 20;
++const BASE_COUNT = 12;
++const MAX_COUNT = 30;
+ 
+ interface ParticleStyle {
+   left: string;
+@@ -18,21 +21,32 @@ interface ParticleStyle {
+ }
+ 
+ export function AmbientParticles() {
++  const { overview } = useOverview();
++
++  const activeAgents = overview?.active_agents ?? 0;
++  const totalAgents = overview?.agent_count ?? 1;
++  const activity = totalAgents > 0 ? activeAgents / totalAgents : 0;
++
++  // More active agents = more particles (12-30)
++  const particleCount = Math.round(BASE_COUNT + activity * (MAX_COUNT - BASE_COUNT));
++
++  // Activity affects drift speed: idle = 18s, full = 10s
++  const baseDuration = 18 - activity * 8;
++
+   const particles = useMemo<ParticleStyle[]>(() => {
+-    return Array.from({ length: PARTICLE_COUNT }, (_, i) => {
+-      // Deterministic pseudo-random distribution so SSR matches client.
+-      const seed = ((i * 7 + 13) % PARTICLE_COUNT) / PARTICLE_COUNT;
+-      const seed2 = ((i * 11 + 3) % PARTICLE_COUNT) / PARTICLE_COUNT;
++    return Array.from({ length: particleCount }, (_, i) => {
++      const seed = ((i * 7 + 13) % particleCount) / particleCount;
++      const seed2 = ((i * 11 + 3) % particleCount) / particleCount;
+ 
+       return {
+         left: `${(seed * 100).toFixed(1)}%`,
+-        animationDuration: `${14 + seed2 * 12}s`,
++        animationDuration: `${baseDuration + seed2 * 10}s`,
+         animationDelay: `${-seed * 18}s`,
+         height: `${30 + seed2 * 40}px`,
+-        opacity: 0.2 + seed2 * 0.3,
++        opacity: 0.15 + seed2 * 0.25 + activity * 0.1,
+       };
+     });
+-  }, []);
++  }, [particleCount, baseDuration, activity]);
+ 
+   return (
+     <div
+diff --git a/dashboard/src/components/layout/Header.tsx b/dashboard/src/components/layout/Header.tsx
+index a226574..25bd06c 100644
+--- a/dashboard/src/components/layout/Header.tsx
++++ b/dashboard/src/components/layout/Header.tsx
+@@ -1,12 +1,8 @@
+ "use client";
+ 
+-/**
+- * DHARMA COMMAND -- Breadcrumb header with Cmd+K trigger and split chat toggle.
+- */
+-
+ import { usePathname } from "next/navigation";
+ import { Command, ChevronRight, MessageCircle } from "lucide-react";
+-import { useCallback, useEffect } from "react";
++import { useCallback, useEffect, useState } from "react";
+ import { resolveChatProfile, shortProfileLabel } from "@/lib/chatProfiles";
+ import { useChatWorkspace } from "@/hooks/useChatWorkspace";
+ 
+@@ -15,29 +11,40 @@ interface HeaderProps {
+   chatOpen?: boolean;
+ }
+ 
++function useMissionClock() {
++  const [time, setTime] = useState("");
++  useEffect(() => {
++    function tick() {
++      const now = new Date();
++      setTime(
++        now.getUTCHours().toString().padStart(2, "0") + ":" +
++        now.getUTCMinutes().toString().padStart(2, "0") + ":" +
++        now.getUTCSeconds().toString().padStart(2, "0")
++      );
++    }
++    tick();
++    const id = setInterval(tick, 1000);
++    return () => clearInterval(id);
++  }, []);
++  return time;
++}
++
+ export function Header({ onToggleChat, chatOpen }: HeaderProps) {
+   const pathname = usePathname();
+   const { profileId } = useChatWorkspace();
+   const activeProfile = resolveChatProfile(null, profileId);
++  const missionClock = useMissionClock();
+ 
+-  // Build breadcrumb segments from the path.
+-  const segments = pathname
+-    .split("/")
+-    .filter(Boolean)
++  const segments = pathname.split("/").filter(Boolean)
+     .map((seg) => seg.charAt(0).toUpperCase() + seg.slice(1));
+ 
+   const handleCmdK = useCallback(() => {
+-    // Dispatch a custom event that a command-palette component can listen to.
+     window.dispatchEvent(new CustomEvent("dharma:cmd-k"));
+   }, []);
+ 
+-  // Listen for Cmd+K / Ctrl+K globally.
+   useEffect(() => {
+     function onKeyDown(e: KeyboardEvent) {
+-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+-        e.preventDefault();
+-        handleCmdK();
+-      }
++      if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); handleCmdK(); }
+     }
+     window.addEventListener("keydown", onKeyDown);
+     return () => window.removeEventListener("keydown", onKeyDown);
+@@ -45,47 +52,24 @@ export function Header({ onToggleChat, chatOpen }: HeaderProps) {
+ 
+   return (
+     <header className="flex h-12 items-center justify-between border-b border-sumi-700/30 bg-sumi-900/40 px-6 backdrop-blur-sm">
+-      {/* Breadcrumbs */}
+       <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm">
+         {segments.map((seg, i) => (
+           <span key={`${seg}-${i}`} className="flex items-center gap-1.5">
+             {i > 0 && <ChevronRight size={12} className="text-sumi-700" />}
+-            <span
+-              className={
+-                i === segments.length - 1
+-                  ? "font-medium text-torinoko"
+-                  : "text-sumi-600"
+-              }
+-            >
+-              {seg}
+-            </span>
++            <span className={i === segments.length - 1 ? "font-medium text-torinoko" : "text-sumi-600"}>{seg}</span>
+           </span>
+         ))}
+       </nav>
+-
+-      <div className="flex items-center gap-2">
+-        {/* Split chat toggle */}
++      <div className="flex items-center gap-3">
++        <span className="font-mono text-[11px] text-sumi-600">{missionClock} UTC</span>
++        <div className="h-4 w-px bg-sumi-700/30" />
+         {onToggleChat && (
+-          <button
+-            onClick={onToggleChat}
+-            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition-all ${
+-              chatOpen
+-                ? "border-aozora/40 bg-aozora/15 text-aozora"
+-                : "border-sumi-700/40 bg-sumi-850/60 text-sumi-600 hover:border-aozora/30 hover:text-aozora/80"
+-            }`}
+-            title="Toggle split chat panel"
+-          >
++          <button onClick={onToggleChat} className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition-all ${chatOpen ? "border-aozora/40 bg-aozora/15 text-aozora" : "border-sumi-700/40 bg-sumi-850/60 text-sumi-600 hover:border-aozora/30 hover:text-aozora/80"}`} title="Toggle split chat panel">
+             <MessageCircle size={12} />
+             <span className="font-mono">{shortProfileLabel(activeProfile)}</span>
+           </button>
+         )}
+-
+-        {/* Cmd+K trigger */}
+-        <button
+-          onClick={handleCmdK}
+-          className="flex items-center gap-2 rounded-lg border border-sumi-700/40 bg-sumi-850/60 px-3 py-1.5 text-xs text-sumi-600 transition-colors hover:border-sumi-600/50 hover:text-torinoko/80"
+-          aria-label="Open command palette"
+-        >
++        <button onClick={handleCmdK} className="flex items-center gap-2 rounded-lg border border-sumi-700/40 bg-sumi-850/60 px-3 py-1.5 text-xs text-sumi-600 transition-colors hover:border-sumi-600/50 hover:text-torinoko/80" aria-label="Open command palette">
+           <Command size={12} />
+           <span className="font-mono">K</span>
+         </button>
+diff --git a/dashboard/src/components/layout/Sidebar.tsx b/dashboard/src/components/layout/Sidebar.tsx
+index 48be74b..b7775ec 100644
+--- a/dashboard/src/components/layout/Sidebar.tsx
++++ b/dashboard/src/components/layout/Sidebar.tsx
+@@ -1,141 +1,76 @@
+ "use client";
+ 
+-/**
+- * DHARMA COMMAND -- Navigation sidebar (260px fixed).
+- *
+- * Sections are level-gated: items above the user's current level
+- * render dimmed and non-interactive.
+- */
+-
+ import Link from "next/link";
+ import { usePathname } from "next/navigation";
+ import { useLevel } from "@/hooks/useLevel";
++import { useSidebarStore } from "@/stores/sidebarStore";
++import { buildDashboardNavSections, isDashboardPathActive, type DashboardNavItem, type DashboardNavSection } from "@/lib/dashboardNav";
+ import {
+-  buildDashboardNavSections,
+-  isDashboardPathActive,
+-  type DashboardNavItem,
+-  type DashboardNavSection,
+-} from "@/lib/dashboardNav";
+-import {
+-  Activity,
+-  Bot,
+-  Brain,
+-  BrainCircuit,
+-  ChevronDown,
+-  ChevronUp,
+-  ClipboardCheck,
+-  Dna,
+-  GitBranch,
+-  Globe,
+-  Grid3X3,
+-  HeartPulse,
+-  LayoutDashboard,
+-  ListTodo,
+-  MessageSquare,
+-  Microscope,
+-  Network,
+-  Orbit,
+-  Settings2,
+-  Shield,
+-  Sparkles,
+-  Workflow,
++  Activity, Bot, Brain, BrainCircuit, ChevronDown, ChevronUp, ClipboardCheck,
++  Dna, GitBranch, Globe, Grid3X3, HeartPulse, LayoutDashboard, ListTodo,
++  MessageSquare, Microscope, Network, Orbit, PanelLeftClose, PanelLeftOpen,
++  Settings2, Shield, Sparkles, Workflow,
+ } from "lucide-react";
+-import { type ComponentType, type ReactNode } from "react";
+-
+-// ---------------------------------------------------------------------------
+-// Icon map
+-// ---------------------------------------------------------------------------
++import { type ComponentType, type ReactNode, useEffect } from "react";
+ 
+ const iconMap: Record<string, ComponentType<{ className?: string; size?: number }>> = {
+-  LayoutDashboard,
+-  Bot,
+-  Brain,
+-  BrainCircuit,
+-  ListTodo,
+-  Activity,
+-  Dna,
+-  Shield,
+-  Microscope,
+-  GitBranch,
+-  Network,
+-  Globe,
+-  Workflow,
+-  Grid3X3,
+-  Orbit,
+-  Sparkles,
+-  MessageSquare,
+-  ClipboardCheck,
+-  HeartPulse,
+-  Settings2,
++  LayoutDashboard, Bot, Brain, BrainCircuit, ListTodo, Activity, Dna, Shield,
++  Microscope, GitBranch, Network, Globe, Workflow, Grid3X3, Orbit, Sparkles,
++  MessageSquare, ClipboardCheck, HeartPulse, Settings2,
+ };
+ 
+-// ---------------------------------------------------------------------------
+-// Nav structure
+-// ---------------------------------------------------------------------------
+ const sections = buildDashboardNavSections();
+ 
+-// ---------------------------------------------------------------------------
+-// Sidebar component
+-// ---------------------------------------------------------------------------
+-
+ export function Sidebar() {
+   const pathname = usePathname();
+   const { level, levelUp, levelDown } = useLevel();
++  const collapsed = useSidebarStore((s) => s.collapsed);
++  const toggle = useSidebarStore((s) => s.toggle);
++
++  useEffect(() => {
++    function onKeyDown(e: KeyboardEvent) {
++      if (e.key === "[" && !e.metaKey && !e.ctrlKey && !e.altKey) {
++        const tag = (e.target as HTMLElement)?.tagName;
++        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
++        e.preventDefault();
++        toggle();
++      }
++    }
++    window.addEventListener("keydown", onKeyDown);
++    return () => window.removeEventListener("keydown", onKeyDown);
++  }, [toggle]);
+ 
+   return (
+-    <aside className="fixed left-0 top-0 z-40 flex h-screen w-[260px] flex-col border-r border-sumi-700/40 bg-sumi-900/80 backdrop-blur-md">
+-      {/* Logo */}
+-      <div className="flex items-center gap-3 px-6 py-5">
+-        <Sparkles className="text-aozora" size={20} />
+-        <span className="glow-aozora font-heading text-sm font-bold tracking-[0.2em] text-aozora">
+-          DHARMA COMMAND
+-        </span>
++    <aside className={`fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-sumi-700/40 bg-sumi-900/80 backdrop-blur-md transition-all duration-200 ${collapsed ? "w-[56px]" : "w-[220px]"}`}>
++      <div className={`flex items-center gap-3 py-5 ${collapsed ? "justify-center px-0" : "px-5"}`}>
++        <Sparkles className="shrink-0 text-aozora" size={20} />
++        {!collapsed && <span className="glow-aozora font-heading text-sm font-bold tracking-[0.2em] text-aozora">DHARMA</span>}
+       </div>
+-
+-      {/* Divider */}
+-      <div className="mx-4 h-px bg-gradient-to-r from-transparent via-sumi-700/60 to-transparent" />
+-
+-      {/* Nav sections */}
+-      <nav className="flex-1 overflow-y-auto px-3 py-4">
++      <div className="mx-3 h-px bg-gradient-to-r from-transparent via-sumi-700/60 to-transparent" />
++      <nav className="flex-1 overflow-y-auto px-1.5 py-4">
+         {sections.map((section) => (
+-          <SectionGroup
+-            key={section.label}
+-            section={section}
+-            userLevel={level}
+-            pathname={pathname}
+-          />
++          <SectionGroup key={section.label} section={section} userLevel={level} pathname={pathname} collapsed={collapsed} />
+         ))}
+       </nav>
+-
+-      {/* Divider */}
+-      <div className="mx-4 h-px bg-gradient-to-r from-transparent via-sumi-700/60 to-transparent" />
+-
+-      {/* Level control */}
+-      <div className="flex items-center justify-between px-5 py-4">
+-        <div className="flex flex-col">
+-          <span className="font-mono text-[10px] uppercase tracking-widest text-sumi-600">
+-            Disclosure
+-          </span>
+-          <span className="font-mono text-xs text-kitsurubami">
+-            Level {level}/5
+-          </span>
+-        </div>
+-        <div className="flex items-center gap-1">
+-          <button
+-            onClick={levelDown}
+-            disabled={level <= 1}
+-            className="rounded p-1 text-sumi-600 transition-colors hover:bg-sumi-800 hover:text-torinoko disabled:opacity-30"
+-            aria-label="Decrease disclosure level"
+-          >
+-            <ChevronDown size={14} />
+-          </button>
+-          <button
+-            onClick={levelUp}
+-            disabled={level >= 5}
+-            className="rounded p-1 text-sumi-600 transition-colors hover:bg-sumi-800 hover:text-torinoko disabled:opacity-30"
+-            aria-label="Increase disclosure level"
+-          >
+-            <ChevronUp size={14} />
++      <div className="mx-3 h-px bg-gradient-to-r from-transparent via-sumi-700/60 to-transparent" />
++      <div className={`flex items-center justify-between py-4 ${collapsed ? "flex-col gap-3 px-0" : "px-4"}`}>
++        {collapsed ? (
++          <span className="font-mono text-xs text-kitsurubami">{level}</span>
++        ) : (
++          <div className="flex flex-col">
++            <span className="font-mono text-[10px] uppercase tracking-widest text-sumi-600">Disclosure</span>
++            <span className="font-mono text-xs text-kitsurubami">Level {level}/5</span>
++          </div>
++        )}
++        <div className={`flex items-center ${collapsed ? "flex-col gap-1" : "gap-1"}`}>
++          {!collapsed && (
++            <>
++              <button onClick={levelDown} disabled={level <= 1} className="rounded p-1 text-sumi-600 transition-colors hover:bg-sumi-800 hover:text-torinoko disabled:opacity-30" aria-label="Decrease disclosure level"><ChevronDown size={14} /></button>
++              <button onClick={levelUp} disabled={level >= 5} className="rounded p-1 text-sumi-600 transition-colors hover:bg-sumi-800 hover:text-torinoko disabled:opacity-30" aria-label="Increase disclosure level"><ChevronUp size={14} /></button>
++            </>
++          )}
++          <button onClick={toggle} className="rounded p-1 text-sumi-600 transition-colors hover:bg-sumi-800 hover:text-torinoko" aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
++            {collapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
+           </button>
+         </div>
+       </div>
+@@ -143,91 +78,27 @@ export function Sidebar() {
+   );
+ }
+ 
+-// ---------------------------------------------------------------------------
+-// Section group
+-// ---------------------------------------------------------------------------
+-
+-function SectionGroup({
+-  section,
+-  userLevel,
+-  pathname,
+-}: {
+-  section: DashboardNavSection;
+-  userLevel: number;
+-  pathname: string;
+-}) {
++function SectionGroup({ section, userLevel, pathname, collapsed }: { section: DashboardNavSection; userLevel: number; pathname: string; collapsed: boolean }) {
+   const sectionLocked = section.level > userLevel;
+-
+   return (
+-    <div className="mb-4">
+-      <div
+-        className={`mb-1 px-3 font-mono text-[10px] font-semibold uppercase tracking-[0.15em] ${
+-          sectionLocked ? "text-sumi-700" : "text-sumi-600"
+-        }`}
+-      >
+-        {section.label}
+-      </div>
++    <div className="mb-3">
++      {!collapsed && <div className={`mb-1 px-3 font-mono text-[10px] font-semibold uppercase tracking-[0.15em] ${sectionLocked ? "text-sumi-700" : "text-sumi-600"}`}>{section.label}</div>}
+       {section.items.map((item) => (
+-        <NavItemLink
+-          key={item.href}
+-          item={item}
+-          active={isDashboardPathActive(item.href, pathname)}
+-          locked={item.level > userLevel}
+-        />
++        <NavItemLink key={item.href} item={item} active={isDashboardPathActive(item.href, pathname)} locked={item.level > userLevel} collapsed={collapsed} />
+       ))}
+     </div>
+   );
+ }
+ 
+-// ---------------------------------------------------------------------------
+-// Nav item link
+-// ---------------------------------------------------------------------------
+-
+-function NavItemLink({
+-  item,
+-  active,
+-  locked,
+-}: {
+-  item: DashboardNavItem;
+-  active: boolean;
+-  locked: boolean;
+-}) {
++function NavItemLink({ item, active, locked, collapsed }: { item: DashboardNavItem; active: boolean; locked: boolean; collapsed: boolean }) {
+   const Icon = iconMap[item.icon] ?? LayoutDashboard;
+-
+   const inner: ReactNode = (
+-    <div
+-      className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all ${
+-        locked
+-          ? "pointer-events-none cursor-default text-sumi-700 opacity-40"
+-          : active
+-            ? "bg-sumi-800/80 text-aozora"
+-            : "text-torinoko/70 hover:bg-sumi-800/50 hover:text-torinoko"
+-      }`}
+-    >
+-      <Icon
+-        size={16}
+-        className={
+-          locked
+-            ? "text-sumi-700"
+-            : active
+-              ? "text-aozora"
+-              : "text-sumi-600 group-hover:text-torinoko/80"
+-        }
+-      />
+-      <span>{item.label}</span>
+-      {active && (
+-        <span className="ml-auto h-1.5 w-1.5 rounded-full bg-aozora shadow-[0_0_6px_var(--color-aozora)]" />
+-      )}
++    <div className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all ${collapsed ? "justify-center px-0" : ""} ${locked ? "pointer-events-none cursor-default text-sumi-700 opacity-40" : active ? "bg-sumi-800/80 text-aozora" : "text-torinoko/70 hover:bg-sumi-800/50 hover:text-torinoko"}`} title={collapsed ? item.label : undefined}>
++      <Icon size={16} className={`shrink-0 ${locked ? "text-sumi-700" : active ? "text-aozora" : "text-sumi-600 group-hover:text-torinoko/80"}`} />
++      {!collapsed && <span>{item.label}</span>}
++      {active && !collapsed && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-aozora shadow-[0_0_6px_var(--color-aozora)]" />}
+     </div>
+   );
+-
+-  if (locked) {
+-    return <div aria-disabled="true">{inner}</div>;
+-  }
+-
+-  return (
+-    <Link href={item.href} prefetch={false}>
+-      {inner}
+-    </Link>
+-  );
++  if (locked) return <div aria-disabled="true">{inner}</div>;
++  return <Link href={item.href} prefetch={false}>{inner}</Link>;
+ }
+diff --git a/dashboard/src/components/layout/TelemetryStrip.tsx b/dashboard/src/components/layout/TelemetryStrip.tsx
+index 6ca20d7..0dec84a 100644
+--- a/dashboard/src/components/layout/TelemetryStrip.tsx
++++ b/dashboard/src/components/layout/TelemetryStrip.tsx
+@@ -1,11 +1,6 @@
+ "use client";
+ 
+-/**
+- * DHARMA COMMAND — Persistent telemetry strip.
+- * Replaces the 443-line OperatorMicrographics with a 48px data-driven bar.
+- * Every value is wired to real /api/overview and /api/health data.
+- */
+-
++import { useEffect, useState } from "react";
+ import { useOverview } from "@/hooks/useOverview";
+ import { useHealth } from "@/hooks/useHealth";
+ import { colors } from "@/lib/theme";
+@@ -16,61 +11,54 @@ export function TelemetryStrip() {
+ 
+   const healthStatus = overview?.health_status ?? health?.overall_status ?? "unknown";
+   const totalAgents = overview?.agent_count ?? 0;
++  const activeAgents = overview?.active_agents ?? 0;
+   const taskCount = overview?.task_count ?? 0;
+   const fitness = overview?.mean_fitness ?? 0;
+   const stigDensity = overview?.stigmergy_density ?? 0;
+   const evoEntries = overview?.evolution_entries ?? 0;
+   const uptimeSeconds = overview?.uptime_seconds ?? 0;
+-  const uptimeH = Math.floor(uptimeSeconds / 3600);
+-  const uptimeM = Math.floor((uptimeSeconds % 3600) / 60);
+-  const uptimeS = Math.floor(uptimeSeconds % 60);
+ 
+-  const pulseColor =
+-    healthStatus === "healthy" ? colors.rokusho
++  const [tickOffset, setTickOffset] = useState(0);
++  useEffect(() => { setTickOffset(0); }, [uptimeSeconds]);
++  useEffect(() => {
++    const id = setInterval(() => setTickOffset((t) => t + 1), 1000);
++    return () => clearInterval(id);
++  }, []);
++
++  const liveUptime = uptimeSeconds + tickOffset;
++  const uptimeH = Math.floor(liveUptime / 3600);
++  const uptimeM = Math.floor((liveUptime % 3600) / 60);
++  const uptimeS = Math.floor(liveUptime % 60);
++
++  const pulseColor = healthStatus === "healthy" ? colors.rokusho
+     : healthStatus === "degraded" ? colors.kinpaku
+     : healthStatus === "critical" ? colors.bengara
+     : colors.sumi[600];
+ 
++  const pulseAnim = healthStatus === "healthy" ? "animate-pulse-gentle"
++    : healthStatus === "degraded" ? "animate-pulse-fast"
++    : healthStatus === "critical" ? "animate-pulse-rapid"
++    : "animate-pulse";
++
+   return (
+     <div className="flex h-12 items-center gap-5 border-b border-sumi-700/30 bg-sumi-900/60 px-6 backdrop-blur-sm">
+-      {/* Heartbeat dot + status */}
+       <div className="flex items-center gap-2">
+-        <div
+-          className="h-2 w-2 rounded-full animate-pulse"
+-          style={{ backgroundColor: pulseColor }}
+-        />
+-        <span
+-          className="font-mono text-[11px] font-medium uppercase tracking-wider"
+-          style={{ color: pulseColor }}
+-        >
+-          {healthStatus}
+-        </span>
++        <div className={`h-2 w-2 rounded-full ${pulseAnim}`} style={{ backgroundColor: pulseColor }} />
++        <span className="font-mono text-[11px] font-medium uppercase tracking-wider" style={{ color: pulseColor }}>{healthStatus}</span>
+       </div>
+-
+       <div className="h-4 w-px bg-sumi-700/40" />
+-
+-      {/* Agents */}
+-      <Metric label="agents" value={totalAgents} />
+-
+-      {/* Tasks */}
++      <Metric label="fleet" value={`${activeAgents}/${totalAgents}`} />
+       <Metric label="tasks" value={taskCount} />
+-
+-      {/* Fitness */}
+       <Metric label="fitness" value={fitness.toFixed(3)} color={fitness > 0.5 ? colors.rokusho : colors.kinpaku} />
+-
+-      {/* Stigmergy */}
+       <Metric label="marks" value={stigDensity} />
+-
+-      {/* Evolution */}
+       <Metric label="evo" value={evoEntries} />
+-
+-      {/* Spacer */}
+       <div className="flex-1" />
+-
+-      {/* Uptime */}
+-      <span className="font-mono text-[11px] text-kitsurubami">
+-        T+{String(uptimeH).padStart(2, "0")}:{String(uptimeM).padStart(2, "0")}:{String(uptimeS).padStart(2, "0")}
+-      </span>
++      <div className="flex items-center gap-2">
++        <div className={`h-1.5 w-1.5 rounded-full ${pulseAnim}`} style={{ backgroundColor: pulseColor }} />
++        <span className="font-mono text-[11px] text-kitsurubami">
++          T+{String(uptimeH).padStart(2, "0")}:{String(uptimeM).padStart(2, "0")}:{String(uptimeS).padStart(2, "0")}
++        </span>
++      </div>
+     </div>
+   );
+ }
+@@ -79,9 +67,7 @@ function Metric({ label, value, color }: { label: string; value: string | number
+   return (
+     <div className="flex items-center gap-1.5">
+       <span className="font-mono text-[10px] uppercase tracking-wider text-sumi-600">{label}</span>
+-      <span className="font-mono text-[12px] font-medium" style={{ color: color ?? colors.torinoko }}>
+-        {value}
+-      </span>
++      <span className="font-mono text-[12px] font-medium" style={{ color: color ?? colors.torinoko }}>{value}</span>
+     </div>
+   );
+ }
+diff --git a/dashboard/src/components/viz/CosmographGraph.tsx b/dashboard/src/components/viz/CosmographGraph.tsx
+index 0802543..9cf4981 100644
+--- a/dashboard/src/components/viz/CosmographGraph.tsx
++++ b/dashboard/src/components/viz/CosmographGraph.tsx
+@@ -41,6 +41,9 @@ interface CosmographGraphProps {
+   defaultPointColor?: string;
+   defaultLinkColor?: string;
+   linkWidth?: number;
++  linkDirectionalParticles?: number;
++  linkDirectionalParticleSpeed?: number;
++  linkDirectionalParticleColor?: string;
+   onClick?: (node: GraphNode | undefined) => void;
+   onZoom?: (level: number) => void;
+   className?: string;
+@@ -58,6 +61,9 @@ export function CosmographGraph({
+   defaultPointColor = colors.aozora,
+   defaultLinkColor = colors.sumi[700],
+   linkWidth = 1,
++  linkDirectionalParticles: dirParticles,
++  linkDirectionalParticleSpeed: dirParticleSpeed,
++  linkDirectionalParticleColor: dirParticleColor,
+   onClick,
+   onZoom,
+   className,
+@@ -137,6 +143,9 @@ export function CosmographGraph({
+         linkColor="color"
+         linkWidth={linkWidth}
+         nodeRelSize={defaultPointSize}
++        linkDirectionalParticles={dirParticles}
++        linkDirectionalParticleSpeed={dirParticleSpeed ?? 0.004}
++        linkDirectionalParticleColor={dirParticleColor ? () => dirParticleColor : undefined}
+         onNodeClick={handleClick as never}
+         onZoom={handleZoom as never}
+         cooldownTicks={100}
+diff --git a/dashboard/src/components/workflow/WorkflowNodeTypes.tsx b/dashboard/src/components/workflow/WorkflowNodeTypes.tsx
+index 37645f5..b9d10a1 100644
+--- a/dashboard/src/components/workflow/WorkflowNodeTypes.tsx
++++ b/dashboard/src/components/workflow/WorkflowNodeTypes.tsx
+@@ -45,6 +45,8 @@ const nodeTypeConfigs: Record<WorkflowNodeType, NodeTypeConfig> = {
+   condition: { icon: GitBranch, color: colors.kinpaku,  label: "Condition" },
+   human:     { icon: User,      color: colors.torinoko, label: "Human" },
+   subflow:   { icon: Layers,    color: colors.aozora,   label: "Subflow" },
++  action:    { icon: Zap,       color: colors.kinpaku,  label: "Action" },
++  output:    { icon: Archive,   color: colors.rokusho,  label: "Output" },
+ };
+ 
+ // ---------------------------------------------------------------------------
+diff --git a/dashboard/src/lib/types.ts b/dashboard/src/lib/types.ts
+index 63f9d0a..ae3e8a3 100644
+--- a/dashboard/src/lib/types.ts
++++ b/dashboard/src/lib/types.ts
+@@ -64,6 +64,9 @@ export interface SwarmOverview {
+   health_status: string;
+   stigmergy_density: number;
+   evolution_entries: number;
++  active_agents?: number;
++  identity_coherence?: number;
++  algedonic_active?: number;
+ }
+ 
+ // ---------------------------------------------------------------------------
+@@ -147,6 +150,29 @@ export interface AgentOut {
+   model_label: string;
+   model_key: string;
+   error: string | null;
++  seat_id?: string | null;
++  agent_number?: number | null;
++  current_binding?: string | null;
++  canonical_agent_id?: string | null;
++  is_resident?: boolean;
++  charter?: string | null;
++  english_title?: string | null;
++  workflow_mode?: string | null;
++  codename?: string | null;
++  department?: string | null;
++  squad_id?: string | null;
++  thread?: string | null;
++  tool_name?: string | null;
++  composite_fitness?: number;
++  success_rate?: number;
++  avg_latency?: number;
++  total_calls?: number;
++  total_cost_usd?: number;
++  last_seen?: string | null;
++  sparkline?: number[];
++  level?: number;
++  xp?: number;
++  [key: string]: unknown;
+ }
+ 
+ export interface AgentConfigOut {
+diff --git a/dharma_swarm/agent_runner.py b/dharma_swarm/agent_runner.py
+index fccc3f6..01e325d 100644
+--- a/dharma_swarm/agent_runner.py
++++ b/dharma_swarm/agent_runner.py
+@@ -1308,9 +1308,17 @@ def _tool_result_text(result: Any) -> str:
+ def _guard_local_tool_side_effect(*, action: str, content: str) -> str | None:
+     """Run a direct telos gate before a local side effect executes."""
+     try:
+-        from dharma_swarm.telos_gates import check_action
+-
+-        gate = check_action(action=action, content=content)
++        gate = check_with_reflective_reroute(
++            action=action,
++            content=content,
++            tool_name="agent_runner_local_tool",
++            think_phase="before_complete",
++            reflection=(
++                "Local tool side effect requested. Validate blast radius, "
++                "minimal mutation, and concrete completion criteria."
++            ),
++            max_reroutes=1,
++        ).result
+     except Exception as exc:
+         logger.warning("Gate evaluation failed for local tool action %s", action, exc_info=True)
+         return f"ERROR: Gate evaluation failed: {exc}"
+diff --git a/dharma_swarm/browser_agent.py b/dharma_swarm/browser_agent.py
+index 009bc03..28bd262 100644
+--- a/dharma_swarm/browser_agent.py
++++ b/dharma_swarm/browser_agent.py
+@@ -556,6 +556,7 @@ class BrowserAgent:
+ 
+ _TAG_RE = re.compile(r"<[^>]+>")
+ _WHITESPACE_RE = re.compile(r"\s+")
++_LIVE_BROWSER_AVAILABLE_CACHE: bool | None = None
+ 
+ 
+ def _strip_html(html: str) -> str:
+@@ -574,7 +575,7 @@ def _extract_title(html: str) -> str:
+ # ── Tool Registry Integration ─────────────────────────────────────────
+ 
+ def _check_browser_available() -> bool:
+-    """Check if browser automation is available."""
++    """Check if browser tooling is installed."""
+     try:
+         import playwright  # noqa: F401
+         return True
+@@ -582,6 +583,53 @@ def _check_browser_available() -> bool:
+         return False
+ 
+ 
++def _check_live_browser_available() -> bool:
++    """Check if live browser tests can actually run in this environment."""
++    global _LIVE_BROWSER_AVAILABLE_CACHE
++    if _LIVE_BROWSER_AVAILABLE_CACHE is not None:
++        return _LIVE_BROWSER_AVAILABLE_CACHE
++
++    try:
++        import socket
++        from playwright.async_api import async_playwright
++    except ImportError:
++        _LIVE_BROWSER_AVAILABLE_CACHE = False
++        return _LIVE_BROWSER_AVAILABLE_CACHE
++
++    try:
++        socket.getaddrinfo("httpbin.org", 443)
++    except OSError:
++        _LIVE_BROWSER_AVAILABLE_CACHE = False
++        return _LIVE_BROWSER_AVAILABLE_CACHE
++
++    async def _probe() -> bool:
++        browser = None
++        playwright = None
++        try:
++            playwright = await async_playwright().start()
++            browser = await playwright.chromium.launch(headless=True)
++            return True
++        except Exception:
++            return False
++        finally:
++            if browser is not None:
++                try:
++                    await browser.close()
++                except Exception:
++                    pass
++            if playwright is not None:
++                try:
++                    await playwright.stop()
++                except Exception:
++                    pass
++
++    try:
++        _LIVE_BROWSER_AVAILABLE_CACHE = asyncio.run(_probe())
++    except RuntimeError:
++        _LIVE_BROWSER_AVAILABLE_CACHE = False
++    return _LIVE_BROWSER_AVAILABLE_CACHE
++
++
+ def _register_browser_tools() -> None:
+     """Register browser tools with the dharma_swarm tool registry."""
+     try:
+diff --git a/dharma_swarm/context.py b/dharma_swarm/context.py
+index 18654a8..2a921e7 100644
+--- a/dharma_swarm/context.py
++++ b/dharma_swarm/context.py
+@@ -32,6 +32,7 @@ from dharma_swarm.dharma_kernel import DharmaKernel
+ from dharma_swarm.injection_scanner import scan_and_sanitize
+ from dharma_swarm.orientation_packet import (
+     DirectiveSummary,
++    IngestedKnowledgeSummary,
+     OrientationPacket,
+     OrientationPacketBuilder,
+     RuntimeStateSummary,
+@@ -1214,35 +1215,28 @@ _DEFAULT_POSITIONS = {
+     "vision": 11,
+ }
+ 
+-
+-def read_ingested_knowledge(
++def _search_ingested_knowledge(
+     query: str = "",
+     *,
+     state_dir: Path | None = None,
+     limit: int = 5,
+-    max_chars: int = 2000,
+-) -> str:
+-    """Query SemanticIngestionSpine for knowledge relevant to *query*.
+-
+-    Returns empty string when no documents have been ingested, the query is
+-    empty, or any error occurs during retrieval. Uses a 5s wall-clock timeout
+-    so a locked/busy database never blocks the context build.
+-    """
++) -> list[dict]:
++    """Run the bounded semantic-ingestion retrieval path shared by text and typed contexts."""
+     if not query.strip():
+-        return ""
++        return []
+     try:
+         # Fast guard: skip if the ingestion spine DB doesn't exist yet.
+         _sdir = Path(state_dir or Path.home() / ".dharma")
+         _spine_db = _sdir / "semantic" / "ingestion_spine.db"
+         if not _spine_db.exists():
+-            return ""
++            return []
+         try:
+             with sqlite3.connect(str(_spine_db), timeout=1.0) as _chk:
+                 _count = _chk.execute("SELECT COUNT(*) FROM documents").fetchone()
+             if not _count or _count[0] == 0:
+-                return ""
++                return []
+         except Exception:
+-            return ""
++            return []
+ 
+         # Move init + search into a thread so any DB lock doesn't block caller.
+         def _search() -> list[dict]:
+@@ -1253,31 +1247,68 @@ def read_ingested_knowledge(
+         _pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+         fut = _pool.submit(_search)
+         try:
+-            results: list[dict] = fut.result(timeout=5.0)
++            return fut.result(timeout=5.0)
+         except (concurrent.futures.TimeoutError, Exception):
+             _pool.shutdown(wait=False)
+-            return ""
++            return []
+         finally:
+             _pool.shutdown(wait=False)
+-
+-        if not results:
+-            return ""
+-        lines = ["## Ingested Knowledge"]
+-        for hit in results:
+-            path = str(hit.get("source_path", ""))
+-            text = str(hit.get("matched_text", "")).strip()
+-            score = float(hit.get("score", 0.0))
+-            if text:
+-                name = Path(path).name if path else "unknown"
+-                lines.append(f"- [{name} score={score:.2f}] {text}")
+-        if len(lines) <= 1:
+-            return ""
+-        content = "\n".join(lines)
+-        if len(content) > max_chars:
+-            content = content[:max_chars] + "\n... [truncated]"
+-        return content
+     except Exception:
++        return []
++
++
++def _read_ingested_knowledge_summaries(
++    query: str = "",
++    *,
++    state_dir: Path | None = None,
++    limit: int = 5,
++) -> list[IngestedKnowledgeSummary]:
++    summaries: list[IngestedKnowledgeSummary] = []
++    for hit in _search_ingested_knowledge(query, state_dir=state_dir, limit=limit):
++        summary = str(hit.get("summary") or hit.get("matched_text") or "").strip()
++        if not summary:
++            continue
++        source_ref = str(hit.get("source_path") or hit.get("title") or hit.get("source_name") or "unknown")
++        summaries.append(
++            IngestedKnowledgeSummary(
++                source_ref=source_ref,
++                summary=summary,
++                relevance_score=float(hit.get("score", 0.0)),
++            )
++        )
++    return summaries
++
++
++def read_ingested_knowledge(
++    query: str = "",
++    *,
++    state_dir: Path | None = None,
++    limit: int = 5,
++    max_chars: int = 2000,
++) -> str:
++    """Query SemanticIngestionSpine for knowledge relevant to *query*.
++
++    Returns empty string when no documents have been ingested, the query is
++    empty, or any error occurs during retrieval. Uses a 5s wall-clock timeout
++    so a locked/busy database never blocks the context build.
++    """
++    results = _search_ingested_knowledge(query, state_dir=state_dir, limit=limit)
++    if not results:
++        return ""
++    lines = ["## Ingested Knowledge"]
++    for hit in results:
++        path = str(hit.get("source_path", ""))
++        text = str(hit.get("matched_text", "")).strip()
++        score = float(hit.get("score", 0.0))
++        if text:
++            name = Path(path).name if path else "unknown"
++            lines.append(f"- [{name} score={score:.2f}] {text}")
++    if len(lines) <= 1:
+         return ""
++    content = "\n".join(lines)
++    if len(content) > max_chars:
++        content = content[:max_chars] + "\n... [truncated]"
++    return content
+ 
+ 
+ def build_agent_context(
+@@ -1436,6 +1467,7 @@ def build_orientation_packet(
+     runtime_state: RuntimeStateSummary | dict | None = None,
+     role_context: str = "",
+     task: str | None = None,
++    state_dir: Path | None = None,
+     provenance: list[str] | None = None,
+     stale_sources: list[str] | None = None,
+ ) -> OrientationPacket:
+@@ -1446,12 +1478,17 @@ def build_orientation_packet(
+     more inspectable than a monolithic prompt blob.
+     """
+     builder = OrientationPacketBuilder()
++    ingested_knowledge = _read_ingested_knowledge_summaries(
++        task or "",
++        state_dir=state_dir,
++    )
+     return builder.build(
+         role=role,
+         kernel=kernel or DharmaKernel.create_default(),
+         claims=claims,
+         contradictions=contradictions,
+         directives=directives,
++        ingested_knowledge=ingested_knowledge,
+         runtime_state=runtime_state,
+         role_context=role_context,
+         task=task,
+diff --git a/dharma_swarm/dgc_cli.py b/dharma_swarm/dgc_cli.py
+index a65c63e..a64a13a 100644
+--- a/dharma_swarm/dgc_cli.py
++++ b/dharma_swarm/dgc_cli.py
+@@ -555,6 +555,19 @@ def _control_plane_snapshot() -> str | None:
+                 if snapshot_pid is not None and live_pid is not None and snapshot_pid != live_pid:
+                     details.append("daemon_pid_mismatch")
+ 
++    routing_snapshot_path = DHARMA_STATE / "stigmergy" / "routing_decision.json"
++    if routing_snapshot_path.exists():
++        try:
++            routing_payload = json.loads(routing_snapshot_path.read_text())
++        except Exception:
++            details.append("routing=unreadable")
++        else:
++            strategy = str(routing_payload.get("strategy", "")).strip() or "unknown"
++            chosen_agent = str(routing_payload.get("chosen_agent_name", "")).strip()
++            details.append(f"routing={strategy}")
++            if chosen_agent:
++                details.append(f"chosen_agent={chosen_agent}")
++
+     if not details:
+         return None
+     return " | ".join(details)
+@@ -1272,7 +1285,10 @@ def cmd_gates(action: str) -> None:
+ 
+ def cmd_maintenance(*, dry_run: bool = False, max_mb: float = 50.0) -> None:
+     """Run WAL checkpoint + JSONL rotation for ~/.dharma/ housekeeping."""
+-    from dharma_swarm.maintenance import checkpoint_wal_files, rotate_jsonl_files
++    from dharma_swarm.maintenance import (
++        checkpoint_wal_files,
++        rotate_jsonl_files,
++    )
+ 
+     print("=== WAL Checkpoint ===")
+     wal = checkpoint_wal_files()
+@@ -1289,6 +1305,7 @@ def cmd_maintenance(*, dry_run: bool = False, max_mb: float = 50.0) -> None:
+         print("  No files above threshold.")
+ 
+ 
++
+ def cmd_health() -> None:
+     """Check ecosystem file health."""
+     try:
+@@ -1356,9 +1373,33 @@ def cmd_cascade(
+     asyncio.run(_run())
+ 
+ 
+-def cmd_forge(path: str | None = None, batch: str | None = None) -> None:
++def cmd_forge(
++    path: str | None = None,
++    batch: str | None = None,
++    *,
++    plan: bool = False,
++    run: bool = False,
++    status: bool = False,
++    receipt: bool = False,
++    state_dir: str | None = None,
++    run_id: str | None = None,
++    deficit_id: str | None = None,
++    title: str | None = None,
++    deficit_class: str = "failing_test",
++    summary: str = "",
++    file_refs: list[str] | None = None,
++    test_refs: list[str] | None = None,
++    changed_files: list[str] | None = None,
++    dry_run: bool = False,
++) -> None:
+     """Score artifact(s) through the quality forge."""
+     from pathlib import Path as P
++    repo_root = DHARMA_SWARM
++    selected_state_dir = P(state_dir).expanduser() if state_dir else DHARMA_STATE
++
++    if plan or run or status or receipt:
++        print("[forge] operator subcommands (--plan/--run/--status/--receipt) not yet wired")
++        return
+ 
+     def _score_file(filepath: str) -> None:
+         p = P(filepath).resolve()
+diff --git a/dharma_swarm/ontology.py b/dharma_swarm/ontology.py
+index 1e81613..13d9371 100644
+--- a/dharma_swarm/ontology.py
++++ b/dharma_swarm/ontology.py
+@@ -28,6 +28,7 @@ Backward-compatible with existing Entity/ONTOLOGY API.
+ 
+ from __future__ import annotations
+ 
++from copy import deepcopy
+ import json
+ import logging
+ from dataclasses import dataclass
+@@ -38,6 +39,8 @@ from typing import Any, Callable
+ 
+ from pydantic import BaseModel, Field
+ 
++from dharma_swarm.ontology_meta import MetaPrimitive, validate_meta_coverage
++
+ logger = logging.getLogger(__name__)
+ 
+ 
+@@ -138,6 +141,7 @@ class ActionDef(BaseModel):
+     description: str = ""
+     input_params: dict[str, str] = Field(default_factory=dict)
+     modifies: list[str] = Field(default_factory=list)
++    valid_transitions: dict[str, list[str]] = Field(default_factory=dict)
+     creates: list[str] = Field(default_factory=list)
+     requires_approval: bool = False
+     telos_gates: list[str] = Field(default_factory=list)
+@@ -175,6 +179,7 @@ class ObjectType(BaseModel):
+     pydantic_model: str = ""
+     storage_backend: str = "jsonl"
+     icon: str = ""
++    meta_type: MetaPrimitive = MetaPrimitive.ENTITY
+ 
+ 
+ # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+@@ -616,25 +621,107 @@ class OntologyRegistry:
+             self._action_log.append(execution)
+             return execution
+ 
++        obj_type = self._types.get(object_type)
++        if obj_type is None:
++            execution.result = "failed"
++            execution.error = f"type not registered: {object_type}"
++            self._action_log.append(execution)
++            return execution
++
++        obj: OntologyObj | None = None
++        if object_id:
++            obj = self._objects.get(object_id)
++            if obj is None:
++                execution.result = "failed"
++                execution.error = f"object not found: {object_id}"
++                self._action_log.append(execution)
++                return execution
++
++            if obj.type_name != object_type:
++                execution.result = "failed"
++                execution.error = (
++                    f"type mismatch for {object_id}: '{obj.type_name}' vs '{object_type}'"
++                )
++                self._action_log.append(execution)
++                return execution
++
+         # Telos gate check
+         if gate_check and action_def.telos_gates:
+             gate_results = gate_check(action_name, params)
+             execution.gate_results = gate_results
+-            if any(v == "BLOCK" for v in gate_results.values()):
++            if any(
++                str(
++                    value.get("result", value) if isinstance(value, dict) else value
++                ).upper() == "BLOCK"
++                for value in gate_results.values()
++            ):
+                 execution.result = "blocked"
+                 execution.error = "telos gate blocked"
+                 self._action_log.append(execution)
+                 return execution
+ 
+         # Security check for telos-required types
+-        obj_type = self._types.get(object_type)
+         if obj_type and obj_type.security.telos_required and not gate_check:
+             execution.result = "blocked"
+             execution.error = "telos gate required but no gate_check provided"
+             self._action_log.append(execution)
+             return execution
+ 
+-        execution.result = "success"
++        if obj is None:
++            execution.result = "success"
++            self._action_log.append(execution)
++            return execution
++
++        original_properties = deepcopy(obj.properties)
++        original_updated_at = obj.updated_at
++        original_version = obj.version
++        execution.lineage_inputs = [object_id]
++
++        if action_def.valid_transitions:
++            current_status = str(obj.properties.get("status", ""))
++            target_status = params.get("status")
++            if target_status is None:
++                execution.result = "failed"
++                execution.error = "missing transition target: status"
++                self._action_log.append(execution)
++                return execution
++            if str(target_status) != current_status:
++                allowed = action_def.valid_transitions.get(current_status, [])
++                if str(target_status) not in allowed:
++                    execution.result = "invalid_transition"
++                    execution.error = (
++                        f"invalid transition for {object_type}: "
++                        f"{current_status!r} -> {target_status!r}"
++                    )
++                    self._action_log.append(execution)
++                    return execution
++
++        try:
++            updates = {
++                field: params[field]
++                for field in action_def.modifies
++                if field in params and obj.properties.get(field) != params[field]
++            }
++            if updates:
++                mutated_properties = deepcopy(obj.properties)
++                mutated_properties.update(updates)
++                candidate = obj.model_copy(update={"properties": mutated_properties})
++                errors = validate_object(candidate, obj_type)
++                if errors:
++                    raise ValueError("; ".join(errors))
++
++                obj.properties = mutated_properties
++                obj.updated_at = _utc_now()
++                obj.version += 1
++                execution.lineage_outputs = [object_id]
++            execution.result = "success"
++        except Exception as exc:
++            obj.properties = original_properties
++            obj.updated_at = original_updated_at
++            obj.version = original_version
++            execution.result = "failed"
++            execution.error = str(exc)
++
+         self._action_log.append(execution)
+         return execution
+ 
+@@ -667,6 +754,7 @@ class OntologyRegistry:
+         lines = [
+             f"## {obj_type.name}",
+             f"{obj_type.description}",
++            f"Meta: {obj_type.meta_type.value} | "
+             f"Telos: {obj_type.telos_alignment:.1f} | "
+             f"Shakti: {obj_type.shakti_energy.value} | "
+             f"Security: {obj_type.security.classification.value}",
+@@ -773,7 +861,8 @@ class OntologyRegistry:
+         lines = ["=== Ontology Graph ===", ""]
+         for name in sorted(self._types):
+             count = sum(1 for o in self._objects.values() if o.type_name == name)
+-            lines.append(f"[{name}] ({count} instances)")
++            obj_type = self._types[name]
++            lines.append(f"[{obj_type.meta_type.value}:{name}] ({count} instances)")
+             for ld in self.get_links_for(name):
+                 lines.append(f"  --{ld.name}--> [{ld.target_type}] ({ld.cardinality.value})")
+             lines.append("")
+@@ -848,6 +937,11 @@ class OntologyRegistry:
+             registry.register_link(link_def)
+         for link_def in _METABOLIC_LINKS:
+             registry.register_link(link_def)
++        missing_meta = validate_meta_coverage(registry)
++        if missing_meta:
++            raise ValueError(
++                "Registered types missing meta_type: " + ", ".join(missing_meta)
++            )
+         return registry
+ 
+ 
+@@ -882,6 +976,7 @@ _RESEARCH_THREAD = ObjectType(
+     shakti_energy=ShaktiEnergy.MAHESHWARI,
+     pydantic_model="dharma_swarm.thread_manager.ThreadState",
+     icon="R",
++    meta_type=MetaPrimitive.ENTITY,
+ )
+ 
+ _EXPERIMENT = ObjectType(
+@@ -918,6 +1013,7 @@ _EXPERIMENT = ObjectType(
+     telos_alignment=0.95,
+     shakti_energy=ShaktiEnergy.MAHASARASWATI,
+     icon="E",
++    meta_type=MetaPrimitive.ENTITY,
+ )
+ 
+ _PAPER = ObjectType(
+@@ -946,6 +1042,7 @@ _PAPER = ObjectType(
+     telos_alignment=0.85,
+     shakti_energy=ShaktiEnergy.MAHASARASWATI,
+     icon="P",
++    meta_type=MetaPrimitive.ENTITY,
+ )
+ 
+ _AGENT_IDENTITY = ObjectType(
+@@ -999,6 +1096,7 @@ _AGENT_IDENTITY = ObjectType(
+     shakti_energy=ShaktiEnergy.MAHAKALI,
+     pydantic_model="dharma_swarm.models.AgentConfig",
+     icon="A",
++    meta_type=MetaPrimitive.ENTITY,
+ )
+ 
+ _CUSTODIAN_ROLE = ObjectType(
+@@ -1060,6 +1158,7 @@ _CUSTODIAN_ROLE = ObjectType(
+     telos_alignment=0.75,
+     shakti_energy=ShaktiEnergy.MAHASARASWATI,
+     icon="U",
++    meta_type=MetaPrimitive.ENTITY,
+ )
+ 
+ _KNOWLEDGE_ARTIFACT = ObjectType(
+@@ -1092,6 +1191,44 @@ _KNOWLEDGE_ARTIFACT = ObjectType(
+     telos_alignment=0.8,
+     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
+     icon="K",
++    meta_type=MetaPrimitive.ENTITY,
++)
++
++_CAPABILITY = ObjectType(
++    name="Capability",
++    description="A first-class capability an agent can possess or a task can require",
++    properties={
++        "name": PropertyDef(
++            name="name",
++            property_type=PropertyType.STRING,
++            required=True,
++            searchable=True,
++        ),
++        "capability_kind": PropertyDef(
++            name="capability_kind",
++            property_type=PropertyType.ENUM,
++            required=True,
++            enum_values=["skill", "tool", "provider", "model"],
++        ),
++        "description": PropertyDef(
++            name="description",
++            property_type=PropertyType.TEXT,
++            searchable=True,
++        ),
++        "version": PropertyDef(
++            name="version",
++            property_type=PropertyType.STRING,
++        ),
++        "status": PropertyDef(
++            name="status",
++            property_type=PropertyType.ENUM,
++            enum_values=["active", "experimental", "deprecated"],
++        ),
++    },
++    telos_alignment=0.7,
++    shakti_energy=ShaktiEnergy.MAHASARASWATI,
++    icon="Q",
++    meta_type=MetaPrimitive.CAPABILITY,
+ )
+ 
+ _TYPED_TASK = ObjectType(
+@@ -1124,6 +1261,7 @@ _TYPED_TASK = ObjectType(
+     shakti_energy=ShaktiEnergy.MAHAKALI,
+     pydantic_model="dharma_swarm.models.Task",
+     icon="T",
++    meta_type=MetaPrimitive.ACTION,
+ )
+ 
+ _EVOLUTION_ENTRY = ObjectType(
+@@ -1157,6 +1295,7 @@ _EVOLUTION_ENTRY = ObjectType(
+     shakti_energy=ShaktiEnergy.MAHAKALI,
+     pydantic_model="dharma_swarm.archive.ArchiveEntry",
+     icon="D",
++    meta_type=MetaPrimitive.EVENT,
+ )
+ 
+ _WITNESS_LOG = ObjectType(
+@@ -1187,6 +1326,7 @@ _WITNESS_LOG = ObjectType(
+     telos_alignment=1.0,
+     shakti_energy=ShaktiEnergy.MAHESHWARI,
+     icon="W",
++    meta_type=MetaPrimitive.EVENT,
+ )
+ 
+ 
+@@ -1210,6 +1350,10 @@ _DOMAIN_LINKS: list[LinkDef] = [
+     LinkDef(name="consumes", source_type="TypedTask",
+            target_type="KnowledgeArtifact", cardinality=LinkCardinality.MANY_TO_MANY,
+            inverse_name="consumed_by_task"),
++    LinkDef(name="requires_capability", source_type="TypedTask",
++           target_type="Capability", cardinality=LinkCardinality.MANY_TO_MANY,
++           inverse_name="required_by_tasks",
++           description="Capabilities required to execute the task"),
+     LinkDef(name="task_produces", source_type="TypedTask",
+            target_type="KnowledgeArtifact", cardinality=LinkCardinality.ONE_TO_MANY,
+            inverse_name="produced_by_task",
+@@ -1223,6 +1367,10 @@ _DOMAIN_LINKS: list[LinkDef] = [
+     LinkDef(name="authored", source_type="AgentIdentity",
+            target_type="KnowledgeArtifact", cardinality=LinkCardinality.ONE_TO_MANY,
+            inverse_name="authored_by"),
++    LinkDef(name="has_capability", source_type="AgentIdentity",
++           target_type="Capability", cardinality=LinkCardinality.MANY_TO_MANY,
++           inverse_name="possessed_by_agents",
++           description="Capabilities available to this agent"),
+     LinkDef(name="proposed_evolution", source_type="AgentIdentity",
+            target_type="EvolutionEntry", cardinality=LinkCardinality.ONE_TO_MANY,
+            inverse_name="proposed_by"),
+@@ -1266,11 +1414,27 @@ _ACTION_PROPOSAL = ObjectType(
+         ActionDef(name="Reject", object_type="ActionProposal",
+                   description="Reject after gate check",
+                   modifies=["status"]),
++        ActionDef(
++            name="AdvanceProposal",
++            object_type="ActionProposal",
++            description="Advance ActionProposal status through the lifecycle",
++            modifies=["status"],
++            valid_transitions={
++                "proposed": ["gated", "approved", "rejected", "completed", "failed"],
++                "gated": ["approved", "rejected", "completed", "failed"],
++                "approved": ["executing", "completed", "failed"],
++                "executing": ["completed", "failed"],
++                "failed": ["proposed"],
++                "rejected": [],
++                "completed": [],
++            },
++        ),
+     ],
+     security=SecurityPolicy(audit_all=True),
+     telos_alignment=0.9,
+     shakti_energy=ShaktiEnergy.MAHAKALI,
+     icon="→",
++    meta_type=MetaPrimitive.ACTION,
+ )
+ 
+ _GATE_DECISION_TYPE = ObjectType(
+@@ -1302,6 +1466,7 @@ _GATE_DECISION_TYPE = ObjectType(
+     telos_alignment=1.0,
+     shakti_energy=ShaktiEnergy.MAHESHWARI,
+     icon="⊘",
++    meta_type=MetaPrimitive.EVENT,
+ )
+ 
+ _EXECUTION_LEASE = ObjectType(
+@@ -1342,6 +1507,7 @@ _EXECUTION_LEASE = ObjectType(
+     telos_alignment=0.95,
+     shakti_energy=ShaktiEnergy.MAHASARASWATI,
+     icon="⌛",
++    meta_type=MetaPrimitive.ACTION,
+ )
+ 
+ _OUTCOME = ObjectType(
+@@ -1372,6 +1538,7 @@ _OUTCOME = ObjectType(
+     telos_alignment=0.85,
+     shakti_energy=ShaktiEnergy.MAHASARASWATI,
+     icon="✓",
++    meta_type=MetaPrimitive.EVENT,
+ )
+ 
+ _VALUE_EVENT = ObjectType(
+@@ -1408,6 +1575,7 @@ _VALUE_EVENT = ObjectType(
+     telos_alignment=0.85,
+     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
+     icon="V",
++    meta_type=MetaPrimitive.EVENT,
+ )
+ 
+ _CONTRIBUTION = ObjectType(
+@@ -1438,6 +1606,7 @@ _CONTRIBUTION = ObjectType(
+     telos_alignment=0.85,
+     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
+     icon="C",
++    meta_type=MetaPrimitive.RELATIONSHIP,
+ )
+ 
+ _VENTURE_CELL = ObjectType(
+@@ -1478,6 +1647,7 @@ _VENTURE_CELL = ObjectType(
+     telos_alignment=0.95,
+     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
+     icon="◈",
++    meta_type=MetaPrimitive.ENTITY,
+ )
+ 
+ 
+@@ -1528,12 +1698,57 @@ _METABOLIC_LINKS: list[LinkDef] = [
+ 
+ _DOMAIN_TYPES: list[ObjectType] = [
+     _RESEARCH_THREAD, _EXPERIMENT, _PAPER, _AGENT_IDENTITY, _CUSTODIAN_ROLE,
+-    _KNOWLEDGE_ARTIFACT, _TYPED_TASK, _EVOLUTION_ENTRY, _WITNESS_LOG,
++    _KNOWLEDGE_ARTIFACT, _CAPABILITY, _TYPED_TASK, _EVOLUTION_ENTRY, _WITNESS_LOG,
+     _ACTION_PROPOSAL, _GATE_DECISION_TYPE, _EXECUTION_LEASE, _OUTCOME, _VALUE_EVENT,
+     _CONTRIBUTION, _VENTURE_CELL,
+ ]
+ 
+ 
++def _capability_names(objects: list[OntologyObj]) -> set[str]:
++    return {
++        str(obj.properties.get("name") or obj.id)
++        for obj in objects
++    }
++
++
++def match_capabilities(
++    registry: OntologyRegistry,
++    task_id: str,
++    agent_id: str,
++) -> dict[str, Any]:
++    """Compare one agent's capabilities against a task's requirements."""
++
++    required = _capability_names(registry.get_linked_objects(task_id, "requires_capability"))
++    possessed = _capability_names(registry.get_linked_objects(agent_id, "has_capability"))
++    matched = sorted(required & possessed)
++    missing = sorted(required - possessed)
++    extra = sorted(possessed - required)
++    score = 1.0 if not required else len(matched) / len(required)
++    return {
++        "agent_id": agent_id,
++        "score": score,
++        "matched": matched,
++        "missing": missing,
++        "extra": extra,
++    }
++
++
++def rank_agents_for_task(
++    registry: OntologyRegistry,
++    task_id: str,
++) -> list[dict[str, Any]]:
++    """Rank registered agents by capability fit for a task."""
++
++    ranked = [
++        match_capabilities(registry, task_id, agent.id)
++        for agent in registry.get_objects_by_type("AgentIdentity")
++    ]
++    return sorted(
++        ranked,
++        key=lambda item: (-item["score"], -len(item["matched"]), item["agent_id"]),
++    )
++
++
+ # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ # BACKWARD COMPATIBILITY — Existing Entity/ONTOLOGY API
+ # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+@@ -1806,7 +2021,10 @@ __all__ = [
+     "SecurityLevel",
+     "SecurityPolicy",
+     "ShaktiEnergy",
++    "MetaPrimitive",
+     "check_security",
++    "match_capabilities",
++    "rank_agents_for_task",
+     "validate_link",
+     "validate_object",
+     "create_ginko_cell",
+diff --git a/dharma_swarm/ontology_adapters.py b/dharma_swarm/ontology_adapters.py
+index 32632cb..e3ac304 100644
+--- a/dharma_swarm/ontology_adapters.py
++++ b/dharma_swarm/ontology_adapters.py
+@@ -15,6 +15,7 @@ import logging
+ from pathlib import Path
+ from typing import Any
+ 
++from dharma_swarm.ontology_meta import MetaPrimitive
+ from dharma_swarm.ontology import (
+     Link,
+     LinkCardinality,
+@@ -91,6 +92,7 @@ _STIGMERGY_MARK_TYPE = ObjectType(
+     ],
+     telos_alignment=0.6,
+     icon="S",
++    meta_type=MetaPrimitive.EVENT,
+ )
+ 
+ _ZEITGEIST_SIGNAL_TYPE = ObjectType(
+@@ -149,6 +151,7 @@ _ZEITGEIST_SIGNAL_TYPE = ObjectType(
+     ],
+     telos_alignment=0.7,
+     icon="Z",
++    meta_type=MetaPrimitive.EVENT,
+ )
+ 
+ _IDENTITY_SNAPSHOT_TYPE = ObjectType(
+@@ -189,6 +192,7 @@ _IDENTITY_SNAPSHOT_TYPE = ObjectType(
+     },
+     telos_alignment=0.95,
+     icon="I",
++    meta_type=MetaPrimitive.EVENT,
+ )
+ 
+ _CORPUS_CLAIM_TYPE = ObjectType(
+@@ -218,6 +222,11 @@ _CORPUS_CLAIM_TYPE = ObjectType(
+             property_type=PropertyType.FLOAT,
+             description="Confidence score 0.0-1.0",
+         ),
++        "source_path": PropertyDef(
++            name="source_path",
++            property_type=PropertyType.PATH,
++            description="Original document path for this claim",
++        ),
+     },
+     links=[
+         LinkDef(
+@@ -228,9 +237,18 @@ _CORPUS_CLAIM_TYPE = ObjectType(
+             inverse_name="corpus_claims",
+             description="Agent that authored this claim",
+         ),
++        LinkDef(
++            name="source_artifact",
++            source_type="CorpusClaim",
++            target_type="KnowledgeArtifact",
++            cardinality=LinkCardinality.MANY_TO_ONE,
++            inverse_name="supports_claims",
++            description="Ingested artifact that surfaced this claim",
++        ),
+     ],
+     telos_alignment=0.9,
+     icon="C",
++    meta_type=MetaPrimitive.ENTITY,
+ )
+ 
+ _HUB_TYPES: list[ObjectType] = [
+@@ -638,6 +656,151 @@ def adapt_evolution(base_path: Path | None = None) -> AdapterResult:
+     return results
+ 
+ 
++def adapt_ingestion(base_path: Path | None = None) -> AdapterResult:
++    """Read semantic/ingestion_spine.db documents into KnowledgeArtifact objects."""
++
++    import sqlite3
++
++    base = base_path or _DEFAULT_BASE
++    db_path = base / "semantic" / "ingestion_spine.db"
++    if not db_path.exists():
++        return []
++
++    results: AdapterResult = []
++    try:
++        conn = sqlite3.connect(str(db_path))
++        conn.row_factory = sqlite3.Row
++        rows = conn.execute(
++            """
++            SELECT doc_id, source_name, source_path, title, summary, concepts_json, claims_json
++            FROM documents
++            ORDER BY updated_at DESC, doc_id ASC
++            """
++        )
++        for row in rows:
++            try:
++                doc_id = str(row["doc_id"] or "")
++                if not doc_id:
++                    continue
++                title = str(row["title"] or "").strip()
++                summary = str(row["summary"] or "").strip()
++                if not title and not summary:
++                    logger.debug("adapt_ingestion: skipping empty document %s", doc_id)
++                    continue
++
++                # Parse JSON fields so corrupt rows are rejected early.
++                json.loads(row["concepts_json"] or "[]")
++                json.loads(row["claims_json"] or "[]")
++
++                source_path = str(row["source_path"] or "")
++                props: dict[str, Any] = {
++                    "title": title or Path(source_path).name or doc_id,
++                    "artifact_type": "file" if source_path.startswith("/") else "note",
++                    "domain": "dharma_swarm",
++                    "content": summary,
++                    "file_path": source_path,
++                    "provenance": str(row["source_name"] or ""),
++                    "confidence": 0.5,
++                    "verified": False,
++                }
++                results.append((_make_obj(f"ingest_{doc_id}", "KnowledgeArtifact", props), []))
++            except Exception as exc:
++                logger.warning("adapt_ingestion: skipping record %s: %s", row["doc_id"], exc)
++        conn.close()
++    except Exception as exc:
++        logger.warning("adapt_ingestion: %s", exc)
++    return results
++
++
++def _claim_payload_from_entry(entry: Any, *, source_path: str) -> dict[str, Any] | None:
++    if isinstance(entry, str):
++        text = entry.strip()
++        if not text:
++            return None
++        return {
++            "claim_text": text,
++            "status": "proposed",
++            "confidence": 0.5,
++            "evidence": "",
++            "source_path": source_path,
++        }
++
++    if isinstance(entry, dict):
++        text = str(entry.get("text") or entry.get("claim") or entry.get("statement") or "").strip()
++        if not text:
++            return None
++        status = str(entry.get("status") or "proposed")
++        if status not in {"proposed", "accepted", "deprecated", "rejected"}:
++            status = "proposed"
++        evidence = entry.get("evidence", "")
++        if evidence and not isinstance(evidence, str):
++            evidence = json.dumps(evidence, default=str)
++        return {
++            "claim_text": text,
++            "status": status,
++            "confidence": float(entry.get("confidence", 0.5)),
++            "evidence": str(evidence or ""),
++            "source_path": source_path,
++        }
++
++    return None
++
++
++def adapt_claims(base_path: Path | None = None) -> AdapterResult:
++    """Read claims_json from semantic/ingestion_spine.db into CorpusClaim objects."""
++
++    import sqlite3
++
++    base = base_path or _DEFAULT_BASE
++    db_path = base / "semantic" / "ingestion_spine.db"
++    if not db_path.exists():
++        return []
++
++    results: AdapterResult = []
++    try:
++        conn = sqlite3.connect(str(db_path))
++        conn.row_factory = sqlite3.Row
++        rows = conn.execute(
++            """
++            SELECT doc_id, source_path, claims_json
++            FROM documents
++            ORDER BY updated_at DESC, doc_id ASC
++            """
++        )
++        for row in rows:
++            doc_id = str(row["doc_id"] or "")
++            source_path = str(row["source_path"] or "")
++            try:
++                claims = json.loads(row["claims_json"] or "[]")
++            except json.JSONDecodeError as exc:
++                logger.warning("adapt_claims: skipping record %s: %s", doc_id, exc)
++                continue
++
++            if not isinstance(claims, list):
++                logger.warning("adapt_claims: skipping non-list claims for %s", doc_id)
++                continue
++
++            for idx, entry in enumerate(claims):
++                payload = _claim_payload_from_entry(entry, source_path=source_path)
++                if payload is None:
++                    continue
++                obj_id = f"iclaim_{doc_id}_{idx}"
++                links = [
++                    _make_link(
++                        "source_artifact",
++                        obj_id,
++                        "CorpusClaim",
++                        f"ingest_{doc_id}",
++                        "KnowledgeArtifact",
++                    )
++                ]
++                results.append((_make_obj(obj_id, "CorpusClaim", payload), links))
++        conn.close()
++    except Exception as exc:
++        logger.warning("adapt_claims: %s", exc)
++    return results
++
++
+ def adapt_corpus(base_path: Path | None = None) -> AdapterResult:
+     """Read ~/.dharma/corpus/claims.jsonl -> CorpusClaim objects.
+ 
+@@ -691,6 +854,7 @@ def adapt_corpus(base_path: Path | None = None) -> AdapterResult:
+                 "status": status_raw,
+                 "evidence": evidence_text,
+                 "confidence": float(rec.get("confidence", 0.5)),
++                "source_path": str(rec.get("source_path", "")),
+             }
+ 
+             if not props["claim_text"]:
+@@ -728,6 +892,8 @@ _ADAPTERS: list[tuple[str, Any]] = [
+     ("identity", adapt_identity),
+     ("gates", adapt_gates),
+     ("evolution", adapt_evolution),
++    ("ingestion", adapt_ingestion),
++    ("claims", adapt_claims),
+     ("corpus", adapt_corpus),
+ ]
+ 
+diff --git a/dharma_swarm/ontology_runtime.py b/dharma_swarm/ontology_runtime.py
+index 7ca0a50..dfea7bb 100644
+--- a/dharma_swarm/ontology_runtime.py
++++ b/dharma_swarm/ontology_runtime.py
+@@ -138,6 +138,14 @@ def get_shared_registry(
+         return _SHARED_REGISTRY
+ 
+ 
++def get_shared_hub(path: str | Path | None = None) -> OntologyHub:
++    """Return the shared ontology hub for incremental persistence."""
++
++    resolved_path = ontology_path(path)
++    with _LOCK:
++        return _ensure_shared_hub(resolved_path)
++
++
+ def persist_shared_registry(
+     registry: OntologyRegistry | None = None,
+     path: str | Path | None = None,
+diff --git a/dharma_swarm/orientation_packet.py b/dharma_swarm/orientation_packet.py
+index 3b49a20..04124f2 100644
+--- a/dharma_swarm/orientation_packet.py
++++ b/dharma_swarm/orientation_packet.py
+@@ -37,6 +37,12 @@ class RuntimeStateSummary(BaseModel):
+     generated_at: str = Field(default_factory=lambda: _utc_now().isoformat())
+ 
+ 
++class IngestedKnowledgeSummary(BaseModel):
++    source_ref: str
++    summary: str
++    relevance_score: float = 0.0
++
++
+ class OrientationPacket(BaseModel):
+     packet_id: str = Field(default_factory=_new_id)
+     role: str
+@@ -45,6 +51,7 @@ class OrientationPacket(BaseModel):
+     active_claims: list[Claim] = Field(default_factory=list)
+     active_contradictions: list[Contradiction] = Field(default_factory=list)
+     active_directives: list[DirectiveSummary] = Field(default_factory=list)
++    ingested_knowledge: list[IngestedKnowledgeSummary] = Field(default_factory=list)
+     runtime_state_summary: RuntimeStateSummary = Field(default_factory=RuntimeStateSummary)
+     role_context: str = ""
+     provenance: list[str] = Field(default_factory=list)
+@@ -117,6 +124,7 @@ class OrientationPacketBuilder:
+         claims: Sequence[Claim],
+         contradictions: Sequence[Contradiction] | None = None,
+         directives: Iterable[DirectiveSummary | dict] | None = None,
++        ingested_knowledge: Sequence[IngestedKnowledgeSummary | dict] | None = None,
+         runtime_state: RuntimeStateSummary | dict | None = None,
+         role_context: str = "",
+         task: str | None = None,
+@@ -145,6 +153,10 @@ class OrientationPacketBuilder:
+             directive if isinstance(directive, DirectiveSummary) else DirectiveSummary.model_validate(directive)
+             for directive in (directives or [])
+         ]
++        normalized_ingested_knowledge = [
++            item if isinstance(item, IngestedKnowledgeSummary) else IngestedKnowledgeSummary.model_validate(item)
++            for item in (ingested_knowledge or [])
++        ]
+ 
+         normalized_runtime = (
+             runtime_state
+@@ -163,6 +175,7 @@ class OrientationPacketBuilder:
+             active_claims=selected_claims,
+             active_contradictions=selected_contradictions,
+             active_directives=normalized_directives,
++            ingested_knowledge=normalized_ingested_knowledge,
+             runtime_state_summary=normalized_runtime,
+             role_context=role_context,
+             provenance=sorted(set(packet_provenance)),
+@@ -193,6 +206,13 @@ class OrientationPacketBuilder:
+             for directive in packet.active_directives:
+                 lines.append(f"- {directive.title} [{directive.priority}] :: {directive.summary}")
+ 
++        if packet.ingested_knowledge:
++            lines.extend(["", "Ingested knowledge:"])
++            for item in packet.ingested_knowledge:
++                lines.append(
++                    f"- {item.source_ref} ({item.relevance_score:.2f}) :: {item.summary}"
++                )
++
+         if packet.role_context:
+             lines.extend(["", "Role context:", packet.role_context])
+ 
+diff --git a/dharma_swarm/runtime_artifacts.py b/dharma_swarm/runtime_artifacts.py
+index 28339c0..2ef6371 100644
+--- a/dharma_swarm/runtime_artifacts.py
++++ b/dharma_swarm/runtime_artifacts.py
+@@ -4,7 +4,9 @@ from __future__ import annotations
+ 
+ from datetime import datetime, timezone
+ import json
++import os
+ from pathlib import Path
++import subprocess
+ from typing import Any
+ 
+ 
+@@ -147,3 +149,478 @@ def write_dgc_health_snapshot(
+     }
+     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+     return path
++
++
++def routing_decision_snapshot_summary(
++    state_dir: Path,
++    *,
++    stale_after_seconds: float = 3600.0,
++) -> dict[str, Any]:
++    """Read the latest adaptive routing decision snapshot, if present."""
++    path = state_dir / "stigmergy" / "routing_decision.json"
++    summary: dict[str, Any] = {
++        "path": path,
++        "exists": path.exists(),
++        "status": "missing",
++        "payload": None,
++        "timestamp": None,
++        "age_seconds": None,
++    }
++    if not path.exists():
++        return summary
++
++    try:
++        payload = json.loads(path.read_text(encoding="utf-8"))
++    except Exception as exc:
++        summary["status"] = "unreadable"
++        summary["error"] = str(exc)
++        return summary
++
++    timestamp = parse_iso_datetime(payload.get("timestamp"))
++    age_seconds = None
++    if timestamp is not None:
++        age_seconds = max(0.0, (datetime.now(timezone.utc) - timestamp).total_seconds())
++
++    summary.update(
++        {
++            "payload": payload,
++            "timestamp": timestamp,
++            "age_seconds": age_seconds,
++        }
++    )
++    if timestamp is None:
++        summary["status"] = "unknown"
++    elif age_seconds is not None and age_seconds > stale_after_seconds:
++        summary["status"] = "stale"
++    else:
++        summary["status"] = "fresh"
++    return summary
++
++
++def write_routing_decision_snapshot(
++    state_dir: Path,
++    *,
++    payload: dict[str, Any],
++) -> Path:
++    """Persist the latest adaptive routing decision for operator surfaces."""
++    path = state_dir / "stigmergy" / "routing_decision.json"
++    path.parent.mkdir(parents=True, exist_ok=True)
++    materialized = dict(payload)
++    materialized["timestamp"] = datetime.now(timezone.utc).isoformat()
++    path.write_text(json.dumps(materialized, indent=2), encoding="utf-8")
++    return path
++
++
++def write_spawn_timing_snapshot(
++    state_dir: Path,
++    *,
++    payload: dict[str, Any],
++) -> Path:
++    """Persist the latest agent spawn timing breakdown for operator surfaces."""
++    path = state_dir / "stigmergy" / "spawn_timing.json"
++    path.parent.mkdir(parents=True, exist_ok=True)
++    materialized = dict(payload)
++    materialized["timestamp"] = datetime.now(timezone.utc).isoformat()
++    path.write_text(json.dumps(materialized, indent=2), encoding="utf-8")
++    return path
++
++
++def _pid_file_status(path: Path) -> tuple[int | None, str]:
++    """Return the pid plus a coarse liveness status for a pid file."""
++    if not path.exists():
++        return None, "missing"
++    try:
++        pid = int(path.read_text(encoding="utf-8").strip())
++    except Exception:
++        return None, "invalid"
++
++    return pid, _pid_status(pid)
++
++
++def _pid_status(pid: int | None) -> str:
++    """Return a coarse liveness status for a pid value."""
++    if pid is None:
++        return "missing"
++    try:
++        if int(pid) <= 1:
++            return "stale"
++        os.kill(int(pid), 0)
++    except (TypeError, ValueError, OSError):
++        return "stale"
++    return "alive"
++
++
++def _command_for_pid(pid: int | None) -> str | None:
++    """Return the process command line for a pid, if available."""
++    if pid is None:
++        return None
++    ps_bin = os.environ.get("PS_BIN", "ps").strip() or "ps"
++    try:
++        completed = subprocess.run(
++            [ps_bin, "-p", str(pid), "-o", "command="],
++            capture_output=True,
++            check=False,
++            text=True,
++            timeout=2,
++        )
++    except (OSError, ValueError, subprocess.SubprocessError):
++        return None
++
++    for raw_line in completed.stdout.splitlines():
++        command = raw_line.strip()
++        if command:
++            return command
++    return None
++
++
++def _is_canonical_operator_command(command: str | None) -> bool:
++    """Whether a process command line matches the canonical backend."""
++    return bool(command) and "uvicorn" in command and "api.main:app" in command
++
++
++def _operator_listener_snapshot(*, port: int | None = None) -> dict[str, Any]:
++    """Return the current canonical operator listener snapshot for the API port."""
++    raw_port = os.environ.get("OPERATOR_PORT", "8420").strip()
++    try:
++        resolved_port = port if port is not None else int(raw_port)
++    except ValueError:
++        resolved_port = 8420
++    if resolved_port <= 0:
++        resolved_port = 8420
++
++    snapshot: dict[str, Any] = {
++        "port": resolved_port,
++        "pid": None,
++        "status": "missing",
++        "command": None,
++        "matches_expected": False,
++    }
++
++    lsof_bin = os.environ.get("LSOF_BIN", "lsof").strip() or "lsof"
++    try:
++        completed = subprocess.run(
++            [
++                lsof_bin,
++                "-n",
++                "-P",
++                f"-tiTCP:{resolved_port}",
++                "-sTCP:LISTEN",
++            ],
++            capture_output=True,
++            check=False,
++            text=True,
++            timeout=2,
++        )
++    except (OSError, ValueError, subprocess.SubprocessError) as exc:
++        snapshot["status"] = "unknown"
++        snapshot["error"] = str(exc)
++        return snapshot
++
++    listener_pid: int | None = None
++    for raw_line in completed.stdout.splitlines():
++        line = raw_line.strip()
++        if not line:
++            continue
++        try:
++            listener_pid = int(line)
++            break
++        except ValueError:
++            continue
++
++    if listener_pid is None:
++        return snapshot
++
++    command = _command_for_pid(listener_pid)
++    snapshot.update(
++        {
++            "pid": listener_pid,
++            "status": _pid_status(listener_pid),
++            "command": command,
++            "matches_expected": _is_canonical_operator_command(command),
++        }
++    )
++    return snapshot
++
++
++def runtime_supervision_summary(
++    state_dir: Path,
++    *,
++    repo_root: Path | None = None,
++    stale_after_seconds: float = 3600.0,
++) -> dict[str, Any]:
++    """Summarize daemon/operator pid ownership plus canonical health freshness."""
++    daemon_pid_path = state_dir / "daemon.pid"
++    operator_pid_path = state_dir / "operator.pid"
++    daemon_pid, daemon_status = _pid_file_status(daemon_pid_path)
++    operator_pid_file_pid, operator_pid_file_status = _pid_file_status(operator_pid_path)
++    operator_listener = _operator_listener_snapshot()
++    operator_listener_pid = operator_listener["pid"]
++    operator_listener_status = operator_listener["status"]
++    operator_listener_matches_expected = bool(operator_listener["matches_expected"])
++    operator_pid_mismatch = (
++        operator_pid_file_pid is not None
++        and operator_listener_pid is not None
++        and str(operator_pid_file_pid).strip() != str(operator_listener_pid).strip()
++    )
++    operator_pid = operator_pid_file_pid
++    operator_status = operator_pid_file_status
++    if operator_listener_matches_expected and operator_listener_status == "alive":
++        operator_pid = operator_listener_pid
++        operator_status = "alive"
++    elif operator_pid_file_status == "alive":
++        operator_status = "drifted"
++    elif operator_listener_pid is not None and not operator_listener_matches_expected:
++        operator_status = "unexpected_listener"
++    dgc_health = dgc_health_snapshot_summary(
++        state_dir,
++        stale_after_seconds=stale_after_seconds,
++    )
++    resolved_repo_root = repo_root or (Path.home() / "dharma_swarm")
++    launchd_candidates = (
++        (
++            "operator",
++            "com.dharma.dashboard-api",
++            Path.home() / "Library" / "LaunchAgents" / "com.dharma.dashboard-api.plist",
++        ),
++        (
++            "operator",
++            "com.dharma.dashboard-api",
++            resolved_repo_root / "scripts" / "com.dharma.dashboard-api.plist",
++        ),
++        (
++            "daemon",
++            "com.dhyana.dharma-daemon",
++            Path.home() / "Library" / "LaunchAgents" / "com.dhyana.dharma-daemon.plist",
++        ),
++        (
++            "daemon",
++            "com.dhyana.dharma-swarm",
++            Path.home() / "Library" / "LaunchAgents" / "com.dhyana.dharma-swarm.plist",
++        ),
++        (
++            "daemon",
++            "com.dhyana.dharma-daemon",
++            resolved_repo_root / "scripts" / "com.dhyana.dharma-daemon.plist",
++        ),
++    )
++    preferred_supervision_surface = (
++        "operator"
++        if operator_listener_matches_expected or operator_pid_path.exists()
++        else "daemon"
++    )
++    existing_preferred_candidate = next(
++        (
++            (surface, label, path)
++            for surface, label, path in launchd_candidates
++            if surface == preferred_supervision_surface and path.exists()
++        ),
++        None,
++    )
++    default_preferred_candidate = next(
++        (
++            (surface, label, path)
++            for surface, label, path in launchd_candidates
++            if surface == preferred_supervision_surface
++        ),
++        launchd_candidates[-1],
++    )
++    launchd_surface, launchd_label, launchd_plist = (
++        existing_preferred_candidate or default_preferred_candidate
++    )
++
++    has_runtime_evidence = (
++        daemon_pid_path.exists()
++        or operator_pid_path.exists()
++        or dgc_health["exists"]
++    )
++    if not has_runtime_evidence:
++        overall_status = "unknown"
++    elif (
++        daemon_status == "alive"
++        and dgc_health["status"] == "fresh"
++        and not dgc_health["daemon_pid_mismatch"]
++    ):
++        overall_status = "healthy"
++    elif daemon_status == "alive" or operator_status == "alive":
++        overall_status = "degraded"
++    else:
++        overall_status = "down"
++
++    return {
++        "status": overall_status,
++        "daemon": {
++            "path": daemon_pid_path,
++            "exists": daemon_pid_path.exists(),
++            "pid": daemon_pid,
++            "status": daemon_status,
++        },
++        "operator": {
++            "path": operator_pid_path,
++            "exists": operator_pid_path.exists(),
++            "pid": operator_pid,
++            "status": operator_status,
++            "pid_file_pid": operator_pid_file_pid,
++            "pid_file_status": operator_pid_file_status,
++            "listener_pid": operator_listener_pid,
++            "listener_status": operator_listener_status,
++            "listener_command": operator_listener["command"],
++            "listener_matches_expected": operator_listener_matches_expected,
++            "pid_mismatch": operator_pid_mismatch,
++            "port": operator_listener["port"],
++        },
++        "dgc_health": {
++            "path": dgc_health["path"],
++            "exists": dgc_health["exists"],
++            "status": dgc_health["status"],
++            "payload": dgc_health["payload"],
++            "timestamp": dgc_health["timestamp"],
++            "age_seconds": dgc_health["age_seconds"],
++            "daemon_pid": dgc_health["daemon_pid"],
++            "live_pid": dgc_health["live_pid"],
++            "daemon_pid_mismatch": dgc_health["daemon_pid_mismatch"],
++        },
++        "supervision": {
++            "mode": "launchd",
++            "surface": launchd_surface,
++            "label": launchd_label,
++            "launchd_plist_path": launchd_plist,
++            "launchd_plist_exists": launchd_plist.exists(),
++            "launchd_candidates": [
++                {
++                    "surface": surface,
++                    "label": label,
++                    "path": path,
++                    "exists": path.exists(),
++                }
++                for surface, label, path in launchd_candidates
++            ],
++        },
++    }
++
++
++def runtime_warning_summary(
++    state_dir: Path,
++    *,
++    limit: int = 20,
++) -> dict[str, Any]:
++    """Read canonical surfaced runtime warnings, newest item last."""
++    path = state_dir / "stigmergy" / "runtime_warnings.jsonl"
++    summary: dict[str, Any] = {
++        "path": path,
++        "exists": path.exists(),
++        "status": "missing",
++        "count": 0,
++        "latest": None,
++        "recent": [],
++    }
++    if not path.exists():
++        return summary
++
++    recent: list[dict[str, Any]] = []
++    try:
++        for raw_line in path.read_text(encoding="utf-8").splitlines():
++            line = raw_line.strip()
++            if not line:
++                continue
++            payload = json.loads(line)
++            if not isinstance(payload, dict):
++                continue
++            summary["count"] += 1
++            recent.append(payload)
++            if len(recent) > max(1, limit):
++                recent.pop(0)
++    except Exception as exc:
++        summary["status"] = "unreadable"
++        summary["error"] = str(exc)
++        return summary
++
++    summary["status"] = "present"
++    summary["recent"] = recent
++    if recent:
++        summary["latest"] = recent[-1]
++    return summary
++
++
++def append_runtime_warning(
++    state_dir: Path,
++    *,
++    component: str,
++    message: str,
++    error: str | None = None,
++    context: dict[str, Any] | None = None,
++) -> Path:
++    """Append a surfaced runtime warning for operator-visible failure paths."""
++    path = state_dir / "stigmergy" / "runtime_warnings.jsonl"
++    path.parent.mkdir(parents=True, exist_ok=True)
++    payload = {
++        "timestamp": datetime.now(timezone.utc).isoformat(),
++        "component": str(component).strip() or "runtime",
++        "message": str(message).strip(),
++    }
++    if error:
++        payload["error"] = str(error)
++    if context:
++        payload["context"] = dict(context)
++    with path.open("a", encoding="utf-8") as handle:
++        handle.write(json.dumps(payload) + "\n")
++    return path
++
++
++def maintenance_snapshot_summary(
++    state_dir: Path,
++    *,
++    stale_after_seconds: float = 172800.0,
++) -> dict[str, Any]:
++    """Read the latest maintenance snapshot, if present."""
++    path = state_dir / "stigmergy" / "maintenance_status.json"
++    summary: dict[str, Any] = {
++        "path": path,
++        "exists": path.exists(),
++        "status": "missing",
++        "payload": None,
++        "timestamp": None,
++        "age_seconds": None,
++    }
++    if not path.exists():
++        return summary
++
++    try:
++        payload = json.loads(path.read_text(encoding="utf-8"))
++    except Exception as exc:
++        summary["status"] = "unreadable"
++        summary["error"] = str(exc)
++        return summary
++
++    timestamp = parse_iso_datetime(payload.get("timestamp"))
++    age_seconds = None
++    if timestamp is not None:
++        age_seconds = max(0.0, (datetime.now(timezone.utc) - timestamp).total_seconds())
++
++    summary.update(
++        {
++            "payload": payload,
++            "timestamp": timestamp,
++            "age_seconds": age_seconds,
++        }
++    )
++    if timestamp is None:
++        summary["status"] = "unknown"
++    elif age_seconds is not None and age_seconds > stale_after_seconds:
++        summary["status"] = "stale"
++    else:
++        summary["status"] = "fresh"
++    return summary
++
++
++def write_maintenance_status_snapshot(
++    state_dir: Path,
++    *,
++    payload: dict[str, Any],
++) -> Path:
++    """Persist the latest retention and maintenance run outcome."""
++    path = state_dir / "stigmergy" / "maintenance_status.json"
++    path.parent.mkdir(parents=True, exist_ok=True)
++    materialized = dict(payload)
++    materialized["timestamp"] = datetime.now(timezone.utc).isoformat()
++    path.write_text(json.dumps(materialized, indent=2), encoding="utf-8")
++    return path
+diff --git a/dharma_swarm/swarm.py b/dharma_swarm/swarm.py
+index 5047144..353f3d1 100644
+--- a/dharma_swarm/swarm.py
++++ b/dharma_swarm/swarm.py
+@@ -143,6 +143,15 @@ class SwarmManager:
+         self._engine: DarwinEngine | None = None
+         self._monitor: SystemMonitor | None = None
+         self._trace_store: TraceStore | None = None
++        self._evolution_interval_ticks: int = 120
++        self._evolution_tick_counter: int = 0
++        self._fitness_history: list[float] = []
++        self._max_auto_evolves_per_day: int = 6
++        self._auto_evolves_today: int = 0
++        self._auto_evolve_day: str | None = None
++        self._stagnation_threshold: float = 0.01
++        self._stagnation_window: int = 60
++        self._auto_evolution_enabled: bool = True
+ 
+         # v0.3.0: Gödel Claw (CRITICAL: kernel + corpus)
+         self._kernel_guard: KernelGuard | None = None
+@@ -2124,6 +2133,23 @@ class SwarmManager:
+             except Exception as exc:
+                 logger.debug("Organism heartbeat error: %s", exc)
+ 
++        self._evolution_tick_counter += 1
++        if (
++            self._auto_evolution_enabled
++            and self._evolution_tick_counter >= self._evolution_interval_ticks
++            and self._engine is not None
++            and not getattr(self._engine, "_evolving", False)
++        ):
++            try:
++                result["auto_evolution"] = await self._maybe_auto_evolve(
++                    gnani_holds=gnani_holds
++                )
++            except Exception as exc:
++                logger.debug("Auto-evolution tick error: %s", exc)
++                result["auto_evolution"] = {"skipped": "error", "reason": str(exc)}
++            finally:
++                self._evolution_tick_counter = 0
++
+         # ── Meta-evolution: observe organism fitness, adapt hyperparameters ──
+         if (hasattr(self, "_meta_engine") and self._meta_engine is not None
+                 and result.get("organism_verdict") is not None):
+@@ -2523,6 +2549,62 @@ class SwarmManager:
+             "weighted_fitness": fitness.weighted() if fitness else 0.0,
+         }
+ 
++    def _current_auto_evolve_day(self) -> str:
++        return datetime.now(timezone.utc).strftime("%Y-%m-%d")
++
++    def _reset_auto_evolve_budget_if_needed(self) -> None:
++        today = self._current_auto_evolve_day()
++        if self._auto_evolve_day != today:
++            self._auto_evolve_day = today
++            self._auto_evolves_today = 0
++
++    def _detect_fitness_stagnation(self) -> bool:
++        window = self._stagnation_window
++        if len(self._fitness_history) < window * 2:
++            return False
++        previous_window = self._fitness_history[-(window * 2):-window]
++        recent_window = self._fitness_history[-window:]
++        previous_avg = sum(previous_window) / window
++        recent_avg = sum(recent_window) / window
++        return (recent_avg - previous_avg) < self._stagnation_threshold
++
++    async def _maybe_auto_evolve(self, *, gnani_holds: bool) -> dict[str, Any]:
++        self._reset_auto_evolve_budget_if_needed()
++
++        if gnani_holds:
++            return {"skipped": "gnani_hold"}
++        if not self._auto_evolution_enabled:
++            return {"skipped": "disabled"}
++        if self._auto_evolves_today >= self._max_auto_evolves_per_day:
++            return {"skipped": "daily_limit"}
++
++        agents = await self._agent_pool.list_agents() if self._agent_pool is not None else []
++        live_scores = [
++            float(getattr(agent, "fitness"))
++            for agent in agents
++            if isinstance(getattr(agent, "fitness", None), (int, float))
++        ]
++        if live_scores:
++            self._fitness_history.append(sum(live_scores) / len(live_scores))
++            max_points = self._stagnation_window * 4
++            if len(self._fitness_history) > max_points:
++                self._fitness_history = self._fitness_history[-max_points:]
++
++        if not self._detect_fitness_stagnation():
++            return {"skipped": "no_stagnation"}
++
++        try:
++            evolve_result = await self.evolve(
++                component="swarm",
++                change_type="auto_evolution",
++                description="Auto-evolution triggered by stagnant fitness history",
++            )
++        except RuntimeError as exc:
++            return {"skipped": "engine_unavailable", "reason": str(exc)}
++
++        self._auto_evolves_today += 1
++        return {"triggered": True, **evolve_result}
++
+     async def health_check(self) -> dict:
+         """Run system health check. Returns report as dict."""
+         if self._monitor is None:
+diff --git a/dharma_swarm/telic_seam.py b/dharma_swarm/telic_seam.py
+index 69e9820..20ad355 100644
+--- a/dharma_swarm/telic_seam.py
++++ b/dharma_swarm/telic_seam.py
+@@ -38,6 +38,7 @@ from dharma_swarm.lineage import LineageEdge, LineageGraph
+ from dharma_swarm.models import GateCheckResult, GateDecision, Task
+ from dharma_swarm.ontology import OntologyRegistry
+ from dharma_swarm.ontology_runtime import (
++    get_shared_hub,
+     get_shared_registry,
+     persist_shared_registry,
+ )
+@@ -69,6 +70,10 @@ class TelicSeam:
+             "value_events": 0,
+             "contributions": 0,
+         }
++        self._hub = get_shared_hub(path) if self._persist_registry else None
++        self._dirty_objects: set[str] = set()
++        self._dirty_links: set[str] = set()
++        self._dirty_actions: dict[str, Any] = {}
+ 
+     @property
+     def registry(self) -> OntologyRegistry:
+@@ -78,9 +83,76 @@ class TelicSeam:
+     def lineage(self) -> LineageGraph:
+         return self._lineage
+ 
++    def _mark_object_dirty(self, obj_id: str | None) -> None:
++        if obj_id:
++            self._dirty_objects.add(obj_id)
++
++    def _mark_link_dirty(self, link_id: str | None) -> None:
++        if link_id:
++            self._dirty_links.add(link_id)
++
++    def _mark_action_dirty(self, action: Any | None) -> None:
++        if action is not None:
++            self._dirty_actions[action.id] = action
++
+     def _flush_registry(self) -> None:
+-        if self._persist_registry:
++        if not self._persist_registry:
++            return
++
++        if not (self._dirty_objects or self._dirty_links or self._dirty_actions):
++            return
++
++        if self._hub is None:
++            self._hub = get_shared_hub(self._path)
++
++        try:
++            for obj_id in sorted(self._dirty_objects):
++                obj = self._registry.get_object(obj_id)
++                if obj is not None:
++                    self._hub.store_object(obj)
++
++            for link_id in sorted(self._dirty_links):
++                link = self._registry._link_instances.get(link_id)
++                if link is not None:
++                    self._hub.store_link(link)
++
++            for action_id in sorted(self._dirty_actions):
++                self._hub.store_action(self._dirty_actions[action_id])
++        except Exception:
+             persist_shared_registry(self._registry, self._path)
++        finally:
++            self._dirty_objects.clear()
++            self._dirty_links.clear()
++            self._dirty_actions.clear()
++
++    def _advance_proposal_status(self, proposal_id: str | None, new_status: str) -> None:
++        if proposal_id is None:
++            return
++
++        proposal = self._registry.get_object(proposal_id)
++        if proposal is None:
++            return
++        if proposal.properties.get("status") == new_status:
++            return
++
++        execution = self._registry.execute_action(
++            "ActionProposal",
++            "AdvanceProposal",
++            proposal_id,
++            {"status": new_status},
++            executed_by="telic_seam",
++        )
++        self._mark_action_dirty(execution)
++        if execution.result == "success":
++            self._mark_object_dirty(proposal_id)
++            return
++
++        logger.debug(
++            "ActionProposal transition to %s failed for %s: %s",
++            new_status,
++            proposal_id,
++            execution.error or execution.result,
++        )
+ 
+     def record_dispatch(
+         self,
+@@ -113,6 +185,7 @@ class TelicSeam:
+                 return None
+ 
+             self._proposal_map[task.id] = obj.id
++            self._mark_object_dirty(obj.id)
+             self._flush_registry()
+             return obj.id
+ 
+@@ -157,12 +230,14 @@ class TelicSeam:
+                 return None
+ 
+             # Link gate decision to proposal
+-            self._registry.create_link(
++            link, _ = self._registry.create_link(
+                 "has_gate_decision",
+                 source_id=proposal_id,
+                 target_id=obj.id,
+                 created_by="telic_seam",
+             )
++            self._mark_object_dirty(obj.id)
++            self._mark_link_dirty(link.id if link is not None else None)
+ 
+             # Update proposal status based on decision
+             new_status = {
+@@ -170,12 +245,7 @@ class TelicSeam:
+                 GateDecision.BLOCK: "rejected",
+                 GateDecision.REVIEW: "gated",
+             }.get(gate_result.decision, "gated")
+-
+-            self._registry.update_object(
+-                proposal_id,
+-                {"status": new_status},
+-                updated_by="telic_seam",
+-            )
++            self._advance_proposal_status(proposal_id, new_status)
+ 
+             self._flush_registry()
+             return obj.id
+@@ -223,6 +293,7 @@ class TelicSeam:
+                 logger.debug("ExecutionLease creation failed: %s", errors)
+                 return None
+ 
++            self._mark_object_dirty(obj.id)
+             self._ensure_execution_lease_linkage(proposal_id, obj)
+             self._flush_registry()
+             return obj.id
+@@ -274,19 +345,19 @@ class TelicSeam:
+                 logger.debug("Outcome creation failed: %s", errors)
+                 return None
+ 
++            self._mark_object_dirty(obj.id)
+             # Link outcome to proposal if we have one
+             if proposal_id:
+-                self._registry.create_link(
++                link, _ = self._registry.create_link(
+                     "has_outcome",
+                     source_id=proposal_id,
+                     target_id=obj.id,
+                     created_by="telic_seam",
+                 )
+-                # Update proposal status
+-                self._registry.update_object(
++                self._mark_link_dirty(link.id if link is not None else None)
++                self._advance_proposal_status(
+                     proposal_id,
+-                    {"status": "completed" if success else "failed"},
+-                    updated_by="telic_seam",
++                    "completed" if success else "failed",
+                 )
+ 
+             # Record lineage edge
+@@ -378,12 +449,14 @@ class TelicSeam:
+                 return None
+ 
+             # Link to outcome
+-            self._registry.create_link(
++            link, _ = self._registry.create_link(
+                 "has_value_event",
+                 source_id=outcome_id,
+                 target_id=obj.id,
+                 created_by="telic_seam",
+             )
++            self._mark_object_dirty(obj.id)
++            self._mark_link_dirty(link.id if link is not None else None)
+ 
+             self._flush_registry()
+             return obj.id
+@@ -434,12 +507,14 @@ class TelicSeam:
+                 return None
+ 
+             # Link to value event
+-            self._registry.create_link(
++            link, _ = self._registry.create_link(
+                 "has_contribution",
+                 source_id=value_event_id,
+                 target_id=obj.id,
+                 created_by="telic_seam",
+             )
++            self._mark_object_dirty(obj.id)
++            self._mark_link_dirty(link.id if link is not None else None)
+ 
+             self._flush_registry()
+             return obj.id
+@@ -665,18 +740,20 @@ class TelicSeam:
+             link_name="has_execution_lease",
+         )
+         if not links:
+-            self._registry.create_link(
++            created_link, _ = self._registry.create_link(
+                 "has_execution_lease",
+                 source_id=proposal_id,
+                 target_id=lease.id,
+                 created_by="telic_seam",
+             )
++            self._mark_link_dirty(created_link.id if created_link is not None else None)
+ 
+         self._registry.update_object(
+             proposal_id,
+             {"status": "executing"},
+             updated_by="telic_seam",
+         )
++        self._mark_object_dirty(proposal_id)
+ 
+     def _ensure_outcome_linkage(self, proposal_id: str | None, outcome: Any) -> None:
+         """Repair proposal linkage/status when reusing an existing canonical Outcome."""
+@@ -689,18 +766,18 @@ class TelicSeam:
+             link_name="has_outcome",
+         )
+         if not links:
+-            self._registry.create_link(
++            created_link, _ = self._registry.create_link(
+                 "has_outcome",
+                 source_id=proposal_id,
+                 target_id=outcome.id,
+                 created_by="telic_seam",
+             )
++            self._mark_link_dirty(created_link.id if created_link is not None else None)
+ 
+         success = bool(outcome.properties.get("success"))
+-        self._registry.update_object(
++        self._advance_proposal_status(
+             proposal_id,
+-            {"status": "completed" if success else "failed"},
+-            updated_by="telic_seam",
++            "completed" if success else "failed",
+         )
+ 
+ 
+diff --git a/dharma_swarm/tui_helpers.py b/dharma_swarm/tui_helpers.py
+index 7abdc99..8994172 100644
+--- a/dharma_swarm/tui_helpers.py
++++ b/dharma_swarm/tui_helpers.py
+@@ -29,6 +29,19 @@ def _read_json(path: Path) -> dict | None:
+         return None
+ 
+ 
++def _read_json_object(raw: object) -> dict[str, object]:
++    """Parse a JSON object payload, returning an empty dict on failure."""
++    if isinstance(raw, dict):
++        return dict(raw)
++    if not isinstance(raw, str) or not raw.strip():
++        return {}
++    try:
++        payload = json.loads(raw)
++    except Exception:
++        return {}
++    return payload if isinstance(payload, dict) else {}
++
++
+ def _load_jsonl_tail(path: Path, *, limit: int) -> list[dict]:
+     """Load up to *limit* JSONL objects from the tail of *path*."""
+     if not path.exists():
+@@ -97,6 +110,119 @@ def _mean(values: list[float]) -> float | None:
+     return sum(values) / len(values)
+ 
+ 
++def load_resident_seat_summary(
++    *,
++    runtime_db_path: Path | None = None,
++    limit: int = 6,
++) -> list[dict[str, str]]:
++    """Return resident-seat identities from the canonical runtime telemetry DB."""
++    db_path = runtime_db_path or _runtime_db_path()
++    if not db_path.exists():
++        return []
++
++    try:
++        with sqlite3.connect(str(db_path)) as db:
++            db.row_factory = sqlite3.Row
++            rows = db.execute(
++                "SELECT tr.agent_id, tr.role, tr.active, tr.updated_at, tr.metadata_json,"
++                " ai.status AS identity_status, ai.metadata_json AS identity_metadata"
++                " FROM team_roster tr"
++                " LEFT JOIN agent_identity ai ON ai.agent_id = tr.agent_id"
++                " WHERE tr.active = 1"
++                " ORDER BY tr.updated_at DESC"
++                " LIMIT ?",
++                (max(1, limit * 4),),
++            ).fetchall()
++    except sqlite3.Error:
++        return []
++
++    summary: list[dict[str, str]] = []
++    for row in rows:
++        roster_meta = _read_json_object(row["metadata_json"])
++        identity_meta = _read_json_object(row["identity_metadata"])
++        seat_id = str(
++            roster_meta.get("seat_id")
++            or identity_meta.get("seat_id")
++            or ""
++        ).strip()
++        agent_id = str(row["agent_id"] or "").strip()
++        if not seat_id and not agent_id.startswith("resident."):
++            continue
++        display_name = str(
++            roster_meta.get("agent_display_name")
++            or roster_meta.get("display_name")
++            or identity_meta.get("agent_display_name")
++            or identity_meta.get("display_name")
++            or identity_meta.get("codename")
++            or agent_id
++        ).strip()
++        runtime_name = str(
++            identity_meta.get("runtime_agent_name")
++            or roster_meta.get("runtime_agent_name")
++            or identity_meta.get("bus_agent_id")
++            or agent_id
++        ).strip()
++        current_binding = str(
++            identity_meta.get("current_binding")
++            or roster_meta.get("current_binding")
++            or identity_meta.get("selected_model_hint")
++            or ""
++        ).strip()
++        status = str(
++            row["identity_status"]
++            or identity_meta.get("bus_status")
++            or "active"
++        ).strip()
++        summary.append(
++            {
++                "agent_id": agent_id,
++                "display_name": display_name,
++                "seat_id": seat_id,
++                "runtime_name": runtime_name,
++                "current_binding": current_binding,
++                "status": status,
++                "role": str(row["role"] or "").strip(),
++            }
++        )
++        if len(summary) >= max(1, limit):
++            break
++
++    try:
++        from dharma_swarm.startup_crew import FRONTIER_MODEL_CREW
++    except Exception:
++        FRONTIER_MODEL_CREW = []
++
++    known_agent_ids = {seat["agent_id"] for seat in summary}
++    for spec in FRONTIER_MODEL_CREW:
++        metadata = spec.get("metadata", {})
++        agent_id = str(metadata.get("agent_id") or "").strip()
++        if not agent_id or agent_id in known_agent_ids:
++            continue
++        summary.append(
++            {
++                "agent_id": agent_id,
++                "display_name": str(
++                    metadata.get("display_name")
++                    or spec.get("name")
++                    or agent_id
++                ).strip(),
++                "seat_id": str(metadata.get("seat_id") or "").strip(),
++                "runtime_name": str(spec.get("name") or agent_id).strip(),
++                "current_binding": str(
++                    metadata.get("current_binding")
++                    or spec.get("model")
++                    or ""
++                ).strip(),
++                "status": "configured",
++                "role": str(spec.get("role") or "").strip(),
++            }
++        )
++        known_agent_ids.add(agent_id)
++        if len(summary) >= max(1, limit):
++            break
++    return summary
++
++
+ def build_status_text() -> str:
+     """Build the system status panel text (Rich markup).
+ 
+@@ -146,6 +272,17 @@ def build_status_text() -> str:
+         src_files = list(src_dir.glob("*.py"))
+         lines.append(f"  Source modules: {len(src_files)}")
+ 
++    resident_seats = load_resident_seat_summary(limit=4)
++    if resident_seats:
++        lines.append(f"  Resident seats: {len(resident_seats)}")
++        for seat in resident_seats:
++            seat_id = seat["seat_id"] or "unscoped"
++            binding = seat["current_binding"] or "binding pending"
++            lines.append(
++                "    "
++                f"{seat['display_name']} ({seat_id}) -> {binding}"
++            )
++
+     # Evolution archive size
+     archive_path = DHARMA_STATE / "evolution" / "archive.jsonl"
+     if archive_path.exists():
+@@ -282,6 +419,25 @@ def build_runtime_status_text(
+     else:
+         lines.append(f"  [dim]No canonical runtime database found at {db_path}[/dim]")
+ 
++    resident_seats = load_resident_seat_summary(
++        runtime_db_path=db_path,
++        limit=limit,
++    )
++    if resident_seats:
++        lines.append(f"  [{AI_DEEP}]Resident seats[/{AI_DEEP}]")
++        for seat in resident_seats:
++            binding = seat["current_binding"] or "binding pending"
++            seat_id = seat["seat_id"] or "unscoped"
++            lines.append(
++                "    "
++                f"{seat['display_name']}  "
++                f"seat={seat_id}  "
++                f"status={seat['status']}  "
++                f"model={binding}  "
++                f"runtime={seat['runtime_name']}  "
++                f"id={seat['agent_id']}"
++            )
++
+     lines.append(f"  [{AI_DEEP}]Toolchain[/{AI_DEEP}]")
+     for prog in ("claude", "python3", "node"):
+         lines.append(f"    {prog}: {shutil.which(prog) or 'not found'}")
+diff --git a/dharma_swarm/witness.py b/dharma_swarm/witness.py
+index c0701e8..8bc603e 100644
+--- a/dharma_swarm/witness.py
++++ b/dharma_swarm/witness.py
+@@ -361,16 +361,31 @@ class WitnessAuditor:
+             except Exception as exc:
+                 logger.debug("Witness: failed to write to operator memory: %s", exc)
+ 
+-        # Emit to signal bus
++        # Emit to signal bus (W1: includes per-agent findings for routing)
+         try:
+             from dharma_swarm.signal_bus import SignalBus
+ 
++            # Build per-agent finding summary for orchestrator consumption
++            findings_by_agent: dict[str, dict[str, Any]] = {}
++            for f in actionable:
++                agent_name = f.agent or "unknown"
++                if agent_name not in findings_by_agent:
++                    findings_by_agent[agent_name] = {
++                        "mimicry": False, "telos_misaligned": False, "count": 0,
++                    }
++                findings_by_agent[agent_name]["count"] += 1
++                if f.mimicry_detected:
++                    findings_by_agent[agent_name]["mimicry"] = True
++                if not f.telos_aligned:
++                    findings_by_agent[agent_name]["telos_misaligned"] = True
++
+             bus = SignalBus.get()
+             bus.emit({
+                 "type": "WITNESS_AUDIT",
+                 "cycle": self._cycles_completed,
+                 "total_findings": len(findings),
+                 "actionable_findings": len(actionable),
++                "findings_by_agent": findings_by_agent,
+                 "severities": {
+                     "info": sum(1 for f in findings if f.severity == "info"),
+                     "warning": sum(1 for f in findings if f.severity == "warning"),
+diff --git a/pyproject.toml b/pyproject.toml
+index 3ed5963..4dd165a 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -45,7 +45,7 @@ ginko = [
+ 
+ [project.scripts]
+ dharma-swarm = "dharma_swarm.cli:app"
+-dgc = "dharma_swarm.dgc_cli:main"
++dgc = "dharma_swarm.dgc:main"
+ 
+ [tool.setuptools.packages.find]
+ include = ["dharma_swarm*"]
+diff --git a/run_operator.sh b/run_operator.sh
+index 4a8d3d9..57ec4cf 100755
+--- a/run_operator.sh
++++ b/run_operator.sh
+@@ -16,6 +16,9 @@ LOG_FILE="${STATE_DIR}/logs/operator.log"
+ PORT="${OPERATOR_PORT:-8420}"
+ HOST="${OPERATOR_HOST:-127.0.0.1}"
+ PYTHON_BIN="${PYTHON_BIN:-python3}"
++PS_BIN="${PS_BIN:-ps}"
++LSOF_BIN="${LSOF_BIN:-lsof}"
++CURL_BIN="${CURL_BIN:-curl}"
+ RUNTIME_ENV_HELPER="${SCRIPT_DIR}/scripts/load_runtime_env.sh"
+ 
+ mkdir -p "${STATE_DIR}/logs" "${STATE_DIR}/db"
+@@ -23,12 +26,71 @@ mkdir -p "${STATE_DIR}/logs" "${STATE_DIR}/db"
+ operator_cmd_matches() {
+     local pid="$1"
+     local cmd
+-    cmd="$(ps -p "$pid" -o command= 2>/dev/null || true)"
++    cmd="$("$PS_BIN" -p "$pid" -o command= 2>/dev/null || true)"
+     [[ "$cmd" == *"uvicorn"* && "$cmd" == *"api.main:app"* ]]
+ }
+ 
++process_state() {
++    local pid="$1"
++    "$PS_BIN" -p "$pid" -o stat= 2>/dev/null | awk 'NR==1 {print $1}'
++}
++
++process_is_defunct() {
++    local pid="$1"
++    local state
++    state="$(process_state "$pid")"
++    [[ "$state" == Z* ]]
++}
++
++process_is_running() {
++    local pid="$1"
++    kill -0 "$pid" 2>/dev/null && ! process_is_defunct "$pid"
++}
++
+ listening_pid() {
+-    lsof -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | head -n 1
++    "$LSOF_BIN" -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | head -n 1
++}
++
++operator_health_url() {
++    local host="$1"
++    local port="$2"
++
++    if [[ "$host" == *":"* && "$host" != \[*\] ]]; then
++        printf 'http://[%s]:%s/api/health\n' "$host" "$port"
++    else
++        printf 'http://%s:%s/api/health\n' "$host" "$port"
++    fi
++}
++
++operator_probe_host() {
++    local host="$1"
++
++    case "$host" in
++        0.0.0.0)
++            printf '%s\n' "127.0.0.1"
++            ;;
++        "::"|"[::]")
++            printf '%s\n' "::1"
++            ;;
++        *)
++            printf '%s\n' "$host"
++            ;;
++    esac
++}
++
++http_ready() {
++    local url="$1"
++    local attempts="${2:-20}"
++    local sleep_seconds="${3:-1}"
++
++    for ((i = 1; i <= attempts; i++)); do
++        if "$CURL_BIN" -fsS --max-time 2 "$url" >/dev/null 2>&1; then
++            return 0
++        fi
++        sleep "$sleep_seconds"
++    done
++
++    return 1
+ }
+ 
+ wait_for_operator_ready() {
+@@ -38,12 +100,12 @@ wait_for_operator_ready() {
+     local observed_pid
+ 
+     for ((i = 1; i <= attempts; i++)); do
+-        if ! kill -0 "$pid" 2>/dev/null; then
++        if ! process_is_running "$pid"; then
+             return 1
+         fi
+ 
+         observed_pid="$(listening_pid || true)"
+-        if [[ "$observed_pid" == "$pid" ]]; then
++        if [[ "$observed_pid" == "$pid" ]] && http_ready "$(operator_health_url "$(operator_probe_host "$HOST")" "$PORT")" 1 1; then
+             return 0
+         fi
+ 
+@@ -60,6 +122,7 @@ fi
+ 
+ export DGC_ROUTER_TELEMETRY_ENABLE="${DGC_ROUTER_TELEMETRY_ENABLE:-1}"
+ export DGC_ROUTER_TELEMETRY_DB="${DGC_ROUTER_TELEMETRY_DB:-${STATE_DIR}/state/runtime.db}"
++export DHARMA_PUBLISH_OPERATOR_PID="${DHARMA_PUBLISH_OPERATOR_PID:-1}"
+ 
+ if [[ -z "${OPENROUTER_API_KEY:-}" ]]; then
+     echo "WARNING: OPENROUTER_API_KEY not set. Chat providers may run degraded." >&2
+@@ -67,7 +130,7 @@ fi
+ 
+ if [[ -f "$PID_FILE" ]]; then
+     old_pid="$(cat "$PID_FILE" 2>/dev/null || true)"
+-    if [[ -n "$old_pid" ]] && kill -0 "$old_pid" 2>/dev/null; then
++    if [[ -n "$old_pid" ]] && process_is_running "$old_pid"; then
+         if operator_cmd_matches "$old_pid"; then
+             echo "Operator already running (PID $old_pid)"
+             exit 0
+@@ -79,7 +142,7 @@ fi
+ 
+ existing_pid="$(listening_pid || true)"
+ if [[ -n "$existing_pid" ]]; then
+-    if operator_cmd_matches "$existing_pid"; then
++    if process_is_running "$existing_pid" && operator_cmd_matches "$existing_pid"; then
+         echo "$existing_pid" > "$PID_FILE"
+         echo "Operator already running on port $PORT (PID $existing_pid)"
+         exit 0
+diff --git a/tests/test_agents_router.py b/tests/test_agents_router.py
+index abac966..d6dc7ac 100644
+--- a/tests/test_agents_router.py
++++ b/tests/test_agents_router.py
+@@ -1,5 +1,7 @@
+ from __future__ import annotations
+ 
++from types import SimpleNamespace
++
+ from fastapi import FastAPI
+ from fastapi.testclient import TestClient
+ import pytest
+@@ -10,6 +12,9 @@ from dharma_swarm.ontology_runtime import get_shared_registry, reset_shared_regi
+ 
+ 
+ class _DummySwarm:
++    def __init__(self) -> None:
++        self._agent_configs = {}
++
+     async def list_agents(self) -> list[AgentState]:
+         return [
+             AgentState(
+@@ -74,6 +79,39 @@ class _EmptyAgentRegistry:
+         return {"daily_spent": 0.0, "weekly_spent": 0.0, "status": "OK"}
+ 
+ 
++class _ResidentSwarm(_DummySwarm):
++    def __init__(self) -> None:
++        super().__init__()
++        self._agent_configs = {
++            "agent-1": SimpleNamespace(
++                metadata={
++                    "agent_id": "resident.frontier.indra_anekanta",
++                    "codename": "Indra_Anekanta",
++                    "display_name": "Indra Anekanta Synthesist",
++                    "seat_id": "frontier_synthesist",
++                    "english_title": "Synthesist",
++                    "charter": "many-sided synthesis into precise implementation without one-sided collapse.",
++                    "workflow_mode": "frontier_models",
++                    "agent_number": "FRONTIER-001",
++                    "current_binding": "qwen/qwen3-coder-next",
++                    "model_family": "qwen_3_5_coder",
++                }
++            )
++        }
++
++    async def list_agents(self) -> list[AgentState]:
++        return [
++            AgentState(
++                id="agent-1",
++                name="Indra_Anekanta_Synthesist",
++                role=AgentRole.SURGEON,
++                status=AgentStatus.IDLE,
++                provider="openrouter",
++                model="qwen/qwen3-coder-next",
++            )
++        ]
++
++
+ def _client() -> TestClient:
+     app = FastAPI()
+     app.include_router(agents_router.router)
+@@ -96,11 +134,13 @@ def test_list_agents_includes_identity_fields(monkeypatch, isolated_shared_ontol
+ 
+     assert resp.status_code == 200
+     agent = resp.json()["data"][0]
++    assert agent["canonical_agent_id"] == "agent-1"
+     assert agent["agent_slug"] == "qwen35-surgeon"
+     assert agent["display_name"] == "Qwen35 Surgeon"
+     assert agent["provider"] == "ollama"
+     assert agent["model_label"] == "qwen3-coder:480b-cloud"
+     assert agent["model_key"] == "ollama::qwen3-coder:480b-cloud"
++    assert agent["is_resident"] is False
+ 
+     registry = get_shared_registry()
+     identities = registry.get_objects_by_type("AgentIdentity")
+@@ -135,6 +175,24 @@ def test_spawn_agent_passes_provider_and_model(monkeypatch, isolated_shared_onto
+     assert identities[0].properties["provider"] == "ollama"
+ 
+ 
++def test_list_agents_exposes_resident_metadata(monkeypatch, isolated_shared_ontology) -> None:
++    monkeypatch.setattr(agents_router, "_get_swarm", lambda: _ResidentSwarm())
++    client = _client()
++
++    resp = client.get("/api/agents")
++
++    assert resp.status_code == 200
++    agent = resp.json()["data"][0]
++    assert agent["id"] == "agent-1"
++    assert agent["canonical_agent_id"] == "resident.frontier.indra_anekanta"
++    assert agent["display_name"] == "Indra Anekanta Synthesist"
++    assert agent["seat_id"] == "frontier_synthesist"
++    assert agent["english_title"] == "Synthesist"
++    assert agent["current_binding"] == "qwen/qwen3-coder-next"
++    assert agent["workflow_mode"] == "frontier_models"
++    assert agent["is_resident"] is True
++
++
+ def test_stop_agent_marks_ontology_identity_stopping(
+     monkeypatch,
+     isolated_shared_ontology,
+diff --git a/tests/test_browser_agent.py b/tests/test_browser_agent.py
+index fe7c601..aab0fed 100644
+--- a/tests/test_browser_agent.py
++++ b/tests/test_browser_agent.py
+@@ -29,6 +29,7 @@ from dharma_swarm.browser_agent import (
+     _strip_html,
+     _extract_title,
+     _check_browser_available,
++    _check_live_browser_available,
+ )
+ 
+ 
+@@ -498,7 +499,7 @@ class TestContextManager:
+ # ── Integration Tests (require real browser, skip in CI) ───────────────
+ 
+ @pytest.mark.skipif(
+-    not _check_browser_available(),
++    not _check_live_browser_available(),
+     reason="Playwright not installed",
+ )
+ class TestBrowserAgentLive:
+diff --git a/tests/test_chat_tools.py b/tests/test_chat_tools.py
+index f2dea55..301602f 100644
+--- a/tests/test_chat_tools.py
++++ b/tests/test_chat_tools.py
+@@ -1,8 +1,13 @@
+ from __future__ import annotations
+ 
++import asyncio
++from types import SimpleNamespace
++
+ import pytest
+ 
++import api.chat_tools as chat_tools
+ from api.chat_tools import exec_stigmergy_query
++from dharma_swarm.models import GateDecision
+ from dharma_swarm.stigmergy import StigmergicMark
+ 
+ 
+@@ -51,3 +56,84 @@ async def test_exec_stigmergy_query_awaits_async_store_methods(
+ 
+     high = await exec_stigmergy_query({"action": "high_salience", "limit": 2})
+     assert "high-2.py" in high
++
++
++@pytest.mark.asyncio
++async def test_exec_write_file_blocks_when_gate_requires_review(
++    monkeypatch: pytest.MonkeyPatch,
++    tmp_path,
++) -> None:
++    monkeypatch.setattr(chat_tools, "ALLOWED_ROOTS", [tmp_path])
++    monkeypatch.setattr(chat_tools, "PROJECT_ROOT", tmp_path)
++
++    gate_calls: list[tuple[str, str]] = []
++
++    def fake_check_action(*, action: str, content: str = ""):
++        gate_calls.append((action, content))
++        return SimpleNamespace(decision=GateDecision.REVIEW, reason="manual review")
++
++    monkeypatch.setattr("dharma_swarm.telos_gates.check_action", fake_check_action)
++
++    result = await chat_tools.exec_write_file(
++        {"path": "review.txt", "content": "sensitive payload"}
++    )
++
++    assert result == "ERROR: Gate review required: manual review"
++    assert gate_calls == [("write_file: review.txt", "sensitive payload")]
++    assert not (tmp_path / "review.txt").exists()
++
++
++@pytest.mark.asyncio
++async def test_exec_edit_file_blocks_when_gate_blocks_edit(
++    monkeypatch: pytest.MonkeyPatch,
++    tmp_path,
++) -> None:
++    monkeypatch.setattr(chat_tools, "ALLOWED_ROOTS", [tmp_path])
++    monkeypatch.setattr(chat_tools, "PROJECT_ROOT", tmp_path)
++    target = tmp_path / "editable.txt"
++    target.write_text("alpha beta")
++
++    gate_calls: list[tuple[str, str]] = []
++
++    def fake_check_action(*, action: str, content: str = ""):
++        gate_calls.append((action, content))
++        return SimpleNamespace(decision=GateDecision.BLOCK, reason="unsafe edit")
++
++    monkeypatch.setattr("dharma_swarm.telos_gates.check_action", fake_check_action)
++
++    result = await chat_tools.exec_edit_file(
++        {
++            "path": "editable.txt",
++            "old_string": "beta",
++            "new_string": "gamma",
++        }
++    )
++
++    assert result == "ERROR: Gate blocked action: unsafe edit"
++    assert gate_calls == [("edit_file: editable.txt", "beta\ngamma")]
++    assert target.read_text() == "alpha beta"
++
++
++@pytest.mark.asyncio
++async def test_exec_shell_holds_on_review_without_launching_subprocess(
++    monkeypatch: pytest.MonkeyPatch,
++) -> None:
++    launched = False
++
++    def fake_check_action(*, action: str, content: str = ""):
++        assert action == "shell_exec: echo hi"
++        assert content == "echo hi"
++        return SimpleNamespace(decision=GateDecision.REVIEW, reason="needs witness")
++
++    async def fake_create_subprocess_exec(*_args, **_kwargs):
++        nonlocal launched
++        launched = True
++        raise AssertionError("subprocess should not launch for REVIEW")
++
++    monkeypatch.setattr("dharma_swarm.telos_gates.check_action", fake_check_action)
++    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_create_subprocess_exec)
++
++    result = await chat_tools.exec_shell({"command": "echo hi"})
++
++    assert result == "ERROR: Gate review required: needs witness"
++    assert not launched
+diff --git a/tests/test_dgc_cli.py b/tests/test_dgc_cli.py
+index 197d213..9d22571 100644
+--- a/tests/test_dgc_cli.py
++++ b/tests/test_dgc_cli.py
+@@ -1333,6 +1333,64 @@ def test_cmd_status_prefers_canonical_runtime_artifacts(monkeypatch, tmp_path, c
+     assert "stale" in out.lower()
+ 
+ 
++def test_cmd_status_reports_latest_routing_snapshot(monkeypatch, tmp_path, capsys):
++    """status should expose the latest adaptive routing decision when present."""
++    import dharma_swarm.dgc_cli as cli
++
++    dharma_state = tmp_path / ".dharma"
++    pulse_log = dharma_state / "logs" / "pulse.log"
++    pulse_log.parent.mkdir(parents=True)
++    pulse_log.write_text("OK: pulse -> /tmp/pulse_1.md\n", encoding="utf-8")
++    (dharma_state / "daemon.pid").write_text(str(os.getpid()), encoding="utf-8")
++
++    stigmergy_dir = dharma_state / "stigmergy"
++    stigmergy_dir.mkdir(parents=True)
++    (stigmergy_dir / "dgc_health.json").write_text(
++        json.dumps(
++            {
++                "daemon_pid": os.getpid(),
++                "timestamp": datetime.now(timezone.utc).isoformat(),
++                "source": "swarm.run",
++            }
++        ),
++        encoding="utf-8",
++    )
++    (stigmergy_dir / "routing_decision.json").write_text(
++        json.dumps(
++            {
++                "timestamp": datetime.now(timezone.utc).isoformat(),
++                "strategy": "fitness",
++                "task_id": "t-routing",
++                "chosen_agent_name": "agent-steady",
++                "chosen_agent_id": "a-steady",
++            }
++        ),
++        encoding="utf-8",
++    )
++
++    monkeypatch.setattr(cli, "HOME", tmp_path)
++    monkeypatch.setattr(cli, "DHARMA_STATE", dharma_state)
++    monkeypatch.setattr(cli, "DGC_CORE", tmp_path / "dgc-core")
++
++    def _fake_run(coro):
++        coro.close()
++        return 0
++
++    monkeypatch.setattr(cli, "_run", _fake_run)
++    monkeypatch.setattr(
++        cli.subprocess,
++        "run",
++        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, "claude 1.2.3\n", ""),
++    )
++
++    cli.cmd_status()
++
++    out = capsys.readouterr().out
++    assert "Control plane snapshot:" in out
++    assert "routing=fitness" in out
++    assert "agent-steady" in out
++
++
+ def test_cmd_status_prefers_fresher_pulse_source(monkeypatch, tmp_path, capsys):
+     """status should favor the freshest canonical pulse evidence when sources disagree."""
+     import subprocess
+@@ -1401,6 +1459,53 @@ def test_cmd_daemon_status_prefers_fresher_pulse_source(monkeypatch, tmp_path, c
+     assert "logs/pulse.log" in out
+ 
+ 
++def test_cmd_status_ignores_future_skewed_cron_pulse_names(monkeypatch, tmp_path, capsys):
++    """status should not let future-skewed cron filenames outrank a real live pulse."""
++    import subprocess
++    from dharma_swarm import dgc_cli as cli
++
++    dharma_state = tmp_path / ".dharma"
++    live_timestamp = (datetime.now(timezone.utc) - timedelta(seconds=10)).isoformat()
++    live_runner_log = dharma_state / "logs" / "pulse.log"
++    live_runner_log.parent.mkdir(parents=True)
++    live_runner_log.write_text(
++        f"\n--- PULSE @ {live_timestamp} [swarm:phenomenological] ---\n"
++        "runtime=swarm tick=1 status=starting\n",
++        encoding="utf-8",
++    )
++
++    cron_dir = dharma_state / "cron"
++    cron_dir.mkdir(parents=True)
++    skewed_ts = datetime.now(timezone.utc) + timedelta(hours=12)
++    skewed = cron_dir / f"pulse_{skewed_ts.strftime('%Y%m%d_%H%M%S')}.md"
++    skewed.write_text("pulse ok", encoding="utf-8")
++    skewed.touch()
++
++    monkeypatch.setattr(cli, "HOME", tmp_path)
++    monkeypatch.setattr(cli, "DHARMA_STATE", dharma_state)
++    monkeypatch.setattr(cli, "DGC_CORE", tmp_path / "dgc-core")
++
++    def _fake_run(coro):
++        coro.close()
++        return 0
++
++    monkeypatch.setattr(cli, "_run", _fake_run)
++    monkeypatch.setattr(
++        cli.subprocess,
++        "run",
++        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, "2.1.87 (Claude Code)\n", ""),
++    )
++
++    pulse_count, last_pulse, pulse_source = cli._canonical_pulse_summary()
++    cli.cmd_status()
++
++    out = capsys.readouterr().out
++    assert pulse_count == 1
++    assert last_pulse is not None
++    assert pulse_source == live_runner_log
++    assert "logs/pulse.log" in out
++
++
+ def test_cmd_reciprocity_summary_prints_ledger_summary(capsys, monkeypatch):
+     """reciprocity summary should print the fetched ledger summary payload."""
+     import dharma_swarm.dgc_cli as cli
+diff --git a/tests/test_ontology_adapters.py b/tests/test_ontology_adapters.py
+index 1d9ac68..c642be4 100644
+--- a/tests/test_ontology_adapters.py
++++ b/tests/test_ontology_adapters.py
+@@ -3,15 +3,18 @@
+ from __future__ import annotations
+ 
+ import json
++import sqlite3
+ from pathlib import Path
+ 
+ import pytest
+ 
+ from dharma_swarm.ontology import OntologyRegistry
+ from dharma_swarm.ontology_adapters import (
++    adapt_claims,
+     adapt_corpus,
+     adapt_evolution,
+     adapt_gates,
++    adapt_ingestion,
+     adapt_identity,
+     adapt_stigmergy,
+     adapt_zeitgeist,
+@@ -178,6 +181,88 @@ def dharma_tree(tmp_path: Path) -> Path:
+         for c in claims:
+             f.write(json.dumps(c) + "\n")
+ 
++    # Semantic ingestion spine
++    semantic_dir = tmp_path / "semantic"
++    semantic_dir.mkdir()
++    conn = sqlite3.connect(semantic_dir / "ingestion_spine.db")
++    conn.executescript(
++        """
++        CREATE TABLE documents (
++            doc_id TEXT PRIMARY KEY,
++            source_name TEXT NOT NULL,
++            source_path TEXT NOT NULL,
++            content_hash TEXT NOT NULL,
++            archive_path TEXT NOT NULL,
++            title TEXT DEFAULT '',
++            summary TEXT DEFAULT '',
++            concepts_json TEXT DEFAULT '[]',
++            claims_json TEXT DEFAULT '[]',
++            structures_json TEXT DEFAULT '[]',
++            categories_json TEXT DEFAULT '{}',
++            tags_json TEXT DEFAULT '[]',
++            metadata_json TEXT DEFAULT '{}',
++            index_doc_id TEXT DEFAULT '',
++            vector_doc_id INTEGER DEFAULT -1,
++            updated_at TEXT NOT NULL
++        );
++        """
++    )
++    conn.executemany(
++        """
++        INSERT INTO documents (
++            doc_id, source_name, source_path, content_hash, archive_path, title, summary,
++            concepts_json, claims_json, structures_json, categories_json, tags_json,
++            metadata_json, index_doc_id, vector_doc_id, updated_at
++        )
++        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
++        """,
++        [
++            (
++                "doc-001",
++                "spec-forge",
++                "/repo/CODEX_BRIEFING.md",
++                "hash-1",
++                "/archive/doc-001.md",
++                "Ontology briefing",
++                "Make the ontology gravitational.",
++                json.dumps(["ontology", "meta-layer"]),
++                json.dumps(
++                    [
++                        "Actions need one real mutation path.",
++                        {"text": "Capabilities stay schema-only in this pass.", "confidence": 0.85},
++                    ]
++                ),
++                "[]",
++                json.dumps(["spec"]),
++                json.dumps(["ontology"]),
++                "{}",
++                "",
++                -1,
++                "2026-03-31T00:00:00+00:00",
++            ),
++            (
++                "doc-002",
++                "plans",
++                "/repo/enumerated-napping-yao.md",
++                "hash-2",
++                "/archive/doc-002.md",
++                "World model plan",
++                "Map the ontology to live system seams.",
++                json.dumps(["plan"]),
++                json.dumps([]),
++                "[]",
++                json.dumps(["design"]),
++                json.dumps(["planning"]),
++                "{}",
++                "",
++                -1,
++                "2026-03-31T00:00:00+00:00",
++            ),
++        ],
++    )
++    conn.commit()
++    conn.close()
++
+     return tmp_path
+ 
+ 
+@@ -381,6 +466,48 @@ class TestAdaptCorpus:
+         assert links == []
+ 
+ 
++class TestAdaptIngestion:
++    def test_reads_documents_as_knowledge_artifacts(self, dharma_tree: Path) -> None:
++        results = adapt_ingestion(base_path=dharma_tree)
++
++        assert len(results) == 2
++        ids = {obj.id for obj, _ in results}
++        assert "ingest_doc-001" in ids
++        assert "ingest_doc-002" in ids
++
++    def test_maps_document_fields(self, dharma_tree: Path) -> None:
++        results = adapt_ingestion(base_path=dharma_tree)
++
++        obj = next(obj for obj, _ in results if obj.id == "ingest_doc-001")
++        assert obj.type_name == "KnowledgeArtifact"
++        assert obj.properties["title"] == "Ontology briefing"
++        assert obj.properties["content"] == "Make the ontology gravitational."
++        assert obj.properties["file_path"] == "/repo/CODEX_BRIEFING.md"
++        assert obj.properties["provenance"] == "spec-forge"
++
++    def test_missing_db_returns_empty(self, tmp_path: Path) -> None:
++        assert adapt_ingestion(base_path=tmp_path) == []
++
++
++class TestAdaptClaims:
++    def test_extracts_claims_from_ingestion_documents(self, dharma_tree: Path) -> None:
++        results = adapt_claims(base_path=dharma_tree)
++
++        assert len(results) == 2
++        ids = {obj.id for obj, _ in results}
++        assert "iclaim_doc-001_0" in ids
++        assert "iclaim_doc-001_1" in ids
++
++    def test_links_claims_to_source_artifact(self, dharma_tree: Path) -> None:
++        results = adapt_claims(base_path=dharma_tree)
++
++        obj, links = next(item for item in results if item[0].id == "iclaim_doc-001_0")
++        assert obj.properties["claim_text"] == "Actions need one real mutation path."
++        assert len(links) == 1
++        assert links[0].link_name == "source_artifact"
++        assert links[0].target_id == "ingest_doc-001"
++
++
+ # ---------------------------------------------------------------------------
+ # Fault tolerance tests
+ # ---------------------------------------------------------------------------
+@@ -445,6 +572,8 @@ class TestSyncAll:
+         assert counts["gates"] == 2
+         assert counts["evolution"] == 1
+         assert counts["corpus"] == 2
++        assert counts["ingestion"] == 2
++        assert counts["claims"] == 2
+ 
+     def test_idempotent_sync(
+         self, registry: OntologyRegistry, dharma_tree: Path
+@@ -463,7 +592,7 @@ class TestSyncAll:
+         assert len(marks) == 2
+ 
+         claims = registry.get_objects_by_type("CorpusClaim")
+-        assert len(claims) == 2
++        assert len(claims) == 4
+ 
+     def test_total_object_count(
+         self, registry: OntologyRegistry, dharma_tree: Path
+@@ -478,10 +607,24 @@ class TestSyncAll:
+                 "GateDecisionRecord",
+                 "EvolutionEntry",
+                 "CorpusClaim",
++                "KnowledgeArtifact",
+             ]
+         )
+-        # 2 + 1 + 2 + 2 + 1 + 2 = 10
+-        assert total == 10
++        # 2 + 1 + 2 + 2 + 1 + 4 + 2 = 14
++        assert total == 14
++
++    def test_sync_links_claims_to_ingested_artifacts(
++        self, registry: OntologyRegistry, dharma_tree: Path
++    ) -> None:
++        sync_all(registry, base_path=dharma_tree)
++
++        claims = registry.get_objects_by_type("CorpusClaim")
++        linked = [
++            registry.get_links(source_id=claim.id, link_name="source_artifact")
++            for claim in claims
++            if claim.id.startswith("iclaim_")
++        ]
++        assert all(links for links in linked)
+ 
+     def test_handles_empty_base_path(self, registry: OntologyRegistry, tmp_path: Path) -> None:
+         """Sync on an empty directory should return all zeros, not crash."""
+diff --git a/tests/test_ontology_registry.py b/tests/test_ontology_registry.py
+index a67cb9e..e8f2728 100644
+--- a/tests/test_ontology_registry.py
++++ b/tests/test_ontology_registry.py
+@@ -22,6 +22,8 @@ from dharma_swarm.ontology import (
+     SecurityPolicy,
+     ShaktiEnergy,
+     check_security,
++    match_capabilities,
++    rank_agents_for_task,
+     validate_link,
+     validate_object,
+     # Legacy API
+@@ -78,19 +80,32 @@ def populated_registry(registry: OntologyRegistry) -> OntologyRegistry:
+ class TestRegistryFactory:
+     def test_create_dharma_registry(self, registry: OntologyRegistry) -> None:
+         stats = registry.stats()
+-        assert stats["registered_types"] == 15  # 8 original + 6 metabolic + 1 custodian type
++        assert stats["registered_types"] == 17
+         assert stats["registered_links"] >= 40  # 12+8 defs, each with inverse
+-        assert stats["registered_actions"] >= 16
++        assert stats["registered_actions"] >= 18
+ 
+     def test_all_type_names(self, registry: OntologyRegistry) -> None:
+         names = registry.type_names()
+-        expected = [
+-            "ActionProposal", "AgentIdentity", "Contribution",
+-            "CustodianRole", "EvolutionEntry", "Experiment", "GateDecisionRecord",
+-            "KnowledgeArtifact", "Outcome", "Paper", "ResearchThread",
+-            "TypedTask", "ValueEvent", "VentureCell", "WitnessLog",
+-        ]
+-        assert names == expected
++        expected = {
++            "ActionProposal",
++            "AgentIdentity",
++            "Capability",
++            "Contribution",
++            "CustodianRole",
++            "EvolutionEntry",
++            "ExecutionLease",
++            "Experiment",
++            "GateDecisionRecord",
++            "KnowledgeArtifact",
++            "Outcome",
++            "Paper",
++            "ResearchThread",
++            "TypedTask",
++            "ValueEvent",
++            "VentureCell",
++            "WitnessLog",
++        }
++        assert set(names) == expected
+ 
+     def test_each_type_has_properties(self, registry: OntologyRegistry) -> None:
+         for obj_type in registry.get_types():
+@@ -400,6 +415,148 @@ class TestActions:
+         assert len(history) == 2
+         assert history[0].action_name == "Run"  # most recent first
+ 
++    def test_advance_proposal_action_updates_status(self, registry: OntologyRegistry) -> None:
++        obj, _ = registry.create_object("ActionProposal", {
++            "task_id": "task-1",
++            "agent_id": "agent-1",
++            "action_type": "dispatch",
++            "title": "Promote proposal",
++            "status": "proposed",
++            "priority": "normal",
++        })
++
++        result = registry.execute_action(
++            "ActionProposal",
++            "AdvanceProposal",
++            obj.id,
++            {"status": "approved"},
++            executed_by="telic_seam",
++        )
++
++        assert result.result == "success"
++        assert registry.get_object(obj.id).properties["status"] == "approved"
++        assert result.lineage_outputs == [obj.id]
++
++    def test_advance_proposal_blocks_invalid_transition(self, registry: OntologyRegistry) -> None:
++        obj, _ = registry.create_object("ActionProposal", {
++            "task_id": "task-1",
++            "agent_id": "agent-1",
++            "action_type": "dispatch",
++            "title": "Closed proposal",
++            "status": "completed",
++            "priority": "normal",
++        })
++
++        result = registry.execute_action(
++            "ActionProposal",
++            "AdvanceProposal",
++            obj.id,
++            {"status": "approved"},
++            executed_by="telic_seam",
++        )
++
++        assert result.result == "invalid_transition"
++        assert registry.get_object(obj.id).properties["status"] == "completed"
++
++    def test_execute_action_rolls_back_failed_mutation(self, registry: OntologyRegistry) -> None:
++        registry.register_type(
++            ObjectType(
++                name="RollbackFixture",
++                properties={
++                    "status": PropertyDef(
++                        name="status",
++                        property_type=PropertyType.ENUM,
++                        required=True,
++                        enum_values=["pending", "done"],
++                    ),
++                },
++                actions=[
++                    ActionDef(
++                        name="Advance",
++                        object_type="RollbackFixture",
++                        modifies=["status"],
++                    )
++                ],
++            )
++        )
++        obj, _ = registry.create_object("RollbackFixture", {"status": "pending"})
++
++        result = registry.execute_action(
++            "RollbackFixture",
++            "Advance",
++            obj.id,
++            {"status": "broken"},
++        )
++
++        assert result.result == "failed"
++        reloaded = registry.get_object(obj.id)
++        assert reloaded.properties["status"] == "pending"
++        assert reloaded.version == 1
++
++
++class TestCapabilities:
++    def test_capability_type_and_links_exist(self, registry: OntologyRegistry) -> None:
++        capability_type = registry.get_type("Capability")
++        assert capability_type is not None
++        assert "capability_kind" in capability_type.properties
++
++        agent_links = {link.name for link in registry.get_links_for("AgentIdentity")}
++        task_links = {link.name for link in registry.get_links_for("TypedTask")}
++        assert "has_capability" in agent_links
++        assert "requires_capability" in task_links
++
++    def test_match_capabilities_and_rank_agents(self, registry: OntologyRegistry) -> None:
++        cap_python, _ = registry.create_object("Capability", {
++            "name": "python",
++            "capability_kind": "skill",
++            "description": "Python engineering",
++            "version": "1",
++            "status": "active",
++        })
++        cap_testing, _ = registry.create_object("Capability", {
++            "name": "testing",
++            "capability_kind": "skill",
++            "description": "TDD and pytest",
++            "version": "1",
++            "status": "active",
++        })
++        cap_ml, _ = registry.create_object("Capability", {
++            "name": "ml",
++            "capability_kind": "skill",
++            "description": "Model evaluation",
++            "version": "1",
++            "status": "active",
++        })
++        agent_alpha, _ = registry.create_object("AgentIdentity", {
++            "name": "agent-alpha",
++            "role": "researcher",
++        })
++        agent_beta, _ = registry.create_object("AgentIdentity", {
++            "name": "agent-beta",
++            "role": "coder",
++        })
++        task, _ = registry.create_object("TypedTask", {
++            "title": "Implement ontology matcher",
++            "status": "pending",
++            "priority": "high",
++            "task_type": "build",
++        })
++
++        registry.create_link("has_capability", agent_alpha.id, cap_python.id)
++        registry.create_link("has_capability", agent_alpha.id, cap_testing.id)
++        registry.create_link("has_capability", agent_beta.id, cap_ml.id)
++        registry.create_link("requires_capability", task.id, cap_python.id)
++        registry.create_link("requires_capability", task.id, cap_testing.id)
++
++        alpha_match = match_capabilities(registry, task.id, agent_alpha.id)
++        beta_match = match_capabilities(registry, task.id, agent_beta.id)
++        ranked = rank_agents_for_task(registry, task.id)
++
++        assert alpha_match["score"] == 1.0
++        assert beta_match["score"] == 0.0
++        assert ranked[0]["agent_id"] == agent_alpha.id
++        assert ranked[-1]["agent_id"] == agent_beta.id
++
+ 
+ # ── Security ────────────────────────────────────────────────────────
+ 
+@@ -439,6 +596,7 @@ class TestOAG:
+     def test_describe_type(self, registry: OntologyRegistry) -> None:
+         desc = registry.describe_type("Experiment")
+         assert "Experiment" in desc
++        assert "Meta:" in desc
+         assert "r_v_value" in desc
+         assert "mahasaraswati" in desc
+ 
+@@ -495,7 +653,7 @@ class TestPersistence:
+     def test_graph_summary(self, registry: OntologyRegistry) -> None:
+         summary = registry.graph_summary()
+         assert "Ontology Graph" in summary
+-        assert "Experiment" in summary
++        assert "[ENTITY:Experiment]" in summary
+ 
+ 
+ # ── Validation ──────────────────────────────────────────────────────
+diff --git a/tests/test_orientation_packet.py b/tests/test_orientation_packet.py
+index 5af03f5..60a4ba9 100644
+--- a/tests/test_orientation_packet.py
++++ b/tests/test_orientation_packet.py
+@@ -3,7 +3,11 @@ from dharma_swarm.claim_graph import Contradiction
+ from dharma_swarm.dharma_corpus import Claim, ClaimCategory, ClaimStatus
+ from dharma_swarm.dharma_kernel import DharmaKernel
+ from dharma_swarm.models import AgentRole
+-from dharma_swarm.orientation_packet import DirectiveSummary, OrientationPacketBuilder
++from dharma_swarm.orientation_packet import (
++    DirectiveSummary,
++    IngestedKnowledgeSummary,
++    OrientationPacketBuilder,
++)
+ 
+ 
+ def _claim(claim_id: str, category: ClaimCategory, confidence: float) -> Claim:
+@@ -84,3 +88,21 @@ def test_context_build_orientation_packet_exposes_typed_helper():
+     )
+     assert packet.role == AgentRole.WORKER.value
+     assert packet.active_claims[0].id == "DC-2026-0001"
++
++
++def test_build_packet_preserves_ingested_knowledge():
++    packet = OrientationPacketBuilder().build(
++        role=AgentRole.GENERAL.value,
++        kernel=DharmaKernel.create_default(),
++        claims=[_claim("DC-2026-0001", ClaimCategory.ARCHITECTURAL, 0.9)],
++        ingested_knowledge=[
++            IngestedKnowledgeSummary(
++                source_ref="spec-forge/CODEX_BRIEFING.md",
++                summary="Make the ontology gravitational.",
++                relevance_score=0.91,
++            )
++        ],
++    )
++
++    assert len(packet.ingested_knowledge) == 1
++    assert packet.ingested_knowledge[0].source_ref == "spec-forge/CODEX_BRIEFING.md"
+diff --git a/tests/test_runtime_artifacts.py b/tests/test_runtime_artifacts.py
+index 5a1a07a..061ac91 100644
+--- a/tests/test_runtime_artifacts.py
++++ b/tests/test_runtime_artifacts.py
+@@ -1,10 +1,14 @@
+ from __future__ import annotations
+ 
+ import json
++import os
+ from pathlib import Path
+ 
+ from dharma_swarm.runtime_artifacts import (
++    append_runtime_warning,
+     dgc_health_snapshot_summary,
++    runtime_supervision_summary,
++    runtime_warning_summary,
+     write_dgc_health_snapshot,
+ )
+ 
+@@ -34,3 +38,126 @@ def test_write_dgc_health_snapshot_persists_fresh_runtime_metadata(tmp_path: Pat
+     assert summary["status"] == "fresh"
+     assert summary["daemon_pid_mismatch"] is False
+ 
++
++def test_runtime_supervision_summary_marks_fresh_matching_daemon_healthy(tmp_path: Path) -> None:
++    state_dir = tmp_path / ".dharma"
++    state_dir.mkdir(parents=True, exist_ok=True)
++    (state_dir / "daemon.pid").write_text(f"{os.getpid()}\n", encoding="utf-8")
++
++    repo_root = tmp_path / "dharma_swarm"
++    plist = repo_root / "scripts" / "com.dhyana.dharma-daemon.plist"
++    plist.parent.mkdir(parents=True, exist_ok=True)
++    plist.write_text("<plist/>", encoding="utf-8")
++
++    write_dgc_health_snapshot(
++        state_dir,
++        daemon_pid=os.getpid(),
++        agent_count=3,
++        task_count=5,
++        anomaly_count=0,
++        source="swarm.run",
++    )
++
++    summary = runtime_supervision_summary(state_dir, repo_root=repo_root)
++
++    assert summary["status"] == "healthy"
++    assert summary["daemon"]["status"] == "alive"
++    assert summary["dgc_health"]["status"] == "fresh"
++    assert summary["supervision"]["launchd_plist_exists"] is True
++
++
++def test_runtime_warning_summary_tracks_latest_warning(tmp_path: Path) -> None:
++    state_dir = tmp_path / ".dharma"
++
++    append_runtime_warning(
++        state_dir,
++        component="maintenance",
++        message="first warning",
++        error="disk busy",
++    )
++    append_runtime_warning(
++        state_dir,
++        component="agent_runner",
++        message="second warning",
++        context={"agent_name": "indra"},
++    )
++
++    summary = runtime_warning_summary(state_dir, limit=5)
++
++    assert summary["status"] == "present"
++    assert summary["count"] == 2
++    assert summary["latest"]["component"] == "agent_runner"
++    assert summary["latest"]["context"]["agent_name"] == "indra"
++
++
++def test_runtime_supervision_summary_prefers_live_operator_listener_over_stale_pid_file(
++    tmp_path: Path,
++    monkeypatch,
++) -> None:
++    state_dir = tmp_path / ".dharma"
++    state_dir.mkdir(parents=True, exist_ok=True)
++    (state_dir / "operator.pid").write_text(f"{os.getpid()}\n", encoding="utf-8")
++
++    repo_root = tmp_path / "dharma_swarm"
++    plist = repo_root / "scripts" / "com.dhyana.dharma-daemon.plist"
++    plist.parent.mkdir(parents=True, exist_ok=True)
++    plist.write_text("<plist/>", encoding="utf-8")
++
++    monkeypatch.setattr(
++        "dharma_swarm.runtime_artifacts._operator_listener_snapshot",
++        lambda *_args, **_kwargs: {
++            "port": 8420,
++            "pid": 33888,
++            "status": "alive",
++            "command": "python -m uvicorn api.main:app --host 127.0.0.1 --port 8420",
++            "matches_expected": True,
++        },
++        raising=False,
++    )
++
++    summary = runtime_supervision_summary(state_dir, repo_root=repo_root)
++
++    assert summary["status"] == "degraded"
++    assert summary["operator"]["pid"] == 33888
++    assert summary["operator"]["status"] == "alive"
++    assert summary["operator"]["pid_file_pid"] == os.getpid()
++    assert summary["operator"]["pid_file_status"] == "alive"
++    assert summary["operator"]["listener_pid"] == 33888
++    assert summary["operator"]["pid_mismatch"] is True
++
++
++def test_runtime_supervision_summary_prefers_operator_launchd_surface_for_canonical_backend(
++    tmp_path: Path,
++    monkeypatch,
++) -> None:
++    monkeypatch.setenv("HOME", str(tmp_path))
++
++    state_dir = tmp_path / ".dharma"
++    state_dir.mkdir(parents=True, exist_ok=True)
++    (state_dir / "operator.pid").write_text(f"{os.getpid()}\n", encoding="utf-8")
++
++    repo_root = tmp_path / "dharma_swarm"
++    operator_plist = repo_root / "scripts" / "com.dharma.dashboard-api.plist"
++    operator_plist.parent.mkdir(parents=True, exist_ok=True)
++    operator_plist.write_text("<plist/>", encoding="utf-8")
++
++    daemon_plist = repo_root / "scripts" / "com.dhyana.dharma-daemon.plist"
++    daemon_plist.write_text("<plist/>", encoding="utf-8")
++
++    monkeypatch.setattr(
++        "dharma_swarm.runtime_artifacts._operator_listener_snapshot",
++        lambda *_args, **_kwargs: {
++            "port": 8420,
++            "pid": 33888,
++            "status": "alive",
++            "command": "python -m uvicorn api.main:app --host 127.0.0.1 --port 8420",
++            "matches_expected": True,
++        },
++        raising=False,
++    )
++
++    summary = runtime_supervision_summary(state_dir, repo_root=repo_root)
++
++    assert summary["supervision"]["label"] == "com.dharma.dashboard-api"
++    assert summary["supervision"]["launchd_plist_path"] == operator_plist
++    assert summary["supervision"]["launchd_plist_exists"] is True
+diff --git a/tests/test_telic_seam.py b/tests/test_telic_seam.py
+index 0576adb..7860d5b 100644
+--- a/tests/test_telic_seam.py
++++ b/tests/test_telic_seam.py
+@@ -336,6 +336,18 @@ class TestRecordGateDecision:
+         result = seam.record_gate_decision(None, gate_allow)
+         assert result is None
+ 
++    def test_records_advance_proposal_action(self, seam, sample_task, gate_allow):
++        proposal_id = seam.record_dispatch(sample_task, "agent_alpha")
++
++        seam.record_gate_decision(proposal_id, gate_allow)
++
++        history = seam.registry.action_history(
++            object_id=proposal_id,
++            action_name="AdvanceProposal",
++        )
++        assert len(history) == 1
++        assert history[0].input_params["status"] == "approved"
++
+ 
+ # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ # TelicSeam — Record Outcome
+@@ -437,6 +449,24 @@ class TestRecordOutcome:
+         stats = seam.stats()
+         assert stats["duplicate_suppressions"]["outcomes"] == 1
+ 
++    def test_records_advance_proposal_action_for_outcome(self, seam, sample_task, gate_allow):
++        proposal_id = seam.record_dispatch(sample_task, "agent_alpha")
++        seam.record_gate_decision(proposal_id, gate_allow)
++
++        seam.record_outcome(
++            sample_task,
++            "agent_alpha",
++            success=True,
++            result_summary="done",
++        )
++
++        history = seam.registry.action_history(
++            object_id=proposal_id,
++            action_name="AdvanceProposal",
++        )
++        assert len(history) == 2
++        assert history[0].input_params["status"] == "completed"
++
+ 
+ # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ # Full Metabolic Loop
+diff --git a/tests/test_tui_helpers.py b/tests/test_tui_helpers.py
+index 87fa3d9..0060203 100644
+--- a/tests/test_tui_helpers.py
++++ b/tests/test_tui_helpers.py
+@@ -18,6 +18,11 @@ from dharma_swarm.runtime_state import (
+     SessionState,
+     TaskClaim,
+ )
++from dharma_swarm.telemetry_plane import (
++    AgentIdentityRecord,
++    TeamRosterRecord,
++    TelemetryPlaneStore,
++)
+ from dharma_swarm.tui_helpers import (
+     _read_json,
+     build_darwin_status_text,
+@@ -446,6 +451,8 @@ def test_build_runtime_status_text_reports_runtime_db_state(tmp_path, monkeypatc
+     async def seed_runtime() -> None:
+         store = RuntimeStateStore(runtime_db)
+         await store.init_db()
++        telemetry = TelemetryPlaneStore(runtime_db)
++        await telemetry.init_db()
+         now = datetime(2026, 3, 11, 1, 2, 3, tzinfo=timezone.utc)
+         await store.upsert_session(
+             SessionState(
+@@ -529,6 +536,36 @@ def test_build_runtime_status_text_reports_runtime_db_state(tmp_path, monkeypatc
+                 created_at=now,
+             )
+         )
++        await telemetry.upsert_agent_identity(
++            AgentIdentityRecord(
++                agent_id="resident.frontier.indra_anekanta",
++                codename="Indra_Anekanta",
++                status="online",
++                metadata={
++                    "agent_display_name": "Indra Anekanta Synthesist",
++                    "seat_id": "frontier_synthesist",
++                    "current_binding": "qwen/qwen3-coder-next",
++                    "runtime_agent_name": "Indra_Anekanta_Synthesist",
++                },
++                created_at=now,
++                updated_at=now,
++            )
++        )
++        await telemetry.record_team_roster(
++            TeamRosterRecord(
++                roster_id="roster-frontier-indra",
++                team_id="dharma_swarm",
++                agent_id="resident.frontier.indra_anekanta",
++                role="surgeon",
++                active=True,
++                metadata={
++                    "agent_display_name": "Indra Anekanta Synthesist",
++                    "seat_id": "frontier_synthesist",
++                },
++                created_at=now,
++                updated_at=now,
++            )
++        )
+ 
+     asyncio.run(seed_runtime())
+ 
+@@ -551,10 +588,68 @@ def test_build_runtime_status_text_reports_runtime_db_state(tmp_path, monkeypatc
+     assert "Active runs" in result
+     assert "Recent artifacts" in result
+     assert "Recent operator actions" in result
++    assert "Resident seats" in result
++    assert "Indra Anekanta Synthesist" in result
++    assert "frontier_synthesist" in result
++    assert "qwen/qwen3-coder-next" in result
+     assert "python3: /mock/bin/python3" in result
+     assert "claude: not found" in result
+ 
+ 
++def test_build_status_text_reports_resident_seats(tmp_path, monkeypatch):
++    import dharma_swarm.tui_helpers as helpers
++
++    dharma_dir = tmp_path / ".dharma"
++    runtime_dir = dharma_dir / "state"
++    runtime_dir.mkdir(parents=True)
++    runtime_db = runtime_dir / "runtime.db"
++
++    async def seed_runtime() -> None:
++        telemetry = TelemetryPlaneStore(runtime_db)
++        await telemetry.init_db()
++        now = datetime(2026, 3, 29, 1, 2, 3, tzinfo=timezone.utc)
++        await telemetry.upsert_agent_identity(
++            AgentIdentityRecord(
++                agent_id="resident.frontier.vajra_pramana",
++                codename="Vajra_Pramana",
++                status="online",
++                metadata={
++                    "agent_display_name": "Vajra Pramana Adjudicator",
++                    "seat_id": "frontier_adjudicator",
++                    "current_binding": "z-ai/glm-5-turbo",
++                    "runtime_agent_name": "Vajra_Pramana_Adjudicator",
++                },
++                created_at=now,
++                updated_at=now,
++            )
++        )
++        await telemetry.record_team_roster(
++            TeamRosterRecord(
++                roster_id="roster-frontier-vajra",
++                team_id="dharma_swarm",
++                agent_id="resident.frontier.vajra_pramana",
++                role="validator",
++                active=True,
++                metadata={
++                    "agent_display_name": "Vajra Pramana Adjudicator",
++                    "seat_id": "frontier_adjudicator",
++                },
++                created_at=now,
++                updated_at=now,
++            )
++        )
++
++    asyncio.run(seed_runtime())
++
++    monkeypatch.setattr(helpers, "DHARMA_STATE", dharma_dir)
++    result = build_status_text()
++
++    assert "Resident seats:" in result
++    assert "Vajra Pramana Adjudicator" in result
++    assert "frontier_adjudicator" in result
++    assert "z-ai/glm-5-turbo" in result
++
++
+ def test_build_runtime_status_text_handles_missing_runtime_db(tmp_path, monkeypatch):
+     import dharma_swarm.tui_helpers as helpers
+ 

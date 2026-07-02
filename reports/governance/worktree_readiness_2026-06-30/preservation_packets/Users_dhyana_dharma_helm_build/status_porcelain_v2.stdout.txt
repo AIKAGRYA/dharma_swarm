@@ -1,0 +1,13 @@
+# branch.oid 680b013c027194eb50416840d63055f025ca4bb7
+# branch.head helm/worldclass-20260612
+# branch.upstream origin/helm/worldclass-20260612
+# branch.ab +0 -0
+1 .M N... 100644 100644 100644 1f315c207be2a0a44960aed8ef2e519f46413cce 1f315c207be2a0a44960aed8ef2e519f46413cce dharma_swarm/operator_core/intent_payloads.py
+1 .M N... 100644 100644 100644 cf11a16d403eebf9497aeaf644f32a4b4df24f8b cf11a16d403eebf9497aeaf644f32a4b4df24f8b dharma_swarm/terminal_bridge.py
+1 .M N... 100644 100644 100644 0f883c96cfe1c938dca3e6f472deb9c7c3eafe77 0f883c96cfe1c938dca3e6f472deb9c7c3eafe77 reports/governance/active_track_evidence.json
+1 .M N... 100644 100644 100644 c2ff10c2559ccd431fae4a40429f02a91e6a27cd c2ff10c2559ccd431fae4a40429f02a91e6a27cd reports/governance/active_track_evidence.md
+1 .M N... 100644 100644 100644 0f883c96cfe1c938dca3e6f472deb9c7c3eafe77 0f883c96cfe1c938dca3e6f472deb9c7c3eafe77 reports/governance/track_portfolio.json
+1 .M N... 100755 100755 100755 9b34404fffeb6aaff1c48c4fb9011937edb02f93 9b34404fffeb6aaff1c48c4fb9011937edb02f93 scripts/start_terminal_tui_tmux.sh
+1 .M N... 100644 100644 100644 63024c017f553ea2a6ad639b8a66c3d566af054b 63024c017f553ea2a6ad639b8a66c3d566af054b tests/test_intent_payloads.py
+? reports/terminal/
+? tests/test_terminal_bridge.py

@@ -1,0 +1,86 @@
+cell_id: livelihood_loom
+mission_id: livelihood_loom_pilot_001
+human_governor: dhyana
+parent_plane: jagat_kalyan
+capital_boundary: dharma_capital_read_only_aggregated_signals
+first_metric: revenue_external_humans_served
+allowed_agent_roles:
+  - loom_conductor
+  - field_cartography
+  - worker_advocate
+  - demand_builder
+  - offer_builder
+  - matching_ops
+  - evidence_auditor
+  - gaia_reciprocity_adapter
+  - treasury_payout_guard
+  - safety_red_team
+  - memory_librarian
+allowed_internal_tools:
+  - read_public_sources
+  - enrich_candidate_records
+  - draft_enablement_packet
+  - risk_score
+  - write_receipt
+  - queue_external_action
+max_children: 12
+max_depth: 2
+budget_policy:
+  mission_cap_usd: 500.0
+  daily_cap_usd: 100.0
+  lane_cap_usd: 75.0
+data_policy:
+  sensitive_data_classes:
+    - identity
+    - exact_location
+    - income
+    - debt
+    - migration_status
+    - caste
+    - religion
+    - health
+    - household
+    - case_notes
+    - consent_record
+  public_proof_allowed_fields:
+    - claim_id
+    - cell_id
+    - claim_type
+    - aggregate_count
+    - sector
+    - region_level
+    - evidence_refs
+    - audit_status
+    - outcome_metric
+    - outcome_value
+    - time_period
+external_action_policy:
+  external_action_mode: human_approved_only
+  approval_required_for:
+    - outreach
+    - publication
+    - payment
+    - on_chain_transaction
+    - procurement_intro
+    - partner_claim
+    - capital_signal
+  forbidden_actions:
+    - autonomous_lending_decision
+    - autonomous_investment_decision
+    - data_sale
+    - trading_alpha_extraction
+    - worker_surveillance
+proof_contract:
+  - mission_id
+  - trace_id
+  - receipt_id
+  - source_refs
+  - consent_state
+  - audit_status
+  - result_ref
+shutdown_conditions:
+  - public_sensitive_data_leak
+  - autonomous_external_action
+  - capital_alpha_extraction
+  - provider_truth_unproven
+  - grievance_path_missing

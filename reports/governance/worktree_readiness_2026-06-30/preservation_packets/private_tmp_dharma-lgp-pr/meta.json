@@ -1,0 +1,11 @@
+{
+  "path": "/private/tmp/dharma-lgp-pr",
+  "observed_at": "2026-06-30T16:10:31.999459+00:00",
+  "branch": "main",
+  "head": "3c2e4a684e873320cc183b91c53c1fada35011a4",
+  "status_short_file": "status_short.stdout.txt",
+  "status_porcelain_v2_file": "status_porcelain_v2.stdout.txt",
+  "diff_stat_file": "diff_stat.stdout.txt",
+  "cached_diff_stat_file": "cached_diff_stat.stdout.txt",
+  "untracked_manifest_file": "untracked.stdout.txt"
+}

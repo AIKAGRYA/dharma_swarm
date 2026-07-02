@@ -1,0 +1,22 @@
+ dharma_swarm/api_keys.py                      |  22 +++
+ dharma_swarm/evolution_roster.py              |  18 +++
+ dharma_swarm/forge_v1/providers.py            |  25 +++-
+ dharma_swarm/forge_v1/run_real.py             | 172 ++++++++++++++++++---
+ dharma_swarm/key_oracle.py                    |   2 +
+ dharma_swarm/model_defaults.py                |   4 +
+ dharma_swarm/model_hierarchy.py               |  12 ++
+ dharma_swarm/model_pool.py                    |   1 +
+ dharma_swarm/models.py                        |   2 +
+ dharma_swarm/providers.py                     | 207 ++++++++++++++++++++++++++
+ dharma_swarm/runtime_provider.py              |  69 +++++++++
+ reports/governance/active_track_evidence.json |  22 ++-
+ reports/governance/active_track_evidence.md   |  10 +-
+ reports/governance/track_portfolio.json       |  22 ++-
+ scripts/load_runtime_env.sh                   |   3 +-
+ tests/test_api_keys.py                        |   2 +
+ tests/test_env_alias_normalization.py         |  22 +++
+ tests/test_forge_v1_providers.py              |  40 +++++
+ tests/test_model_pool.py                      |  12 +-
+ tests/test_providers_quality_track.py         |  31 ++++
+ tests/test_runtime_provider.py                |  92 ++++++++++++
+ 21 files changed, 747 insertions(+), 43 deletions(-)

@@ -1,0 +1,11 @@
+{
+  "path": "/Users/dhyana/ds_active_track_graduation_20260630",
+  "observed_at": "2026-06-30T16:10:34.453945+00:00",
+  "branch": "codex/active-track-graduation-20260630",
+  "head": "f84f40344cbdfab9d236239b0d3ec00718e10bf9",
+  "status_short_file": "status_short.stdout.txt",
+  "status_porcelain_v2_file": "status_porcelain_v2.stdout.txt",
+  "diff_stat_file": "diff_stat.stdout.txt",
+  "cached_diff_stat_file": "cached_diff_stat.stdout.txt",
+  "untracked_manifest_file": "untracked.stdout.txt"
+}

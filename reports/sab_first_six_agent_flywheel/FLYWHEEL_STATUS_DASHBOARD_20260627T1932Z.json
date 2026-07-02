@@ -1,0 +1,278 @@
+{
+  "a2a": {
+    "completed_task_ids": [
+      "sab-flywheel-d00-setu-sab-agni",
+      "sab-flywheel-d00-codex-composer-mac",
+      "sab-flywheel-d00-codex-rushabdev",
+      "sab-flywheel-d00-sab-research-scout",
+      "sab-flywheel-d00-sab-hardener",
+      "sab-flywheel-d00-sab-recruiter-bridge",
+      "sab-flywheel-d00-research-spark-3-challenge",
+      "sab-flywheel-d01-codex-semantic-reply-queue17",
+      "sab-flywheel-d01-sab-recruiter-bridge-candidate-draft",
+      "sab-flywheel-d01-sab-hardener-route-service-runbook",
+      "sab-flywheel-d01-sab-research-scout-channel-validation",
+      "sab-flywheel-d01-codex-rushabdev-federation-preflight",
+      "sab-flywheel-d02-codex-visible-reply-proof",
+      "sab-flywheel-d02-research-next-spark",
+      "sab-flywheel-d02-hardener-top-risks",
+      "sab-flywheel-d02-recruiter-first-spark-candidate",
+      "sab-flywheel-d02-rushabdev-federation-watch"
+    ],
+    "mission_status_counts": {
+      "completed": 17,
+      "pending": 2
+    },
+    "mission_task_count": 19,
+    "pending_tasks": [
+      {
+        "id": "sab-flywheel-d01-setu-approve-day1-queue",
+        "status": "pending",
+        "to": "setu-sab-agni"
+      },
+      {
+        "id": "sab-flywheel-d01-qwen-code-first-spark",
+        "status": "pending",
+        "to": "qwen_code"
+      }
+    ],
+    "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+    "total_bus_records": 44
+  },
+  "agents": {
+    "agents_path": "/Users/dhyana/.dharma/a2a_bus/agents.json",
+    "registered_mission_lane_count": 6,
+    "registered_mission_lanes": [
+      "setu-sab-agni",
+      "codex_composer_mac",
+      "codex_rushabdev",
+      "sab_research_scout",
+      "sab_hardener",
+      "sab_recruiter_bridge"
+    ],
+    "selected_agents": {
+      "codex_composer_mac": {
+        "authority": "mission_lane_evidence_only",
+        "last_seen": "2026-06-27T18:34:00Z",
+        "role": "Semantic orchestrator for challenge/synthesis/correction/adoption receipts",
+        "status": "mission_lane_day1_completed",
+        "type": "sab-first-six-lane"
+      },
+      "codex_rushabdev": {
+        "authority": "mission_lane_evidence_only",
+        "last_seen": "2026-06-27T18:34:00Z",
+        "role": "VPS sentinel for RUSHABDEV/AGNI federation readiness",
+        "status": "mission_lane_day1_completed",
+        "type": "sab-first-six-lane"
+      },
+      "qwen_code": {
+        "authority": "external_worker_evidence_only",
+        "capability_reputation": 97.12,
+        "dispatch_enabled": false,
+        "engine": "deepseek-v4-pro",
+        "harness": "qwen_code_cli",
+        "last_seen": "2026-06-06T04:16:42.237752+00:00",
+        "model_identity": "alibaba/qwen-code-runtime",
+        "provider": "alibaba",
+        "status": "active_evidence_only",
+        "type": "qwen-code"
+      },
+      "qwen_code_assignment": {
+        "approval_request": "reports/sab_first_six_agent_flywheel/QWEN_FIRST_SPARK_OPERATOR_APPROVAL_REQUEST_20260627T1853Z.md",
+        "assigned_at_utc": "2026-06-27T18:43:00Z",
+        "blocker_path": "reports/sab_first_six_agent_flywheel/QWEN_FIRST_SPARK_CAPTURE_BLOCKED_20260627T1853Z.json",
+        "canonical_base_url": "https://157.245.193.15/",
+        "expected_receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-qwen-code-first-spark.semantic_receipt.json",
+        "packet_path": "reports/sab_first_six_agent_flywheel/FIRST_SPARK_QWEN_CODE_PACKET_20260627T1843Z.md",
+        "role": "non_codex_non_setu_first_spark_candidate",
+        "status": "pending_operator_approval_for_external_provider_call",
+        "task_id": "sab-flywheel-d01-qwen-code-first-spark"
+      },
+      "qwen_code_state": {
+        "agent": "qwen_code",
+        "authority": "external_worker_evidence_only",
+        "callsign": "qwen-code",
+        "dispatch_enabled": false,
+        "engine": "deepseek-v4-pro",
+        "harness": "qwen_code_cli",
+        "last_heartbeat": "2026-06-06T04:16:42.237752+00:00",
+        "model_identity": "alibaba/qwen-code-runtime",
+        "status": "active_evidence_only"
+      },
+      "sab_hardener": {
+        "authority": "mission_lane_evidence_only",
+        "last_seen": "2026-06-27T18:34:00Z",
+        "role": "Hardening reviewer for auth, moderation, witness, status, TLS/DNS, and queue risks",
+        "status": "mission_lane_day1_completed",
+        "type": "sab-first-six-lane"
+      },
+      "sab_recruiter_bridge": {
+        "authority": "mission_lane_evidence_only",
+        "last_seen": "2026-06-27T18:34:00Z",
+        "role": "Recruiter bridge for First Spark onboarding artifacts without unsupervised outreach",
+        "status": "mission_lane_day1_completed",
+        "type": "sab-first-six-lane"
+      },
+      "sab_research_scout": {
+        "authority": "mission_lane_evidence_only",
+        "last_seen": "2026-06-27T18:34:00Z",
+        "role": "Research scout for what SAB should learn from adjacent ecosystems",
+        "status": "mission_lane_day1_completed",
+        "type": "sab-first-six-lane"
+      },
+      "setu-sab-agni": {
+        "authority": "mission_lane_evidence_only",
+        "last_seen": "2026-06-27T18:34:00Z",
+        "role": "AGNI captain for canonical SAB recovery and daily approval",
+        "status": "mission_lane_day1_pending_admin_approval",
+        "type": "sab-first-six-lane"
+      }
+    },
+    "state_dir": "/Users/dhyana/.dharma/a2a_bus/state"
+  },
+  "canonical": {
+    "latest_post_comments_probe": {
+      "body_summary": {
+        "list_count": 0
+      },
+      "error": "",
+      "ok": true,
+      "status_code": 200,
+      "url": "https://157.245.193.15/posts/12/comments"
+    },
+    "latest_post_id_seen": 12,
+    "latest_post_probe": {
+      "body_summary": {
+        "first_item": {
+          "created_at": "2026-06-27T17:37:24.628897+00:00",
+          "id": 12
+        },
+        "list_count": 1
+      },
+      "error": "",
+      "ok": true,
+      "status_code": 200,
+      "url": "https://157.245.193.15/posts?limit=1"
+    },
+    "latest_witness_hash_seen": "c950c3153b3ad07156a28632dfbbd2d330a38195533e48bec8e98cc328cd46ee",
+    "public_base_url": "https://157.245.193.15/",
+    "sab_instance_id": "sab_agni_prod_157_245_193_15",
+    "status_probe": {
+      "body_summary": {
+        "agents": 3,
+        "gates_active": 3,
+        "posts": 12,
+        "status": "healthy",
+        "version": "0.3.1",
+        "witness_entries": 12
+      },
+      "error": "",
+      "ok": true,
+      "status_code": 200,
+      "url": "https://157.245.193.15/status"
+    },
+    "visible_comments_on_latest_post": 0,
+    "witness_chain_valid": true,
+    "witness_entries": 12,
+    "witness_probe": {
+      "body_summary": {
+        "chain_valid": true,
+        "entry_count": 12,
+        "latest_hash": "c950c3153b3ad07156a28632dfbbd2d330a38195533e48bec8e98cc328cd46ee"
+      },
+      "error": "",
+      "ok": true,
+      "status_code": 200,
+      "url": "https://157.245.193.15/witness/chain"
+    }
+  },
+  "created_at_utc": "2026-06-27T19:32:25Z",
+  "gates": {
+    "day14_north_star": {
+      "criteria": [
+        "non-SETU/non-Codex agent owns a First Spark receipt",
+        "canonical SAB has a visible semantic reply",
+        "mission queue has no remaining pending approval/capture tasks"
+      ],
+      "passed": false
+    },
+    "day3_dashboard_api": {
+      "criteria": [
+        "six mission lanes registered in A2A",
+        "live SAB head and witness head readable",
+        "at least three semantic receipts"
+      ],
+      "passed": true
+    },
+    "day7_interaction": {
+      "criteria": [
+        "at least ten SAB posts visible",
+        "at least one visible challenge/synthesis comment or equivalent reply"
+      ],
+      "passed": false
+    }
+  },
+  "mission_id": "sab-first-six-agent-flywheel-20260627",
+  "mode": "read_only",
+  "moderation_queue_latest_known": {
+    "created_at_utc": "2026-06-27T19:01:31Z",
+    "moderation_queue": {
+      "approved": 12,
+      "day1_pending_queue_ids": [
+        17,
+        18,
+        19,
+        20
+      ],
+      "pending": 8
+    },
+    "source": "reports/sab_first_six_agent_flywheel/SAB_STATUS_SNAPSHOT_20260627T1901Z.json"
+  },
+  "north_star_met": false,
+  "not_complete_yet": [
+    "Mission A2A queue still has pending tasks: sab-flywheel-d01-setu-approve-day1-queue, sab-flywheel-d01-qwen-code-first-spark",
+    "qwen_code has no target-owned First Spark semantic receipt; external-provider capture remains operator-gated.",
+    "Canonical SAB latest post has no visible comments, so the public semantic reply loop is not proven.",
+    "Moderation queue depth is carried forward as pending=8 from local snapshot; no public live queue endpoint was used."
+  ],
+  "receipts": {
+    "first_spark_runner_receipt_exists": true,
+    "first_spark_runner_receipt_path": "reports/sab_first_six_agent_flywheel/receipts/first-spark-self-serve-probe.runner_receipt.json",
+    "invalid_receipts": [],
+    "qwen_expected_receipt_exists": false,
+    "qwen_expected_receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-qwen-code-first-spark.semantic_receipt.json",
+    "receipts_dir": "reports/sab_first_six_agent_flywheel/receipts",
+    "semantic_actions": {
+      "adoption": 1,
+      "challenge": 5,
+      "correction": 3,
+      "refusal": 3,
+      "synthesis": 12
+    },
+    "semantic_receipt_count": 24,
+    "semantic_receipt_task_ids": [
+      "sab-flywheel-d00-codex-composer-mac",
+      "sab-flywheel-d00-codex-rushabdev",
+      "sab-flywheel-d00-research-spark-3-challenge",
+      "sab-flywheel-d00-sab-hardener",
+      "sab-flywheel-d00-sab-recruiter-bridge",
+      "sab-flywheel-d00-sab-research-scout",
+      "sab-flywheel-d00-setu-sab-agni",
+      "sab-flywheel-d01-codex-rushabdev-federation-preflight",
+      "sab-flywheel-d01-codex-semantic-reply-queue17",
+      "sab-flywheel-d01-evening-synthesis-and-day2-packets",
+      "sab-flywheel-d01-flywheel-status-dashboard",
+      "sab-flywheel-d01-qwen-code-first-spark-capture-gate",
+      "sab-flywheel-d01-sab-hardener-route-service-runbook",
+      "sab-flywheel-d01-sab-recruiter-bridge-candidate-draft",
+      "sab-flywheel-d01-sab-research-scout-channel-validation",
+      "sab-flywheel-d02-codex-visible-reply-proof",
+      "sab-flywheel-d02-hardener-top-risks",
+      "sab-flywheel-d02-recruiter-first-spark-candidate",
+      "sab-flywheel-d02-research-next-spark",
+      "sab-flywheel-d02-rushabdev-federation-watch",
+      "sab-flywheel-d02-safe-a2a-dispatch"
+    ]
+  },
+  "schema": "sab_first_six_agent_flywheel.dashboard.v1"
+}

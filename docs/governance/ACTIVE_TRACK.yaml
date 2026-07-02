@@ -133,7 +133,7 @@ active_tracks:
     name: Runtime Truth Reconciliation — operator-visible truth packets
     status: ACTIVE
     opened_at: "2026-06-04"
-    verified_at: "2026-06-04"
+    verified_at: "2026-06-29"
     ttl_days: 14
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
@@ -244,7 +244,7 @@ active_tracks:
     name: Runtime Truth NATS — internal live transport for A2A dispatch
     status: ACTIVE
     opened_at: "2026-06-06"
-    verified_at: "2026-07-01"
+    verified_at: "2026-06-29"
     ttl_days: 21
     owner: "@codex"
     serves: substrate-nativeness
@@ -266,9 +266,9 @@ active_tracks:
       - tests/test_nats_transport.py
       - tests/test_nats_substrate_contract.py
       - reports/governance/nats_live_production_matrix/**
+      - reports/governance/runtime_truth_nats_closeout_packet_2026-07-01.md
       - reports/governance/runtime_truth_nats_final_evidence_2026-07-01.md
       - reports/governance/runtime_truth_nats_compact_raw_evidence_2026-07-01.json
-      - reports/governance/runtime_truth_nats_remedial_evidence_2026-07-01.md
     touched_complementary_surfaces:
       - dharma_swarm/a2a/a2a_bridge.py
       - dharma_swarm/runtime_state.py
@@ -614,6 +614,9 @@ active_tracks:
       - id: hardening_goal_exists
         kind: file_exists
         file: docs/agent_tasks/2026-06-14_runtime_spine_hardening_goal.md
+      - id: hardening_score_at_least_75
+        kind: hardening_score_at_least
+        minimum: 75
 
     non_goals:
       - Do not create new spine sub-modules. Adopt invoke/receipt/routing/persistence.
@@ -652,7 +655,7 @@ active_tracks:
     name: Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
     status: ACTIVE
     opened_at: "2026-06-11"
-    verified_at: "2026-06-11"
+    verified_at: "2026-06-29"
     ttl_days: 21
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
@@ -700,6 +703,25 @@ active_tracks:
         kind: file_contains
         file: reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md
         pattern: "never let internal artifacts touch archive fitness"
+      - id: cybernetics_codex_manifest_registered
+        kind: file_contains
+        file: ACTIVE_SURFACE_MANIFEST.yaml
+        pattern: "id: cybernetics_codex"
+      - id: cybernetics_codex_seed_exists
+        kind: file_exists
+        file: docs/agents/cybernetics_codex/agent.seed.yaml
+      - id: cybernetics_codex_soul_exists
+        kind: file_exists
+        file: docs/agents/cybernetics_codex/SOUL.md
+      - id: cybernetics_codex_context_desk_exists
+        kind: file_exists
+        file: docs/agents/cybernetics_codex/CONTEXT_ENGINEERING.md
+      - id: cybernetics_codex_audit_script_exists
+        kind: file_exists
+        file: scripts/governance/cybernetics_codex_audit.py
+      - id: cybernetics_codex_registration_script_exists
+        kind: file_exists
+        file: scripts/governance/register_cybernetics_codex.py
       - id: loop1_closure_receipt_exists
         kind: file_exists
         file: reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md
@@ -821,7 +843,7 @@ active_tracks:
     name: Composer Holon Spine Longrun — fable/codex pair over verified command receipts
     status: ACTIVE
     opened_at: "2026-06-11"
-    verified_at: "2026-06-11"
+    verified_at: "2026-06-29"
     ttl_days: 14
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
@@ -915,7 +937,7 @@ active_tracks:
     name: AgentAdmission + Semantic Commons — one door for agent identity and naming
     status: ACTIVE
     opened_at: "2026-06-14"
-    verified_at: "2026-06-14"
+    verified_at: "2026-06-29"
     ttl_days: 14
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
@@ -1049,7 +1071,7 @@ active_tracks:
     name: Cybernetics Codex Stewardship — permanent owner for loop ecology
     status: ACTIVE
     opened_at: "2026-06-14"
-    verified_at: "2026-06-14"
+    verified_at: "2026-06-29"
     ttl_days: 14
     owner: "@AmitabhainArunachala"
     serves: research-depth
@@ -1149,7 +1171,7 @@ active_tracks:
     name: TELOS AI Morning Refinery — user-facing semantic refinery seed
     status: ACTIVE
     opened_at: "2026-06-14"
-    verified_at: "2026-06-14"
+    verified_at: "2026-06-29"
     ttl_days: 14
     owner: "@AmitabhainArunachala"
     serves: revenue-external-humans-served
@@ -1204,7 +1226,7 @@ active_tracks:
         kind: file_exists
         file: tests/test_telos_morning_refinery.py
       - id: first_external_receipt_exists
-        kind: file_exists
+        kind: external_acted_receipt
         file: reports/telos_ai/FIRST_EXTERNAL_ACTED_RECEIPT.md
 
     non_goals:
@@ -1215,23 +1237,19 @@ active_tracks:
 
     next_items:
       - id: 1
-        what: "Write the consent/privacy boundary test before any product implementation."
-        kind: test
+        what: "Run an operator-mediated external action on a consented, sanitized TELOS output and capture redacted durable evidence outside the repo."
+        kind: external
         blocker: true
       - id: 2
-        what: "Create a narrow dashboard or CLI prototype that reads only sanitized example packets."
-        kind: code
-        blocker: true
-      - id: 3
-        what: "Define the first external acted receipt format for TELOS without spend or account action."
-        kind: docs
+        what: "Only after that external action exists, create reports/telos_ai/FIRST_EXTERNAL_ACTED_RECEIPT.md using the schema without exposing private material."
+        kind: receipt
         blocker: true
 
   - id: helm-worldclass-terminal-2026-06
     name: Helm Worldclass Terminal — operator TUI integration and verification lane
     status: ACTIVE
     opened_at: "2026-06-14"
-    verified_at: "2026-06-14"
+    verified_at: "2026-06-29"
     ttl_days: 14
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
@@ -1300,7 +1318,7 @@ active_tracks:
     name: A2A Cloud-Agent Bridge — cloud reasoners onto the NATS substrate
     status: ACTIVE
     opened_at: "2026-06-14"
-    verified_at: "2026-06-14"
+    verified_at: "2026-06-29"
     ttl_days: 14
     owner: "@codex_composer"
     serves: substrate-nativeness

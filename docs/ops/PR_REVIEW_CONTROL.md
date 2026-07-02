@@ -10,11 +10,14 @@ present.
 
 ## Why `@terminal-review` Was Brittle
 
-`.github/workflows/codex-mention-router.yml` only forwards a GitHub comment to
-`CODEX_WEBHOOK_URL`. If that secret, token, or local bridge is down, the mention
-does nothing useful. PR Review Control is pull-based from the local operator
-machine: it asks GitHub for live state, writes packets under `~/.dharma`, and
-does not depend on inbound webhooks.
+The workflow file is still named `.github/workflows/codex-mention-router.yml`,
+but its current workflow name is `merge-master-mike-router`. It no longer acts
+as a generic Codex webhook forwarder. It routes owner/member/collaborator PR
+mentions into deterministic Merge Master Mike packet/gate/comment flows, and
+conditional merge is only armed by an explicit `merge when clean` command.
+Local PR Review Control remains pull-based from the operator machine: it asks
+GitHub for live state, writes packets under `~/.dharma`, and does not depend on
+inbound local webhooks.
 
 ## CI Truth Contract
 
@@ -76,6 +79,11 @@ The workflow also supports manual dispatch with a `pr` input from the GitHub
 Actions UI. A normal PR comment mention always posts a fresh visible Mike
 comment; manual dispatch may update the stable
 `<!-- dharma-pr-review-control:auto -->` comment.
+
+This is not the official `@claude` GitHub Actions path. No Claude GitHub app or
+Anthropic/Claude repository secret is assumed here. If that route is adopted,
+credential installation and secret rotation are separate operator actions before
+any workflow can be declared live.
 
 For a PR-specific mention, the GitHub adapter does only this:
 

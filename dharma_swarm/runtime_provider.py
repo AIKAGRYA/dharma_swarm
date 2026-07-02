@@ -185,12 +185,20 @@ def resolve_runtime_provider_config(
     if provider == ProviderType.ANTHROPIC and not _env_value(env_map, "DHARMA_FORCE_ANTHROPIC_API"):
         provider = ProviderType.CLAUDE_CODE
 
+    # Legacy configs may still say "local"; the canonical local runtime lane is
+    # Ollama. Force the local API default rather than accidentally selecting
+    # Ollama Cloud when an OLLAMA_API_KEY is present.
+    if provider == ProviderType.LOCAL:
+        provider = ProviderType.OLLAMA
+        base_url = base_url or "http://localhost:11434"
+
     if provider == ProviderType.ANTHROPIC:
         token = api_key or _env_value(env_map, ANTHROPIC_API_KEY_ENV)
         return RuntimeProviderConfig(
             provider=provider,
             api_key=token,
             default_model=model or DEFAULT_CLAUDE_MODEL,
+            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -201,6 +209,7 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=(base_url or OPENAI_BASE_URL).rstrip("/"),
             default_model=model or DEFAULT_OPENAI_MODEL,
+            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -211,6 +220,7 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=(base_url or OPENROUTER_BASE_URL).rstrip("/"),
             default_model=model or DEFAULT_OPENROUTER_MODEL,
+            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -221,6 +231,7 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=(base_url or OPENROUTER_BASE_URL).rstrip("/"),
             default_model=model,
+            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -236,6 +247,7 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=resolved_base,
             default_model=model or DEFAULT_NIM_MODEL,
+            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -266,6 +278,7 @@ def resolve_runtime_provider_config(
             base_url=resolved_base,
             default_model=resolved_model,
             transport_mode=transport_mode,
+            timeout_seconds=timeout,
             available=available,
             metadata=metadata,
         )
@@ -306,6 +319,7 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=resolved_base,
             default_model=model or DEFAULT_GROQ_MODEL,
+            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -321,6 +335,7 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=resolved_base,
             default_model=model or DEFAULT_CEREBRAS_MODEL,
+            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -336,6 +351,7 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=resolved_base,
             default_model=model or DEFAULT_SILICONFLOW_MODEL,
+            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -351,6 +367,7 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=resolved_base,
             default_model=model or DEFAULT_TOGETHER_MODEL,
+            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -366,6 +383,7 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=resolved_base,
             default_model=model or DEFAULT_FIREWORKS_MODEL,
+            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -381,6 +399,7 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=resolved_base,
             default_model=model or DEFAULT_GOOGLE_AI_MODEL,
+            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -396,6 +415,7 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=resolved_base,
             default_model=model or DEFAULT_SAMBANOVA_MODEL,
+            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -411,6 +431,7 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=resolved_base,
             default_model=model or DEFAULT_MISTRAL_MODEL,
+            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -426,6 +447,7 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=resolved_base,
             default_model=model or DEFAULT_CHUTES_MODEL,
+            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -436,6 +458,8 @@ def _attach_runtime_provider_metadata(provider: Any, config: RuntimeProviderConf
     try:
         setattr(provider, "runtime_provider_type", config.provider.value)
         setattr(provider, "runtime_default_model", config.default_model or "")
+        setattr(provider, "runtime_available", config.available)
+        setattr(provider, "available", config.available)
     except Exception:
         pass
     return provider
@@ -445,6 +469,17 @@ def _stamp_response_provider(response: LLMResponse, provider: ProviderType) -> L
     if str(response.provider or "").strip():
         return response
     return response.model_copy(update={"provider": provider.value})
+
+
+def _api_key_base_url_kwargs(config: RuntimeProviderConfig) -> dict[str, Any]:
+    kwargs: dict[str, Any] = {}
+    if config.api_key is not None:
+        kwargs["api_key"] = config.api_key
+    if config.base_url is not None:
+        kwargs["base_url"] = config.base_url
+    if config.timeout_seconds is not None:
+        kwargs["timeout_seconds"] = config.timeout_seconds
+    return kwargs
 
 
 def create_runtime_provider(config: RuntimeProviderConfig) -> Any:
@@ -476,19 +511,13 @@ def create_runtime_provider(config: RuntimeProviderConfig) -> Any:
             kwargs["api_key"] = config.api_key
         return _attach_runtime_provider_metadata(AnthropicProvider(**kwargs), config)
     if config.provider == ProviderType.OPENAI:
-        kwargs = {}
-        if config.api_key is not None:
-            kwargs["api_key"] = config.api_key
+        kwargs = _api_key_base_url_kwargs(config)
         return _attach_runtime_provider_metadata(OpenAIProvider(**kwargs), config)
     if config.provider == ProviderType.OPENROUTER:
-        kwargs = {}
-        if config.api_key is not None:
-            kwargs["api_key"] = config.api_key
+        kwargs = _api_key_base_url_kwargs(config)
         return _attach_runtime_provider_metadata(OpenRouterProvider(**kwargs), config)
     if config.provider == ProviderType.OPENROUTER_FREE:
-        kwargs = {}
-        if config.api_key is not None:
-            kwargs["api_key"] = config.api_key
+        kwargs = _api_key_base_url_kwargs(config)
         if config.default_model is not None:
             kwargs["model"] = config.default_model
         return _attach_runtime_provider_metadata(OpenRouterFreeProvider(**kwargs), config)
@@ -498,6 +527,8 @@ def create_runtime_provider(config: RuntimeProviderConfig) -> Any:
             kwargs["api_key"] = config.api_key
         if config.base_url is not None:
             kwargs["base_url"] = config.base_url
+        if config.timeout_seconds is not None:
+            kwargs["timeout_seconds"] = config.timeout_seconds
         return _attach_runtime_provider_metadata(NVIDIANIMProvider(**kwargs), config)
     if config.provider == ProviderType.OLLAMA:
         kwargs = {}
@@ -507,6 +538,8 @@ def create_runtime_provider(config: RuntimeProviderConfig) -> Any:
             kwargs["model"] = config.default_model
         if config.api_key is not None:
             kwargs["api_key"] = config.api_key
+        if config.timeout_seconds is not None:
+            kwargs["timeout_seconds"] = config.timeout_seconds
         return _attach_runtime_provider_metadata(OllamaProvider(**kwargs), config)
     if config.provider == ProviderType.CLAUDE_CODE:
         kwargs = {"timeout": config.timeout_seconds or DEFAULT_PROVIDER_TIMEOUT_SECONDS}
@@ -519,49 +552,31 @@ def create_runtime_provider(config: RuntimeProviderConfig) -> Any:
             kwargs["working_dir"] = config.working_dir
         return _attach_runtime_provider_metadata(CodexProvider(**kwargs), config)
     if config.provider == ProviderType.GROQ:
-        kwargs = {}
-        if config.api_key is not None:
-            kwargs["api_key"] = config.api_key
+        kwargs = _api_key_base_url_kwargs(config)
         return _attach_runtime_provider_metadata(GroqProvider(**kwargs), config)
     if config.provider == ProviderType.CEREBRAS:
-        kwargs = {}
-        if config.api_key is not None:
-            kwargs["api_key"] = config.api_key
+        kwargs = _api_key_base_url_kwargs(config)
         return _attach_runtime_provider_metadata(CerebrasProvider(**kwargs), config)
     if config.provider == ProviderType.SILICONFLOW:
-        kwargs = {}
-        if config.api_key is not None:
-            kwargs["api_key"] = config.api_key
+        kwargs = _api_key_base_url_kwargs(config)
         return _attach_runtime_provider_metadata(SiliconFlowProvider(**kwargs), config)
     if config.provider == ProviderType.TOGETHER:
-        kwargs = {}
-        if config.api_key is not None:
-            kwargs["api_key"] = config.api_key
+        kwargs = _api_key_base_url_kwargs(config)
         return _attach_runtime_provider_metadata(TogetherProvider(**kwargs), config)
     if config.provider == ProviderType.FIREWORKS:
-        kwargs = {}
-        if config.api_key is not None:
-            kwargs["api_key"] = config.api_key
+        kwargs = _api_key_base_url_kwargs(config)
         return _attach_runtime_provider_metadata(FireworksProvider(**kwargs), config)
     if config.provider == ProviderType.GOOGLE_AI:
-        kwargs = {}
-        if config.api_key is not None:
-            kwargs["api_key"] = config.api_key
+        kwargs = _api_key_base_url_kwargs(config)
         return _attach_runtime_provider_metadata(GoogleAIProvider(**kwargs), config)
     if config.provider == ProviderType.SAMBANOVA:
-        kwargs = {}
-        if config.api_key is not None:
-            kwargs["api_key"] = config.api_key
+        kwargs = _api_key_base_url_kwargs(config)
         return _attach_runtime_provider_metadata(SambaNovaProvider(**kwargs), config)
     if config.provider == ProviderType.MISTRAL:
-        kwargs = {}
-        if config.api_key is not None:
-            kwargs["api_key"] = config.api_key
+        kwargs = _api_key_base_url_kwargs(config)
         return _attach_runtime_provider_metadata(MistralProvider(**kwargs), config)
     if config.provider == ProviderType.CHUTES:
-        kwargs = {}
-        if config.api_key is not None:
-            kwargs["api_key"] = config.api_key
+        kwargs = _api_key_base_url_kwargs(config)
         return _attach_runtime_provider_metadata(ChutesProvider(**kwargs), config)
     raise ValueError(f"Unsupported runtime provider: {config.provider.value}")
 

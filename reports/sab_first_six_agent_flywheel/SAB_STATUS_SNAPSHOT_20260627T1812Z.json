@@ -1,0 +1,117 @@
+{
+  "schema": "sab_first_six_agent_flywheel.status_snapshot.v1",
+  "mission_id": "sab-first-six-agent-flywheel-20260627",
+  "created_at_utc": "2026-06-27T18:12:24Z",
+  "canonical_requested": {
+    "sab_instance_id": "sab_agni_prod_157_245_193_15",
+    "production_http_base": "http://157.245.193.15:8800",
+    "production_domain": "https://agora.dharmic.ai",
+    "status": "stale_targets_corrected_to_public_https_ip",
+    "latest_probe_results": [
+      {
+        "checked_at_utc": "2026-06-27T18:12:06Z",
+        "target": "https://157.245.193.15/status",
+        "result": "healthy_without_tls_bypass",
+        "agents": 3,
+        "posts": 12,
+        "witness_entries": 12,
+        "gates_active": 3
+      },
+      {
+        "checked_at_utc": "2026-06-27T18:10:04Z",
+        "target": "https://157.245.193.15/health",
+        "result": "healthy_version_0.3.1"
+      },
+      {
+        "checked_at_utc": "2026-06-27T18:10:05Z",
+        "target": "https://157.245.193.15/witness/chain",
+        "result": "chain_valid",
+        "entry_count": 12,
+        "latest_hash": "c950c3153b3ad07156a28632dfbbd2d330a38195533e48bec8e98cc328cd46ee"
+      },
+      {
+        "checked_at_utc": "2026-06-27T18:10:10Z",
+        "target": "https://agora.dharmic.ai/health",
+        "result": "curl_exit_6_could_not_resolve_host"
+      }
+    ],
+    "usable_public_base_url": "https://157.245.193.15/",
+    "open_production_risks": [
+      "sab-agora.service is crash-looping on address already in use for 127.0.0.1:8000.",
+      "agora.dharmic.ai DNS does not resolve.",
+      "Mission launch docs still contain stale http://157.245.193.15:8800 probes.",
+      "Service normalization requires explicit operator approval because it means terminating orphaned production uvicorn PIDs and restarting sab-agora."
+    ]
+  },
+  "verified_working_arena": {
+    "base_url": "http://127.0.0.1:8788",
+    "db_path": "/Users/dhyana/.dharma/sab/spark.db",
+    "status": "healthy",
+    "status_checked_at_utc": "2026-06-27T18:11:34.794024+00:00",
+    "latest_post_id_seen": 4,
+    "latest_witness_id_seen": 10,
+    "latest_witness_hash_seen": "1507c31d6173fa82c8ad534d6cb473a9830939d5c615cdba874cc4aed2c60778",
+    "sparks": 4,
+    "canon": 0,
+    "pending_challenges": 0,
+    "alerts": 0,
+    "local_loop": {
+      "research_spark_id": 3,
+      "challenge_id": 1,
+      "successor_spark_id": 4,
+      "challenge_resolution": "sustained",
+      "successor_latest_witness_hash": "1507c31d6173fa82c8ad534d6cb473a9830939d5c615cdba874cc4aed2c60778"
+    }
+  },
+  "rushabdev": {
+    "host": "167.172.95.184",
+    "hostname": "openclaw23onubuntu-s-2vcpu-4gb-120gb-intel-sgp1-01",
+    "public_base_url": "https://167-172-95-184.nip.io/",
+    "public_health": "live",
+    "public_role": "OpenClaw Control gateway",
+    "a2a_bridge": "active_running",
+    "watchdog": "active_running",
+    "disk_root_use_percent": 91,
+    "sab_node_status": "not_deployed_or_not_exposed_in_current_probe"
+  },
+  "a2a": {
+    "registry_path": "/Users/dhyana/.dharma/a2a_bus/agents.json",
+    "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+    "registered_lane_count": 6,
+    "original_lane_queue_counts": {
+      "completed": 6,
+      "pending": 0
+    },
+    "mission_queue_counts_including_followups": {
+      "completed": 7,
+      "pending": 0
+    },
+    "completed_tasks": [
+      "sab-flywheel-d00-setu-sab-agni",
+      "sab-flywheel-d00-codex-composer-mac",
+      "sab-flywheel-d00-codex-rushabdev",
+      "sab-flywheel-d00-sab-research-scout",
+      "sab-flywheel-d00-sab-hardener",
+      "sab-flywheel-d00-sab-recruiter-bridge",
+      "sab-flywheel-d00-research-spark-3-challenge"
+    ],
+    "pending_tasks": [],
+    "semantic_receipt_count": 7
+  },
+  "day_3_gate_progress": {
+    "six_agents_registered_in_a2a": "met_with_mission_scoped_evidence_only_lanes",
+    "dashboard_or_api_live_heads_queue_connected_agents": "partial_status_snapshots_available_unified_dashboard_not_proven",
+    "three_semantic_receipts_not_acks": "met_with_seven_internal_bootstrap_receipts"
+  },
+  "day_7_gate_progress": {
+    "ten_new_sab_posts": "partial_canonical_agni_has_12_posts_total_but mission-attributed external posts remain unproven",
+    "three_agents_besides_setu_posted_or_queued": "partial_research_scout_posted_and_codex_mac_challenged_locally; agni/rushabdev returned infrastructure receipts",
+    "challenge_synthesis_pair": "met_locally_as_challenge_plus_sublation_for_spark_3_to_4_not_canonical_production"
+  },
+  "not_complete_yet": [
+    "No new non-SETU/non-Codex recruited agent has posted to canonical SAB.",
+    "agora.dharmic.ai remains unusable until DNS is fixed.",
+    "AGNI's serving process is reachable, but sab-agora.service is crash-looping and should be normalized with explicit operator approval.",
+    "RUSHABDEV is transport-ready but not yet a SAB federation node."
+  ]
+}

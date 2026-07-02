@@ -1,0 +1,576 @@
+diff --git a/dharma_swarm/operator_core/intent_payloads.py b/dharma_swarm/operator_core/intent_payloads.py
+index 1f315c207..f652ab24d 100644
+--- a/dharma_swarm/operator_core/intent_payloads.py
++++ b/dharma_swarm/operator_core/intent_payloads.py
+@@ -87,6 +87,9 @@ def _classify_bridge_intent(prompt: str) -> dict[str, Any]:
+     if any(t in lowered for t in ("subagent", "delegate", "agent swarm")):
+         return {"kind": "agent", "confidence": "medium",
+                 "reason": "agent-orchestration request"}
++    if _looks_like_tool_capable_work(lowered):
++        return {"kind": "agent", "confidence": "high",
++                "reason": "tool-capable repo work request"}
+     if any(t in lowered for t in ("evolve", "improve yourself", "cascade")):
+         return {"kind": "evolution", "confidence": "medium",
+                 "reason": "self-improvement request"}
+@@ -110,6 +113,23 @@ def _classify_bridge_intent(prompt: str) -> dict[str, Any]:
+             "reason": "default conversational turn"}
+ 
+ 
++def _looks_like_tool_capable_work(lowered_prompt: str) -> bool:
++    import re
++
++    action = re.search(
++        r"\b(add|analyze|build|check|debug|edit|execute|fix|grep|implement|inspect|lint|list|modify|patch|read|refactor|run|scan|search|test|typecheck|update|write)\b",
++        lowered_prompt,
++    )
++    if action is None:
++        return False
++    return bool(
++        re.search(
++            r"(/|\.py\b|\.ts\b|\.tsx\b|\.js\b|\.jsx\b|\.json\b|\.md\b|\bbug\b|\bcode\b|\bcommand\b|\bdashboard\b|\bdiff\b|\berror\b|\bfailing\b|\bfile\b|\bfiles\b|\bgit\b|\bpytest\b|\brepo\b|\brepository\b|\bshell\b|\bterminal\b|\btest\b|\btests\b|\btool\b|\btools\b|\btui\b)",
++            lowered_prompt,
++        )
++    )
++
++
+ def _route_and_decompose(prompt: str) -> dict[str, Any]:
+     """Run IntentRouter analysis + decomposition."""
+     try:
+diff --git a/dharma_swarm/terminal_bridge.py b/dharma_swarm/terminal_bridge.py
+index cf11a16d4..68c5254f1 100644
+--- a/dharma_swarm/terminal_bridge.py
++++ b/dharma_swarm/terminal_bridge.py
+@@ -851,6 +851,13 @@ class TerminalBridge:
+         self._active_session_id = session_id
+         self._active_provider_id = provider_id
+         self._active_model_id = str(request.get("model", "") or adapter.get_profile(None).model_id)
++        self._ensure_session_store_entry(
++            session_id=session_id,
++            provider_id=provider_id,
++            model_id=self._active_model_id,
++            prompt=prompt,
++            request=request,
++        )
+         self._emit(
+             {
+                 "type": "session.ack",
+@@ -861,13 +868,17 @@ class TerminalBridge:
+             }
+         )
+ 
++        provider_options = dict(request.get("provider_options", {}) or {})
++        if provider_id == "claude":
++            provider_options.setdefault("scrub_metered_keys", True)
++
+         completion = self._completion_request_cls(
+             messages=[{"role": "user", "content": prompt}],
+             model=str(request.get("model", "") or adapter.get_profile(None).model_id),
+             system_prompt=str(request.get("system_prompt", "") or bootstrap.get("system_prompt", "") or "") or None,
+             enable_thinking=bool(request.get("enable_thinking", False)),
+             resume_session_id=str(request.get("resume_session_id", "") or "") or None,
+-            provider_options=dict(request.get("provider_options", {}) or {}),
++            provider_options=provider_options,
+         )
+ 
+         try:
+@@ -880,6 +891,43 @@ class TerminalBridge:
+         finally:
+             self._active_session_id = None
+ 
++    def _ensure_session_store_entry(
++        self,
++        *,
++        session_id: str,
++        provider_id: str,
++        model_id: str,
++        prompt: str,
++        request: dict[str, Any],
++    ) -> None:
++        if self._session_store_has_session(session_id):
++            self._ensure_session_store_files(session_id)
++            return
++
++        title = " ".join(prompt.split())[:96]
++        parent_session_id = str(request.get("resume_session_id", "") or "").strip() or None
++        self._session_store.create_session(
++            session_id=session_id,
++            provider_id=provider_id,
++            model_id=model_id,
++            cwd=str(self._repo_root),
++            title=title,
++            parent_session_id=parent_session_id,
++        )
++
++    def _session_store_has_session(self, session_id: str) -> bool:
++        try:
++            self._session_store.load_meta(session_id)
++            return True
++        except Exception:
++            return False
++
++    def _ensure_session_store_files(self, session_id: str) -> None:
++        session_path = self._session_store.root / session_id
++        session_path.mkdir(parents=True, exist_ok=True)
++        for name in ("transcript.jsonl", "audit.jsonl", "runtime.jsonl", "snapshots.jsonl"):
++            (session_path / name).touch(exist_ok=True)
++
+     async def _run_chat_turn(self, request_id: str, request: dict[str, Any]) -> None:
+         """Lightweight conversational turn: history, slim prompt, no tools.
+ 
+@@ -1264,7 +1312,7 @@ class TerminalBridge:
+         created_at = str(payload.get("resolved_at", "") or datetime.now(timezone.utc).isoformat())
+         domain = str(payload.get("domain", "") or "")
+         if domain == "permission_decision":
+-            self._session_store.append_event(
++            self._append_permission_event(
+                 session_id,
+                 PermissionDecisionEvent(
+                     session_id=session_id,
+@@ -1282,7 +1330,7 @@ class TerminalBridge:
+             )
+             return
+         if domain == "permission_resolution":
+-            self._session_store.append_event(
++            self._append_permission_event(
+                 session_id,
+                 PermissionResolutionEvent(
+                     session_id=session_id,
+@@ -1299,7 +1347,7 @@ class TerminalBridge:
+             )
+             return
+         if domain == "permission_outcome":
+-            self._session_store.append_event(
++            self._append_permission_event(
+                 session_id,
+                 PermissionOutcomeEvent(
+                     session_id=session_id,
+@@ -1314,6 +1362,12 @@ class TerminalBridge:
+             )
+             return
+ 
++    def _append_permission_event(self, session_id: str, event: Any) -> None:
++        try:
++            self._session_store.append_event(session_id, event)
++        except FileNotFoundError:
++            return
++
+     def _build_workspace_snapshot(self) -> str:
+         summary = self._load_repo_xray()
+         topology = build_workspace_topology(self._repo_root.parent)
+@@ -2196,6 +2250,13 @@ class TerminalBridge:
+                 "confidence": "medium",
+                 "reason": "agent-orchestration request",
+             }
++        if self._looks_like_tool_capable_work(lowered):
++            return {
++                "kind": "agent",
++                "auto_execute": False,
++                "confidence": "high",
++                "reason": "tool-capable repo work request",
++            }
+         if any(term in lowered for term in ("evolve", "improve yourself", "refine the shell", "cascade")):
+             return {
+                 "kind": "evolution",
+@@ -2210,6 +2271,20 @@ class TerminalBridge:
+             "reason": "default conversational turn",
+         }
+ 
++    def _looks_like_tool_capable_work(self, lowered_prompt: str) -> bool:
++        action = re.search(
++            r"\b(add|analyze|build|check|debug|edit|execute|fix|grep|implement|inspect|lint|list|modify|patch|read|refactor|run|scan|search|test|typecheck|update|write)\b",
++            lowered_prompt,
++        )
++        if action is None:
++            return False
++        return bool(
++            re.search(
++                r"(/|\.py\b|\.ts\b|\.tsx\b|\.js\b|\.jsx\b|\.json\b|\.md\b|\bbug\b|\bcode\b|\bcommand\b|\bdashboard\b|\bdiff\b|\berror\b|\bfailing\b|\bfile\b|\bfiles\b|\bgit\b|\bpytest\b|\brepo\b|\brepository\b|\bshell\b|\bterminal\b|\btest\b|\btests\b|\btool\b|\btools\b|\btui\b)",
++                lowered_prompt,
++            )
++        )
++
+     def _render_identity_response(self, bootstrap: dict[str, Any]) -> str:
+         return render_identity_response(bootstrap, repo_root=self._repo_root)
+ 
+diff --git a/reports/governance/active_track_evidence.json b/reports/governance/active_track_evidence.json
+index 0f883c96c..cc3568fda 100644
+--- a/reports/governance/active_track_evidence.json
++++ b/reports/governance/active_track_evidence.json
+@@ -1,5 +1,5 @@
+ {
+-  "generated_at": "2026-06-09T00:02:55+09:00",
++  "generated_at": "2026-06-16T20:02:10+09:00",
+   "schema_version": 2,
+   "active_track_id": "runtime-truth-reconciliation-2026-06",
+   "shippable": true,
+@@ -95,7 +95,7 @@
+     }
+   ],
+   "portfolio_summary": {
+-    "active": 2,
++    "active": 3,
+     "max_active": 10,
+     "warn_active": 5,
+     "shippable": 2
+@@ -301,6 +301,100 @@
+           "detail": "pattern 'NATS' found in docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md"
+         }
+       ]
++    },
++    {
++      "id": "runtime-truth-spine-adoption-2026-06",
++      "name": "Runtime Truth Spine \u2014 Adoption (god objects flow through invoke_agent)",
++      "status": "ACTIVE",
++      "serves": "substrate-nativeness",
++      "complements": [
++        "runtime-truth-reconciliation-2026-06",
++        "runtime-truth-nats-2026-06"
++      ],
++      "depends_on": [],
++      "conflicts_with": [],
++      "owned_surfaces": [
++        "dharma_swarm/spine/**",
++        "dharma_swarm/a2a/a2a_bridge.py",
++        "dharma_swarm/orchestrator.py",
++        "dharma_swarm/agent_runner.py",
++        "scripts/uplift_guards/check_spine_ownership.py"
++      ],
++      "moves_vital_signs": [
++        "quality_gates",
++        "tool_coverage"
++      ],
++      "verified_at": "2026-06-10",
++      "ttl_days": 21,
++      "owner": "@AmitabhainArunachala",
++      "shippable": false,
++      "prerequisites_ok": true,
++      "completion_progress": {
++        "passed": 5,
++        "total": 8
++      },
++      "criteria": [
++        {
++          "id": "spine_package_exists",
++          "kind": "file_exists",
++          "passed": true,
++          "detail": "dharma_swarm/spine/__init__.py present"
++        },
++        {
++          "id": "invoke_agent_defined",
++          "kind": "file_contains",
++          "passed": true,
++          "detail": "pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py"
++        },
++        {
++          "id": "a2a_bridge_calls_spine",
++          "kind": "file_contains",
++          "passed": true,
++          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/a2a/a2a_bridge.py"
++        },
++        {
++          "id": "orchestrator_calls_spine",
++          "kind": "file_contains",
++          "passed": true,
++          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/orchestrator.py"
++        },
++        {
++          "id": "agent_runner_calls_spine",
++          "kind": "file_contains",
++          "passed": false,
++          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' NOT FOUND in dharma_swarm/agent_runner.py"
++        },
++        {
++          "id": "dispatch_emits_evidence_receipt",
++          "kind": "file_contains",
++          "passed": true,
++          "detail": "pattern 'test_every_dispatch_emits_exactly_one_evidence_receipt' found in tests/test_spine_adoption_dispatch.py"
++        },
++        {
++          "id": "zero_dropoff_sources",
++          "kind": "file_contains",
++          "passed": true,
++          "detail": "pattern 'test_no_dropoff_sources_remain' found in tests/test_spine_adoption_dispatch.py"
++        },
++        {
++          "id": "bypass_allowlist_empty",
++          "kind": "file_contains",
++          "passed": false,
++          "detail": "pattern '(?m)^_INTENTIONAL_BYPASS: dict\\\\[tuple\\\\[str, int\\\\], str\\\\] = \\\\{\\\\s*\\\\}' NOT FOUND in scripts/governance/spine_bypass_report.py"
++        },
++        {
++          "id": "adoption_narrative_docs",
++          "kind": "file_exists",
++          "passed": true,
++          "detail": "docs/architecture/SPINE_ADOPTION_NARRATIVE.md present"
++        },
++        {
++          "id": "gate1_witnessed",
++          "kind": "file_exists",
++          "passed": false,
++          "detail": "reports/governance/GATE1_WITNESSED.md MISSING"
++        }
++      ]
+     }
+   ],
+   "findings": [
+@@ -327,6 +421,12 @@
+       "check": "track-shippable:runtime-truth-nats-2026-06",
+       "message": "[runtime-truth-nats-2026-06] all 2 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
+       "criterion_id": null
++    },
++    {
++      "severity": "INFO",
++      "check": "track-in-progress:runtime-truth-spine-adoption-2026-06",
++      "message": "[runtime-truth-spine-adoption-2026-06] 5/8 completion criteria pass.",
++      "criterion_id": null
+     }
+   ]
+ }
+diff --git a/reports/governance/active_track_evidence.md b/reports/governance/active_track_evidence.md
+index c2ff10c25..4a8cac556 100644
+--- a/reports/governance/active_track_evidence.md
++++ b/reports/governance/active_track_evidence.md
+@@ -1,7 +1,7 @@
+ # Track Portfolio Evidence
+ 
+-Generated: 2026-06-09T00:02:55+09:00 (schema v2)
+-Active tracks: **2** (warn 5, max 10) — shippable 2
++Generated: 2026-06-16T20:02:10+09:00 (schema v2)
++Active tracks: **3** (warn 5, max 10) — shippable 2
+ 
+ ## Spine coverage
+ 
+@@ -40,9 +40,27 @@ Active tracks: **2** (warn 5, max 10) — shippable 2
+   - ✓ `nats_master_spec_present` (file_exists) — docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present
+   - ✓ `nats_transport_landed` (file_contains) — pattern 'NATS' found in docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
+ 
++## `runtime-truth-spine-adoption-2026-06` — 5/8
++
++- serves: `substrate-nativeness` · complements: ['runtime-truth-reconciliation-2026-06', 'runtime-truth-nats-2026-06'] · depends_on: [] · conflicts_with: []
++- owned_surfaces: ['dharma_swarm/spine/**', 'dharma_swarm/a2a/a2a_bridge.py', 'dharma_swarm/orchestrator.py', 'dharma_swarm/agent_runner.py', 'scripts/uplift_guards/check_spine_ownership.py']
++- moves_vital_signs: ['quality_gates', 'tool_coverage']
++
++  - ✓ `spine_package_exists` (file_exists) — dharma_swarm/spine/__init__.py present
++  - ✓ `invoke_agent_defined` (file_contains) — pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py
++  - ✓ `a2a_bridge_calls_spine` (file_contains) — pattern '(?m)^\\s*from dharma_swarm\\.spine' found in dharma_swarm/a2a/a2a_bridge.py
++  - ✓ `orchestrator_calls_spine` (file_contains) — pattern '(?m)^\\s*from dharma_swarm\\.spine' found in dharma_swarm/orchestrator.py
++  - ✗ `agent_runner_calls_spine` (file_contains) — pattern '(?m)^\\s*from dharma_swarm\\.spine' NOT FOUND in dharma_swarm/agent_runner.py
++  - ✓ `dispatch_emits_evidence_receipt` (file_contains) — pattern 'test_every_dispatch_emits_exactly_one_evidence_receipt' found in tests/test_spine_adoption_dispatch.py
++  - ✓ `zero_dropoff_sources` (file_contains) — pattern 'test_no_dropoff_sources_remain' found in tests/test_spine_adoption_dispatch.py
++  - ✗ `bypass_allowlist_empty` (file_contains) — pattern '(?m)^_INTENTIONAL_BYPASS: dict\\[tuple\\[str, int\\], str\\] = \\{\\s*\\}' NOT FOUND in scripts/governance/spine_bypass_report.py
++  - ✓ `adoption_narrative_docs` (file_exists) — docs/architecture/SPINE_ADOPTION_NARRATIVE.md present
++  - ✗ `gate1_witnessed` (file_exists) — reports/governance/GATE1_WITNESSED.md MISSING
++
+ ## Findings
+ 
+ - **WARN** `spine-uncovered:research-depth`: Spine objective 'research-depth' has no ACTIVE track serving it (coverage gap).
+ - **WARN** `spine-uncovered:revenue-external-humans-served`: Spine objective 'revenue-external-humans-served' has no ACTIVE track serving it (coverage gap).
+ - **INFO** `track-shippable:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] all 11 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
+ - **INFO** `track-shippable:runtime-truth-nats-2026-06`: [runtime-truth-nats-2026-06] all 2 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
++- **INFO** `track-in-progress:runtime-truth-spine-adoption-2026-06`: [runtime-truth-spine-adoption-2026-06] 5/8 completion criteria pass.
+diff --git a/reports/governance/track_portfolio.json b/reports/governance/track_portfolio.json
+index 0f883c96c..cc3568fda 100644
+--- a/reports/governance/track_portfolio.json
++++ b/reports/governance/track_portfolio.json
+@@ -1,5 +1,5 @@
+ {
+-  "generated_at": "2026-06-09T00:02:55+09:00",
++  "generated_at": "2026-06-16T20:02:10+09:00",
+   "schema_version": 2,
+   "active_track_id": "runtime-truth-reconciliation-2026-06",
+   "shippable": true,
+@@ -95,7 +95,7 @@
+     }
+   ],
+   "portfolio_summary": {
+-    "active": 2,
++    "active": 3,
+     "max_active": 10,
+     "warn_active": 5,
+     "shippable": 2
+@@ -301,6 +301,100 @@
+           "detail": "pattern 'NATS' found in docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md"
+         }
+       ]
++    },
++    {
++      "id": "runtime-truth-spine-adoption-2026-06",
++      "name": "Runtime Truth Spine \u2014 Adoption (god objects flow through invoke_agent)",
++      "status": "ACTIVE",
++      "serves": "substrate-nativeness",
++      "complements": [
++        "runtime-truth-reconciliation-2026-06",
++        "runtime-truth-nats-2026-06"
++      ],
++      "depends_on": [],
++      "conflicts_with": [],
++      "owned_surfaces": [
++        "dharma_swarm/spine/**",
++        "dharma_swarm/a2a/a2a_bridge.py",
++        "dharma_swarm/orchestrator.py",
++        "dharma_swarm/agent_runner.py",
++        "scripts/uplift_guards/check_spine_ownership.py"
++      ],
++      "moves_vital_signs": [
++        "quality_gates",
++        "tool_coverage"
++      ],
++      "verified_at": "2026-06-10",
++      "ttl_days": 21,
++      "owner": "@AmitabhainArunachala",
++      "shippable": false,
++      "prerequisites_ok": true,
++      "completion_progress": {
++        "passed": 5,
++        "total": 8
++      },
++      "criteria": [
++        {
++          "id": "spine_package_exists",
++          "kind": "file_exists",
++          "passed": true,
++          "detail": "dharma_swarm/spine/__init__.py present"
++        },
++        {
++          "id": "invoke_agent_defined",
++          "kind": "file_contains",
++          "passed": true,
++          "detail": "pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py"
++        },
++        {
++          "id": "a2a_bridge_calls_spine",
++          "kind": "file_contains",
++          "passed": true,
++          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/a2a/a2a_bridge.py"
++        },
++        {
++          "id": "orchestrator_calls_spine",
++          "kind": "file_contains",
++          "passed": true,
++          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/orchestrator.py"
++        },
++        {
++          "id": "agent_runner_calls_spine",
++          "kind": "file_contains",
++          "passed": false,
++          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' NOT FOUND in dharma_swarm/agent_runner.py"
++        },
++        {
++          "id": "dispatch_emits_evidence_receipt",
++          "kind": "file_contains",
++          "passed": true,
++          "detail": "pattern 'test_every_dispatch_emits_exactly_one_evidence_receipt' found in tests/test_spine_adoption_dispatch.py"
++        },
++        {
++          "id": "zero_dropoff_sources",
++          "kind": "file_contains",
++          "passed": true,
++          "detail": "pattern 'test_no_dropoff_sources_remain' found in tests/test_spine_adoption_dispatch.py"
++        },
++        {
++          "id": "bypass_allowlist_empty",
++          "kind": "file_contains",
++          "passed": false,
++          "detail": "pattern '(?m)^_INTENTIONAL_BYPASS: dict\\\\[tuple\\\\[str, int\\\\], str\\\\] = \\\\{\\\\s*\\\\}' NOT FOUND in scripts/governance/spine_bypass_report.py"
++        },
++        {
++          "id": "adoption_narrative_docs",
++          "kind": "file_exists",
++          "passed": true,
++          "detail": "docs/architecture/SPINE_ADOPTION_NARRATIVE.md present"
++        },
++        {
++          "id": "gate1_witnessed",
++          "kind": "file_exists",
++          "passed": false,
++          "detail": "reports/governance/GATE1_WITNESSED.md MISSING"
++        }
++      ]
+     }
+   ],
+   "findings": [
+@@ -327,6 +421,12 @@
+       "check": "track-shippable:runtime-truth-nats-2026-06",
+       "message": "[runtime-truth-nats-2026-06] all 2 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
+       "criterion_id": null
++    },
++    {
++      "severity": "INFO",
++      "check": "track-in-progress:runtime-truth-spine-adoption-2026-06",
++      "message": "[runtime-truth-spine-adoption-2026-06] 5/8 completion criteria pass.",
++      "criterion_id": null
+     }
+   ]
+ }
+diff --git a/scripts/start_terminal_tui_tmux.sh b/scripts/start_terminal_tui_tmux.sh
+index 9b34404ff..019aaf68d 100755
+--- a/scripts/start_terminal_tui_tmux.sh
++++ b/scripts/start_terminal_tui_tmux.sh
+@@ -1,11 +1,21 @@
+ #!/usr/bin/env bash
+ set -euo pipefail
+ 
+-ROOT="${HOME}/dharma_swarm"
++SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
++ROOT="${DHARMA_TERMINAL_ROOT:-$(cd -- "${SCRIPT_DIR}/.." && pwd)}"
+ SESSION="${SESSION_NAME:-dharma_terminal_tui}"
+ STATE_DIR="${DHARMA_TERMINAL_TUI_STATE_DIR:-${HOME}/.dharma/terminal_tui}"
+ LOG_FILE="${STATE_DIR}/session.log"
+ TERMINAL_DIR="${ROOT}/terminal"
++PYTHON_BIN="${DHARMA_PYTHON:-}"
++
++if [[ -z "${PYTHON_BIN}" && -x "${ROOT}/.venv/bin/python" ]]; then
++  PYTHON_BIN="${ROOT}/.venv/bin/python"
++fi
++
++if [[ -z "${PYTHON_BIN}" && -x "${HOME}/dharma_swarm/.venv/bin/python" ]]; then
++  PYTHON_BIN="${HOME}/dharma_swarm/.venv/bin/python"
++fi
+ 
+ if tmux has-session -t "${SESSION}" 2>/dev/null; then
+   echo "Session '${SESSION}' already running."
+@@ -14,11 +24,18 @@ fi
+ 
+ mkdir -p "${STATE_DIR}"
+ 
+-tmux new-session -d -s "${SESSION}" "cd '${TERMINAL_DIR}' && bun run src/index.tsx"
++START_CMD="cd $(printf '%q' "${TERMINAL_DIR}") && "
++if [[ -n "${PYTHON_BIN}" ]]; then
++  START_CMD+="DHARMA_PYTHON=$(printf '%q' "${PYTHON_BIN}") "
++fi
++START_CMD+="bun run src/index.tsx"
++
++tmux new-session -d -s "${SESSION}" "${START_CMD}"
+ tmux pipe-pane -o -t "${SESSION}" "cat >> '${LOG_FILE}'"
+ 
+ echo "Started terminal TUI session '${SESSION}'"
+ echo "Terminal dir: ${TERMINAL_DIR}"
++echo "Python: ${PYTHON_BIN:-python3}"
+ echo "State dir: ${STATE_DIR}"
+ echo "Log file: ${LOG_FILE}"
+ echo "Attach: tmux attach -t ${SESSION}"
+diff --git a/tests/test_intent_payloads.py b/tests/test_intent_payloads.py
+index 63024c017..b3371a163 100644
+--- a/tests/test_intent_payloads.py
++++ b/tests/test_intent_payloads.py
+@@ -34,8 +34,19 @@ class TestClassifyBridgeIntent:
+         result = _classify_bridge_intent("delegate to a subagent")
+         assert result["kind"] == "agent"
+ 
+-    def test_chat_fallback(self):
++    def test_tool_work_request(self):
++        result = _classify_bridge_intent(
++            "read terminal/src/app.tsx and tell me where session.start is sent"
++        )
++        assert result["kind"] == "agent"
++        assert result["reason"] == "tool-capable repo work request"
++
++    def test_code_change_request(self):
+         result = _classify_bridge_intent("add dark mode to dashboard")
++        assert result["kind"] == "agent"
++
++    def test_chat_fallback(self):
++        result = _classify_bridge_intent("what do you think about the helm UI?")
+         assert result["kind"] == "chat"
+ 
+     def test_plain_language_command(self):

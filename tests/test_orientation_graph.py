@@ -4,9 +4,10 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import sqlite3
 import subprocess
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -26,7 +27,7 @@ def test_packet_has_all_axes():
     packet = og.build_packet()
     data = og.asdict(packet)
     assert set(data) == {"identity", "organs", "tracks", "custody",
-                         "liveness", "broken"}
+                         "liveness", "loop1", "broken"}
 
 
 def test_identity_serves_the_one_line():
@@ -332,6 +333,113 @@ def test_liveness_flags_stale_valid_census(tmp_path, monkeypatch):
     assert "older than 24h" in liveness.receipt
 
 
+def _loop1_db(tmp_path: Path) -> Path:
+    db_path = tmp_path / "runtime.db"
+    with sqlite3.connect(db_path) as db:
+        db.execute(
+            "CREATE TABLE delegation_runs ("
+            "run_id TEXT PRIMARY KEY, task_id TEXT, status TEXT, "
+            "started_at TEXT NOT NULL, receipt_json TEXT)"
+        )
+    return db_path
+
+
+def test_loop1_closure_requires_actual_served_provider_model(tmp_path):
+    db_path = _loop1_db(tmp_path)
+    now = datetime.now(UTC).isoformat()
+    with sqlite3.connect(db_path) as db:
+        db.execute(
+            "INSERT INTO delegation_runs "
+            "(run_id, task_id, status, started_at, receipt_json) VALUES "
+            "('empty', 'task-empty', 'completed', ?, ?)",
+            (now, json.dumps({"provider": "", "model": ""})),
+        )
+
+    closure = og.build_loop1_closure(db_path=db_path)
+
+    assert closure.live is False
+    assert "missing provider" in closure.detail
+
+
+def test_loop1_closure_rejects_static_provider_model_without_provenance(tmp_path):
+    db_path = _loop1_db(tmp_path)
+    now = datetime.now(UTC).isoformat()
+    with sqlite3.connect(db_path) as db:
+        db.execute(
+            "INSERT INTO delegation_runs "
+            "(run_id, task_id, status, started_at, receipt_json) VALUES "
+            "('static', 'task-static', 'completed', ?, ?)",
+            (
+                now,
+                json.dumps({
+                    "provider": "ollama",
+                    "model": "mistral:latest",
+                    "attributes": {"provider_model_truth_source": "static_config"},
+                }),
+            ),
+        )
+
+    closure = og.build_loop1_closure(db_path=db_path)
+
+    assert closure.live is False
+    assert closure.provider == "ollama"
+    assert closure.model == "mistral:latest"
+    assert "provenance" in closure.detail
+
+
+def test_loop1_closure_accepts_fresh_runtime_provider_actual_served(tmp_path):
+    db_path = _loop1_db(tmp_path)
+    now = datetime.now(UTC).isoformat()
+    with sqlite3.connect(db_path) as db:
+        db.execute(
+            "INSERT INTO delegation_runs "
+            "(run_id, task_id, status, started_at, receipt_json) VALUES "
+            "('served', 'task-served', 'completed', ?, ?)",
+            (
+                now,
+                json.dumps({
+                    "provider": "nvidia_nim",
+                    "model": "meta/llama-3.3-70b-instruct",
+                    "attributes": {
+                        "provider_model_truth_source": "runtime_provider.actual_served",
+                    },
+                }),
+            ),
+        )
+
+    closure = og.build_loop1_closure(db_path=db_path)
+
+    assert closure.live is True
+    assert closure.provider == "nvidia_nim"
+    assert closure.model == "meta/llama-3.3-70b-instruct"
+
+
+def test_loop1_closure_rejects_stale_actual_served_receipt(tmp_path):
+    db_path = _loop1_db(tmp_path)
+    stale = (datetime.now(UTC) - timedelta(days=2)).isoformat()
+    with sqlite3.connect(db_path) as db:
+        db.execute(
+            "INSERT INTO delegation_runs "
+            "(run_id, task_id, status, started_at, receipt_json) VALUES "
+            "('stale', 'task-stale', 'completed', ?, ?)",
+            (
+                stale,
+                json.dumps({
+                    "provider": "nvidia_nim",
+                    "model": "meta/llama-3.3-70b-instruct",
+                    "attributes": {
+                        "provider_model_truth_source": "runtime_provider.actual_served",
+                    },
+                }),
+            ),
+        )
+
+    closure = og.build_loop1_closure(db_path=db_path)
+
+    assert closure.live is False
+    assert "stale" in closure.detail
+
+
 def test_orientation_graph_render_is_read_only(tmp_path):
     before = subprocess.run(
         ["git", "status", "--porcelain"], cwd=REPO_ROOT,
@@ -344,6 +452,35 @@ def test_orientation_graph_render_is_read_only(tmp_path):
         ["git", "status", "--porcelain"], cwd=REPO_ROOT,
         capture_output=True, text=True).stdout
     assert before == after, "orientation graph must not write owner files"
+
+
+def test_broken_register_excludes_bold_fixed_and_closed_items(tmp_path, monkeypatch):
+    register = tmp_path / "BROKEN_REGISTER.md"
+    register.write_text(
+        "## OPEN ITEMS\n\n"
+        "### BR-001 — still open\n"
+        "- **status:** OPEN\n\n"
+        "### BR-002 — partial work remains\n"
+        "- **status:** PARTIAL — scoped follow-up\n\n"
+        "### BR-003 — fixed with date\n"
+        "- **status:** **FIXED 2026-05-20** — evidence attached\n\n"
+        "### BR-004 — closed in bold\n"
+        "- **status:** **CLOSED**\n\n"
+        "## CLOSED ITEMS\n\n"
+        "### BR-005 — should not appear\n"
+        "- **status:** OPEN\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(og, "BROKEN_REGISTER", register)
+
+    broken = og.build_broken()
+    ids = {item.id for item in broken}
+
+    assert "BR-001" in ids
+    assert "BR-002" in ids
+    assert "BR-003" not in ids
+    assert "BR-004" not in ids
+    assert "BR-005" not in ids
 
 
 def test_json_mode_is_machine_parseable():

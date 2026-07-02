@@ -1,0 +1,11 @@
+{
+  "path": "/Users/dhyana/ds_forge_v1_scoreboard",
+  "observed_at": "2026-06-29T16:34:35.970113+00:00",
+  "branch": "forge-v1/tokenbroker-scoreboard-20260620",
+  "head": "d8bca7aab20af7871cff4ef46d08227cdb0923fa",
+  "status_short_file": "status_short.stdout.txt",
+  "status_porcelain_v2_file": "status_porcelain_v2.stdout.txt",
+  "diff_stat_file": "diff_stat.stdout.txt",
+  "cached_diff_stat_file": "cached_diff_stat.stdout.txt",
+  "untracked_manifest_file": "untracked.stdout.txt"
+}

@@ -1,0 +1,99 @@
+diff --git a/Makefile b/Makefile
+index 778026c1a..939e9eb95 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,7 +1,7 @@
+ # DHARMA SWARM — Makefile
+ # Run `make help` to see all targets.
+ 
+-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test
++.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout forge-proving-ground-readiness forge-proving-ground-smoke forge-proving-ground-100 forge-external-proof spine-check onboard orient status go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test
+ 
+ # Prefer the repo venv when present so onboarding sections that need repo
+ # dependencies (pydantic, yaml) render instead of degrading silently.
+@@ -84,6 +84,10 @@ help:
+ 	@echo "  make orient       Render the whole organism at once (identity, organs, tracks, custody, liveness)"
+ 	@echo "  make agent-build-preflight Run onboarding + hygiene integrity before agent work"
+ 	@echo "  make agent-build-closeout Run hygiene scan + full governance bundle after agent work"
++	@echo "  make forge-proving-ground-readiness Grade Dharma Forge Proving Ground readiness"
++	@echo "  make forge-proving-ground-smoke Run 1-iteration Forge Proving Ground smoke"
++	@echo "  make forge-proving-ground-100 Run gated 100-iteration Forge Proving Ground loop"
++	@echo "  make forge-external-proof JOB_DIR=... Validate official Harbor/Terminal-Bench proof"
+ 	@echo "  make status       Quick cross-agent state snapshot (PRs, stale, hotlist, track)"
+ 	@echo "  make go-ci        Run Go evidence sense-organ fmt/vet/test gates"
+ 	@echo ""
+@@ -406,6 +410,18 @@ agent-build-closeout:
+ 	$(MAKE) governance-all
+ 	@printf "\nAgent build closeout complete. Hygiene audit receipt: /tmp/dharma-hygiene-audit.txt\n"
+ 
++forge-proving-ground-readiness:
++	$(PYTHON) scripts/runtime/forge_proving_ground_readiness.py --json --strict
++
++forge-proving-ground-smoke:
++	$(PYTHON) scripts/runtime/forge_proving_ground_run.py --iterations 1 --mode smoke --json
++
++forge-proving-ground-100:
++	$(PYTHON) scripts/runtime/forge_proving_ground_run.py --iterations 100 --mode full --json
++
++forge-external-proof:
++	$(PYTHON) scripts/runtime/forge_external_benchmark_proof.py --job-dir $(JOB_DIR) --output reports/forge/external_proof/external_proof.json --json
++
+ spine-check:
+ 	$(PYTHON) -m scripts.uplift_guards.check_spine_ownership
+ 
+diff --git a/docs/ontology/SEMANTIC_COMMONS.md b/docs/ontology/SEMANTIC_COMMONS.md
+index 598dfcb22..af7782741 100644
+--- a/docs/ontology/SEMANTIC_COMMONS.md
++++ b/docs/ontology/SEMANTIC_COMMONS.md
+@@ -44,6 +44,7 @@ codex_composer -> A2ACard -> AgentUID -> A2AInboxRoute -> dharma.agent.codex_com
+ | `ProviderPolicyRouter` | Provider-family policy and escalation layer. | `dharma_swarm/provider_policy.py` |
+ | `ModelRouter` | Runtime router for executing provider calls under the canonical contract. | `dharma_swarm/providers.py` |
+ | `RoutingMemory` | Provider-learning evidence store for route outcomes. | `dharma_swarm/routing_memory.py` |
++| `DharmaForgeProvingGround` | Canonical external swarm evolution and benchmark-hardening system. | `docs/governance/FORGE_NAMING_BOUNDARY.md` |
+ 
+ Deprecated names resolve back into `ModelKeyRouting`; do not create a
+ `parallel model routing layer`, read `project .env keys`, instantiate a
+diff --git a/docs/ontology/semantic_aliases.yaml b/docs/ontology/semantic_aliases.yaml
+index 96bf23543..0e3b812aa 100644
+--- a/docs/ontology/semantic_aliases.yaml
++++ b/docs/ontology/semantic_aliases.yaml
+@@ -30,6 +30,24 @@ aliases:
+   routing_memory:
+     canonical: RoutingMemory
+     kind: routing_telemetry_alias
++  forge_proving_ground:
++    canonical: DharmaForgeProvingGround
++    kind: system_alias
++  dharma_forge:
++    canonical: DharmaForgeProvingGround
++    kind: legacy_alias
++  run the Dharma Forge Proving Ground:
++    canonical: DharmaForgeProvingGround
++    kind: preferred_operator_phrase
++  run the Forge Proving Ground:
++    canonical: DharmaForgeProvingGround
++    kind: preferred_operator_phrase
++  run the canonical Forge Proving Ground external loop:
++    canonical: DharmaForgeProvingGround
++    kind: preferred_operator_phrase
++  run Forge:
++    canonical: DharmaForgeProvingGround
++    kind: deprecated_operator_phrase
+   "parallel model routing layer":
+     canonical: ModelKeyRouting
+     kind: deprecated_pattern
+diff --git a/docs/ontology/semantic_objects.yaml b/docs/ontology/semantic_objects.yaml
+index 23939c2d7..da144b022 100644
+--- a/docs/ontology/semantic_objects.yaml
++++ b/docs/ontology/semantic_objects.yaml
+@@ -75,6 +75,10 @@ objects:
+     kind: routing_telemetry
+     owner: dharma_swarm/routing_memory.py
+     description: Provider-learning evidence store for route outcomes; telemetry, not semantic canon.
++  DharmaForgeProvingGround:
++    kind: evolution_proving_ground
++    owner: docs/governance/FORGE_NAMING_BOUNDARY.md
++    description: Canonical external swarm evolution and benchmark-hardening system.
+   IntelligenceSupplyChainRawReceipt:
+     kind: evidence_receipt
+     owner: dharma_swarm.world_radar.bronze

@@ -152,6 +152,7 @@ from dharma_swarm.terminal_commands.infrastructure import (
     cmd_agni,
     cmd_model,
     cmd_model_catalog,
+    cmd_model_pool,
     cmd_free_fleet,
     cmd_provider_smoke,
     cmd_provider_matrix,
@@ -512,7 +513,26 @@ def _build_parser() -> argparse.ArgumentParser:
     p_ctx.add_argument("domain", nargs="?", default="all")
 
     # -- memory --
-    sub.add_parser("memory", help="Show memory status")
+    p_mem = sub.add_parser("memory", help="Common memory surface")
+    p_mem.add_argument("--top-k", type=int, default=5, help="Maximum retrieval hits for query/common/gate")
+    p_mem.add_argument("--json", action="store_true", help="Emit JSON for supported memory modes")
+    mem_sub = p_mem.add_subparsers(dest="memory_cmd")
+    mem_sub.add_parser("status", help="Show common memory status")
+    p_mem_query = mem_sub.add_parser("query", help="Query common governed memory")
+    p_mem_query.add_argument("memory_query", nargs="+")
+    p_mem_common = mem_sub.add_parser("common", help="Build an agent handoff memory pack")
+    p_mem_common.add_argument("memory_task", nargs="+")
+    p_mem_brief = mem_sub.add_parser("brief", help="Alias for memory common")
+    p_mem_brief.add_argument("memory_task", nargs="+")
+    mem_sub.add_parser("ingest", help="Backfill live wiki concepts into common memory")
+    mem_sub.add_parser("gate", help="Run the common memory system gate")
+    mem_sub.add_parser("metabolize", help="Run ingest + gates and write a metabolism receipt")
+    p_mem_schedule = mem_sub.add_parser("schedule", help="Register recurring Memory Common metabolism")
+    p_mem_schedule.add_argument(
+        "--schedule",
+        default="every 24h",
+        help="Recurring cron schedule for Memory Common metabolism",
+    )
 
     # -- witness --
     p_wit = sub.add_parser("witness", help="Record a witness observation")
@@ -1272,6 +1292,11 @@ def _build_parser() -> argparse.ArgumentParser:
     p_mc = sub.add_parser("model-catalog", help="Show canonical model packs and routing selectors")
     p_mc.add_argument("selector", nargs="?", default=None, help="Pack selector, e.g. 'top open models' or 'tier one models'")
     p_mc.add_argument("--json", dest="json", action="store_true", default=False, help="Output as JSON")
+    p_mp = sub.add_parser("model-pool", help="Show merged model pool registry across providers, A2A, and local catalogs")
+    p_mp.add_argument("--json", dest="json", action="store_true", default=False, help="Output as JSON")
+    p_mp.add_argument("--limit", type=int, default=40, help="Maximum entries to print")
+    p_mp.add_argument("--refresh-nim", dest="refresh_nim", action="store_true", default=False, help="Query NVIDIA NIM /models live")
+    p_mp.add_argument("--no-ollama-list", dest="include_ollama_list", action="store_false", default=True, help="Skip local `ollama list` discovery")
 
     # -- custodians (Phase 17: Autonomous Code Maintenance Fleet) --
     p_cust = sub.add_parser("custodians", help="Autonomous code maintenance fleet")
@@ -1492,7 +1517,19 @@ def main() -> None:
         case "context":
             cmd_context(args.domain)
         case "memory":
-            cmd_memory()
+            memory_text = ""
+            if getattr(args, "memory_cmd", None) in {"query"}:
+                memory_text = " ".join(args.memory_query)
+            elif getattr(args, "memory_cmd", None) in {"common", "brief"}:
+                memory_text = " ".join(args.memory_task)
+            elif getattr(args, "memory_cmd", None) == "schedule":
+                memory_text = getattr(args, "schedule", "every 24h")
+            cmd_memory(
+                args.memory_cmd,
+                text=memory_text,
+                top_k=args.top_k,
+                as_json=args.json,
+            )
         case "witness":
             cmd_witness(" ".join(args.message))
         case "develop":
@@ -2192,6 +2229,13 @@ def main() -> None:
             cmd_free_fleet(tier=args.tier, as_json=args.json, set_env=args.set_env)
         case "model-catalog":
             cmd_model_catalog(selector=args.selector, as_json=args.json)
+        case "model-pool":
+            cmd_model_pool(
+                as_json=args.json,
+                limit=args.limit,
+                refresh_nim=args.refresh_nim,
+                include_ollama_list=args.include_ollama_list,
+            )
         case "custodians":
             cmd_custodians(
                 custodians_cmd=args.custodians_cmd,

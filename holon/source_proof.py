@@ -91,4 +91,3 @@ def _git(args: list[str], cwd: Path) -> str:
     if completed.returncode != 0:
         return ""
     return completed.stdout.strip()
-

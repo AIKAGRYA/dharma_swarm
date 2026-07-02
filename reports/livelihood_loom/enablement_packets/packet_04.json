@@ -1,0 +1,110 @@
+{
+  "beneficiary": "small restaurants, home kitchens, couriers, and food vendors",
+  "candidate_partners": [
+    {
+      "company_id": "enabler_5ae380f28642",
+      "country": "Mexico",
+      "evidence_refs": [
+        "http://www.wikidata.org/entity/Q36879490",
+        "https://www.rappi.com.mx/"
+      ],
+      "flags": [
+        "exploitative_gig_platform"
+      ],
+      "name": "Rappi",
+      "prioritization_score": 0.924,
+      "rank": 7,
+      "safety_status": "needs_review",
+      "wedge_id": "food_vendor_demand"
+    },
+    {
+      "company_id": "enabler_bd1fe6fed7ff",
+      "country": "India",
+      "evidence_refs": [
+        "http://www.wikidata.org/entity/Q137661216",
+        "https://accesco.co.in/"
+      ],
+      "flags": [
+        "exploitative_gig_platform"
+      ],
+      "name": "Accesco Living",
+      "prioritization_score": 0.913,
+      "rank": 8,
+      "safety_status": "needs_review",
+      "wedge_id": "food_vendor_demand"
+    },
+    {
+      "company_id": "enabler_88c3f45f2957",
+      "country": "India",
+      "evidence_refs": [
+        "http://www.wikidata.org/entity/Q65944364",
+        "https://www.swiggy.com"
+      ],
+      "flags": [
+        "exploitative_gig_platform"
+      ],
+      "name": "Swiggy",
+      "prioritization_score": 0.913,
+      "rank": 9,
+      "safety_status": "needs_review",
+      "wedge_id": "food_vendor_demand"
+    },
+    {
+      "company_id": "enabler_8e3f9acc2853",
+      "country": "Mexico",
+      "evidence_refs": [
+        "http://www.wikidata.org/entity/Q108539714",
+        "http://www.devy.center"
+      ],
+      "flags": [
+        "exploitative_gig_platform"
+      ],
+      "name": "Devy",
+      "prioritization_score": 0.912,
+      "rank": 10,
+      "safety_status": "needs_review",
+      "wedge_id": "food_vendor_demand"
+    },
+    {
+      "company_id": "enabler_0c17b579cf7e",
+      "country": "Turkey",
+      "evidence_refs": [
+        "http://www.wikidata.org/entity/Q6090601",
+        "https://www.yemeksepeti.com/"
+      ],
+      "flags": [
+        "exploitative_gig_platform"
+      ],
+      "name": "Yemeksepeti.com",
+      "prioritization_score": 0.887,
+      "rank": 11,
+      "safety_status": "needs_review",
+      "wedge_id": "food_vendor_demand"
+    }
+  ],
+  "cell_id": "livelihood_loom",
+  "evidence_refs": [
+    "http://www.wikidata.org/entity/Q36879490",
+    "https://www.rappi.com.mx/",
+    "http://www.wikidata.org/entity/Q137661216",
+    "https://accesco.co.in/",
+    "http://www.wikidata.org/entity/Q65944364",
+    "https://www.swiggy.com",
+    "http://www.wikidata.org/entity/Q108539714",
+    "http://www.devy.center",
+    "http://www.wikidata.org/entity/Q6090601",
+    "https://www.yemeksepeti.com/"
+  ],
+  "friction": "demand aggregation can raise volume while worsening worker terms",
+  "generated_at": "2026-06-29T16:06:44.889679+00:00",
+  "next_safe_action": "Draft-only internal sponsor review packet; do not contact partners or publish claims without human_governor approval.",
+  "packet_id": "packet_04",
+  "risks": [
+    "Exploitative gig terms and surveillance are risk-reviewed.",
+    "No dispatch optimization or worker monitoring."
+  ],
+  "schema_version": "livelihood_loom.enablement_packet.v1",
+  "sponsor_value": "sponsor sees demand rails with explicit courier-welfare risks",
+  "target_wedge": "food_vendor_demand",
+  "welfare_metric": "aggregate food-vendor demand rails reviewed for worker safety"
+}

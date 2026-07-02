@@ -1,0 +1,104 @@
+{
+  "schema_version": "dharma.agentops.deepseek_ml_lead_council_synthesis.v1",
+  "created_at": "2026-07-01T00:00:00+09:00",
+  "status": "pass",
+  "operator_request": "Instantiate qwen_code as the DeepSeek ML Lead / house ML specialist, ask what it would do with this environment, collaborate with six Codex agents, and decide what model to build and why.",
+  "external_model_call": {
+    "provider": "deepseek",
+    "model": "deepseek-v4-pro",
+    "harness": "qwen_code_cli",
+    "prompt_policy": "sanitized_no_private_paths_no_repo_names_no_secrets",
+    "private_prompt_blocked_by_reviewer": true,
+    "api_key_logged": false,
+    "prompt_path": "reports/agentops/deepseek_ml_lead_council/DEEPSEEK_ML_LEAD_SANITIZED_PROMPT_20260701.md",
+    "response_path": "reports/agentops/deepseek_ml_lead_council/DEEPSEEK_ML_LEAD_RESPONSE_20260701.md",
+    "response_receipt_path": "reports/agentops/deepseek_ml_lead_council/DEEPSEEK_ML_LEAD_RESPONSE_RECEIPT_20260701.json"
+  },
+  "codex_council": [
+    {
+      "agent_id": "019f1933-be66-74a1-827f-19144ea06325",
+      "name": "Feynman",
+      "role": "concrete ML environment and runtime inventory"
+    },
+    {
+      "agent_id": "019f1933-e4d4-78e3-b7e4-2b71c8d4e0f2",
+      "name": "Noether",
+      "role": "strategic model choice"
+    },
+    {
+      "agent_id": "019f1934-0ba5-7642-a46d-9b71722cc0f0",
+      "name": "Faraday",
+      "role": "trainable corpus and data flywheel"
+    },
+    {
+      "agent_id": "019f1934-2d25-7a83-be4a-6f6bc5963ac2",
+      "name": "Carson",
+      "role": "technical ML architecture"
+    },
+    {
+      "agent_id": "019f1934-54e2-75b0-b54b-0568c4851ad4",
+      "name": "Kierkegaard",
+      "role": "evaluation and benchmark strategy"
+    },
+    {
+      "agent_id": "019f1934-71a4-71b3-ba6d-87a75de289a7",
+      "name": "Plato",
+      "role": "DeepSeek ML Lead seat contract and execution plan"
+    }
+  ],
+  "decision": {
+    "seat_identity": "qwen_code",
+    "seat_alias": "deepseek_ml_lead",
+    "seat_handle": "ds_ml_lead",
+    "authority": "external_worker_evidence_only",
+    "dispatch_enabled": false,
+    "first_model_program": "DharmaVerifier-Ranker v0",
+    "first_dataset_program": "Dharma Semantic Receipt Graph v0",
+    "non_goals": [
+      "generic Dharma chat model",
+      "autonomous agent policy first",
+      "world or ecological simulator first",
+      "self-judging governance model",
+      "public claim engine"
+    ]
+  },
+  "artifacts": {
+    "charter_path": "docs/agents/qwen_code/ML_SPECIALIST_CHARTER.md",
+    "synthesis_path": "reports/agentops/deepseek_ml_lead_council/DEEPSEEK_ML_LEAD_COUNCIL_SYNTHESIS_20260701.md",
+    "manifest_alias_paths": [
+      "/Users/dhyana/.dharma/agents/qwen_code/living_agent.json",
+      "/Users/dhyana/.dharma/external_agents/qwen_code/registration.json",
+      "/Users/dhyana/.dharma/external_agents/qwen_code/identity_manifest.normalized.json",
+      "/Users/dhyana/.dharma/a2a/cards/qwen-code.json",
+      "/Users/dhyana/.dharma/a2a_bus/state/qwen_code.json",
+      "examples/agents/qwen_code.registration.json"
+    ]
+  },
+  "sha256": {
+    "prompt": "a7cc7ac2976c0b28f448e1ee5e064e5e23ea496f5e090aae25c635fe04ff2e4e",
+    "deepseek_response": "ae6eb777de57b2906bbb26da8e7f41a91941b48008d02d625cc7fe1a97bf2197",
+    "synthesis": "8e34d8796a7d2073c334c74c99f5ead01dd9cb27bb869486831ba2fa02ba6097",
+    "charter": "7ed0adb4012a5e376d848ffebc0c07ef476b6c1073d5b9ffd66dcbfb5d753d2b",
+    "example_registration": "85e8084f840215ce7ef239841d6409c09af12ae928b93a1efcd0363c24665307",
+    "living_agent": "96aad742c1ba3d6e5e41cc0b4d65d3e0b394592ba4b530b8cc01d37a7e228e96",
+    "external_registration": "c532690de8a373d100774363419ed9fbdede3266ce1096f6ab2bdd6e704f04e9",
+    "identity_manifest_normalized": "db62af6007cd64269bb3e10cb7ff15210b32ef848501eee1e6e80bc05dcaa7b1",
+    "a2a_card": "a2e8a2a082dda64e439c505216ea5922ba758f00a612c78a1541cfe37da9834a",
+    "a2a_bus_state": "d6ef1cbd905854d0ed822113c0920d55d1a04f0e4b89202dddb706c1965b3b03"
+  },
+  "verification": {
+    "planned": [
+      "JSON syntax validation",
+      "artifact existence check",
+      "status and content review"
+    ],
+    "completed": [
+      "jq empty on DeepSeek response receipt and council synthesis receipt",
+      "jq empty on qwen_code living-agent, external registration, normalized identity manifest, A2A card, A2A bus state, and repo example registration",
+      "artifact existence check for synthesis markdown",
+      "git status scoped to charter and council report directory",
+      "direct content review of synthesis markdown, charter markdown, and synthesis receipt",
+      "authority and dispatch check confirming external_worker_evidence_only and dispatch_enabled false"
+    ]
+  }
+}

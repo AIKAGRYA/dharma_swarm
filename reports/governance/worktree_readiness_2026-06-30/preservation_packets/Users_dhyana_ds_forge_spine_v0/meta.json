@@ -1,0 +1,17 @@
+{
+  "observed_at": "2026-06-30T16:43:35.307996+00:00",
+  "path": "/Users/dhyana/ds_forge_spine_v0",
+  "branch": "feat/forge-spine-v0",
+  "head": "f84f40344cbdfab9d236239b0d3ec00718e10bf9",
+  "status": "preserved",
+  "errors": [],
+  "untracked_file_count": 40,
+  "untracked_tar_candidate_bytes": 301736,
+  "artifacts": {
+    "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_spine_v0/meta.json",
+    "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_spine_v0/HEAD.bundle",
+    "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_spine_v0/tracked.diff",
+    "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_spine_v0/cached.diff",
+    "untracked_tar": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_spine_v0/untracked_files.tar.gz"
+  }
+}

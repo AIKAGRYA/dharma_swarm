@@ -1,0 +1,19 @@
+## codex/langgraph-orchestration-parity-20260701...origin/main
+ M dharma_swarm/langgraph_parity/benchmark.py
+ M dharma_swarm/langgraph_parity/benchmark_runner.py
+ M dharma_swarm/langgraph_parity/benchmark_types.py
+ M dharma_swarm/models.py
+ M dharma_swarm/orchestrator.py
+ M reports/governance/active_track_evidence.json
+ M reports/governance/active_track_evidence.md
+ M reports/governance/track_portfolio.json
+ M reports/langgraph_parity/benchmark/benchmark_receipt.json
+ M reports/langgraph_parity/benchmark/benchmark_report.json
+ M reports/langgraph_parity/benchmark/benchmark_report.md
+ M tests/test_langgraph_parity_isolation_benchmark.py
+ M tests/test_orchestrator.py
+ M tests/test_orchestrator_spine_dispatch.py
+ M tests/test_topology_execution.py
+ M uv.lock
+?? reports/langgraph_parity/allnight/
+?? scripts/governance/spine_dispatch_mode_report.py

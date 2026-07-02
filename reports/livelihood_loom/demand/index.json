@@ -1,0 +1,15 @@
+{
+  "cell_id": "livelihood_loom",
+  "draft_only": true,
+  "external_action_draft": "reports/livelihood_loom/demand/external_action_draft.json",
+  "external_action_status": "risk_reviewed",
+  "first_paid_offer": "reports/livelihood_loom/demand/first_paid_offer.md",
+  "generated_at": "2026-06-29T16:06:44.889679+00:00",
+  "schema_version": "livelihood_loom.demand_artifacts.v1",
+  "sent": false,
+  "sponsor_briefs": [
+    "reports/livelihood_loom/demand/sponsor_brief_01.md",
+    "reports/livelihood_loom/demand/sponsor_brief_02.md",
+    "reports/livelihood_loom/demand/sponsor_brief_03.md"
+  ]
+}

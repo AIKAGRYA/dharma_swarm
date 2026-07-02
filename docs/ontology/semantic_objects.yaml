@@ -439,6 +439,53 @@ objects:
     superseded_by: []
     orientation_route: route.semantic_commons_campaign
 
+  - id: semobj.operator_idea_spark
+    canonical_name: OperatorIdeaSpark
+    api_name: dharma.ingest.OperatorIdeaSpark
+    lifecycle: working
+    owner_surface: dharma_swarm/idea_spark/
+    authority_level: projection
+    source_path: docs/ops/OPERATOR_IDEA_SPARK_LIVE_INGEST.md
+    object_kind: ingest_lifecycle
+    public_ontology: true
+    aliases:
+      - Operator Idea Spark
+      - operator idea spark
+      - idea spark
+      - idea-spark
+      - idea_spark
+      - IdeaSparkCandidate
+      - OperatorInputReceipt
+      - operator input receipt
+      - idea spark ingest
+    forbidden_aliases: []
+    supersedes: []
+    superseded_by: []
+    orientation_route: route.semantic_commons_campaign
+
+  - id: semobj.revenue_wedge_pipeline
+    canonical_name: RevenueWedgePipeline
+    api_name: dharma.revenue.RevenueWedgePipeline
+    lifecycle: working
+    owner_surface: dharma_swarm/revenue/wedge_pipeline.py
+    authority_level: projection
+    source_path: dharma_swarm/revenue/wedge_pipeline.py
+    object_kind: revenue_intelligence_loop
+    public_ontology: true
+    aliases:
+      - RevenueWedgePipeline
+      - Revenue Wedge Pipeline
+      - revenue wedge pipeline
+      - revenue-wedge-pipeline
+      - revenue_wedge_pipeline
+      - Revenue Wedge
+      - revenue wedge
+      - wedge pipeline
+    forbidden_aliases: []
+    supersedes: []
+    superseded_by: []
+    orientation_route: route.semantic_commons_campaign
+
   - id: semobj.openclaw_integration
     canonical_name: OpenClawIntegration
     api_name: dharma.integration.OpenClawIntegration
@@ -555,6 +602,28 @@ objects:
     supersedes: []
     superseded_by: []
     orientation_route: route.semantic_commons_campaign
+
+  - id: semobj.livelihood_loom_ceo
+    canonical_name: LivelihoodLoomCEO
+    api_name: dharma.agent.LivelihoodLoomCEO
+    lifecycle: working
+    owner_surface: docs/agents/livelihood_loom_ceo/agent.seed.yaml
+    authority_level: active_spec
+    source_path: docs/agents/livelihood_loom_ceo/agent.seed.yaml
+    object_kind: persistent_agent
+    public_ontology: true
+    aliases:
+      - LivelihoodLoomCEO
+      - Livelihood Loom CEO
+      - livelihood-loom-ceo
+      - livelihood_loom_ceo
+    forbidden_aliases:
+      - autonomous livelihood lender
+      - informal economy alpha desk
+      - worker data monetization agent
+    supersedes: []
+    superseded_by: []
+    orientation_route: route.seat_livelihood_loom_ceo
 
   - id: semobj.model_key_routing
     canonical_name: ModelKeyRouting
@@ -773,6 +842,31 @@ objects:
       - --route agent-inbox
     forbidden_aliases:
       - handler ack as semantic reply
+    supersedes: []
+    superseded_by: []
+    orientation_route: route.semantic_commons_campaign
+
+  - id: semobj.a2a_consumer_liveness_projection
+    canonical_name: A2AConsumerLivenessProjection
+    api_name: dharma.transport.A2AConsumerLivenessProjection
+    lifecycle: working
+    owner_surface: scripts/governance/agent_onboard.py
+    authority_level: projection
+    source_path: reports/handoffs/HUB_INBOUND_2026-06-12.md
+    object_kind: transport_health_projection
+    public_ontology: true
+    aliases:
+      - A2AConsumerLivenessProjection
+      - A2A Consumer Liveness Projection
+      - a2a consumer liveness projection
+      - a2a-consumer-liveness-projection
+      - a2a_consumer_liveness_projection
+      - consumer-liveness projection
+      - consumer_liveness_projection
+      - write-only bus
+      - dark inboxes
+    forbidden_aliases:
+      - send receipt as delivery proof
     supersedes: []
     superseded_by: []
     orientation_route: route.semantic_commons_campaign

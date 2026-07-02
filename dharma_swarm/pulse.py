@@ -606,11 +606,26 @@ def pulse(config: DaemonConfig | None = None) -> str:
     else:
         cfg.circuit_breaker.record_success()
 
-    # Store in memory (async)
-    asyncio.run(_store_pulse_result(result, thread))
+    # Store in memory (async — wrapped in try/except because asyncio.run
+    # can fail with "cannot be called from a running event loop" when the
+    # thread pool reuses a thread that already has an active event loop.)
+    try:
+        asyncio.run(_store_pulse_result(result, thread))
+    except RuntimeError as e:
+        if "running event loop" in str(e):
+            logger.debug("[pulse] Skipping async store: %s", e)
+        else:
+            raise
 
     # Living-layer heartbeat (subconscious + shakti)
-    living_summary = asyncio.run(_run_living_layers(thread, result))
+    try:
+        living_summary = asyncio.run(_run_living_layers(thread, result))
+    except RuntimeError as e:
+        if "running event loop" in str(e):
+            logger.debug("[pulse] Skipping living layers: %s", e)
+            living_summary = {}
+        else:
+            raise
     if living_summary:
         print(
             "[pulse] Living: density={density} dream={dream} assoc={assoc} "

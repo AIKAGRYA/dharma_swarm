@@ -1,0 +1,13 @@
+diff --git a/dharma_swarm/claude_cli.py b/dharma_swarm/claude_cli.py
+index ea5b52422..ceab5e9a2 100644
+--- a/dharma_swarm/claude_cli.py
++++ b/dharma_swarm/claude_cli.py
+@@ -89,7 +89,7 @@ def unattended_claude_auth_error(
+     if merged.get("ANTHROPIC_API_KEY", "").strip():
+         return None
+     return (
+-        "ERROR: unattended Claude bare mode requires ANTHROPIC_API_KEY; "
++        "SKIP: unattended Claude bare mode requires ANTHROPIC_API_KEY; "
+         "OAuth/login is ignored in --bare mode"
+     )
+ 

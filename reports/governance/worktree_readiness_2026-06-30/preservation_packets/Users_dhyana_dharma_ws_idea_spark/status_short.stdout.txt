@@ -1,0 +1,4 @@
+## feat/operator-idea-spark-ingest
+ M dharma_swarm/chetana/promote.py
+?? dharma_swarm/chetana/quality_gate.py
+?? tests/test_chetana_quality_gate.py

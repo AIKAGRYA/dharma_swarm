@@ -4,7 +4,7 @@
 **Previous version:** 2026-05-04 (provenance-completion audit against `74d015c`)
 **Maintainer:** Guardian Crew (`guardian_crew.py`) — auto-updates every 4 hours
 **How to read this:** Severity = BLOCKER (crashes at runtime), DEGRADED (silent failure / wrong behavior), WARNING (structural smell).
-**Status:** All BLOCKERs resolved. 3 items remain (NEW-05 GUARDED, NEW-07/08 PARTIAL+) — actively monitored, not stale.
+**Status:** One BLOCKER remains open: NEW-14 world-model loop API drift. 3 non-blocker items remain (NEW-05 GUARDED, NEW-07/08 PARTIAL+) — actively monitored, not stale.
 
 ---
 
@@ -40,7 +40,7 @@
 | NEW-14: world-model loop ↔ WorldModelAgent total API mismatch | BLOCKER (loop dead) | 🔴 OPEN | `orchestrate_live.py:1657` calls `WorldModelAgent(state_dir=...)` / `.initialize()` / `.run_cycle()`; `world_model.py:265` actually takes `(store, search_tool, arxiv_tool)` with `.boot()` / `.run_loop()`. Runtime-proven 2026-06-12 02:07 swarm.log: `TypeError: unexpected keyword argument 'state_dir'` → 5 restarts → "exceeded max restarts, abandoning" on every daemon boot. Fix needs a tool-injection decision (which search/arxiv tools to wire) — left to the loop owner. Abandoned loops are now visible via `dgc status` "Daemon loops" line (loop_liveness.json projection). |
 | NEW-15: F821 sweep — 17 undefined names, all fixed | DEGRADED (silent failures) | ✅ FIXED (2026-06-12) | All 16 `dharma_swarm/` F821s + 1 in `scripts/` fixed and runtime-verified. Notable: `archaeology_ingestion.py` missing `PalaceQuery` import meant ALL 5 lessons-learned palace queries silently failed since NEW-01 (anti-amnesia dead); `orchestrate_live.py` `_evo_allowed` was used 38 lines before its definition (meta-evolution feed NameError'd every cycle, swallowed); `orchestrator.py:2567` `agent_name` → catalytic graph never recorded completion edges; `semantic.py` `_DEFAULT_GRAPH_PATH` lost in the dgc_cli extraction (8a5a8cd52, restored from d7af817ac); `verify_holon_harness_prod.py` called unaliased `holon_wake_cycle`. Guard: `make lint-blockers` (F821, blocking) wired into `make verifier-selfcheck` and `agent-build-preflight`. |
 
-**Net change:** 12 resolved, 5 fixed prior sessions, 6 new entries (NEW-05 guarded, NEW-07/NEW-08 partially resolved, NEW-09/10/11 fixed), plus BR-007/BR-008 closure notes from PR #187. 0 open BLOCKERs, 1 structural degraded remains (message_bus semantics).
+**Net change:** 12 resolved, 5 fixed prior sessions, 6 new entries (NEW-05 guarded, NEW-07/NEW-08 partially resolved, NEW-09/10/11 fixed), plus BR-007/BR-008 closure notes from PR #187. 1 open BLOCKER remains (NEW-14 world-model loop API drift), plus 1 structural degraded item (message_bus semantics).
 
 ---
 

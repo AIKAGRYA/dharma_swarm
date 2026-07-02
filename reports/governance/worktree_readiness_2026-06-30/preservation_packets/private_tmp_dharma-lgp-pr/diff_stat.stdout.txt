@@ -1,0 +1,4 @@
+ reports/governance/active_track_evidence.json | 32 ++++++++++++++++-----------
+ reports/governance/active_track_evidence.md   | 25 +++++++++++----------
+ reports/governance/track_portfolio.json       | 32 ++++++++++++++++-----------
+ 3 files changed, 51 insertions(+), 38 deletions(-)

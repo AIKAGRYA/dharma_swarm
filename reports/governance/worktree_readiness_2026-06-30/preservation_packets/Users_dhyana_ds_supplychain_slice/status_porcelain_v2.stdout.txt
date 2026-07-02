@@ -1,0 +1,17 @@
+# branch.oid 11de04fb743ff9b02a293b248d579bf02fe8fd38
+# branch.head loop-closure/supplychain-bronze-20260620
+# branch.upstream origin/loop-closure/supplychain-bronze-20260620
+1 .M N... 100644 100644 100644 48d1ebe1fa427376d17682f5a994aa51a44e09fa 48d1ebe1fa427376d17682f5a994aa51a44e09fa reports/governance/active_track_evidence.json
+1 .M N... 100644 100644 100644 9c9ea27829edcb1f7582d409d48cb0c71c8d215c 9c9ea27829edcb1f7582d409d48cb0c71c8d215c reports/governance/active_track_evidence.md
+1 .M N... 100644 100644 100644 48d1ebe1fa427376d17682f5a994aa51a44e09fa 48d1ebe1fa427376d17682f5a994aa51a44e09fa reports/governance/track_portfolio.json
+1 .M N... 100644 100644 100644 092bca0344dd8b655ae2dd5d4ba9dac58361670e 092bca0344dd8b655ae2dd5d4ba9dac58361670e tests/test_canonical_replay.py
+1 .M N... 100644 100644 100644 4def1faf4314f40398262c0b76f1f1865d9f1536 4def1faf4314f40398262c0b76f1f1865d9f1536 tests/test_constitutional_size_check.py
+1 .M N... 100644 100644 100644 b1146e64166fe8f20baa465de78dfb86337602db b1146e64166fe8f20baa465de78dfb86337602db tests/test_ginko_evolution.py
+1 .M N... 100644 100644 100644 32166e6eb1d98af4eecab9aac76c2d8a7b9b65db 32166e6eb1d98af4eecab9aac76c2d8a7b9b65db tests/test_godel_claw_e2e.py
+1 .M N... 100644 100644 100644 c4e1e00ba01d52ede53614664d9089c6c27835e2 c4e1e00ba01d52ede53614664d9089c6c27835e2 tests/test_organism_boot.py
+1 .M N... 100644 100644 100644 558e31625a6767cb33c8a0f4fc2f0a4e37cb0c7a 558e31625a6767cb33c8a0f4fc2f0a4e37cb0c7a tests/test_phase3_integration.py
+? reports/governance/track_acceptance_strength.json
+? reports/governance/track_acceptance_strength.md
+? reports/loop_closure/RETROSPECTIVE.md
+? scripts/governance/track_acceptance_strength_report.py
+? tests/test_track_acceptance_strength_report.py

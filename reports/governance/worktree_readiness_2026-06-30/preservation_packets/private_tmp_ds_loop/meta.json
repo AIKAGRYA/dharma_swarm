@@ -1,0 +1,11 @@
+{
+  "path": "/private/tmp/ds_loop",
+  "observed_at": "2026-06-30T16:10:32.866636+00:00",
+  "branch": "ratchet/loop-phases-1-3",
+  "head": "2f9d6eb094730b9bfb6f478a62305b3a5efa6da2",
+  "status_short_file": "status_short.stdout.txt",
+  "status_porcelain_v2_file": "status_porcelain_v2.stdout.txt",
+  "diff_stat_file": "diff_stat.stdout.txt",
+  "cached_diff_stat_file": "cached_diff_stat.stdout.txt",
+  "untracked_manifest_file": "untracked.stdout.txt"
+}

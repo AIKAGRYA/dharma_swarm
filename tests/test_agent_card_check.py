@@ -165,4 +165,3 @@ def test_agent_card_check_strict_fails_on_error(tmp_path: Path) -> None:
     )
 
     assert rc == 1
-

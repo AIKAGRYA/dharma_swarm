@@ -1,0 +1,167 @@
+diff --git a/reports/handoffs/SEAT_REBASE_PREVIEW_2026-06-11.md b/reports/handoffs/SEAT_REBASE_PREVIEW_2026-06-11.md
+new file mode 100644
+index 000000000..705e53707
+--- /dev/null
++++ b/reports/handoffs/SEAT_REBASE_PREVIEW_2026-06-11.md
+@@ -0,0 +1,161 @@
++# Seat Rebase Preview — organ/03-seat onto future-main
++
++**Date:** 2026-06-11
++**Produced by:** scratch-clone dry run (`/tmp/seat_rebase_preview_*`, deleted after harvest). No real worktree was touched.
++**Verdict in one line:** **ZERO real code conflicts.** Every conflict in the entire stack (future-main assembly + both seat slices) was confined to two generated DocOps files. The prior audit's expected hot files (orchestrator.py, agent_runner.py, runtime_state.py) all auto-resolve. 351 targeted tests pass on the fully integrated tree.
++
++---
++
++## 1. Topology (as measured, not assumed)
++
++| Ref | SHA | Notes |
++|---|---|---|
++| GitHub `main` (fresh fetch) | `906833f56` | contains `dc72312f0` (#557) + 3 docs/governance commits (#544, #543, #542) |
++| ⚠️ local `/Users/dhyana/dharma_swarm` `main` | `fc2200758` (#514) | **STALE — behind #557.** Do not rebase against local main; fetch origin first |
++| PR #561 `fix/provider-honesty-g6` | `8e086e092` | branches off `906833f56` exactly (2 commits) |
++| PR #562 `fix/evolution-archive-honesty` | `a9b8fc957` | branches off `906833f56` exactly (1 commit) |
++| `qwen/spine-adoption` | `717a53340` | branches off `c1124d2a7` (one docs commit behind main); 11 commits incl. the merged-in #557 |
++| `organ/03-seat` HEAD | `e67b91829` | merge-base with main = `dc72312f0` (#557), 10 commits ahead |
++| wounds slice | `af7991aab..f3c926490` | 8 commits |
++| seat slice | `2c88e6cd3` + `e67b91829` | 2 commits |
++
++Preview artifacts built in the scratch clone (SHAs are scratch-local, for provenance only):
++future-main = `5b28210e0`, wounds-rebased = `bbfe3fa82`, seat-rebased = `fcc615d20`.
++
++## 2. Future-main assembly — where the in-flight lanes conflict with EACH OTHER
++
++Order used: `main(906833f56)` → merge #561 → merge #562 → merge spine-adoption.
++
++| Step | Result | Conflicts |
++|---|---|---|
++| #561 onto main | **clean** | none |
++| #562 onto main+#561 | conflict | `docs/docops/AUTO_INVENTORY.md` only (LOC counter: 285,944 vs 286,022) |
++| spine-adoption onto main+561+562 | conflict | `docs/docops/AUTO_INVENTORY.md` + `docs/governance/SOVEREIGN_MANIFEST.md` (corpus counters only) |
++
++**All inter-lane conflicts are generated-file counter drift.** No Python file conflicted between #561, #562, and spine-adoption. `orchestrator.py` merged clean between spine-adoption and main because spine-adoption already carries #557 via its own merge commit `1caf91715`.
++
++## 3. Conflict inventory — seat slices onto future-main
++
++### Slice 1: wounds (`af7991aab..f3c926490`, 8 commits, rebase --onto future-main dc72312f0)
++
++| Commit | Real code conflicts | Generated-file conflicts |
++|---|---|---|
++| `af7991aab` floor: unblock dispatch | **none** | AUTO_INVENTORY + SOVEREIGN_MANIFEST |
++| `87acdb228` deadlines from config | **none** | AUTO_INVENTORY |
++| `76f722042` WorldModelAgent MM-13 | **none** | AUTO_INVENTORY + SOVEREIGN_MANIFEST |
++| `0d0fe2ead` divergence-round harvest | **none** | AUTO_INVENTORY |
++| `2423f0bef` marks.tmp race + log bloat | **none** | AUTO_INVENTORY |
++| `2e613fc54` busy_timeout runtime.db | **none** | AUTO_INVENTORY |
++| `e4429d9c6` ambient seed :939 bypass | **none** | AUTO_INVENTORY + SOVEREIGN_MANIFEST |
++| `f3c926490` test fixture witness pollution | **none** | AUTO_INVENTORY |
++
++### Slice 2: seat (`2c88e6cd3`, `e67b91829`, rebase --onto wounds-rebased f3c926490)
++
++| Commit | Real code conflicts | Generated-file conflicts |
++|---|---|---|
++| `2c88e6cd3` SeatedCheckpoint | **none** | AUTO_INVENTORY + SOVEREIGN_MANIFEST |
++| `e67b91829` H02 audit packet | **none** | AUTO_INVENTORY + SOVEREIGN_MANIFEST |
++
++**Score: 0 real conflicts / 14 generated-file conflict instances across 2 files.**
++
++### Resolution recipe for the generated files
++
++Per-commit during the rebase: take the **base side** (`git checkout --ours` during rebase) for both files and continue. Then **regenerate once at the end** (DocOps auto-inventory regeneration + `make docops-integrity`) and fold the refresh into the final commit or a trailing `chore(docops)` commit. Do not hand-merge counter rows — the numbers are derived.
++
++## 4. Why the predicted hot files did NOT conflict (verified, not hoped)
++
++| Predicted file | What actually happens |
++|---|---|
++| `orchestrator.py` | Seat hunks at ~943 (memory-kernel cache), ~1948 (reflection text), ~2012 (`_attach_latent_gold` → `to_thread`), ~2056 (`_dispatched_cumulative`), ~2119 (names-only log). Spine hunks at ~318 (`available.append`), ~1961 (`gate_decision` log), ~2282 (receipt persistence). The ~1948/~1961 pair is the closest approach — they interleave without textual overlap. **Verified in merged tree: all 8 edits coexist** (`rollback: unassign` at 1954, `gate_decision=` at 1961, `busy_timeout=2000` at 2283, `_dispatched_cumulative` at 2064, `_memory_kernel_cache` at 950). |
++| `agent_runner.py` | Only seat touches it (`_build_system_prompt` ~935). Spine-adoption, #561, #562 do not. Auto-applies. |
++| `runtime_state.py` | Only seat touches it (`_apply_connection_pragmas_sync/_async` ~382). Spine's lock budget lives in `orchestrator.py` (raw `aiosqlite.connect`), NOT in `runtime_state.py` or `spine/persistence.py`. Auto-applies. |
++
++Semantic watch-point (no action needed at merge): seat's `2c88e6cd3` gates live evolution at the `orchestrate_live`/`swarm`/`dharma_attractor` layer; #562 changes archive honesty inside `evolution.py`/`archive.py`. Disjoint files, same honesty direction, `tests/test_evolution.py` + `tests/test_seat_checkpoint.py` + `tests/test_dharma_attractor.py` all pass on the integrated tree.
++
++## 5. The runtime.db lock policy — unified proposal
++
++**What each lane actually shipped:**
++
++- **Seat** (`2e613fc54`): `PRAGMA busy_timeout=5000` added FIRST in `runtime_state._apply_connection_pragmas_sync/_async` — the single door all runtime_state connections pass through. Motivation: settle-vs-cron writers failed instantly on a sub-second WAL lock ("database is locked" at `record_execution_identity_sync`).
++- **Spine** (`60d7736c7`): the receipt-persist site in `orchestrator.py` opens its own raw connection: `aiosqlite.connect(_db_path, timeout=2.0)` + `PRAGMA busy_timeout=2000`. Motivation: the dispatch coroutine must NOT stall ~5s behind a held WAL writer; 2s bounds tail latency, then fails open (receipt stays in memory, warning logged).
++
++**These are not in tension — they are two deliberate QoS classes on the same database:**
++background/settle writers want *correctness over latency* (wait 5s), the dispatch hot path wants *bounded latency over persistence* (give up at 2s, fail open). Both lanes' tests pass together.
++
++**Unified policy (one place, one default, one declared exception):**
++
++1. **Owner: `runtime_state`'s pragma helpers.** Add a parameter: `_apply_connection_pragmas_sync(db, busy_timeout_ms=5000)` / `_apply_connection_pragmas_async(db, busy_timeout_ms=5000)`. The 5000 default is the fleet-wide policy.
++2. **The spine receipt site declares its exception through the same door:** replace its hand-rolled `PRAGMA busy_timeout=2000` with `await _apply_connection_pragmas_async(_receipt_db, busy_timeout_ms=2000)`. The driver-level `timeout=2.0` on `aiosqlite.connect` stays at the connect site (it is a distinct knob — Python driver retry window — and belongs with the connection). This also gives the receipt connection WAL + synchronous=NORMAL for free, which the hand-rolled version currently skips.
++3. **Rule going forward:** no raw `PRAGMA busy_timeout` outside `runtime_state.py`. Any new runtime.db connection passes through the pragma helpers; hot-path callers override `busy_timeout_ms` explicitly and justify it in a comment.
++
++**Merge-time impact: NONE.** This is a follow-up refactor (one small PR, ~10 lines), not a merge blocker. The two policies coexist correctly as shipped. Record it in `INTERFACE_MISMATCH_MAP.md` if not refactored within the cycle.
++
++## 6. Verification evidence (scratch clone, fully integrated tree)
++
++```
++python -m py_compile  <10 hot files>                                  → OK
++pytest tests/test_seat_checkpoint.py tests/test_orchestrator_spine_dispatch.py
++       tests/test_spine_adoption_dispatch.py tests/test_runtime_state.py
++                                                                       → 32 passed
++pytest tests/test_agent_runner.py tests/test_world_model.py tests/test_meta_daemon.py
++       tests/test_context_compiler.py tests/test_providers_quality_track.py
++       tests/test_evolution.py tests/test_dharma_attractor.py
++                                                                       → 319 passed
++```
++
++## 7. Runbook — execute after #561, #562, and spine-adoption land on main
++
++**Preconditions:** #561 merged, #562 merged, spine-adoption merged (any order — they only collide on generated DocOps counters, regenerated on merge anyway). All commands run in `/Users/dhyana/dharma_swarm_live` EXCEPT do not start until the preconditions hold.
++
++```bash
++cd /Users/dhyana/dharma_swarm_live
++
++# 0. Fresh main from GitHub (local /Users/dhyana/dharma_swarm main is stale — #514)
++git fetch origin main
++
++# 1. Safety net
++git branch backup/organ-03-seat-pre-rebase-$(date +%Y%m%d) organ/03-seat
++
++# 2. Slice 1 — wounds-only branch
++git checkout -b seat/wounds-only f3c926490
++git rebase --onto origin/main dc72312f0
++#   Expected stops: docs/docops/AUTO_INVENTORY.md on ~7/8 commits,
++#   docs/governance/SOVEREIGN_MANIFEST.md on ~3/8. At each stop:
++#     git checkout --ours docs/docops/AUTO_INVENTORY.md docs/governance/SOVEREIGN_MANIFEST.md 2>/dev/null
++#     git add docs/docops/AUTO_INVENTORY.md docs/governance/SOVEREIGN_MANIFEST.md
++#     git rebase --continue
++#   NO Python conflicts are expected. If one appears, main moved since this
++#   preview — stop and re-run the preview, do not improvise.
++
++# 3. Regenerate generated docs once, on the rebased tip
++#    (DocOps inventory regeneration + integrity gate)
++make docops-integrity   # regenerate AUTO_INVENTORY per repo tooling if it flags drift
++git add docs/docops/AUTO_INVENTORY.md docs/governance/SOVEREIGN_MANIFEST.md
++git commit -m "chore(docops): regenerate inventory after wounds rebase" || true
++
++# 4. Verify slice 1
++python3 -m pytest tests/test_agent_runner.py tests/test_world_model.py \
++  tests/test_meta_daemon.py tests/test_context_compiler.py tests/test_runtime_state.py -q
++python3 -m pytest tests/ -q          # full suite (~6 min) before opening the PR
++
++# 5. PR 1: seat/wounds-only → main. Merge it.
++
++# 6. Slice 2 — seat checkpoint + audit packet (after PR 1 merges)
++git fetch origin main
++git checkout -b seat/checkpoint e67b91829
++git rebase --onto origin/main f3c926490
++#   Expected stops: same two generated files on both commits; same recipe.
++
++# 7. Verify slice 2
++python3 -m pytest tests/test_seat_checkpoint.py tests/test_dharma_attractor.py \
++  tests/test_orchestrator_spine_dispatch.py -q
++python3 -m pytest tests/ -q
++
++# 8. PR 2: seat/checkpoint → main.
++
++# 9. Follow-up (non-blocking): unified lock-policy refactor per §5 —
++#    parameterize runtime_state pragma helpers, route the orchestrator
++#    receipt connection through them with busy_timeout_ms=2000.
++```
++
++**Drift guard:** this preview is valid for the measured SHAs (`main=906833f56`, `#561=8e086e092`, `#562=a9b8fc957`, `spine=717a53340`, `seat=e67b91829`). If any lane gains commits before merge, re-run the scratch-clone preview (cheap: local clone + 3 fetches + 2 rebases, ~2 minutes).

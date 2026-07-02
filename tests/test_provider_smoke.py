@@ -68,7 +68,7 @@ def test_run_provider_smoke_local_prefers_installed_chat_model_before_missing_de
 ) -> None:
     monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
     monkeypatch.delenv("OLLAMA_MODEL", raising=False)
-    monkeypatch.delenv("OLLAMA_FORCE_LOCAL", raising=False)
+    monkeypatch.setenv("OLLAMA_FORCE_LOCAL", "1")
     monkeypatch.delenv("OLLAMA_USE_CLOUD", raising=False)
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434")
     monkeypatch.setattr(

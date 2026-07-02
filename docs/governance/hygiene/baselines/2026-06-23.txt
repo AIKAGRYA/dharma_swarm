@@ -4085,7 +4085,7 @@ output:
     dharma_swarm/providers.py: 3145 lines (grandfather=3096, ceiling=3405). Approaching the budget.
     dharma_swarm/runtime_state.py: 4245 lines already exceeds budget; this PR did not introduce the breach.
     dharma_swarm/thinkodynamic_director.py: 5320 lines (grandfather=5215, ceiling=5736). Approaching the budget.
-  
+
   ::error::Rule 10 violation(s) — module line budget:
     dharma_swarm/orchestrator.py: 3225 lines exceeds grandfathered ceiling 3215 (grandfather=2923 +10%). Open a decomposition issue or shrink the file.
   /Users/dhyana/.profile: line 3: /Users/dhyana/.local/bin/env: No such file or directory

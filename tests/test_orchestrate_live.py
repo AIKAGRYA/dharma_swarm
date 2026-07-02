@@ -163,6 +163,88 @@ def test_runtime_dispatch_self_report_thread_writes_during_sync_sleep(
     assert payload["runtime_dispatch"]["spine_dispatch_enabled"] is True
 
 
+def test_archaeology_ingestion_enabled_defaults_on(monkeypatch) -> None:
+    from dharma_swarm import orchestrate_live as mod
+
+    monkeypatch.delenv(mod.ARCHAEOLOGY_INGESTION_ENV, raising=False)
+
+    assert mod._archaeology_ingestion_enabled() is True
+
+
+def test_archaeology_ingestion_enabled_respects_disable_flag(monkeypatch) -> None:
+    from dharma_swarm import orchestrate_live as mod
+
+    monkeypatch.setenv(mod.ARCHAEOLOGY_INGESTION_ENV, "0")
+
+    assert mod._archaeology_ingestion_enabled() is False
+
+
+@pytest.mark.asyncio
+async def test_run_archaeology_loop_returns_when_ingestion_disabled(monkeypatch) -> None:
+    from dharma_swarm import orchestrate_live as mod
+
+    logs: list[tuple[str, str]] = []
+    monkeypatch.setenv(mod.ARCHAEOLOGY_INGESTION_ENV, "0")
+    monkeypatch.setattr(mod, "_log", lambda system, message: logs.append((system, message)))
+
+    shutdown = asyncio.Event()
+
+    async def stop_soon() -> None:
+        await asyncio.sleep(0.01)
+        shutdown.set()
+
+    stopper = asyncio.create_task(stop_soon())
+    await asyncio.wait_for(mod._run_archaeology_loop(shutdown), timeout=1.0)
+    await stopper
+
+    assert any("Ingestion disabled" in message for _, message in logs)
+
+
+@pytest.mark.asyncio
+async def test_run_archaeology_once_bounded_returns_counts() -> None:
+    from dharma_swarm import orchestrate_live as mod
+
+    class Daemon:
+        async def run_once(self) -> dict[str, int]:
+            return {"evolution_archive": 1}
+
+    counts = await mod._run_archaeology_once_bounded(Daemon(), timeout_seconds=1.0)
+
+    assert counts == {"evolution_archive": 1}
+
+
+@pytest.mark.asyncio
+async def test_run_archaeology_once_bounded_times_out_when_ingestion_blocks() -> None:
+    from dharma_swarm import orchestrate_live as mod
+
+    class BlockingDaemon:
+        async def run_once(self) -> dict[str, int]:
+            # Simulates the production failure mode: synchronous CPU/file/vector
+            # work inside an async coroutine before it yields to the event loop.
+            time.sleep(0.12)
+            return {"shared_research": 1}
+
+    started = time.perf_counter()
+    with pytest.raises(asyncio.TimeoutError):
+        await mod._run_archaeology_once_bounded(
+            BlockingDaemon(),
+            timeout_seconds=0.02,
+        )
+
+    assert time.perf_counter() - started < 0.10
+
+
+def test_pulse_result_daily_limit_classification() -> None:
+    from dharma_swarm import orchestrate_live as mod
+
+    assert mod._pulse_result_counts_toward_daily_limit("HEALTH PULSE: daemon_alive=True") is False
+    assert mod._pulse_result_counts_toward_daily_limit("PAUSED: .PAUSE file") is False
+    assert mod._pulse_result_counts_toward_daily_limit("QUIET: quiet hours") is False
+    assert mod._pulse_result_counts_toward_daily_limit("CIRCUIT breaker open") is False
+    assert mod._pulse_result_counts_toward_daily_limit("TELOS gate blocked") is False
+    assert mod._pulse_result_counts_toward_daily_limit("Wrote synthesis to shared memory") is True
+
+
 # ---------------------------------------------------------------------------
 # Module-level constants
 # ---------------------------------------------------------------------------

@@ -1,0 +1,22 @@
+{
+  "schema": "sab_first_six_agent_flywheel.a2a_challenge_request.v1",
+  "mission_id": "sab-first-six-agent-flywheel-20260627",
+  "created_at_utc": "2026-06-27T17:55:00Z",
+  "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+  "task_id": "sab-flywheel-d00-research-spark-3-challenge",
+  "from": "sab_research_scout",
+  "to": "codex_composer_mac",
+  "required_receipt_schema": "sab.semantic_receipt.v1",
+  "target": {
+    "working_arena": "http://127.0.0.1:8788",
+    "local_spark_id": 3,
+    "local_spark_url": "http://127.0.0.1:8788/spark/3",
+    "latest_witness_hash_seen": "982bb71b9dcee44a6f84e03ee63855cebb6c5276accea8e562a22e7172aff00d"
+  },
+  "request": "Challenge or synthesize the research scout spark using FIRST_SPARK_PROTOCOL v0.2 review fields: semantic_action, summary, pros, cons, confidence, and sybil_resistance_ref.",
+  "success_condition": "A semantic receipt that challenges or synthesizes spark_id=3 and can be referenced as the first challenge/synthesis pair candidate for the Day 7 gate.",
+  "limitations": [
+    "This request targets the local working arena because production canonical SAB is still unverified.",
+    "Completion of this request will not satisfy the Day 14 external recruited-agent requirement by itself."
+  ]
+}

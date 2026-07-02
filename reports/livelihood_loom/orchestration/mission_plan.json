@@ -1,0 +1,123 @@
+{
+  "cell_id": "livelihood_loom",
+  "execution_mode": "emulated_six_lane_local_cycle",
+  "external_actions": "draft_and_risk_review_only",
+  "generated_at": "2026-06-29T16:06:44.889679+00:00",
+  "lanes": [
+    {
+      "agent": "loom_conductor",
+      "charter_roles": [
+        "loom_conductor"
+      ],
+      "lane_id": "lane_loom_conductor",
+      "module": "dharma_swarm/venture_cell/livelihood_loom/orchestration.py",
+      "proof_refs": [
+        "reports/livelihood_loom/orchestration/mission_plan.json"
+      ],
+      "scope": "orchestration, task graph, receipt map",
+      "status": "complete"
+    },
+    {
+      "agent": "field_cartography",
+      "charter_roles": [
+        "field_cartography"
+      ],
+      "lane_id": "lane_field_cartography",
+      "module": "dharma_swarm/venture_cell/livelihood_loom/prioritization.py",
+      "proof_refs": [
+        "reports/livelihood_loom/cultivation/top_50.json",
+        "reports/livelihood_loom/cultivation/top_50.md",
+        "reports/livelihood_loom/cultivation/wedges.json"
+      ],
+      "scope": "CSV enrichment, scoring, Top 50, ROI wedges",
+      "status": "complete"
+    },
+    {
+      "agent": "worker_advocate_safety_red_team",
+      "charter_roles": [
+        "worker_advocate",
+        "safety_red_team"
+      ],
+      "lane_id": "lane_worker_advocate_safety_red_team",
+      "module": "dharma_swarm/venture_cell/livelihood_loom/safety.py",
+      "proof_refs": [
+        "reports/livelihood_loom/safety/top_50_safety_review.json"
+      ],
+      "scope": "harm analysis, exclusion rules, safety review",
+      "status": "complete"
+    },
+    {
+      "agent": "offer_builder",
+      "charter_roles": [
+        "offer_builder"
+      ],
+      "lane_id": "lane_offer_builder",
+      "module": "dharma_swarm/venture_cell/livelihood_loom/enablement_packets.py",
+      "proof_refs": [
+        "reports/livelihood_loom/enablement_packets/index.json"
+      ],
+      "scope": "five enablement packets",
+      "status": "complete"
+    },
+    {
+      "agent": "demand_builder",
+      "charter_roles": [
+        "demand_builder"
+      ],
+      "lane_id": "lane_demand_builder",
+      "module": "dharma_swarm/venture_cell/livelihood_loom/demand.py",
+      "proof_refs": [
+        "reports/livelihood_loom/demand/first_paid_offer.md",
+        "reports/livelihood_loom/demand/sponsor_brief_01.md",
+        "reports/livelihood_loom/demand/sponsor_brief_02.md",
+        "reports/livelihood_loom/demand/sponsor_brief_03.md",
+        "reports/livelihood_loom/demand/external_action_draft.json"
+      ],
+      "scope": "sponsor demand briefs and first paid offer",
+      "status": "complete"
+    },
+    {
+      "agent": "evidence_auditor_memory_librarian",
+      "charter_roles": [
+        "evidence_auditor",
+        "memory_librarian"
+      ],
+      "lane_id": "lane_evidence_auditor_memory_librarian",
+      "module": "dharma_swarm/venture_cell/livelihood_loom/evidence.py",
+      "proof_refs": [
+        "reports/livelihood_loom/cycles/latest.json",
+        "reports/livelihood_loom/status/provider_readiness_gap.json"
+      ],
+      "scope": "proof, status gates, CLI integration, receipt index",
+      "status": "complete"
+    }
+  ],
+  "provider_claim": "provider_blocked_no_green_claim",
+  "schema_version": "livelihood_loom.orchestration_plan.v1",
+  "task_graph": [
+    {
+      "from": "field_cartography",
+      "to": "worker_advocate_safety_red_team"
+    },
+    {
+      "from": "field_cartography",
+      "to": "offer_builder"
+    },
+    {
+      "from": "worker_advocate_safety_red_team",
+      "to": "offer_builder"
+    },
+    {
+      "from": "offer_builder",
+      "to": "demand_builder"
+    },
+    {
+      "from": "demand_builder",
+      "to": "evidence_auditor_memory_librarian"
+    },
+    {
+      "from": "loom_conductor",
+      "to": "evidence_auditor_memory_librarian"
+    }
+  ]
+}

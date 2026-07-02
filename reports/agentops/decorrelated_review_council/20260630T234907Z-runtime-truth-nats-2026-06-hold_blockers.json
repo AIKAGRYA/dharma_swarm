@@ -1,0 +1,190 @@
+{
+  "blockers": [
+    "glm52: RuntimeError Ollama cloud error after 1 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your session usage limit, add extra usage: https://ollama.com/settings (ref: 25c25f2c-be85-42f7-81f1-e73086db4e15)\"}\n",
+    "glm52: disagreement=Ollama cloud error after 1 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your session usage limit, add extra usage: https://ollama.com/settings (ref: 25c25f2c-be85-42f7-81f1-e73086db4e15)\"}\n",
+    "kimi27code: RuntimeError Ollama cloud error after 1 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your session usage limit, add extra usage: https://ollama.com/settings (ref: 627ef1a8-0f86-4fda-b2ba-77c32f8c3ef9)\"}\n",
+    "kimi27code: disagreement=Ollama cloud error after 1 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your session usage limit, add extra usage: https://ollama.com/settings (ref: 627ef1a8-0f86-4fda-b2ba-77c32f8c3ef9)\"}\n",
+    "qwen3coder: RuntimeError Ollama cloud error after 5 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your session usage limit, add extra usage: https://ollama.com/settings (ref: 45234dd2-765a-4f2e-b657-a42f1e6a8a77)\"}\n",
+    "qwen3coder: disagreement=Ollama cloud error after 5 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your session usage limit, add extra usage: https://ollama.com/settings (ref: 45234dd2-765a-4f2e-b657-a42f1e6a8a77)\"}\n",
+    "deepseekv4pro: RuntimeError Ollama cloud error after 1 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your session usage limit, add extra usage: https://ollama.com/settings (ref: 7bbd1a1d-6efe-490d-bfc1-37395077ebce)\"}\n",
+    "deepseekv4pro: disagreement=Ollama cloud error after 1 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your session usage limit, add extra usage: https://ollama.com/settings (ref: 7bbd1a1d-6efe-490d-bfc1-37395077ebce)\"}\n",
+    "minimaxm3: RuntimeError Ollama cloud error after 1 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your session usage limit, add extra usage: https://ollama.com/settings (ref: a2791861-74e2-4bdd-81f9-154aa3fd8737)\"}\n",
+    "minimaxm3: disagreement=Ollama cloud error after 1 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your session usage limit, add extra usage: https://ollama.com/settings (ref: a2791861-74e2-4bdd-81f9-154aa3fd8737)\"}\n"
+  ],
+  "conviction_gate": "hold_blockers",
+  "critic_count": 6,
+  "critics": [
+    {
+      "actual_model": "",
+      "failure_reason": "Ollama cloud error after 1 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your session usage limit, add extra usage: https://ollama.com/settings (ref: 25c25f2c-be85-42f7-81f1-e73086db4e15)\"}\n",
+      "failure_type": "RuntimeError",
+      "lane_id": "glm52",
+      "latency_ms": null,
+      "ok": false,
+      "parsed": {
+        "blockers": [
+          "Ollama cloud error after 1 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your session usage limit, add extra usage: https://ollama.com/settings (ref: 25c25f2c-be85-42f7-81f1-e73086db4e15)\"}\n"
+        ],
+        "evidence_checked": [],
+        "explicit_disagreement": "Ollama cloud error after 1 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your session usage limit, add extra usage: https://ollama.com/settings (ref: 25c25f2c-be85-42f7-81f1-e73086db4e15)\"}\n",
+        "required_changes": [
+          "Make ollama:glm-5.2:cloud reachable or mark the lane optional with justification."
+        ],
+        "score": 0,
+        "summary": "glm52 could not run.",
+        "verdict": "blocked"
+      },
+      "provider": "ollama",
+      "raw_response_preview": "",
+      "requested_model": "glm-5.2:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "",
+      "failure_reason": "Ollama cloud error after 1 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your session usage limit, add extra usage: https://ollama.com/settings (ref: 627ef1a8-0f86-4fda-b2ba-77c32f8c3ef9)\"}\n",
+      "failure_type": "RuntimeError",
+      "lane_id": "kimi27code",
+      "latency_ms": null,
+      "ok": false,
+      "parsed": {
+        "blockers": [
+          "Ollama cloud error after 1 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your session usage limit, add extra usage: https://ollama.com/settings (ref: 627ef1a8-0f86-4fda-b2ba-77c32f8c3ef9)\"}\n"
+        ],
+        "evidence_checked": [],
+        "explicit_disagreement": "Ollama cloud error after 1 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your session usage limit, add extra usage: https://ollama.com/settings (ref: 627ef1a8-0f86-4fda-b2ba-77c32f8c3ef9)\"}\n",
+        "required_changes": [
+          "Make ollama:kimi-k2.7-code:cloud reachable or mark the lane optional with justification."
+        ],
+        "score": 0,
+        "summary": "kimi27code could not run.",
+        "verdict": "blocked"
+      },
+      "provider": "ollama",
+      "raw_response_preview": "",
+      "requested_model": "kimi-k2.7-code:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "",
+      "failure_reason": "Ollama cloud error after 5 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your session usage limit, add extra usage: https://ollama.com/settings (ref: 45234dd2-765a-4f2e-b657-a42f1e6a8a77)\"}\n",
+      "failure_type": "RuntimeError",
+      "lane_id": "qwen3coder",
+      "latency_ms": null,
+      "ok": false,
+      "parsed": {
+        "blockers": [
+          "Ollama cloud error after 5 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your session usage limit, add extra usage: https://ollama.com/settings (ref: 45234dd2-765a-4f2e-b657-a42f1e6a8a77)\"}\n"
+        ],
+        "evidence_checked": [],
+        "explicit_disagreement": "Ollama cloud error after 5 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your session usage limit, add extra usage: https://ollama.com/settings (ref: 45234dd2-765a-4f2e-b657-a42f1e6a8a77)\"}\n",
+        "required_changes": [
+          "Make ollama:qwen3-coder:480b-cloud reachable or mark the lane optional with justification."
+        ],
+        "score": 0,
+        "summary": "qwen3coder could not run.",
+        "verdict": "blocked"
+      },
+      "provider": "ollama",
+      "raw_response_preview": "",
+      "requested_model": "qwen3-coder:480b-cloud",
+      "required": true
+    },
+    {
+      "actual_model": "",
+      "failure_reason": "Ollama cloud error after 1 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your session usage limit, add extra usage: https://ollama.com/settings (ref: 7bbd1a1d-6efe-490d-bfc1-37395077ebce)\"}\n",
+      "failure_type": "RuntimeError",
+      "lane_id": "deepseekv4pro",
+      "latency_ms": null,
+      "ok": false,
+      "parsed": {
+        "blockers": [
+          "Ollama cloud error after 1 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your session usage limit, add extra usage: https://ollama.com/settings (ref: 7bbd1a1d-6efe-490d-bfc1-37395077ebce)\"}\n"
+        ],
+        "evidence_checked": [],
+        "explicit_disagreement": "Ollama cloud error after 1 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your session usage limit, add extra usage: https://ollama.com/settings (ref: 7bbd1a1d-6efe-490d-bfc1-37395077ebce)\"}\n",
+        "required_changes": [
+          "Make ollama:deepseek-v4-pro:cloud reachable or mark the lane optional with justification."
+        ],
+        "score": 0,
+        "summary": "deepseekv4pro could not run.",
+        "verdict": "blocked"
+      },
+      "provider": "ollama",
+      "raw_response_preview": "",
+      "requested_model": "deepseek-v4-pro:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "",
+      "failure_reason": "Ollama cloud error after 1 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your session usage limit, add extra usage: https://ollama.com/settings (ref: a2791861-74e2-4bdd-81f9-154aa3fd8737)\"}\n",
+      "failure_type": "RuntimeError",
+      "lane_id": "minimaxm3",
+      "latency_ms": null,
+      "ok": false,
+      "parsed": {
+        "blockers": [
+          "Ollama cloud error after 1 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your session usage limit, add extra usage: https://ollama.com/settings (ref: a2791861-74e2-4bdd-81f9-154aa3fd8737)\"}\n"
+        ],
+        "evidence_checked": [],
+        "explicit_disagreement": "Ollama cloud error after 1 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your session usage limit, add extra usage: https://ollama.com/settings (ref: a2791861-74e2-4bdd-81f9-154aa3fd8737)\"}\n",
+        "required_changes": [
+          "Make ollama:minimax-m3:cloud reachable or mark the lane optional with justification."
+        ],
+        "score": 0,
+        "summary": "minimaxm3 could not run.",
+        "verdict": "blocked"
+      },
+      "provider": "ollama",
+      "raw_response_preview": "",
+      "requested_model": "minimax-m3:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "nvidia/nemotron-3-ultra-550b-a55b-20260604:free",
+      "lane_id": "nemotron3ultra",
+      "latency_ms": 39604,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "reports/governance/nats_live_production_matrix/latest.json (run nats-live-20260630T234132Z-187818af)",
+          "scripts/governance/check_nats_live_production_evidence.py",
+          "scripts/governance/run_nats_live_production_matrix.py",
+          "docs/governance/ACTIVE_TRACK.yaml (runtime-truth-nats-2026-06 track)",
+          "Makefile (nats-substrate-contract target)"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "All 12 required live matrix rows pass with fresh evidence (generated 2026-06-30T23:42:50Z, within 24h). Live NATS/JetStream broker at nats://127.0.0.1:4222 verified with DS_TASKS/DS_DLQ topology, explicit-ack durable consumer a2a_task_handler (max_deliver=3, ack_wait=60s). Canonical envelope dharma.nats.envelope.v1 with stable Nats-Msg-Id, identity/causality headers (Dharma-Trace-Id, Dharma-Causation-Id, Dharma-Correlation-Id, Dharma-Idempotency-Key), typed payload dharma.a2a.nats_task.v1. Live publish via A2ANatsTransport.publish_task, A2AServer(require_execution_identity=True) handler execution, model-backed semantic receipt (ollama:glm-5.2:cloud). Happy path ack, duplicate suppression (runtime+broker), publish failure retry, handler failure nack+redelivery (2 attempts), stale idempotency retry, concurrent in-progress blocked (retry_blocked), broker ack failure surfaced (nack+redelivery), MaxDeliver=3 with typed DLQ envelope dharma.nats.dlq_failure.v1 and original ack after DLQ publish, DLQ publish failure leaves original unacked and operator-visible (ack_floor < stream_seq), restart recovery redelivers same stream_seq (num_delivered=2), governance-negative tamper detection fails checker. Active-track completion criteria and Makefile nats-substrate-contract gate require fresh live evidence checker. Compatibility publisher a2a_send.py explicitly marked non-canonical (canonical_runtime_truth_nats_task_path=false, production_readiness_claim_allowed=false). No stale, simulated, or bypassed evidence.",
+        "verdict": "pass"
+      },
+      "provider": "openrouter_free",
+      "raw_response": "{\n \"verdict\": \"pass\",\n  \"score\": 100,\n  \"summary\": \"All 12 required live matrix rows pass with fresh evidence (generated 2026-06-30T23:42:50Z, within 24h). Live NATS/JetStream broker at nats://127.0.0.1:4222 verified with DS_TASKS/DS_DLQ topology, explicit-ack durable consumer a2a_task_handler (max_deliver=3, ack_wait=60s). Canonical envelope dharma.nats.envelope.v1 with stable Nats-Msg-Id, identity/causality headers (Dharma-Trace-Id, Dharma-Causation-Id, Dharma-Correlation-Id, Dharma-Idempotency-Key), typed payload dharma.a2a.nats_task.v1. Live publish via A2ANatsTransport.publish_task, A2AServer(require_execution_identity=True) handler execution, model-backed semantic receipt (ollama:glm-5.2:cloud). Happy path ack, duplicate suppression (runtime+broker), publish failure retry, handler failure nack+redelivery (2 attempts), stale idempotency retry, concurrent in-progress blocked (retry_blocked), broker ack failure surfaced (nack+redelivery), MaxDeliver=3 with typed DLQ envelope dharma.nats.dlq_failure.v1 and original ack after DLQ publish, DLQ publish failure leaves original unacked and operator-visible (ack_floor < stream_seq), restart recovery redelivers same stream_seq (num_delivered=2), governance-negative tamper detection fails checker. Active-track completion criteria and Makefile nats-substrate-contract gate require fresh live evidence checker. Compatibility publisher a2a_send.py explicitly marked non-canonical (canonical_runtime_truth_nats_task_path=false, production_readiness_claim_allowed=false). No stale, simulated, or bypassed evidence.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"reports/governance/nats_live_production_matrix/latest.json (run nats-live-20260630T234132Z-187818af)\",\n    \"scripts/governance/check_nats_live_production_evidence.py\",\n    \"scripts/governance/run_nats_live_production_matrix.py\",\n    \"docs/governance/ACTIVE_TRACK.yaml (runtime-truth-nats-2026-06 track)\",\n    \"Makefile (nats-substrate-contract target)\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "required": true
+    }
+  ],
+  "generated_at": "20260630T234907Z",
+  "max_evidence_chars": 60000,
+  "max_output_tokens": 12000,
+  "persistent_agent_witness": {
+    "agent": "palantir-pilot",
+    "blocker": "",
+    "fresh": true,
+    "heartbeat_age_seconds": 28,
+    "heartbeat_timestamp": "2026-06-30T23:48:39Z",
+    "max_heartbeat_age_seconds": 300,
+    "raw_status": "status=running session=dharma_palantir_pilot_a2a_worker\nsubject=dharma.a2a.palantir-pilot\nconsumer=palantir_pilot_a2a\nstream=DHARMA_FLEET\nheartbeat=/Users/dhyana/.dharma/a2a_bus/worker_heartbeats/palantir-pilot.json\nlog=/Users/dhyana/.dharma/logs/palantir_pilot_a2a_worker/dharma_palantir_pilot_a2a_worker.log\n--- heartbeat ---\n{\n    \"agent_id\": \"palantir_pilot\",\n    \"callsign\": \"palantir-pilot\",\n    \"consumer\": \"palantir_pilot_a2a\",\n    \"cycle\": 1054,\n    \"last_receipt_path\": \"\",\n    \"receipt_count\": 0,\n    \"schema_version\": \"dharma.a2a.palantir_pilot.worker_heartbeat.v1\",\n    \"status\": \"IDLE\",\n    \"stream\": \"DHARMA_FLEET\",\n    \"subject\": \"dharma.a2a.palantir-pilot\",\n    \"suppress_no_messages\": true,\n    \"timestamp\": \"2026-06-30T23:48:39Z\"\n}\n--- consumer ---\n{\n  \"stream_name\": \"DHARMA_FLEET\",\n  \"name\": \"palantir_pilot_a2a\",\n  \"config\": {\n    \"ack_policy\": \"explicit\",\n    \"ack_wait\": 30000000000,\n    \"deliver_policy\": \"all\",\n    \"durable_name\": \"palantir_pilot_a2a\",\n    \"name\": \"palantir_pilot_a2a\",\n    \"filter_subject\": \"dharma.a2a.palantir-pilot\",\n    \"max_ack_pending\": 1000,\n    \"max_deliver\": -1,\n    \"max_waiting\": 512,\n    \"replay_policy\": \"instant\",\n    \"num_replicas\": 0,\n    \"metadata\": {\n      \"_nats.level\": \"3\",\n      \"_nats.req.level\": \"0\",\n      \"_nats.ver\": \"2.12.6\"\n    },\n    \"pause_until\": \"0001-01-01T00:00:00Z\"\n  },\n  \"created\": \"2026-06-15T16:08:32.524099Z\",\n  \"delivered\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"ack_floor\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"num_ack_pending\": 0,\n  \"num_redelivered\": 0,\n  \"num_waiting\": 1,\n  \"num_pending\": 0,\n  \"ts\": \"2026-06-30T23:49:06.734395Z\"\n}\n--- latest worker receipts ---\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260618T014416Z-palantir-pilot-codex_hardened_spec_notice_20260618T0155Z_palantir-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260618T013101Z-palantir-pilot-palantir_a2a_hardening_20260618T0001Z-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260617T135931Z-palantir-pilot-longrun_spec_95_vote_20260617T135751Z-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260617T131705Z-palantir-pilot-7215f005165f-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260617T130349Z-palantir-pilot-761445fa892d-PALANTIR_PILOT_REPLIED.json\n",
+    "status": "running"
+  },
+  "prompt_chars": 211345,
+  "prompt_file": "/Users/dhyana/dharma_swarm/reports/agentops/decorrelated_review_council/prompts/runtime_truth_nats_final_adversarial_20260701.md",
+  "prompt_words_estimate": 15119,
+  "required_critic_count": 6,
+  "schema_version": "codex.decorrelated_review_council.v1",
+  "score_avg": 16.67,
+  "score_min": 0,
+  "target_score": 100,
+  "timeout_seconds": 900
+}

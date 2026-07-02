@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 
 from dharma_swarm.gaia_initiative import (
@@ -19,6 +20,7 @@ from dharma_swarm.gaia_initiative import (
     GaiaRestorationInitiative,
 )
 from dharma_swarm.gaia_platform import (
+    GaiaCanonicalBinding,
     GaiaChallengeGround,
     GaiaChallengeState,
     GaiaClaimVisibility,
@@ -31,6 +33,7 @@ from dharma_swarm.gaia_platform import (
     GaiaRemediationStep,
     main,
 )
+from dharma_swarm.runtime_state import DelegationRun, RuntimeStateStore, SessionState
 
 
 def _make_intake() -> GaiaPilotIntake:
@@ -203,6 +206,53 @@ def _make_initiative_packet() -> GaiaInitiativePilotPacket:
             audit_refs=("audit://bayou-lafourche/independent-q2",),
         ),
     )
+
+
+def _make_canonical_binding(tmp_path, *, run_id: str = "run-gaia", session_id: str = "sess-gaia") -> GaiaCanonicalBinding:
+    return GaiaCanonicalBinding(
+        run_id=run_id,
+        session_id=session_id,
+        task_id="task-gaia",
+        trace_id=f"trace-{run_id}",
+        db_path=tmp_path / "runtime.db",
+        event_log_dir=tmp_path / "events",
+        workspace_root=tmp_path / "workspace" / "sessions",
+        provenance_root=tmp_path / "workspace" / "sessions",
+        created_by="test.gaia_platform",
+    )
+
+
+async def _seed_canonical_runtime(binding: GaiaCanonicalBinding) -> None:
+    assert binding.db_path is not None
+    runtime_state = RuntimeStateStore(binding.db_path)
+    await runtime_state.init_db()
+    await runtime_state.upsert_session(
+        SessionState(
+            session_id=binding.session_id,
+            operator_id="operator",
+            status="active",
+            current_task_id=binding.task_id,
+        )
+    )
+    await runtime_state.record_delegation_run(
+        DelegationRun(
+            run_id=binding.run_id,
+            session_id=binding.session_id,
+            task_id=binding.task_id,
+            assigned_to="agent-gaia",
+            assigned_by="operator",
+            status="completed",
+            metadata={"trace_id": binding.trace_id},
+        )
+    )
+
+
+async def _artifact_kind(binding: GaiaCanonicalBinding, artifact_id: str) -> str | None:
+    assert binding.db_path is not None
+    runtime_state = RuntimeStateStore(binding.db_path)
+    await runtime_state.init_db()
+    artifact = await runtime_state.get_artifact(artifact_id)
+    return None if artifact is None else artifact.artifact_kind
 
 
 def test_recommendations_prioritize_verified_projects(tmp_path):
@@ -420,15 +470,23 @@ def test_build_intake_pilot_report_writes_claim_card_and_intake_artifacts(tmp_pa
     report_payload = json.loads(result["json_path"].read_text(encoding="utf-8"))
     claim_card_payload = json.loads(result["claim_card_path"].read_text(encoding="utf-8"))
     measurement_payload = json.loads(result["measurement_path"].read_text(encoding="utf-8"))
+    evidence_payload = json.loads(result["evidence_path"].read_text(encoding="utf-8"))
     livelihood_payload = json.loads(result["livelihood_path"].read_text(encoding="utf-8"))
     challenge_payload = json.loads(result["challenge_path"].read_text(encoding="utf-8"))
+    adaptive_review_payload = json.loads(
+        result["adaptive_review_path"].read_text(encoding="utf-8")
+    )
     claim_explorer_payload = json.loads(
         result["claim_explorer_path"].read_text(encoding="utf-8")
     )
     claim_markdown = result["claim_card_markdown_path"].read_text(encoding="utf-8")
     measurement_markdown = result["measurement_markdown_path"].read_text(encoding="utf-8")
+    evidence_markdown = result["evidence_markdown_path"].read_text(encoding="utf-8")
     livelihood_markdown = result["livelihood_markdown_path"].read_text(encoding="utf-8")
     challenge_markdown = result["challenge_markdown_path"].read_text(encoding="utf-8")
+    adaptive_review_markdown = result["adaptive_review_markdown_path"].read_text(
+        encoding="utf-8"
+    )
     claim_explorer_markdown = result["claim_explorer_markdown_path"].read_text(
         encoding="utf-8"
     )
@@ -442,10 +500,14 @@ def test_build_intake_pilot_report_writes_claim_card_and_intake_artifacts(tmp_pa
     assert result["claim_card_markdown_path"].exists()
     assert result["measurement_path"].exists()
     assert result["measurement_markdown_path"].exists()
+    assert result["evidence_path"].exists()
+    assert result["evidence_markdown_path"].exists()
     assert result["livelihood_path"].exists()
     assert result["livelihood_markdown_path"].exists()
     assert result["challenge_path"].exists()
     assert result["challenge_markdown_path"].exists()
+    assert result["adaptive_review_path"].exists()
+    assert result["adaptive_review_markdown_path"].exists()
     assert result["claim_explorer_path"].exists()
     assert result["claim_explorer_markdown_path"].exists()
     assert result["reciprocity_path"].exists()
@@ -454,6 +516,8 @@ def test_build_intake_pilot_report_writes_claim_card_and_intake_artifacts(tmp_pa
     assert report_payload["qualification"]["public_claim_ready"] is True
     assert report_payload["qualification"]["measurement_claim_ready"] is True
     assert report_payload["measurement"]["public_claim_ready"] is True
+    assert report_payload["evidence"]["bundle_hash"]
+    assert report_payload["adaptive_review"]["owner"] == "gaia-review-council"
     assert report_payload["livelihood"]["participant_count"] == 42
     assert report_payload["livelihood"]["person_hours"] == 1280.0
     assert report_payload["challenge"]["freeze_promotional_use"] is False
@@ -467,6 +531,11 @@ def test_build_intake_pilot_report_writes_claim_card_and_intake_artifacts(tmp_pa
     assert claim_card_payload["measurement_mode"] == "measured"
     assert claim_card_payload["measurement_claim_ready"] is True
     assert claim_card_payload["measurement_packet_path"].endswith("measurement_packet.json")
+    assert claim_card_payload["evidence_packet_path"].endswith("evidence_packet.json")
+    assert claim_card_payload["adaptive_review_path"].endswith(
+        "adaptive_review_packet.json"
+    )
+    assert claim_card_payload["evidence_bundle_hash"]
     assert claim_card_payload["livelihood_packet_path"].endswith("livelihood_packet.json")
     assert claim_card_payload["challenge_packet_path"].endswith("challenge_packet.json")
     assert len(claim_card_payload["metering_evidence_refs"]) == 2
@@ -482,6 +551,13 @@ def test_build_intake_pilot_report_writes_claim_card_and_intake_artifacts(tmp_pa
     assert measurement_payload["measurement_verifier"] == "Anthropic Sustainability Metering"
     assert len(measurement_payload["metering_evidence_refs"]) == 2
     assert len(measurement_payload["metering_audit_refs"]) == 1
+    assert len(evidence_payload["metering_evidence"]) == 2
+    assert len(evidence_payload["metering_audits"]) == 1
+    assert len(evidence_payload["ecological_evidence"]) == 2
+    assert len(evidence_payload["ecological_audits"]) == 1
+    assert len(evidence_payload["governance_refs"]) == 4
+    assert evidence_payload["claim_ready_by_evidence"] is True
+    assert evidence_payload["bundle_hash"]
     assert livelihood_payload["participant_count"] == 42
     assert livelihood_payload["person_hours"] == 1280.0
     assert livelihood_payload["feedback_response_count"] == 1
@@ -491,6 +567,11 @@ def test_build_intake_pilot_report_writes_claim_card_and_intake_artifacts(tmp_pa
     assert challenge_payload["freeze_promotional_use"] is False
     assert challenge_payload["challenge_count"] == 0
     assert challenge_payload["material_challenge_count"] == 0
+    assert adaptive_review_payload["owner"] == "gaia-review-council"
+    assert adaptive_review_payload["review_status"] == "continue"
+    assert adaptive_review_payload["next_action"] == "continue_claim_and_schedule_next_review"
+    assert adaptive_review_payload["challenge_count"] == 0
+    assert adaptive_review_payload["evidence_packet_path"].endswith("evidence_packet.json")
     assert claim_explorer_payload["public_ready_count"] == 1
     assert claim_explorer_payload["provisional_count"] == 0
     assert claim_explorer_payload["entries"][0]["claim_id"] == claim_card_payload["claim_id"]
@@ -512,20 +593,204 @@ def test_build_intake_pilot_report_writes_claim_card_and_intake_artifacts(tmp_pa
     assert report_payload["reciprocity"]["outcome_status"] == "verified"
     assert "## Claim Card" in result["markdown_path"].read_text(encoding="utf-8")
     assert "## Challengeability" in result["markdown_path"].read_text(encoding="utf-8")
+    assert "## Evidence Bundle" in result["markdown_path"].read_text(encoding="utf-8")
     assert "## Claim Explorer" in result["markdown_path"].read_text(encoding="utf-8")
     assert "## Measurement" in result["markdown_path"].read_text(encoding="utf-8")
     assert "## Livelihood Transition" in result["markdown_path"].read_text(encoding="utf-8")
     assert "## Reciprocity Proof Chain" in result["markdown_path"].read_text(encoding="utf-8")
+    assert "## Adaptive Review" in result["markdown_path"].read_text(encoding="utf-8")
     assert "## Claim" in claim_markdown
     assert "## Challengeability" in claim_markdown
     assert "# GAIA Claim Card" in claim_markdown
     assert "Measurement claim ready: yes" in claim_markdown
+    assert "Evidence packet:" in claim_markdown
     assert "## Livelihood" in claim_markdown
     assert "## Reciprocity" in claim_markdown
     assert "# GAIA Measurement Packet" in measurement_markdown
+    assert "# GAIA Evidence Packet" in evidence_markdown
     assert "# GAIA Livelihood Packet" in livelihood_markdown
     assert "# GAIA Challenge Packet" in challenge_markdown
+    assert "# GAIA Adaptive Review Packet" in adaptive_review_markdown
     assert "# GAIA Claim Explorer" in claim_explorer_markdown
+
+
+def test_build_intake_pilot_report_can_record_canonical_reciprocity_summary(tmp_path):
+    binding = _make_canonical_binding(tmp_path)
+    asyncio.run(_seed_canonical_runtime(binding))
+    platform = GaiaPlatform(data_dir=tmp_path)
+
+    result = platform.build_intake_pilot_report(
+        intake=_make_intake(),
+        canonical_binding=binding,
+    )
+
+    report_payload = json.loads(result["json_path"].read_text(encoding="utf-8"))
+    receipt_payload = json.loads(
+        result["registry_receipt_path"].read_text(encoding="utf-8")
+    )
+
+    assert result["registry_receipt_path"].exists()
+    assert report_payload["registry"]["receipt_path"].endswith("registry_receipt.json")
+    assert report_payload["registry"]["summary"]["source"] == "gaia_platform"
+    assert receipt_payload["summary_payload"]["claim_id"] == result["claim_card"].claim_id
+    assert receipt_payload["summary_payload"]["summary_type"] == "pilot_claim"
+    assert receipt_payload["registry"]["manifest_path"]
+    assert (
+        asyncio.run(
+            _artifact_kind(binding, receipt_payload["registry"]["artifact_id"])
+        )
+        == "reciprocity_ledger_summary"
+    )
+    assert "## Canonical Binding" in result["markdown_path"].read_text(
+        encoding="utf-8"
+    )
+
+
+def test_submit_claim_challenge_refreshes_canonical_reciprocity_summary(tmp_path):
+    binding = _make_canonical_binding(tmp_path)
+    asyncio.run(_seed_canonical_runtime(binding))
+    platform = GaiaPlatform(data_dir=tmp_path)
+    result = platform.build_intake_pilot_report(
+        intake=_make_intake(),
+        canonical_binding=binding,
+    )
+
+    update = platform.submit_claim_challenge(
+        claim_card_path=result["claim_card_path"],
+        canonical_binding=binding.model_copy(
+            update={"summary_type": "claim_challenge_update"}
+        ),
+        challenge={
+            "raised_by": "community-observer",
+            "role": "community_steward",
+            "summary": "Recent shoreline monitoring suggests reversal risk exceeds the published wording.",
+            "ground": GaiaChallengeGround.ECOLOGICAL_REVERSAL.value,
+            "state": GaiaChallengeState.ACKNOWLEDGED.value,
+            "evidence_ref": "evidence://bayou-lafourche/reversal-review",
+            "requested_action": "Freeze promotional use until the updated monitoring bundle is reviewed.",
+        },
+    )
+
+    report_payload = json.loads(update["json_path"].read_text(encoding="utf-8"))
+    receipt_payload = json.loads(
+        update["registry_receipt_path"].read_text(encoding="utf-8")
+    )
+
+    assert report_payload["registry"]["summary"]["challenged_claims"] == 1
+    assert receipt_payload["summary_payload"]["summary_type"] == "claim_challenge_update"
+    assert any(
+        issue["code"] == "unresolved_claim_challenge"
+        for issue in receipt_payload["summary_payload"]["issues"]
+    )
+    assert report_payload["claim_card"]["promotional_use_frozen"] is True
+
+
+def test_build_portfolio_plan_falls_back_to_seeded_projects_without_claims(tmp_path):
+    platform = GaiaPlatform(data_dir=tmp_path)
+
+    result = platform.build_portfolio_plan(
+        model_id="anthropic_claude_ops",
+        budget_usd=1_200_000.0,
+        candidate_source="auto",
+    )
+
+    payload = json.loads(result["json_path"].read_text(encoding="utf-8"))
+    markdown = result["markdown_path"].read_text(encoding="utf-8")
+
+    assert payload["candidate_source_requested"] == "auto"
+    assert payload["candidate_source_used"] == "seeded_recommendations"
+    assert payload["candidate_summary"]["eligible_candidate_count"] >= 1
+    assert payload["plan"]["selected_projects"]
+    assert "Candidate source used: seeded_recommendations" in markdown
+
+
+def test_build_portfolio_plan_uses_public_ready_claims_when_present(tmp_path):
+    platform = GaiaPlatform(data_dir=tmp_path)
+    platform.build_intake_pilot_report(intake=_make_intake())
+
+    result = platform.build_portfolio_plan(
+        model_id="anthropic_claude_ops",
+        budget_usd=35_000.0,
+        candidate_source="auto",
+    )
+
+    payload = json.loads(result["json_path"].read_text(encoding="utf-8"))
+    selected = payload["plan"]["selected_projects"]
+
+    assert payload["candidate_source_requested"] == "auto"
+    assert payload["candidate_source_used"] == "claim_explorer"
+    assert payload["candidate_summary"]["matching_model_entries"] == 1
+    assert payload["candidate_summary"]["eligible_candidate_count"] == 1
+    assert len(selected) == 1
+    assert selected[0]["project_id"] == "bayou-lafourche-mangroves"
+    assert selected[0]["cost_usd"] == 31_500.0
+
+
+def test_build_portfolio_plan_respects_frozen_claim_governance(tmp_path):
+    platform = GaiaPlatform(data_dir=tmp_path)
+    result = platform.build_intake_pilot_report(intake=_make_intake())
+
+    platform.submit_claim_challenge(
+        claim_card_path=result["claim_card_path"],
+        challenge={
+            "raised_by": "community-observer",
+            "role": "community_steward",
+            "summary": "Recent shoreline monitoring suggests reversal risk exceeds the published wording.",
+            "ground": GaiaChallengeGround.ECOLOGICAL_REVERSAL.value,
+            "state": GaiaChallengeState.ACKNOWLEDGED.value,
+            "evidence_ref": "evidence://bayou-lafourche/reversal-review",
+            "requested_action": "Freeze promotional use until the updated monitoring bundle is reviewed.",
+        },
+    )
+
+    portfolio = platform.build_portfolio_plan(
+        model_id="anthropic_claude_ops",
+        budget_usd=35_000.0,
+        candidate_source="auto",
+    )
+
+    payload = json.loads(portfolio["json_path"].read_text(encoding="utf-8"))
+    markdown = portfolio["markdown_path"].read_text(encoding="utf-8")
+
+    assert payload["candidate_source_used"] == "claim_explorer"
+    assert payload["candidate_summary"]["matching_model_entries"] == 1
+    assert payload["candidate_summary"]["eligible_candidate_count"] == 0
+    assert payload["candidate_summary"]["skipped_reasons"] == {
+        "visibility_not_public_ready": 1
+    }
+    assert payload["plan"]["selected_projects"] == []
+    assert "Skipped reasons: visibility_not_public_ready=1" in markdown
+
+
+def test_cli_portfolio_plan_can_target_claim_artifacts(tmp_path, capsys):
+    platform = GaiaPlatform(data_dir=tmp_path)
+    platform.build_intake_pilot_report(intake=_make_intake())
+
+    exit_code = main(
+        [
+            "portfolio-plan",
+            "--data-dir",
+            str(tmp_path),
+            "--model",
+            "anthropic_claude_ops",
+            "--budget-usd",
+            "35000",
+            "--candidate-source",
+            "claims",
+        ]
+    )
+
+    out = capsys.readouterr().out
+    payload = json.loads(
+        (tmp_path / "portfolio_plans" / "anthropic_claude_ops-35000.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert exit_code == 0
+    assert "GAIA portfolio plan written" in out
+    assert payload["candidate_source_requested"] == "claims"
+    assert payload["candidate_source_used"] == "claim_explorer"
 
 
 def test_build_initiative_pilot_report_preserves_standards_metadata(tmp_path):
@@ -552,8 +817,10 @@ def test_build_initiative_pilot_report_preserves_standards_metadata(tmp_path):
 
     assert result["initiative_packet_path"].exists()
     assert result["measurement_path"].exists()
+    assert result["evidence_path"].exists()
     assert result["livelihood_path"].exists()
     assert result["challenge_path"].exists()
+    assert result["adaptive_review_path"].exists()
     assert result["claim_explorer_path"].exists()
     assert report_payload["initiative"]["ecosystem_type"] == "mangrove"
     assert report_payload["initiative"]["boundary_ref"] == "stac://bayou-lafourche/footprint"
@@ -583,8 +850,10 @@ def test_build_initiative_pilot_report_preserves_standards_metadata(tmp_path):
     assert claim_card_payload["measurement_claim_ready"] is True
     assert "## Initiative Context" in report_markdown
     assert "## Challengeability" in report_markdown
+    assert "## Evidence Bundle" in report_markdown
     assert "## Measurement" in report_markdown
     assert "## Livelihood Transition" in report_markdown
+    assert "## Adaptive Review" in report_markdown
     assert "## Challengeability" in claim_markdown
     assert "## Standards" in claim_markdown
     assert "## Livelihood" in claim_markdown
@@ -662,12 +931,59 @@ def test_cli_pilot_intake_report_writes_claim_card_artifacts(tmp_path, capsys):
     assert (pilot_dir / "claim_card.md").exists()
     assert (pilot_dir / "measurement_packet.json").exists()
     assert (pilot_dir / "measurement_packet.md").exists()
+    assert (pilot_dir / "evidence_packet.json").exists()
+    assert (pilot_dir / "evidence_packet.md").exists()
     assert (pilot_dir / "livelihood_packet.json").exists()
     assert (pilot_dir / "livelihood_packet.md").exists()
     assert (pilot_dir / "challenge_packet.json").exists()
     assert (pilot_dir / "challenge_packet.md").exists()
+    assert (pilot_dir / "adaptive_review_packet.json").exists()
+    assert (pilot_dir / "adaptive_review_packet.md").exists()
     assert (tmp_path / "claim_explorer.json").exists()
     assert (tmp_path / "claim_explorer.md").exists()
+
+
+def test_cli_pilot_intake_report_can_record_canonical_summary(tmp_path, capsys):
+    binding = _make_canonical_binding(tmp_path)
+    asyncio.run(_seed_canonical_runtime(binding))
+    intake_file = tmp_path / "pilot_intake.json"
+    intake_file.write_text(
+        json.dumps(_make_intake().model_dump(mode="json"), indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+
+    exit_code = main(
+        [
+            "pilot-intake-report",
+            "--data-dir",
+            str(tmp_path),
+            "--intake-file",
+            str(intake_file),
+            "--session-id",
+            binding.session_id,
+            "--run-id",
+            binding.run_id,
+            "--task-id",
+            binding.task_id,
+            "--trace-id",
+            binding.trace_id,
+            "--runtime-db",
+            str(binding.db_path),
+            "--event-log-dir",
+            str(binding.event_log_dir),
+            "--workspace-root",
+            str(binding.workspace_root),
+            "--provenance-root",
+            str(binding.provenance_root),
+        ]
+    )
+
+    out = capsys.readouterr().out
+    pilot_dir = tmp_path / "pilots" / "anthropic_claude_ops-bayou-lafourche-mangroves"
+
+    assert exit_code == 0
+    assert "registry=" in out
+    assert (pilot_dir / "registry_receipt.json").exists()
 
 
 def test_cli_initiative_pilot_report_writes_standards_artifacts(tmp_path, capsys):
@@ -700,8 +1016,10 @@ def test_cli_initiative_pilot_report_writes_standards_artifacts(tmp_path, capsys
     assert (pilot_dir / "pilot_report.json").exists()
     assert (pilot_dir / "claim_card.json").exists()
     assert (pilot_dir / "measurement_packet.json").exists()
+    assert (pilot_dir / "evidence_packet.json").exists()
     assert (pilot_dir / "livelihood_packet.json").exists()
     assert (pilot_dir / "livelihood_packet.md").exists()
+    assert (pilot_dir / "adaptive_review_packet.json").exists()
 
 
 def test_submit_claim_challenge_freezes_promotional_claim_and_updates_explorer(tmp_path):
@@ -735,6 +1053,9 @@ def test_submit_claim_challenge_freezes_promotional_claim_and_updates_explorer(t
 
     claim_card_payload = json.loads(update["claim_card_path"].read_text(encoding="utf-8"))
     challenge_payload = json.loads(update["challenge_path"].read_text(encoding="utf-8"))
+    adaptive_review_payload = json.loads(
+        update["adaptive_review_path"].read_text(encoding="utf-8")
+    )
     explorer_payload = json.loads(
         update["claim_explorer_path"].read_text(encoding="utf-8")
     )
@@ -756,6 +1077,12 @@ def test_submit_claim_challenge_freezes_promotional_claim_and_updates_explorer(t
     assert challenge_payload["next_triage_due_at"] is not None
     assert challenge_payload["next_initial_finding_due_at"] is not None
     assert challenge_payload["service_level_notes"]
+    assert adaptive_review_payload["review_status"] == "challenge_triage"
+    assert (
+        adaptive_review_payload["next_action"]
+        == "triage_open_challenges_and_publish_initial_finding"
+    )
+    assert adaptive_review_payload["promotional_use_frozen"] is True
     assert explorer_payload["challenged_count"] == 1
     assert explorer_payload["entries"][0]["promotional_use_frozen"] is True
     assert explorer_payload["entries"][0]["challenge_count"] == 1
@@ -814,6 +1141,9 @@ def test_apply_claim_remediation_resolves_challenge_and_restores_public_ready(tm
     challenge_payload = json.loads(
         remediation_result["challenge_path"].read_text(encoding="utf-8")
     )
+    adaptive_review_payload = json.loads(
+        remediation_result["adaptive_review_path"].read_text(encoding="utf-8")
+    )
 
     assert claim_card_payload["challenge_status"] == "resolved"
     assert claim_card_payload["visibility"] == "public_ready"
@@ -824,6 +1154,8 @@ def test_apply_claim_remediation_resolves_challenge_and_restores_public_ready(tm
     assert challenge_payload["unresolved_challenge_count"] == 0
     assert challenge_payload["remediation_case_count"] == 1
     assert challenge_payload["freeze_promotional_use"] is False
+    assert adaptive_review_payload["review_status"] == "continue"
+    assert adaptive_review_payload["promotional_use_frozen"] is False
 
 
 def test_cli_challenge_and_remediation_commands_update_governance_artifacts(

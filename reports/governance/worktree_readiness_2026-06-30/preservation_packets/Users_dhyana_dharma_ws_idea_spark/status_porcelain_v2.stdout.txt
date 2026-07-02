@@ -1,0 +1,5 @@
+# branch.oid 2cb4669775321e2e5bdf6503a5e017f2179c1a85
+# branch.head feat/operator-idea-spark-ingest
+1 .M N... 100644 100644 100644 634cd20b86f1ee009758c0ed5661b77c35253582 634cd20b86f1ee009758c0ed5661b77c35253582 dharma_swarm/chetana/promote.py
+? dharma_swarm/chetana/quality_gate.py
+? tests/test_chetana_quality_gate.py

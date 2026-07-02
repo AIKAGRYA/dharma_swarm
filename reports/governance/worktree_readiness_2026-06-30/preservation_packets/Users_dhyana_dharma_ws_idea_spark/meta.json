@@ -1,0 +1,11 @@
+{
+  "path": "/Users/dhyana/dharma_ws_idea_spark",
+  "observed_at": "2026-06-29T16:34:32.205864+00:00",
+  "branch": "feat/operator-idea-spark-ingest",
+  "head": "2cb4669775321e2e5bdf6503a5e017f2179c1a85",
+  "status_short_file": "status_short.stdout.txt",
+  "status_porcelain_v2_file": "status_porcelain_v2.stdout.txt",
+  "diff_stat_file": "diff_stat.stdout.txt",
+  "cached_diff_stat_file": "cached_diff_stat.stdout.txt",
+  "untracked_manifest_file": "untracked.stdout.txt"
+}

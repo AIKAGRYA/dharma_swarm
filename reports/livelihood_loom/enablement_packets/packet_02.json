@@ -1,0 +1,114 @@
+{
+  "beneficiary": "micro-sellers, craftspeople, and small food vendors",
+  "candidate_partners": [
+    {
+      "company_id": "enabler_985c91bf1889",
+      "country": "Nigeria",
+      "evidence_refs": [
+        "http://www.wikidata.org/entity/Q138776467",
+        "https://pandascrow.io/"
+      ],
+      "flags": [
+        "high_fee_lending",
+        "privacy_risk"
+      ],
+      "name": "Pandascrow",
+      "prioritization_score": 0.952,
+      "rank": 6,
+      "safety_status": "needs_review",
+      "wedge_id": "finance_enablement"
+    },
+    {
+      "company_id": "enabler_8fccf5699c2e",
+      "country": "Brazil",
+      "evidence_refs": [
+        "http://www.wikidata.org/entity/Q138850704",
+        "https://mon3.co"
+      ],
+      "flags": [
+        "high_fee_lending"
+      ],
+      "name": "MON 3",
+      "prioritization_score": 0.846,
+      "rank": 15,
+      "safety_status": "needs_review",
+      "wedge_id": "finance_enablement"
+    },
+    {
+      "company_id": "enabler_1d2e9c05d957",
+      "country": "Brazil",
+      "evidence_refs": [
+        "http://www.wikidata.org/entity/Q61002117",
+        "http://www.stone.com.br"
+      ],
+      "flags": [
+        "high_fee_lending"
+      ],
+      "name": "Stone Pagamentos",
+      "prioritization_score": 0.846,
+      "rank": 16,
+      "safety_status": "needs_review",
+      "wedge_id": "finance_enablement"
+    },
+    {
+      "company_id": "enabler_090e5a3c465c",
+      "country": "Ghana",
+      "evidence_refs": [
+        "http://www.wikidata.org/entity/Q5321559",
+        "https://ghipss.net/"
+      ],
+      "flags": [
+        "high_fee_lending",
+        "privacy_risk"
+      ],
+      "name": "E-zwich",
+      "prioritization_score": 0.846,
+      "rank": 17,
+      "safety_status": "needs_review",
+      "wedge_id": "finance_enablement"
+    },
+    {
+      "company_id": "enabler_1433304a4cfb",
+      "country": "India",
+      "evidence_refs": [
+        "http://www.wikidata.org/entity/Q139742615",
+        "https://www.estatecoin.in"
+      ],
+      "flags": [
+        "high_fee_lending"
+      ],
+      "name": "EstateCoin",
+      "prioritization_score": 0.846,
+      "rank": 18,
+      "safety_status": "needs_review",
+      "wedge_id": "finance_enablement"
+    }
+  ],
+  "cell_id": "livelihood_loom",
+  "evidence_refs": [
+    "http://www.wikidata.org/entity/Q138776467",
+    "https://pandascrow.io/",
+    "http://www.wikidata.org/entity/Q138850704",
+    "https://mon3.co",
+    "http://www.wikidata.org/entity/Q61002117",
+    "http://www.stone.com.br",
+    "http://www.wikidata.org/entity/Q5321559",
+    "https://ghipss.net/",
+    "http://www.wikidata.org/entity/Q139742615",
+    "https://www.estatecoin.in",
+    "http://www.wikidata.org/entity/Q130741763",
+    "https://www.lendbox.in"
+  ],
+  "friction": "buyers cannot discover trustworthy small suppliers",
+  "generated_at": "2026-06-29T16:06:44.889679+00:00",
+  "next_safe_action": "Draft-only internal sponsor review packet; do not contact partners or publish claims without human_governor approval.",
+  "packet_id": "packet_02",
+  "risks": [
+    "No seller scraping, lead-list sale, or private contact enrichment.",
+    "Use public partner-level proof only."
+  ],
+  "schema_version": "livelihood_loom.enablement_packet.v1",
+  "sponsor_value": "sponsor receives an evidence-backed market-access shortlist",
+  "target_wedge": "market_access",
+  "welfare_metric": "aggregate new buyer-access opportunities identified"
+}

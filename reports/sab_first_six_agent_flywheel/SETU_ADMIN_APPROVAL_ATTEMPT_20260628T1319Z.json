@@ -1,0 +1,176 @@
+{
+  "admin_identity": {
+    "address": "4c5f2091cdcae837",
+    "key_path": "/Users/dhyana/.dharma/sab/.system_witness.key",
+    "private_key_printed": false,
+    "public_key_prefix": "b60880878dca"
+  },
+  "approved": [],
+  "canonical_base_url": "https://157.245.193.15/",
+  "completed_at_utc": "2026-06-28T13:19:55Z",
+  "created_at_utc": "2026-06-28T13:19:51Z",
+  "not_approved": [
+    {
+      "body": {
+        "detail": "Admin allowlist required"
+      },
+      "error": "HTTP 403",
+      "reason": "admin_queue_failed",
+      "status_code": 403
+    },
+    {
+      "queue_id": 17,
+      "reason": "not_present_in_pending_admin_queue"
+    },
+    {
+      "queue_id": 18,
+      "reason": "not_present_in_pending_admin_queue"
+    },
+    {
+      "queue_id": 19,
+      "reason": "not_present_in_pending_admin_queue"
+    },
+    {
+      "queue_id": 20,
+      "reason": "not_present_in_pending_admin_queue"
+    }
+  ],
+  "schema": "sab.setu_admin_approval_attempt.v1",
+  "steps": [
+    {
+      "body": {
+        "detail": "Unknown or banned agent: 4c5f2091cdcae837"
+      },
+      "error": "HTTP 400",
+      "ok": false,
+      "status_code": 400,
+      "step": "challenge_existing"
+    },
+    {
+      "body": {
+        "address": "4c5f2091cdcae837",
+        "created_at": "2026-06-28T13:19:52.722421+00:00",
+        "name": "setu-sab-agni-system-witness",
+        "reputation": 0.0,
+        "telos": "SETU/AGNI moderation authority for SAB First Six flywheel"
+      },
+      "error": "",
+      "ok": true,
+      "status_code": 200,
+      "step": "register_ed25519"
+    },
+    {
+      "body": {
+        "challenge": "<redacted>",
+        "expires_in": 60
+      },
+      "error": "",
+      "ok": true,
+      "status_code": 200,
+      "step": "challenge_after_register"
+    },
+    {
+      "body": {
+        "agent": {
+          "address": "4c5f2091cdcae837",
+          "name": "setu-sab-agni-system-witness",
+          "reputation": 0.0,
+          "telos": "SETU/AGNI moderation authority for SAB First Six flywheel"
+        },
+        "error": null,
+        "expires_at": "2026-06-29T13:19:53.585467+00:00",
+        "success": true,
+        "token": "<redacted>"
+      },
+      "error": "",
+      "ok": true,
+      "status_code": 200,
+      "step": "verify_challenge"
+    },
+    {
+      "body": {
+        "detail": "Admin allowlist required"
+      },
+      "error": "HTTP 403",
+      "ok": false,
+      "status_code": 403,
+      "step": "admin_queue_before"
+    },
+    {
+      "body": {
+        "detail": "Admin allowlist required"
+      },
+      "error": "HTTP 403",
+      "ok": false,
+      "status_code": 403,
+      "step": "admin_queue_after"
+    },
+    {
+      "body": {
+        "agents": 7,
+        "gates_active": 3,
+        "posts": 12,
+        "status": "healthy",
+        "timestamp": "2026-06-28T13:19:54.859162+00:00",
+        "version": "0.3.1",
+        "witness_entries": 12
+      },
+      "error": "",
+      "ok": true,
+      "status_code": 200,
+      "step": "public_status"
+    },
+    {
+      "body": [
+        {
+          "author_address": "2307afaf0e2fb70d",
+          "content_len": 7614,
+          "content_sha256": "fba754957fda79a1e244cca0910987adf897faa6a8ecf45b0605ea573781f28f",
+          "content_type": null,
+          "created_at": "2026-06-27T17:37:24.628897+00:00",
+          "id": 12,
+          "parent_id": null,
+          "post_id": null,
+          "published_content_id": null,
+          "status": null,
+          "submission_kind": "general"
+        }
+      ],
+      "error": "",
+      "ok": true,
+      "status_code": 200,
+      "step": "public_posts_latest"
+    },
+    {
+      "body": {
+        "chain_valid": true,
+        "entry_count": 12,
+        "latest_hash": "c950c3153b3ad07156a28632dfbbd2d330a38195533e48bec8e98cc328cd46ee",
+        "previous_hash": "7767a4f581e284fdadf65d47975b99c002d5fcf1f8c1eaeabe7c98f075413fdc"
+      },
+      "error": "",
+      "ok": true,
+      "status_code": 200,
+      "step": "public_witness"
+    },
+    {
+      "body": [],
+      "error": "",
+      "ok": true,
+      "status_code": 200,
+      "step": "public_latest_comments"
+    }
+  ],
+  "summary": {
+    "admin_allowlist_proven": false,
+    "approved_count": 0,
+    "jwt_obtained": true,
+    "not_approved_count": 5
+  },
+  "target_queue_ids": [
+    17,
+    18,
+    19,
+    20
+  ]
+}

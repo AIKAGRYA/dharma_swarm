@@ -1,0 +1,86 @@
+{
+  "schema": "sab_first_six_agent_flywheel.status_snapshot.v1",
+  "mission_id": "sab-first-six-agent-flywheel-20260627",
+  "created_at_utc": "2026-06-27T18:26:00Z",
+  "canonical": {
+    "sab_instance_id": "sab_agni_prod_157_245_193_15",
+    "public_base_url": "https://157.245.193.15/",
+    "status": "reachable_public_https_ip",
+    "domain_url": "https://agora.dharmic.ai",
+    "domain_status": "dns_resolution_failed_from_codex_probe",
+    "latest_probe_results": [
+      {
+        "checked_at_utc": "2026-06-27T18:24:47Z",
+        "target": "https://157.245.193.15/status",
+        "result": "healthy",
+        "posts": 12,
+        "witness_entries": 12,
+        "gates_active": 3
+      },
+      {
+        "checked_at_utc": "2026-06-27T18:24:47Z",
+        "target": "https://157.245.193.15/witness/chain",
+        "result": "chain_valid",
+        "entry_count": 12,
+        "latest_hash": "c950c3153b3ad07156a28632dfbbd2d330a38195533e48bec8e98cc328cd46ee"
+      }
+    ],
+    "moderation_queue": {
+      "approved": 12,
+      "pending": 7,
+      "day1_pending_queue_ids": [
+        17,
+        18,
+        19
+      ],
+      "day1_queue_receipt": "reports/sab_first_six_agent_flywheel/CANONICAL_POST_QUEUE_RECEIPT_20260627T1825Z.json"
+    },
+    "open_production_risks": [
+      "sab-agora.service is crash-looping because orphaned uvicorn workers own 127.0.0.1:8000.",
+      "Service normalization requires explicit operator approval because it means terminating production PIDs and restarting sab-agora.",
+      "agora.dharmic.ai DNS does not resolve.",
+      "RUSHABDEV is transport-ready but not yet a SAB federation node."
+    ]
+  },
+  "a2a": {
+    "registry_path": "/Users/dhyana/.dharma/a2a_bus/agents.json",
+    "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+    "registered_lane_count": 6,
+    "mission_queue_counts_including_followups": {
+      "completed": 7,
+      "pending": 6
+    },
+    "new_day1_tasks": [
+      "sab-flywheel-d01-setu-approve-day1-queue",
+      "sab-flywheel-d01-codex-semantic-reply-queue17",
+      "sab-flywheel-d01-sab-recruiter-bridge-candidate-draft",
+      "sab-flywheel-d01-sab-hardener-route-service-runbook",
+      "sab-flywheel-d01-sab-research-scout-channel-validation",
+      "sab-flywheel-d01-codex-rushabdev-federation-preflight"
+    ],
+    "semantic_receipts_completed": 7
+  },
+  "day_3_gate_progress": {
+    "six_agents_registered_in_a2a": "met_with_mission_scoped_evidence_only_lanes",
+    "dashboard_or_api_live_heads_queue_connected_agents": "partial_live_heads_and_queue_depth_are_receipted_but_not_yet_exposed_in_one_public_dashboard_or_api",
+    "three_semantic_receipts_not_acks": "met_with_seven_internal_bootstrap_receipts"
+  },
+  "day_7_gate_progress": {
+    "ten_new_sab_posts": "partial_canonical_agni_has_12_visible_posts_total_and_3_new_day1_mission_queue_items_pending_moderation",
+    "three_agents_besides_setu_posted_or_queued": "met_as_pending_canonical_queue_entries_from sab_recruiter_bridge, sab_hardener, and sab_research_scout",
+    "challenge_synthesis_pair": "met_locally_but_not_yet_canonical; day1 semantic reply task depends on approval of queue_id_17"
+  },
+  "day_14_gate_progress": {
+    "recruited_new_agent_completes_first_spark": "not_met",
+    "repeatable_onboarding_path": "partial_manifest_and_external_packet_created",
+    "hardening_report_fixed_or_filed_top_risks": "partial_top_risks_filed_operator_gated",
+    "daily_loop_without_manual_babysitting": "not_met_day1_tasks_are_queued_for_agent_receipts"
+  },
+  "not_complete_yet": [
+    "No recruited non-SETU/non-Codex agent has posted to canonical SAB.",
+    "No canonical semantic reply exists yet; visible comments remain 0.",
+    "Day 1 canonical queue entries require SETU/AGNI approval.",
+    "agora.dharmic.ai DNS remains broken.",
+    "sab-agora.service still needs operator-approved normalization."
+  ]
+}

@@ -132,6 +132,102 @@ def make_revenue_wedge_cell() -> VentureCellV1:
     return cell
 
 
+def make_livelihood_loom_cell() -> VentureCellV1:
+    """Livelihood Loom — informal-economy enablement VentureCell."""
+    cell = VentureCellV1(
+        id="livelihood-loom",
+        kind=RoomKind.VENTURE_CELL,
+        parent_id="core-ops",
+        purpose="Cultivate informal-economy enablement with consented outcomes",
+        operator="dhyana",
+        budget_tokens=20_000,
+        revenue_target=5_000,
+        agents=[
+            "loom_conductor",
+            "field_cartography",
+            "worker_advocate",
+            "evidence_auditor",
+            "safety_red_team",
+        ],
+        allowed_work=[
+            "public-source livelihood mapping",
+            "candidate enrichment",
+            "risk scoring",
+            "enablement packet drafting",
+            "outcome receipt drafting",
+            "sponsor brief drafting",
+        ],
+        forbidden_work=[
+            # Inherited from core-ops
+            "live autonomy",
+            "unsupervised deployment",
+            "external outreach without approval",
+            # Livelihood-specific constraints
+            "autonomous lending decisions",
+            "autonomous payments",
+            "worker surveillance",
+            "raw data sale",
+            "trading alpha extraction",
+            "publishing sensitive livelihood data",
+        ],
+        approval_required_for=[
+            "budget increase",
+            "sub-cell spawn",
+            "external outreach",
+            "merge to main",
+            "spending money",
+            "publication",
+            "payment",
+            "on-chain transaction",
+            "procurement intro",
+            "partner claim",
+            "capital signal",
+        ],
+        gates=[
+            "scope_gate",
+            "test_gate",
+            "burn_awareness",
+            "human_approval_external",
+            "consent_gate",
+            "public_proof_privacy_gate",
+            "worker_harm_gate",
+        ],
+        memory_namespace="livelihood_loom",
+        report_paths={
+            "agentops": "reports/agentops/livelihood_loom/",
+            "kaizen": "reports/kaizen/livelihood_loom/",
+            "outcomes": "reports/livelihood_loom/outcomes/",
+        },
+        customer_or_beneficiary="informal workers, microenterprises, sponsors, and buyers",
+        value_proposition=(
+            "Source-backed livelihood maps, enablement packets, and audited "
+            "outcome evidence without exploiting vulnerable data"
+        ),
+        self_funding_hypothesis=(
+            "Sponsors and buyers will pay for verified livelihood enablement, "
+            "procurement bridges, and outcome reporting"
+        ),
+        first_revenue_proof="",
+        kill_conditions=[
+            "no_revenue_after_60_days",
+            "budget_exceeded",
+            "welfare_tons_negative",
+            "operator_override",
+        ],
+        spinout_conditions=[
+            "revenue_exceeds_burn",
+            "operator_approval",
+            "customer_validation",
+        ],
+        jagat_kalyan_constraint=(
+            "No livelihood record, proof, outreach, payment, or capital signal "
+            "may expose sensitive people or convert vulnerability into alpha."
+        ),
+    )
+    validate_venture_cell(cell)
+    return cell
+
+
 def make_agentops_room() -> FractalRoom:
     """The AgentOps room — makes multi-agent repo work safe and repeatable."""
     room = FractalRoom(
@@ -178,11 +274,13 @@ def bootstrap_registry() -> RoomRegistry:
     Returns a RoomRegistry with:
       core-ops (root)
         ├── revenue-wedge (venture cell)
+        ├── livelihood-loom (venture cell)
         └── agentops (operations)
     """
     registry = RoomRegistry()
     core = make_core_ops_room()
     registry.register(core)
     registry.register(make_revenue_wedge_cell())
+    registry.register(make_livelihood_loom_cell())
     registry.register(make_agentops_room())
     return registry

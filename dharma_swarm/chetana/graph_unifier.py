@@ -253,8 +253,23 @@ def _query_catalytic(text: str, *, limit: int) -> tuple[list[GraphHit], str | No
     return hits, None
 
 
+def _gitnexus_repo_target() -> str:
+    try:
+        proc = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return "dharma_swarm"
+    if proc.returncode == 0 and proc.stdout.strip():
+        return proc.stdout.strip()
+    return "dharma_swarm"
+
+
 def _query_gitnexus(text: str, *, limit: int) -> tuple[list[GraphHit], str | None]:
-    """Best-effort gitnexus call. Skips silently if the CLI isn't available."""
+    """Best-effort GitNexus call through the installed local CLI."""
     bin_check = subprocess.run(
         ["which", "gitnexus"], capture_output=True, text=True, timeout=2
     )
@@ -262,7 +277,15 @@ def _query_gitnexus(text: str, *, limit: int) -> tuple[list[GraphHit], str | Non
         return [], "gitnexus CLI not found"
     try:
         proc = subprocess.run(
-            ["gitnexus", "search", "--json", "--limit", str(limit), text],
+            [
+                "gitnexus",
+                "query",
+                "--repo",
+                _gitnexus_repo_target(),
+                "--limit",
+                str(max(1, limit)),
+                text,
+            ],
             capture_output=True,
             text=True,
             timeout=10,
@@ -277,29 +300,48 @@ def _query_gitnexus(text: str, *, limit: int) -> tuple[list[GraphHit], str | Non
         return [], f"json error: {e}"
 
     hits: list[GraphHit] = []
-    rows = data.get("results", data) if isinstance(data, dict) else data
-    if isinstance(rows, list):
-        for row in rows[:limit]:
-            if not isinstance(row, dict):
-                continue
-            hits.append(
-                GraphHit(
-                    source="gitnexus",
-                    kind=row.get("type", "symbol"),
-                    id=str(row.get("id") or row.get("name") or "?"),
-                    label=str(row.get("name") or row.get("label") or "?"),
-                    payload=row,
-                )
+    if not isinstance(data, dict):
+        return [], "unexpected gitnexus payload"
+
+    for row in (data.get("processes") or [])[:limit]:
+        if not isinstance(row, dict):
+            continue
+        hits.append(
+            GraphHit(
+                source="gitnexus",
+                kind="process",
+                id=str(row.get("id") or "?"),
+                label=str(row.get("summary") or row.get("id") or "?"),
+                payload=row,
             )
+        )
+    remaining = max(0, limit - len(hits))
+    rows = [*(data.get("definitions") or []), *(data.get("process_symbols") or [])]
+    for row in rows[:remaining]:
+        if not isinstance(row, dict):
+            continue
+        file_path = str(row.get("filePath") or "")
+        label = str(row.get("name") or row.get("id") or "?")
+        if file_path:
+            label = f"{label} ({file_path})"
+        hits.append(
+            GraphHit(
+                source="gitnexus",
+                kind="symbol",
+                id=str(row.get("id") or row.get("name") or "?"),
+                label=label,
+                payload=row,
+            )
+        )
     return hits, None
 
 
 def _query_memory(text: str, *, limit: int) -> tuple[list[GraphHit], str | None]:
     """Memory MCP not directly reachable from a Python process without an MCP client."""
     return [], (
-        "memory MCP query requires MCP client (use chetana.mcp_server tool: "
-        "chetana_query) or call mcp__plugin_everything-claude-code_memory__search_nodes "
-        "from an agent harness"
+        "memory MCP is reachable from the agent harness, not this local Python "
+        "process; call mcp__memory.search_nodes with 'Operator Idea Spark ingest' "
+        "for cross-session Memory hits"
     )
 
 

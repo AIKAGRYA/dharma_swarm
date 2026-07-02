@@ -136,6 +136,43 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Swarm init partial: %s", e)
 
+    # Initialize the A2A HTTP gateway. Including the router alone is not enough:
+    # node_gateway keeps singleton state and returns 503 for agent-card/tasks until
+    # init_gateway() binds an A2AServer, CardRegistry, and node card.
+    try:
+        from dharma_swarm.a2a.a2a_server import A2AServer
+        from dharma_swarm.a2a.agent_card import AgentCard, AgentSkill, CardRegistry
+        from dharma_swarm.a2a.node_gateway import init_gateway
+
+        registry = CardRegistry()
+        node_card = registry.get("hermes-m5") or AgentCard(
+            name="hermes-m5",
+            description="Hermes M5 dharma_swarm A2A hub",
+            skills=[
+                AgentSkill(
+                    id="remote-vps-nats-a2a",
+                    name="remote-vps-nats-a2a",
+                    description="Routes remote VPS Hermes nodes through AGNI DHARMA_A2A NATS bridge.",
+                    tags=["nats", "a2a", "remote-vps"],
+                )
+            ],
+            endpoint="http://127.0.0.1:8420",
+            role="hub",
+            model="hermes-agent",
+            provider="local",
+            status="idle",
+        )
+        registry.register(node_card)
+        a2a_server = A2AServer()
+        init_gateway(
+            server=a2a_server,
+            registry=registry,
+            node_card=node_card,
+            node_id="hermes-m5",
+        )
+    except Exception as e:
+        logger.warning("A2A gateway init partial: %s", e)
+
     _log_auth_mode()
     logger.info("DHARMA COMMAND API ready on port 8420")
     try:
@@ -277,6 +314,7 @@ def _register_routers(api_app: FastAPI) -> None:
     from api.routers.revenue import router as revenue_router
     from api.routers.control_surface import router as control_surface_router
     from api.routers.operator_coherence import router as operator_coherence_router
+    from api.routers.pool import router as pool_router
     from api.routers.holon import router as holon_router
 
     api_app.include_router(holon_router)
@@ -298,6 +336,7 @@ def _register_routers(api_app: FastAPI) -> None:
     api_app.include_router(revenue_router)
     api_app.include_router(control_surface_router)
     api_app.include_router(operator_coherence_router)
+    api_app.include_router(pool_router)
 
     from api.routers.chat import router as chat_router, ws_router as chat_ws_router
     from api.routers.fleet import router as fleet_router

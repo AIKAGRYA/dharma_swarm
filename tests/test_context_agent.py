@@ -264,6 +264,32 @@ class TestContextAgent:
         assert (packages_dir / "system_health.md").exists()
 
     @pytest.mark.asyncio
+    async def test_run_cycle_can_disable_intelligence_actions(self, tmp_dharma: Path) -> None:
+        """Disabled intelligence mode should skip LLM-backed actions but keep health/package work."""
+        from dharma_swarm.signal_bus import SignalBus
+
+        notes_path = tmp_dharma / "shared" / "builder_notes.md"
+        notes_path.write_text("\n---\n".join(
+            f"## Entry {i}\n" + ("finding\n" * 2000)
+            for i in range(6)
+        ))
+
+        agent = ContextAgent(
+            signal_bus=SignalBus(),
+            base_path=tmp_dharma,
+            intelligence_enabled=False,
+        )
+        agent.intelligence._complete = AsyncMock(return_value="should not be called")
+
+        report = await agent.run_cycle()
+
+        assert report["intelligence_enabled"] is False
+        assert "intelligence:disabled" in report["actions"]
+        agent.intelligence._complete.assert_not_called()
+        assert (tmp_dharma / "context" / "packages" / "system_health.md").exists()
+        assert (tmp_dharma / "context" / "freshness.json").exists()
+
+    @pytest.mark.asyncio
     async def test_health_alerts_on_stale_context(self, tmp_dharma: Path) -> None:
         """Should emit CONTEXT_STALE when health drops below threshold."""
         from dharma_swarm.signal_bus import SignalBus

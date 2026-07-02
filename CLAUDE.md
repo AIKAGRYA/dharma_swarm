@@ -32,7 +32,7 @@ If this file disagrees with that output on anything live (track id, prereqs, rec
 ### Runtime Truth Reconciliation — operator-visible truth packets
 
 **Track id:** `runtime-truth-reconciliation-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-04 (TTL 14 days)
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-29 (TTL 14 days)
 **Relations:** complements: runtime-truth-nats-2026-06
 **Owns surfaces:** dharma_swarm/operator_core/**, scripts/governance/agent_onboard.py, dharma_swarm/runtime_state.py
 **Moves vital signs:** quality_gates, memory_persistence
@@ -69,10 +69,10 @@ Doctrine line that must hold:
 ### Runtime Truth NATS — internal live transport for A2A dispatch
 
 **Track id:** `runtime-truth-nats-2026-06` · **Status:** ACTIVE · **Owner:** @codex
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-07 (TTL 21 days)
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-29 (TTL 21 days)
 **Relations:** complements: runtime-truth-reconciliation-2026-06
-**Owns surfaces:** docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md, dharma_swarm/a2a/a2a_nats_contact.py, dharma_swarm/a2a/a2a_core_contact.py
-**Moves vital signs:** tool_coverage
+**Owns surfaces:** docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md, dharma_swarm/a2a/nats_transport.py, dharma_swarm/a2a/a2a_server.py, dharma_swarm/operator_core/nats_live_contact.py, dharma_swarm/operator_core/nats_substrate_status.py, scripts/runtime/a2a_send.py, scripts/runtime/a2a_inbox_bridge.py, scripts/runtime/a2a_domain_reply_worker.py, scripts/runtime/a2a_reply_capture.py, scripts/governance/check_nats_substrate_contract.py, tests/test_nats_transport.py, tests/test_nats_substrate_contract.py, reports/governance/runtime_truth_nats_closeout_packet_2026-07-01.md
+**Moves vital signs:** tool_coverage, quality_gates
 
 The concurrent Codex transport lane. NATS was scoped out of the global
 prohibition by the 2026-05-31 doctrine amendment and runs as a concurrent
@@ -81,17 +81,20 @@ track wires the internal live transport so A2A dispatch can travel at
 broker speed, distinct from the reconciliation lane's read-model surfaces.
 
 Surface separation is the safety boundary: this track owns the NATS
-transport contact modules and the master spec; it does not touch the
-operator_core read models the reconciliation lane owns.
+transport, handler idempotency, proof probes, contract checker, and
+focused tests. The cloud-agent bridge owns its ingress module; this track's
+checker verifies that module delegates to A2ANatsTransport. It may touch
+operator_core only for NATS-specific live-contact/status probes; the
+reconciliation lane's broader read models remain projection-only.
 
 **Next items:**
 
-- [code] Confirm NATS transport contact modules are wired and receipted end-to-end.
+- [code] Collect fresh live broker evidence with current HANDLER_ACKED or DOMAIN_RECEIPTED proof, or explicitly close this slice as local/offline substrate evidence.
 
 **Non-goals:**
 
 - Do not introduce Redis or gRPC as part of this track.
-- Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
+- Do not broaden operator_core beyond NATS-specific live-contact/status probes.
 - Do not add a parallel spine-check CI workflow.
 
 ### Runtime Truth Spine — Adoption (god objects flow through invoke_agent)
@@ -145,7 +148,7 @@ Runtime-only audit baseline, 2026-06-14 JST:
 ### Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
 
 **Track id:** `loop-closure-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-11 (TTL 21 days)
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-29 (TTL 21 days)
 **Relations:** complements: runtime-truth-reconciliation-2026-06
 **Owns surfaces:** reports/loop_closure/**, CYBERNETIC_LOOP_MAP.md
 **Moves vital signs:** quality_gates, eval_coverage
@@ -223,7 +226,7 @@ runtime-truth rendering or non-goals.
 ### Composer Holon Spine Longrun — fable/codex pair over verified command receipts
 
 **Track id:** `composer-holon-spine-longrun-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-11 (TTL 14 days)
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-29 (TTL 14 days)
 **Relations:** complements: runtime-truth-reconciliation-2026-06, runtime-truth-nats-2026-06 · depends_on: runtime-truth-spine-adoption-2026-06
 **Owns surfaces:** docs/sovereign_holons/**, reports/sovereign_holons/**, dharma_swarm/holon_*.py, scripts/holon_*.py, tests/test_holon_*.py
 **Moves vital signs:** quality_gates, tool_coverage, memory_persistence
@@ -256,7 +259,7 @@ to main through the normal review path before it is called shipped.
 ### AgentAdmission + Semantic Commons — one door for agent identity and naming
 
 **Track id:** `agent-admission-semantic-commons-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-14 (TTL 14 days)
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-29 (TTL 14 days)
 **Relations:** complements: cybernetics-codex-stewardship-2026-06
 **Owns surfaces:** docs/ontology/**, docs/ops/AGENT_ADMISSION.md, dharma_swarm/semantic_commons.py, dharma_swarm/engine/hybrid_retriever.py, dharma_swarm/context.py, scripts/governance/agent_admission*.py, scripts/governance/name_drift*.py, tests/test_agent_admission*.py, tests/test_semantic_commons*.py, tests/test_hybrid_retriever.py
 **Moves vital signs:** quality_gates, memory_persistence
@@ -293,7 +296,7 @@ Canonical intent:
 ### Cybernetics Codex Stewardship — permanent owner for loop ecology
 
 **Track id:** `cybernetics-codex-stewardship-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `research-depth` · **Verified at:** 2026-06-14 (TTL 14 days)
+**Serves spine objective:** `research-depth` · **Verified at:** 2026-06-29 (TTL 14 days)
 **Relations:** complements: agent-admission-semantic-commons-2026-06 · depends_on: loop-closure-2026-06
 **Owns surfaces:** docs/ops/CYBERNETICS_CODEX.md, docs/agents/cybernetics_codex/**, dharma_swarm/cybernetics_codex.py, scripts/governance/cybernetics_codex_audit.py, scripts/governance/register_cybernetics_codex.py, tests/test_cybernetics_codex.py, reports/loop_closure/cybernetics_codex/**
 **Moves vital signs:** quality_gates, eval_coverage, memory_persistence
@@ -323,7 +326,7 @@ metaphor.
 ### TELOS AI Morning Refinery — user-facing semantic refinery seed
 
 **Track id:** `telos-ai-morning-refinery-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `revenue-external-humans-served` · **Verified at:** 2026-06-14 (TTL 14 days)
+**Serves spine objective:** `revenue-external-humans-served` · **Verified at:** 2026-06-29 (TTL 14 days)
 **Owns surfaces:** docs/vision_maps/TELOS_AI_SEED_SPEC_V0.md, docs/vision_maps/TELOS_MORNING_REFINERY_V0.md, docs/research/telos_ai/**, PRODUCT_SURFACE.md, dashboard/src/app/dashboard/telos*/**, dashboard/src/components/telos*/**, tests/test_telos*.py
 **Moves vital signs:** eval_coverage, cost_efficiency
 
@@ -338,9 +341,8 @@ bridge candidates, venture seeds, and consent-gated public artifacts.
 
 **Next items:**
 
-- [test] (blocker) Write the consent/privacy boundary test before any product implementation.
-- [code] (blocker) Create a narrow dashboard or CLI prototype that reads only sanitized example packets.
-- [docs] (blocker) Define the first external acted receipt format for TELOS without spend or account action.
+- [external] (blocker) Run an operator-mediated external action on a consented, sanitized TELOS output and capture redacted durable evidence outside the repo.
+- [receipt] (blocker) Only after that external action exists, create reports/telos_ai/FIRST_EXTERNAL_ACTED_RECEIPT.md using the schema without exposing private material.
 
 **Non-goals:**
 
@@ -352,7 +354,7 @@ bridge candidates, venture seeds, and consent-gated public artifacts.
 ### Helm Worldclass Terminal — operator TUI integration and verification lane
 
 **Track id:** `helm-worldclass-terminal-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-14 (TTL 14 days)
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-29 (TTL 14 days)
 **Owns surfaces:** terminal/**, docs/TERMINAL_TUI_TMUX_HARNESS_2026-04-02.md, docs/plans/2026-04-02-terminal-*.md, reports/terminal/**
 **Moves vital signs:** quality_gates, tool_coverage
 
@@ -375,7 +377,7 @@ viewport checks, and live tmux receipts.
 ### A2A Cloud-Agent Bridge — cloud reasoners onto the NATS substrate
 
 **Track id:** `a2a-cloud-agent-bridge-2026-06` · **Status:** ACTIVE · **Owner:** @codex_composer
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-14 (TTL 14 days)
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-29 (TTL 14 days)
 **Relations:** complements: agent-admission-semantic-commons-2026-06
 **Owns surfaces:** docs/governance/proposed_tracks/perplexity-a2a-bus-bridge-2026-06.yaml, docs/architecture/A2A_CLOUD_BRIDGE.md, dharma_swarm/a2a/a2a_cloud_contact.py, dharma_swarm/a2a/contact_registry.py, dharma_swarm/a2a/verifier.py, reports/state/a2a_score_denominator.md, tests/test_a2a_cloud_contact.py
 **Moves vital signs:** tool_coverage, memory_persistence
@@ -517,6 +519,11 @@ make dashboard-lint
 
 - ALWAYS run tests after making code changes
 - ALWAYS verify tests pass before committing
+- Current suite reality as of the 2026-07-01 audit: collection is about
+  12,432 tests and a full run is measured/extrapolated at roughly 55-130+
+  minutes in this live-mutating checkout. Treat older "~6 min" / "4300+
+  tests" claims as stale and prefer focused tests unless the task explicitly
+  requires a full run.
 
 ## CLI Entry Points
 
@@ -570,8 +577,8 @@ See `foundations/` for the 10-pillar intellectual genome.
 **Highest-system map:** Read [`docs/MEGAFILE_INDEX.md`](docs/MEGAFILE_INDEX.md) before treating any large map as canonical. It points to the Attractor Closure synthesis, live ops dashboard, broken register, and missing slots.
 
 See [`INTERFACE_MISMATCH_MAP.md`](INTERFACE_MISMATCH_MAP.md) for the complete map of every interface mismatch between modules. **This is the #1 source of runtime failures.** The map documents:
-- 0 BLOCKER mismatches (all 3 original BLOCKERs resolved)
-- 4 DEGRADED mismatches remaining (MM-05 private coupling, NEW-05 guarded, NEW-07/08 partial)
+- 1 open BLOCKER mismatch: NEW-14 world-model loop API drift
+- 3 non-blocker monitored items: NEW-05 guarded, NEW-07 partial+, NEW-08 partial+
 - 55 module pairs verified, 11 resolved, 6 new entries added and fixed
 - A prioritized **Bootstrap Sequence** of fixes (most now resolved)
 
@@ -588,7 +595,7 @@ Historical agent identity notes now live at [`docs/_archive/2026-04/AGENT_IDENTI
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **dharma_swarm** (130947 symbols, 219088 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **dharma_swarm** (133931 symbols, 224516 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 

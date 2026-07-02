@@ -1,0 +1,624 @@
+{
+  "generated_at": "2026-07-01T04:27:58.328139+00:00",
+  "organs": [
+    {
+      "actual_runtime_primitive": "no AgentOps reports loaded",
+      "coherence_state": "unknown",
+      "declared_primitive": "bounded repo execution facts",
+      "declared_state": "owns bounded repo execution facts; emits AgentOpsRunFact",
+      "drift": "AgentOps is declared but no report fact is present in this bundle",
+      "evidence_refs": [],
+      "gates_declared": [
+        "human_yds",
+        "daily_operating_brief",
+        "kaizen_review"
+      ],
+      "gates_enforced": [],
+      "last_observed": "2026-07-01T04:27:58.329705+00:00",
+      "merged_to_main": "UNKNOWN",
+      "name": "agentops",
+      "next_bindable_gap": "run one bounded AgentOps packet and load its report.json",
+      "next_packet_hint": "run one bounded AgentOps packet and load its report.json",
+      "observed_state": "no AgentOps reports loaded",
+      "open_gap": "AgentOps is declared but no report fact is present in this bundle",
+      "owns": "bounded repo execution facts",
+      "risk": "unknown",
+      "scheduled": "UNKNOWN",
+      "sink_stores": [
+        "AgentOpsRunFact"
+      ],
+      "source_stores": [],
+      "witness_writes": []
+    },
+    {
+      "actual_runtime_primitive": "audit evidence found",
+      "coherence_state": "partial",
+      "declared_primitive": "pain/urgency signals from omega divergence and related alarms",
+      "declared_state": "owns pain/urgency signals from omega divergence and related alarms",
+      "drift": "stream values can be present without proving the consumer loop is causal",
+      "evidence_refs": [
+        "docs/governance/AUDIT_2026-07-01.md:16",
+        "docs/governance/AUDIT_2026-07-01.md:64",
+        "docs/governance/AUDIT_2026-07-01.md:107",
+        "docs/governance/AUDIT_2026-07-01_REMEDIATION.md:12",
+        "docs/governance/AUDIT_2026-07-01_REMEDIATION.md:13",
+        "docs/governance/AUDIT_2026-07-01_REMEDIATION.md:15",
+        "docs/governance/AUDIT_2026-07-01_REMEDIATION.md:37",
+        "docs/governance/AUDIT_2026-07-01_REMEDIATION.md:42",
+        "docs/governance/AUDIT_2026-07-01_REMEDIATION.md:44",
+        "docs/governance/CONVERGENCE_MAP_2026-07-01.md:28",
+        "docs/governance/CONVERGENCE_MAP_2026-07-01.md:221",
+        "docs/governance/CONVERGENCE_MAP_2026-07-01.md:223"
+      ],
+      "gates_declared": [],
+      "gates_enforced": [],
+      "last_observed": "2026-07-01T04:27:58.328139+00:00",
+      "merged_to_main": "UNKNOWN",
+      "name": "algedonic_stream",
+      "next_bindable_gap": "show which runtime path consumes the latest algedonic value",
+      "next_packet_hint": "show which runtime path consumes the latest algedonic value",
+      "observed_state": "audit evidence found",
+      "open_gap": "stream values can be present without proving the consumer loop is causal",
+      "owns": "pain/urgency signals from omega divergence and related alarms",
+      "risk": "medium",
+      "scheduled": "UNKNOWN",
+      "sink_stores": [
+        "reports/system_map/latest.json"
+      ],
+      "source_stores": [
+        "docs/governance/AUDIT_2026-07-01.md",
+        "docs/governance/AUDIT_2026-07-01.md",
+        "docs/governance/AUDIT_2026-07-01.md",
+        "docs/governance/AUDIT_2026-07-01_REMEDIATION.md"
+      ],
+      "witness_writes": [
+        "reports/system_map/latest.json"
+      ]
+    },
+    {
+      "actual_runtime_primitive": "declared boundary with no loaded runtime fact",
+      "coherence_state": "declared_only",
+      "declared_primitive": "resource-spend and waste signals",
+      "declared_state": "owns resource-spend and waste signals; emits BurnReportFact",
+      "drift": "burn/cost report has no loaded fact",
+      "evidence_refs": [
+        "load_burn_report_facts()"
+      ],
+      "gates_declared": [
+        "agentops",
+        "human_yds",
+        "telic_value"
+      ],
+      "gates_enforced": [],
+      "last_observed": "2026-07-01T04:27:58.329738+00:00",
+      "merged_to_main": "UNKNOWN",
+      "name": "burn_cost",
+      "next_bindable_gap": "load a cost report before scaling more agent execution",
+      "next_packet_hint": "load a cost report before scaling more agent execution",
+      "observed_state": "declared boundary with no loaded runtime fact",
+      "open_gap": "burn/cost report has no loaded fact",
+      "owns": "resource-spend and waste signals",
+      "risk": "declared_only",
+      "scheduled": "UNKNOWN",
+      "sink_stores": [
+        "BurnReportFact"
+      ],
+      "source_stores": [],
+      "witness_writes": [
+        "load_burn_report_facts()"
+      ]
+    },
+    {
+      "actual_runtime_primitive": "audit evidence found",
+      "coherence_state": "partial",
+      "declared_primitive": "proposal to execution to value feedback loop",
+      "declared_state": "owns proposal to execution to value feedback loop",
+      "drift": "loop edges can be documented without a complete observed chain",
+      "evidence_refs": [
+        "docs/governance/AUDIT_2026-07-01.md:14",
+        "docs/governance/AUDIT_2026-07-01.md:40",
+        "docs/governance/BUILD_SESSION_ENTRYPOINT.md:19",
+        "docs/governance/BUILD_SESSION_ENTRYPOINT.md:449",
+        "docs/governance/BUILD_SESSION_ENTRYPOINT.md:451",
+        "docs/governance/BUILD_SESSION_ENTRYPOINT.md:452",
+        "docs/governance/BUILD_SESSION_ENTRYPOINT.md:478",
+        "docs/governance/CONVERGENCE_MAP_2026-07-01.md:69",
+        "docs/governance/DAILY_OPERATING_BRIEF.md:133",
+        "docs/governance/FOURFOLD_ACTION_WARRANT.md:93",
+        "docs/governance/HUMAN_YDS_LEDGER.md:94",
+        "docs/governance/KAIZENOPS.md:106"
+      ],
+      "gates_declared": [],
+      "gates_enforced": [],
+      "last_observed": "2026-07-01T04:27:58.328139+00:00",
+      "merged_to_main": "UNKNOWN",
+      "name": "central_loop",
+      "next_bindable_gap": "prove one proposal-to-value chain with file evidence",
+      "next_packet_hint": "prove one proposal-to-value chain with file evidence",
+      "observed_state": "audit evidence found",
+      "open_gap": "loop edges can be documented without a complete observed chain",
+      "owns": "proposal to execution to value feedback loop",
+      "risk": "high",
+      "scheduled": "UNKNOWN",
+      "sink_stores": [
+        "reports/system_map/latest.json"
+      ],
+      "source_stores": [
+        "docs/governance/AUDIT_2026-07-01.md",
+        "docs/governance/AUDIT_2026-07-01.md",
+        "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
+        "docs/governance/BUILD_SESSION_ENTRYPOINT.md"
+      ],
+      "witness_writes": [
+        "reports/system_map/latest.json"
+      ]
+    },
+    {
+      "actual_runtime_primitive": "dry-run command planning API exists without loaded execution feedback",
+      "coherence_state": "partial",
+      "declared_primitive": "dry-run operator planning and next-packet recommendation",
+      "declared_state": "owns dry-run operator planning and next-packet recommendation; emits WorkPacketDraft, AgentOpsReview, RustReadinessDecision",
+      "drift": "no AgentOps feedback fact is loaded for this command spine view",
+      "evidence_refs": [
+        "dharma_swarm.operator_core.command_spine"
+      ],
+      "gates_declared": [
+        "agentops",
+        "daily_operating_brief",
+        "telic_value"
+      ],
+      "gates_enforced": [],
+      "last_observed": "2026-07-01T04:27:58.329752+00:00",
+      "merged_to_main": "UNKNOWN",
+      "name": "command_spine",
+      "next_bindable_gap": "run the drafted packet through AgentOps and reload facts",
+      "next_packet_hint": "run the drafted packet through AgentOps and reload facts",
+      "observed_state": "dry-run command planning API exists without loaded execution feedback",
+      "open_gap": "no AgentOps feedback fact is loaded for this command spine view",
+      "owns": "dry-run operator planning and next-packet recommendation",
+      "risk": "partial",
+      "scheduled": "UNKNOWN",
+      "sink_stores": [
+        "WorkPacketDraft",
+        "AgentOpsReview",
+        "RustReadinessDecision"
+      ],
+      "source_stores": [
+        "agentops",
+        "human_yds",
+        "mission_contract",
+        "intent_router"
+      ],
+      "witness_writes": [
+        "dharma_swarm.operator_core.command_spine"
+      ]
+    },
+    {
+      "actual_runtime_primitive": "declared boundary with no loaded runtime fact",
+      "coherence_state": "declared_only",
+      "declared_primitive": "human-facing synthesis of operating facts",
+      "declared_state": "owns human-facing synthesis of operating facts; emits DailyOperatingBrief",
+      "drift": "Daily Brief has no loaded upstream facts in this bundle",
+      "evidence_refs": [
+        "dharma_swarm.daily_operating_brief"
+      ],
+      "gates_declared": [
+        "agentops",
+        "kaizen_review",
+        "human_yds",
+        "telic_value"
+      ],
+      "gates_enforced": [],
+      "last_observed": "2026-07-01T04:27:58.329747+00:00",
+      "merged_to_main": "UNKNOWN",
+      "name": "daily_operating_brief",
+      "next_bindable_gap": "feed at least one operating fact source into the brief builder",
+      "next_packet_hint": "feed at least one operating fact source into the brief builder",
+      "observed_state": "declared boundary with no loaded runtime fact",
+      "open_gap": "Daily Brief has no loaded upstream facts in this bundle",
+      "owns": "human-facing synthesis of operating facts",
+      "risk": "declared_only",
+      "scheduled": "UNKNOWN",
+      "sink_stores": [
+        "DailyOperatingBrief"
+      ],
+      "source_stores": [
+        "agentops",
+        "kaizen_review",
+        "human_yds",
+        "burn_cost",
+        "revenue"
+      ],
+      "witness_writes": [
+        "dharma_swarm.daily_operating_brief"
+      ]
+    },
+    {
+      "actual_runtime_primitive": "declared boundary with no loaded runtime fact",
+      "coherence_state": "declared_only",
+      "declared_primitive": "human-authoritative quality judgment",
+      "declared_state": "owns human-authoritative quality judgment; emits HumanQualityRatingFact",
+      "drift": "human YDS ledger has no loaded rating fact",
+      "evidence_refs": [
+        "append_human_yds_rating() / load_human_yds_rating_facts()"
+      ],
+      "gates_declared": [
+        "agentops",
+        "kaizen_review",
+        "daily_operating_brief"
+      ],
+      "gates_enforced": [],
+      "last_observed": "2026-07-01T04:27:58.329733+00:00",
+      "merged_to_main": "UNKNOWN",
+      "name": "human_yds",
+      "next_bindable_gap": "record one human-authoritative YDS rating for the latest useful artifact",
+      "next_packet_hint": "record one human-authoritative YDS rating for the latest useful artifact",
+      "observed_state": "declared boundary with no loaded runtime fact",
+      "open_gap": "human YDS ledger has no loaded rating fact",
+      "owns": "human-authoritative quality judgment",
+      "risk": "declared_only",
+      "scheduled": "UNKNOWN",
+      "sink_stores": [
+        "HumanQualityRatingFact"
+      ],
+      "source_stores": [],
+      "witness_writes": [
+        "append_human_yds_rating() / load_human_yds_rating_facts()"
+      ]
+    },
+    {
+      "actual_runtime_primitive": "declared boundary with no loaded runtime fact",
+      "coherence_state": "declared_only",
+      "declared_primitive": "continuous-improvement evidence from completed AgentOps runs",
+      "declared_state": "owns continuous-improvement evidence from completed AgentOps runs; emits KaizenReviewFact",
+      "drift": "KaizenReview has no report fact in this bundle",
+      "evidence_refs": [
+        "scripts/governance/kaizen_review_from_agentops.py"
+      ],
+      "gates_declared": [
+        "agentops",
+        "human_yds",
+        "daily_operating_brief"
+      ],
+      "gates_enforced": [],
+      "last_observed": "2026-07-01T04:27:58.329724+00:00",
+      "merged_to_main": "UNKNOWN",
+      "name": "kaizen_review",
+      "next_bindable_gap": "run KaizenReview from a completed AgentOps report",
+      "next_packet_hint": "run KaizenReview from a completed AgentOps report",
+      "observed_state": "declared boundary with no loaded runtime fact",
+      "open_gap": "KaizenReview has no report fact in this bundle",
+      "owns": "continuous-improvement evidence from completed AgentOps runs",
+      "risk": "declared_only",
+      "scheduled": "UNKNOWN",
+      "sink_stores": [
+        "KaizenReviewFact"
+      ],
+      "source_stores": [
+        "agentops",
+        "human_yds"
+      ],
+      "witness_writes": [
+        "scripts/governance/kaizen_review_from_agentops.py"
+      ]
+    },
+    {
+      "actual_runtime_primitive": "audit evidence found",
+      "coherence_state": "partial",
+      "declared_primitive": "scheduled metabolic jobs and launchd clock attachment",
+      "declared_state": "owns scheduled metabolic jobs and launchd clock attachment",
+      "drift": "scheduler truth is split unless launchd target, dgc verbs, and jobs.json agree",
+      "evidence_refs": [
+        "docs/governance/AUDIT_2026-07-01.md:5",
+        "docs/governance/AUDIT_2026-07-01.md:61",
+        "docs/governance/AUDIT_2026-07-01.md:64",
+        "docs/governance/AUDIT_2026-07-01.md:107",
+        "docs/governance/AUDIT_2026-07-01_REMEDIATION.md:13",
+        "docs/governance/AUDIT_2026-07-01_REMEDIATION.md:14",
+        "docs/governance/AUDIT_2026-07-01_REMEDIATION.md:15",
+        "docs/governance/AUDIT_2026-07-01_REMEDIATION.md:17",
+        "docs/governance/AUDIT_2026-07-01_REMEDIATION.md:29",
+        "docs/governance/AUDIT_2026-07-01_REMEDIATION.md:37",
+        "docs/governance/AUDIT_2026-07-01_REMEDIATION.md:42",
+        "docs/governance/AUDIT_2026-07-01_REMEDIATION.md:43"
+      ],
+      "gates_declared": [],
+      "gates_enforced": [],
+      "last_observed": "2026-07-01T04:27:58.328139+00:00",
+      "merged_to_main": "UNKNOWN",
+      "name": "metabolic_clock",
+      "next_bindable_gap": "bind one canonical clock doc to live jobs.json and installed dgc command surface",
+      "next_packet_hint": "bind one canonical clock doc to live jobs.json and installed dgc command surface",
+      "observed_state": "audit evidence found",
+      "open_gap": "scheduler truth is split unless launchd target, dgc verbs, and jobs.json agree",
+      "owns": "scheduled metabolic jobs and launchd clock attachment",
+      "risk": "high",
+      "scheduled": "UNKNOWN",
+      "sink_stores": [
+        "reports/system_map/latest.json"
+      ],
+      "source_stores": [
+        "docs/governance/AUDIT_2026-07-01.md",
+        "docs/governance/AUDIT_2026-07-01.md",
+        "docs/governance/AUDIT_2026-07-01.md",
+        "docs/governance/AUDIT_2026-07-01.md"
+      ],
+      "witness_writes": [
+        "reports/system_map/latest.json"
+      ]
+    },
+    {
+      "actual_runtime_primitive": "audit evidence found",
+      "coherence_state": "partial",
+      "declared_primitive": "cold-start reading order and megafile map",
+      "declared_state": "owns cold-start reading order and megafile map",
+      "drift": "onboarding files can exist without becoming the path an agent actually follows",
+      "evidence_refs": [
+        "docs/governance/ANTI_SLOP_RULES.md:132",
+        "docs/governance/AUDIT_2026-07-01.md:11",
+        "docs/governance/AUDIT_2026-07-01.md:19",
+        "docs/governance/AUDIT_2026-07-01.md:26",
+        "docs/governance/AUDIT_2026-07-01.md:36",
+        "docs/governance/AUDIT_2026-07-01.md:44",
+        "docs/governance/AUDIT_2026-07-01.md:54",
+        "docs/governance/AUDIT_2026-07-01.md:55",
+        "docs/governance/AUDIT_2026-07-01.md:69",
+        "docs/governance/AUDIT_2026-07-01.md:77",
+        "docs/governance/AUDIT_2026-07-01.md:97",
+        "docs/governance/AUDIT_2026-07-01_REMEDIATION.md:21"
+      ],
+      "gates_declared": [],
+      "gates_enforced": [],
+      "last_observed": "2026-07-01T04:27:58.328139+00:00",
+      "merged_to_main": "UNKNOWN",
+      "name": "onboarding_spine",
+      "next_bindable_gap": "keep the megafile survey tied to the first file an agent loads",
+      "next_packet_hint": "keep the megafile survey tied to the first file an agent loads",
+      "observed_state": "audit evidence found",
+      "open_gap": "onboarding files can exist without becoming the path an agent actually follows",
+      "owns": "cold-start reading order and megafile map",
+      "risk": "medium",
+      "scheduled": "UNKNOWN",
+      "sink_stores": [
+        "reports/system_map/latest.json"
+      ],
+      "source_stores": [
+        "docs/governance/ANTI_SLOP_RULES.md",
+        "docs/governance/AUDIT_2026-07-01.md",
+        "docs/governance/AUDIT_2026-07-01.md",
+        "docs/governance/AUDIT_2026-07-01.md"
+      ],
+      "witness_writes": [
+        "reports/system_map/latest.json"
+      ]
+    },
+    {
+      "actual_runtime_primitive": "audit evidence found",
+      "coherence_state": "partial",
+      "declared_primitive": "recognition-mediated self-model and attractor closure evidence",
+      "declared_state": "owns recognition-mediated self-model and attractor closure evidence",
+      "drift": "recognition is not causal until map changes alter routing or gates",
+      "evidence_refs": [
+        "docs/governance/BUILD_SESSION_ENTRYPOINT.md:436",
+        "docs/governance/CONVERGENCE_MAP_2026-07-01.md:308",
+        "docs/governance/REPO_GOVERNANCE_AUDIT.md:267",
+        "docs/governance/REPO_GOVERNANCE_AUDIT.md:326",
+        "docs/governance/SOVEREIGN_MANIFEST.md:406"
+      ],
+      "gates_declared": [],
+      "gates_enforced": [],
+      "last_observed": "2026-07-01T04:27:58.328139+00:00",
+      "merged_to_main": "UNKNOWN",
+      "name": "recognition_seed",
+      "next_bindable_gap": "trace one recognized drift into a runtime decision",
+      "next_packet_hint": "trace one recognized drift into a runtime decision",
+      "observed_state": "audit evidence found",
+      "open_gap": "recognition is not causal until map changes alter routing or gates",
+      "owns": "recognition-mediated self-model and attractor closure evidence",
+      "risk": "high",
+      "scheduled": "UNKNOWN",
+      "sink_stores": [
+        "reports/system_map/latest.json"
+      ],
+      "source_stores": [
+        "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
+        "docs/governance/CONVERGENCE_MAP_2026-07-01.md",
+        "docs/governance/REPO_GOVERNANCE_AUDIT.md",
+        "docs/governance/REPO_GOVERNANCE_AUDIT.md"
+      ],
+      "witness_writes": [
+        "reports/system_map/latest.json"
+      ]
+    },
+    {
+      "actual_runtime_primitive": "declared boundary with no loaded runtime fact",
+      "coherence_state": "declared_only",
+      "declared_primitive": "self-funding and product wedge signals",
+      "declared_state": "owns self-funding and product wedge signals; emits RevenueSignalFact",
+      "drift": "revenue signal source has no loaded fact",
+      "evidence_refs": [
+        "load_revenue_signal_facts()"
+      ],
+      "gates_declared": [
+        "human_yds",
+        "agentops",
+        "telic_value"
+      ],
+      "gates_enforced": [],
+      "last_observed": "2026-07-01T04:27:58.329742+00:00",
+      "merged_to_main": "UNKNOWN",
+      "name": "revenue",
+      "next_bindable_gap": "bind one revenue or product-wedge note to the operating brief inputs",
+      "next_packet_hint": "bind one revenue or product-wedge note to the operating brief inputs",
+      "observed_state": "declared boundary with no loaded runtime fact",
+      "open_gap": "revenue signal source has no loaded fact",
+      "owns": "self-funding and product wedge signals",
+      "risk": "declared_only",
+      "scheduled": "UNKNOWN",
+      "sink_stores": [
+        "RevenueSignalFact"
+      ],
+      "source_stores": [],
+      "witness_writes": [
+        "load_revenue_signal_facts()"
+      ]
+    },
+    {
+      "actual_runtime_primitive": "audit evidence found",
+      "coherence_state": "partial",
+      "declared_primitive": "Darwin/Shakti/self-modification trace and selection memory",
+      "declared_state": "owns Darwin/Shakti/self-modification trace and selection memory",
+      "drift": "evolutionary machinery can generate volume without a compact rollup",
+      "evidence_refs": [
+        "docs/governance/ANTI_SLOP_RULES.md:103",
+        "docs/governance/ANTI_SLOP_RULES.md:123",
+        "docs/governance/AUDIT_2026-07-01.md:36",
+        "docs/governance/AUDIT_2026-07-01.md:42",
+        "docs/governance/AUDIT_2026-07-01.md:62",
+        "docs/governance/AUDIT_2026-07-01.md:86",
+        "docs/governance/AUDIT_2026-07-01.md:98",
+        "docs/governance/AUDIT_2026-07-01.md:112",
+        "docs/governance/BUILD_SESSION_ENTRYPOINT.md:466",
+        "docs/governance/CI_GATES.md:7",
+        "docs/governance/CI_GATES.md:23",
+        "docs/governance/CI_GATES.md:24"
+      ],
+      "gates_declared": [],
+      "gates_enforced": [],
+      "last_observed": "2026-07-01T04:27:58.328139+00:00",
+      "merged_to_main": "UNKNOWN",
+      "name": "self_evolution",
+      "next_bindable_gap": "summarize latest accepted/rejected changes as operating facts",
+      "next_packet_hint": "summarize latest accepted/rejected changes as operating facts",
+      "observed_state": "audit evidence found",
+      "open_gap": "evolutionary machinery can generate volume without a compact rollup",
+      "owns": "Darwin/Shakti/self-modification trace and selection memory",
+      "risk": "high",
+      "scheduled": "UNKNOWN",
+      "sink_stores": [
+        "reports/system_map/latest.json"
+      ],
+      "source_stores": [
+        "docs/governance/ANTI_SLOP_RULES.md",
+        "docs/governance/ANTI_SLOP_RULES.md",
+        "docs/governance/AUDIT_2026-07-01.md",
+        "docs/governance/AUDIT_2026-07-01.md"
+      ],
+      "witness_writes": [
+        "reports/system_map/latest.json"
+      ]
+    },
+    {
+      "actual_runtime_primitive": "8785 telic objects (Outcome=3125, ValueEvent=2831, Contribution=2829)",
+      "coherence_state": "bound",
+      "declared_primitive": "Outcome, ValueEvent, and Contribution truth",
+      "declared_state": "owns Outcome, ValueEvent, and Contribution truth; emits Outcome, ValueEvent, Contribution",
+      "drift": "",
+      "evidence_refs": [
+        "/Users/dhyana/.dharma/ontology.db"
+      ],
+      "gates_declared": [
+        "agentops",
+        "human_yds",
+        "daily_operating_brief"
+      ],
+      "gates_enforced": [],
+      "last_observed": "2026-07-01T04:27:58.334929+00:00",
+      "merged_to_main": "UNKNOWN",
+      "name": "telic_value",
+      "next_bindable_gap": "use telic value facts in operator synthesis",
+      "next_packet_hint": "use telic value facts in operator synthesis",
+      "observed_state": "8785 telic objects (Outcome=3125, ValueEvent=2831, Contribution=2829)",
+      "open_gap": "",
+      "owns": "Outcome, ValueEvent, and Contribution truth",
+      "risk": "bound",
+      "scheduled": "UNKNOWN",
+      "sink_stores": [
+        "Outcome",
+        "ValueEvent",
+        "Contribution"
+      ],
+      "source_stores": [],
+      "witness_writes": [
+        "/Users/dhyana/.dharma/ontology.db"
+      ]
+    },
+    {
+      "actual_runtime_primitive": "audit evidence found",
+      "coherence_state": "partial",
+      "declared_primitive": "declared-vs-actual operating fact projection",
+      "declared_state": "owns declared-vs-actual operating fact projection",
+      "drift": "declared organs remain advisory until observed facts are loaded",
+      "evidence_refs": [
+        "docs/governance/ANTI_SLOP_RULES.md:30",
+        "docs/governance/AUDIT_2026-07-01.md:40",
+        "docs/governance/AUDIT_2026-07-01.md:48",
+        "docs/governance/AUDIT_2026-07-01.md:74",
+        "docs/governance/BUILD_SESSION_ENTRYPOINT.md:67",
+        "docs/governance/BUILD_SESSION_ENTRYPOINT.md:127",
+        "docs/governance/BUILD_SESSION_ENTRYPOINT.md:434",
+        "docs/governance/COHERENCE_DELTA.md:16",
+        "docs/governance/COHERENCE_DELTA.md:43",
+        "docs/governance/COHERENCE_DELTA.md:121",
+        "docs/governance/CONVERGENCE_MAP_2026-07-01.md:55",
+        "docs/governance/CONVERGENCE_MAP_2026-07-01.md:108"
+      ],
+      "gates_declared": [],
+      "gates_enforced": [],
+      "last_observed": "2026-07-01T04:27:58.328139+00:00",
+      "merged_to_main": "UNKNOWN",
+      "name": "truth_spine",
+      "next_bindable_gap": "load current organ facts into reports/system_map/latest.json",
+      "next_packet_hint": "load current organ facts into reports/system_map/latest.json",
+      "observed_state": "audit evidence found",
+      "open_gap": "declared organs remain advisory until observed facts are loaded",
+      "owns": "declared-vs-actual operating fact projection",
+      "risk": "medium",
+      "scheduled": "UNKNOWN",
+      "sink_stores": [
+        "reports/system_map/latest.json"
+      ],
+      "source_stores": [
+        "docs/governance/ANTI_SLOP_RULES.md",
+        "docs/governance/AUDIT_2026-07-01.md",
+        "docs/governance/AUDIT_2026-07-01.md",
+        "docs/governance/AUDIT_2026-07-01.md"
+      ],
+      "witness_writes": [
+        "reports/system_map/latest.json"
+      ]
+    }
+  ],
+  "schema_version": "system_map.v0",
+  "sources": [
+    "docs/governance/AGENTOPS.md",
+    "docs/governance/ANTI_SLOP_RULES.md",
+    "docs/governance/AUDIT_2026-07-01.md",
+    "docs/governance/AUDIT_2026-07-01_REMEDIATION.md",
+    "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
+    "docs/governance/CANONICAL_DOC_STACK.md",
+    "docs/governance/CI_GATES.md",
+    "docs/governance/COHERENCE_DELTA.md",
+    "docs/governance/CONVERGENCE_MAP_2026-07-01.md",
+    "docs/governance/DAILY_OPERATING_BRIEF.md",
+    "docs/governance/FOURFOLD_ACTION_WARRANT.md",
+    "docs/governance/HUMAN_YDS_LEDGER.md",
+    "docs/governance/INTEGRATION_LANDING_ORDER.md",
+    "docs/governance/KAIZENOPS.md",
+    "docs/governance/METABOLIC_CLOCK.md",
+    "docs/governance/MIGRATING_v1_TO_v2.md",
+    "docs/governance/MMM_CHARTER.md",
+    "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
+    "docs/governance/ONBOARDING_RECEIPT.md",
+    "docs/governance/PRE_COMMIT.md",
+    "docs/governance/PR_QUALITY_GATES.md",
+    "docs/governance/README.md",
+    "docs/governance/REALITY_DEBT_LEDGER.md",
+    "docs/governance/REPO_GOVERNANCE_AUDIT.md",
+    "docs/governance/RUNTIME_TRUTH_COMMAND_CUTOVER.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "docs/governance/SWARM_GENOME.md",
+    "docs/governance/VENTURE_CELL_REVENUE_WEDGE.md",
+    "docs/governance/VIBE_CODE_HYGIENE.md"
+  ]
+}

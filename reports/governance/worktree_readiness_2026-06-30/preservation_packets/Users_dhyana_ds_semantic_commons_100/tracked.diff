@@ -1,0 +1,4365 @@
+diff --git a/Makefile b/Makefile
+index e5f1a033e..524fbf945 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,11 +1,11 @@
+ # DHARMA SWARM — Makefile
+ # Run `make help` to see all targets.
+ 
+-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet
++.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check bug-corral-scan name-drift-preflight semantic-commons-check agent-admit onboard-agent codex-composer-bootstrap codex-composer-once codex-composer-status codex-composer-start codex-composer-stop living-dock-check d-score-report docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet
+ 
+ # Prefer the repo venv when present so onboarding sections that need repo
+ # dependencies (pydantic, yaml) render instead of degrading silently.
+-PYTHON ?= $(shell test -x .venv/bin/python && echo .venv/bin/python || echo python3)
++PYTHON ?= $(shell test -x .venv/bin/python && echo .venv/bin/python || (command -v python3.11 >/dev/null 2>&1 && echo python3.11 || echo python3))
+ REPO_PYTHON ?= PYTHONPATH=. $(PYTHON)
+ PYTEST ?= pytest
+ # Test targets need the repo venv (pytest-timeout etc. live there, not in system pythons).
+@@ -53,6 +53,16 @@ help:
+ 	@echo "  make hygiene-audit Run non-blocking vibe-code hygiene scan"
+ 	@echo "  make mypy-strict-ratchet Verify allowlisted modules pass mypy --strict"
+ 	@echo "  make hygiene-check Verify hygiene catalogue/generated docs integrity"
++	@echo "  make semantic-commons-check Validate Semantic Commons registry and orientation routes"
++	@echo "  make agent-admit ARGS='...' Run read-only persistent-agent admission checks"
++	@echo "  make onboard-agent AGENT_NAME=codex_composer Run read-only named-agent orientation"
++	@echo "  make codex-composer-bootstrap Create/update codex_composer wake nest"
++	@echo "  make codex-composer-once Run one read-only codex_composer wake cycle"
++	@echo "  make codex-composer-status Render codex_composer wake status"
++	@echo "  make codex-composer-start ARGS='--activation-lease <id>' Start lease-gated wake loop"
++	@echo "  make codex-composer-stop Stop codex_composer wake loop if present"
++	@echo "  make living-dock-check Verify codex_composer LivingDock projection shape"
++	@echo "  make d-score-report Write Codex Composer D-score maturity report"
+ 	@echo "  make docops-integrity Run machine-verifiable documentation checks"
+ 	@echo "  make verify-corral  Verify DE_BUG_CORRAL findings still resolve to live code"
+ 	@echo "  make verify-corral-strict Same, but fail non-zero on any stale finding"
+@@ -255,6 +265,45 @@ hygiene-audit:
+ hygiene-check:
+ 	$(PYTHON) scripts/governance/hygiene/check_hygiene_integrity.py
+ 
++bug-corral-scan:
++	$(PYTHON) scripts/governance/name_drift_preflight.py $(ARGS)
++
++name-drift-preflight: bug-corral-scan
++
++semantic-commons-check:
++	$(PYTHON) scripts/governance/agent_admission.py
++	$(PYTHON) scripts/governance/name_drift_preflight.py --strict-semantic-commons --limit 20
++
++agent-admit:
++	$(PYTHON) scripts/governance/agent_admission.py $(ARGS)
++
++onboard-agent:
++	@[ -n "$(AGENT_NAME)" ] || (printf "set AGENT_NAME=codex_composer\n"; exit 2)
++	@[ "$(AGENT_NAME)" = "codex_composer" ] || (printf "unsupported AGENT_NAME=%s; supported: codex_composer\n" "$(AGENT_NAME)"; exit 2)
++	$(PYTHON) scripts/governance/agent_admission.py
++	$(PYTHON) scripts/runtime/codex_composer_wake_loop.py once $(ARGS)
++
++codex-composer-bootstrap:
++	$(PYTHON) scripts/runtime/codex_composer_wake_loop.py bootstrap $(ARGS)
++
++codex-composer-once:
++	$(PYTHON) scripts/runtime/codex_composer_wake_loop.py once $(ARGS)
++
++codex-composer-status:
++	$(PYTHON) scripts/runtime/codex_composer_wake_loop.py status $(ARGS)
++
++codex-composer-start:
++	$(PYTHON) scripts/runtime/codex_composer_wake_loop.py start $(ARGS)
++
++codex-composer-stop:
++	$(PYTHON) scripts/runtime/codex_composer_wake_loop.py stop $(ARGS)
++
++living-dock-check:
++	$(PYTHON) scripts/governance/living_dock_verifier.py --agent-uid codex_composer --require-dialogue --require-sanctum $(ARGS)
++
++d-score-report:
++	$(PYTHON) scripts/governance/d_score_verifier.py --target codex_composer $(ARGS)
++
+ # One-way quality ratchet (QL-R1): counters may only improve vs the
+ # git-tracked baselines; green improvements auto-tighten (commit the
+ # baselines file with the improving change). CI/agents use plain check.
+diff --git a/dharma_swarm/fs_substrate/okf.py b/dharma_swarm/fs_substrate/okf.py
+index 0e0ce69ee..3ada9b132 100644
+--- a/dharma_swarm/fs_substrate/okf.py
++++ b/dharma_swarm/fs_substrate/okf.py
+@@ -220,26 +220,28 @@ def project_semantic_objects(manifest_path: str | Path) -> list[OKFConcept]:
+     """Project docs/ontology/semantic_objects.yaml into OKF concepts.
+ 
+     Each runtime object becomes one concept; its OKF ``type`` is the object's
+-    ``kind`` (runtime_object, identifier, route_binding, ...). This makes the
+-    Semantic Commons a portable, browsable index of terms — the outward face of
+-    the ontology. Read-only projection: the manifest stays the owner.
++    ``kind`` / ``object_kind`` (runtime_object, identifier, route_binding, ...).
++    This makes the Semantic Commons a portable, browsable index of terms — the
++    outward face of the ontology. Read-only projection: the manifest stays the
++    owner.
+     """
+     data = yaml.safe_load(Path(manifest_path).read_text(encoding="utf-8")) or {}
+-    objects = data.get("objects", {}) if isinstance(data, dict) else {}
++    raw_objects = data.get("objects", {}) if isinstance(data, dict) else {}
++    object_items = _semantic_object_items(raw_objects)
++    object_names = {name for name, _spec in object_items}
+     concepts: list[OKFConcept] = []
+-    for name, spec in objects.items():
+-        spec = spec if isinstance(spec, dict) else {}
+-        kind = str(spec.get("kind", "runtime_object"))
+-        desc = str(spec.get("description", ""))
++    for name, spec in object_items:
++        kind = str(spec.get("kind") or spec.get("object_kind") or "runtime_object")
++        desc = str(spec.get("description") or spec.get("purpose") or "")
+         # Links: any field whose value names another object in the manifest.
+         links: list[str] = []
+         for v in _flat_values(spec):
+-            if isinstance(v, str) and v in objects and v != name:
++            if isinstance(v, str) and v in object_names and v != name:
+                 tgt = f"objects/{v}.md"
+                 if tgt not in links:
+                     links.append(tgt)
+         body_lines = [desc, ""] if desc else []
+-        owner = spec.get("owner")
++        owner = spec.get("owner") or spec.get("owner_surface")
+         if owner:
+             body_lines.append(f"**Owner:** `{owner}`")
+         concepts.append(
+@@ -248,8 +250,22 @@ def project_semantic_objects(manifest_path: str | Path) -> list[OKFConcept]:
+                 type=kind,
+                 title=name,
+                 description=desc,
+-                fields={k: v for k, v in spec.items()
+-                        if k in ("owner", "alias") and isinstance(v, (str, int, float, bool))},
++                fields={
++                    k: v
++                    for k, v in spec.items()
++                    if k
++                    in (
++                        "id",
++                        "api_name",
++                        "owner",
++                        "owner_surface",
++                        "alias",
++                        "authority_level",
++                        "lifecycle",
++                        "source_path",
++                    )
++                    and isinstance(v, (str, int, float, bool))
++                },
+                 body="\n".join(body_lines),
+                 links=links,
+             )
+@@ -257,6 +273,26 @@ def project_semantic_objects(manifest_path: str | Path) -> list[OKFConcept]:
+     return concepts
+ 
+ 
++def _semantic_object_items(raw_objects: object) -> list[tuple[str, dict[str, object]]]:
++    """Return manifest objects from either legacy mapping or list schema."""
++    if isinstance(raw_objects, dict):
++        return [
++            (str(name), spec if isinstance(spec, dict) else {})
++            for name, spec in raw_objects.items()
++            if str(name)
++        ]
++    if isinstance(raw_objects, list):
++        items: list[tuple[str, dict[str, object]]] = []
++        for item in raw_objects:
++            if not isinstance(item, dict):
++                continue
++            name = str(item.get("canonical_name") or item.get("name") or item.get("id") or "")
++            if name:
++                items.append((name, item))
++        return items
++    return []
++
++
+ def _flat_values(obj: object):
+     """Yield scalar values nested anywhere in a dict/list (for link discovery)."""
+     if isinstance(obj, dict):
+diff --git a/dharma_swarm/persistent_agent.py b/dharma_swarm/persistent_agent.py
+index d0ec851ef..a64fc625f 100644
+--- a/dharma_swarm/persistent_agent.py
++++ b/dharma_swarm/persistent_agent.py
+@@ -490,7 +490,12 @@ class PersistentAgent:
+     # -- Gate check ------------------------------------------------------
+ 
+     def _check_gate(self, task_text: str) -> dict[str, Any] | None:
+-        """Run telos gate check. Returns None if gates unavailable."""
++        """Run telos gate check.
++
++        Persistent agents are standing actors. If the gate path errors, the
++        safe outcome is to block the wake instead of treating the missing gate
++        as approval.
++        """
+         try:
+             from dharma_swarm.telos_gates import check_with_reflective_reroute
+             from dharma_swarm.models import GateDecision
+@@ -503,11 +508,19 @@ class PersistentAgent:
+             )
+             decision = outcome.result.decision
+             if decision == GateDecision.BLOCK:
+-                return {"blocked": True, "reason": outcome.result.reason}
+-            return {"blocked": False}
++                return {
++                    "blocked": True,
++                    "reason": outcome.result.reason,
++                    "gate_status": "blocked",
++                }
++            return {"blocked": False, "gate_status": "passed"}
+         except Exception as e:
+-            logger.debug("[%s] gate check skipped: %s", self.name, e)
+-            return None
++            logger.warning("[%s] gate check failed closed: %s", self.name, e)
++            return {
++                "blocked": True,
++                "reason": f"gate_check_error:{type(e).__name__}",
++                "gate_status": "fail_closed",
++            }
+ 
+     # -- Helpers ---------------------------------------------------------
+ 
+diff --git a/docs/ontology/semantic_aliases.yaml b/docs/ontology/semantic_aliases.yaml
+index 96bf23543..83902bc92 100644
+--- a/docs/ontology/semantic_aliases.yaml
++++ b/docs/ontology/semantic_aliases.yaml
+@@ -1,51 +1,906 @@
+-schema_version: dharma.semantic_aliases.v1
++schema_version: semantic-aliases-v0
++owner_track: agent-admission-semantic-commons-2026-06
+ aliases:
+-  agent-inbox:
+-    canonical: A2AInboxRoute
+-    kind: route_alias
+-  nats:
+-    canonical: NATSSubstrate
+-    kind: substrate_alias
+-  agent_card:
+-    canonical: A2ACard
+-    kind: object_alias
+-  agent_uid:
+-    canonical: AgentUID
+-    kind: identifier_alias
+-  dkeys:
+-    canonical: DKeysKeyStore
+-    kind: key_store_alias
+-  runtime_provider:
+-    canonical: RuntimeProvider
+-    kind: provider_factory_alias
+-  model_hierarchy:
+-    canonical: ModelHierarchy
+-    kind: routing_order_alias
+-  provider_policy_router:
+-    canonical: ProviderPolicyRouter
+-    kind: routing_policy_alias
+-  model_router:
+-    canonical: ModelRouter
+-    kind: runtime_router_alias
+-  routing_memory:
+-    canonical: RoutingMemory
+-    kind: routing_telemetry_alias
+-  "parallel model routing layer":
+-    canonical: ModelKeyRouting
+-    kind: deprecated_pattern
+-  "project .env keys":
+-    canonical: DKeysKeyStore
+-    kind: deprecated_pattern
+-  "direct provider factory":
+-    canonical: RuntimeProvider
+-    kind: deprecated_pattern
+-  "scattered model order":
+-    canonical: ModelHierarchy
+-    kind: deprecated_pattern
+-agent_uid_aliases:
+-  codex: codex_composer
+-  opus: opus_composer
+-  hermes: hermes-m5
+-  hermes_m5: hermes-m5
+-  devin: devin-roaming-2987d222
+-  fable-5-cursor: fable_5_cursor
++  - alias: AgentAdmission
++    canonical_id: semobj.agent_admission
++    status: active
++    kind: display
++  - alias: agent-admission
++    canonical_id: semobj.agent_admission
++    status: active
++    kind: slug
++  - alias: agent_admission
++    canonical_id: semobj.agent_admission
++    status: active
++    kind: token
++  - alias: agent admission
++    canonical_id: semobj.agent_admission
++    status: active
++    kind: phrase
++  - alias: agent-admit
++    canonical_id: semobj.agent_admission
++    status: active
++    kind: command
++  - alias: agent_admit
++    canonical_id: semobj.agent_admission
++    status: active
++    kind: command
++
++  - alias: RegistrationDesk
++    canonical_id: semobj.registration_desk
++    status: active
++    kind: display
++  - alias: registration-desk
++    canonical_id: semobj.registration_desk
++    status: active
++    kind: slug
++  - alias: registration_desk
++    canonical_id: semobj.registration_desk
++    status: active
++    kind: token
++  - alias: external-agent-registration
++    canonical_id: semobj.registration_desk
++    status: active
++    kind: module
++  - alias: external_agent_registration
++    canonical_id: semobj.registration_desk
++    status: active
++    kind: module
++
++  - alias: AgentSeed
++    canonical_id: semobj.agent_seed
++    status: active
++    kind: display
++  - alias: agent-seed
++    canonical_id: semobj.agent_seed
++    status: active
++    kind: slug
++  - alias: agent_seed
++    canonical_id: semobj.agent_seed
++    status: active
++    kind: token
++  - alias: agent.seed.yaml
++    canonical_id: semobj.agent_seed
++    status: active
++    kind: path
++
++  - alias: LivingDock
++    canonical_id: semobj.living_dock
++    status: active
++    kind: display
++  - alias: living-dock
++    canonical_id: semobj.living_dock
++    status: active
++    kind: slug
++  - alias: living_dock
++    canonical_id: semobj.living_dock
++    status: active
++    kind: token
++  - alias: living agent dock
++    canonical_id: semobj.living_dock
++    status: active
++    kind: phrase
++
++  - alias: CodexComposer
++    canonical_id: semobj.codex_composer
++    status: active
++    kind: display
++  - alias: Codex Composer
++    canonical_id: semobj.codex_composer
++    status: active
++    kind: phrase
++  - alias: codex-composer
++    canonical_id: semobj.codex_composer
++    status: active
++    kind: slug
++  - alias: codex_composer
++    canonical_id: semobj.codex_composer
++    status: active
++    kind: token
++
++  - alias: Sanctum
++    canonical_id: semobj.sanctum
++    status: active
++    kind: display
++  - alias: sanctum
++    canonical_id: semobj.sanctum
++    status: active
++    kind: token
++  - alias: living-dock-sanctum
++    canonical_id: semobj.sanctum
++    status: active
++    kind: slug
++  - alias: living_dock_sanctum
++    canonical_id: semobj.sanctum
++    status: active
++    kind: token
++  - alias: sanctum context
++    canonical_id: semobj.sanctum
++    status: active
++    kind: phrase
++
++  - alias: Holocron
++    canonical_id: semobj.holocron
++    status: active
++    kind: display
++  - alias: holocron
++    canonical_id: semobj.holocron
++    status: active
++    kind: token
++  - alias: living-dock-holocron
++    canonical_id: semobj.holocron
++    status: active
++    kind: slug
++  - alias: living_dock_holocron
++    canonical_id: semobj.holocron
++    status: active
++    kind: token
++
++  - alias: HolocronNest
++    canonical_id: semobj.holocron_nest
++    status: active
++    kind: display
++  - alias: Holocron Nest
++    canonical_id: semobj.holocron_nest
++    status: active
++    kind: phrase
++  - alias: holocron-nest
++    canonical_id: semobj.holocron_nest
++    status: active
++    kind: slug
++  - alias: holocron_nest
++    canonical_id: semobj.holocron_nest
++    status: active
++    kind: token
++  - alias: Nest
++    canonical_id: semobj.holocron_nest
++    status: active
++    kind: display
++  - alias: nest
++    canonical_id: semobj.holocron_nest
++    status: active
++    kind: token
++  - alias: living-dock-holocron-nest
++    canonical_id: semobj.holocron_nest
++    status: active
++    kind: slug
++  - alias: living_dock_holocron_nest
++    canonical_id: semobj.holocron_nest
++    status: active
++    kind: token
++
++  - alias: Aerie
++    canonical_id: semobj.aerie
++    status: active
++    kind: display
++  - alias: aerie
++    canonical_id: semobj.aerie
++    status: active
++    kind: token
++  - alias: fleet-aerie
++    canonical_id: semobj.aerie
++    status: active
++    kind: slug
++  - alias: fleet_aerie
++    canonical_id: semobj.aerie
++    status: active
++    kind: token
++
++  - alias: Sarathi
++    canonical_id: semobj.sarathi
++    status: active
++    kind: display
++  - alias: sarathi
++    canonical_id: semobj.sarathi
++    status: active
++    kind: token
++  - alias: APEX
++    canonical_id: semobj.sarathi
++    status: active
++    kind: display
++  - alias: apex-holon
++    canonical_id: semobj.sarathi
++    status: active
++    kind: slug
++  - alias: apex_holon
++    canonical_id: semobj.sarathi
++    status: active
++    kind: token
++
++  - alias: OperatorGuideCursor
++    canonical_id: semobj.operator_guide_cursor
++    status: active
++    kind: display
++  - alias: operator-guide-cursor
++    canonical_id: semobj.operator_guide_cursor
++    status: active
++    kind: slug
++  - alias: operator_guide_cursor
++    canonical_id: semobj.operator_guide_cursor
++    status: active
++    kind: token
++  - alias: operator-guide
++    canonical_id: semobj.operator_guide_cursor
++    status: active
++    kind: slug
++  - alias: operator_guide
++    canonical_id: semobj.operator_guide_cursor
++    status: active
++    kind: token
++  - alias: cursor-guide
++    canonical_id: semobj.operator_guide_cursor
++    status: active
++    kind: slug
++  - alias: cursor_guide
++    canonical_id: semobj.operator_guide_cursor
++    status: active
++    kind: token
++  - alias: "@OPERATOR_GUIDE"
++    canonical_id: semobj.operator_guide_cursor
++    status: active
++    kind: summon
++  - alias: "@operator-guide"
++    canonical_id: semobj.operator_guide_cursor
++    status: active
++    kind: summon
++  - alias: "@operator_guide"
++    canonical_id: semobj.operator_guide_cursor
++    status: active
++    kind: summon
++  - alias: "@CURSOR_GUIDE"
++    canonical_id: semobj.operator_guide_cursor
++    status: active
++    kind: summon
++  - alias: "@cursor-guide"
++    canonical_id: semobj.operator_guide_cursor
++    status: active
++    kind: summon
++  - alias: "@cursor_guide"
++    canonical_id: semobj.operator_guide_cursor
++    status: active
++    kind: summon
++
++  - alias: LandingDock
++    canonical_id: semobj.landing_dock
++    status: active
++    kind: display
++  - alias: Landing Dock
++    canonical_id: semobj.landing_dock
++    status: active
++    kind: phrase
++  - alias: landing-dock
++    canonical_id: semobj.landing_dock
++    status: active
++    kind: slug
++  - alias: landing_dock
++    canonical_id: semobj.landing_dock
++    status: active
++    kind: token
++  - alias: landing dock
++    canonical_id: semobj.landing_dock
++    status: active
++    kind: phrase
++
++  - alias: FactoryDroid
++    canonical_id: semobj.factory_droid
++    status: active
++    kind: display
++  - alias: Factory Droid
++    canonical_id: semobj.factory_droid
++    status: active
++    kind: phrase
++  - alias: factory-droid
++    canonical_id: semobj.factory_droid
++    status: active
++    kind: slug
++  - alias: factory_droid
++    canonical_id: semobj.factory_droid
++    status: active
++    kind: token
++  - alias: DroidFactory
++    canonical_id: semobj.factory_droid
++    status: active
++    kind: compatibility_display
++  - alias: Droid Factory
++    canonical_id: semobj.factory_droid
++    status: active
++    kind: compatibility_phrase
++  - alias: droid-factory
++    canonical_id: semobj.factory_droid
++    status: active
++    kind: compatibility_slug
++  - alias: droid_factory
++    canonical_id: semobj.factory_droid
++    status: active
++    kind: compatibility_token
++
++  - alias: A2ACard
++    canonical_id: semobj.a2a_card
++    status: active
++    kind: display
++  - alias: A2A card
++    canonical_id: semobj.a2a_card
++    status: active
++    kind: phrase
++  - alias: a2a-card
++    canonical_id: semobj.a2a_card
++    status: active
++    kind: slug
++  - alias: a2a_card
++    canonical_id: semobj.a2a_card
++    status: active
++    kind: token
++  - alias: agent-card
++    canonical_id: semobj.a2a_card
++    status: active
++    kind: slug
++  - alias: agent_card
++    canonical_id: semobj.a2a_card
++    status: active
++    kind: token
++
++  - alias: NameDriftPreflight
++    canonical_id: semobj.name_drift_preflight
++    status: active
++    kind: display
++  - alias: name-drift-preflight
++    canonical_id: semobj.name_drift_preflight
++    status: active
++    kind: slug
++  - alias: name_drift_preflight
++    canonical_id: semobj.name_drift_preflight
++    status: active
++    kind: token
++  - alias: name drift preflight
++    canonical_id: semobj.name_drift_preflight
++    status: active
++    kind: phrase
++  - alias: bug-corral-scan
++    canonical_id: semobj.name_drift_preflight
++    status: active
++    kind: command
++  - alias: bug_corral_scan
++    canonical_id: semobj.name_drift_preflight
++    status: active
++    kind: command
++
++  - alias: SessionOrientation
++    canonical_id: semobj.session_orientation
++    status: active
++    kind: display
++  - alias: session-orientation
++    canonical_id: semobj.session_orientation
++    status: active
++    kind: slug
++  - alias: session_orientation
++    canonical_id: semobj.session_orientation
++    status: active
++    kind: token
++  - alias: session loading
++    canonical_id: semobj.session_orientation
++    status: active
++    kind: phrase
++  - alias: context map
++    canonical_id: semobj.session_orientation
++    status: active
++    kind: phrase
++  - alias: orientation map
++    canonical_id: semobj.session_orientation
++    status: active
++    kind: phrase
++
++  - alias: OrientationLayer
++    canonical_id: semobj.orientation_layer
++    status: active
++    kind: display
++  - alias: orientation-layer
++    canonical_id: semobj.orientation_layer
++    status: active
++    kind: slug
++  - alias: orientation_layer
++    canonical_id: semobj.orientation_layer
++    status: active
++    kind: token
++  - alias: L0-L4 orientation layer
++    canonical_id: semobj.orientation_layer
++    status: active
++    kind: phrase
++  - alias: L0-L5 orientation layer
++    canonical_id: semobj.orientation_layer
++    status: active
++    kind: phrase
++
++  - alias: OrientationRoute
++    canonical_id: semobj.orientation_route
++    status: active
++    kind: display
++  - alias: orientation-route
++    canonical_id: semobj.orientation_route
++    status: active
++    kind: slug
++  - alias: orientation_route
++    canonical_id: semobj.orientation_route
++    status: active
++    kind: token
++  - alias: route.semantic_commons_campaign
++    canonical_id: semobj.orientation_route
++    status: active
++    kind: route_id
++
++  - alias: OntologyRegistry
++    canonical_id: semobj.ontology_registry
++    status: active
++    kind: display
++  - alias: ontology-registry
++    canonical_id: semobj.ontology_registry
++    status: active
++    kind: slug
++  - alias: ontology_registry
++    canonical_id: semobj.ontology_registry
++    status: active
++    kind: token
++  - alias: semantic object registry
++    canonical_id: semobj.ontology_registry
++    status: active
++    kind: phrase
++  - alias: semantic-objects
++    canonical_id: semobj.ontology_registry
++    status: active
++    kind: file_stem
++  - alias: semantic_objects
++    canonical_id: semobj.ontology_registry
++    status: active
++    kind: file_stem
++
++  - alias: OntologyHub
++    canonical_id: semobj.ontology_hub
++    status: active
++    kind: display
++  - alias: ontology-hub
++    canonical_id: semobj.ontology_hub
++    status: active
++    kind: slug
++  - alias: ontology_hub
++    canonical_id: semobj.ontology_hub
++    status: active
++    kind: token
++  - alias: Semantic Commons
++    canonical_id: semobj.ontology_hub
++    status: active
++    kind: phrase
++  - alias: semantic-commons
++    canonical_id: semobj.ontology_hub
++    status: active
++    kind: slug
++  - alias: semantic_commons
++    canonical_id: semobj.ontology_hub
++    status: active
++    kind: token
++
++  - alias: RuntimeReceipt
++    canonical_id: semobj.runtime_receipt
++    status: active
++    kind: display
++  - alias: runtime-receipt
++    canonical_id: semobj.runtime_receipt
++    status: active
++    kind: slug
++  - alias: runtime_receipt
++    canonical_id: semobj.runtime_receipt
++    status: active
++    kind: token
++  - alias: runtime receipt
++    canonical_id: semobj.runtime_receipt
++    status: active
++    kind: phrase
++
++  - alias: OpenClaw
++    canonical_id: semobj.openclaw_integration
++    status: active
++    kind: display
++  - alias: openclaw
++    canonical_id: semobj.openclaw_integration
++    status: active
++    kind: token
++  - alias: colima-openclaw
++    canonical_id: semobj.openclaw_integration
++    status: active
++    kind: slug
++  - alias: colima_openclaw
++    canonical_id: semobj.openclaw_integration
++    status: active
++    kind: token
++  - alias: colima-openclaw-secure
++    canonical_id: semobj.openclaw_integration
++    status: active
++    kind: slug
++  - alias: colima_openclaw_secure
++    canonical_id: semobj.openclaw_integration
++    status: active
++    kind: token
++
++  - alias: GLMResearcherLane
++    canonical_id: semobj.glm_researcher_lane
++    status: active
++    kind: display
++  - alias: glm-researcher
++    canonical_id: semobj.glm_researcher_lane
++    status: active
++    kind: slug
++  - alias: glm_researcher
++    canonical_id: semobj.glm_researcher_lane
++    status: active
++    kind: token
++  - alias: glm5-researcher
++    canonical_id: semobj.glm_researcher_lane
++    status: active
++    kind: slug
++  - alias: glm5_researcher
++    canonical_id: semobj.glm_researcher_lane
++    status: active
++    kind: token
++
++  - alias: OpusForgeArchitect
++    canonical_id: semobj.opus_forge_architect
++    status: active
++    kind: display
++  - alias: opus-forge-architect
++    canonical_id: semobj.opus_forge_architect
++    status: active
++    kind: slug
++  - alias: opus_forge_architect
++    canonical_id: semobj.opus_forge_architect
++    status: active
++    kind: token
++
++  - alias: PalantirPilot
++    canonical_id: semobj.palantir_pilot
++    status: active
++    kind: display
++  - alias: Palantir Pilot
++    canonical_id: semobj.palantir_pilot
++    status: active
++    kind: phrase
++  - alias: palantir-pilot
++    canonical_id: semobj.palantir_pilot
++    status: active
++    kind: slug
++  - alias: palantir_pilot
++    canonical_id: semobj.palantir_pilot
++    status: active
++    kind: token
++
++  - alias: CyberneticsCodex
++    canonical_id: semobj.cybernetics_codex
++    status: active
++    kind: display
++  - alias: Cybernetics Codex
++    canonical_id: semobj.cybernetics_codex
++    status: active
++    kind: phrase
++  - alias: cybernetics-codex
++    canonical_id: semobj.cybernetics_codex
++    status: active
++    kind: slug
++  - alias: cybernetics_codex
++    canonical_id: semobj.cybernetics_codex
++    status: active
++    kind: token
++
++  - alias: CodexTelos
++    canonical_id: semobj.codex_telos
++    status: active
++    kind: display
++  - alias: Codex TELOS Steward
++    canonical_id: semobj.codex_telos
++    status: active
++    kind: phrase
++  - alias: codex-telos
++    canonical_id: semobj.codex_telos
++    status: active
++    kind: slug
++  - alias: codex_telos
++    canonical_id: semobj.codex_telos
++    status: active
++    kind: token
++
++  - alias: ModelKeyRouting
++    canonical_id: semobj.model_key_routing
++    status: active
++    kind: display
++  - alias: model-key-routing
++    canonical_id: semobj.model_key_routing
++    status: active
++    kind: slug
++  - alias: model_key_routing
++    canonical_id: semobj.model_key_routing
++    status: active
++    kind: token
++  - alias: model key routing
++    canonical_id: semobj.model_key_routing
++    status: active
++    kind: phrase
++  - alias: MODEL_KEY_ROUTING
++    canonical_id: semobj.model_key_routing
++    status: active
++    kind: file_stem
++  - alias: the one way
++    canonical_id: semobj.model_key_routing
++    status: active
++    kind: phrase
++
++  - alias: DKeysKeyStore
++    canonical_id: semobj.dkeys_key_store
++    status: active
++    kind: display
++  - alias: dkeys-key-store
++    canonical_id: semobj.dkeys_key_store
++    status: active
++    kind: slug
++  - alias: dkeys_key_store
++    canonical_id: semobj.dkeys_key_store
++    status: active
++    kind: token
++  - alias: dkeys
++    canonical_id: semobj.dkeys_key_store
++    status: active
++    kind: command
++  - alias: agent-keys-env
++    canonical_id: semobj.dkeys_key_store
++    status: active
++    kind: slug
++  - alias: agent_keys_env
++    canonical_id: semobj.dkeys_key_store
++    status: active
++    kind: token
++  - alias: agent_keys.env
++    canonical_id: semobj.dkeys_key_store
++    status: active
++    kind: file_name
++
++  - alias: RuntimeProvider
++    canonical_id: semobj.runtime_provider
++    status: active
++    kind: display
++  - alias: runtime-provider
++    canonical_id: semobj.runtime_provider
++    status: active
++    kind: slug
++  - alias: runtime_provider
++    canonical_id: semobj.runtime_provider
++    status: active
++    kind: token
++  - alias: runtime provider door
++    canonical_id: semobj.runtime_provider
++    status: active
++    kind: phrase
++  - alias: resolve-runtime-provider-config
++    canonical_id: semobj.runtime_provider
++    status: active
++    kind: function
++  - alias: resolve_runtime_provider_config
++    canonical_id: semobj.runtime_provider
++    status: active
++    kind: function
++  - alias: create-runtime-provider
++    canonical_id: semobj.runtime_provider
++    status: active
++    kind: function
++  - alias: create_runtime_provider
++    canonical_id: semobj.runtime_provider
++    status: active
++    kind: function
++
++  - alias: ModelHierarchy
++    canonical_id: semobj.model_hierarchy
++    status: active
++    kind: display
++  - alias: model-hierarchy
++    canonical_id: semobj.model_hierarchy
++    status: active
++    kind: slug
++  - alias: model_hierarchy
++    canonical_id: semobj.model_hierarchy
++    status: active
++    kind: token
++  - alias: canonical-seed-order
++    canonical_id: semobj.model_hierarchy
++    status: active
++    kind: constant
++  - alias: canonical_seed_order
++    canonical_id: semobj.model_hierarchy
++    status: active
++    kind: constant
++  - alias: provider seed order
++    canonical_id: semobj.model_hierarchy
++    status: active
++    kind: phrase
++
++  - alias: ProviderPolicyRouter
++    canonical_id: semobj.provider_policy_router
++    status: active
++    kind: display
++  - alias: provider-policy-router
++    canonical_id: semobj.provider_policy_router
++    status: active
++    kind: slug
++  - alias: provider_policy_router
++    canonical_id: semobj.provider_policy_router
++    status: active
++    kind: token
++  - alias: provider route policy
++    canonical_id: semobj.provider_policy_router
++    status: active
++    kind: phrase
++  - alias: ProviderRouteRequest
++    canonical_id: semobj.provider_policy_router
++    status: active
++    kind: class
++  - alias: ProviderRouteDecision
++    canonical_id: semobj.provider_policy_router
++    status: active
++    kind: class
++
++  - alias: ModelRouter
++    canonical_id: semobj.model_router
++    status: active
++    kind: display
++  - alias: model-router
++    canonical_id: semobj.model_router
++    status: active
++    kind: slug
++  - alias: model_router
++    canonical_id: semobj.model_router
++    status: active
++    kind: token
++  - alias: complete-for-task
++    canonical_id: semobj.model_router
++    status: active
++    kind: method
++  - alias: complete_for_task
++    canonical_id: semobj.model_router
++    status: active
++    kind: method
++  - alias: provider-chain
++    canonical_id: semobj.model_router
++    status: active
++    kind: method
++  - alias: provider_chain
++    canonical_id: semobj.model_router
++    status: active
++    kind: method
++
++  - alias: RoutingMemory
++    canonical_id: semobj.routing_memory
++    status: active
++    kind: display
++  - alias: routing-memory
++    canonical_id: semobj.routing_memory
++    status: active
++    kind: slug
++  - alias: routing_memory
++    canonical_id: semobj.routing_memory
++    status: active
++    kind: token
++  - alias: routing memory
++    canonical_id: semobj.routing_memory
++    status: active
++    kind: phrase
++  - alias: routing_memory.sqlite3
++    canonical_id: semobj.routing_memory
++    status: active
++    kind: file_name
++
++  - alias: AgentUID
++    canonical_id: semobj.agent_uid
++    status: active
++    kind: display
++  - alias: agent-uid
++    canonical_id: semobj.agent_uid
++    status: active
++    kind: slug
++  - alias: agent_uid
++    canonical_id: semobj.agent_uid
++    status: active
++    kind: token
++  - alias: agent uid
++    canonical_id: semobj.agent_uid
++    status: active
++    kind: phrase
++  - alias: stable agent UID
++    canonical_id: semobj.agent_uid
++    status: active
++    kind: phrase
++
++  - alias: NATSSubstrate
++    canonical_id: semobj.nats_substrate
++    status: active
++    kind: display
++  - alias: NATS substrate
++    canonical_id: semobj.nats_substrate
++    status: active
++    kind: phrase
++  - alias: nats-substrate
++    canonical_id: semobj.nats_substrate
++    status: active
++    kind: slug
++  - alias: nats_substrate
++    canonical_id: semobj.nats_substrate
++    status: active
++    kind: token
++  - alias: NATS_SUBSTRATE_MASTER_SPEC
++    canonical_id: semobj.nats_substrate
++    status: active
++    kind: file_stem
++  - alias: nats-substrate-master-spec
++    canonical_id: semobj.nats_substrate
++    status: active
++    kind: slug
++  - alias: nats_substrate_master_spec
++    canonical_id: semobj.nats_substrate
++    status: active
++    kind: token
++
++  - alias: A2AInboxRoute
++    canonical_id: semobj.a2a_inbox_route
++    status: active
++    kind: display
++  - alias: A2A inbox route
++    canonical_id: semobj.a2a_inbox_route
++    status: active
++    kind: phrase
++  - alias: a2a-inbox-route
++    canonical_id: semobj.a2a_inbox_route
++    status: active
++    kind: slug
++  - alias: a2a_inbox_route
++    canonical_id: semobj.a2a_inbox_route
++    status: active
++    kind: token
++  - alias: agent-inbox
++    canonical_id: semobj.a2a_inbox_route
++    status: active
++    kind: route
++  - alias: agent_inbox
++    canonical_id: semobj.a2a_inbox_route
++    status: active
++    kind: route
++  - alias: --route agent-inbox
++    canonical_id: semobj.a2a_inbox_route
++    status: active
++    kind: command
++
++forbidden_aliases:
++  - alias: ICM
++    canonical_id: semobj.session_orientation
++    reason: Bare acronym is polysemous; use SessionOrientation or an explicit expanded phrase.
++  - alias: opencalw
++    canonical_id: semobj.openclaw_integration
++    reason: Typo-distance collision with OpenClaw.
++  - alias: Message_v2
++    canonical_id: semobj.ontology_registry
++    reason: ADR-008 forbids version suffixes in public ontology names.
++  - alias: Aaverie
++    canonical_id: semobj.aerie
++    reason: Typo-distance near miss for Aerie; use the operator-facing projection name only when admitted.
++  - alias: parallel model routing layer
++    canonical_id: semobj.model_key_routing
++    reason: Model/key routing has one sanctioned resolver/factory path.
++  - alias: project .env keys
++    canonical_id: semobj.dkeys_key_store
++    reason: Provider keys live under dkeys/agent_keys.env, not project env files.
++  - alias: direct provider factory
++    canonical_id: semobj.runtime_provider
++    reason: Provider construction goes through RuntimeProvider resolver/factory helpers.
++  - alias: scattered model order
++    canonical_id: semobj.model_hierarchy
++    reason: Provider/model ordering belongs in ModelHierarchy.
++  - alias: human display name as durable id
++    canonical_id: semobj.agent_uid
++    reason: Durable NATS consumers and agent routes use stable agent_uid, not display names.
++  - alias: filesystem bus as live contact
++    canonical_id: semobj.nats_substrate
++    reason: Filesystem mirrors are audit surfaces, not live-contact authority.
++  - alias: handler ack as semantic reply
++    canonical_id: semobj.a2a_inbox_route
++    reason: Inbox handler acknowledgements do not prove model-level semantic reply.
+diff --git a/docs/ontology/semantic_objects.yaml b/docs/ontology/semantic_objects.yaml
+index 23939c2d7..b537aa655 100644
+--- a/docs/ontology/semantic_objects.yaml
++++ b/docs/ontology/semantic_objects.yaml
+@@ -1,104 +1,780 @@
+-schema_version: dharma.semantic_objects.v1
++schema_version: semantic-commons-v0
++owner_track: agent-admission-semantic-commons-2026-06
++lifecycle_values:
++  - seed
++  - working
++  - preferred
++  - canonical
++  - deprecated
++  - forbidden
+ objects:
+-  A2ACard:
+-    kind: runtime_object
+-    owner: dharma_swarm.a2a.agent_card.AgentCard
+-    description: Agent discovery and capability card.
+-    required_fields:
+-      - name
+-      - agent_uid
+-      - supported_interfaces
+-    required_internal_route: A2AInboxRoute
+-  AgentUID:
+-    kind: identifier
+-    description: Stable durable agent identifier used in internal NATS subjects.
+-    subject_token_rules:
+-      forbidden_chars:
+-        - "."
+-        - "*"
+-        - ">"
+-        - "/"
+-        - "\\"
+-      whitespace_allowed: false
+-  NATSSubstrate:
+-    kind: transport_substrate
+-    description: Internal live fleet transport backed by NATS/JetStream.
+-    external_edge: false
+-  A2AInboxRoute:
+-    kind: route_binding
+-    alias: agent-inbox
+-    substrate: NATSSubstrate
+-    subject_template: dharma.agent.<agent_uid>.inbox
+-    ack_subject_template: dharma.agent.<agent_uid>.inbox.ack.<packet_id>
+-    reply_subject_template: dharma.agent.<agent_uid>.inbox.reply.<packet_id>
+-    implemented_by:
+-      sender: scripts/runtime/a2a_send.py
+-      bridge: scripts/runtime/a2a_inbox_bridge.py
+-      card_resolver: dharma_swarm/a2a/agent_card.py
+-  ModelKeyRouting:
+-    kind: governance_contract
+-    owner: docs/ops/MODEL_KEY_ROUTING.md
+-    description: Canonical contract for provider keys, runtime providers, model order, and routing memory.
+-    canonical_components:
+-      key_store: DKeysKeyStore
+-      runtime_provider: RuntimeProvider
+-      model_order: ModelHierarchy
+-      provider_policy: ProviderPolicyRouter
+-      router: ModelRouter
+-      learning_state: RoutingMemory
+-    deprecated_patterns:
++  - id: semobj.agent_admission
++    canonical_name: AgentAdmission
++    api_name: dharma.agent.AgentAdmission
++    lifecycle: working
++    owner_surface: docs/ops/AGENT_ADMISSION.md
++    authority_level: active_spec
++    source_path: docs/ops/AGENT_ADMISSION.md
++    object_kind: governance_contract
++    public_ontology: true
++    aliases:
++      - AgentAdmission
++      - agent-admission
++      - agent_admission
++      - agent admission
++      - agent-admit
++      - agent_admit
++    forbidden_aliases:
++      - admit-agent-without-receipt
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.registration_desk
++    canonical_name: RegistrationDesk
++    api_name: dharma.agent.RegistrationDesk
++    lifecycle: working
++    owner_surface: dharma_swarm/external_agent_registration.py
++    authority_level: runtime_owner
++    source_path: dharma_swarm/external_agent_registration.py
++    object_kind: runtime_surface
++    public_ontology: true
++    aliases:
++      - RegistrationDesk
++      - registration-desk
++      - registration_desk
++      - external-agent-registration
++      - external_agent_registration
++    forbidden_aliases: []
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.agent_seed
++    canonical_name: AgentSeed
++    api_name: dharma.agent.AgentSeed
++    lifecycle: working
++    owner_surface: docs/agents/**
++    authority_level: active_spec
++    source_path: docs/agents
++    object_kind: agent_identity_record
++    public_ontology: true
++    aliases:
++      - AgentSeed
++      - agent-seed
++      - agent_seed
++      - agent.seed.yaml
++    forbidden_aliases: []
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.living_dock
++    canonical_name: LivingDock
++    api_name: dharma.agent.LivingDock
++    lifecycle: working
++    owner_surface: dharma_swarm/operator_core/living_agent_kernel.py
++    authority_level: runtime_owner
++    source_path: dharma_swarm/operator_core/living_agent_kernel.py
++    object_kind: runtime_surface
++    public_ontology: true
++    aliases:
++      - LivingDock
++      - living-dock
++      - living_dock
++      - living agent dock
++    forbidden_aliases: []
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.codex_composer
++    canonical_name: CodexComposer
++    api_name: dharma.agent.CodexComposer
++    lifecycle: working
++    owner_surface: docs/sovereign_holons/CODEX_COMPOSER_WAKE_LOOP.md
++    authority_level: active_spec
++    source_path: docs/sovereign_holons/CODEX_COMPOSER_WAKE_LOOP.md
++    object_kind: persistent_agent_orientation_shell
++    public_ontology: true
++    aliases:
++      - CodexComposer
++      - Codex Composer
++      - codex-composer
++      - codex_composer
++    forbidden_aliases: []
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.sanctum
++    canonical_name: Sanctum
++    api_name: dharma.agent.Sanctum
++    lifecycle: working
++    owner_surface: docs/architecture/APEX_HOLON_LONG_RUNNING_GOAL_SPEC.md
++    authority_level: active_spec
++    source_path: docs/architecture/APEX_HOLON_LONG_RUNNING_GOAL_SPEC.md
++    object_kind: living_dock_subspace
++    public_ontology: true
++    aliases:
++      - Sanctum
++      - sanctum
++      - living-dock-sanctum
++      - living_dock_sanctum
++      - sanctum context
++    forbidden_aliases: []
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.holocron
++    canonical_name: Holocron
++    api_name: dharma.agent.Holocron
++    lifecycle: working
++    owner_surface: docs/architecture/APEX_HOLON_LONG_RUNNING_GOAL_SPEC.md
++    authority_level: active_spec
++    source_path: docs/architecture/APEX_HOLON_LONG_RUNNING_GOAL_SPEC.md
++    object_kind: living_dock_subspace
++    public_ontology: true
++    aliases:
++      - Holocron
++      - holocron
++      - living-dock-holocron
++      - living_dock_holocron
++    forbidden_aliases: []
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.holocron_nest
++    canonical_name: HolocronNest
++    api_name: dharma.agent.HolocronNest
++    lifecycle: working
++    owner_surface: docs/architecture/APEX_HOLON_LONG_RUNNING_GOAL_SPEC.md
++    authority_level: active_spec
++    source_path: docs/architecture/APEX_HOLON_LONG_RUNNING_GOAL_SPEC.md
++    object_kind: living_dock_subspace
++    public_ontology: true
++    aliases:
++      - HolocronNest
++      - Holocron Nest
++      - holocron-nest
++      - holocron_nest
++      - Nest
++      - nest
++      - living-dock-holocron-nest
++      - living_dock_holocron_nest
++    forbidden_aliases: []
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.aerie
++    canonical_name: Aerie
++    api_name: dharma.operator.Aerie
++    lifecycle: seed
++    owner_surface: docs/architecture/APEX_HOLON_LONG_RUNNING_GOAL_SPEC.md
++    authority_level: active_spec
++    source_path: docs/architecture/APEX_HOLON_LONG_RUNNING_GOAL_SPEC.md
++    object_kind: operator_fleet_projection_name
++    public_ontology: true
++    aliases:
++      - Aerie
++      - aerie
++      - fleet-aerie
++      - fleet_aerie
++    forbidden_aliases:
++      - Aaverie
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.sarathi
++    canonical_name: Sarathi
++    api_name: dharma.operator.Sarathi
++    lifecycle: seed
++    owner_surface: docs/agents/sarathi/SARATHI_CONTRACT.md
++    authority_level: active_spec
++    source_path: docs/agents/sarathi/SARATHI_CONTRACT.md
++    object_kind: apex_holon_command_intelligence
++    public_ontology: true
++    aliases:
++      - Sarathi
++      - sarathi
++      - APEX
++      - apex-holon
++      - apex_holon
++    forbidden_aliases:
++      - fable_5_cursor
++      - Fable 5
++      - Fable5
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.seat_sarathi
++
++  - id: semobj.operator_guide_cursor
++    canonical_name: OperatorGuideCursor
++    api_name: dharma.operator.OperatorGuideCursor
++    lifecycle: seed
++    owner_surface: docs/agents/operator_guide_cursor/OPERATOR_GUIDE_CURSOR_CONTRACT.md
++    authority_level: active_spec
++    source_path: docs/agents/operator_guide_cursor/OPERATOR_GUIDE_CURSOR_CONTRACT.md
++    object_kind: cursor_harness_operator_relay
++    public_ontology: true
++    aliases:
++      - OperatorGuideCursor
++      - operator-guide-cursor
++      - operator_guide_cursor
++      - operator-guide
++      - operator_guide
++      - cursor-guide
++      - cursor_guide
++    forbidden_aliases: []
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.seat_operator_guide_cursor
++
++  - id: semobj.landing_dock
++    canonical_name: LandingDock
++    api_name: dharma.governance.LandingDock
++    lifecycle: seed
++    owner_surface: docs/ontology/session_orientation.yaml
++    authority_level: active_spec
++    source_path: docs/ontology/session_orientation.yaml
++    object_kind: onboarding_projection_name
++    public_ontology: true
++    aliases:
++      - LandingDock
++      - Landing Dock
++      - landing-dock
++      - landing_dock
++      - landing dock
++    forbidden_aliases: []
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.factory_droid
++    canonical_name: FactoryDroid
++    api_name: dharma.agent.FactoryDroid
++    lifecycle: seed
++    owner_surface: docs/agents/factory_droid/FACTORY_DROID_CONTRACT.md
++    authority_level: active_spec
++    source_path: docs/agents/factory_droid/FACTORY_DROID_CONTRACT.md
++    object_kind: tooling_agent_seed
++    public_ontology: true
++    aliases:
++      - FactoryDroid
++      - Factory Droid
++      - factory-droid
++      - factory_droid
++      - DroidFactory
++      - Droid Factory
++      - droid-factory
++      - droid_factory
++    forbidden_aliases: []
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.a2a_card
++    canonical_name: A2ACard
++    api_name: dharma.agent.A2ACard
++    lifecycle: working
++    owner_surface: dharma_swarm/a2a/agent_card.py
++    authority_level: runtime_owner
++    source_path: dharma_swarm/a2a/agent_card.py
++    object_kind: runtime_identity_card
++    public_ontology: true
++    aliases:
++      - A2ACard
++      - A2A card
++      - a2a-card
++      - a2a_card
++      - agent-card
++      - agent_card
++    forbidden_aliases: []
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.name_drift_preflight
++    canonical_name: NameDriftPreflight
++    api_name: dharma.governance.NameDriftPreflight
++    lifecycle: working
++    owner_surface: scripts/governance/name_drift_preflight.py
++    authority_level: governance_check
++    source_path: scripts/governance/name_drift_preflight.py
++    object_kind: verifier
++    public_ontology: true
++    aliases:
++      - NameDriftPreflight
++      - name-drift-preflight
++      - name_drift_preflight
++      - name drift preflight
++      - bug-corral-scan
++      - bug_corral_scan
++    forbidden_aliases: []
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.session_orientation
++    canonical_name: SessionOrientation
++    api_name: dharma.governance.SessionOrientation
++    lifecycle: working
++    owner_surface: docs/ontology/session_orientation.yaml
++    authority_level: active_spec
++    source_path: docs/ontology/session_orientation.yaml
++    object_kind: orientation_contract
++    public_ontology: true
++    aliases:
++      - SessionOrientation
++      - session-orientation
++      - session_orientation
++      - session loading
++      - context map
++      - orientation map
++    forbidden_aliases:
++      - ICM
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.orientation_layer
++    canonical_name: OrientationLayer
++    api_name: dharma.governance.OrientationLayer
++    lifecycle: working
++    owner_surface: docs/ontology/session_orientation.yaml
++    authority_level: active_spec
++    source_path: docs/ontology/session_orientation.yaml
++    object_kind: orientation_contract
++    public_ontology: true
++    aliases:
++      - OrientationLayer
++      - orientation-layer
++      - orientation_layer
++      - L0-L4 orientation layer
++      - L0-L5 orientation layer
++    forbidden_aliases: []
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.orientation_route
++    canonical_name: OrientationRoute
++    api_name: dharma.governance.OrientationRoute
++    lifecycle: working
++    owner_surface: docs/ontology/session_orientation.yaml
++    authority_level: active_spec
++    source_path: docs/ontology/session_orientation.yaml
++    object_kind: orientation_contract
++    public_ontology: true
++    aliases:
++      - OrientationRoute
++      - orientation-route
++      - orientation_route
++      - route.semantic_commons_campaign
++    forbidden_aliases: []
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.ontology_registry
++    canonical_name: OntologyRegistry
++    api_name: dharma.ontology.OntologyRegistry
++    lifecycle: working
++    owner_surface: docs/ontology/semantic_objects.yaml
++    authority_level: active_spec
++    source_path: docs/ontology/semantic_objects.yaml
++    object_kind: registry
++    public_ontology: true
++    aliases:
++      - OntologyRegistry
++      - ontology-registry
++      - ontology_registry
++      - semantic object registry
++      - semantic-objects
++      - semantic_objects
++    forbidden_aliases: []
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.ontology_hub
++    canonical_name: OntologyHub
++    api_name: dharma.ontology.OntologyHub
++    lifecycle: working
++    owner_surface: docs/ontology/SEMANTIC_COMMONS.md
++    authority_level: active_spec
++    source_path: docs/ontology/SEMANTIC_COMMONS.md
++    object_kind: orientation_hub
++    public_ontology: true
++    aliases:
++      - OntologyHub
++      - ontology-hub
++      - ontology_hub
++      - Semantic Commons
++      - semantic-commons
++      - semantic_commons
++    forbidden_aliases: []
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.runtime_receipt
++    canonical_name: RuntimeReceipt
++    api_name: dharma.runtime.RuntimeReceipt
++    lifecycle: working
++    owner_surface: dharma_swarm/runtime_state.py
++    authority_level: runtime_owner
++    source_path: dharma_swarm/runtime_state.py
++    object_kind: runtime_receipt
++    public_ontology: true
++    aliases:
++      - RuntimeReceipt
++      - runtime-receipt
++      - runtime_receipt
++      - runtime receipt
++    forbidden_aliases: []
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.openclaw_integration
++    canonical_name: OpenClawIntegration
++    api_name: dharma.integration.OpenClawIntegration
++    lifecycle: seed
++    owner_surface: dharma_swarm/terminal_commands/_status_helpers.py
++    authority_level: runtime_owner
++    source_path: dharma_swarm/terminal_commands/_status_helpers.py
++    object_kind: integration
++    public_ontology: true
++    aliases:
++      - OpenClaw
++      - openclaw
++      - colima-openclaw
++      - colima_openclaw
++      - colima-openclaw-secure
++      - colima_openclaw_secure
++    forbidden_aliases:
++      - opencalw
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.glm_researcher_lane
++    canonical_name: GLMResearcherLane
++    api_name: dharma.agent.GLMResearcherLane
++    lifecycle: seed
++    owner_surface: dharma_swarm/certified_lanes.py
++    authority_level: runtime_owner
++    source_path: dharma_swarm/certified_lanes.py
++    object_kind: agent_lane
++    public_ontology: true
++    aliases:
++      - GLMResearcherLane
++      - glm-researcher
++      - glm_researcher
++      - glm5-researcher
++      - glm5_researcher
++    forbidden_aliases: []
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.opus_forge_architect
++    canonical_name: OpusForgeArchitect
++    api_name: dharma.agent.OpusForgeArchitect
++    lifecycle: seed
++    owner_surface: docs/ops/DHARMA_FORGE_HYDRA_ARCHAEOLOGY_2026-06-11.md
++    authority_level: behavior_contract
++    source_path: docs/ops/DHARMA_FORGE_HYDRA_ARCHAEOLOGY_2026-06-11.md
++    object_kind: agent_role
++    public_ontology: true
++    aliases:
++      - OpusForgeArchitect
++      - opus-forge-architect
++      - opus_forge_architect
++    forbidden_aliases: []
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.palantir_pilot
++    canonical_name: PalantirPilot
++    api_name: dharma.agent.PalantirPilot
++    lifecycle: working
++    owner_surface: docs/agents/palantir_pilot/agent.seed.yaml
++    authority_level: active_spec
++    source_path: docs/agents/palantir_pilot/agent.seed.yaml
++    object_kind: persistent_agent
++    public_ontology: true
++    aliases:
++      - PalantirPilot
++      - Palantir Pilot
++      - palantir-pilot
++      - palantir_pilot
++    forbidden_aliases: []
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.cybernetics_codex
++    canonical_name: CyberneticsCodex
++    api_name: dharma.agent.CyberneticsCodex
++    lifecycle: working
++    owner_surface: docs/agents/cybernetics_codex/agent.seed.yaml
++    authority_level: active_spec
++    source_path: docs/agents/cybernetics_codex/agent.seed.yaml
++    object_kind: persistent_agent
++    public_ontology: true
++    aliases:
++      - CyberneticsCodex
++      - Cybernetics Codex
++      - cybernetics-codex
++      - cybernetics_codex
++    forbidden_aliases: []
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.codex_telos
++    canonical_name: CodexTelos
++    api_name: dharma.agent.CodexTelos
++    lifecycle: seed
++    owner_surface: docs/agents/codex_telos/agent.seed.yaml
++    authority_level: active_spec
++    source_path: docs/agents/codex_telos/agent.seed.yaml
++    object_kind: persistent_agent
++    public_ontology: true
++    aliases:
++      - CodexTelos
++      - Codex TELOS Steward
++      - codex-telos
++      - codex_telos
++    forbidden_aliases: []
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.model_key_routing
++    canonical_name: ModelKeyRouting
++    api_name: dharma.routing.ModelKeyRouting
++    lifecycle: working
++    owner_surface: docs/ops/MODEL_KEY_ROUTING.md
++    authority_level: active_spec
++    source_path: docs/ops/MODEL_KEY_ROUTING.md
++    object_kind: governance_contract
++    public_ontology: true
++    aliases:
++      - ModelKeyRouting
++      - model-key-routing
++      - model_key_routing
++      - model key routing
++      - MODEL_KEY_ROUTING
++      - the one way
++    forbidden_aliases:
+       - parallel model routing layer
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.dkeys_key_store
++    canonical_name: DKeysKeyStore
++    api_name: dharma.routing.DKeysKeyStore
++    lifecycle: working
++    owner_surface: docs/ops/MODEL_KEY_ROUTING.md
++    authority_level: active_spec
++    source_path: docs/ops/MODEL_KEY_ROUTING.md
++    object_kind: credential_management_contract
++    public_ontology: true
++    aliases:
++      - DKeysKeyStore
++      - dkeys-key-store
++      - dkeys_key_store
++      - dkeys
++      - agent-keys-env
++      - agent_keys_env
++      - agent_keys.env
++    forbidden_aliases:
+       - project .env keys
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.runtime_provider
++    canonical_name: RuntimeProvider
++    api_name: dharma.routing.RuntimeProvider
++    lifecycle: working
++    owner_surface: dharma_swarm/runtime_provider.py
++    authority_level: runtime_owner
++    source_path: dharma_swarm/runtime_provider.py
++    object_kind: runtime_provider_resolver
++    public_ontology: true
++    aliases:
++      - RuntimeProvider
++      - runtime-provider
++      - runtime_provider
++      - runtime provider door
++      - resolve-runtime-provider-config
++      - resolve_runtime_provider_config
++      - create-runtime-provider
++      - create_runtime_provider
++    forbidden_aliases:
+       - direct provider factory
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.model_hierarchy
++    canonical_name: ModelHierarchy
++    api_name: dharma.routing.ModelHierarchy
++    lifecycle: working
++    owner_surface: dharma_swarm/model_hierarchy.py
++    authority_level: runtime_owner
++    source_path: dharma_swarm/model_hierarchy.py
++    object_kind: provider_order_registry
++    public_ontology: true
++    aliases:
++      - ModelHierarchy
++      - model-hierarchy
++      - model_hierarchy
++      - canonical-seed-order
++      - canonical_seed_order
++      - provider seed order
++    forbidden_aliases:
+       - scattered model order
+-  DKeysKeyStore:
+-    kind: key_store
+-    owner: dharma_swarm/api_keys.py
+-    description: The single approved path for provider key lookup, backed by dkeys and ~/.dharma/agent_keys.env.
+-  RuntimeProvider:
+-    kind: provider_factory
+-    owner: dharma_swarm/runtime_provider.py
+-    description: The single runtime provider resolution and creation door for model calls.
+-  ModelHierarchy:
+-    kind: routing_order
+-    owner: dharma_swarm/model_hierarchy.py
+-    description: Canonical most-powerful-first model and route ordering.
+-  ProviderPolicyRouter:
+-    kind: routing_policy
+-    owner: dharma_swarm/provider_policy.py
+-    description: Policy layer that selects and escalates provider families without bypassing ModelKeyRouting.
+-  ModelRouter:
+-    kind: runtime_router
+-    owner: dharma_swarm/providers.py
+-    description: Provider router that executes model calls under RuntimeProvider and ModelHierarchy constraints.
+-  RoutingMemory:
+-    kind: routing_telemetry
+-    owner: dharma_swarm/routing_memory.py
+-    description: Provider-learning evidence store for route outcomes; telemetry, not semantic canon.
+-  IntelligenceSupplyChainRawReceipt:
+-    kind: evidence_receipt
+-    owner: dharma_swarm.world_radar.bronze
+-    track: loop-closure-2026-06
+-    description: Content-addressed Bronze receipt for a sanctioned external signal treated as untrusted data.
+-    required_fields:
+-      - schema_version
+-      - receipt_id
+-      - content_hash
+-      - source_url
+-      - fetch_method
+-      - license
+-      - prov
+-      - instruction_policy
+-  FrontierCouncilBoundarySignal:
+-    kind: verifier_boundary
+-    owner: dharma_swarm.world_radar.bronze
+-    track: loop-closure-2026-06
+-    description: Meet-point artifact handed to the decorrelated frontier council; not a verifier verdict or apply permission.
+-    required_fields:
+-      - schema_version
+-      - boundary_id
+-      - verifier_interface
+-      - source_receipt_id
+-      - content_hash
+-      - guardrails
+-      - not_applied
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.provider_policy_router
++    canonical_name: ProviderPolicyRouter
++    api_name: dharma.routing.ProviderPolicyRouter
++    lifecycle: working
++    owner_surface: dharma_swarm/provider_policy.py
++    authority_level: runtime_owner
++    source_path: dharma_swarm/provider_policy.py
++    object_kind: provider_policy_engine
++    public_ontology: true
++    aliases:
++      - ProviderPolicyRouter
++      - provider-policy-router
++      - provider_policy_router
++      - provider route policy
++      - ProviderRouteRequest
++      - ProviderRouteDecision
++    forbidden_aliases: []
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.model_router
++    canonical_name: ModelRouter
++    api_name: dharma.routing.ModelRouter
++    lifecycle: working
++    owner_surface: dharma_swarm/providers.py
++    authority_level: runtime_owner
++    source_path: dharma_swarm/providers.py
++    object_kind: provider_execution_router
++    public_ontology: true
++    aliases:
++      - ModelRouter
++      - model-router
++      - model_router
++      - complete-for-task
++      - complete_for_task
++      - provider-chain
++      - provider_chain
++    forbidden_aliases: []
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.routing_memory
++    canonical_name: RoutingMemory
++    api_name: dharma.routing.RoutingMemory
++    lifecycle: working
++    owner_surface: dharma_swarm/routing_memory.py
++    authority_level: runtime_owner
++    source_path: dharma_swarm/routing_memory.py
++    object_kind: provider_learning_store
++    public_ontology: true
++    aliases:
++      - RoutingMemory
++      - routing-memory
++      - routing_memory
++      - routing memory
++      - routing_memory.sqlite3
++    forbidden_aliases: []
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.agent_uid
++    canonical_name: AgentUID
++    api_name: dharma.agent.AgentUID
++    lifecycle: working
++    owner_surface: docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
++    authority_level: active_spec
++    source_path: docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
++    object_kind: durable_identifier
++    public_ontology: true
++    aliases:
++      - AgentUID
++      - agent-uid
++      - agent_uid
++      - agent uid
++      - stable agent UID
++    forbidden_aliases:
++      - human display name as durable id
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.nats_substrate
++    canonical_name: NATSSubstrate
++    api_name: dharma.transport.NATSSubstrate
++    lifecycle: working
++    owner_surface: docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
++    authority_level: active_spec
++    source_path: docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
++    object_kind: transport_contract
++    public_ontology: true
++    aliases:
++      - NATSSubstrate
++      - NATS substrate
++      - nats-substrate
++      - nats_substrate
++      - NATS_SUBSTRATE_MASTER_SPEC
++      - nats-substrate-master-spec
++      - nats_substrate_master_spec
++    forbidden_aliases:
++      - filesystem bus as live contact
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
++
++  - id: semobj.a2a_inbox_route
++    canonical_name: A2AInboxRoute
++    api_name: dharma.transport.A2AInboxRoute
++    lifecycle: working
++    owner_surface: scripts/runtime/a2a_send.py
++    authority_level: runtime_owner
++    source_path: scripts/runtime/a2a_send.py
++    object_kind: transport_route
++    public_ontology: true
++    aliases:
++      - A2AInboxRoute
++      - A2A inbox route
++      - a2a-inbox-route
++      - a2a_inbox_route
++      - agent-inbox
++      - agent_inbox
++      - --route agent-inbox
++    forbidden_aliases:
++      - handler ack as semantic reply
++    supersedes: []
++    superseded_by: []
++    orientation_route: route.semantic_commons_campaign
+diff --git a/reports/governance/active_track_evidence.json b/reports/governance/active_track_evidence.json
+index d92324291..39a860d5e 100644
+--- a/reports/governance/active_track_evidence.json
++++ b/reports/governance/active_track_evidence.json
+@@ -1,5 +1,5 @@
+ {
+-  "generated_at": "2026-06-25T05:45:22+00:00",
++  "generated_at": "2026-06-26T01:35:06+09:00",
+   "schema_version": 2,
+   "active_track_id": "runtime-truth-reconciliation-2026-06",
+   "shippable": true,
+@@ -13,91 +13,106 @@
+       "id": "runtime_spine_package_exists",
+       "kind": "file_exists",
+       "passed": true,
+-      "detail": "dharma_swarm/spine/__init__.py present"
++      "detail": "dharma_swarm/spine/__init__.py present",
++      "executed": true
+     },
+     {
+       "id": "receipt_equivalence_matrix_exists",
+       "kind": "file_exists",
+       "passed": true,
+-      "detail": "docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md present"
++      "detail": "docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md present",
++      "executed": true
+     },
+     {
+       "id": "a2a_persistence_invariant_tests_exist",
+       "kind": "file_exists",
+       "passed": true,
+-      "detail": "tests/test_spine_persistence_invariant.py present"
++      "detail": "tests/test_spine_persistence_invariant.py present",
++      "executed": true
+     },
+     {
+       "id": "runtime_truth_packet_defined",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'class RuntimeTruthPacket' found in dharma_swarm/operator_core/contracts.py"
++      "detail": "pattern 'class RuntimeTruthPacket' found in dharma_swarm/operator_core/contracts.py",
++      "executed": true
+     },
+     {
+       "id": "runtime_truth_axes_defined",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'class RuntimeTruthState' found in dharma_swarm/operator_core/contracts.py"
++      "detail": "pattern 'class RuntimeTruthState' found in dharma_swarm/operator_core/contracts.py",
++      "executed": true
+     },
+     {
+       "id": "onboard_runtime_truth_render",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'render_runtime_truth' found in scripts/governance/agent_onboard.py"
++      "detail": "pattern 'render_runtime_truth' found in scripts/governance/agent_onboard.py",
++      "executed": true
+     },
+     {
+       "id": "onboard_runtime_truth_no_write_test",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'test_runtime_truth_render_is_read_only' found in tests/test_agent_onboard.py"
++      "detail": "pattern 'test_runtime_truth_render_is_read_only' found in tests/test_agent_onboard.py",
++      "executed": true
+     },
+     {
+       "id": "runtime_truth_packet_axis_test",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'test_runtime_truth_packet_keeps_state_axes_separate' found in tests/test_operator_core_contracts.py"
++      "detail": "pattern 'test_runtime_truth_packet_keeps_state_axes_separate' found in tests/test_operator_core_contracts.py",
++      "executed": true
+     },
+     {
+       "id": "a2a_single_persistence_invariant",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'test_submit_via_spine_retry_does_not_create_second_runtime_receipt' found in tests/test_spine_persistence_invariant.py"
++      "detail": "pattern 'test_submit_via_spine_retry_does_not_create_second_runtime_receipt' found in tests/test_spine_persistence_invariant.py",
++      "executed": true
+     },
+     {
+       "id": "spine_bypass_report_exists",
+       "kind": "file_exists",
+       "passed": true,
+-      "detail": "scripts/governance/spine_bypass_report.py present"
++      "detail": "scripts/governance/spine_bypass_report.py present",
++      "executed": true
+     },
+     {
+       "id": "receipt_json_projection_only_doc",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'projection/cache only' found in docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md"
++      "detail": "pattern 'projection/cache only' found in docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md",
++      "executed": true
+     },
+     {
+       "id": "correlation_spine_manifest_still_declared",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml"
++      "detail": "pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml",
++      "executed": true
+     },
+     {
+       "id": "evidence_receipt_still_defined",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py"
++      "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py",
++      "executed": true
+     },
+     {
+       "id": "runtime_receipt_still_defined",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py"
++      "detail": "pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py",
++      "executed": true
+     },
+     {
+       "id": "operator_core_contracts_pass",
+       "kind": "test_passes",
+       "passed": true,
+-      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 1.56s"
++      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.25s",
++      "executed": true
+     }
+   ],
+   "portfolio_summary": {
+@@ -181,91 +196,106 @@
+           "id": "runtime_spine_package_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/spine/__init__.py present"
++          "detail": "dharma_swarm/spine/__init__.py present",
++          "executed": true
+         },
+         {
+           "id": "receipt_equivalence_matrix_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md present"
++          "detail": "docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md present",
++          "executed": true
+         },
+         {
+           "id": "a2a_persistence_invariant_tests_exist",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "tests/test_spine_persistence_invariant.py present"
++          "detail": "tests/test_spine_persistence_invariant.py present",
++          "executed": true
+         },
+         {
+           "id": "runtime_truth_packet_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class RuntimeTruthPacket' found in dharma_swarm/operator_core/contracts.py"
++          "detail": "pattern 'class RuntimeTruthPacket' found in dharma_swarm/operator_core/contracts.py",
++          "executed": true
+         },
+         {
+           "id": "runtime_truth_axes_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class RuntimeTruthState' found in dharma_swarm/operator_core/contracts.py"
++          "detail": "pattern 'class RuntimeTruthState' found in dharma_swarm/operator_core/contracts.py",
++          "executed": true
+         },
+         {
+           "id": "onboard_runtime_truth_render",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'render_runtime_truth' found in scripts/governance/agent_onboard.py"
++          "detail": "pattern 'render_runtime_truth' found in scripts/governance/agent_onboard.py",
++          "executed": true
+         },
+         {
+           "id": "onboard_runtime_truth_no_write_test",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_runtime_truth_render_is_read_only' found in tests/test_agent_onboard.py"
++          "detail": "pattern 'test_runtime_truth_render_is_read_only' found in tests/test_agent_onboard.py",
++          "executed": true
+         },
+         {
+           "id": "runtime_truth_packet_axis_test",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_runtime_truth_packet_keeps_state_axes_separate' found in tests/test_operator_core_contracts.py"
++          "detail": "pattern 'test_runtime_truth_packet_keeps_state_axes_separate' found in tests/test_operator_core_contracts.py",
++          "executed": true
+         },
+         {
+           "id": "a2a_single_persistence_invariant",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_submit_via_spine_retry_does_not_create_second_runtime_receipt' found in tests/test_spine_persistence_invariant.py"
++          "detail": "pattern 'test_submit_via_spine_retry_does_not_create_second_runtime_receipt' found in tests/test_spine_persistence_invariant.py",
++          "executed": true
+         },
+         {
+           "id": "spine_bypass_report_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/governance/spine_bypass_report.py present"
++          "detail": "scripts/governance/spine_bypass_report.py present",
++          "executed": true
+         },
+         {
+           "id": "receipt_json_projection_only_doc",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'projection/cache only' found in docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md"
++          "detail": "pattern 'projection/cache only' found in docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md",
++          "executed": true
+         },
+         {
+           "id": "correlation_spine_manifest_still_declared",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml"
++          "detail": "pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml",
++          "executed": true
+         },
+         {
+           "id": "evidence_receipt_still_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py"
++          "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py",
++          "executed": true
+         },
+         {
+           "id": "runtime_receipt_still_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py"
++          "detail": "pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py",
++          "executed": true
+         },
+         {
+           "id": "operator_core_contracts_pass",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 1.56s"
++          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.25s",
++          "executed": true
+         }
+       ]
+     },
+@@ -306,19 +336,22 @@
+           "id": "nats_master_spec_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present"
++          "detail": "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present",
++          "executed": true
+         },
+         {
+           "id": "nats_master_spec_present",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present"
++          "detail": "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present",
++          "executed": true
+         },
+         {
+           "id": "nats_transport_landed",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'NATS' found in docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md"
++          "detail": "pattern 'NATS' found in docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
++          "executed": true
+         }
+       ]
+     },
+@@ -364,61 +397,71 @@
+           "id": "spine_package_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/spine/__init__.py present"
++          "detail": "dharma_swarm/spine/__init__.py present",
++          "executed": true
+         },
+         {
+           "id": "invoke_agent_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py"
++          "detail": "pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py",
++          "executed": true
+         },
+         {
+           "id": "a2a_bridge_calls_spine",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/a2a/a2a_bridge.py"
++          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/a2a/a2a_bridge.py",
++          "executed": true
+         },
+         {
+           "id": "orchestrator_calls_spine",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/orchestrator.py"
++          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/orchestrator.py",
++          "executed": true
+         },
+         {
+           "id": "agent_runner_calls_spine",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/agent_runner.py"
++          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/agent_runner.py",
++          "executed": true
+         },
+         {
+           "id": "dispatch_emits_evidence_receipt",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_every_dispatch_emits_exactly_one_evidence_receipt' found in tests/test_spine_adoption_dispatch.py"
++          "detail": "pattern 'test_every_dispatch_emits_exactly_one_evidence_receipt' found in tests/test_spine_adoption_dispatch.py",
++          "executed": true
+         },
+         {
+           "id": "zero_dropoff_sources",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_no_dropoff_sources_remain' found in tests/test_spine_adoption_dispatch.py"
++          "detail": "pattern 'test_no_dropoff_sources_remain' found in tests/test_spine_adoption_dispatch.py",
++          "executed": true
+         },
+         {
+           "id": "bypass_allowlist_empty",
+           "kind": "file_contains",
+           "passed": false,
+-          "detail": "pattern '(?m)^_INTENTIONAL_BYPASS: dict\\\\[tuple\\\\[str, int\\\\], str\\\\] = \\\\{\\\\s*\\\\}' NOT FOUND in scripts/governance/spine_bypass_report.py"
++          "detail": "pattern '(?m)^_INTENTIONAL_BYPASS: dict\\\\[tuple\\\\[str, int\\\\], str\\\\] = \\\\{\\\\s*\\\\}' NOT FOUND in scripts/governance/spine_bypass_report.py",
++          "executed": true
+         },
+         {
+           "id": "adoption_narrative_docs",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/architecture/SPINE_ADOPTION_NARRATIVE.md present"
++          "detail": "docs/architecture/SPINE_ADOPTION_NARRATIVE.md present",
++          "executed": true
+         },
+         {
+           "id": "gate1_witnessed",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "reports/governance/GATE1_WITNESSED.md present"
++          "detail": "reports/governance/GATE1_WITNESSED.md present",
++          "executed": true
+         }
+       ]
+     },
+@@ -460,79 +503,92 @@
+           "id": "loop_map_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "CYBERNETIC_LOOP_MAP.md present"
++          "detail": "CYBERNETIC_LOOP_MAP.md present",
++          "executed": true
+         },
+         {
+           "id": "loop_supervisor_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/loop_supervisor.py present"
++          "detail": "dharma_swarm/loop_supervisor.py present",
++          "executed": true
+         },
+         {
+           "id": "phase0_dossier_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md present"
++          "detail": "reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md present",
++          "executed": true
+         },
+         {
+           "id": "phase0_fresh_status_table",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'Fresh 13-loop status table' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md"
++          "detail": "pattern 'Fresh 13-loop status table' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md",
++          "executed": true
+         },
+         {
+           "id": "one_wire_invariant_stated",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'never let internal artifacts touch archive fitness' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md"
++          "detail": "pattern 'never let internal artifacts touch archive fitness' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md",
++          "executed": true
+         },
+         {
+           "id": "loop1_closure_receipt_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md present"
++          "detail": "reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md present",
++          "executed": true
+         },
+         {
+           "id": "campaign_retrospective_exists",
+           "kind": "file_exists",
+           "passed": false,
+-          "detail": "reports/loop_closure/RETROSPECTIVE.md MISSING"
++          "detail": "reports/loop_closure/RETROSPECTIVE.md MISSING",
++          "executed": true
+         },
+         {
+           "id": "cybernetics_codex_manifest_registered",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'id: cybernetics_codex' found in ACTIVE_SURFACE_MANIFEST.yaml"
++          "detail": "pattern 'id: cybernetics_codex' found in ACTIVE_SURFACE_MANIFEST.yaml",
++          "executed": true
+         },
+         {
+           "id": "cybernetics_codex_seed_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/agents/cybernetics_codex/agent.seed.yaml present"
++          "detail": "docs/agents/cybernetics_codex/agent.seed.yaml present",
++          "executed": true
+         },
+         {
+           "id": "cybernetics_codex_soul_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/agents/cybernetics_codex/SOUL.md present"
++          "detail": "docs/agents/cybernetics_codex/SOUL.md present",
++          "executed": true
+         },
+         {
+           "id": "cybernetics_codex_context_desk_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/agents/cybernetics_codex/CONTEXT_ENGINEERING.md present"
++          "detail": "docs/agents/cybernetics_codex/CONTEXT_ENGINEERING.md present",
++          "executed": true
+         },
+         {
+           "id": "cybernetics_codex_audit_script_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/governance/cybernetics_codex_audit.py present"
++          "detail": "scripts/governance/cybernetics_codex_audit.py present",
++          "executed": true
+         },
+         {
+           "id": "cybernetics_codex_registration_script_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/governance/register_cybernetics_codex.py present"
++          "detail": "scripts/governance/register_cybernetics_codex.py present",
++          "executed": true
+         }
+       ]
+     },
+@@ -583,121 +639,141 @@
+           "id": "identity_owner_on_branch",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "foundations/THE_ORGANISM.md present"
++          "detail": "foundations/THE_ORGANISM.md present",
++          "executed": true
+         },
+         {
+           "id": "vision_owner_on_branch",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/vision_maps/NORTH_STAR.md present"
++          "detail": "docs/vision_maps/NORTH_STAR.md present",
++          "executed": true
+         },
+         {
+           "id": "orientation_graph_owner_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/governance/orientation_graph.py present"
++          "detail": "scripts/governance/orientation_graph.py present",
++          "executed": true
+         },
+         {
+           "id": "expanded_orientation_packet_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class OrientationPacket' found in scripts/governance/orientation_graph.py"
++          "detail": "pattern 'class OrientationPacket' found in scripts/governance/orientation_graph.py",
++          "executed": true
+         },
+         {
+           "id": "repo_context_writer_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def write_repo_context' found in scripts/governance/orientation_graph.py"
++          "detail": "pattern 'def write_repo_context' found in scripts/governance/orientation_graph.py",
++          "executed": true
+         },
+         {
+           "id": "repo_context_hash_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'context_hash' found in scripts/governance/orientation_graph.py"
++          "detail": "pattern 'context_hash' found in scripts/governance/orientation_graph.py",
++          "executed": true
+         },
+         {
+           "id": "make_orient_writes_context",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern '--write-context' found in Makefile"
++          "detail": "pattern '--write-context' found in Makefile",
++          "executed": true
+         },
+         {
+           "id": "orientation_default_read_only_test",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_orientation_graph_render_is_read_only' found in tests/test_orientation_graph.py"
++          "detail": "pattern 'test_orientation_graph_render_is_read_only' found in tests/test_orientation_graph.py",
++          "executed": true
+         },
+         {
+           "id": "repo_context_test_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_truth_graph_repo_context_writes_json_and_markdown' found in tests/test_truth_graph_repo_context.py"
++          "detail": "pattern 'test_truth_graph_repo_context_writes_json_and_markdown' found in tests/test_truth_graph_repo_context.py",
++          "executed": true
+         },
+         {
+           "id": "a2a_receipt_gate_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/a2a/task_receipt.py present"
++          "detail": "dharma_swarm/a2a/task_receipt.py present",
++          "executed": true
+         },
+         {
+           "id": "a2a_receipt_schema_declared",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'dharma_a2a_task_receipt.v1' found in dharma_swarm/a2a/task_receipt.py"
++          "detail": "pattern 'dharma_a2a_task_receipt.v1' found in dharma_swarm/a2a/task_receipt.py",
++          "executed": true
+         },
+         {
+           "id": "a2a_receipted_inbox_reader_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def read_receipted_inbox' found in dharma_swarm/a2a/task_receipt.py"
++          "detail": "pattern 'def read_receipted_inbox' found in dharma_swarm/a2a/task_receipt.py",
++          "executed": true
+         },
+         {
+           "id": "agent_presence_projection_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/a2a/agent_presence.py present"
++          "detail": "dharma_swarm/a2a/agent_presence.py present",
++          "executed": true
+         },
+         {
+           "id": "agent_presence_stale_red",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'age > 2' found in dharma_swarm/a2a/agent_presence.py"
++          "detail": "pattern 'age > 2' found in dharma_swarm/a2a/agent_presence.py",
++          "executed": true
+         },
+         {
+           "id": "nats_e2e_demo_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/governance/truth_graph_nats_e2e_demo.py present"
++          "detail": "scripts/governance/truth_graph_nats_e2e_demo.py present",
++          "executed": true
+         },
+         {
+           "id": "nats_e2e_shell_wrapper_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/governance/run_truth_graph_nats_e2e_demo.sh present"
++          "detail": "scripts/governance/run_truth_graph_nats_e2e_demo.sh present",
++          "executed": true
+         },
+         {
+           "id": "a2a_gate_tests_exist",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern \"receipt or it didn't happen\" found in tests/test_a2a_gate.py"
++          "detail": "pattern \"receipt or it didn't happen\" found in tests/test_a2a_gate.py",
++          "executed": true
+         },
+         {
+           "id": "registry_presence_tests_exist",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'heartbeat_status' found in tests/test_agent_registry_presence.py"
++          "detail": "pattern 'heartbeat_status' found in tests/test_agent_registry_presence.py",
++          "executed": true
+         },
+         {
+           "id": "repo_context_projection_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 0.56s"
++          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 1.12s",
++          "executed": true
+         },
+         {
+           "id": "truth_graph_projection_on_main",
+           "kind": "commit_on_main",
+           "passed": true,
+-          "detail": "936d365db is an ancestor of origin/main"
++          "detail": "936d365db is an ancestor of origin/main",
++          "executed": true
+         }
+       ]
+     },
+@@ -743,67 +819,78 @@
+           "id": "evidence_receipt_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py"
++          "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py",
++          "executed": true
+         },
+         {
+           "id": "holon_orchestrator_spec_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/sovereign_holons/HOLON_ORCHESTRATOR_BUILD_SPEC.md present"
++          "detail": "docs/sovereign_holons/HOLON_ORCHESTRATOR_BUILD_SPEC.md present",
++          "executed": true
+         },
+         {
+           "id": "holon_runtime_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/holon_runtime.py present"
++          "detail": "dharma_swarm/holon_runtime.py present",
++          "executed": true
+         },
+         {
+           "id": "readiness_packet_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md present"
++          "detail": "reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md present",
++          "executed": true
+         },
+         {
+           "id": "receipt_profile_documented",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'The command receipt is a profile of `dharma_swarm.spine.receipt.EvidenceReceipt`' found in reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md"
++          "detail": "pattern 'The command receipt is a profile of `dharma_swarm.spine.receipt.EvidenceReceipt`' found in reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md",
++          "executed": true
+         },
+         {
+           "id": "frozen_verifier_runbook_present",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'Frozen Non-Implementer Verifier Runbook' found in reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md"
++          "detail": "pattern 'Frozen Non-Implementer Verifier Runbook' found in reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md",
++          "executed": true
+         },
+         {
+           "id": "holon_bridge_verifier_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "tests/test_holon_bridge.py present"
++          "detail": "tests/test_holon_bridge.py present",
++          "executed": true
+         },
+         {
+           "id": "holon_runtime_verifier_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "tests/test_holon_runtime.py present"
++          "detail": "tests/test_holon_runtime.py present",
++          "executed": true
+         },
+         {
+           "id": "composer_wake_witness_pending",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md present"
++          "detail": "reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md present",
++          "executed": true
+         },
+         {
+           "id": "holon_bridge_verifier_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_holon_bridge.py: PASS \u2014 15 passed, 1 skipped in 0.34s"
++          "detail": "pytest tests/test_holon_bridge.py: PASS \u2014 16 passed in 0.14s",
++          "executed": true
+         },
+         {
+           "id": "holon_substrate_on_main",
+           "kind": "commit_on_main",
+           "passed": true,
+-          "detail": "9c76b210 is an ancestor of origin/main"
++          "detail": "9c76b210 is an ancestor of origin/main",
++          "executed": true
+         }
+       ]
+     },
+@@ -852,73 +939,85 @@
+           "id": "model_pool_owner_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/model_pool.py present"
++          "detail": "dharma_swarm/model_pool.py present",
++          "executed": true
+         },
+         {
+           "id": "provider_policy_owner_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/provider_policy.py present"
++          "detail": "dharma_swarm/provider_policy.py present",
++          "executed": true
+         },
+         {
+           "id": "model_hierarchy_owner_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/model_hierarchy.py present"
++          "detail": "dharma_swarm/model_hierarchy.py present",
++          "executed": true
+         },
+         {
+           "id": "routing_architecture_doc_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md present"
++          "detail": "docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md present",
++          "executed": true
+         },
+         {
+           "id": "routing_precedence_documented",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'explicit > capability' found in docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md"
++          "detail": "pattern 'explicit > capability' found in docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md",
++          "executed": true
+         },
+         {
+           "id": "explicit_provider_honored",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'preferred_provider' found in dharma_swarm/provider_policy.py"
++          "detail": "pattern 'preferred_provider' found in dharma_swarm/provider_policy.py",
++          "executed": true
+         },
+         {
+           "id": "explicit_wins_test_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_explicit_provider_is_selected' found in tests/test_provider_routing_explicit.py"
++          "detail": "pattern 'test_explicit_provider_is_selected' found in tests/test_provider_routing_explicit.py",
++          "executed": true
+         },
+         {
+           "id": "power_first_default",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'power_first' found in dharma_swarm/provider_policy.py"
++          "detail": "pattern 'power_first' found in dharma_swarm/provider_policy.py",
++          "executed": true
+         },
+         {
+           "id": "zhipu_provider_enum",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'ZHIPU' found in dharma_swarm/models.py"
++          "detail": "pattern 'ZHIPU' found in dharma_swarm/models.py",
++          "executed": true
+         },
+         {
+           "id": "zhipu_provider_class",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class ZhipuProvider' found in dharma_swarm/providers.py"
++          "detail": "pattern 'class ZhipuProvider' found in dharma_swarm/providers.py",
++          "executed": true
+         },
+         {
+           "id": "precedence_invariant_test_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.28s"
++          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.12s",
++          "executed": true
+         },
+         {
+           "id": "stage4_precedence_locked_on_main",
+           "kind": "commit_on_main",
+           "passed": true,
+-          "detail": "bc110d84 is an ancestor of origin/main"
++          "detail": "bc110d84 is an ancestor of origin/main",
++          "executed": true
+         }
+       ]
+     },
+@@ -967,73 +1066,85 @@
+           "id": "arena_runner_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/coordination/arena/runner.py present"
++          "detail": "dharma_swarm/coordination/arena/runner.py present",
++          "executed": true
+         },
+         {
+           "id": "arena_scorer_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/coordination/arena/scorer.py present"
++          "detail": "dharma_swarm/coordination/arena/scorer.py present",
++          "executed": true
+         },
+         {
+           "id": "orchestration_genome_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/coordination/genome.py present"
++          "detail": "dharma_swarm/coordination/genome.py present",
++          "executed": true
+         },
+         {
+           "id": "frozen_taskpack_present",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'TASK_PACK_ID' found in dharma_swarm/coordination/arena/taskpack.py"
++          "detail": "pattern 'TASK_PACK_ID' found in dharma_swarm/coordination/arena/taskpack.py",
++          "executed": true
+         },
+         {
+           "id": "deterministic_scorer_hash",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def scorer_hash' found in dharma_swarm/coordination/arena/scorer.py"
++          "detail": "pattern 'def scorer_hash' found in dharma_swarm/coordination/arena/scorer.py",
++          "executed": true
+         },
+         {
+           "id": "orchestration_genome_class",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class OrchestrationGenome' found in dharma_swarm/coordination/genome.py"
++          "detail": "pattern 'class OrchestrationGenome' found in dharma_swarm/coordination/genome.py",
++          "executed": true
+         },
+         {
+           "id": "zero_weight_orchestrator_map_elites",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class MapElitesArchive' found in dharma_swarm/coordination/orchestrator_v1.py"
++          "detail": "pattern 'class MapElitesArchive' found in dharma_swarm/coordination/orchestrator_v1.py",
++          "executed": true
+         },
+         {
+           "id": "dpi_decorrelation_gated_on_correctness",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def decorrelation_bonus' found in dharma_swarm/coordination/dpi.py"
++          "detail": "pattern 'def decorrelation_bonus' found in dharma_swarm/coordination/dpi.py",
++          "executed": true
+         },
+         {
+           "id": "council_trace_verification",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class Council' found in dharma_swarm/council/council.py"
++          "detail": "pattern 'class Council' found in dharma_swarm/council/council.py",
++          "executed": true
+         },
+         {
+           "id": "arena_v1_test_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def test_positive_lift_candidate_beats_best_single_at_parity' found in tests/test_arena_v1.py"
++          "detail": "pattern 'def test_positive_lift_candidate_beats_best_single_at_parity' found in tests/test_arena_v1.py",
++          "executed": true
+         },
+         {
+           "id": "dpi_test_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "tests/test_dpi.py present"
++          "detail": "tests/test_dpi.py present",
++          "executed": true
+         },
+         {
+           "id": "closure_checks_test_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "tests/test_coordination_closure_checks.py present"
++          "detail": "tests/test_coordination_closure_checks.py present",
++          "executed": true
+         }
+       ]
+     },
+@@ -1079,49 +1190,57 @@
+           "id": "pr_merge_control_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/runtime/pr_merge_control.py present"
++          "detail": "scripts/runtime/pr_merge_control.py present",
++          "executed": true
+         },
+         {
+           "id": "mike_daemon_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/runtime/merge_master_mike_daemon.py present"
++          "detail": "scripts/runtime/merge_master_mike_daemon.py present",
++          "executed": true
+         },
+         {
+           "id": "automerge_workflow_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": ".github/workflows/automerge.yml present"
++          "detail": ".github/workflows/automerge.yml present",
++          "executed": true
+         },
+         {
+           "id": "router_workflow_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": ".github/workflows/codex-mention-router.yml present"
++          "detail": ".github/workflows/codex-mention-router.yml present",
++          "executed": true
+         },
+         {
+           "id": "github_review_receipt_bridge",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'github_review' found in scripts/runtime/pr_merge_control.py"
++          "detail": "pattern 'github_review' found in scripts/runtime/pr_merge_control.py",
++          "executed": true
+         },
+         {
+           "id": "github_review_bridge_tested",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "tests/test_pr_merge_control_github_reviews.py present"
++          "detail": "tests/test_pr_merge_control_github_reviews.py present",
++          "executed": true
+         },
+         {
+           "id": "automerge_enrolls_all_nondraft",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'mike-watch' found in .github/workflows/automerge.yml"
++          "detail": "pattern 'mike-watch' found in .github/workflows/automerge.yml",
++          "executed": true
+         },
+         {
+           "id": "mike_cloud_heartbeat",
+           "kind": "file_contains",
+           "passed": false,
+-          "detail": "pattern 'schedule:' NOT FOUND in .github/workflows/merge-master-mike-backlog.yml"
++          "detail": "pattern 'schedule:' NOT FOUND in .github/workflows/merge-master-mike-backlog.yml",
++          "executed": true
+         }
+       ]
+     },
+@@ -1169,91 +1288,106 @@
+           "id": "dossier_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md present"
++          "detail": "docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md present",
++          "executed": true
+         },
+         {
+           "id": "spine_invoke_owner_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py"
++          "detail": "pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py",
++          "executed": true
+         },
+         {
+           "id": "handoff_owner_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/handoff.py present"
++          "detail": "dharma_swarm/handoff.py present",
++          "executed": true
+         },
+         {
+           "id": "dossier_consolidates_four_powers",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'The four powers at a glance' found in docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md"
++          "detail": "pattern 'The four powers at a glance' found in docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md",
++          "executed": true
+         },
+         {
+           "id": "dossier_carries_organism_tie",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'How this serves the organism' found in docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md"
++          "detail": "pattern 'How this serves the organism' found in docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md",
++          "executed": true
+         },
+         {
+           "id": "stage_contract_reader_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class StageContract' found in dharma_swarm/fs_substrate/stage_contracts.py"
++          "detail": "pattern 'class StageContract' found in dharma_swarm/fs_substrate/stage_contracts.py",
++          "executed": true
+         },
+         {
+           "id": "stage_reader_routes_through_spine",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'invoke_agent' found in dharma_swarm/fs_substrate/stage_executor.py"
++          "detail": "pattern 'invoke_agent' found in dharma_swarm/fs_substrate/stage_executor.py",
++          "executed": true
+         },
+         {
+           "id": "stage_contract_test_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_stage_contracts.py: PASS \u2014 13 passed in 0.36s"
++          "detail": "pytest tests/test_stage_contracts.py: PASS \u2014 13 passed in 0.14s",
++          "executed": true
+         },
+         {
+           "id": "okf_projector_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def project_semantic_objects' found in dharma_swarm/fs_substrate/okf.py"
++          "detail": "pattern 'def project_semantic_objects' found in dharma_swarm/fs_substrate/okf.py",
++          "executed": true
+         },
+         {
+           "id": "okf_roundtrip_test_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_okf_projection.py: PASS \u2014 8 passed in 0.36s"
++          "detail": "pytest tests/test_okf_projection.py: PASS \u2014 8 passed in 0.18s",
++          "executed": true
+         },
+         {
+           "id": "semantic_fs_facade_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def semantic_retrieve' found in dharma_swarm/fs_substrate/semantic_fs.py"
++          "detail": "pattern 'def semantic_retrieve' found in dharma_swarm/fs_substrate/semantic_fs.py",
++          "executed": true
+         },
+         {
+           "id": "semantic_fs_test_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_semantic_fs.py: PASS \u2014 5 passed in 0.34s"
++          "detail": "pytest tests/test_semantic_fs.py: PASS \u2014 5 passed in 0.14s",
++          "executed": true
+         },
+         {
+           "id": "organizer_dry_run_first_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def propose_organization' found in dharma_swarm/fs_substrate/organizer.py"
++          "detail": "pattern 'def propose_organization' found in dharma_swarm/fs_substrate/organizer.py",
++          "executed": true
+         },
+         {
+           "id": "organizer_test_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_organizer.py: PASS \u2014 5 passed in 0.30s"
++          "detail": "pytest tests/test_organizer.py: PASS \u2014 5 passed in 0.13s",
++          "executed": true
+         },
+         {
+           "id": "fs_substrate_e2e_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_fs_substrate_e2e.py: PASS \u2014 4 passed in 0.40s"
++          "detail": "pytest tests/test_fs_substrate_e2e.py: PASS \u2014 4 passed in 1.92s",
++          "executed": true
+         }
+       ]
+     }
+diff --git a/reports/governance/active_track_evidence.md b/reports/governance/active_track_evidence.md
+index 6463d44a6..c67c4065a 100644
+--- a/reports/governance/active_track_evidence.md
++++ b/reports/governance/active_track_evidence.md
+@@ -1,6 +1,6 @@
+ # Track Portfolio Evidence
+ 
+-Generated: 2026-06-25T05:45:22+00:00 (schema v2)
++Generated: 2026-06-26T01:35:06+09:00 (schema v2)
+ Active tracks: **10** (warn 5, max 10) — shippable 5
+ 
+ ## Spine coverage
+@@ -29,7 +29,7 @@ Active tracks: **10** (warn 5, max 10) — shippable 5
+   - ✓ `correlation_spine_manifest_still_declared` (file_contains) — pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml
+   - ✓ `evidence_receipt_still_defined` (file_contains) — pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py
+   - ✓ `runtime_receipt_still_defined` (file_contains) — pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py
+-  - ✓ `operator_core_contracts_pass` (test_passes) — pytest tests/test_operator_core_contracts.py: PASS — 7 passed in 1.56s
++  - ✓ `operator_core_contracts_pass` (test_passes) — pytest tests/test_operator_core_contracts.py: PASS — 7 passed in 0.25s
+ 
+ ## `runtime-truth-nats-2026-06` — 2/2
+ 
+@@ -102,7 +102,7 @@ Active tracks: **10** (warn 5, max 10) — shippable 5
+   - ✓ `nats_e2e_shell_wrapper_exists` (file_exists) — scripts/governance/run_truth_graph_nats_e2e_demo.sh present
+   - ✓ `a2a_gate_tests_exist` (file_contains) — pattern "receipt or it didn't happen" found in tests/test_a2a_gate.py
+   - ✓ `registry_presence_tests_exist` (file_contains) — pattern 'heartbeat_status' found in tests/test_agent_registry_presence.py
+-  - ✓ `repo_context_projection_passes` (test_passes) — pytest tests/test_truth_graph_repo_context.py: PASS — 1 passed in 0.56s
++  - ✓ `repo_context_projection_passes` (test_passes) — pytest tests/test_truth_graph_repo_context.py: PASS — 1 passed in 1.12s
+   - ✓ `truth_graph_projection_on_main` (commit_on_main) — 936d365db is an ancestor of origin/main
+ 
+ ## `composer-holon-spine-longrun-2026-06` — SHIPPABLE
+@@ -120,7 +120,7 @@ Active tracks: **10** (warn 5, max 10) — shippable 5
+   - ✓ `holon_bridge_verifier_exists` (file_exists) — tests/test_holon_bridge.py present
+   - ✓ `holon_runtime_verifier_exists` (file_exists) — tests/test_holon_runtime.py present
+   - ✓ `composer_wake_witness_pending` (file_exists) — reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md present
+-  - ✓ `holon_bridge_verifier_passes` (test_passes) — pytest tests/test_holon_bridge.py: PASS — 15 passed, 1 skipped in 0.34s
++  - ✓ `holon_bridge_verifier_passes` (test_passes) — pytest tests/test_holon_bridge.py: PASS — 16 passed in 0.14s
+   - ✓ `holon_substrate_on_main` (commit_on_main) — 9c76b210 is an ancestor of origin/main
+ 
+ ## `provider-routing-consolidation-2026-06` — SHIPPABLE
+@@ -139,7 +139,7 @@ Active tracks: **10** (warn 5, max 10) — shippable 5
+   - ✓ `power_first_default` (file_contains) — pattern 'power_first' found in dharma_swarm/provider_policy.py
+   - ✓ `zhipu_provider_enum` (file_contains) — pattern 'ZHIPU' found in dharma_swarm/models.py
+   - ✓ `zhipu_provider_class` (file_contains) — pattern 'class ZhipuProvider' found in dharma_swarm/providers.py
+-  - ✓ `precedence_invariant_test_passes` (test_passes) — pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS — 1 passed in 0.28s
++  - ✓ `precedence_invariant_test_passes` (test_passes) — pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS — 1 passed in 0.12s
+   - ✓ `stage4_precedence_locked_on_main` (commit_on_main) — bc110d84 is an ancestor of origin/main
+ 
+ ## `orchestration-arena-v1-2026-06` — 9/9
+@@ -189,14 +189,14 @@ Active tracks: **10** (warn 5, max 10) — shippable 5
+   - ✓ `dossier_carries_organism_tie` (file_contains) — pattern 'How this serves the organism' found in docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md
+   - ✓ `stage_contract_reader_exists` (file_contains) — pattern 'class StageContract' found in dharma_swarm/fs_substrate/stage_contracts.py
+   - ✓ `stage_reader_routes_through_spine` (file_contains) — pattern 'invoke_agent' found in dharma_swarm/fs_substrate/stage_executor.py
+-  - ✓ `stage_contract_test_passes` (test_passes) — pytest tests/test_stage_contracts.py: PASS — 13 passed in 0.36s
++  - ✓ `stage_contract_test_passes` (test_passes) — pytest tests/test_stage_contracts.py: PASS — 13 passed in 0.14s
+   - ✓ `okf_projector_exists` (file_contains) — pattern 'def project_semantic_objects' found in dharma_swarm/fs_substrate/okf.py
+-  - ✓ `okf_roundtrip_test_passes` (test_passes) — pytest tests/test_okf_projection.py: PASS — 8 passed in 0.36s
++  - ✓ `okf_roundtrip_test_passes` (test_passes) — pytest tests/test_okf_projection.py: PASS — 8 passed in 0.18s
+   - ✓ `semantic_fs_facade_exists` (file_contains) — pattern 'def semantic_retrieve' found in dharma_swarm/fs_substrate/semantic_fs.py
+-  - ✓ `semantic_fs_test_passes` (test_passes) — pytest tests/test_semantic_fs.py: PASS — 5 passed in 0.34s
++  - ✓ `semantic_fs_test_passes` (test_passes) — pytest tests/test_semantic_fs.py: PASS — 5 passed in 0.14s
+   - ✓ `organizer_dry_run_first_exists` (file_contains) — pattern 'def propose_organization' found in dharma_swarm/fs_substrate/organizer.py
+-  - ✓ `organizer_test_passes` (test_passes) — pytest tests/test_organizer.py: PASS — 5 passed in 0.30s
+-  - ✓ `fs_substrate_e2e_passes` (test_passes) — pytest tests/test_fs_substrate_e2e.py: PASS — 4 passed in 0.40s
++  - ✓ `organizer_test_passes` (test_passes) — pytest tests/test_organizer.py: PASS — 5 passed in 0.13s
++  - ✓ `fs_substrate_e2e_passes` (test_passes) — pytest tests/test_fs_substrate_e2e.py: PASS — 4 passed in 1.92s
+ 
+ ## Findings
+ 
+diff --git a/reports/governance/track_portfolio.json b/reports/governance/track_portfolio.json
+index d92324291..39a860d5e 100644
+--- a/reports/governance/track_portfolio.json
++++ b/reports/governance/track_portfolio.json
+@@ -1,5 +1,5 @@
+ {
+-  "generated_at": "2026-06-25T05:45:22+00:00",
++  "generated_at": "2026-06-26T01:35:06+09:00",
+   "schema_version": 2,
+   "active_track_id": "runtime-truth-reconciliation-2026-06",
+   "shippable": true,
+@@ -13,91 +13,106 @@
+       "id": "runtime_spine_package_exists",
+       "kind": "file_exists",
+       "passed": true,
+-      "detail": "dharma_swarm/spine/__init__.py present"
++      "detail": "dharma_swarm/spine/__init__.py present",
++      "executed": true
+     },
+     {
+       "id": "receipt_equivalence_matrix_exists",
+       "kind": "file_exists",
+       "passed": true,
+-      "detail": "docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md present"
++      "detail": "docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md present",
++      "executed": true
+     },
+     {
+       "id": "a2a_persistence_invariant_tests_exist",
+       "kind": "file_exists",
+       "passed": true,
+-      "detail": "tests/test_spine_persistence_invariant.py present"
++      "detail": "tests/test_spine_persistence_invariant.py present",
++      "executed": true
+     },
+     {
+       "id": "runtime_truth_packet_defined",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'class RuntimeTruthPacket' found in dharma_swarm/operator_core/contracts.py"
++      "detail": "pattern 'class RuntimeTruthPacket' found in dharma_swarm/operator_core/contracts.py",
++      "executed": true
+     },
+     {
+       "id": "runtime_truth_axes_defined",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'class RuntimeTruthState' found in dharma_swarm/operator_core/contracts.py"
++      "detail": "pattern 'class RuntimeTruthState' found in dharma_swarm/operator_core/contracts.py",
++      "executed": true
+     },
+     {
+       "id": "onboard_runtime_truth_render",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'render_runtime_truth' found in scripts/governance/agent_onboard.py"
++      "detail": "pattern 'render_runtime_truth' found in scripts/governance/agent_onboard.py",
++      "executed": true
+     },
+     {
+       "id": "onboard_runtime_truth_no_write_test",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'test_runtime_truth_render_is_read_only' found in tests/test_agent_onboard.py"
++      "detail": "pattern 'test_runtime_truth_render_is_read_only' found in tests/test_agent_onboard.py",
++      "executed": true
+     },
+     {
+       "id": "runtime_truth_packet_axis_test",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'test_runtime_truth_packet_keeps_state_axes_separate' found in tests/test_operator_core_contracts.py"
++      "detail": "pattern 'test_runtime_truth_packet_keeps_state_axes_separate' found in tests/test_operator_core_contracts.py",
++      "executed": true
+     },
+     {
+       "id": "a2a_single_persistence_invariant",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'test_submit_via_spine_retry_does_not_create_second_runtime_receipt' found in tests/test_spine_persistence_invariant.py"
++      "detail": "pattern 'test_submit_via_spine_retry_does_not_create_second_runtime_receipt' found in tests/test_spine_persistence_invariant.py",
++      "executed": true
+     },
+     {
+       "id": "spine_bypass_report_exists",
+       "kind": "file_exists",
+       "passed": true,
+-      "detail": "scripts/governance/spine_bypass_report.py present"
++      "detail": "scripts/governance/spine_bypass_report.py present",
++      "executed": true
+     },
+     {
+       "id": "receipt_json_projection_only_doc",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'projection/cache only' found in docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md"
++      "detail": "pattern 'projection/cache only' found in docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md",
++      "executed": true
+     },
+     {
+       "id": "correlation_spine_manifest_still_declared",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml"
++      "detail": "pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml",
++      "executed": true
+     },
+     {
+       "id": "evidence_receipt_still_defined",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py"
++      "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py",
++      "executed": true
+     },
+     {
+       "id": "runtime_receipt_still_defined",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py"
++      "detail": "pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py",
++      "executed": true
+     },
+     {
+       "id": "operator_core_contracts_pass",
+       "kind": "test_passes",
+       "passed": true,
+-      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 1.56s"
++      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.25s",
++      "executed": true
+     }
+   ],
+   "portfolio_summary": {
+@@ -181,91 +196,106 @@
+           "id": "runtime_spine_package_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/spine/__init__.py present"
++          "detail": "dharma_swarm/spine/__init__.py present",
++          "executed": true
+         },
+         {
+           "id": "receipt_equivalence_matrix_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md present"
++          "detail": "docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md present",
++          "executed": true
+         },
+         {
+           "id": "a2a_persistence_invariant_tests_exist",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "tests/test_spine_persistence_invariant.py present"
++          "detail": "tests/test_spine_persistence_invariant.py present",
++          "executed": true
+         },
+         {
+           "id": "runtime_truth_packet_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class RuntimeTruthPacket' found in dharma_swarm/operator_core/contracts.py"
++          "detail": "pattern 'class RuntimeTruthPacket' found in dharma_swarm/operator_core/contracts.py",
++          "executed": true
+         },
+         {
+           "id": "runtime_truth_axes_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class RuntimeTruthState' found in dharma_swarm/operator_core/contracts.py"
++          "detail": "pattern 'class RuntimeTruthState' found in dharma_swarm/operator_core/contracts.py",
++          "executed": true
+         },
+         {
+           "id": "onboard_runtime_truth_render",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'render_runtime_truth' found in scripts/governance/agent_onboard.py"
++          "detail": "pattern 'render_runtime_truth' found in scripts/governance/agent_onboard.py",
++          "executed": true
+         },
+         {
+           "id": "onboard_runtime_truth_no_write_test",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_runtime_truth_render_is_read_only' found in tests/test_agent_onboard.py"
++          "detail": "pattern 'test_runtime_truth_render_is_read_only' found in tests/test_agent_onboard.py",
++          "executed": true
+         },
+         {
+           "id": "runtime_truth_packet_axis_test",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_runtime_truth_packet_keeps_state_axes_separate' found in tests/test_operator_core_contracts.py"
++          "detail": "pattern 'test_runtime_truth_packet_keeps_state_axes_separate' found in tests/test_operator_core_contracts.py",
++          "executed": true
+         },
+         {
+           "id": "a2a_single_persistence_invariant",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_submit_via_spine_retry_does_not_create_second_runtime_receipt' found in tests/test_spine_persistence_invariant.py"
++          "detail": "pattern 'test_submit_via_spine_retry_does_not_create_second_runtime_receipt' found in tests/test_spine_persistence_invariant.py",
++          "executed": true
+         },
+         {
+           "id": "spine_bypass_report_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/governance/spine_bypass_report.py present"
++          "detail": "scripts/governance/spine_bypass_report.py present",
++          "executed": true
+         },
+         {
+           "id": "receipt_json_projection_only_doc",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'projection/cache only' found in docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md"
++          "detail": "pattern 'projection/cache only' found in docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md",
++          "executed": true
+         },
+         {
+           "id": "correlation_spine_manifest_still_declared",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml"
++          "detail": "pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml",
++          "executed": true
+         },
+         {
+           "id": "evidence_receipt_still_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py"
++          "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py",
++          "executed": true
+         },
+         {
+           "id": "runtime_receipt_still_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py"
++          "detail": "pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py",
++          "executed": true
+         },
+         {
+           "id": "operator_core_contracts_pass",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 1.56s"
++          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.25s",
++          "executed": true
+         }
+       ]
+     },
+@@ -306,19 +336,22 @@
+           "id": "nats_master_spec_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present"
++          "detail": "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present",
++          "executed": true
+         },
+         {
+           "id": "nats_master_spec_present",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present"
++          "detail": "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present",
++          "executed": true
+         },
+         {
+           "id": "nats_transport_landed",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'NATS' found in docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md"
++          "detail": "pattern 'NATS' found in docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
++          "executed": true
+         }
+       ]
+     },
+@@ -364,61 +397,71 @@
+           "id": "spine_package_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/spine/__init__.py present"
++          "detail": "dharma_swarm/spine/__init__.py present",
++          "executed": true
+         },
+         {
+           "id": "invoke_agent_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py"
++          "detail": "pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py",
++          "executed": true
+         },
+         {
+           "id": "a2a_bridge_calls_spine",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/a2a/a2a_bridge.py"
++          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/a2a/a2a_bridge.py",
++          "executed": true
+         },
+         {
+           "id": "orchestrator_calls_spine",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/orchestrator.py"
++          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/orchestrator.py",
++          "executed": true
+         },
+         {
+           "id": "agent_runner_calls_spine",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/agent_runner.py"
++          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/agent_runner.py",
++          "executed": true
+         },
+         {
+           "id": "dispatch_emits_evidence_receipt",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_every_dispatch_emits_exactly_one_evidence_receipt' found in tests/test_spine_adoption_dispatch.py"
++          "detail": "pattern 'test_every_dispatch_emits_exactly_one_evidence_receipt' found in tests/test_spine_adoption_dispatch.py",
++          "executed": true
+         },
+         {
+           "id": "zero_dropoff_sources",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_no_dropoff_sources_remain' found in tests/test_spine_adoption_dispatch.py"
++          "detail": "pattern 'test_no_dropoff_sources_remain' found in tests/test_spine_adoption_dispatch.py",
++          "executed": true
+         },
+         {
+           "id": "bypass_allowlist_empty",
+           "kind": "file_contains",
+           "passed": false,
+-          "detail": "pattern '(?m)^_INTENTIONAL_BYPASS: dict\\\\[tuple\\\\[str, int\\\\], str\\\\] = \\\\{\\\\s*\\\\}' NOT FOUND in scripts/governance/spine_bypass_report.py"
++          "detail": "pattern '(?m)^_INTENTIONAL_BYPASS: dict\\\\[tuple\\\\[str, int\\\\], str\\\\] = \\\\{\\\\s*\\\\}' NOT FOUND in scripts/governance/spine_bypass_report.py",
++          "executed": true
+         },
+         {
+           "id": "adoption_narrative_docs",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/architecture/SPINE_ADOPTION_NARRATIVE.md present"
++          "detail": "docs/architecture/SPINE_ADOPTION_NARRATIVE.md present",
++          "executed": true
+         },
+         {
+           "id": "gate1_witnessed",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "reports/governance/GATE1_WITNESSED.md present"
++          "detail": "reports/governance/GATE1_WITNESSED.md present",
++          "executed": true
+         }
+       ]
+     },
+@@ -460,79 +503,92 @@
+           "id": "loop_map_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "CYBERNETIC_LOOP_MAP.md present"
++          "detail": "CYBERNETIC_LOOP_MAP.md present",
++          "executed": true
+         },
+         {
+           "id": "loop_supervisor_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/loop_supervisor.py present"
++          "detail": "dharma_swarm/loop_supervisor.py present",
++          "executed": true
+         },
+         {
+           "id": "phase0_dossier_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md present"
++          "detail": "reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md present",
++          "executed": true
+         },
+         {
+           "id": "phase0_fresh_status_table",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'Fresh 13-loop status table' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md"
++          "detail": "pattern 'Fresh 13-loop status table' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md",
++          "executed": true
+         },
+         {
+           "id": "one_wire_invariant_stated",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'never let internal artifacts touch archive fitness' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md"
++          "detail": "pattern 'never let internal artifacts touch archive fitness' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md",
++          "executed": true
+         },
+         {
+           "id": "loop1_closure_receipt_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md present"
++          "detail": "reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md present",
++          "executed": true
+         },
+         {
+           "id": "campaign_retrospective_exists",
+           "kind": "file_exists",
+           "passed": false,
+-          "detail": "reports/loop_closure/RETROSPECTIVE.md MISSING"
++          "detail": "reports/loop_closure/RETROSPECTIVE.md MISSING",
++          "executed": true
+         },
+         {
+           "id": "cybernetics_codex_manifest_registered",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'id: cybernetics_codex' found in ACTIVE_SURFACE_MANIFEST.yaml"
++          "detail": "pattern 'id: cybernetics_codex' found in ACTIVE_SURFACE_MANIFEST.yaml",
++          "executed": true
+         },
+         {
+           "id": "cybernetics_codex_seed_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/agents/cybernetics_codex/agent.seed.yaml present"
++          "detail": "docs/agents/cybernetics_codex/agent.seed.yaml present",
++          "executed": true
+         },
+         {
+           "id": "cybernetics_codex_soul_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/agents/cybernetics_codex/SOUL.md present"
++          "detail": "docs/agents/cybernetics_codex/SOUL.md present",
++          "executed": true
+         },
+         {
+           "id": "cybernetics_codex_context_desk_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/agents/cybernetics_codex/CONTEXT_ENGINEERING.md present"
++          "detail": "docs/agents/cybernetics_codex/CONTEXT_ENGINEERING.md present",
++          "executed": true
+         },
+         {
+           "id": "cybernetics_codex_audit_script_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/governance/cybernetics_codex_audit.py present"
++          "detail": "scripts/governance/cybernetics_codex_audit.py present",
++          "executed": true
+         },
+         {
+           "id": "cybernetics_codex_registration_script_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/governance/register_cybernetics_codex.py present"
++          "detail": "scripts/governance/register_cybernetics_codex.py present",
++          "executed": true
+         }
+       ]
+     },
+@@ -583,121 +639,141 @@
+           "id": "identity_owner_on_branch",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "foundations/THE_ORGANISM.md present"
++          "detail": "foundations/THE_ORGANISM.md present",
++          "executed": true
+         },
+         {
+           "id": "vision_owner_on_branch",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/vision_maps/NORTH_STAR.md present"
++          "detail": "docs/vision_maps/NORTH_STAR.md present",
++          "executed": true
+         },
+         {
+           "id": "orientation_graph_owner_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/governance/orientation_graph.py present"
++          "detail": "scripts/governance/orientation_graph.py present",
++          "executed": true
+         },
+         {
+           "id": "expanded_orientation_packet_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class OrientationPacket' found in scripts/governance/orientation_graph.py"
++          "detail": "pattern 'class OrientationPacket' found in scripts/governance/orientation_graph.py",
++          "executed": true
+         },
+         {
+           "id": "repo_context_writer_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def write_repo_context' found in scripts/governance/orientation_graph.py"
++          "detail": "pattern 'def write_repo_context' found in scripts/governance/orientation_graph.py",
++          "executed": true
+         },
+         {
+           "id": "repo_context_hash_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'context_hash' found in scripts/governance/orientation_graph.py"
++          "detail": "pattern 'context_hash' found in scripts/governance/orientation_graph.py",
++          "executed": true
+         },
+         {
+           "id": "make_orient_writes_context",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern '--write-context' found in Makefile"
++          "detail": "pattern '--write-context' found in Makefile",
++          "executed": true
+         },
+         {
+           "id": "orientation_default_read_only_test",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_orientation_graph_render_is_read_only' found in tests/test_orientation_graph.py"
++          "detail": "pattern 'test_orientation_graph_render_is_read_only' found in tests/test_orientation_graph.py",
++          "executed": true
+         },
+         {
+           "id": "repo_context_test_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_truth_graph_repo_context_writes_json_and_markdown' found in tests/test_truth_graph_repo_context.py"
++          "detail": "pattern 'test_truth_graph_repo_context_writes_json_and_markdown' found in tests/test_truth_graph_repo_context.py",
++          "executed": true
+         },
+         {
+           "id": "a2a_receipt_gate_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/a2a/task_receipt.py present"
++          "detail": "dharma_swarm/a2a/task_receipt.py present",
++          "executed": true
+         },
+         {
+           "id": "a2a_receipt_schema_declared",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'dharma_a2a_task_receipt.v1' found in dharma_swarm/a2a/task_receipt.py"
++          "detail": "pattern 'dharma_a2a_task_receipt.v1' found in dharma_swarm/a2a/task_receipt.py",
++          "executed": true
+         },
+         {
+           "id": "a2a_receipted_inbox_reader_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def read_receipted_inbox' found in dharma_swarm/a2a/task_receipt.py"
++          "detail": "pattern 'def read_receipted_inbox' found in dharma_swarm/a2a/task_receipt.py",
++          "executed": true
+         },
+         {
+           "id": "agent_presence_projection_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/a2a/agent_presence.py present"
++          "detail": "dharma_swarm/a2a/agent_presence.py present",
++          "executed": true
+         },
+         {
+           "id": "agent_presence_stale_red",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'age > 2' found in dharma_swarm/a2a/agent_presence.py"
++          "detail": "pattern 'age > 2' found in dharma_swarm/a2a/agent_presence.py",
++          "executed": true
+         },
+         {
+           "id": "nats_e2e_demo_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/governance/truth_graph_nats_e2e_demo.py present"
++          "detail": "scripts/governance/truth_graph_nats_e2e_demo.py present",
++          "executed": true
+         },
+         {
+           "id": "nats_e2e_shell_wrapper_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/governance/run_truth_graph_nats_e2e_demo.sh present"
++          "detail": "scripts/governance/run_truth_graph_nats_e2e_demo.sh present",
++          "executed": true
+         },
+         {
+           "id": "a2a_gate_tests_exist",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern \"receipt or it didn't happen\" found in tests/test_a2a_gate.py"
++          "detail": "pattern \"receipt or it didn't happen\" found in tests/test_a2a_gate.py",
++          "executed": true
+         },
+         {
+           "id": "registry_presence_tests_exist",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'heartbeat_status' found in tests/test_agent_registry_presence.py"
++          "detail": "pattern 'heartbeat_status' found in tests/test_agent_registry_presence.py",
++          "executed": true
+         },
+         {
+           "id": "repo_context_projection_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 0.56s"
++          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 1.12s",
++          "executed": true
+         },
+         {
+           "id": "truth_graph_projection_on_main",
+           "kind": "commit_on_main",
+           "passed": true,
+-          "detail": "936d365db is an ancestor of origin/main"
++          "detail": "936d365db is an ancestor of origin/main",
++          "executed": true
+         }
+       ]
+     },
+@@ -743,67 +819,78 @@
+           "id": "evidence_receipt_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py"
++          "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py",
++          "executed": true
+         },
+         {
+           "id": "holon_orchestrator_spec_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/sovereign_holons/HOLON_ORCHESTRATOR_BUILD_SPEC.md present"
++          "detail": "docs/sovereign_holons/HOLON_ORCHESTRATOR_BUILD_SPEC.md present",
++          "executed": true
+         },
+         {
+           "id": "holon_runtime_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/holon_runtime.py present"
++          "detail": "dharma_swarm/holon_runtime.py present",
++          "executed": true
+         },
+         {
+           "id": "readiness_packet_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md present"
++          "detail": "reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md present",
++          "executed": true
+         },
+         {
+           "id": "receipt_profile_documented",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'The command receipt is a profile of `dharma_swarm.spine.receipt.EvidenceReceipt`' found in reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md"
++          "detail": "pattern 'The command receipt is a profile of `dharma_swarm.spine.receipt.EvidenceReceipt`' found in reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md",
++          "executed": true
+         },
+         {
+           "id": "frozen_verifier_runbook_present",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'Frozen Non-Implementer Verifier Runbook' found in reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md"
++          "detail": "pattern 'Frozen Non-Implementer Verifier Runbook' found in reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md",
++          "executed": true
+         },
+         {
+           "id": "holon_bridge_verifier_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "tests/test_holon_bridge.py present"
++          "detail": "tests/test_holon_bridge.py present",
++          "executed": true
+         },
+         {
+           "id": "holon_runtime_verifier_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "tests/test_holon_runtime.py present"
++          "detail": "tests/test_holon_runtime.py present",
++          "executed": true
+         },
+         {
+           "id": "composer_wake_witness_pending",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md present"
++          "detail": "reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md present",
++          "executed": true
+         },
+         {
+           "id": "holon_bridge_verifier_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_holon_bridge.py: PASS \u2014 15 passed, 1 skipped in 0.34s"
++          "detail": "pytest tests/test_holon_bridge.py: PASS \u2014 16 passed in 0.14s",
++          "executed": true
+         },
+         {
+           "id": "holon_substrate_on_main",
+           "kind": "commit_on_main",
+           "passed": true,
+-          "detail": "9c76b210 is an ancestor of origin/main"
++          "detail": "9c76b210 is an ancestor of origin/main",
++          "executed": true
+         }
+       ]
+     },
+@@ -852,73 +939,85 @@
+           "id": "model_pool_owner_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/model_pool.py present"
++          "detail": "dharma_swarm/model_pool.py present",
++          "executed": true
+         },
+         {
+           "id": "provider_policy_owner_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/provider_policy.py present"
++          "detail": "dharma_swarm/provider_policy.py present",
++          "executed": true
+         },
+         {
+           "id": "model_hierarchy_owner_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/model_hierarchy.py present"
++          "detail": "dharma_swarm/model_hierarchy.py present",
++          "executed": true
+         },
+         {
+           "id": "routing_architecture_doc_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md present"
++          "detail": "docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md present",
++          "executed": true
+         },
+         {
+           "id": "routing_precedence_documented",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'explicit > capability' found in docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md"
++          "detail": "pattern 'explicit > capability' found in docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md",
++          "executed": true
+         },
+         {
+           "id": "explicit_provider_honored",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'preferred_provider' found in dharma_swarm/provider_policy.py"
++          "detail": "pattern 'preferred_provider' found in dharma_swarm/provider_policy.py",
++          "executed": true
+         },
+         {
+           "id": "explicit_wins_test_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_explicit_provider_is_selected' found in tests/test_provider_routing_explicit.py"
++          "detail": "pattern 'test_explicit_provider_is_selected' found in tests/test_provider_routing_explicit.py",
++          "executed": true
+         },
+         {
+           "id": "power_first_default",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'power_first' found in dharma_swarm/provider_policy.py"
++          "detail": "pattern 'power_first' found in dharma_swarm/provider_policy.py",
++          "executed": true
+         },
+         {
+           "id": "zhipu_provider_enum",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'ZHIPU' found in dharma_swarm/models.py"
++          "detail": "pattern 'ZHIPU' found in dharma_swarm/models.py",
++          "executed": true
+         },
+         {
+           "id": "zhipu_provider_class",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class ZhipuProvider' found in dharma_swarm/providers.py"
++          "detail": "pattern 'class ZhipuProvider' found in dharma_swarm/providers.py",
++          "executed": true
+         },
+         {
+           "id": "precedence_invariant_test_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.28s"
++          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.12s",
++          "executed": true
+         },
+         {
+           "id": "stage4_precedence_locked_on_main",
+           "kind": "commit_on_main",
+           "passed": true,
+-          "detail": "bc110d84 is an ancestor of origin/main"
++          "detail": "bc110d84 is an ancestor of origin/main",
++          "executed": true
+         }
+       ]
+     },
+@@ -967,73 +1066,85 @@
+           "id": "arena_runner_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/coordination/arena/runner.py present"
++          "detail": "dharma_swarm/coordination/arena/runner.py present",
++          "executed": true
+         },
+         {
+           "id": "arena_scorer_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/coordination/arena/scorer.py present"
++          "detail": "dharma_swarm/coordination/arena/scorer.py present",
++          "executed": true
+         },
+         {
+           "id": "orchestration_genome_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/coordination/genome.py present"
++          "detail": "dharma_swarm/coordination/genome.py present",
++          "executed": true
+         },
+         {
+           "id": "frozen_taskpack_present",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'TASK_PACK_ID' found in dharma_swarm/coordination/arena/taskpack.py"
++          "detail": "pattern 'TASK_PACK_ID' found in dharma_swarm/coordination/arena/taskpack.py",
++          "executed": true
+         },
+         {
+           "id": "deterministic_scorer_hash",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def scorer_hash' found in dharma_swarm/coordination/arena/scorer.py"
++          "detail": "pattern 'def scorer_hash' found in dharma_swarm/coordination/arena/scorer.py",
++          "executed": true
+         },
+         {
+           "id": "orchestration_genome_class",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class OrchestrationGenome' found in dharma_swarm/coordination/genome.py"
++          "detail": "pattern 'class OrchestrationGenome' found in dharma_swarm/coordination/genome.py",
++          "executed": true
+         },
+         {
+           "id": "zero_weight_orchestrator_map_elites",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class MapElitesArchive' found in dharma_swarm/coordination/orchestrator_v1.py"
++          "detail": "pattern 'class MapElitesArchive' found in dharma_swarm/coordination/orchestrator_v1.py",
++          "executed": true
+         },
+         {
+           "id": "dpi_decorrelation_gated_on_correctness",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def decorrelation_bonus' found in dharma_swarm/coordination/dpi.py"
++          "detail": "pattern 'def decorrelation_bonus' found in dharma_swarm/coordination/dpi.py",
++          "executed": true
+         },
+         {
+           "id": "council_trace_verification",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class Council' found in dharma_swarm/council/council.py"
++          "detail": "pattern 'class Council' found in dharma_swarm/council/council.py",
++          "executed": true
+         },
+         {
+           "id": "arena_v1_test_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def test_positive_lift_candidate_beats_best_single_at_parity' found in tests/test_arena_v1.py"
++          "detail": "pattern 'def test_positive_lift_candidate_beats_best_single_at_parity' found in tests/test_arena_v1.py",
++          "executed": true
+         },
+         {
+           "id": "dpi_test_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "tests/test_dpi.py present"
++          "detail": "tests/test_dpi.py present",
++          "executed": true
+         },
+         {
+           "id": "closure_checks_test_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "tests/test_coordination_closure_checks.py present"
++          "detail": "tests/test_coordination_closure_checks.py present",
++          "executed": true
+         }
+       ]
+     },
+@@ -1079,49 +1190,57 @@
+           "id": "pr_merge_control_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/runtime/pr_merge_control.py present"
++          "detail": "scripts/runtime/pr_merge_control.py present",
++          "executed": true
+         },
+         {
+           "id": "mike_daemon_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/runtime/merge_master_mike_daemon.py present"
++          "detail": "scripts/runtime/merge_master_mike_daemon.py present",
++          "executed": true
+         },
+         {
+           "id": "automerge_workflow_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": ".github/workflows/automerge.yml present"
++          "detail": ".github/workflows/automerge.yml present",
++          "executed": true
+         },
+         {
+           "id": "router_workflow_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": ".github/workflows/codex-mention-router.yml present"
++          "detail": ".github/workflows/codex-mention-router.yml present",
++          "executed": true
+         },
+         {
+           "id": "github_review_receipt_bridge",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'github_review' found in scripts/runtime/pr_merge_control.py"
++          "detail": "pattern 'github_review' found in scripts/runtime/pr_merge_control.py",
++          "executed": true
+         },
+         {
+           "id": "github_review_bridge_tested",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "tests/test_pr_merge_control_github_reviews.py present"
++          "detail": "tests/test_pr_merge_control_github_reviews.py present",
++          "executed": true
+         },
+         {
+           "id": "automerge_enrolls_all_nondraft",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'mike-watch' found in .github/workflows/automerge.yml"
++          "detail": "pattern 'mike-watch' found in .github/workflows/automerge.yml",
++          "executed": true
+         },
+         {
+           "id": "mike_cloud_heartbeat",
+           "kind": "file_contains",
+           "passed": false,
+-          "detail": "pattern 'schedule:' NOT FOUND in .github/workflows/merge-master-mike-backlog.yml"
++          "detail": "pattern 'schedule:' NOT FOUND in .github/workflows/merge-master-mike-backlog.yml",
++          "executed": true
+         }
+       ]
+     },
+@@ -1169,91 +1288,106 @@
+           "id": "dossier_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md present"
++          "detail": "docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md present",
++          "executed": true
+         },
+         {
+           "id": "spine_invoke_owner_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py"
++          "detail": "pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py",
++          "executed": true
+         },
+         {
+           "id": "handoff_owner_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/handoff.py present"
++          "detail": "dharma_swarm/handoff.py present",
++          "executed": true
+         },
+         {
+           "id": "dossier_consolidates_four_powers",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'The four powers at a glance' found in docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md"
++          "detail": "pattern 'The four powers at a glance' found in docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md",
++          "executed": true
+         },
+         {
+           "id": "dossier_carries_organism_tie",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'How this serves the organism' found in docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md"
++          "detail": "pattern 'How this serves the organism' found in docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md",
++          "executed": true
+         },
+         {
+           "id": "stage_contract_reader_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class StageContract' found in dharma_swarm/fs_substrate/stage_contracts.py"
++          "detail": "pattern 'class StageContract' found in dharma_swarm/fs_substrate/stage_contracts.py",
++          "executed": true
+         },
+         {
+           "id": "stage_reader_routes_through_spine",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'invoke_agent' found in dharma_swarm/fs_substrate/stage_executor.py"
++          "detail": "pattern 'invoke_agent' found in dharma_swarm/fs_substrate/stage_executor.py",
++          "executed": true
+         },
+         {
+           "id": "stage_contract_test_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_stage_contracts.py: PASS \u2014 13 passed in 0.36s"
++          "detail": "pytest tests/test_stage_contracts.py: PASS \u2014 13 passed in 0.14s",
++          "executed": true
+         },
+         {
+           "id": "okf_projector_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def project_semantic_objects' found in dharma_swarm/fs_substrate/okf.py"
++          "detail": "pattern 'def project_semantic_objects' found in dharma_swarm/fs_substrate/okf.py",
++          "executed": true
+         },
+         {
+           "id": "okf_roundtrip_test_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_okf_projection.py: PASS \u2014 8 passed in 0.36s"
++          "detail": "pytest tests/test_okf_projection.py: PASS \u2014 8 passed in 0.18s",
++          "executed": true
+         },
+         {
+           "id": "semantic_fs_facade_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def semantic_retrieve' found in dharma_swarm/fs_substrate/semantic_fs.py"
++          "detail": "pattern 'def semantic_retrieve' found in dharma_swarm/fs_substrate/semantic_fs.py",
++          "executed": true
+         },
+         {
+           "id": "semantic_fs_test_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_semantic_fs.py: PASS \u2014 5 passed in 0.34s"
++          "detail": "pytest tests/test_semantic_fs.py: PASS \u2014 5 passed in 0.14s",
++          "executed": true
+         },
+         {
+           "id": "organizer_dry_run_first_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def propose_organization' found in dharma_swarm/fs_substrate/organizer.py"
++          "detail": "pattern 'def propose_organization' found in dharma_swarm/fs_substrate/organizer.py",
++          "executed": true
+         },
+         {
+           "id": "organizer_test_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_organizer.py: PASS \u2014 5 passed in 0.30s"
++          "detail": "pytest tests/test_organizer.py: PASS \u2014 5 passed in 0.13s",
++          "executed": true
+         },
+         {
+           "id": "fs_substrate_e2e_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_fs_substrate_e2e.py: PASS \u2014 4 passed in 0.40s"
++          "detail": "pytest tests/test_fs_substrate_e2e.py: PASS \u2014 4 passed in 1.92s",
++          "executed": true
+         }
+       ]
+     }
+diff --git a/tests/test_okf_projection.py b/tests/test_okf_projection.py
+index 03aad07ba..40e9960dd 100644
+--- a/tests/test_okf_projection.py
++++ b/tests/test_okf_projection.py
+@@ -94,15 +94,16 @@ def test_missing_type_defaults_not_fatal(tmp_path):
+     assert concepts and concepts[0].type == "unknown"
+ 
+ 
+-def test_project_semantic_objects_uses_kind_as_type():
++def test_project_semantic_objects_uses_manifest_kind_as_type():
+     if not SEMANTIC_OBJECTS.is_file():
+         return  # manifest is the owner; skip cleanly if absent on this branch
+     concepts = project_semantic_objects(SEMANTIC_OBJECTS)
+     assert concepts, "expected at least one projected concept"
+     by_title = {c.title: c for c in concepts}
+-    # A2ACard is a runtime_object in the manifest -> that is its OKF type.
++    # A2ACard used to be a runtime_object in the legacy mapping manifest. The
++    # list-shaped Semantic Commons manifest carries the narrower object_kind.
+     if "A2ACard" in by_title:
+-        assert by_title["A2ACard"].type == "runtime_object"
++        assert by_title["A2ACard"].type in {"runtime_object", "runtime_identity_card"}
+         assert by_title["A2ACard"].rel_path == "objects/A2ACard.md"
+ 
+ 

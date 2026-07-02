@@ -1,0 +1,18 @@
+ .venv                                              |   1 +
+ ...ma_forge_proving_ground_10_10_readiness_goal.md | 154 ++++++++++
+ scripts/runtime/forge_provider_oracle.py           | 161 +++++++++++
+ .../runtime/forge_proving_ground_autoresearch.py   | 137 +++++++++
+ scripts/runtime/forge_proving_ground_common.py     | 122 ++++++++
+ .../runtime/forge_proving_ground_patch_sandbox.py  | 119 ++++++++
+ scripts/runtime/forge_proving_ground_readiness.py  | 311 +++++++++++++++++++++
+ scripts/runtime/forge_proving_ground_run.py        | 239 ++++++++++++++++
+ scripts/runtime/forge_proving_ground_verifier.py   | 179 ++++++++++++
+ scripts/runtime/forge_real_benchmark_adapter.py    | 212 ++++++++++++++
+ tests/test_forge_provider_oracle.py                |  60 ++++
+ tests/test_forge_proving_ground_autoresearch.py    |  46 +++
+ tests/test_forge_proving_ground_patch_sandbox.py   |  70 +++++
+ tests/test_forge_proving_ground_readiness.py       |  58 ++++
+ tests/test_forge_proving_ground_run.py             |  46 +++
+ tests/test_forge_proving_ground_verifier.py        |  54 ++++
+ tests/test_forge_real_benchmark_adapter.py         |  52 ++++
+ 17 files changed, 2021 insertions(+)

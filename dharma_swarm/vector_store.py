@@ -22,6 +22,7 @@ import importlib
 import json
 import logging
 import os
+import re
 import sqlite3
 import struct
 from datetime import datetime, timezone
@@ -31,6 +32,19 @@ from typing import Any, Protocol, runtime_checkable
 import numpy as np
 
 logger = logging.getLogger(__name__)
+_FTS_TOKEN_RE = re.compile(r"[\w]+", re.UNICODE)
+_LOW_SIGNAL_QUERY_TERMS = {
+    "about",
+    "document",
+    "documents",
+    "entry",
+    "memory",
+    "query",
+    "retrieval",
+    "search",
+    "system",
+    "topic",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -43,6 +57,93 @@ def _utc_now() -> datetime:
 
 def _utc_now_iso() -> str:
     return _utc_now().isoformat()
+
+
+def _fts_match_query(query_text: str) -> str:
+    """Return a conservative FTS5 MATCH expression for arbitrary operator text."""
+
+    terms = [term for term in _FTS_TOKEN_RE.findall(query_text) if len(term) > 1]
+    return " OR ".join(f'"{term}"' for term in terms)
+
+
+def _is_degenerate_query_embedding(query_text: str, query_vec: list[float]) -> bool:
+    """Detect low-information query vectors that cause false-positive ANN hits."""
+
+    query_terms = [term for term in _FTS_TOKEN_RE.findall(query_text) if len(term) > 1]
+    if len(query_terms) <= 1:
+        return False
+    active_dims = sum(1 for value in query_vec if abs(float(value)) > 1e-9)
+    return active_dims <= 1
+
+
+def _candidate_has_query_lexical_signal(query_text: str, row: dict[str, Any]) -> bool:
+    query_terms = _query_signal_terms(query_text)
+    if not query_terms:
+        return False
+    return _candidate_query_signal_count(query_terms, row) > 0
+
+
+def _query_signal_terms(query_text: str) -> set[str]:
+    return {
+        term.lower()
+        for term in _FTS_TOKEN_RE.findall(query_text)
+        if len(term) > 1 and term.lower() not in _LOW_SIGNAL_QUERY_TERMS
+    }
+
+
+def _candidate_query_signal_count(
+    query_terms: set[str],
+    row: dict[str, Any],
+    *,
+    field: str = "all",
+) -> int:
+    if not query_terms:
+        return 0
+    if field == "prefix":
+        candidate_text = str(row.get("content", ""))[:360]
+    elif field == "source":
+        candidate_text = str(row.get("source", ""))
+    else:
+        candidate_text = f"{row.get('content', '')} {row.get('source', '')}"
+    candidate_terms = {
+        term.lower()
+        for term in _FTS_TOKEN_RE.findall(candidate_text)
+        if len(term) > 1
+    }
+    return len(query_terms & candidate_terms)
+
+
+def _filter_and_rank_vector_results(
+    query_text: str,
+    results: list[dict[str, Any]],
+    *,
+    degenerate_query: bool,
+    memory_prefilter: bool,
+) -> list[dict[str, Any]]:
+    query_terms = _query_signal_terms(query_text)
+    ranked: list[tuple[tuple[int, int, int, float], dict[str, Any]]] = []
+    min_overlap = 2 if len(query_terms) >= 3 else 1
+    for row in results:
+        distance = float(row.get("distance", 1.0) or 1.0)
+        overlap = _candidate_query_signal_count(query_terms, row)
+        if degenerate_query or memory_prefilter:
+            if overlap < min_overlap:
+                continue
+        prefix_overlap = _candidate_query_signal_count(query_terms, row, field="prefix")
+        source_overlap = _candidate_query_signal_count(query_terms, row, field="source")
+        ranked.append(((-prefix_overlap, -source_overlap, -overlap, distance), row))
+    if not ranked and not (degenerate_query or memory_prefilter):
+        return results
+    ranked.sort(key=lambda item: item[0])
+    return [row for _rank, row in ranked]
+
+
+def _memory_retrieval_prefilter_available(conn: sqlite3.Connection) -> bool:
+    try:
+        conn.execute("SELECT vec_doc_id FROM memory_retrieval_docs LIMIT 1").fetchone()
+        return True
+    except Exception:
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -145,9 +246,15 @@ class TFIDFEmbedder:
     Pickle-persisted alongside the SQLite database so vocab survives restarts.
     """
 
-    def __init__(self, dim: int = 128, state_path: Path | None = None) -> None:
+    def __init__(
+        self,
+        dim: int = 128,
+        state_path: Path | None = None,
+        fit_on_embed: bool = True,
+    ) -> None:
         self._dim = dim
         self._state_path = state_path  # Path for pickle persistence
+        self._fit_on_embed = fit_on_embed
         self._vectorizer: Any = None   # TfidfVectorizer
         self._svd: Any = None          # TruncatedSVD
         self._corpus: list[str] = []
@@ -172,14 +279,22 @@ class TFIDFEmbedder:
             return [[0.0] * self._dim for _ in texts]
 
         try:
-            # Bootstrap: if not fitted, use the texts themselves as initial corpus
             if not self._fitted or self._vectorizer is None:
-                self._fit(texts)
+                if self._corpus:
+                    self._fit(self._corpus)
+                if not self._fitted or self._vectorizer is None:
+                    if not self._fit_on_embed:
+                        return [[0.0] * self._dim for _ in texts]
+                    self._fit(texts)
+                if not self._fitted or self._vectorizer is None:
+                    return [[0.0] * self._dim for _ in texts]
 
             # Transform
             tfidf_matrix = self._vectorizer.transform(texts)
             if tfidf_matrix.shape[1] == 0:
-                # Empty vocabulary — refit with current texts
+                if not self._fit_on_embed:
+                    return [[0.0] * self._dim for _ in texts]
+                # Empty vocabulary — refit with current texts only for standalone embedders.
                 self._fit(texts)
                 tfidf_matrix = self._vectorizer.transform(texts)
 
@@ -191,7 +306,14 @@ class TFIDFEmbedder:
             # SVD may need refit if feature count changed
             actual_dim = min(self._dim, n_features)
             if self._svd is None or self._svd.n_components != actual_dim:
-                self._fit(texts)
+                if self._corpus:
+                    self._fit(self._corpus)
+                elif self._fit_on_embed:
+                    self._fit(texts)
+                else:
+                    return [[0.0] * self._dim for _ in texts]
+                if not self._fitted or self._vectorizer is None or self._svd is None:
+                    return [[0.0] * self._dim for _ in texts]
                 tfidf_matrix = self._vectorizer.transform(texts)
                 n_features = tfidf_matrix.shape[1]
                 actual_dim = min(self._dim, n_features)
@@ -224,6 +346,15 @@ class TFIDFEmbedder:
         if len(self._corpus) > 10000:
             self._corpus = self._corpus[-10000:]
         self._fit(self._corpus)
+
+    def fit_replace(self, texts: list[str]) -> None:
+        """Replace the persisted corpus and refit from trusted document text."""
+        self._corpus = []
+        self._corpus_hash = ""
+        self._fitted = False
+        self._vectorizer = None
+        self._svd = None
+        self._fit(texts[-10000:])
 
     def _fit(self, texts: list[str]) -> None:
         """Fit TF-IDF + SVD on provided texts."""
@@ -302,7 +433,9 @@ class TFIDFEmbedder:
             self._svd = None
             self._corpus = state.get("corpus", [])
             self._corpus_hash = state.get("corpus_hash", "")
-            self._fitted = False  # must refit since models aren't persisted
+            self._fitted = False
+            if self._corpus:
+                self._fit(self._corpus)
         except Exception as exc:
             logger.debug("TFIDFEmbedder._load_state failed: %s", exc)
 
@@ -339,19 +472,40 @@ class VectorStore:
         self._state_dir = state_dir
         self._db_path = state_dir / "vectors.db"
         self._embedder_path = state_dir / "tfidf_embedder.pkl"
+        self._memory_embedder_path = state_dir / "tfidf_embedder_memory_retrieval.pkl"
         self._dim = dim
+        self._memory_embedder: TFIDFEmbedder | None = None
+        self._memory_embedder_mtime: float | None = None
 
         # Embedder — TFIDFEmbedder by default, swappable
         if embedder is not None:
             self._embedder = embedder
         else:
-            self._embedder = TFIDFEmbedder(dim=dim, state_path=self._embedder_path)
+            self._embedder = TFIDFEmbedder(
+                dim=dim,
+                state_path=self._embedder_path,
+                fit_on_embed=False,
+            )
 
         try:
             self._state_dir.mkdir(parents=True, exist_ok=True)
             self._init_db()
         except Exception as exc:
             logger.debug("VectorStore init failed (non-fatal): %s", exc)
+
+    def _get_memory_retrieval_embedder(self) -> TFIDFEmbedder:
+        try:
+            mtime = self._memory_embedder_path.stat().st_mtime
+        except OSError:
+            mtime = None
+        if self._memory_embedder is None or self._memory_embedder_mtime != mtime:
+            self._memory_embedder = TFIDFEmbedder(
+                dim=self._dim,
+                state_path=self._memory_embedder_path,
+                fit_on_embed=False,
+            )
+            self._memory_embedder_mtime = mtime
+        return self._memory_embedder
 
     # ------------------------------------------------------------------
     # DB init
@@ -363,7 +517,11 @@ class VectorStore:
             import sqlite_vec
             conn = sqlite3.connect(str(self._db_path), timeout=10)
             conn.row_factory = sqlite3.Row
-            sqlite_vec.load(conn)
+            try:
+                conn.enable_load_extension(True)
+                sqlite_vec.load(conn)
+            finally:
+                conn.enable_load_extension(False)
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA synchronous=NORMAL")
             return conn
@@ -735,33 +893,60 @@ class VectorStore:
             return []
         conn = self._connect()
         try:
+            has_vec0 = self._has_vec0(conn)
+            memory_prefilter = has_vec0 and _memory_retrieval_prefilter_available(conn)
+            memory_embedder_available = (
+                memory_prefilter and self._memory_embedder_path.exists()
+            )
+            embedder = (
+                self._get_memory_retrieval_embedder()
+                if memory_embedder_available
+                else self._embedder
+            )
             # Embed the query
             try:
-                vecs = self._embedder.embed([query_text])
+                vecs = embedder.embed([query_text])
             except Exception:
                 vecs = [[0.0] * self._dim]
             if not vecs or not vecs[0]:
                 return []
             query_vec = vecs[0]
             packed_query = struct.pack(f"{self._dim}f", *query_vec)
+            degenerate_query = _is_degenerate_query_embedding(query_text, query_vec)
 
-            has_vec0 = self._has_vec0(conn)
             results: list[dict[str, Any]] = []
 
             if has_vec0:
                 try:
+                    candidate_k = max(top_k * 20, 100) if memory_prefilter else top_k * 2
                     # vec0 KNN search
-                    rows = conn.execute("""
-                        SELECT d.id, d.content, d.source, d.layer,
-                               d.metadata_json, d.event_time, d.ingestion_time,
-                               d.valid_until, d.confidence, d.access_count,
-                               d.last_accessed,
-                               e.distance
-                        FROM vec_embeddings e
-                        JOIN vec_documents d ON d.id = e.rowid
-                        WHERE e.embedding MATCH ?
-                          AND k = ?
-                    """, (packed_query, top_k * 2)).fetchall()
+                    if memory_prefilter:
+                        rows = conn.execute("""
+                            SELECT d.id, d.content, d.source, d.layer,
+                                   d.metadata_json, d.event_time, d.ingestion_time,
+                                   d.valid_until, d.confidence, d.access_count,
+                                   d.last_accessed,
+                                   e.distance
+                            FROM vec_embeddings e
+                            JOIN vec_documents d ON d.id = e.rowid
+                            WHERE e.embedding MATCH ?
+                              AND k = ?
+                              AND e.rowid IN (
+                                  SELECT vec_doc_id FROM memory_retrieval_docs
+                              )
+                        """, (packed_query, candidate_k)).fetchall()
+                    else:
+                        rows = conn.execute("""
+                            SELECT d.id, d.content, d.source, d.layer,
+                                   d.metadata_json, d.event_time, d.ingestion_time,
+                                   d.valid_until, d.confidence, d.access_count,
+                                   d.last_accessed,
+                                   e.distance
+                            FROM vec_embeddings e
+                            JOIN vec_documents d ON d.id = e.rowid
+                            WHERE e.embedding MATCH ?
+                              AND k = ?
+                        """, (packed_query, candidate_k)).fetchall()
 
                     for row in rows:
                         if not include_invalid and row["valid_until"] is not None:
@@ -776,6 +961,13 @@ class VectorStore:
                 if not self._fallback_vector_scan_allowed(conn):
                     return []
                 results = self._fallback_vector_search(conn, query_vec, top_k, include_invalid)
+
+            results = _filter_and_rank_vector_results(
+                query_text,
+                results,
+                degenerate_query=degenerate_query,
+                memory_prefilter=memory_prefilter,
+            )
 
             # Update access tracking
             for r in results[:top_k]:
@@ -858,10 +1050,9 @@ class VectorStore:
             if not self._fts_search_allowed(conn):
                 return []
 
-            # Sanitize query for FTS5
-            fts_query = " OR ".join(
-                w for w in query_text.split() if len(w) > 1
-            ) or query_text
+            fts_query = _fts_match_query(query_text)
+            if not fts_query:
+                return []
 
             rows = conn.execute("""
                 SELECT d.id, d.content, d.source, d.layer,

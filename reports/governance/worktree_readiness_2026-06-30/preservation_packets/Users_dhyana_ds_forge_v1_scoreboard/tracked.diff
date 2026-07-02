@@ -1,0 +1,1570 @@
+diff --git a/dharma_swarm/api_keys.py b/dharma_swarm/api_keys.py
+index 9d2a8e977..85ee8f8c6 100644
+--- a/dharma_swarm/api_keys.py
++++ b/dharma_swarm/api_keys.py
+@@ -27,6 +27,8 @@ GOOGLE_AI_API_KEY_ENV = "GOOGLE_AI_API_KEY"
+ SAMBANOVA_API_KEY_ENV = "SAMBANOVA_API_KEY"
+ MISTRAL_API_KEY_ENV = "MISTRAL_API_KEY"
+ CHUTES_API_KEY_ENV = "CHUTES_API_KEY"
++ZAI_API_KEY_ENV = "ZAI_API_KEY"
++KIMI_API_KEY_ENV = "KIMI_API_KEY"
+ MOONSHOT_API_KEY_ENV = "MOONSHOT_API_KEY"
+ NGC_API_KEY_ENV = "NGC_API_KEY"
+ NVIDIA_API_KEY_ENV = "NVIDIA_API_KEY"
+@@ -58,6 +60,8 @@ GOOGLE_AI_BASE_URL_ENV = "GOOGLE_AI_BASE_URL"
+ SAMBANOVA_BASE_URL_ENV = "SAMBANOVA_BASE_URL"
+ MISTRAL_BASE_URL_ENV = "MISTRAL_BASE_URL"
+ CHUTES_BASE_URL_ENV = "CHUTES_BASE_URL"
++ZAI_BASE_URL_ENV = "ZAI_BASE_URL"
++KIMI_BASE_URL_ENV = "KIMI_BASE_URL"
+ MOONSHOT_BASE_URL_ENV = "MOONSHOT_BASE_URL"
+ 
+ 
+@@ -88,6 +92,8 @@ PROVIDER_API_KEY_ENV_KEYS: dict[str, str] = {
+     "sambanova": SAMBANOVA_API_KEY_ENV,
+     "mistral": MISTRAL_API_KEY_ENV,
+     "chutes": CHUTES_API_KEY_ENV,
++    "zai": ZAI_API_KEY_ENV,
++    "kimi_code": KIMI_API_KEY_ENV,
+ }
+ 
+ CHAT_PROVIDER_API_KEY_ENV_KEYS: dict[str, str] = {
+@@ -99,6 +105,8 @@ CHAT_PROVIDER_API_KEY_ENV_KEYS: dict[str, str] = {
+     "together": TOGETHER_API_KEY_ENV,
+     "fireworks": FIREWORKS_API_KEY_ENV,
+     "nvidia_nim": NVIDIA_NIM_API_KEY_ENV,
++    "zai": ZAI_API_KEY_ENV,
++    "kimi_code": KIMI_API_KEY_ENV,
+ }
+ 
+ PROVIDER_BASE_URL_ENV_KEYS: dict[str, str] = {
+@@ -116,6 +124,8 @@ PROVIDER_BASE_URL_ENV_KEYS: dict[str, str] = {
+     "sambanova": SAMBANOVA_BASE_URL_ENV,
+     "mistral": MISTRAL_BASE_URL_ENV,
+     "chutes": CHUTES_BASE_URL_ENV,
++    "zai": ZAI_BASE_URL_ENV,
++    "kimi_code": KIMI_BASE_URL_ENV,
+ }
+ 
+ GINKO_API_KEY_ENV_VARS: dict[str, str] = {
+@@ -172,6 +182,14 @@ ENV_ALIASES: dict[str, str] = {
+     # dkeys may export DEEPSEEK_API_KEY; no first-class provider yet but
+     # OpenRouter is the canonical lane — alias for forward-compat
+     "DEEPSEEK_API_KEY": "DEEPSEEK_API_KEY",
++    # Z.ai / Zhipu / GLM local keys should all feed the first-class Z.ai route.
++    "GLM_API_KEY": ZAI_API_KEY_ENV,
++    "ZHIPU_API_KEY": ZAI_API_KEY_ENV,
++    "BIGMODEL_API_KEY": ZAI_API_KEY_ENV,
++    "GLM_API_KEY_ID": "ZAI_API_KEY_ID",
++    # Kimi Code membership API.  This is not the pay-as-you-go Moonshot
++    # Platform lane; callers should prefer KIMI_API_KEY for Kimi Code.
++    "MOONSHOT_KIMI_API_KEY": KIMI_API_KEY_ENV,
+ }
+ 
+ 
+@@ -390,6 +408,8 @@ __all__ = [
+     "GROQ_API_KEY_ENV",
+     "GROQ_BASE_URL_ENV",
+     "has_any_llm",
++    "KIMI_API_KEY_ENV",
++    "KIMI_BASE_URL_ENV",
+     "MISTRAL_API_KEY_ENV",
+     "MISTRAL_BASE_URL_ENV",
+     "MOONSHOT_API_KEY_ENV",
+@@ -414,6 +434,8 @@ __all__ = [
+     "SILICONFLOW_BASE_URL_ENV",
+     "TOGETHER_API_KEY_ENV",
+     "TOGETHER_BASE_URL_ENV",
++    "ZAI_API_KEY_ENV",
++    "ZAI_BASE_URL_ENV",
+     "env_has_value",
+     "env_value",
+     "load_runtime_env_files",
+diff --git a/dharma_swarm/evolution_roster.py b/dharma_swarm/evolution_roster.py
+index 31e419fed..35d357237 100644
+--- a/dharma_swarm/evolution_roster.py
++++ b/dharma_swarm/evolution_roster.py
+@@ -381,6 +381,15 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
+         256_000,
+         "Floor model via NVIDIA NIM hosted catalog (paced secondary route)",
+     ),
++    ModelSlot(
++        ProviderType.KIMI_CODE,
++        "kimi-for-coding",
++        "Kimi Code (stable latest)",
++        ModelTier.STRONG,
++        ("code", "reasoning", "long_context", "synthesis"),
++        256_000,
++        "Floor — direct Kimi Code membership API; stable id maps to latest K2.x Code",
++    ),
+     # ── NEW floor frontier (>= K2.6) — Ollama-Cloud lanes, keyless ─────
+     # The K2.6 floor the roster must SERVE. Live providers first: each rides
+     # the Ollama-Cloud keyless route ahead of any paid aggregator.
+@@ -438,6 +447,15 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
+         256_000,
+         "Floor — GLM-5.1 reasoning lane via Ollama Cloud (GLM-zai live)",
+     ),
++    ModelSlot(
++        ProviderType.ZAI,
++        "glm-5.2",
++        "GLM 5.2 (Z.ai)",
++        ModelTier.STRONG,
++        ("code", "reasoning", "long_context", "synthesis", "multilingual"),
++        1_000_000,
++        "Floor — direct Z.ai GLM-5.2 coding/reasoning lane",
++    ),
+     ModelSlot(
+         ProviderType.OLLAMA,
+         "minimax-m3:cloud",
+diff --git a/dharma_swarm/forge_v1/providers.py b/dharma_swarm/forge_v1/providers.py
+index 7cd9455f0..187060e50 100644
+--- a/dharma_swarm/forge_v1/providers.py
++++ b/dharma_swarm/forge_v1/providers.py
+@@ -14,6 +14,7 @@ Backends:
+ from __future__ import annotations
+ 
+ import asyncio
++import os
+ import re
+ from dataclasses import dataclass
+ 
+@@ -31,6 +32,7 @@ def _provider_for_model(model_id: str):
+     routing here means PoolCompletion.__init__ stays a one-liner.
+     """
+     from dharma_swarm.api_keys import bootstrap_runtime_env
++    from dharma_swarm.model_pool import MODEL_POWER_FLOOR, entry_for_model_id
+     from dharma_swarm.model_hierarchy import ProviderType
+     from dharma_swarm.runtime_provider import (
+         create_runtime_provider,
+@@ -41,12 +43,26 @@ def _provider_for_model(model_id: str):
+     bootstrap_runtime_env()
+ 
+     mid = (model_id or "").strip().lower()
+-    if mid.startswith("gpt") or mid.startswith("o1") or mid.startswith("o3"):
++    pool_entry = entry_for_model_id(model_id)
++    if pool_entry is not None:
++        if pool_entry.below_floor and os.environ.get("DHARMA_ALLOW_SUB_FLOOR_MODEL") != "1":
++            raise RuntimeError(
++                f"model {model_id!r} is below the {MODEL_POWER_FLOOR} floor "
++                "and is allowed only with DHARMA_ALLOW_SUB_FLOOR_MODEL=1 for "
++                "explicit grunt work"
++            )
++        exact_route = next((r for r in pool_entry.routes if r.model_id == model_id), None)
++        provider_type = (exact_route or pool_entry.routes[0]).provider
++    elif mid.startswith("gpt") or mid.startswith("o1") or mid.startswith("o3"):
+         provider_type = ProviderType.OPENAI
+     elif mid.startswith("claude") or mid.startswith("opus") or mid.startswith("sonnet"):
+         provider_type = ProviderType.ANTHROPIC
+     elif mid.startswith("gemini"):
+         provider_type = ProviderType.GOOGLE_AI
++    elif mid in {"kimi-for-coding", "kimi-code"} or mid.startswith("kimi_code/") or mid.startswith("kimi-code/"):
++        provider_type = ProviderType.KIMI_CODE
++    elif mid.startswith("glm-5.2") or mid.startswith("zai/") or mid.startswith("z-ai/"):
++        provider_type = ProviderType.ZAI
+     elif mid.endswith(":cloud") or mid.startswith("glm") or mid.startswith("kimi"):
+         provider_type = ProviderType.OLLAMA  # Ollama Cloud frontier chain
+     elif mid.startswith("meta/") or mid.startswith("nvidia/") or "llama" in mid:
+@@ -59,7 +75,12 @@ def _provider_for_model(model_id: str):
+     # Pass model only when the caller named a concrete id; otherwise let the
+     # provider config supply its canonical default (e.g. gemini-2.5-flash).
+     pass_model = model_id if mid not in ("", "default") else None
+-    config = resolve_runtime_provider_config(provider_type, model=pass_model)
++    model_timeout = int(os.environ.get("FORGE_MODEL_CALL_TIMEOUT_S", "240"))
++    config = resolve_runtime_provider_config(
++        provider_type,
++        model=pass_model,
++        timeout_seconds=model_timeout,
++    )
+     if not config.available:
+         raise RuntimeError(
+             f"PoolCompletion(model={model_id}) resolved provider "
+diff --git a/dharma_swarm/forge_v1/run_real.py b/dharma_swarm/forge_v1/run_real.py
+index 3fd03c7ec..d8f06c413 100644
+--- a/dharma_swarm/forge_v1/run_real.py
++++ b/dharma_swarm/forge_v1/run_real.py
+@@ -162,6 +162,9 @@ def build_repair_prompt(instance: dict, file_context: dict[str, str]) -> str:
+         "## Your task\n"
+         "Make the MINIMAL change needed to fix the bug. Do NOT touch tests. Output "
+         "must be valid Python.\n\n"
++        "IMPORTANT: Do NOT explain your reasoning, do NOT restate the file, and do NOT "
++        "say what you are about to do. Your ENTIRE response must be the edit block(s) "
++        "below and nothing else.\n\n"
+         "Return ONE OR MORE edits in this exact SEARCH/REPLACE format, and NOTHING "
+         "else:\n\n"
+         "<<<<<<< SEARCH path=django/db/models/base.py\n"
+@@ -273,6 +276,11 @@ class Proposal:
+     patch: str
+     tokens: int
+     error: str | None = None
++    # Diagnostics so a failed proposal is never opaque to the research loop.
++    raw_text: str = ""           # the model's full raw response
++    stop_reason: str | None = None  # 'stop' | 'length'(truncated) | provider-specific
++    prompt_chars: int = 0
++    n_edit_blocks: int = 0
+ 
+ 
+ # SEARCH/REPLACE output is small (just the changed lines), so the cap can be
+@@ -292,38 +300,64 @@ class SweBenchProposer:
+     per-call timeout on a stalled provider) is captured and returned as an errored
+     Proposal so one transient failure cannot kill a multi-hour run."""
+ 
+-    def __init__(self, model_id: str, temperature: float = 0.2, max_tokens: int = DIFF_MAX_TOKENS):
++    def __init__(self, model_id: str, temperature: float = 0.2, max_tokens: int = DIFF_MAX_TOKENS,
++                 timeout_s: int | None = None, continue_rounds: int = 3):
+         self.model_id = model_id
+         self.temperature = temperature
+         self.max_tokens = max_tokens
+-        self._completion = _DiffCompletion(model_id, temperature, max_tokens)
++        # MODEL_CALL_TIMEOUT_S is defined below this class; resolve at call time.
++        self._completion = _DiffCompletion(
++            model_id, temperature, max_tokens,
++            timeout_s=timeout_s if timeout_s is not None else MODEL_CALL_TIMEOUT_S,
++            continue_rounds=continue_rounds,
++        )
+ 
+-    def propose(self, instance: dict, file_context: dict[str, str]) -> Proposal:
+-        prompt = build_repair_prompt(instance, file_context)
++    def propose(self, instance: dict, file_context: dict[str, str],
++                prompt_context: dict[str, str] | None = None) -> Proposal:
++        # `prompt_context` is what the MODEL sees (optionally a windowed slice for
++        # small-context endpoints that hang on the full file). Edits are always
++        # applied against the FULL `file_context` — the window is a verbatim
++        # substring of it, so a SEARCH block from the window still matches.
++        prompt = build_repair_prompt(instance, prompt_context or file_context)
+         try:
+             text, tokens = self._completion.complete(prompt)
+         except Exception as e:  # transient/timeout provider error -> errored sample, not crash
+             return Proposal(model=self.model_id, patch="", tokens=0,
+-                            error=f"{type(e).__name__}: {e}")
++                            error=f"{type(e).__name__}: {e}",
++                            prompt_chars=len(prompt))
++
++        stop_reason = getattr(self._completion, "last_stop_reason", None)
++
++        def _mk(patch: str, error: str | None, n_blocks: int) -> Proposal:
++            return Proposal(model=self.model_id, patch=patch, tokens=tokens, error=error,
++                            raw_text=text, stop_reason=stop_reason,
++                            prompt_chars=len(prompt), n_edit_blocks=n_blocks)
+ 
+         # Primary path: SEARCH/REPLACE edit blocks applied to base content.
+         edits = parse_edit_blocks(text)
+         if edits:
+             new_files, err = apply_edit_blocks(file_context, edits)
+             if err:
+-                return Proposal(model=self.model_id, patch="", tokens=tokens, error=err)
++                return _mk("", err, len(edits))
+         else:
+             # Fallback: model returned whole `path=` files instead.
+             new_files = parse_full_files(text)
+             if not new_files:
+-                return Proposal(model=self.model_id, patch="", tokens=tokens,
+-                                error="no SEARCH/REPLACE or path= block in response")
++                # Distinguish a truncated response (model ran out of output budget
++                # mid-block) from a genuine format miss — they need different fixes.
++                if (stop_reason or "").lower() in ("length", "max_tokens", "max_output_tokens"):
++                    err = (f"truncated at max_tokens (stop_reason={stop_reason}); "
++                           f"no complete edit block in {len(text)} chars")
++                elif not text.strip():
++                    err = f"empty response (stop_reason={stop_reason})"
++                else:
++                    err = "no SEARCH/REPLACE or path= block in response"
++                return _mk("", err, 0)
+ 
+         patch = compute_unified_diff(file_context, new_files)
+         if not patch.strip():
+-            return Proposal(model=self.model_id, patch="", tokens=tokens,
+-                            error="edits produced no change vs base")
+-        return Proposal(model=self.model_id, patch=patch, tokens=tokens)
++            return _mk("", "edits produced no change vs base", len(edits))
++        return _mk(patch, None, len(edits))
+ 
+ 
+ # Hard wall-clock cap on ONE live model call. Without it, a stalled provider
+@@ -331,7 +365,32 @@ class SweBenchProposer:
+ # process at 0% CPU) hangs the whole run forever — provider.complete has no
+ # client-side timeout. asyncio.wait_for turns a hang into a TimeoutError that the
+ # proposer catches and records as an errored (unresolved) sample.
+-MODEL_CALL_TIMEOUT_S = 240
++MODEL_CALL_TIMEOUT_S = 600
++
++# Rate-limit (HTTP 429) repair: free/throttled tiers (e.g. gemini-2.5-flash free
++# tier ~RPM cap) return 429 with a "retry in Ns" / retryDelay hint. Rather than
++# burning the sample, wait the hinted delay (capped) and retry a few times.
++_RATE_LIMIT_RETRIES = 3
++_RATE_LIMIT_MAX_WAIT_S = 65
++
++
++def _rate_limit_wait_s(exc: Exception) -> float | None:
++    """If `exc` is a rate-limit (429) error, return how long to wait before retry
++    (seconds), parsed from the provider's hint; else None. Looks for 429 /
++    RESOURCE_EXHAUSTED and a 'retry in Ns' or retryDelay '...s' figure."""
++    msg = str(exc)
++    is_429 = (
++        "429" in msg
++        or "RESOURCE_EXHAUSTED" in msg
++        or "rate limit" in msg.lower()
++        or "rate-limit" in msg.lower()
++        or type(exc).__name__ in ("RateLimitError", "ResourceExhausted")
++    )
++    if not is_429:
++        return None
++    m = re.search(r"retry in ([\d.]+)\s*s", msg) or re.search(r"retryDelay'?:?\s*'?([\d.]+)s", msg)
++    delay = float(m.group(1)) if m else 20.0
++    return min(delay + 1.5, _RATE_LIMIT_MAX_WAIT_S)
+ 
+ 
+ class _DiffCompletion(PoolCompletion):
+@@ -339,11 +398,23 @@ class _DiffCompletion(PoolCompletion):
+     a hard per-call timeout so a hung provider can't stall the whole run."""
+ 
+     def __init__(self, model_id: str, temperature: float, max_tokens: int,
+-                 timeout_s: int = MODEL_CALL_TIMEOUT_S):
++                 timeout_s: int = MODEL_CALL_TIMEOUT_S, continue_rounds: int = 3):
+         super().__init__(model_id)
+         self._temperature = temperature
+         self._max_tokens = max_tokens
+         self._timeout_s = timeout_s
++        # How many extra "finish the block" turns to grant when the first
++        # response yields no usable edit block. This is the per-model wall-repair
++        # for reasoning families (GLM, kimi): they truncate at max_tokens OR
++        # narrate the fix and end the turn with "I'll now produce the edit." and
++        # never emit it. Either way we push the SAME conversation to emit ONLY
++        # the block. Tokens accumulate honestly toward the budget.
++        self._continue_rounds = continue_rounds
++        # Last-call diagnostics, read back by the proposer so a non-parsing
++        # response is inspectable (truncation vs format-miss vs empty).
++        self.last_stop_reason: str | None = None
++        self.last_raw: str = ""
++        self.last_rounds: int = 0
+ 
+     def complete(self, prompt: str):
+         import asyncio
+@@ -351,20 +422,79 @@ class _DiffCompletion(PoolCompletion):
+         from dharma_swarm.models import LLMRequest
+         from dharma_swarm.forge_v1.providers import _usage_tokens
+ 
+-        request = LLMRequest(
+-            model=self._wire_model,
+-            messages=[{"role": "user", "content": prompt}],
+-            max_tokens=self._max_tokens,
+-            temperature=self._temperature,
+-        )
++        messages = [{"role": "user", "content": prompt}]
++        accumulated = ""
++        total_tokens = 0
++        last_stop: str | None = None
++
++        for rnd in range(self._continue_rounds + 1):
++            request = LLMRequest(
++                model=self._wire_model,
++                messages=list(messages),
++                max_tokens=self._max_tokens,
++                temperature=self._temperature,
++            )
++
++            response = self._complete_once(request)
++            text = response.content or ""
++            last_stop = getattr(response, "stop_reason", None)
++            total_tokens += _usage_tokens(response.usage)
++            accumulated += (("\n" if accumulated else "") + text)
++            self.last_rounds = rnd + 1
++
++            # Stop the moment the accumulated transcript yields a usable block.
++            if parse_edit_blocks(accumulated) or parse_full_files(accumulated):
++                break
++            if rnd >= self._continue_rounds:
++                break
++
++            truncated = (last_stop or "").lower() in ("length", "max_tokens", "max_output_tokens")
++            if truncated:
++                nudge = (
++                    "Your previous message was cut off before the edit block was "
++                    "complete. Continue EXACTLY from where you stopped and finish the "
++                    "SEARCH/REPLACE block(s). Output only the remaining characters, "
++                    "nothing else — do not restart or repeat."
++                )
++            else:
++                nudge = (
++                    "You explained the fix but did NOT output an edit block. Now output "
++                    "ONLY the SEARCH/REPLACE block(s), in exactly this format and nothing "
++                    "else (no prose, no code fences, no 'I will'):\n"
++                    "<<<<<<< SEARCH path=<file path>\n<exact original lines, verbatim>\n"
++                    "=======\n<replacement lines>\n>>>>>>> REPLACE"
++                )
++            messages.append({"role": "assistant", "content": text})
++            messages.append({"role": "user", "content": nudge})
++
++        self.last_stop_reason = last_stop
++        self.last_raw = accumulated
++        return accumulated, total_tokens
++
++    def _complete_once(self, request):
++        """One provider call with hard timeout + 429-aware retry. On a rate-limit
++        error, sleep the provider's hinted delay (capped) and retry a few times so
++        a free-tier RPM throttle costs latency, not the whole sample."""
++        import asyncio
++        import time as _time
+ 
+         async def _call():
+             return await asyncio.wait_for(
+                 self._provider.complete(request), timeout=self._timeout_s
+             )
+ 
+-        response = asyncio.run(_call())
+-        return response.content or "", _usage_tokens(response.usage)
++        last_exc: Exception | None = None
++        for attempt in range(_RATE_LIMIT_RETRIES + 1):
++            try:
++                return asyncio.run(_call())
++            except Exception as e:
++                wait = _rate_limit_wait_s(e)
++                if wait is None or attempt >= _RATE_LIMIT_RETRIES:
++                    raise
++                last_exc = e
++                _time.sleep(wait)
++        if last_exc:
++            raise last_exc
+ 
+ 
+ # --------------------------------------------------------------------------- #
+diff --git a/dharma_swarm/key_oracle.py b/dharma_swarm/key_oracle.py
+index 5908329ef..3545cb84c 100644
+--- a/dharma_swarm/key_oracle.py
++++ b/dharma_swarm/key_oracle.py
+@@ -62,9 +62,11 @@ _PROVIDER_TO_ROW: dict[str, str] = {
+     "mistral": "mistral",
+     "deepseek": "deepseek",
+     "kimi": "kimi",
++    "kimi_code": "kimi",
+     "minimax": "minimax",
+     "qwen": "qwen",
+     "xai": "xai",
++    "zai": "zai_coding",
+     "zai_coding": "zai_coding",
+     "zai_global": "zai_global",
+ }
+diff --git a/dharma_swarm/model_defaults.py b/dharma_swarm/model_defaults.py
+index 81f75a386..209352a26 100644
+--- a/dharma_swarm/model_defaults.py
++++ b/dharma_swarm/model_defaults.py
+@@ -56,6 +56,10 @@ _PROVIDER_DEFAULTS: dict[ProviderType, str] = {
+     ProviderType.MISTRAL: "mistral-small-latest",
+     ProviderType.GOOGLE_AI: "gemini-2.5-flash",
+     ProviderType.CHUTES: "deepseek-ai/DeepSeek-R1",
++    ProviderType.ZAI: "glm-5.2",
++    # Kimi Code docs specify kimi-for-coding as the stable id; the backend maps
++    # it to the current K2.x coding model without client-side model churn.
++    ProviderType.KIMI_CODE: "kimi-for-coding",
+     ProviderType.OPENROUTER_FREE: "meta-llama/llama-3.3-70b-instruct:free",
+     # Paid / subscription tier
+     # FLOOR-compliant: the K2.6 floor route (not the superseded sub-floor K2.5).
+diff --git a/dharma_swarm/model_hierarchy.py b/dharma_swarm/model_hierarchy.py
+index 31b6d3a9f..aff3873d5 100644
+--- a/dharma_swarm/model_hierarchy.py
++++ b/dharma_swarm/model_hierarchy.py
+@@ -89,7 +89,9 @@ TIER_FREE: tuple[ProviderType, ...] = (
+ )
+ 
+ TIER_CHEAP: tuple[ProviderType, ...] = (
++    ProviderType.KIMI_CODE,      # Kimi Code membership API (stable kimi-for-coding)
+     ProviderType.GOOGLE_AI,      # gemini-2.5-pro (free tier, 1M ctx)
++    ProviderType.ZAI,            # GLM-5.2 direct API (cheap, long-context coding)
+     ProviderType.CHUTES,         # DeepSeek-R1 (community)
+     ProviderType.MISTRAL,        # mistral-large (1B tok/mo free tier)
+     ProviderType.OPENROUTER_FREE,  # Nemotron 120B, GLM-4.5-Air, etc.
+@@ -140,6 +142,7 @@ PRIMARY_DRIVER_LANES: tuple[ProviderType, ...] = (
+ )
+ 
+ DELEGATED_RESEARCH_PRIORITY: tuple[ProviderType, ...] = (
++    ProviderType.KIMI_CODE,      # Kimi Code direct API
+     ProviderType.OPENROUTER,     # Kimi / GLM / Qwen router
+     ProviderType.OLLAMA,         # GLM-5 / Kimi cloud
+     ProviderType.NVIDIA_NIM,     # MiniMax / Nemotron frontier support
+@@ -150,20 +153,24 @@ DELEGATED_RESEARCH_PRIORITY: tuple[ProviderType, ...] = (
+     ProviderType.GROQ,
+     ProviderType.CEREBRAS,
+     ProviderType.GOOGLE_AI,
++    ProviderType.ZAI,
+     ProviderType.MISTRAL,
+     ProviderType.CHUTES,
+     ProviderType.SAMBANOVA,
+ )
+ 
+ CHALLENGER_PRIORITY: tuple[ProviderType, ...] = (
++    ProviderType.KIMI_CODE,
+     ProviderType.NVIDIA_NIM,
+     ProviderType.OPENROUTER,
+     ProviderType.OLLAMA,
+     ProviderType.OPENROUTER_FREE,
++    ProviderType.ZAI,
+     ProviderType.OPENAI,
+ )
+ 
+ DELEGATED_BUILDER_PRIORITY: tuple[ProviderType, ...] = (
++    ProviderType.KIMI_CODE,
+     ProviderType.OPENROUTER,
+     ProviderType.OPENROUTER_FREE,
+     ProviderType.OLLAMA,
+@@ -172,6 +179,7 @@ DELEGATED_BUILDER_PRIORITY: tuple[ProviderType, ...] = (
+     ProviderType.FIREWORKS,
+     ProviderType.GROQ,
+     ProviderType.GOOGLE_AI,
++    ProviderType.ZAI,
+     ProviderType.MISTRAL,
+     ProviderType.CHUTES,
+     ProviderType.CEREBRAS,
+@@ -236,6 +244,7 @@ _LANE_ROLES: dict[ProviderType, LaneRole] = {
+     ProviderType.CLAUDE_CODE: LaneRole.PRIMARY_DRIVER,
+     ProviderType.ANTHROPIC: LaneRole.PRIMARY_DRIVER,
+     ProviderType.OPENROUTER: LaneRole.RESEARCH_DELEGATE,
++    ProviderType.KIMI_CODE: LaneRole.RESEARCH_DELEGATE,
+     ProviderType.OLLAMA: LaneRole.RESEARCH_DELEGATE,
+     ProviderType.OPENROUTER_FREE: LaneRole.RESEARCH_DELEGATE,
+     ProviderType.NVIDIA_NIM: LaneRole.CHALLENGER,
+@@ -245,6 +254,7 @@ _LANE_ROLES: dict[ProviderType, LaneRole] = {
+     ProviderType.GROQ: LaneRole.VALIDATOR,
+     ProviderType.CEREBRAS: LaneRole.BULK_BUILDER,
+     ProviderType.GOOGLE_AI: LaneRole.GENERAL_SUPPORT,
++    ProviderType.ZAI: LaneRole.RESEARCH_DELEGATE,
+     ProviderType.MISTRAL: LaneRole.GENERAL_SUPPORT,
+     ProviderType.CHUTES: LaneRole.GENERAL_SUPPORT,
+     ProviderType.SAMBANOVA: LaneRole.GENERAL_SUPPORT,
+@@ -309,7 +319,9 @@ MODEL_INTELLIGENCE: dict[ProviderType, int] = {
+     ProviderType.CODEX: 70,            # GPT-5-class via subscription
+     # Free / cheap frontier
+     ProviderType.OLLAMA: 68,           # GLM-5 744B (cloud)
++    ProviderType.KIMI_CODE: 68,        # Kimi Code stable lane (K2.x Code)
+     ProviderType.GOOGLE_AI: 65,        # Gemini 2.5 Pro
++    ProviderType.ZAI: 65,              # GLM-5.2 direct API
+     ProviderType.GROQ: 64,             # Kimi K2 1T MoE
+     ProviderType.CEREBRAS: 63,         # Qwen3 235B
+     ProviderType.SAMBANOVA: 62,        # DeepSeek V3 671B
+diff --git a/dharma_swarm/model_pool.py b/dharma_swarm/model_pool.py
+index b2400bc07..1309f742b 100644
+--- a/dharma_swarm/model_pool.py
++++ b/dharma_swarm/model_pool.py
+@@ -136,6 +136,7 @@ _PROVIDER_RANK: dict[ProviderType, int] = {
+     ProviderType.CLAUDE_CODE: 0,
+     ProviderType.OPENAI: 1,
+     ProviderType.CODEX: 1,
++    ProviderType.KIMI_CODE: 2,
+     ProviderType.OLLAMA: 2,
+     ProviderType.NVIDIA_NIM: 3,
+     ProviderType.GROQ: 4,
+diff --git a/dharma_swarm/models.py b/dharma_swarm/models.py
+index a70c31e70..00ccd9260 100644
+--- a/dharma_swarm/models.py
++++ b/dharma_swarm/models.py
+@@ -130,6 +130,8 @@ class ProviderType(str, Enum):
+     SAMBANOVA = "sambanova"
+     MISTRAL = "mistral"
+     CHUTES = "chutes"
++    ZAI = "zai"
++    KIMI_CODE = "kimi_code"
+ 
+ 
+ class AutonomyLevel(str, Enum):
+diff --git a/dharma_swarm/providers.py b/dharma_swarm/providers.py
+index 4049a731b..68ca73273 100644
+--- a/dharma_swarm/providers.py
++++ b/dharma_swarm/providers.py
+@@ -31,6 +31,7 @@ from dharma_swarm.api_keys import (
+     FIREWORKS_API_KEY_ENV,
+     GOOGLE_AI_API_KEY_ENV,
+     GROQ_API_KEY_ENV,
++    KIMI_API_KEY_ENV,
+     MISTRAL_API_KEY_ENV,
+     NVIDIA_NIM_API_KEY_ENV,
+     OLLAMA_API_KEY_ENV,
+@@ -39,6 +40,7 @@ from dharma_swarm.api_keys import (
+     SAMBANOVA_API_KEY_ENV,
+     SILICONFLOW_API_KEY_ENV,
+     TOGETHER_API_KEY_ENV,
++    ZAI_API_KEY_ENV,
+ )
+ from dharma_swarm.base_provider import BaseProvider, ProviderCapabilities
+ from dharma_swarm.codex_cli import dgc_codex_exec_prefix
+@@ -165,6 +167,11 @@ def _extract_openai_compatible_message_text(message: Any) -> str:
+     reasoning = _coerce_openrouter_text(_get_openai_compatible_field(message, "reasoning"))
+     if reasoning:
+         return reasoning
++    reasoning_content = _coerce_openrouter_text(
++        _get_openai_compatible_field(message, "reasoning_content")
++    )
++    if reasoning_content:
++        return reasoning_content
+     return _coerce_openrouter_text(
+         _get_openai_compatible_field(message, "reasoning_details")
+     )
+@@ -1676,6 +1683,206 @@ class GoogleAIProvider(LLMProvider):
+                 yield delta.content
+ 
+ 
++class ZAIProvider(LLMProvider):
++    """Z.ai GLM direct API, using its OpenAI-compatible chat endpoint."""
++
++    capabilities = ProviderCapabilities(
++        supports_streaming=True, supports_tools=True,
++        max_context_tokens=1_000_000, provider_family="zai",
++    )
++
++    def __init__(
++        self,
++        api_key: str | None = None,
++        base_url: str | None = None,
++        default_model: str | None = None,
++        timeout: float = 300.0,
++    ) -> None:
++        self._api_key = api_key or os.environ.get(ZAI_API_KEY_ENV)
++        self._base_url = (
++            base_url
++            or os.environ.get("ZAI_BASE_URL")
++            or "https://api.z.ai/api/coding/paas/v4"
++        ).rstrip("/")
++        self._default_model = default_model or canonical_default_model(ProviderType.ZAI)
++        self._timeout = float(timeout)
++        self._client: Any = None
++
++    def _client_or_raise(self) -> Any:
++        if self._client is not None:
++            return self._client
++        if not self._api_key:
++            raise RuntimeError(f"{ZAI_API_KEY_ENV} not set")
++        try:
++            from openai import AsyncOpenAI
++        except ImportError as exc:
++            raise ImportError("pip install openai") from exc
++        self._client = AsyncOpenAI(
++            api_key=self._api_key,
++            base_url=self._base_url,
++            timeout=self._timeout,
++        )
++        return self._client
++
++    @staticmethod
++    def _build_messages(msgs: list[dict[str, str]], system: str) -> list[dict[str, str]]:
++        out: list[dict[str, str]] = []
++        if system:
++            out.append({"role": "system", "content": system})
++        out.extend(msgs)
++        return out
++
++    @jikoku_traced_provider
++    async def complete(self, request: LLMRequest) -> LLMResponse:
++        client = self._client_or_raise()
++        messages = self._build_messages(request.messages, request.system)
++        kwargs: dict[str, Any] = dict(
++            model=request.model or self._default_model,
++            messages=messages,
++            max_tokens=request.max_tokens,
++            temperature=request.temperature,
++        )
++        if request.tools:
++            kwargs["tools"] = request.tools
++        resp = await client.chat.completions.create(**kwargs)
++        choice = resp.choices[0]
++        msg = choice.message
++        tool_calls: list[dict[str, Any]] = [
++            {
++                "id": tc.id,
++                "name": tc.function.name,
++                "arguments": tc.function.arguments,
++            }
++            for tc in (msg.tool_calls or [])
++        ]
++        return LLMResponse(
++            content=_extract_openai_compatible_message_text(msg),
++            model=resp.model,
++            usage={
++                "prompt_tokens": resp.usage.prompt_tokens,
++                "completion_tokens": resp.usage.completion_tokens,
++                "total_tokens": resp.usage.total_tokens,
++            } if resp.usage else {},
++            tool_calls=tool_calls,
++            stop_reason=choice.finish_reason,
++        )
++
++    async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
++        client = self._client_or_raise()
++        resp = await client.chat.completions.create(
++            model=request.model or self._default_model,
++            stream=True,
++            messages=self._build_messages(request.messages, request.system),
++            max_tokens=request.max_tokens,
++            temperature=request.temperature,
++        )
++        async for chunk in resp:
++            delta = chunk.choices[0].delta if chunk.choices else None
++            if delta and delta.content:
++                yield delta.content
++
++
++class KimiCodeProvider(LLMProvider):
++    """Kimi Code membership API, using its OpenAI-compatible chat endpoint."""
++
++    capabilities = ProviderCapabilities(
++        supports_streaming=True, supports_tools=True,
++        supports_thinking=True, supports_system_prompt=True,
++        max_context_tokens=256_000, provider_family="kimi_code",
++    )
++
++    def __init__(
++        self,
++        api_key: str | None = None,
++        base_url: str | None = None,
++        default_model: str | None = None,
++        timeout: float = 300.0,
++    ) -> None:
++        self._api_key = api_key or os.environ.get(KIMI_API_KEY_ENV)
++        self._base_url = (
++            base_url
++            or os.environ.get("KIMI_BASE_URL")
++            or "https://api.kimi.com/coding/v1"
++        ).rstrip("/")
++        self._default_model = default_model or canonical_default_model(ProviderType.KIMI_CODE)
++        self._timeout = float(timeout)
++        self._client: Any = None
++
++    def _client_or_raise(self) -> Any:
++        if self._client is not None:
++            return self._client
++        if not self._api_key:
++            raise RuntimeError(f"{KIMI_API_KEY_ENV} not set")
++        try:
++            from openai import AsyncOpenAI
++        except ImportError as exc:
++            raise ImportError("pip install openai") from exc
++        self._client = AsyncOpenAI(
++            api_key=self._api_key,
++            base_url=self._base_url,
++            timeout=self._timeout,
++        )
++        return self._client
++
++    @staticmethod
++    def _build_messages(msgs: list[dict[str, str]], system: str) -> list[dict[str, str]]:
++        out: list[dict[str, str]] = []
++        if system:
++            out.append({"role": "system", "content": system})
++        out.extend(msgs)
++        return out
++
++    @jikoku_traced_provider
++    async def complete(self, request: LLMRequest) -> LLMResponse:
++        client = self._client_or_raise()
++        messages = self._build_messages(request.messages, request.system)
++        kwargs: dict[str, Any] = dict(
++            model=request.model or self._default_model,
++            messages=messages,
++            max_tokens=request.max_tokens,
++            # Kimi Code rejects other temperature values on the coding model.
++            temperature=1,
++        )
++        if request.tools:
++            kwargs["tools"] = request.tools
++        resp = await client.chat.completions.create(**kwargs)
++        choice = resp.choices[0]
++        msg = choice.message
++        tool_calls: list[dict[str, Any]] = [
++            {
++                "id": tc.id,
++                "name": tc.function.name,
++                "arguments": tc.function.arguments,
++            }
++            for tc in (msg.tool_calls or [])
++        ]
++        return LLMResponse(
++            content=_extract_openai_compatible_message_text(msg),
++            model=resp.model,
++            usage={
++                "prompt_tokens": resp.usage.prompt_tokens,
++                "completion_tokens": resp.usage.completion_tokens,
++                "total_tokens": resp.usage.total_tokens,
++            } if resp.usage else {},
++            tool_calls=tool_calls,
++            stop_reason=choice.finish_reason,
++        )
++
++    async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
++        client = self._client_or_raise()
++        resp = await client.chat.completions.create(
++            model=request.model or self._default_model,
++            stream=True,
++            messages=self._build_messages(request.messages, request.system),
++            max_tokens=request.max_tokens,
++            temperature=1,
++        )
++        async for chunk in resp:
++            delta = chunk.choices[0].delta if chunk.choices else None
++            if delta and delta.content:
++                yield delta.content
++
++
+ class SambaNovaProvider(LLMProvider):
+     """SambaNova -- 100-200 tok/s on 405B via RDU hardware. Free tier persists forever."""
+ 
+diff --git a/dharma_swarm/runtime_provider.py b/dharma_swarm/runtime_provider.py
+index d27206c9c..83630d507 100644
+--- a/dharma_swarm/runtime_provider.py
++++ b/dharma_swarm/runtime_provider.py
+@@ -25,6 +25,8 @@ from dharma_swarm.api_keys import (
+     GOOGLE_AI_BASE_URL_ENV,
+     GROQ_API_KEY_ENV,
+     GROQ_BASE_URL_ENV,
++    KIMI_API_KEY_ENV,
++    KIMI_BASE_URL_ENV,
+     MISTRAL_API_KEY_ENV,
+     MISTRAL_BASE_URL_ENV,
+     NVIDIA_NIM_API_KEY_ENV,
+@@ -38,6 +40,8 @@ from dharma_swarm.api_keys import (
+     SILICONFLOW_BASE_URL_ENV,
+     TOGETHER_API_KEY_ENV,
+     TOGETHER_BASE_URL_ENV,
++    ZAI_API_KEY_ENV,
++    ZAI_BASE_URL_ENV,
+     env_value,
+     normalize_env_aliases,
+ )
+@@ -61,6 +65,11 @@ GOOGLE_AI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+ SAMBANOVA_BASE_URL = "https://api.sambanova.ai/v1"
+ MISTRAL_BASE_URL = "https://api.mistral.ai/v1"
+ CHUTES_BASE_URL = "https://api.chutes.ai/v1"
++# The local Z.ai key is a GLM Coding Plan key. Z.ai exposes that plan through a
++# dedicated OpenAI-compatible endpoint; the general endpoint may reject it with
++# "insufficient balance" even when the coding plan is live.
++ZAI_BASE_URL = "https://api.z.ai/api/coding/paas/v4"
++KIMI_BASE_URL = "https://api.kimi.com/coding/v1"
+ from dharma_swarm.model_hierarchy import (
+     CANONICAL_SEED_ORDER,
+     default_model,
+@@ -81,6 +90,8 @@ DEFAULT_MISTRAL_MODEL = default_model(ProviderType.MISTRAL)
+ DEFAULT_CHUTES_MODEL = default_model(ProviderType.CHUTES)
+ DEFAULT_GOOGLE_AI_MODEL = default_model(ProviderType.GOOGLE_AI)
+ DEFAULT_CODEX_MODEL = default_model(ProviderType.CODEX)
++DEFAULT_ZAI_MODEL = default_model(ProviderType.ZAI)
++DEFAULT_KIMI_CODE_MODEL = default_model(ProviderType.KIMI_CODE)
+ DEFAULT_PROVIDER_TIMEOUT_SECONDS = 300
+ 
+ # Provider ordering sourced from model_hierarchy.py — the single source of truth.
+@@ -102,6 +113,8 @@ PREFERRED_LOW_COST_RUNTIME_PROVIDERS: tuple[ProviderType, ...] = (
+     ProviderType.OPENROUTER_FREE, # FREE: auto-discovered
+     ProviderType.MISTRAL,         # CHEAP
+     ProviderType.GOOGLE_AI,       # CHEAP
++    ProviderType.KIMI_CODE,       # CHEAP/SUBSCRIPTION: Kimi Code stable K2.x coding lane
++    ProviderType.ZAI,             # CHEAP: GLM-5.2 direct API
+     ProviderType.CHUTES,          # CHEAP
+     ProviderType.OPENROUTER,      # PAID (default: moonshotai/kimi-k2.5)
+     ProviderType.CLAUDE_CODE,     # FALLBACK: always available if claude binary installed
+@@ -115,6 +128,8 @@ PREFERRED_LOW_COST_WITH_ANTHROPIC_RUNTIME_PROVIDERS: tuple[ProviderType, ...] =
+     ProviderType.OPENROUTER_FREE,
+     ProviderType.TOGETHER,
+     ProviderType.FIREWORKS,
++    ProviderType.KIMI_CODE,
++    ProviderType.ZAI,
+     ProviderType.OPENROUTER,      # PAID (moonshotai/kimi-k2.5)
+     ProviderType.ANTHROPIC,
+     ProviderType.CLAUDE_CODE,     # FALLBACK: always available if claude binary installed
+@@ -428,6 +443,36 @@ def resolve_runtime_provider_config(
+             available=bool(token),
+         )
+ 
++    if provider == ProviderType.ZAI:
++        token = api_key or _env_value(env_map, ZAI_API_KEY_ENV)
++        resolved_base = (
++            base_url
++            or _env_value(env_map, ZAI_BASE_URL_ENV)
++            or ZAI_BASE_URL
++        ).rstrip("/")
++        return RuntimeProviderConfig(
++            provider=provider,
++            api_key=token,
++            base_url=resolved_base,
++            default_model=model or DEFAULT_ZAI_MODEL,
++            available=bool(token),
++        )
++
++    if provider == ProviderType.KIMI_CODE:
++        token = api_key or _env_value(env_map, KIMI_API_KEY_ENV)
++        resolved_base = (
++            base_url
++            or _env_value(env_map, KIMI_BASE_URL_ENV)
++            or KIMI_BASE_URL
++        ).rstrip("/")
++        return RuntimeProviderConfig(
++            provider=provider,
++            api_key=token,
++            base_url=resolved_base,
++            default_model=model or DEFAULT_KIMI_CODE_MODEL,
++            available=bool(token),
++        )
++
+     raise ValueError(f"Unsupported runtime provider: {provider.value}")
+ 
+ 
+@@ -442,6 +487,7 @@ def create_runtime_provider(config: RuntimeProviderConfig) -> Any:
+         CodexProvider,
+         FireworksProvider,
+         GoogleAIProvider,
++        KimiCodeProvider,
+         GroqProvider,
+         MistralProvider,
+         NVIDIANIMProvider,
+@@ -452,6 +498,7 @@ def create_runtime_provider(config: RuntimeProviderConfig) -> Any:
+         SambaNovaProvider,
+         SiliconFlowProvider,
+         TogetherProvider,
++        ZAIProvider,
+     )
+ 
+     if config.provider == ProviderType.ANTHROPIC:
+@@ -547,6 +594,24 @@ def create_runtime_provider(config: RuntimeProviderConfig) -> Any:
+         if config.api_key is not None:
+             kwargs["api_key"] = config.api_key
+         return ChutesProvider(**kwargs)
++    if config.provider == ProviderType.ZAI:
++        kwargs = {"timeout": config.timeout_seconds or DEFAULT_PROVIDER_TIMEOUT_SECONDS}
++        if config.api_key is not None:
++            kwargs["api_key"] = config.api_key
++        if config.base_url is not None:
++            kwargs["base_url"] = config.base_url
++        if config.default_model is not None:
++            kwargs["default_model"] = config.default_model
++        return ZAIProvider(**kwargs)
++    if config.provider == ProviderType.KIMI_CODE:
++        kwargs = {"timeout": config.timeout_seconds or DEFAULT_PROVIDER_TIMEOUT_SECONDS}
++        if config.api_key is not None:
++            kwargs["api_key"] = config.api_key
++        if config.base_url is not None:
++            kwargs["base_url"] = config.base_url
++        if config.default_model is not None:
++            kwargs["default_model"] = config.default_model
++        return KimiCodeProvider(**kwargs)
+     raise ValueError(f"Unsupported runtime provider: {config.provider.value}")
+ 
+ 
+@@ -670,6 +735,7 @@ __all__ = [
+     "CEREBRAS_BASE_URL",
+     "DEFAULT_CLAUDE_MODEL",
+     "DEFAULT_GROQ_MODEL",
++    "DEFAULT_KIMI_CODE_MODEL",
+     "DEFAULT_FIREWORKS_MODEL",
+     "DEFAULT_NIM_MODEL",
+     "DEFAULT_OPENAI_MODEL",
+@@ -678,9 +744,11 @@ __all__ = [
+     "DEFAULT_RUNTIME_PROVIDERS",
+     "DEFAULT_SILICONFLOW_MODEL",
+     "DEFAULT_TOGETHER_MODEL",
++    "DEFAULT_ZAI_MODEL",
+     "FIREWORKS_BASE_URL",
+     "GOOGLE_AI_BASE_URL",
+     "GROQ_BASE_URL",
++    "KIMI_BASE_URL",
+     "NVIDIA_NIM_BASE_URL",
+     "OPENAI_BASE_URL",
+     "OPENROUTER_BASE_URL",
+@@ -689,6 +757,7 @@ __all__ = [
+     "RuntimeProviderConfig",
+     "SILICONFLOW_BASE_URL",
+     "TOGETHER_BASE_URL",
++    "ZAI_BASE_URL",
+     "complete_via_preferred_runtime_providers",
+     "create_default_provider_map",
+     "create_runtime_provider",
+diff --git a/reports/governance/active_track_evidence.json b/reports/governance/active_track_evidence.json
+index 09b20ed46..7cc9a0775 100644
+--- a/reports/governance/active_track_evidence.json
++++ b/reports/governance/active_track_evidence.json
+@@ -1,5 +1,5 @@
+ {
+-  "generated_at": "2026-06-18T11:03:04+09:00",
++  "generated_at": "2026-06-28T08:44:18+09:00",
+   "schema_version": 2,
+   "active_track_id": "runtime-truth-reconciliation-2026-06",
+   "shippable": true,
+@@ -420,7 +420,7 @@
+       "shippable": false,
+       "prerequisites_ok": true,
+       "completion_progress": {
+-        "passed": 3,
++        "passed": 4,
+         "total": 5
+       },
+       "criteria": [
+@@ -457,8 +457,8 @@
+         {
+           "id": "loop1_closure_receipt_exists",
+           "kind": "file_exists",
+-          "passed": false,
+-          "detail": "reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md MISSING"
++          "passed": true,
++          "detail": "reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md present"
+         },
+         {
+           "id": "campaign_retrospective_exists",
+@@ -729,6 +729,12 @@
+       "message": "Spine objective 'revenue-external-humans-served' has no ACTIVE track serving it (coverage gap).",
+       "criterion_id": null
+     },
++    {
++      "severity": "ERROR",
++      "check": "track-stale:runtime-truth-reconciliation-2026-06",
++      "message": "[runtime-truth-reconciliation-2026-06] verified_at is 24 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.",
++      "criterion_id": null
++    },
+     {
+       "severity": "INFO",
+       "check": "track-shippable:runtime-truth-reconciliation-2026-06",
+@@ -750,7 +756,7 @@
+     {
+       "severity": "INFO",
+       "check": "track-in-progress:loop-closure-2026-06",
+-      "message": "[loop-closure-2026-06] 3/5 completion criteria pass.",
++      "message": "[loop-closure-2026-06] 4/5 completion criteria pass.",
+       "criterion_id": null
+     },
+     {
+@@ -759,6 +765,12 @@
+       "message": "[truth-graph-platform-2026-06] all 15 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
+       "criterion_id": null
+     },
++    {
++      "severity": "ERROR",
++      "check": "track-stale:composer-holon-spine-longrun-2026-06",
++      "message": "[composer-holon-spine-longrun-2026-06] verified_at is 17 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.",
++      "criterion_id": null
++    },
+     {
+       "severity": "INFO",
+       "check": "track-shippable:composer-holon-spine-longrun-2026-06",
+diff --git a/reports/governance/active_track_evidence.md b/reports/governance/active_track_evidence.md
+index 74bccb0f4..360129277 100644
+--- a/reports/governance/active_track_evidence.md
++++ b/reports/governance/active_track_evidence.md
+@@ -1,6 +1,6 @@
+ # Track Portfolio Evidence
+ 
+-Generated: 2026-06-18T11:03:04+09:00 (schema v2)
++Generated: 2026-06-28T08:44:18+09:00 (schema v2)
+ Active tracks: **6** (warn 5, max 10) — shippable 4
+ 
+ ## Spine coverage
+@@ -57,7 +57,7 @@ Active tracks: **6** (warn 5, max 10) — shippable 4
+   - ✓ `adoption_narrative_docs` (file_exists) — docs/architecture/SPINE_ADOPTION_NARRATIVE.md present
+   - ✓ `gate1_witnessed` (file_exists) — reports/governance/GATE1_WITNESSED.md present
+ 
+-## `loop-closure-2026-06` — 3/5
++## `loop-closure-2026-06` — 4/5
+ 
+ - serves: `substrate-nativeness` · complements: ['runtime-truth-reconciliation-2026-06'] · depends_on: [] · conflicts_with: []
+ - owned_surfaces: ['reports/loop_closure/**', 'CYBERNETIC_LOOP_MAP.md']
+@@ -68,7 +68,7 @@ Active tracks: **6** (warn 5, max 10) — shippable 4
+   - ✓ `phase0_dossier_exists` (file_exists) — reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md present
+   - ✓ `phase0_fresh_status_table` (file_contains) — pattern 'Fresh 13-loop status table' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md
+   - ✓ `one_wire_invariant_stated` (file_contains) — pattern 'never let internal artifacts touch archive fitness' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md
+-  - ✗ `loop1_closure_receipt_exists` (file_exists) — reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md MISSING
++  - ✓ `loop1_closure_receipt_exists` (file_exists) — reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md present
+   - ✗ `campaign_retrospective_exists` (file_exists) — reports/loop_closure/RETROSPECTIVE.md MISSING
+ 
+ ## `truth-graph-platform-2026-06` — SHIPPABLE
+@@ -117,9 +117,11 @@ Active tracks: **6** (warn 5, max 10) — shippable 4
+ - **WARN** `wip-high`: 6 ACTIVE tracks exceed warn_active=5 — focus is spreading thin.
+ - **WARN** `spine-uncovered:research-depth`: Spine objective 'research-depth' has no ACTIVE track serving it (coverage gap).
+ - **WARN** `spine-uncovered:revenue-external-humans-served`: Spine objective 'revenue-external-humans-served' has no ACTIVE track serving it (coverage gap).
++- **ERROR** `track-stale:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] verified_at is 24 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
+ - **INFO** `track-shippable:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] all 11 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
+ - **INFO** `track-shippable:runtime-truth-nats-2026-06`: [runtime-truth-nats-2026-06] all 2 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
+ - **INFO** `track-in-progress:runtime-truth-spine-adoption-2026-06`: [runtime-truth-spine-adoption-2026-06] 7/8 completion criteria pass.
+-- **INFO** `track-in-progress:loop-closure-2026-06`: [loop-closure-2026-06] 3/5 completion criteria pass.
++- **INFO** `track-in-progress:loop-closure-2026-06`: [loop-closure-2026-06] 4/5 completion criteria pass.
+ - **INFO** `track-shippable:truth-graph-platform-2026-06`: [truth-graph-platform-2026-06] all 15 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
++- **ERROR** `track-stale:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] verified_at is 17 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
+ - **INFO** `track-shippable:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] all 6 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
+diff --git a/reports/governance/track_portfolio.json b/reports/governance/track_portfolio.json
+index 09b20ed46..7cc9a0775 100644
+--- a/reports/governance/track_portfolio.json
++++ b/reports/governance/track_portfolio.json
+@@ -1,5 +1,5 @@
+ {
+-  "generated_at": "2026-06-18T11:03:04+09:00",
++  "generated_at": "2026-06-28T08:44:18+09:00",
+   "schema_version": 2,
+   "active_track_id": "runtime-truth-reconciliation-2026-06",
+   "shippable": true,
+@@ -420,7 +420,7 @@
+       "shippable": false,
+       "prerequisites_ok": true,
+       "completion_progress": {
+-        "passed": 3,
++        "passed": 4,
+         "total": 5
+       },
+       "criteria": [
+@@ -457,8 +457,8 @@
+         {
+           "id": "loop1_closure_receipt_exists",
+           "kind": "file_exists",
+-          "passed": false,
+-          "detail": "reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md MISSING"
++          "passed": true,
++          "detail": "reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md present"
+         },
+         {
+           "id": "campaign_retrospective_exists",
+@@ -729,6 +729,12 @@
+       "message": "Spine objective 'revenue-external-humans-served' has no ACTIVE track serving it (coverage gap).",
+       "criterion_id": null
+     },
++    {
++      "severity": "ERROR",
++      "check": "track-stale:runtime-truth-reconciliation-2026-06",
++      "message": "[runtime-truth-reconciliation-2026-06] verified_at is 24 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.",
++      "criterion_id": null
++    },
+     {
+       "severity": "INFO",
+       "check": "track-shippable:runtime-truth-reconciliation-2026-06",
+@@ -750,7 +756,7 @@
+     {
+       "severity": "INFO",
+       "check": "track-in-progress:loop-closure-2026-06",
+-      "message": "[loop-closure-2026-06] 3/5 completion criteria pass.",
++      "message": "[loop-closure-2026-06] 4/5 completion criteria pass.",
+       "criterion_id": null
+     },
+     {
+@@ -759,6 +765,12 @@
+       "message": "[truth-graph-platform-2026-06] all 15 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
+       "criterion_id": null
+     },
++    {
++      "severity": "ERROR",
++      "check": "track-stale:composer-holon-spine-longrun-2026-06",
++      "message": "[composer-holon-spine-longrun-2026-06] verified_at is 17 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.",
++      "criterion_id": null
++    },
+     {
+       "severity": "INFO",
+       "check": "track-shippable:composer-holon-spine-longrun-2026-06",
+diff --git a/scripts/load_runtime_env.sh b/scripts/load_runtime_env.sh
+index e0bd29c86..32deb6bc2 100644
+--- a/scripts/load_runtime_env.sh
++++ b/scripts/load_runtime_env.sh
+@@ -19,7 +19,7 @@ _load_env_file() {
+ if [[ -f "$HOME/.zshrc" ]]; then
+     eval "$(
+         grep -E '^export ' "$HOME/.zshrc" 2>/dev/null \
+-            | grep -E '(API_KEY|BASE_URL|OPENROUTER|OLLAMA|GROQ|CEREBRAS|SILICONFLOW|MOONSHOT|NIM_API_KEY|NVIDIA_NIM_API_KEY)' \
++            | grep -E '(API_KEY|BASE_URL|OPENROUTER|OLLAMA|GROQ|CEREBRAS|SILICONFLOW|KIMI|MOONSHOT|NIM_API_KEY|NVIDIA_NIM_API_KEY)' \
+             || true
+     )"
+ fi
+@@ -49,6 +49,7 @@ _load_keychain_var "ANTHROPIC_API_KEY" "$USER" "anthropic-api-key"
+ _load_keychain_var "OPENAI_API_KEY" "$USER" "openai-api-key"
+ _load_keychain_var "OPENROUTER_API_KEY" "$USER" "openrouter-api-key"
+ _load_keychain_var "OLLAMA_API_KEY" "$USER" "ollama-api-key"
++_load_keychain_var "KIMI_API_KEY" "$USER" "kimi-api-key"
+ _load_keychain_var "GROQ_API_KEY" "$USER" "groq-api-key"
+ _load_keychain_var "NIM_API_KEY" "$USER" "nim-api-key"
+ 
+diff --git a/tests/test_api_keys.py b/tests/test_api_keys.py
+index e939bd142..4367a57dd 100644
+--- a/tests/test_api_keys.py
++++ b/tests/test_api_keys.py
+@@ -48,6 +48,7 @@ def test_provider_registry_covers_runtime_providers() -> None:
+     assert provider_api_key_env(ProviderType.OPENROUTER_FREE) == OPENROUTER_API_KEY_ENV
+     assert provider_api_key_env(ProviderType.OLLAMA) == "OLLAMA_API_KEY"
+     assert provider_api_key_env(ProviderType.CHUTES) == "CHUTES_API_KEY"
++    assert provider_api_key_env(ProviderType.KIMI_CODE) == "KIMI_API_KEY"
+ 
+ 
+ def test_runtime_provider_registry_is_unique() -> None:
+@@ -77,6 +78,7 @@ def test_all_api_key_registry_contains_system_services() -> None:
+ def test_chat_provider_registry_matches_dashboard_surface() -> None:
+     assert CHAT_PROVIDER_API_KEY_ENV_KEYS[ProviderType.OPENROUTER.value] == OPENROUTER_API_KEY_ENV
+     assert CHAT_PROVIDER_API_KEY_ENV_KEYS[ProviderType.NVIDIA_NIM.value] == "NVIDIA_NIM_API_KEY"
++    assert CHAT_PROVIDER_API_KEY_ENV_KEYS[ProviderType.KIMI_CODE.value] == "KIMI_API_KEY"
+ 
+ 
+ def test_env_value_empty_mapping_does_not_read_real_shell(monkeypatch) -> None:
+diff --git a/tests/test_env_alias_normalization.py b/tests/test_env_alias_normalization.py
+index bb4e89cea..701a60dce 100644
+--- a/tests/test_env_alias_normalization.py
++++ b/tests/test_env_alias_normalization.py
+@@ -19,8 +19,10 @@ import pytest
+ from dharma_swarm.api_keys import (
+     ENV_ALIASES,
+     GOOGLE_AI_API_KEY_ENV,
++    KIMI_API_KEY_ENV,
+     NVIDIA_NIM_API_KEY_ENV,
+     PPLX_API_KEY_ENV,
++    ZAI_API_KEY_ENV,
+     apply_env_assignment,
+     bootstrap_runtime_env,
+     env_value,
+@@ -41,6 +43,14 @@ class TestEnvAliasTable:
+     def test_perplexity_maps_to_pplx(self) -> None:
+         assert ENV_ALIASES["PERPLEXITY_API_KEY"] == PPLX_API_KEY_ENV
+ 
++    def test_zai_aliases_map_to_zai(self) -> None:
++        assert ENV_ALIASES["GLM_API_KEY"] == ZAI_API_KEY_ENV
++        assert ENV_ALIASES["ZHIPU_API_KEY"] == ZAI_API_KEY_ENV
++        assert ENV_ALIASES["BIGMODEL_API_KEY"] == ZAI_API_KEY_ENV
++
++    def test_kimi_code_alias_maps_to_kimi(self) -> None:
++        assert ENV_ALIASES["MOONSHOT_KIMI_API_KEY"] == KIMI_API_KEY_ENV
++
+     def test_self_mapping_is_noop(self) -> None:
+         for alias, canonical in ENV_ALIASES.items():
+             if alias == canonical:
+@@ -73,6 +83,18 @@ class TestNormalizeEnvAliases:
+         applied = normalize_env_aliases(env)
+         assert env["PPLX_API_KEY"] == "pplx-test"
+ 
++    def test_copies_glm_to_zai(self) -> None:
++        env: dict[str, str] = {"GLM_API_KEY": "zai-test"}
++        applied = normalize_env_aliases(env)
++        assert env["ZAI_API_KEY"] == "zai-test"
++        assert ("GLM_API_KEY", "ZAI_API_KEY") in applied
++
++    def test_copies_moonshot_kimi_to_kimi(self) -> None:
++        env: dict[str, str] = {"MOONSHOT_KIMI_API_KEY": "kimi-test"}
++        applied = normalize_env_aliases(env)
++        assert env["KIMI_API_KEY"] == "kimi-test"
++        assert ("MOONSHOT_KIMI_API_KEY", "KIMI_API_KEY") in applied
++
+     def test_does_not_overwrite_existing_canonical(self) -> None:
+         env: dict[str, str] = {
+             "GEMINI_API_KEY": "old-gemini-key",
+diff --git a/tests/test_forge_v1_providers.py b/tests/test_forge_v1_providers.py
+index a8071b8e2..1b833c926 100644
+--- a/tests/test_forge_v1_providers.py
++++ b/tests/test_forge_v1_providers.py
+@@ -17,8 +17,11 @@ from dharma_swarm.forge_v1.providers import (
+     FakeCompletion,
+     LiveModel,
+     PoolCompletion,
++    _provider_for_model,
+     _usage_tokens,
+ )
++from dharma_swarm.models import ProviderType
++from dharma_swarm.runtime_provider import RuntimeProviderConfig
+ 
+ 
+ # --- OFFLINE: prompt -> completion -> parse -> Candidate plumbing ---
+@@ -72,6 +75,43 @@ def test_usage_tokens_empty():
+     assert _usage_tokens({}) == 0
+ 
+ 
++def test_pool_completion_routes_kimi_for_coding_to_kimi_code_provider(monkeypatch):
++    captured = {}
++    provider = object()
++
++    def fake_resolve(provider_type, *, model=None, timeout_seconds=None):
++        captured["provider_type"] = provider_type
++        captured["model"] = model
++        captured["timeout_seconds"] = timeout_seconds
++        return RuntimeProviderConfig(
++            provider=provider_type,
++            default_model=model,
++            timeout_seconds=timeout_seconds,
++            available=True,
++        )
++
++    def fake_create(config):
++        captured["config"] = config
++        return provider
++
++    monkeypatch.setattr(
++        "dharma_swarm.runtime_provider.resolve_runtime_provider_config",
++        fake_resolve,
++    )
++    monkeypatch.setattr(
++        "dharma_swarm.runtime_provider.create_runtime_provider",
++        fake_create,
++    )
++
++    resolved_provider, wire_model = _provider_for_model("kimi-for-coding")
++
++    assert resolved_provider is provider
++    assert captured["provider_type"] == ProviderType.KIMI_CODE
++    assert captured["model"] == "kimi-for-coding"
++    assert captured["timeout_seconds"] == 240
++    assert wire_model == "kimi-for-coding"
++
++
+ # --- LIVE: gated single real call (skipped unless FORGE_LIVE=1) ---
+ @pytest.mark.skipif(
+     os.environ.get("FORGE_LIVE") != "1",
+diff --git a/tests/test_model_pool.py b/tests/test_model_pool.py
+index d9487802b..73c9d797f 100644
+--- a/tests/test_model_pool.py
++++ b/tests/test_model_pool.py
+@@ -60,7 +60,7 @@ def test_pool_routes_are_exactly_the_roster_literals():
+ 
+ 
+ def test_pool_collapses_roster_slots_to_logical_entries():
+-    """The roster has 44 slots that collapse to 30 logical pool entries.
++    """The roster has 46 slots that collapse to 32 logical pool entries.
+     Guards against silent regroup drift.
+ 
+     The floor-demarcation work (2026-06-17) added 13 slots for the K2.6-floor
+@@ -72,9 +72,11 @@ def test_pool_collapses_roster_slots_to_logical_entries():
+     logical entries. That is 13 new slots (31 -> 44) and 7 new logical entries
+     (23 -> 30): claude-opus-4.8,
+     claude-sonnet-4.6, gpt-5.5, kimi-k2.7-code, deepseek-v4-pro, glm-5.1,
+-    minimax-m3. No sub-floor model was removed — they are marked, not deleted."""
+-    assert len(EVOLUTION_ROSTER) == 44
+-    assert len(MODEL_POOL) == 30
++    The Kimi Code direct route adds one more floor slot/logical entry with the
++    stable documented model id ``kimi-for-coding``.
++    """
++    assert len(EVOLUTION_ROSTER) == 46
++    assert len(MODEL_POOL) == 32
+ 
+ 
+ # --------------------------------------------------------------------------
+@@ -242,7 +244,7 @@ def test_floor_and_grunt_partition_the_pool():
+     assert len(floor) + len(grunt) == len(MODEL_POOL)
+     assert all(not e.below_floor for e in floor)
+     assert all(e.below_floor for e in grunt)
+-    assert len(floor) == 12
++    assert len(floor) == 14
+     assert len(grunt) == 18
+ 
+ 
+diff --git a/tests/test_providers_quality_track.py b/tests/test_providers_quality_track.py
+index 123588bfb..f7b0b6051 100644
+--- a/tests/test_providers_quality_track.py
++++ b/tests/test_providers_quality_track.py
+@@ -15,6 +15,7 @@ from dharma_swarm.providers import (
+     CerebrasProvider,
+     ClaudeCodeProvider,
+     CodexProvider,
++    KimiCodeProvider,
+     ModelRouter,
+     NVIDIANIMProvider,
+     OllamaProvider,
+@@ -48,6 +49,7 @@ def _mk_resp(
+     content: str | None = "ok",
+     *,
+     reasoning: str | None = None,
++    reasoning_content: str | None = None,
+     reasoning_details: list[object] | None = None,
+ ) -> SimpleNamespace:
+     return SimpleNamespace(
+@@ -57,6 +59,7 @@ def _mk_resp(
+             message=SimpleNamespace(
+                 content=content,
+                 reasoning=reasoning,
++                reasoning_content=reasoning_content,
+                 reasoning_details=reasoning_details,
+                 tool_calls=None,
+             ),
+@@ -366,6 +369,25 @@ async def test_cerebras_provider_uses_reasoning_when_content_empty(monkeypatch):
+     assert out.content == "OK"
+ 
+ 
++@pytest.mark.asyncio
++async def test_kimi_code_provider_uses_reasoning_content_when_content_empty(monkeypatch):
++    p = KimiCodeProvider(api_key="k")
++    req = LLMRequest(model="kimi-for-coding", messages=[{"role": "user", "content": "hi"}])
++
++    client = AsyncMock()
++    client.chat.completions.create = AsyncMock(
++        return_value=_mk_resp(content=None, reasoning_content="OK")
++    )
++    monkeypatch.setattr(p, "_client_or_raise", lambda: client)
++
++    out = await p.complete(req)
++
++    kwargs = client.chat.completions.create.await_args.kwargs
++    assert kwargs["model"] == "kimi-for-coding"
++    assert kwargs["temperature"] == 1
++    assert out.content == "OK"
++
++
+ def test_openai_build_messages_without_system_does_not_prepend():
+     msgs = [{"role": "user", "content": "x"}]
+     out = OpenAIProvider._build_messages(msgs, "")
+@@ -402,6 +424,8 @@ def test_create_default_router_contains_expected_provider_types():
+         ProviderType.CHUTES,
+         ProviderType.NVIDIA_NIM,
+         ProviderType.OLLAMA,
++        ProviderType.ZAI,
++        ProviderType.KIMI_CODE,
+     }
+     assert set(router._providers.keys()) == expected
+ 
+@@ -854,10 +878,12 @@ from dharma_swarm.providers import (  # noqa: E402
+     ChutesProvider,
+     FireworksProvider,
+     GoogleAIProvider,
++    KimiCodeProvider,
+     MistralProvider,
+     SambaNovaProvider,
+     SiliconFlowProvider,
+     TogetherProvider,
++    ZAIProvider,
+     _extract_openai_compatible_message_text,
+ )
+ 
+@@ -869,6 +895,8 @@ _SIBLING_PROVIDERS = [
+     SambaNovaProvider,
+     MistralProvider,
+     ChutesProvider,
++    ZAIProvider,
++    KimiCodeProvider,
+ ]
+ 
+ 
+@@ -924,6 +952,9 @@ def test_extractor_handles_plain_dict_message() -> None:
+     assert _extract_openai_compatible_message_text(
+         {"content": None, "reasoning": "dict reasoning"}
+     ) == "dict reasoning"
++    assert _extract_openai_compatible_message_text(
++        {"content": None, "reasoning_content": "dict reasoning content"}
++    ) == "dict reasoning content"
+     assert _extract_openai_compatible_message_text(
+         {"content": [{"type": "text", "text": "dict list"}]}
+     ) == "dict list"
+diff --git a/tests/test_runtime_provider.py b/tests/test_runtime_provider.py
+index 212254f03..a636f90cf 100644
+--- a/tests/test_runtime_provider.py
++++ b/tests/test_runtime_provider.py
+@@ -9,16 +9,21 @@ from dharma_swarm.runtime_provider import (
+     DEFAULT_SILICONFLOW_MODEL,
+     DEFAULT_FIREWORKS_MODEL,
+     DEFAULT_OPENROUTER_MODEL,
++    DEFAULT_KIMI_CODE_MODEL,
+     DEFAULT_TOGETHER_MODEL,
++    DEFAULT_ZAI_MODEL,
+     FIREWORKS_BASE_URL,
+     GROQ_BASE_URL,
++    KIMI_BASE_URL,
+     NVIDIA_NIM_BASE_URL,
+     OPENROUTER_BASE_URL,
+     SILICONFLOW_BASE_URL,
+     TOGETHER_BASE_URL,
++    ZAI_BASE_URL,
+     RuntimeProviderConfig,
+     complete_via_preferred_runtime_providers,
+     create_default_provider_map,
++    create_runtime_provider,
+     preferred_runtime_provider_configs,
+     resolve_runtime_provider_config,
+ )
+@@ -60,6 +65,87 @@ def test_resolve_runtime_provider_config_for_openrouter_uses_canonical_base(monk
+     assert cfg.available is True
+ 
+ 
++def test_resolve_runtime_provider_config_for_zai_uses_alias_base_and_model() -> None:
++    cfg = resolve_runtime_provider_config(
++        ProviderType.ZAI,
++        model="glm-5.2",
++        env={
++            "GLM_API_KEY": "zai-key",
++            "ZAI_BASE_URL": "https://zai.internal/api/paas/v4",
++        },
++    )
++
++    assert cfg.api_key == "zai-key"
++    assert cfg.base_url == "https://zai.internal/api/paas/v4"
++    assert cfg.default_model == "glm-5.2"
++    assert cfg.available is True
++
++
++def test_resolve_runtime_provider_config_for_zai_uses_default_model() -> None:
++    cfg = resolve_runtime_provider_config(
++        ProviderType.ZAI,
++        env={"ZAI_API_KEY": "zai-key"},
++    )
++
++    assert cfg.base_url == ZAI_BASE_URL
++    assert cfg.default_model == DEFAULT_ZAI_MODEL
++    assert cfg.default_model == "glm-5.2"
++
++
++def test_resolve_runtime_provider_config_for_kimi_code_uses_default_model() -> None:
++    cfg = resolve_runtime_provider_config(
++        ProviderType.KIMI_CODE,
++        env={"KIMI_API_KEY": "kimi-key"},
++    )
++
++    assert cfg.api_key == "kimi-key"
++    assert cfg.base_url == KIMI_BASE_URL
++    assert cfg.default_model == DEFAULT_KIMI_CODE_MODEL
++    assert cfg.default_model == "kimi-for-coding"
++    assert cfg.available is True
++
++
++def test_resolve_runtime_provider_config_for_kimi_code_uses_env_base_and_alias() -> None:
++    cfg = resolve_runtime_provider_config(
++        ProviderType.KIMI_CODE,
++        env={
++            "MOONSHOT_KIMI_API_KEY": "kimi-key",
++            "KIMI_BASE_URL": "https://kimi.internal/coding/v1",
++        },
++    )
++
++    assert cfg.api_key == "kimi-key"
++    assert cfg.base_url == "https://kimi.internal/coding/v1"
++    assert cfg.default_model == "kimi-for-coding"
++    assert cfg.available is True
++
++
++def test_create_runtime_provider_threads_timeout_to_kimi_and_zai() -> None:
++    kimi = create_runtime_provider(
++        RuntimeProviderConfig(
++            provider=ProviderType.KIMI_CODE,
++            api_key="kimi-key",
++            base_url=KIMI_BASE_URL,
++            default_model=DEFAULT_KIMI_CODE_MODEL,
++            timeout_seconds=17,
++            available=True,
++        )
++    )
++    zai = create_runtime_provider(
++        RuntimeProviderConfig(
++            provider=ProviderType.ZAI,
++            api_key="zai-key",
++            base_url=ZAI_BASE_URL,
++            default_model=DEFAULT_ZAI_MODEL,
++            timeout_seconds=19,
++            available=True,
++        )
++    )
++
++    assert kimi._timeout == 17
++    assert zai._timeout == 19
++
++
+ def test_resolve_runtime_provider_config_normalizes_alias_env() -> None:
+     cfg = resolve_runtime_provider_config(
+         ProviderType.GOOGLE_AI,
+@@ -239,6 +325,8 @@ def test_create_default_provider_map_includes_expected_runtime_providers() -> No
+     assert ProviderType.NVIDIA_NIM in provider_map
+     assert ProviderType.OPENROUTER_FREE in provider_map
+     assert ProviderType.OLLAMA in provider_map
++    assert ProviderType.ZAI in provider_map
++    assert ProviderType.KIMI_CODE in provider_map
+ 
+ 
+ def test_preferred_runtime_provider_configs_prioritizes_ollama_nim_before_openrouter(
+@@ -251,6 +339,8 @@ def test_preferred_runtime_provider_configs_prioritizes_ollama_nim_before_openro
+     monkeypatch.setenv("SILICONFLOW_API_KEY", "sf-key")
+     monkeypatch.setenv("TOGETHER_API_KEY", "together-key")
+     monkeypatch.setenv("FIREWORKS_API_KEY", "fireworks-key")
++    monkeypatch.setenv("ZAI_API_KEY", "zai-key")
++    monkeypatch.setenv("KIMI_API_KEY", "kimi-key")
+ 
+     configs = preferred_runtime_provider_configs(model="test-model")
+ 
+@@ -259,6 +349,8 @@ def test_preferred_runtime_provider_configs_prioritizes_ollama_nim_before_openro
+     assert providers.index(ProviderType.SILICONFLOW) < providers.index(ProviderType.OPENROUTER)
+     assert providers.index(ProviderType.TOGETHER) < providers.index(ProviderType.OPENROUTER)
+     assert providers.index(ProviderType.FIREWORKS) < providers.index(ProviderType.OPENROUTER)
++    assert providers.index(ProviderType.ZAI) < providers.index(ProviderType.OPENROUTER)
++    assert providers.index(ProviderType.KIMI_CODE) < providers.index(ProviderType.OPENROUTER)
+     assert ProviderType.OPENROUTER_FREE in providers
+     assert ProviderType.NVIDIA_NIM in providers
+     assert ProviderType.OLLAMA in providers

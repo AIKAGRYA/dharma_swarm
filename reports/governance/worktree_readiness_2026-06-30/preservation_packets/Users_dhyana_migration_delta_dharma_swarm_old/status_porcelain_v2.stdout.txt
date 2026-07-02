@@ -1,0 +1,57 @@
+# branch.oid 662b16dd7a48f163d159a40164d500ff730fd2cf
+# branch.head main
+# branch.upstream origin/main
+# branch.ab +16 -0
+1 .M N... 100644 100644 100644 a6f13eddb2736f652390b85760b8c0541d9cf813 a6f13eddb2736f652390b85760b8c0541d9cf813 .gitignore
+1 .M N... 100644 100644 100644 3c52b03170b4600cb130c7cad658a3c66a122d56 3c52b03170b4600cb130c7cad658a3c66a122d56 README.md
+1 .M N... 100644 100644 100644 08c6d8d8d5e1d3c27a656e14ddc198bca15c60db 08c6d8d8d5e1d3c27a656e14ddc198bca15c60db dashboard/src/app/dashboard/catalytic/page.tsx
+1 .M N... 100644 100644 100644 631e0b30a944f60f2340e92aef8fc6b8e0972cd9 631e0b30a944f60f2340e92aef8fc6b8e0972cd9 dashboard/src/app/dashboard/ecosystem/page.tsx
+1 .M N... 100644 100644 100644 50d4861c642c8ecfae3ea7ec026ba300cc9a2aa1 50d4861c642c8ecfae3ea7ec026ba300cc9a2aa1 dashboard/src/app/layout.tsx
+1 .M N... 100644 100644 100644 6faada21bc914970739026c2611b971e97ec0a31 6faada21bc914970739026c2611b971e97ec0a31 dashboard/src/components/layout/AmbientParticles.tsx
+1 .M N... 100644 100644 100644 a2265740bf393ae1e5df97202122f4c5f35218a1 a2265740bf393ae1e5df97202122f4c5f35218a1 dashboard/src/components/layout/Header.tsx
+1 .M N... 100644 100644 100644 48be74bf1b88a200f8cff399a83cfc5cbef0ba00 48be74bf1b88a200f8cff399a83cfc5cbef0ba00 dashboard/src/components/layout/Sidebar.tsx
+1 .M N... 100644 100644 100644 6ca20d7cd76dfdf5af7063108dfd20733f789f6c 6ca20d7cd76dfdf5af7063108dfd20733f789f6c dashboard/src/components/layout/TelemetryStrip.tsx
+1 .M N... 100644 100644 100644 0802543f9a5a9ddca20fc2a55d2108e07709b186 0802543f9a5a9ddca20fc2a55d2108e07709b186 dashboard/src/components/viz/CosmographGraph.tsx
+1 .M N... 100644 100644 100644 37645f50bbf29e3550855ff1e326560cc528a52c 37645f50bbf29e3550855ff1e326560cc528a52c dashboard/src/components/workflow/WorkflowNodeTypes.tsx
+1 .M N... 100644 100644 100644 63f9d0ae7b1346a39fe6987592be3efd57ca307d 63f9d0ae7b1346a39fe6987592be3efd57ca307d dashboard/src/lib/types.ts
+1 .M N... 100644 100644 100644 fccc3f6bd63857b3e79df6f3b617ac3d0c13e995 fccc3f6bd63857b3e79df6f3b617ac3d0c13e995 dharma_swarm/agent_runner.py
+1 .M N... 100644 100644 100644 009bc03e0d0e66387241bc4c7fe505e9302d755f 009bc03e0d0e66387241bc4c7fe505e9302d755f dharma_swarm/browser_agent.py
+1 .M N... 100644 100644 100644 18654a8809560d07b00385fa7bdd100faf2fd14b 18654a8809560d07b00385fa7bdd100faf2fd14b dharma_swarm/context.py
+1 .M N... 100644 100644 100644 a65c63eb5a6b66e06e753c8bbc9e8d607c24c6f9 a65c63eb5a6b66e06e753c8bbc9e8d607c24c6f9 dharma_swarm/dgc_cli.py
+1 .M N... 100644 100644 100644 1e81613b2e6c61aab3fe9f953cebf4592d0be2db 1e81613b2e6c61aab3fe9f953cebf4592d0be2db dharma_swarm/ontology.py
+1 .M N... 100644 100644 100644 32632cb842a0a5d672aafd44d55d63b714b6ea51 32632cb842a0a5d672aafd44d55d63b714b6ea51 dharma_swarm/ontology_adapters.py
+1 .M N... 100644 100644 100644 7ca0a50f6f224e6694fb48a27cc8019eb91d4916 7ca0a50f6f224e6694fb48a27cc8019eb91d4916 dharma_swarm/ontology_runtime.py
+1 .M N... 100644 100644 100644 3b49a207c0577bdf2c378ac6e9852ed709b3171b 3b49a207c0577bdf2c378ac6e9852ed709b3171b dharma_swarm/orientation_packet.py
+1 .M N... 100644 100644 100644 28339c0dabdf8f11d1be521533607816ba1ebf14 28339c0dabdf8f11d1be521533607816ba1ebf14 dharma_swarm/runtime_artifacts.py
+1 .M N... 100644 100644 100644 504714403c82743fae319c940136f34d4fc1b4c9 504714403c82743fae319c940136f34d4fc1b4c9 dharma_swarm/swarm.py
+1 .M N... 100644 100644 100644 69e9820b9b54d5c777bff4069afa22fc7252b0e4 69e9820b9b54d5c777bff4069afa22fc7252b0e4 dharma_swarm/telic_seam.py
+1 .M N... 100644 100644 100644 7abdc99e8f72cb56a4df1e077126bd0b171651cd 7abdc99e8f72cb56a4df1e077126bd0b171651cd dharma_swarm/tui_helpers.py
+1 .M N... 100644 100644 100644 c0701e83846ff1fd1b0c9ae403e6ac7b4624ff56 c0701e83846ff1fd1b0c9ae403e6ac7b4624ff56 dharma_swarm/witness.py
+1 .M N... 100644 100644 100644 3ed596344533b3c0ca1a3872cb8e97a3d8fc9726 3ed596344533b3c0ca1a3872cb8e97a3d8fc9726 pyproject.toml
+1 .M N... 100755 100755 100755 4a8d3d91c00148a9e13147e28f6c21c8a0292ea7 4a8d3d91c00148a9e13147e28f6c21c8a0292ea7 run_operator.sh
+1 .M N... 100644 100644 100644 abac9663b05de91b0041dda4b57a323b41fe479f abac9663b05de91b0041dda4b57a323b41fe479f tests/test_agents_router.py
+1 .M N... 100644 100644 100644 fe7c6014b1c423da398af499a43c7c4d06354775 fe7c6014b1c423da398af499a43c7c4d06354775 tests/test_browser_agent.py
+1 .M N... 100644 100644 100644 f2dea553421243d0a750d194801cba0d519eaf98 f2dea553421243d0a750d194801cba0d519eaf98 tests/test_chat_tools.py
+1 .M N... 100644 100644 100644 197d213aea4452d3b4561c90be49482911b4e56d 197d213aea4452d3b4561c90be49482911b4e56d tests/test_dgc_cli.py
+1 .M N... 100644 100644 100644 1d9ac683994d87169b94d06a102d95f46b138cc3 1d9ac683994d87169b94d06a102d95f46b138cc3 tests/test_ontology_adapters.py
+1 .M N... 100644 100644 100644 a67cb9e4e79f60405650915bd56035a698957bad a67cb9e4e79f60405650915bd56035a698957bad tests/test_ontology_registry.py
+1 .M N... 100644 100644 100644 5af03f516662791ba159853a76e9026480268124 5af03f516662791ba159853a76e9026480268124 tests/test_orientation_packet.py
+1 .M N... 100644 100644 100644 5a1a07a29a9f12cf71c84a0d6399f3a2969fb6c3 5a1a07a29a9f12cf71c84a0d6399f3a2969fb6c3 tests/test_runtime_artifacts.py
+1 .M N... 100644 100644 100644 0576adb0e35e45d182824ef726ef0debcd7fa98b 0576adb0e35e45d182824ef726ef0debcd7fa98b tests/test_telic_seam.py
+1 .M N... 100644 100644 100644 87fa3d9be40e027bd0cea7cac63d65348502cd5f 87fa3d9be40e027bd0cea7cac63d65348502cd5f tests/test_tui_helpers.py
+? dashboard/src/components/layout/SidebarLayout.tsx
+? dashboard/src/components/viz/SystemBackground.tsx
+? dashboard/src/stores/
+? dharma_swarm/agentic_corporation/
+? dharma_swarm/codex_build_packet.py
+? dharma_swarm/dgc/
+? dharma_swarm/ontology_meta.py
+? docs/plans/2026-03-29-codex-long-running-autonomy.md
+? docs/plans/2026-03-29-merge-blocker-sprint.md
+? docs/plans/2026-03-30-repo-cleanup-sprint.md
+? references/
+? tests/test_agentic_corporation/
+? tests/test_dgc_modular_forge.py
+? tests/test_ontology_meta.py
+? tests/test_repo_cleanup_contracts.py
+? tests/test_runtime_pipeline_hardening_spec.py

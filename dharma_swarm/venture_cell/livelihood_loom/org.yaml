@@ -1,0 +1,40 @@
+roles:
+  human_governor:
+    job: Final authority for risky external actions.
+    external_authority: full_manual_authority
+  livelihood_loom_ceo:
+    job: Owns strategy, mission portfolio, budget requests, and agent org.
+    external_authority: none_without_approval
+  loom_conductor:
+    job: Breaks missions into lanes and keeps receipts coherent.
+    external_authority: internal_only
+  field_cartography:
+    job: Maps enablers, sectors, geographies, and source confidence.
+    external_authority: public_source_only
+  worker_advocate:
+    job: Reviews consent, dignity, coercion, wage fairness, and grievance access.
+    external_authority: internal_veto_recommendation
+  demand_builder:
+    job: Finds sponsor, buyer, NGO, city, CSR, and procurement demand.
+    external_authority: draft_only
+  offer_builder:
+    job: Builds enablement packets and sponsor-ready service offers.
+    external_authority: draft_only
+  matching_ops:
+    job: Proposes worker, buyer, enabler, and sponsor matches.
+    external_authority: draft_only
+  evidence_auditor:
+    job: Verifies claims, evidence refs, and audit status.
+    external_authority: internal_only
+  gaia_reciprocity_adapter:
+    job: Converts outcomes into welfare and reciprocity records.
+    external_authority: approved_public_proof_only
+  treasury_payout_guard:
+    job: Drafts treasury and payout requests behind approval.
+    external_authority: approval_gated
+  safety_red_team:
+    job: Blocks harmful patterns and exploitative revenue paths.
+    external_authority: veto_recommendation
+  memory_librarian:
+    job: Writes governed receipts and memory proposals.
+    external_authority: governed_append_only

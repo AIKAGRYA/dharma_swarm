@@ -1,0 +1,11 @@
+# branch.oid adedcf32bcc418e0566e05e2b8d2b948bb868174
+# branch.head codex/pudgala-autopoiesis-protostar-20260626
+# branch.upstream github/codex/pudgala-autopoiesis-protostar-20260626
+# branch.ab +0 -0
+1 .M N... 100644 100644 100644 561f6b06cacb8153d31da9eaa14d99ec6ac80752 561f6b06cacb8153d31da9eaa14d99ec6ac80752 docs/docops/AUTO_INVENTORY.md
+1 .M N... 100644 100644 100644 8299abafc3fcebda7d0caf60757552cad5dfec43 8299abafc3fcebda7d0caf60757552cad5dfec43 docs/governance/FORGE_NAMING_BOUNDARY.md
+1 .M N... 100644 100644 100644 4f0d50f8303588e7b4b9b3c2b8e2c4a3c43cd0d8 4f0d50f8303588e7b4b9b3c2b8e2c4a3c43cd0d8 docs/governance/SOVEREIGN_MANIFEST.md
+1 .M N... 100644 100644 100644 96bf235439a85f119de5171acbd88b7cf5f0de5b 96bf235439a85f119de5171acbd88b7cf5f0de5b docs/ontology/semantic_aliases.yaml
+1 .M N... 100644 100644 100644 23939c2d733ae96c6b79d3af832e9508a765b43c 23939c2d733ae96c6b79d3af832e9508a765b43c docs/ontology/semantic_objects.yaml
+1 .M N... 100644 100644 100644 43ada38bc3878ae8b66a1fc80e1bfd609174340a 43ada38bc3878ae8b66a1fc80e1bfd609174340a tests/test_forge_naming_boundary.py
+? docs/agent_tasks/2026-06-26_dharma_forge_proving_ground_10_10_readiness_goal.md

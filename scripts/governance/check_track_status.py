@@ -40,6 +40,36 @@ SUPPORTED_SCHEMA_VERSIONS = {1, 2}       # v1 (singular active_track) read via a
 EDGE_KINDS = ("complements", "depends_on", "conflicts_with")
 SCORE_GATE_RE = re.compile(r"^\s*(\d+)_to_(\d+)\s*:")
 
+EXTERNAL_ACTED_RECEIPT_REQUIRED_FIELDS = (
+    "receipt_id",
+    "occurred_at",
+    "actor_boundary",
+    "consent_basis",
+    "input_material_class",
+    "output_artifact",
+    "external_action",
+    "evidence_refs",
+    "privacy_redactions",
+    "operator_attestation",
+)
+
+EXTERNAL_ACTED_RECEIPT_FORBIDDEN_MARKERS = (
+    "schema only",
+    "operator handoff only",
+    "not an external acted receipt",
+    "not itself the first external acted receipt",
+    "this operator packet is not a receipt",
+    "a receipt template is not a receipt",
+    "mock",
+    "template",
+    "design note",
+    "internal test",
+    "local dashboard render",
+    "agent self-review",
+    "passive reading",
+    "simulated response",
+)
+
 
 @dataclass
 class Finding:
@@ -239,31 +269,53 @@ def check_file_contains(file_path: str, pattern: str) -> CriterionResult:
     )
 
 
+def _markdown_field_present(text: str, field: str) -> bool:
+    pattern = rf"(?im)^\s*(?:[-*]\s*)?(?:[`*_]*\s*)?{re.escape(field)}(?:\s*[`*_]*)?\s*:"
+    return bool(re.search(pattern, text))
+
+
+def check_external_acted_receipt(file_path: str) -> CriterionResult:
+    path = Path(file_path)
+    kind = "external_acted_receipt"
+    if not path.exists():
+        return CriterionResult(id="", kind=kind, passed=False, detail=f"{file_path} MISSING")
+    if not path.is_file():
+        return CriterionResult(id="", kind=kind, passed=False, detail=f"{file_path} is not a file")
+    text = path.read_text(encoding="utf-8", errors="ignore")
+    compact = " ".join(text.split()).lower()
+    forbidden = [marker for marker in EXTERNAL_ACTED_RECEIPT_FORBIDDEN_MARKERS if marker in compact]
+    if forbidden:
+        return CriterionResult(
+            id="",
+            kind=kind,
+            passed=False,
+            detail=f"forbidden non-receipt marker(s): {', '.join(forbidden)} in {file_path}",
+        )
+    missing = [
+        field
+        for field in EXTERNAL_ACTED_RECEIPT_REQUIRED_FIELDS
+        if not _markdown_field_present(text, field)
+    ]
+    if missing:
+        return CriterionResult(
+            id="",
+            kind=kind,
+            passed=False,
+            detail=f"missing external acted receipt field(s): {', '.join(missing)} in {file_path}",
+        )
+    return CriterionResult(
+        id="",
+        kind=kind,
+        passed=True,
+        detail=f"{file_path} present with required acted-receipt fields",
+    )
+
+
 def _compact_command_output(text: str, *, limit: int = 500) -> str:
     compact = " | ".join(line.strip() for line in text.splitlines() if line.strip())
     if len(compact) <= limit:
         return compact
     return compact[: limit - 3] + "..."
-
-
-def _resolve_command_for_current_runtime(command: list[str]) -> list[str]:
-    """Keep executable criteria portable across worktrees.
-
-    ACTIVE_TRACK criteria are written as literal commands so operators can see
-    what is being proven. In isolated worktrees, though, the repository-local
-    virtualenv may not exist even when this checker is already running under a
-    dependency-complete Python. Resolve those common Python entrypoints to the
-    current interpreter instead of making track truth depend on one checkout's
-    `.venv` path.
-    """
-    if not command:
-        return command
-    executable = command[0]
-    if executable == "pytest":
-        return [sys.executable, "-m", "pytest", *command[1:]]
-    if executable in {"./.venv/bin/python", ".venv/bin/python"} and not Path(executable).exists():
-        return [sys.executable, *command[1:]]
-    return command
 
 
 def check_command_passes(
@@ -273,10 +325,9 @@ def check_command_passes(
     cwd: str | None = None,
 ) -> CriterionResult:
     kind = "command_passes"
-    resolved_command = _resolve_command_for_current_runtime(command)
     try:
         result = subprocess.run(
-            resolved_command,
+            command,
             cwd=cwd or None,
             capture_output=True,
             text=True,
@@ -287,23 +338,57 @@ def check_command_passes(
             id="",
             kind=kind,
             passed=False,
-            detail=f"{' '.join(resolved_command)} timed out after {exc.timeout}s",
+            detail=f"{' '.join(command)} timed out after {exc.timeout}s",
         )
     except OSError as exc:
         return CriterionResult(
             id="",
             kind=kind,
             passed=False,
-            detail=f"{' '.join(resolved_command)} failed to start: {exc}",
+            detail=f"{' '.join(command)} failed to start: {exc}",
         )
 
     output = _compact_command_output((result.stdout or "") + "\n" + (result.stderr or ""))
-    detail = f"{' '.join(resolved_command)} exited {result.returncode}"
-    if resolved_command != command:
-        detail += f" (resolved from {' '.join(command)})"
+    detail = f"{' '.join(command)} exited {result.returncode}"
     if output:
         detail += f"; output: {output}"
     return CriterionResult(id="", kind=kind, passed=result.returncode == 0, detail=detail)
+
+
+def _nested_mapping_value(mapping: dict[str, Any], dotted_path: str) -> Any:
+    value: Any = mapping
+    for part in dotted_path.split("."):
+        if not isinstance(value, dict):
+            return None
+        value = value.get(part)
+    return value
+
+
+def check_hardening_score_at_least(
+    track: dict[str, Any],
+    *,
+    minimum: int,
+    field_path: str = "hardening_status.current_score",
+) -> CriterionResult:
+    kind = "hardening_score_at_least"
+    value = _int_or_none(_nested_mapping_value(track, field_path))
+    scale = _int_or_none(_nested_mapping_value(track, "hardening_status.scale")) or 100
+    if value is None:
+        return CriterionResult(
+            id="",
+            kind=kind,
+            passed=False,
+            detail=f"{field_path} missing or not an integer",
+        )
+    return CriterionResult(
+        id="",
+        kind=kind,
+        passed=value >= minimum,
+        detail=(
+            f"{field_path}={value}/{scale}; requires >= {minimum}/{scale} "
+            "before this track can render shippable"
+        ),
+    )
 
 
 def check_pr_merged(pr_number: int) -> CriterionResult:
@@ -332,7 +417,11 @@ def check_pr_merged(pr_number: int) -> CriterionResult:
                                 detail=f"PR #{pr_number}: {type(exc).__name__}, skipped")
 
 
-def evaluate_criterion(crit: dict[str, Any]) -> CriterionResult:
+def evaluate_criterion(
+    crit: dict[str, Any],
+    *,
+    track: dict[str, Any] | None = None,
+) -> CriterionResult:
     """Evaluate one predicate. A malformed criterion becomes a failing result,
     never an exception — a governance gate must convert bad config into a
     Finding, not crash (and a crash would also bypass --warn-only)."""
@@ -354,6 +443,12 @@ def evaluate_criterion(crit: dict[str, Any]) -> CriterionResult:
                                       detail="malformed criterion: empty 'file' or 'pattern'")
             else:
                 res = check_file_contains(crit["file"], crit["pattern"])
+        elif kind == "external_acted_receipt":
+            if not isinstance(crit.get("file"), str) or not crit.get("file"):
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail="malformed criterion: 'file' must be a non-empty string")
+            else:
+                res = check_external_acted_receipt(crit["file"])
         elif kind == "command_passes":
             command = crit.get("command")
             if not isinstance(command, list) or not command or not all(isinstance(part, str) and part for part in command):
@@ -367,6 +462,24 @@ def evaluate_criterion(crit: dict[str, Any]) -> CriterionResult:
                     command,
                     timeout_s=int(crit.get("timeout_s", 120)),
                     cwd=crit.get("cwd"),
+                )
+        elif kind == "hardening_score_at_least":
+            minimum = _int_or_none(crit.get("minimum"))
+            field_path = str(crit.get("field", "hardening_status.current_score") or "")
+            if track is None:
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail="malformed criterion: track context is required")
+            elif minimum is None:
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail="malformed criterion: 'minimum' must be an integer")
+            elif not field_path:
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail="malformed criterion: 'field' must be non-empty when present")
+            else:
+                res = check_hardening_score_at_least(
+                    track,
+                    minimum=minimum,
+                    field_path=field_path,
                 )
         elif kind == "pr_merged":
             res = check_pr_merged(int(crit["pr"]))
@@ -697,8 +810,12 @@ def detect_dependency_cycle(tracks: list[dict[str, Any]], findings: list[Finding
 
 
 def evaluate_track(t: dict[str, Any]) -> dict[str, Any]:
-    prereqs = [evaluate_criterion(c) for c in (t.get("prerequisites") or [])]
-    comps = [evaluate_criterion(c) for c in (t.get("completion_criteria") or [])]
+    prereqs = [
+        evaluate_criterion(c, track=t) for c in (t.get("prerequisites") or [])
+    ]
+    comps = [
+        evaluate_criterion(c, track=t) for c in (t.get("completion_criteria") or [])
+    ]
     prereqs_ok = all(c.passed for c in prereqs) if prereqs else True
     completion_ok = all(c.passed for c in comps) if comps else False
     return {
@@ -785,7 +902,7 @@ def run(args: argparse.Namespace) -> int:
 
         # Prerequisite failures => track mis-declared.
         for c in r["prereqs"]:
-            if not c.passed and c.kind in {"file_exists", "file_contains", "command_passes"}:
+            if not c.passed and c.kind in {"file_exists", "file_contains", "external_acted_receipt", "command_passes"}:
                 findings.append(Finding("ERROR", f"prerequisite:{tid}:{c.id}",
                     f"[{tid}] prerequisite failed: {c.detail}. The work it builds on "
                     "does not exist.", criterion_id=c.id))

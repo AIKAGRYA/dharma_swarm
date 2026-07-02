@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "verified_at": "2026-06-04",
+  "verified_at": "2026-06-30",
   "ttl_days": 14,
   "assertions": [
     {
@@ -85,14 +85,14 @@
       "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
       "regex": "Adapter files \\| \\*\\*([\\d,]+)",
       "metric": "adapter_files",
-      "verify": "find dharma_swarm -type f | rg -i \"adapter\" | wc -l"
+      "verify": "git ls-files dharma_swarm | rg -i \"adapter\" | wc -l"
     },
     {
       "id": "manifest-router-files",
       "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
       "regex": "Router files \\| \\*\\*([\\d,]+)\\*\\*",
       "metric": "router_files",
-      "verify": "find dharma_swarm -type f | rg -i \"rout\" | wc -l"
+      "verify": "git ls-files dharma_swarm | rg -i \"rout\" | wc -l"
     }
   ],
   "path_guards": {

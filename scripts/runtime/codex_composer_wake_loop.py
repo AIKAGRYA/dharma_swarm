@@ -27,10 +27,16 @@ from typing import Any, Callable, Mapping, Sequence
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from dharma_swarm.model_hierarchy import default_model  # noqa: E402
+from dharma_swarm.models import ProviderType  # noqa: E402
+
 AGENT_UID = "codex_composer"
 CALLSIGN = "codex_composer"
 DISPLAY_NAME = "Codex Composer"
-MODEL_IDENTITY = "gpt-5.5"
+MODEL_IDENTITY = os.getenv("DGC_DIRECTOR_CODEX_MODEL", "").strip() or default_model(ProviderType.CODEX)
 AUTHORITY_MODE = "read_only_until_execution_lease"
 DEFAULT_DHARMA_HOME = Path("~/.dharma")
 DEFAULT_SESSION = "codex-composer-wake"

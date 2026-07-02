@@ -1,0 +1,19 @@
+{
+  "schema": "sab_first_six_agent_flywheel.a2a_queue_append_receipt.v1",
+  "mission_id": "sab-first-six-agent-flywheel-20260627",
+  "created_at_utc": "2026-06-27T17:33:00Z",
+  "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+  "source_packets": "reports/sab_first_six_agent_flywheel/A2A_LAUNCH_PACKETS.jsonl",
+  "append_mode": "duplicate_id_guarded",
+  "appended": 6,
+  "task_ids": [
+    "sab-flywheel-d00-setu-sab-agni",
+    "sab-flywheel-d00-codex-composer-mac",
+    "sab-flywheel-d00-codex-rushabdev",
+    "sab-flywheel-d00-sab-research-scout",
+    "sab-flywheel-d00-sab-hardener",
+    "sab-flywheel-d00-sab-recruiter-bridge"
+  ],
+  "receipt_contract": "sab.semantic_receipt.v1",
+  "note": "Rows are pending in the local A2A queue. External outreach remains operator-gated; these packets do not send external messages."
+}

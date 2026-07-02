@@ -1,0 +1,246 @@
+{
+  "blockers": [
+    "glm52: score=94 < 100",
+    "glm52: disagreement=No disagreement with the claimed pass verdict. The evidence is fresh, live, tied to current repo HEAD f1f3e140, and discloses the local-live-jetstream profile boundary. The two required_changes are proof-highlight completeness gaps, not sem",
+    "kimi27code: verdict=revise",
+    "kimi27code: disagreement=I disagree with the report's claim that all matrix rows pass and that the evidence proves production readiness. The semantic receipt was produced by the wrong model (`ollama:glm-5.2:cloud` instead of `ollama:kimi-k2.7-code:cloud`), and the ",
+    "minimaxm3: verdict=revise",
+    "minimaxm3: disagreement=The packet's closeout language asserts live JetStream production readiness, but it cannot be merged as 'minimax-m3' production-ready because the recorded producer model is `ollama:glm-5.2:cloud`. The semantic-receipt backbone that the entir"
+  ],
+  "conviction_gate": "hold_blockers",
+  "critic_count": 6,
+  "critics": [
+    {
+      "actual_model": "glm-5.2",
+      "lane_id": "glm52",
+      "latency_ms": 104868,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "reports/governance/runtime_truth_nats_final_evidence_2026-07-01.md",
+          "reports/governance/nats_live_production_matrix/latest.json (referenced)",
+          "reports/governance/nats_live_production_matrix/nats-live-20260701T002140Z-f2b16527/evidence.json (referenced)",
+          "Semantic receipt path for ollama:glm-5.2:cloud (referenced)",
+          "Verification commands: nats_live_contact, run_nats_live_production_matrix.py, check_nats_live_production_evidence.py, pytest, make nats-substrate-contract, check_track_status.py",
+          "Matrix rows: topology, happy_path, duplicate_path, publish_failure_path, handler_failure_redelivery_path, stale_started_idempotency_path, concurrent_duplicate_path, ack_failure_path, max_deliver_path, dlq_failure_path, restart_path, governance_negative_path",
+          "Broker state excerpt for DLQ failure: ack_floor, delivered, num_ack_pending, num_redelivered",
+          "Restart redelivery: same stream seq 68, redelivery count 2",
+          "Governance negative: return code 1"
+        ],
+        "explicit_disagreement": "No disagreement with the claimed pass verdict. The evidence is fresh, live, tied to current repo HEAD f1f3e140, and discloses the local-live-jetstream profile boundary. The two required_changes are proof-highlight completeness gaps, not semantic failures.",
+        "required_changes": [
+          "Add explicit proof-highlight line confirming A2AServer(require_execution_identity=True) was active during the live happy-path run, not just implied by happy_path pass.",
+          "Add explicit proof-highlight line or raw evidence excerpt showing the Nats-Msg-Id header value on the published message, distinct from the causality.message_id field, to prove NATS-level idempotency key was set."
+        ],
+        "score": 94,
+        "summary": "Fresh live JetStream evidence against nats://127.0.0.1:4222 with profile local-live-jetstream covers all 12 required matrix rows with concrete sequence numbers, run IDs, timestamps, and broker state. Topology, durable explicit-ack consumer, happy path, duplicate, handler failure/redelivery, stale idempotency, concurrent duplicate, ack failure, MaxDeliver DLQ, DLQ failure operator-visible state, restart redelivery, and governance-negative tamper path all pass with rc 0. Provider/model ollama:glm-5.2:cloud matches request and semantic receipt path is cited. Verification commands and Makefile gate return rc 0. Two proof-highlight gaps prevent a perfect score: explicit confirmation of A2AServer(require_execution_identity=True) in the live run and explicit Nats-Msg-Id header presence on the published message are not surfaced in the summary, though the matrix rows that would exercise them passed.",
+        "verdict": "approve"
+      },
+      "provider": "ollama",
+      "raw_response": "```json\n{\n  \"verdict\": \"approve\",\n  \"score\": 94,\n  \"summary\": \"Fresh live JetStream evidence against nats://127.0.0.1:4222 with profile local-live-jetstream covers all 12 required matrix rows with concrete sequence numbers, run IDs, timestamps, and broker state. Topology, durable explicit-ack consumer, happy path, duplicate, handler failure/redelivery, stale idempotency, concurrent duplicate, ack failure, MaxDeliver DLQ, DLQ failure operator-visible state, restart redelivery, and governance-negative tamper path all pass with rc 0. Provider/model ollama:glm-5.2:cloud matches request and semantic receipt path is cited. Verification commands and Makefile gate return rc 0. Two proof-highlight gaps prevent a perfect score: explicit confirmation of A2AServer(require_execution_identity=True) in the live run and explicit Nats-Msg-Id header presence on the published message are not surfaced in the summary, though the matrix rows that would exercise them passed.\",\n  \"blockers\": [],\n  \"required_changes\": [\n    \"Add explicit proof-highlight line confirming A2AServer(require_execution_identity=True) was active during the live happy-path run, not just implied by happy_path pass.\",\n    \"Add explicit proof-highlight line or raw evidence excerpt showing the Nats-Msg-Id header value on the published message, distinct from the causality.message_id field, to prove NATS-level idempotency key was set.\"\n  ],\n  \"evidence_checked\": [\n    \"reports/governance/runtime_truth_nats_final_evidence_2026-07-01.md\",\n    \"reports/governance/nats_live_production_matrix/latest.json (referenced)\",\n    \"reports/governance/nats_live_production_matrix/nats-live-20260701T002140Z-f2b16527/evidence.json (referenced)\",\n    \"Semantic receipt path for ollama:glm-5.2:cloud (referenced)\",\n    \"Verification commands: nats_live_contact, run_nats_live_production_matrix.py, check_nats_live_production_evidence.py, pytest, make nats-substrate-contract, check_track_status.py\",\n    \"Matrix rows: topology, happy_path, duplicate_path, publish_failure_path, handler_failure_redelivery_path, stale_started_idempotency_path, concurrent_duplicate_path, ack_failure_path, max_deliver_path, dlq_failure_path, restart_path, governance_negative_path\",\n    \"Broker state excerpt for DLQ failure: ack_floor, delivered, num_ack_pending, num_redelivered\",\n    \"Restart redelivery: same stream seq 68, redelivery count 2\",\n    \"Governance negative: return code 1\"\n  ],\n  \"explicit_disagreement\": \"No disagreement with the claimed pass verdict. The evidence is fresh, live, tied to current repo HEAD f1f3e140, and discloses the local-live-jetstream profile boundary. The two required_changes are proof-highlight completeness gaps, not semantic failures.\"\n}\n```",
+      "requested_model": "glm-5.2:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "kimi-k2.7-code",
+      "lane_id": "kimi27code",
+      "latency_ms": 16036,
+      "ok": true,
+      "parsed": {
+        "blockers": [
+          "Provider/model mismatch: the evidence reports `ollama:glm-5.2:cloud`, but the requested provider/model is `ollama:kimi-k2.7-code:cloud`. The live model-backed semantic handler receipt therefore does not satisfy the request.",
+          "No raw evidence attached: only a summary markdown is provided. The actual `latest.json`, compact raw evidence JSON, stream/consumer info, semantic receipt, and command outputs are not present, so matrix rows, envelope fields, broker state, and source fingerprints cannot be verified.",
+          "Semantic receipt path inconsistency: the report references `/Users/dhyana/dharma_swarm/reports/a2a/nats_live_production_matrix/...` while the matrix evidence path is `/Users/dhyana/dharma_swarm/reports/governance/nats_live_production_matrix/...`. This discrepancy is unresolved.",
+          "No code content or diffs for the modified files are attached, so claims cannot be tied to the current code at HEAD `f1f3e140e3ddac4e5d246daaabb1d1d588bd04e2`.",
+          "Verification commands are asserted with return codes and status strings but no actual output logs or timestamps, so they cannot be independently confirmed as fresh or live."
+        ],
+        "evidence_checked": [
+          "Requested provider/model: `ollama:kimi-k2.7-code:cloud`",
+          "Reported provider/model in evidence: `ollama:glm-5.2:cloud`",
+          "Matrix summary rows and claimed pass statuses",
+          "Reported envelope fields and broker topology assertions",
+          "Semantic receipt path referenced in the report",
+          "Git status and HEAD reference",
+          "Verification command assertions and reported return codes",
+          "Evidence generation timestamp and broker endpoint claim"
+        ],
+        "explicit_disagreement": "I disagree with the report's claim that all matrix rows pass and that the evidence proves production readiness. The semantic receipt was produced by the wrong model (`ollama:glm-5.2:cloud` instead of `ollama:kimi-k2.7-code:cloud`), and the packet is an unverifiable summary lacking raw broker artifacts, code diffs, and command logs. A rerun with the exact requested model and full attached raw evidence is required before any pass verdict can be considered.",
+        "required_changes": [
+          "Rerun the live production matrix using the exact requested provider/model `ollama:kimi-k2.7-code:cloud` and attach the full raw matrix JSON, stream/consumer info, and semantic receipt.",
+          "Attach the actual `latest.json`, compact raw evidence JSON, and semantic receipt file contents (or signed links) so each pass claim can be audited against broker state.",
+          "Provide actual command output logs with timestamps for all verification commands, not just asserted return codes and status strings.",
+          "Attach code diffs or a reproducible checkout of the reviewed HEAD for all modified files so evidence can be tied to current code.",
+          "Resolve and verify the semantic receipt path so it consistently matches the matrix evidence directory and include the model identifier in receipt metadata."
+        ],
+        "score": 10,
+        "summary": "The submission is a self-reported pass summary that does not use the requested provider/model and provides no independently verifiable raw broker evidence, code diffs, or command logs. Production readiness cannot be confirmed from the attached markdown alone.",
+        "verdict": "revise"
+      },
+      "provider": "ollama",
+      "raw_response": "{\n  \"verdict\": \"revise\",\n  \"score\": 10,\n  \"summary\": \"The submission is a self-reported pass summary that does not use the requested provider/model and provides no independently verifiable raw broker evidence, code diffs, or command logs. Production readiness cannot be confirmed from the attached markdown alone.\",\n  \"blockers\": [\n    \"Provider/model mismatch: the evidence reports `ollama:glm-5.2:cloud`, but the requested provider/model is `ollama:kimi-k2.7-code:cloud`. The live model-backed semantic handler receipt therefore does not satisfy the request.\",\n    \"No raw evidence attached: only a summary markdown is provided. The actual `latest.json`, compact raw evidence JSON, stream/consumer info, semantic receipt, and command outputs are not present, so matrix rows, envelope fields, broker state, and source fingerprints cannot be verified.\",\n    \"Semantic receipt path inconsistency: the report references `/Users/dhyana/dharma_swarm/reports/a2a/nats_live_production_matrix/...` while the matrix evidence path is `/Users/dhyana/dharma_swarm/reports/governance/nats_live_production_matrix/...`. This discrepancy is unresolved.\",\n    \"No code content or diffs for the modified files are attached, so claims cannot be tied to the current code at HEAD `f1f3e140e3ddac4e5d246daaabb1d1d588bd04e2`.\",\n    \"Verification commands are asserted with return codes and status strings but no actual output logs or timestamps, so they cannot be independently confirmed as fresh or live.\"\n  ],\n  \"required_changes\": [\n    \"Rerun the live production matrix using the exact requested provider/model `ollama:kimi-k2.7-code:cloud` and attach the full raw matrix JSON, stream/consumer info, and semantic receipt.\",\n    \"Attach the actual `latest.json`, compact raw evidence JSON, and semantic receipt file contents (or signed links) so each pass claim can be audited against broker state.\",\n    \"Provide actual command output logs with timestamps for all verification commands, not just asserted return codes and status strings.\",\n    \"Attach code diffs or a reproducible checkout of the reviewed HEAD for all modified files so evidence can be tied to current code.\",\n    \"Resolve and verify the semantic receipt path so it consistently matches the matrix evidence directory and include the model identifier in receipt metadata.\"\n  ],\n  \"evidence_checked\": [\n    \"Requested provider/model: `ollama:kimi-k2.7-code:cloud`\",\n    \"Reported provider/model in evidence: `ollama:glm-5.2:cloud`\",\n    \"Matrix summary rows and claimed pass statuses\",\n    \"Reported envelope fields and broker topology assertions\",\n    \"Semantic receipt path referenced in the report\",\n    \"Git status and HEAD reference\",\n    \"Verification command assertions and reported return codes\",\n    \"Evidence generation timestamp and broker endpoint claim\"\n  ],\n  \"explicit_disagreement\": \"I disagree with the report's claim that all matrix rows pass and that the evidence proves production readiness. The semantic receipt was produced by the wrong model (`ollama:glm-5.2:cloud` instead of `ollama:kimi-k2.7-code:cloud`), and the packet is an unverifiable summary lacking raw broker artifacts, code diffs, and command logs. A rerun with the exact requested model and full attached raw evidence is required before any pass verdict can be considered.\"\n}",
+      "requested_model": "kimi-k2.7-code:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "qwen3-coder:480b-cloud",
+      "lane_id": "qwen3coder",
+      "latency_ms": 11657,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "Fresh live NATS/JetStream broker evidence",
+          "DS_TASKS and DS_DLQ topology evidence",
+          "Durable explicit-ack consumer evidence for a2a_task_handler",
+          "Live publish through A2ANatsTransport.publish_task",
+          "Canonical envelope with dharma.nats.envelope.v1, stable message id, identity/causality fields, typed payload, and Nats-Msg-Id",
+          "Live A2AServer(require_execution_identity=True) handler execution",
+          "Live model-backed semantic handler receipt",
+          "Ack after handler success",
+          "Handler failure nack and redelivery",
+          "Stale idempotency retry",
+          "Concurrent in-progress duplicate blocked/nacked truthfully",
+          "Broker ack failure surfaced truthfully",
+          "MaxDeliver typed DLQ envelope and original ack after DLQ publish",
+          "DLQ publish failure does not falsely ack original and leaves operator-visible state",
+          "Restart/recovery redelivery without lost work",
+          "Governance-negative tamper path fails",
+          "Active-track and Makefile gates require live evidence"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "All required production-grade integration criteria verified with fresh live NATS/JetStream evidence. DS_TASKS and DS_DLQ topology confirmed. Durable explicit-ack consumer for a2a_task_handler demonstrated. Live publish through A2ANatsTransport.publish_task verified. Canonical envelope with dharma.nats.envelope.v1, stable message id, identity/causality fields, typed payload, and Nats-Msg-Id present. Live A2AServer(require_execution_identity=True) handler execution confirmed. Live model-backed semantic handler receipt verified. Ack after handler success demonstrated. Handler failure nack and redelivery confirmed. Stale idempotency retry verified. Concurrent in-progress duplicate blocked/nacked truthfully. Broker ack failure surfaced truthfully. MaxDeliver typed DLQ envelope and original ack after DLQ publish confirmed. DLQ publish failure does not falsely ack original and leaves operator-visible state. Restart/recovery redelivery without lost work verified. Governance-negative tamper path fails. Active-track and Makefile gates require live evidence satisfied. All verification commands passed with rc 0.",
+        "verdict": "approve"
+      },
+      "provider": "ollama",
+      "raw_response": "{\n  \"verdict\": \"approve\",\n  \"score\": 100,\n  \"summary\": \"All required production-grade integration criteria verified with fresh live NATS/JetStream evidence. DS_TASKS and DS_DLQ topology confirmed. Durable explicit-ack consumer for a2a_task_handler demonstrated. Live publish through A2ANatsTransport.publish_task verified. Canonical envelope with dharma.nats.envelope.v1, stable message id, identity/causality fields, typed payload, and Nats-Msg-Id present. Live A2AServer(require_execution_identity=True) handler execution confirmed. Live model-backed semantic handler receipt verified. Ack after handler success demonstrated. Handler failure nack and redelivery confirmed. Stale idempotency retry verified. Concurrent in-progress duplicate blocked/nacked truthfully. Broker ack failure surfaced truthfully. MaxDeliver typed DLQ envelope and original ack after DLQ publish confirmed. DLQ publish failure does not falsely ack original and leaves operator-visible state. Restart/recovery redelivery without lost work verified. Governance-negative tamper path fails. Active-track and Makefile gates require live evidence satisfied. All verification commands passed with rc 0.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"Fresh live NATS/JetStream broker evidence\",\n    \"DS_TASKS and DS_DLQ topology evidence\",\n    \"Durable explicit-ack consumer evidence for a2a_task_handler\",\n    \"Live publish through A2ANatsTransport.publish_task\",\n    \"Canonical envelope with dharma.nats.envelope.v1, stable message id, identity/causality fields, typed payload, and Nats-Msg-Id\",\n    \"Live A2AServer(require_execution_identity=True) handler execution\",\n    \"Live model-backed semantic handler receipt\",\n    \"Ack after handler success\",\n    \"Handler failure nack and redelivery\",\n    \"Stale idempotency retry\",\n    \"Concurrent in-progress duplicate blocked/nacked truthfully\",\n    \"Broker ack failure surfaced truthfully\",\n    \"MaxDeliver typed DLQ envelope and original ack after DLQ publish\",\n    \"DLQ publish failure does not falsely ack original and leaves operator-visible state\",\n    \"Restart/recovery redelivery without lost work\",\n    \"Governance-negative tamper path fails\",\n    \"Active-track and Makefile gates require live evidence\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "qwen3-coder:480b-cloud",
+      "required": true
+    },
+    {
+      "actual_model": "deepseek-v4-pro",
+      "lane_id": "deepseekv4pro",
+      "latency_ms": 14836,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "Fresh live NATS/JetStream broker evidence (nats://127.0.0.1:4222, profile local-live-jetstream)",
+          "DS_TASKS and DS_DLQ topology evidence with explicit ack consumer a2a_task_handler",
+          "Live publish through A2ANatsTransport.publish_task (happy_path pass, envelope details)",
+          "Canonical envelope with dharma.nats.envelope.v1, stable message id, identity/causality fields, typed payload, Nats-Msg-Id",
+          "Live A2AServer(require_execution_identity=True) handler execution (semantic receipt file)",
+          "Live model-backed semantic handler receipt (ollama:glm-5.2:cloud)",
+          "Ack after handler success (happy_path ack)",
+          "Handler failure nack and redelivery (handler_failure_redelivery_path: attempts 2, first nack, second ack)",
+          "Stale idempotency retry (stale_started_idempotency_path pass)",
+          "Concurrent in-progress duplicate blocked/nacked truthfully (concurrent_duplicate_path pass)",
+          "Broker ack failure surfaced truthfully (ack_failure_path: failed ack nack, cleanup ack)",
+          "MaxDeliver typed DLQ envelope and original ack after DLQ publish (max_deliver_path: DLQ subject dharma.dlq.ds_tasks.a2a_task_handler)",
+          "DLQ publish failure does not falsely ack original and leaves operator-visible state (dlq_failure_path: operator_visible True, state details)",
+          "Restart/recovery redelivery without lost work (restart_path: same stream seq, redelivery count 2, cleanup ack)",
+          "Governance-negative tamper path fails (governance_negative_path: return code 1)",
+          "Active-track and Makefile gates require live evidence (make nats-substrate-contract rc 0, check_track_status.py SHIPPABLE)",
+          "Compatibility publishers cannot claim production readiness (no compatibility publisher used)",
+          "All verification commands returned 0, 47 tests passed, live matrix status pass"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "All production readiness checks passed with live JetStream evidence. No blockers.",
+        "verdict": "pass"
+      },
+      "provider": "ollama",
+      "raw_response": "{\n  \"verdict\": \"pass\",\n  \"score\": 100,\n  \"summary\": \"All production readiness checks passed with live JetStream evidence. No blockers.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"Fresh live NATS/JetStream broker evidence (nats://127.0.0.1:4222, profile local-live-jetstream)\",\n    \"DS_TASKS and DS_DLQ topology evidence with explicit ack consumer a2a_task_handler\",\n    \"Live publish through A2ANatsTransport.publish_task (happy_path pass, envelope details)\",\n    \"Canonical envelope with dharma.nats.envelope.v1, stable message id, identity/causality fields, typed payload, Nats-Msg-Id\",\n    \"Live A2AServer(require_execution_identity=True) handler execution (semantic receipt file)\",\n    \"Live model-backed semantic handler receipt (ollama:glm-5.2:cloud)\",\n    \"Ack after handler success (happy_path ack)\",\n    \"Handler failure nack and redelivery (handler_failure_redelivery_path: attempts 2, first nack, second ack)\",\n    \"Stale idempotency retry (stale_started_idempotency_path pass)\",\n    \"Concurrent in-progress duplicate blocked/nacked truthfully (concurrent_duplicate_path pass)\",\n    \"Broker ack failure surfaced truthfully (ack_failure_path: failed ack nack, cleanup ack)\",\n    \"MaxDeliver typed DLQ envelope and original ack after DLQ publish (max_deliver_path: DLQ subject dharma.dlq.ds_tasks.a2a_task_handler)\",\n    \"DLQ publish failure does not falsely ack original and leaves operator-visible state (dlq_failure_path: operator_visible True, state details)\",\n    \"Restart/recovery redelivery without lost work (restart_path: same stream seq, redelivery count 2, cleanup ack)\",\n    \"Governance-negative tamper path fails (governance_negative_path: return code 1)\",\n    \"Active-track and Makefile gates require live evidence (make nats-substrate-contract rc 0, check_track_status.py SHIPPABLE)\",\n    \"Compatibility publishers cannot claim production readiness (no compatibility publisher used)\",\n    \"All verification commands returned 0, 47 tests passed, live matrix status pass\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "deepseek-v4-pro:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "minimax-m3",
+      "lane_id": "minimaxm3",
+      "latency_ms": 28397,
+      "ok": true,
+      "parsed": {
+        "blockers": [
+          "Provider/model mismatch: live matrix records `provider/model = ollama:glm-5.2:cloud` while the requested/under-review lane is `ollama:minimax-m3:cloud`. The semantic receipt, handler-execution semantics, and identity fields are therefore tied to a different model than the one whose production readiness is being claimed. Re-run the live matrix with `ollama:minimax-m3:cloud` and regenerate all receipts, or formally disclose the substitution and explain why model identity is not load-bearing for this lane.",
+          "No evidence in the packet that the consumer process in the matrix run was actually `A2AServer(require_execution_identity=True)`. The 'happy_path' and 'handler_failure_redelivery_path' rows must identify the in-process handler class and constructor flags; otherwise the explicit-ack/nack/redelivery claims cannot be attributed to the production server path.",
+          "No evidence that the live publish path is `A2ANatsTransport.publish_task`. The compact evidence shows sequence numbers and Nats-Msg-Id, but does not name the calling entrypoint. A script that bypasses `A2ANatsTransport` and calls nats-py directly would still produce the observed envelope fields; the gate must capture the entrypoint symbol (e.g., via telemetry or matrix row metadata).",
+          "The 'compatibility publishers cannot claim production readiness' constraint has no enforcement artifact. The Makefile/active-track gate does not reference this constraint, and no row in the matrix asserts that compatibility-only publishers were rejected from the production track. Add an explicit gate or matrix row."
+        ],
+        "evidence_checked": [
+          "reports/governance/runtime_truth_nats_final_evidence_2026-07-01.md (full body)",
+          "Referenced: reports/governance/nats_live_production_matrix/latest.json",
+          "Referenced: reports/governance/nats_live_production_matrix/nats-live-20260701T002140Z-f2b16527/evidence.json",
+          "Referenced: compact raw evidence JSON",
+          "Referenced: semantic receipt at reports/a2a/nats_live_production_matrix/.../nats_live_20260701T002140Z_f2b16527_happy_path_c26ccfb4.semantic_receipt.json",
+          "Git status (modified files: a2a_bridge, a2a_server, nats_transport, nats_live_contact, runtime_state, ACTIVE_TRACK, contract scripts, test files, matrix runner, new live evidence checker)",
+          "Verification command exit codes (rc 0 across nats_live_contact, matrix runner, evidence checker, pytest, make nats-substrate-contract, check_track_status)"
+        ],
+        "explicit_disagreement": "The packet's closeout language asserts live JetStream production readiness, but it cannot be merged as 'minimax-m3' production-ready because the recorded producer model is `ollama:glm-5.2:cloud`. The semantic-receipt backbone that the entire handler-execution and identity story rests on is therefore tied to a different model than the lane under review. Additionally, the absence of recorded publish entrypoint and `A2AServer(require_execution_identity=True)` flags in the matrix rows means the explicit-ack/nack/redelivery behavior is not yet proven to be exercised through the production transport and server. I disagree with the implied claim that this evidence is sufficient to ship the `minimax-m3` lane as-is; a re-run with the correct model identity and enriched per-row metadata is required.",
+        "required_changes": [
+          "Re-run `run_nats_live_production_matrix.py` with `--provider ollama --model minimax-m3:cloud` (or the configured env-var equivalent) and regenerate `nats_live_production_matrix/latest.json`, the per-run `evidence.json`, the semantic receipt, the compact raw evidence, and the final evidence packet. The matrix metadata must record `provider/model = ollama:minimax-m3:cloud`.",
+          "Extend the matrix runner to record, per row, (a) the publish entrypoint symbol (must be `dharma_swarm.a2a.nats_transport.A2ANatsTransport.publish_task`), (b) the consumer process class and `require_execution_identity` flag, and (c) the handler callable identity. Persist this alongside the existing envelope/causality fields.",
+          "Add an active-track/Makefile gate (e.g., `make nats-compat-publishers-rejected`) that fails if any non-`A2ANatsTransport` publisher is allowed to mint `dharma.nats.envelope.v1` messages, or that asserts the production-readiness claim is not granted to compatibility-only publisher paths.",
+          "Disclose model substitution in the final evidence packet if a re-run is not feasible: explicitly state that `glm-5.2` was used in place of `minimax-m3`, justify why model identity is not semantically load-bearing for this substrate lane, and obtain governance sign-off recorded in the active track.",
+          "Tighten the `governance_negative_path` row to capture the exact mutation attempted (e.g., tamper of `execution_agent`, `message_id`, or stream subjects) and the precise assertion that failed, so the 'tamper path fails' claim is reproducible."
+        ],
+        "score": 62,
+        "summary": "Evidence packet is structurally comprehensive (topology, 11 matrix rows, semantic receipt, gates), but the producer model recorded in the live matrix is `ollama:glm-5.2:cloud`, not the requested/claimed `ollama:minimax-m3:cloud`. This is a non-trivial model-identity mismatch that invalidates the semantic-receipt-based claims of 'model-backed handler execution' for the target lane. Additional gaps: no explicit proof that `A2ANatsTransport.publish_task` (the production transport) is the actual publish path exercised (versus a helper/script bypass), no explicit confirmation that the live `A2AServer` was constructed with `require_execution_identity=True` in the matrix run, and the 'compatibility publishers cannot claim production readiness' constraint is not enforced or evidenced in the matrix or active-track gate. Cannot pass as stated.",
+        "verdict": "revise"
+      },
+      "provider": "ollama",
+      "raw_response": "{\n  \"verdict\": \"revise\",\n  \"score\": 62,\n  \"summary\": \"Evidence packet is structurally comprehensive (topology, 11 matrix rows, semantic receipt, gates), but the producer model recorded in the live matrix is `ollama:glm-5.2:cloud`, not the requested/claimed `ollama:minimax-m3:cloud`. This is a non-trivial model-identity mismatch that invalidates the semantic-receipt-based claims of 'model-backed handler execution' for the target lane. Additional gaps: no explicit proof that `A2ANatsTransport.publish_task` (the production transport) is the actual publish path exercised (versus a helper/script bypass), no explicit confirmation that the live `A2AServer` was constructed with `require_execution_identity=True` in the matrix run, and the 'compatibility publishers cannot claim production readiness' constraint is not enforced or evidenced in the matrix or active-track gate. Cannot pass as stated.\",\n  \"blockers\": [\n    \"Provider/model mismatch: live matrix records `provider/model = ollama:glm-5.2:cloud` while the requested/under-review lane is `ollama:minimax-m3:cloud`. The semantic receipt, handler-execution semantics, and identity fields are therefore tied to a different model than the one whose production readiness is being claimed. Re-run the live matrix with `ollama:minimax-m3:cloud` and regenerate all receipts, or formally disclose the substitution and explain why model identity is not load-bearing for this lane.\",\n    \"No evidence in the packet that the consumer process in the matrix run was actually `A2AServer(require_execution_identity=True)`. The 'happy_path' and 'handler_failure_redelivery_path' rows must identify the in-process handler class and constructor flags; otherwise the explicit-ack/nack/redelivery claims cannot be attributed to the production server path.\",\n    \"No evidence that the live publish path is `A2ANatsTransport.publish_task`. The compact evidence shows sequence numbers and Nats-Msg-Id, but does not name the calling entrypoint. A script that bypasses `A2ANatsTransport` and calls nats-py directly would still produce the observed envelope fields; the gate must capture the entrypoint symbol (e.g., via telemetry or matrix row metadata).\",\n    \"The 'compatibility publishers cannot claim production readiness' constraint has no enforcement artifact. The Makefile/active-track gate does not reference this constraint, and no row in the matrix asserts that compatibility-only publishers were rejected from the production track. Add an explicit gate or matrix row.\"\n  ],\n  \"required_changes\": [\n    \"Re-run `run_nats_live_production_matrix.py` with `--provider ollama --model minimax-m3:cloud` (or the configured env-var equivalent) and regenerate `nats_live_production_matrix/latest.json`, the per-run `evidence.json`, the semantic receipt, the compact raw evidence, and the final evidence packet. The matrix metadata must record `provider/model = ollama:minimax-m3:cloud`.\",\n    \"Extend the matrix runner to record, per row, (a) the publish entrypoint symbol (must be `dharma_swarm.a2a.nats_transport.A2ANatsTransport.publish_task`), (b) the consumer process class and `require_execution_identity` flag, and (c) the handler callable identity. Persist this alongside the existing envelope/causality fields.\",\n    \"Add an active-track/Makefile gate (e.g., `make nats-compat-publishers-rejected`) that fails if any non-`A2ANatsTransport` publisher is allowed to mint `dharma.nats.envelope.v1` messages, or that asserts the production-readiness claim is not granted to compatibility-only publisher paths.\",\n    \"Disclose model substitution in the final evidence packet if a re-run is not feasible: explicitly state that `glm-5.2` was used in place of `minimax-m3`, justify why model identity is not semantically load-bearing for this substrate lane, and obtain governance sign-off recorded in the active track.\",\n    \"Tighten the `governance_negative_path` row to capture the exact mutation attempted (e.g., tamper of `execution_agent`, `message_id`, or stream subjects) and the precise assertion that failed, so the 'tamper path fails' claim is reproducible.\"\n  ],\n  \"evidence_checked\": [\n    \"reports/governance/runtime_truth_nats_final_evidence_2026-07-01.md (full body)\",\n    \"Referenced: reports/governance/nats_live_production_matrix/latest.json\",\n    \"Referenced: reports/governance/nats_live_production_matrix/nats-live-20260701T002140Z-f2b16527/evidence.json\",\n    \"Referenced: compact raw evidence JSON\",\n    \"Referenced: semantic receipt at reports/a2a/nats_live_production_matrix/.../nats_live_20260701T002140Z_f2b16527_happy_path_c26ccfb4.semantic_receipt.json\",\n    \"Git status (modified files: a2a_bridge, a2a_server, nats_transport, nats_live_contact, runtime_state, ACTIVE_TRACK, contract scripts, test files, matrix runner, new live evidence checker)\",\n    \"Verification command exit codes (rc 0 across nats_live_contact, matrix runner, evidence checker, pytest, make nats-substrate-contract, check_track_status)\"\n  ],\n  \"explicit_disagreement\": \"The packet's closeout language asserts live JetStream production readiness, but it cannot be merged as 'minimax-m3' production-ready because the recorded producer model is `ollama:glm-5.2:cloud`. The semantic-receipt backbone that the entire handler-execution and identity story rests on is therefore tied to a different model than the lane under review. Additionally, the absence of recorded publish entrypoint and `A2AServer(require_execution_identity=True)` flags in the matrix rows means the explicit-ack/nack/redelivery behavior is not yet proven to be exercised through the production transport and server. I disagree with the implied claim that this evidence is sufficient to ship the `minimax-m3` lane as-is; a re-run with the correct model identity and enriched per-row metadata is required.\"\n}",
+      "requested_model": "minimax-m3:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "nvidia/nemotron-3-ultra-550b-a55b-20260604:free",
+      "lane_id": "nemotron3ultra",
+      "latency_ms": 69382,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "reports/governance/nats_live_production_matrix/latest.json",
+          "reports/governance/nats_live_production_matrix/nats-live-20260701T002140Z-f2b16527/evidence.json",
+          "reports/governance/runtime_truth_nats_compact_raw_evidence_2026-07-01.json",
+          "reports/a2a/nats_live_production_matrix/nats-live-20260701T002140Z-f2b16527/receipts/nats_live_20260701T002140Z_f2b16527_happy_path_c26ccfb4.semantic_receipt.json",
+          "Verification commands: nats_live_contact, run_nats_live_production_matrix, check_nats_live_production_evidence, pytest suite, make nats-substrate-contract, check_track_status"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "All 12 live production matrix rows pass against fresh JetStream broker (nats://127.0.0.1:4222, profile local-live-jetstream). Evidence covers topology (DS_TASKS/DS_DLQ), durable explicit-ack consumer a2a_task_handler, canonical envelope v1 with stable message_id and full causality, live publish via A2ANatsTransport, handler execution with semantic receipt, ack/nack/redelivery semantics, idempotency, concurrent duplicate blocking, ack failure surfacing, MaxDeliver DLQ with typed envelope, DLQ failure operator visibility, restart recovery, and governance-negative tamper rejection. Makefile and active-track gates pass with live evidence. No stale or simulated evidence; all tied to current HEAD f1f3e14.",
+        "verdict": "pass"
+      },
+      "provider": "openrouter_free",
+      "raw_response": "{\n  \"verdict\": \"pass\",\n  \"score\": 100,\n  \"summary\": \"All 12 live production matrix rows pass against fresh JetStream broker (nats://127.0.0.1:4222, profile local-live-jetstream). Evidence covers topology (DS_TASKS/DS_DLQ), durable explicit-ack consumer a2a_task_handler, canonical envelope v1 with stable message_id and full causality, live publish via A2ANatsTransport, handler execution with semantic receipt, ack/nack/redelivery semantics, idempotency, concurrent duplicate blocking, ack failure surfacing, MaxDeliver DLQ with typed envelope, DLQ failure operator visibility, restart recovery, and governance-negative tamper rejection. Makefile and active-track gates pass with live evidence. No stale or simulated evidence; all tied to current HEAD f1f3e14.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"reports/governance/nats_live_production_matrix/latest.json\",\n    \"reports/governance/nats_live_production_matrix/nats-live-20260701T002140Z-f2b16527/evidence.json\",\n    \"reports/governance/runtime_truth_nats_compact_raw_evidence_2026-07-01.json\",\n    \"reports/a2a/nats_live_production_matrix/nats-live-20260701T002140Z-f2b16527/receipts/nats_live_20260701T002140Z_f2b16527_happy_path_c26ccfb4.semantic_receipt.json\",\n    \"Verification commands: nats_live_contact, run_nats_live_production_matrix, check_nats_live_production_evidence, pytest suite, make nats-substrate-contract, check_track_status\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "required": true
+    }
+  ],
+  "generated_at": "20260701T002619Z",
+  "max_evidence_chars": 0,
+  "max_output_tokens": 3000,
+  "persistent_agent_witness": {
+    "agent": "palantir-pilot",
+    "blocker": "",
+    "fresh": true,
+    "heartbeat_age_seconds": 27,
+    "heartbeat_timestamp": "2026-07-01T00:25:52Z",
+    "max_heartbeat_age_seconds": 300,
+    "raw_status": "status=running session=dharma_palantir_pilot_a2a_worker\nsubject=dharma.a2a.palantir-pilot\nconsumer=palantir_pilot_a2a\nstream=DHARMA_FLEET\nheartbeat=/Users/dhyana/.dharma/a2a_bus/worker_heartbeats/palantir-pilot.json\nlog=/Users/dhyana/.dharma/logs/palantir_pilot_a2a_worker/dharma_palantir_pilot_a2a_worker.log\n--- heartbeat ---\n{\n    \"agent_id\": \"palantir_pilot\",\n    \"callsign\": \"palantir-pilot\",\n    \"consumer\": \"palantir_pilot_a2a\",\n    \"cycle\": 1126,\n    \"last_receipt_path\": \"\",\n    \"receipt_count\": 0,\n    \"schema_version\": \"dharma.a2a.palantir_pilot.worker_heartbeat.v1\",\n    \"status\": \"IDLE\",\n    \"stream\": \"DHARMA_FLEET\",\n    \"subject\": \"dharma.a2a.palantir-pilot\",\n    \"suppress_no_messages\": true,\n    \"timestamp\": \"2026-07-01T00:25:52Z\"\n}\n--- consumer ---\n{\n  \"stream_name\": \"DHARMA_FLEET\",\n  \"name\": \"palantir_pilot_a2a\",\n  \"config\": {\n    \"ack_policy\": \"explicit\",\n    \"ack_wait\": 30000000000,\n    \"deliver_policy\": \"all\",\n    \"durable_name\": \"palantir_pilot_a2a\",\n    \"name\": \"palantir_pilot_a2a\",\n    \"filter_subject\": \"dharma.a2a.palantir-pilot\",\n    \"max_ack_pending\": 1000,\n    \"max_deliver\": -1,\n    \"max_waiting\": 512,\n    \"replay_policy\": \"instant\",\n    \"num_replicas\": 0,\n    \"metadata\": {\n      \"_nats.level\": \"3\",\n      \"_nats.req.level\": \"0\",\n      \"_nats.ver\": \"2.12.6\"\n    },\n    \"pause_until\": \"0001-01-01T00:00:00Z\"\n  },\n  \"created\": \"2026-06-15T16:08:32.524099Z\",\n  \"delivered\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"ack_floor\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"num_ack_pending\": 0,\n  \"num_redelivered\": 0,\n  \"num_waiting\": 1,\n  \"num_pending\": 0,\n  \"ts\": \"2026-07-01T00:26:19.012874Z\"\n}\n--- latest worker receipts ---\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260618T014416Z-palantir-pilot-codex_hardened_spec_notice_20260618T0155Z_palantir-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260618T013101Z-palantir-pilot-palantir_a2a_hardening_20260618T0001Z-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260617T135931Z-palantir-pilot-longrun_spec_95_vote_20260617T135751Z-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260617T131705Z-palantir-pilot-7215f005165f-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260617T130349Z-palantir-pilot-761445fa892d-PALANTIR_PILOT_REPLIED.json\n",
+    "status": "running"
+  },
+  "prompt_chars": 7516,
+  "prompt_file": "/Users/dhyana/dharma_swarm/reports/agentops/decorrelated_review_council/prompts/runtime_truth_nats_final_adversarial_20260701.md",
+  "prompt_words_estimate": 619,
+  "required_critic_count": 6,
+  "schema_version": "codex.decorrelated_review_council.v1",
+  "score_avg": 77.67,
+  "score_min": 10,
+  "target_score": 100,
+  "timeout_seconds": 300
+}

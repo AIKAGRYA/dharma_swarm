@@ -1,0 +1,21 @@
+{
+  "agent_uid": "livelihood_loom_ceo",
+  "cell_id": "livelihood_loom",
+  "claim_guard": "Do not claim provider-green until ProviderProof.is_green().",
+  "generated_at": "2026-06-29T16:06:44.889679+00:00",
+  "missing_provider_proof_fields": [
+    "provider",
+    "model",
+    "attempted_at",
+    "success=true",
+    "receipt_id",
+    "trace_id",
+    "result_ref"
+  ],
+  "path": "reports/livelihood_loom/status/provider_readiness_gap.json",
+  "provider_calls_made": false,
+  "provider_green": false,
+  "schema_version": "livelihood_loom.provider_readiness_gap.v1",
+  "status": "red",
+  "truth": "registered_bootstrapped_cultivation_ready_provider_blocked"
+}

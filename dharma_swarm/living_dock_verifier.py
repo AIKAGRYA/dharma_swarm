@@ -185,4 +185,3 @@ def verify_living_dock(
         evidence_paths=list(dict.fromkeys(evidence)),
         legacy_mirrors=list(dict.fromkeys(legacy_mirrors)),
     )
-

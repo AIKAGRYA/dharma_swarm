@@ -1,0 +1,31 @@
+# branch.oid 2f9d6eb094730b9bfb6f478a62305b3a5efa6da2
+# branch.head ratchet/loop-phases-1-3
+# branch.upstream origin/main
+# branch.ab +20 -35
+1 .M N... 100644 100644 100644 c478e003d5b81d9dffd77031bcdba4bd74051070 c478e003d5b81d9dffd77031bcdba4bd74051070 schemas/expert_audit_output.schema.json
+1 .M N... 100644 100644 100644 4e0922cb0665d06b6d35462cee54a0fb5a1b96a4 4e0922cb0665d06b6d35462cee54a0fb5a1b96a4 scripts/governance/loop/agent_backend.py
+1 .M N... 100644 100644 100644 7173a9e2e7bbf1753c57d3713b77c2f2f4d701b3 7173a9e2e7bbf1753c57d3713b77c2f2f4d701b3 scripts/governance/loop/anti_gaming.py
+1 .M N... 100644 100644 100644 46fd8d0c247c87235dc9ce1ee4c8cb3b1f493242 46fd8d0c247c87235dc9ce1ee4c8cb3b1f493242 scripts/governance/loop/prompt_audit_learn.py
+1 .M N... 100644 100644 100644 c9feb04f213bc8a8e9d21476bcf3ec44f86149a6 c9feb04f213bc8a8e9d21476bcf3ec44f86149a6 scripts/governance/loop/prompt_audit_reaudit.py
+1 .M N... 100644 100644 100644 3fecd2282dda93cb829a74360497fed77d000237 3fecd2282dda93cb829a74360497fed77d000237 scripts/governance/loop/prompt_audit_remediate.py
+1 .M N... 100644 100644 100644 1ccbbb050ab5057362ce3516e620a7a8b1e7ef19 1ccbbb050ab5057362ce3516e620a7a8b1e7ef19 scripts/governance/loop/prompt_audit_run.py
+1 .M N... 100644 100644 100644 49de199d85863f8c863bcc75ff6bd9861415daf2 49de199d85863f8c863bcc75ff6bd9861415daf2 scripts/governance/loop/prompt_audit_triage.py
+1 .M N... 100644 100644 100644 c7b14a47864a1b6e587434a886547c80cc49bc66 c7b14a47864a1b6e587434a886547c80cc49bc66 scripts/governance/loop/runs.py
+1 .M N... 100644 100644 100644 1b932e9c7f8f5f01c6850e156076fd68a691e0e9 1b932e9c7f8f5f01c6850e156076fd68a691e0e9 scripts/governance/loop/scoper.py
+1 .M N... 100644 100644 100644 c09c52b22874dc793f40a2b0543c104bcf04deec c09c52b22874dc793f40a2b0543c104bcf04deec scripts/governance/loop/validate_audit.py
+1 .M N... 100644 100644 100644 1f470eb223d1624de77a2ddfda8a6f6dc29d4244 1f470eb223d1624de77a2ddfda8a6f6dc29d4244 scripts/governance/loop/warrant.py
+1 .M N... 100644 100644 100644 55c9ecd58969edd564c9ae35feefce7601b95b7d 55c9ecd58969edd564c9ae35feefce7601b95b7d scripts/governance/loop/wire_ci_gate.py
+1 .M N... 100644 100644 100644 bf6375b57bba0e38dddf1b924bea83b9501d6b44 bf6375b57bba0e38dddf1b924bea83b9501d6b44 tests/governance/loop/test_agent_backend.py
+1 .M N... 100644 100644 100644 cc2a85f8c0ef01dcaa8938515cc3a275e42f4191 cc2a85f8c0ef01dcaa8938515cc3a275e42f4191 tests/governance/loop/test_agentized_e2e.py
+1 .M N... 100644 100644 100644 82347449289e3970310ad8fc5260cab36cfc9c64 82347449289e3970310ad8fc5260cab36cfc9c64 tests/governance/loop/test_anti_gaming.py
+1 .M N... 100644 100644 100644 ca33d58406d63cf4fe2fb4a1a3d863deb52a11d2 ca33d58406d63cf4fe2fb4a1a3d863deb52a11d2 tests/governance/loop/test_pipeline_e2e.py
+1 .M N... 100644 100644 100644 8ef63aa249481fa73749f24527dac7b12d00e08a 8ef63aa249481fa73749f24527dac7b12d00e08a tests/governance/loop/test_prompt_audit_learn.py
+1 .M N... 100644 100644 100644 9b5d7ff3c1bd2999dec556ee9ac89342f5161f0e 9b5d7ff3c1bd2999dec556ee9ac89342f5161f0e tests/governance/loop/test_prompt_audit_reaudit.py
+1 .M N... 100644 100644 100644 d78966f9834d6af1a2c7885cef9fec554068978a d78966f9834d6af1a2c7885cef9fec554068978a tests/governance/loop/test_prompt_audit_remediate.py
+1 .M N... 100644 100644 100644 e54b8f8248614d0ab67c6ffc482d8afeca991cce e54b8f8248614d0ab67c6ffc482d8afeca991cce tests/governance/loop/test_prompt_audit_run.py
+1 .M N... 100644 100644 100644 ae2449f593581ebdfabcaea623804c6bca97facd ae2449f593581ebdfabcaea623804c6bca97facd tests/governance/loop/test_prompt_audit_triage.py
+1 .M N... 100644 100644 100644 eb1eb59be0aaf1e38d5732f034a77936cd23e315 eb1eb59be0aaf1e38d5732f034a77936cd23e315 tests/governance/loop/test_runs.py
+1 .M N... 100644 100644 100644 7b6049c529b32396657d2b3bb8f8122234e633fb 7b6049c529b32396657d2b3bb8f8122234e633fb tests/governance/loop/test_scoper.py
+1 .M N... 100644 100644 100644 e0cb656a5964f7b8278409e3a0b5790884cc4488 e0cb656a5964f7b8278409e3a0b5790884cc4488 tests/governance/loop/test_validate_audit.py
+1 .M N... 100644 100644 100644 3e79d382ede38e59338d94a7574296f67d0c3990 3e79d382ede38e59338d94a7574296f67d0c3990 tests/governance/loop/test_warrant.py
+1 .M N... 100644 100644 100644 b18e3444995028d85a52441eceb64a0469d80ae9 b18e3444995028d85a52441eceb64a0469d80ae9 tests/governance/loop/test_wire_ci_gate.py

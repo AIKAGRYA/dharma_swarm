@@ -1,0 +1,118 @@
+diff --git a/reports/governance/active_track_evidence.json b/reports/governance/active_track_evidence.json
+index a1d44087d..d62e29388 100644
+--- a/reports/governance/active_track_evidence.json
++++ b/reports/governance/active_track_evidence.json
+@@ -1,5 +1,5 @@
+ {
+-  "generated_at": "2026-06-25T23:45:42+09:00",
++  "generated_at": "2026-06-29T11:09:11+09:00",
+   "schema_version": 2,
+   "active_track_id": "runtime-truth-reconciliation-2026-06",
+   "shippable": true,
+@@ -732,7 +732,7 @@
+     {
+       "severity": "ERROR",
+       "check": "track-stale:runtime-truth-reconciliation-2026-06",
+-      "message": "[runtime-truth-reconciliation-2026-06] verified_at is 21 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.",
++      "message": "[runtime-truth-reconciliation-2026-06] verified_at is 25 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.",
+       "criterion_id": null
+     },
+     {
+@@ -741,6 +741,12 @@
+       "message": "[runtime-truth-reconciliation-2026-06] all 11 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
+       "criterion_id": null
+     },
++    {
++      "severity": "ERROR",
++      "check": "track-stale:runtime-truth-nats-2026-06",
++      "message": "[runtime-truth-nats-2026-06] verified_at is 22 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.",
++      "criterion_id": null
++    },
+     {
+       "severity": "INFO",
+       "check": "track-shippable:runtime-truth-nats-2026-06",
+@@ -765,6 +771,12 @@
+       "message": "[truth-graph-platform-2026-06] all 15 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
+       "criterion_id": null
+     },
++    {
++      "severity": "ERROR",
++      "check": "track-stale:composer-holon-spine-longrun-2026-06",
++      "message": "[composer-holon-spine-longrun-2026-06] verified_at is 18 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.",
++      "criterion_id": null
++    },
+     {
+       "severity": "INFO",
+       "check": "track-shippable:composer-holon-spine-longrun-2026-06",
+diff --git a/reports/governance/active_track_evidence.md b/reports/governance/active_track_evidence.md
+index 1336abf20..631fdcb12 100644
+--- a/reports/governance/active_track_evidence.md
++++ b/reports/governance/active_track_evidence.md
+@@ -1,6 +1,6 @@
+ # Track Portfolio Evidence
+ 
+-Generated: 2026-06-25T23:45:42+09:00 (schema v2)
++Generated: 2026-06-29T11:09:11+09:00 (schema v2)
+ Active tracks: **6** (warn 5, max 10) — shippable 4
+ 
+ ## Spine coverage
+@@ -117,10 +117,12 @@ Active tracks: **6** (warn 5, max 10) — shippable 4
+ - **WARN** `wip-high`: 6 ACTIVE tracks exceed warn_active=5 — focus is spreading thin.
+ - **WARN** `spine-uncovered:research-depth`: Spine objective 'research-depth' has no ACTIVE track serving it (coverage gap).
+ - **WARN** `spine-uncovered:revenue-external-humans-served`: Spine objective 'revenue-external-humans-served' has no ACTIVE track serving it (coverage gap).
+-- **ERROR** `track-stale:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] verified_at is 21 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
++- **ERROR** `track-stale:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] verified_at is 25 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
+ - **INFO** `track-shippable:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] all 11 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
++- **ERROR** `track-stale:runtime-truth-nats-2026-06`: [runtime-truth-nats-2026-06] verified_at is 22 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.
+ - **INFO** `track-shippable:runtime-truth-nats-2026-06`: [runtime-truth-nats-2026-06] all 2 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
+ - **INFO** `track-in-progress:runtime-truth-spine-adoption-2026-06`: [runtime-truth-spine-adoption-2026-06] 7/8 completion criteria pass.
+ - **INFO** `track-in-progress:loop-closure-2026-06`: [loop-closure-2026-06] 4/5 completion criteria pass.
+ - **INFO** `track-shippable:truth-graph-platform-2026-06`: [truth-graph-platform-2026-06] all 15 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
++- **ERROR** `track-stale:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] verified_at is 18 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
+ - **INFO** `track-shippable:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] all 6 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
+diff --git a/reports/governance/track_portfolio.json b/reports/governance/track_portfolio.json
+index a1d44087d..d62e29388 100644
+--- a/reports/governance/track_portfolio.json
++++ b/reports/governance/track_portfolio.json
+@@ -1,5 +1,5 @@
+ {
+-  "generated_at": "2026-06-25T23:45:42+09:00",
++  "generated_at": "2026-06-29T11:09:11+09:00",
+   "schema_version": 2,
+   "active_track_id": "runtime-truth-reconciliation-2026-06",
+   "shippable": true,
+@@ -732,7 +732,7 @@
+     {
+       "severity": "ERROR",
+       "check": "track-stale:runtime-truth-reconciliation-2026-06",
+-      "message": "[runtime-truth-reconciliation-2026-06] verified_at is 21 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.",
++      "message": "[runtime-truth-reconciliation-2026-06] verified_at is 25 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.",
+       "criterion_id": null
+     },
+     {
+@@ -741,6 +741,12 @@
+       "message": "[runtime-truth-reconciliation-2026-06] all 11 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
+       "criterion_id": null
+     },
++    {
++      "severity": "ERROR",
++      "check": "track-stale:runtime-truth-nats-2026-06",
++      "message": "[runtime-truth-nats-2026-06] verified_at is 22 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.",
++      "criterion_id": null
++    },
+     {
+       "severity": "INFO",
+       "check": "track-shippable:runtime-truth-nats-2026-06",
+@@ -765,6 +771,12 @@
+       "message": "[truth-graph-platform-2026-06] all 15 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
+       "criterion_id": null
+     },
++    {
++      "severity": "ERROR",
++      "check": "track-stale:composer-holon-spine-longrun-2026-06",
++      "message": "[composer-holon-spine-longrun-2026-06] verified_at is 18 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.",
++      "criterion_id": null
++    },
+     {
+       "severity": "INFO",
+       "check": "track-shippable:composer-holon-spine-longrun-2026-06",

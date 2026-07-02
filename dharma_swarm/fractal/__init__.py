@@ -34,6 +34,7 @@ from dharma_swarm.fractal.room_configs import (
     bootstrap_registry,
     make_agentops_room,
     make_core_ops_room,
+    make_livelihood_loom_cell,
     make_revenue_wedge_cell,
 )
 
@@ -54,6 +55,7 @@ __all__ = [
     "build_review_from_packets",
     "make_agentops_room",
     "make_core_ops_room",
+    "make_livelihood_loom_cell",
     "make_revenue_wedge_cell",
     "render_room_section",
     "render_room_summary_line",

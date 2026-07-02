@@ -1,0 +1,55 @@
+{
+  "approved": false,
+  "cell_id": "livelihood_loom",
+  "created_at": "2026-06-29T16:29:01.594574+00:00",
+  "decision": null,
+  "event_log": "/Users/dhyana/.dharma/venture_cells/livelihood_loom/external_actions.jsonl",
+  "evidence_refs": [
+    "https://www.accion.org/",
+    "https://www.accion.org/partner-with-us/"
+  ],
+  "executed": false,
+  "execution_receipt_id": "",
+  "idempotency_key": "livelihood_loom_pilot_001:first_sponsor_outreach:20260629T162901Z:accion",
+  "kind": "outreach",
+  "payload": {
+    "draft_path": "reports/livelihood_loom/promotion/first_outreach_draft.md",
+    "partner_page": "https://www.accion.org/partner-with-us/",
+    "safety_summary": {
+      "allowed": 28,
+      "blocked": 4,
+      "flag_counts": {
+        "data_sale": 0,
+        "exploitative_gig_platform": 6,
+        "high_fee_lending": 16,
+        "privacy_risk": 2,
+        "sensitive_leakage": 4,
+        "source_gap": 0,
+        "worker_surveillance": 0
+      },
+      "needs_review": 18,
+      "private_data_used": false,
+      "public_only": true,
+      "total": 50
+    },
+    "target_name": "Accion",
+    "target_public_url": "https://www.accion.org/",
+    "target_type": "nonprofit_financial_inclusion_partner",
+    "top_50_count": 50,
+    "wedge_count": 3
+  },
+  "request_id": "ext_9f2de970d9c14999",
+  "requested_by": "livelihood_loom_ceo",
+  "risk_notes": [
+    "Draft only; do not send without human_governor approval.",
+    "Uses public organization-level target data only.",
+    "No private worker data, income, debt, caste, religion, health, or exact-location data.",
+    "No provider-green or external acted receipt claim.",
+    "Outreach draft uses public organization-level information.",
+    "No approval or execution has been granted.",
+    "External acted receipt remains pending until a real external act exists."
+  ],
+  "status": "risk_reviewed",
+  "title": "Draft first sponsor outreach to Accion",
+  "updated_at": "2026-06-29T16:29:01.595306+00:00"
+}

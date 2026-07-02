@@ -1,0 +1,7 @@
+ docs/docops/AUTO_INVENTORY.md            |  4 +--
+ docs/governance/FORGE_NAMING_BOUNDARY.md | 37 +++++++++++++++++++-------
+ docs/governance/SOVEREIGN_MANIFEST.md    |  4 +--
+ docs/ontology/semantic_aliases.yaml      | 45 ++++++++++++++++++++++++++++++++
+ docs/ontology/semantic_objects.yaml      | 18 +++++++++++++
+ tests/test_forge_naming_boundary.py      | 22 +++++++++++++++-
+ 6 files changed, 115 insertions(+), 15 deletions(-)

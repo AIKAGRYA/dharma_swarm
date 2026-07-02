@@ -1,0 +1,188 @@
+# branch.oid 260a11539b806c3db74f6220094e61eaad4fe85a
+# branch.head agent/magpie-seed
+1 .M N... 100644 100644 100644 b0f09f113cfa3493f59c4eb74682040b0f4bb0db b0f09f113cfa3493f59c4eb74682040b0f4bb0db CLAUDE.md
+1 .M N... 100644 100644 100644 2c26d82b0699512211617fa2012d4716085f7879 2c26d82b0699512211617fa2012d4716085f7879 Makefile
+1 .M N... 100644 100644 100644 7456ec4345ebd8bdc2f25d3f92c86d035aaec98c 7456ec4345ebd8bdc2f25d3f92c86d035aaec98c README.md
+1 .M N... 100644 100644 100644 49ce8a58a0dc88aeada2e64712b3539823a56540 49ce8a58a0dc88aeada2e64712b3539823a56540 api/main.py
+1 .M N... 100644 100644 100644 41a45b917805ef8c3553b64e284cb1d8ab29d7f8 41a45b917805ef8c3553b64e284cb1d8ab29d7f8 dashboard/src/lib/dashboardNav.test.ts
+1 .M N... 100644 100644 100644 649fd791d598532b87910158c0e6c242182d1ee7 649fd791d598532b87910158c0e6c242182d1ee7 dashboard/src/lib/dashboardNav.ts
+1 .M N... 100644 100644 100644 68274c1db80ffca6cebaf3c78065af7e8e71e343 68274c1db80ffca6cebaf3c78065af7e8e71e343 dharma_swarm/chetana/graph_unifier.py
+1 .M N... 100644 100644 100644 634cd20b86f1ee009758c0ed5661b77c35253582 634cd20b86f1ee009758c0ed5661b77c35253582 dharma_swarm/chetana/promote.py
+1 .M N... 100644 100644 100644 fb67882bf38c9d2461ddc93f7fc155fb0c1d0745 fb67882bf38c9d2461ddc93f7fc155fb0c1d0745 dharma_swarm/chetana/tests/test_graph_unifier.py
+1 .M N... 100644 100644 100644 7d7be5bb419c2f0a090208cabb675b0ca8e7ddae 7d7be5bb419c2f0a090208cabb675b0ca8e7ddae dharma_swarm/context.py
+1 .M N... 100644 100644 100644 fd9062327f7b2038f4dae96ac30c40e30a43c931 fd9062327f7b2038f4dae96ac30c40e30a43c931 dharma_swarm/cron_runner.py
+1 .M N... 100644 100644 100644 0e85a17b8a2ebaccce0921efc3124e8a3e00e1cb 0e85a17b8a2ebaccce0921efc3124e8a3e00e1cb dharma_swarm/dgc_cli.py
+1 .M N... 100644 100644 100644 12dacf2e5c84d45a0dc59113421e6ca640d019d3 12dacf2e5c84d45a0dc59113421e6ca640d019d3 dharma_swarm/fractal/__init__.py
+1 .M N... 100644 100644 100644 d70b49a3618f5db5a6b5839ba56e6be3f5e98698 d70b49a3618f5db5a6b5839ba56e6be3f5e98698 dharma_swarm/fractal/room_configs.py
+1 .M N... 100644 100644 100644 365c58a78d7c785ac12efa2d40b4ff65ba3f7cd2 365c58a78d7c785ac12efa2d40b4ff65ba3f7cd2 dharma_swarm/gaia_platform.py
+1 .M N... 100644 100644 100644 f467604532a9c61c95fbc8ca6baba90747d1cea5 f467604532a9c61c95fbc8ca6baba90747d1cea5 dharma_swarm/holon_l4_service.py
+1 .M N... 100644 100644 100644 c017fa853feb303dedc7e0fe0b4855d7c61472d9 c017fa853feb303dedc7e0fe0b4855d7c61472d9 dharma_swarm/holon_truth_projection.py
+1 .M N... 100644 100644 100644 4f5c4bd2f859eced31a69c485ff5f63a08a46239 4f5c4bd2f859eced31a69c485ff5f63a08a46239 dharma_swarm/idea_spark/semantic_routing.py
+1 .M N... 100644 100644 100644 897990137db35f092e454a895d8b311da32155e9 897990137db35f092e454a895d8b311da32155e9 dharma_swarm/idea_spark/store.py
+1 .M N... 100644 100644 100644 2d5ea2da97efdf933622651db7dae7998739e44b 2d5ea2da97efdf933622651db7dae7998739e44b dharma_swarm/memory_kernel/facade.py
+1 .M N... 100644 100644 100644 9888717bd352ba11462464deec3b4888719ec4c6 9888717bd352ba11462464deec3b4888719ec4c6 dharma_swarm/orchestrator.py
+1 .M N... 100644 100644 100644 6072c5f827a8e0166e39763dfaebabd7a655a442 6072c5f827a8e0166e39763dfaebabd7a655a442 dharma_swarm/providers.py
+1 .M N... 100644 100644 100644 e9a93f3a54653b3a76d25135d2ff1c431ecf4afb e9a93f3a54653b3a76d25135d2ff1c431ecf4afb dharma_swarm/runtime_lifecycle.py
+1 .M N... 100644 100644 100644 4b9919a037feeb93bc2481a985222bfe8d322210 4b9919a037feeb93bc2481a985222bfe8d322210 dharma_swarm/runtime_provider.py
+1 .M N... 100644 100644 100644 e890d0c035ee890e8815a538eacf169877306eff e890d0c035ee890e8815a538eacf169877306eff dharma_swarm/telos_substrate.py
+1 .M N... 100644 100644 100644 ac3d74762c1019effc0da0fbda9feff384e092ca ac3d74762c1019effc0da0fbda9feff384e092ca dharma_swarm/terminal_bridge.py
+1 .M N... 100644 100644 100644 6ca351d50ad8d91415c2da70291c0659e9c47b9d 6ca351d50ad8d91415c2da70291c0659e9c47b9d dharma_swarm/terminal_commands/infrastructure.py
+1 .M N... 100644 100644 100644 b45dd13ac85a60c4cac165f2df538c60d87af008 b45dd13ac85a60c4cac165f2df538c60d87af008 dharma_swarm/terminal_commands/memory.py
+1 .M N... 100644 100644 100644 3bea3d7fcfb152a632fc4c0ec2ae1ed2c9385400 3bea3d7fcfb152a632fc4c0ec2ae1ed2c9385400 dharma_swarm/tui/app.py
+1 .M N... 100644 100644 100644 8d5417ae1159592b64e335eceb36530fbcdb6ac0 8d5417ae1159592b64e335eceb36530fbcdb6ac0 dharma_swarm/tui/commands/system_commands.py
+1 .M N... 100644 100644 100644 09791f05cd0af8b7ed2c4e387f35c421e6de1761 09791f05cd0af8b7ed2c4e387f35c421e6de1761 dharma_swarm/vector_store.py
+1 .M N... 100644 100644 100644 e1e8a00fd7713564aa990d7569f020ffcb9968fb e1e8a00fd7713564aa990d7569f020ffcb9968fb docs/governance/ACTIVE_TRACK.yaml
+1 .M N... 100644 100644 100644 a9cbe21693e1053e8b765ceabf144b293781e053 a9cbe21693e1053e8b765ceabf144b293781e053 docs/governance/BUILD_SESSION_ENTRYPOINT.md
+1 .M N... 100644 100644 100644 4ec6f6e9c11d306bb9efafebee25269fee21fe50 4ec6f6e9c11d306bb9efafebee25269fee21fe50 docs/governance/SOVEREIGN_MANIFEST.md
+1 .M N... 100644 100644 100644 20e88faa4218eae7be72b6e11c103fa5107edd17 20e88faa4218eae7be72b6e11c103fa5107edd17 docs/missions/2026-06-20_jagat_kalyan_gaia_execution_spine.md
+1 .M N... 100644 100644 100644 135ba8c2af457a6f38b677c73d97c8784234d82c 135ba8c2af457a6f38b677c73d97c8784234d82c docs/missions/2026-06-26_jagat_kalyan_gaia_mechanistic_execution_spine.md
+1 .M N... 100644 100644 100644 e0d609abe5942251d70436571a90787f6bb2d40b e0d609abe5942251d70436571a90787f6bb2d40b docs/ontology/semantic_aliases.yaml
+1 .M N... 100644 100644 100644 5c16ca17f218008a756bb22830b798e4b8b7713a 5c16ca17f218008a756bb22830b798e4b8b7713a docs/ontology/semantic_objects.yaml
+1 .M N... 100644 100644 100644 57f20e722a5488f5ee3bf43923884c43ea3bc484 57f20e722a5488f5ee3bf43923884c43ea3bc484 docs/ontology/session_orientation.yaml
+1 .M N... 100644 100644 100644 43ecbcbf5e9f160abeb7565831afe98417317da2 43ecbcbf5e9f160abeb7565831afe98417317da2 pyproject.toml
+1 .M N... 100644 100644 100644 ae5eebddf82d91270f009fec4a778ea4f3436c74 ae5eebddf82d91270f009fec4a778ea4f3436c74 reports/governance/active_track_evidence.json
+1 .M N... 100644 100644 100644 0d216805e3d0e5eda445026eca3068dc0f240692 0d216805e3d0e5eda445026eca3068dc0f240692 reports/governance/active_track_evidence.md
+1 .M N... 100644 100644 100644 ae5eebddf82d91270f009fec4a778ea4f3436c74 ae5eebddf82d91270f009fec4a778ea4f3436c74 reports/governance/track_portfolio.json
+1 .M N... 100644 100644 100644 31d1b866b489fdce9f0dfd4a049ef26f2f918236 31d1b866b489fdce9f0dfd4a049ef26f2f918236 reports/sovereign_holons/l4_memory_write_receipts.jsonl
+1 .M N... 100755 100755 100755 8c57fdee2e012fbc5b1bc209cd95b5d4b6a17352 8c57fdee2e012fbc5b1bc209cd95b5d4b6a17352 scripts/governance/agent_onboard.py
+1 .M N... 100644 100644 100644 4ed1a8a6e6a8d588e45d267db892bc0f75215cd4 4ed1a8a6e6a8d588e45d267db892bc0f75215cd4 scripts/governance/check_a2a_readiness.py
+1 .M N... 100644 100644 100644 61b7962d64c6a9961123447a62fcbcf27a14b33a 61b7962d64c6a9961123447a62fcbcf27a14b33a scripts/governance/check_track_status.py
+1 .M N... 100644 100644 100644 ea9332e4aa6fc07a5a00aa8e6a8bf4ef1e370082 ea9332e4aa6fc07a5a00aa8e6a8bf4ef1e370082 scripts/governance/orientation_graph.py
+1 .M N... 100644 100644 100644 964b2989a53619bbb40dc35b9ff1881520281ba9 964b2989a53619bbb40dc35b9ff1881520281ba9 scripts/runtime/codex_composer_wake_loop.py
+1 .M N... 100644 100644 100644 444efd878952bd33ef231dcc452f3c9eec3f5930 444efd878952bd33ef231dcc452f3c9eec3f5930 scripts/runtime/model_critic_runner.py
+1 .M N... 100755 100755 100755 a242c77446607a798ab59099c9e80127c6e6a65b a242c77446607a798ab59099c9e80127c6e6a65b scripts/start_a2a_inbox_bridge_fleet_launchd.sh
+1 .M N... 100755 100755 100755 335b146cb2b4f2841f731f8ab8f93defd53b6fc1 335b146cb2b4f2841f731f8ab8f93defd53b6fc1 scripts/status_a2a_inbox_bridge_fleet_launchd.sh
+1 .M N... 100755 100755 100755 5d84e66068ed35cab2675c8b0c36fb26501e7cd3 5d84e66068ed35cab2675c8b0c36fb26501e7cd3 scripts/stop_a2a_inbox_bridge_fleet_launchd.sh
+1 .M N... 100644 100644 100644 3fdd6843cfdfd729f18e73899d586c4f4a3ff280 3fdd6843cfdfd729f18e73899d586c4f4a3ff280 tests/test_a2a_inbox_bridge_tmux_scripts.py
+1 .M N... 100644 100644 100644 c930b6ee106a9b83e03f5385b9e24cd00fba01ca c930b6ee106a9b83e03f5385b9e24cd00fba01ca tests/test_a2a_readiness_gate.py
+1 D. N... 100644 000000 000000 1e3b48725779c2faaf4bbac39d6d6533e6d4201d 0000000000000000000000000000000000000000 tests/test_apex_command_map.py
+1 .M N... 100644 100644 100644 bebf46c64673958c189b4bab3cefbbd411855301 bebf46c64673958c189b4bab3cefbbd411855301 tests/test_context.py
+1 .M N... 100644 100644 100644 81bfb4420e855146528a651c85f29ca05738c51f 81bfb4420e855146528a651c85f29ca05738c51f tests/test_cron_runner.py
+1 .M N... 100644 100644 100644 7f1af57817412284d91d095b0b799290e5c6f6f7 7f1af57817412284d91d095b0b799290e5c6f6f7 tests/test_dgc_cli.py
+1 .M N... 100644 100644 100644 cffb4bf5a68ff0cc1ff2931374987e0c29c07874 cffb4bf5a68ff0cc1ff2931374987e0c29c07874 tests/test_gaia_platform.py
+1 .M N... 100644 100644 100644 d70ee08a76feea58b31b659d937820c4e9ce91f2 d70ee08a76feea58b31b659d937820c4e9ce91f2 tests/test_holon_truth_projection.py
+1 .M N... 100644 100644 100644 f781b1622a02d6ff0756cc90440c0f65672fb3d5 f781b1622a02d6ff0756cc90440c0f65672fb3d5 tests/test_idea_spark_semantic_routing.py
+1 .M N... 100644 100644 100644 937f3357a3a79b5a5bcbc41be8912c64fc48b18c 937f3357a3a79b5a5bcbc41be8912c64fc48b18c tests/test_memory_kernel_generic_adapters.py
+1 .M N... 100644 100644 100644 817ec8eaa8f0629838ecaadd025a9f5303adc881 817ec8eaa8f0629838ecaadd025a9f5303adc881 tests/test_memory_palace.py
+1 .M N... 100644 100644 100644 e8242fe2175a31f8eb7e372b378c472c36c263fd e8242fe2175a31f8eb7e372b378c472c36c263fd tests/test_model_critic_runner.py
+1 .M N... 100644 100644 100644 83ff0cec15bc50a31648fad0dc7bd6f922c318b9 83ff0cec15bc50a31648fad0dc7bd6f922c318b9 tests/test_model_key_routing_guard.py
+1 .M N... 100644 100644 100644 d16f9c168e3f2df357ca1939980fdb4b44da2e51 d16f9c168e3f2df357ca1939980fdb4b44da2e51 tests/test_orchestrator_spine_dispatch.py
+1 .M N... 100644 100644 100644 32b36cac586f2015c7734d149d99f288cdb09596 32b36cac586f2015c7734d149d99f288cdb09596 tests/test_orientation_graph.py
+1 .M N... 100644 100644 100644 2faffd940578bf017f95651125c0e65eb2f7549c 2faffd940578bf017f95651125c0e65eb2f7549c tests/test_provider_smoke.py
+1 .M N... 100644 100644 100644 f5b0c86be3e72e1f6bbd2f2c51d6f5faef4cb31f f5b0c86be3e72e1f6bbd2f2c51d6f5faef4cb31f tests/test_room_configs.py
+1 .M N... 100644 100644 100644 e807468456012e043ca7a8d1f76d521690ed706e e807468456012e043ca7a8d1f76d521690ed706e tests/test_runtime_lifecycle.py
+1 .M N... 100644 100644 100644 4bd66a3e098d6388bb0c89a9926f46c613ae28e5 4bd66a3e098d6388bb0c89a9926f46c613ae28e5 tests/test_runtime_provider.py
+1 .M N... 100644 100644 100644 d903e55dac63d8f512ce2bc530b0b658438d6727 d903e55dac63d8f512ce2bc530b0b658438d6727 tests/test_telos_morning_refinery.py
+1 .M N... 100644 100644 100644 79816001bf0106f507776639c78df5aa57524ce2 79816001bf0106f507776639c78df5aa57524ce2 tests/test_terminal_bridge.py
+1 .M N... 100644 100644 100644 d96e58d1ecc3236af4ff496c2d8c52ae5e638ca8 d96e58d1ecc3236af4ff496c2d8c52ae5e638ca8 tests/test_track_portfolio.py
+1 .M N... 100644 100644 100644 812be6033d37083e014762194775a82b2309add6 812be6033d37083e014762194775a82b2309add6 tests/test_vector_store.py
+1 .M N... 100644 100644 100644 56a1e67713ab965d0d4f6be182907fbc9c51602a 56a1e67713ab965d0d4f6be182907fbc9c51602a uv.lock
+? api/routers/pool.py
+? dashboard/src/app/api/
+? dashboard/src/app/dashboard/livelihood-loom/
+? dashboard/src/app/dashboard/telos/
+? dashboard/src/lib/livelihoodLoom.test.ts
+? dashboard/src/lib/livelihoodLoom.ts
+? dharma_swarm/holon_canonical_state.py
+? dharma_swarm/idea_spark/cli.py
+? dharma_swarm/langgraph_parity/
+? dharma_swarm/memory_common.py
+? dharma_swarm/memory_retrieval.py
+? dharma_swarm/model_pool_registry.py
+? dharma_swarm/venture_cell/
+? dharma_swarm/welfare_tons.py
+? dharma_swarm/wiki_vector_ingest.py
+? docs/agents/livelihood_loom_ceo/
+? docs/governance/hygiene/baselines/2026-06-29.txt
+? docs/langgraph_parity/
+? docs/ops/MEMORY_COMMON.md
+? docs/ops/OPERATOR_IDEA_SPARK_LIVE_INGEST.md
+? foundations/WHAT_THE_NEXT_TOKEN_WANTS.md
+? langgraph_parity/
+? reports/a2a/domain_reply_artifacts/20260627T163430Z-codex_composer-semantic-responder-live-drill-20260627T163107Z.json
+? reports/a2a/domain_reply_artifacts/20260627T163926Z-codex_composer-semantic-responder-launchd-drill-20260627T163809Z.json
+? reports/a2a/domain_reply_artifacts/20260627T164124Z-codex_composer-semantic-responder-launchd-drill-20260627T163809Z.json
+? reports/a2a/domain_reply_artifacts/20260629T161154Z-codex_composer-agent5-fresh-a2a-drill-20260629T161047Z.json
+? reports/a2a/domain_reply_artifacts/20260629T161334Z-codex_composer-agent5-fresh-a2a-drill-20260629T161047Z.json
+? reports/a2a/domain_reply_artifacts/20260629T161513Z-codex_composer-agent5-fresh-a2a-drill-20260629T161047Z.json
+? reports/a2a/domain_reply_receipts/20260627T163430Z-codex_composer-semantic-responder-live-drill-20260627T163107Z.json
+? reports/a2a/domain_reply_receipts/20260627T164124Z-codex_composer-semantic-responder-launchd-drill-20260627T163809Z.json
+? reports/a2a/domain_reply_receipts/20260629T161328Z-codex_composer-agent5-fresh-a2a-drill-20260629T161047Z.json
+? reports/a2a/domain_reply_receipts/20260629T161513Z-codex_composer-agent5-fresh-a2a-drill-20260629T161047Z.json
+? reports/a2a/reply_receipts/20260627T163457Z-codex_composer-semantic-responder-live-drill-20260627T163107Z.json
+? reports/a2a/reply_receipts/20260627T164248Z-codex_composer-semantic-responder-launchd-drill-20260627T163809Z.json
+? reports/a2a/reply_receipts/20260629T161345Z-codex_composer-agent5-fresh-a2a-drill-20260629T161047Z.json
+? reports/a2a/semantic_inbox_drains/20260627T163430Z-codex_composer-semantic-responder-live-drill-20260627T163107Z.json
+? reports/a2a/semantic_inbox_drains/20260627T163926Z-codex_composer-semantic-responder-launchd-drill-20260627T163809Z.json
+? reports/a2a/semantic_inbox_drains/20260627T164124Z-codex_composer-semantic-responder-launchd-drill-20260627T163809Z.json
+? reports/a2a/semantic_inbox_drains/20260629T161154Z-codex_composer-agent5-fresh-a2a-drill-20260629T161047Z.json
+? reports/a2a/semantic_inbox_drains/20260629T161334Z-codex_composer-agent5-fresh-a2a-drill-20260629T161047Z.json
+? reports/a2a/semantic_inbox_drains/20260629T161513Z-codex_composer-agent5-fresh-a2a-drill-20260629T161047Z.json
+? reports/a2a/semantic_inbox_drains/prompts/agent5-fresh-a2a-drill-20260629T161047Z.md
+? reports/a2a/semantic_inbox_drains/prompts/semantic-responder-launchd-drill-20260627T163809Z.md
+? reports/a2a/semantic_inbox_drains/prompts/semantic-responder-live-drill-20260627T163107Z.md
+? reports/agentops/semantic_receipts/20260627T163430Z-ollama-glm-5_cloud-f47ac10b-58cc-4372-a567-0e02b2c3d479.json
+? reports/agentops/semantic_receipts/20260627T163926Z-ollama-glm-5_cloud-critic-receipt-20260627T163840Z.json
+? reports/agentops/semantic_receipts/20260627T164124Z-ollama-glm-5_cloud-receipt-codex_composer-20260627T163835Z.json
+? reports/agentops/semantic_receipts/20260629T161154Z-ollama-glm-5_cloud-critique-ollama-glm5-20260629T161115Z.json
+? reports/agentops/semantic_receipts/20260629T161334Z-ollama-glm-5_cloud-receipt-codex-composer-agent5-drill-20260629T161116Z.json
+? reports/agentops/semantic_receipts/20260629T161513Z-ollama-glm-5_cloud-rcpt-6f8a9b2c-4d1e-5a7b-8c9d-0e1f2a3b4c5d.json
+? reports/governance/active_track_revalidation_2026-06-29.md
+? reports/governance/active_track_revalidation_2026-06-30.md
+? reports/governance/worktree_readiness_2026-06-30/
+? reports/idea_spark/
+? reports/langgraph_parity/
+? reports/livelihood_loom/
+? reports/loop_closure/RETROSPECTIVE.md
+? reports/loop_closure/cybernetics_codex/
+? reports/loop_closure/phase1/
+? reports/sab_first_six_agent_flywheel/
+? reports/telos_ai/
+? reports/terminal/
+? scripts/governance/register_livelihood_loom_ceo.py
+? scripts/memory_retrieval_benchmark.py
+? scripts/memory_retrieval_broad_sweep.py
+? scripts/memory_retrieval_live_gate.py
+? scripts/memory_retrieval_sync_index.py
+? scripts/memory_retrieval_system_gate.py
+? scripts/runtime/codex_composer_semantic_responder.py
+? scripts/runtime/cross_model_verification.py
+? scripts/runtime/prove_loop1_live_provider_dispatch.py
+? scripts/terminal_guardian_preflight.sh
+? scripts/vector_store_backfill_memory_sources.py
+? scripts/vector_store_backfill_vec0.py
+? scripts/vector_store_live_gate.py
+? scripts/vector_store_reembed_vec0.py
+? scripts/watchdog/
+? scripts/wiki_vector_live_gate.py
+? terminal/scripts/
+? terminal/tests/compactShell.test.tsx
+? terminal/tests/golden/
+? tests/test_codex_composer_semantic_responder.py
+? tests/test_holon_canonical_state.py
+? tests/test_idea_spark_cli.py
+? tests/test_langgraph_parity_isolation_benchmark.py
+? tests/test_langgraph_parity_readiness.py
+? tests/test_langgraph_parity_supervisor.py
+? tests/test_langgraph_parity_swarm.py
+? tests/test_memory_common.py
+? tests/test_memory_retrieval.py
+? tests/test_memory_retrieval_broad_sweep.py
+? tests/test_memory_retrieval_sync_index.py
+? tests/test_memory_retrieval_system_gate.py
+? tests/test_model_pool_registry.py
+? tests/test_pool_router.py
+? tests/test_vector_store_backfill_memory_sources.py
+? tests/test_vector_store_backfill_vec0.py
+? tests/test_vector_store_live_gate.py
+? tests/test_vector_store_reembed_vec0.py
+? tests/test_venture_cell_domain_ceo.py
+? tests/test_venture_cell_external_actions.py
+? tests/test_venture_cell_livelihood_ceo_agent.py
+? tests/test_venture_cell_livelihood_cli.py
+? tests/test_venture_cell_livelihood_cultivation.py
+? tests/test_venture_cell_livelihood_execution.py
+? tests/test_venture_cell_livelihood_loom.py
+? tests/test_venture_cell_livelihood_status.py
+? tests/test_venture_cell_runtime.py
+? tests/test_wiki_vector_live_gate.py

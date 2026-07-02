@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from dharma_swarm.holon_bridge import AGENTS_ROOT
+from dharma_swarm.holon_canonical_state import project_canonical_holon_state
 from dharma_swarm.holon_l4_smoke import L4SmokeConfig, run_l4_supervised_smoke, utc_compact
 from dharma_swarm.holon_service_liveness import record_service_heartbeat
 
@@ -246,6 +247,15 @@ async def run_holon_l4_service_async(
                         "artifact": cycle["artifact"],
                     },
                     claim_scope=cycle["claim_scope"],
+                )
+                project_canonical_holon_state(
+                    config.name,
+                    agents_root=config.agents_root,
+                    a2a_bus=config.agents_root.parent / "a2a_bus",
+                    service_id=SERVICE_ID,
+                    live_model_call_claimed=bool(
+                        cycle["claim_scope"].get("live_model_call_claimed")
+                    ),
                 )
                 if cycle["status"] == "stopped":
                     status = "stopped"

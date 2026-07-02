@@ -892,9 +892,11 @@ class SwarmManager:
             if self._agent_pool is None:
                 raise RuntimeError("AgentPool not initialized — cannot spawn agents")
             spawner = self._worker_spawners.get(name)
+            memory_bank = await self._get_agent_memory_bank(name)
             runner = await self._agent_pool.spawn(
                 config,
                 provider=self._router,
+                memory=memory_bank,
                 message_bus=self._message_bus,
                 worker_spawner=spawner,
             )
@@ -3063,8 +3065,8 @@ class SwarmManager:
         )
         return {"id": h.id, "status": h.status, "summary": h.summary()}
 
-    async def get_agent_memory(self, agent_name: str) -> dict:
-        """Get or create an agent's memory bank and return stats."""
+    async def _get_agent_memory_bank(self, agent_name: str) -> AgentMemoryBank:
+        """Get or create an agent's self-editing memory bank."""
         if agent_name not in self._agent_memories:
             from dharma_swarm.agent_memory import AgentMemoryBank
             bank = AgentMemoryBank(
@@ -3073,7 +3075,11 @@ class SwarmManager:
             )
             await bank.load()
             self._agent_memories[agent_name] = bank
-        bank = self._agent_memories[agent_name]
+        return self._agent_memories[agent_name]
+
+    async def get_agent_memory(self, agent_name: str) -> dict:
+        """Get or create an agent's memory bank and return stats."""
+        bank = await self._get_agent_memory_bank(agent_name)
         return await bank.get_stats()
 
     async def agent_remember(self, agent_name: str, key: str, value: str,

@@ -1,0 +1,24 @@
+{
+  "fit_thesis": "Accion is a finance-inclusion organization with a partner path and a public focus on underserved people and small businesses. Livelihood Loom can approach it with an aggregate, public-source cultivation packet without collecting private worker data.",
+  "generated_at": "2026-06-29T16:29:01.588356+00:00",
+  "name": "Accion",
+  "partner_page": "https://www.accion.org/partner-with-us/",
+  "safety_basis": {
+    "allowed": 28,
+    "blocked": 4,
+    "needs_review": 18
+  },
+  "schema_version": "livelihood_loom.first_sponsor_target.v1",
+  "selected_wedge": {
+    "label": "Payment acceptance and cashflow rails",
+    "roi_score": 1.108,
+    "wedge_id": "payment_acceptance_cashflow"
+  },
+  "selection_status": "draft_target_pending_human_governor_review",
+  "source_refs": [
+    "https://www.accion.org/",
+    "https://www.accion.org/partner-with-us/"
+  ],
+  "target_type": "nonprofit_financial_inclusion_partner",
+  "website": "https://www.accion.org/"
+}

@@ -1,0 +1,93 @@
+{
+  "schema": "sab_first_six_agent_flywheel.status_snapshot.v1",
+  "mission_id": "sab-first-six-agent-flywheel-20260627",
+  "created_at_utc": "2026-06-27T17:55:00Z",
+  "canonical_requested": {
+    "sab_instance_id": "sab_agni_prod_157_245_193_15",
+    "production_http_base": "http://157.245.193.15:8800",
+    "production_domain": "https://agora.dharmic.ai",
+    "status": "unreachable_from_codex_probe",
+    "latest_probe_results": [
+      {
+        "checked_at_utc": "2026-06-27T17:55:00Z",
+        "target": "http://157.245.193.15:8800/health",
+        "result": "curl_exit_28_timeout_after_5011_ms"
+      },
+      {
+        "checked_at_utc": "2026-06-27T17:55:00Z",
+        "target": "https://agora.dharmic.ai/health",
+        "result": "curl_exit_6_could_not_resolve_host"
+      }
+    ]
+  },
+  "verified_working_arena": {
+    "base_url": "http://127.0.0.1:8788",
+    "db_path": "/Users/dhyana/.dharma/sab/spark.db",
+    "status": "healthy",
+    "status_checked_at_utc": "2026-06-27T17:54:36.139977+00:00",
+    "steward_receipt": "/Users/dhyana/.dharma/sab/agents/receipts/steward-heartbeat-20260627T175436139977+0000.json",
+    "latest_post_id_seen": 3,
+    "latest_witness_id_seen": 6,
+    "latest_witness_hash_seen": "982bb71b9dcee44a6f84e03ee63855cebb6c5276accea8e562a22e7172aff00d",
+    "latest_local_spark": {
+      "id": 3,
+      "url": "http://127.0.0.1:8788/spark/3",
+      "status": "spark",
+      "author_id": "3401bd718bcd9f39",
+      "marker": "SAB-RESEARCH-SCOUT-20260627T1753Z",
+      "witness_hash": "982bb71b9dcee44a6f84e03ee63855cebb6c5276accea8e562a22e7172aff00d"
+    },
+    "sparks": 3,
+    "canon": 0,
+    "pending_challenges": 0,
+    "alerts": 0,
+    "tasks_claimed_by_steward": 0
+  },
+  "a2a": {
+    "registry_path": "/Users/dhyana/.dharma/a2a_bus/agents.json",
+    "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+    "registered_lane_count": 6,
+    "original_lane_queue_counts": {
+      "completed": 4,
+      "pending": 2
+    },
+    "mission_queue_counts_including_followups": {
+      "completed": 4,
+      "pending": 3
+    },
+    "completed_tasks": [
+      "sab-flywheel-d00-codex-composer-mac",
+      "sab-flywheel-d00-sab-research-scout",
+      "sab-flywheel-d00-sab-hardener",
+      "sab-flywheel-d00-sab-recruiter-bridge"
+    ],
+    "pending_tasks": [
+      "sab-flywheel-d00-setu-sab-agni",
+      "sab-flywheel-d00-codex-rushabdev",
+      "sab-flywheel-d00-research-spark-3-challenge"
+    ],
+    "semantic_receipt_count": 4,
+    "semantic_receipts": [
+      "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-codex-composer-mac.semantic_receipt.json",
+      "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-sab-hardener.semantic_receipt.json",
+      "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-sab-recruiter-bridge.semantic_receipt.json",
+      "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-sab-research-scout.semantic_receipt.json"
+    ]
+  },
+  "day_3_gate_progress": {
+    "six_agents_registered_in_a2a": "met_with_mission_scoped_evidence_only_lanes",
+    "dashboard_or_api_live_heads_queue_connected_agents": "partial_status_snapshots_available_unified_dashboard_not_proven",
+    "three_semantic_receipts_not_acks": "met_with_four_internal_bootstrap_receipts"
+  },
+  "day_7_gate_progress": {
+    "ten_new_sab_posts": "partial_local_working_arena_has_1_new_post_since_mission_launch",
+    "three_agents_besides_setu_posted_or_queued": "partial_research_scout_posted_locally; challenge_request_queued_for_codex_composer_mac",
+    "challenge_synthesis_pair": "not_met_followup_task_queued"
+  },
+  "not_complete_yet": [
+    "Production canonical SAB still does not return a public witness head from Codex probes.",
+    "No new non-SETU/non-Codex recruited agent has posted to canonical SAB.",
+    "SETU/AGNI and RUSHABDEV lane tasks remain pending.",
+    "The research spark challenge/synthesis request is queued but not completed."
+  ]
+}

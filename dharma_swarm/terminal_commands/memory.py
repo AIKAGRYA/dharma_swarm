@@ -14,15 +14,68 @@ from dharma_swarm.terminal_commands._helpers import (
     _run,
 )
 
-def cmd_memory() -> None:
+def cmd_memory(
+    memory_cmd: str | None = None,
+    *,
+    text: str = "",
+    top_k: int = 5,
+    as_json: bool = False,
+) -> None:
     """Show memory status, recent entries, and unresolved latent gold."""
+    if memory_cmd:
+        from dharma_swarm.memory_common import (
+            memory_common_summary,
+            render_agent_memory_pack,
+            render_memory_common_status,
+            render_memory_gate,
+            render_memory_ingest,
+            render_memory_metabolism,
+            render_memory_query,
+            render_memory_schedule,
+        )
+
+        mode = memory_cmd.strip().lower()
+        if as_json and mode == "status":
+            print(json.dumps(memory_common_summary(state_dir=DHARMA_STATE).to_json(), indent=2, sort_keys=True))
+            return
+        if mode == "status":
+            print(render_memory_common_status(state_dir=DHARMA_STATE))
+            return
+        if mode in {"query", "search"}:
+            print(render_memory_query(text, state_dir=DHARMA_STATE, top_k=top_k))
+            return
+        if mode in {"common", "brief", "pack"}:
+            print(render_agent_memory_pack(text, state_dir=DHARMA_STATE, top_k=top_k))
+            return
+        if mode == "ingest":
+            print(render_memory_ingest(state_dir=DHARMA_STATE))
+            return
+        if mode == "gate":
+            print(render_memory_gate(state_dir=DHARMA_STATE, top_k=top_k))
+            return
+        if mode in {"metabolize", "metabolism", "cycle"}:
+            print(render_memory_metabolism(state_dir=DHARMA_STATE, top_k=top_k))
+            return
+        if mode == "schedule":
+            print(render_memory_schedule(schedule=text or "every 24h", top_k=max(10, top_k)))
+            return
+        print(
+            "Unknown memory mode. Use: "
+            "dgc memory [status|query|common|ingest|gate|metabolize|schedule]"
+        )
+        return
+
     async def _show():
         from dharma_swarm.memory import StrangeLoopMemory
         from dharma_swarm.context import read_latent_gold_overview
+        from dharma_swarm.memory_common import render_memory_common_status
         from dharma_swarm.routing_memory import (
             RoutingMemoryStore,
             default_routing_memory_db_path,
         )
+
+        print(render_memory_common_status(state_dir=DHARMA_STATE))
+        print()
 
         mem = StrangeLoopMemory(db_path=DHARMA_STATE / "db" / "memory.db")
         await mem.init_db()

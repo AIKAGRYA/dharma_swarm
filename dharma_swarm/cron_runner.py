@@ -710,6 +710,60 @@ def _run_store_sync(job: dict[str, Any]) -> CronJobExecutionResult:
         )
 
 
+def _run_algedonic_triage(job: dict[str, Any]) -> CronJobExecutionResult:
+    """Drain algedonic pain signals into the triage cursor and alert flag."""
+
+    import subprocess
+    import sys
+
+    repo_root = Path(__file__).resolve().parent.parent
+    script = repo_root / "scripts" / "algedonic_triage.py"
+    if not script.exists():
+        error = f"missing script: {script}"
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output=error,
+            error=error,
+        )
+
+    env = os.environ.copy()
+    state_dir = str(job.get("state_dir") or "").strip()
+    if state_dir:
+        env["DHARMA_STATE_DIR"] = str(Path(state_dir).expanduser())
+
+    timeout = _as_int(job.get("timeout_sec"), 60)
+    try:
+        proc = subprocess.run(
+            [sys.executable, str(script)],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=str(repo_root),
+            env=env,
+        )
+    except subprocess.TimeoutExpired:
+        error = f"algedonic_triage timed out after {timeout}s"
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output="",
+            error=error,
+        )
+
+    output = (proc.stdout or "").strip()
+    err = (proc.stderr or "").strip()
+    if proc.returncode != 0:
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output=output or err or f"algedonic_triage exited {proc.returncode}",
+            error=err or output[:500],
+        )
+    return CronJobExecutionResult(
+        status=CronJobRunStatus.COMPLETED,
+        output=output or "algedonic_triage: no new signals",
+        error="",
+    )
+
+
 def _run_world_scout(job: dict[str, Any]) -> CronJobExecutionResult:
     """Run the external world radar and canonicalize promoted signals."""
 
@@ -836,6 +890,8 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         tcs_heartbeat   — local IdentityMonitor time-series sample
         world_scout     — external zeitgeist radar and scout cascade
         store_sync      — materialize ontology outcomes into runtime artifacts
+        memory_common_metabolism — ingest promoted memory and gate retrieval
+        algedonic_triage — drain pain-signal cursor and write P0 alert summary
     """
     handler = str(job.get("handler", "headless_prompt")).strip() or "headless_prompt"
 
@@ -881,6 +937,11 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         return _run_world_scout(job)
     if handler == "store_sync":
         return _run_store_sync(job)
+    if handler == "algedonic_triage":
+        return _run_algedonic_triage(job)
+    if handler == "memory_common_metabolism":
+        from dharma_swarm.memory_common import memory_common_cron_run_fn
+        return _result_from_legacy(*memory_common_cron_run_fn(job))
     if handler == "shell":
         return _run_shell_command(job)
 

@@ -1,0 +1,35 @@
+{
+  "cell_id": "livelihood_loom",
+  "generated_at": "2026-06-29T16:06:44.889679+00:00",
+  "packet_count": 5,
+  "packets": [
+    {
+      "json": "reports/livelihood_loom/enablement_packets/packet_01.json",
+      "md": "reports/livelihood_loom/enablement_packets/packet_01.md",
+      "packet_id": "packet_01"
+    },
+    {
+      "json": "reports/livelihood_loom/enablement_packets/packet_02.json",
+      "md": "reports/livelihood_loom/enablement_packets/packet_02.md",
+      "packet_id": "packet_02"
+    },
+    {
+      "json": "reports/livelihood_loom/enablement_packets/packet_03.json",
+      "md": "reports/livelihood_loom/enablement_packets/packet_03.md",
+      "packet_id": "packet_03"
+    },
+    {
+      "json": "reports/livelihood_loom/enablement_packets/packet_04.json",
+      "md": "reports/livelihood_loom/enablement_packets/packet_04.md",
+      "packet_id": "packet_04"
+    },
+    {
+      "json": "reports/livelihood_loom/enablement_packets/packet_05.json",
+      "md": "reports/livelihood_loom/enablement_packets/packet_05.md",
+      "packet_id": "packet_05"
+    }
+  ],
+  "schema_version": "livelihood_loom.enablement_packet_index.v1",
+  "source_safety_review": "reports/livelihood_loom/safety/top_50_safety_review.json",
+  "source_wedges": "reports/livelihood_loom/cultivation/wedges.json"
+}

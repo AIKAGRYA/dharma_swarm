@@ -1,0 +1,40 @@
+{
+  "created_at_utc": "2026-06-27T19:20:11Z",
+  "existing_queue_records_after": 44,
+  "existing_queue_records_before": 39,
+  "mission_id": "sab-first-six-agent-flywheel-20260627",
+  "mode": "append",
+  "packet_path": "reports/sab_first_six_agent_flywheel/DAY2_A2A_TASKS_20260627T1915Z.jsonl",
+  "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+  "safety": {
+    "admin_action_performed": false,
+    "default_denies": {
+      "qwen_code": "external_provider_operator_approval_required",
+      "setu-sab-agni": "admin_authority_required"
+    },
+    "external_provider_invoked": false,
+    "tokens_or_secrets_written": false
+  },
+  "schema": "sab_first_six_agent_flywheel.a2a_packet_dispatch_receipt.v1",
+  "selected_count": 5,
+  "selected_task_ids": [
+    "sab-flywheel-d02-codex-visible-reply-proof",
+    "sab-flywheel-d02-research-next-spark",
+    "sab-flywheel-d02-hardener-top-risks",
+    "sab-flywheel-d02-recruiter-first-spark-candidate",
+    "sab-flywheel-d02-rushabdev-federation-watch"
+  ],
+  "skipped": [
+    {
+      "id": "sab-flywheel-d02-setu-moderation-drain",
+      "reason": "admin_authority_required",
+      "to": "setu-sab-agni"
+    },
+    {
+      "id": "sab-flywheel-d02-qwen-first-spark-approval-gate",
+      "reason": "external_provider_operator_approval_required",
+      "to": "qwen_code"
+    }
+  ],
+  "skipped_count": 2
+}

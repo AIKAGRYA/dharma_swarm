@@ -1,0 +1,11 @@
+{
+  "path": "/Users/dhyana/ds_forge_proving_ground_10_10_20260626",
+  "observed_at": "2026-06-29T16:34:34.547443+00:00",
+  "branch": "codex/dharma-forge-proving-ground-10-10-20260626",
+  "head": "50c8e2b7556258d80839e9860065dad488d855cc",
+  "status_short_file": "status_short.stdout.txt",
+  "status_porcelain_v2_file": "status_porcelain_v2.stdout.txt",
+  "diff_stat_file": "diff_stat.stdout.txt",
+  "cached_diff_stat_file": "cached_diff_stat.stdout.txt",
+  "untracked_manifest_file": "untracked.stdout.txt"
+}

@@ -1,0 +1,84 @@
+{
+  "blockers": [
+    "kimi27code: CriticResponseError invalid critic JSON from ollama:kimi-k2.7-code:cloud; actual_model=kimi-k2.7-code; content_len=9634; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=We need act as strict JSON-only production review critic. User provided prompt/evidence to review. We must return JSON only, no markdown fences, no prose outside JSON. Need evaluate evidence and produce verdict, score, summary, blockers, required_cha ... d and status. For missing, note absent. For present, note verified.\\n\\nLet's craft JSON.\\n\\nFields:\\n- verdict: \"revise\"\\n- score: maybe 75 (since most core paths verified but missing required evidence for restart/idempotency/source tie). Could be 70",
+    "kimi27code: disagreement=invalid critic JSON from ollama:kimi-k2.7-code:cloud; actual_model=kimi-k2.7-code; content_len=9634; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=We need act as strict JSON-only production review critic. U",
+    "minimaxm3: CriticResponseError invalid critic JSON from ollama:minimax-m3:cloud; actual_model=minimax-m3; content_len=8372; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=Let me carefully review this evidence for production-grade integration quality.\\n\\nThe evidence provided is a remedial review package for `runtime-truth-nats-2026-06`. Let me check each required element against the prompt's pass criteria:\\n\\n1. **Fre ... The evidence has a clear timestamp and is fresh (within 24h)\\n\\nI'll go with verdict \"pass\" and score 95. Minor deduction for not having all detailed rows visible (though the matrix summary is clear).\\n\\nActually, let me reconsider one more time. The",
+    "minimaxm3: disagreement=invalid critic JSON from ollama:minimax-m3:cloud; actual_model=minimax-m3; content_len=8372; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=Let me carefully review this evidence for production-grade integrat"
+  ],
+  "conviction_gate": "hold_blockers",
+  "critic_count": 2,
+  "critics": [
+    {
+      "actual_model": "kimi-k2.7-code",
+      "failure_reason": "invalid critic JSON from ollama:kimi-k2.7-code:cloud; actual_model=kimi-k2.7-code; content_len=9634; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=We need act as strict JSON-only production review critic. User provided prompt/evidence to review. We must return JSON only, no markdown fences, no prose outside JSON. Need evaluate evidence and produce verdict, score, summary, blockers, required_cha ... d and status. For missing, note absent. For present, note verified.\\n\\nLet's craft JSON.\\n\\nFields:\\n- verdict: \"revise\"\\n- score: maybe 75 (since most core paths verified but missing required evidence for restart/idempotency/source tie). Could be 70",
+      "failure_type": "CriticResponseError",
+      "lane_id": "kimi27code",
+      "latency_ms": 18923,
+      "ok": false,
+      "parsed": {
+        "blockers": [
+          "invalid critic JSON from ollama:kimi-k2.7-code:cloud; actual_model=kimi-k2.7-code; content_len=9634; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=We need act as strict JSON-only production review critic. User provided prompt/evidence to review. We must return JSON only, no markdown fences, no prose outside JSON. Need evaluate evidence and produce verdict, score, summary, blockers, required_cha ... d and status. For missing, note absent. For present, note verified.\\n\\nLet's craft JSON.\\n\\nFields:\\n- verdict: \"revise\"\\n- score: maybe 75 (since most core paths verified but missing required evidence for restart/idempotency/source tie). Could be 70"
+        ],
+        "evidence_checked": [],
+        "explicit_disagreement": "invalid critic JSON from ollama:kimi-k2.7-code:cloud; actual_model=kimi-k2.7-code; content_len=9634; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=We need act as strict JSON-only production review critic. User provided prompt/evidence to review. We must return JSON only, no markdown fences, no prose outside JSON. Need evaluate evidence and produce verdict, score, summary, blockers, required_cha ... d and status. For missing, note absent. For present, note verified.\\n\\nLet's craft JSON.\\n\\nFields:\\n- verdict: \"revise\"\\n- score: maybe 75 (since most core paths verified but missing required evidence for restart/idempotency/source tie). Could be 70",
+        "required_changes": [
+          "Make ollama:kimi-k2.7-code:cloud reachable or mark the lane optional with justification."
+        ],
+        "score": 0,
+        "summary": "kimi27code could not run.",
+        "verdict": "blocked"
+      },
+      "provider": "ollama",
+      "raw_response_preview": "We need act as strict JSON-only production review critic. User provided prompt/evidence to review. We must return JSON only, no markdown fences, no prose outside JSON. Need evaluate evidence and produce verdict, score, summary, blockers, required_cha ... d and status. For missing, note absent. For present, note verified.\\n\\nLet's craft JSON.\\n\\nFields:\\n- verdict: \"revise\"\\n- score: maybe 75 (since most core paths verified but missing required evidence for restart/idempotency/source tie). Could be 70",
+      "requested_model": "kimi-k2.7-code:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "minimax-m3",
+      "failure_reason": "invalid critic JSON from ollama:minimax-m3:cloud; actual_model=minimax-m3; content_len=8372; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=Let me carefully review this evidence for production-grade integration quality.\\n\\nThe evidence provided is a remedial review package for `runtime-truth-nats-2026-06`. Let me check each required element against the prompt's pass criteria:\\n\\n1. **Fre ... The evidence has a clear timestamp and is fresh (within 24h)\\n\\nI'll go with verdict \"pass\" and score 95. Minor deduction for not having all detailed rows visible (though the matrix summary is clear).\\n\\nActually, let me reconsider one more time. The",
+      "failure_type": "CriticResponseError",
+      "lane_id": "minimaxm3",
+      "latency_ms": 22027,
+      "ok": false,
+      "parsed": {
+        "blockers": [
+          "invalid critic JSON from ollama:minimax-m3:cloud; actual_model=minimax-m3; content_len=8372; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=Let me carefully review this evidence for production-grade integration quality.\\n\\nThe evidence provided is a remedial review package for `runtime-truth-nats-2026-06`. Let me check each required element against the prompt's pass criteria:\\n\\n1. **Fre ... The evidence has a clear timestamp and is fresh (within 24h)\\n\\nI'll go with verdict \"pass\" and score 95. Minor deduction for not having all detailed rows visible (though the matrix summary is clear).\\n\\nActually, let me reconsider one more time. The"
+        ],
+        "evidence_checked": [],
+        "explicit_disagreement": "invalid critic JSON from ollama:minimax-m3:cloud; actual_model=minimax-m3; content_len=8372; parse_error=JSONDecodeError: Expecting value: line 1 column 1 (char 0); preview=Let me carefully review this evidence for production-grade integration quality.\\n\\nThe evidence provided is a remedial review package for `runtime-truth-nats-2026-06`. Let me check each required element against the prompt's pass criteria:\\n\\n1. **Fre ... The evidence has a clear timestamp and is fresh (within 24h)\\n\\nI'll go with verdict \"pass\" and score 95. Minor deduction for not having all detailed rows visible (though the matrix summary is clear).\\n\\nActually, let me reconsider one more time. The",
+        "required_changes": [
+          "Make ollama:minimax-m3:cloud reachable or mark the lane optional with justification."
+        ],
+        "score": 0,
+        "summary": "minimaxm3 could not run.",
+        "verdict": "blocked"
+      },
+      "provider": "ollama",
+      "raw_response_preview": "Let me carefully review this evidence for production-grade integration quality.\\n\\nThe evidence provided is a remedial review package for `runtime-truth-nats-2026-06`. Let me check each required element against the prompt's pass criteria:\\n\\n1. **Fre ... The evidence has a clear timestamp and is fresh (within 24h)\\n\\nI'll go with verdict \"pass\" and score 95. Minor deduction for not having all detailed rows visible (though the matrix summary is clear).\\n\\nActually, let me reconsider one more time. The",
+      "requested_model": "minimax-m3:cloud",
+      "required": true
+    }
+  ],
+  "generated_at": "20260701T004132Z",
+  "max_evidence_chars": 0,
+  "max_output_tokens": 1200,
+  "persistent_agent_witness": {
+    "agent": "palantir-pilot",
+    "blocker": "",
+    "fresh": true,
+    "heartbeat_age_seconds": 10,
+    "heartbeat_timestamp": "2026-07-01T00:41:22Z",
+    "max_heartbeat_age_seconds": 300,
+    "raw_status": "status=running session=dharma_palantir_pilot_a2a_worker\nsubject=dharma.a2a.palantir-pilot\nconsumer=palantir_pilot_a2a\nstream=DHARMA_FLEET\nheartbeat=/Users/dhyana/.dharma/a2a_bus/worker_heartbeats/palantir-pilot.json\nlog=/Users/dhyana/.dharma/logs/palantir_pilot_a2a_worker/dharma_palantir_pilot_a2a_worker.log\n--- heartbeat ---\n{\n    \"agent_id\": \"palantir_pilot\",\n    \"callsign\": \"palantir-pilot\",\n    \"consumer\": \"palantir_pilot_a2a\",\n    \"cycle\": 1156,\n    \"last_receipt_path\": \"\",\n    \"receipt_count\": 0,\n    \"schema_version\": \"dharma.a2a.palantir_pilot.worker_heartbeat.v1\",\n    \"status\": \"IDLE\",\n    \"stream\": \"DHARMA_FLEET\",\n    \"subject\": \"dharma.a2a.palantir-pilot\",\n    \"suppress_no_messages\": true,\n    \"timestamp\": \"2026-07-01T00:41:22Z\"\n}\n--- consumer ---\n{\n  \"stream_name\": \"DHARMA_FLEET\",\n  \"name\": \"palantir_pilot_a2a\",\n  \"config\": {\n    \"ack_policy\": \"explicit\",\n    \"ack_wait\": 30000000000,\n    \"deliver_policy\": \"all\",\n    \"durable_name\": \"palantir_pilot_a2a\",\n    \"name\": \"palantir_pilot_a2a\",\n    \"filter_subject\": \"dharma.a2a.palantir-pilot\",\n    \"max_ack_pending\": 1000,\n    \"max_deliver\": -1,\n    \"max_waiting\": 512,\n    \"replay_policy\": \"instant\",\n    \"num_replicas\": 0,\n    \"metadata\": {\n      \"_nats.level\": \"3\",\n      \"_nats.req.level\": \"0\",\n      \"_nats.ver\": \"2.12.6\"\n    },\n    \"pause_until\": \"0001-01-01T00:00:00Z\"\n  },\n  \"created\": \"2026-06-15T16:08:32.524099Z\",\n  \"delivered\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"ack_floor\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"num_ack_pending\": 0,\n  \"num_redelivered\": 0,\n  \"num_waiting\": 1,\n  \"num_pending\": 0,\n  \"ts\": \"2026-07-01T00:41:32.351566Z\"\n}\n--- latest worker receipts ---\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260618T014416Z-palantir-pilot-codex_hardened_spec_notice_20260618T0155Z_palantir-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260618T013101Z-palantir-pilot-palantir_a2a_hardening_20260618T0001Z-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260617T135931Z-palantir-pilot-longrun_spec_95_vote_20260617T135751Z-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260617T131705Z-palantir-pilot-7215f005165f-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260617T130349Z-palantir-pilot-761445fa892d-PALANTIR_PILOT_REPLIED.json\n",
+    "status": "running"
+  },
+  "prompt_chars": 23734,
+  "prompt_file": "/Users/dhyana/dharma_swarm/reports/agentops/decorrelated_review_council/prompts/runtime_truth_nats_json_only_remedial_20260701.md",
+  "prompt_words_estimate": 1358,
+  "required_critic_count": 2,
+  "schema_version": "codex.decorrelated_review_council.v1",
+  "score_avg": 0.0,
+  "score_min": 0,
+  "target_score": 100,
+  "timeout_seconds": 300
+}

@@ -49,4 +49,3 @@ export function CoherenceKanban({ lanes }: { lanes: KanbanLane[] }) {
     </section>
   );
 }
-

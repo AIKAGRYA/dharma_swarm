@@ -1,0 +1,5 @@
+ Makefile                            | 18 +++++++++++++++++-
+ docs/ontology/SEMANTIC_COMMONS.md   |  1 +
+ docs/ontology/semantic_aliases.yaml | 18 ++++++++++++++++++
+ docs/ontology/semantic_objects.yaml |  4 ++++
+ 4 files changed, 40 insertions(+), 1 deletion(-)

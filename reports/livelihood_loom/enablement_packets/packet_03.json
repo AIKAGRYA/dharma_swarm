@@ -1,0 +1,56 @@
+{
+  "beneficiary": "entrepreneurs needing small-ticket stock or tool financing",
+  "candidate_partners": [
+    {
+      "company_id": "enabler_1f759fc70732",
+      "country": "India",
+      "evidence_refs": [
+        "http://www.wikidata.org/entity/Q30589043",
+        "https://www.impactguru.com/"
+      ],
+      "flags": [
+        "high_fee_lending"
+      ],
+      "name": "Impact Guru",
+      "prioritization_score": 0.844,
+      "rank": 24,
+      "safety_status": "needs_review",
+      "wedge_id": "responsible_microfinance"
+    },
+    {
+      "company_id": "enabler_384634ae06c6",
+      "country": "India",
+      "evidence_refs": [
+        "http://www.wikidata.org/entity/Q28127092",
+        "http://www.wishberry.in/"
+      ],
+      "flags": [
+        "high_fee_lending"
+      ],
+      "name": "Wishberry",
+      "prioritization_score": 0.843,
+      "rank": 25,
+      "safety_status": "needs_review",
+      "wedge_id": "responsible_microfinance"
+    }
+  ],
+  "cell_id": "livelihood_loom",
+  "evidence_refs": [
+    "http://www.wikidata.org/entity/Q30589043",
+    "https://www.impactguru.com/",
+    "http://www.wikidata.org/entity/Q28127092",
+    "http://www.wishberry.in/"
+  ],
+  "friction": "working capital is expensive, opaque, or unavailable",
+  "generated_at": "2026-06-29T16:06:44.889679+00:00",
+  "next_safe_action": "Draft-only internal sponsor review packet; do not contact partners or publish claims without human_governor approval.",
+  "packet_id": "packet_03",
+  "risks": [
+    "High-fee lending and debt burden require human review.",
+    "No autonomous lending or investment decision is allowed."
+  ],
+  "schema_version": "livelihood_loom.enablement_packet.v1",
+  "sponsor_value": "sponsor gets a red-team-filtered responsible-finance map",
+  "target_wedge": "responsible_microfinance",
+  "welfare_metric": "aggregate number of finance rails passing fee-safety review"
+}

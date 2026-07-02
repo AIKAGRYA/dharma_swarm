@@ -21,11 +21,22 @@
 
 ---
 
-## OPEN ITEMS (5 open/partial after 2026-05-20 closure pass; BR-009/010/011/012 fixed below)
+## OPEN ITEMS (BR-007 reopened 2026-07-01; other open/partial items retained)
 
 > **Convergence pass executed 2026-05-07 18:00–18:10:** Plan at `~/.claude/plans/yes-write-a-plan-wobbly-cerf.md`. Closed items moved to CLOSED section: BR-001 (cron daemon plist fixed), BR-016 (SOVEREIGN_MANIFEST counts refreshed and now DocOps-verified), BR-017 (BUILD_SESSION_ENTRYPOINT.md present), BR-018 (MEGAFILE_INDEX referenced from CLAUDE.md + README), BR-019 (Coherence Delta CI validator installed). BR-015 was already CLOSED. Total CLOSED = 6; OPEN = 13.
 
-*(BR-001, BR-002, BR-006, BR-007, and BR-008 moved to CLOSED ITEMS — see below)*
+*(BR-001, BR-002, BR-006, and BR-008 moved to CLOSED ITEMS — see below. BR-007's historical closure entry is retained in CLOSED ITEMS but is superseded by the reopened entry here.)*
+
+### BR-007 — REOPENED 2026-07-01 — runtime.db and ontology.db sync still broken
+- **first_observed:** 2026-05-10 closure later disproven; independently re-confirmed 2026-06-10 and 2026-07-01.
+- **last_verified:** 2026-07-01
+- **age_days:** 52 since original closure claim; 21 since the 2026-06-10 re-confirmation.
+- **severity:** BLOCKER
+- **domain:** runtime / state
+- **root_cause:** The closure evidence assumed one canonical ontology/runtime path and an enabled sync path. The 2026-07-01 audit found the live `store_sync` cron disabled in `~/.dharma/cron/jobs.json`, no sync-derived rows in the live runtime DB, and two diverged `ontology.db` copies with materially different object populations.
+- **blast_radius:** Ontology/runtime self-recognition remains split; status surfaces can claim closure from code presence while live state never converges.
+- **evidence:** `docs/governance/AUDIT_2026-07-01.md`; `dharma_swarm/cron_runner.py` still exposes `store_sync`, but live scheduler state has `store_sync.enabled=false`; ontology path resolution remains split between repo-local `dharma_swarm/ontology.db` and `~/.dharma/ontology.db`.
+- **status:** OPEN — documentation corrected. Do not re-enable `store_sync` or consolidate database files until the operator chooses the canonical `ontology.db` copy and a backup/merge plan exists.
 
 ### BR-003 — Apply gate present but closed (self-evolution loop)
 - **first_observed:** 2026-05-07

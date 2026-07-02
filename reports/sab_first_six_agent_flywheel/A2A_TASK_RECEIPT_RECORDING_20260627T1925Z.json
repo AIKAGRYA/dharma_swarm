@@ -1,0 +1,28 @@
+{
+  "created_at_utc": "2026-06-27T19:25:05Z",
+  "mission_id": "sab-first-six-agent-flywheel-20260627",
+  "mode": "write",
+  "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+  "results": [
+    {
+      "message": "sab-flywheel-d02-codex-visible-reply-proof: completed",
+      "receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-codex-visible-reply-proof.semantic_receipt.json",
+      "task_id": "sab-flywheel-d02-codex-visible-reply-proof",
+      "updated": true
+    },
+    {
+      "message": "sab-flywheel-d02-hardener-top-risks: completed",
+      "receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-hardener-top-risks.semantic_receipt.json",
+      "task_id": "sab-flywheel-d02-hardener-top-risks",
+      "updated": true
+    },
+    {
+      "message": "sab-flywheel-d02-recruiter-first-spark-candidate: completed",
+      "receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-recruiter-first-spark-candidate.semantic_receipt.json",
+      "task_id": "sab-flywheel-d02-recruiter-first-spark-candidate",
+      "updated": true
+    }
+  ],
+  "schema": "sab_first_six_agent_flywheel.a2a_task_receipt_recording.v1",
+  "updated_count": 3
+}

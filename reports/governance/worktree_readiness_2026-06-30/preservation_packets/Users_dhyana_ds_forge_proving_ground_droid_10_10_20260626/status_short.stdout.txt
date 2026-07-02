@@ -1,0 +1,20 @@
+## droid/dharma-forge-proving-ground-10-10-20260626...origin/main [behind 10]
+A  .venv
+A  docs/agent_tasks/2026-06-26_dharma_forge_proving_ground_10_10_readiness_goal.md
+A  scripts/runtime/forge_provider_oracle.py
+A  scripts/runtime/forge_proving_ground_autoresearch.py
+A  scripts/runtime/forge_proving_ground_common.py
+A  scripts/runtime/forge_proving_ground_patch_sandbox.py
+A  scripts/runtime/forge_proving_ground_readiness.py
+A  scripts/runtime/forge_proving_ground_run.py
+A  scripts/runtime/forge_proving_ground_verifier.py
+A  scripts/runtime/forge_real_benchmark_adapter.py
+A  tests/test_forge_provider_oracle.py
+A  tests/test_forge_proving_ground_autoresearch.py
+A  tests/test_forge_proving_ground_patch_sandbox.py
+A  tests/test_forge_proving_ground_readiness.py
+A  tests/test_forge_proving_ground_run.py
+A  tests/test_forge_proving_ground_verifier.py
+A  tests/test_forge_real_benchmark_adapter.py
+?? scripts/runtime/forge_swebench_adapter.py
+?? tests/test_forge_swebench_adapter.py

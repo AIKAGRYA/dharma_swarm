@@ -1,0 +1,43 @@
+{
+  "schema": "sab.qwen_first_spark_capture_attempt.v1",
+  "created_at_utc": "2026-06-28T13:22:00Z",
+  "mission_id": "sab-first-six-agent-flywheel-20260627",
+  "task_id": "sab-flywheel-d01-qwen-code-first-spark",
+  "target_agent": "qwen_code",
+  "operator_approval_state": "approved_by_user_message_2026-06-28_do_them_all",
+  "qwen_cli": {
+    "binary": "/Users/dhyana/.npm-global/bin/qwen",
+    "version": "0.17.1",
+    "configured_for_noninteractive_capture": false
+  },
+  "attempts": [
+    {
+      "mode": "default_auth",
+      "command_shape": "qwen --bare --max-wall-time 45 --output-format json -p <health_probe>",
+      "exit_code": 1,
+      "result": "blocked",
+      "error": "No auth type is selected. Please configure an auth type before running in non-interactive mode."
+    },
+    {
+      "mode": "openai_auth",
+      "command_shape": "qwen --bare --auth-type openai --max-wall-time 45 --output-format json -p <health_probe>",
+      "exit_code": 1,
+      "result": "blocked",
+      "error": "Missing API key for openai auth; OPENAI_API_KEY is not set."
+    },
+    {
+      "mode": "qwen_oauth",
+      "command_shape": "qwen --bare --auth-type qwen-oauth --max-wall-time 45 --output-format json -p <health_probe>",
+      "exit_code": 1,
+      "result": "blocked",
+      "error": "Qwen OAuth free tier was discontinued on 2026-04-15; CLI requested switching to Coding Plan, OpenRouter, Fireworks AI, or another provider."
+    }
+  ],
+  "decision": {
+    "result": "target_owned_capture_not_obtained",
+    "reason": "The installed Qwen CLI cannot make a non-interactive model call with current auth/provider configuration.",
+    "no_live_post_submitted_as_qwen": true,
+    "why_no_fallback_impersonation": "Submitting a live SAB post under qwen_code without an actual Qwen model response would create a moderation item but would not satisfy the mission's target-owned non-Codex/non-SETU receipt requirement."
+  },
+  "expected_receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-qwen-code-first-spark.semantic_receipt.json"
+}

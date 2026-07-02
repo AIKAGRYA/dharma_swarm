@@ -1,0 +1,9 @@
+ .github/workflows/active-track.yml                 |  16 +-
+ .gitignore                                         |  11 +
+ CLAUDE.md                                          | 343 +--------------------
+ docs/governance/BUILD_SESSION_ENTRYPOINT.md        | 343 +--------------------
+ docs/governance/REPO_GOVERNANCE_AUDIT.md           |   2 +-
+ docs/governance/SOVEREIGN_MANIFEST.md              | 343 +--------------------
+ scripts/governance/agent_onboard.py                |   8 +-
+ scripts/governance/render_active_track_includes.py |  47 ++-
+ 8 files changed, 74 insertions(+), 1039 deletions(-)

@@ -58,6 +58,7 @@ EVOLUTION_INTERVAL = _ll.evolution_interval_seconds
 HEALTH_INTERVAL = _ll.health_interval_seconds
 LIVING_INTERVAL = _ll.living_interval_seconds
 MAX_DAILY = _ll.max_daily_tasks
+NON_CONTRIBUTION_PULSE_PREFIXES = ("PAUSED", "QUIET", "CIRCUIT", "TELOS", "HEALTH PULSE")
 HEALTH_MONITOR_TIMEOUT_SECONDS = min(30.0, max(1.0, HEALTH_INTERVAL / 2))
 DAEMON_RUNTIME_DISPATCH_SELF_REPORT_INTERVAL = 60.0
 _RUNTIME_HEALTH_STATE: dict[str, int] = {
@@ -67,6 +68,10 @@ _RUNTIME_HEALTH_STATE: dict[str, int] = {
 DAEMON_RUNTIME_DISPATCH_SELF_REPORT_SCHEMA_VERSION = (
     "dharma.daemon.runtime_dispatch_self_report.v1"
 )
+
+
+def _pulse_result_counts_toward_daily_limit(result: str) -> bool:
+    return not result.startswith(NON_CONTRIBUTION_PULSE_PREFIXES)
 
 
 def _update_runtime_health_state(*, agent_count: int | None = None, task_count: int | None = None) -> None:
@@ -579,7 +584,7 @@ async def run_pulse_loop(shutdown_event: asyncio.Event) -> None:
             short = result[:120].replace("\n", " ")
             _log("pulse", f"Result: {short}")
 
-            if not result.startswith(("PAUSED", "QUIET", "CIRCUIT", "TELOS")):
+            if _pulse_result_counts_toward_daily_limit(result):
                 daily_count += 1
         except Exception as e:
             _log("pulse", f"Error: {e}")
@@ -2092,6 +2097,38 @@ async def _run_guardian_loop(
         _log("guardian", f"Guardian loop crashed: {exc}")
 
 
+ARCHAEOLOGY_INGESTION_ENV = "DGC_ARCHAEOLOGY_INGESTION"
+_ARCHAEOLOGY_DISABLED_VALUES = {"0", "false", "no", "off"}
+
+
+def _archaeology_ingestion_enabled() -> bool:
+    value = os.environ.get(ARCHAEOLOGY_INGESTION_ENV, "1").strip().lower()
+    return value not in _ARCHAEOLOGY_DISABLED_VALUES
+
+
+async def _run_archaeology_once_bounded(
+    daemon: Any,
+    *,
+    timeout_seconds: float = 120.0,
+) -> dict[str, int]:
+    """Run archaeology ingestion without blocking the orchestrator event loop.
+
+    The ingestion coroutine performs synchronous file/vector-store work before it
+    yields. Wrapping ``daemon.run_once()`` directly in ``asyncio.wait_for`` does
+    not protect the shared live loop from that CPU-bound section; the timeout can
+    only fire after the event loop gets control back. Running the ingestion pass
+    in a worker thread preserves pulse liveness even when archaeology stalls.
+    """
+
+    def _run_in_thread() -> dict[str, int]:
+        return asyncio.run(daemon.run_once())
+
+    return await asyncio.wait_for(
+        asyncio.to_thread(_run_in_thread),
+        timeout=timeout_seconds,
+    )
+
+
 async def _run_archaeology_loop(shutdown_event: asyncio.Event) -> None:
     """Fang 7: Self-Reading Archaeology loop.
 
@@ -2101,13 +2138,21 @@ async def _run_archaeology_loop(shutdown_event: asyncio.Event) -> None:
     Agents gain query_archaeology tool access to all ingested institutional memory.
     """
     _log("archaeology", "Starting archaeology ingestion loop (interval=1800s)")
+    if not _archaeology_ingestion_enabled():
+        _log(
+            "archaeology",
+            f"Ingestion disabled by {ARCHAEOLOGY_INGESTION_ENV}={os.environ.get(ARCHAEOLOGY_INGESTION_ENV)!r}",
+        )
+        await shutdown_event.wait()
+        return
     try:
         from dharma_swarm.archaeology_ingestion import ArchaeologyIngestionDaemon
         daemon = ArchaeologyIngestionDaemon(state_dir=STATE_DIR, interval_seconds=1800)
 
-        # Run once immediately at boot
+        # Run once immediately at boot. Keep it off the shared event loop so a
+        # synchronous LanceDB/filesystem pass cannot starve pulse writes.
         try:
-            counts = await asyncio.wait_for(daemon.run_once(), timeout=120.0)
+            counts = await _run_archaeology_once_bounded(daemon, timeout_seconds=120.0)
             _log("archaeology", f"Boot ingestion complete: {counts}")
         except asyncio.TimeoutError:
             _log("archaeology", "Boot ingestion timed out (120s) — continuing")
@@ -2124,7 +2169,7 @@ async def _run_archaeology_loop(shutdown_event: asyncio.Event) -> None:
             if shutdown_event.is_set():
                 break
             try:
-                counts = await asyncio.wait_for(daemon.run_once(), timeout=120.0)
+                counts = await _run_archaeology_once_bounded(daemon, timeout_seconds=120.0)
                 _log("archaeology", f"Ingestion cycle complete: {counts}")
             except asyncio.TimeoutError:
                 _log("archaeology", "Ingestion cycle timed out (120s) — continuing")

@@ -99,4 +99,3 @@ def test_missing_agent_check_is_read_only(tmp_path):
 def test_invalid_uid_rejected(tmp_path):
     with pytest.raises(ValueError):
         verify_living_dock("../bad", dharma_home=tmp_path)
-

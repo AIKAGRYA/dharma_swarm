@@ -3757,7 +3757,7 @@ output:
     dharma_swarm/orchestrator.py: 3028 lines (grandfather=2923, ceiling=3215). Approaching the budget.
     dharma_swarm/runtime_state.py: 4152 lines already exceeds budget; this PR did not introduce the breach.
     dharma_swarm/thinkodynamic_director.py: 5320 lines (grandfather=5215, ceiling=5736). Approaching the budget.
-  
+
   ::error::Rule 10 violation(s) — module line budget:
     dharma_swarm/palantir_pilot.py: 0 → 1326 lines crosses the 1000-line budget. Decompose before merge, or open a decomposition issue and add this path to GRANDFATHERED in scripts/governance/check_module_budget.py (with the issue link in the PR description).
 

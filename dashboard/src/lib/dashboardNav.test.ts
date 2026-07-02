@@ -42,9 +42,25 @@ test("buildDashboardNavSections avoids advertising /dashboard/claude as a second
   assert.equal(items.some((item) => item.label === "Control Plane"), false);
 });
 
+test("buildDashboardNavSections exposes Livelihood Loom as an internal command surface", () => {
+  const items = commandSection().items;
+  const loom = items.find((item) => item.href === "/dashboard/livelihood-loom");
+
+  assert.equal(loom?.label, "Livelihood Loom");
+  assert.equal(loom?.icon, "HeartPulse");
+  assert.equal(loom?.level, 1);
+});
+
 test("isDashboardPathActive keeps nested routes attached to their canonical top-level nav item", () => {
   assert.equal(isDashboardPathActive("/dashboard/agents", "/dashboard/agents/agent-7"), true);
   assert.equal(isDashboardPathActive("/dashboard/qwen35", "/dashboard/qwen35/telemetry"), true);
+  assert.equal(
+    isDashboardPathActive(
+      "/dashboard/livelihood-loom",
+      "/dashboard/livelihood-loom/packet/packet_01",
+    ),
+    true,
+  );
 });
 
 test("isDashboardPathActive does not let /dashboard match every nested route", () => {

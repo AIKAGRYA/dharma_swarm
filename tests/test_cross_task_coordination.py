@@ -24,6 +24,7 @@ from dharma_swarm.models import (
     TaskStatus,
 )
 from dharma_swarm.orchestrator import Orchestrator
+import dharma_swarm.orchestrator as orchestrator_mod
 
 
 # ---------- helpers ----------
@@ -248,6 +249,58 @@ def test_slug_truncates_long_titles():
     long_title = "a" * 100
     slug = _slugify(long_title)
     assert len(slug) <= 40
+
+
+@pytest.mark.asyncio
+async def test_memory_palace_task_ingest_timeout_does_not_block_loop(tmp_path, monkeypatch):
+    """A stuck task-output MemoryPalace write must not starve the live loop."""
+    monkeypatch.setenv("DGC_TASK_MEMORY_PALACE_INGEST_TIMEOUT_SECONDS", "0.1")
+
+    def slow_ingest(**_kwargs):
+        time.sleep(0.5)
+        return "late"
+
+    monkeypatch.setattr(orchestrator_mod, "_run_memory_palace_ingest_sync", slow_ingest)
+
+    started = time.monotonic()
+    result = await orchestrator_mod._memory_palace_ingest_background(
+        state_dir=tmp_path,
+        content="result",
+        source="task:test",
+        tags=["task_output"],
+    )
+    elapsed = time.monotonic() - started
+
+    assert result == ""
+    assert elapsed < 0.3
+
+
+@pytest.mark.asyncio
+async def test_persist_result_respects_memory_palace_ingest_disable(
+    tmp_orchestrator,
+    monkeypatch,
+):
+    """The live daemon can disable semantic indexing without losing artifacts."""
+    monkeypatch.setenv("DGC_TASK_MEMORY_PALACE_INGESTION", "0")
+
+    def forbidden_ingest(**_kwargs):
+        raise AssertionError("MemoryPalace ingestion should not be scheduled")
+
+    monkeypatch.setattr(orchestrator_mod, "_run_memory_palace_ingest_sync", forbidden_ingest)
+    task = Task(id="feedface00001111", title="Disable memory palace ingest")
+
+    await tmp_orchestrator._persist_result(
+        agent_name="analyst-1",
+        model_name="claude-sonnet",
+        provider_name="anthropic",
+        task=task,
+        result="artifact survives without semantic indexing",
+    )
+    await asyncio.sleep(0)
+
+    artifacts = list(tmp_orchestrator._shared_dir.glob(f"{task.id[:8]}_*.md"))
+    assert len(artifacts) == 1
+    assert "artifact survives" in artifacts[0].read_text(encoding="utf-8")
 
 
 # ---------- PART 5: notes file still created alongside artifact ----------

@@ -1,0 +1,6 @@
+# branch.oid 791801e0fd9f9410df38166d53aa957a2f92e218
+# branch.head codex/governance-fitness-ci-20260625-225920
+# branch.upstream origin/codex/governance-fitness-ci-20260625-225920
+1 .M N... 100644 100644 100644 d92324291665bca8613ccc308e84b8f7c0073fb4 d92324291665bca8613ccc308e84b8f7c0073fb4 reports/governance/active_track_evidence.json
+1 .M N... 100644 100644 100644 6463d44a657c3ffa0b3b28a2f1d2af38667d1601 6463d44a657c3ffa0b3b28a2f1d2af38667d1601 reports/governance/active_track_evidence.md
+1 .M N... 100644 100644 100644 d92324291665bca8613ccc308e84b8f7c0073fb4 d92324291665bca8613ccc308e84b8f7c0073fb4 reports/governance/track_portfolio.json

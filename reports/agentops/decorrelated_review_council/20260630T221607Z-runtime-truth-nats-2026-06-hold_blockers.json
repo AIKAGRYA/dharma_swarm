@@ -1,0 +1,223 @@
+{
+  "blockers": [
+    "kimi27code: CriticResponseError invalid critic JSON from ollama:kimi-k2.7-code:cloud; actual_model=kimi-k2.7-code; content_len=55811; parse_error=JSONDecodeError: Expecting ':' delimiter: line 1 column 13 (char 12); preview=We need act as strict JSON-only production review critic. Need return JSON only, no markdown fences, no prose outside JSON. We are lane kimi27code. Review target runtime-truth-nats-2026-06, requested provider/model ollama:kimi-k2.7-code:cloud. We gra ...  #5 and #4 are about the transport/spec. The scripts are not the transport. So maybe all 10 are satisfied for the slice.\\n\\nThe closeout packet test count inconsistency is still a current evidence issue. But maybe not a functional blocker. The prompt",
+    "kimi27code: disagreement=invalid critic JSON from ollama:kimi-k2.7-code:cloud; actual_model=kimi-k2.7-code; content_len=55811; parse_error=JSONDecodeError: Expecting ':' delimiter: line 1 column 13 (char 12); preview=We need act as strict JSON-only production revie"
+  ],
+  "conviction_gate": "hold_blockers",
+  "critic_count": 6,
+  "critics": [
+    {
+      "actual_model": "glm-5.2",
+      "lane_id": "glm52",
+      "latency_ms": 22394,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "reports/governance/runtime_truth_nats_council_evidence_2026-07-01.md",
+          "reports/governance/active_track_evidence.md",
+          "reports/governance/runtime_truth_nats_closeout_packet_2026-07-01.md",
+          "dharma_swarm/a2a/nats_transport.py",
+          "dharma_swarm/a2a/a2a_server.py",
+          "tests/test_nats_transport.py",
+          "tests/test_nats_substrate_contract.py",
+          "scripts/governance/check_nats_substrate_contract.py",
+          "scripts/runtime/a2a_send.py",
+          "scripts/runtime/a2a_inbox_bridge.py",
+          "scripts/runtime/a2a_domain_reply_worker.py",
+          "scripts/runtime/a2a_reply_capture.py",
+          "dharma_swarm/a2a/a2a_cloud_contact.py",
+          "Makefile"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "All 10 original rejection requirements are satisfied for the explicitly scoped local/offline NATS substrate hardening slice. Idempotency retry semantics are fixed (failed/stale records create retry keys, not duplicate acks). Tests cover all six required failure modes. Canonical envelope dharma.nats.envelope.v1 with message_id, causality, actors, subject, payload, and Nats-Msg-Id is implemented and tested. Durable stream/consumer setup and DLQ behavior with MaxDeliver exhaustion and operator-visible blocker are present. A2A cloud contact routes through A2ANatsTransport. tests/test_nats_substrate_contract.py exists with negative checker tests. Active-track gates are executable command_passes criteria. Owned surfaces point at real tracked files. Closeout packet exists and track remains ACTIVE/SHIPPABLE pending operator lifecycle review. Live broker evidence is explicitly scoped as local/offline per requirement 10's alternative.",
+        "verdict": "pass"
+      },
+      "provider": "ollama",
+      "raw_response": "{\"verdict\":\"pass\",\"score\":100,\"summary\":\"All 10 original rejection requirements are satisfied for the explicitly scoped local/offline NATS substrate hardening slice. Idempotency retry semantics are fixed (failed/stale records create retry keys, not duplicate acks). Tests cover all six required failure modes. Canonical envelope dharma.nats.envelope.v1 with message_id, causality, actors, subject, payload, and Nats-Msg-Id is implemented and tested. Durable stream/consumer setup and DLQ behavior with MaxDeliver exhaustion and operator-visible blocker are present. A2A cloud contact routes through A2ANatsTransport. tests/test_nats_substrate_contract.py exists with negative checker tests. Active-track gates are executable command_passes criteria. Owned surfaces point at real tracked files. Closeout packet exists and track remains ACTIVE/SHIPPABLE pending operator lifecycle review. Live broker evidence is explicitly scoped as local/offline per requirement 10's alternative.\",\"blockers\":[],\"required_changes\":[],\"evidence_checked\":[\"reports/governance/runtime_truth_nats_council_evidence_2026-07-01.md\",\"reports/governance/active_track_evidence.md\",\"reports/governance/runtime_truth_nats_closeout_packet_2026-07-01.md\",\"dharma_swarm/a2a/nats_transport.py\",\"dharma_swarm/a2a/a2a_server.py\",\"tests/test_nats_transport.py\",\"tests/test_nats_substrate_contract.py\",\"scripts/governance/check_nats_substrate_contract.py\",\"scripts/runtime/a2a_send.py\",\"scripts/runtime/a2a_inbox_bridge.py\",\"scripts/runtime/a2a_domain_reply_worker.py\",\"scripts/runtime/a2a_reply_capture.py\",\"dharma_swarm/a2a/a2a_cloud_contact.py\",\"Makefile\"],\"explicit_disagreement\":\"\"}",
+      "requested_model": "glm-5.2:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "kimi-k2.7-code",
+      "failure_reason": "invalid critic JSON from ollama:kimi-k2.7-code:cloud; actual_model=kimi-k2.7-code; content_len=55811; parse_error=JSONDecodeError: Expecting ':' delimiter: line 1 column 13 (char 12); preview=We need act as strict JSON-only production review critic. Need return JSON only, no markdown fences, no prose outside JSON. We are lane kimi27code. Review target runtime-truth-nats-2026-06, requested provider/model ollama:kimi-k2.7-code:cloud. We gra ...  #5 and #4 are about the transport/spec. The scripts are not the transport. So maybe all 10 are satisfied for the slice.\\n\\nThe closeout packet test count inconsistency is still a current evidence issue. But maybe not a functional blocker. The prompt",
+      "failure_type": "CriticResponseError",
+      "lane_id": "kimi27code",
+      "latency_ms": 109290,
+      "ok": false,
+      "parsed": {
+        "blockers": [
+          "invalid critic JSON from ollama:kimi-k2.7-code:cloud; actual_model=kimi-k2.7-code; content_len=55811; parse_error=JSONDecodeError: Expecting ':' delimiter: line 1 column 13 (char 12); preview=We need act as strict JSON-only production review critic. Need return JSON only, no markdown fences, no prose outside JSON. We are lane kimi27code. Review target runtime-truth-nats-2026-06, requested provider/model ollama:kimi-k2.7-code:cloud. We gra ...  #5 and #4 are about the transport/spec. The scripts are not the transport. So maybe all 10 are satisfied for the slice.\\n\\nThe closeout packet test count inconsistency is still a current evidence issue. But maybe not a functional blocker. The prompt"
+        ],
+        "evidence_checked": [],
+        "explicit_disagreement": "invalid critic JSON from ollama:kimi-k2.7-code:cloud; actual_model=kimi-k2.7-code; content_len=55811; parse_error=JSONDecodeError: Expecting ':' delimiter: line 1 column 13 (char 12); preview=We need act as strict JSON-only production review critic. Need return JSON only, no markdown fences, no prose outside JSON. We are lane kimi27code. Review target runtime-truth-nats-2026-06, requested provider/model ollama:kimi-k2.7-code:cloud. We gra ...  #5 and #4 are about the transport/spec. The scripts are not the transport. So maybe all 10 are satisfied for the slice.\\n\\nThe closeout packet test count inconsistency is still a current evidence issue. But maybe not a functional blocker. The prompt",
+        "required_changes": [
+          "Make ollama:kimi-k2.7-code:cloud reachable or mark the lane optional with justification."
+        ],
+        "score": 0,
+        "summary": "kimi27code could not run.",
+        "verdict": "blocked"
+      },
+      "provider": "ollama",
+      "raw_response_preview": "We need act as strict JSON-only production review critic. Need return JSON only, no markdown fences, no prose outside JSON. We are lane kimi27code. Review target runtime-truth-nats-2026-06, requested provider/model ollama:kimi-k2.7-code:cloud. We gra ...  #5 and #4 are about the transport/spec. The scripts are not the transport. So maybe all 10 are satisfied for the slice.\\n\\nThe closeout packet test count inconsistency is still a current evidence issue. But maybe not a functional blocker. The prompt",
+      "requested_model": "kimi-k2.7-code:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "qwen3-coder:480b-cloud",
+      "lane_id": "qwen3coder",
+      "latency_ms": 17474,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "Verified idempotency retry semantics prevent failed/stale publish/consume from becoming duplicate ack success",
+          "Confirmed tests cover consume failure redelivery, stale started records, publish failure retry, concurrent duplicate delivery, ack failure, and duplicate ack truth",
+          "Validated canonical envelope implementation with dharma.nats.envelope.v1, message_id, causality fields, actors, subject, payload, and Nats-Msg-Id",
+          "Confirmed durable stream/consumer setup and DLQ behavior matching spec with MaxDeliver/operator-visible blocker",
+          "Verified A2A publish/consume routes through governed abstraction with equivalent identity/idempotency/receipt guarantees",
+          "Confirmed tests/test_nats_substrate_contract.py exists with negative checker tests",
+          "Verified active-track criteria are executable behavioral gates via command_passes checks",
+          "Confirmed ACTIVE_TRACK.yaml owned surfaces point at real modules",
+          "Verified real closeout packet exists and track remains ACTIVE until operator lifecycle review",
+          "Confirmed explicit local/offline scope is properly implemented without requiring live broker evidence"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "The NATS substrate implementation meets all requirements for local/offline hardening. All original rejection items have been addressed through comprehensive idempotency handling, proper envelope contracts, durable stream/consumer setup, DLQ behavior, and executable governance gates. The track remains ACTIVE as required pending operator lifecycle review.",
+        "verdict": "pass"
+      },
+      "provider": "ollama",
+      "raw_response": "{\n  \"verdict\": \"pass\",\n  \"score\": 100,\n  \"summary\": \"The NATS substrate implementation meets all requirements for local/offline hardening. All original rejection items have been addressed through comprehensive idempotency handling, proper envelope contracts, durable stream/consumer setup, DLQ behavior, and executable governance gates. The track remains ACTIVE as required pending operator lifecycle review.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"Verified idempotency retry semantics prevent failed/stale publish/consume from becoming duplicate ack success\",\n    \"Confirmed tests cover consume failure redelivery, stale started records, publish failure retry, concurrent duplicate delivery, ack failure, and duplicate ack truth\",\n    \"Validated canonical envelope implementation with dharma.nats.envelope.v1, message_id, causality fields, actors, subject, payload, and Nats-Msg-Id\",\n    \"Confirmed durable stream/consumer setup and DLQ behavior matching spec with MaxDeliver/operator-visible blocker\",\n    \"Verified A2A publish/consume routes through governed abstraction with equivalent identity/idempotency/receipt guarantees\",\n    \"Confirmed tests/test_nats_substrate_contract.py exists with negative checker tests\",\n    \"Verified active-track criteria are executable behavioral gates via command_passes checks\",\n    \"Confirmed ACTIVE_TRACK.yaml owned surfaces point at real modules\",\n    \"Verified real closeout packet exists and track remains ACTIVE until operator lifecycle review\",\n    \"Confirmed explicit local/offline scope is properly implemented without requiring live broker evidence\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "qwen3-coder:480b-cloud",
+      "required": true
+    },
+    {
+      "actual_model": "deepseek-v4-pro",
+      "lane_id": "deepseekv4pro",
+      "latency_ms": 23021,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "reports/governance/runtime_truth_nats_council_evidence_2026-07-01.md",
+          "reports/governance/active_track_evidence.md",
+          "reports/governance/runtime_truth_nats_closeout_packet_2026-07-01.md",
+          "dharma_swarm/a2a/nats_transport.py",
+          "dharma_swarm/a2a/a2a_server.py",
+          "tests/test_nats_transport.py",
+          "tests/test_nats_substrate_contract.py",
+          "scripts/governance/check_nats_substrate_contract.py",
+          "scripts/runtime/a2a_send.py",
+          "scripts/runtime/a2a_inbox_bridge.py",
+          "scripts/runtime/a2a_domain_reply_worker.py",
+          "scripts/runtime/a2a_reply_capture.py",
+          "dharma_swarm/a2a/a2a_cloud_contact.py",
+          "Makefile"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "All 10 original rejection requirements are satisfied with concrete evidence: idempotency retry/DLQ, behavioral tests, canonical envelope, durable topology/DLQ, governed transport abstraction, negative contract tests, executable gates, owned surfaces, closeout packet, and explicit local/offline scope. No blockers remain.",
+        "verdict": "pass"
+      },
+      "provider": "ollama",
+      "raw_response": "{\n  \"verdict\": \"pass\",\n  \"score\": 100,\n  \"summary\": \"All 10 original rejection requirements are satisfied with concrete evidence: idempotency retry/DLQ, behavioral tests, canonical envelope, durable topology/DLQ, governed transport abstraction, negative contract tests, executable gates, owned surfaces, closeout packet, and explicit local/offline scope. No blockers remain.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"reports/governance/runtime_truth_nats_council_evidence_2026-07-01.md\",\n    \"reports/governance/active_track_evidence.md\",\n    \"reports/governance/runtime_truth_nats_closeout_packet_2026-07-01.md\",\n    \"dharma_swarm/a2a/nats_transport.py\",\n    \"dharma_swarm/a2a/a2a_server.py\",\n    \"tests/test_nats_transport.py\",\n    \"tests/test_nats_substrate_contract.py\",\n    \"scripts/governance/check_nats_substrate_contract.py\",\n    \"scripts/runtime/a2a_send.py\",\n    \"scripts/runtime/a2a_inbox_bridge.py\",\n    \"scripts/runtime/a2a_domain_reply_worker.py\",\n    \"scripts/runtime/a2a_reply_capture.py\",\n    \"dharma_swarm/a2a/a2a_cloud_contact.py\",\n    \"Makefile\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "deepseek-v4-pro:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "minimax-m3",
+      "lane_id": "minimaxm3",
+      "latency_ms": 35947,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "reports/governance/runtime_truth_nats_council_evidence_2026-07-01.md (scope boundary and evidence index)",
+          "reports/governance/active_track_evidence.md (5/5 file prereqs and 2/2 command_passes gates; 17/17 pytest)",
+          "reports/governance/runtime_truth_nats_closeout_packet_2026-07-01.md (closeout packet; explicit ACTIVE/SHIPPABLE stance)",
+          "dharma_swarm/a2a/nats_transport.py (canonical envelope, _begin_idempotent_side_effect retry/blocked logic, _publish_dlq with operator_blocker, Nats-Msg-Id headers, ensure_stream_topology + ensure_task_consumer)",
+          "dharma_swarm/a2a/a2a_server.py (require_execution_identity boundary)",
+          "dharma_swarm/a2a/a2a_cloud_contact.py (publish_task via A2ANatsTransport; JETSTREAM_PUBLISH_CONTRACT marker)",
+          "tests/test_nats_transport.py (all six required behavioral tests present: consume failure redelivery, stale started, publish failure retry, in-progress duplicate nack, duplicate ack failure truth, max-delivery DLQ)",
+          "tests/test_nats_substrate_contract.py (negative tests for Nats-Msg-Id wiring removal and redelivery marker removal)",
+          "scripts/governance/check_nats_substrate_contract.py (transport markers, regression markers, spec phrases, governance-all inclusion)",
+          "scripts/runtime/a2a_send.py (classify_contact_evidence, NATS_CLI_JETSTREAM_PUB_ACK, live_contact_claim, RuntimeWarrant issuance)",
+          "scripts/runtime/a2a_inbox_bridge.py (DELIVERED_AND_ACKED, semantic_reply_claim=False)",
+          "scripts/runtime/a2a_domain_reply_worker.py (target-owned boundary, DOMAIN_REPLY_PUBLISHED, dharma.a2a.domain_receipt.v1)",
+          "scripts/runtime/a2a_reply_capture.py (NO_REPLY honesty, DOMAIN_RECEIPTED tier)",
+          "Makefile (nats-substrate-contract target, governance-all composition)"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "The local/offline NATS substrate hardening slice now satisfies all 10 original rejection requirements with concrete, verifiable evidence. The transport (dharma_swarm/a2a/nats_transport.py) implements retry-on-failed-stale via :retry:<uuid> side-effect keys, blocks in-progress duplicates with retry_blocked receipts, and publishes typed dharma.nats.dlq_failure.v1 envelopes with operator_blocker=NATS_MAX_DELIVER_EXHAUSTED to dharma.dlq.<stream>.<consumer>. The canonical envelope dharma.nats.envelope.v1 carries message_id, trace_id, span_id, parent_span_id, correlation_id, causation_id, subject, from_agent, to_agent, kind, payload, and execution_identity; Nats-Msg-Id is set in headers. Durable stream/consumer setup declares DS_TASKS + DS_DLQ with explicit-ack, max_deliver=N, and stable durable consumer. A2A paths route through A2ANatsTransport (a2a_cloud_contact.py) or use equivalent documented runtime-state-backed governance in a2a_send.py (ExecutionIdentity, RuntimeStateStore idempotency, RuntimeWarrant, EvidenceReceipt, contact-evidence classifier). tests/test_nats_substrate_contract.py exists with negative tests that prove the checker fails when Nats-Msg-Id wiring or the redelivery regression marker is removed. Active-track criteria are executable command_passes gates (contract checker + pytest), not spec string checks. ACTIVE_TRACK.yaml owned surfaces match real files. The closeout packet exists at reports/governance/runtime_truth_nats_closeout_packet_2026-07-01.md and explicitly states the track stays ACTIVE/SHIPPABLE until operator lifecycle review. The slice is explicitly scoped as local/offline; no fresh live HANDLER_ACKED or DOMAIN_RECEIPTED is claimed.",
+        "verdict": "approve"
+      },
+      "provider": "ollama",
+      "raw_response": "{\"verdict\":\"approve\",\"score\":100,\"summary\":\"The local/offline NATS substrate hardening slice now satisfies all 10 original rejection requirements with concrete, verifiable evidence. The transport (dharma_swarm/a2a/nats_transport.py) implements retry-on-failed-stale via :retry:<uuid> side-effect keys, blocks in-progress duplicates with retry_blocked receipts, and publishes typed dharma.nats.dlq_failure.v1 envelopes with operator_blocker=NATS_MAX_DELIVER_EXHAUSTED to dharma.dlq.<stream>.<consumer>. The canonical envelope dharma.nats.envelope.v1 carries message_id, trace_id, span_id, parent_span_id, correlation_id, causation_id, subject, from_agent, to_agent, kind, payload, and execution_identity; Nats-Msg-Id is set in headers. Durable stream/consumer setup declares DS_TASKS + DS_DLQ with explicit-ack, max_deliver=N, and stable durable consumer. A2A paths route through A2ANatsTransport (a2a_cloud_contact.py) or use equivalent documented runtime-state-backed governance in a2a_send.py (ExecutionIdentity, RuntimeStateStore idempotency, RuntimeWarrant, EvidenceReceipt, contact-evidence classifier). tests/test_nats_substrate_contract.py exists with negative tests that prove the checker fails when Nats-Msg-Id wiring or the redelivery regression marker is removed. Active-track criteria are executable command_passes gates (contract checker + pytest), not spec string checks. ACTIVE_TRACK.yaml owned surfaces match real files. The closeout packet exists at reports/governance/runtime_truth_nats_closeout_packet_2026-07-01.md and explicitly states the track stays ACTIVE/SHIPPABLE until operator lifecycle review. The slice is explicitly scoped as local/offline; no fresh live HANDLER_ACKED or DOMAIN_RECEIPTED is claimed.\",\"blockers\":[],\"required_changes\":[],\"evidence_checked\":[\"reports/governance/runtime_truth_nats_council_evidence_2026-07-01.md (scope boundary and evidence index)\",\"reports/governance/active_track_evidence.md (5/5 file prereqs and 2/2 command_passes gates; 17/17 pytest)\",\"reports/governance/runtime_truth_nats_closeout_packet_2026-07-01.md (closeout packet; explicit ACTIVE/SHIPPABLE stance)\",\"dharma_swarm/a2a/nats_transport.py (canonical envelope, _begin_idempotent_side_effect retry/blocked logic, _publish_dlq with operator_blocker, Nats-Msg-Id headers, ensure_stream_topology + ensure_task_consumer)\",\"dharma_swarm/a2a/a2a_server.py (require_execution_identity boundary)\",\"dharma_swarm/a2a/a2a_cloud_contact.py (publish_task via A2ANatsTransport; JETSTREAM_PUBLISH_CONTRACT marker)\",\"tests/test_nats_transport.py (all six required behavioral tests present: consume failure redelivery, stale started, publish failure retry, in-progress duplicate nack, duplicate ack failure truth, max-delivery DLQ)\",\"tests/test_nats_substrate_contract.py (negative tests for Nats-Msg-Id wiring removal and redelivery marker removal)\",\"scripts/governance/check_nats_substrate_contract.py (transport markers, regression markers, spec phrases, governance-all inclusion)\",\"scripts/runtime/a2a_send.py (classify_contact_evidence, NATS_CLI_JETSTREAM_PUB_ACK, live_contact_claim, RuntimeWarrant issuance)\",\"scripts/runtime/a2a_inbox_bridge.py (DELIVERED_AND_ACKED, semantic_reply_claim=False)\",\"scripts/runtime/a2a_domain_reply_worker.py (target-owned boundary, DOMAIN_REPLY_PUBLISHED, dharma.a2a.domain_receipt.v1)\",\"scripts/runtime/a2a_reply_capture.py (NO_REPLY honesty, DOMAIN_RECEIPTED tier)\",\"Makefile (nats-substrate-contract target, governance-all composition)\"],\"explicit_disagreement\":\"\"}",
+      "requested_model": "minimax-m3:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "nvidia/nemotron-3-ultra-550b-a55b-20260604:free",
+      "lane_id": "nemotron3ultra",
+      "latency_ms": 114214,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "reports/governance/runtime_truth_nats_council_evidence_2026-07-01.md",
+          "reports/governance/active_track_evidence.md",
+          "reports/governance/runtime_truth_nats_closeout_packet_2026-07-01.md",
+          "dharma_swarm/a2a/nats_transport.py",
+          "dharma_swarm/a2a/a2a_server.py",
+          "tests/test_nats_transport.py",
+          "tests/test_nats_substrate_contract.py",
+          "scripts/governance/check_nats_substrate_contract.py",
+          "scripts/runtime/a2a_send.py",
+          "scripts/runtime/a2a_inbox_bridge.py",
+          "scripts/runtime/a2a_domain_reply_worker.py",
+          "scripts/runtime/a2a_reply_capture.py",
+          "dharma_swarm/a2a/a2a_cloud_contact.py",
+          "Makefile"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "All 10 original rejection requirements are satisfied for the explicitly scoped local/offline NATS substrate hardening slice. The implementation provides: (1) correct idempotency retry semantics with retry keys for failed/stale records and DLQ visibility; (2) behavioral regression tests covering all 6 required failure modes; (3) canonical envelope dharma.nats.envelope.v1 with message_id, causality fields, actors, subject, payload, and Nats-Msg-Id; (4) durable stream/consumer topology (DS_TASKS, DS_DLQ) with MaxDeliver and operator-visible DLQ blocker; (5) governed A2ANatsTransport abstraction with equivalent handling verified in runtime scripts via contract checker; (6) tests/test_nats_substrate_contract.py with negative checker tests; (7) executable behavioral gates (command_passes) for active-track criteria; (8) ACTIVE_TRACK.yaml owned surfaces pointing to real existing modules; (9) real closeout packet keeping track ACTIVE pending operator lifecycle review; (10) explicit local/offline scope with no claim of fresh live broker contact. All verification commands pass (17 transport/contract tests, contract checker OK, track status SHIPPABLE, make nats-substrate-contract 70+ tests).",
+        "verdict": "pass"
+      },
+      "provider": "openrouter_free",
+      "raw_response": "{\n  \"verdict\": \"pass\",\n  \"score\": 100,\n  \"summary\": \"All 10 original rejection requirements are satisfied for the explicitly scoped local/offline NATS substrate hardening slice. The implementation provides: (1) correct idempotency retry semantics with retry keys for failed/stale records and DLQ visibility; (2) behavioral regression tests covering all 6 required failure modes; (3) canonical envelope dharma.nats.envelope.v1 with message_id, causality fields, actors, subject, payload, and Nats-Msg-Id; (4) durable stream/consumer topology (DS_TASKS, DS_DLQ) with MaxDeliver and operator-visible DLQ blocker; (5) governed A2ANatsTransport abstraction with equivalent handling verified in runtime scripts via contract checker; (6) tests/test_nats_substrate_contract.py with negative checker tests; (7) executable behavioral gates (command_passes) for active-track criteria; (8) ACTIVE_TRACK.yaml owned surfaces pointing to real existing modules; (9) real closeout packet keeping track ACTIVE pending operator lifecycle review; (10) explicit local/offline scope with no claim of fresh live broker contact. All verification commands pass (17 transport/contract tests, contract checker OK, track status SHIPPABLE, make nats-substrate-contract 70+ tests).\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"reports/governance/runtime_truth_nats_council_evidence_2026-07-01.md\",\n    \"reports/governance/active_track_evidence.md\",\n    \"reports/governance/runtime_truth_nats_closeout_packet_2026-07-01.md\",\n    \"dharma_swarm/a2a/nats_transport.py\",\n    \"dharma_swarm/a2a/a2a_server.py\",\n    \"tests/test_nats_transport.py\",\n    \"tests/test_nats_substrate_contract.py\",\n    \"scripts/governance/check_nats_substrate_contract.py\",\n    \"scripts/runtime/a2a_send.py\",\n    \"scripts/runtime/a2a_inbox_bridge.py\",\n    \"scripts/runtime/a2a_domain_reply_worker.py\",\n    \"scripts/runtime/a2a_reply_capture.py\",\n    \"dharma_swarm/a2a/a2a_cloud_contact.py\",\n    \"Makefile\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "required": true
+    }
+  ],
+  "generated_at": "20260630T221607Z",
+  "max_evidence_chars": 0,
+  "max_output_tokens": 12000,
+  "persistent_agent_witness": {
+    "agent": "palantir-pilot",
+    "blocker": "",
+    "fresh": true,
+    "heartbeat_age_seconds": 30,
+    "heartbeat_timestamp": "2026-06-30T22:15:37Z",
+    "max_heartbeat_age_seconds": 300,
+    "raw_status": "status=running session=dharma_palantir_pilot_a2a_worker\nsubject=dharma.a2a.palantir-pilot\nconsumer=palantir_pilot_a2a\nstream=DHARMA_FLEET\nheartbeat=/Users/dhyana/.dharma/a2a_bus/worker_heartbeats/palantir-pilot.json\nlog=/Users/dhyana/.dharma/logs/palantir_pilot_a2a_worker/dharma_palantir_pilot_a2a_worker.log\n--- heartbeat ---\n{\n    \"agent_id\": \"palantir_pilot\",\n    \"callsign\": \"palantir-pilot\",\n    \"consumer\": \"palantir_pilot_a2a\",\n    \"cycle\": 874,\n    \"last_receipt_path\": \"\",\n    \"receipt_count\": 0,\n    \"schema_version\": \"dharma.a2a.palantir_pilot.worker_heartbeat.v1\",\n    \"status\": \"IDLE\",\n    \"stream\": \"DHARMA_FLEET\",\n    \"subject\": \"dharma.a2a.palantir-pilot\",\n    \"suppress_no_messages\": true,\n    \"timestamp\": \"2026-06-30T22:15:37Z\"\n}\n--- consumer ---\n{\n  \"stream_name\": \"DHARMA_FLEET\",\n  \"name\": \"palantir_pilot_a2a\",\n  \"config\": {\n    \"ack_policy\": \"explicit\",\n    \"ack_wait\": 30000000000,\n    \"deliver_policy\": \"all\",\n    \"durable_name\": \"palantir_pilot_a2a\",\n    \"name\": \"palantir_pilot_a2a\",\n    \"filter_subject\": \"dharma.a2a.palantir-pilot\",\n    \"max_ack_pending\": 1000,\n    \"max_deliver\": -1,\n    \"max_waiting\": 512,\n    \"replay_policy\": \"instant\",\n    \"num_replicas\": 0,\n    \"metadata\": {\n      \"_nats.level\": \"3\",\n      \"_nats.req.level\": \"0\",\n      \"_nats.ver\": \"2.12.6\"\n    },\n    \"pause_until\": \"0001-01-01T00:00:00Z\"\n  },\n  \"created\": \"2026-06-15T16:08:32.524099Z\",\n  \"delivered\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"ack_floor\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"num_ack_pending\": 0,\n  \"num_redelivered\": 0,\n  \"num_waiting\": 1,\n  \"num_pending\": 0,\n  \"ts\": \"2026-06-30T22:16:07.410198Z\"\n}\n--- latest worker receipts ---\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260618T014416Z-palantir-pilot-codex_hardened_spec_notice_20260618T0155Z_palantir-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260618T013101Z-palantir-pilot-palantir_a2a_hardening_20260618T0001Z-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260617T135931Z-palantir-pilot-longrun_spec_95_vote_20260617T135751Z-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260617T131705Z-palantir-pilot-7215f005165f-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260617T130349Z-palantir-pilot-761445fa892d-PALANTIR_PILOT_REPLIED.json\n",
+    "status": "running"
+  },
+  "prompt_chars": 268526,
+  "prompt_file": "/Users/dhyana/dharma_swarm/reports/agentops/decorrelated_review_council/prompts/runtime_truth_nats_20260701_rerun_strict.md",
+  "prompt_words_estimate": 20728,
+  "required_critic_count": 6,
+  "schema_version": "codex.decorrelated_review_council.v1",
+  "score_avg": 83.33,
+  "score_min": 0,
+  "target_score": 100,
+  "timeout_seconds": 900
+}

@@ -1,0 +1,73 @@
+{
+  "schema": "sab_first_six_agent_flywheel.status_snapshot.v1",
+  "mission_id": "sab-first-six-agent-flywheel-20260627",
+  "created_at_utc": "2026-06-27T18:43:00Z",
+  "canonical": {
+    "sab_instance_id": "sab_agni_prod_157_245_193_15",
+    "public_base_url": "https://157.245.193.15/",
+    "status": "reachable_public_https_ip",
+    "latest_post_id_seen": 12,
+    "visible_comments_total": 0,
+    "latest_witness_hash_seen": "c950c3153b3ad07156a28632dfbbd2d330a38195533e48bec8e98cc328cd46ee",
+    "witness_chain_valid": true,
+    "moderation_queue": {
+      "approved": 12,
+      "pending": 8,
+      "day1_pending_queue_ids": [
+        17,
+        18,
+        19,
+        20
+      ],
+      "queued_semantic_challenge": {
+        "queue_id": 20,
+        "reply_to_post_id": 12,
+        "agent_id": "codex_composer_mac",
+        "status": "pending"
+      }
+    },
+    "admin_gate": {
+      "status": "operator_or_setu_required",
+      "evidence": "Approval requires allowlisted Ed25519 admin auth; private-key probing was rejected and direct DB mutation was not attempted.",
+      "artifact": "reports/sab_first_six_agent_flywheel/SETU_APPROVAL_GATE_STATUS_20260627T1834Z.json"
+    }
+  },
+  "a2a": {
+    "registry_path": "/Users/dhyana/.dharma/a2a_bus/agents.json",
+    "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+    "qwen_candidate": {
+      "agent_uid": "qwen_code",
+      "provider": "alibaba",
+      "authority": "external_worker_evidence_only",
+      "dispatch_enabled": false,
+      "task_id": "sab-flywheel-d01-qwen-code-first-spark",
+      "packet_path": "reports/sab_first_six_agent_flywheel/FIRST_SPARK_QWEN_CODE_PACKET_20260627T1843Z.md",
+      "status": "pending_target_owned_receipt",
+      "inbox_mirror_path": "/Users/dhyana/.dharma/a2a_bus/inboxes/qwen_code/sab-first-spark-qwen-code-20260627T1843Z.json"
+    },
+    "mission_queue_counts_including_followups": {
+      "completed": 12,
+      "pending": 2
+    },
+    "pending_day1_tasks": [
+      "sab-flywheel-d01-setu-approve-day1-queue",
+      "sab-flywheel-d01-qwen-code-first-spark"
+    ],
+    "semantic_receipts_completed": 12
+  },
+  "day_14_gate_progress": {
+    "recruited_new_agent_completes_first_spark": "not_met",
+    "non_codex_non_setu_candidate_task": "queued_for_qwen_code",
+    "repeatable_onboarding_path": "partial_manifest_external_packet_invite_draft_and_qwen_packet_created",
+    "hardening_report_fixed_or_filed_top_risks": "partial_top_risks_filed_operator_gated",
+    "daily_loop_without_manual_babysitting": "partial_all_day1_non_admin_tasks_closed_but_setu_admin_approval_and_qwen_receipt_remain_pending"
+  },
+  "not_complete_yet": [
+    "qwen_code has not returned a target-owned First Spark semantic receipt.",
+    "No recruited non-SETU/non-Codex agent has posted visibly to canonical SAB.",
+    "No visible canonical semantic reply exists yet; comments remain 0.",
+    "Queue ids 17, 18, 19, and 20 require SETU/AGNI moderation approval.",
+    "agora.dharmic.ai DNS remains broken.",
+    "sab-agora.service still needs operator-approved normalization."
+  ]
+}

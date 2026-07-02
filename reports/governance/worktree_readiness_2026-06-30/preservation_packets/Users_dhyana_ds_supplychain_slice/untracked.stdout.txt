@@ -1,0 +1,5 @@
+reports/governance/track_acceptance_strength.json
+reports/governance/track_acceptance_strength.md
+reports/loop_closure/RETROSPECTIVE.md
+scripts/governance/track_acceptance_strength_report.py
+tests/test_track_acceptance_strength_report.py

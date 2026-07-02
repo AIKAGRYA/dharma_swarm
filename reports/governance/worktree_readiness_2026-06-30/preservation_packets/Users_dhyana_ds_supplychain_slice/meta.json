@@ -1,0 +1,11 @@
+{
+  "path": "/Users/dhyana/ds_supplychain_slice",
+  "observed_at": "2026-06-29T16:34:38.150777+00:00",
+  "branch": "loop-closure/supplychain-bronze-20260620",
+  "head": "11de04fb743ff9b02a293b248d579bf02fe8fd38",
+  "status_short_file": "status_short.stdout.txt",
+  "status_porcelain_v2_file": "status_porcelain_v2.stdout.txt",
+  "diff_stat_file": "diff_stat.stdout.txt",
+  "cached_diff_stat_file": "cached_diff_stat.stdout.txt",
+  "untracked_manifest_file": "untracked.stdout.txt"
+}

@@ -51,6 +51,97 @@ from dharma_swarm.yoga_node import ConstraintVerdict, YogaScheduler
 
 logger = logging.getLogger(__name__)
 
+_FALSE_ENV_VALUES = {"0", "false", "no", "off", "disabled"}
+_TASK_MEMORY_PALACE_INGEST_TIMEOUT_SECONDS = 15.0
+
+
+def _env_enabled(name: str, *, default: bool = True) -> bool:
+    """Return a boolean feature flag from the environment."""
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() not in _FALSE_ENV_VALUES
+
+
+def _task_memory_palace_ingest_enabled() -> bool:
+    """Whether task-output MemoryPalace ingestion should run."""
+    return _env_enabled("DGC_TASK_MEMORY_PALACE_INGESTION", default=True)
+
+
+def _task_memory_palace_ingest_timeout_seconds() -> float:
+    raw = os.getenv("DGC_TASK_MEMORY_PALACE_INGEST_TIMEOUT_SECONDS")
+    if raw is None:
+        return _TASK_MEMORY_PALACE_INGEST_TIMEOUT_SECONDS
+    try:
+        return max(0.1, float(raw))
+    except ValueError:
+        logger.debug(
+            "Invalid DGC_TASK_MEMORY_PALACE_INGEST_TIMEOUT_SECONDS=%r; using %.1fs",
+            raw,
+            _TASK_MEMORY_PALACE_INGEST_TIMEOUT_SECONDS,
+        )
+        return _TASK_MEMORY_PALACE_INGEST_TIMEOUT_SECONDS
+
+
+def _run_memory_palace_ingest_sync(
+    *,
+    state_dir: Path,
+    content: str,
+    source: str,
+    layer: str,
+    tags: list[str],
+) -> str:
+    """Run MemoryPalace ingestion in a worker thread.
+
+    MemoryPalace.ingest is async by signature, but its persistent VectorStore and
+    LanceDB side effects are currently synchronous before any meaningful await.
+    Calling it directly from the live orchestrator event loop can starve pulse
+    liveness. Keep all construction and ingestion inside the worker thread.
+    """
+    from dharma_swarm.memory_palace import MemoryPalace
+
+    palace = MemoryPalace(state_dir=state_dir)
+    return asyncio.run(
+        palace.ingest(
+            content=content,
+            source=source,
+            layer=layer,
+            tags=tags,
+        )
+    )
+
+
+async def _memory_palace_ingest_background(
+    *,
+    state_dir: Path,
+    content: str,
+    source: str,
+    layer: str = "working",
+    tags: list[str] | None = None,
+) -> str:
+    """Bound task-result MemoryPalace ingestion off the main event loop."""
+    timeout_s = _task_memory_palace_ingest_timeout_seconds()
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(
+                _run_memory_palace_ingest_sync,
+                state_dir=state_dir,
+                content=content,
+                source=source,
+                layer=layer,
+                tags=list(tags or []),
+            ),
+            timeout=timeout_s,
+        )
+    except TimeoutError:
+        logger.warning(
+            "MemoryPalace task-output ingest timed out after %.1fs; continuing live loop",
+            timeout_s,
+        )
+    except Exception as exc:
+        logger.debug("MemoryPalace ingest failed (non-fatal): %s", exc)
+    return ""
+
 
 @runtime_checkable
 class TaskBoard(Protocol):
@@ -2509,12 +2600,25 @@ class Orchestrator:
                 captured["exc"] = exc
                 status, err_source, err_detail = "failed", "internal_error", str(exc)
             finished = datetime.now(timezone.utc)
+            route_metadata = (
+                Orchestrator._runner_served_route_metadata(runner)
+                or (
+                    Orchestrator._runner_no_provider_execution_metadata(runner)
+                    or Orchestrator._runner_unproven_provider_execution_metadata(runner)
+                    if status == "ok"
+                    else Orchestrator._runner_attempted_route_metadata(runner)
+                    or Orchestrator._runner_no_provider_execution_metadata(runner)
+                )
+            )
+            served_provider = str(route_metadata.get("actual_served_provider") or "")
+            served_model = str(route_metadata.get("actual_served_model") or "")
             return EvidenceReceipt(
                 trace_id=str(ident.get("trace_id", "") or ""),
                 context_id=context_id,
                 task_id=td.task_id,
                 agent_id=agent_id,
-                provider="orchestrator",
+                provider=served_provider,
+                model=served_model,
                 operation="invoke_agent",
                 provider_attempted=True,
                 status=status,
@@ -2524,7 +2628,7 @@ class Orchestrator:
                 finished_at=finished,
                 latency_ms=int((finished - started).total_seconds() * 1000),
                 routing_decision_id=routing.decision_id,
-                attributes={"router": "orchestrator_dispatch"},
+                attributes={"router": "orchestrator_dispatch", **route_metadata},
             )
 
         captured["_task_obj"] = task
@@ -3126,13 +3230,13 @@ class Orchestrator:
             )
 
         # Fix 2: Feed result into MemoryPalace for cross-session semantic recall.
-        # Even with TF-IDF only (sqlite-vec not installed), this builds the corpus
-        # that future vector/hybrid search will query.
-        try:
-            from dharma_swarm.memory_palace import MemoryPalace
-            palace = MemoryPalace(state_dir=self._runtime_root())
+        # Persistent VectorStore/LanceDB writes are synchronous under the async
+        # MemoryPalace.ingest signature, so run the whole ingestion path off the
+        # main event loop. Pulse liveness must not depend on semantic indexing.
+        if _task_memory_palace_ingest_enabled():
             _t_palace = asyncio.create_task(
-                palace.ingest(
+                _memory_palace_ingest_background(
+                    state_dir=self._runtime_root(),
                     content=result,
                     source=f"task:{task.id[:8]}:{task.title[:60]}",
                     layer="working",
@@ -3145,8 +3249,8 @@ class Orchestrator:
                     if not t.cancelled() and t.exception() else None
                 )
             )
-        except Exception as exc:
-            logger.debug("MemoryPalace ingest failed (non-fatal): %s", exc)
+        else:
+            logger.debug("MemoryPalace task-output ingest disabled by env")
 
         # Leave stigmergic mark
         try:

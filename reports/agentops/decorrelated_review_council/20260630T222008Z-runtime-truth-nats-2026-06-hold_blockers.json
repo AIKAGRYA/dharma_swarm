@@ -1,0 +1,220 @@
+{
+  "blockers": [
+    "minimaxm3: verdict=insufficient_context",
+    "minimaxm3: disagreement=I cannot agree or disagree on the pass/approve claim because the ten original requirements are not visible to me. The evidence presented is internally consistent and appears strong, but per the review rules I must not certify satisfaction o"
+  ],
+  "conviction_gate": "hold_blockers",
+  "critic_count": 6,
+  "critics": [
+    {
+      "actual_model": "glm-5.2",
+      "lane_id": "glm52",
+      "latency_ms": 49209,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "Retry via :retry:<uuid> side-effect keys with retry_blocked and completed-only duplicate success path",
+          "Max-delivery DLQ publish to dharma.dlq.<stream>.<consumer> with NATS_MAX_DELIVER_EXHAUSTED before original ack",
+          "Canonical envelope dharma.nats.envelope.v1 with message_id, trace/span/parent/correlation/causation, actors, subject, kind, payload, Nats-Msg-Id",
+          "ensure_stream_topology() declaring DS_TASKS and DS_DLQ",
+          "ensure_task_consumer() declaring explicit ack durable consumer with max_deliveries",
+          "A2ANatsTransport rejecting non-A2AServer(require_execution_identity=True) consume server",
+          "Cloud contact ingress delegating to A2ANatsTransport.publish_task with contract-checked runtime script boundaries",
+          "tests/test_nats_transport.py and tests/test_nats_substrate_contract.py coverage list including publish failure retry, consume redelivery, stale started, in-progress duplicate nack, ack failure truth, DLQ, identity guard, envelope/header, durable topology, negative contract failures",
+          "Active-track completion criteria as executable command_passes gates not string checks",
+          "Stale a2a_nats_contact.py and a2a_core_contact.py not declared in owned surfaces",
+          "Closeout packet scoping local/offline and keeping track ACTIVE pending operator lifecycle review",
+          "pytest tests/test_nats_transport.py tests/test_nats_substrate_contract.py -q -> 17 passed",
+          "make nats-substrate-contract -> 71 passed",
+          "Broader suite pytest -> 210 passed",
+          "check_track_status.py -> NATS track SHIPPABLE, 2/2 executable criteria passed",
+          "check_nats_substrate_contract.py -> NATS_CONTRACT_OK"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "The evidence summary for runtime-truth-nats-2026-06 addresses all ten original requirements for the scoped local/offline NATS substrate hardening slice. Retry semantics, DLQ failure handling with post-DLQ ack ordering, canonical envelope v1 with trace context, explicit durable consumer topology with max_deliveries, identity-required server guard, contract-checked runtime script boundaries, executable completion criteria, real-file ownership with stale files excluded, and an ACTIVE-track closeout packet with explicit local/offline scoping are all described with concrete implementation details. Verified command outputs (17 passed, 71 passed, 210 passed, SHIPPABLE 2/2, NATS_CONTRACT_OK) are internally consistent and span the relevant test surfaces. No unresolved blocker is identifiable from the provided evidence.",
+        "verdict": "pass"
+      },
+      "provider": "ollama",
+      "raw_response": "{\"verdict\":\"pass\",\"score\":100,\"summary\":\"The evidence summary for runtime-truth-nats-2026-06 addresses all ten original requirements for the scoped local/offline NATS substrate hardening slice. Retry semantics, DLQ failure handling with post-DLQ ack ordering, canonical envelope v1 with trace context, explicit durable consumer topology with max_deliveries, identity-required server guard, contract-checked runtime script boundaries, executable completion criteria, real-file ownership with stale files excluded, and an ACTIVE-track closeout packet with explicit local/offline scoping are all described with concrete implementation details. Verified command outputs (17 passed, 71 passed, 210 passed, SHIPPABLE 2/2, NATS_CONTRACT_OK) are internally consistent and span the relevant test surfaces. No unresolved blocker is identifiable from the provided evidence.\",\"blockers\":[],\"required_changes\":[],\"evidence_checked\":[\"Retry via :retry:<uuid> side-effect keys with retry_blocked and completed-only duplicate success path\",\"Max-delivery DLQ publish to dharma.dlq.<stream>.<consumer> with NATS_MAX_DELIVER_EXHAUSTED before original ack\",\"Canonical envelope dharma.nats.envelope.v1 with message_id, trace/span/parent/correlation/causation, actors, subject, kind, payload, Nats-Msg-Id\",\"ensure_stream_topology() declaring DS_TASKS and DS_DLQ\",\"ensure_task_consumer() declaring explicit ack durable consumer with max_deliveries\",\"A2ANatsTransport rejecting non-A2AServer(require_execution_identity=True) consume server\",\"Cloud contact ingress delegating to A2ANatsTransport.publish_task with contract-checked runtime script boundaries\",\"tests/test_nats_transport.py and tests/test_nats_substrate_contract.py coverage list including publish failure retry, consume redelivery, stale started, in-progress duplicate nack, ack failure truth, DLQ, identity guard, envelope/header, durable topology, negative contract failures\",\"Active-track completion criteria as executable command_passes gates not string checks\",\"Stale a2a_nats_contact.py and a2a_core_contact.py not declared in owned surfaces\",\"Closeout packet scoping local/offline and keeping track ACTIVE pending operator lifecycle review\",\"pytest tests/test_nats_transport.py tests/test_nats_substrate_contract.py -q -> 17 passed\",\"make nats-substrate-contract -> 71 passed\",\"Broader suite pytest -> 210 passed\",\"check_track_status.py -> NATS track SHIPPABLE, 2/2 executable criteria passed\",\"check_nats_substrate_contract.py -> NATS_CONTRACT_OK\"],\"explicit_disagreement\":\"\"}",
+      "requested_model": "glm-5.2:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "kimi-k2.7-code",
+      "lane_id": "kimi27code",
+      "latency_ms": 16357,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "pytest tests/test_nats_transport.py tests/test_nats_substrate_contract.py -q -> 17 passed",
+          "make nats-substrate-contract -> 71 passed",
+          "pytest tests/test_a2a.py tests/test_a2a_e2e.py tests/test_a2a_spec_conformance.py tests/test_spine_persistence_invariant.py tests/test_runtime_truth_spine_v1.py tests/test_runtime_truth_spine_v2_evidence.py tests/test_a2a_cloud_contact.py tests/test_track_portfolio.py -q -> 210 passed",
+          "./.venv/bin/python scripts/governance/check_track_status.py -> NATS track SHIPPABLE, 2/2 executable criteria passed",
+          "./.venv/bin/python scripts/governance/check_nats_substrate_contract.py -> NATS_CONTRACT_OK",
+          "retry via :retry:<uuid> side-effect keys with retry_blocked in-progress and completed-only duplicate success path",
+          "max-delivery DLQ publish dharma.nats.dlq_failure.v1 to dharma.dlq.<stream>.<consumer> with NATS_MAX_DELIVER_EXHAUSTED then ack original",
+          "canonical envelope dharma.nats.envelope.v1 with message_id, trace/span/parent/correlation/causation, actors, subject, kind, payload, Nats-Msg-Id",
+          "ensure_stream_topology() declares DS_TASKS and DS_DLQ; ensure_task_consumer() declares explicit ack durable consumer with max_deliveries",
+          "A2ANatsTransport rejects supplied consume server unless A2AServer(require_execution_identity=True)",
+          "cloud contact ingress delegates to A2ANatsTransport.publish_task with contract checker allowed/honest boundary checks",
+          "active-track NATS completion criteria are executable command_passes gates",
+          "real owned surfaces; stale a2a_nats_contact.py and a2a_core_contact.py not declared",
+          "closeout packet scopes local/offline and keeps track ACTIVE pending operator lifecycle review"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "All ten scoped local/offline NATS substrate requirements are satisfied by concrete evidence: retry side-effect keys, DLQ typed failure publishing with ack-after-DLQ semantics, canonical envelope with required headers, durable stream/consumer topology, identity-required server guard, cloud contact ingress delegation, comprehensive passing test coverage (17 + 71 + 210), executable active-track criteria, real owned surfaces, and a closeout packet that keeps the track ACTIVE pending operator lifecycle review. Verified commands pass and contract checks report OK/SHIPPABLE.",
+        "verdict": "pass"
+      },
+      "provider": "ollama",
+      "raw_response": "{\"verdict\":\"pass\",\"score\":100,\"summary\":\"All ten scoped local/offline NATS substrate requirements are satisfied by concrete evidence: retry side-effect keys, DLQ typed failure publishing with ack-after-DLQ semantics, canonical envelope with required headers, durable stream/consumer topology, identity-required server guard, cloud contact ingress delegation, comprehensive passing test coverage (17 + 71 + 210), executable active-track criteria, real owned surfaces, and a closeout packet that keeps the track ACTIVE pending operator lifecycle review. Verified commands pass and contract checks report OK/SHIPPABLE.\",\"blockers\":[],\"required_changes\":[],\"evidence_checked\":[\"pytest tests/test_nats_transport.py tests/test_nats_substrate_contract.py -q -> 17 passed\",\"make nats-substrate-contract -> 71 passed\",\"pytest tests/test_a2a.py tests/test_a2a_e2e.py tests/test_a2a_spec_conformance.py tests/test_spine_persistence_invariant.py tests/test_runtime_truth_spine_v1.py tests/test_runtime_truth_spine_v2_evidence.py tests/test_a2a_cloud_contact.py tests/test_track_portfolio.py -q -> 210 passed\",\"./.venv/bin/python scripts/governance/check_track_status.py -> NATS track SHIPPABLE, 2/2 executable criteria passed\",\"./.venv/bin/python scripts/governance/check_nats_substrate_contract.py -> NATS_CONTRACT_OK\",\"retry via :retry:<uuid> side-effect keys with retry_blocked in-progress and completed-only duplicate success path\",\"max-delivery DLQ publish dharma.nats.dlq_failure.v1 to dharma.dlq.<stream>.<consumer> with NATS_MAX_DELIVER_EXHAUSTED then ack original\",\"canonical envelope dharma.nats.envelope.v1 with message_id, trace/span/parent/correlation/causation, actors, subject, kind, payload, Nats-Msg-Id\",\"ensure_stream_topology() declares DS_TASKS and DS_DLQ; ensure_task_consumer() declares explicit ack durable consumer with max_deliveries\",\"A2ANatsTransport rejects supplied consume server unless A2AServer(require_execution_identity=True)\",\"cloud contact ingress delegates to A2ANatsTransport.publish_task with contract checker allowed/honest boundary checks\",\"active-track NATS completion criteria are executable command_passes gates\",\"real owned surfaces; stale a2a_nats_contact.py and a2a_core_contact.py not declared\",\"closeout packet scopes local/offline and keeps track ACTIVE pending operator lifecycle review\"],\"explicit_disagreement\":\"\"}",
+      "requested_model": "kimi-k2.7-code:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "qwen3-coder:480b-cloud",
+      "lane_id": "qwen3coder",
+      "latency_ms": 18414,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "Failed/stale publish and consume records retry via `:retry:<uuid>` side-effect keys",
+          "Max-delivery consume failure publishes typed `dharma.nats.dlq_failure.v1` to `dharma.dlq.<stream>.<consumer>`",
+          "Canonical envelope is `dharma.nats.envelope.v1` with required fields",
+          "`ensure_stream_topology()` declares `DS_TASKS` and `DS_DLQ`",
+          "`A2ANatsTransport` rejects consume server unless it is `A2AServer(require_execution_identity=True)`",
+          "Cloud contact ingress delegates to `A2ANatsTransport.publish_task`",
+          "Tests cover publish failure retry, consume failure redelivery, stale started records, in-progress duplicate nack, ack failure truth, DLQ, identity-required server guard, canonical envelope/header, durable topology, and negative contract-checker failures",
+          "Active-track NATS completion criteria are executable `command_passes` gates",
+          "Current owned surfaces are real files; stale files are not declared",
+          "Closeout packet exists, explicitly scopes local/offline, and keeps the track ACTIVE pending operator lifecycle review"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "The local/offline NATS substrate hardening slice satisfies all ten original requirements. Evidence demonstrates robust retry mechanisms, DLQ handling, canonical envelope usage, explicit ack durable consumers, identity-required server guards, comprehensive test coverage, and adherence to contract checks. The track remains ACTIVE as required until operator lifecycle review.",
+        "verdict": "pass"
+      },
+      "provider": "ollama",
+      "raw_response": "{\n  \"verdict\": \"pass\",\n  \"score\": 100,\n  \"summary\": \"The local/offline NATS substrate hardening slice satisfies all ten original requirements. Evidence demonstrates robust retry mechanisms, DLQ handling, canonical envelope usage, explicit ack durable consumers, identity-required server guards, comprehensive test coverage, and adherence to contract checks. The track remains ACTIVE as required until operator lifecycle review.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"Failed/stale publish and consume records retry via `:retry:<uuid>` side-effect keys\",\n    \"Max-delivery consume failure publishes typed `dharma.nats.dlq_failure.v1` to `dharma.dlq.<stream>.<consumer>`\",\n    \"Canonical envelope is `dharma.nats.envelope.v1` with required fields\",\n    \"`ensure_stream_topology()` declares `DS_TASKS` and `DS_DLQ`\",\n    \"`A2ANatsTransport` rejects consume server unless it is `A2AServer(require_execution_identity=True)`\",\n    \"Cloud contact ingress delegates to `A2ANatsTransport.publish_task`\",\n    \"Tests cover publish failure retry, consume failure redelivery, stale started records, in-progress duplicate nack, ack failure truth, DLQ, identity-required server guard, canonical envelope/header, durable topology, and negative contract-checker failures\",\n    \"Active-track NATS completion criteria are executable `command_passes` gates\",\n    \"Current owned surfaces are real files; stale files are not declared\",\n    \"Closeout packet exists, explicitly scopes local/offline, and keeps the track ACTIVE pending operator lifecycle review\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "qwen3-coder:480b-cloud",
+      "required": true
+    },
+    {
+      "actual_model": "deepseek-v4-pro",
+      "lane_id": "deepseekv4pro",
+      "latency_ms": 14568,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "retry and stale record handling with side-effect keys",
+          "DLQ publishing on max-delivery exhaustion",
+          "canonical envelope structure and headers",
+          "stream and consumer topology declaration",
+          "A2ANatsTransport identity guard",
+          "cloud contact delegation to A2ANatsTransport",
+          "test coverage for publish/consume failure, DLQ, identity, envelope, topology, and contract negatives",
+          "executable command_passes criteria (make nats-substrate-contract, check_nats_substrate_contract)",
+          "real file ownership (no stale a2a_nats_contact.py or a2a_core_contact.py)",
+          "closeout packet with local/offline scoping and ACTIVE track status"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "All ten original requirements for the scoped local/offline NATS substrate slice are satisfied. Evidence includes retry/DLQ logic, canonical envelope, topology/consumer setup, identity guard, contract checks, comprehensive test coverage (17+71+210 tests passing), executable criteria gates, and a closeout packet that keeps the track ACTIVE pending operator lifecycle review. No blockers remain.",
+        "verdict": "pass"
+      },
+      "provider": "ollama",
+      "raw_response": "{\n  \"verdict\": \"pass\",\n  \"score\": 100,\n  \"summary\": \"All ten original requirements for the scoped local/offline NATS substrate slice are satisfied. Evidence includes retry/DLQ logic, canonical envelope, topology/consumer setup, identity guard, contract checks, comprehensive test coverage (17+71+210 tests passing), executable criteria gates, and a closeout packet that keeps the track ACTIVE pending operator lifecycle review. No blockers remain.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"retry and stale record handling with side-effect keys\",\n    \"DLQ publishing on max-delivery exhaustion\",\n    \"canonical envelope structure and headers\",\n    \"stream and consumer topology declaration\",\n    \"A2ANatsTransport identity guard\",\n    \"cloud contact delegation to A2ANatsTransport\",\n    \"test coverage for publish/consume failure, DLQ, identity, envelope, topology, and contract negatives\",\n    \"executable command_passes criteria (make nats-substrate-contract, check_nats_substrate_contract)\",\n    \"real file ownership (no stale a2a_nats_contact.py or a2a_core_contact.py)\",\n    \"closeout packet with local/offline scoping and ACTIVE track status\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "deepseek-v4-pro:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "minimax-m3",
+      "lane_id": "minimaxm3",
+      "latency_ms": 25375,
+      "ok": true,
+      "parsed": {
+        "blockers": [
+          "The ten original requirements referenced by the prompt are not included in the review packet, so compliance cannot be evaluated requirement-by-requirement.",
+          "The original 55/100 rejection criteria are not provided, so I cannot assess whether the specific gaps that produced that score have been addressed."
+        ],
+        "evidence_checked": [
+          "Claim: 17 passed in test_nats_transport.py + test_nats_substrate_contract.py - command output shown",
+          "Claim: make nats-substrate-contract -> 71 passed - command output shown",
+          "Claim: 210 passed across broader A2A/spine/runtime-truth/track-portfolio tests - command output shown",
+          "Claim: check_track_status.py -> NATS SHIPPABLE 2/2 executable criteria - command output shown",
+          "Claim: check_nats_substrate_contract.py -> NATS_CONTRACT_OK - command output shown",
+          "Scope constraint: local/offline explicitly scoped and track kept ACTIVE - stated in closeout packet description",
+          "Consistency check: retry/DLQ/envelope/topology/identity-guard claims align with the test names listed"
+        ],
+        "explicit_disagreement": "I cannot agree or disagree on the pass/approve claim because the ten original requirements are not visible to me. The evidence presented is internally consistent and appears strong, but per the review rules I must not certify satisfaction of requirements I have not been shown.",
+        "required_changes": [
+          "Provide the enumerated list of the ten original requirements (or the full original 55/100 rejection packet) so the evidence can be mapped requirement-by-requirement.",
+          "For each of the ten requirements, cite the concrete evidence line (test name, command output, file, or check result) that demonstrates satisfaction; the current summary bundles claims without per-requirement traceability."
+        ],
+        "score": 0,
+        "summary": "The prompt asks me to verify that the evidence satisfies 'all ten original requirements' for the scoped local/offline NATS slice, but those ten requirements are never enumerated in the prompt or evidence provided. I can see the evidence summary, the verified commands, and the scope constraints, but I cannot map the listed evidence to specific original requirements I have not been shown. The internal consistency of the evidence (17+71+210 tests passing, NATS_CONTRACT_OK, track SHIPPABLE 2/2, local/offline scoping preserved, track kept ACTIVE) is plausibly strong, but without the ten original requirements I cannot certify the claim. The earlier 55/100 rejection rationale is also not provided, so I cannot assess whether the gaps that drove that score have been closed.",
+        "verdict": "insufficient_context"
+      },
+      "provider": "ollama",
+      "raw_response": "{\"verdict\":\"insufficient_context\",\"score\":0,\"summary\":\"The prompt asks me to verify that the evidence satisfies 'all ten original requirements' for the scoped local/offline NATS slice, but those ten requirements are never enumerated in the prompt or evidence provided. I can see the evidence summary, the verified commands, and the scope constraints, but I cannot map the listed evidence to specific original requirements I have not been shown. The internal consistency of the evidence (17+71+210 tests passing, NATS_CONTRACT_OK, track SHIPPABLE 2/2, local/offline scoping preserved, track kept ACTIVE) is plausibly strong, but without the ten original requirements I cannot certify the claim. The earlier 55/100 rejection rationale is also not provided, so I cannot assess whether the gaps that drove that score have been closed.\",\"blockers\":[\"The ten original requirements referenced by the prompt are not included in the review packet, so compliance cannot be evaluated requirement-by-requirement.\",\"The original 55/100 rejection criteria are not provided, so I cannot assess whether the specific gaps that produced that score have been addressed.\"],\"required_changes\":[\"Provide the enumerated list of the ten original requirements (or the full original 55/100 rejection packet) so the evidence can be mapped requirement-by-requirement.\",\"For each of the ten requirements, cite the concrete evidence line (test name, command output, file, or check result) that demonstrates satisfaction; the current summary bundles claims without per-requirement traceability.\"],\"evidence_checked\":[\"Claim: 17 passed in test_nats_transport.py + test_nats_substrate_contract.py - command output shown\",\"Claim: make nats-substrate-contract -> 71 passed - command output shown\",\"Claim: 210 passed across broader A2A/spine/runtime-truth/track-portfolio tests - command output shown\",\"Claim: check_track_status.py -> NATS SHIPPABLE 2/2 executable criteria - command output shown\",\"Claim: check_nats_substrate_contract.py -> NATS_CONTRACT_OK - command output shown\",\"Scope constraint: local/offline explicitly scoped and track kept ACTIVE - stated in closeout packet description\",\"Consistency check: retry/DLQ/envelope/topology/identity-guard claims align with the test names listed\"],\"explicit_disagreement\":\"I cannot agree or disagree on the pass/approve claim because the ten original requirements are not visible to me. The evidence presented is internally consistent and appears strong, but per the review rules I must not certify satisfaction of requirements I have not been shown.\"}",
+      "requested_model": "minimax-m3:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "nvidia/nemotron-3-ultra-550b-a55b-20260604:free",
+      "lane_id": "nemotron3ultra",
+      "latency_ms": 9914,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "pytest tests/test_nats_transport.py tests/test_nats_substrate_contract.py -q (17 passed)",
+          "make nats-substrate-contract (71 passed)",
+          "pytest broader suite (210 passed)",
+          "./.venv/bin/python scripts/governance/check_track_status.py (SHIPPABLE, 2/2 criteria)",
+          "./.venv/bin/python scripts/governance/check_nats_substrate_contract.py (NATS_CONTRACT_OK)"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "All ten original requirements for the local/offline NATS substrate hardening slice are satisfied by the provided evidence. Retry mechanics, DLQ handling, canonical envelope, durable topology, identity guard, cloud contact delegation, comprehensive test coverage (17+71+210 tests passing), executable completion criteria, clean owned surfaces, and a valid closeout packet scoping local/offline while keeping the track ACTIVE pending operator lifecycle review are all verified. Governance checks report SHIPPABLE with 2/2 executable criteria passed and NATS_CONTRACT_OK.",
+        "verdict": "pass"
+      },
+      "provider": "openrouter_free",
+      "raw_response": "{\n\"verdict\": \"pass\",\n  \"score\": 100,\n  \"summary\": \"All ten original requirements for the local/offline NATS substrate hardening slice are satisfied by the provided evidence. Retry mechanics, DLQ handling, canonical envelope, durable topology, identity guard, cloud contact delegation, comprehensive test coverage (17+71+210 tests passing), executable completion criteria, clean owned surfaces, and a valid closeout packet scoping local/offline while keeping the track ACTIVE pending operator lifecycle review are all verified. Governance checks report SHIPPABLE with 2/2 executable criteria passed and NATS_CONTRACT_OK.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"pytest tests/test_nats_transport.py tests/test_nats_substrate_contract.py -q (17 passed)\",\n    \"make nats-substrate-contract (71 passed)\",\n    \"pytest broader suite (210 passed)\",\n    \"./.venv/bin/python scripts/governance/check_track_status.py (SHIPPABLE, 2/2 criteria)\",\n    \"./.venv/bin/python scripts/governance/check_nats_substrate_contract.py (NATS_CONTRACT_OK)\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "required": true
+    }
+  ],
+  "generated_at": "20260630T222008Z",
+  "max_evidence_chars": 0,
+  "max_output_tokens": 1000,
+  "persistent_agent_witness": {
+    "agent": "palantir-pilot",
+    "blocker": "",
+    "fresh": true,
+    "heartbeat_age_seconds": 23,
+    "heartbeat_timestamp": "2026-06-30T22:19:45Z",
+    "max_heartbeat_age_seconds": 300,
+    "raw_status": "status=running session=dharma_palantir_pilot_a2a_worker\nsubject=dharma.a2a.palantir-pilot\nconsumer=palantir_pilot_a2a\nstream=DHARMA_FLEET\nheartbeat=/Users/dhyana/.dharma/a2a_bus/worker_heartbeats/palantir-pilot.json\nlog=/Users/dhyana/.dharma/logs/palantir_pilot_a2a_worker/dharma_palantir_pilot_a2a_worker.log\n--- heartbeat ---\n{\n    \"agent_id\": \"palantir_pilot\",\n    \"callsign\": \"palantir-pilot\",\n    \"consumer\": \"palantir_pilot_a2a\",\n    \"cycle\": 882,\n    \"last_receipt_path\": \"\",\n    \"receipt_count\": 0,\n    \"schema_version\": \"dharma.a2a.palantir_pilot.worker_heartbeat.v1\",\n    \"status\": \"IDLE\",\n    \"stream\": \"DHARMA_FLEET\",\n    \"subject\": \"dharma.a2a.palantir-pilot\",\n    \"suppress_no_messages\": true,\n    \"timestamp\": \"2026-06-30T22:19:45Z\"\n}\n--- consumer ---\n{\n  \"stream_name\": \"DHARMA_FLEET\",\n  \"name\": \"palantir_pilot_a2a\",\n  \"config\": {\n    \"ack_policy\": \"explicit\",\n    \"ack_wait\": 30000000000,\n    \"deliver_policy\": \"all\",\n    \"durable_name\": \"palantir_pilot_a2a\",\n    \"name\": \"palantir_pilot_a2a\",\n    \"filter_subject\": \"dharma.a2a.palantir-pilot\",\n    \"max_ack_pending\": 1000,\n    \"max_deliver\": -1,\n    \"max_waiting\": 512,\n    \"replay_policy\": \"instant\",\n    \"num_replicas\": 0,\n    \"metadata\": {\n      \"_nats.level\": \"3\",\n      \"_nats.req.level\": \"0\",\n      \"_nats.ver\": \"2.12.6\"\n    },\n    \"pause_until\": \"0001-01-01T00:00:00Z\"\n  },\n  \"created\": \"2026-06-15T16:08:32.524099Z\",\n  \"delivered\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"ack_floor\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"num_ack_pending\": 0,\n  \"num_redelivered\": 0,\n  \"num_waiting\": 1,\n  \"num_pending\": 0,\n  \"ts\": \"2026-06-30T22:20:08.345049Z\"\n}\n--- latest worker receipts ---\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260618T014416Z-palantir-pilot-codex_hardened_spec_notice_20260618T0155Z_palantir-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260618T013101Z-palantir-pilot-palantir_a2a_hardening_20260618T0001Z-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260617T135931Z-palantir-pilot-longrun_spec_95_vote_20260617T135751Z-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260617T131705Z-palantir-pilot-7215f005165f-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260617T130349Z-palantir-pilot-761445fa892d-PALANTIR_PILOT_REPLIED.json\n",
+    "status": "running"
+  },
+  "prompt_chars": 3172,
+  "prompt_file": "/Users/dhyana/dharma_swarm/reports/agentops/decorrelated_review_council/prompts/runtime_truth_nats_20260701_ultra_compact.md",
+  "prompt_words_estimate": 308,
+  "required_critic_count": 6,
+  "schema_version": "codex.decorrelated_review_council.v1",
+  "score_avg": 83.33,
+  "score_min": 0,
+  "target_score": 100,
+  "timeout_seconds": 900
+}

@@ -1,0 +1,251 @@
+diff --git a/reports/governance/active_track_evidence.json b/reports/governance/active_track_evidence.json
+index 48d1ebe1f..9a8158052 100644
+--- a/reports/governance/active_track_evidence.json
++++ b/reports/governance/active_track_evidence.json
+@@ -1,5 +1,5 @@
+ {
+-  "generated_at": "2026-06-20T12:43:51+09:00",
++  "generated_at": "2026-06-25T00:27:03+09:00",
+   "schema_version": 2,
+   "active_track_id": "runtime-truth-reconciliation-2026-06",
+   "shippable": true,
+@@ -98,7 +98,7 @@
+     "active": 6,
+     "max_active": 10,
+     "warn_active": 5,
+-    "shippable": 4
++    "shippable": 5
+   },
+   "spine_objectives": [
+     {
+@@ -417,10 +417,10 @@
+       "verified_at": "2026-06-11",
+       "ttl_days": 21,
+       "owner": "@AmitabhainArunachala",
+-      "shippable": false,
++      "shippable": true,
+       "prerequisites_ok": true,
+       "completion_progress": {
+-        "passed": 4,
++        "passed": 5,
+         "total": 5
+       },
+       "criteria": [
+@@ -463,8 +463,8 @@
+         {
+           "id": "campaign_retrospective_exists",
+           "kind": "file_exists",
+-          "passed": false,
+-          "detail": "reports/loop_closure/RETROSPECTIVE.md MISSING"
++          "passed": true,
++          "detail": "reports/loop_closure/RETROSPECTIVE.md present"
+         }
+       ]
+     },
+@@ -749,8 +749,8 @@
+     },
+     {
+       "severity": "INFO",
+-      "check": "track-in-progress:loop-closure-2026-06",
+-      "message": "[loop-closure-2026-06] 4/5 completion criteria pass.",
++      "check": "track-shippable:loop-closure-2026-06",
++      "message": "[loop-closure-2026-06] all 5 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
+       "criterion_id": null
+     },
+     {
+diff --git a/reports/governance/active_track_evidence.md b/reports/governance/active_track_evidence.md
+index 9c9ea2782..ac88bfd4a 100644
+--- a/reports/governance/active_track_evidence.md
++++ b/reports/governance/active_track_evidence.md
+@@ -1,7 +1,7 @@
+ # Track Portfolio Evidence
+ 
+-Generated: 2026-06-20T12:43:51+09:00 (schema v2)
+-Active tracks: **6** (warn 5, max 10) — shippable 4
++Generated: 2026-06-25T00:27:03+09:00 (schema v2)
++Active tracks: **6** (warn 5, max 10) — shippable 5
+ 
+ ## Spine coverage
+ 
+@@ -57,7 +57,7 @@ Active tracks: **6** (warn 5, max 10) — shippable 4
+   - ✓ `adoption_narrative_docs` (file_exists) — docs/architecture/SPINE_ADOPTION_NARRATIVE.md present
+   - ✓ `gate1_witnessed` (file_exists) — reports/governance/GATE1_WITNESSED.md present
+ 
+-## `loop-closure-2026-06` — 4/5
++## `loop-closure-2026-06` — SHIPPABLE
+ 
+ - serves: `substrate-nativeness` · complements: ['runtime-truth-reconciliation-2026-06'] · depends_on: [] · conflicts_with: []
+ - owned_surfaces: ['reports/loop_closure/**', 'CYBERNETIC_LOOP_MAP.md']
+@@ -69,7 +69,7 @@ Active tracks: **6** (warn 5, max 10) — shippable 4
+   - ✓ `phase0_fresh_status_table` (file_contains) — pattern 'Fresh 13-loop status table' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md
+   - ✓ `one_wire_invariant_stated` (file_contains) — pattern 'never let internal artifacts touch archive fitness' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md
+   - ✓ `loop1_closure_receipt_exists` (file_exists) — reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md present
+-  - ✗ `campaign_retrospective_exists` (file_exists) — reports/loop_closure/RETROSPECTIVE.md MISSING
++  - ✓ `campaign_retrospective_exists` (file_exists) — reports/loop_closure/RETROSPECTIVE.md present
+ 
+ ## `truth-graph-platform-2026-06` — SHIPPABLE
+ 
+@@ -120,6 +120,6 @@ Active tracks: **6** (warn 5, max 10) — shippable 4
+ - **INFO** `track-shippable:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] all 11 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
+ - **INFO** `track-shippable:runtime-truth-nats-2026-06`: [runtime-truth-nats-2026-06] all 2 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
+ - **INFO** `track-in-progress:runtime-truth-spine-adoption-2026-06`: [runtime-truth-spine-adoption-2026-06] 7/8 completion criteria pass.
+-- **INFO** `track-in-progress:loop-closure-2026-06`: [loop-closure-2026-06] 4/5 completion criteria pass.
++- **INFO** `track-shippable:loop-closure-2026-06`: [loop-closure-2026-06] all 5 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
+ - **INFO** `track-shippable:truth-graph-platform-2026-06`: [truth-graph-platform-2026-06] all 15 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
+ - **INFO** `track-shippable:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] all 6 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
+diff --git a/reports/governance/track_portfolio.json b/reports/governance/track_portfolio.json
+index 48d1ebe1f..9a8158052 100644
+--- a/reports/governance/track_portfolio.json
++++ b/reports/governance/track_portfolio.json
+@@ -1,5 +1,5 @@
+ {
+-  "generated_at": "2026-06-20T12:43:51+09:00",
++  "generated_at": "2026-06-25T00:27:03+09:00",
+   "schema_version": 2,
+   "active_track_id": "runtime-truth-reconciliation-2026-06",
+   "shippable": true,
+@@ -98,7 +98,7 @@
+     "active": 6,
+     "max_active": 10,
+     "warn_active": 5,
+-    "shippable": 4
++    "shippable": 5
+   },
+   "spine_objectives": [
+     {
+@@ -417,10 +417,10 @@
+       "verified_at": "2026-06-11",
+       "ttl_days": 21,
+       "owner": "@AmitabhainArunachala",
+-      "shippable": false,
++      "shippable": true,
+       "prerequisites_ok": true,
+       "completion_progress": {
+-        "passed": 4,
++        "passed": 5,
+         "total": 5
+       },
+       "criteria": [
+@@ -463,8 +463,8 @@
+         {
+           "id": "campaign_retrospective_exists",
+           "kind": "file_exists",
+-          "passed": false,
+-          "detail": "reports/loop_closure/RETROSPECTIVE.md MISSING"
++          "passed": true,
++          "detail": "reports/loop_closure/RETROSPECTIVE.md present"
+         }
+       ]
+     },
+@@ -749,8 +749,8 @@
+     },
+     {
+       "severity": "INFO",
+-      "check": "track-in-progress:loop-closure-2026-06",
+-      "message": "[loop-closure-2026-06] 4/5 completion criteria pass.",
++      "check": "track-shippable:loop-closure-2026-06",
++      "message": "[loop-closure-2026-06] all 5 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
+       "criterion_id": null
+     },
+     {
+diff --git a/tests/test_canonical_replay.py b/tests/test_canonical_replay.py
+index 092bca034..41d3c26a5 100644
+--- a/tests/test_canonical_replay.py
++++ b/tests/test_canonical_replay.py
+@@ -286,9 +286,10 @@ async def test_replay_result_passed_requires_all_conditions():
+ async def test_canonical_replay_cli():
+     """CLI test runs successfully."""
+     import subprocess
++    import sys
+ 
+     result = subprocess.run(
+-        ["python3", "-m", "dharma_swarm.canonical_replay"],
++        [sys.executable, "-m", "dharma_swarm.canonical_replay"],
+         cwd=Path(__file__).parent.parent,
+         capture_output=True,
+         text=True,
+diff --git a/tests/test_constitutional_size_check.py b/tests/test_constitutional_size_check.py
+index 4def1faf4..960feb153 100644
+--- a/tests/test_constitutional_size_check.py
++++ b/tests/test_constitutional_size_check.py
+@@ -80,9 +80,10 @@ def test_enforce_constitutional_size_logs_result(caplog):
+ def test_constitutional_size_check_cli():
+     """CLI test can be run standalone."""
+     import subprocess
++    import sys
+ 
+     result = subprocess.run(
+-        ["python3", "-m", "dharma_swarm.constitutional_size_check"],
++        [sys.executable, "-m", "dharma_swarm.constitutional_size_check"],
+         cwd=Path(__file__).parent.parent,
+         capture_output=True,
+         text=True,
+diff --git a/tests/test_ginko_evolution.py b/tests/test_ginko_evolution.py
+index b1146e641..d0728bfd8 100644
+--- a/tests/test_ginko_evolution.py
++++ b/tests/test_ginko_evolution.py
+@@ -335,6 +335,13 @@ class TestPromptTournament:
+     @pytest.mark.asyncio
+     async def test_mutate_prompt_no_api_key(self, monkeypatch):
+         monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
++        async def _raise_missing_config(*args, **kwargs):
++            raise RuntimeError("missing_config")
++
++        monkeypatch.setattr(
++            "dharma_swarm.ginko_evolution.complete_via_preferred_runtime_providers",
++            _raise_missing_config,
++        )
+         t = PromptTournament()
+         result = await t.mutate_prompt("original prompt", {"success_rate": 0.5})
+         assert result == "original prompt"  # Safe fallback
+diff --git a/tests/test_godel_claw_e2e.py b/tests/test_godel_claw_e2e.py
+index 32166e6eb..f52fad240 100644
+--- a/tests/test_godel_claw_e2e.py
++++ b/tests/test_godel_claw_e2e.py
+@@ -267,11 +267,11 @@ async def test_canary_promote_and_rollback(tmp_dharma):
+ # === Scenario 7: All 11 gates fire ===
+ 
+ 
+-def test_all_eleven_gates_fire():
++def test_all_eleven_gates_fire(tmp_path):
+     """All 11 gates should be present and evaluated."""
+-    from dharma_swarm.telos_gates import TelosGatekeeper
++    from dharma_swarm.telos_gates import GateRegistry, TelosGatekeeper
+ 
+-    gk = TelosGatekeeper()
++    gk = TelosGatekeeper(registry=GateRegistry(tmp_path / "gate_proposals.jsonl"))
+     assert len(gk.GATES) == 11
+ 
+     result = gk.check(action="echo test")
+diff --git a/tests/test_organism_boot.py b/tests/test_organism_boot.py
+index c4e1e00ba..25571bae8 100644
+--- a/tests/test_organism_boot.py
++++ b/tests/test_organism_boot.py
+@@ -46,9 +46,9 @@ class TestOrganismBoot:
+         assert pulse.cycle_number == 1
+         assert pulse.is_healthy
+ 
+-    def test_organism_status(self):
++    def test_organism_status(self, tmp_path):
+         from dharma_swarm.organism import Organism
+-        org = Organism()
++        org = Organism(state_dir=tmp_path)
+         _run(org.boot())
+         status = org.status()
+         assert "vsm" in status
+diff --git a/tests/test_phase3_integration.py b/tests/test_phase3_integration.py
+index 558e31625..7e42574ac 100644
+--- a/tests/test_phase3_integration.py
++++ b/tests/test_phase3_integration.py
+@@ -34,9 +34,9 @@ class TestModelRoutingActivation:
+ class TestPalacePopulation:
+     """Test that agent outputs get indexed into the palace."""
+ 
+-    def test_organism_on_agent_output_ingests_to_palace(self):
++    def test_organism_on_agent_output_ingests_to_palace(self, tmp_path):
+         from dharma_swarm.organism import Organism
+-        org = Organism()
++        org = Organism(state_dir=tmp_path)
+         _run(org.boot())
+         _run(org.on_agent_output(
+             agent_id="test_agent",

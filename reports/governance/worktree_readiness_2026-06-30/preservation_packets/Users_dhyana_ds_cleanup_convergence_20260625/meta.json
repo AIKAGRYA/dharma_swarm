@@ -1,0 +1,11 @@
+{
+  "path": "/Users/dhyana/ds_cleanup_convergence_20260625",
+  "observed_at": "2026-06-29T16:34:33.837385+00:00",
+  "branch": "codex/governance-fitness-ci-20260625-225920",
+  "head": "791801e0fd9f9410df38166d53aa957a2f92e218",
+  "status_short_file": "status_short.stdout.txt",
+  "status_porcelain_v2_file": "status_porcelain_v2.stdout.txt",
+  "diff_stat_file": "diff_stat.stdout.txt",
+  "cached_diff_stat_file": "cached_diff_stat.stdout.txt",
+  "untracked_manifest_file": "untracked.stdout.txt"
+}

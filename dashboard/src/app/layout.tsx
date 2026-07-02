@@ -1,10 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import { Providers } from "./providers";
-import { Sidebar } from "@/components/layout/Sidebar";
-import { AmbientParticles } from "@/components/layout/AmbientParticles";
-import { ScanLines } from "@/components/layout/ScanLines";
-import { ChatOverlayWrapper } from "@/components/chat/ChatOverlayWrapper";
 import "./globals.css";
 
 // ---------------------------------------------------------------------------
@@ -53,22 +49,7 @@ export default function RootLayout({
       className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
     >
       <body className="min-h-screen bg-sumi-950 font-body text-torinoko antialiased">
-        <Providers>
-          {/* Ambient effects */}
-          <AmbientParticles />
-          <ScanLines />
-
-          {/* Layout shell: sidebar + main */}
-          <div className="flex min-h-screen overflow-x-hidden">
-            <Sidebar />
-            <main className="ml-[260px] min-w-0 w-[calc(100vw-260px)] max-w-[calc(100vw-260px)] flex-none overflow-x-hidden">
-              {children}
-            </main>
-          </div>
-
-          {/* Floating chat overlay */}
-          <ChatOverlayWrapper />
-        </Providers>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

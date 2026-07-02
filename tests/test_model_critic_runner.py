@@ -1,8 +1,11 @@
 import json
 import urllib.error
+from pathlib import Path
+from types import SimpleNamespace
 
 from dharma_swarm.operator_core.semantic_receipt import SCHEMA_VERSION
 import scripts.runtime.model_critic_runner as runner
+import scripts.runtime.cross_model_verification as cross_runner
 
 
 def _write_prompt(tmp_path):
@@ -171,3 +174,67 @@ def test_runner_repairs_malformed_ollama_semantic_receipt(tmp_path, monkeypatch)
     assert receipt["summary"] == repaired["summary"]
     assert receipt["model_runner"]["repair_attempts_allowed"] == 2
     assert receipt["model_runner"]["repair_attempts_used"] == 1
+
+
+def test_runner_can_call_runtime_provider_for_non_ollama(tmp_path, monkeypatch):
+    from dharma_swarm.models import LLMResponse, ProviderType
+
+    prompt_path = _write_prompt(tmp_path)
+    response_path = _write_mock_response(tmp_path)
+    response = response_path.read_text(encoding="utf-8")
+
+    class FakeProvider:
+        async def complete(self, request):
+            return LLMResponse(content=response, model=request.model, provider="groq")
+
+    monkeypatch.setattr(
+        runner,
+        "resolve_runtime_provider_config",
+        lambda provider, model, timeout_seconds: SimpleNamespace(
+            provider=ProviderType.GROQ,
+            default_model=model,
+            available=True,
+        ),
+    )
+    monkeypatch.setattr(runner, "create_runtime_provider", lambda config: FakeProvider())
+
+    result = runner.run_model_critic(
+        prompt_file=prompt_path,
+        provider="groq",
+        model="qwen/qwen3-32b",
+        out_dir=tmp_path / "semantic_receipts",
+        review_target="prompt:runtime",
+    )
+
+    receipt = json.loads(open(result["artifact_path"], encoding="utf-8").read())
+    assert receipt["semantic_reply_claim"] is True
+    assert receipt["model_identity"] == {"provider": "groq", "model": "qwen/qwen3-32b"}
+    assert receipt["model_runner"]["raw_payload_keys"] == [
+        "requested_model",
+        "requested_provider",
+        "resolved_model",
+        "runtime_provider",
+        "usage_keys",
+    ]
+
+
+def test_cross_model_verification_writes_summary_from_mock_receipts(tmp_path):
+    prompt_path = _write_prompt(tmp_path)
+    response_path = _write_mock_response(tmp_path)
+
+    summary = cross_runner.run_cross_model_verification(
+        prompt_file=prompt_path,
+        critics=["ollama:glm-5:cloud", "groq:qwen/qwen3-32b"],
+        out_dir=tmp_path / "semantic_receipts",
+        mock_response_file=response_path,
+        review_target="prompt:cross",
+    )
+
+    assert summary["conviction_gate"] == "pass_consensus"
+    assert summary["critic_count"] == 2
+    assert Path(summary["summary_json"]).exists()
+    assert Path(summary["summary_markdown"]).exists()
+
+
+def test_cross_model_critic_parser_preserves_model_colons():
+    assert cross_runner.parse_critic("ollama:glm-5:cloud") == ("ollama", "glm-5:cloud")

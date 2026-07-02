@@ -1,0 +1,11 @@
+{
+  "path": "/Users/dhyana/dharma_swarm_main",
+  "observed_at": "2026-06-29T16:34:30.894063+00:00",
+  "branch": "",
+  "head": "6b9c5005a222507a20eb59f5dcf095819a3ffb70",
+  "status_short_file": "status_short.stdout.txt",
+  "status_porcelain_v2_file": "status_porcelain_v2.stdout.txt",
+  "diff_stat_file": "diff_stat.stdout.txt",
+  "cached_diff_stat_file": "cached_diff_stat.stdout.txt",
+  "untracked_manifest_file": "untracked.stdout.txt"
+}

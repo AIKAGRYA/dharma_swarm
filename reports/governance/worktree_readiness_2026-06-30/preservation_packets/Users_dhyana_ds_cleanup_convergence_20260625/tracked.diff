@@ -1,0 +1,2786 @@
+diff --git a/reports/governance/active_track_evidence.json b/reports/governance/active_track_evidence.json
+index d92324291..2f95962b5 100644
+--- a/reports/governance/active_track_evidence.json
++++ b/reports/governance/active_track_evidence.json
+@@ -1,11 +1,11 @@
+ {
+-  "generated_at": "2026-06-25T05:45:22+00:00",
++  "generated_at": "2026-06-26T00:35:44+09:00",
+   "schema_version": 2,
+   "active_track_id": "runtime-truth-reconciliation-2026-06",
+-  "shippable": true,
++  "shippable": false,
+   "prerequisites_ok": true,
+   "completion_progress": {
+-    "passed": 12,
++    "passed": 11,
+     "total": 12
+   },
+   "criteria": [
+@@ -13,98 +13,113 @@
+       "id": "runtime_spine_package_exists",
+       "kind": "file_exists",
+       "passed": true,
+-      "detail": "dharma_swarm/spine/__init__.py present"
++      "detail": "dharma_swarm/spine/__init__.py present",
++      "executed": true
+     },
+     {
+       "id": "receipt_equivalence_matrix_exists",
+       "kind": "file_exists",
+       "passed": true,
+-      "detail": "docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md present"
++      "detail": "docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md present",
++      "executed": true
+     },
+     {
+       "id": "a2a_persistence_invariant_tests_exist",
+       "kind": "file_exists",
+       "passed": true,
+-      "detail": "tests/test_spine_persistence_invariant.py present"
++      "detail": "tests/test_spine_persistence_invariant.py present",
++      "executed": true
+     },
+     {
+       "id": "runtime_truth_packet_defined",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'class RuntimeTruthPacket' found in dharma_swarm/operator_core/contracts.py"
++      "detail": "pattern 'class RuntimeTruthPacket' found in dharma_swarm/operator_core/contracts.py",
++      "executed": true
+     },
+     {
+       "id": "runtime_truth_axes_defined",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'class RuntimeTruthState' found in dharma_swarm/operator_core/contracts.py"
++      "detail": "pattern 'class RuntimeTruthState' found in dharma_swarm/operator_core/contracts.py",
++      "executed": true
+     },
+     {
+       "id": "onboard_runtime_truth_render",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'render_runtime_truth' found in scripts/governance/agent_onboard.py"
++      "detail": "pattern 'render_runtime_truth' found in scripts/governance/agent_onboard.py",
++      "executed": true
+     },
+     {
+       "id": "onboard_runtime_truth_no_write_test",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'test_runtime_truth_render_is_read_only' found in tests/test_agent_onboard.py"
++      "detail": "pattern 'test_runtime_truth_render_is_read_only' found in tests/test_agent_onboard.py",
++      "executed": true
+     },
+     {
+       "id": "runtime_truth_packet_axis_test",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'test_runtime_truth_packet_keeps_state_axes_separate' found in tests/test_operator_core_contracts.py"
++      "detail": "pattern 'test_runtime_truth_packet_keeps_state_axes_separate' found in tests/test_operator_core_contracts.py",
++      "executed": true
+     },
+     {
+       "id": "a2a_single_persistence_invariant",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'test_submit_via_spine_retry_does_not_create_second_runtime_receipt' found in tests/test_spine_persistence_invariant.py"
++      "detail": "pattern 'test_submit_via_spine_retry_does_not_create_second_runtime_receipt' found in tests/test_spine_persistence_invariant.py",
++      "executed": true
+     },
+     {
+       "id": "spine_bypass_report_exists",
+       "kind": "file_exists",
+       "passed": true,
+-      "detail": "scripts/governance/spine_bypass_report.py present"
++      "detail": "scripts/governance/spine_bypass_report.py present",
++      "executed": true
+     },
+     {
+       "id": "receipt_json_projection_only_doc",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'projection/cache only' found in docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md"
++      "detail": "pattern 'projection/cache only' found in docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md",
++      "executed": true
+     },
+     {
+       "id": "correlation_spine_manifest_still_declared",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml"
++      "detail": "pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml",
++      "executed": true
+     },
+     {
+       "id": "evidence_receipt_still_defined",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py"
++      "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py",
++      "executed": true
+     },
+     {
+       "id": "runtime_receipt_still_defined",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py"
++      "detail": "pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py",
++      "executed": true
+     },
+     {
+       "id": "operator_core_contracts_pass",
+       "kind": "test_passes",
+-      "passed": true,
+-      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 1.56s"
++      "passed": false,
++      "detail": "pytest tests/test_operator_core_contracts.py: pytest not installed (could not execute)",
++      "executed": false
+     }
+   ],
+   "portfolio_summary": {
+     "active": 10,
+     "max_active": 10,
+     "warn_active": 5,
+-    "shippable": 5
++    "shippable": 0
+   },
+   "spine_objectives": [
+     {
+@@ -167,13 +182,15 @@
+       "verified_at": "2026-06-23",
+       "ttl_days": 14,
+       "owner": "@AmitabhainArunachala",
+-      "shippable": true,
+-      "criteria_pass": true,
+-      "ship_blocks": [],
+-      "has_rigorous_evidence": true,
++      "shippable": false,
++      "criteria_pass": false,
++      "ship_blocks": [
++        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)"
++      ],
++      "has_rigorous_evidence": false,
+       "prerequisites_ok": true,
+       "completion_progress": {
+-        "passed": 12,
++        "passed": 11,
+         "total": 12
+       },
+       "criteria": [
+@@ -181,91 +198,106 @@
+           "id": "runtime_spine_package_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/spine/__init__.py present"
++          "detail": "dharma_swarm/spine/__init__.py present",
++          "executed": true
+         },
+         {
+           "id": "receipt_equivalence_matrix_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md present"
++          "detail": "docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md present",
++          "executed": true
+         },
+         {
+           "id": "a2a_persistence_invariant_tests_exist",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "tests/test_spine_persistence_invariant.py present"
++          "detail": "tests/test_spine_persistence_invariant.py present",
++          "executed": true
+         },
+         {
+           "id": "runtime_truth_packet_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class RuntimeTruthPacket' found in dharma_swarm/operator_core/contracts.py"
++          "detail": "pattern 'class RuntimeTruthPacket' found in dharma_swarm/operator_core/contracts.py",
++          "executed": true
+         },
+         {
+           "id": "runtime_truth_axes_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class RuntimeTruthState' found in dharma_swarm/operator_core/contracts.py"
++          "detail": "pattern 'class RuntimeTruthState' found in dharma_swarm/operator_core/contracts.py",
++          "executed": true
+         },
+         {
+           "id": "onboard_runtime_truth_render",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'render_runtime_truth' found in scripts/governance/agent_onboard.py"
++          "detail": "pattern 'render_runtime_truth' found in scripts/governance/agent_onboard.py",
++          "executed": true
+         },
+         {
+           "id": "onboard_runtime_truth_no_write_test",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_runtime_truth_render_is_read_only' found in tests/test_agent_onboard.py"
++          "detail": "pattern 'test_runtime_truth_render_is_read_only' found in tests/test_agent_onboard.py",
++          "executed": true
+         },
+         {
+           "id": "runtime_truth_packet_axis_test",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_runtime_truth_packet_keeps_state_axes_separate' found in tests/test_operator_core_contracts.py"
++          "detail": "pattern 'test_runtime_truth_packet_keeps_state_axes_separate' found in tests/test_operator_core_contracts.py",
++          "executed": true
+         },
+         {
+           "id": "a2a_single_persistence_invariant",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_submit_via_spine_retry_does_not_create_second_runtime_receipt' found in tests/test_spine_persistence_invariant.py"
++          "detail": "pattern 'test_submit_via_spine_retry_does_not_create_second_runtime_receipt' found in tests/test_spine_persistence_invariant.py",
++          "executed": true
+         },
+         {
+           "id": "spine_bypass_report_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/governance/spine_bypass_report.py present"
++          "detail": "scripts/governance/spine_bypass_report.py present",
++          "executed": true
+         },
+         {
+           "id": "receipt_json_projection_only_doc",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'projection/cache only' found in docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md"
++          "detail": "pattern 'projection/cache only' found in docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md",
++          "executed": true
+         },
+         {
+           "id": "correlation_spine_manifest_still_declared",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml"
++          "detail": "pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml",
++          "executed": true
+         },
+         {
+           "id": "evidence_receipt_still_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py"
++          "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py",
++          "executed": true
+         },
+         {
+           "id": "runtime_receipt_still_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py"
++          "detail": "pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py",
++          "executed": true
+         },
+         {
+           "id": "operator_core_contracts_pass",
+           "kind": "test_passes",
+-          "passed": true,
+-          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 1.56s"
++          "passed": false,
++          "detail": "pytest tests/test_operator_core_contracts.py: pytest not installed (could not execute)",
++          "executed": false
+         }
+       ]
+     },
+@@ -306,19 +338,22 @@
+           "id": "nats_master_spec_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present"
++          "detail": "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present",
++          "executed": true
+         },
+         {
+           "id": "nats_master_spec_present",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present"
++          "detail": "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present",
++          "executed": true
+         },
+         {
+           "id": "nats_transport_landed",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'NATS' found in docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md"
++          "detail": "pattern 'NATS' found in docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
++          "executed": true
+         }
+       ]
+     },
+@@ -364,61 +399,71 @@
+           "id": "spine_package_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/spine/__init__.py present"
++          "detail": "dharma_swarm/spine/__init__.py present",
++          "executed": true
+         },
+         {
+           "id": "invoke_agent_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py"
++          "detail": "pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py",
++          "executed": true
+         },
+         {
+           "id": "a2a_bridge_calls_spine",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/a2a/a2a_bridge.py"
++          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/a2a/a2a_bridge.py",
++          "executed": true
+         },
+         {
+           "id": "orchestrator_calls_spine",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/orchestrator.py"
++          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/orchestrator.py",
++          "executed": true
+         },
+         {
+           "id": "agent_runner_calls_spine",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/agent_runner.py"
++          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/agent_runner.py",
++          "executed": true
+         },
+         {
+           "id": "dispatch_emits_evidence_receipt",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_every_dispatch_emits_exactly_one_evidence_receipt' found in tests/test_spine_adoption_dispatch.py"
++          "detail": "pattern 'test_every_dispatch_emits_exactly_one_evidence_receipt' found in tests/test_spine_adoption_dispatch.py",
++          "executed": true
+         },
+         {
+           "id": "zero_dropoff_sources",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_no_dropoff_sources_remain' found in tests/test_spine_adoption_dispatch.py"
++          "detail": "pattern 'test_no_dropoff_sources_remain' found in tests/test_spine_adoption_dispatch.py",
++          "executed": true
+         },
+         {
+           "id": "bypass_allowlist_empty",
+           "kind": "file_contains",
+           "passed": false,
+-          "detail": "pattern '(?m)^_INTENTIONAL_BYPASS: dict\\\\[tuple\\\\[str, int\\\\], str\\\\] = \\\\{\\\\s*\\\\}' NOT FOUND in scripts/governance/spine_bypass_report.py"
++          "detail": "pattern '(?m)^_INTENTIONAL_BYPASS: dict\\\\[tuple\\\\[str, int\\\\], str\\\\] = \\\\{\\\\s*\\\\}' NOT FOUND in scripts/governance/spine_bypass_report.py",
++          "executed": true
+         },
+         {
+           "id": "adoption_narrative_docs",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/architecture/SPINE_ADOPTION_NARRATIVE.md present"
++          "detail": "docs/architecture/SPINE_ADOPTION_NARRATIVE.md present",
++          "executed": true
+         },
+         {
+           "id": "gate1_witnessed",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "reports/governance/GATE1_WITNESSED.md present"
++          "detail": "reports/governance/GATE1_WITNESSED.md present",
++          "executed": true
+         }
+       ]
+     },
+@@ -460,79 +505,92 @@
+           "id": "loop_map_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "CYBERNETIC_LOOP_MAP.md present"
++          "detail": "CYBERNETIC_LOOP_MAP.md present",
++          "executed": true
+         },
+         {
+           "id": "loop_supervisor_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/loop_supervisor.py present"
++          "detail": "dharma_swarm/loop_supervisor.py present",
++          "executed": true
+         },
+         {
+           "id": "phase0_dossier_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md present"
++          "detail": "reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md present",
++          "executed": true
+         },
+         {
+           "id": "phase0_fresh_status_table",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'Fresh 13-loop status table' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md"
++          "detail": "pattern 'Fresh 13-loop status table' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md",
++          "executed": true
+         },
+         {
+           "id": "one_wire_invariant_stated",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'never let internal artifacts touch archive fitness' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md"
++          "detail": "pattern 'never let internal artifacts touch archive fitness' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md",
++          "executed": true
+         },
+         {
+           "id": "loop1_closure_receipt_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md present"
++          "detail": "reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md present",
++          "executed": true
+         },
+         {
+           "id": "campaign_retrospective_exists",
+           "kind": "file_exists",
+           "passed": false,
+-          "detail": "reports/loop_closure/RETROSPECTIVE.md MISSING"
++          "detail": "reports/loop_closure/RETROSPECTIVE.md MISSING",
++          "executed": true
+         },
+         {
+           "id": "cybernetics_codex_manifest_registered",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'id: cybernetics_codex' found in ACTIVE_SURFACE_MANIFEST.yaml"
++          "detail": "pattern 'id: cybernetics_codex' found in ACTIVE_SURFACE_MANIFEST.yaml",
++          "executed": true
+         },
+         {
+           "id": "cybernetics_codex_seed_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/agents/cybernetics_codex/agent.seed.yaml present"
++          "detail": "docs/agents/cybernetics_codex/agent.seed.yaml present",
++          "executed": true
+         },
+         {
+           "id": "cybernetics_codex_soul_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/agents/cybernetics_codex/SOUL.md present"
++          "detail": "docs/agents/cybernetics_codex/SOUL.md present",
++          "executed": true
+         },
+         {
+           "id": "cybernetics_codex_context_desk_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/agents/cybernetics_codex/CONTEXT_ENGINEERING.md present"
++          "detail": "docs/agents/cybernetics_codex/CONTEXT_ENGINEERING.md present",
++          "executed": true
+         },
+         {
+           "id": "cybernetics_codex_audit_script_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/governance/cybernetics_codex_audit.py present"
++          "detail": "scripts/governance/cybernetics_codex_audit.py present",
++          "executed": true
+         },
+         {
+           "id": "cybernetics_codex_registration_script_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/governance/register_cybernetics_codex.py present"
++          "detail": "scripts/governance/register_cybernetics_codex.py present",
++          "executed": true
+         }
+       ]
+     },
+@@ -569,13 +627,13 @@
+       "verified_at": "2026-06-23",
+       "ttl_days": 21,
+       "owner": "@codex",
+-      "shippable": true,
+-      "criteria_pass": true,
++      "shippable": false,
++      "criteria_pass": false,
+       "ship_blocks": [],
+       "has_rigorous_evidence": true,
+       "prerequisites_ok": true,
+       "completion_progress": {
+-        "passed": 17,
++        "passed": 16,
+         "total": 17
+       },
+       "criteria": [
+@@ -583,121 +641,141 @@
+           "id": "identity_owner_on_branch",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "foundations/THE_ORGANISM.md present"
++          "detail": "foundations/THE_ORGANISM.md present",
++          "executed": true
+         },
+         {
+           "id": "vision_owner_on_branch",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/vision_maps/NORTH_STAR.md present"
++          "detail": "docs/vision_maps/NORTH_STAR.md present",
++          "executed": true
+         },
+         {
+           "id": "orientation_graph_owner_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/governance/orientation_graph.py present"
++          "detail": "scripts/governance/orientation_graph.py present",
++          "executed": true
+         },
+         {
+           "id": "expanded_orientation_packet_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class OrientationPacket' found in scripts/governance/orientation_graph.py"
++          "detail": "pattern 'class OrientationPacket' found in scripts/governance/orientation_graph.py",
++          "executed": true
+         },
+         {
+           "id": "repo_context_writer_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def write_repo_context' found in scripts/governance/orientation_graph.py"
++          "detail": "pattern 'def write_repo_context' found in scripts/governance/orientation_graph.py",
++          "executed": true
+         },
+         {
+           "id": "repo_context_hash_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'context_hash' found in scripts/governance/orientation_graph.py"
++          "detail": "pattern 'context_hash' found in scripts/governance/orientation_graph.py",
++          "executed": true
+         },
+         {
+           "id": "make_orient_writes_context",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern '--write-context' found in Makefile"
++          "detail": "pattern '--write-context' found in Makefile",
++          "executed": true
+         },
+         {
+           "id": "orientation_default_read_only_test",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_orientation_graph_render_is_read_only' found in tests/test_orientation_graph.py"
++          "detail": "pattern 'test_orientation_graph_render_is_read_only' found in tests/test_orientation_graph.py",
++          "executed": true
+         },
+         {
+           "id": "repo_context_test_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_truth_graph_repo_context_writes_json_and_markdown' found in tests/test_truth_graph_repo_context.py"
++          "detail": "pattern 'test_truth_graph_repo_context_writes_json_and_markdown' found in tests/test_truth_graph_repo_context.py",
++          "executed": true
+         },
+         {
+           "id": "a2a_receipt_gate_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/a2a/task_receipt.py present"
++          "detail": "dharma_swarm/a2a/task_receipt.py present",
++          "executed": true
+         },
+         {
+           "id": "a2a_receipt_schema_declared",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'dharma_a2a_task_receipt.v1' found in dharma_swarm/a2a/task_receipt.py"
++          "detail": "pattern 'dharma_a2a_task_receipt.v1' found in dharma_swarm/a2a/task_receipt.py",
++          "executed": true
+         },
+         {
+           "id": "a2a_receipted_inbox_reader_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def read_receipted_inbox' found in dharma_swarm/a2a/task_receipt.py"
++          "detail": "pattern 'def read_receipted_inbox' found in dharma_swarm/a2a/task_receipt.py",
++          "executed": true
+         },
+         {
+           "id": "agent_presence_projection_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/a2a/agent_presence.py present"
++          "detail": "dharma_swarm/a2a/agent_presence.py present",
++          "executed": true
+         },
+         {
+           "id": "agent_presence_stale_red",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'age > 2' found in dharma_swarm/a2a/agent_presence.py"
++          "detail": "pattern 'age > 2' found in dharma_swarm/a2a/agent_presence.py",
++          "executed": true
+         },
+         {
+           "id": "nats_e2e_demo_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/governance/truth_graph_nats_e2e_demo.py present"
++          "detail": "scripts/governance/truth_graph_nats_e2e_demo.py present",
++          "executed": true
+         },
+         {
+           "id": "nats_e2e_shell_wrapper_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/governance/run_truth_graph_nats_e2e_demo.sh present"
++          "detail": "scripts/governance/run_truth_graph_nats_e2e_demo.sh present",
++          "executed": true
+         },
+         {
+           "id": "a2a_gate_tests_exist",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern \"receipt or it didn't happen\" found in tests/test_a2a_gate.py"
++          "detail": "pattern \"receipt or it didn't happen\" found in tests/test_a2a_gate.py",
++          "executed": true
+         },
+         {
+           "id": "registry_presence_tests_exist",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'heartbeat_status' found in tests/test_agent_registry_presence.py"
++          "detail": "pattern 'heartbeat_status' found in tests/test_agent_registry_presence.py",
++          "executed": true
+         },
+         {
+           "id": "repo_context_projection_passes",
+           "kind": "test_passes",
+-          "passed": true,
+-          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 0.56s"
++          "passed": false,
++          "detail": "pytest tests/test_truth_graph_repo_context.py: pytest not installed (could not execute)",
++          "executed": false
+         },
+         {
+           "id": "truth_graph_projection_on_main",
+           "kind": "commit_on_main",
+           "passed": true,
+-          "detail": "936d365db is an ancestor of origin/main"
++          "detail": "936d365db is an ancestor of origin/main",
++          "executed": true
+         }
+       ]
+     },
+@@ -729,13 +807,13 @@
+       "verified_at": "2026-06-23",
+       "ttl_days": 14,
+       "owner": "@AmitabhainArunachala",
+-      "shippable": true,
+-      "criteria_pass": true,
++      "shippable": false,
++      "criteria_pass": false,
+       "ship_blocks": [],
+       "has_rigorous_evidence": true,
+       "prerequisites_ok": true,
+       "completion_progress": {
+-        "passed": 8,
++        "passed": 7,
+         "total": 8
+       },
+       "criteria": [
+@@ -743,67 +821,78 @@
+           "id": "evidence_receipt_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py"
++          "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py",
++          "executed": true
+         },
+         {
+           "id": "holon_orchestrator_spec_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/sovereign_holons/HOLON_ORCHESTRATOR_BUILD_SPEC.md present"
++          "detail": "docs/sovereign_holons/HOLON_ORCHESTRATOR_BUILD_SPEC.md present",
++          "executed": true
+         },
+         {
+           "id": "holon_runtime_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/holon_runtime.py present"
++          "detail": "dharma_swarm/holon_runtime.py present",
++          "executed": true
+         },
+         {
+           "id": "readiness_packet_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md present"
++          "detail": "reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md present",
++          "executed": true
+         },
+         {
+           "id": "receipt_profile_documented",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'The command receipt is a profile of `dharma_swarm.spine.receipt.EvidenceReceipt`' found in reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md"
++          "detail": "pattern 'The command receipt is a profile of `dharma_swarm.spine.receipt.EvidenceReceipt`' found in reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md",
++          "executed": true
+         },
+         {
+           "id": "frozen_verifier_runbook_present",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'Frozen Non-Implementer Verifier Runbook' found in reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md"
++          "detail": "pattern 'Frozen Non-Implementer Verifier Runbook' found in reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md",
++          "executed": true
+         },
+         {
+           "id": "holon_bridge_verifier_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "tests/test_holon_bridge.py present"
++          "detail": "tests/test_holon_bridge.py present",
++          "executed": true
+         },
+         {
+           "id": "holon_runtime_verifier_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "tests/test_holon_runtime.py present"
++          "detail": "tests/test_holon_runtime.py present",
++          "executed": true
+         },
+         {
+           "id": "composer_wake_witness_pending",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md present"
++          "detail": "reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md present",
++          "executed": true
+         },
+         {
+           "id": "holon_bridge_verifier_passes",
+           "kind": "test_passes",
+-          "passed": true,
+-          "detail": "pytest tests/test_holon_bridge.py: PASS \u2014 15 passed, 1 skipped in 0.34s"
++          "passed": false,
++          "detail": "pytest tests/test_holon_bridge.py: pytest not installed (could not execute)",
++          "executed": false
+         },
+         {
+           "id": "holon_substrate_on_main",
+           "kind": "commit_on_main",
+           "passed": true,
+-          "detail": "9c76b210 is an ancestor of origin/main"
++          "detail": "9c76b210 is an ancestor of origin/main",
++          "executed": true
+         }
+       ]
+     },
+@@ -838,13 +927,13 @@
+       "verified_at": "2026-06-22",
+       "ttl_days": 21,
+       "owner": "@AmitabhainArunachala",
+-      "shippable": true,
+-      "criteria_pass": true,
++      "shippable": false,
++      "criteria_pass": false,
+       "ship_blocks": [],
+       "has_rigorous_evidence": true,
+       "prerequisites_ok": true,
+       "completion_progress": {
+-        "passed": 9,
++        "passed": 8,
+         "total": 9
+       },
+       "criteria": [
+@@ -852,73 +941,85 @@
+           "id": "model_pool_owner_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/model_pool.py present"
++          "detail": "dharma_swarm/model_pool.py present",
++          "executed": true
+         },
+         {
+           "id": "provider_policy_owner_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/provider_policy.py present"
++          "detail": "dharma_swarm/provider_policy.py present",
++          "executed": true
+         },
+         {
+           "id": "model_hierarchy_owner_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/model_hierarchy.py present"
++          "detail": "dharma_swarm/model_hierarchy.py present",
++          "executed": true
+         },
+         {
+           "id": "routing_architecture_doc_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md present"
++          "detail": "docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md present",
++          "executed": true
+         },
+         {
+           "id": "routing_precedence_documented",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'explicit > capability' found in docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md"
++          "detail": "pattern 'explicit > capability' found in docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md",
++          "executed": true
+         },
+         {
+           "id": "explicit_provider_honored",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'preferred_provider' found in dharma_swarm/provider_policy.py"
++          "detail": "pattern 'preferred_provider' found in dharma_swarm/provider_policy.py",
++          "executed": true
+         },
+         {
+           "id": "explicit_wins_test_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_explicit_provider_is_selected' found in tests/test_provider_routing_explicit.py"
++          "detail": "pattern 'test_explicit_provider_is_selected' found in tests/test_provider_routing_explicit.py",
++          "executed": true
+         },
+         {
+           "id": "power_first_default",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'power_first' found in dharma_swarm/provider_policy.py"
++          "detail": "pattern 'power_first' found in dharma_swarm/provider_policy.py",
++          "executed": true
+         },
+         {
+           "id": "zhipu_provider_enum",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'ZHIPU' found in dharma_swarm/models.py"
++          "detail": "pattern 'ZHIPU' found in dharma_swarm/models.py",
++          "executed": true
+         },
+         {
+           "id": "zhipu_provider_class",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class ZhipuProvider' found in dharma_swarm/providers.py"
++          "detail": "pattern 'class ZhipuProvider' found in dharma_swarm/providers.py",
++          "executed": true
+         },
+         {
+           "id": "precedence_invariant_test_passes",
+           "kind": "test_passes",
+-          "passed": true,
+-          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.28s"
++          "passed": false,
++          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: pytest not installed (could not execute)",
++          "executed": false
+         },
+         {
+           "id": "stage4_precedence_locked_on_main",
+           "kind": "commit_on_main",
+           "passed": true,
+-          "detail": "bc110d84 is an ancestor of origin/main"
++          "detail": "bc110d84 is an ancestor of origin/main",
++          "executed": true
+         }
+       ]
+     },
+@@ -967,73 +1068,85 @@
+           "id": "arena_runner_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/coordination/arena/runner.py present"
++          "detail": "dharma_swarm/coordination/arena/runner.py present",
++          "executed": true
+         },
+         {
+           "id": "arena_scorer_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/coordination/arena/scorer.py present"
++          "detail": "dharma_swarm/coordination/arena/scorer.py present",
++          "executed": true
+         },
+         {
+           "id": "orchestration_genome_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/coordination/genome.py present"
++          "detail": "dharma_swarm/coordination/genome.py present",
++          "executed": true
+         },
+         {
+           "id": "frozen_taskpack_present",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'TASK_PACK_ID' found in dharma_swarm/coordination/arena/taskpack.py"
++          "detail": "pattern 'TASK_PACK_ID' found in dharma_swarm/coordination/arena/taskpack.py",
++          "executed": true
+         },
+         {
+           "id": "deterministic_scorer_hash",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def scorer_hash' found in dharma_swarm/coordination/arena/scorer.py"
++          "detail": "pattern 'def scorer_hash' found in dharma_swarm/coordination/arena/scorer.py",
++          "executed": true
+         },
+         {
+           "id": "orchestration_genome_class",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class OrchestrationGenome' found in dharma_swarm/coordination/genome.py"
++          "detail": "pattern 'class OrchestrationGenome' found in dharma_swarm/coordination/genome.py",
++          "executed": true
+         },
+         {
+           "id": "zero_weight_orchestrator_map_elites",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class MapElitesArchive' found in dharma_swarm/coordination/orchestrator_v1.py"
++          "detail": "pattern 'class MapElitesArchive' found in dharma_swarm/coordination/orchestrator_v1.py",
++          "executed": true
+         },
+         {
+           "id": "dpi_decorrelation_gated_on_correctness",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def decorrelation_bonus' found in dharma_swarm/coordination/dpi.py"
++          "detail": "pattern 'def decorrelation_bonus' found in dharma_swarm/coordination/dpi.py",
++          "executed": true
+         },
+         {
+           "id": "council_trace_verification",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class Council' found in dharma_swarm/council/council.py"
++          "detail": "pattern 'class Council' found in dharma_swarm/council/council.py",
++          "executed": true
+         },
+         {
+           "id": "arena_v1_test_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def test_positive_lift_candidate_beats_best_single_at_parity' found in tests/test_arena_v1.py"
++          "detail": "pattern 'def test_positive_lift_candidate_beats_best_single_at_parity' found in tests/test_arena_v1.py",
++          "executed": true
+         },
+         {
+           "id": "dpi_test_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "tests/test_dpi.py present"
++          "detail": "tests/test_dpi.py present",
++          "executed": true
+         },
+         {
+           "id": "closure_checks_test_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "tests/test_coordination_closure_checks.py present"
++          "detail": "tests/test_coordination_closure_checks.py present",
++          "executed": true
+         }
+       ]
+     },
+@@ -1079,49 +1192,57 @@
+           "id": "pr_merge_control_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/runtime/pr_merge_control.py present"
++          "detail": "scripts/runtime/pr_merge_control.py present",
++          "executed": true
+         },
+         {
+           "id": "mike_daemon_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/runtime/merge_master_mike_daemon.py present"
++          "detail": "scripts/runtime/merge_master_mike_daemon.py present",
++          "executed": true
+         },
+         {
+           "id": "automerge_workflow_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": ".github/workflows/automerge.yml present"
++          "detail": ".github/workflows/automerge.yml present",
++          "executed": true
+         },
+         {
+           "id": "router_workflow_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": ".github/workflows/codex-mention-router.yml present"
++          "detail": ".github/workflows/codex-mention-router.yml present",
++          "executed": true
+         },
+         {
+           "id": "github_review_receipt_bridge",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'github_review' found in scripts/runtime/pr_merge_control.py"
++          "detail": "pattern 'github_review' found in scripts/runtime/pr_merge_control.py",
++          "executed": true
+         },
+         {
+           "id": "github_review_bridge_tested",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "tests/test_pr_merge_control_github_reviews.py present"
++          "detail": "tests/test_pr_merge_control_github_reviews.py present",
++          "executed": true
+         },
+         {
+           "id": "automerge_enrolls_all_nondraft",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'mike-watch' found in .github/workflows/automerge.yml"
++          "detail": "pattern 'mike-watch' found in .github/workflows/automerge.yml",
++          "executed": true
+         },
+         {
+           "id": "mike_cloud_heartbeat",
+           "kind": "file_contains",
+           "passed": false,
+-          "detail": "pattern 'schedule:' NOT FOUND in .github/workflows/merge-master-mike-backlog.yml"
++          "detail": "pattern 'schedule:' NOT FOUND in .github/workflows/merge-master-mike-backlog.yml",
++          "executed": true
+         }
+       ]
+     },
+@@ -1155,13 +1276,15 @@
+       "verified_at": "2026-06-24",
+       "ttl_days": 21,
+       "owner": "@AmitabhainArunachala",
+-      "shippable": true,
+-      "criteria_pass": true,
+-      "ship_blocks": [],
+-      "has_rigorous_evidence": true,
++      "shippable": false,
++      "criteria_pass": false,
++      "ship_blocks": [
++        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)"
++      ],
++      "has_rigorous_evidence": false,
+       "prerequisites_ok": true,
+       "completion_progress": {
+-        "passed": 12,
++        "passed": 7,
+         "total": 12
+       },
+       "criteria": [
+@@ -1169,91 +1292,106 @@
+           "id": "dossier_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md present"
++          "detail": "docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md present",
++          "executed": true
+         },
+         {
+           "id": "spine_invoke_owner_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py"
++          "detail": "pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py",
++          "executed": true
+         },
+         {
+           "id": "handoff_owner_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/handoff.py present"
++          "detail": "dharma_swarm/handoff.py present",
++          "executed": true
+         },
+         {
+           "id": "dossier_consolidates_four_powers",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'The four powers at a glance' found in docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md"
++          "detail": "pattern 'The four powers at a glance' found in docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md",
++          "executed": true
+         },
+         {
+           "id": "dossier_carries_organism_tie",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'How this serves the organism' found in docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md"
++          "detail": "pattern 'How this serves the organism' found in docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md",
++          "executed": true
+         },
+         {
+           "id": "stage_contract_reader_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class StageContract' found in dharma_swarm/fs_substrate/stage_contracts.py"
++          "detail": "pattern 'class StageContract' found in dharma_swarm/fs_substrate/stage_contracts.py",
++          "executed": true
+         },
+         {
+           "id": "stage_reader_routes_through_spine",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'invoke_agent' found in dharma_swarm/fs_substrate/stage_executor.py"
++          "detail": "pattern 'invoke_agent' found in dharma_swarm/fs_substrate/stage_executor.py",
++          "executed": true
+         },
+         {
+           "id": "stage_contract_test_passes",
+           "kind": "test_passes",
+-          "passed": true,
+-          "detail": "pytest tests/test_stage_contracts.py: PASS \u2014 13 passed in 0.36s"
++          "passed": false,
++          "detail": "pytest tests/test_stage_contracts.py: pytest not installed (could not execute)",
++          "executed": false
+         },
+         {
+           "id": "okf_projector_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def project_semantic_objects' found in dharma_swarm/fs_substrate/okf.py"
++          "detail": "pattern 'def project_semantic_objects' found in dharma_swarm/fs_substrate/okf.py",
++          "executed": true
+         },
+         {
+           "id": "okf_roundtrip_test_passes",
+           "kind": "test_passes",
+-          "passed": true,
+-          "detail": "pytest tests/test_okf_projection.py: PASS \u2014 8 passed in 0.36s"
++          "passed": false,
++          "detail": "pytest tests/test_okf_projection.py: pytest not installed (could not execute)",
++          "executed": false
+         },
+         {
+           "id": "semantic_fs_facade_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def semantic_retrieve' found in dharma_swarm/fs_substrate/semantic_fs.py"
++          "detail": "pattern 'def semantic_retrieve' found in dharma_swarm/fs_substrate/semantic_fs.py",
++          "executed": true
+         },
+         {
+           "id": "semantic_fs_test_passes",
+           "kind": "test_passes",
+-          "passed": true,
+-          "detail": "pytest tests/test_semantic_fs.py: PASS \u2014 5 passed in 0.34s"
++          "passed": false,
++          "detail": "pytest tests/test_semantic_fs.py: pytest not installed (could not execute)",
++          "executed": false
+         },
+         {
+           "id": "organizer_dry_run_first_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def propose_organization' found in dharma_swarm/fs_substrate/organizer.py"
++          "detail": "pattern 'def propose_organization' found in dharma_swarm/fs_substrate/organizer.py",
++          "executed": true
+         },
+         {
+           "id": "organizer_test_passes",
+           "kind": "test_passes",
+-          "passed": true,
+-          "detail": "pytest tests/test_organizer.py: PASS \u2014 5 passed in 0.30s"
++          "passed": false,
++          "detail": "pytest tests/test_organizer.py: pytest not installed (could not execute)",
++          "executed": false
+         },
+         {
+           "id": "fs_substrate_e2e_passes",
+           "kind": "test_passes",
+-          "passed": true,
+-          "detail": "pytest tests/test_fs_substrate_e2e.py: PASS \u2014 4 passed in 0.40s"
++          "passed": false,
++          "detail": "pytest tests/test_fs_substrate_e2e.py: pytest not installed (could not execute)",
++          "executed": false
+         }
+       ]
+     }
+@@ -1279,8 +1417,14 @@
+     },
+     {
+       "severity": "INFO",
+-      "check": "track-shippable:runtime-truth-reconciliation-2026-06",
+-      "message": "[runtime-truth-reconciliation-2026-06] all 12 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
++      "check": "unverified:runtime-truth-reconciliation-2026-06:operator_core_contracts_pass",
++      "message": "[runtime-truth-reconciliation-2026-06] UNVERIFIED \u2014 'operator_core_contracts_pass' could not run here (not a regression): pytest tests/test_operator_core_contracts.py: pytest not installed (could not execute)",
++      "criterion_id": "operator_core_contracts_pass"
++    },
++    {
++      "severity": "INFO",
++      "check": "track-in-progress:runtime-truth-reconciliation-2026-06",
++      "message": "[runtime-truth-reconciliation-2026-06] 11/12 completion criteria pass.",
+       "criterion_id": null
+     },
+     {
+@@ -1303,20 +1447,38 @@
+     },
+     {
+       "severity": "INFO",
+-      "check": "track-shippable:truth-graph-platform-2026-06",
+-      "message": "[truth-graph-platform-2026-06] all 17 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
++      "check": "unverified:truth-graph-platform-2026-06:repo_context_projection_passes",
++      "message": "[truth-graph-platform-2026-06] UNVERIFIED \u2014 'repo_context_projection_passes' could not run here (not a regression): pytest tests/test_truth_graph_repo_context.py: pytest not installed (could not execute)",
++      "criterion_id": "repo_context_projection_passes"
++    },
++    {
++      "severity": "INFO",
++      "check": "track-in-progress:truth-graph-platform-2026-06",
++      "message": "[truth-graph-platform-2026-06] 16/17 completion criteria pass.",
+       "criterion_id": null
+     },
+     {
+       "severity": "INFO",
+-      "check": "track-shippable:composer-holon-spine-longrun-2026-06",
+-      "message": "[composer-holon-spine-longrun-2026-06] all 8 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
++      "check": "unverified:composer-holon-spine-longrun-2026-06:holon_bridge_verifier_passes",
++      "message": "[composer-holon-spine-longrun-2026-06] UNVERIFIED \u2014 'holon_bridge_verifier_passes' could not run here (not a regression): pytest tests/test_holon_bridge.py: pytest not installed (could not execute)",
++      "criterion_id": "holon_bridge_verifier_passes"
++    },
++    {
++      "severity": "INFO",
++      "check": "track-in-progress:composer-holon-spine-longrun-2026-06",
++      "message": "[composer-holon-spine-longrun-2026-06] 7/8 completion criteria pass.",
+       "criterion_id": null
+     },
+     {
+       "severity": "INFO",
+-      "check": "track-shippable:provider-routing-consolidation-2026-06",
+-      "message": "[provider-routing-consolidation-2026-06] all 9 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
++      "check": "unverified:provider-routing-consolidation-2026-06:precedence_invariant_test_passes",
++      "message": "[provider-routing-consolidation-2026-06] UNVERIFIED \u2014 'precedence_invariant_test_passes' could not run here (not a regression): pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: pytest not installed (could not execute)",
++      "criterion_id": "precedence_invariant_test_passes"
++    },
++    {
++      "severity": "INFO",
++      "check": "track-in-progress:provider-routing-consolidation-2026-06",
++      "message": "[provider-routing-consolidation-2026-06] 8/9 completion criteria pass.",
+       "criterion_id": null
+     },
+     {
+@@ -1333,8 +1495,38 @@
+     },
+     {
+       "severity": "INFO",
+-      "check": "track-shippable:filesystem-native-substrate-2026-06",
+-      "message": "[filesystem-native-substrate-2026-06] all 12 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
++      "check": "unverified:filesystem-native-substrate-2026-06:stage_contract_test_passes",
++      "message": "[filesystem-native-substrate-2026-06] UNVERIFIED \u2014 'stage_contract_test_passes' could not run here (not a regression): pytest tests/test_stage_contracts.py: pytest not installed (could not execute)",
++      "criterion_id": "stage_contract_test_passes"
++    },
++    {
++      "severity": "INFO",
++      "check": "unverified:filesystem-native-substrate-2026-06:okf_roundtrip_test_passes",
++      "message": "[filesystem-native-substrate-2026-06] UNVERIFIED \u2014 'okf_roundtrip_test_passes' could not run here (not a regression): pytest tests/test_okf_projection.py: pytest not installed (could not execute)",
++      "criterion_id": "okf_roundtrip_test_passes"
++    },
++    {
++      "severity": "INFO",
++      "check": "unverified:filesystem-native-substrate-2026-06:semantic_fs_test_passes",
++      "message": "[filesystem-native-substrate-2026-06] UNVERIFIED \u2014 'semantic_fs_test_passes' could not run here (not a regression): pytest tests/test_semantic_fs.py: pytest not installed (could not execute)",
++      "criterion_id": "semantic_fs_test_passes"
++    },
++    {
++      "severity": "INFO",
++      "check": "unverified:filesystem-native-substrate-2026-06:organizer_test_passes",
++      "message": "[filesystem-native-substrate-2026-06] UNVERIFIED \u2014 'organizer_test_passes' could not run here (not a regression): pytest tests/test_organizer.py: pytest not installed (could not execute)",
++      "criterion_id": "organizer_test_passes"
++    },
++    {
++      "severity": "INFO",
++      "check": "unverified:filesystem-native-substrate-2026-06:fs_substrate_e2e_passes",
++      "message": "[filesystem-native-substrate-2026-06] UNVERIFIED \u2014 'fs_substrate_e2e_passes' could not run here (not a regression): pytest tests/test_fs_substrate_e2e.py: pytest not installed (could not execute)",
++      "criterion_id": "fs_substrate_e2e_passes"
++    },
++    {
++      "severity": "INFO",
++      "check": "track-in-progress:filesystem-native-substrate-2026-06",
++      "message": "[filesystem-native-substrate-2026-06] 7/12 completion criteria pass.",
+       "criterion_id": null
+     }
+   ]
+diff --git a/reports/governance/active_track_evidence.md b/reports/governance/active_track_evidence.md
+index 6463d44a6..090098c05 100644
+--- a/reports/governance/active_track_evidence.md
++++ b/reports/governance/active_track_evidence.md
+@@ -1,7 +1,7 @@
+ # Track Portfolio Evidence
+ 
+-Generated: 2026-06-25T05:45:22+00:00 (schema v2)
+-Active tracks: **10** (warn 5, max 10) — shippable 5
++Generated: 2026-06-26T00:35:44+09:00 (schema v2)
++Active tracks: **10** (warn 5, max 10) — shippable 0
+ 
+ ## Spine coverage
+ 
+@@ -9,7 +9,7 @@ Active tracks: **10** (warn 5, max 10) — shippable 5
+ - `revenue-external-humans-served` — ✗ (no active track)
+ - `research-depth` — ✗ (no active track)
+ 
+-## `runtime-truth-reconciliation-2026-06` — SHIPPABLE
++## `runtime-truth-reconciliation-2026-06` — 11/12
+ 
+ - serves: `substrate-nativeness` · complements: ['runtime-truth-nats-2026-06'] · depends_on: [] · conflicts_with: []
+ - owned_surfaces: ['dharma_swarm/operator_core/**', 'scripts/governance/agent_onboard.py', 'dharma_swarm/runtime_state.py']
+@@ -29,7 +29,7 @@ Active tracks: **10** (warn 5, max 10) — shippable 5
+   - ✓ `correlation_spine_manifest_still_declared` (file_contains) — pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml
+   - ✓ `evidence_receipt_still_defined` (file_contains) — pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py
+   - ✓ `runtime_receipt_still_defined` (file_contains) — pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py
+-  - ✓ `operator_core_contracts_pass` (test_passes) — pytest tests/test_operator_core_contracts.py: PASS — 7 passed in 1.56s
++  - ✗ `operator_core_contracts_pass` (test_passes) — pytest tests/test_operator_core_contracts.py: pytest not installed (could not execute)
+ 
+ ## `runtime-truth-nats-2026-06` — 2/2
+ 
+@@ -78,7 +78,7 @@ Active tracks: **10** (warn 5, max 10) — shippable 5
+   - ✓ `cybernetics_codex_audit_script_exists` (file_exists) — scripts/governance/cybernetics_codex_audit.py present
+   - ✓ `cybernetics_codex_registration_script_exists` (file_exists) — scripts/governance/register_cybernetics_codex.py present
+ 
+-## `truth-graph-platform-2026-06` — SHIPPABLE
++## `truth-graph-platform-2026-06` — 16/17
+ 
+ - serves: `substrate-nativeness` · complements: ['runtime-truth-reconciliation-2026-06', 'runtime-truth-nats-2026-06'] · depends_on: ['orientation-graph-2026-06'] · conflicts_with: []
+ - owned_surfaces: ['scripts/governance/orientation_graph.py', 'scripts/governance/truth_graph_nats_e2e_demo.py', 'scripts/governance/run_truth_graph_nats_e2e_demo.sh', 'tests/test_orientation_graph.py', 'tests/test_truth_graph_repo_context.py', 'dharma_swarm/a2a/task_receipt.py', 'dharma_swarm/a2a/agent_presence.py', 'tests/test_a2a_gate.py', 'tests/test_agent_registry_presence.py', 'reports/orientation/**']
+@@ -102,10 +102,10 @@ Active tracks: **10** (warn 5, max 10) — shippable 5
+   - ✓ `nats_e2e_shell_wrapper_exists` (file_exists) — scripts/governance/run_truth_graph_nats_e2e_demo.sh present
+   - ✓ `a2a_gate_tests_exist` (file_contains) — pattern "receipt or it didn't happen" found in tests/test_a2a_gate.py
+   - ✓ `registry_presence_tests_exist` (file_contains) — pattern 'heartbeat_status' found in tests/test_agent_registry_presence.py
+-  - ✓ `repo_context_projection_passes` (test_passes) — pytest tests/test_truth_graph_repo_context.py: PASS — 1 passed in 0.56s
++  - ✗ `repo_context_projection_passes` (test_passes) — pytest tests/test_truth_graph_repo_context.py: pytest not installed (could not execute)
+   - ✓ `truth_graph_projection_on_main` (commit_on_main) — 936d365db is an ancestor of origin/main
+ 
+-## `composer-holon-spine-longrun-2026-06` — SHIPPABLE
++## `composer-holon-spine-longrun-2026-06` — 7/8
+ 
+ - serves: `substrate-nativeness` · complements: ['runtime-truth-reconciliation-2026-06', 'runtime-truth-nats-2026-06'] · depends_on: ['runtime-truth-spine-adoption-2026-06'] · conflicts_with: []
+ - owned_surfaces: ['docs/sovereign_holons/**', 'reports/sovereign_holons/**', 'dharma_swarm/holon_*.py', 'scripts/holon_*.py', 'tests/test_holon_*.py']
+@@ -120,10 +120,10 @@ Active tracks: **10** (warn 5, max 10) — shippable 5
+   - ✓ `holon_bridge_verifier_exists` (file_exists) — tests/test_holon_bridge.py present
+   - ✓ `holon_runtime_verifier_exists` (file_exists) — tests/test_holon_runtime.py present
+   - ✓ `composer_wake_witness_pending` (file_exists) — reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md present
+-  - ✓ `holon_bridge_verifier_passes` (test_passes) — pytest tests/test_holon_bridge.py: PASS — 15 passed, 1 skipped in 0.34s
++  - ✗ `holon_bridge_verifier_passes` (test_passes) — pytest tests/test_holon_bridge.py: pytest not installed (could not execute)
+   - ✓ `holon_substrate_on_main` (commit_on_main) — 9c76b210 is an ancestor of origin/main
+ 
+-## `provider-routing-consolidation-2026-06` — SHIPPABLE
++## `provider-routing-consolidation-2026-06` — 8/9
+ 
+ - serves: `substrate-nativeness` · complements: ['runtime-truth-spine-adoption-2026-06', 'loop-closure-2026-06'] · depends_on: [] · conflicts_with: []
+ - owned_surfaces: ['dharma_swarm/providers.py', 'dharma_swarm/provider_policy.py', 'dharma_swarm/model_hierarchy.py', 'dharma_swarm/model_pool.py', 'dharma_swarm/model_defaults.py', 'dharma_swarm/runtime_provider.py', 'dharma_swarm/router_v1.py', 'dharma_swarm/smart_router.py', 'dharma_swarm/decision_router.py', 'docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md']
+@@ -139,7 +139,7 @@ Active tracks: **10** (warn 5, max 10) — shippable 5
+   - ✓ `power_first_default` (file_contains) — pattern 'power_first' found in dharma_swarm/provider_policy.py
+   - ✓ `zhipu_provider_enum` (file_contains) — pattern 'ZHIPU' found in dharma_swarm/models.py
+   - ✓ `zhipu_provider_class` (file_contains) — pattern 'class ZhipuProvider' found in dharma_swarm/providers.py
+-  - ✓ `precedence_invariant_test_passes` (test_passes) — pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS — 1 passed in 0.28s
++  - ✗ `precedence_invariant_test_passes` (test_passes) — pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: pytest not installed (could not execute)
+   - ✓ `stage4_precedence_locked_on_main` (commit_on_main) — bc110d84 is an ancestor of origin/main
+ 
+ ## `orchestration-arena-v1-2026-06` — 9/9
+@@ -176,7 +176,7 @@ Active tracks: **10** (warn 5, max 10) — shippable 5
+   - ✓ `automerge_enrolls_all_nondraft` (file_contains) — pattern 'mike-watch' found in .github/workflows/automerge.yml
+   - ✗ `mike_cloud_heartbeat` (file_contains) — pattern 'schedule:' NOT FOUND in .github/workflows/merge-master-mike-backlog.yml
+ 
+-## `filesystem-native-substrate-2026-06` — SHIPPABLE
++## `filesystem-native-substrate-2026-06` — 7/12
+ 
+ - serves: `substrate-nativeness` · complements: ['truth-graph-platform-2026-06', 'runtime-truth-spine-adoption-2026-06'] · depends_on: [] · conflicts_with: []
+ - owned_surfaces: ['docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md', 'docs/research/FILESYSTEM_SUBSTRATE_SLICE_A_SPEC.md', 'docs/research/palantir-ontology/ONTOLOGY_PROPOSAL_LOG.md', 'dharma_swarm/fs_substrate/**', 'tests/test_stage_contracts.py', 'tests/test_okf_projection.py', 'tests/test_semantic_fs.py', 'tests/test_organizer.py', 'tests/test_fs_substrate_e2e.py']
+@@ -189,27 +189,36 @@ Active tracks: **10** (warn 5, max 10) — shippable 5
+   - ✓ `dossier_carries_organism_tie` (file_contains) — pattern 'How this serves the organism' found in docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md
+   - ✓ `stage_contract_reader_exists` (file_contains) — pattern 'class StageContract' found in dharma_swarm/fs_substrate/stage_contracts.py
+   - ✓ `stage_reader_routes_through_spine` (file_contains) — pattern 'invoke_agent' found in dharma_swarm/fs_substrate/stage_executor.py
+-  - ✓ `stage_contract_test_passes` (test_passes) — pytest tests/test_stage_contracts.py: PASS — 13 passed in 0.36s
++  - ✗ `stage_contract_test_passes` (test_passes) — pytest tests/test_stage_contracts.py: pytest not installed (could not execute)
+   - ✓ `okf_projector_exists` (file_contains) — pattern 'def project_semantic_objects' found in dharma_swarm/fs_substrate/okf.py
+-  - ✓ `okf_roundtrip_test_passes` (test_passes) — pytest tests/test_okf_projection.py: PASS — 8 passed in 0.36s
++  - ✗ `okf_roundtrip_test_passes` (test_passes) — pytest tests/test_okf_projection.py: pytest not installed (could not execute)
+   - ✓ `semantic_fs_facade_exists` (file_contains) — pattern 'def semantic_retrieve' found in dharma_swarm/fs_substrate/semantic_fs.py
+-  - ✓ `semantic_fs_test_passes` (test_passes) — pytest tests/test_semantic_fs.py: PASS — 5 passed in 0.34s
++  - ✗ `semantic_fs_test_passes` (test_passes) — pytest tests/test_semantic_fs.py: pytest not installed (could not execute)
+   - ✓ `organizer_dry_run_first_exists` (file_contains) — pattern 'def propose_organization' found in dharma_swarm/fs_substrate/organizer.py
+-  - ✓ `organizer_test_passes` (test_passes) — pytest tests/test_organizer.py: PASS — 5 passed in 0.30s
+-  - ✓ `fs_substrate_e2e_passes` (test_passes) — pytest tests/test_fs_substrate_e2e.py: PASS — 4 passed in 0.40s
++  - ✗ `organizer_test_passes` (test_passes) — pytest tests/test_organizer.py: pytest not installed (could not execute)
++  - ✗ `fs_substrate_e2e_passes` (test_passes) — pytest tests/test_fs_substrate_e2e.py: pytest not installed (could not execute)
+ 
+ ## Findings
+ 
+ - **WARN** `wip-high`: 10 ACTIVE tracks exceed warn_active=5 — focus is spreading thin.
+ - **WARN** `spine-uncovered:research-depth`: Spine objective 'research-depth' has no ACTIVE track serving it (coverage gap).
+ - **WARN** `spine-uncovered:revenue-external-humans-served`: Spine objective 'revenue-external-humans-served' has no ACTIVE track serving it (coverage gap).
+-- **INFO** `track-shippable:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] all 12 criteria pass, rigorous evidence present, no open blockers — SHIPPABLE (rigorous bar). Close it.
++- **INFO** `unverified:runtime-truth-reconciliation-2026-06:operator_core_contracts_pass`: [runtime-truth-reconciliation-2026-06] UNVERIFIED — 'operator_core_contracts_pass' could not run here (not a regression): pytest tests/test_operator_core_contracts.py: pytest not installed (could not execute)
++- **INFO** `track-in-progress:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] 11/12 completion criteria pass.
+ - **INFO** `track-provisional:runtime-truth-nats-2026-06`: [runtime-truth-nats-2026-06] 2/2 criteria pass but NOT shippable under the rigorous bar: no rigorous evidence (criteria are existence-only: file_exists/file_contains — add test_passes / commit_on_main / receipt_valid). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).
+ - **INFO** `track-in-progress:runtime-truth-spine-adoption-2026-06`: [runtime-truth-spine-adoption-2026-06] 7/8 completion criteria pass.
+ - **INFO** `track-in-progress:loop-closure-2026-06`: [loop-closure-2026-06] 10/11 completion criteria pass.
+-- **INFO** `track-shippable:truth-graph-platform-2026-06`: [truth-graph-platform-2026-06] all 17 criteria pass, rigorous evidence present, no open blockers — SHIPPABLE (rigorous bar). Close it.
+-- **INFO** `track-shippable:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] all 8 criteria pass, rigorous evidence present, no open blockers — SHIPPABLE (rigorous bar). Close it.
+-- **INFO** `track-shippable:provider-routing-consolidation-2026-06`: [provider-routing-consolidation-2026-06] all 9 criteria pass, rigorous evidence present, no open blockers — SHIPPABLE (rigorous bar). Close it.
++- **INFO** `unverified:truth-graph-platform-2026-06:repo_context_projection_passes`: [truth-graph-platform-2026-06] UNVERIFIED — 'repo_context_projection_passes' could not run here (not a regression): pytest tests/test_truth_graph_repo_context.py: pytest not installed (could not execute)
++- **INFO** `track-in-progress:truth-graph-platform-2026-06`: [truth-graph-platform-2026-06] 16/17 completion criteria pass.
++- **INFO** `unverified:composer-holon-spine-longrun-2026-06:holon_bridge_verifier_passes`: [composer-holon-spine-longrun-2026-06] UNVERIFIED — 'holon_bridge_verifier_passes' could not run here (not a regression): pytest tests/test_holon_bridge.py: pytest not installed (could not execute)
++- **INFO** `track-in-progress:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] 7/8 completion criteria pass.
++- **INFO** `unverified:provider-routing-consolidation-2026-06:precedence_invariant_test_passes`: [provider-routing-consolidation-2026-06] UNVERIFIED — 'precedence_invariant_test_passes' could not run here (not a regression): pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: pytest not installed (could not execute)
++- **INFO** `track-in-progress:provider-routing-consolidation-2026-06`: [provider-routing-consolidation-2026-06] 8/9 completion criteria pass.
+ - **INFO** `track-provisional:orchestration-arena-v1-2026-06`: [orchestration-arena-v1-2026-06] 9/9 criteria pass but NOT shippable under the rigorous bar: 1 open blocker next-item(s); no rigorous evidence (criteria are existence-only: file_exists/file_contains — add test_passes / commit_on_main / receipt_valid). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).
+ - **INFO** `track-in-progress:merge-master-mike-d4-2026-06`: [merge-master-mike-d4-2026-06] 3/4 completion criteria pass.
+-- **INFO** `track-shippable:filesystem-native-substrate-2026-06`: [filesystem-native-substrate-2026-06] all 12 criteria pass, rigorous evidence present, no open blockers — SHIPPABLE (rigorous bar). Close it.
++- **INFO** `unverified:filesystem-native-substrate-2026-06:stage_contract_test_passes`: [filesystem-native-substrate-2026-06] UNVERIFIED — 'stage_contract_test_passes' could not run here (not a regression): pytest tests/test_stage_contracts.py: pytest not installed (could not execute)
++- **INFO** `unverified:filesystem-native-substrate-2026-06:okf_roundtrip_test_passes`: [filesystem-native-substrate-2026-06] UNVERIFIED — 'okf_roundtrip_test_passes' could not run here (not a regression): pytest tests/test_okf_projection.py: pytest not installed (could not execute)
++- **INFO** `unverified:filesystem-native-substrate-2026-06:semantic_fs_test_passes`: [filesystem-native-substrate-2026-06] UNVERIFIED — 'semantic_fs_test_passes' could not run here (not a regression): pytest tests/test_semantic_fs.py: pytest not installed (could not execute)
++- **INFO** `unverified:filesystem-native-substrate-2026-06:organizer_test_passes`: [filesystem-native-substrate-2026-06] UNVERIFIED — 'organizer_test_passes' could not run here (not a regression): pytest tests/test_organizer.py: pytest not installed (could not execute)
++- **INFO** `unverified:filesystem-native-substrate-2026-06:fs_substrate_e2e_passes`: [filesystem-native-substrate-2026-06] UNVERIFIED — 'fs_substrate_e2e_passes' could not run here (not a regression): pytest tests/test_fs_substrate_e2e.py: pytest not installed (could not execute)
++- **INFO** `track-in-progress:filesystem-native-substrate-2026-06`: [filesystem-native-substrate-2026-06] 7/12 completion criteria pass.
+diff --git a/reports/governance/track_portfolio.json b/reports/governance/track_portfolio.json
+index d92324291..2f95962b5 100644
+--- a/reports/governance/track_portfolio.json
++++ b/reports/governance/track_portfolio.json
+@@ -1,11 +1,11 @@
+ {
+-  "generated_at": "2026-06-25T05:45:22+00:00",
++  "generated_at": "2026-06-26T00:35:44+09:00",
+   "schema_version": 2,
+   "active_track_id": "runtime-truth-reconciliation-2026-06",
+-  "shippable": true,
++  "shippable": false,
+   "prerequisites_ok": true,
+   "completion_progress": {
+-    "passed": 12,
++    "passed": 11,
+     "total": 12
+   },
+   "criteria": [
+@@ -13,98 +13,113 @@
+       "id": "runtime_spine_package_exists",
+       "kind": "file_exists",
+       "passed": true,
+-      "detail": "dharma_swarm/spine/__init__.py present"
++      "detail": "dharma_swarm/spine/__init__.py present",
++      "executed": true
+     },
+     {
+       "id": "receipt_equivalence_matrix_exists",
+       "kind": "file_exists",
+       "passed": true,
+-      "detail": "docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md present"
++      "detail": "docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md present",
++      "executed": true
+     },
+     {
+       "id": "a2a_persistence_invariant_tests_exist",
+       "kind": "file_exists",
+       "passed": true,
+-      "detail": "tests/test_spine_persistence_invariant.py present"
++      "detail": "tests/test_spine_persistence_invariant.py present",
++      "executed": true
+     },
+     {
+       "id": "runtime_truth_packet_defined",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'class RuntimeTruthPacket' found in dharma_swarm/operator_core/contracts.py"
++      "detail": "pattern 'class RuntimeTruthPacket' found in dharma_swarm/operator_core/contracts.py",
++      "executed": true
+     },
+     {
+       "id": "runtime_truth_axes_defined",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'class RuntimeTruthState' found in dharma_swarm/operator_core/contracts.py"
++      "detail": "pattern 'class RuntimeTruthState' found in dharma_swarm/operator_core/contracts.py",
++      "executed": true
+     },
+     {
+       "id": "onboard_runtime_truth_render",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'render_runtime_truth' found in scripts/governance/agent_onboard.py"
++      "detail": "pattern 'render_runtime_truth' found in scripts/governance/agent_onboard.py",
++      "executed": true
+     },
+     {
+       "id": "onboard_runtime_truth_no_write_test",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'test_runtime_truth_render_is_read_only' found in tests/test_agent_onboard.py"
++      "detail": "pattern 'test_runtime_truth_render_is_read_only' found in tests/test_agent_onboard.py",
++      "executed": true
+     },
+     {
+       "id": "runtime_truth_packet_axis_test",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'test_runtime_truth_packet_keeps_state_axes_separate' found in tests/test_operator_core_contracts.py"
++      "detail": "pattern 'test_runtime_truth_packet_keeps_state_axes_separate' found in tests/test_operator_core_contracts.py",
++      "executed": true
+     },
+     {
+       "id": "a2a_single_persistence_invariant",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'test_submit_via_spine_retry_does_not_create_second_runtime_receipt' found in tests/test_spine_persistence_invariant.py"
++      "detail": "pattern 'test_submit_via_spine_retry_does_not_create_second_runtime_receipt' found in tests/test_spine_persistence_invariant.py",
++      "executed": true
+     },
+     {
+       "id": "spine_bypass_report_exists",
+       "kind": "file_exists",
+       "passed": true,
+-      "detail": "scripts/governance/spine_bypass_report.py present"
++      "detail": "scripts/governance/spine_bypass_report.py present",
++      "executed": true
+     },
+     {
+       "id": "receipt_json_projection_only_doc",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'projection/cache only' found in docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md"
++      "detail": "pattern 'projection/cache only' found in docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md",
++      "executed": true
+     },
+     {
+       "id": "correlation_spine_manifest_still_declared",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml"
++      "detail": "pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml",
++      "executed": true
+     },
+     {
+       "id": "evidence_receipt_still_defined",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py"
++      "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py",
++      "executed": true
+     },
+     {
+       "id": "runtime_receipt_still_defined",
+       "kind": "file_contains",
+       "passed": true,
+-      "detail": "pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py"
++      "detail": "pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py",
++      "executed": true
+     },
+     {
+       "id": "operator_core_contracts_pass",
+       "kind": "test_passes",
+-      "passed": true,
+-      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 1.56s"
++      "passed": false,
++      "detail": "pytest tests/test_operator_core_contracts.py: pytest not installed (could not execute)",
++      "executed": false
+     }
+   ],
+   "portfolio_summary": {
+     "active": 10,
+     "max_active": 10,
+     "warn_active": 5,
+-    "shippable": 5
++    "shippable": 0
+   },
+   "spine_objectives": [
+     {
+@@ -167,13 +182,15 @@
+       "verified_at": "2026-06-23",
+       "ttl_days": 14,
+       "owner": "@AmitabhainArunachala",
+-      "shippable": true,
+-      "criteria_pass": true,
+-      "ship_blocks": [],
+-      "has_rigorous_evidence": true,
++      "shippable": false,
++      "criteria_pass": false,
++      "ship_blocks": [
++        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)"
++      ],
++      "has_rigorous_evidence": false,
+       "prerequisites_ok": true,
+       "completion_progress": {
+-        "passed": 12,
++        "passed": 11,
+         "total": 12
+       },
+       "criteria": [
+@@ -181,91 +198,106 @@
+           "id": "runtime_spine_package_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/spine/__init__.py present"
++          "detail": "dharma_swarm/spine/__init__.py present",
++          "executed": true
+         },
+         {
+           "id": "receipt_equivalence_matrix_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md present"
++          "detail": "docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md present",
++          "executed": true
+         },
+         {
+           "id": "a2a_persistence_invariant_tests_exist",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "tests/test_spine_persistence_invariant.py present"
++          "detail": "tests/test_spine_persistence_invariant.py present",
++          "executed": true
+         },
+         {
+           "id": "runtime_truth_packet_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class RuntimeTruthPacket' found in dharma_swarm/operator_core/contracts.py"
++          "detail": "pattern 'class RuntimeTruthPacket' found in dharma_swarm/operator_core/contracts.py",
++          "executed": true
+         },
+         {
+           "id": "runtime_truth_axes_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class RuntimeTruthState' found in dharma_swarm/operator_core/contracts.py"
++          "detail": "pattern 'class RuntimeTruthState' found in dharma_swarm/operator_core/contracts.py",
++          "executed": true
+         },
+         {
+           "id": "onboard_runtime_truth_render",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'render_runtime_truth' found in scripts/governance/agent_onboard.py"
++          "detail": "pattern 'render_runtime_truth' found in scripts/governance/agent_onboard.py",
++          "executed": true
+         },
+         {
+           "id": "onboard_runtime_truth_no_write_test",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_runtime_truth_render_is_read_only' found in tests/test_agent_onboard.py"
++          "detail": "pattern 'test_runtime_truth_render_is_read_only' found in tests/test_agent_onboard.py",
++          "executed": true
+         },
+         {
+           "id": "runtime_truth_packet_axis_test",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_runtime_truth_packet_keeps_state_axes_separate' found in tests/test_operator_core_contracts.py"
++          "detail": "pattern 'test_runtime_truth_packet_keeps_state_axes_separate' found in tests/test_operator_core_contracts.py",
++          "executed": true
+         },
+         {
+           "id": "a2a_single_persistence_invariant",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_submit_via_spine_retry_does_not_create_second_runtime_receipt' found in tests/test_spine_persistence_invariant.py"
++          "detail": "pattern 'test_submit_via_spine_retry_does_not_create_second_runtime_receipt' found in tests/test_spine_persistence_invariant.py",
++          "executed": true
+         },
+         {
+           "id": "spine_bypass_report_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/governance/spine_bypass_report.py present"
++          "detail": "scripts/governance/spine_bypass_report.py present",
++          "executed": true
+         },
+         {
+           "id": "receipt_json_projection_only_doc",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'projection/cache only' found in docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md"
++          "detail": "pattern 'projection/cache only' found in docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md",
++          "executed": true
+         },
+         {
+           "id": "correlation_spine_manifest_still_declared",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml"
++          "detail": "pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml",
++          "executed": true
+         },
+         {
+           "id": "evidence_receipt_still_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py"
++          "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py",
++          "executed": true
+         },
+         {
+           "id": "runtime_receipt_still_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py"
++          "detail": "pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py",
++          "executed": true
+         },
+         {
+           "id": "operator_core_contracts_pass",
+           "kind": "test_passes",
+-          "passed": true,
+-          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 1.56s"
++          "passed": false,
++          "detail": "pytest tests/test_operator_core_contracts.py: pytest not installed (could not execute)",
++          "executed": false
+         }
+       ]
+     },
+@@ -306,19 +338,22 @@
+           "id": "nats_master_spec_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present"
++          "detail": "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present",
++          "executed": true
+         },
+         {
+           "id": "nats_master_spec_present",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present"
++          "detail": "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present",
++          "executed": true
+         },
+         {
+           "id": "nats_transport_landed",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'NATS' found in docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md"
++          "detail": "pattern 'NATS' found in docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
++          "executed": true
+         }
+       ]
+     },
+@@ -364,61 +399,71 @@
+           "id": "spine_package_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/spine/__init__.py present"
++          "detail": "dharma_swarm/spine/__init__.py present",
++          "executed": true
+         },
+         {
+           "id": "invoke_agent_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py"
++          "detail": "pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py",
++          "executed": true
+         },
+         {
+           "id": "a2a_bridge_calls_spine",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/a2a/a2a_bridge.py"
++          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/a2a/a2a_bridge.py",
++          "executed": true
+         },
+         {
+           "id": "orchestrator_calls_spine",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/orchestrator.py"
++          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/orchestrator.py",
++          "executed": true
+         },
+         {
+           "id": "agent_runner_calls_spine",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/agent_runner.py"
++          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/agent_runner.py",
++          "executed": true
+         },
+         {
+           "id": "dispatch_emits_evidence_receipt",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_every_dispatch_emits_exactly_one_evidence_receipt' found in tests/test_spine_adoption_dispatch.py"
++          "detail": "pattern 'test_every_dispatch_emits_exactly_one_evidence_receipt' found in tests/test_spine_adoption_dispatch.py",
++          "executed": true
+         },
+         {
+           "id": "zero_dropoff_sources",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_no_dropoff_sources_remain' found in tests/test_spine_adoption_dispatch.py"
++          "detail": "pattern 'test_no_dropoff_sources_remain' found in tests/test_spine_adoption_dispatch.py",
++          "executed": true
+         },
+         {
+           "id": "bypass_allowlist_empty",
+           "kind": "file_contains",
+           "passed": false,
+-          "detail": "pattern '(?m)^_INTENTIONAL_BYPASS: dict\\\\[tuple\\\\[str, int\\\\], str\\\\] = \\\\{\\\\s*\\\\}' NOT FOUND in scripts/governance/spine_bypass_report.py"
++          "detail": "pattern '(?m)^_INTENTIONAL_BYPASS: dict\\\\[tuple\\\\[str, int\\\\], str\\\\] = \\\\{\\\\s*\\\\}' NOT FOUND in scripts/governance/spine_bypass_report.py",
++          "executed": true
+         },
+         {
+           "id": "adoption_narrative_docs",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/architecture/SPINE_ADOPTION_NARRATIVE.md present"
++          "detail": "docs/architecture/SPINE_ADOPTION_NARRATIVE.md present",
++          "executed": true
+         },
+         {
+           "id": "gate1_witnessed",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "reports/governance/GATE1_WITNESSED.md present"
++          "detail": "reports/governance/GATE1_WITNESSED.md present",
++          "executed": true
+         }
+       ]
+     },
+@@ -460,79 +505,92 @@
+           "id": "loop_map_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "CYBERNETIC_LOOP_MAP.md present"
++          "detail": "CYBERNETIC_LOOP_MAP.md present",
++          "executed": true
+         },
+         {
+           "id": "loop_supervisor_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/loop_supervisor.py present"
++          "detail": "dharma_swarm/loop_supervisor.py present",
++          "executed": true
+         },
+         {
+           "id": "phase0_dossier_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md present"
++          "detail": "reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md present",
++          "executed": true
+         },
+         {
+           "id": "phase0_fresh_status_table",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'Fresh 13-loop status table' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md"
++          "detail": "pattern 'Fresh 13-loop status table' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md",
++          "executed": true
+         },
+         {
+           "id": "one_wire_invariant_stated",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'never let internal artifacts touch archive fitness' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md"
++          "detail": "pattern 'never let internal artifacts touch archive fitness' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md",
++          "executed": true
+         },
+         {
+           "id": "loop1_closure_receipt_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md present"
++          "detail": "reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md present",
++          "executed": true
+         },
+         {
+           "id": "campaign_retrospective_exists",
+           "kind": "file_exists",
+           "passed": false,
+-          "detail": "reports/loop_closure/RETROSPECTIVE.md MISSING"
++          "detail": "reports/loop_closure/RETROSPECTIVE.md MISSING",
++          "executed": true
+         },
+         {
+           "id": "cybernetics_codex_manifest_registered",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'id: cybernetics_codex' found in ACTIVE_SURFACE_MANIFEST.yaml"
++          "detail": "pattern 'id: cybernetics_codex' found in ACTIVE_SURFACE_MANIFEST.yaml",
++          "executed": true
+         },
+         {
+           "id": "cybernetics_codex_seed_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/agents/cybernetics_codex/agent.seed.yaml present"
++          "detail": "docs/agents/cybernetics_codex/agent.seed.yaml present",
++          "executed": true
+         },
+         {
+           "id": "cybernetics_codex_soul_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/agents/cybernetics_codex/SOUL.md present"
++          "detail": "docs/agents/cybernetics_codex/SOUL.md present",
++          "executed": true
+         },
+         {
+           "id": "cybernetics_codex_context_desk_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/agents/cybernetics_codex/CONTEXT_ENGINEERING.md present"
++          "detail": "docs/agents/cybernetics_codex/CONTEXT_ENGINEERING.md present",
++          "executed": true
+         },
+         {
+           "id": "cybernetics_codex_audit_script_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/governance/cybernetics_codex_audit.py present"
++          "detail": "scripts/governance/cybernetics_codex_audit.py present",
++          "executed": true
+         },
+         {
+           "id": "cybernetics_codex_registration_script_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/governance/register_cybernetics_codex.py present"
++          "detail": "scripts/governance/register_cybernetics_codex.py present",
++          "executed": true
+         }
+       ]
+     },
+@@ -569,13 +627,13 @@
+       "verified_at": "2026-06-23",
+       "ttl_days": 21,
+       "owner": "@codex",
+-      "shippable": true,
+-      "criteria_pass": true,
++      "shippable": false,
++      "criteria_pass": false,
+       "ship_blocks": [],
+       "has_rigorous_evidence": true,
+       "prerequisites_ok": true,
+       "completion_progress": {
+-        "passed": 17,
++        "passed": 16,
+         "total": 17
+       },
+       "criteria": [
+@@ -583,121 +641,141 @@
+           "id": "identity_owner_on_branch",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "foundations/THE_ORGANISM.md present"
++          "detail": "foundations/THE_ORGANISM.md present",
++          "executed": true
+         },
+         {
+           "id": "vision_owner_on_branch",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/vision_maps/NORTH_STAR.md present"
++          "detail": "docs/vision_maps/NORTH_STAR.md present",
++          "executed": true
+         },
+         {
+           "id": "orientation_graph_owner_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/governance/orientation_graph.py present"
++          "detail": "scripts/governance/orientation_graph.py present",
++          "executed": true
+         },
+         {
+           "id": "expanded_orientation_packet_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class OrientationPacket' found in scripts/governance/orientation_graph.py"
++          "detail": "pattern 'class OrientationPacket' found in scripts/governance/orientation_graph.py",
++          "executed": true
+         },
+         {
+           "id": "repo_context_writer_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def write_repo_context' found in scripts/governance/orientation_graph.py"
++          "detail": "pattern 'def write_repo_context' found in scripts/governance/orientation_graph.py",
++          "executed": true
+         },
+         {
+           "id": "repo_context_hash_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'context_hash' found in scripts/governance/orientation_graph.py"
++          "detail": "pattern 'context_hash' found in scripts/governance/orientation_graph.py",
++          "executed": true
+         },
+         {
+           "id": "make_orient_writes_context",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern '--write-context' found in Makefile"
++          "detail": "pattern '--write-context' found in Makefile",
++          "executed": true
+         },
+         {
+           "id": "orientation_default_read_only_test",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_orientation_graph_render_is_read_only' found in tests/test_orientation_graph.py"
++          "detail": "pattern 'test_orientation_graph_render_is_read_only' found in tests/test_orientation_graph.py",
++          "executed": true
+         },
+         {
+           "id": "repo_context_test_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_truth_graph_repo_context_writes_json_and_markdown' found in tests/test_truth_graph_repo_context.py"
++          "detail": "pattern 'test_truth_graph_repo_context_writes_json_and_markdown' found in tests/test_truth_graph_repo_context.py",
++          "executed": true
+         },
+         {
+           "id": "a2a_receipt_gate_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/a2a/task_receipt.py present"
++          "detail": "dharma_swarm/a2a/task_receipt.py present",
++          "executed": true
+         },
+         {
+           "id": "a2a_receipt_schema_declared",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'dharma_a2a_task_receipt.v1' found in dharma_swarm/a2a/task_receipt.py"
++          "detail": "pattern 'dharma_a2a_task_receipt.v1' found in dharma_swarm/a2a/task_receipt.py",
++          "executed": true
+         },
+         {
+           "id": "a2a_receipted_inbox_reader_defined",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def read_receipted_inbox' found in dharma_swarm/a2a/task_receipt.py"
++          "detail": "pattern 'def read_receipted_inbox' found in dharma_swarm/a2a/task_receipt.py",
++          "executed": true
+         },
+         {
+           "id": "agent_presence_projection_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/a2a/agent_presence.py present"
++          "detail": "dharma_swarm/a2a/agent_presence.py present",
++          "executed": true
+         },
+         {
+           "id": "agent_presence_stale_red",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'age > 2' found in dharma_swarm/a2a/agent_presence.py"
++          "detail": "pattern 'age > 2' found in dharma_swarm/a2a/agent_presence.py",
++          "executed": true
+         },
+         {
+           "id": "nats_e2e_demo_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/governance/truth_graph_nats_e2e_demo.py present"
++          "detail": "scripts/governance/truth_graph_nats_e2e_demo.py present",
++          "executed": true
+         },
+         {
+           "id": "nats_e2e_shell_wrapper_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/governance/run_truth_graph_nats_e2e_demo.sh present"
++          "detail": "scripts/governance/run_truth_graph_nats_e2e_demo.sh present",
++          "executed": true
+         },
+         {
+           "id": "a2a_gate_tests_exist",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern \"receipt or it didn't happen\" found in tests/test_a2a_gate.py"
++          "detail": "pattern \"receipt or it didn't happen\" found in tests/test_a2a_gate.py",
++          "executed": true
+         },
+         {
+           "id": "registry_presence_tests_exist",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'heartbeat_status' found in tests/test_agent_registry_presence.py"
++          "detail": "pattern 'heartbeat_status' found in tests/test_agent_registry_presence.py",
++          "executed": true
+         },
+         {
+           "id": "repo_context_projection_passes",
+           "kind": "test_passes",
+-          "passed": true,
+-          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 0.56s"
++          "passed": false,
++          "detail": "pytest tests/test_truth_graph_repo_context.py: pytest not installed (could not execute)",
++          "executed": false
+         },
+         {
+           "id": "truth_graph_projection_on_main",
+           "kind": "commit_on_main",
+           "passed": true,
+-          "detail": "936d365db is an ancestor of origin/main"
++          "detail": "936d365db is an ancestor of origin/main",
++          "executed": true
+         }
+       ]
+     },
+@@ -729,13 +807,13 @@
+       "verified_at": "2026-06-23",
+       "ttl_days": 14,
+       "owner": "@AmitabhainArunachala",
+-      "shippable": true,
+-      "criteria_pass": true,
++      "shippable": false,
++      "criteria_pass": false,
+       "ship_blocks": [],
+       "has_rigorous_evidence": true,
+       "prerequisites_ok": true,
+       "completion_progress": {
+-        "passed": 8,
++        "passed": 7,
+         "total": 8
+       },
+       "criteria": [
+@@ -743,67 +821,78 @@
+           "id": "evidence_receipt_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py"
++          "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py",
++          "executed": true
+         },
+         {
+           "id": "holon_orchestrator_spec_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/sovereign_holons/HOLON_ORCHESTRATOR_BUILD_SPEC.md present"
++          "detail": "docs/sovereign_holons/HOLON_ORCHESTRATOR_BUILD_SPEC.md present",
++          "executed": true
+         },
+         {
+           "id": "holon_runtime_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/holon_runtime.py present"
++          "detail": "dharma_swarm/holon_runtime.py present",
++          "executed": true
+         },
+         {
+           "id": "readiness_packet_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md present"
++          "detail": "reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md present",
++          "executed": true
+         },
+         {
+           "id": "receipt_profile_documented",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'The command receipt is a profile of `dharma_swarm.spine.receipt.EvidenceReceipt`' found in reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md"
++          "detail": "pattern 'The command receipt is a profile of `dharma_swarm.spine.receipt.EvidenceReceipt`' found in reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md",
++          "executed": true
+         },
+         {
+           "id": "frozen_verifier_runbook_present",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'Frozen Non-Implementer Verifier Runbook' found in reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md"
++          "detail": "pattern 'Frozen Non-Implementer Verifier Runbook' found in reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md",
++          "executed": true
+         },
+         {
+           "id": "holon_bridge_verifier_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "tests/test_holon_bridge.py present"
++          "detail": "tests/test_holon_bridge.py present",
++          "executed": true
+         },
+         {
+           "id": "holon_runtime_verifier_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "tests/test_holon_runtime.py present"
++          "detail": "tests/test_holon_runtime.py present",
++          "executed": true
+         },
+         {
+           "id": "composer_wake_witness_pending",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md present"
++          "detail": "reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md present",
++          "executed": true
+         },
+         {
+           "id": "holon_bridge_verifier_passes",
+           "kind": "test_passes",
+-          "passed": true,
+-          "detail": "pytest tests/test_holon_bridge.py: PASS \u2014 15 passed, 1 skipped in 0.34s"
++          "passed": false,
++          "detail": "pytest tests/test_holon_bridge.py: pytest not installed (could not execute)",
++          "executed": false
+         },
+         {
+           "id": "holon_substrate_on_main",
+           "kind": "commit_on_main",
+           "passed": true,
+-          "detail": "9c76b210 is an ancestor of origin/main"
++          "detail": "9c76b210 is an ancestor of origin/main",
++          "executed": true
+         }
+       ]
+     },
+@@ -838,13 +927,13 @@
+       "verified_at": "2026-06-22",
+       "ttl_days": 21,
+       "owner": "@AmitabhainArunachala",
+-      "shippable": true,
+-      "criteria_pass": true,
++      "shippable": false,
++      "criteria_pass": false,
+       "ship_blocks": [],
+       "has_rigorous_evidence": true,
+       "prerequisites_ok": true,
+       "completion_progress": {
+-        "passed": 9,
++        "passed": 8,
+         "total": 9
+       },
+       "criteria": [
+@@ -852,73 +941,85 @@
+           "id": "model_pool_owner_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/model_pool.py present"
++          "detail": "dharma_swarm/model_pool.py present",
++          "executed": true
+         },
+         {
+           "id": "provider_policy_owner_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/provider_policy.py present"
++          "detail": "dharma_swarm/provider_policy.py present",
++          "executed": true
+         },
+         {
+           "id": "model_hierarchy_owner_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/model_hierarchy.py present"
++          "detail": "dharma_swarm/model_hierarchy.py present",
++          "executed": true
+         },
+         {
+           "id": "routing_architecture_doc_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md present"
++          "detail": "docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md present",
++          "executed": true
+         },
+         {
+           "id": "routing_precedence_documented",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'explicit > capability' found in docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md"
++          "detail": "pattern 'explicit > capability' found in docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md",
++          "executed": true
+         },
+         {
+           "id": "explicit_provider_honored",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'preferred_provider' found in dharma_swarm/provider_policy.py"
++          "detail": "pattern 'preferred_provider' found in dharma_swarm/provider_policy.py",
++          "executed": true
+         },
+         {
+           "id": "explicit_wins_test_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'test_explicit_provider_is_selected' found in tests/test_provider_routing_explicit.py"
++          "detail": "pattern 'test_explicit_provider_is_selected' found in tests/test_provider_routing_explicit.py",
++          "executed": true
+         },
+         {
+           "id": "power_first_default",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'power_first' found in dharma_swarm/provider_policy.py"
++          "detail": "pattern 'power_first' found in dharma_swarm/provider_policy.py",
++          "executed": true
+         },
+         {
+           "id": "zhipu_provider_enum",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'ZHIPU' found in dharma_swarm/models.py"
++          "detail": "pattern 'ZHIPU' found in dharma_swarm/models.py",
++          "executed": true
+         },
+         {
+           "id": "zhipu_provider_class",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class ZhipuProvider' found in dharma_swarm/providers.py"
++          "detail": "pattern 'class ZhipuProvider' found in dharma_swarm/providers.py",
++          "executed": true
+         },
+         {
+           "id": "precedence_invariant_test_passes",
+           "kind": "test_passes",
+-          "passed": true,
+-          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.28s"
++          "passed": false,
++          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: pytest not installed (could not execute)",
++          "executed": false
+         },
+         {
+           "id": "stage4_precedence_locked_on_main",
+           "kind": "commit_on_main",
+           "passed": true,
+-          "detail": "bc110d84 is an ancestor of origin/main"
++          "detail": "bc110d84 is an ancestor of origin/main",
++          "executed": true
+         }
+       ]
+     },
+@@ -967,73 +1068,85 @@
+           "id": "arena_runner_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/coordination/arena/runner.py present"
++          "detail": "dharma_swarm/coordination/arena/runner.py present",
++          "executed": true
+         },
+         {
+           "id": "arena_scorer_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/coordination/arena/scorer.py present"
++          "detail": "dharma_swarm/coordination/arena/scorer.py present",
++          "executed": true
+         },
+         {
+           "id": "orchestration_genome_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/coordination/genome.py present"
++          "detail": "dharma_swarm/coordination/genome.py present",
++          "executed": true
+         },
+         {
+           "id": "frozen_taskpack_present",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'TASK_PACK_ID' found in dharma_swarm/coordination/arena/taskpack.py"
++          "detail": "pattern 'TASK_PACK_ID' found in dharma_swarm/coordination/arena/taskpack.py",
++          "executed": true
+         },
+         {
+           "id": "deterministic_scorer_hash",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def scorer_hash' found in dharma_swarm/coordination/arena/scorer.py"
++          "detail": "pattern 'def scorer_hash' found in dharma_swarm/coordination/arena/scorer.py",
++          "executed": true
+         },
+         {
+           "id": "orchestration_genome_class",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class OrchestrationGenome' found in dharma_swarm/coordination/genome.py"
++          "detail": "pattern 'class OrchestrationGenome' found in dharma_swarm/coordination/genome.py",
++          "executed": true
+         },
+         {
+           "id": "zero_weight_orchestrator_map_elites",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class MapElitesArchive' found in dharma_swarm/coordination/orchestrator_v1.py"
++          "detail": "pattern 'class MapElitesArchive' found in dharma_swarm/coordination/orchestrator_v1.py",
++          "executed": true
+         },
+         {
+           "id": "dpi_decorrelation_gated_on_correctness",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def decorrelation_bonus' found in dharma_swarm/coordination/dpi.py"
++          "detail": "pattern 'def decorrelation_bonus' found in dharma_swarm/coordination/dpi.py",
++          "executed": true
+         },
+         {
+           "id": "council_trace_verification",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class Council' found in dharma_swarm/council/council.py"
++          "detail": "pattern 'class Council' found in dharma_swarm/council/council.py",
++          "executed": true
+         },
+         {
+           "id": "arena_v1_test_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def test_positive_lift_candidate_beats_best_single_at_parity' found in tests/test_arena_v1.py"
++          "detail": "pattern 'def test_positive_lift_candidate_beats_best_single_at_parity' found in tests/test_arena_v1.py",
++          "executed": true
+         },
+         {
+           "id": "dpi_test_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "tests/test_dpi.py present"
++          "detail": "tests/test_dpi.py present",
++          "executed": true
+         },
+         {
+           "id": "closure_checks_test_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "tests/test_coordination_closure_checks.py present"
++          "detail": "tests/test_coordination_closure_checks.py present",
++          "executed": true
+         }
+       ]
+     },
+@@ -1079,49 +1192,57 @@
+           "id": "pr_merge_control_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/runtime/pr_merge_control.py present"
++          "detail": "scripts/runtime/pr_merge_control.py present",
++          "executed": true
+         },
+         {
+           "id": "mike_daemon_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "scripts/runtime/merge_master_mike_daemon.py present"
++          "detail": "scripts/runtime/merge_master_mike_daemon.py present",
++          "executed": true
+         },
+         {
+           "id": "automerge_workflow_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": ".github/workflows/automerge.yml present"
++          "detail": ".github/workflows/automerge.yml present",
++          "executed": true
+         },
+         {
+           "id": "router_workflow_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": ".github/workflows/codex-mention-router.yml present"
++          "detail": ".github/workflows/codex-mention-router.yml present",
++          "executed": true
+         },
+         {
+           "id": "github_review_receipt_bridge",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'github_review' found in scripts/runtime/pr_merge_control.py"
++          "detail": "pattern 'github_review' found in scripts/runtime/pr_merge_control.py",
++          "executed": true
+         },
+         {
+           "id": "github_review_bridge_tested",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "tests/test_pr_merge_control_github_reviews.py present"
++          "detail": "tests/test_pr_merge_control_github_reviews.py present",
++          "executed": true
+         },
+         {
+           "id": "automerge_enrolls_all_nondraft",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'mike-watch' found in .github/workflows/automerge.yml"
++          "detail": "pattern 'mike-watch' found in .github/workflows/automerge.yml",
++          "executed": true
+         },
+         {
+           "id": "mike_cloud_heartbeat",
+           "kind": "file_contains",
+           "passed": false,
+-          "detail": "pattern 'schedule:' NOT FOUND in .github/workflows/merge-master-mike-backlog.yml"
++          "detail": "pattern 'schedule:' NOT FOUND in .github/workflows/merge-master-mike-backlog.yml",
++          "executed": true
+         }
+       ]
+     },
+@@ -1155,13 +1276,15 @@
+       "verified_at": "2026-06-24",
+       "ttl_days": 21,
+       "owner": "@AmitabhainArunachala",
+-      "shippable": true,
+-      "criteria_pass": true,
+-      "ship_blocks": [],
+-      "has_rigorous_evidence": true,
++      "shippable": false,
++      "criteria_pass": false,
++      "ship_blocks": [
++        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)"
++      ],
++      "has_rigorous_evidence": false,
+       "prerequisites_ok": true,
+       "completion_progress": {
+-        "passed": 12,
++        "passed": 7,
+         "total": 12
+       },
+       "criteria": [
+@@ -1169,91 +1292,106 @@
+           "id": "dossier_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md present"
++          "detail": "docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md present",
++          "executed": true
+         },
+         {
+           "id": "spine_invoke_owner_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py"
++          "detail": "pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py",
++          "executed": true
+         },
+         {
+           "id": "handoff_owner_exists",
+           "kind": "file_exists",
+           "passed": true,
+-          "detail": "dharma_swarm/handoff.py present"
++          "detail": "dharma_swarm/handoff.py present",
++          "executed": true
+         },
+         {
+           "id": "dossier_consolidates_four_powers",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'The four powers at a glance' found in docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md"
++          "detail": "pattern 'The four powers at a glance' found in docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md",
++          "executed": true
+         },
+         {
+           "id": "dossier_carries_organism_tie",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'How this serves the organism' found in docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md"
++          "detail": "pattern 'How this serves the organism' found in docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md",
++          "executed": true
+         },
+         {
+           "id": "stage_contract_reader_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'class StageContract' found in dharma_swarm/fs_substrate/stage_contracts.py"
++          "detail": "pattern 'class StageContract' found in dharma_swarm/fs_substrate/stage_contracts.py",
++          "executed": true
+         },
+         {
+           "id": "stage_reader_routes_through_spine",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'invoke_agent' found in dharma_swarm/fs_substrate/stage_executor.py"
++          "detail": "pattern 'invoke_agent' found in dharma_swarm/fs_substrate/stage_executor.py",
++          "executed": true
+         },
+         {
+           "id": "stage_contract_test_passes",
+           "kind": "test_passes",
+-          "passed": true,
+-          "detail": "pytest tests/test_stage_contracts.py: PASS \u2014 13 passed in 0.36s"
++          "passed": false,
++          "detail": "pytest tests/test_stage_contracts.py: pytest not installed (could not execute)",
++          "executed": false
+         },
+         {
+           "id": "okf_projector_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def project_semantic_objects' found in dharma_swarm/fs_substrate/okf.py"
++          "detail": "pattern 'def project_semantic_objects' found in dharma_swarm/fs_substrate/okf.py",
++          "executed": true
+         },
+         {
+           "id": "okf_roundtrip_test_passes",
+           "kind": "test_passes",
+-          "passed": true,
+-          "detail": "pytest tests/test_okf_projection.py: PASS \u2014 8 passed in 0.36s"
++          "passed": false,
++          "detail": "pytest tests/test_okf_projection.py: pytest not installed (could not execute)",
++          "executed": false
+         },
+         {
+           "id": "semantic_fs_facade_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def semantic_retrieve' found in dharma_swarm/fs_substrate/semantic_fs.py"
++          "detail": "pattern 'def semantic_retrieve' found in dharma_swarm/fs_substrate/semantic_fs.py",
++          "executed": true
+         },
+         {
+           "id": "semantic_fs_test_passes",
+           "kind": "test_passes",
+-          "passed": true,
+-          "detail": "pytest tests/test_semantic_fs.py: PASS \u2014 5 passed in 0.34s"
++          "passed": false,
++          "detail": "pytest tests/test_semantic_fs.py: pytest not installed (could not execute)",
++          "executed": false
+         },
+         {
+           "id": "organizer_dry_run_first_exists",
+           "kind": "file_contains",
+           "passed": true,
+-          "detail": "pattern 'def propose_organization' found in dharma_swarm/fs_substrate/organizer.py"
++          "detail": "pattern 'def propose_organization' found in dharma_swarm/fs_substrate/organizer.py",
++          "executed": true
+         },
+         {
+           "id": "organizer_test_passes",
+           "kind": "test_passes",
+-          "passed": true,
+-          "detail": "pytest tests/test_organizer.py: PASS \u2014 5 passed in 0.30s"
++          "passed": false,
++          "detail": "pytest tests/test_organizer.py: pytest not installed (could not execute)",
++          "executed": false
+         },
+         {
+           "id": "fs_substrate_e2e_passes",
+           "kind": "test_passes",
+-          "passed": true,
+-          "detail": "pytest tests/test_fs_substrate_e2e.py: PASS \u2014 4 passed in 0.40s"
++          "passed": false,
++          "detail": "pytest tests/test_fs_substrate_e2e.py: pytest not installed (could not execute)",
++          "executed": false
+         }
+       ]
+     }
+@@ -1279,8 +1417,14 @@
+     },
+     {
+       "severity": "INFO",
+-      "check": "track-shippable:runtime-truth-reconciliation-2026-06",
+-      "message": "[runtime-truth-reconciliation-2026-06] all 12 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
++      "check": "unverified:runtime-truth-reconciliation-2026-06:operator_core_contracts_pass",
++      "message": "[runtime-truth-reconciliation-2026-06] UNVERIFIED \u2014 'operator_core_contracts_pass' could not run here (not a regression): pytest tests/test_operator_core_contracts.py: pytest not installed (could not execute)",
++      "criterion_id": "operator_core_contracts_pass"
++    },
++    {
++      "severity": "INFO",
++      "check": "track-in-progress:runtime-truth-reconciliation-2026-06",
++      "message": "[runtime-truth-reconciliation-2026-06] 11/12 completion criteria pass.",
+       "criterion_id": null
+     },
+     {
+@@ -1303,20 +1447,38 @@
+     },
+     {
+       "severity": "INFO",
+-      "check": "track-shippable:truth-graph-platform-2026-06",
+-      "message": "[truth-graph-platform-2026-06] all 17 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
++      "check": "unverified:truth-graph-platform-2026-06:repo_context_projection_passes",
++      "message": "[truth-graph-platform-2026-06] UNVERIFIED \u2014 'repo_context_projection_passes' could not run here (not a regression): pytest tests/test_truth_graph_repo_context.py: pytest not installed (could not execute)",
++      "criterion_id": "repo_context_projection_passes"
++    },
++    {
++      "severity": "INFO",
++      "check": "track-in-progress:truth-graph-platform-2026-06",
++      "message": "[truth-graph-platform-2026-06] 16/17 completion criteria pass.",
+       "criterion_id": null
+     },
+     {
+       "severity": "INFO",
+-      "check": "track-shippable:composer-holon-spine-longrun-2026-06",
+-      "message": "[composer-holon-spine-longrun-2026-06] all 8 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
++      "check": "unverified:composer-holon-spine-longrun-2026-06:holon_bridge_verifier_passes",
++      "message": "[composer-holon-spine-longrun-2026-06] UNVERIFIED \u2014 'holon_bridge_verifier_passes' could not run here (not a regression): pytest tests/test_holon_bridge.py: pytest not installed (could not execute)",
++      "criterion_id": "holon_bridge_verifier_passes"
++    },
++    {
++      "severity": "INFO",
++      "check": "track-in-progress:composer-holon-spine-longrun-2026-06",
++      "message": "[composer-holon-spine-longrun-2026-06] 7/8 completion criteria pass.",
+       "criterion_id": null
+     },
+     {
+       "severity": "INFO",
+-      "check": "track-shippable:provider-routing-consolidation-2026-06",
+-      "message": "[provider-routing-consolidation-2026-06] all 9 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
++      "check": "unverified:provider-routing-consolidation-2026-06:precedence_invariant_test_passes",
++      "message": "[provider-routing-consolidation-2026-06] UNVERIFIED \u2014 'precedence_invariant_test_passes' could not run here (not a regression): pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: pytest not installed (could not execute)",
++      "criterion_id": "precedence_invariant_test_passes"
++    },
++    {
++      "severity": "INFO",
++      "check": "track-in-progress:provider-routing-consolidation-2026-06",
++      "message": "[provider-routing-consolidation-2026-06] 8/9 completion criteria pass.",
+       "criterion_id": null
+     },
+     {
+@@ -1333,8 +1495,38 @@
+     },
+     {
+       "severity": "INFO",
+-      "check": "track-shippable:filesystem-native-substrate-2026-06",
+-      "message": "[filesystem-native-substrate-2026-06] all 12 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
++      "check": "unverified:filesystem-native-substrate-2026-06:stage_contract_test_passes",
++      "message": "[filesystem-native-substrate-2026-06] UNVERIFIED \u2014 'stage_contract_test_passes' could not run here (not a regression): pytest tests/test_stage_contracts.py: pytest not installed (could not execute)",
++      "criterion_id": "stage_contract_test_passes"
++    },
++    {
++      "severity": "INFO",
++      "check": "unverified:filesystem-native-substrate-2026-06:okf_roundtrip_test_passes",
++      "message": "[filesystem-native-substrate-2026-06] UNVERIFIED \u2014 'okf_roundtrip_test_passes' could not run here (not a regression): pytest tests/test_okf_projection.py: pytest not installed (could not execute)",
++      "criterion_id": "okf_roundtrip_test_passes"
++    },
++    {
++      "severity": "INFO",
++      "check": "unverified:filesystem-native-substrate-2026-06:semantic_fs_test_passes",
++      "message": "[filesystem-native-substrate-2026-06] UNVERIFIED \u2014 'semantic_fs_test_passes' could not run here (not a regression): pytest tests/test_semantic_fs.py: pytest not installed (could not execute)",
++      "criterion_id": "semantic_fs_test_passes"
++    },
++    {
++      "severity": "INFO",
++      "check": "unverified:filesystem-native-substrate-2026-06:organizer_test_passes",
++      "message": "[filesystem-native-substrate-2026-06] UNVERIFIED \u2014 'organizer_test_passes' could not run here (not a regression): pytest tests/test_organizer.py: pytest not installed (could not execute)",
++      "criterion_id": "organizer_test_passes"
++    },
++    {
++      "severity": "INFO",
++      "check": "unverified:filesystem-native-substrate-2026-06:fs_substrate_e2e_passes",
++      "message": "[filesystem-native-substrate-2026-06] UNVERIFIED \u2014 'fs_substrate_e2e_passes' could not run here (not a regression): pytest tests/test_fs_substrate_e2e.py: pytest not installed (could not execute)",
++      "criterion_id": "fs_substrate_e2e_passes"
++    },
++    {
++      "severity": "INFO",
++      "check": "track-in-progress:filesystem-native-substrate-2026-06",
++      "message": "[filesystem-native-substrate-2026-06] 7/12 completion criteria pass.",
+       "criterion_id": null
+     }
+   ]

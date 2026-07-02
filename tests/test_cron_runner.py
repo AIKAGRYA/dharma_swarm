@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -493,6 +494,21 @@ def test_run_cron_job_dispatches_doctor_assurance():
     mock.assert_called_once()
 
 
+def test_run_cron_job_dispatches_memory_common_metabolism():
+    with patch(
+        "dharma_swarm.memory_common.memory_common_cron_run_fn",
+        return_value=(True, "# Memory Metabolism", None),
+    ) as mock:
+        success, output, error = run_cron_job(
+            {"handler": "memory_common_metabolism", "top_k": 6}
+        )
+
+    assert success is True
+    assert output == "# Memory Metabolism"
+    assert error is None
+    mock.assert_called_once()
+
+
 def test_run_cron_job_dispatches_system_map_populator(tmp_path):
     repo_root = cron_runner.Path(cron_runner.__file__).resolve().parent.parent
     script = repo_root / "scripts" / "system_map_populator.py"
@@ -519,6 +535,31 @@ def test_run_cron_job_dispatches_system_map_populator(tmp_path):
     assert ["--output", "/tmp/latest.json"] == args[4:6]
     assert mock_run.call_args.kwargs["cwd"] == str(repo_root)
     assert mock_run.call_args.kwargs["timeout"] == 12
+
+
+def test_run_cron_job_dispatches_algedonic_triage(tmp_path):
+    repo_root = cron_runner.Path(cron_runner.__file__).resolve().parent.parent
+    script = repo_root / "scripts" / "algedonic_triage.py"
+    with patch(
+        "subprocess.run",
+        return_value=SimpleNamespace(returncode=0, stdout="triaged 2 new signals\n", stderr=""),
+    ) as mock_run:
+        success, output, error = run_cron_job(
+            {
+                "handler": "algedonic_triage",
+                "timeout_sec": 9,
+                "state_dir": str(tmp_path / ".dharma"),
+            }
+        )
+
+    assert success is True
+    assert output == "triaged 2 new signals"
+    assert error is None
+    args = mock_run.call_args.args[0]
+    assert args == [sys.executable, str(script)]
+    assert mock_run.call_args.kwargs["cwd"] == str(repo_root)
+    assert mock_run.call_args.kwargs["timeout"] == 9
+    assert mock_run.call_args.kwargs["env"]["DHARMA_STATE_DIR"] == str(tmp_path / ".dharma")
 
 
 def test_run_cron_job_dispatches_tcs_heartbeat(tmp_path):

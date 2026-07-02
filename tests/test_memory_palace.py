@@ -9,6 +9,7 @@ Tests cover:
 """
 
 import asyncio
+import importlib.util
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -21,6 +22,12 @@ from dharma_swarm.memory_palace import (
     PalaceResponse,
     PalaceResult,
     _LanceDBAdapter,
+)
+
+LANCEDB_AVAILABLE = importlib.util.find_spec("lancedb") is not None
+requires_lancedb = pytest.mark.skipif(
+    not LANCEDB_AVAILABLE,
+    reason="lancedb not installed; install dharma-swarm[vector] to run LanceDB persistence tests",
 )
 
 
@@ -49,12 +56,14 @@ def _run(coro):
 class TestLanceDBAdapter:
     """Direct tests for the _LanceDBAdapter wrapper."""
 
+    @requires_lancedb
     def test_connect_creates_db(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "lance_test"
             adapter = _LanceDBAdapter(db_path=db_path)
             assert adapter.connected is True
 
+    @requires_lancedb
     def test_upsert_and_count(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "lance_test"
@@ -74,6 +83,7 @@ class TestLanceDBAdapter:
             assert ok is False
             assert adapter.count() == 0
 
+    @requires_lancedb
     def test_search_returns_results(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "lance_test"
@@ -96,6 +106,7 @@ class TestLanceDBAdapter:
             results = adapter.search("anything")
             assert results == []
 
+    @requires_lancedb
     def test_cross_session_persistence(self):
         """Content indexed in one adapter instance can be retrieved by another
         pointing to the same db_path — the key cross-session test."""
@@ -153,6 +164,7 @@ class TestLanceDBAdapter:
 # ===========================================================================
 
 
+@requires_lancedb
 class TestMemoryPalaceLanceDB:
     """Tests for MemoryPalace with LanceDB integration (Phase 4)."""
 

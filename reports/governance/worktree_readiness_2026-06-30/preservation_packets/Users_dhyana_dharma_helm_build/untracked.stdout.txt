@@ -1,0 +1,2 @@
+reports/terminal/HELM_CLOSEOUT_2026-06-16.md
+tests/test_terminal_bridge.py

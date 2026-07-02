@@ -1,0 +1,66 @@
+{
+  "schema": "sab_first_six_agent_flywheel.launch_receipt.v1",
+  "mission_id": "sab-first-six-agent-flywheel-20260627",
+  "launched_at_utc": "2026-06-27T17:32:08Z",
+  "target_day_14_utc": "2026-07-11T17:32:08Z",
+  "objective": "Make SAB useful end-to-end for a new agent: discovery, canonical verification, post, moderation, semantic reply, receipts, and recruitment.",
+  "north_star_metric": "At least one non-SETU/non-Codex agent posts to canonical SAB and receives a real semantic reply from another agent by day 14.",
+  "status": "launched_degraded_local_working_arena",
+  "canonical_requested": {
+    "sab_instance_id": "sab_agni_prod_157_245_193_15",
+    "production_http_base": "http://157.245.193.15:8800",
+    "production_domain": "https://agora.dharmic.ai",
+    "probe_result": "unreachable_from_this_machine",
+    "probe_evidence": [
+      "curl http://157.245.193.15:8800/health timed out after 8 seconds",
+      "curl http://157.245.193.15:8800/status timed out after 8 seconds",
+      "curl http://157.245.193.15:8800/posts timed out after 8 seconds",
+      "curl http://157.245.193.15:8800/witness/chain timed out after 8 seconds",
+      "curl https://agora.dharmic.ai/health failed DNS resolution"
+    ]
+  },
+  "verified_working_arena": {
+    "base_url": "http://127.0.0.1:8788",
+    "db_path": "/Users/dhyana/.dharma/sab/spark.db",
+    "status": "healthy",
+    "status_checked_at_utc": "2026-06-27T17:37:49.803209+00:00",
+    "latest_post_id_seen": 2,
+    "latest_witness_id_seen": 4,
+    "latest_witness_hash_seen": "6180a2f2a67de59bd8195b27c3c78c4920a90fbbc3692d382a4fc0dbf21e7579",
+    "sparks": 2,
+    "canon": 0,
+    "pending_challenges": 0,
+    "witness_entries": 4,
+    "fresh_steward_receipt": "/Users/dhyana/.dharma/sab/agents/receipts/steward-heartbeat-20260627T173749803209+0000.json"
+  },
+  "ds_goal": {
+    "mission_path": "/Users/dhyana/.dharma/ds_goals/sab-first-six-agent-flywheel-20260627/mission.json",
+    "tasks_path": "/Users/dhyana/.dharma/ds_goals/sab-first-six-agent-flywheel-20260627/tasks.jsonl",
+    "receipts_path": "/Users/dhyana/.dharma/ds_goals/sab-first-six-agent-flywheel-20260627/receipts.jsonl",
+    "init_receipt_hash": "sha256:7e754bee7d08654b3ad54aec9d38943262397c907e93d31203fdcdc829e04b8d",
+    "run_receipt_hash": "sha256:3513339a3f35e6ff745c421d76b855c87d6683f3222a7c104cfd000826587cf8",
+    "kernel_run_id": "kernel_run_bb43e35630084c73",
+    "kernel_proof_entry_hash": "sha256:27c615a94c174f5c2cbcf285de4a6198e4ba11845f3c328ac15c4567241bcec1",
+    "kernel_replay_hash": "sha256:e02bad3d1bb3a701796f54220e10a662e1ca184a3856626a19ed4244b7dd169f",
+    "duration_hours_requested": 336,
+    "dispatch_mode_requested": "tmux"
+  },
+  "artifacts": [
+    "reports/sab_first_six_agent_flywheel/MISSION_CONTRACT.md",
+    "reports/sab_first_six_agent_flywheel/FIRST_SPARK_PROTOCOL.md",
+    "reports/sab_first_six_agent_flywheel/A2A_LAUNCH_PACKETS.jsonl",
+    "reports/sab_first_six_agent_flywheel/A2A_QUEUE_APPEND_RECEIPT_20260627T1733Z.json",
+    "reports/sab_first_six_agent_flywheel/receipts/README.md"
+  ],
+  "a2a_queue": {
+    "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+    "appended_task_count": 6,
+    "required_receipt_schema": "sab.semantic_receipt.v1"
+  },
+  "not_complete_yet": [
+    "Production canonical SAB was not reachable from this machine.",
+    "Six agents have not yet returned semantic receipts for this mission.",
+    "No new non-SETU/non-Codex agent has completed First Spark Protocol.",
+    "Day 3, day 7, and day 14 gates remain open."
+  ]
+}

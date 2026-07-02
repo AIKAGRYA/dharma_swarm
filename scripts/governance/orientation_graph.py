@@ -31,8 +31,10 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sqlite3
 import sys
 from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -115,6 +117,15 @@ class Liveness:
 
 
 @dataclass
+class Loop1Closure:
+    live: bool
+    provider: str = ""
+    model: str = ""
+    started_at: str = ""
+    detail: str = ""
+
+
+@dataclass
 class BrokenItem:
     id: str
     status: str
@@ -128,6 +139,7 @@ class OrientationPacket:
     tracks: list[Track]
     custody: CustodyReport
     liveness: Liveness
+    loop1: Loop1Closure
     broken: list[BrokenItem]
 
 
@@ -660,8 +672,124 @@ def build_liveness() -> Liveness:
     )
 
 
+def _coerce_utc_datetime(value: Any) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _default_runtime_db() -> Path:
+    try:
+        from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB
+
+        return Path(DEFAULT_RUNTIME_DB)
+    except Exception:
+        return Path("~/.dharma/state/runtime.db").expanduser()
+
+
+def build_loop1_closure(db_path: Any = None) -> Loop1Closure:
+    """Project Loop 1 closure from delegation_runs.receipt_json.
+
+    This is read-only and owns no fact. LIVE requires the newest persisted
+    dispatch receipt to carry a non-empty actually-served provider/model pair,
+    runtime_provider.actual_served provenance, and a fresh timestamp.
+    """
+    resolved = Path(db_path).expanduser() if db_path is not None else _default_runtime_db()
+    if not resolved.exists():
+        return Loop1Closure(live=False, detail=f"runtime db missing: {resolved}")
+    try:
+        with sqlite3.connect(resolved) as db:
+            row = db.execute(
+                """
+                SELECT started_at, receipt_json
+                FROM delegation_runs
+                WHERE receipt_json IS NOT NULL AND receipt_json != ''
+                ORDER BY started_at DESC, rowid DESC
+                LIMIT 1
+                """
+            ).fetchone()
+    except sqlite3.Error as exc:
+        return Loop1Closure(live=False, detail=f"runtime db unreadable: {exc}")
+    if not row:
+        return Loop1Closure(live=False, detail="no delegation_runs receipt_json rows")
+    started_at, raw_receipt = row
+    try:
+        receipt = json.loads(str(raw_receipt))
+    except Exception:
+        return Loop1Closure(
+            live=False,
+            started_at=str(started_at or ""),
+            detail="latest receipt_json is not valid JSON",
+        )
+    if not isinstance(receipt, dict):
+        return Loop1Closure(
+            live=False,
+            started_at=str(started_at or ""),
+            detail="latest receipt_json is not an object",
+        )
+    provider = str(receipt.get("provider") or "").strip()
+    model = str(receipt.get("model") or "").strip()
+    attributes = receipt.get("attributes") if isinstance(receipt.get("attributes"), dict) else {}
+    source = str(
+        attributes.get("provider_model_truth_source")
+        or receipt.get("provider_model_truth_source")
+        or ""
+    ).strip()
+    if not provider or not model:
+        return Loop1Closure(
+            live=False,
+            provider=provider,
+            model=model,
+            started_at=str(started_at or ""),
+            detail="latest receipt missing provider and/or model",
+        )
+    if source != "runtime_provider.actual_served":
+        return Loop1Closure(
+            live=False,
+            provider=provider,
+            model=model,
+            started_at=str(started_at or ""),
+            detail=f"latest provider/model provenance is {source or 'missing'}",
+        )
+    stamped = _coerce_utc_datetime(started_at or receipt.get("started_at"))
+    if stamped is None:
+        return Loop1Closure(
+            live=False,
+            provider=provider,
+            model=model,
+            started_at=str(started_at or ""),
+            detail="latest receipt timestamp is unreadable",
+        )
+    age_seconds = (datetime.now(timezone.utc) - stamped).total_seconds()
+    if age_seconds > 24 * 60 * 60:
+        age_hours = round(age_seconds / 3600, 2)
+        return Loop1Closure(
+            live=False,
+            provider=provider,
+            model=model,
+            started_at=str(started_at or ""),
+            detail=f"latest actual-served receipt is stale ({age_hours}h old)",
+        )
+    return Loop1Closure(
+        live=True,
+        provider=provider,
+        model=model,
+        started_at=str(started_at or ""),
+        detail="latest dispatch receipt carries fresh actual-served provider/model",
+    )
+
+
 _BR_HEAD = re.compile(r"^###\s+(?P<id>BR-\d+)\s*[—-]\s*(?P<title>.+)$")
-_BR_STATUS = re.compile(r"^-\s*\*\*status:\*\*\s*(?P<status>[A-Z]+)")
+_BR_STATUS = re.compile(r"^-\s*\*\*status:\*\*\s*(?:\*\*)?(?P<status>[A-Z]+)(?:\*\*)?")
 
 
 def build_broken() -> list[BrokenItem]:
@@ -692,6 +820,7 @@ def build_packet() -> OrientationPacket:
         tracks=build_tracks(),
         custody=build_custody(),
         liveness=build_liveness(),
+        loop1=build_loop1_closure(),
         broken=build_broken(),
     )
 
@@ -748,6 +877,19 @@ def render(packet: OrientationPacket) -> None:
         proof_gaps = surface.get("proof_gaps") or []
         proof = f"; proof_gaps={','.join(proof_gaps)}" if proof_gaps else ""
         print(f"  [{surface['status']:<8}] {surface['id']} — {surface['label']}{proof}")
+
+    _section("LOOP 1 CLOSURE — owner: delegation_runs.receipt_json (read-only)")
+    status = "LIVE" if packet.loop1.live else "NOT-LIVE"
+    print(f"  Loop 1 (provider chain + dispatch): {status}")
+    if packet.loop1.provider or packet.loop1.model:
+        print(
+            f"    latest receipt: provider={packet.loop1.provider!r} "
+            f"model={packet.loop1.model!r}"
+        )
+    if packet.loop1.started_at:
+        print(f"    started_at: {packet.loop1.started_at}")
+    if packet.loop1.detail:
+        print(f"    detail: {packet.loop1.detail}")
 
     _section(f"BROKEN REGISTER — open-like items ({len(packet.broken)})")
     for item in packet.broken:

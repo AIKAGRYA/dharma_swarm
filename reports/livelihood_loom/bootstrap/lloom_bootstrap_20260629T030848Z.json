@@ -1,0 +1,1006 @@
+{
+  "schema_version": "livelihood_loom.safe_bootstrap.v1",
+  "receipt_id": "lloom_bootstrap_20260629T030848Z",
+  "created_at": "2026-06-29T03:08:48.488727+00:00",
+  "agent_uid": "livelihood_loom_ceo",
+  "cell_id": "livelihood_loom",
+  "mission": {
+    "mission_id": "livelihood_loom_pilot_001",
+    "cell_id": "livelihood_loom",
+    "title": "Livelihood Loom safe bootstrap",
+    "success_contract": [
+      "CEO identity registered",
+      "bounded internal lanes spawned",
+      "public enabler candidates loaded or absence receipted",
+      "top candidates scored without private data",
+      "external action remains drafted only unless human approved"
+    ],
+    "status": "active",
+    "lanes": [
+      {
+        "lane_id": "lane_loom_conductor",
+        "role": "loom_conductor",
+        "mission_id": "livelihood_loom_pilot_001",
+        "depth": 1,
+        "status": "planned",
+        "proof_refs": [],
+        "spent_usd": 0.0,
+        "created_at": "2026-06-29T03:08:48.807943+00:00"
+      },
+      {
+        "lane_id": "lane_field_cartography",
+        "role": "field_cartography",
+        "mission_id": "livelihood_loom_pilot_001",
+        "depth": 1,
+        "status": "planned",
+        "proof_refs": [],
+        "spent_usd": 0.0,
+        "created_at": "2026-06-29T03:08:48.807949+00:00"
+      },
+      {
+        "lane_id": "lane_worker_advocate",
+        "role": "worker_advocate",
+        "mission_id": "livelihood_loom_pilot_001",
+        "depth": 1,
+        "status": "planned",
+        "proof_refs": [],
+        "spent_usd": 0.0,
+        "created_at": "2026-06-29T03:08:48.807954+00:00"
+      },
+      {
+        "lane_id": "lane_offer_builder",
+        "role": "offer_builder",
+        "mission_id": "livelihood_loom_pilot_001",
+        "depth": 1,
+        "status": "planned",
+        "proof_refs": [],
+        "spent_usd": 0.0,
+        "created_at": "2026-06-29T03:08:48.807957+00:00"
+      },
+      {
+        "lane_id": "lane_evidence_auditor",
+        "role": "evidence_auditor",
+        "mission_id": "livelihood_loom_pilot_001",
+        "depth": 1,
+        "status": "planned",
+        "proof_refs": [],
+        "spent_usd": 0.0,
+        "created_at": "2026-06-29T03:08:48.807960+00:00"
+      },
+      {
+        "lane_id": "lane_safety_red_team",
+        "role": "safety_red_team",
+        "mission_id": "livelihood_loom_pilot_001",
+        "depth": 1,
+        "status": "planned",
+        "proof_refs": [],
+        "spent_usd": 0.0,
+        "created_at": "2026-06-29T03:08:48.807963+00:00"
+      }
+    ],
+    "spent_usd": 0.0,
+    "created_at": "2026-06-29T03:08:48.807925+00:00"
+  },
+  "registration": {
+    "agent_uid": "livelihood_loom_ceo",
+    "callsign": "livelihood-loom-ceo",
+    "external_registration": {
+      "record_path": "/Users/dhyana/.dharma/external_agents/livelihood_loom_ceo/registration.json",
+      "worker": {
+        "agent_uid": "livelihood_loom_ceo",
+        "callsign": "livelihood-loom-ceo",
+        "display_name": "Livelihood Loom CEO",
+        "harness": "codex",
+        "model_identity": "codex",
+        "department": "venture_cell",
+        "role": "livelihood_loom_ceo",
+        "squad_id": "livelihood_loom",
+        "team_id": "dharma_swarm",
+        "endpoint": "pending://manual",
+        "mailbox": "nats://dharma.a2a.livelihood-loom-ceo",
+        "authority": "sandbox_write",
+        "autonomy_policy": {
+          "mode": "manual",
+          "requires_approval": true,
+          "can_approve_prs": false,
+          "can_write_source": false,
+          "can_mutate_meta_dharma": false,
+          "can_mutate_telos": false,
+          "can_mutate_dharma_kernel": false,
+          "can_mutate_dgm_protected": false,
+          "can_author_context_bundles": false,
+          "explicit_task_assignment_required": true
+        },
+        "workspace_policy": {
+          "sandbox_root": "/Users/dhyana/.dharma/external_agents/livelihood_loom_ceo",
+          "repo_writes_allowed": false,
+          "canonical_dharma_dir_writes_allowed": false
+        },
+        "memory_namespace": "agent:livelihood_loom_ceo",
+        "trace_identity": "trace:livelihood_loom_ceo",
+        "status": "registered",
+        "is_returning_historical_embodiment": false,
+        "notes": "Persistent CEO identity for the Livelihood Loom VentureCell. It can coordinate bounded internal lanes, ingest public enabler research, score candidates, write receipts, and draft approval-gated external actions. It cannot contact people, publish, spend, move funds, run live accounts, or make capital decisions without the human_governor approval path.",
+        "registration_source": "livelihood_loom_ceo_registration",
+        "capabilities": [
+          "venture_cell_strategy",
+          "informal_economy_research",
+          "public_candidate_scoring",
+          "approval_gated_action_drafting",
+          "receipt_backed_bootstrap_execution",
+          "jagat_kalyan_alignment_review"
+        ],
+        "identity_invariant": {
+          "schema_version": "dharma_identity_invariant.v1",
+          "agent_uid": "livelihood_loom_ceo",
+          "authority_floor": "sandbox_write",
+          "memory_namespace": "agent:livelihood_loom_ceo",
+          "trace_identity": "trace:livelihood_loom_ceo",
+          "serial": "AGT-LIVELIHOOD_LOOM_CEO",
+          "created_at": "2026-06-29T03:08:48.779897+00:00",
+          "digest": "sha256:cc8900f23287fefea3ab3b571907af0afb2e43d37c35b727522229e9636438cb"
+        },
+        "metadata": {
+          "cell_id": "livelihood_loom",
+          "fractal_cell_id": "livelihood-loom",
+          "mission_id": "livelihood_loom_pilot_001",
+          "human_governor": "dhyana",
+          "parent_plane": "jagat_kalyan",
+          "capital_boundary": "dharma_capital_read_only_aggregated_signals",
+          "first_metric": "revenue_external_humans_served",
+          "allowed_agent_roles": [
+            "loom_conductor",
+            "field_cartography",
+            "worker_advocate",
+            "demand_builder",
+            "offer_builder",
+            "matching_ops",
+            "evidence_auditor",
+            "gaia_reciprocity_adapter",
+            "treasury_payout_guard",
+            "safety_red_team",
+            "memory_librarian"
+          ],
+          "allowed_internal_tools": [
+            "read_public_sources",
+            "enrich_candidate_records",
+            "draft_enablement_packet",
+            "risk_score",
+            "write_receipt",
+            "queue_external_action"
+          ],
+          "approval_required_for": [
+            "outreach",
+            "publication",
+            "payment",
+            "on_chain_transaction",
+            "procurement_intro",
+            "partner_claim",
+            "capital_signal"
+          ],
+          "forbidden_actions": [
+            "autonomous_lending_decision",
+            "autonomous_investment_decision",
+            "data_sale",
+            "trading_alpha_extraction",
+            "worker_surveillance"
+          ],
+          "proof_contract": [
+            "mission_id",
+            "trace_id",
+            "receipt_id",
+            "source_refs",
+            "consent_state",
+            "audit_status",
+            "result_ref"
+          ],
+          "repo_home": "/Users/dhyana/dharma_swarm/docs/agents/livelihood_loom_ceo",
+          "seed_path": "/Users/dhyana/dharma_swarm/docs/agents/livelihood_loom_ceo/agent.seed.yaml",
+          "soul_file": "/Users/dhyana/dharma_swarm/docs/agents/livelihood_loom_ceo/SOUL.md",
+          "protocols_file": "/Users/dhyana/dharma_swarm/docs/agents/livelihood_loom_ceo/PROTOCOLS.md",
+          "wake_context": "/Users/dhyana/dharma_swarm/docs/agents/livelihood_loom_ceo/WAKE_CONTEXT.md",
+          "charter": "/Users/dhyana/dharma_swarm/dharma_swarm/venture_cell/livelihood_loom/charter.yaml",
+          "org_map": "/Users/dhyana/dharma_swarm/dharma_swarm/venture_cell/livelihood_loom/org.yaml",
+          "manifest_agent_id": "livelihood_loom_ceo",
+          "nats_subject": "dharma.a2a.livelihood-loom-ceo",
+          "nats_runtime_status": "declared_not_started",
+          "a2a_transport_status": "card_registered_only_after_onboarding",
+          "authority_boundary": "sandbox_write_human_approved_external_actions",
+          "external_authority": "none_without_approval",
+          "external_action_mode": "human_approved_only",
+          "no_provider_secret_access": true,
+          "no_autonomous_external_action": true,
+          "no_autonomous_capital_decision": true,
+          "first_receipt_dir": "/Users/dhyana/dharma_swarm/reports/livelihood_loom/bootstrap"
+        },
+        "created_at": "2026-06-29T03:08:48.779897+00:00",
+        "updated_at": "2026-06-29T03:08:48.780073+00:00",
+        "last_seen_at": "2026-06-29T03:08:48.780068+00:00"
+      },
+      "onboarding_receipt": {
+        "receipt_id": "onboard-livelihood_loom_ceo-1782702528",
+        "agent_uid": "livelihood_loom_ceo",
+        "callsign": "livelihood-loom-ceo",
+        "team_id": "dharma_swarm",
+        "department": "venture_cell",
+        "squad_id": "livelihood_loom",
+        "harness": "codex",
+        "endpoint": "pending://manual",
+        "dock_path": "/Users/dhyana/.dharma/agents/livelihood_loom_ceo/living_agent.json",
+        "card_path": "/Users/dhyana/.dharma/a2a/cards/livelihood-loom-ceo.json",
+        "telemetry_db_path": "/Users/dhyana/.dharma/state/runtime.db",
+        "receipt_path": "/Users/dhyana/.dharma/onboarding/receipts/onboard-livelihood_loom_ceo-1782702528.json",
+        "created_at": "2026-06-29T03:08:48.780456+00:00"
+      }
+    },
+    "agent_registry_identity": {
+      "name": "livelihood_loom_ceo",
+      "role": "livelihood_loom_ceo",
+      "model": "local_control_plane",
+      "system_prompt": "You are Livelihood Loom CEO, a persistent governed VentureCell identity.\n\nMandate:\n- Increase real livelihood opportunity for informal workers and micro-businesses.\n- Serve jagat_kalyan first; Dharma Capital may receive only read-only aggregated signals.\n- Convert public research into safe enablement packets, proofs, and approval-gated actions.\n\nAuthority boundary:\n- You may plan missions, spawn bounded internal lanes, score public candidates, and write receipts.\n- You may draft external actions only through the human-governed approval queue.\n- You may not contact people, publish claims, move funds, use private data, or make capital decisions.\n- You may not weaken AHIMSA, SATYA, telos, consent, privacy, or non-extraction gates.\n\nOperating inputs:\n- Charter: /Users/dhyana/dharma_swarm/dharma_swarm/venture_cell/livelihood_loom/charter.yaml\n- Org map: /Users/dhyana/dharma_swarm/dharma_swarm/venture_cell/livelihood_loom/org.yaml\n- Agent seed: /Users/dhyana/dharma_swarm/docs/agents/livelihood_loom_ceo/agent.seed.yaml\n- Wake context: /Users/dhyana/dharma_swarm/docs/agents/livelihood_loom_ceo/WAKE_CONTEXT.md\n\nDefinition of progress:\n- Every mission step leaves a replayable receipt.\n- Public proofs are aggregate, non-sensitive, and source-backed.\n- External-world action remains drafted until human_governor approval and execution receipts exist.",
+      "status": "idle",
+      "created_at": "2026-06-29T03:08:42.847144+00:00",
+      "last_active": "2026-06-29T03:08:42.847144+00:00",
+      "tasks_completed": 0,
+      "tasks_failed": 0,
+      "total_tokens_used": 0,
+      "total_calls": 0,
+      "avg_quality": 0.0,
+      "prompt_generation": 0,
+      "task_history": []
+    },
+    "agent_registry_path": "/Users/dhyana/.dharma/ginko/agents/livelihood_loom_ceo/identity.json",
+    "runtime_fields_path": "/Users/dhyana/.dharma/ginko/agents/livelihood_loom_ceo/runtime_fields.json"
+  },
+  "candidate_source": {
+    "path": "/Users/dhyana/informal_economy_enabler_map/informal_economy_enablers_1000.csv",
+    "status": "loaded",
+    "limit": 1000,
+    "loaded_count": 1000
+  },
+  "scored_candidates": [
+    {
+      "rank": 1,
+      "company": {
+        "name": "10Q Reports",
+        "sector": "finance_rails",
+        "geography": "United States",
+        "enablement_levers": [
+          "financial tools, accounts, credit, payment, or risk rails for small earners and micro-businesses"
+        ],
+        "source_refs": [
+          "http://www.wikidata.org/entity/Q43374781"
+        ],
+        "evidence_level": "public_source",
+        "risk_class": "low",
+        "company_id": "enabler_b378cdfa691b"
+      },
+      "score": 1.0,
+      "blocked": false,
+      "reasons": [
+        "has_source_refs",
+        "has_enablement_levers",
+        "livelihood_relevant_sector",
+        "low_initial_risk",
+        "geography_known"
+      ]
+    },
+    {
+      "rank": 2,
+      "company": {
+        "name": "11Onze",
+        "sector": "finance_rails",
+        "geography": "Luxembourg",
+        "enablement_levers": [
+          "financial tools, accounts, credit, payment, or risk rails for small earners and micro-businesses"
+        ],
+        "source_refs": [
+          "http://www.wikidata.org/entity/Q99195236"
+        ],
+        "evidence_level": "public_source",
+        "risk_class": "low",
+        "company_id": "enabler_4cd67a4758f5"
+      },
+      "score": 1.0,
+      "blocked": false,
+      "reasons": [
+        "has_source_refs",
+        "has_enablement_levers",
+        "livelihood_relevant_sector",
+        "low_initial_risk",
+        "geography_known"
+      ]
+    },
+    {
+      "rank": 3,
+      "company": {
+        "name": "1West Finance",
+        "sector": "finance_rails",
+        "geography": "United States",
+        "enablement_levers": [
+          "financial tools, accounts, credit, payment, or risk rails for small earners and micro-businesses"
+        ],
+        "source_refs": [
+          "http://www.wikidata.org/entity/Q139681451"
+        ],
+        "evidence_level": "public_source",
+        "risk_class": "low",
+        "company_id": "enabler_45e0a157c387"
+      },
+      "score": 1.0,
+      "blocked": false,
+      "reasons": [
+        "has_source_refs",
+        "has_enablement_levers",
+        "livelihood_relevant_sector",
+        "low_initial_risk",
+        "geography_known"
+      ]
+    },
+    {
+      "rank": 4,
+      "company": {
+        "name": "2local",
+        "sector": "finance_rails",
+        "geography": "Netherlands",
+        "enablement_levers": [
+          "financial tools, accounts, credit, payment, or risk rails for small earners and micro-businesses"
+        ],
+        "source_refs": [
+          "http://www.wikidata.org/entity/Q97101477"
+        ],
+        "evidence_level": "public_source",
+        "risk_class": "low",
+        "company_id": "enabler_72b115cbf391"
+      },
+      "score": 1.0,
+      "blocked": false,
+      "reasons": [
+        "has_source_refs",
+        "has_enablement_levers",
+        "livelihood_relevant_sector",
+        "low_initial_risk",
+        "geography_known"
+      ]
+    },
+    {
+      "rank": 5,
+      "company": {
+        "name": "AccessPay",
+        "sector": "finance_rails",
+        "geography": "United Kingdom",
+        "enablement_levers": [
+          "financial tools, accounts, credit, payment, or risk rails for small earners and micro-businesses"
+        ],
+        "source_refs": [
+          "http://www.wikidata.org/entity/Q17112518"
+        ],
+        "evidence_level": "public_source",
+        "risk_class": "low",
+        "company_id": "enabler_439f259a5aa2"
+      },
+      "score": 1.0,
+      "blocked": false,
+      "reasons": [
+        "has_source_refs",
+        "has_enablement_levers",
+        "livelihood_relevant_sector",
+        "low_initial_risk",
+        "geography_known"
+      ]
+    },
+    {
+      "rank": 6,
+      "company": {
+        "name": "Actuals",
+        "sector": "finance_rails",
+        "geography": "Netherlands",
+        "enablement_levers": [
+          "financial tools, accounts, credit, payment, or risk rails for small earners and micro-businesses"
+        ],
+        "source_refs": [
+          "http://www.wikidata.org/entity/Q139741963"
+        ],
+        "evidence_level": "public_source",
+        "risk_class": "low",
+        "company_id": "enabler_a3a8440726d9"
+      },
+      "score": 1.0,
+      "blocked": false,
+      "reasons": [
+        "has_source_refs",
+        "has_enablement_levers",
+        "livelihood_relevant_sector",
+        "low_initial_risk",
+        "geography_known"
+      ]
+    },
+    {
+      "rank": 7,
+      "company": {
+        "name": "AddisCashMap",
+        "sector": "finance_rails",
+        "geography": "Ethiopia",
+        "enablement_levers": [
+          "financial tools, accounts, credit, payment, or risk rails for small earners and micro-businesses"
+        ],
+        "source_refs": [
+          "http://www.wikidata.org/entity/Q140079371"
+        ],
+        "evidence_level": "public_source",
+        "risk_class": "low",
+        "company_id": "enabler_118b7dfad28a"
+      },
+      "score": 1.0,
+      "blocked": false,
+      "reasons": [
+        "has_source_refs",
+        "has_enablement_levers",
+        "livelihood_relevant_sector",
+        "low_initial_risk",
+        "geography_known"
+      ]
+    },
+    {
+      "rank": 8,
+      "company": {
+        "name": "Affirm",
+        "sector": "finance_rails",
+        "geography": "United States",
+        "enablement_levers": [
+          "financial tools, accounts, credit, payment, or risk rails for small earners and micro-businesses"
+        ],
+        "source_refs": [
+          "http://www.wikidata.org/entity/Q65085822"
+        ],
+        "evidence_level": "public_source",
+        "risk_class": "low",
+        "company_id": "enabler_ef6628fce757"
+      },
+      "score": 1.0,
+      "blocked": false,
+      "reasons": [
+        "has_source_refs",
+        "has_enablement_levers",
+        "livelihood_relevant_sector",
+        "low_initial_risk",
+        "geography_known"
+      ]
+    },
+    {
+      "rank": 9,
+      "company": {
+        "name": "Afterpay",
+        "sector": "finance_rails",
+        "geography": "Australia",
+        "enablement_levers": [
+          "financial tools, accounts, credit, payment, or risk rails for small earners and micro-businesses"
+        ],
+        "source_refs": [
+          "http://www.wikidata.org/entity/Q55639119"
+        ],
+        "evidence_level": "public_source",
+        "risk_class": "low",
+        "company_id": "enabler_6d9b0b2ee38b"
+      },
+      "score": 1.0,
+      "blocked": false,
+      "reasons": [
+        "has_source_refs",
+        "has_enablement_levers",
+        "livelihood_relevant_sector",
+        "low_initial_risk",
+        "geography_known"
+      ]
+    },
+    {
+      "rank": 10,
+      "company": {
+        "name": "Aimtoget Technology Limited",
+        "sector": "finance_rails",
+        "geography": "Nigeria",
+        "enablement_levers": [
+          "financial tools, accounts, credit, payment, or risk rails for small earners and micro-businesses"
+        ],
+        "source_refs": [
+          "http://www.wikidata.org/entity/Q130344145"
+        ],
+        "evidence_level": "public_source",
+        "risk_class": "low",
+        "company_id": "enabler_86e832d1fe15"
+      },
+      "score": 1.0,
+      "blocked": false,
+      "reasons": [
+        "has_source_refs",
+        "has_enablement_levers",
+        "livelihood_relevant_sector",
+        "low_initial_risk",
+        "geography_known"
+      ]
+    },
+    {
+      "rank": 11,
+      "company": {
+        "name": "Alif Bank",
+        "sector": "finance_rails",
+        "geography": "Tajikistan",
+        "enablement_levers": [
+          "financial tools, accounts, credit, payment, or risk rails for small earners and micro-businesses"
+        ],
+        "source_refs": [
+          "http://www.wikidata.org/entity/Q19717747"
+        ],
+        "evidence_level": "public_source",
+        "risk_class": "low",
+        "company_id": "enabler_2bdc3a3d4a8a"
+      },
+      "score": 1.0,
+      "blocked": false,
+      "reasons": [
+        "has_source_refs",
+        "has_enablement_levers",
+        "livelihood_relevant_sector",
+        "low_initial_risk",
+        "geography_known"
+      ]
+    },
+    {
+      "rank": 12,
+      "company": {
+        "name": "Align Commerce",
+        "sector": "finance_rails",
+        "geography": "United States",
+        "enablement_levers": [
+          "payment acceptance infrastructure for micro-merchants and independent sellers"
+        ],
+        "source_refs": [
+          "http://www.wikidata.org/entity/Q22077748"
+        ],
+        "evidence_level": "public_source",
+        "risk_class": "low",
+        "company_id": "enabler_e15dd74aca2b"
+      },
+      "score": 1.0,
+      "blocked": false,
+      "reasons": [
+        "has_source_refs",
+        "has_enablement_levers",
+        "livelihood_relevant_sector",
+        "low_initial_risk",
+        "geography_known"
+      ]
+    },
+    {
+      "rank": 13,
+      "company": {
+        "name": "Allvest GmbH",
+        "sector": "finance_rails",
+        "geography": "Germany",
+        "enablement_levers": [
+          "financial tools, accounts, credit, payment, or risk rails for small earners and micro-businesses"
+        ],
+        "source_refs": [
+          "http://www.wikidata.org/entity/Q120499372"
+        ],
+        "evidence_level": "public_source",
+        "risk_class": "low",
+        "company_id": "enabler_eb030f6bd9c7"
+      },
+      "score": 1.0,
+      "blocked": false,
+      "reasons": [
+        "has_source_refs",
+        "has_enablement_levers",
+        "livelihood_relevant_sector",
+        "low_initial_risk",
+        "geography_known"
+      ]
+    },
+    {
+      "rank": 14,
+      "company": {
+        "name": "Altrady",
+        "sector": "finance_rails",
+        "geography": "Netherlands",
+        "enablement_levers": [
+          "financial tools, accounts, credit, payment, or risk rails for small earners and micro-businesses"
+        ],
+        "source_refs": [
+          "http://www.wikidata.org/entity/Q139369865"
+        ],
+        "evidence_level": "public_source",
+        "risk_class": "low",
+        "company_id": "enabler_543e8ccbdb67"
+      },
+      "score": 1.0,
+      "blocked": false,
+      "reasons": [
+        "has_source_refs",
+        "has_enablement_levers",
+        "livelihood_relevant_sector",
+        "low_initial_risk",
+        "geography_known"
+      ]
+    },
+    {
+      "rank": 15,
+      "company": {
+        "name": "Antalpha Platform Holding Company",
+        "sector": "finance_rails",
+        "geography": "Singapore",
+        "enablement_levers": [
+          "financial tools, accounts, credit, payment, or risk rails for small earners and micro-businesses"
+        ],
+        "source_refs": [
+          "http://www.wikidata.org/entity/Q140361256"
+        ],
+        "evidence_level": "public_source",
+        "risk_class": "low",
+        "company_id": "enabler_1da825aa8f7e"
+      },
+      "score": 1.0,
+      "blocked": false,
+      "reasons": [
+        "has_source_refs",
+        "has_enablement_levers",
+        "livelihood_relevant_sector",
+        "low_initial_risk",
+        "geography_known"
+      ]
+    },
+    {
+      "rank": 16,
+      "company": {
+        "name": "Antivirus",
+        "sector": "finance_rails",
+        "geography": "Czech Republic",
+        "enablement_levers": [
+          "financial tools, accounts, credit, payment, or risk rails for small earners and micro-businesses"
+        ],
+        "source_refs": [
+          "http://www.wikidata.org/entity/Q109997140"
+        ],
+        "evidence_level": "public_source",
+        "risk_class": "low",
+        "company_id": "enabler_620ba46b805f"
+      },
+      "score": 1.0,
+      "blocked": false,
+      "reasons": [
+        "has_source_refs",
+        "has_enablement_levers",
+        "livelihood_relevant_sector",
+        "low_initial_risk",
+        "geography_known"
+      ]
+    },
+    {
+      "rank": 17,
+      "company": {
+        "name": "Aplazame",
+        "sector": "finance_rails",
+        "geography": "Spain",
+        "enablement_levers": [
+          "financial tools, accounts, credit, payment, or risk rails for small earners and micro-businesses"
+        ],
+        "source_refs": [
+          "http://www.wikidata.org/entity/Q83866518"
+        ],
+        "evidence_level": "public_source",
+        "risk_class": "low",
+        "company_id": "enabler_dc750582b6db"
+      },
+      "score": 1.0,
+      "blocked": false,
+      "reasons": [
+        "has_source_refs",
+        "has_enablement_levers",
+        "livelihood_relevant_sector",
+        "low_initial_risk",
+        "geography_known"
+      ]
+    },
+    {
+      "rank": 18,
+      "company": {
+        "name": "Array",
+        "sector": "finance_rails",
+        "geography": "United States",
+        "enablement_levers": [
+          "financial tools, accounts, credit, payment, or risk rails for small earners and micro-businesses"
+        ],
+        "source_refs": [
+          "http://www.wikidata.org/entity/Q113988065"
+        ],
+        "evidence_level": "public_source",
+        "risk_class": "low",
+        "company_id": "enabler_ca2045fa8c6d"
+      },
+      "score": 1.0,
+      "blocked": false,
+      "reasons": [
+        "has_source_refs",
+        "has_enablement_levers",
+        "livelihood_relevant_sector",
+        "low_initial_risk",
+        "geography_known"
+      ]
+    },
+    {
+      "rank": 19,
+      "company": {
+        "name": "Artavest Oy",
+        "sector": "finance_rails",
+        "geography": "Finland",
+        "enablement_levers": [
+          "financial tools, accounts, credit, payment, or risk rails for small earners and micro-businesses"
+        ],
+        "source_refs": [
+          "http://www.wikidata.org/entity/Q138836922"
+        ],
+        "evidence_level": "public_source",
+        "risk_class": "low",
+        "company_id": "enabler_22152dcff8c9"
+      },
+      "score": 1.0,
+      "blocked": false,
+      "reasons": [
+        "has_source_refs",
+        "has_enablement_levers",
+        "livelihood_relevant_sector",
+        "low_initial_risk",
+        "geography_known"
+      ]
+    },
+    {
+      "rank": 20,
+      "company": {
+        "name": "Asociaci\u00f3n Espa\u00f1ola de FinTech",
+        "sector": "finance_rails",
+        "geography": "Spain",
+        "enablement_levers": [
+          "financial tools, accounts, credit, payment, or risk rails for small earners and micro-businesses"
+        ],
+        "source_refs": [
+          "http://www.wikidata.org/entity/Q131436211"
+        ],
+        "evidence_level": "public_source",
+        "risk_class": "low",
+        "company_id": "enabler_79429b4a7ecb"
+      },
+      "score": 1.0,
+      "blocked": false,
+      "reasons": [
+        "has_source_refs",
+        "has_enablement_levers",
+        "livelihood_relevant_sector",
+        "low_initial_risk",
+        "geography_known"
+      ]
+    },
+    {
+      "rank": 21,
+      "company": {
+        "name": "Avaloq",
+        "sector": "finance_rails",
+        "geography": "Switzerland",
+        "enablement_levers": [
+          "financial tools, accounts, credit, payment, or risk rails for small earners and micro-businesses"
+        ],
+        "source_refs": [
+          "http://www.wikidata.org/entity/Q790110"
+        ],
+        "evidence_level": "public_source",
+        "risk_class": "low",
+        "company_id": "enabler_6d6281c4410f"
+      },
+      "score": 1.0,
+      "blocked": false,
+      "reasons": [
+        "has_source_refs",
+        "has_enablement_levers",
+        "livelihood_relevant_sector",
+        "low_initial_risk",
+        "geography_known"
+      ]
+    },
+    {
+      "rank": 22,
+      "company": {
+        "name": "Avenue Bank",
+        "sector": "finance_rails",
+        "geography": "Australia",
+        "enablement_levers": [
+          "financial tools, accounts, credit, payment, or risk rails for small earners and micro-businesses"
+        ],
+        "source_refs": [
+          "http://www.wikidata.org/entity/Q139717831"
+        ],
+        "evidence_level": "public_source",
+        "risk_class": "low",
+        "company_id": "enabler_08487215cb20"
+      },
+      "score": 1.0,
+      "blocked": false,
+      "reasons": [
+        "has_source_refs",
+        "has_enablement_levers",
+        "livelihood_relevant_sector",
+        "low_initial_risk",
+        "geography_known"
+      ]
+    },
+    {
+      "rank": 23,
+      "company": {
+        "name": "Axian Telecom",
+        "sector": "finance_rails",
+        "geography": "Madagascar",
+        "enablement_levers": [
+          "financial tools, accounts, credit, payment, or risk rails for small earners and micro-businesses"
+        ],
+        "source_refs": [
+          "http://www.wikidata.org/entity/Q109312582"
+        ],
+        "evidence_level": "public_source",
+        "risk_class": "low",
+        "company_id": "enabler_ee224d28f00a"
+      },
+      "score": 1.0,
+      "blocked": false,
+      "reasons": [
+        "has_source_refs",
+        "has_enablement_levers",
+        "livelihood_relevant_sector",
+        "low_initial_risk",
+        "geography_known"
+      ]
+    },
+    {
+      "rank": 24,
+      "company": {
+        "name": "BackerKit",
+        "sector": "finance_rails",
+        "geography": "United States",
+        "enablement_levers": [
+          "community capital formation for creators, traders, mutual-aid groups, and small ventures"
+        ],
+        "source_refs": [
+          "http://www.wikidata.org/entity/Q129251986"
+        ],
+        "evidence_level": "public_source",
+        "risk_class": "low",
+        "company_id": "enabler_95debb88e3eb"
+      },
+      "score": 1.0,
+      "blocked": false,
+      "reasons": [
+        "has_source_refs",
+        "has_enablement_levers",
+        "livelihood_relevant_sector",
+        "low_initial_risk",
+        "geography_known"
+      ]
+    },
+    {
+      "rank": 25,
+      "company": {
+        "name": "Backtrex",
+        "sector": "finance_rails",
+        "geography": "France",
+        "enablement_levers": [
+          "financial tools, accounts, credit, payment, or risk rails for small earners and micro-businesses"
+        ],
+        "source_refs": [
+          "http://www.wikidata.org/entity/Q139497671"
+        ],
+        "evidence_level": "public_source",
+        "risk_class": "low",
+        "company_id": "enabler_273b008eae21"
+      },
+      "score": 1.0,
+      "blocked": false,
+      "reasons": [
+        "has_source_refs",
+        "has_enablement_levers",
+        "livelihood_relevant_sector",
+        "low_initial_risk",
+        "geography_known"
+      ]
+    }
+  ],
+  "external_action": {
+    "cell_id": "livelihood_loom",
+    "kind": "capital_signal",
+    "title": "Draft non-extractive sponsor signal for informal economy enabler pilot",
+    "requested_by": "livelihood_loom_ceo",
+    "payload": {
+      "claim_id": "claim_lloom_bootstrap_20260629T030848Z",
+      "cell_id": "livelihood_loom",
+      "claim_type": "public_enabler_map_ready",
+      "aggregate_count": 1000,
+      "sector": "informal_economy_enablers",
+      "region_level": "country_or_public_market",
+      "evidence_refs": [
+        "http://www.wikidata.org/entity/Q109312582",
+        "http://www.wikidata.org/entity/Q109997140",
+        "http://www.wikidata.org/entity/Q113988065",
+        "http://www.wikidata.org/entity/Q120499372",
+        "http://www.wikidata.org/entity/Q129251986",
+        "http://www.wikidata.org/entity/Q130344145",
+        "http://www.wikidata.org/entity/Q131436211",
+        "http://www.wikidata.org/entity/Q138836922",
+        "http://www.wikidata.org/entity/Q139369865",
+        "http://www.wikidata.org/entity/Q139497671",
+        "http://www.wikidata.org/entity/Q139681451",
+        "http://www.wikidata.org/entity/Q139717831",
+        "http://www.wikidata.org/entity/Q139741963",
+        "http://www.wikidata.org/entity/Q140079371",
+        "http://www.wikidata.org/entity/Q140361256",
+        "http://www.wikidata.org/entity/Q17112518",
+        "http://www.wikidata.org/entity/Q19717747",
+        "http://www.wikidata.org/entity/Q22077748",
+        "http://www.wikidata.org/entity/Q43374781",
+        "http://www.wikidata.org/entity/Q55639119"
+      ],
+      "audit_status": "internal_bootstrap_only",
+      "outcome_metric": "public_enabler_candidates_loaded",
+      "outcome_value": "1000",
+      "time_period": "2026-06"
+    },
+    "risk_notes": [
+      "Draft only; no sponsor contacted.",
+      "Uses aggregate public-source candidate count only.",
+      "Requires human_governor risk review and approval before action."
+    ],
+    "evidence_refs": [
+      "http://www.wikidata.org/entity/Q109312582",
+      "http://www.wikidata.org/entity/Q109997140",
+      "http://www.wikidata.org/entity/Q113988065",
+      "http://www.wikidata.org/entity/Q120499372",
+      "http://www.wikidata.org/entity/Q129251986",
+      "http://www.wikidata.org/entity/Q130344145",
+      "http://www.wikidata.org/entity/Q131436211",
+      "http://www.wikidata.org/entity/Q138836922",
+      "http://www.wikidata.org/entity/Q139369865",
+      "http://www.wikidata.org/entity/Q139497671",
+      "http://www.wikidata.org/entity/Q139681451",
+      "http://www.wikidata.org/entity/Q139717831",
+      "http://www.wikidata.org/entity/Q139741963",
+      "http://www.wikidata.org/entity/Q140079371",
+      "http://www.wikidata.org/entity/Q140361256",
+      "http://www.wikidata.org/entity/Q17112518",
+      "http://www.wikidata.org/entity/Q19717747",
+      "http://www.wikidata.org/entity/Q22077748",
+      "http://www.wikidata.org/entity/Q43374781",
+      "http://www.wikidata.org/entity/Q55639119"
+    ],
+    "idempotency_key": "livelihood_loom_pilot_001:lloom_bootstrap_20260629T030848Z:capital_signal",
+    "request_id": "ext_6bbda4db3bd8488c",
+    "status": "drafted",
+    "created_at": "2026-06-29T03:08:48.827358+00:00",
+    "updated_at": "2026-06-29T03:08:48.827367+00:00",
+    "decision": null,
+    "execution_receipt_id": ""
+  },
+  "external_action_log": "/Users/dhyana/.dharma/venture_cells/livelihood_loom/external_actions.jsonl",
+  "safety_boundary": {
+    "external_action_mode": "human_approved_only",
+    "capital_boundary": "dharma_capital_read_only_aggregated_signals",
+    "provider_calls_made": false,
+    "external_contacts_made": false,
+    "payments_made": false,
+    "on_chain_transactions_made": false,
+    "private_data_used": false
+  },
+  "next_actions": [
+    "Human reviews top scored candidates and removes any harmful target classes.",
+    "CEO drafts 5 enablement packets from public information only.",
+    "Evidence auditor verifies source refs before any partner claim.",
+    "Human_governor decides whether a sponsor/cultivation signal may leave draft state."
+  ],
+  "receipt_path": "/Users/dhyana/dharma_swarm/reports/livelihood_loom/bootstrap/lloom_bootstrap_20260629T030848Z.json",
+  "latest_path": "/Users/dhyana/dharma_swarm/reports/livelihood_loom/bootstrap/latest.json",
+  "sandbox_receipt_path": "/Users/dhyana/.dharma/external_agents/livelihood_loom_ceo/receipts/lloom_bootstrap_20260629T030848Z.json"
+}

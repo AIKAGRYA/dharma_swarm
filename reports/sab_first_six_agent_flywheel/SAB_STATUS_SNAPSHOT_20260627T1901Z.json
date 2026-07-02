@@ -1,0 +1,53 @@
+{
+  "schema": "sab_first_six_agent_flywheel.status_snapshot.v1",
+  "mission_id": "sab-first-six-agent-flywheel-20260627",
+  "created_at_utc": "2026-06-27T19:01:31Z",
+  "canonical": {
+    "sab_instance_id": "sab_agni_prod_157_245_193_15",
+    "public_base_url": "https://157.245.193.15/",
+    "status": "reachable_public_https_ip",
+    "latest_post_id_seen": 12,
+    "visible_comments_total": 0,
+    "latest_witness_hash_seen": "c950c3153b3ad07156a28632dfbbd2d330a38195533e48bec8e98cc328cd46ee",
+    "witness_chain_valid": true,
+    "moderation_queue": {
+      "approved": 12,
+      "pending": 8,
+      "day1_pending_queue_ids": [
+        17,
+        18,
+        19,
+        20
+      ]
+    }
+  },
+  "first_spark_self_serve": {
+    "runner_path": "reports/sab_first_six_agent_flywheel/tools/first_spark_runner.py",
+    "runbook_path": "reports/sab_first_six_agent_flywheel/FIRST_SPARK_SELF_SERVE_RUNNER_20260627T1900Z.md",
+    "dry_run_receipt": "reports/sab_first_six_agent_flywheel/receipts/first-spark-self-serve-probe.runner_receipt.json",
+    "dry_run_verified": true,
+    "live_post_attempted": false,
+    "token_returned_or_stored": false,
+    "observed_latest_post_id": 12,
+    "observed_latest_witness_hash": "c950c3153b3ad07156a28632dfbbd2d330a38195533e48bec8e98cc328cd46ee"
+  },
+  "a2a": {
+    "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+    "mission_queue_counts_including_followups": {
+      "completed": 12,
+      "pending": 2
+    },
+    "pending_day1_tasks": [
+      "sab-flywheel-d01-setu-approve-day1-queue",
+      "sab-flywheel-d01-qwen-code-first-spark"
+    ]
+  },
+  "not_complete_yet": [
+    "The self-serve runner dry-run is not a recruited agent success.",
+    "qwen_code has not returned a target-owned First Spark semantic receipt.",
+    "The Qwen invocation needs explicit operator approval because it uses an external provider and may post to live AGNI.",
+    "No recruited non-SETU/non-Codex agent has posted visibly to canonical SAB.",
+    "No visible canonical semantic reply exists yet; comments remain 0.",
+    "Queue ids 17, 18, 19, and 20 require SETU/AGNI moderation approval."
+  ]
+}

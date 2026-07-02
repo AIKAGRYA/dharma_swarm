@@ -1,0 +1,83 @@
+## runtime-truth/nats-rebuild-preflight-20260618...origin/main [behind 212]
+ M Makefile
+ M dharma_swarm/a2a/__init__.py
+ M dharma_swarm/a2a/nats_transport.py
+ M dharma_swarm/a2a/node_gateway.py
+ M docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
+ M reports/governance/active_track_evidence.json
+ M reports/governance/active_track_evidence.md
+ M reports/governance/track_portfolio.json
+ M reports/orientation/repo_context.json
+ M reports/orientation/repo_context.md
+ M scripts/governance/check_nats_substrate_contract.py
+ M scripts/runtime/a2a_domain_reply_artifact.py
+ M scripts/runtime/a2a_domain_reply_worker.py
+ M scripts/runtime/a2a_inbox_bridge.py
+ M scripts/runtime/a2a_reply_capture.py
+ M scripts/runtime/a2a_send.py
+ M scripts/runtime/pr_merge_control.py
+ M scripts/start_a2a_inbox_bridge_tmux.sh
+ M scripts/status_a2a_inbox_bridge_tmux.sh
+ M tests/test_a2a_domain_reply_artifact.py
+ M tests/test_a2a_domain_reply_worker.py
+ M tests/test_a2a_inbox_bridge.py
+ M tests/test_a2a_inbox_bridge_tmux_scripts.py
+ M tests/test_a2a_reply_capture.py
+ M tests/test_a2a_send.py
+ M tests/test_a2a_spec_conformance.py
+ M tests/test_nats_transport.py
+ M tests/test_pr_merge_control.py
+?? dharma_swarm/a2a/agent_roster.py
+?? dharma_swarm/a2a/jetstream_topology.py
+?? docs/governance/a2a/
+?? reports/a2a/domain_reply_artifact_preflight/
+?? reports/a2a/domain_reply_artifacts/20260619T084913Z-codex_composer-a2a-semantic-signoff-codex_composer-e4778df2dfe6.json
+?? reports/a2a/domain_reply_artifacts/20260619T085732Z-hermes-m5-a2a-semantic-signoff-hermes-m5-e4778df2dfe6.json
+?? reports/a2a/domain_reply_requests/
+?? reports/a2a/full_spec_readiness/
+?? reports/a2a/identity_reconcile/
+?? reports/a2a/live_acl/
+?? reports/a2a/live_topology/
+?? reports/a2a/model_reply_captures/
+?? reports/a2a/presence_preflight/
+?? reports/a2a/presence_projection/
+?? reports/a2a/rebuild_preflight/
+?? reports/a2a/semantic_task_packets/
+?? reports/a2a/semantic_tasks/
+?? reports/a2a/standing_agent_preflight/
+?? reports/a2a/standing_wake_loop/
+?? reports/a2a/topology/
+?? reports/a2a/wake_loop_preflight/
+?? scripts/governance/a2a_domain_reply_artifact_preflight.py
+?? scripts/governance/a2a_domain_reply_request.py
+?? scripts/governance/a2a_full_spec_readiness.py
+?? scripts/governance/a2a_identity_reconcile.py
+?? scripts/governance/a2a_jetstream_topology.py
+?? scripts/governance/a2a_live_acl_probe.py
+?? scripts/governance/a2a_live_topology_probe.py
+?? scripts/governance/a2a_onboard.py
+?? scripts/governance/a2a_presence_preflight.py
+?? scripts/governance/a2a_presence_projector.py
+?? scripts/governance/a2a_semantic_task_packet.py
+?? scripts/governance/a2a_standing_agent_preflight.py
+?? scripts/governance/a2a_wake_loop_preflight.py
+?? scripts/governance/check_a2a_onboard_contract.py
+?? scripts/runtime/a2a_model_reply_capture.py
+?? scripts/runtime/a2a_standing_wake_loop.py
+?? tests/test_a2a_agent_roster.py
+?? tests/test_a2a_domain_reply_artifact_preflight.py
+?? tests/test_a2a_domain_reply_request.py
+?? tests/test_a2a_full_spec_readiness.py
+?? tests/test_a2a_identity_reconcile.py
+?? tests/test_a2a_jetstream_topology.py
+?? tests/test_a2a_live_acl_probe.py
+?? tests/test_a2a_live_topology_probe.py
+?? tests/test_a2a_model_reply_capture.py
+?? tests/test_a2a_onboard.py
+?? tests/test_a2a_onboard_contract_verifier.py
+?? tests/test_a2a_presence_preflight.py
+?? tests/test_a2a_presence_projector.py
+?? tests/test_a2a_semantic_task_packet.py
+?? tests/test_a2a_standing_agent_preflight.py
+?? tests/test_a2a_standing_wake_loop.py
+?? tests/test_a2a_wake_loop_preflight.py

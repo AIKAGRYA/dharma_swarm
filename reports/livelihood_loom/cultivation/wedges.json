@@ -1,0 +1,213 @@
+{
+  "cell_id": "livelihood_loom",
+  "generated_at": "2026-06-29T16:06:44.889679+00:00",
+  "schema_version": "livelihood_loom.roi_wedges.v1",
+  "source_top_50": "reports/livelihood_loom/cultivation/top_50.json",
+  "wedge_count": 3,
+  "wedges": [
+    {
+      "candidate_count_in_top_50": 28,
+      "country_count": 17,
+      "evidence_refs": [
+        "http://www.wikidata.org/entity/Q22907148",
+        "http://mypoolin.com/",
+        "http://www.wikidata.org/entity/Q48816527",
+        "https://1link.net.pk/paypak/",
+        "http://www.wikidata.org/entity/Q120755794",
+        "https://www.bayad.com/",
+        "http://www.wikidata.org/entity/Q6886937",
+        "http://www.wikidata.org/entity/Q65090336",
+        "http://www.wikidata.org/entity/Q107299057",
+        "http://www.wikidata.org/entity/Q15113520",
+        "http://www.fortumo.com",
+        "http://www.wikidata.org/entity/Q5475100"
+      ],
+      "label": "Payment acceptance and cashflow rails",
+      "rank": 1,
+      "roi_score": 1.108,
+      "roi_thesis": "Micro-merchants and independent sellers can convert demand into earnings faster when payment acceptance and cashflow rails are usable.",
+      "safety_caveats": [
+        "No lending decision, credit pricing, or worker-level financial data.",
+        "Use aggregate merchant-readiness signals only."
+      ],
+      "top_candidates": [
+        {
+          "company_id": "enabler_8adee02c31f1",
+          "country": "India",
+          "name": "MyPoolin",
+          "rank": 1,
+          "score": 0.984,
+          "source_rank": 1
+        },
+        {
+          "company_id": "enabler_108de5b4fe4d",
+          "country": "Pakistan",
+          "name": "PayPak",
+          "rank": 2,
+          "score": 0.982,
+          "source_rank": 5
+        },
+        {
+          "company_id": "enabler_06370289a0a9",
+          "country": "Philippines",
+          "name": "Bayad Center",
+          "rank": 3,
+          "score": 0.982,
+          "source_rank": 6
+        },
+        {
+          "company_id": "enabler_a762fddb96ce",
+          "country": "India",
+          "name": "Mobile Payments in India",
+          "rank": 12,
+          "score": 0.873,
+          "source_rank": 34
+        },
+        {
+          "company_id": "enabler_9d6ef0c65fc6",
+          "country": "Pakistan",
+          "name": "JazzCash",
+          "rank": 13,
+          "score": 0.872,
+          "source_rank": 39
+        }
+      ],
+      "wedge_id": "payment_acceptance_cashflow"
+    },
+    {
+      "candidate_count_in_top_50": 11,
+      "country_count": 5,
+      "evidence_refs": [
+        "http://www.wikidata.org/entity/Q138776467",
+        "https://pandascrow.io/",
+        "http://www.wikidata.org/entity/Q138850704",
+        "https://mon3.co",
+        "http://www.wikidata.org/entity/Q61002117",
+        "http://www.stone.com.br",
+        "http://www.wikidata.org/entity/Q5321559",
+        "https://ghipss.net/",
+        "http://www.wikidata.org/entity/Q139742615",
+        "https://www.estatecoin.in",
+        "http://www.wikidata.org/entity/Q130741763",
+        "https://www.lendbox.in"
+      ],
+      "label": "General finance enablement rails",
+      "rank": 2,
+      "roi_score": 0.994,
+      "roi_thesis": "General enablement candidates need narrower field proof.",
+      "safety_caveats": [
+        "Use public aggregate proof only."
+      ],
+      "top_candidates": [
+        {
+          "company_id": "enabler_985c91bf1889",
+          "country": "Nigeria",
+          "name": "Pandascrow",
+          "rank": 6,
+          "score": 0.952,
+          "source_rank": 4
+        },
+        {
+          "company_id": "enabler_8fccf5699c2e",
+          "country": "Brazil",
+          "name": "MON 3",
+          "rank": 15,
+          "score": 0.846,
+          "source_rank": 27
+        },
+        {
+          "company_id": "enabler_1d2e9c05d957",
+          "country": "Brazil",
+          "name": "Stone Pagamentos",
+          "rank": 16,
+          "score": 0.846,
+          "source_rank": 28
+        },
+        {
+          "company_id": "enabler_090e5a3c465c",
+          "country": "Ghana",
+          "name": "E-zwich",
+          "rank": 17,
+          "score": 0.846,
+          "source_rank": 29
+        },
+        {
+          "company_id": "enabler_1433304a4cfb",
+          "country": "India",
+          "name": "EstateCoin",
+          "rank": 18,
+          "score": 0.846,
+          "source_rank": 30
+        }
+      ],
+      "wedge_id": "finance_enablement"
+    },
+    {
+      "candidate_count_in_top_50": 5,
+      "country_count": 3,
+      "evidence_refs": [
+        "http://www.wikidata.org/entity/Q36879490",
+        "https://www.rappi.com.mx/",
+        "http://www.wikidata.org/entity/Q137661216",
+        "https://accesco.co.in/",
+        "http://www.wikidata.org/entity/Q65944364",
+        "https://www.swiggy.com",
+        "http://www.wikidata.org/entity/Q108539714",
+        "http://www.devy.center",
+        "http://www.wikidata.org/entity/Q6090601",
+        "https://www.yemeksepeti.com/"
+      ],
+      "label": "Food vendor demand and courier welfare",
+      "rank": 3,
+      "roi_score": 0.975,
+      "roi_thesis": "Food-vendor demand rails have fast measurable welfare signals, but courier surveillance and platform terms require review.",
+      "safety_caveats": [
+        "Flag exploitative gig terms and worker surveillance.",
+        "Do not optimize dispatch, pricing, or worker allocation."
+      ],
+      "top_candidates": [
+        {
+          "company_id": "enabler_5ae380f28642",
+          "country": "Mexico",
+          "name": "Rappi",
+          "rank": 7,
+          "score": 0.924,
+          "source_rank": 10
+        },
+        {
+          "company_id": "enabler_bd1fe6fed7ff",
+          "country": "India",
+          "name": "Accesco Living",
+          "rank": 8,
+          "score": 0.913,
+          "source_rank": 7
+        },
+        {
+          "company_id": "enabler_88c3f45f2957",
+          "country": "India",
+          "name": "Swiggy",
+          "rank": 9,
+          "score": 0.913,
+          "source_rank": 8
+        },
+        {
+          "company_id": "enabler_8e3f9acc2853",
+          "country": "Mexico",
+          "name": "Devy",
+          "rank": 10,
+          "score": 0.912,
+          "source_rank": 9
+        },
+        {
+          "company_id": "enabler_0c17b579cf7e",
+          "country": "Turkey",
+          "name": "Yemeksepeti.com",
+          "rank": 11,
+          "score": 0.887,
+          "source_rank": 11
+        }
+      ],
+      "wedge_id": "food_vendor_demand"
+    }
+  ]
+}

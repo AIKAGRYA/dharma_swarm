@@ -1,0 +1,10 @@
+ CLAUDE.md                                          |  275 +-----
+ docs/governance/ACTIVE_TRACK.yaml                  |  849 +++-------------
+ docs/governance/BUILD_SESSION_ENTRYPOINT.md        |  275 +-----
+ docs/governance/SOVEREIGN_MANIFEST.md              |  275 +-----
+ .../governance/ACTIVE_TRACK_CLOSEOUT_2026-06-30.md |    6 +
+ reports/governance/active_track_evidence.json      | 1044 ++------------------
+ reports/governance/active_track_evidence.md        |  131 +--
+ reports/governance/track_portfolio.json            | 1044 ++------------------
+ tests/test_track_closure_rigor.py                  |   81 +-
+ 9 files changed, 341 insertions(+), 3639 deletions(-)

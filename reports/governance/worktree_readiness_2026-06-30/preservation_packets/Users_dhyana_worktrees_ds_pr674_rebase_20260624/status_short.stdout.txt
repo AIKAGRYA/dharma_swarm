@@ -1,0 +1,5 @@
+## repair/pr674-track-closure-gate-20260624...origin/chore/reconcile-records-2026-06-22 [gone]
+ M reports/governance/active_track_evidence.json
+ M reports/governance/active_track_evidence.md
+ M reports/governance/track_portfolio.json
+ M uv.lock

@@ -136,4 +136,3 @@ def _last_cycle_status(result: dict[str, Any]) -> str:
 
 
 __all__ = ["BurnInConfig", "run_burn_in", "run_burn_in_sync"]
-

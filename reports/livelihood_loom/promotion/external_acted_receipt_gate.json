@@ -1,0 +1,16 @@
+{
+  "cell_id": "livelihood_loom",
+  "complete": false,
+  "current_external_action": "reports/livelihood_loom/promotion/first_outreach_external_action.json",
+  "current_external_action_status": "risk_reviewed",
+  "generated_at": "2026-06-29T16:29:01.588356+00:00",
+  "not_fabricated": true,
+  "required_for_completion": [
+    "human_governor approves outreach action",
+    "human or approved executor sends outreach",
+    "external counterparty acts or responds",
+    "acted receipt records timestamp, actor, counterparty, action, and evidence_ref"
+  ],
+  "schema_version": "livelihood_loom.external_acted_receipt_gate.v1",
+  "status": "blocked_pending_human_governor_approval_and_external_act"
+}

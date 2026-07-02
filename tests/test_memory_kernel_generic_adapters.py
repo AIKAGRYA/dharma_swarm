@@ -133,6 +133,35 @@ def test_generic_adapter_suppresses_unsafe_surface_atoms(tmp_path: Path) -> None
     assert atoms == []
 
 
+def test_memory_kernel_query_routes_to_governed_retrieval(tmp_path: Path) -> None:
+    from dharma_swarm.vector_store import VectorStore
+
+    state_dir = tmp_path / ".dharma"
+    store = VectorStore(state_dir=state_dir, dim=32)
+    store.upsert(
+        "Orchestrator async task routing engine",
+        source="text_file:concepts-orchestrator",
+        layer="source_file",
+        metadata={"source_file": "concepts/orchestrator.md"},
+    )
+    kernel = MemoryKernel(
+        MemoryKernelConfig(
+            census=CensusConfig(
+                repo_root=tmp_path / "repo",
+                home=tmp_path,
+                include_discovered=False,
+            ),
+            adapter=ReadOnlyAdapterConfig(default_limit=1),
+        )
+    )
+
+    result = kernel.query("orchestrator async task routing engine", top_k=2)
+
+    assert result.candidates
+    assert result.candidates[0].source == "text_file:concepts-orchestrator"
+    assert result.memory_kernel.text_query_supported is True
+
+
 def _surface(
     *,
     surface_id: str,

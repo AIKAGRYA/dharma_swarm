@@ -113,7 +113,7 @@ def check_tests() -> tuple[bool, str]:
         # When a human or CI runs the verifyCmd in a proper dev shell (with pytest), the real pytest path
         # will be used and must pass for the official prod claim.
         fb_code, fb_out, fb_err = run([
-            "python3", "-c",
+            test_python(), "-c",
             """
 import asyncio
 import sys
@@ -161,7 +161,7 @@ def check_live_smoke_free() -> tuple[bool, str]:
     # We keep it cheap: use the in-repo smoke harness if present, else a direct python -c that exercises holon_runtime with a stub runner.
     # This is deliberately the "external signal" — the verifier runs the thing, not the builder claiming it worked.
     code, out, err = run([
-        "python3", "-c",
+        test_python(), "-c",
         """
 import asyncio
 import tempfile
@@ -215,7 +215,7 @@ def check_artifact_gate() -> tuple[bool, str]:
     # Ensure that if a reply contains outcome words without an explicit artifact, the gate surfaces the refusal signal.
     # We exercise the code path we added in holon_runtime (outcome_claim_without_artifact).
     code, out, err = run([
-        "python3", "-c",
+        test_python(), "-c",
         """
 import asyncio
 import tempfile
@@ -250,7 +250,7 @@ asyncio.run(main())
 
 def check_l4_supervised_chain() -> tuple[bool, str]:
     code, out, err = run([
-        "python3", "-c",
+        test_python(), "-c",
         """
 import json
 import tempfile
@@ -311,7 +311,7 @@ with tempfile.TemporaryDirectory() as td:
 
 def check_l4_service_runner_unattended_wake() -> tuple[bool, str]:
     code, out, err = run([
-        "python3", "-c",
+        test_python(), "-c",
         """
 import fcntl
 import json
@@ -798,7 +798,7 @@ with tempfile.TemporaryDirectory() as td:
 
 def check_l4_model_response_probe_stub() -> tuple[bool, str]:
     code, out, err = run([
-        "python3", "-c",
+        test_python(), "-c",
         """
 import json
 import tempfile
@@ -856,7 +856,7 @@ with tempfile.TemporaryDirectory() as td:
 
 def check_l4_unsafe_subprocess_model_probe_refusal() -> tuple[bool, str]:
     code, out, err = run([
-        "python3", "-c",
+        test_python(), "-c",
         """
 import json
 import tempfile
@@ -913,7 +913,7 @@ with tempfile.TemporaryDirectory() as td:
 
 def check_l4_subprocess_model_probe_lease_gate() -> tuple[bool, str]:
     code, out, err = run([
-        "python3", "-c",
+        test_python(), "-c",
         """
 import json
 import tempfile
@@ -1028,7 +1028,7 @@ with tempfile.TemporaryDirectory() as td:
 
 def check_l4_transport_probe_stub() -> tuple[bool, str]:
     code, out, err = run([
-        "python3", "-c",
+        test_python(), "-c",
         """
 import json
 import tempfile
@@ -1088,7 +1088,7 @@ with tempfile.TemporaryDirectory() as td:
 
 def check_l4_orchestration_probe_stub() -> tuple[bool, str]:
     code, out, err = run([
-        "python3", "-c",
+        test_python(), "-c",
         """
 import json
 import tempfile
@@ -1241,7 +1241,7 @@ with tempfile.TemporaryDirectory() as td:
 
 def check_l4_swarm_manager_bounded_execution() -> tuple[bool, str]:
     code, out, err = run([
-        "python3", "-c",
+        test_python(), "-c",
         """
 import asyncio
 import json

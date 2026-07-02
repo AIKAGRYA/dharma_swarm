@@ -236,6 +236,8 @@ def update_lifecycle_receipt(
 
     String fields are overwritten only when a non-empty value is supplied; list
     fields (``blockers``, ``evidence_paths``) are unioned to stay append-only.
+    Passing ``blockers=[]`` explicitly clears resolved blockers while leaving
+    evidence paths append-only.
     Pass ``created_at`` to make the receipt timestamps deterministic.
     """
     stamp = created_at or utc_now_iso()
@@ -246,6 +248,8 @@ def update_lifecycle_receipt(
         else {"correlation_id": correlation_id, "created_at": stamp}
     )
     for key, value in fields.items():
+        if key == "blockers" and value == []:
+            base[key] = []
         if key in _LIFECYCLE_MERGE_LIST_FIELDS and value:
             merged = list(base.get(key) or [])
             for item in value:

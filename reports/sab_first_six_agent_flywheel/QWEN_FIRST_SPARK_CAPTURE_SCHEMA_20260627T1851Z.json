@@ -1,0 +1,181 @@
+{
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "string"
+    },
+    "authored_by": {
+      "type": "string"
+    },
+    "agent_uid": {
+      "type": "string"
+    },
+    "packet_id": {
+      "type": "string"
+    },
+    "reply_subject": {
+      "type": "string"
+    },
+    "send_receipt_path": {
+      "type": "string"
+    },
+    "locked_spec_sha256": {
+      "type": "string"
+    },
+    "task_hash": {
+      "type": "string"
+    },
+    "semantic_reply_claim": {
+      "type": "boolean"
+    },
+    "peer_model_processed_claim": {
+      "type": "boolean"
+    },
+    "model_identity": {
+      "type": "string"
+    },
+    "confidence": {
+      "type": "number"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "approve",
+        "revise",
+        "reject",
+        "blocked"
+      ]
+    },
+    "summary": {
+      "type": "string"
+    },
+    "failure_digest": {
+      "type": "string"
+    },
+    "sab_semantic_receipt": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "type": "string"
+        },
+        "mission_id": {
+          "type": "string"
+        },
+        "task_id": {
+          "type": "string"
+        },
+        "agent": {
+          "type": "string"
+        },
+        "model_identity": {
+          "type": "string"
+        },
+        "sab_instance_id": {
+          "type": "string"
+        },
+        "canonical_base_url": {
+          "type": "string"
+        },
+        "latest_post_id_seen": {
+          "type": "integer"
+        },
+        "latest_witness_hash_seen": {
+          "type": "string"
+        },
+        "semantic_action": {
+          "type": "string",
+          "enum": [
+            "adoption",
+            "challenge",
+            "correction",
+            "synthesis",
+            "refusal"
+          ]
+        },
+        "claim": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "action_taken": {
+          "type": "string"
+        },
+        "canonical_queue_id": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "published_post_id": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "token_returned_or_stored": {
+          "type": "boolean"
+        },
+        "next_request": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema",
+        "mission_id",
+        "task_id",
+        "agent",
+        "model_identity",
+        "sab_instance_id",
+        "canonical_base_url",
+        "latest_post_id_seen",
+        "latest_witness_hash_seen",
+        "semantic_action",
+        "claim",
+        "evidence",
+        "action_taken",
+        "canonical_queue_id",
+        "published_post_id",
+        "token_returned_or_stored",
+        "next_request"
+      ],
+      "additionalProperties": true
+    }
+  },
+  "required": [
+    "schema_version",
+    "authored_by",
+    "agent_uid",
+    "packet_id",
+    "reply_subject",
+    "send_receipt_path",
+    "locked_spec_sha256",
+    "task_hash",
+    "semantic_reply_claim",
+    "peer_model_processed_claim",
+    "model_identity",
+    "confidence",
+    "evidence_refs",
+    "blockers",
+    "verdict",
+    "summary",
+    "failure_digest",
+    "sab_semantic_receipt"
+  ],
+  "additionalProperties": true
+}

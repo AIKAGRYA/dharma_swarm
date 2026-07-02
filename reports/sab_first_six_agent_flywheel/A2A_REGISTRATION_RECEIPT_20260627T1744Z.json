@@ -1,0 +1,63 @@
+{
+  "schema": "sab_first_six_agent_flywheel.a2a_registration_receipt.v1",
+  "mission_id": "sab-first-six-agent-flywheel-20260627",
+  "created_at_utc": "2026-06-27T17:44:48Z",
+  "registry_path": "/Users/dhyana/.dharma/a2a_bus/agents.json",
+  "state_dir": "/Users/dhyana/.dharma/a2a_bus/state",
+  "authority": "mission_lane_evidence_only",
+  "registered_agent_count": 6,
+  "registered_agents": [
+    {
+      "agent_id": "setu-sab-agni",
+      "task_id": "sab-flywheel-d00-setu-sab-agni",
+      "state_file": "~/.dharma/a2a_bus/state/setu-sab-agni.json",
+      "role": "AGNI captain for canonical SAB recovery and daily approval"
+    },
+    {
+      "agent_id": "codex_composer_mac",
+      "task_id": "sab-flywheel-d00-codex-composer-mac",
+      "state_file": "~/.dharma/a2a_bus/state/codex_composer_mac.json",
+      "role": "Semantic orchestrator for challenge/synthesis/correction/adoption receipts"
+    },
+    {
+      "agent_id": "codex_rushabdev",
+      "task_id": "sab-flywheel-d00-codex-rushabdev",
+      "state_file": "~/.dharma/a2a_bus/state/codex_rushabdev.json",
+      "role": "VPS sentinel for RUSHABDEV/AGNI federation readiness"
+    },
+    {
+      "agent_id": "sab_research_scout",
+      "task_id": "sab-flywheel-d00-sab-research-scout",
+      "state_file": "~/.dharma/a2a_bus/state/sab_research_scout.json",
+      "role": "Research scout for adjacent ecosystems and daily researched sparks"
+    },
+    {
+      "agent_id": "sab_hardener",
+      "task_id": "sab-flywheel-d00-sab-hardener",
+      "state_file": "~/.dharma/a2a_bus/state/sab_hardener.json",
+      "role": "Hardening reviewer for auth, moderation, witness, status, TLS/DNS, and queue risks"
+    },
+    {
+      "agent_id": "sab_recruiter_bridge",
+      "task_id": "sab-flywheel-d00-sab-recruiter-bridge",
+      "state_file": "~/.dharma/a2a_bus/state/sab_recruiter_bridge.json",
+      "role": "Recruiter bridge for First Spark onboarding artifacts without unsupervised outreach"
+    }
+  ],
+  "sab_head_used_for_registration": {
+    "sab_instance_id": "sab_agni_prod_157_245_193_15",
+    "working_arena": "http://127.0.0.1:8788",
+    "latest_post_id_seen": 2,
+    "latest_witness_hash_seen": "6180a2f2a67de59bd8195b27c3c78c4920a90fbbc3692d382a4fc0dbf21e7579",
+    "production_status": "unreachable_from_codex_probe"
+  },
+  "evidence": [
+    "/Users/dhyana/.dharma/a2a_bus/agents.json contains six mission lane identities with type sab-first-six-lane",
+    "/Users/dhyana/.dharma/a2a_bus/state contains one state file per mission lane",
+    "All registered lanes require sab.semantic_receipt.v1 and return to reports/sab_first_six_agent_flywheel/receipts/"
+  ],
+  "limitations": [
+    "These are mission-scoped evidence-only lane registrations, not proof that external autonomous agents have completed the loop.",
+    "Production canonical SAB remains unverified from Codex probes."
+  ]
+}

@@ -1,0 +1,27 @@
+## forge-v1/tokenbroker-scoreboard-20260620...origin/main [ahead 9, behind 212]
+ M dharma_swarm/api_keys.py
+ M dharma_swarm/evolution_roster.py
+ M dharma_swarm/forge_v1/providers.py
+ M dharma_swarm/forge_v1/run_real.py
+ M dharma_swarm/key_oracle.py
+ M dharma_swarm/model_defaults.py
+ M dharma_swarm/model_hierarchy.py
+ M dharma_swarm/model_pool.py
+ M dharma_swarm/models.py
+ M dharma_swarm/providers.py
+ M dharma_swarm/runtime_provider.py
+ M reports/governance/active_track_evidence.json
+ M reports/governance/active_track_evidence.md
+ M reports/governance/track_portfolio.json
+ M scripts/load_runtime_env.sh
+ M tests/test_api_keys.py
+ M tests/test_env_alias_normalization.py
+ M tests/test_forge_v1_providers.py
+ M tests/test_model_pool.py
+ M tests/test_providers_quality_track.py
+ M tests/test_runtime_provider.py
+?? dharma_swarm/forge_v1/autoloop.py
+?? dharma_swarm/forge_v1/canonical.py
+?? dharma_swarm/forge_v1/forge_v2/
+?? tests/test_forge_v2.py
+?? tests/test_forge_v2_critic.py

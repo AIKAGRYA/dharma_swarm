@@ -10,7 +10,9 @@ This module composes the tracked GAIA core into a small shipped operator surface
 from __future__ import annotations
 
 import argparse
+import asyncio
 import calendar
+import hashlib
 import json
 from datetime import date, datetime, timedelta
 from enum import Enum
@@ -18,7 +20,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Sequence
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from dharma_swarm.ai_reciprocity_ledger import (
     AIActor,
@@ -60,6 +62,17 @@ from dharma_swarm.gaia_ledger import (
     OffsetUnit,
 )
 from dharma_swarm.gaia_verification import ORACLE_TYPES, OracleVerdict, verify_offset
+from dharma_swarm.evaluation_registry import EvaluationRegistry
+from dharma_swarm.memory_lattice import MemoryLattice
+from dharma_swarm.runtime_state import RuntimeStateStore
+from dharma_swarm.welfare_tons import (
+    WelfareTonFactors,
+    WelfareTonPortfolioCandidate,
+    WelfareTonPortfolioPlan,
+    WelfareTonScorecard,
+    plan_welfare_portfolio,
+    score_welfare_tons,
+)
 
 if TYPE_CHECKING:
     from dharma_swarm.gaia_initiative import GaiaInitiativePilotPacket
@@ -71,6 +84,8 @@ GAIA_PRINCIPLES: tuple[str, ...] = (
     "satya",
     "jagat_kalyan",
 )
+GAIA_REVIEW_OWNER = "gaia-review-council"
+GAIA_REVIEW_WINDOW_DAYS = 30
 
 
 class GaiaProject(BaseModel):
@@ -89,6 +104,8 @@ class GaiaProject(BaseModel):
     community_partner: str
     description: str
     verification_channels: tuple[str, ...] = Field(default_factory=tuple)
+    welfare_factors: WelfareTonFactors | None = None
+    welfare_assumptions: tuple[str, ...] = Field(default_factory=tuple)
 
     @property
     def is_verified(self) -> bool:
@@ -109,6 +126,7 @@ class GaiaRecommendation(BaseModel):
 
     project: GaiaProject
     strategy: GaiaStrategy
+    welfare_scorecard: WelfareTonScorecard
     welfare_tons: float
     match_score: float
     verification_bonus: float
@@ -397,6 +415,8 @@ class GaiaClaimCard(BaseModel):
     metering_audit_refs: tuple[str, ...] = Field(default_factory=tuple)
     measurement_claim_ready: bool = False
     measurement_packet_path: str
+    evidence_packet_path: str = ""
+    evidence_bundle_hash: str = ""
     obligation_rule: str
     benefit_sharing_ref: str
     grievance_process_ref: str
@@ -434,6 +454,7 @@ class GaiaClaimCard(BaseModel):
     livelihood_feedback_roles: tuple[str, ...] = Field(default_factory=tuple)
     livelihood_packet_path: str
     challenge_packet_path: str
+    adaptive_review_path: str = ""
     promotional_use_frozen: bool = False
     challenge_count: int = 0
     unresolved_challenge_count: int = 0
@@ -503,6 +524,116 @@ class GaiaLivelihoodPacket(BaseModel):
     verification_channels: tuple[str, ...] = Field(default_factory=tuple)
     reciprocity_ledger_path: str
     report_path: str
+
+
+class GaiaProofRef(BaseModel):
+    """A hashed reference inside the GAIA proof chain."""
+
+    ref: str
+    kind: str
+    hash_mode: str
+    sha256: str
+    local_path: str = ""
+    local_exists: bool = False
+
+
+class GaiaEvidencePacket(BaseModel):
+    """Bounded evidence and audit bundle for one GAIA claim."""
+
+    claim_id: str
+    sponsor_name: str
+    model_id: str
+    reporting_period: str
+    project_id: str
+    project_name: str
+    methodology_ref: str
+    measurement_ref: str
+    measurement_verifier: str = ""
+    verification_channels: tuple[str, ...] = Field(default_factory=tuple)
+    metering_evidence: tuple[GaiaProofRef, ...] = Field(default_factory=tuple)
+    metering_audits: tuple[GaiaProofRef, ...] = Field(default_factory=tuple)
+    ecological_evidence: tuple[GaiaProofRef, ...] = Field(default_factory=tuple)
+    ecological_audits: tuple[GaiaProofRef, ...] = Field(default_factory=tuple)
+    governance_refs: tuple[GaiaProofRef, ...] = Field(default_factory=tuple)
+    evidence_bundle_hash: str
+    audit_bundle_hash: str
+    governance_bundle_hash: str
+    bundle_hash: str
+    claim_ready_by_evidence: bool = False
+    report_path: str
+    claim_card_path: str
+    warnings: list[str] = Field(default_factory=list)
+
+
+class GaiaAdaptiveReviewPacket(BaseModel):
+    """Post-claim review packet that assigns the next governance move."""
+
+    claim_id: str
+    visibility: GaiaClaimVisibility
+    owner: str
+    review_status: str
+    next_action: str
+    decision_rationale: str
+    review_window_days: int = Field(default=GAIA_REVIEW_WINDOW_DAYS, ge=1)
+    next_review_due_at: datetime
+    challenge_status: str
+    audit_status: ReciprocityAuditStatus
+    grievance_status: GaiaGrievanceStatus
+    reversal_status: GaiaReversalStatus
+    monitoring_status: str
+    promotional_use_frozen: bool = False
+    feedback_response_count: int = Field(default=0, ge=0)
+    feedback_average_satisfaction: float = Field(default=0.0, ge=0.0, le=5.0)
+    feedback_average_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    top_follow_up: str = ""
+    evidence_ref_count: int = Field(default=0, ge=0)
+    audit_ref_count: int = Field(default=0, ge=0)
+    metering_evidence_ref_count: int = Field(default=0, ge=0)
+    metering_audit_ref_count: int = Field(default=0, ge=0)
+    challenge_count: int = Field(default=0, ge=0)
+    remediation_case_count: int = Field(default=0, ge=0)
+    claim_card_path: str
+    challenge_packet_path: str
+    evidence_packet_path: str
+    report_path: str
+    active_signals: tuple[str, ...] = Field(default_factory=tuple)
+    public_notes: tuple[str, ...] = Field(default_factory=tuple)
+    last_reviewed_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class GaiaCanonicalBinding(BaseModel):
+    """Optional canonical binding config for GAIA proof-chain artifacts."""
+
+    run_id: str = ""
+    session_id: str = ""
+    task_id: str = ""
+    trace_id: str = ""
+    created_by: str = "gaia_platform"
+    summary_type: str = "pilot_claim"
+    promotion_state: str = "shared"
+    db_path: Path | None = None
+    event_log_dir: Path | None = None
+    workspace_root: Path | None = None
+    provenance_root: Path | None = None
+
+    @field_validator("run_id", "session_id", "task_id", "trace_id", "created_by", "summary_type")
+    @classmethod
+    def strip_text_fields(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("promotion_state")
+    @classmethod
+    def normalize_promotion_state(cls, value: str) -> str:
+        cleaned = value.strip()
+        return cleaned or "shared"
+
+    @model_validator(mode="after")
+    def require_session_or_run(self) -> "GaiaCanonicalBinding":
+        if not self.session_id and not self.run_id:
+            raise ValueError(
+                "GaiaCanonicalBinding requires session_id or run_id for canonical recording"
+            )
+        return self
 
 
 class GaiaChallengeRecord(BaseModel):
@@ -690,7 +821,8 @@ class GaiaPlatform:
             if not strategy.approved:
                 continue
 
-            welfare_tons = round(self._estimate_welfare_tons(project), 2)
+            welfare_scorecard = self._scorecard_for_project(project)
+            welfare_tons = round(welfare_scorecard.welfare_tons, 2)
             verification_bonus = self._verification_multiplier(project)
             community_bonus = self._community_multiplier(project)
             match_score = round(
@@ -703,6 +835,7 @@ class GaiaPlatform:
                 GaiaRecommendation(
                     project=project,
                     strategy=strategy,
+                    welfare_scorecard=welfare_scorecard,
                     welfare_tons=welfare_tons,
                     match_score=match_score,
                     verification_bonus=verification_bonus,
@@ -772,6 +905,234 @@ class GaiaPlatform:
             "json_path": json_path,
             "markdown_path": markdown_path,
             "report": report,
+        }
+
+    def build_portfolio_plan(
+        self,
+        *,
+        model_id: str,
+        budget_usd: float,
+        max_projects: int | None = None,
+        candidate_source: str = "auto",
+    ) -> dict[str, Any]:
+        """Build an auditable welfare-ton allocation plan for the current portfolio."""
+        source_requested = candidate_source.strip().lower()
+        if source_requested not in {"auto", "claims", "seeded"}:
+            raise ValueError(
+                "candidate_source must be one of: auto, claims, seeded"
+            )
+
+        recommendations: list[GaiaRecommendation] = []
+        candidates: list[WelfareTonPortfolioCandidate] = []
+        source_used = "seeded_recommendations"
+        candidate_summary: dict[str, Any] = {}
+
+        if source_requested in {"auto", "claims"}:
+            claim_candidates, claim_summary = self._claim_portfolio_candidates(
+                model_id=model_id
+            )
+            if source_requested == "claims" or (
+                claim_summary["claim_explorer_present"]
+                and claim_summary["matching_model_entries"] > 0
+            ):
+                candidates = claim_candidates
+                candidate_summary = claim_summary
+                source_used = "claim_explorer"
+
+        if not candidates and source_used != "claim_explorer":
+            recommendations = self.recommend_projects(
+                model_id=model_id,
+                top_n=len(self._projects),
+            )
+            candidates = [
+                WelfareTonPortfolioCandidate(
+                    project_id=recommendation.project.project_id,
+                    project_name=recommendation.project.name,
+                    cost_usd=recommendation.project.funding_gap_usd,
+                    worker_count=recommendation.project.labor_needed,
+                    geography=(
+                        f"{recommendation.project.region}, "
+                        f"{recommendation.project.country}"
+                    ),
+                    project_type=recommendation.project.project_type,
+                    verified=recommendation.project.is_verified,
+                    scorecard=recommendation.welfare_scorecard,
+                )
+                for recommendation in recommendations
+            ]
+            candidate_summary = {
+                "project_count": len(self._projects),
+                "eligible_candidate_count": len(candidates),
+                "skipped_candidate_count": max(
+                    len(self._projects) - len(candidates),
+                    0,
+                ),
+                "skipped_reasons": {},
+            }
+        plan = plan_welfare_portfolio(
+            candidates,
+            budget_usd=budget_usd,
+            max_projects=max_projects,
+        )
+        plan_dir = self._data_dir / "portfolio_plans"
+        plan_dir.mkdir(parents=True, exist_ok=True)
+        plan_stem = f"{_safe_token(model_id)}-{int(round(budget_usd))}"
+        payload = {
+            "generated_at": datetime.utcnow().isoformat(),
+            "model_id": model_id,
+            "budget_usd": budget_usd,
+            "max_projects": max_projects,
+            "candidate_source_requested": source_requested,
+            "candidate_source_used": source_used,
+            "candidate_summary": candidate_summary,
+            "recommendations_considered": len(recommendations),
+            "plan": plan.model_dump(mode="json"),
+        }
+        json_path = plan_dir / f"{plan_stem}.json"
+        json_path.write_text(
+            json.dumps(payload, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        markdown_path = json_path.with_suffix(".md")
+        markdown_path.write_text(
+            self._render_portfolio_plan_markdown(payload),
+            encoding="utf-8",
+        )
+        return {
+            "plan": plan,
+            "payload": payload,
+            "json_path": json_path,
+            "markdown_path": markdown_path,
+        }
+
+    def _claim_portfolio_candidates(
+        self,
+        *,
+        model_id: str,
+    ) -> tuple[list[WelfareTonPortfolioCandidate], dict[str, Any]]:
+        explorer_path = self._data_dir / "claim_explorer.json"
+        if not explorer_path.exists():
+            return [], {
+                "claim_explorer_present": False,
+                "entries_considered": 0,
+                "matching_model_entries": 0,
+                "eligible_candidate_count": 0,
+                "skipped_candidate_count": 0,
+                "skipped_reasons": {},
+            }
+
+        try:
+            explorer = GaiaClaimExplorer.model_validate_json(
+                explorer_path.read_text(encoding="utf-8")
+            )
+        except Exception:
+            return [], {
+                "claim_explorer_present": True,
+                "entries_considered": 0,
+                "matching_model_entries": 0,
+                "eligible_candidate_count": 0,
+                "skipped_candidate_count": 0,
+                "skipped_reasons": {"invalid_claim_explorer": 1},
+            }
+
+        candidates: list[WelfareTonPortfolioCandidate] = []
+        skipped_reasons: dict[str, int] = {}
+        matching_model_entries = 0
+        seen_project_ids: set[str] = set()
+
+        def skip(reason: str) -> None:
+            skipped_reasons[reason] = skipped_reasons.get(reason, 0) + 1
+
+        for entry in explorer.entries:
+            claim_card_path = Path(entry.claim_card_path)
+            if not claim_card_path.exists():
+                skip("missing_claim_card")
+                continue
+            try:
+                claim_card = GaiaClaimCard.model_validate_json(
+                    claim_card_path.read_text(encoding="utf-8")
+                )
+            except Exception:
+                skip("invalid_claim_card")
+                continue
+
+            if claim_card.model_id != model_id:
+                skip("model_mismatch")
+                continue
+
+            matching_model_entries += 1
+            if claim_card.project_id in seen_project_ids:
+                skip("superseded_project_claim")
+                continue
+            seen_project_ids.add(claim_card.project_id)
+
+            if claim_card.visibility is not GaiaClaimVisibility.PUBLIC_READY:
+                skip("visibility_not_public_ready")
+                continue
+            if claim_card.promotional_use_frozen:
+                skip("promotional_use_frozen")
+                continue
+            if claim_card.audit_status is not ReciprocityAuditStatus.PASSED:
+                skip("audit_not_passed")
+                continue
+            if claim_card.unresolved_challenge_count > 0:
+                skip("unresolved_challenges")
+                continue
+
+            report_path = Path(claim_card.report_path)
+            if not report_path.exists():
+                skip("missing_report")
+                continue
+            try:
+                report = json.loads(report_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                skip("invalid_report")
+                continue
+
+            recommendation_payload = report.get("recommendation")
+            if recommendation_payload is None:
+                skip("missing_recommendation")
+                continue
+            try:
+                recommendation = GaiaRecommendation.model_validate(
+                    recommendation_payload
+                )
+            except Exception:
+                skip("invalid_recommendation")
+                continue
+
+            cost_usd = round(
+                claim_card.routed_value_usd
+                or claim_card.obligation_quantity_usd
+                or recommendation.project.funding_gap_usd,
+                2,
+            )
+            candidates.append(
+                WelfareTonPortfolioCandidate(
+                    project_id=claim_card.project_id,
+                    project_name=claim_card.project_name,
+                    cost_usd=cost_usd,
+                    worker_count=max(
+                        claim_card.livelihood_participant_count,
+                        recommendation.project.labor_needed,
+                    ),
+                    geography=(
+                        f"{recommendation.project.region}, "
+                        f"{recommendation.project.country}"
+                    ),
+                    project_type=recommendation.project.project_type,
+                    verified=True,
+                    scorecard=recommendation.welfare_scorecard,
+                )
+            )
+
+        return candidates, {
+            "claim_explorer_present": True,
+            "entries_considered": len(explorer.entries),
+            "matching_model_entries": matching_model_entries,
+            "eligible_candidate_count": len(candidates),
+            "skipped_candidate_count": sum(skipped_reasons.values()),
+            "skipped_reasons": skipped_reasons,
         }
 
     def qualify_intake(self, intake: GaiaPilotIntake) -> GaiaQualificationDecision:
@@ -941,6 +1302,7 @@ class GaiaPlatform:
         intake: GaiaPilotIntake,
         feedback_entries: Sequence[GaiaUserFeedback | dict[str, Any]] | None = None,
         initiative_summary: dict[str, Any] | None = None,
+        canonical_binding: GaiaCanonicalBinding | dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Build a qualified pilot packet from a structured intake contract."""
         qualification = self.qualify_intake(intake)
@@ -1001,6 +1363,27 @@ class GaiaPlatform:
             report=report,
             challenge_packet=challenge_packet,
         )
+        evidence_packet = self._build_evidence_packet(claim_card=claim_card)
+        claim_card = claim_card.model_copy(
+            update={
+                "evidence_packet_path": str(
+                    Path(report["ledger_path"]).with_name("evidence_packet.json")
+                ),
+                "evidence_bundle_hash": evidence_packet.bundle_hash,
+            }
+        )
+        adaptive_review = self._build_adaptive_review_packet(
+            claim_card=claim_card,
+            challenge_packet=challenge_packet,
+            report=report,
+        )
+        claim_card = claim_card.model_copy(
+            update={
+                "adaptive_review_path": str(
+                    Path(report["ledger_path"]).with_name("adaptive_review_packet.json")
+                )
+            }
+        )
         measurement_packet = self._build_measurement_packet(
             intake=intake,
             qualification=qualification,
@@ -1014,7 +1397,17 @@ class GaiaPlatform:
             "packet_path": str(Path(report["ledger_path"]).with_name("challenge_packet.json")),
         }
         report["claim_card"] = claim_card.model_dump(mode="json")
+        report["evidence"] = {
+            **evidence_packet.model_dump(mode="json"),
+            "packet_path": str(Path(report["ledger_path"]).with_name("evidence_packet.json")),
+        }
         report["measurement"] = measurement_packet.model_dump(mode="json")
+        report["adaptive_review"] = {
+            **adaptive_review.model_dump(mode="json"),
+            "packet_path": str(
+                Path(report["ledger_path"]).with_name("adaptive_review_packet.json")
+            ),
+        }
         report["claim_explorer"] = claim_explorer["explorer"].model_dump(mode="json")
         rendered_initiative_summary = (
             initiative_summary
@@ -1062,6 +1455,16 @@ class GaiaPlatform:
             self._render_measurement_packet_markdown(measurement_packet),
             encoding="utf-8",
         )
+        evidence_path = json_path.with_name("evidence_packet.json")
+        evidence_path.write_text(
+            json.dumps(evidence_packet.model_dump(mode="json"), indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        evidence_markdown_path = evidence_path.with_suffix(".md")
+        evidence_markdown_path.write_text(
+            self._render_evidence_packet_markdown(evidence_packet),
+            encoding="utf-8",
+        )
         livelihood_path = json_path.with_name("livelihood_packet.json")
         livelihood_path.write_text(
             json.dumps(livelihood_packet.model_dump(mode="json"), indent=2, sort_keys=True),
@@ -1082,8 +1485,24 @@ class GaiaPlatform:
             self._render_challenge_packet_markdown(challenge_packet),
             encoding="utf-8",
         )
+        adaptive_review_path = json_path.with_name("adaptive_review_packet.json")
+        adaptive_review_path.write_text(
+            json.dumps(adaptive_review.model_dump(mode="json"), indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        adaptive_review_markdown_path = adaptive_review_path.with_suffix(".md")
+        adaptive_review_markdown_path.write_text(
+            self._render_adaptive_review_packet_markdown(adaptive_review),
+            encoding="utf-8",
+        )
 
-        return {
+        registry_receipt = self._attach_registry_receipt(
+            report=report,
+            claim_card=claim_card,
+            canonical_binding=canonical_binding,
+        )
+
+        result = {
             **staged,
             "json_path": json_path,
             "markdown_path": markdown_path,
@@ -1100,27 +1519,40 @@ class GaiaPlatform:
             "measurement_packet": measurement_packet,
             "measurement_path": measurement_path,
             "measurement_markdown_path": measurement_markdown_path,
+            "evidence_packet": evidence_packet,
+            "evidence_path": evidence_path,
+            "evidence_markdown_path": evidence_markdown_path,
             "livelihood_packet": livelihood_packet,
             "livelihood_path": livelihood_path,
             "livelihood_markdown_path": livelihood_markdown_path,
             "challenge_packet": challenge_packet,
             "challenge_path": challenge_path,
             "challenge_markdown_path": challenge_markdown_path,
+            "adaptive_review": adaptive_review,
+            "adaptive_review_path": adaptive_review_path,
+            "adaptive_review_markdown_path": adaptive_review_markdown_path,
             "claim_explorer": claim_explorer["explorer"],
             "claim_explorer_path": claim_explorer["json_path"],
             "claim_explorer_markdown_path": claim_explorer["markdown_path"],
         }
+        if registry_receipt is not None:
+            result["report"] = report
+            result["registry"] = registry_receipt["registry"]
+            result["registry_receipt_path"] = registry_receipt["receipt_path"]
+        return result
 
     def build_initiative_pilot_report(
         self,
         packet: GaiaInitiativePilotPacket,
         feedback_entries: Sequence[GaiaUserFeedback | dict[str, Any]] | None = None,
+        canonical_binding: GaiaCanonicalBinding | dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Promote a standards-aligned initiative packet into the shipped pilot flow."""
         result = self.build_intake_pilot_report(
             intake=packet.to_pilot_intake(),
             feedback_entries=feedback_entries,
             initiative_summary=packet.initiative_summary(),
+            canonical_binding=canonical_binding,
         )
         initiative_packet_path = result["json_path"].with_name("initiative_packet.json")
         initiative_packet_path.write_text(
@@ -1136,6 +1568,7 @@ class GaiaPlatform:
         *,
         claim_card_path: Path,
         challenge: GaiaChallengeRecord | dict[str, Any],
+        canonical_binding: GaiaCanonicalBinding | dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Append one typed public challenge and refresh all GAIA governance artifacts."""
         bundle = self._load_claim_governance_bundle(claim_card_path)
@@ -1158,6 +1591,7 @@ class GaiaPlatform:
             challenge_packet=challenge_packet,
             livelihood_packet=bundle["livelihood_packet"],
             report=bundle["report"],
+            canonical_binding=canonical_binding,
         )
 
     def apply_claim_remediation(
@@ -1165,6 +1599,7 @@ class GaiaPlatform:
         *,
         claim_card_path: Path,
         remediation: GaiaRemediationCase | dict[str, Any],
+        canonical_binding: GaiaCanonicalBinding | dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Append one typed remediation case and refresh all GAIA governance artifacts."""
         bundle = self._load_claim_governance_bundle(claim_card_path)
@@ -1206,7 +1641,204 @@ class GaiaPlatform:
             challenge_packet=challenge_packet,
             livelihood_packet=bundle["livelihood_packet"],
             report=bundle["report"],
+            canonical_binding=canonical_binding,
         )
+
+    def _attach_registry_receipt(
+        self,
+        *,
+        report: dict[str, Any],
+        claim_card: GaiaClaimCard,
+        canonical_binding: GaiaCanonicalBinding | dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        binding = self._coerce_canonical_binding(canonical_binding)
+        if binding is None:
+            return None
+        receipt = self._record_canonical_reciprocity_summary(
+            report=report,
+            claim_card=claim_card,
+            canonical_binding=binding,
+        )
+        report["registry"] = receipt["registry"]
+        report_path = Path(claim_card.report_path)
+        report_path.write_text(
+            json.dumps(report, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        report_path.with_suffix(".md").write_text(
+            self._render_pilot_report_markdown(report),
+            encoding="utf-8",
+        )
+        return receipt
+
+    def _coerce_canonical_binding(
+        self,
+        canonical_binding: GaiaCanonicalBinding | dict[str, Any] | None,
+    ) -> GaiaCanonicalBinding | None:
+        if canonical_binding is None:
+            return None
+        if isinstance(canonical_binding, GaiaCanonicalBinding):
+            return canonical_binding
+        return GaiaCanonicalBinding.model_validate(canonical_binding)
+
+    def _record_canonical_reciprocity_summary(
+        self,
+        *,
+        report: dict[str, Any],
+        claim_card: GaiaClaimCard,
+        canonical_binding: GaiaCanonicalBinding,
+    ) -> dict[str, Any]:
+        summary_payload = self._registry_summary_payload(
+            report=report,
+            claim_card=claim_card,
+            canonical_binding=canonical_binding,
+        )
+        receipt_path = Path(claim_card.report_path).with_name("registry_receipt.json")
+
+        async def _record() -> Any:
+            runtime_state = RuntimeStateStore(canonical_binding.db_path)
+            memory_lattice = MemoryLattice(
+                db_path=runtime_state.db_path,
+                event_log_dir=canonical_binding.event_log_dir,
+            )
+            registry = EvaluationRegistry(
+                runtime_state=runtime_state,
+                memory_lattice=memory_lattice,
+                workspace_root=canonical_binding.workspace_root,
+                provenance_root=(
+                    canonical_binding.provenance_root or canonical_binding.workspace_root
+                ),
+            )
+            try:
+                return await registry.record_reciprocity_summary(
+                    summary_payload,
+                    run_id=canonical_binding.run_id,
+                    session_id=canonical_binding.session_id,
+                    task_id=canonical_binding.task_id,
+                    trace_id=canonical_binding.trace_id or None,
+                    created_by=canonical_binding.created_by,
+                    promotion_state=canonical_binding.promotion_state,
+                )
+            finally:
+                await memory_lattice.close()
+
+        result = asyncio.run(_record())
+        registry_payload = {
+            "artifact_id": result.artifact.artifact_id,
+            "manifest_path": str(result.manifest_path),
+            "summary": dict(result.summary),
+            "fact_ids": [fact.fact_id for fact in result.facts],
+            "receipt_event_id": str(result.receipt.get("event_id", "")),
+            "receipt_path": str(receipt_path),
+        }
+        receipt_payload = {
+            "recorded_at": datetime.utcnow().isoformat(),
+            "binding": canonical_binding.model_dump(mode="json"),
+            "summary_payload": summary_payload,
+            "registry": registry_payload,
+        }
+        receipt_path.write_text(
+            json.dumps(receipt_payload, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        return {
+            "receipt_path": receipt_path,
+            "registry": registry_payload,
+            "summary_payload": summary_payload,
+        }
+
+    def _registry_summary_payload(
+        self,
+        *,
+        report: dict[str, Any],
+        claim_card: GaiaClaimCard,
+        canonical_binding: GaiaCanonicalBinding,
+    ) -> dict[str, Any]:
+        reciprocity_summary = dict(report.get("reciprocity", {}).get("summary") or {})
+        issues = [dict(issue) for issue in reciprocity_summary.get("issues") or []]
+        issues.extend(self._gaia_registry_issue_records(claim_card))
+        challenged_claims = max(
+            int(reciprocity_summary.get("challenged_claims", 0)),
+            1 if claim_card.challenge_count > 0 else 0,
+        )
+        summary_payload = {
+            **reciprocity_summary,
+            "service": "gaia_platform",
+            "source": "gaia_platform",
+            "summary_type": canonical_binding.summary_type,
+            "claim_id": claim_card.claim_id,
+            "claim_visibility": claim_card.visibility.value,
+            "claim_type": claim_card.claim_type.value,
+            "challenge_status": claim_card.challenge_status,
+            "promotional_use_frozen": claim_card.promotional_use_frozen,
+            "monitoring_status": claim_card.monitoring_status,
+            "remediation_status": claim_card.remediation_status,
+            "project_id": claim_card.project_id,
+            "project_name": claim_card.project_name,
+            "model_id": claim_card.model_id,
+            "sponsor_name": claim_card.sponsor_name,
+            "reporting_period": claim_card.reporting_period,
+            "claim_card_path": str(Path(claim_card.report_path).with_name("claim_card.json")),
+            "report_path": claim_card.report_path,
+            "evidence_packet_path": claim_card.evidence_packet_path,
+            "challenge_packet_path": claim_card.challenge_packet_path,
+            "adaptive_review_path": claim_card.adaptive_review_path,
+            "claim_explorer_path": str(self._data_dir / "claim_explorer.json"),
+            "challenged_claims": challenged_claims,
+            "issues": issues,
+            "invariant_issues": len(issues),
+        }
+        return summary_payload
+
+    def _gaia_registry_issue_records(
+        self,
+        claim_card: GaiaClaimCard,
+    ) -> list[dict[str, Any]]:
+        issues: list[dict[str, Any]] = []
+        if claim_card.visibility is not GaiaClaimVisibility.PUBLIC_READY:
+            issues.append({"code": "public_claim_not_ready", "visibility": claim_card.visibility.value})
+        if claim_card.promotional_use_frozen:
+            issues.append({"code": "promotional_use_frozen"})
+        if claim_card.unresolved_challenge_count > 0:
+            issues.append(
+                {
+                    "code": "unresolved_claim_challenge",
+                    "count": claim_card.unresolved_challenge_count,
+                }
+            )
+        if claim_card.material_challenge_count > 0:
+            issues.append(
+                {
+                    "code": "material_claim_challenge",
+                    "count": claim_card.material_challenge_count,
+                }
+            )
+        if claim_card.audit_status is not ReciprocityAuditStatus.PASSED:
+            issues.append({"code": "audit_not_passed", "status": claim_card.audit_status.value})
+        if claim_card.reversal_status is GaiaReversalStatus.WATCH:
+            issues.append({"code": "ecological_reversal_watch"})
+        if claim_card.monitoring_status in {"needs_attention", "at_risk"}:
+            issues.append(
+                {
+                    "code": "monitoring_follow_up_required",
+                    "status": claim_card.monitoring_status,
+                }
+            )
+        if claim_card.reciprocity_projection_warnings:
+            issues.append(
+                {
+                    "code": "reciprocity_projection_warnings_present",
+                    "count": len(claim_card.reciprocity_projection_warnings),
+                }
+            )
+        if claim_card.blockers:
+            issues.append(
+                {
+                    "code": "qualification_blockers_present",
+                    "count": len(claim_card.blockers),
+                }
+            )
+        return issues
 
     def _load_claim_governance_bundle(
         self,
@@ -1238,6 +1870,7 @@ class GaiaPlatform:
         challenge_packet: GaiaChallengePacket,
         livelihood_packet: GaiaLivelihoodPacket,
         report: dict[str, Any],
+        canonical_binding: GaiaCanonicalBinding | dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         governance = self._reconcile_claim_governance(
             claim_card=claim_card,
@@ -1249,6 +1882,27 @@ class GaiaPlatform:
         challenge_packet = governance["challenge_packet"]
         livelihood_packet = governance["livelihood_packet"]
         report = governance["report"]
+        evidence_packet = self._build_evidence_packet(claim_card=claim_card)
+        claim_card = claim_card.model_copy(
+            update={
+                "evidence_packet_path": str(
+                    Path(claim_card.report_path).with_name("evidence_packet.json")
+                ),
+                "evidence_bundle_hash": evidence_packet.bundle_hash,
+            }
+        )
+        adaptive_review = self._build_adaptive_review_packet(
+            claim_card=claim_card,
+            challenge_packet=challenge_packet,
+            report=report,
+        )
+        claim_card = claim_card.model_copy(
+            update={
+                "adaptive_review_path": str(
+                    Path(claim_card.report_path).with_name("adaptive_review_packet.json")
+                )
+            }
+        )
 
         report["claim_card"] = claim_card.model_dump(mode="json")
         report["challenge"] = {
@@ -1256,6 +1910,14 @@ class GaiaPlatform:
             "packet_path": str(Path(claim_card.challenge_packet_path)),
         }
         report["livelihood"] = livelihood_packet.model_dump(mode="json")
+        report["evidence"] = {
+            **evidence_packet.model_dump(mode="json"),
+            "packet_path": str(Path(claim_card.evidence_packet_path)),
+        }
+        report["adaptive_review"] = {
+            **adaptive_review.model_dump(mode="json"),
+            "packet_path": str(Path(claim_card.adaptive_review_path)),
+        }
         claim_explorer = self._update_claim_explorer(claim_card)
         report["claim_explorer"] = claim_explorer["explorer"].model_dump(mode="json")
 
@@ -1289,6 +1951,19 @@ class GaiaPlatform:
             self._render_challenge_packet_markdown(challenge_packet),
             encoding="utf-8",
         )
+        evidence_path = Path(claim_card.evidence_packet_path)
+        evidence_path.write_text(
+            json.dumps(
+                evidence_packet.model_dump(mode="json"),
+                indent=2,
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
+        evidence_path.with_suffix(".md").write_text(
+            self._render_evidence_packet_markdown(evidence_packet),
+            encoding="utf-8",
+        )
         livelihood_path = Path(claim_card.livelihood_packet_path)
         livelihood_path.write_text(
             json.dumps(
@@ -1302,13 +1977,37 @@ class GaiaPlatform:
             self._render_livelihood_packet_markdown(livelihood_packet),
             encoding="utf-8",
         )
-        return {
+        adaptive_review_path = Path(claim_card.adaptive_review_path)
+        adaptive_review_path.write_text(
+            json.dumps(
+                adaptive_review.model_dump(mode="json"),
+                indent=2,
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
+        adaptive_review_path.with_suffix(".md").write_text(
+            self._render_adaptive_review_packet_markdown(adaptive_review),
+            encoding="utf-8",
+        )
+        registry_receipt = self._attach_registry_receipt(
+            report=report,
+            claim_card=claim_card,
+            canonical_binding=canonical_binding,
+        )
+        result = {
             "claim_card": claim_card,
             "claim_card_path": claim_card_path,
             "challenge_packet": challenge_packet,
             "challenge_path": challenge_path,
+            "evidence_packet": evidence_packet,
+            "evidence_path": evidence_path,
+            "evidence_markdown_path": evidence_path.with_suffix(".md"),
             "livelihood_packet": livelihood_packet,
             "livelihood_path": livelihood_path,
+            "adaptive_review": adaptive_review,
+            "adaptive_review_path": adaptive_review_path,
+            "adaptive_review_markdown_path": adaptive_review_path.with_suffix(".md"),
             "json_path": report_path,
             "markdown_path": report_path.with_suffix(".md"),
             "claim_explorer": claim_explorer["explorer"],
@@ -1316,6 +2015,11 @@ class GaiaPlatform:
             "claim_explorer_markdown_path": claim_explorer["markdown_path"],
             "report": report,
         }
+        if registry_receipt is not None:
+            result["report"] = report
+            result["registry"] = registry_receipt["registry"]
+            result["registry_receipt_path"] = registry_receipt["receipt_path"]
+        return result
 
     def _reconcile_claim_governance(
         self,
@@ -1942,6 +2646,19 @@ class GaiaPlatform:
                     "human_auditor",
                     "community",
                 ),
+                welfare_factors=WelfareTonFactors(
+                    carbon_tons=3_800.0,
+                    employment_factor=2.15,
+                    agency_factor=0.95,
+                    biodiversity_factor=1.50,
+                    verification_factor=0.95,
+                    permanence_factor=0.85,
+                ),
+                welfare_assumptions=(
+                    "Employment factor reflects displaced-worker restoration intensity for the pilot staffing plan.",
+                    "Agency factor assumes community-led governance with documented local stewardship.",
+                    "Verification factor assumes satellite, IoT, community, and auditor evidence remain active.",
+                ),
             ),
             GaiaProject(
                 project_id="narmada-watershed-commons",
@@ -1966,6 +2683,19 @@ class GaiaPlatform:
                     "human_auditor",
                     "statistical_model",
                 ),
+                welfare_factors=WelfareTonFactors(
+                    carbon_tons=3_200.0,
+                    employment_factor=1.85,
+                    agency_factor=0.92,
+                    biodiversity_factor=1.35,
+                    verification_factor=0.92,
+                    permanence_factor=0.82,
+                ),
+                welfare_assumptions=(
+                    "Employment factor reflects watershed labor intensity and stewardship coverage.",
+                    "Agency factor assumes commons governance with partner diligence but lower co-ownership than the bayou pilot.",
+                    "Permanence factor remains conservative until hydrology-backed durability curves are attached.",
+                ),
             ),
             GaiaProject(
                 project_id="delta-shelterbelt-corridor",
@@ -1989,25 +2719,80 @@ class GaiaPlatform:
                     "community",
                     "ground",
                 ),
+                welfare_factors=WelfareTonFactors(
+                    carbon_tons=2_100.0,
+                    employment_factor=1.65,
+                    agency_factor=0.88,
+                    biodiversity_factor=1.30,
+                    verification_factor=0.72,
+                    permanence_factor=0.78,
+                ),
+                welfare_assumptions=(
+                    "Verification factor is provisional because the corridor is still at field review.",
+                    "Permanence factor is held below the mangrove pilot until shelterbelt maintenance evidence matures.",
+                ),
             ),
         ]
 
     def _estimate_welfare_tons(self, project: GaiaProject) -> float:
-        labor_multiplier = 1.0 + min(project.labor_needed / 80.0, 0.40)
+        return self._scorecard_for_project(project).welfare_tons
+
+    def _scorecard_for_project(self, project: GaiaProject) -> WelfareTonScorecard:
+        factors = project.welfare_factors or self._default_welfare_factors(project)
+        assumptions = (
+            project.welfare_assumptions
+            if project.welfare_assumptions
+            else self._default_welfare_assumptions(project)
+        )
+        return score_welfare_tons(factors, assumptions=assumptions)
+
+    def _default_welfare_factors(self, project: GaiaProject) -> WelfareTonFactors:
+        labor_density = project.labor_needed / max(project.hectares, 1.0)
+        employment_factor = round(min(max(labor_density * 12.0, 0.20), 5.0), 2)
+        biodiversity_factor = {
+            "mangrove_restoration": 1.50,
+            "watershed_restoration": 1.35,
+            "agroforestry": 1.30,
+            "monoculture": 0.80,
+        }.get(project.project_type.lower(), 1.00)
+        permanence_factor = {
+            "mangrove_restoration": 0.85,
+            "watershed_restoration": 0.82,
+            "agroforestry": 0.80,
+            "monoculture": 0.60,
+        }.get(project.project_type.lower(), 0.75)
+        return WelfareTonFactors(
+            carbon_tons=project.carbon_potential_tons_yr,
+            employment_factor=employment_factor,
+            agency_factor=0.95 if self._has_viable_partner(project.community_partner) else 0.60,
+            biodiversity_factor=biodiversity_factor,
+            verification_factor=self._verification_multiplier(project),
+            permanence_factor=permanence_factor,
+        )
+
+    def _default_welfare_assumptions(self, project: GaiaProject) -> tuple[str, ...]:
         return (
-            project.carbon_potential_tons_yr
-            * self._verification_multiplier(project)
-            * self._community_multiplier(project)
-            * labor_multiplier
+            "Carbon factor uses annual project sequestration potential as the current C term.",
+            "Employment factor is inferred from labor density because wage and skill-transition data are not yet attached to GaiaProject.",
+            (
+                "Verification factor is derived from verification status plus channel diversity "
+                f"for {project.project_id}."
+            ),
+            "Permanence factor uses project-type priors until site-specific durability curves are linked.",
         )
 
     def _verification_multiplier(self, project: GaiaProject) -> float:
         status = project.verification_status.lower()
+        channel_bonus = min(
+            len({_normalize_channel(channel) for channel in project.verification_channels})
+            * 0.05,
+            0.20,
+        )
         if status == "verified":
-            return 1.0
+            return round(min(0.85 + channel_bonus, 1.0), 2)
         if status in {"field_review", "community_review"}:
-            return 0.6
-        return 0.35
+            return round(min(0.60 + channel_bonus, 0.85), 2)
+        return round(min(0.40 + channel_bonus, 0.60), 2)
 
     def _community_multiplier(self, project: GaiaProject) -> float:
         return 1.15 if self._has_viable_partner(project.community_partner) else 0.80
@@ -2063,12 +2848,14 @@ class GaiaPlatform:
         project: GaiaProject,
     ) -> GaiaRecommendation:
         strategy = self.assess_project(project)
+        welfare_scorecard = self._scorecard_for_project(project)
         return GaiaRecommendation(
             project=project,
             strategy=strategy,
-            welfare_tons=round(self._estimate_welfare_tons(project), 2),
+            welfare_scorecard=welfare_scorecard,
+            welfare_tons=round(welfare_scorecard.welfare_tons, 2),
             match_score=round(
-                self._estimate_welfare_tons(project)
+                welfare_scorecard.welfare_tons
                 * self._model_affinity(model_id, project)
                 / max(project.funding_gap_usd / 100_000.0, 1.0),
                 2,
@@ -2890,6 +3677,216 @@ class GaiaPlatform:
             blockers=list(qualification.blockers),
         )
 
+    def _build_evidence_packet(
+        self,
+        *,
+        claim_card: GaiaClaimCard,
+    ) -> GaiaEvidencePacket:
+        metering_evidence = tuple(
+            _proof_ref_from_declared_ref(ref, "metering_evidence")
+            for ref in claim_card.metering_evidence_refs
+        )
+        metering_audits = tuple(
+            _proof_ref_from_declared_ref(ref, "metering_audit")
+            for ref in claim_card.metering_audit_refs
+        )
+        ecological_evidence = tuple(
+            _proof_ref_from_declared_ref(ref, "ecological_evidence")
+            for ref in claim_card.evidence_refs
+        )
+        ecological_audits = tuple(
+            _proof_ref_from_declared_ref(ref, "ecological_audit")
+            for ref in claim_card.audit_refs
+        )
+        governance_refs = tuple(
+            _proof_ref_from_declared_ref(ref, kind)
+            for ref, kind in (
+                (claim_card.due_diligence_ref, "due_diligence"),
+                (claim_card.consent_ref, "consent"),
+                (claim_card.benefit_sharing_ref, "benefit_sharing"),
+                (claim_card.grievance_process_ref, "grievance_process"),
+            )
+            if ref.strip()
+        )
+        evidence_bundle_hash = _stable_hash(
+            {
+                "metering_evidence": [entry.sha256 for entry in metering_evidence],
+                "ecological_evidence": [entry.sha256 for entry in ecological_evidence],
+            }
+        )
+        audit_bundle_hash = _stable_hash(
+            {
+                "metering_audits": [entry.sha256 for entry in metering_audits],
+                "ecological_audits": [entry.sha256 for entry in ecological_audits],
+            }
+        )
+        governance_bundle_hash = _stable_hash(
+            [entry.sha256 for entry in governance_refs]
+        )
+        warnings: list[str] = []
+        if not ecological_evidence:
+            warnings.append(
+                "SATYA: ecological evidence bundle is empty; claim cannot be public-ready."
+            )
+        if not ecological_audits:
+            warnings.append(
+                "SATYA: ecological audit bundle is empty; claim remains provisional."
+            )
+        if not metering_evidence and claim_card.measurement_mode is GaiaMeasurementMode.MEASURED:
+            warnings.append(
+                "MEASUREMENT: measured claim lacks metering evidence bundle entries."
+            )
+        if not governance_refs:
+            warnings.append(
+                "JAGAT_KALYAN: governance references are missing from the proof bundle."
+            )
+        bundle_hash = _stable_hash(
+            {
+                "claim_id": claim_card.claim_id,
+                "evidence_bundle_hash": evidence_bundle_hash,
+                "audit_bundle_hash": audit_bundle_hash,
+                "governance_bundle_hash": governance_bundle_hash,
+                "verification_channels": list(claim_card.verification_channels),
+            }
+        )
+        return GaiaEvidencePacket(
+            claim_id=claim_card.claim_id,
+            sponsor_name=claim_card.sponsor_name,
+            model_id=claim_card.model_id,
+            reporting_period=claim_card.reporting_period,
+            project_id=claim_card.project_id,
+            project_name=claim_card.project_name,
+            methodology_ref=claim_card.methodology_ref,
+            measurement_ref=claim_card.measurement_ref,
+            measurement_verifier=claim_card.measurement_verifier,
+            verification_channels=claim_card.verification_channels,
+            metering_evidence=metering_evidence,
+            metering_audits=metering_audits,
+            ecological_evidence=ecological_evidence,
+            ecological_audits=ecological_audits,
+            governance_refs=governance_refs,
+            evidence_bundle_hash=evidence_bundle_hash,
+            audit_bundle_hash=audit_bundle_hash,
+            governance_bundle_hash=governance_bundle_hash,
+            bundle_hash=bundle_hash,
+            claim_ready_by_evidence=claim_card.measurement_claim_ready
+            and bool(ecological_evidence)
+            and bool(ecological_audits),
+            report_path=claim_card.report_path,
+            claim_card_path=str(Path(claim_card.report_path).with_name("claim_card.json")),
+            warnings=warnings,
+        )
+
+    def _build_adaptive_review_packet(
+        self,
+        *,
+        claim_card: GaiaClaimCard,
+        challenge_packet: GaiaChallengePacket,
+        report: dict[str, Any],
+    ) -> GaiaAdaptiveReviewPacket:
+        feedback_summary = report.get("feedback_summary", {})
+        last_reviewed_at = max(
+            claim_card.last_reviewed_at,
+            challenge_packet.last_reviewed_at,
+        )
+        next_review_due_at = (
+            challenge_packet.next_initial_finding_due_at
+            or challenge_packet.next_triage_due_at
+            or challenge_packet.next_acknowledge_due_at
+            or (last_reviewed_at + timedelta(days=GAIA_REVIEW_WINDOW_DAYS))
+        )
+        active_signals: list[str] = []
+        if challenge_packet.challenge_count:
+            active_signals.append(
+                f"{challenge_packet.challenge_count} active challenge(s) require governance review."
+            )
+        if claim_card.promotional_use_frozen:
+            active_signals.append(
+                "Promotional reuse is frozen while challenge or remediation pressure is active."
+            )
+        if claim_card.monitoring_status in {"needs_attention", "at_risk"}:
+            active_signals.append(
+                f"Monitoring status is {claim_card.monitoring_status}."
+            )
+        if feedback_summary.get("top_follow_up"):
+            active_signals.append(
+                f"Top follow-up: {feedback_summary['top_follow_up']}"
+            )
+        active_signals.extend(f"Blocker: {blocker}" for blocker in claim_card.blockers)
+        if not claim_card.blockers:
+            active_signals.extend(
+                f"Warning: {warning}" for warning in claim_card.warnings[:3]
+            )
+
+        if claim_card.promotional_use_frozen:
+            review_status = "challenge_triage"
+            next_action = "triage_open_challenges_and_publish_initial_finding"
+            decision_rationale = (
+                "Public circulation is frozen because challenge or remediation pressure "
+                "is active."
+            )
+        elif claim_card.blockers:
+            review_status = "proof_surface_gap"
+            next_action = "close_qualification_blockers_before_publication"
+            decision_rationale = (
+                "The packet still has qualification blockers, so review must focus on "
+                "closing missing proof surfaces."
+            )
+        elif claim_card.monitoring_status in {"needs_attention", "at_risk"}:
+            review_status = "monitoring_follow_up"
+            next_action = "review_monitoring_bundle_and_narrow_claim_scope"
+            decision_rationale = (
+                "Monitoring signals require follow-up before the next review window."
+            )
+        else:
+            review_status = "continue"
+            next_action = "continue_claim_and_schedule_next_review"
+            decision_rationale = (
+                "The packet is publishable and has no active governance pressure."
+            )
+
+        return GaiaAdaptiveReviewPacket(
+            claim_id=claim_card.claim_id,
+            visibility=claim_card.visibility,
+            owner=GAIA_REVIEW_OWNER,
+            review_status=review_status,
+            next_action=next_action,
+            decision_rationale=decision_rationale,
+            next_review_due_at=next_review_due_at,
+            challenge_status=claim_card.challenge_status,
+            audit_status=claim_card.audit_status,
+            grievance_status=claim_card.grievance_status,
+            reversal_status=claim_card.reversal_status,
+            monitoring_status=claim_card.monitoring_status,
+            promotional_use_frozen=claim_card.promotional_use_frozen,
+            feedback_response_count=int(feedback_summary.get("response_count", 0)),
+            feedback_average_satisfaction=float(
+                feedback_summary.get("average_satisfaction", 0.0)
+            ),
+            feedback_average_confidence=float(
+                feedback_summary.get("average_confidence", 0.0)
+            ),
+            top_follow_up=str(feedback_summary.get("top_follow_up", "")),
+            evidence_ref_count=len(claim_card.evidence_refs),
+            audit_ref_count=len(claim_card.audit_refs),
+            metering_evidence_ref_count=len(claim_card.metering_evidence_refs),
+            metering_audit_ref_count=len(claim_card.metering_audit_refs),
+            challenge_count=claim_card.challenge_count,
+            remediation_case_count=claim_card.remediation_case_count,
+            claim_card_path=str(Path(claim_card.report_path).with_name("claim_card.json")),
+            challenge_packet_path=claim_card.challenge_packet_path,
+            evidence_packet_path=claim_card.evidence_packet_path
+            or str(Path(claim_card.report_path).with_name("evidence_packet.json")),
+            report_path=claim_card.report_path,
+            active_signals=tuple(active_signals),
+            public_notes=tuple(
+                dict.fromkeys(
+                    (*claim_card.public_notes, *challenge_packet.public_notes)
+                )
+            ),
+            last_reviewed_at=last_reviewed_at,
+        )
+
     def _update_claim_explorer(self, claim_card: GaiaClaimCard) -> dict[str, Any]:
         explorer_path = self._data_dir / "claim_explorer.json"
         markdown_path = explorer_path.with_suffix(".md")
@@ -3088,6 +4085,30 @@ class GaiaPlatform:
                     f"- Public notes: {len(challenge['public_notes'])}",
                 ]
             )
+        evidence = report.get("evidence")
+        if evidence is not None:
+            lines.extend(
+                [
+                    "",
+                    "## Evidence Bundle",
+                    (
+                        "- "
+                        f"Metering evidence: {len(evidence['metering_evidence'])} | "
+                        f"Metering audits: {len(evidence['metering_audits'])}"
+                    ),
+                    (
+                        "- "
+                        f"Ecological evidence: {len(evidence['ecological_evidence'])} | "
+                        f"Ecological audits: {len(evidence['ecological_audits'])}"
+                    ),
+                    (
+                        "- "
+                        f"Governance refs: {len(evidence['governance_refs'])} | "
+                        f"Bundle hash: {evidence['bundle_hash']}"
+                    ),
+                    f"- Evidence packet: {evidence['packet_path']}",
+                ]
+            )
         initiative = report.get("initiative")
         if initiative is not None:
             lines.extend(
@@ -3190,6 +4211,35 @@ class GaiaPlatform:
                     ),
                 ]
             )
+        adaptive_review = report.get("adaptive_review")
+        if adaptive_review is not None:
+            lines.extend(
+                [
+                    "",
+                    "## Adaptive Review",
+                    f"- Owner: {adaptive_review['owner']}",
+                    f"- Status: {adaptive_review['review_status']}",
+                    f"- Next action: {adaptive_review['next_action']}",
+                    (
+                        "- "
+                        "Next review due: "
+                        f"{adaptive_review['next_review_due_at']}"
+                    ),
+                    f"- Adaptive review packet: {adaptive_review['packet_path']}",
+                ]
+            )
+        registry = report.get("registry")
+        if registry is not None:
+            lines.extend(
+                [
+                    "",
+                    "## Canonical Binding",
+                    f"- Artifact ID: {registry['artifact_id']}",
+                    f"- Receipt event: {registry['receipt_event_id']}",
+                    f"- Manifest: {registry['manifest_path']}",
+                    f"- Receipt: {registry['receipt_path']}",
+                ]
+            )
         claim_explorer = report.get("claim_explorer")
         if claim_explorer is not None:
             lines.extend(
@@ -3200,6 +4250,76 @@ class GaiaPlatform:
                     f"- Public-ready claims: {claim_explorer['public_ready_count']}",
                     f"- Provisional claims: {claim_explorer['provisional_count']}",
                     f"- Explorer path: {self._data_dir / 'claim_explorer.json'}",
+                ]
+            )
+        return "\n".join(lines)
+
+    def _render_portfolio_plan_markdown(self, payload: dict[str, Any]) -> str:
+        plan = payload["plan"]
+        candidate_summary = payload.get("candidate_summary") or {}
+        lines = [
+            "# GAIA Welfare-Ton Portfolio Plan",
+            "",
+            f"Model Profile: {payload['model_id']}",
+            f"Budget USD: {payload['budget_usd']:.2f}",
+            f"Candidate source requested: {payload['candidate_source_requested']}",
+            f"Candidate source used: {payload['candidate_source_used']}",
+            f"Recommendations considered: {payload['recommendations_considered']}",
+            "",
+            "## Outcome",
+            f"- Objective: {plan['objective']}",
+            f"- Compared portfolios: {plan['compared_portfolios']}",
+            f"- Selected projects: {len(plan['selected_projects'])}",
+            f"- Total welfare-tons: {plan['total_welfare_tons']:.2f}",
+            f"- Total workers: {plan['total_workers']}",
+            f"- Total cost USD: {plan['total_cost_usd']:.2f}",
+            f"- Remaining budget USD: {plan['remaining_budget_usd']:.2f}",
+        ]
+        if candidate_summary:
+            lines.extend(
+                [
+                    "",
+                    "## Candidate Summary",
+                    (
+                        "- "
+                        "Eligible candidates: "
+                        f"{candidate_summary.get('eligible_candidate_count', 0)}"
+                    ),
+                    (
+                        "- "
+                        "Skipped candidates: "
+                        f"{candidate_summary.get('skipped_candidate_count', 0)}"
+                    ),
+                ]
+            )
+            skipped_reasons = candidate_summary.get("skipped_reasons") or {}
+            if skipped_reasons:
+                lines.append(
+                    "- Skipped reasons: "
+                    + ", ".join(
+                        f"{reason}={count}"
+                        for reason, count in sorted(skipped_reasons.items())
+                    )
+                )
+        if not plan["selected_projects"]:
+            lines.extend(["", "No eligible verified projects fit the current budget."])
+            return "\n".join(lines)
+        lines.extend(["", "## Selected Projects"])
+        for candidate in plan["selected_projects"]:
+            lines.extend(
+                [
+                    (
+                        "- "
+                        f"{candidate['project_name']} ({candidate['project_id']}): "
+                        f"welfare_tons={candidate['scorecard']['welfare_tons']:.2f}, "
+                        f"cost_usd={candidate['cost_usd']:.2f}, "
+                        f"workers={candidate['worker_count']}"
+                    ),
+                    (
+                        "  "
+                        f"limiting_factor={candidate['scorecard']['limiting_factor']} "
+                        f"geography={candidate['geography']}"
+                    ),
                 ]
             )
         return "\n".join(lines)
@@ -3286,6 +4406,8 @@ class GaiaPlatform:
             f"- Measurement packet: {claim_card.measurement_packet_path}",
             f"- Evidence refs: {len(claim_card.evidence_refs)}",
             f"- Audit refs: {len(claim_card.audit_refs)}",
+            f"- Evidence packet: {claim_card.evidence_packet_path}",
+            f"- Evidence bundle hash: {claim_card.evidence_bundle_hash or 'unspecified'}",
             (
                 "- "
                 "Verification channels: "
@@ -3340,6 +4462,9 @@ class GaiaPlatform:
                 "- "
                 f"Projection warnings: {len(claim_card.reciprocity_projection_warnings)}"
             ),
+            "",
+            "## Adaptive Review",
+            f"- Review packet: {claim_card.adaptive_review_path}",
         ]
         if claim_card.warnings:
             lines.extend(["", "## Warnings"])
@@ -3383,6 +4508,52 @@ class GaiaPlatform:
                 "Public claim ready: "
                 f"{'yes' if packet.public_claim_ready else 'no'}"
             ),
+        ]
+        if packet.warnings:
+            lines.extend(["", "## Warnings"])
+            lines.extend(f"- {warning}" for warning in packet.warnings)
+        return "\n".join(lines)
+
+    def _render_evidence_packet_markdown(
+        self,
+        packet: GaiaEvidencePacket,
+    ) -> str:
+        lines = [
+            "# GAIA Evidence Packet",
+            "",
+            f"Claim ID: {packet.claim_id}",
+            f"Project: {packet.project_name}",
+            f"Sponsor: {packet.sponsor_name}",
+            f"Reporting Period: {packet.reporting_period}",
+            "",
+            "## Bundle Summary",
+            f"- Verification channels: {', '.join(packet.verification_channels)}",
+            (
+                "- "
+                f"Metering evidence: {len(packet.metering_evidence)} | "
+                f"Metering audits: {len(packet.metering_audits)}"
+            ),
+            (
+                "- "
+                f"Ecological evidence: {len(packet.ecological_evidence)} | "
+                f"Ecological audits: {len(packet.ecological_audits)}"
+            ),
+            f"- Governance refs: {len(packet.governance_refs)}",
+            (
+                "- "
+                "Claim ready by evidence: "
+                f"{'yes' if packet.claim_ready_by_evidence else 'no'}"
+            ),
+            "",
+            "## Hashes",
+            f"- Evidence bundle hash: {packet.evidence_bundle_hash}",
+            f"- Audit bundle hash: {packet.audit_bundle_hash}",
+            f"- Governance bundle hash: {packet.governance_bundle_hash}",
+            f"- Full bundle hash: {packet.bundle_hash}",
+            "",
+            "## Linked Proof",
+            f"- Claim card: {packet.claim_card_path}",
+            f"- Pilot report: {packet.report_path}",
         ]
         if packet.warnings:
             lines.extend(["", "## Warnings"])
@@ -3527,6 +4698,71 @@ class GaiaPlatform:
             )
         return "\n".join(lines)
 
+    def _render_adaptive_review_packet_markdown(
+        self,
+        packet: GaiaAdaptiveReviewPacket,
+    ) -> str:
+        lines = [
+            "# GAIA Adaptive Review Packet",
+            "",
+            f"Claim ID: {packet.claim_id}",
+            f"Visibility: {packet.visibility.value}",
+            f"Owner: {packet.owner}",
+            "",
+            "## Review Decision",
+            f"- Status: {packet.review_status}",
+            f"- Next action: {packet.next_action}",
+            f"- Rationale: {packet.decision_rationale}",
+            f"- Next review due: {packet.next_review_due_at.isoformat()}",
+            f"- Monitoring status: {packet.monitoring_status}",
+            (
+                "- "
+                "Promotional reuse frozen: "
+                f"{'yes' if packet.promotional_use_frozen else 'no'}"
+            ),
+            "",
+            "## Signals",
+            f"- Challenge status: {packet.challenge_status}",
+            f"- Audit status: {packet.audit_status.value}",
+            f"- Grievance status: {packet.grievance_status.value}",
+            f"- Reversal status: {packet.reversal_status.value}",
+            (
+                "- "
+                f"Feedback responses: {packet.feedback_response_count} | "
+                f"satisfaction={packet.feedback_average_satisfaction:.2f}/5 | "
+                f"confidence={packet.feedback_average_confidence:.2f}"
+            ),
+            f"- Top follow-up: {packet.top_follow_up or 'none'}",
+            (
+                "- "
+                f"Evidence refs: {packet.evidence_ref_count} | "
+                f"Audit refs: {packet.audit_ref_count}"
+            ),
+            (
+                "- "
+                f"Metering evidence refs: {packet.metering_evidence_ref_count} | "
+                f"Metering audit refs: {packet.metering_audit_ref_count}"
+            ),
+            (
+                "- "
+                f"Challenges: {packet.challenge_count} | "
+                f"Remediation cases: {packet.remediation_case_count}"
+            ),
+            "",
+            "## Linked Proof",
+            f"- Claim card: {packet.claim_card_path}",
+            f"- Challenge packet: {packet.challenge_packet_path}",
+            f"- Evidence packet: {packet.evidence_packet_path}",
+            f"- Pilot report: {packet.report_path}",
+        ]
+        if packet.active_signals:
+            lines.extend(["", "## Active Signals"])
+            lines.extend(f"- {signal}" for signal in packet.active_signals)
+        if packet.public_notes:
+            lines.extend(["", "## Public Notes"])
+            lines.extend(f"- {note}" for note in packet.public_notes)
+        return "\n".join(lines)
+
     def _render_claim_explorer_markdown(
         self,
         explorer: GaiaClaimExplorer,
@@ -3615,6 +4851,121 @@ def _normalize_channel(channel: str) -> str:
 
 def _normalize_standard_name(value: str) -> str:
     return value.strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def _stable_hash(value: Any) -> str:
+    payload = json.dumps(value, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _safe_token(value: object, *, fallback: str = "unknown") -> str:
+    chars = [
+        char if char.isalnum() or char in {"_", "-"} else "_"
+        for char in str(value or "")
+    ]
+    return ("".join(chars).strip("_-") or fallback)[:96]
+
+
+def _proof_ref_from_declared_ref(ref: str, kind: str) -> GaiaProofRef:
+    local_path = ""
+    local_exists = False
+    hash_mode = "ref_sha256"
+    normalized_ref = ref.strip()
+    if "://" not in normalized_ref and normalized_ref:
+        candidate = Path(normalized_ref).expanduser()
+        if candidate.exists() and candidate.is_file():
+            local_path = str(candidate)
+            local_exists = True
+            hash_mode = "file_sha256"
+            digest = hashlib.sha256(candidate.read_bytes()).hexdigest()
+            return GaiaProofRef(
+                ref=normalized_ref,
+                kind=kind,
+                hash_mode=hash_mode,
+                sha256=digest,
+                local_path=local_path,
+                local_exists=local_exists,
+            )
+    digest = hashlib.sha256(normalized_ref.encode("utf-8")).hexdigest()
+    return GaiaProofRef(
+        ref=normalized_ref,
+        kind=kind,
+        hash_mode=hash_mode,
+        sha256=digest,
+        local_path=local_path,
+        local_exists=local_exists,
+    )
+
+
+def _add_canonical_binding_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--session-id",
+        default="",
+        help="Optional canonical session id for EvaluationRegistry recording",
+    )
+    parser.add_argument(
+        "--run-id",
+        default="",
+        help="Optional canonical run id for EvaluationRegistry recording",
+    )
+    parser.add_argument(
+        "--task-id",
+        default="",
+        help="Optional canonical task id for EvaluationRegistry recording",
+    )
+    parser.add_argument(
+        "--trace-id",
+        default="",
+        help="Optional canonical trace id for EvaluationRegistry recording",
+    )
+    parser.add_argument(
+        "--runtime-db",
+        type=Path,
+        default=None,
+        help="Optional runtime-state database path used for canonical recording",
+    )
+    parser.add_argument(
+        "--event-log-dir",
+        type=Path,
+        default=None,
+        help="Optional event-log directory used for canonical recording",
+    )
+    parser.add_argument(
+        "--workspace-root",
+        type=Path,
+        default=None,
+        help="Optional workspace root used for canonical manifests",
+    )
+    parser.add_argument(
+        "--provenance-root",
+        type=Path,
+        default=None,
+        help="Optional provenance root used for canonical manifests",
+    )
+
+
+def _canonical_binding_from_args(
+    args: argparse.Namespace,
+    *,
+    summary_type: str,
+    created_by: str = "gaia_platform.cli",
+) -> GaiaCanonicalBinding | None:
+    session_id = str(getattr(args, "session_id", "") or "").strip()
+    run_id = str(getattr(args, "run_id", "") or "").strip()
+    if not session_id and not run_id:
+        return None
+    return GaiaCanonicalBinding(
+        session_id=session_id,
+        run_id=run_id,
+        task_id=str(getattr(args, "task_id", "") or "").strip(),
+        trace_id=str(getattr(args, "trace_id", "") or "").strip(),
+        created_by=created_by,
+        summary_type=summary_type,
+        db_path=getattr(args, "runtime_db", None),
+        event_log_dir=getattr(args, "event_log_dir", None),
+        workspace_root=getattr(args, "workspace_root", None),
+        provenance_root=getattr(args, "provenance_root", None),
+    )
 
 
 def _format_optional_amount(value: float | None) -> str:
@@ -3897,6 +5248,43 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Optional JSON file containing structured feedback entries",
     )
 
+    portfolio_plan = subparsers.add_parser(
+        "portfolio-plan",
+        help="Build an auditable welfare-ton allocation plan for the current GAIA portfolio",
+    )
+    portfolio_plan.add_argument(
+        "--data-dir",
+        type=Path,
+        default=Path.home() / ".dharma" / "gaia_platform",
+        help="Directory for GAIA pilot artifacts",
+    )
+    portfolio_plan.add_argument(
+        "--model",
+        default="anthropic_claude_ops",
+        help="Model/operator profile to match against GAIA projects",
+    )
+    portfolio_plan.add_argument(
+        "--budget-usd",
+        type=float,
+        required=True,
+        help="Total budget available for the pilot portfolio",
+    )
+    portfolio_plan.add_argument(
+        "--max-projects",
+        type=int,
+        default=None,
+        help="Optional cap on the number of projects that can be selected",
+    )
+    portfolio_plan.add_argument(
+        "--candidate-source",
+        choices=("auto", "claims", "seeded"),
+        default="auto",
+        help=(
+            "Whether to plan from governed claim artifacts, seeded recommendations, "
+            "or auto-select claims when they exist"
+        ),
+    )
+
     pilot_intake_report = subparsers.add_parser(
         "pilot-intake-report",
         help="Build a qualified GAIA pilot packet from a structured intake file",
@@ -3919,6 +5307,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional JSON file containing structured feedback entries",
     )
+    _add_canonical_binding_arguments(pilot_intake_report)
 
     initiative_pilot_report = subparsers.add_parser(
         "initiative-pilot-report",
@@ -3942,6 +5331,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional JSON file containing structured feedback entries",
     )
+    _add_canonical_binding_arguments(initiative_pilot_report)
 
     challenge_claim = subparsers.add_parser(
         "challenge-claim",
@@ -3965,6 +5355,7 @@ def _build_parser() -> argparse.ArgumentParser:
         required=True,
         help="JSON file containing a GaiaChallengeRecord payload",
     )
+    _add_canonical_binding_arguments(challenge_claim)
 
     remediate_claim = subparsers.add_parser(
         "remediate-claim",
@@ -3988,6 +5379,7 @@ def _build_parser() -> argparse.ArgumentParser:
         required=True,
         help="JSON file containing a GaiaRemediationCase payload",
     )
+    _add_canonical_binding_arguments(remediate_claim)
 
     return parser
 
@@ -4027,21 +5419,43 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 0
 
+    if args.command == "portfolio-plan":
+        platform = GaiaPlatform(data_dir=args.data_dir)
+        result = platform.build_portfolio_plan(
+            model_id=args.model,
+            budget_usd=args.budget_usd,
+            max_projects=args.max_projects,
+            candidate_source=args.candidate_source,
+        )
+        print(
+            "GAIA portfolio plan written: "
+            f"{result['json_path']} | markdown={result['markdown_path']}"
+        )
+        return 0
+
     if args.command == "pilot-intake-report":
         platform = GaiaPlatform(data_dir=args.data_dir)
         feedback_entries = None
         if args.feedback_file is not None:
             feedback_entries = json.loads(args.feedback_file.read_text(encoding="utf-8"))
+        canonical_binding = _canonical_binding_from_args(
+            args,
+            summary_type="pilot_claim",
+        )
         intake = GaiaPilotIntake.model_validate_json(
             args.intake_file.read_text(encoding="utf-8")
         )
         report = platform.build_intake_pilot_report(
             intake=intake,
             feedback_entries=feedback_entries,
+            canonical_binding=canonical_binding,
         )
+        registry_suffix = ""
+        if report.get("registry_receipt_path") is not None:
+            registry_suffix = f" | registry={report['registry_receipt_path']}"
         print(
             "GAIA intake pilot packet written: "
-            f"{report['json_path']} | claim_card={report['claim_card_path']}"
+            f"{report['json_path']} | claim_card={report['claim_card_path']}{registry_suffix}"
         )
         return 0
 
@@ -4052,40 +5466,64 @@ def main(argv: Sequence[str] | None = None) -> int:
         feedback_entries = None
         if args.feedback_file is not None:
             feedback_entries = json.loads(args.feedback_file.read_text(encoding="utf-8"))
+        canonical_binding = _canonical_binding_from_args(
+            args,
+            summary_type="initiative_pilot_claim",
+        )
         packet = GaiaInitiativePilotPacket.model_validate_json(
             args.packet_file.read_text(encoding="utf-8")
         )
         report = platform.build_initiative_pilot_report(
             packet=packet,
             feedback_entries=feedback_entries,
+            canonical_binding=canonical_binding,
         )
+        registry_suffix = ""
+        if report.get("registry_receipt_path") is not None:
+            registry_suffix = f" | registry={report['registry_receipt_path']}"
         print(
             "GAIA initiative pilot packet written: "
-            f"{report['json_path']} | initiative_packet={report['initiative_packet_path']}"
+            f"{report['json_path']} | initiative_packet={report['initiative_packet_path']}{registry_suffix}"
         )
         return 0
 
     if args.command == "challenge-claim":
         platform = GaiaPlatform(data_dir=args.data_dir)
+        canonical_binding = _canonical_binding_from_args(
+            args,
+            summary_type="claim_challenge_update",
+        )
         result = platform.submit_claim_challenge(
             claim_card_path=args.claim_card_file,
             challenge=json.loads(args.challenge_file.read_text(encoding="utf-8")),
+            canonical_binding=canonical_binding,
         )
+        registry_suffix = ""
+        if result.get("registry_receipt_path") is not None:
+            registry_suffix = f" | registry={result['registry_receipt_path']}"
         print(
             "GAIA claim challenge recorded: "
-            f"{result['challenge_path']} | claim_card={result['claim_card_path']}"
+            f"{result['challenge_path']} | claim_card={result['claim_card_path']}{registry_suffix}"
         )
         return 0
 
     if args.command == "remediate-claim":
         platform = GaiaPlatform(data_dir=args.data_dir)
+        canonical_binding = _canonical_binding_from_args(
+            args,
+            summary_type="claim_remediation_update",
+        )
         result = platform.apply_claim_remediation(
             claim_card_path=args.claim_card_file,
             remediation=json.loads(args.remediation_file.read_text(encoding="utf-8")),
+            canonical_binding=canonical_binding,
         )
+        registry_suffix = ""
+        if result.get("registry_receipt_path") is not None:
+            registry_suffix = f" | registry={result['registry_receipt_path']}"
         print(
             "GAIA claim remediation recorded: "
-            f"{result['challenge_path']} | claim_card={result['claim_card_path']}"
+            f"{result['challenge_path']} | claim_card={result['claim_card_path']}{registry_suffix}"
         )
         return 0
 
@@ -4098,6 +5536,8 @@ if __name__ == "__main__":
 
 
 __all__ = [
+    "GaiaAdaptiveReviewPacket",
+    "GaiaCanonicalBinding",
     "GaiaChallengeGround",
     "GaiaChallengePacket",
     "GaiaChallengeRecord",
@@ -4106,6 +5546,7 @@ __all__ = [
     "GaiaClaimExplorerEntry",
     "GaiaClaimCard",
     "GaiaClaimVisibility",
+    "GaiaEvidencePacket",
     "GaiaGrievanceStatus",
     "GaiaLivelihoodPacket",
     "GaiaMeasurementPacket",
@@ -4114,6 +5555,7 @@ __all__ = [
     "GaiaPartnerCredibility",
     "GaiaPilotIntake",
     "GaiaPlatform",
+    "GaiaProofRef",
     "GaiaProject",
     "GaiaQualificationDecision",
     "GaiaRecommendation",

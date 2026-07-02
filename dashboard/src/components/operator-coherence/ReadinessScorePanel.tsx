@@ -35,4 +35,3 @@ export function ReadinessScorePanel({ readiness }: { readiness: ReadinessReport 
     </section>
   );
 }
-

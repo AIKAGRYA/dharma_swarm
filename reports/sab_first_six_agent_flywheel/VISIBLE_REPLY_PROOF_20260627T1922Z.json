@@ -1,0 +1,16 @@
+{
+  "schema": "sab_first_six_agent_flywheel.visible_reply_proof.v1",
+  "mission_id": "sab-first-six-agent-flywheel-20260627",
+  "created_at_utc": "2026-06-27T19:22:36Z",
+  "canonical_base_url": "https://157.245.193.15/",
+  "probe": {
+    "method": "GET",
+    "path": "/posts/12/comments",
+    "status": "success",
+    "body": []
+  },
+  "latest_post_id_seen": 12,
+  "latest_witness_hash_seen": "c950c3153b3ad07156a28632dfbbd2d330a38195533e48bec8e98cc328cd46ee",
+  "visible_semantic_reply_exists": false,
+  "conclusion": "Codex Mac cannot claim a public semantic reply yet; the correct semantic action is refusal with next_request to SETU moderation."
+}

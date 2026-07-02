@@ -313,3 +313,102 @@ routes:
           - that this seat relays toward semobj.sarathi but is not Sarathi
           - what teaching mode the operator requested
         search_allowed: false
+
+  - id: route.seat_livelihood_loom_ceo
+    canonical_name: Livelihood Loom CEO Seat Load
+    active_track: agent-admission-semantic-commons-2026-06
+    canonical_object_id: semobj.livelihood_loom_ceo
+    lifecycle: working
+    entry_order:
+      - L0
+      - L1
+      - L2
+      - L4
+      - L5
+    layers:
+      - id: L0
+        name: Bootstrap
+        purpose: Enter safely with the smallest required context for the CEO seat.
+        budget_tokens: 1000
+        source_kind: bootstrap
+        source_paths:
+          - AGENTS.md
+          - docs/agents/livelihood_loom_ceo/WAKE_CONTEXT.md
+          - docs/agents/livelihood_loom_ceo/SOUL.md
+        commands:
+          - make onboard
+        required_answers:
+          - where am I
+          - what authority ceiling applies
+          - why provider liveness is still blocked
+        search_allowed: false
+
+      - id: L1
+        name: CEO Contract
+        purpose: Load the VentureCell contract before interpreting any mission request.
+        budget_tokens: 2000
+        source_kind: routing_moc
+        source_paths:
+          - dharma_swarm/venture_cell/livelihood_loom/charter.yaml
+          - dharma_swarm/venture_cell/livelihood_loom/org.yaml
+          - dharma_swarm/venture_cell/livelihood_loom/status.py
+        commands:
+          - python -m dharma_swarm.venture_cell.livelihood_loom.cli status --json
+        required_answers:
+          - which roles may spawn
+          - which external actions require human approval
+          - what data may be public
+        search_allowed: false
+
+      - id: L2
+        name: Runtime Surfaces
+        purpose: Confirm the registered identity, A2A card, receipts, and bootstrap state.
+        budget_tokens: 3000
+        source_kind: active_track_packet
+        source_paths:
+          - docs/agents/livelihood_loom_ceo/agent.seed.yaml
+          - dharma_swarm/venture_cell/livelihood_loom/ceo_agent.py
+          - dharma_swarm/venture_cell/livelihood_loom/execution.py
+          - reports/livelihood_loom/bootstrap/latest.json
+        commands:
+          - python -m dharma_swarm.venture_cell.livelihood_loom.cli register-ceo --dry-run --json
+        required_answers:
+          - where is living_agent.json
+          - where is registration.json
+          - which bootstrap receipt is current
+        search_allowed: false
+
+      - id: L4
+        name: Public Research Corpus
+        purpose: Search candidate-enabler research after identity and policy are loaded.
+        budget_tokens: task_specific
+        source_kind: corpus_search
+        source_paths:
+          - /Users/dhyana/informal_economy_enabler_map
+          - reports/livelihood_loom
+          - docs/agents/livelihood_loom_ceo
+        commands:
+          - rg
+        required_answers:
+          - which source backs this candidate
+          - what risk class applies
+          - whether consent or public-proof gates are missing
+        search_allowed: true
+
+      - id: L5
+        name: Seat Load
+        purpose: Load the persistent CEO identity and its bounded execution command.
+        budget_tokens: task_specific
+        source_kind: named_agent_seat_load
+        source_paths:
+          - docs/agents/livelihood_loom_ceo/PROTOCOLS.md
+          - docs/agents/livelihood_loom_ceo/CAPABILITIES.md
+          - docs/agents/livelihood_loom_ceo/MEMORY.md
+        commands:
+          - python -m dharma_swarm.venture_cell.livelihood_loom.cli run-bootstrap --json
+        required_answers:
+          - what mission is active
+          - which lanes were spawned
+          - what external action is only drafted
+          - what remains blocked before provider-green
+        search_allowed: false

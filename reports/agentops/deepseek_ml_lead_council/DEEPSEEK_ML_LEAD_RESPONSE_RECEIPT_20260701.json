@@ -1,0 +1,13 @@
+{
+  "api_key_logged": false,
+  "created_at": "2026-06-30T15:50:41.004390+00:00",
+  "model": "deepseek-v4-pro",
+  "private_paths_in_prompt": false,
+  "prompt_path": "reports/agentops/deepseek_ml_lead_council/DEEPSEEK_ML_LEAD_SANITIZED_PROMPT_20260701.md",
+  "prompt_sha256": "sha256:a7cc7ac2976c0b28f448e1ee5e064e5e23ea496f5e090aae25c635fe04ff2e4e",
+  "provider": "deepseek",
+  "response_path": "reports/agentops/deepseek_ml_lead_council/DEEPSEEK_ML_LEAD_RESPONSE_20260701.md",
+  "response_sha256": "sha256:ae6eb777de57b2906bbb26da8e7f41a91941b48008d02d625cc7fe1a97bf2197",
+  "schema_version": "dharma.deepseek_ml_lead_response.v1",
+  "status": "pass"
+}

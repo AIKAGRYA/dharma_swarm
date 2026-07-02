@@ -1,0 +1,10 @@
+## helm/worldclass-20260612...origin/helm/worldclass-20260612
+ M dharma_swarm/operator_core/intent_payloads.py
+ M dharma_swarm/terminal_bridge.py
+ M reports/governance/active_track_evidence.json
+ M reports/governance/active_track_evidence.md
+ M reports/governance/track_portfolio.json
+ M scripts/start_terminal_tui_tmux.sh
+ M tests/test_intent_payloads.py
+?? reports/terminal/
+?? tests/test_terminal_bridge.py

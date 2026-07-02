@@ -20,6 +20,7 @@ It combines a Python orchestration core, a FastAPI backend, a Next.js dashboard,
 
 - Python package: `dharma-swarm`
 - CLI: `dgc`
+- Operator Idea Spark intake: `python -m dharma_swarm.idea_spark.cli ingest --text "<note>"` (see `docs/ops/OPERATOR_IDEA_SPARK_LIVE_INGEST.md`)
 - API server: `uvicorn api.main:app --host 127.0.0.1 --port 8420 --reload`
 - Canonical backend launcher: `bash run_operator.sh`
 - Dashboard dev server: `npm --prefix dashboard run dev`

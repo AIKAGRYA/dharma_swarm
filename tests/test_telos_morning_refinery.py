@@ -63,3 +63,51 @@ def test_empire_agents_are_second_stage_portfolio_screeners() -> None:
     assert "15 bear agents" in empire
     assert "Portfolio / Quality-Diversity Curator" in empire
     assert "A receipt template is not a receipt" in empire
+
+
+def test_external_action_operator_packet_is_not_the_receipt() -> None:
+    packet_path = REPO_ROOT / "reports/telos_ai/EXTERNAL_ACTION_OPERATOR_PACKET_2026-06-30.md"
+    first_receipt_path = REPO_ROOT / "reports/telos_ai/FIRST_EXTERNAL_ACTED_RECEIPT.md"
+    packet = packet_path.read_text(encoding="utf-8")
+    compact = _compact(packet)
+
+    assert packet_path.exists()
+    assert not first_receipt_path.exists()
+    assert "operator handoff only; not an external acted receipt" in compact
+    assert "This operator packet is not a receipt" in compact
+    assert "Do not mark the TELOS active track shippable from this packet alone." in packet
+    assert "Raw morning-page text" in packet
+    assert "external human action exists" in packet
+
+
+def test_sanitized_external_output_candidate_is_safe_but_unacted() -> None:
+    candidate_path = REPO_ROOT / "reports/telos_ai/SANITIZED_EXTERNAL_OUTPUT_CANDIDATE_2026-06-30.md"
+    packet = _read("reports/telos_ai/EXTERNAL_ACTION_OPERATOR_PACKET_2026-06-30.md")
+    candidate = candidate_path.read_text(encoding="utf-8")
+    compact = _compact(candidate)
+
+    assert candidate_path.exists()
+    assert "SANITIZED_EXTERNAL_OUTPUT_CANDIDATE_2026-06-30.md" in packet
+    assert "ready-to-review candidate only; not sent; not acted" in compact
+    assert "public/spec-derived TELOS concept note" in compact
+    assert "Private source material:** none included" in candidate
+    assert "not `reports/telos_ai/FIRST_EXTERNAL_ACTED_RECEIPT.md`" in candidate
+    assert "No external human action has been performed" in candidate
+
+    forbidden_markers = (
+        "/Users/dhyana/.dharma/telos/raw",
+        "working_source_ref:",
+        "raw_source_ref:",
+        "source_original_typo_preserving",
+        "credential:",
+    )
+    for marker in forbidden_markers:
+        assert marker not in candidate
+
+
+def test_telos_external_receipt_gate_requires_acted_receipt_predicate() -> None:
+    active_track = _read("docs/governance/ACTIVE_TRACK.yaml")
+    compact = _compact(active_track)
+
+    assert "id: first_external_receipt_exists kind: external_acted_receipt" in compact
+    assert "file: reports/telos_ai/FIRST_EXTERNAL_ACTED_RECEIPT.md" in compact

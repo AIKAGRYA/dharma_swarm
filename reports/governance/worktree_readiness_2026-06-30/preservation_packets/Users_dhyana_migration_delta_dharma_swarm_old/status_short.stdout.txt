@@ -1,0 +1,54 @@
+## main...origin/main [ahead 16]
+ M .gitignore
+ M README.md
+ M dashboard/src/app/dashboard/catalytic/page.tsx
+ M dashboard/src/app/dashboard/ecosystem/page.tsx
+ M dashboard/src/app/layout.tsx
+ M dashboard/src/components/layout/AmbientParticles.tsx
+ M dashboard/src/components/layout/Header.tsx
+ M dashboard/src/components/layout/Sidebar.tsx
+ M dashboard/src/components/layout/TelemetryStrip.tsx
+ M dashboard/src/components/viz/CosmographGraph.tsx
+ M dashboard/src/components/workflow/WorkflowNodeTypes.tsx
+ M dashboard/src/lib/types.ts
+ M dharma_swarm/agent_runner.py
+ M dharma_swarm/browser_agent.py
+ M dharma_swarm/context.py
+ M dharma_swarm/dgc_cli.py
+ M dharma_swarm/ontology.py
+ M dharma_swarm/ontology_adapters.py
+ M dharma_swarm/ontology_runtime.py
+ M dharma_swarm/orientation_packet.py
+ M dharma_swarm/runtime_artifacts.py
+ M dharma_swarm/swarm.py
+ M dharma_swarm/telic_seam.py
+ M dharma_swarm/tui_helpers.py
+ M dharma_swarm/witness.py
+ M pyproject.toml
+ M run_operator.sh
+ M tests/test_agents_router.py
+ M tests/test_browser_agent.py
+ M tests/test_chat_tools.py
+ M tests/test_dgc_cli.py
+ M tests/test_ontology_adapters.py
+ M tests/test_ontology_registry.py
+ M tests/test_orientation_packet.py
+ M tests/test_runtime_artifacts.py
+ M tests/test_telic_seam.py
+ M tests/test_tui_helpers.py
+?? dashboard/src/components/layout/SidebarLayout.tsx
+?? dashboard/src/components/viz/SystemBackground.tsx
+?? dashboard/src/stores/
+?? dharma_swarm/agentic_corporation/
+?? dharma_swarm/codex_build_packet.py
+?? dharma_swarm/dgc/
+?? dharma_swarm/ontology_meta.py
+?? docs/plans/2026-03-29-codex-long-running-autonomy.md
+?? docs/plans/2026-03-29-merge-blocker-sprint.md
+?? docs/plans/2026-03-30-repo-cleanup-sprint.md
+?? references/
+?? tests/test_agentic_corporation/
+?? tests/test_dgc_modular_forge.py
+?? tests/test_ontology_meta.py
+?? tests/test_repo_cleanup_contracts.py
+?? tests/test_runtime_pipeline_hardening_spec.py

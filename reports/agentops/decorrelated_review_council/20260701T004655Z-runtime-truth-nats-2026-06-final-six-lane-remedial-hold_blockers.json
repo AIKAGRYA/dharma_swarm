@@ -1,0 +1,219 @@
+{
+  "blockers": [
+    "minimaxm3: score=96 < 100",
+    "minimaxm3: disagreement=Minor: the production_path_contract handler_callable entries (e.g., __main__.MatrixRunner.handler_model.<locals>.handler) are matrix-runner-local injection callables, not the literal production handler module. This is an acceptable test pat"
+  ],
+  "conviction_gate": "hold_blockers",
+  "critic_count": 6,
+  "critics": [
+    {
+      "actual_model": "glm-5.2",
+      "lane_id": "glm52",
+      "latency_ms": 9267,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "topology row: nats://127.0.0.1:4222, DS_TASKS/DS_DLQ streams, consumer a2a_task_handler, max_deliver=3, ack_wait=60s, duplicate_window=600s",
+          "happy_path: publish_task + consume_message via A2AServer(require_execution_identity=True), semantic_receipt from ollama glm-5.2:cloud with token usage, consume_ack=ack, side_effect_count=1",
+          "handler_failure_redelivery_path: first nack then redelivery num_delivered=2 then ack",
+          "ack_failure_path: forced ack failure, original nacked and redelivered, cleanup ack",
+          "max_deliver_path: 3 nacks then dlq action, typed DLQ payload schema dharma.nats.dlq_failure.v1, dlq_subject dharma.dlq.ds_tasks.a2a_task_handler",
+          "dlq_failure_path: DLQ publish failure at MaxDeliver, dlq_failed=true, operator_visible=true, num_ack_pending=1, message remains beyond ack floor",
+          "duplicate_path: runtime duplicate publish returns status=duplicate, side_effect_count_after_replay=1",
+          "stale_started_idempotency_path: preexisting started record retried safely, ack",
+          "concurrent_duplicate_path: blocked with retry_blocked status then cleanup ack, side_effect_count=1",
+          "restart_path: 65s wait, redelivery num_delivered=2 then ack",
+          "compatibility gate: compatibility_publishers_can_satisfy_production_gate=false, gate enforced by check_nats_substrate_contract.py and check_nats_live_production_evidence.py",
+          "governance_negative_path: tampered evidence missing happy_path row returns rc 1 with correct error",
+          "source_tie: sha256 hashes for a2a_server.py, nats_transport.py, runtime_state.py, ACTIVE_TRACK.yaml, governance scripts, and tests",
+          "verification: check_nats_live_production_evidence rc 0, 47 passed, make nats-substrate-contract rc 0 73 passed, check_track_status rc 0 SHIPPABLE"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "Evidence proves fresh live NATS/JetStream topology, governed publish_task, A2AServer(require_execution_identity=True), live model-backed happy-path semantic receipt (glm-5.2:cloud), ack/nack/redelivery, MaxDeliver typed DLQ, DLQ failure visibility, restart recovery, duplicate/idempotency safety, source-tied hashes, and governance/compatibility gates. All 13 matrix rows pass. Verification commands return rc 0.",
+        "verdict": "pass"
+      },
+      "provider": "ollama",
+      "raw_response": "{\"verdict\":\"pass\",\"score\":100,\"summary\":\"Evidence proves fresh live NATS/JetStream topology, governed publish_task, A2AServer(require_execution_identity=True), live model-backed happy-path semantic receipt (glm-5.2:cloud), ack/nack/redelivery, MaxDeliver typed DLQ, DLQ failure visibility, restart recovery, duplicate/idempotency safety, source-tied hashes, and governance/compatibility gates. All 13 matrix rows pass. Verification commands return rc 0.\",\"blockers\":[],\"required_changes\":[],\"evidence_checked\":[\"topology row: nats://127.0.0.1:4222, DS_TASKS/DS_DLQ streams, consumer a2a_task_handler, max_deliver=3, ack_wait=60s, duplicate_window=600s\",\"happy_path: publish_task + consume_message via A2AServer(require_execution_identity=True), semantic_receipt from ollama glm-5.2:cloud with token usage, consume_ack=ack, side_effect_count=1\",\"handler_failure_redelivery_path: first nack then redelivery num_delivered=2 then ack\",\"ack_failure_path: forced ack failure, original nacked and redelivered, cleanup ack\",\"max_deliver_path: 3 nacks then dlq action, typed DLQ payload schema dharma.nats.dlq_failure.v1, dlq_subject dharma.dlq.ds_tasks.a2a_task_handler\",\"dlq_failure_path: DLQ publish failure at MaxDeliver, dlq_failed=true, operator_visible=true, num_ack_pending=1, message remains beyond ack floor\",\"duplicate_path: runtime duplicate publish returns status=duplicate, side_effect_count_after_replay=1\",\"stale_started_idempotency_path: preexisting started record retried safely, ack\",\"concurrent_duplicate_path: blocked with retry_blocked status then cleanup ack, side_effect_count=1\",\"restart_path: 65s wait, redelivery num_delivered=2 then ack\",\"compatibility gate: compatibility_publishers_can_satisfy_production_gate=false, gate enforced by check_nats_substrate_contract.py and check_nats_live_production_evidence.py\",\"governance_negative_path: tampered evidence missing happy_path row returns rc 1 with correct error\",\"source_tie: sha256 hashes for a2a_server.py, nats_transport.py, runtime_state.py, ACTIVE_TRACK.yaml, governance scripts, and tests\",\"verification: check_nats_live_production_evidence rc 0, 47 passed, make nats-substrate-contract rc 0 73 passed, check_track_status rc 0 SHIPPABLE\"],\"explicit_disagreement\":\"\"}",
+      "requested_model": "glm-5.2:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "kimi-k2.7-code",
+      "lane_id": "kimi27code",
+      "latency_ms": 15297,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "fresh live NATS/JetStream topology: broker nats://127.0.0.1:4222, DS_TASKS, DS_DLQ, consumer a2a_task_handler, explicit ack, MaxDeliver=3, duplicate_window=600s, file storage",
+          "governed A2ANatsTransport.publish_task as canonical publish entrypoint",
+          "A2AServer(require_execution_identity=True) as consumer class with A2ANatsTransport.consume_message entrypoint",
+          "live model-backed happy-path semantic receipt from ollama/glm-5.2:cloud with confirmed status and token usage",
+          "ack after success on happy path with publish_ack seq 78 and consume_ack action=ack",
+          "nack/redelivery on handler failure: first nack then second ack with num_delivered=2",
+          "MaxDeliver typed DLQ: three deliveries, final action=dlq, DS_DLQ stream_sequence 8, payload_schema dharma.nats.dlq_failure.v1",
+          "DLQ failure visibility: dlq_failed=true, final nack, operator_visible state with num_ack_pending=1",
+          "restart recovery: first delivery, 65s wait, redelivery, cleanup ack",
+          "duplicate/idempotency safety: broker duplicate probe duplicate=true, runtime duplicate ack duplicate=true, side_effect_count_after_replay=1, stale-started idempotency ack, concurrent duplicate blocked then cleanup ack with side_effect_count=1",
+          "source-tied evidence: sha256 hashes and mtimes for a2a_server.py, nats_transport.py, runtime_state.py, ACTIVE_TRACK.yaml, governance scripts, matrix script, tests; mtimes predate matrix run",
+          "governance/compatibility gates: a2a_send declares gate ineligible, domain reply worker does not mint nats envelope v1, compatibility_publishers_can_satisfy_production_gate=false, governance negative test fails with rc=1 and missing required rows",
+          "verification results: check_nats_live_production_evidence.py rc 0 OK, focused pytest 47 passed, make nats-substrate-contract rc 0 73 passed, check_track_status rc 0 SHIPPABLE",
+          "handler model/provider mismatch (glm-5.2:cloud vs requested kimi-k2.7-code:cloud) noted and not required per review instructions"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "The remedial evidence provides concrete, timestamped, source-tied JSON for every required production gate: live NATS/JetStream topology with DS_TASKS/DS_DLQ, explicit ack, MaxDeliver=3, duplicate window; A2ANatsTransport.publish_task and A2AServer(require_execution_identity=True) on all production paths; a live model-backed happy-path semantic receipt; nack/redelivery on handler failure; ack-failure surfacing and redelivery; MaxDeliver-typed DLQ with dharma.nats.dlq_failure.v1 schema; DLQ publish failure visibility leaving the message ack-pending; restart recovery after 65s; duplicate-window and runtime idempotency safety including stale-started and concurrent-duplicate blocking; compatibility gate enforcing non-canonical publishers cannot satisfy the production gate; and a governance negative test that tampering fails the evidence checker. Verification commands all returned rc 0 with explicit OK/SHIPPABLE output, and source hashes are listed with mtimes predating the matrix run.",
+        "verdict": "pass"
+      },
+      "provider": "ollama",
+      "raw_response": "{\n  \"verdict\": \"pass\",\n  \"score\": 100,\n  \"summary\": \"The remedial evidence provides concrete, timestamped, source-tied JSON for every required production gate: live NATS/JetStream topology with DS_TASKS/DS_DLQ, explicit ack, MaxDeliver=3, duplicate window; A2ANatsTransport.publish_task and A2AServer(require_execution_identity=True) on all production paths; a live model-backed happy-path semantic receipt; nack/redelivery on handler failure; ack-failure surfacing and redelivery; MaxDeliver-typed DLQ with dharma.nats.dlq_failure.v1 schema; DLQ publish failure visibility leaving the message ack-pending; restart recovery after 65s; duplicate-window and runtime idempotency safety including stale-started and concurrent-duplicate blocking; compatibility gate enforcing non-canonical publishers cannot satisfy the production gate; and a governance negative test that tampering fails the evidence checker. Verification commands all returned rc 0 with explicit OK/SHIPPABLE output, and source hashes are listed with mtimes predating the matrix run.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"fresh live NATS/JetStream topology: broker nats://127.0.0.1:4222, DS_TASKS, DS_DLQ, consumer a2a_task_handler, explicit ack, MaxDeliver=3, duplicate_window=600s, file storage\",\n    \"governed A2ANatsTransport.publish_task as canonical publish entrypoint\",\n    \"A2AServer(require_execution_identity=True) as consumer class with A2ANatsTransport.consume_message entrypoint\",\n    \"live model-backed happy-path semantic receipt from ollama/glm-5.2:cloud with confirmed status and token usage\",\n    \"ack after success on happy path with publish_ack seq 78 and consume_ack action=ack\",\n    \"nack/redelivery on handler failure: first nack then second ack with num_delivered=2\",\n    \"MaxDeliver typed DLQ: three deliveries, final action=dlq, DS_DLQ stream_sequence 8, payload_schema dharma.nats.dlq_failure.v1\",\n    \"DLQ failure visibility: dlq_failed=true, final nack, operator_visible state with num_ack_pending=1\",\n    \"restart recovery: first delivery, 65s wait, redelivery, cleanup ack\",\n    \"duplicate/idempotency safety: broker duplicate probe duplicate=true, runtime duplicate ack duplicate=true, side_effect_count_after_replay=1, stale-started idempotency ack, concurrent duplicate blocked then cleanup ack with side_effect_count=1\",\n    \"source-tied evidence: sha256 hashes and mtimes for a2a_server.py, nats_transport.py, runtime_state.py, ACTIVE_TRACK.yaml, governance scripts, matrix script, tests; mtimes predate matrix run\",\n    \"governance/compatibility gates: a2a_send declares gate ineligible, domain reply worker does not mint nats envelope v1, compatibility_publishers_can_satisfy_production_gate=false, governance negative test fails with rc=1 and missing required rows\",\n    \"verification results: check_nats_live_production_evidence.py rc 0 OK, focused pytest 47 passed, make nats-substrate-contract rc 0 73 passed, check_track_status rc 0 SHIPPABLE\",\n    \"handler model/provider mismatch (glm-5.2:cloud vs requested kimi-k2.7-code:cloud) noted and not required per review instructions\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "kimi-k2.7-code:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "qwen3-coder:480b-cloud",
+      "lane_id": "qwen3coder",
+      "latency_ms": 3722,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "Live NATS/JetStream topology",
+          "Governed A2ANatsTransport.publish_task",
+          "A2AServer(require_execution_identity=True)",
+          "Live model-backed happy-path handler receipt",
+          "Ack after success",
+          "Nack/redelivery",
+          "MaxDeliver typed DLQ",
+          "DLQ failure visibility",
+          "Restart recovery",
+          "Duplicate/idempotency safety",
+          "Source-tied evidence",
+          "Governance/compatibility gates"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "All required criteria for production readiness are met with concrete evidence. The review includes live NATS/JetStream topology, governed A2ANatsTransport.publish_task, A2AServer(require_execution_identity=True), live model-backed happy-path handler receipt, ack after success, nack/redelivery, MaxDeliver typed DLQ, DLQ failure visibility, restart recovery, duplicate/idempotency safety, source-tied evidence, and governance/compatibility gates.",
+        "verdict": "pass"
+      },
+      "provider": "ollama",
+      "raw_response": "{\n  \"verdict\": \"pass\",\n  \"score\": 100,\n  \"summary\": \"All required criteria for production readiness are met with concrete evidence. The review includes live NATS/JetStream topology, governed A2ANatsTransport.publish_task, A2AServer(require_execution_identity=True), live model-backed happy-path handler receipt, ack after success, nack/redelivery, MaxDeliver typed DLQ, DLQ failure visibility, restart recovery, duplicate/idempotency safety, source-tied evidence, and governance/compatibility gates.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"Live NATS/JetStream topology\",\n    \"Governed A2ANatsTransport.publish_task\",\n    \"A2AServer(require_execution_identity=True)\",\n    \"Live model-backed happy-path handler receipt\",\n    \"Ack after success\",\n    \"Nack/redelivery\",\n    \"MaxDeliver typed DLQ\",\n    \"DLQ failure visibility\",\n    \"Restart recovery\",\n    \"Duplicate/idempotency safety\",\n    \"Source-tied evidence\",\n    \"Governance/compatibility gates\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "qwen3-coder:480b-cloud",
+      "required": true
+    },
+    {
+      "actual_model": "deepseek-v4-pro",
+      "lane_id": "deepseekv4pro",
+      "latency_ms": 6049,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "topology",
+          "happy_path",
+          "handler_failure_redelivery_path",
+          "ack_failure_path",
+          "max_deliver_path",
+          "dlq_failure_path",
+          "duplicate_path",
+          "stale_started_idempotency_path",
+          "concurrent_duplicate_path",
+          "restart_path",
+          "compatibility_bypass_contract",
+          "governance_negative_path",
+          "source_tie_hashes",
+          "verification_scripts"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "All production-grade integration criteria are met with fresh live evidence: NATS/JetStream topology, governed publish/consume paths, A2AServer(require_execution_identity=True), live model-backed happy-path handler receipt, ack after success, nack/redelivery, MaxDeliver typed DLQ, DLQ failure visibility, restart recovery, duplicate/idempotency safety, source-tied evidence, and governance/compatibility gates. No blockers remain.",
+        "verdict": "pass"
+      },
+      "provider": "ollama",
+      "raw_response": "{\n  \"verdict\": \"pass\",\n  \"score\": 100,\n  \"summary\": \"All production-grade integration criteria are met with fresh live evidence: NATS/JetStream topology, governed publish/consume paths, A2AServer(require_execution_identity=True), live model-backed happy-path handler receipt, ack after success, nack/redelivery, MaxDeliver typed DLQ, DLQ failure visibility, restart recovery, duplicate/idempotency safety, source-tied evidence, and governance/compatibility gates. No blockers remain.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"topology\",\n    \"happy_path\",\n    \"handler_failure_redelivery_path\",\n    \"ack_failure_path\",\n    \"max_deliver_path\",\n    \"dlq_failure_path\",\n    \"duplicate_path\",\n    \"stale_started_idempotency_path\",\n    \"concurrent_duplicate_path\",\n    \"restart_path\",\n    \"compatibility_bypass_contract\",\n    \"governance_negative_path\",\n    \"source_tie_hashes\",\n    \"verification_scripts\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "deepseek-v4-pro:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "minimax-m3",
+      "lane_id": "minimaxm3",
+      "latency_ms": 33256,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "Topology row: broker nats://127.0.0.1:4222, DS_TASKS/DS_DLQ streams, consumer a2a_task_handler with MaxDeliver=3, explicit ack policy, 60s ack wait, file storage, 600s duplicate window, run id nats-live-20260701T003355Z-3bc2492d",
+          "Happy path: publish_entrypoint=A2ANatsTransport.publish_task, consume_entrypoint=A2ANatsTransport.consume_message, consumer_class=A2AServer with require_execution_identity=true, semantic_receipt from ollama:glm-5.2:cloud (response_model=glm-5.2, status=confirmed, 99 prompt / 109 completion tokens), side_effect_count=1, ack after success",
+          "Handler failure redelivery: 2 attempts (num_delivered 1\u21922), first nack with error='forced first handler failure', redelivery at consumer_seq 143 / stream_seq 80, second delivery acked",
+          "Ack failure: forced broker ack failure surfaces as nack, message redelivered (num_delivered=2, consumer_seq 148), cleanup acked",
+          "MaxDeliver DLQ: 3 deliveries (nack, nack, dlq), DLQ message published to dharma.dlq.ds_tasks.a2a_task_handler with payload schema dharma.nats.dlq_failure.v1, envelope dharma.nats.envelope.v1, on DS_DLQ stream (consumer_seq 8 / stream_seq 8), final_ack action=dlq",
+          "DLQ failure: 3 nacks, final action=nack with dlq_failed=true, operator_visible=true, operator_visible_state shows num_ack_pending=1 with current consumer floor",
+          "Restart recovery: first delivery at consumer_seq 155 / stream_seq 86, restart_wait_seconds=65, redelivery at consumer_seq 156, cleanup acked",
+          "Duplicate/idempotency: broker_duplicate_probe duplicate=true seq=78, runtime_duplicate_publish_ack status=duplicate side_effect_count_after_replay=1, stale_started_idempotency_path ack with seeded key, concurrent_duplicate_path blocked with retry_blocked (citing the still-started record by name and receipt) then cleanup ack side_effect_count=1",
+          "Compatibility gate: a2a_send.py and a2a_domain_reply_worker.py both classified as may_satisfy_production_gate=false, canonical_runtime_truth_nats_task_path=A2ANatsTransport.publish_task, gate enforced by check_nats_substrate_contract.py + check_nats_live_production_evidence.py + ACTIVE_TRACK.yaml",
+          "Governance negative: tampered_row_removed=happy_path, negative_return_code=1, negative_stderr='NATS_LIVE_PRODUCTION_EVIDENCE_FAILED EvidenceError: missing required rows: [happy_path, governance_negative_path]'",
+          "Source ties: SHA256 hashes for a2a_server.py, nats_transport.py, runtime_state.py, ACTIVE_TRACK.yaml, check_nats_live_production_evidence.py, check_nats_substrate_contract.py, run_nats_live_production_matrix.py, test_nats_substrate_contract.py, test_nats_transport.py \u2014 all with mtimes \u2264 2026-07-01T00:33:50Z, predating the 2026-07-01T00:35:04Z matrix generation",
+          "External gates: check_nats_live_production_evidence.py --max-age-hours 24 rc=0, focused pytest 47 passed, make nats-substrate-contract 73 passed rc=0, check_track_status.py SHIPPABLE"
+        ],
+        "explicit_disagreement": "Minor: the production_path_contract handler_callable entries (e.g., __main__.MatrixRunner.handler_model.<locals>.handler) are matrix-runner-local injection callables, not the literal production handler module. This is an acceptable test pattern when paired with explicit acknowledgment that the live model-backed semantic handler is proven on happy_path and the production transport/consumer path is exercised live throughout \u2014 and the source-tie hashes plus governance gate ensure the transport and consumer classes are the actual production implementations. Not a blocker.",
+        "required_changes": [],
+        "score": 96,
+        "summary": "Remedial packet provides concrete, source-tied live NATS/JetStream evidence covering all 13 required criteria. Fresh topology (consumer_seq=139, stream_seq=77, file storage, MaxDeliver=3, dup window 600s, both DS_TASKS and DS_DLQ streams). Live model-backed happy_path uses ollama:glm-5.2:cloud with a real semantic_receipt (status=confirmed, live_semantic_execution, token usage present), routed through the canonical A2ANatsTransport.publish_task / A2AServer(require_execution_identity=True) / A2ANatsTransport.consume_message production path. Failure rows (handler_failure_redelivery, ack_failure, max_deliver, dlq_failure) prove nack\u2192redelivery\u2192dlq sequencing, dlq_failed=true surfacing with operator_visible state (num_ack_pending=1, num_redelivered=11), and broker ack-failure recovery. Restart path confirms JetStream redelivery after 65s wait. Duplicate/idempotency safety demonstrated three ways: broker duplicate-window probe, runtime transport duplicate (side_effect_count_after_replay=1), stale-started retry (ack), and concurrent in-progress blocking (retry_blocked \u2192 cleanup ack exactly once, side_effect_count=1). Compatibility gate explicitly marks a2a_send.py and a2a_domain_reply_worker.py as may_satisfy_production_gate=false, and governance_negative_path proves the gate fails closed (rc=1, 'missing required rows: [happy_path, governance_negative_path]') when a required row is removed. Source ties are SHA256-pinned across 9 key files with mtimes predating matrix generation. External gate runs all return rc 0 (47 focused pytest passes, 73 nats-substrate-contract passes, track_status SHIPPABLE).",
+        "verdict": "pass"
+      },
+      "provider": "ollama",
+      "raw_response": "{\n  \"verdict\": \"pass\",\n  \"score\": 96,\n  \"summary\": \"Remedial packet provides concrete, source-tied live NATS/JetStream evidence covering all 13 required criteria. Fresh topology (consumer_seq=139, stream_seq=77, file storage, MaxDeliver=3, dup window 600s, both DS_TASKS and DS_DLQ streams). Live model-backed happy_path uses ollama:glm-5.2:cloud with a real semantic_receipt (status=confirmed, live_semantic_execution, token usage present), routed through the canonical A2ANatsTransport.publish_task / A2AServer(require_execution_identity=True) / A2ANatsTransport.consume_message production path. Failure rows (handler_failure_redelivery, ack_failure, max_deliver, dlq_failure) prove nack\u2192redelivery\u2192dlq sequencing, dlq_failed=true surfacing with operator_visible state (num_ack_pending=1, num_redelivered=11), and broker ack-failure recovery. Restart path confirms JetStream redelivery after 65s wait. Duplicate/idempotency safety demonstrated three ways: broker duplicate-window probe, runtime transport duplicate (side_effect_count_after_replay=1), stale-started retry (ack), and concurrent in-progress blocking (retry_blocked \u2192 cleanup ack exactly once, side_effect_count=1). Compatibility gate explicitly marks a2a_send.py and a2a_domain_reply_worker.py as may_satisfy_production_gate=false, and governance_negative_path proves the gate fails closed (rc=1, 'missing required rows: [happy_path, governance_negative_path]') when a required row is removed. Source ties are SHA256-pinned across 9 key files with mtimes predating matrix generation. External gate runs all return rc 0 (47 focused pytest passes, 73 nats-substrate-contract passes, track_status SHIPPABLE).\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"Topology row: broker nats://127.0.0.1:4222, DS_TASKS/DS_DLQ streams, consumer a2a_task_handler with MaxDeliver=3, explicit ack policy, 60s ack wait, file storage, 600s duplicate window, run id nats-live-20260701T003355Z-3bc2492d\",\n    \"Happy path: publish_entrypoint=A2ANatsTransport.publish_task, consume_entrypoint=A2ANatsTransport.consume_message, consumer_class=A2AServer with require_execution_identity=true, semantic_receipt from ollama:glm-5.2:cloud (response_model=glm-5.2, status=confirmed, 99 prompt / 109 completion tokens), side_effect_count=1, ack after success\",\n    \"Handler failure redelivery: 2 attempts (num_delivered 1\u21922), first nack with error='forced first handler failure', redelivery at consumer_seq 143 / stream_seq 80, second delivery acked\",\n    \"Ack failure: forced broker ack failure surfaces as nack, message redelivered (num_delivered=2, consumer_seq 148), cleanup acked\",\n    \"MaxDeliver DLQ: 3 deliveries (nack, nack, dlq), DLQ message published to dharma.dlq.ds_tasks.a2a_task_handler with payload schema dharma.nats.dlq_failure.v1, envelope dharma.nats.envelope.v1, on DS_DLQ stream (consumer_seq 8 / stream_seq 8), final_ack action=dlq\",\n    \"DLQ failure: 3 nacks, final action=nack with dlq_failed=true, operator_visible=true, operator_visible_state shows num_ack_pending=1 with current consumer floor\",\n    \"Restart recovery: first delivery at consumer_seq 155 / stream_seq 86, restart_wait_seconds=65, redelivery at consumer_seq 156, cleanup acked\",\n    \"Duplicate/idempotency: broker_duplicate_probe duplicate=true seq=78, runtime_duplicate_publish_ack status=duplicate side_effect_count_after_replay=1, stale_started_idempotency_path ack with seeded key, concurrent_duplicate_path blocked with retry_blocked (citing the still-started record by name and receipt) then cleanup ack side_effect_count=1\",\n    \"Compatibility gate: a2a_send.py and a2a_domain_reply_worker.py both classified as may_satisfy_production_gate=false, canonical_runtime_truth_nats_task_path=A2ANatsTransport.publish_task, gate enforced by check_nats_substrate_contract.py + check_nats_live_production_evidence.py + ACTIVE_TRACK.yaml\",\n    \"Governance negative: tampered_row_removed=happy_path, negative_return_code=1, negative_stderr='NATS_LIVE_PRODUCTION_EVIDENCE_FAILED EvidenceError: missing required rows: [happy_path, governance_negative_path]'\",\n    \"Source ties: SHA256 hashes for a2a_server.py, nats_transport.py, runtime_state.py, ACTIVE_TRACK.yaml, check_nats_live_production_evidence.py, check_nats_substrate_contract.py, run_nats_live_production_matrix.py, test_nats_substrate_contract.py, test_nats_transport.py \u2014 all with mtimes \u2264 2026-07-01T00:33:50Z, predating the 2026-07-01T00:35:04Z matrix generation\",\n    \"External gates: check_nats_live_production_evidence.py --max-age-hours 24 rc=0, focused pytest 47 passed, make nats-substrate-contract 73 passed rc=0, check_track_status.py SHIPPABLE\"\n  ],\n  \"explicit_disagreement\": \"Minor: the production_path_contract handler_callable entries (e.g., __main__.MatrixRunner.handler_model.<locals>.handler) are matrix-runner-local injection callables, not the literal production handler module. This is an acceptable test pattern when paired with explicit acknowledgment that the live model-backed semantic handler is proven on happy_path and the production transport/consumer path is exercised live throughout \u2014 and the source-tie hashes plus governance gate ensure the transport and consumer classes are the actual production implementations. Not a blocker.\"\n}",
+      "requested_model": "minimax-m3:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "nvidia/nemotron-3-ultra-550b-a55b-20260604:free",
+      "lane_id": "nemotron3ultra",
+      "latency_ms": 76254,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "reports/governance/runtime_truth_nats_remedial_evidence_2026-07-01.md"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "All production readiness criteria verified via fresh live NATS/JetStream matrix run (run id: nats-live-20260701T003355Z-3bc2492d). Topology: DS_TASKS/DS_DLQ streams, consumer a2a_task_handler with max_deliver=3, explicit ack, 60s ack_wait. Happy path: live model-backed handler (ollama:glm-5.2:cloud) executed with semantic receipt (208 tokens), ack after success. Failure paths: handler failure redelivery (num_delivered=2), ack failure surfacing (nack+redelivery+cleanup), MaxDeliver=3 typed DLQ (dharma.nats.dlq_failure.v1 on DS_DLQ), DLQ publish failure visibility (operator_visible=true, num_ack_pending=1). Restart recovery: 65s wait > ack_wait, redelivery with num_delivered=2. Duplicate/idempotency: broker duplicate window detection, runtime duplicate publish returns duplicate (side_effect_count=1), stale started record retries safely, concurrent in-progress blocked then cleanup succeeds once. Compatibility gate enforced (compatibility_publishers_can_satisfy_production_gate=false). Governance negative tamper detection works. Source-tied via SHA256 hashes of 9 key files. All verification gates pass: evidence checker, pytest (47 passed), nats-substrate-contract (73 passed), track status SHIPPABLE.",
+        "verdict": "pass"
+      },
+      "provider": "openrouter_free",
+      "raw_response": "{\n  \"verdict\": \"pass\",\n  \"score\": 100,\n  \"summary\": \"All production readiness criteria verified via fresh live NATS/JetStream matrix run (run id: nats-live-20260701T003355Z-3bc2492d). Topology: DS_TASKS/DS_DLQ streams, consumer a2a_task_handler with max_deliver=3, explicit ack, 60s ack_wait. Happy path: live model-backed handler (ollama:glm-5.2:cloud) executed with semantic receipt (208 tokens), ack after success. Failure paths: handler failure redelivery (num_delivered=2), ack failure surfacing (nack+redelivery+cleanup), MaxDeliver=3 typed DLQ (dharma.nats.dlq_failure.v1 on DS_DLQ), DLQ publish failure visibility (operator_visible=true, num_ack_pending=1). Restart recovery: 65s wait > ack_wait, redelivery with num_delivered=2. Duplicate/idempotency: broker duplicate window detection, runtime duplicate publish returns duplicate (side_effect_count=1), stale started record retries safely, concurrent in-progress blocked then cleanup succeeds once. Compatibility gate enforced (compatibility_publishers_can_satisfy_production_gate=false). Governance negative tamper detection works. Source-tied via SHA256 hashes of 9 key files. All verification gates pass: evidence checker, pytest (47 passed), nats-substrate-contract (73 passed), track status SHIPPABLE.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"reports/governance/runtime_truth_nats_remedial_evidence_2026-07-01.md\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "required": true
+    }
+  ],
+  "generated_at": "20260701T004655Z",
+  "max_evidence_chars": 0,
+  "max_output_tokens": 6000,
+  "persistent_agent_witness": {
+    "agent": "palantir-pilot",
+    "blocker": "",
+    "fresh": true,
+    "heartbeat_age_seconds": 23,
+    "heartbeat_timestamp": "2026-07-01T00:46:32Z",
+    "max_heartbeat_age_seconds": 300,
+    "raw_status": "status=running session=dharma_palantir_pilot_a2a_worker\nsubject=dharma.a2a.palantir-pilot\nconsumer=palantir_pilot_a2a\nstream=DHARMA_FLEET\nheartbeat=/Users/dhyana/.dharma/a2a_bus/worker_heartbeats/palantir-pilot.json\nlog=/Users/dhyana/.dharma/logs/palantir_pilot_a2a_worker/dharma_palantir_pilot_a2a_worker.log\n--- heartbeat ---\n{\n    \"agent_id\": \"palantir_pilot\",\n    \"callsign\": \"palantir-pilot\",\n    \"consumer\": \"palantir_pilot_a2a\",\n    \"cycle\": 1166,\n    \"last_receipt_path\": \"\",\n    \"receipt_count\": 0,\n    \"schema_version\": \"dharma.a2a.palantir_pilot.worker_heartbeat.v1\",\n    \"status\": \"IDLE\",\n    \"stream\": \"DHARMA_FLEET\",\n    \"subject\": \"dharma.a2a.palantir-pilot\",\n    \"suppress_no_messages\": true,\n    \"timestamp\": \"2026-07-01T00:46:32Z\"\n}\n--- consumer ---\n{\n  \"stream_name\": \"DHARMA_FLEET\",\n  \"name\": \"palantir_pilot_a2a\",\n  \"config\": {\n    \"ack_policy\": \"explicit\",\n    \"ack_wait\": 30000000000,\n    \"deliver_policy\": \"all\",\n    \"durable_name\": \"palantir_pilot_a2a\",\n    \"name\": \"palantir_pilot_a2a\",\n    \"filter_subject\": \"dharma.a2a.palantir-pilot\",\n    \"max_ack_pending\": 1000,\n    \"max_deliver\": -1,\n    \"max_waiting\": 512,\n    \"replay_policy\": \"instant\",\n    \"num_replicas\": 0,\n    \"metadata\": {\n      \"_nats.level\": \"3\",\n      \"_nats.req.level\": \"0\",\n      \"_nats.ver\": \"2.12.6\"\n    },\n    \"pause_until\": \"0001-01-01T00:00:00Z\"\n  },\n  \"created\": \"2026-06-15T16:08:32.524099Z\",\n  \"delivered\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"ack_floor\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"num_ack_pending\": 0,\n  \"num_redelivered\": 0,\n  \"num_waiting\": 1,\n  \"num_pending\": 0,\n  \"ts\": \"2026-07-01T00:46:54.716075Z\"\n}\n--- latest worker receipts ---\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260618T014416Z-palantir-pilot-codex_hardened_spec_notice_20260618T0155Z_palantir-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260618T013101Z-palantir-pilot-palantir_a2a_hardening_20260618T0001Z-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260617T135931Z-palantir-pilot-longrun_spec_95_vote_20260617T135751Z-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260617T131705Z-palantir-pilot-7215f005165f-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260617T130349Z-palantir-pilot-761445fa892d-PALANTIR_PILOT_REPLIED.json\n",
+    "status": "running"
+  },
+  "prompt_chars": 34043,
+  "prompt_file": "/Users/dhyana/dharma_swarm/reports/agentops/decorrelated_review_council/prompts/runtime_truth_nats_json_only_remedial_20260701.md",
+  "prompt_words_estimate": 1864,
+  "required_critic_count": 6,
+  "schema_version": "codex.decorrelated_review_council.v1",
+  "score_avg": 99.33,
+  "score_min": 96,
+  "target_score": 100,
+  "timeout_seconds": 300
+}

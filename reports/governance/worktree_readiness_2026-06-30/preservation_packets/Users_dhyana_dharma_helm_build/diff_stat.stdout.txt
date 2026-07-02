@@ -1,0 +1,8 @@
+ dharma_swarm/operator_core/intent_payloads.py |  20 +++++
+ dharma_swarm/terminal_bridge.py               |  83 +++++++++++++++++++-
+ reports/governance/active_track_evidence.json | 104 +++++++++++++++++++++++++-
+ reports/governance/active_track_evidence.md   |  22 +++++-
+ reports/governance/track_portfolio.json       | 104 +++++++++++++++++++++++++-
+ scripts/start_terminal_tui_tmux.sh            |  21 +++++-
+ tests/test_intent_payloads.py                 |  13 +++-
+ 7 files changed, 354 insertions(+), 13 deletions(-)

@@ -1,0 +1,4 @@
+# branch.oid e529bf3390fe1136686b37ada54e57f04b1a6652
+# branch.head codex/routing-canon-20260630
+# branch.upstream origin/main
+# branch.ab +1 -0

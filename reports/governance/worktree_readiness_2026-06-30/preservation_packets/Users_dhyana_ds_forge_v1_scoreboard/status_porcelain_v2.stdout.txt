@@ -1,0 +1,30 @@
+# branch.oid d8bca7aab20af7871cff4ef46d08227cdb0923fa
+# branch.head forge-v1/tokenbroker-scoreboard-20260620
+# branch.upstream origin/main
+# branch.ab +9 -212
+1 .M N... 100644 100644 100644 9d2a8e9772e14b9cc64e627906959cc4fe0bf08a 9d2a8e9772e14b9cc64e627906959cc4fe0bf08a dharma_swarm/api_keys.py
+1 .M N... 100644 100644 100644 31e419fed73e76b486beb7a4494135064626a362 31e419fed73e76b486beb7a4494135064626a362 dharma_swarm/evolution_roster.py
+1 .M N... 100644 100644 100644 7cd9455f0f4e9c2735d2568a7531d7ad160f5ea9 7cd9455f0f4e9c2735d2568a7531d7ad160f5ea9 dharma_swarm/forge_v1/providers.py
+1 .M N... 100644 100644 100644 3fd03c7ec8648caa8f9e17a61f00bb7faf1f7a83 3fd03c7ec8648caa8f9e17a61f00bb7faf1f7a83 dharma_swarm/forge_v1/run_real.py
+1 .M N... 100644 100644 100644 5908329efec92fbdeaeb6247b9f454ce766b7f01 5908329efec92fbdeaeb6247b9f454ce766b7f01 dharma_swarm/key_oracle.py
+1 .M N... 100644 100644 100644 81f75a386f3736d96e8c19930ed58d5f03c458fd 81f75a386f3736d96e8c19930ed58d5f03c458fd dharma_swarm/model_defaults.py
+1 .M N... 100644 100644 100644 31b6d3a9f7355614cae8b3a2c9ce0d5fe4ba4cef 31b6d3a9f7355614cae8b3a2c9ce0d5fe4ba4cef dharma_swarm/model_hierarchy.py
+1 .M N... 100644 100644 100644 b2400bc07183eb92fbbc87421f4270eda079a72a b2400bc07183eb92fbbc87421f4270eda079a72a dharma_swarm/model_pool.py
+1 .M N... 100644 100644 100644 a70c31e70b0f5a19f240a19dca24ec5f3bf1809b a70c31e70b0f5a19f240a19dca24ec5f3bf1809b dharma_swarm/models.py
+1 .M N... 100644 100644 100644 4049a731b39e46d833392857736ad7d6da7dbc97 4049a731b39e46d833392857736ad7d6da7dbc97 dharma_swarm/providers.py
+1 .M N... 100644 100644 100644 d27206c9c2d1f948f86cfcdb55961e04e14fe782 d27206c9c2d1f948f86cfcdb55961e04e14fe782 dharma_swarm/runtime_provider.py
+1 .M N... 100644 100644 100644 09b20ed468fb602edaad373f6c2a93f9d98d08d9 09b20ed468fb602edaad373f6c2a93f9d98d08d9 reports/governance/active_track_evidence.json
+1 .M N... 100644 100644 100644 74bccb0f4ac06e9254e1012b355b001b84a2ca83 74bccb0f4ac06e9254e1012b355b001b84a2ca83 reports/governance/active_track_evidence.md
+1 .M N... 100644 100644 100644 09b20ed468fb602edaad373f6c2a93f9d98d08d9 09b20ed468fb602edaad373f6c2a93f9d98d08d9 reports/governance/track_portfolio.json
+1 .M N... 100644 100644 100644 e0bd29c8646bdaa19bd403772f18b2b27c939167 e0bd29c8646bdaa19bd403772f18b2b27c939167 scripts/load_runtime_env.sh
+1 .M N... 100644 100644 100644 e939bd142df491d6f599dcae64f2d47f4b246f74 e939bd142df491d6f599dcae64f2d47f4b246f74 tests/test_api_keys.py
+1 .M N... 100644 100644 100644 bb4e89cea91748a2a8ea527317890699eda58a55 bb4e89cea91748a2a8ea527317890699eda58a55 tests/test_env_alias_normalization.py
+1 .M N... 100644 100644 100644 a8071b8e225eecd3864db426cd295fd2569de318 a8071b8e225eecd3864db426cd295fd2569de318 tests/test_forge_v1_providers.py
+1 .M N... 100644 100644 100644 d9487802be3220e861a06e3bfe3711798e798b90 d9487802be3220e861a06e3bfe3711798e798b90 tests/test_model_pool.py
+1 .M N... 100644 100644 100644 123588bfbe400d6654753e9d2186824ebf410d2b 123588bfbe400d6654753e9d2186824ebf410d2b tests/test_providers_quality_track.py
+1 .M N... 100644 100644 100644 212254f039aac23ed377d1c21e6d3416c5370c44 212254f039aac23ed377d1c21e6d3416c5370c44 tests/test_runtime_provider.py
+? dharma_swarm/forge_v1/autoloop.py
+? dharma_swarm/forge_v1/canonical.py
+? dharma_swarm/forge_v1/forge_v2/
+? tests/test_forge_v2.py
+? tests/test_forge_v2_critic.py

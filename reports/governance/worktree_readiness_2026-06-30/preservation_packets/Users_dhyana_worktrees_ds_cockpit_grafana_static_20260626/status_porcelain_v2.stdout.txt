@@ -1,0 +1,3 @@
+# branch.oid 69506fc803c2b56912a71e0c169a5b37b9ea345d
+# branch.head scratch/cockpit-grafana-static-20260626
+? cockpit_static/

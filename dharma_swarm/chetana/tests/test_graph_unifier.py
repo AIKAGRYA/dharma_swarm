@@ -98,6 +98,46 @@ def test_query_missing_backends_dont_break(tmp_path, monkeypatch):
     assert all(v >= 0 for v in result.coverage.values())
 
 
+def test_gitnexus_query_uses_installed_query_command(monkeypatch):
+    calls = []
+
+    class Proc:
+        def __init__(self, returncode=0, stdout="", stderr=""):
+            self.returncode = returncode
+            self.stdout = stdout
+            self.stderr = stderr
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        if cmd[0] == "which":
+            return Proc(stdout="/usr/local/bin/gitnexus\n")
+        if cmd[0] == "git":
+            return Proc(stdout="/Users/dhyana/dharma_swarm\n")
+        assert cmd[:3] == ["gitnexus", "query", "--repo"]
+        assert cmd[3].endswith("dharma_swarm")
+        payload = {
+            "processes": [
+                {"id": "proc_idea_spark", "summary": "Idea Spark ingest lifecycle"}
+            ],
+            "definitions": [
+                {
+                    "id": "Function:dharma_swarm/idea_spark/cli.py:main",
+                    "name": "main",
+                    "filePath": "dharma_swarm/idea_spark/cli.py",
+                }
+            ],
+            "process_symbols": [],
+        }
+        return Proc(stdout=json.dumps(payload))
+
+    monkeypatch.setattr(gu_mod.subprocess, "run", fake_run)
+    hits, note = gu_mod._query_gitnexus("idea spark", limit=2)
+    assert note is None
+    assert hits[0].kind == "process"
+    assert hits[0].label == "Idea Spark ingest lifecycle"
+    assert any(call[:2] == ["gitnexus", "query"] for call in calls)
+
+
 def test_coverage_summary_renders():
     from dharma_swarm.chetana.graph_unifier import UnifiedQueryResult, GraphHit
 

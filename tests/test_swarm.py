@@ -245,8 +245,9 @@ async def test_spawn_agent_preserves_constitutional_routing_metadata(tmp_path, m
     captured: dict[str, object] = {}
 
     class _FakePool:
-        async def spawn(self, config, **_: object):
+        async def spawn(self, config, **kwargs: object):
             captured["config"] = config
+            captured["spawn_kwargs"] = kwargs
             return type(
                 "_Runner",
                 (),
@@ -278,6 +279,7 @@ async def test_spawn_agent_preserves_constitutional_routing_metadata(tmp_path, m
     config = captured["config"]
 
     assert agent.name == "operator"
+    assert captured["spawn_kwargs"]["memory"] is swarm._agent_memories["operator"]
     assert config.metadata["allow_provider_routing"] is True
     assert config.metadata["state_dir"] == str(state_dir)
 

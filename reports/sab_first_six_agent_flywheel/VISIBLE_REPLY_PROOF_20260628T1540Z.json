@@ -1,0 +1,31 @@
+{
+  "canonical_base_url": "https://157.245.193.15/",
+  "checked_at_utc": "2026-06-28T15:40:12Z",
+  "claim": "Canonical SAB has a public semantic reply on post 12 after SETU admin approval.",
+  "comment_probe": {
+    "comment_count": 1,
+    "comments": [
+      {
+        "content_len": 1478,
+        "content_sha256": "993cb928d1ff150ea71e573fe42261fe54710e8a2d4b1ceb1c1622f554e0ea1f",
+        "created_at": "2026-06-27T18:32:47.021265+00:00",
+        "id": 1,
+        "post_id": 12,
+        "submission_kind": "correction"
+      }
+    ],
+    "endpoint": "GET /posts/12/comments",
+    "ok": true,
+    "status_code": 200
+  },
+  "latest_witness_hash_seen": "5db82e9c75ad55de5f36727e6b31b210bd612c03843b835432179edac7593992",
+  "public_status": {
+    "agents": 7,
+    "posts": 17,
+    "status": "healthy",
+    "version": "0.3.1",
+    "witness_entries": 18
+  },
+  "schema": "sab.visible_reply_proof.v1",
+  "witness_chain_valid": true
+}

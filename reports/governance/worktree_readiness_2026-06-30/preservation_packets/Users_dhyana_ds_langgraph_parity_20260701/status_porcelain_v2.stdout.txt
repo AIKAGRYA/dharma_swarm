@@ -1,0 +1,23 @@
+# branch.oid f84f40344cbdfab9d236239b0d3ec00718e10bf9
+# branch.head codex/langgraph-orchestration-parity-20260701
+# branch.upstream origin/main
+# branch.ab +0 -0
+1 .M N... 100644 100644 100644 eabf4e56f77efa554cf2f8ad73d93bbe7daa4eed eabf4e56f77efa554cf2f8ad73d93bbe7daa4eed dharma_swarm/langgraph_parity/benchmark.py
+1 .M N... 100644 100644 100644 62e581624854ae022114efa8616bf77081aea060 62e581624854ae022114efa8616bf77081aea060 dharma_swarm/langgraph_parity/benchmark_runner.py
+1 .M N... 100644 100644 100644 ef818965a75db8d1a49c8a95e0dbe1d0a911fbdc ef818965a75db8d1a49c8a95e0dbe1d0a911fbdc dharma_swarm/langgraph_parity/benchmark_types.py
+1 .M N... 100644 100644 100644 4ee63b4dd37a02b2bc98439a8d17514fa99bb260 4ee63b4dd37a02b2bc98439a8d17514fa99bb260 dharma_swarm/models.py
+1 .M N... 100644 100644 100644 6080b709d4d0024cd33daf443156166978fec39d 6080b709d4d0024cd33daf443156166978fec39d dharma_swarm/orchestrator.py
+1 .M N... 100644 100644 100644 d4d7b8ec65504304f9861975bc82ebdeb9f6085a d4d7b8ec65504304f9861975bc82ebdeb9f6085a reports/governance/active_track_evidence.json
+1 .M N... 100644 100644 100644 7cbdaeb35ab0eedcea747b6c267e10da513020a9 7cbdaeb35ab0eedcea747b6c267e10da513020a9 reports/governance/active_track_evidence.md
+1 .M N... 100644 100644 100644 d4d7b8ec65504304f9861975bc82ebdeb9f6085a d4d7b8ec65504304f9861975bc82ebdeb9f6085a reports/governance/track_portfolio.json
+1 .M N... 100644 100644 100644 f4d4f0ddb4f5ae41fb44433d4f838b5d987a1119 f4d4f0ddb4f5ae41fb44433d4f838b5d987a1119 reports/langgraph_parity/benchmark/benchmark_receipt.json
+1 .M N... 100644 100644 100644 ab38cdcf82fb702a6dbbbe1872fa7bdcfa68aa10 ab38cdcf82fb702a6dbbbe1872fa7bdcfa68aa10 reports/langgraph_parity/benchmark/benchmark_report.json
+1 .M N... 100644 100644 100644 43d2eed36fa1fa3329278e457a3f5481034caf40 43d2eed36fa1fa3329278e457a3f5481034caf40 reports/langgraph_parity/benchmark/benchmark_report.md
+1 .M N... 100644 100644 100644 e18739e1beadf8f7dc231a2ba395de3a2872cbf1 e18739e1beadf8f7dc231a2ba395de3a2872cbf1 tests/test_langgraph_parity_isolation_benchmark.py
+1 .M N... 100644 100644 100644 5201a3bddeea137350cfacb3df053c174156a21d 5201a3bddeea137350cfacb3df053c174156a21d tests/test_orchestrator.py
+1 .M N... 100644 100644 100644 2ecd6d2d36384ae83f9f9dc98a5da0d5f8ad4394 2ecd6d2d36384ae83f9f9dc98a5da0d5f8ad4394 tests/test_orchestrator_spine_dispatch.py
+1 .M N... 100644 100644 100644 b9e777dd07b238aa7767bf0df48038f30facea92 b9e777dd07b238aa7767bf0df48038f30facea92 tests/test_topology_execution.py
+1 .M N... 100644 100644 100644 082996b7dc86f1b581028cd1d4029f049a98bd02 082996b7dc86f1b581028cd1d4029f049a98bd02 uv.lock
+? reports/langgraph_parity/allnight/ALLNIGHT_LOG.md
+? reports/langgraph_parity/allnight/SCOREBOARD.json
+? scripts/governance/spine_dispatch_mode_report.py

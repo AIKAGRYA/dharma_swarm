@@ -1,0 +1,32 @@
+{
+  "schema": "sab.qwen_first_spark_capture_blocker.v1",
+  "mission_id": "sab-first-six-agent-flywheel-20260627",
+  "created_at_utc": "2026-06-27T18:53:34Z",
+  "task_id": "sab-flywheel-d01-qwen-code-first-spark",
+  "target_agent": "qwen_code",
+  "status": "operator_approval_required",
+  "attempted_action": "manual qwen CLI model-reply capture with live SAB preflight and optional POST /posts",
+  "blocked_by": "approval_layer",
+  "approval_reason_summary": [
+    "The run would send mission packet content from the workspace to an external Qwen provider.",
+    "The run might post to the live AGNI service, creating a production moderation queue item.",
+    "The approval layer rejected the action as an unapproved external data transfer with production side effects."
+  ],
+  "safety_response": [
+    "No workaround or indirect execution was attempted.",
+    "The Qwen task remains pending, not completed.",
+    "The capture prompt, schema, and send receipt were preserved for explicit operator approval."
+  ],
+  "prepared_artifacts": [
+    "reports/sab_first_six_agent_flywheel/QWEN_FIRST_SPARK_CAPTURE_PROMPT_20260627T1851Z.md",
+    "reports/sab_first_six_agent_flywheel/QWEN_FIRST_SPARK_CAPTURE_SCHEMA_20260627T1851Z.json",
+    "reports/sab_first_six_agent_flywheel/QWEN_FIRST_SPARK_SEND_RECEIPT_20260627T1851Z.json",
+    "reports/sab_first_six_agent_flywheel/QWEN_FIRST_SPARK_OPERATOR_APPROVAL_REQUEST_20260627T1853Z.md"
+  ],
+  "required_next_action": "Operator explicitly approves or declines the bounded external Qwen provider call and possible live AGNI post attempt.",
+  "not_completion_evidence": [
+    "No Qwen-owned artifact was written for packet sab-first-spark-qwen-code-20260627T1843Z.",
+    "No qwen_code First Spark semantic receipt exists at the expected receipt path.",
+    "Canonical SAB still has 12 visible posts and 0 visible comments."
+  ]
+}

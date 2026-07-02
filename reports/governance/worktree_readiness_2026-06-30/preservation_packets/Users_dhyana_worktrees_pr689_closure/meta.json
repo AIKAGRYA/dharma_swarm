@@ -1,0 +1,11 @@
+{
+  "path": "/Users/dhyana/worktrees/pr689_closure",
+  "observed_at": "2026-06-29T16:34:40.174512+00:00",
+  "branch": "pr-689-closure",
+  "head": "91dfe4db255f0078670288017683a00f5c901fcc",
+  "status_short_file": "status_short.stdout.txt",
+  "status_porcelain_v2_file": "status_porcelain_v2.stdout.txt",
+  "diff_stat_file": "diff_stat.stdout.txt",
+  "cached_diff_stat_file": "cached_diff_stat.stdout.txt",
+  "untracked_manifest_file": "untracked.stdout.txt"
+}

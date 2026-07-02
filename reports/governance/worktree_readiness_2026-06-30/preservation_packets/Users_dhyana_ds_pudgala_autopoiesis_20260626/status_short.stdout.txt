@@ -1,0 +1,8 @@
+## codex/pudgala-autopoiesis-protostar-20260626...github/codex/pudgala-autopoiesis-protostar-20260626
+ M docs/docops/AUTO_INVENTORY.md
+ M docs/governance/FORGE_NAMING_BOUNDARY.md
+ M docs/governance/SOVEREIGN_MANIFEST.md
+ M docs/ontology/semantic_aliases.yaml
+ M docs/ontology/semantic_objects.yaml
+ M tests/test_forge_naming_boundary.py
+?? docs/agent_tasks/2026-06-26_dharma_forge_proving_ground_10_10_readiness_goal.md

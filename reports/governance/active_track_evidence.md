@@ -1,7 +1,7 @@
 # Track Portfolio Evidence
 
-Generated: 2026-07-01T12:40:51+09:00 (schema v2)
-Active tracks: **11** (warn 11, max 11) — shippable 7
+Generated: 2026-07-02T10:19:42+09:00 (schema v2)
+Active tracks: **11** (warn 11, max 11) — shippable 8
 
 ## Spine coverage
 
@@ -30,10 +30,10 @@ Active tracks: **11** (warn 11, max 11) — shippable 7
   - ✓ `evidence_receipt_still_defined` (file_contains) — pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py
   - ✓ `runtime_receipt_still_defined` (file_contains) — pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py
 
-## `runtime-truth-nats-2026-06` — SHIPPABLE
+## `runtime-truth-nats-2026-06` — 1/3
 
 - serves: `substrate-nativeness` · complements: ['runtime-truth-reconciliation-2026-06'] · depends_on: [] · conflicts_with: []
-- owned_surfaces: ['docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md', 'dharma_swarm/a2a/nats_transport.py', 'dharma_swarm/a2a/a2a_server.py', 'dharma_swarm/operator_core/nats_live_contact.py', 'dharma_swarm/operator_core/nats_substrate_status.py', 'scripts/runtime/a2a_send.py', 'scripts/runtime/a2a_inbox_bridge.py', 'scripts/runtime/a2a_domain_reply_worker.py', 'scripts/runtime/a2a_reply_capture.py', 'scripts/governance/check_nats_substrate_contract.py', 'scripts/governance/run_nats_live_production_matrix.py', 'scripts/governance/check_nats_live_production_evidence.py', 'tests/test_nats_transport.py', 'tests/test_nats_substrate_contract.py', 'reports/governance/nats_live_production_matrix/**', 'reports/governance/runtime_truth_nats_final_evidence_2026-07-01.md', 'reports/governance/runtime_truth_nats_compact_raw_evidence_2026-07-01.json', 'reports/governance/runtime_truth_nats_remedial_evidence_2026-07-01.md']
+- owned_surfaces: ['docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md', 'dharma_swarm/a2a/nats_transport.py', 'dharma_swarm/a2a/a2a_server.py', 'dharma_swarm/operator_core/nats_live_contact.py', 'dharma_swarm/operator_core/nats_substrate_status.py', 'scripts/runtime/a2a_send.py', 'scripts/runtime/a2a_inbox_bridge.py', 'scripts/runtime/a2a_domain_reply_worker.py', 'scripts/runtime/a2a_reply_capture.py', 'scripts/governance/check_nats_substrate_contract.py', 'scripts/governance/run_nats_live_production_matrix.py', 'scripts/governance/check_nats_live_production_evidence.py', 'tests/test_nats_transport.py', 'tests/test_nats_substrate_contract.py', 'reports/governance/nats_live_production_matrix/**', 'reports/governance/runtime_truth_nats_closeout_packet_2026-07-01.md', 'reports/governance/runtime_truth_nats_final_evidence_2026-07-01.md', 'reports/governance/runtime_truth_nats_compact_raw_evidence_2026-07-01.json']
 - moves_vital_signs: ['tool_coverage', 'quality_gates']
 
   - ✓ `nats_master_spec_exists` (file_exists) — docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present
@@ -41,11 +41,11 @@ Active tracks: **11** (warn 11, max 11) — shippable 7
   - ✓ `nats_contract_checker_exists` (file_exists) — scripts/governance/check_nats_substrate_contract.py present
   - ✓ `nats_transport_tests_exist` (file_exists) — tests/test_nats_transport.py present
   - ✓ `nats_contract_tests_exist` (file_exists) — tests/test_nats_substrate_contract.py present
-  - ✓ `nats_substrate_contract_checker_passes` (command_passes) — /Users/dhyana/dharma_swarm/.venv/bin/python scripts/governance/check_nats_substrate_contract.py exited 0 (resolved from ./.venv/bin/python scripts/governance/check_nats_substrate_contract.py); output: NATS_CONTRACT_OK docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
-  - ✓ `nats_transport_regression_tests_pass` (command_passes) — /Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_nats_transport.py tests/test_nats_substrate_contract.py exited 0 (resolved from pytest -q tests/test_nats_transport.py tests/test_nats_substrate_contract.py); output: ...................                                                      [100%] | 19 passed in 3.27s
-  - ✓ `nats_live_production_evidence_fresh` (command_passes) — /Users/dhyana/dharma_swarm/.venv/bin/python scripts/governance/check_nats_live_production_evidence.py --max-age-hours 24 exited 0 (resolved from ./.venv/bin/python scripts/governance/check_nats_live_production_evidence.py --max-age-hours 24); output: NATS_LIVE_PRODUCTION_EVIDENCE_OK /Users/dhyana/ds_runtime_truth_nats_clean_20260701/reports/governance/nats_live_production_matrix/latest.json
+  - ✗ `nats_substrate_contract_checker_passes` (command_passes) — ./.venv/bin/python scripts/governance/check_nats_substrate_contract.py exited 1; output: NATS_CONTRACT_FAIL fresh live NATS production evidence check failed: EvidenceError: evidence is stale: age=1 day, 0:44:35.786437
+  - ✓ `nats_transport_regression_tests_pass` (command_passes) — pytest -q tests/test_nats_transport.py tests/test_nats_substrate_contract.py exited 0; output: ...................                                                      [100%] | 19 passed in 1.85s
+  - ✗ `nats_live_production_evidence_fresh` (command_passes) — ./.venv/bin/python scripts/governance/check_nats_live_production_evidence.py --max-age-hours 24 exited 1; output: NATS_LIVE_PRODUCTION_EVIDENCE_FAILED EvidenceError: evidence is stale: age=1 day, 0:44:38.091450
 
-## `runtime-truth-spine-adoption-2026-06` — SHIPPABLE
+## `runtime-truth-spine-adoption-2026-06` — 9/10
 
 - serves: `substrate-nativeness` · complements: ['runtime-truth-reconciliation-2026-06', 'runtime-truth-nats-2026-06'] · depends_on: [] · conflicts_with: []
 - owned_surfaces: ['dharma_swarm/spine/**', 'dharma_swarm/a2a/a2a_bridge.py', 'dharma_swarm/orchestrator.py', 'dharma_swarm/agent_runner.py', 'docs/agent_tasks/2026-06-14_runtime_spine_hardening_goal.md', 'scripts/uplift_guards/check_spine_ownership.py']
@@ -63,8 +63,9 @@ Active tracks: **11** (warn 11, max 11) — shippable 7
   - ✓ `adoption_narrative_docs` (file_exists) — docs/architecture/SPINE_ADOPTION_NARRATIVE.md present
   - ✓ `gate1_witnessed` (file_exists) — reports/governance/GATE1_WITNESSED.md present
   - ✓ `hardening_goal_exists` (file_exists) — docs/agent_tasks/2026-06-14_runtime_spine_hardening_goal.md present
+  - ✗ `hardening_score_at_least_75` (hardening_score_at_least) — hardening_status.current_score=70/100; requires >= 75/100 before this track can render shippable
 
-## `loop-closure-2026-06` — 3/5
+## `loop-closure-2026-06` — SHIPPABLE
 
 - serves: `substrate-nativeness` · complements: ['runtime-truth-reconciliation-2026-06'] · depends_on: [] · conflicts_with: []
 - owned_surfaces: ['reports/loop_closure/**', 'CYBERNETIC_LOOP_MAP.md']
@@ -75,8 +76,14 @@ Active tracks: **11** (warn 11, max 11) — shippable 7
   - ✓ `phase0_dossier_exists` (file_exists) — reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md present
   - ✓ `phase0_fresh_status_table` (file_contains) — pattern 'Fresh 13-loop status table' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md
   - ✓ `one_wire_invariant_stated` (file_contains) — pattern 'never let internal artifacts touch archive fitness' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md
-  - ✗ `loop1_closure_receipt_exists` (file_exists) — reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md MISSING
-  - ✗ `campaign_retrospective_exists` (file_exists) — reports/loop_closure/RETROSPECTIVE.md MISSING
+  - ✓ `cybernetics_codex_manifest_registered` (file_contains) — pattern 'id: cybernetics_codex' found in ACTIVE_SURFACE_MANIFEST.yaml
+  - ✓ `cybernetics_codex_seed_exists` (file_exists) — docs/agents/cybernetics_codex/agent.seed.yaml present
+  - ✓ `cybernetics_codex_soul_exists` (file_exists) — docs/agents/cybernetics_codex/SOUL.md present
+  - ✓ `cybernetics_codex_context_desk_exists` (file_exists) — docs/agents/cybernetics_codex/CONTEXT_ENGINEERING.md present
+  - ✓ `cybernetics_codex_audit_script_exists` (file_exists) — scripts/governance/cybernetics_codex_audit.py present
+  - ✓ `cybernetics_codex_registration_script_exists` (file_exists) — scripts/governance/register_cybernetics_codex.py present
+  - ✓ `loop1_closure_receipt_exists` (file_exists) — reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md present
+  - ✓ `campaign_retrospective_exists` (file_exists) — reports/loop_closure/RETROSPECTIVE.md present
 
 ## `orientation-graph-2026-06` — SHIPPABLE
 
@@ -134,7 +141,7 @@ Active tracks: **11** (warn 11, max 11) — shippable 7
   - ✓ `hybrid_retriever_scope_consumes_semantic_commons` (file_contains) — pattern 'orientation_route' found in dharma_swarm/engine/hybrid_retriever.py
   - ✓ `retrieval_scope_runtime_test_exists` (file_contains) — pattern 'test_hybrid_retriever_exposes_semantic_commons_scope_first' found in tests/test_hybrid_retriever.py
 
-## `cybernetics-codex-stewardship-2026-06` — 10/12
+## `cybernetics-codex-stewardship-2026-06` — SHIPPABLE
 
 - serves: `research-depth` · complements: ['agent-admission-semantic-commons-2026-06'] · depends_on: ['loop-closure-2026-06'] · conflicts_with: []
 - owned_surfaces: ['docs/ops/CYBERNETICS_CODEX.md', 'docs/agents/cybernetics_codex/**', 'dharma_swarm/cybernetics_codex.py', 'scripts/governance/cybernetics_codex_audit.py', 'scripts/governance/register_cybernetics_codex.py', 'tests/test_cybernetics_codex.py', 'reports/loop_closure/cybernetics_codex/**']
@@ -151,8 +158,8 @@ Active tracks: **11** (warn 11, max 11) — shippable 7
   - ✓ `cybernetics_codex_audit_script_exists` (file_exists) — scripts/governance/cybernetics_codex_audit.py present
   - ✓ `cybernetics_codex_registration_script_exists` (file_exists) — scripts/governance/register_cybernetics_codex.py present
   - ✓ `cybernetics_codex_tests_exist` (file_exists) — tests/test_cybernetics_codex.py present
-  - ✗ `cybernetics_codex_admission_receipt_exists` (file_exists) — reports/loop_closure/cybernetics_codex/ADMISSION_RECEIPT.md MISSING
-  - ✗ `cybernetics_codex_runtime_receipt_exists` (file_exists) — reports/loop_closure/cybernetics_codex/RUNTIME_HEARTBEAT_RECEIPT.md MISSING
+  - ✓ `cybernetics_codex_admission_receipt_exists` (file_exists) — reports/loop_closure/cybernetics_codex/ADMISSION_RECEIPT.md present
+  - ✓ `cybernetics_codex_runtime_receipt_exists` (file_exists) — reports/loop_closure/cybernetics_codex/RUNTIME_HEARTBEAT_RECEIPT.md present
 
 ## `telos-ai-morning-refinery-2026-06` — 6/7
 
@@ -168,9 +175,9 @@ Active tracks: **11** (warn 11, max 11) — shippable 7
   - ✓ `refinery_example_exists` (file_exists) — docs/research/telos_ai/refinery_examples/2026-06-13_ARTICULATE_ESSENCE_EXTRATOR_NODE_trial_001.md present
   - ✓ `telos_product_surface_registered` (file_contains) — pattern 'TELOS' found in PRODUCT_SURFACE.md
   - ✓ `consent_boundary_test_exists` (file_exists) — tests/test_telos_morning_refinery.py present
-  - ✗ `first_external_receipt_exists` (file_exists) — reports/telos_ai/FIRST_EXTERNAL_ACTED_RECEIPT.md MISSING
+  - ✗ `first_external_receipt_exists` (external_acted_receipt) — reports/telos_ai/FIRST_EXTERNAL_ACTED_RECEIPT.md MISSING
 
-## `helm-worldclass-terminal-2026-06` — 1/7
+## `helm-worldclass-terminal-2026-06` — SHIPPABLE
 
 - serves: `substrate-nativeness` · complements: [] · depends_on: [] · conflicts_with: []
 - owned_surfaces: ['terminal/**', 'docs/TERMINAL_TUI_TMUX_HARNESS_2026-04-02.md', 'docs/plans/2026-04-02-terminal-*.md', 'reports/terminal/**']
@@ -179,12 +186,12 @@ Active tracks: **11** (warn 11, max 11) — shippable 7
   - ✓ `terminal_package_exists` (file_exists) — terminal/package.json present
   - ✓ `terminal_app_exists` (file_exists) — terminal/src/app.tsx present
   - ✓ `app_test_exists` (file_exists) — terminal/tests/app.test.ts present
-  - ✗ `golden_capture_exists` (file_exists) — terminal/scripts/golden_capture.sh MISSING
-  - ✗ `ratchet_script_exists` (file_exists) — terminal/scripts/ratchet.sh MISSING
-  - ✗ `chat_golden_exists` (file_exists) — terminal/tests/golden/120x40/chat.txt MISSING
-  - ✗ `compact_shell_test_exists` (file_exists) — terminal/tests/compactShell.test.tsx MISSING
-  - ✗ `live_tmux_receipt_exists` (file_exists) — reports/terminal/HELM_WORLDCLASS_LIVE_TMUX_RECEIPT.md MISSING
-  - ✗ `merge_readiness_packet_exists` (file_exists) — reports/terminal/HELM_WORLDCLASS_CLOSEOUT.md MISSING
+  - ✓ `golden_capture_exists` (file_exists) — terminal/scripts/golden_capture.sh present
+  - ✓ `ratchet_script_exists` (file_exists) — terminal/scripts/ratchet.sh present
+  - ✓ `chat_golden_exists` (file_exists) — terminal/tests/golden/120x40/chat.txt present
+  - ✓ `compact_shell_test_exists` (file_exists) — terminal/tests/compactShell.test.tsx present
+  - ✓ `live_tmux_receipt_exists` (file_exists) — reports/terminal/HELM_WORLDCLASS_LIVE_TMUX_RECEIPT.md present
+  - ✓ `merge_readiness_packet_exists` (file_exists) — reports/terminal/HELM_WORLDCLASS_CLOSEOUT.md present
 
 ## `a2a-cloud-agent-bridge-2026-06` — SHIPPABLE
 
@@ -204,21 +211,15 @@ Active tracks: **11** (warn 11, max 11) — shippable 7
 
 ## Findings
 
-- **ERROR** `track-stale:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] verified_at is 27 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
 - **INFO** `track-shippable:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] all 11 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
-- **INFO** `track-shippable:runtime-truth-nats-2026-06`: [runtime-truth-nats-2026-06] all 3 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
-- **INFO** `track-shippable:runtime-truth-spine-adoption-2026-06`: [runtime-truth-spine-adoption-2026-06] all 9 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
-- **INFO** `track-in-progress:loop-closure-2026-06`: [loop-closure-2026-06] 3/5 completion criteria pass.
+- **INFO** `track-in-progress:runtime-truth-nats-2026-06`: [runtime-truth-nats-2026-06] 1/3 completion criteria pass.
+- **ERROR** `track-stale:runtime-truth-spine-adoption-2026-06`: [runtime-truth-spine-adoption-2026-06] verified_at is 22 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.
+- **INFO** `track-in-progress:runtime-truth-spine-adoption-2026-06`: [runtime-truth-spine-adoption-2026-06] 9/10 completion criteria pass.
+- **INFO** `track-shippable:loop-closure-2026-06`: [loop-closure-2026-06] all 11 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
 - **INFO** `track-shippable:orientation-graph-2026-06`: [orientation-graph-2026-06] all 6 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
-- **ERROR** `track-stale:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] verified_at is 20 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
 - **INFO** `track-shippable:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] all 6 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
-- **ERROR** `track-stale:agent-admission-semantic-commons-2026-06`: [agent-admission-semantic-commons-2026-06] verified_at is 17 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
 - **INFO** `track-shippable:agent-admission-semantic-commons-2026-06`: [agent-admission-semantic-commons-2026-06] all 16 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
-- **ERROR** `track-stale:cybernetics-codex-stewardship-2026-06`: [cybernetics-codex-stewardship-2026-06] verified_at is 17 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
-- **INFO** `track-in-progress:cybernetics-codex-stewardship-2026-06`: [cybernetics-codex-stewardship-2026-06] 10/12 completion criteria pass.
-- **ERROR** `track-stale:telos-ai-morning-refinery-2026-06`: [telos-ai-morning-refinery-2026-06] verified_at is 17 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
+- **INFO** `track-shippable:cybernetics-codex-stewardship-2026-06`: [cybernetics-codex-stewardship-2026-06] all 12 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
 - **INFO** `track-in-progress:telos-ai-morning-refinery-2026-06`: [telos-ai-morning-refinery-2026-06] 6/7 completion criteria pass.
-- **ERROR** `track-stale:helm-worldclass-terminal-2026-06`: [helm-worldclass-terminal-2026-06] verified_at is 17 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
-- **INFO** `track-in-progress:helm-worldclass-terminal-2026-06`: [helm-worldclass-terminal-2026-06] 1/7 completion criteria pass.
-- **ERROR** `track-stale:a2a-cloud-agent-bridge-2026-06`: [a2a-cloud-agent-bridge-2026-06] verified_at is 17 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
+- **INFO** `track-shippable:helm-worldclass-terminal-2026-06`: [helm-worldclass-terminal-2026-06] all 7 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
 - **INFO** `track-shippable:a2a-cloud-agent-bridge-2026-06`: [a2a-cloud-agent-bridge-2026-06] all 7 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.

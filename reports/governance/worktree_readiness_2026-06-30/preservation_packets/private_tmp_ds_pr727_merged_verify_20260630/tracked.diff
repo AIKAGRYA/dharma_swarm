@@ -1,0 +1,320 @@
+diff --git a/reports/governance/active_track_evidence.json b/reports/governance/active_track_evidence.json
+index d4d7b8ec6..988518cf6 100644
+--- a/reports/governance/active_track_evidence.json
++++ b/reports/governance/active_track_evidence.json
+@@ -1,5 +1,5 @@
+ {
+-  "generated_at": "2026-06-26T10:44:18+09:00",
++  "generated_at": "2026-06-30T23:17:13+09:00",
+   "schema_version": 2,
+   "active_track_id": "runtime-truth-reconciliation-2026-06",
+   "shippable": true,
+@@ -111,7 +111,7 @@
+       "id": "operator_core_contracts_pass",
+       "kind": "test_passes",
+       "passed": true,
+-      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.41s",
++      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.38s",
+       "executed": true
+     }
+   ],
+@@ -298,7 +298,7 @@
+           "id": "operator_core_contracts_pass",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.41s",
++          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.38s",
+           "executed": true
+         }
+       ]
+@@ -363,14 +363,14 @@
+           "id": "nats_transport_tests_pass",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_nats_transport.py: PASS \u2014 6 passed in 0.84s",
++          "detail": "pytest tests/test_nats_transport.py: PASS \u2014 6 passed in 0.81s",
+           "executed": true
+         },
+         {
+           "id": "nats_substrate_contract_test_pass",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_nats_substrate_contract.py: PASS \u2014 1 passed in 0.28s",
++          "detail": "pytest tests/test_nats_substrate_contract.py: PASS \u2014 1 passed in 0.26s",
+           "executed": true
+         }
+       ]
+@@ -799,7 +799,7 @@
+           "id": "repo_context_projection_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 1.42s",
++          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 1.69s",
+           "executed": true
+         },
+         {
+@@ -1051,7 +1051,7 @@
+           "id": "precedence_invariant_test_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.26s",
++          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.25s",
+           "executed": true
+         },
+         {
+@@ -1393,7 +1393,7 @@
+           "id": "stage_contract_test_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_stage_contracts.py: PASS \u2014 13 passed in 0.18s",
++          "detail": "pytest tests/test_stage_contracts.py: PASS \u2014 13 passed in 0.13s",
+           "executed": true
+         },
+         {
+@@ -1407,7 +1407,7 @@
+           "id": "okf_roundtrip_test_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_okf_projection.py: PASS \u2014 8 passed in 0.19s",
++          "detail": "pytest tests/test_okf_projection.py: PASS \u2014 8 passed in 0.12s",
+           "executed": true
+         },
+         {
+@@ -1421,7 +1421,7 @@
+           "id": "semantic_fs_test_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_semantic_fs.py: PASS \u2014 5 passed in 0.19s",
++          "detail": "pytest tests/test_semantic_fs.py: PASS \u2014 5 passed in 0.14s",
+           "executed": true
+         },
+         {
+@@ -1435,14 +1435,14 @@
+           "id": "organizer_test_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_organizer.py: PASS \u2014 5 passed in 0.16s",
++          "detail": "pytest tests/test_organizer.py: PASS \u2014 5 passed in 0.10s",
+           "executed": true
+         },
+         {
+           "id": "fs_substrate_e2e_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_fs_substrate_e2e.py: PASS \u2014 4 passed in 4.08s",
++          "detail": "pytest tests/test_fs_substrate_e2e.py: PASS \u2014 4 passed in 3.86s",
+           "executed": true
+         }
+       ]
+@@ -1473,6 +1473,12 @@
+       "message": "[runtime-truth-reconciliation-2026-06] all 12 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
+       "criterion_id": null
+     },
++    {
++      "severity": "WARN",
++      "check": "track-stale:runtime-truth-nats-2026-06",
++      "message": "[runtime-truth-nats-2026-06] verified_at is 23 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.",
++      "criterion_id": null
++    },
+     {
+       "severity": "INFO",
+       "check": "track-shippable:runtime-truth-nats-2026-06",
+diff --git a/reports/governance/active_track_evidence.md b/reports/governance/active_track_evidence.md
+index 7cbdaeb35..5a05415fd 100644
+--- a/reports/governance/active_track_evidence.md
++++ b/reports/governance/active_track_evidence.md
+@@ -1,6 +1,6 @@
+ # Track Portfolio Evidence
+ 
+-Generated: 2026-06-26T10:44:18+09:00 (schema v2)
++Generated: 2026-06-30T23:17:13+09:00 (schema v2)
+ Active tracks: **10** (warn 5, max 10) — shippable 6
+ 
+ ## Spine coverage
+@@ -29,7 +29,7 @@ Active tracks: **10** (warn 5, max 10) — shippable 6
+   - ✓ `correlation_spine_manifest_still_declared` (file_contains) — pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml
+   - ✓ `evidence_receipt_still_defined` (file_contains) — pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py
+   - ✓ `runtime_receipt_still_defined` (file_contains) — pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py
+-  - ✓ `operator_core_contracts_pass` (test_passes) — pytest tests/test_operator_core_contracts.py: PASS — 7 passed in 0.41s
++  - ✓ `operator_core_contracts_pass` (test_passes) — pytest tests/test_operator_core_contracts.py: PASS — 7 passed in 0.38s
+ 
+ ## `runtime-truth-nats-2026-06` — SHIPPABLE
+ 
+@@ -40,8 +40,8 @@ Active tracks: **10** (warn 5, max 10) — shippable 6
+   - ✓ `nats_master_spec_exists` (file_exists) — docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present
+   - ✓ `nats_master_spec_present` (file_exists) — docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present
+   - ✓ `nats_transport_landed` (file_contains) — pattern 'NATS' found in docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
+-  - ✓ `nats_transport_tests_pass` (test_passes) — pytest tests/test_nats_transport.py: PASS — 6 passed in 0.84s
+-  - ✓ `nats_substrate_contract_test_pass` (test_passes) — pytest tests/test_nats_substrate_contract.py: PASS — 1 passed in 0.28s
++  - ✓ `nats_transport_tests_pass` (test_passes) — pytest tests/test_nats_transport.py: PASS — 6 passed in 0.81s
++  - ✓ `nats_substrate_contract_test_pass` (test_passes) — pytest tests/test_nats_substrate_contract.py: PASS — 1 passed in 0.26s
+ 
+ ## `runtime-truth-spine-adoption-2026-06` — 7/8
+ 
+@@ -104,7 +104,7 @@ Active tracks: **10** (warn 5, max 10) — shippable 6
+   - ✓ `nats_e2e_shell_wrapper_exists` (file_exists) — scripts/governance/run_truth_graph_nats_e2e_demo.sh present
+   - ✓ `a2a_gate_tests_exist` (file_contains) — pattern "receipt or it didn't happen" found in tests/test_a2a_gate.py
+   - ✓ `registry_presence_tests_exist` (file_contains) — pattern 'heartbeat_status' found in tests/test_agent_registry_presence.py
+-  - ✓ `repo_context_projection_passes` (test_passes) — pytest tests/test_truth_graph_repo_context.py: PASS — 1 passed in 1.42s
++  - ✓ `repo_context_projection_passes` (test_passes) — pytest tests/test_truth_graph_repo_context.py: PASS — 1 passed in 1.69s
+   - ✓ `truth_graph_projection_on_main` (commit_on_main) — 936d365db is an ancestor of origin/main
+ 
+ ## `composer-holon-spine-longrun-2026-06` — SHIPPABLE
+@@ -141,7 +141,7 @@ Active tracks: **10** (warn 5, max 10) — shippable 6
+   - ✓ `power_first_default` (file_contains) — pattern 'power_first' found in dharma_swarm/provider_policy.py
+   - ✓ `zhipu_provider_enum` (file_contains) — pattern 'ZHIPU' found in dharma_swarm/models.py
+   - ✓ `zhipu_provider_class` (file_contains) — pattern 'class ZhipuProvider' found in dharma_swarm/providers.py
+-  - ✓ `precedence_invariant_test_passes` (test_passes) — pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS — 1 passed in 0.26s
++  - ✓ `precedence_invariant_test_passes` (test_passes) — pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS — 1 passed in 0.25s
+   - ✓ `stage4_precedence_locked_on_main` (commit_on_main) — bc110d84 is an ancestor of origin/main
+ 
+ ## `orchestration-arena-v1-2026-06` — 9/9
+@@ -191,14 +191,14 @@ Active tracks: **10** (warn 5, max 10) — shippable 6
+   - ✓ `dossier_carries_organism_tie` (file_contains) — pattern 'How this serves the organism' found in docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md
+   - ✓ `stage_contract_reader_exists` (file_contains) — pattern 'class StageContract' found in dharma_swarm/fs_substrate/stage_contracts.py
+   - ✓ `stage_reader_routes_through_spine` (file_contains) — pattern 'invoke_agent' found in dharma_swarm/fs_substrate/stage_executor.py
+-  - ✓ `stage_contract_test_passes` (test_passes) — pytest tests/test_stage_contracts.py: PASS — 13 passed in 0.18s
++  - ✓ `stage_contract_test_passes` (test_passes) — pytest tests/test_stage_contracts.py: PASS — 13 passed in 0.13s
+   - ✓ `okf_projector_exists` (file_contains) — pattern 'def project_semantic_objects' found in dharma_swarm/fs_substrate/okf.py
+-  - ✓ `okf_roundtrip_test_passes` (test_passes) — pytest tests/test_okf_projection.py: PASS — 8 passed in 0.19s
++  - ✓ `okf_roundtrip_test_passes` (test_passes) — pytest tests/test_okf_projection.py: PASS — 8 passed in 0.12s
+   - ✓ `semantic_fs_facade_exists` (file_contains) — pattern 'def semantic_retrieve' found in dharma_swarm/fs_substrate/semantic_fs.py
+-  - ✓ `semantic_fs_test_passes` (test_passes) — pytest tests/test_semantic_fs.py: PASS — 5 passed in 0.19s
++  - ✓ `semantic_fs_test_passes` (test_passes) — pytest tests/test_semantic_fs.py: PASS — 5 passed in 0.14s
+   - ✓ `organizer_dry_run_first_exists` (file_contains) — pattern 'def propose_organization' found in dharma_swarm/fs_substrate/organizer.py
+-  - ✓ `organizer_test_passes` (test_passes) — pytest tests/test_organizer.py: PASS — 5 passed in 0.16s
+-  - ✓ `fs_substrate_e2e_passes` (test_passes) — pytest tests/test_fs_substrate_e2e.py: PASS — 4 passed in 4.08s
++  - ✓ `organizer_test_passes` (test_passes) — pytest tests/test_organizer.py: PASS — 5 passed in 0.10s
++  - ✓ `fs_substrate_e2e_passes` (test_passes) — pytest tests/test_fs_substrate_e2e.py: PASS — 4 passed in 3.86s
+ 
+ ## Findings
+ 
+@@ -206,6 +206,7 @@ Active tracks: **10** (warn 5, max 10) — shippable 6
+ - **WARN** `spine-uncovered:research-depth`: Spine objective 'research-depth' has no ACTIVE track serving it (coverage gap).
+ - **WARN** `spine-uncovered:revenue-external-humans-served`: Spine objective 'revenue-external-humans-served' has no ACTIVE track serving it (coverage gap).
+ - **INFO** `track-shippable:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] all 12 criteria pass, rigorous evidence present, no open blockers — SHIPPABLE (rigorous bar). Close it.
++- **WARN** `track-stale:runtime-truth-nats-2026-06`: [runtime-truth-nats-2026-06] verified_at is 23 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.
+ - **INFO** `track-shippable:runtime-truth-nats-2026-06`: [runtime-truth-nats-2026-06] all 4 criteria pass, rigorous evidence present, no open blockers — SHIPPABLE (rigorous bar). Close it.
+ - **INFO** `track-in-progress:runtime-truth-spine-adoption-2026-06`: [runtime-truth-spine-adoption-2026-06] 7/8 completion criteria pass.
+ - **INFO** `track-in-progress:loop-closure-2026-06`: [loop-closure-2026-06] 10/11 completion criteria pass.
+diff --git a/reports/governance/track_portfolio.json b/reports/governance/track_portfolio.json
+index d4d7b8ec6..988518cf6 100644
+--- a/reports/governance/track_portfolio.json
++++ b/reports/governance/track_portfolio.json
+@@ -1,5 +1,5 @@
+ {
+-  "generated_at": "2026-06-26T10:44:18+09:00",
++  "generated_at": "2026-06-30T23:17:13+09:00",
+   "schema_version": 2,
+   "active_track_id": "runtime-truth-reconciliation-2026-06",
+   "shippable": true,
+@@ -111,7 +111,7 @@
+       "id": "operator_core_contracts_pass",
+       "kind": "test_passes",
+       "passed": true,
+-      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.41s",
++      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.38s",
+       "executed": true
+     }
+   ],
+@@ -298,7 +298,7 @@
+           "id": "operator_core_contracts_pass",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.41s",
++          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.38s",
+           "executed": true
+         }
+       ]
+@@ -363,14 +363,14 @@
+           "id": "nats_transport_tests_pass",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_nats_transport.py: PASS \u2014 6 passed in 0.84s",
++          "detail": "pytest tests/test_nats_transport.py: PASS \u2014 6 passed in 0.81s",
+           "executed": true
+         },
+         {
+           "id": "nats_substrate_contract_test_pass",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_nats_substrate_contract.py: PASS \u2014 1 passed in 0.28s",
++          "detail": "pytest tests/test_nats_substrate_contract.py: PASS \u2014 1 passed in 0.26s",
+           "executed": true
+         }
+       ]
+@@ -799,7 +799,7 @@
+           "id": "repo_context_projection_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 1.42s",
++          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 1.69s",
+           "executed": true
+         },
+         {
+@@ -1051,7 +1051,7 @@
+           "id": "precedence_invariant_test_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.26s",
++          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.25s",
+           "executed": true
+         },
+         {
+@@ -1393,7 +1393,7 @@
+           "id": "stage_contract_test_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_stage_contracts.py: PASS \u2014 13 passed in 0.18s",
++          "detail": "pytest tests/test_stage_contracts.py: PASS \u2014 13 passed in 0.13s",
+           "executed": true
+         },
+         {
+@@ -1407,7 +1407,7 @@
+           "id": "okf_roundtrip_test_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_okf_projection.py: PASS \u2014 8 passed in 0.19s",
++          "detail": "pytest tests/test_okf_projection.py: PASS \u2014 8 passed in 0.12s",
+           "executed": true
+         },
+         {
+@@ -1421,7 +1421,7 @@
+           "id": "semantic_fs_test_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_semantic_fs.py: PASS \u2014 5 passed in 0.19s",
++          "detail": "pytest tests/test_semantic_fs.py: PASS \u2014 5 passed in 0.14s",
+           "executed": true
+         },
+         {
+@@ -1435,14 +1435,14 @@
+           "id": "organizer_test_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_organizer.py: PASS \u2014 5 passed in 0.16s",
++          "detail": "pytest tests/test_organizer.py: PASS \u2014 5 passed in 0.10s",
+           "executed": true
+         },
+         {
+           "id": "fs_substrate_e2e_passes",
+           "kind": "test_passes",
+           "passed": true,
+-          "detail": "pytest tests/test_fs_substrate_e2e.py: PASS \u2014 4 passed in 4.08s",
++          "detail": "pytest tests/test_fs_substrate_e2e.py: PASS \u2014 4 passed in 3.86s",
+           "executed": true
+         }
+       ]
+@@ -1473,6 +1473,12 @@
+       "message": "[runtime-truth-reconciliation-2026-06] all 12 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
+       "criterion_id": null
+     },
++    {
++      "severity": "WARN",
++      "check": "track-stale:runtime-truth-nats-2026-06",
++      "message": "[runtime-truth-nats-2026-06] verified_at is 23 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.",
++      "criterion_id": null
++    },
+     {
+       "severity": "INFO",
+       "check": "track-shippable:runtime-truth-nats-2026-06",

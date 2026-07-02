@@ -1,0 +1,13 @@
+## chore/render-on-demand-stop-churn-20260625...origin/main [behind 37]
+ M .github/workflows/active-track.yml
+ M .gitignore
+ M CLAUDE.md
+D  docs/docops/AUTO_INVENTORY.md
+ M docs/governance/BUILD_SESSION_ENTRYPOINT.md
+ M docs/governance/REPO_GOVERNANCE_AUDIT.md
+ M docs/governance/SOVEREIGN_MANIFEST.md
+D  reports/governance/active_track_evidence.json
+D  reports/governance/active_track_evidence.md
+D  reports/governance/track_portfolio.json
+ M scripts/governance/agent_onboard.py
+ M scripts/governance/render_active_track_includes.py

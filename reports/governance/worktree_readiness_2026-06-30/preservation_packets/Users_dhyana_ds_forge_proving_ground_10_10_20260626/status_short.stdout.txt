@@ -1,0 +1,26 @@
+## codex/dharma-forge-proving-ground-10-10-20260626...origin/main [behind 10]
+ M Makefile
+ M docs/ontology/SEMANTIC_COMMONS.md
+ M docs/ontology/semantic_aliases.yaml
+ M docs/ontology/semantic_objects.yaml
+?? benchmarks/fixtures/
+?? benchmarks/forge_real_benchmark_adapter.py
+?? docs/agent_tasks/2026-06-26_dharma_forge_proving_ground_10_10_readiness_goal.md
+?? docs/governance/FORGE_NAMING_BOUNDARY.md
+?? docs/governance/proposed_tracks/dharma-forge-proving-ground-10-10-2026-06.yaml
+?? scripts/runtime/forge_external_benchmark_proof.py
+?? scripts/runtime/forge_provider_oracle.py
+?? scripts/runtime/forge_proving_ground_autoresearch.py
+?? scripts/runtime/forge_proving_ground_lib.py
+?? scripts/runtime/forge_proving_ground_patch_sandbox.py
+?? scripts/runtime/forge_proving_ground_readiness.py
+?? scripts/runtime/forge_proving_ground_run.py
+?? scripts/runtime/forge_proving_ground_verifier.py
+?? tests/test_forge_external_benchmark_proof.py
+?? tests/test_forge_provider_oracle.py
+?? tests/test_forge_proving_ground_autoresearch.py
+?? tests/test_forge_proving_ground_patch_sandbox.py
+?? tests/test_forge_proving_ground_readiness.py
+?? tests/test_forge_proving_ground_run.py
+?? tests/test_forge_proving_ground_verifier.py
+?? tests/test_forge_real_benchmark_adapter.py

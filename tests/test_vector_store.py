@@ -11,6 +11,7 @@ Tests cover:
     - Stats reporting
 """
 
+import json
 from datetime import datetime, timezone, timedelta
 
 import pytest
@@ -85,6 +86,28 @@ class TestTFIDFEmbedder:
         vecs = emb.embed(["hello"])
         assert len(vecs) == 1
         assert len(vecs[0]) == 16
+
+    def test_fit_on_embed_false_does_not_persist_query_corpus(self, tmp_path):
+        from dharma_swarm.vector_store import TFIDFEmbedder
+
+        state_path = tmp_path / "emb.pkl"
+        emb = TFIDFEmbedder(dim=16, state_path=state_path, fit_on_embed=False)
+        vecs = emb.embed(["xyzzq impossible memory topic lunar cheese invoice"])
+
+        assert vecs == [[0.0] * 16]
+        assert not state_path.exists()
+
+    def test_fit_replace_overwrites_persisted_corpus(self, tmp_path):
+        from dharma_swarm.vector_store import TFIDFEmbedder
+
+        state_path = tmp_path / "emb.pkl"
+        emb = TFIDFEmbedder(dim=16, state_path=state_path)
+        emb.fit_add(["poisoned query corpus lunar cheese invoice"])
+
+        emb.fit_replace(["trusted memory kernel retrieval corpus"])
+
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        assert state["corpus"] == ["trusted memory kernel retrieval corpus"]
 
 
 # ---------------------------------------------------------------------------
@@ -237,6 +260,129 @@ class TestVectorStoreSearch:
         monkeypatch.setattr(store, "_fallback_vector_search", _explode)
 
         assert store.search_vector("heartbeat organism health", top_k=3) == []
+
+    def test_search_vector_rejects_degenerate_multitoken_query_embedding(self, tmp_path):
+        """Degenerate query vectors should not return high-confidence false hits."""
+
+        class DegenerateEmbedder:
+            dim = 4
+
+            def fit_add(self, _texts):
+                pass
+
+            def embed(self, texts):
+                return [[1.0, 0.0, 0.0, 0.0] for _ in texts]
+
+        from dharma_swarm.vector_store import VectorStore
+
+        store = VectorStore(state_dir=tmp_path, embedder=DegenerateEmbedder(), dim=4)
+        store.upsert("Known document about heartbeat health", source="heartbeat")
+
+        assert store.search_vector("impossible unrelated multi token query", top_k=3) == []
+
+    def test_search_vector_does_not_persist_query_only_corpus(self, tmp_path):
+        from dharma_swarm.vector_store import VectorStore
+
+        store = VectorStore(state_dir=tmp_path, dim=16)
+        state_path = tmp_path / "tfidf_embedder.pkl"
+
+        assert store.search_vector("xyzzq impossible memory topic lunar cheese invoice") == []
+        assert not state_path.exists()
+
+    def test_upsert_persists_document_corpus_for_default_store(self, tmp_path):
+        from dharma_swarm.vector_store import VectorStore
+
+        store = VectorStore(state_dir=tmp_path, dim=16)
+        doc = "MemoryKernel governed retrieval admission preview"
+
+        assert store.upsert(doc, source="doc:memory-kernel") > 0
+
+        state_path = tmp_path / "tfidf_embedder.pkl"
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        assert doc in state["corpus"]
+
+    def test_search_vector_prefers_memory_retrieval_projection(self, tmp_path):
+        from dharma_swarm.vector_store import VectorStore
+
+        store = VectorStore(state_dir=tmp_path, dim=32)
+        stale_id = store.upsert(
+            "Evolution archive gauntlet result with unrelated stale vectors",
+            source="evolution_archive:test",
+            layer="development",
+        )
+        doc = "Orchestrator async task routing engine"
+        doc_id = store.upsert(doc, source="doc:orchestrator", layer="source_file")
+        conn = store._connect()
+        try:
+            conn.execute(
+                """
+                CREATE TABLE memory_retrieval_docs (
+                    vec_doc_id INTEGER PRIMARY KEY,
+                    content TEXT NOT NULL,
+                    source TEXT DEFAULT '',
+                    valid_until TEXT
+                )
+                """
+            )
+            conn.execute(
+                """
+                INSERT INTO memory_retrieval_docs
+                    (vec_doc_id, content, source, valid_until)
+                VALUES (?, ?, ?, NULL)
+                """,
+                (doc_id, doc, "doc:orchestrator"),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        results = store.search_vector("orchestrator async task routing engine", top_k=3)
+
+        assert results
+        assert results[0]["id"] == doc_id
+        assert stale_id not in {row["id"] for row in results}
+
+    def test_search_vector_memory_projection_rejects_generic_false_positive(self, tmp_path):
+        from dharma_swarm.vector_store import VectorStore
+
+        store = VectorStore(state_dir=tmp_path, dim=32)
+        doc_id = store.upsert(
+            "Memory graph relation: orchestrator validates dharma swarm",
+            source="memory_relation:orchestrator:validates:dharma_swarm",
+            layer="memory_graph",
+        )
+        conn = store._connect()
+        try:
+            conn.execute(
+                """
+                CREATE TABLE memory_retrieval_docs (
+                    vec_doc_id INTEGER PRIMARY KEY,
+                    content TEXT NOT NULL,
+                    source TEXT DEFAULT '',
+                    valid_until TEXT
+                )
+                """
+            )
+            conn.execute(
+                """
+                INSERT INTO memory_retrieval_docs
+                    (vec_doc_id, content, source, valid_until)
+                VALUES (?, ?, ?, NULL)
+                """,
+                (
+                    doc_id,
+                    "Memory graph relation: orchestrator validates dharma swarm",
+                    "memory_relation:orchestrator:validates:dharma_swarm",
+                ),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        assert store.search_vector(
+            "xyzzq impossible memory topic lunar cheese invoice",
+            top_k=3,
+        ) == []
 
     def test_search_fts_skips_large_projection(self, monkeypatch, tmp_path):
         """Large FTS projections must not block daemon-time retrieval."""

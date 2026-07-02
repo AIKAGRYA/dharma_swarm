@@ -1,0 +1,27 @@
+# branch.oid f84f40344cbdfab9d236239b0d3ec00718e10bf9
+# branch.head codex/active-track-graduation-20260630
+# branch.upstream origin/main
+# branch.ab +0 -0
+1 .M N... 100644 100644 100644 d5824764ec83c65c740d723d6d266c28ee552079 d5824764ec83c65c740d723d6d266c28ee552079 CLAUDE.md
+1 .M N... 100644 100644 100644 c03d54531ca9cc6bbdfc4729b51e97c82e737c17 c03d54531ca9cc6bbdfc4729b51e97c82e737c17 docs/governance/ACTIVE_TRACK.yaml
+1 .M N... 100644 100644 100644 031b2954f9f46139b1ceff715a13179728c9138c 031b2954f9f46139b1ceff715a13179728c9138c docs/governance/BUILD_SESSION_ENTRYPOINT.md
+1 .M N... 100644 100644 100644 bd2cd1c18044f0e59a75c5ebb23d151d26a2c5ff bd2cd1c18044f0e59a75c5ebb23d151d26a2c5ff docs/governance/SOVEREIGN_MANIFEST.md
+1 AM N... 000000 100644 100644 0000000000000000000000000000000000000000 d0e44bfa00694716212de30dbd6714080cbbdd6c reports/governance/ACTIVE_TRACK_CLOSEOUT_2026-06-30.md
+1 .M N... 100644 100644 100644 d4d7b8ec65504304f9861975bc82ebdeb9f6085a d4d7b8ec65504304f9861975bc82ebdeb9f6085a reports/governance/active_track_evidence.json
+1 .M N... 100644 100644 100644 7cbdaeb35ab0eedcea747b6c267e10da513020a9 7cbdaeb35ab0eedcea747b6c267e10da513020a9 reports/governance/active_track_evidence.md
+1 .M N... 100644 100644 100644 d4d7b8ec65504304f9861975bc82ebdeb9f6085a d4d7b8ec65504304f9861975bc82ebdeb9f6085a reports/governance/track_portfolio.json
+1 .M N... 100644 100644 100644 dea2e15cbbf6df71ced8529db02c6e0cebc77592 dea2e15cbbf6df71ced8529db02c6e0cebc77592 tests/test_track_closure_rigor.py
+? reports/agentops/decorrelated_review_council/20260630T143837Z-active-track-graduation-closeout-20260630-hold_blockers.json
+? reports/agentops/decorrelated_review_council/20260630T143837Z-active-track-graduation-closeout-20260630-hold_blockers.md
+? reports/agentops/decorrelated_review_council/20260630T144107Z-active-track-graduation-closeout-20260630-hold_blockers.json
+? reports/agentops/decorrelated_review_council/20260630T144107Z-active-track-graduation-closeout-20260630-hold_blockers.md
+? reports/agentops/decorrelated_review_council/20260630T145627Z-active-track-graduation-closeout-20260630-v2-hold_blockers.json
+? reports/agentops/decorrelated_review_council/20260630T145627Z-active-track-graduation-closeout-20260630-v2-hold_blockers.md
+? reports/agentops/decorrelated_review_council/20260630T145938Z-active-track-graduation-closeout-20260630-v3-attached-evidence-hold_blockers.json
+? reports/agentops/decorrelated_review_council/20260630T145938Z-active-track-graduation-closeout-20260630-v3-attached-evidence-hold_blockers.md
+? reports/agentops/decorrelated_review_council/20260630T150101Z-active-track-graduation-closeout-20260630-local-substitute-triple-hold_blockers.json
+? reports/agentops/decorrelated_review_council/20260630T150101Z-active-track-graduation-closeout-20260630-local-substitute-triple-hold_blockers.md
+? reports/agentops/decorrelated_review_council/20260630T150235Z-active-track-graduation-closeout-20260630-local-substitute-triple-rerun-hold_blockers.json
+? reports/agentops/decorrelated_review_council/20260630T150235Z-active-track-graduation-closeout-20260630-local-substitute-triple-rerun-hold_blockers.md
+? reports/agentops/decorrelated_review_council/prompts/active-track-graduation-closeout-v2.md
+? reports/agentops/decorrelated_review_council/prompts/active-track-graduation-closeout.md

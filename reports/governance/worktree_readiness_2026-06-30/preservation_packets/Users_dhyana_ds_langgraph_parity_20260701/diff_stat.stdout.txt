@@ -1,0 +1,17 @@
+ dharma_swarm/langgraph_parity/benchmark.py         |    2 +
+ dharma_swarm/langgraph_parity/benchmark_runner.py  |  271 +-
+ dharma_swarm/langgraph_parity/benchmark_types.py   |   29 +
+ dharma_swarm/models.py                             |    3 +
+ dharma_swarm/orchestrator.py                       |  210 +-
+ reports/governance/active_track_evidence.json      |  221 +-
+ reports/governance/active_track_evidence.md        |   62 +-
+ reports/governance/track_portfolio.json            |  221 +-
+ .../benchmark/benchmark_receipt.json               |   28 +-
+ .../benchmark/benchmark_report.json                | 3077 +++++++++++++++++++-
+ .../langgraph_parity/benchmark/benchmark_report.md |   74 +-
+ tests/test_langgraph_parity_isolation_benchmark.py |    7 +
+ tests/test_orchestrator.py                         |   64 +
+ tests/test_orchestrator_spine_dispatch.py          |   18 +-
+ tests/test_topology_execution.py                   |   68 +
+ uv.lock                                            |  156 +-
+ 16 files changed, 4188 insertions(+), 323 deletions(-)

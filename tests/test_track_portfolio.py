@@ -15,13 +15,14 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts/governance"))
 
 from check_track_status import (  # type: ignore  # noqa: E402
+    EXTERNAL_ACTED_RECEIPT_REQUIRED_FIELDS,
+    evaluate_criterion,
     normalize_portfolio,
     validate_portfolio_graph,
     validate_readiness_score_caps,
     readiness_score_cap,
     detect_dependency_cycle,
     _parse_minimal_yaml,
-    _resolve_command_for_current_runtime,
     Finding,
 )
 
@@ -272,21 +273,122 @@ def test_scalar_nested_flow_list_degrades_gracefully() -> None:
     assert p["active_tracks"][0]["id"] == "a"
 
 
-# --- executable criteria portability ---------------------------------------
+# --- external acted receipt predicate --------------------------------------
 
-def test_command_passes_resolves_pytest_to_current_interpreter() -> None:
-    resolved = _resolve_command_for_current_runtime(["pytest", "-q", "tests/test_nats_transport.py"])
+def _receipt_criterion(path: Path) -> dict[str, str]:
+    return {
+        "id": "first_external_receipt_exists",
+        "kind": "external_acted_receipt",
+        "file": str(path),
+    }
 
-    assert resolved[:3] == [sys.executable, "-m", "pytest"]
-    assert resolved[3:] == ["-q", "tests/test_nats_transport.py"]
+
+def test_external_acted_receipt_missing_fails(tmp_path: Path) -> None:
+    missing = tmp_path / "FIRST_EXTERNAL_ACTED_RECEIPT.md"
+
+    result = evaluate_criterion(_receipt_criterion(missing))
+
+    assert result.id == "first_external_receipt_exists"
+    assert result.kind == "external_acted_receipt"
+    assert result.passed is False
+    assert "MISSING" in result.detail
 
 
-def test_command_passes_resolves_missing_repo_venv(monkeypatch) -> None:
-    monkeypatch.setattr("check_track_status.Path.exists", lambda _path: False)
+def test_external_acted_receipt_rejects_operator_packet_or_template(tmp_path: Path) -> None:
+    fake = tmp_path / "FIRST_EXTERNAL_ACTED_RECEIPT.md"
+    lines = [
+        "# Fake receipt",
+        "**Status:** operator handoff only; not an external acted receipt",
+        *[f"- `{field}`: filled" for field in EXTERNAL_ACTED_RECEIPT_REQUIRED_FIELDS],
+    ]
+    fake.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-    resolved = _resolve_command_for_current_runtime(["./.venv/bin/python", "scripts/check.py"])
+    result = evaluate_criterion(_receipt_criterion(fake))
 
-    assert resolved == [sys.executable, "scripts/check.py"]
+    assert result.passed is False
+    assert "forbidden non-receipt marker" in result.detail
+
+
+def test_external_acted_receipt_accepts_minimal_redacted_receipt(tmp_path: Path) -> None:
+    receipt = tmp_path / "FIRST_EXTERNAL_ACTED_RECEIPT.md"
+    lines = ["# First External Acted Receipt"]
+    lines.extend(f"{field}: redacted proof value" for field in EXTERNAL_ACTED_RECEIPT_REQUIRED_FIELDS)
+    receipt.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    result = evaluate_criterion(_receipt_criterion(receipt))
+
+    assert result.passed is True
+    assert "required acted-receipt fields" in result.detail
+
+
+# --- executable command predicate ------------------------------------------
+
+def test_command_passes_predicate_reports_exit_status() -> None:
+    passed = evaluate_criterion(
+        {
+            "id": "focused_gate",
+            "kind": "command_passes",
+            "command": [sys.executable, "-c", "print('ok')"],
+            "timeout_s": 10,
+        }
+    )
+    failed = evaluate_criterion(
+        {
+            "id": "focused_gate",
+            "kind": "command_passes",
+            "command": [sys.executable, "-c", "import sys; print('bad'); sys.exit(3)"],
+            "timeout_s": 10,
+        }
+    )
+
+    assert passed.passed is True
+    assert "exited 0" in passed.detail
+    assert failed.passed is False
+    assert "exited 3" in failed.detail
+    assert "bad" in failed.detail
+
+
+def test_command_passes_rejects_shell_string() -> None:
+    result = evaluate_criterion(
+        {
+            "id": "focused_gate",
+            "kind": "command_passes",
+            "command": f"{sys.executable} -c 'print(1)'",
+        }
+    )
+
+    assert result.passed is False
+    assert "list of strings" in result.detail
+
+
+def test_hardening_score_at_least_blocks_flat_score() -> None:
+    track = {"hardening_status": {"current_score": 70, "scale": 100}}
+    result = evaluate_criterion(
+        {
+            "id": "score_gate",
+            "kind": "hardening_score_at_least",
+            "minimum": 75,
+        },
+        track=track,
+    )
+
+    assert result.id == "score_gate"
+    assert result.kind == "hardening_score_at_least"
+    assert result.passed is False
+    assert "70/100" in result.detail
+
+
+def test_hardening_score_at_least_passes_when_threshold_met() -> None:
+    track = {"hardening_status": {"current_score": 75, "scale": 100}}
+    result = evaluate_criterion(
+        {
+            "kind": "hardening_score_at_least",
+            "minimum": 75,
+        },
+        track=track,
+    )
+
+    assert result.passed is True
 
 
 # --- closed_tracks shape validation -----------------------------------------

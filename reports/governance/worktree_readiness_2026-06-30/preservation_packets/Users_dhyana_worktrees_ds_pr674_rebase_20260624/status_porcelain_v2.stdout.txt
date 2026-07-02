@@ -1,0 +1,7 @@
+# branch.oid ebccfb1e2d242f035ac7d9c7a10c3a1ed7d05edc
+# branch.head repair/pr674-track-closure-gate-20260624
+# branch.upstream origin/chore/reconcile-records-2026-06-22
+1 .M N... 100644 100644 100644 5a85b200864178a8193994a0fb30693a533d70b0 5a85b200864178a8193994a0fb30693a533d70b0 reports/governance/active_track_evidence.json
+1 .M N... 100644 100644 100644 cc2938638f129509210ef3ee1a2b122da46da6c7 cc2938638f129509210ef3ee1a2b122da46da6c7 reports/governance/active_track_evidence.md
+1 .M N... 100644 100644 100644 5a85b200864178a8193994a0fb30693a533d70b0 5a85b200864178a8193994a0fb30693a533d70b0 reports/governance/track_portfolio.json
+1 .M N... 100644 100644 100644 082996b7dc86f1b581028cd1d4029f049a98bd02 082996b7dc86f1b581028cd1d4029f049a98bd02 uv.lock

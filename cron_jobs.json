@@ -307,6 +307,16 @@
     "prompt": "Materialize ontology Outcome objects into runtime ArtifactRecords."
   },
   {
+    "id": "algedonic_triage",
+    "name": "Algedonic P0 Triage",
+    "trigger": "interval",
+    "interval_seconds": 900,
+    "handler": "algedonic_triage",
+    "timeout_sec": 60,
+    "enabled": true,
+    "prompt": "Drain ~/.dharma/algedonic_signals.jsonl into ~/.dharma/triage and raise ALERT when P0 conditions are present."
+  },
+  {
     "id": "staging_promote",
     "name": "Knowledge Staging Promote",
     "trigger": "interval",

@@ -25,6 +25,7 @@ MODEL_REGISTRY_FILES = {
     "dharma_swarm/model_catalog.py",
     "dharma_swarm/model_hierarchy.py",
     "dharma_swarm/model_manager.py",
+    "dharma_swarm/model_pool_registry.py",
     "dharma_swarm/model_registry.py",
     "dharma_swarm/model_routing.py",
     "dharma_swarm/ollama_config.py",

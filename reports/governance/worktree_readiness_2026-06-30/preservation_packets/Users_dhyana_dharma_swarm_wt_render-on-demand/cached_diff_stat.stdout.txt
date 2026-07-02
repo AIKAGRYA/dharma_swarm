@@ -1,0 +1,5 @@
+ docs/docops/AUTO_INVENTORY.md                 |   21 -
+ reports/governance/active_track_evidence.json | 1109 -------------------------
+ reports/governance/active_track_evidence.md   |  176 ----
+ reports/governance/track_portfolio.json       | 1109 -------------------------
+ 4 files changed, 2415 deletions(-)

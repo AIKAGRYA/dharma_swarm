@@ -84,17 +84,20 @@ Default resolution:
 - use only the grant-safe summary in ecological-facing artifacts
 - keep stronger numbers internal until `PHASE1_FINAL_REPORT.md` is restored
 
-### 3. Shipped intake vs emerging standards bridge
+### 3. Shipped intake vs active standards ingress
 
-- `GaiaPlatform.qualify_intake()` is a tested live gate.
-- `dharma_swarm/gaia_initiative.py` is a useful standards-aligned bridge, but
-  in the current worktree it is not yet part of the focused verified surface.
+- `GaiaPlatform.qualify_intake()` is the tested live gate.
+- `dharma_swarm/gaia_initiative.py` is already wired into
+  `GaiaPlatform`, exercised by `tests/test_gaia_platform.py`, and supports a
+  live `GaiaInitiativePilotPacket.to_pilot_intake()` ingress plus governed
+  initiative report path.
 
 Default resolution:
 
-- Phase 1 may reference `GaiaInitiativePilotPacket` as an adapter candidate
-- do not treat it as packet authority until it is tested and intentionally
-  promoted
+- treat `GaiaInitiativePilotPacket` as the preferred standards-aligned front
+  door when sponsor + project packets are available
+- keep canonical authority at `GaiaPilotIntake`,
+  `GaiaPlatform.qualify_intake()`, and the governed report / claim path
 
 ## Phase 1 Empirical Grounding
 
@@ -221,7 +224,7 @@ label it `provisional`.
 |---|---|---|---|---|
 | 0. Scope lock | pilot brief + mech policy note | proof-chain packet remains primary and mechanistic lane is labeled internal | June 20 spine + grant packet | anyone tries to make `R_V` a public-claim prerequisite |
 | 1. Measurement contract | activity + obligation basis | compute basis is labeled `measured`, `estimated`, or `disclosed` honestly | sponsor data or disclosure | measurement language overstates certainty |
-| 2. Qualification | qualified intake packet | consent, grievance, challenge path, and verification channels are explicit | `GaiaPlatform.qualify_intake()` | credibility or consent is unresolved |
+| 2. Qualification | qualified intake packet | consent, grievance, challenge path, and verification channels are explicit | `GaiaInitiativePilotPacket.to_pilot_intake()` + `GaiaPlatform.qualify_intake()` | credibility or consent is unresolved |
 | 3. Routing | reciprocity ledger packet | obligation, routing, and livelihood records compose without invariant drift | `AIReciprocityLedger` | routing outruns obligation or livelihood is nominal |
 | 4. Evidence and audit | evidence bundle + audit refs | ecological claim is challengeable before any `verified` label appears | evidence partners + auditor | public claim pressure exceeds audit readiness |
 | 5. Public proof | claim card + pilot report | the ecological claim stands on its own proof chain without mechanistic support | prior steps complete | narrative outruns evidence |
@@ -270,8 +273,8 @@ label it `provisional`.
 - stronger continuity numbers escape into public ecological language
 - `gaia_observer_function()` is misrepresented as the original transformer-side
   empirical pipeline
-- `gaia_initiative.py` is treated as authoritative before intentional
-  integration and test coverage
+- `gaia_initiative.py` is treated as replacing the canonical qualification /
+  report authority instead of feeding it
 - SAE decomposition expands scope before the proof-chain packet is real
 
 ## Escalation Matrix
@@ -281,7 +284,7 @@ label it `provisional`.
 | request to cite Layer 27 / Mistral / Pythia numbers publicly | raw authority is missing | downgrade to grant-safe summary or halt publication |
 | public claim depends on mechanistic evidence | scope inversion | block publication; ecological proof chain must stand alone |
 | GAIA drift score and ecological evidence disagree materially | possible proxy drift or instrumentation mismatch | open adaptive review and assign remediation owner |
-| `gaia_initiative.py` is promoted into planning as shipped authority | standards scope may outrun verified runtime | either test/promote intentionally or demote to adapter candidate |
+| `gaia_initiative.py` is treated as replacing `GaiaPlatform` authority | standards scope may outrun the governed proof boundary | route back through `to_pilot_intake()` + `qualify_intake()` and review authority order |
 | SAE work starts defining packet scope | tool expansion instead of mission progress | move to separate research lane |
 
 ## Recommended Packet Order

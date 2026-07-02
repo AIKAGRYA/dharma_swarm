@@ -86,6 +86,26 @@ def cmd_model_catalog(
     print(model_catalog_summary(selector=selector, as_json=as_json))
 
 
+def cmd_model_pool(
+    *,
+    as_json: bool = False,
+    limit: int = 40,
+    refresh_nim: bool = False,
+    include_ollama_list: bool = True,
+) -> None:
+    """Show the merged model pool registry."""
+    from dharma_swarm.model_pool_registry import model_pool_summary
+
+    print(
+        model_pool_summary(
+            as_json=as_json,
+            limit=limit,
+            refresh_nim=refresh_nim,
+            include_ollama_list=include_ollama_list,
+        )
+    )
+
+
 def cmd_free_fleet(
     tier: int | None = None,
     as_json: bool = False,

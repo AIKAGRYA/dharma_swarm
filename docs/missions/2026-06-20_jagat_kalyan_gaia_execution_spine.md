@@ -1,7 +1,7 @@
 # Jagat Kalyan / GAIA Execution Spine
 
 Date: 2026-06-20
-Updated: 2026-06-26
+Updated: 2026-06-28
 Status: hardened execution spine
 Thread: architectural
 Mission: Build ecological restoration coordination for AI carbon offset
@@ -50,9 +50,12 @@ Use as live runtime authority:
 - `dharma_swarm/gaia_platform.py`
 - `dharma_swarm/evaluation_registry.py`
 
-Use as standards-aligned adapter candidate, not primary packet authority yet:
+Use as standards-aligned ingress surface into the primary packet authority:
 
 - `dharma_swarm/gaia_initiative.py`
+
+Canonical packet authority still begins at `GaiaPilotIntake`,
+`GaiaPlatform.qualify_intake()`, and the governed report / claim path.
 
 Use as continuity, not authority:
 
@@ -60,7 +63,22 @@ Use as continuity, not authority:
 
 ## Exact Runtime Packet Path
 
-Phase 1 should run through the tested intake/report chain, not a new parallel stack:
+Preferred standards-aligned ingress when sponsor and initiative packetization is
+available:
+
+1. `GaiaPilotMeasurementContract`
+2. `GaiaRestorationInitiative`
+3. `GaiaInitiativePilotPacket`
+4. `GaiaInitiativePilotPacket.to_pilot_intake()`
+5. `GaiaPlatform.qualify_intake()`
+6. `GaiaQualificationDecision`
+7. `GaiaPlatform.build_initiative_pilot_report()` or
+   `GaiaPlatform.build_intake_pilot_report()`
+8. `GaiaClaimCard` + report artifacts + `AIReciprocityLedger` projection into
+   `GaiaLedger`
+9. monitoring, feedback, and remediation review
+
+Narrow-core direct ingress remains valid when no standards wrapper is present:
 
 1. `GaiaPilotIntake`
 2. `GaiaPlatform.qualify_intake()`
@@ -70,15 +88,26 @@ Phase 1 should run through the tested intake/report chain, not a new parallel st
    `GaiaLedger`
 6. monitoring, feedback, and remediation review
 
-Optional upstream adapter, only when intentionally integrated and verified:
-
-- `GaiaPilotMeasurementContract`
-- `GaiaRestorationInitiative`
-- `GaiaInitiativePilotPacket`
-- `GaiaInitiativePilotPacket.to_pilot_intake()`
-
 If work cannot be expressed through this chain, it is not Phase 1 execution. It
 is either upstream research or downstream expansion.
+
+## Current Leverage Snapshot — 2026-06-28
+
+- `dharma_swarm/gaia_initiative.py` is already wired into
+  `dharma_swarm/gaia_platform.py`, exercised in `tests/test_gaia_platform.py`,
+  and should be treated as an active ingress path rather than speculative future
+  scaffolding.
+- `GaiaPlatform.qualify_intake()` and the governed report path remain the
+  narrow canonical authority seam for Phase 1 qualification, visibility, and
+  claim issuance.
+- Public ecological artifacts may cite only the current grant-safe mechanistic
+  summary: `~400 measurements`, `6 architectures`, activation patching
+  `Cohen's d = -2.26`, `32/39` FDR-significant, `AUROC = 0.909`.
+- Missing external roots such as `~/jagat_kalyan` remain continuity-only until
+  restored on disk; they are not a prerequisite for the in-repo pilot packet.
+- The dominant blockers are now sponsor measurement honesty, operator /
+  community diligence, independent audit, and challenge-owner assignment, not
+  missing internal mathematical infrastructure.
 
 ## Hard Publication Invariant
 
@@ -367,14 +396,16 @@ Keep in higher-trust lanes:
 
 Build in this order:
 
-1. `pilot charter + non-goals`
+1. `pilot charter + sponsor/project/cohort freeze`
 2. `GaiaPilotMeasurementContract`
 3. `GaiaRestorationInitiative`
 4. `GaiaInitiativePilotPacket`
-5. `GaiaPilotIntake` + `GaiaQualificationDecision`
-6. routed ledger + evidence + audit packet
-7. claim card + pilot report
-8. adaptive review + remediation note
+5. `GaiaInitiativePilotPacket.to_pilot_intake()` +
+   `GaiaPlatform.qualify_intake()`
+6. `GaiaPlatform.build_initiative_pilot_report()` or
+   `GaiaPlatform.build_intake_pilot_report()`
+7. routed ledger + evidence + audit packet
+8. claim card + adaptive review + remediation note
 
 ## Acceptance Bar For Mission Completion
 

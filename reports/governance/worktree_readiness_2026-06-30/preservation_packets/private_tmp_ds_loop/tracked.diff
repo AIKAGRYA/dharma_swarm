@@ -1,0 +1,2183 @@
+diff --git a/schemas/expert_audit_output.schema.json b/schemas/expert_audit_output.schema.json
+index c478e003d..5f39d949f 100644
+--- a/schemas/expert_audit_output.schema.json
++++ b/schemas/expert_audit_output.schema.json
+@@ -57,7 +57,21 @@
+       "type": "array",
+       "items": {
+         "type": "object",
+-        "required": ["id", "title", "severity", "evidence_level", "observed", "recommendation"],
++        "required": [
++          "id",
++          "title",
++          "severity",
++          "evidence_level",
++          "confidence",
++          "files",
++          "line_refs",
++          "observed",
++          "inferred",
++          "risk",
++          "failure_class",
++          "recommendation",
++          "verification"
++        ],
+         "properties": {
+           "id": {"type": "string"},
+           "title": {"type": "string"},
+@@ -71,7 +85,12 @@
+           "risk": {"type": "string"},
+           "failure_class": {"type": "string"},
+           "recommendation": {"type": "string"},
+-          "verification": {"type": "string"}
++          "verification": {"type": "string"},
++          "evidence_refs": {
++            "type": "array",
++            "items": {"type": "integer", "minimum": 0},
++            "uniqueItems": true
++          }
+         }
+       }
+     },
+diff --git a/scripts/governance/loop/agent_backend.py b/scripts/governance/loop/agent_backend.py
+index 4e0922cb0..d267f7313 100644
+--- a/scripts/governance/loop/agent_backend.py
++++ b/scripts/governance/loop/agent_backend.py
+@@ -237,6 +237,7 @@ class StubBackend(AgentBackend):
+                     "failure_class": "STUB_FINDING",
+                     "recommendation": "stub: replace with real auditor output in M2",
+                     "verification": "stub: validate via schema + downstream gates",
++                    "evidence_refs": [0],
+                 }
+             ],
+             "not_proven": ["stub backend — no real audit performed"],
+@@ -291,8 +292,13 @@ class DroidBackend(AgentBackend):
+         self.auto_level = auto_level or os.environ.get("LOOP_DROID_AUTO_LEVEL", "high")
+ 
+     def _resolve_droid(self) -> str:
+-        if self.droid_path.is_file():
++        if self.droid_path.is_file() and os.access(self.droid_path, os.X_OK):
+             return str(self.droid_path)
++        if self.droid_path.exists():
++            raise BackendUnavailableError(
++                f"droid CLI path exists but is not executable at {self.droid_path}; "
++                "no silent fallback to stub"
++            )
+         if str(self.droid_path) == DEFAULT_DROID_PATH:
+             found = shutil.which("droid")
+             if found:
+@@ -367,6 +373,28 @@ class DroidBackend(AgentBackend):
+                     f"after {self.timeout_seconds}s",
+                     result=timed_out,
+                 ) from exc
++            except OSError as exc:
++                failed = AgentInvocationResult(
++                    invocation_id=invocation_id,
++                    role=role,
++                    model=model,
++                    model_family=_model_family(model),
++                    command=command,
++                    cwd=str(self.cwd),
++                    return_code=-1,
++                    stdout="",
++                    stderr=str(exc),
++                    prompt_sha256=_prompt_hash(prompt),
++                    context_keys=context_keys,
++                    started_utc=started,
++                    ended_utc=_utc_now_iso(),
++                    model_independence=model_independence,
++                    degraded=True,
++                )
++                raise BackendInvocationError(
++                    f"droid CLI could not launch for role {role!r}: {exc}",
++                    result=failed,
++                ) from exc
+ 
+         result = AgentInvocationResult(
+             invocation_id=invocation_id,
+diff --git a/scripts/governance/loop/anti_gaming.py b/scripts/governance/loop/anti_gaming.py
+index 7173a9e2e..ece78dd84 100644
+--- a/scripts/governance/loop/anti_gaming.py
++++ b/scripts/governance/loop/anti_gaming.py
+@@ -37,6 +37,8 @@ from pathlib import Path
+ 
+ SKIP_PATTERNS: tuple[str, ...] = (
+     r"pytest\.skip",
++    r"pytestmark\s*=\s*pytest\.mark\.skip\b",
++    r"pytest\.mark\.skip\b",
+     r"@pytest\.mark\.skip\b",
+     r"@pytest\.mark\.skipif",
+     r"unittest\.skip",
+@@ -44,6 +46,7 @@ SKIP_PATTERNS: tuple[str, ...] = (
+ )
+ 
+ XFAIL_PATTERNS: tuple[str, ...] = (
++    r"pytestmark\s*=\s*pytest\.mark\.xfail\b",
+     r"pytest\.mark\.xfail",
+     r"pytest\.xfail",
+     r"@unittest\.expectedFailure",
+@@ -150,17 +153,32 @@ def _check_no_new_xfails(added: list[str]) -> ChecklistItem:
+ 
+ 
+ def _check_no_weakened_assertions(added: list[str], removed: list[str]) -> ChecklistItem:
+-    removed_asserts = sum(1 for line in removed if ASSERT_RE.search(line))
+-    added_asserts = sum(1 for line in added if ASSERT_RE.search(line))
++    removed_assert_lines = [line for line in removed if ASSERT_RE.search(line)]
++    added_assert_lines = [line for line in added if ASSERT_RE.search(line)]
++    removed_asserts = len(removed_assert_lines)
++    added_asserts = len(added_assert_lines)
+     if removed_asserts > added_asserts:
+         return ChecklistItem(
+             "no_weakened_assertions",
+             False,
+             f"assertions weakened: removed {removed_asserts} assert lines, added {added_asserts}",
+         )
++    if removed_assert_lines and added_assert_lines:
++        trivial = [line for line in added_assert_lines if _is_trivial_assert(line)]
++        if trivial:
++            return ChecklistItem(
++                "no_weakened_assertions",
++                False,
++                f"assertions weakened: replaced specific assertion with trivial assertion {trivial[0].strip()!r}",
++            )
+     return ChecklistItem("no_weakened_assertions", True)
+ 
+ 
++def _is_trivial_assert(line: str) -> bool:
++    text = line.strip()
++    return bool(re.fullmatch(r"assert\s+(True|1|not\s+False)(\s*(,|#).*)?", text))
++
++
+ def _check_no_deleted_tests(removed: list[str], added: list[str]) -> ChecklistItem:
+     removed_tests = sum(1 for line in removed if TEST_DEF_RE.match(line))
+     added_tests = sum(1 for line in added if TEST_DEF_RE.match(line))
+diff --git a/scripts/governance/loop/prompt_audit_learn.py b/scripts/governance/loop/prompt_audit_learn.py
+index 46fd8d0c2..7c88c014e 100644
+--- a/scripts/governance/loop/prompt_audit_learn.py
++++ b/scripts/governance/loop/prompt_audit_learn.py
+@@ -199,6 +199,10 @@ def _build_new_gate(
+     }
+ 
+ 
++def _is_disposable_worktree_command(command: str) -> bool:
++    return "ds_loop_fix_" in command
++
++
+ # ---------------------------------------------------------------------------
+ # CI gate + ratchet engine driving
+ # ---------------------------------------------------------------------------
+@@ -220,9 +224,9 @@ def _drive_ratchet_engine(oracle: CIOracle, repo_root: Path) -> dict:
+     engine's state as evidence. This does NOT build a parallel ratchet — it
+     invokes the existing engine and records its output as a receipt.
+ 
+-    The ratchet engine may exit 2 (BROKEN — e.g. baselines file missing). This
+-    is recorded honestly as evidence; it does not block the finding from being
+-    ratcheted (the CI gate being green is the advance condition, VAL-LEARN-001).
++    The ratchet engine may exit non-zero (BROKEN — e.g. baselines file missing).
++    The learn stage records that receipt honestly and defers the finding; a red
++    ratchet engine is not treated as successful learning.
+     """
+     command = f'"{oracle.python}" {RATCHET_SCRIPT} --json'
+     result = oracle.run_gate(command, cwd=str(repo_root))
+@@ -272,24 +276,28 @@ def _assess_prevents_recurrence(
+     return True, "red_before_ref shows non-zero (slop existed), green_after_ref shows zero (gate passes after fix)"
+ 
+ 
+-def _promote_deferral_note(finding: dict, fix_proposal: dict) -> str:
++def _promote_deferral_note(
++    finding: dict,
++    fix_proposal: dict,
++    ratchet_receipt_ref: str,
++) -> str:
+     """Document concretely why promote.py is deferred for this finding (VAL-LEARN-002).
+ 
+     promote.py moves a hygiene pattern through the lifecycle (advisory -> enforced).
+-    In M1 stub mode the finding is synthetic — there is no real hygiene pattern
+-    in ``docs/governance/hygiene/patterns/`` to promote. An advisory->enforced
+-    promotion is therefore not warranted. The ratchet engine (ratchet.py) IS
++    Promotion is deferred unless the finding/fix proposal supplies an
++    evidence-backed hygiene pattern input. The ratchet engine (ratchet.py) IS
+     driven via subprocess (see ``_drive_ratchet_engine``); promote.py is deferred
+-    until a real hygiene pattern exists to promote.
++    until a concrete pattern_ref/advisory lifecycle artifact exists to promote.
+     """
+     failure_class = finding.get("failure_class", "UNKNOWN")
++    patch_ref = fix_proposal.get("patch_ref", "")
+     return (
+-        f"promote.py deferred: no real hygiene pattern for {failure_class} in "
+-        f"docs/governance/hygiene/patterns/ (M1 stub mode — synthetic finding). "
+-        f"ratchet.py was driven via subprocess for a state receipt; "
+-        f"promote.py (advisory->enforced promotion) is not warranted until a "
+-        f"real pattern exists. PROMOTE_SCRIPT={PROMOTE_SCRIPT} available for "
+-        f"subprocess invocation when a promotion is warranted."
++        f"promote.py deferred with evidence: ratchet engine receipt {ratchet_receipt_ref} "
++        f"was captured for {failure_class}, and fix_patch_ref={patch_ref!r}. "
++        "No promote.py input pattern_ref/advisory lifecycle artifact was present "
++        "in the finding or fix proposal, so an advisory->enforced promotion is "
++        f"not warranted. PROMOTE_SCRIPT={PROMOTE_SCRIPT} remains the required "
++        "subprocess path when such an evidence-backed promotion input exists."
+     )
+ 
+ 
+@@ -407,6 +415,21 @@ def _write_ci_wire_receipt(
+     return _relative_ref(run, path)
+ 
+ 
++def _artifact_run_id_mismatch(
++    artifact: dict,
++    expected_run_id: str,
++    artifact_kind: str,
++    finding_id: str,
++) -> str | None:
++    artifact_run_id = artifact.get("run_id")
++    if artifact_run_id is not None and artifact_run_id != expected_run_id:
++        return (
++            f"{artifact_kind} for finding {finding_id!r} has run_id={artifact_run_id!r}; "
++            f"expected {expected_run_id!r}"
++        )
++    return None
++
++
+ # ---------------------------------------------------------------------------
+ # Stage core
+ # ---------------------------------------------------------------------------
+@@ -448,6 +471,17 @@ def _process_finding(
+         return 1, "rejected"
+ 
+     # 4. Green CI. Check gate producibility (ratchet-or-nothing).
++    if not wire_ci:
++        _write_defer_record(
++            run,
++            finding_id,
++            "--wire-ci disabled — learned gates require a durable standing CI gate",
++        )
++        sys.stdout.write(
++            f"finding {finding_id}: DEFER — --wire-ci disabled; no durable standing gate wired\n"
++        )
++        return 0, "deferred"
++
+     can_produce, reason = _can_produce_gate(fp)
+     if not can_produce:
+         _write_defer_record(run, finding_id, reason)
+@@ -459,6 +493,17 @@ def _process_finding(
+     # 5. Drive the existing ratchet engine (VAL-LEARN-002).
+     ratchet_receipt = _drive_ratchet_engine(oracle, repo_root)
+     ratchet_receipt_ref = _write_ratchet_engine_receipt(run, finding_id, ratchet_receipt)
++    if ratchet_receipt.get("exit_code") != 0:
++        _write_defer_record(
++            run,
++            finding_id,
++            f"existing ratchet engine failed with exit {ratchet_receipt.get('exit_code')}; "
++            f"receipt={ratchet_receipt_ref}",
++        )
++        sys.stdout.write(
++            f"finding {finding_id}: DEFER — existing ratchet engine red; receipt {ratchet_receipt_ref}\n"
++        )
++        return 0, "deferred"
+ 
+     # 6. Write the red_before receipt (evidence-linked).
+     red_before_ref = _write_red_before_receipt(run, finding_id, fp)
+@@ -470,6 +515,16 @@ def _process_finding(
+         red_before_ref=red_before_ref,
+         green_after_ref=ci_receipt_ref,
+     )
++    if _is_disposable_worktree_command(new_gate["location"]):
++        _write_defer_record(
++            run,
++            finding_id,
++            f"gate command points at disposable worktree path: {new_gate['location']}",
++        )
++        sys.stdout.write(
++            f"finding {finding_id}: DEFER — gate command is not repo-durable\n"
++        )
++        return 0, "deferred"
+ 
+     # 8. Honestly assess prevents_recurrence from receipt evidence (VAL-LEARN-008).
+     prevents, prevents_note = _assess_prevents_recurrence(
+@@ -477,7 +532,32 @@ def _process_finding(
+     )
+ 
+     # 9. Document promote.py deferral concretely (VAL-LEARN-002).
+-    promote_note = _promote_deferral_note(finding, fp)
++    promote_note = _promote_deferral_note(finding, fp, ratchet_receipt_ref)
++
++    ci_wire_ref = ""
++    from scripts.governance.loop.wire_ci_gate import WorkflowError, wire_gate
++
++    workflow_path = ci_workflow or (repo_root / DEFAULT_CI_WORKFLOW)
++    gate_name = f"{finding_id}: {failure_class}"
++    try:
++        added = wire_gate(
++            workflow_path,
++            gate_id=finding_id,
++            name=gate_name,
++            command=new_gate["location"] or ci_gate_command,
++        )
++    except WorkflowError as exc:
++        sys.stderr.write(f"finding {finding_id}: CI workflow wiring failed — {exc}\n")
++        return 2, "error"
++    ci_wire_ref = _write_ci_wire_receipt(
++        run=run,
++        finding_id=finding_id,
++        workflow_path=workflow_path,
++        gate_id=finding_id,
++        gate_name=gate_name,
++        gate_command=new_gate["location"] or ci_gate_command,
++        added=added,
++    )
+ 
+     # 10. Build the ratchet record (§6.4).
+     root_cause = finding.get("observed", finding.get("title", ""))
+@@ -510,32 +590,6 @@ def _process_finding(
+     ledger_path = run.ledger_entry_path(finding_id)
+     run.write_yaml(ledger_path, ledger.to_dict())
+ 
+-    ci_wire_ref = ""
+-    if wire_ci:
+-        from scripts.governance.loop.wire_ci_gate import WorkflowError, wire_gate
+-
+-        workflow_path = ci_workflow or (repo_root / DEFAULT_CI_WORKFLOW)
+-        gate_name = f"{finding_id}: {failure_class}"
+-        try:
+-            added = wire_gate(
+-                workflow_path,
+-                gate_id=finding_id,
+-                name=gate_name,
+-                command=new_gate["location"] or ci_gate_command,
+-            )
+-        except WorkflowError as exc:
+-            sys.stderr.write(f"finding {finding_id}: CI workflow wiring failed — {exc}\n")
+-            return 2, "error"
+-        ci_wire_ref = _write_ci_wire_receipt(
+-            run=run,
+-            finding_id=finding_id,
+-            workflow_path=workflow_path,
+-            gate_id=finding_id,
+-            gate_name=gate_name,
+-            gate_command=new_gate["location"] or ci_gate_command,
+-            added=added,
+-        )
+-
+     # 12. Update the run manifest.
+     gate_manifest = {
+         "finding_id": finding_id,
+@@ -546,8 +600,7 @@ def _process_finding(
+         "ci_receipt_ref": ci_receipt_ref,
+         "ratchet_engine_receipt_ref": ratchet_receipt_ref,
+     }
+-    if ci_wire_ref:
+-        gate_manifest["ci_wire_receipt_ref"] = ci_wire_ref
++    gate_manifest["ci_wire_receipt_ref"] = ci_wire_ref
+     run.add_gate(gate_manifest)
+ 
+     sys.stdout.write(
+@@ -582,6 +635,14 @@ def run_learn(
+     findings_map: dict[str, dict] = {}
+     if findings_path.is_file():
+         for f in run.read_jsonl(findings_path):
++            mismatch = _artifact_run_id_mismatch(
++                f,
++                run.run_id,
++                "accepted finding",
++                f.get("finding_id", "unknown"),
++            )
++            if mismatch is not None:
++                return _emit_error(mismatch)
+             fid = f.get("finding_id")
+             if fid:
+                 findings_map[fid] = f
+@@ -597,9 +658,17 @@ def run_learn(
+     for vpath in verdicts:
+         vdoc = run.read_yaml(vpath)
+         vv = vdoc.get("verifier_verdict", vdoc)
+-        if vv.get("verdict") != "confirmed":
+-            continue
+         finding_id = vv.get("finding_id", "unknown")
++        mismatch = _artifact_run_id_mismatch(
++            vv,
++            run.run_id,
++            "verifier verdict",
++            finding_id,
++        )
++        if mismatch is not None:
++            return _emit_error(mismatch)
++        if vv.get("verdict") != "confirmed" or vv.get("routing") != "ADVANCE":
++            continue
+         finding = findings_map.get(finding_id, {"finding_id": finding_id})
+         fp_path = run.fix_proposal_path(finding_id)
+         if not fp_path.is_file():
+@@ -608,6 +677,15 @@ def run_learn(
+             )
+             continue
+         fp_doc = run.read_yaml(fp_path)
++        fp = fp_doc.get("fix_proposal", fp_doc)
++        mismatch = _artifact_run_id_mismatch(
++            fp,
++            run.run_id,
++            "fix proposal",
++            finding_id,
++        )
++        if mismatch is not None:
++            return _emit_error(mismatch)
+         confirmed.append((vv, finding, fp_doc))
+ 
+     if not confirmed:
+diff --git a/scripts/governance/loop/prompt_audit_reaudit.py b/scripts/governance/loop/prompt_audit_reaudit.py
+index c9feb04f2..a565966f5 100644
+--- a/scripts/governance/loop/prompt_audit_reaudit.py
++++ b/scripts/governance/loop/prompt_audit_reaudit.py
+@@ -36,12 +36,14 @@ Exit codes:
+ from __future__ import annotations
+ 
+ import argparse
++import json
+ import os
+ import sys
+ from abc import ABC, abstractmethod
+ from dataclasses import dataclass, field
+ from datetime import datetime, timezone
+ from pathlib import Path
++from uuid import uuid4
+ 
+ from scripts.governance.loop.agent_backend import (
+     ApiBackend,
+@@ -80,6 +82,15 @@ _RATIONALE_KEYS = frozenset({
+     "write_set_used",
+     "anti_gaming_checklist",  # the Verifier runs this independently
+ })
++_DETERMINISTIC_RECEIPT_KEYS = frozenset({
++    "command",
++    "exit_code",
++    "key_output",
++    "receipt_ref",
++    "valid",
++    "kind",
++    "value",
++})
+ 
+ 
+ def build_verifier_input(finding: dict, fix_proposal: dict) -> dict:
+@@ -91,7 +102,8 @@ def build_verifier_input(finding: dict, fix_proposal: dict) -> dict:
+     remediate stage's own anti-gaming checklist result (the Verifier runs that
+     independently).
+     """
+-    # The claim: only the finding's observable facts, not the recommendation.
++    # The claim: only the finding's observable facts, not the recommendation or
++    # any implementer/session context nested on the record.
+     claim = {
+         "finding_id": finding.get("finding_id"),
+         "title": finding.get("title"),
+@@ -104,8 +116,8 @@ def build_verifier_input(finding: dict, fix_proposal: dict) -> dict:
+ 
+     # The deterministic evidence: red-before/green-after receipts + proof_mode.
+     evidence = {
+-        "red_before": fix_proposal.get("red_before", {}),
+-        "green_after": fix_proposal.get("green_after", {}),
++        "red_before": _deterministic_receipt_subset(fix_proposal.get("red_before", {})),
++        "green_after": _deterministic_receipt_subset(fix_proposal.get("green_after", {})),
+         "proof_mode": fix_proposal.get("proof_mode", "none"),
+     }
+ 
+@@ -116,6 +128,24 @@ def build_verifier_input(finding: dict, fix_proposal: dict) -> dict:
+     }
+ 
+ 
++def _deterministic_receipt_subset(receipt: object) -> dict:
++    if not isinstance(receipt, dict):
++        return {}
++    return {
++        key: value
++        for key, value in receipt.items()
++        if key in _DETERMINISTIC_RECEIPT_KEYS and _is_json_scalar_or_list(value)
++    }
++
++
++def _is_json_scalar_or_list(value: object) -> bool:
++    if value is None or isinstance(value, (str, int, float, bool)):
++        return True
++    if isinstance(value, list):
++        return all(_is_json_scalar_or_list(item) for item in value)
++    return False
++
++
+ # ---------------------------------------------------------------------------
+ # Falsification-first prompt (VAL-REAUDIT-011)
+ # ---------------------------------------------------------------------------
+@@ -207,7 +237,23 @@ class StubVerifier(VerifierBackend):
+     as proven, spec §19.2).
+     """
+ 
++    def __init__(self) -> None:
++        self._last_invocation: dict | None = None
++
+     def verify(self, finding: dict, evidence: dict, prompt: str) -> VerifierResult:
++        if type(self) is StubVerifier:
++            self._last_invocation = {
++                "invocation_id": f"stub-verifier-{uuid4().hex}",
++                "role": "verifier",
++                "model": "stub",
++                "model_family": "stub",
++                "command": ["stub"],
++                "cwd": "",
++                "return_code": 0,
++                "context_keys": ["claim", "evidence", "finding_id"],
++                "model_independence": "not_proven",
++                "degraded": False,
++            }
+         ev = evidence.get("evidence", evidence)
+         red = ev.get("red_before", {})
+         green = ev.get("green_after", {})
+@@ -259,6 +305,9 @@ class StubVerifier(VerifierBackend):
+             model_independence="not_proven",
+         )
+ 
++    def invocation_receipt(self) -> dict | None:
++        return self._last_invocation
++
+ 
+ class DroidVerifier(StubVerifier):
+     """Verifier wrapper that invokes Droid with verifier-specific model policy."""
+@@ -282,7 +331,13 @@ class DroidVerifier(StubVerifier):
+                 "evidence_keys": sorted(evidence.keys()),
+             },
+         )
+-        result = super().verify(finding, evidence, prompt)
++        result = _verifier_result_from_stdout(
++            stdout=self._last_invocation.stdout,
++            verifier_model=self._last_invocation.model,
++            model_independence=self._last_invocation.model_independence,
++        )
++        if result is None:
++            result = super().verify(finding, evidence, prompt)
+         result.verifier_model = self._last_invocation.model
+         result.model_independence = self._last_invocation.model_independence
+         result.falsification_attempts.append({
+@@ -350,6 +405,58 @@ def get_verifier(name: str | None = None) -> VerifierBackend:
+     )
+ 
+ 
++def _verifier_result_from_stdout(
++    stdout: str,
++    verifier_model: str,
++    model_independence: str,
++) -> VerifierResult | None:
++    text = stdout.strip()
++    if not text:
++        return None
++    try:
++        doc = json.loads(text)
++    except json.JSONDecodeError:
++        start = text.find("{")
++        end = text.rfind("}")
++        if start < 0 or end <= start:
++            return None
++        try:
++            doc = json.loads(text[start:end + 1])
++        except json.JSONDecodeError:
++            return None
++    if not isinstance(doc, dict):
++        return None
++
++    verdict = doc.get("verdict")
++    if verdict not in ("confirmed", "refuted", "inconclusive"):
++        verdict = "inconclusive"
++    attempts = doc.get("falsification_attempts", [])
++    if not isinstance(attempts, list):
++        attempts = []
++    attempts = [a for a in attempts if isinstance(a, dict)]
++    if not attempts:
++        attempts = [{
++            "attempt": "parse structured verifier output",
++            "result": "inconclusive",
++            "evidence": "no falsification_attempts supplied",
++        }]
++    metadata = doc.get("model_metadata")
++    if isinstance(metadata, dict):
++        attempts.append({
++            "attempt": "record verifier model metadata",
++            "result": "observed",
++            "evidence": json.dumps(metadata, sort_keys=True),
++        })
++    return VerifierResult(
++        verdict=verdict,
++        falsification_attempts=attempts,
++        verifier_model=verifier_model,
++        model_independence=model_independence
++        if model_independence in ("proven", "not_proven")
++        else "not_proven",
++    )
++
++
+ # ---------------------------------------------------------------------------
+ # Verifier verdict artifact (§6.3 schema)
+ # ---------------------------------------------------------------------------
+@@ -446,6 +553,21 @@ def _reconcile_verdict(
+     return proposed
+ 
+ 
++def _artifact_run_id_mismatch(
++    artifact: dict,
++    expected_run_id: str,
++    artifact_kind: str,
++    finding_id: str,
++) -> str | None:
++    artifact_run_id = artifact.get("run_id")
++    if artifact_run_id is not None and artifact_run_id != expected_run_id:
++        return (
++            f"{artifact_kind} for finding {finding_id!r} has run_id={artifact_run_id!r}; "
++            f"expected {expected_run_id!r}"
++        )
++    return None
++
++
+ # ---------------------------------------------------------------------------
+ # Stage core
+ # ---------------------------------------------------------------------------
+@@ -583,6 +705,14 @@ def run_reaudit(
+     findings_map: dict[str, dict] = {}
+     if findings_path.is_file():
+         for f in run.read_jsonl(findings_path):
++            mismatch = _artifact_run_id_mismatch(
++                f,
++                run.run_id,
++                "accepted finding",
++                f.get("finding_id", "unknown"),
++            )
++            if mismatch is not None:
++                return _emit_error(mismatch)
+             fid = f.get("finding_id")
+             if fid:
+                 findings_map[fid] = f
+@@ -601,6 +731,14 @@ def run_reaudit(
+         fp_doc = run.read_yaml(fp_path)
+         fp = fp_doc.get("fix_proposal", fp_doc)
+         finding_id = fp.get("finding_id", "unknown")
++        mismatch = _artifact_run_id_mismatch(
++            fp,
++            run.run_id,
++            "fix proposal",
++            finding_id,
++        )
++        if mismatch is not None:
++            return _emit_error(mismatch)
+         finding = findings_map.get(finding_id, {"finding_id": finding_id})
+ 
+         rc, status = _process_finding(finding, fp_doc, run, verifier)
+diff --git a/scripts/governance/loop/prompt_audit_remediate.py b/scripts/governance/loop/prompt_audit_remediate.py
+index 3fecd2282..4d83645e3 100644
+--- a/scripts/governance/loop/prompt_audit_remediate.py
++++ b/scripts/governance/loop/prompt_audit_remediate.py
+@@ -42,6 +42,7 @@ import os
+ import re
+ import subprocess
+ import sys
++import time
+ from abc import ABC, abstractmethod
+ from dataclasses import dataclass, field
+ from datetime import datetime, timezone
+@@ -69,6 +70,7 @@ CHECKLIST_ITEMS = (
+     "no_widened_budgets",
+     "fix_addresses_root_cause",
+ )
++VALID_PROOF_MODES = ("natural", "synthetic", "none")
+ 
+ 
+ def _emit_error(message: str) -> int:
+@@ -290,12 +292,14 @@ def extract_changed_paths(diff_text: str) -> list[str]:
+     be gamed by an LLM implementer misreporting paths.
+     """
+     paths: list[str] = []
++    seen: set[str] = set()
+     for line in diff_text.splitlines():
+         m = _DIFF_GIT_RE.match(line)
+         if m:
+-            b_path = m.group(2)
+-            if b_path and b_path != "/dev/null":
+-                paths.append(b_path)
++            for path in (m.group(1), m.group(2)):
++                if path and path != "/dev/null" and path not in seen:
++                    paths.append(path)
++                    seen.add(path)
+     return paths
+ 
+ 
+@@ -409,6 +413,34 @@ class FixProposal:
+         return {"fix_proposal": payload}
+ 
+ 
++def _relative_ref(run: Run, path: Path) -> str:
++    try:
++        return str(path.relative_to(run.run_dir))
++    except ValueError:
++        return str(path)
++
++
++def _write_defer_record(run: Run, finding_id: str, reason: str) -> str:
++    record = {
++        "defer": {
++            "finding_id": finding_id,
++            "reason": reason,
++            "timestamp_utc": _utc_now_iso(),
++        }
++    }
++    path = run.run_dir / f"defer_{finding_id}.yaml"
++    run.write_yaml(path, record)
++    return _relative_ref(run, path)
++
++
++def _find_stale_run_id(records: list[dict], expected_run_id: str) -> tuple[str, str] | None:
++    for record in records:
++        record_run_id = record.get("run_id")
++        if record_run_id is not None and record_run_id != expected_run_id:
++            return record.get("finding_id", "unknown"), str(record_run_id)
++    return None
++
++
+ def _process_finding(
+     finding: dict,
+     warrant: Warrant,
+@@ -432,7 +464,18 @@ def _process_finding(
+     except BackendError as exc:
+         sys.stderr.write(f"finding {finding_id}: implementer backend failed — {exc}\n")
+         return 2, "error"
++    if plan.proof_mode not in VALID_PROOF_MODES:
++        sys.stderr.write(
++            f"finding {finding_id}: invalid proof_mode={plan.proof_mode!r}; "
++            f"expected one of {VALID_PROOF_MODES}\n"
++        )
++        return 2, "error"
+     if plan.proof_mode == "none":
++        _write_defer_record(
++            run,
++            finding_id,
++            "proof_mode=none — no red-before/green-after achievable",
++        )
+         sys.stdout.write(
+             f"finding {finding_id}: proof_mode=none — routing to DEFER (no fix attempted)\n"
+         )
+@@ -513,7 +556,7 @@ def _process_finding(
+             run_id=run.run_id,
+             finding_id=finding_id,
+             write_set_used=write_set,
+-            patch_ref=branch_name,
++            patch_ref=_relative_ref(run, diff_path),
+             red_before={
+                 "command": plan.gate_command,
+                 "exit_code": red_result.exit_code,
+@@ -570,6 +613,13 @@ def run_remediate(
+             f"no accepted_findings.jsonl in {run.run_dir} — run prompt-audit-triage (Stage 2) first"
+         )
+     findings = run.read_jsonl(findings_path)
++    stale = _find_stale_run_id(findings, run.run_id)
++    if stale is not None:
++        finding_id, stale_run_id = stale
++        return _emit_error(
++            f"accepted finding {finding_id!r} has run_id={stale_run_id!r}; "
++            f"expected {run.run_id!r}"
++        )
+ 
+     # Filter to IMPLEMENT findings only.
+     impl_findings = [f for f in findings if f.get("routing") == "IMPLEMENT"]
+@@ -580,20 +630,61 @@ def run_remediate(
+         return 0
+ 
+     # Check budget.
+-    used_fixes = sum(1 for f in impl_findings if f.get("routing") == "IMPLEMENT")
+-    budget_result = warrant.check_budget(used_fixes=used_fixes)
+-    if budget_result.exceeded:
+-        sys.stderr.write(f"budget exceeded — {budget_result.reason}\n")
+-        return 2
++    max_tokens = warrant.budget["max_tokens"]
++    max_wall_clock_min = warrant.budget["max_wall_clock_min"]
++    if max_tokens <= 0:
++        for finding in impl_findings:
++            _write_defer_record(
++                run,
++                finding.get("finding_id", "unknown"),
++                "budget.max_tokens exhausted before remediation",
++            )
++        sys.stdout.write("budget.max_tokens exhausted — all IMPLEMENT findings routed to DEFER\n")
++        return 0
++    if max_wall_clock_min <= 0:
++        for finding in impl_findings:
++            _write_defer_record(
++                run,
++                finding.get("finding_id", "unknown"),
++                "budget.max_wall_clock_min exhausted before remediation",
++            )
++        sys.stdout.write("budget.max_wall_clock_min exhausted — all IMPLEMENT findings routed to DEFER\n")
++        return 0
++
++    max_fixes = int(warrant.budget["max_fixes_per_run"])
++    process_findings = impl_findings[:max_fixes]
++    excess_findings = impl_findings[max_fixes:]
++    for finding in excess_findings:
++        _write_defer_record(
++            run,
++            finding.get("finding_id", "unknown"),
++            f"budget.max_fixes_per_run exceeded: limit {max_fixes}; routed excess IMPLEMENT finding to DEFER",
++        )
++    if excess_findings:
++        sys.stdout.write(
++            f"budget.max_fixes_per_run limit {max_fixes}: "
++            f"{len(excess_findings)} excess IMPLEMENT finding(s) routed to DEFER\n"
++        )
+ 
+     # Create the oracle for gate runs (PYTHONPATH = worktree at run time).
+     oracle = CIOracle(python=DEFAULT_PYTHON, repo_root=repo_root)
+ 
+     rejected = 0
+     accepted = 0
+-    deferred = 0
+-
+-    for finding in impl_findings:
++    deferred = len(excess_findings)
++
++    start = time.monotonic()
++    for index, finding in enumerate(process_findings):
++        elapsed_min = (time.monotonic() - start) / 60
++        if elapsed_min > max_wall_clock_min:
++            for remaining in process_findings[index:]:
++                _write_defer_record(
++                    run,
++                    remaining.get("finding_id", "unknown"),
++                    f"budget.max_wall_clock_min exceeded: elapsed {elapsed_min:.3f} > limit {max_wall_clock_min}",
++                )
++                deferred += 1
++            break
+         rc, status = _process_finding(
+             finding, warrant, run, implementer, repo_root, worktree_root, oracle,
+         )
+diff --git a/scripts/governance/loop/prompt_audit_run.py b/scripts/governance/loop/prompt_audit_run.py
+index 1ccbbb050..88e20160e 100644
+--- a/scripts/governance/loop/prompt_audit_run.py
++++ b/scripts/governance/loop/prompt_audit_run.py
+@@ -91,7 +91,7 @@ def run_audit(
+         "warrant_id": warrant.id,
+     }
+ 
+-    written = 0
++    pending: list[tuple[str, dict]] = []
+     for prompt_id in selected:
+         council_id = prompt_to_council(prompt_id)
+         if council_id is None:
+@@ -117,6 +117,10 @@ def run_audit(
+                 f"Errors: {errs}"
+             )
+ 
++        pending.append((prompt_id, audit_doc))
++
++    written = 0
++    for prompt_id, audit_doc in pending:
+         audit_path = run.audit_path(prompt_id)
+         run.write_json(audit_path, audit_doc)
+         written += 1
+diff --git a/scripts/governance/loop/prompt_audit_triage.py b/scripts/governance/loop/prompt_audit_triage.py
+index 49de199d8..dbe4c2504 100644
+--- a/scripts/governance/loop/prompt_audit_triage.py
++++ b/scripts/governance/loop/prompt_audit_triage.py
+@@ -195,12 +195,28 @@ def triage_findings(
+         must_gate = recurrence_score >= MUST_GATE_THRESHOLD
+         routing = route_finding(survivor["finding"])
+ 
+-        accepted.append(_build_record(survivor, routing, must_gate, recurrence_score, recurrence_within_run))
++        accepted.append(
++            _build_record(
++                survivor,
++                routing,
++                must_gate,
++                recurrence_score,
++                recurrence_within_run,
++                current_run_id,
++            )
++        )
+ 
+     for entry in ambiguous:
+         recurrence_score = 0
+         accepted.append(
+-            _build_record(entry, "NEEDS_HUMAN", False, recurrence_score, False)
++            _build_record(
++                entry,
++                "NEEDS_HUMAN",
++                False,
++                recurrence_score,
++                False,
++                current_run_id,
++            )
+         )
+ 
+     return accepted
+@@ -212,9 +228,11 @@ def _build_record(
+     must_gate: bool,
+     recurrence_score: int,
+     recurrence_within_run: bool,
++    current_run_id: str,
+ ) -> dict:
+     finding = entry["finding"]
+     return {
++        "run_id": current_run_id,
+         "finding_id": finding.get("id", ""),
+         "prompt_id": entry.get("prompt_id", ""),
+         "council_id": entry.get("council_id", ""),
+@@ -247,6 +265,12 @@ def _load_all_findings(run: Run) -> list[dict]:
+             doc = run.read_json(audit_path)
+         except (json.JSONDecodeError, OSError) as exc:
+             raise ValueError(f"cannot read audit JSON {audit_path}: {exc}") from exc
++        doc_run_id = doc.get("run_id")
++        if doc_run_id is not None and doc_run_id != run.run_id:
++            raise ValueError(
++                f"audit artifact {audit_path} has run_id={doc_run_id!r}; "
++                f"expected {run.run_id!r}"
++            )
+         prompt_id = doc.get("prompt_id", audit_path.stem)
+         council_id = doc.get("council_id", "")
+         for finding in doc.get("findings", []):
+diff --git a/scripts/governance/loop/runs.py b/scripts/governance/loop/runs.py
+index c7b14a478..95336498f 100644
+--- a/scripts/governance/loop/runs.py
++++ b/scripts/governance/loop/runs.py
+@@ -236,10 +236,19 @@ class RunManager:
+         warrant: dict | None = None,
+         scope: dict | None = None,
+         week: str | None = None,
++        resume: bool = False,
+     ) -> Run:
+         """Create the run dir tree + initial manifest and return the ``Run``."""
+         week_root = RunManager._week_root(week)
+         run_dir = week_root / run_id
++        if run_dir.exists():
++            if not resume:
++                raise FileExistsError(
++                    f"run already exists: {run_dir}; pass --resume to reuse it"
++                )
++            for sub in RUN_SUBDIRS:
++                (run_dir / sub).mkdir(parents=True, exist_ok=True)
++            return Run(run_dir)
+         for sub in RUN_SUBDIRS:
+             (run_dir / sub).mkdir(parents=True, exist_ok=True)
+ 
+@@ -341,7 +350,16 @@ def _cmd_create(args) -> int:
+             scope = _load_scope(Path(args.scope))
+         except (FileNotFoundError, json.JSONDecodeError) as exc:
+             return _emit_error(f"scope load failed: {exc}")
+-    run = RunManager.create_run(run_id=args.run_id, warrant=warrant, scope=scope, week=args.week)
++    try:
++        run = RunManager.create_run(
++            run_id=args.run_id,
++            warrant=warrant,
++            scope=scope,
++            week=args.week,
++            resume=args.resume,
++        )
++    except FileExistsError as exc:
++        return _emit_error(str(exc))
+     sys.stdout.write(str(run.run_dir) + "\n")
+     return 0
+ 
+@@ -372,6 +390,7 @@ def main(argv: list[str] | None = None) -> int:
+     p_create.add_argument("--warrant", default=None, help="path to a warrant YAML (recorded in manifest)")
+     p_create.add_argument("--scope", default=None, help="path to a scope.json (recorded in manifest)")
+     p_create.add_argument("--week", default=None, help="override the YYYY-WW bucket (default: current week)")
++    p_create.add_argument("--resume", action="store_true", help="reuse an existing run dir explicitly")
+ 
+     p_path = sub.add_parser("path", help="print the run dir path for an existing run id")
+     p_path.add_argument("--run-id", required=True)
+diff --git a/scripts/governance/loop/scoper.py b/scripts/governance/loop/scoper.py
+index 1b932e9c7..3b4717c9f 100644
+--- a/scripts/governance/loop/scoper.py
++++ b/scripts/governance/loop/scoper.py
+@@ -17,7 +17,7 @@ Selection rules:
+ 
+ Output (``scope.json``):
+   - ``sentinel_prompt_ids``: the 6 sentinel ids
+-  - ``diff_mapped_prompt_ids``: the capped diff-mapped ids (pre-filter)
++  - ``diff_mapped_prompt_ids``: the in-scope capped diff-mapped ids
+   - ``selected_prompt_ids``: sentinels + diff-mapped, after council filter
+   - ``council_paths``: prompt_id -> ported PROMPTS.md path
+   - ``changed_files``: the diff file list
+@@ -48,7 +48,7 @@ import sys
+ from pathlib import Path
+ 
+ from scripts.governance.loop.councils import resolve_prompt_path
+-from scripts.governance.loop.warrant import Warrant, WarrantValidationError
++from scripts.governance.loop.warrant import Warrant, WarrantError
+ 
+ # --- sentinel set (spec §9.1) ---
+ SENTINEL_PROMPT_IDS: tuple[str, ...] = (
+@@ -163,6 +163,7 @@ def select_prompts(
+     """
+     root = repo_root or Path(__file__).resolve().parents[3]
+     allowed = set(warrant_councils)
++    effective_cap = max(0, min(DEFAULT_DIFF_MAPPED_CAP, int(diff_mapped_cap)))
+ 
+     # 1. sentinels (diff-independent candidates)
+     sentinel_set = list(SENTINEL_PROMPT_IDS)
+@@ -176,19 +177,18 @@ def select_prompts(
+         matched.update(pids)
+     rationale.sort(key=lambda e: e["file"])
+ 
+-    diff_mapped_all = sorted(matched)
+-    diff_mapped_capped = diff_mapped_all[:diff_mapped_cap]
+-
+     # 3. council filter: drop any candidate whose council is not in warrant scope
+     def _in_scope(pid: str) -> bool:
+         council = prompt_to_council(pid)
+         return council is not None and council in allowed
+ 
++    diff_mapped_all = sorted(pid for pid in matched if _in_scope(pid))
++    diff_mapped_capped = diff_mapped_all[:effective_cap]
++
+     sentinel_in_scope = [pid for pid in sentinel_set if _in_scope(pid)]
+-    diff_mapped_in_scope = [pid for pid in diff_mapped_capped if _in_scope(pid)]
+ 
+     # selected = sentinels + diff-mapped, deduped, sorted (deterministic order)
+-    selected = sorted(set(sentinel_in_scope) | set(diff_mapped_in_scope))
++    selected = sorted(set(sentinel_in_scope) | set(diff_mapped_capped))
+ 
+     # 4. council paths for every selected prompt
+     council_paths: dict[str, str] = {}
+@@ -208,7 +208,7 @@ def select_prompts(
+         "changed_files": sorted(changed_files),
+         "rationale": rationale,
+         "warrant_councils": sorted(allowed),
+-        "diff_mapped_cap": diff_mapped_cap,
++        "diff_mapped_cap": effective_cap,
+     }
+ 
+ 
+@@ -248,8 +248,8 @@ def main(argv: list[str] | None = None) -> int:
+ 
+     # Load + validate the warrant (re-uses the warrant module).
+     try:
+-        warrant = Warrant.from_yaml(Path(args.warrant))
+-    except WarrantValidationError as exc:
++        warrant = Warrant.load_and_check(Path(args.warrant))
++    except WarrantError as exc:
+         return _emit_error(f"warrant validation failed: {exc}")
+ 
+     scope_dict = warrant.scope
+diff --git a/scripts/governance/loop/validate_audit.py b/scripts/governance/loop/validate_audit.py
+index c09c52b22..a54481808 100644
+--- a/scripts/governance/loop/validate_audit.py
++++ b/scripts/governance/loop/validate_audit.py
+@@ -25,6 +25,7 @@ from pathlib import Path
+ import jsonschema
+ 
+ SCHEMA_REL = Path("schemas") / "expert_audit_output.schema.json"
++E2_PLUS = {"E2_tested", "E3_cross_checked", "E4_regression_proven"}
+ 
+ 
+ def _schema_path(repo_root: Path | None = None) -> Path:
+@@ -77,9 +78,75 @@ def validate_audit_doc(doc: object, repo_root: Path | None = None) -> Validation
+     schema = _load_schema(_schema_path(repo_root))
+     validator = jsonschema.Draft202012Validator(schema)
+     collected = sorted(validator.iter_errors(doc), key=lambda e: list(e.absolute_path))
+-    if not collected:
++    semantic_errors = _semantic_evidence_errors(doc)
++    if not collected and not semantic_errors:
+         return ValidationResult(valid=True, errors=[])
+-    return ValidationResult(valid=False, errors=_structured_errors_from_list(collected))
++    return ValidationResult(
++        valid=False,
++        errors=[*_structured_errors_from_list(collected), *semantic_errors],
++    )
++
++
++def _semantic_evidence_errors(doc: object) -> list[dict]:
++    """Cross-field evidence binding checks beyond JSON Schema.
++
++    E2+ claims are only valid when backed by deterministic command receipts.
++    The summary evidence floor gates the whole document, and each E2+ finding
++    must bind to one or more indexes in ``scope.commands_run``.
++    """
++    if not isinstance(doc, dict):
++        return []
++
++    scope = doc.get("scope", {})
++    commands_run = scope.get("commands_run", []) if isinstance(scope, dict) else []
++    command_count = len(commands_run) if isinstance(commands_run, list) else 0
++    errors: list[dict] = []
++
++    summary = doc.get("summary", {})
++    evidence_floor = summary.get("evidence_floor") if isinstance(summary, dict) else None
++    if evidence_floor in E2_PLUS and command_count == 0:
++        errors.append({
++            "path": "summary/evidence_floor",
++            "message": f"summary.evidence_floor={evidence_floor} requires at least one scope.commands_run receipt",
++            "validator": "deterministic_evidence",
++            "validator_value": "scope.commands_run minItems 1 for E2+",
++        })
++
++    findings = doc.get("findings", [])
++    if not isinstance(findings, list):
++        return errors
++    for idx, finding in enumerate(findings):
++        if not isinstance(finding, dict):
++            continue
++        evidence_level = finding.get("evidence_level")
++        if evidence_level not in E2_PLUS:
++            continue
++        refs = finding.get("evidence_refs")
++        if command_count == 0:
++            errors.append({
++                "path": f"findings/{idx}/evidence_refs",
++                "message": f"finding evidence_level={evidence_level} requires scope.commands_run receipts",
++                "validator": "deterministic_evidence",
++                "validator_value": "scope.commands_run minItems 1 for E2+ findings",
++            })
++            continue
++        if not isinstance(refs, list) or not refs:
++            errors.append({
++                "path": f"findings/{idx}/evidence_refs",
++                "message": f"finding evidence_level={evidence_level} requires non-empty evidence_refs",
++                "validator": "deterministic_evidence",
++                "validator_value": "non-empty indexes into scope.commands_run",
++            })
++            continue
++        bad_refs = [ref for ref in refs if not isinstance(ref, int) or ref < 0 or ref >= command_count]
++        if bad_refs:
++            errors.append({
++                "path": f"findings/{idx}/evidence_refs",
++                "message": f"evidence_refs {bad_refs} do not point to existing scope.commands_run receipts",
++                "validator": "deterministic_evidence",
++                "validator_value": f"0..{command_count - 1}",
++            })
++    return errors
+ 
+ 
+ def _structured_errors_from_list(errs: list[jsonschema.ValidationError]) -> list[dict]:
+diff --git a/scripts/governance/loop/warrant.py b/scripts/governance/loop/warrant.py
+index 1f470eb22..a9200a868 100644
+--- a/scripts/governance/loop/warrant.py
++++ b/scripts/governance/loop/warrant.py
+@@ -24,6 +24,7 @@ Exit codes:
+ from __future__ import annotations
+ 
+ import argparse
++import fnmatch
+ import sys
+ from dataclasses import dataclass, field
+ from datetime import datetime, timezone
+@@ -156,6 +157,21 @@ class Warrant:
+         for key in REQUIRED_BUDGET_KEYS:
+             if key not in budget:
+                 raise WarrantValidationError(f"missing required budget field: budget.{key}")
++            value = budget[key]
++            if isinstance(value, bool) or not isinstance(value, (int, float)):
++                raise WarrantValidationError(
++                    f"budget.{key} must be a non-negative numeric value, got {value!r}"
++                )
++            if value < 0:
++                raise WarrantValidationError(
++                    f"budget.{key} must be a non-negative numeric value, got {value!r}"
++                )
++        if not isinstance(budget["max_fixes_per_run"], int) or isinstance(
++            budget["max_fixes_per_run"], bool
++        ):
++            raise WarrantValidationError(
++                "budget.max_fixes_per_run must be a non-negative integer"
++            )
+ 
+         expires_at = _parse_expires_at(str(data["expires_at"]))
+ 
+@@ -215,8 +231,9 @@ class Warrant:
+         A file the Implementer touches must be in the write_set; a violation is
+         a hard abort (the caller maps this to exit 2).
+         """
+-        if path in self.write_set:
+-            return
++        for pattern in self.write_set:
++            if _path_matches_write_pattern(path, pattern):
++                return
+         raise WriteSetViolationError(
+             f"write-set violation: {path!r} is not in warrant {self.id!r} write_set"
+         )
+@@ -256,6 +273,18 @@ class Warrant:
+         return BudgetResult(exceeded=False)
+ 
+ 
++def _path_matches_write_pattern(path: str, pattern: str) -> bool:
++    """Glob-aware write-set match shared with remediation semantics."""
++    normalized_path = path.strip("/")
++    normalized_pattern = pattern.strip("/")
++    if fnmatch.fnmatchcase(normalized_path, normalized_pattern):
++        return True
++    if normalized_path == normalized_pattern:
++        return True
++    base = normalized_pattern.rstrip("*/")
++    return bool(base and normalized_path.startswith(base + "/"))
++
++
+ # ---------------------------------------------------------------------------
+ # CLI
+ # ---------------------------------------------------------------------------
+diff --git a/scripts/governance/loop/wire_ci_gate.py b/scripts/governance/loop/wire_ci_gate.py
+index 55c9ecd58..fa4f21cb3 100644
+--- a/scripts/governance/loop/wire_ci_gate.py
++++ b/scripts/governance/loop/wire_ci_gate.py
+@@ -166,9 +166,21 @@ def validate_workflow(workflow: dict) -> None:
+     jobs = workflow.get("jobs")
+     if not isinstance(jobs, dict) or JOB_ID not in jobs:
+         raise WorkflowError(f"workflow missing jobs.{JOB_ID}")
+-    steps = jobs[JOB_ID].get("steps")
++    job = jobs[JOB_ID]
++    if not isinstance(job, dict):
++        raise WorkflowError(f"workflow jobs.{JOB_ID} must be a mapping")
++    if not job.get("runs-on"):
++        raise WorkflowError(f"workflow jobs.{JOB_ID} missing runs-on")
++    steps = job.get("steps")
+     if not isinstance(steps, list):
+         raise WorkflowError(f"workflow jobs.{JOB_ID}.steps must be a list")
++    for idx, step in enumerate(steps):
++        if not isinstance(step, dict):
++            raise WorkflowError(f"workflow jobs.{JOB_ID}.steps[{idx}] must be a mapping")
++        if "run" not in step and "uses" not in step:
++            raise WorkflowError(
++                f"workflow jobs.{JOB_ID}.steps[{idx}] must define run or uses"
++            )
+ 
+ 
+ def add_gate_step(workflow: dict, gate_id: str, name: str, command: str) -> bool:
+diff --git a/tests/governance/loop/test_agent_backend.py b/tests/governance/loop/test_agent_backend.py
+index bf6375b57..67388ff77 100644
+--- a/tests/governance/loop/test_agent_backend.py
++++ b/tests/governance/loop/test_agent_backend.py
+@@ -9,6 +9,7 @@ import pytest
+ 
+ from scripts.governance.loop.agent_backend import (
+     ApiBackend,
++    BackendInvocationError,
+     BackendUnavailableError,
+     DroidBackend,
+     StubBackend,
+@@ -100,6 +101,28 @@ def test_droid_backend_missing_cli_fails_clear_no_stub(tmp_path):
+         backend.invoke("auditor", "prompt", {})
+ 
+ 
++def test_droid_backend_non_executable_file_fails_unavailable(tmp_path):
++    fake = tmp_path / "droid"
++    fake.write_text("#!/bin/sh\necho no\n")
++    fake.chmod(0o644)
++    backend = DroidBackend(droid_path=fake)
++
++    with pytest.raises(BackendUnavailableError, match="executable"):
++        backend.invoke("auditor", "prompt", {})
++
++
++def test_droid_backend_oserror_wrapped(monkeypatch, tmp_path):
++    fake = _write_fake_droid(tmp_path)
++    backend = DroidBackend(droid_path=fake, cwd=REPO_ROOT)
++
++    def boom(*args, **kwargs):
++        raise PermissionError("cannot execute")
++
++    monkeypatch.setattr("subprocess.run", boom)
++    with pytest.raises(BackendInvocationError, match="could not launch"):
++        backend.invoke("auditor", "prompt", {})
++
++
+ def test_backend_selection_env(monkeypatch):
+     monkeypatch.setenv("LOOP_AGENT_BACKEND", "api")
+     assert isinstance(get_backend(), ApiBackend)
+@@ -174,3 +197,35 @@ def test_stage_wrappers_record_agent_invocation_receipts(tmp_path):
+     assert impl_receipt and impl_receipt["role"] == "implementer"
+     assert verdict.verifier_model
+     assert verifier_receipt and verifier_receipt["role"] == "verifier"
++
++
++def test_droid_verifier_parses_structured_output(tmp_path, monkeypatch):
++    fake_output = json.dumps({
++        "verdict": "refuted",
++        "falsification_attempts": [
++            {"attempt": "replay failing gate", "result": "fail", "evidence": "exit=1"}
++        ],
++        "verifier_model": "custom-verifier",
++        "model_metadata": {"provider": "fake"},
++    })
++    fake = _write_fake_droid(tmp_path, stdout_text=fake_output)
++    verifier = DroidVerifier(droid_path=fake, cwd=REPO_ROOT)
++
++    result = verifier.verify(
++        {"finding_id": "F-STRUCT", "severity": "critical"},
++        {
++            "finding_id": "F-STRUCT",
++            "claim": {"finding_id": "F-STRUCT", "severity": "critical"},
++            "evidence": {
++                "red_before": {"exit_code": 1},
++                "green_after": {"exit_code": 0},
++                "proof_mode": "synthetic",
++            },
++        },
++        build_falsification_prompt(),
++    )
++
++    assert result.verdict == "refuted"
++    assert result.falsification_attempts[0]["attempt"] == "replay failing gate"
++    assert result.verifier_model == "gpt-5.2"
++    assert verifier.invocation_receipt()["stdout_excerpt"].startswith("{")
+diff --git a/tests/governance/loop/test_agentized_e2e.py b/tests/governance/loop/test_agentized_e2e.py
+index cc2a85f8c..641c6c3bd 100644
+--- a/tests/governance/loop/test_agentized_e2e.py
++++ b/tests/governance/loop/test_agentized_e2e.py
+@@ -149,6 +149,7 @@ def _high_severity_audit_json(run_id: str) -> dict:
+                 "failure_class": "HIGH_SLOP_AGENTIZED",
+                 "recommendation": "fix via isolated worktree + deterministic gate",
+                 "verification": "red-before/green-after on a deterministic gate",
++                "evidence_refs": [0],
+             }
+         ],
+         "not_proven": ["agentized e2e — canned finding for role-separation proof"],
+@@ -178,13 +179,36 @@ def _write_fake_droid(tmp_path: Path, stdout_text: str) -> Path:
+         "if log_path:\n"
+         "    with open(log_path, 'a') as fh:\n"
+         "        fh.write(json.dumps({'argv': sys.argv[1:], 'prompt': prompt_text}) + '\\n')\n"
+-        "sys.stdout.write(os.environ.get('DROID_FAKE_STDOUT', " + repr(stdout_text) + "))\n"
++        "if 'FRESH Verifier' in prompt_text:\n"
++        "    sys.stdout.write(json.dumps({\n"
++        "        'verdict': 'confirmed',\n"
++        "        'falsification_attempts': [\n"
++        "            {'attempt': 'verify deterministic receipts', 'result': 'pass', 'evidence': 'red nonzero and green zero'},\n"
++        "        ],\n"
++        "        'model_metadata': {'fake_droid': True},\n"
++        "    }))\n"
++        "else:\n"
++        "    sys.stdout.write(os.environ.get('DROID_FAKE_STDOUT', " + repr(stdout_text) + "))\n"
+         "sys.exit(int(os.environ.get('DROID_FAKE_EXIT', '0')))\n"
+     )
+     fake.chmod(0o755)
+     return fake
+ 
+ 
++def _green_ratchet_repo(tmp_path: Path) -> Path:
++    repo = tmp_path / "green-ratchet-repo"
++    script_dir = repo / "scripts" / "governance" / "hygiene"
++    script_dir.mkdir(parents=True, exist_ok=True)
++    (script_dir / "ratchet.py").write_text(
++        "import json\n"
++        "import sys\n"
++        "if '--json' in sys.argv:\n"
++        "    print(json.dumps({'status': 'ok', 'stub': True}))\n"
++        "sys.exit(0)\n"
++    )
++    return repo
++
++
+ def _base_env(runs_root: Path, fake_droid: Path, audit_stdout: str) -> dict:
+     """Build the env for agentized CLI stage invocations."""
+     env = os.environ.copy()
+@@ -311,7 +335,9 @@ def agentized_run(tmp_path: Path):
+         "--warrant", str(warrant_path),
+         "--run-id", run_id,
+         "--ci-gate", ci_gate_cmd,
+-        "--repo-root", str(REPO_ROOT),
++        "--repo-root", str(_green_ratchet_repo(tmp_path)),
++        "--wire-ci",
++        "--ci-workflow", str(tmp_path / "loop-ratchet-gates.yml"),
+     )
+     stage_procs["learn"] = proc
+     assert proc.returncode == 0, f"learn failed: {proc.stderr!r}"
+diff --git a/tests/governance/loop/test_anti_gaming.py b/tests/governance/loop/test_anti_gaming.py
+index 823474492..9c63400a3 100644
+--- a/tests/governance/loop/test_anti_gaming.py
++++ b/tests/governance/loop/test_anti_gaming.py
+@@ -130,6 +130,22 @@ def test_new_skipif_fails():
+     assert not skip_item.passed
+ 
+ 
++def test_module_level_pytestmark_skip_fails():
++    """Adding pytestmark = pytest.mark.skip(...) fails no_new_skips."""
++    diff = textwrap.dedent("""\
++        diff --git a/tests/test_foo.py b/tests/test_foo.py
++        --- a/tests/test_foo.py
++        +++ b/tests/test_foo.py
++        @@ -1,2 +1,3 @@
++         import pytest
++        +pytestmark = pytest.mark.skip(reason="not now")
++         def test_a():
++        """)
++    result = _run_check(diff)
++    skip_item = next(i for i in result.items if i.name == "no_new_skips")
++    assert not skip_item.passed
++
++
+ # ---------------------------------------------------------------------------
+ # no_new_xfails
+ # ---------------------------------------------------------------------------
+@@ -189,6 +205,23 @@ def test_replaced_assert_passes():
+     assert weak_item.passed, f"replaced assert should pass: {weak_item.detail}"
+ 
+ 
++def test_replaced_specific_assert_with_assert_true_fails():
++    """Replacing a specific assertion with assert True is a weakened assertion."""
++    diff = textwrap.dedent("""\
++        diff --git a/tests/test_foo.py b/tests/test_foo.py
++        --- a/tests/test_foo.py
++        +++ b/tests/test_foo.py
++        @@ -1,3 +1,3 @@
++         def test_a():
++        -    assert result == 42
++        +    assert True
++             pass
++        """)
++    result = _run_check(diff)
++    weak_item = next(i for i in result.items if i.name == "no_weakened_assertions")
++    assert not weak_item.passed
++
++
+ # ---------------------------------------------------------------------------
+ # no_deleted_tests
+ # ---------------------------------------------------------------------------
+diff --git a/tests/governance/loop/test_pipeline_e2e.py b/tests/governance/loop/test_pipeline_e2e.py
+index ca33d5840..7468490c6 100644
+--- a/tests/governance/loop/test_pipeline_e2e.py
++++ b/tests/governance/loop/test_pipeline_e2e.py
+@@ -150,6 +150,20 @@ def _make_gate_script(tmp_path: Path, marker_path: Path) -> Path:
+     return gate
+ 
+ 
++def _green_ratchet_repo(tmp_path: Path) -> Path:
++    repo = tmp_path / "green-ratchet-repo"
++    script_dir = repo / "scripts" / "governance" / "hygiene"
++    script_dir.mkdir(parents=True, exist_ok=True)
++    (script_dir / "ratchet.py").write_text(
++        "import json\n"
++        "import sys\n"
++        "if '--json' in sys.argv:\n"
++        "    print(json.dumps({'status': 'ok', 'stub': True}))\n"
++        "sys.exit(0)\n"
++    )
++    return repo
++
++
+ # ---------------------------------------------------------------------------
+ # Fixture: run the full 5-stage chain once
+ # ---------------------------------------------------------------------------
+@@ -251,7 +265,9 @@ def e2e_run(tmp_path: Path):
+         "--warrant", str(warrant_path),
+         "--run-id", run_id,
+         "--ci-gate", ci_gate_cmd,
+-        "--repo-root", str(REPO_ROOT),
++        "--repo-root", str(_green_ratchet_repo(tmp_path)),
++        "--wire-ci",
++        "--ci-workflow", str(tmp_path / "loop-ratchet-gates.yml"),
+     )
+     stage_procs["learn"] = proc
+     assert proc.returncode == 0, f"learn failed: {proc.stderr!r}"
+diff --git a/tests/governance/loop/test_prompt_audit_learn.py b/tests/governance/loop/test_prompt_audit_learn.py
+index 8ef63aa24..1e03fda72 100644
+--- a/tests/governance/loop/test_prompt_audit_learn.py
++++ b/tests/governance/loop/test_prompt_audit_learn.py
+@@ -203,6 +203,24 @@ def _setup_run(
+     return warrant_path, run_id, runs_root
+ 
+ 
++def _green_ratchet_repo(tmp_path: Path) -> Path:
++    repo = tmp_path / "green-ratchet-repo"
++    script_dir = repo / "scripts" / "governance" / "hygiene"
++    script_dir.mkdir(parents=True, exist_ok=True)
++    (script_dir / "ratchet.py").write_text(
++        "import json\n"
++        "import sys\n"
++        "if '--json' in sys.argv:\n"
++        "    print(json.dumps({'status': 'ok', 'stub': True}))\n"
++        "sys.exit(0)\n"
++    )
++    return repo
++
++
++def _has_repo_root_arg(args: list[str] | None) -> bool:
++    return args is not None and "--repo-root" in args
++
++
+ def _run_learn_cli(
+     warrant: Path,
+     run_id: str,
+@@ -210,6 +228,7 @@ def _run_learn_cli(
+     ci_gate: str = "true",
+     extra_args: list[str] | None = None,
+     extra_env: dict | None = None,
++    wire_ci: bool = True,
+ ) -> subprocess.CompletedProcess[str]:
+     env = os.environ.copy()
+     env["PYTHONPATH"] = str(REPO_ROOT)
+@@ -223,6 +242,13 @@ def _run_learn_cli(
+         "--run-id", run_id,
+         "--ci-gate", ci_gate,
+     ]
++    if wire_ci:
++        cmd.extend([
++            "--wire-ci",
++            "--ci-workflow", str(runs_root.parent / "loop-ratchet-gates.yml"),
++        ])
++    if not _has_repo_root_arg(extra_args):
++        cmd.extend(["--repo-root", str(_green_ratchet_repo(runs_root.parent))])
+     if extra_args:
+         cmd.extend(extra_args)
+     return subprocess.run(cmd, capture_output=True, text=True, env=env)
+@@ -299,11 +325,27 @@ class TestLearnGreenAdvances:
+         # A rejection record should exist in the run dir
+         rejection_files = list(run.run_dir.glob("*reject*")) + list(run.run_dir.glob("*rejection*"))
+         # Also check the receipts dir for a ci_receipt with non-green exit
+-        receipt_files = list(run.receipts_dir.glob("*ci*"))
++        receipt_files = list(run.receipts_dir.glob("ci_receipt_*.json"))
+         assert receipt_files, "CI receipt must be written even on non-green"
+         receipt = json.loads(receipt_files[0].read_text())
+         assert receipt["exit_code"] != 0, "non-green receipt must have non-zero exit_code"
+ 
++    def test_wire_ci_disabled_routes_to_defer_not_gated(self, tmp_path):
++        finding = _make_finding(fid="F-NOWIRE")
++        fp = _make_fix_proposal("learn-test-001", "F-NOWIRE")
++        vv = _make_verifier_verdict("learn-test-001", "F-NOWIRE", verdict="confirmed", routing="ADVANCE")
++        warrant, run_id, runs_root = _setup_run(tmp_path, finding, fp, vv)
++
++        proc = _run_learn_cli(warrant, run_id, runs_root, ci_gate="true", wire_ci=False)
++        assert proc.returncode == 0, f"stdout={proc.stdout!r} stderr={proc.stderr!r}"
++
++        run = _open_run_search(run_id, runs_root)
++        assert not run.ratchet_path("F-NOWIRE").exists()
++        assert not run.ledger_entry_path("F-NOWIRE").exists()
++        defer_path = run.run_dir / "defer_F-NOWIRE.yaml"
++        assert defer_path.is_file()
++        assert "wire-ci" in defer_path.read_text().lower()
++
+ 
+ class TestLearnDrivesRatchetEngine:
+     """VAL-LEARN-002: Drives existing ratchet engine, not a parallel one."""
+@@ -337,6 +379,56 @@ class TestLearnDrivesRatchetEngine:
+             "a ratchet engine receipt must be produced showing the existing engine was driven"
+         )
+ 
++    def test_red_ratchet_engine_defers_learning(self, tmp_path):
++        finding = _make_finding(fid="F-ENGINE-RED")
++        fp = _make_fix_proposal("learn-test-001", "F-ENGINE-RED")
++        vv = _make_verifier_verdict("learn-test-001", "F-ENGINE-RED", verdict="confirmed", routing="ADVANCE")
++        warrant, run_id, runs_root = _setup_run(tmp_path, finding, fp, vv)
++        empty_repo = tmp_path / "empty-repo"
++        empty_repo.mkdir()
++
++        proc = _run_learn_cli(
++            warrant,
++            run_id,
++            runs_root,
++            ci_gate="true",
++            extra_args=["--repo-root", str(empty_repo)],
++        )
++        assert proc.returncode == 0, f"{proc.stdout!r} {proc.stderr!r}"
++
++        run = _open_run_search(run_id, runs_root)
++        assert not run.ratchet_path("F-ENGINE-RED").exists()
++        assert not run.ledger_entry_path("F-ENGINE-RED").exists()
++        defer_path = run.run_dir / "defer_F-ENGINE-RED.yaml"
++        assert defer_path.is_file()
++        assert "ratchet" in defer_path.read_text().lower()
++
++    def test_temp_worktree_gate_command_defers_not_gated(self, tmp_path):
++        finding = _make_finding(fid="F-TEMP-GATE")
++        temp_gate = '"/tmp/ds_loop_fix_F-TEMP-GATE/scripts/governance/loop/fix_gate.py"'
++        fp = _make_fix_proposal(
++            "learn-test-001",
++            "F-TEMP-GATE",
++            gate_command=f"{VENV_PYTHON} {temp_gate}",
++        )
++        vv = _make_verifier_verdict(
++            "learn-test-001",
++            "F-TEMP-GATE",
++            verdict="confirmed",
++            routing="ADVANCE",
++        )
++        warrant, run_id, runs_root = _setup_run(tmp_path, finding, fp, vv)
++
++        proc = _run_learn_cli(warrant, run_id, runs_root, ci_gate="true")
++        assert proc.returncode == 0, f"{proc.stdout!r} {proc.stderr!r}"
++
++        run = _open_run_search(run_id, runs_root)
++        assert not run.ratchet_path("F-TEMP-GATE").exists()
++        assert not run.ledger_entry_path("F-TEMP-GATE").exists()
++        defer_path = run.run_dir / "defer_F-TEMP-GATE.yaml"
++        assert defer_path.is_file()
++        assert "disposable worktree" in defer_path.read_text()
++
+ 
+ class TestLearnRatchetRecord:
+     """VAL-LEARN-003, 008, 009: ratchet record with new_gate + required fields."""
+@@ -488,7 +580,7 @@ class TestLearnCIReceipt:
+         assert proc.returncode == 0, f"{proc.stdout!r} {proc.stderr!r}"
+ 
+         run = _open_run_search(run_id, runs_root)
+-        ci_receipts = list(run.receipts_dir.glob("*ci*"))
++        ci_receipts = list(run.receipts_dir.glob("ci_receipt_*.json"))
+         assert ci_receipts, "CI receipt must be written to receipts/"
+         receipt = json.loads(ci_receipts[0].read_text())
+         assert receipt["exit_code"] == 0, "green CI receipt must have exit_code 0"
+@@ -520,6 +612,18 @@ class TestLearnRefutedNoRatchet:
+         run = _open_run_search(run_id, runs_root)
+         assert not run.ratchet_path("F-REF").is_file(), "refuted verdict must not produce a ratchet"
+ 
++    def test_confirmed_without_advance_routing_no_ratchet(self, tmp_path):
++        finding = _make_finding(fid="F-CONF-DEFER")
++        fp = _make_fix_proposal("learn-test-001", "F-CONF-DEFER")
++        vv = _make_verifier_verdict("learn-test-001", "F-CONF-DEFER", verdict="confirmed", routing="DEFER")
++        warrant, run_id, runs_root = _setup_run(tmp_path, finding, fp, vv)
++
++        proc = _run_learn_cli(warrant, run_id, runs_root, ci_gate="true")
++        assert proc.returncode == 0
++
++        run = _open_run_search(run_id, runs_root)
++        assert not run.ratchet_path("F-CONF-DEFER").is_file()
++
+     def test_inconclusive_verdict_no_ratchet(self, tmp_path):
+         finding = _make_finding(fid="F-INCON")
+         fp = _make_fix_proposal("learn-test-001", "F-INCON")
+diff --git a/tests/governance/loop/test_prompt_audit_reaudit.py b/tests/governance/loop/test_prompt_audit_reaudit.py
+index 9b5d7ff3c..52e237f96 100644
+--- a/tests/governance/loop/test_prompt_audit_reaudit.py
++++ b/tests/governance/loop/test_prompt_audit_reaudit.py
+@@ -250,6 +250,9 @@ def test_verifier_verdict_produced(tmp_path):
+         assert isinstance(vv["falsification_attempts"], list)
+         assert len(vv["falsification_attempts"]) > 0
+         assert "evidence" in vv
++        receipt = vv.get("verifier_invocation")
++        assert receipt and receipt["role"] == "verifier"
++        assert receipt["invocation_id"].startswith("stub-verifier-")
+     finally:
+         os.environ.pop("LOOP_RUNS_DIR", None)
+ 
+@@ -288,6 +291,28 @@ def test_verifier_input_excludes_implementer_rationale(tmp_path):
+         assert key not in verifier_input, f"Verifier input leaks {key!r}"
+ 
+ 
++def test_verifier_input_recursively_strips_session_context():
++    from scripts.governance.loop.prompt_audit_reaudit import build_verifier_input
++
++    finding = _make_finding(fid="F-NESTED-ISO")
++    finding["session_context"] = {"implementer_rationale": "SECRET_RATIONALE"}
++    finding["nested"] = [{"rationale": "SECRET_NESTED"}]
++    fix_proposal = _make_fix_proposal("reaudit-test-001", "F-NESTED-ISO")
++    fp = fix_proposal["fix_proposal"]
++    fp["implementer_invocation"] = {
++        "invocation_id": "impl-secret",
++        "stdout_excerpt": "SECRET_STDOUT",
++        "session_context": {"notes": "SECRET_NOTES"},
++    }
++    fp["red_before"]["session_context"] = {"rationale": "SECRET_RECEIPT_CONTEXT"}
++
++    verifier_input = build_verifier_input(finding, fp)
++    serialized = json.dumps(verifier_input, sort_keys=True)
++    assert "SECRET_" not in serialized
++    assert "implementer_invocation" not in serialized
++    assert "session_context" not in serialized
++
++
+ # ---------------------------------------------------------------------------
+ # VAL-REAUDIT-003: Falsification mandate (concrete attempts listed)
+ # ---------------------------------------------------------------------------
+diff --git a/tests/governance/loop/test_prompt_audit_remediate.py b/tests/governance/loop/test_prompt_audit_remediate.py
+index d78966f98..dba02c512 100644
+--- a/tests/governance/loop/test_prompt_audit_remediate.py
++++ b/tests/governance/loop/test_prompt_audit_remediate.py
+@@ -230,6 +230,7 @@ def test_stub_produces_fix_proposal_and_cleans_up(tmp_path):
+         assert fp["finding_id"] == "F-STUB-001"
+         assert "write_set_used" in fp
+         assert "patch_ref" in fp
++        assert (run.run_dir / fp["patch_ref"]).is_file(), "patch_ref must be durable after worktree cleanup"
+         assert "red_before" in fp
+         assert "green_after" in fp
+         assert "proof_mode" in fp
+@@ -429,8 +430,42 @@ def test_proof_mode_none_routes_to_defer(tmp_path):
+         assert rc == 0, f"proof_mode=none should route to DEFER cleanly, got exit {rc}"
+         # No fix_proposal written
+         assert not run.fix_proposal_path("F-DEFER-001").exists()
+-        # DEFER record should exist (check accepted_findings updated or a defer record)
+-        # The finding should be marked as DEFER in some artifact
++        defer_path = run.run_dir / "defer_F-DEFER-001.yaml"
++        assert defer_path.is_file(), "proof_mode=none must write a durable DEFER artifact"
++        defer = yaml.safe_load(defer_path.read_text())["defer"]
++        assert defer["finding_id"] == "F-DEFER-001"
++        assert defer["reason"]
++    finally:
++        os.environ.pop("LOOP_RUNS_DIR", None)
++
++
++def test_invalid_proof_mode_rejected_before_worktree(tmp_path):
++    """Invalid proof_mode values fail immediately and write no fix_proposal."""
++    from scripts.governance.loop.prompt_audit_remediate import ImplementerBackend, ImplementerPlan
++    from scripts.governance.loop.runs import RunManager
++
++    repo = _make_temp_repo(tmp_path)
++    wt_root = tmp_path / "worktrees"
++    wt_root.mkdir()
++    finding = _make_finding(fid="F-BADPROOF-001")
++    warrant_path, run_id, runs_root = _setup_run_with_findings(tmp_path, [finding])
++
++    os.environ["LOOP_RUNS_DIR"] = str(runs_root)
++    try:
++        run = RunManager.open_run(run_id)
++
++        class BadProofImplementer(ImplementerBackend):
++            def plan(self, finding, write_set):
++                return ImplementerPlan(proof_mode="trust_me", gate_command="")
++            def setup_proof(self, worktree_path, finding):
++                raise AssertionError("worktree should not be created")
++            def apply_fix(self, worktree_path, finding):
++                return []
++
++        rc = _run_remediate_api(warrant_path, run, BadProofImplementer(), repo, wt_root)
++        assert rc == 2
++        assert not run.fix_proposal_path("F-BADPROOF-001").exists()
++        assert list(wt_root.glob("ds_loop_fix_*")) == []
+     finally:
+         os.environ.pop("LOOP_RUNS_DIR", None)
+ 
+@@ -538,6 +573,22 @@ def test_misreported_write_set_caught_by_git_diff(tmp_path):
+         os.environ.pop("LOOP_RUNS_DIR", None)
+ 
+ 
++def test_rename_from_outside_write_set_into_allowed_path_rejected():
++    """Rename/copy diffs must enforce both a/ and b/ paths, not only b/."""
++    from scripts.governance.loop.prompt_audit_remediate import check_write_set, extract_changed_paths
++
++    diff = (
++        "diff --git a/secret/seed.txt b/scripts/governance/loop/allowed/seed.txt\n"
++        "similarity index 100%\n"
++        "rename from secret/seed.txt\n"
++        "rename to scripts/governance/loop/allowed/seed.txt\n"
++    )
++    changed = extract_changed_paths(diff)
++    assert "secret/seed.txt" in changed
++    assert "scripts/governance/loop/allowed/seed.txt" in changed
++    assert check_write_set(changed, ["scripts/governance/loop/allowed/**"]) == ["secret/seed.txt"]
++
++
+ def test_honest_in_write_set_accepted_by_git_diff(tmp_path):
+     """M2 hardening: an implementer that writes inside the write_set AND
+     self-reports correctly must still be accepted (git-diff enforcement
+@@ -836,6 +887,33 @@ def test_all_deferred_no_fix_proposals(tmp_path):
+         os.environ.pop("LOOP_RUNS_DIR", None)
+ 
+ 
++def test_max_fixes_budget_defers_excess_findings(tmp_path):
++    """Excess IMPLEMENT findings over max_fixes_per_run are durably deferred."""
++    repo = _make_temp_repo(tmp_path)
++    wt_root = tmp_path / "worktrees"
++    wt_root.mkdir()
++    findings = [_make_finding(fid="F-BUDGET-1"), _make_finding(fid="F-BUDGET-2")]
++    warrant = _make_warrant_dict()
++    warrant["budget"] = {**warrant["budget"], "max_fixes_per_run": 1}
++    warrant_path, run_id, runs_root = _setup_run_with_findings(tmp_path, findings, warrant=warrant)
++
++    proc = _run_remediate_cli(warrant_path, run_id, runs_root, repo, wt_root)
++    assert proc.returncode == 0, f"stdout={proc.stdout!r} stderr={proc.stderr!r}"
++
++    from scripts.governance.loop.runs import RunManager
++    os.environ["LOOP_RUNS_DIR"] = str(runs_root)
++    try:
++        run = RunManager.open_run(run_id)
++        assert run.fix_proposal_path("F-BUDGET-1").is_file()
++        assert not run.fix_proposal_path("F-BUDGET-2").exists()
++        defer_path = run.run_dir / "defer_F-BUDGET-2.yaml"
++        assert defer_path.is_file(), "excess finding must be durably routed to DEFER"
++        defer = yaml.safe_load(defer_path.read_text())["defer"]
++        assert "max_fixes_per_run" in defer["reason"]
++    finally:
++        os.environ.pop("LOOP_RUNS_DIR", None)
++
++
+ # ---------------------------------------------------------------------------
+ # Warrant re-validation on stage entry
+ # ---------------------------------------------------------------------------
+diff --git a/tests/governance/loop/test_prompt_audit_run.py b/tests/governance/loop/test_prompt_audit_run.py
+index e54b8f824..4c75984aa 100644
+--- a/tests/governance/loop/test_prompt_audit_run.py
++++ b/tests/governance/loop/test_prompt_audit_run.py
+@@ -253,7 +253,10 @@ def test_invalid_output_aborts_no_partial_for_invalid_prompt(tmp_path):
+         rc = run_audit(warrant_path, run, scope, backend=MixedBackend())
+         assert rc == 2, f"expected exit 2, got {rc}"
+ 
+-        # The first (valid) prompt's audit may exist; the second (invalid) must NOT.
++        # Stage 1 is atomic: once any prompt is invalid, no audit artifacts from
++        # that stage may remain, including earlier valid prompt outputs.
++        assert list(run.audit_dir.glob("*.json")) == []
++        assert not (run.audit_dir / "TV-01.json").exists()
+         assert not (run.audit_dir / "TV-08.json").exists(), (
+             "no partial artifact for the invalid prompt (TV-08)"
+         )
+diff --git a/tests/governance/loop/test_prompt_audit_triage.py b/tests/governance/loop/test_prompt_audit_triage.py
+index ae2449f59..4573f7b3f 100644
+--- a/tests/governance/loop/test_prompt_audit_triage.py
++++ b/tests/governance/loop/test_prompt_audit_triage.py
+@@ -101,8 +101,9 @@ def _make_audit_doc(
+     prompt_id: str = "TV-01",
+     council_id: str = "testing_verification",
+     findings: list[dict] | None = None,
++    run_id: str | None = None,
+ ) -> dict:
+-    return {
++    doc = {
+         "prompt_id": prompt_id,
+         "council_id": council_id,
+         "repo_path": "/tmp/ds_loop",
+@@ -116,6 +117,9 @@ def _make_audit_doc(
+         "findings": findings if findings is not None else [_make_finding()],
+         "not_proven": [],
+     }
++    if run_id is not None:
++        doc["run_id"] = run_id
++    return doc
+ 
+ 
+ def _setup_run(
+@@ -207,6 +211,18 @@ def test_e2plus_findings_routed_to_implement(tmp_path, ev):
+     assert records[0]["routing"] == "IMPLEMENT", f"E2+ finding must route to IMPLEMENT, got {records[0]['routing']}"
+ 
+ 
++def test_triage_rejects_audit_artifact_from_different_run_id(tmp_path):
++    finding = _make_finding(evidence_level="E2_tested", failure_class="RUN_ID_MISMATCH")
++    audit = _make_audit_doc(findings=[finding], run_id="other-run")
++    warrant, run_id, run_dir = _setup_run(tmp_path, run_id="triage-current", audits={"TV-01": audit})
++
++    proc = _run_triage_cli(warrant, run_id, tmp_path / "runs")
++    assert proc.returncode == 2
++    out = proc.stdout + proc.stderr
++    assert "run_id" in out and "other-run" in out
++    assert not (run_dir / "accepted_findings.jsonl").exists()
++
++
+ # ---------------------------------------------------------------------------
+ # VAL-TRIAGE-002: below-E2 findings routed to DEFER
+ # ---------------------------------------------------------------------------
+diff --git a/tests/governance/loop/test_runs.py b/tests/governance/loop/test_runs.py
+index eb1eb59be..4e2dd1ff2 100644
+--- a/tests/governance/loop/test_runs.py
++++ b/tests/governance/loop/test_runs.py
+@@ -114,15 +114,24 @@ class TestRunDirStructure:
+         assert week_bucket == runs.current_week_bucket()
+         assert run.run_dir.parent.parent == tmp_path
+ 
+-    def test_create_run_idempotent_subdirs_exist(self, tmp_path, monkeypatch):
++    def test_create_run_id_single_use_by_default(self, tmp_path, monkeypatch):
+         monkeypatch.setenv("LOOP_RUNS_DIR", str(tmp_path))
+         runs = _import_runs()
+         run = runs.RunManager.create_run(run_id="test-run-003")
+-        # creating the same run again should not error and subdirs remain
+-        run2 = runs.RunManager.create_run(run_id="test-run-003")
+-        assert run2.run_dir == run.run_dir
++        with pytest.raises(FileExistsError):
++            runs.RunManager.create_run(run_id="test-run-003")
+         for sub in REQUIRED_SUBDIRS:
+-            assert (run2.run_dir / sub).is_dir()
++            assert (run.run_dir / sub).is_dir()
++
++    def test_create_run_resume_existing_requires_explicit_flag(self, tmp_path, monkeypatch):
++        monkeypatch.setenv("LOOP_RUNS_DIR", str(tmp_path))
++        runs = _import_runs()
++        run = runs.RunManager.create_run(run_id="test-run-resume")
++        marker = run.audit_dir / "stale.json"
++        marker.write_text("{}\n")
++        resumed = runs.RunManager.create_run(run_id="test-run-resume", resume=True)
++        assert resumed.run_dir == run.run_dir
++        assert marker.exists(), "resume mode may keep existing artifacts"
+ 
+     def test_cli_create_subdirs(self, tmp_path):
+         env = {"LOOP_RUNS_DIR": str(tmp_path)}
+@@ -140,6 +149,16 @@ class TestRunDirStructure:
+         for sub in REQUIRED_SUBDIRS:
+             assert (found[0] / sub).is_dir(), f"CLI missing subdir: {sub}"
+ 
++    def test_cli_create_duplicate_requires_resume(self, tmp_path):
++        env = {"LOOP_RUNS_DIR": str(tmp_path)}
++        first = _run_cli("create", "--run-id", "cli-run-dupe", env=env)
++        assert first.returncode == 0, first.stderr
++        second = _run_cli("create", "--run-id", "cli-run-dupe", env=env)
++        assert second.returncode == 2
++        assert "already exists" in second.stderr
++        resumed = _run_cli("create", "--run-id", "cli-run-dupe", "--resume", env=env)
++        assert resumed.returncode == 0, resumed.stderr
++
+ 
+ # ---------------------------------------------------------------------------
+ # VAL-RUNS-002: manifest.json written
+diff --git a/tests/governance/loop/test_scoper.py b/tests/governance/loop/test_scoper.py
+index 7b6049c52..6c4dbafe8 100644
+--- a/tests/governance/loop/test_scoper.py
++++ b/tests/governance/loop/test_scoper.py
+@@ -193,6 +193,17 @@ def test_scope_filtered_by_warrant_councils(scoper):
+         assert council in restricted, f"prompt {pid} (council {council}) outside warrant scope"
+ 
+ 
++def test_council_filter_applies_before_diff_cap(scoper):
++    """Out-of-scope prompts must not consume the diff cap before filtering."""
++    scope = scoper.select_prompts(
++        changed_files=["dharma_swarm/providers.py"],
++        warrant_councils=["runtime_distributed_reliability"],
++        diff_mapped_cap=1,
++    )
++    assert scope["diff_mapped_prompt_ids"] == ["RDR-06"]
++    assert "RDR-06" in scope["selected_prompt_ids"]
++
++
+ def test_sentinels_filtered_when_council_excluded(scoper):
+     """VAL-SCOPE-006 (edge): a sentinel whose council is excluded is filtered out.
+ 
+@@ -291,3 +302,44 @@ def test_cli_deterministic_two_runs(tmp_path):
+     assert res1.returncode == 0
+     assert res2.returncode == 0
+     assert out1.read_text() == out2.read_text()
++
++
++def test_cli_refuses_expired_warrant(tmp_path):
++    bad = dict(VALID_WARRANT)
++    bad["expires_at"] = "2000-01-01T00:00:00Z"
++    warrant = _write_warrant(tmp_path, bad)
++    out = tmp_path / "scope.json"
++    res = _run_cli([
++        "--warrant", str(warrant),
++        "--output", str(out),
++        "--changed-files", "dharma_swarm/providers.py",
++    ])
++    assert res.returncode == 2
++    assert "expired" in (res.stdout + res.stderr).lower()
++    assert not out.exists()
++
++
++def test_cli_clamps_diff_mapped_cap_to_five(tmp_path):
++    warrant = _write_warrant(tmp_path, VALID_WARRANT)
++    out = tmp_path / "scope.json"
++    res = _run_cli([
++        "--warrant", str(warrant),
++        "--output", str(out),
++        "--diff-mapped-cap", "99",
++        "--changed-files",
++        "dharma_swarm/providers.py",
++        "dharma_swarm/a2a/a2a_bridge.py",
++        "dharma_swarm/orchestrator.py",
++        "dharma_swarm/evolution.py",
++        "dharma_swarm/memory_kernel/kernel.py",
++        "dharma_swarm/telos_gates.py",
++        "dharma_swarm/handoff.py",
++        "dharma_swarm/vsm_channels.py",
++        "dharma_swarm/stigmergy.py",
++        "tests/test_cascade.py",
++        ".github/workflows/ci.yml",
++    ])
++    assert res.returncode == 0, res.stderr
++    data = json.loads(out.read_text())
++    assert data["diff_mapped_cap"] == 5
++    assert len(data["diff_mapped_prompt_ids"]) <= 5
+diff --git a/tests/governance/loop/test_validate_audit.py b/tests/governance/loop/test_validate_audit.py
+index e0cb656a5..bb4bdf1b8 100644
+--- a/tests/governance/loop/test_validate_audit.py
++++ b/tests/governance/loop/test_validate_audit.py
+@@ -55,6 +55,7 @@ VALID_AUDIT = {
+             "failure_class": "GREEN_SUITE_FROM_SKIPS",
+             "recommendation": "remove skips",
+             "verification": "re-run without skips",
++            "evidence_refs": [0],
+         }
+     ],
+     "not_proven": [],
+@@ -123,6 +124,8 @@ def test_cli_valid_audit_exits_zero(tmp_path):
+ def test_cli_zero_findings_audit_exits_zero(tmp_path):
+     zero = json.loads(json.dumps(VALID_AUDIT))
+     zero["findings"] = []
++    zero["summary"]["evidence_floor"] = "E0_none"
++    zero["scope"]["commands_run"] = []
+     audit = _write_audit(tmp_path, zero)
+     proc = _run_cli(audit)
+     assert proc.returncode == 0, f"stdout={proc.stdout!r} stderr={proc.stderr!r}"
+@@ -169,6 +172,52 @@ def test_cli_invalid_evidence_level_enum_exits_two(tmp_path):
+     assert "evidence_level" in out or "E5_imagined" in out, f"error must name the enum field: {out!r}"
+ 
+ 
++def test_e2_summary_requires_command_receipt(tmp_path):
++    """E2+ summary floors cannot claim tested evidence without commands_run."""
++    bad = json.loads(json.dumps(VALID_AUDIT))
++    bad["scope"]["commands_run"] = []
++    audit = _write_audit(tmp_path, bad)
++    proc = _run_cli(audit)
++    assert proc.returncode == 2
++    out = proc.stdout + proc.stderr
++    assert "commands_run" in out and "evidence_floor" in out
++
++
++def test_e2_finding_requires_evidence_refs(tmp_path):
++    """E2+ findings must bind to replayable command receipts."""
++    bad = json.loads(json.dumps(VALID_AUDIT))
++    bad["findings"][0].pop("evidence_refs")
++    audit = _write_audit(tmp_path, bad)
++    proc = _run_cli(audit)
++    assert proc.returncode == 2
++    out = proc.stdout + proc.stderr
++    assert "evidence_refs" in out
++
++
++def test_e2_finding_rejects_out_of_range_evidence_ref(tmp_path):
++    bad = json.loads(json.dumps(VALID_AUDIT))
++    bad["findings"][0]["evidence_refs"] = [99]
++    audit = _write_audit(tmp_path, bad)
++    proc = _run_cli(audit)
++    assert proc.returncode == 2
++    out = proc.stdout + proc.stderr
++    assert "evidence_refs" in out or "commands_run" in out
++
++
++@pytest.mark.parametrize(
++    "field",
++    ["confidence", "files", "line_refs", "inferred", "risk", "failure_class", "verification"],
++)
++def test_finding_architecture_fields_required(tmp_path, field):
++    bad = json.loads(json.dumps(VALID_AUDIT))
++    bad["findings"][0].pop(field)
++    audit = _write_audit(tmp_path, bad)
++    proc = _run_cli(audit)
++    assert proc.returncode == 2
++    out = proc.stdout + proc.stderr
++    assert field in out
++
++
+ def test_cli_missing_file_exits_two(tmp_path):
+     proc = _run_cli(tmp_path / "does-not-exist.json")
+     assert proc.returncode == 2
+diff --git a/tests/governance/loop/test_warrant.py b/tests/governance/loop/test_warrant.py
+index 3e79d382e..5f160a79d 100644
+--- a/tests/governance/loop/test_warrant.py
++++ b/tests/governance/loop/test_warrant.py
+@@ -196,6 +196,17 @@ def test_assert_write_set_rejects_out_of_set_path(tmp_path):
+     assert "dharma_swarm/secret.py" in str(exc.value), "must name the violating path"
+ 
+ 
++def test_assert_write_set_accepts_glob_semantics(tmp_path):
++    """Warrant.assert_write_set must use the same glob-aware semantics as remediation."""
++    from scripts.governance.loop.warrant import Warrant
++
++    doc = {**VALID_WARRANT, "write_set": ["scripts/governance/loop/**", "docs/governance"]}
++    p = _write_warrant(tmp_path, doc)
++    w = Warrant.from_yaml(p)
++    w.assert_write_set("scripts/governance/loop/nested/fix.py")
++    w.assert_write_set("docs/governance/README.md")
++
++
+ # ---------------------------------------------------------------------------
+ # Budget enforcement
+ # ---------------------------------------------------------------------------
+@@ -240,6 +251,28 @@ def test_check_budget_max_wall_clock_exceeded(tmp_path):
+     assert "max_wall_clock_min" in res.reason or "wall" in res.reason.lower()
+ 
+ 
++@pytest.mark.parametrize(
++    ("key", "value"),
++    [
++        ("max_tokens", "a lot"),
++        ("max_wall_clock_min", "soon"),
++        ("max_fixes_per_run", "many"),
++        ("max_tokens", -1),
++        ("max_wall_clock_min", -0.5),
++        ("max_fixes_per_run", -2),
++    ],
++)
++def test_budget_values_must_be_non_negative_numbers(tmp_path, key, value):
++    from scripts.governance.loop.warrant import Warrant, WarrantValidationError
++
++    bad = {**VALID_WARRANT, "budget": {**VALID_WARRANT["budget"], key: value}}
++    p = _write_warrant(tmp_path, bad)
++    with pytest.raises(WarrantValidationError) as exc:
++        Warrant.from_yaml(p)
++    msg = str(exc.value)
++    assert f"budget.{key}" in msg
++
++
+ # ---------------------------------------------------------------------------
+ # Mid-run re-validation (VAL-WARRANT-007)
+ # ---------------------------------------------------------------------------
+@@ -342,6 +375,16 @@ def test_cli_budget_under_limit_exits_zero(tmp_path):
+     assert proc.returncode == 0, f"stdout={proc.stdout!r} stderr={proc.stderr!r}"
+ 
+ 
++def test_cli_malformed_budget_yaml_exits_two_without_traceback(tmp_path):
++    bad = {**VALID_WARRANT, "budget": {**VALID_WARRANT["budget"], "max_tokens": "many"}}
++    p = _write_warrant(tmp_path, bad)
++    proc = _run_cli(["check-budget", str(p), "--used-tokens", "1"])
++    assert proc.returncode == 2
++    out = proc.stdout + proc.stderr
++    assert "budget.max_tokens" in out
++    assert "Traceback" not in out
++
++
+ def test_cli_stage_entry_expired_refused_nonzero(tmp_path):
+     """VAL-WARRANT-007: mid-run expiry refused at next stage entry (non-zero)."""
+     bad = {**VALID_WARRANT, "expires_at": "2000-01-01T00:00:00Z"}
+diff --git a/tests/governance/loop/test_wire_ci_gate.py b/tests/governance/loop/test_wire_ci_gate.py
+index b18e34449..a0362e13a 100644
+--- a/tests/governance/loop/test_wire_ci_gate.py
++++ b/tests/governance/loop/test_wire_ci_gate.py
+@@ -7,6 +7,7 @@ import subprocess
+ from datetime import datetime, timedelta, timezone
+ from pathlib import Path
+ 
++import pytest
+ import yaml
+ 
+ from scripts.governance.loop.runs import Run
+@@ -39,6 +40,20 @@ def _workflow_steps(doc: dict) -> list[dict]:
+     return doc["jobs"]["loop-ratchet-gates"]["steps"]
+ 
+ 
++def _green_ratchet_repo(tmp_path: Path) -> Path:
++    repo = tmp_path / "green-ratchet-repo"
++    script_dir = repo / "scripts" / "governance" / "hygiene"
++    script_dir.mkdir(parents=True, exist_ok=True)
++    (script_dir / "ratchet.py").write_text(
++        "import json\n"
++        "import sys\n"
++        "if '--json' in sys.argv:\n"
++        "    print(json.dumps({'status': 'ok', 'stub': True}))\n"
++        "sys.exit(0)\n"
++    )
++    return repo
++
++
+ def test_default_workflow_file_is_valid_and_has_required_triggers():
+     doc = _load_yaml(WORKFLOW)
+ 
+@@ -186,6 +201,33 @@ def test_wire_ci_gate_validates_yaml_after_write_and_fails_on_malformed(tmp_path
+     assert "YAML" in proc.stderr or "yaml" in proc.stderr
+ 
+ 
++def test_validate_workflow_rejects_missing_runs_on():
++    from scripts.governance.loop.wire_ci_gate import WorkflowError, validate_workflow
++
++    workflow = {
++        "on": {"push": {}, "pull_request": {}, "merge_group": None},
++        "jobs": {"loop-ratchet-gates": {"steps": [{"name": "Gate", "run": "true"}]}},
++    }
++    with pytest.raises(WorkflowError, match="runs-on"):
++        validate_workflow(workflow)
++
++
++def test_validate_workflow_rejects_step_without_run_or_uses():
++    from scripts.governance.loop.wire_ci_gate import WorkflowError, validate_workflow
++
++    workflow = {
++        "on": {"push": {}, "pull_request": {}, "merge_group": None},
++        "jobs": {
++            "loop-ratchet-gates": {
++                "runs-on": "ubuntu-latest",
++                "steps": [{"name": "Missing command"}],
++            }
++        },
++    }
++    with pytest.raises(WorkflowError, match="run.*uses|uses.*run"):
++        validate_workflow(workflow)
++
++
+ def _make_warrant_dict() -> dict:
+     return {
+         "id": "wire-learn-test",
+@@ -304,6 +346,8 @@ def test_prompt_audit_learn_wire_ci_flag_updates_workflow(tmp_path):
+             "--wire-ci",
+             "--ci-workflow",
+             str(workflow),
++            "--repo-root",
++            str(_green_ratchet_repo(tmp_path)),
+         ],
+         capture_output=True,
+         text=True,

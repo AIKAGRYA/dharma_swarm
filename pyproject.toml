@@ -38,6 +38,11 @@ infra = [
     "qdrant-client>=1.11.0",
     "neo4j>=5.25.0",
 ]
+vector = [
+    "lancedb>=0.14",
+    "scikit-learn>=1.4",
+    "sqlite-vec>=0.1.6",
+]
 ginko = [
     "hmmlearn>=0.3",
     "arch>=6.0",
@@ -47,6 +52,7 @@ ginko = [
 [project.scripts]
 dharma-swarm = "dharma_swarm.cli:app"
 dgc = "dharma_swarm.dgc_cli:main"
+operator-idea-spark = "dharma_swarm.idea_spark.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["dharma_swarm*"]

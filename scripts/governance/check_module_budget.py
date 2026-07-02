@@ -39,7 +39,8 @@ GRANDFATHERED: dict[str, int] = {
     "dharma_swarm/providers.py": 3096,
     # 2026-06-12: re-grandfathered from 2525 — #557 spine-dispatch (main) +
     # lane EvidenceReceipt persistence took it to 2923; decomposition issue #582.
-    "dharma_swarm/orchestrator.py": 2923,
+    # 2026-06-30: active lane growth tracked by decomposition issues #548/#582.
+    "dharma_swarm/orchestrator.py": 3238,
     "dharma_swarm/tui/app.py": 2520,
     "dharma_swarm/terminal_bridge.py": 2539,
     "dharma_swarm/operator_core/control_surface.py": 1001,
@@ -51,6 +52,10 @@ GRANDFATHERED: dict[str, int] = {
     "dharma_swarm/operator_core/control_surface_memory.py": 1240,
     "dharma_swarm/operator_core/living_agent_kernel.py": 2921,
     "dharma_swarm/operator_core/runtime_truth.py": 1008,
+    # 2026-06-30: operator coherence cockpit rescue lane; decomposition issue #725.
+    "dharma_swarm/operator_core/operator_coherence_cockpit.py": 2012,
+    # 2026-06-30: vector storage/live-gate growth; decomposition issue #726.
+    "dharma_swarm/vector_store.py": 1256,
 }
 
 LINE_BUDGET = 1000  # New modules: hard limit.

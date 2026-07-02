@@ -1,0 +1,10 @@
+ reports/governance/active_track_evidence.json | 16 ++++++++--------
+ reports/governance/active_track_evidence.md   | 10 +++++-----
+ reports/governance/track_portfolio.json       | 16 ++++++++--------
+ tests/test_canonical_replay.py                |  3 ++-
+ tests/test_constitutional_size_check.py       |  3 ++-
+ tests/test_ginko_evolution.py                 |  7 +++++++
+ tests/test_godel_claw_e2e.py                  |  6 +++---
+ tests/test_organism_boot.py                   |  4 ++--
+ tests/test_phase3_integration.py              |  4 ++--
+ 9 files changed, 39 insertions(+), 30 deletions(-)

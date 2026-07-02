@@ -211,6 +211,33 @@ def test_spine_dispatch_success_emits_one_receipt_and_returns_result():
     assert td.metadata["evidence_receipt_id"] == str(receipt.receipt_id)
 
 
+def test_spine_dispatch_receipt_carries_actual_served_route_metadata():
+    class Runner:
+        async def run_task(self, task):
+            self.actual_served_provider = "ollama"
+            self.actual_served_model = "glm-5:cloud"
+            self.provider_model_truth_source = "runtime_provider.actual_served"
+            return "RUN_RESULT"
+
+    me = _stub_self()
+    td = _stub_td(task_id="t-served")
+    task = types.SimpleNamespace(metadata={})
+
+    result = asyncio.run(
+        Orchestrator._run_task_via_spine(me, Runner(), task, td, 5.0)
+    )
+
+    assert result == "RUN_RESULT"
+    receipt = me._last_evidence_receipt
+    assert receipt.provider == "ollama"
+    assert receipt.model == "glm-5:cloud"
+    assert receipt.attributes["actual_served_provider"] == "ollama"
+    assert receipt.attributes["actual_served_model"] == "glm-5:cloud"
+    assert receipt.attributes["provider_model_truth_source"] == (
+        "runtime_provider.actual_served"
+    )
+
+
 def test_spine_dispatch_failure_reraises_and_records_failed_receipt():
     class BoomRunner:
         async def run_task(self, task):
@@ -332,6 +359,49 @@ def test_spine_dispatch_persists_receipt_json_to_the_stores_db(tmp_path):
     assert blob["task_id"] == "t-persist"
     assert blob["operation"] == "invoke_agent"
     assert blob["receipt_id"] == str(me._last_evidence_receipt.receipt_id)
+
+
+def test_spine_dispatch_persists_actual_served_provider_and_model(tmp_path):
+    import json
+    import sqlite3
+
+    db_path = tmp_path / "runtime.db"
+    conn = sqlite3.connect(db_path)
+    conn.execute("CREATE TABLE delegation_runs (task_id TEXT PRIMARY KEY, status TEXT)")
+    conn.execute(
+        "INSERT INTO delegation_runs (task_id, status) VALUES ('t-served-persist', 'running')"
+    )
+    conn.commit()
+    conn.close()
+
+    class Runner:
+        async def run_task(self, task):
+            self.actual_served_provider = "nvidia_nim"
+            self.actual_served_model = "meta/llama-3.3-70b-instruct"
+            self.provider_model_truth_source = "runtime_provider.actual_served"
+            return "RUN_RESULT"
+
+    me = _stub_self_with_store(db_path)
+    td = _stub_td(task_id="t-served-persist")
+    task = types.SimpleNamespace(metadata={})
+
+    result = asyncio.run(
+        Orchestrator._run_task_via_spine(me, Runner(), task, td, 5.0)
+    )
+
+    assert result == "RUN_RESULT"
+    conn = sqlite3.connect(db_path)
+    row = conn.execute(
+        "SELECT receipt_json FROM delegation_runs WHERE task_id='t-served-persist'"
+    ).fetchone()
+    conn.close()
+    assert row is not None and row[0], "receipt_json must be populated"
+    blob = json.loads(row[0])
+    assert blob["provider"] == "nvidia_nim"
+    assert blob["model"] == "meta/llama-3.3-70b-instruct"
+    assert blob["attributes"]["provider_model_truth_source"] == (
+        "runtime_provider.actual_served"
+    )
 
 
 def test_spine_dispatch_zero_row_persist_is_loud_not_silent(tmp_path, caplog):

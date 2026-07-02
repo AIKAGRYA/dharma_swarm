@@ -32,6 +32,22 @@ def test_terminal_bridge_bootstraps_commands_and_adapters() -> None:
         asyncio.run(bridge.close())
 
 
+def test_terminal_bridge_materializes_memory_common(monkeypatch) -> None:
+    bridge = TerminalBridge()
+    monkeypatch.setattr(
+        "dharma_swarm.memory_common.render_memory_common_command",
+        lambda arg, **kwargs: f"memory common rendered: {arg}",
+        raising=True,
+    )
+
+    try:
+        output = bridge._materialize_async_command("memory common agent task", "async:memory:common agent task")
+    finally:
+        asyncio.run(bridge.close())
+
+    assert output == "memory common rendered: common agent task"
+
+
 def test_session_start_creates_store_entry_before_tool_permissions(tmp_path, capsys) -> None:
     class FakeProfile:
         model_id = "gpt-5.4"

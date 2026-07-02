@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check bug-corral-scan name-drift-preflight semantic-commons-check semantic-commons-project agent-admit onboard-agent codex-composer-bootstrap codex-composer-once codex-composer-status codex-composer-start codex-composer-stop docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke runtime-truth-ci runtime-truth-closeout runtime-truth-burn-in runtime-truth-burn-in-smoke runtime-truth-100-audit runtime-task-firebreak ds-goal-longrun-preflight-check governance-all agent-build-preflight agent-build-closeout cybernetics-codex-audit spine-check onboard offboard orient status go-fmt-check go-test go-vet go-ci xray compile test-smoke test-all dashboard-lint dashboard-build
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check bug-corral-scan name-drift-preflight semantic-commons-check semantic-commons-project agent-admit onboard-agent codex-composer-bootstrap codex-composer-once codex-composer-status codex-composer-start codex-composer-stop docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop tmux-bootstrap tmux-status tmux-substrate-contract memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke runtime-truth-ci runtime-truth-closeout runtime-truth-burn-in runtime-truth-burn-in-smoke runtime-truth-100-audit runtime-task-firebreak ds-goal-longrun-preflight-check governance-all agent-build-preflight agent-build-closeout cybernetics-codex-audit spine-check onboard offboard orient status go-fmt-check go-test go-vet go-ci xray compile test-smoke test-all dashboard-lint dashboard-build
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently.
@@ -23,6 +23,8 @@ GO_WORLD_SCOUT_MODULE := tools/world_scout_go
 GO_MODULES := $(GO_SDK_MODULE) $(GO_EVIDENCE_MODULE) $(GO_GITHUB_INGESTOR_MODULE) $(GO_WORLD_SIGNAL_INGESTOR_MODULE) $(GO_WORLD_SCOUT_MODULE)
 GO_CACHE_DIR ?= /tmp/dharma-swarm-go-build
 GO_MOD_CACHE_DIR ?= /tmp/dharma-swarm-go-mod
+TMUX ?= tmux
+TMUX_MANAGED_SESSIONS := dharma-control dharma-agents dharma-vps
 
 help:
 	@echo ""
@@ -78,6 +80,9 @@ help:
 	@echo "  make mike-cycle ARGS='--cycle-mode dry-run --max-prs 5' Run one supervised Mike cycle"
 	@echo "  make mike-tmux-start Start Mike's dry-run daemon lane in tmux"
 	@echo "  make mike-tmux-stop  Stop Mike's tmux daemon lane"
+	@echo "  make tmux-bootstrap Create standard local tmux cockpit sessions"
+	@echo "  make tmux-status  Report standard local tmux cockpit sessions"
+	@echo "  make tmux-substrate-contract Verify tmux docs/census contract wiring"
 	@echo "  make memory-kernel-readiness Run read-only MemoryKernel readiness gates"
 	@echo "  make memory-kernel-readiness-strict Require 100% strict MemoryKernel readiness"
 	@echo "  make memory-kernel-burn-in Append M3 context preview burn-in receipts"
@@ -278,7 +283,7 @@ nats-live-production-matrix:
 	$(REPO_PYTHON) scripts/governance/run_nats_live_production_matrix.py --endpoint $${NATS_URL:-nats://127.0.0.1:4222} --broker-profile $${NATS_PROFILE:-local-live-jetstream}
 
 uplift-guards:
-	python3 scripts/uplift_guards/run_pre_commit.py
+	$(PYTHON) scripts/uplift_guards/run_pre_commit.py
 
 module-budget:
 	$(PYTHON) scripts/governance/check_module_budget.py \
@@ -382,6 +387,39 @@ mike-tmux-start:
 
 mike-tmux-stop:
 	$(PYTHON) scripts/runtime/merge_master_mike_daemon.py tmux-stop $${ARGS:-}
+
+tmux-bootstrap:
+	@command -v $(TMUX) >/dev/null || (printf "tmux not found\n"; exit 127)
+	@for session in $(TMUX_MANAGED_SESSIONS); do \
+		if $(TMUX) has-session -t "$$session" 2>/dev/null; then \
+			printf "tmux session '%s' already running\n" "$$session"; \
+		else \
+			$(TMUX) new-session -d -s "$$session" -c "$(CURDIR)"; \
+			printf "tmux session '%s' created\n" "$$session"; \
+		fi; \
+	done
+
+tmux-status:
+	@command -v $(TMUX) >/dev/null || (printf "tmux not found\n"; exit 127)
+	@$(TMUX) -V
+	@$(TMUX) ls 2>/dev/null || true
+	@missing=0; \
+	for session in $(TMUX_MANAGED_SESSIONS); do \
+		if $(TMUX) has-session -t "$$session" 2>/dev/null; then \
+			printf "managed session '%s': live\n" "$$session"; \
+		else \
+			printf "managed session '%s': missing\n" "$$session"; \
+			missing=1; \
+		fi; \
+	done; \
+	exit $$missing
+
+tmux-substrate-contract:
+	@grep -q "dharma-control" docs/ops/TMUX_AGENT_SUBSTRATE.md
+	@grep -q "dharma-agents" docs/ops/TMUX_AGENT_SUBSTRATE.md
+	@grep -q "dharma-vps" docs/ops/TMUX_AGENT_SUBSTRATE.md
+	@grep -q "managed_tmux = {\"dharma-control\", \"dharma-agents\", \"dharma-vps\"}" scripts/runtime/live_ops_census.py
+	@$(MAKE) -s tmux-status
 
 memory-kernel-readiness:
 	$(REPO_PYTHON) scripts/memory_kernel_readiness.py --repo-root . --dry-run

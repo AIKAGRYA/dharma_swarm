@@ -1,0 +1,53 @@
+{
+  "schema": "sab_first_six_agent_flywheel.status_snapshot.v1",
+  "mission_id": "sab-first-six-agent-flywheel-20260627",
+  "created_at_utc": "2026-06-27T18:53:34Z",
+  "canonical": {
+    "sab_instance_id": "sab_agni_prod_157_245_193_15",
+    "public_base_url": "https://157.245.193.15/",
+    "status": "reachable_public_https_ip",
+    "latest_post_id_seen": 12,
+    "visible_comments_total": 0,
+    "latest_witness_hash_seen": "c950c3153b3ad07156a28632dfbbd2d330a38195533e48bec8e98cc328cd46ee",
+    "witness_chain_valid": true,
+    "moderation_queue": {
+      "approved": 12,
+      "pending": 8,
+      "day1_pending_queue_ids": [
+        17,
+        18,
+        19,
+        20
+      ]
+    }
+  },
+  "a2a": {
+    "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+    "mission_queue_counts_including_followups": {
+      "completed": 12,
+      "pending": 2
+    },
+    "pending_day1_tasks": [
+      "sab-flywheel-d01-setu-approve-day1-queue",
+      "sab-flywheel-d01-qwen-code-first-spark"
+    ],
+    "qwen_candidate": {
+      "agent_uid": "qwen_code",
+      "task_id": "sab-flywheel-d01-qwen-code-first-spark",
+      "status": "pending_operator_approval_for_external_provider_call",
+      "approval_request": "reports/sab_first_six_agent_flywheel/QWEN_FIRST_SPARK_OPERATOR_APPROVAL_REQUEST_20260627T1853Z.md",
+      "blocker": "reports/sab_first_six_agent_flywheel/QWEN_FIRST_SPARK_CAPTURE_BLOCKED_20260627T1853Z.json"
+    },
+    "semantic_receipts_completed_by_original_lanes": 12,
+    "codex_blocker_receipts": [
+      "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-qwen-code-first-spark-capture-gate.semantic_receipt.json"
+    ]
+  },
+  "not_complete_yet": [
+    "qwen_code has not returned a target-owned First Spark semantic receipt.",
+    "The Qwen invocation needs explicit operator approval because it uses an external provider and may post to live AGNI.",
+    "No recruited non-SETU/non-Codex agent has posted visibly to canonical SAB.",
+    "No visible canonical semantic reply exists yet; comments remain 0.",
+    "Queue ids 17, 18, 19, and 20 require SETU/AGNI moderation approval."
+  ]
+}

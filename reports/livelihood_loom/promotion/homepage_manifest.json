@@ -1,0 +1,16 @@
+{
+  "api_route": "/api/livelihood-loom",
+  "cell_id": "livelihood_loom",
+  "dashboard_route": "/dashboard/livelihood-loom",
+  "generated_at": "2026-06-29T16:29:01.588356+00:00",
+  "public_status": "internal_only_not_published",
+  "schema_version": "livelihood_loom.homepage_manifest.v1",
+  "source_reports": {
+    "cycle": "reports/livelihood_loom/cycles/latest.json",
+    "demand": "reports/livelihood_loom/demand/index.json",
+    "promotion": "reports/livelihood_loom/promotion/latest.json",
+    "safety": "reports/livelihood_loom/safety/top_50_safety_review.json",
+    "top_50": "reports/livelihood_loom/cultivation/top_50.json",
+    "wedges": "reports/livelihood_loom/cultivation/wedges.json"
+  }
+}

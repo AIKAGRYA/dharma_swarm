@@ -1,0 +1,11 @@
+## codex/active-track-graduation-20260630...origin/main
+ M CLAUDE.md
+ M docs/governance/ACTIVE_TRACK.yaml
+ M docs/governance/BUILD_SESSION_ENTRYPOINT.md
+ M docs/governance/SOVEREIGN_MANIFEST.md
+AM reports/governance/ACTIVE_TRACK_CLOSEOUT_2026-06-30.md
+ M reports/governance/active_track_evidence.json
+ M reports/governance/active_track_evidence.md
+ M reports/governance/track_portfolio.json
+ M tests/test_track_closure_rigor.py
+?? reports/agentops/decorrelated_review_council/

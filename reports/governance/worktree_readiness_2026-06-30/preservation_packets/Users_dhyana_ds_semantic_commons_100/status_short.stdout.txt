@@ -1,0 +1,39 @@
+## codex/semantic-commons-livingdock-composer-100...origin/main [behind 23]
+ M Makefile
+ M dharma_swarm/fs_substrate/okf.py
+ M dharma_swarm/persistent_agent.py
+ M docs/ontology/semantic_aliases.yaml
+ M docs/ontology/semantic_objects.yaml
+ M reports/governance/active_track_evidence.json
+ M reports/governance/active_track_evidence.md
+ M reports/governance/track_portfolio.json
+ M tests/test_okf_projection.py
+?? dharma_swarm/living_dock_verifier.py
+?? dharma_swarm/verify/d_score.py
+?? docs/agents/codex_telos/
+?? docs/agents/factory_droid/
+?? docs/agents/operator_guide_cursor/
+?? docs/agents/sarathi/
+?? docs/architecture/AGENT_HIERARCHY_MATURITY_MAP.md
+?? docs/architecture/APEX_HOLON_LONG_RUNNING_GOAL_SPEC.md
+?? docs/ontology/pkm_projection.yaml
+?? docs/ontology/retrieval_scope.yaml
+?? docs/ontology/session_orientation.yaml
+?? docs/ops/AGENT_ADMISSION.md
+?? docs/plans/2026-06-26-semantic-commons-livingdock-codex-composer-100-goal-spec.md
+?? docs/sovereign_holons/CODEX_COMPOSER_WAKE_LOOP.md
+?? reports/agents/
+?? reports/governance/semantic_commons_livingdock_codex_composer_scorecard_2026-06-26.md
+?? scripts/governance/agent_admission.py
+?? scripts/governance/agent_admission_projection.py
+?? scripts/governance/d_score_verifier.py
+?? scripts/governance/living_dock_verifier.py
+?? scripts/governance/name_drift_preflight.py
+?? scripts/runtime/codex_composer_wake_loop.py
+?? tests/test_agent_admission.py
+?? tests/test_codex_composer_wake_loop.py
+?? tests/test_d_score_verifier.py
+?? tests/test_living_dock_verifier.py
+?? tests/test_name_drift_preflight.py
+?? tests/test_semantic_commons.py
+?? tests/test_semantic_commons_projection.py

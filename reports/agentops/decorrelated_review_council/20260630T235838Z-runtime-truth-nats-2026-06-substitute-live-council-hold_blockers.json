@@ -1,0 +1,186 @@
+{
+  "blockers": [
+    "groqqwen: APIStatusError Error code: 413 - {'error': {'message': 'Request too large for model `qwen/qwen3-32b` in organization `org_01kmg5twh6f83byc0j3pnj7c8m` service tier `on_demand` on tokens per minute (TPM): Limit 6000, Requested 31357, please reduce your message size and try again. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}",
+    "groqqwen: disagreement=Error code: 413 - {'error': {'message': 'Request too large for model `qwen/qwen3-32b` in organization `org_01kmg5twh6f83byc0j3pnj7c8m` service tier `on_demand` on tokens per minute (TPM): Limit 6000, Requested 31357, please reduce your mess",
+    "groqllama: APIStatusError Error code: 413 - {'error': {'message': 'Request too large for model `llama-3.3-70b-versatile` in organization `org_01kmg5twh6f83byc0j3pnj7c8m` service tier `on_demand` on tokens per minute (TPM): Limit 12000, Requested 28093, please reduce your message size and try again. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}",
+    "groqllama: disagreement=Error code: 413 - {'error': {'message': 'Request too large for model `llama-3.3-70b-versatile` in organization `org_01kmg5twh6f83byc0j3pnj7c8m` service tier `on_demand` on tokens per minute (TPM): Limit 12000, Requested 28093, please reduce",
+    "groqgptoss: APIStatusError Error code: 413 - {'error': {'message': 'Request too large for model `openai/gpt-oss-120b` in organization `org_01kmg5twh6f83byc0j3pnj7c8m` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 28305, please reduce your message size and try again. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}",
+    "groqgptoss: disagreement=Error code: 413 - {'error': {'message': 'Request too large for model `openai/gpt-oss-120b` in organization `org_01kmg5twh6f83byc0j3pnj7c8m` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 28305, please reduce your"
+  ],
+  "conviction_gate": "hold_blockers",
+  "critic_count": 6,
+  "critics": [
+    {
+      "actual_model": "nvidia/nemotron-3-ultra-550b-a55b-20260604:free",
+      "lane_id": "nemotron3ultra",
+      "latency_ms": 146360,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "reports/governance/runtime_truth_nats_final_evidence_2026-07-01.md",
+          "reports/governance/nats_live_production_matrix/latest.json",
+          "scripts/governance/check_nats_live_production_evidence.py",
+          "scripts/governance/check_nats_substrate_contract.py",
+          "scripts/runtime/a2a_send.py"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "All 12 required live matrix rows pass against fresh local JetStream broker (generated 2026-06-30T23:42:50Z, within 24h). Topology shows DS_TASKS/DS_DLQ streams, explicit-ack durable consumer a2a_task_handler with max_deliver=3. Happy path proves canonical envelope (dharma.nats.envelope.v1), stable Nats-Msg-Id, identity/causality headers, typed payload (dharma.a2a.nats_task.v1), live publish via A2ANatsTransport.publish_task, model-backed semantic receipt (glm-5.2:cloud), and handler ack. Failure paths verified: handler nack+redelivery (2 attempts), stale started idempotency retry, concurrent in-progress duplicate blocked (retry_blocked) then cleaned up, broker ack failure surfaced (nack then redelivery ack), max_deliver=3 exhausts to typed DLQ envelope (dharma.nats.dlq_failure.v1) with original ack, DLQ publish failure leaves original unacked and operator-visible beyond ack floor, restart redelivers same stream sequence. Governance-negative tamper path fails (return code 1). Active-track and Makefile gates enforce live evidence freshness. Compatibility publisher a2a_send.py explicitly marked non-canonical (canonical_runtime_truth_nats_task_path=false, production_readiness_claim_allowed=false) and cannot satisfy production gates. No stale, simulated, or bypass evidence remains.",
+        "verdict": "pass"
+      },
+      "provider": "openrouter_free",
+      "raw_response": "{\n  \"verdict\": \"pass\",\n  \"score\": 100,\n  \"summary\": \"All 12 required live matrix rows pass against fresh local JetStream broker (generated 2026-06-30T23:42:50Z, within 24h). Topology shows DS_TASKS/DS_DLQ streams, explicit-ack durable consumer a2a_task_handler with max_deliver=3. Happy path proves canonical envelope (dharma.nats.envelope.v1), stable Nats-Msg-Id, identity/causality headers, typed payload (dharma.a2a.nats_task.v1), live publish via A2ANatsTransport.publish_task, model-backed semantic receipt (glm-5.2:cloud), and handler ack. Failure paths verified: handler nack+redelivery (2 attempts), stale started idempotency retry, concurrent in-progress duplicate blocked (retry_blocked) then cleaned up, broker ack failure surfaced (nack then redelivery ack), max_deliver=3 exhausts to typed DLQ envelope (dharma.nats.dlq_failure.v1) with original ack, DLQ publish failure leaves original unacked and operator-visible beyond ack floor, restart redelivers same stream sequence. Governance-negative tamper path fails (return code 1). Active-track and Makefile gates enforce live evidence freshness. Compatibility publisher a2a_send.py explicitly marked non-canonical (canonical_runtime_truth_nats_task_path=false, production_readiness_claim_allowed=false) and cannot satisfy production gates. No stale, simulated, or bypass evidence remains.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"reports/governance/runtime_truth_nats_final_evidence_2026-07-01.md\",\n    \"reports/governance/nats_live_production_matrix/latest.json\",\n    \"scripts/governance/check_nats_live_production_evidence.py\",\n    \"scripts/governance/check_nats_substrate_contract.py\",\n    \"scripts/runtime/a2a_send.py\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "required": true
+    },
+    {
+      "actual_model": "meta/llama-3.3-70b-instruct",
+      "lane_id": "nimllama",
+      "latency_ms": 26283,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "reports/governance/runtime_truth_nats_final_evidence_2026-07-01.md",
+          "reports/governance/nats_live_production_matrix/latest.json",
+          "scripts/governance/check_nats_live_production_evidence.py",
+          "scripts/governance/check_nats_substrate_contract.py",
+          "scripts/runtime/a2a_send.py"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "The provided evidence proves end-to-end readiness for the scoped live broker profile.",
+        "verdict": "pass"
+      },
+      "provider": "nvidia_nim",
+      "raw_response": "{\"verdict\": \"pass\", \"score\": 100, \"summary\": \"The provided evidence proves end-to-end readiness for the scoped live broker profile.\", \"blockers\": [], \"required_changes\": [], \"evidence_checked\": [\"reports/governance/runtime_truth_nats_final_evidence_2026-07-01.md\", \"reports/governance/nats_live_production_matrix/latest.json\", \"scripts/governance/check_nats_live_production_evidence.py\", \"scripts/governance/check_nats_substrate_contract.py\", \"scripts/runtime/a2a_send.py\"], \"explicit_disagreement\": \"\"}",
+      "requested_model": "meta/llama-3.3-70b-instruct",
+      "required": true
+    },
+    {
+      "actual_model": "deepseek-ai/deepseek-v4-pro",
+      "lane_id": "nimdeepseekv4",
+      "latency_ms": 7830,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "reports/governance/nats_live_production_matrix/latest.json (fresh, all rows pass)",
+          "scripts/governance/check_nats_live_production_evidence.py (validates schema, staleness, topology, all row invariants)",
+          "scripts/governance/check_nats_substrate_contract.py (validates spec, Makefile, transport markers, a2a_send non-canonical markers)",
+          "scripts/runtime/a2a_send.py (marked CANONICAL_RUNTIME_TRUTH_NATS_TASK_PATH=False, production_readiness_claim_allowed=False)",
+          "reports/governance/runtime_truth_nats_final_evidence_2026-07-01.md (confirms live matrix run, verification commands, governance changes)"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "All 12 required live matrix rows pass with fresh evidence (2026-06-30T23:42:50Z, within 24h). Topology confirms DS_TASKS/DS_DLQ streams, explicit ack consumer a2a_task_handler with max_deliver=3. Happy path proves canonical dharma.nats.envelope.v1, Nats-Msg-Id, identity/causality headers, typed payload, live model-backed semantic receipt, and broker ack. Handler failure nacks and redelivers successfully. Stale/concurrent idempotency paths correctly retry or block/nack. Ack failure surfaces truthfully and redelivers. MaxDeliver publishes typed DLQ envelope and acks original. DLQ publish failure does not falsely ack original and leaves operator-visible state. Restart path proves redelivery without lost work. Governance negative path fails as required. Compatibility publisher a2a_send.py is marked non-canonical and cannot satisfy production gates. Makefile and contract checker enforce fresh live evidence. No blockers remain.",
+        "verdict": "approve"
+      },
+      "provider": "nvidia_nim",
+      "raw_response": "{\n  \"verdict\": \"approve\",\n  \"score\": 100,\n  \"summary\": \"All 12 required live matrix rows pass with fresh evidence (2026-06-30T23:42:50Z, within 24h). Topology confirms DS_TASKS/DS_DLQ streams, explicit ack consumer a2a_task_handler with max_deliver=3. Happy path proves canonical dharma.nats.envelope.v1, Nats-Msg-Id, identity/causality headers, typed payload, live model-backed semantic receipt, and broker ack. Handler failure nacks and redelivers successfully. Stale/concurrent idempotency paths correctly retry or block/nack. Ack failure surfaces truthfully and redelivers. MaxDeliver publishes typed DLQ envelope and acks original. DLQ publish failure does not falsely ack original and leaves operator-visible state. Restart path proves redelivery without lost work. Governance negative path fails as required. Compatibility publisher a2a_send.py is marked non-canonical and cannot satisfy production gates. Makefile and contract checker enforce fresh live evidence. No blockers remain.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"reports/governance/nats_live_production_matrix/latest.json (fresh, all rows pass)\",\n    \"scripts/governance/check_nats_live_production_evidence.py (validates schema, staleness, topology, all row invariants)\",\n    \"scripts/governance/check_nats_substrate_contract.py (validates spec, Makefile, transport markers, a2a_send non-canonical markers)\",\n    \"scripts/runtime/a2a_send.py (marked CANONICAL_RUNTIME_TRUTH_NATS_TASK_PATH=False, production_readiness_claim_allowed=False)\",\n    \"reports/governance/runtime_truth_nats_final_evidence_2026-07-01.md (confirms live matrix run, verification commands, governance changes)\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "deepseek-ai/deepseek-v4-pro",
+      "required": true
+    },
+    {
+      "actual_model": "",
+      "failure_reason": "Error code: 413 - {'error': {'message': 'Request too large for model `qwen/qwen3-32b` in organization `org_01kmg5twh6f83byc0j3pnj7c8m` service tier `on_demand` on tokens per minute (TPM): Limit 6000, Requested 31357, please reduce your message size and try again. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}",
+      "failure_type": "APIStatusError",
+      "lane_id": "groqqwen",
+      "latency_ms": null,
+      "ok": false,
+      "parsed": {
+        "blockers": [
+          "Error code: 413 - {'error': {'message': 'Request too large for model `qwen/qwen3-32b` in organization `org_01kmg5twh6f83byc0j3pnj7c8m` service tier `on_demand` on tokens per minute (TPM): Limit 6000, Requested 31357, please reduce your message size and try again. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}"
+        ],
+        "evidence_checked": [],
+        "explicit_disagreement": "Error code: 413 - {'error': {'message': 'Request too large for model `qwen/qwen3-32b` in organization `org_01kmg5twh6f83byc0j3pnj7c8m` service tier `on_demand` on tokens per minute (TPM): Limit 6000, Requested 31357, please reduce your message size and try again. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}",
+        "required_changes": [
+          "Make groq:qwen/qwen3-32b reachable or mark the lane optional with justification."
+        ],
+        "score": 0,
+        "summary": "groqqwen could not run.",
+        "verdict": "blocked"
+      },
+      "provider": "groq",
+      "raw_response_preview": "",
+      "requested_model": "qwen/qwen3-32b",
+      "required": true
+    },
+    {
+      "actual_model": "",
+      "failure_reason": "Error code: 413 - {'error': {'message': 'Request too large for model `llama-3.3-70b-versatile` in organization `org_01kmg5twh6f83byc0j3pnj7c8m` service tier `on_demand` on tokens per minute (TPM): Limit 12000, Requested 28093, please reduce your message size and try again. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}",
+      "failure_type": "APIStatusError",
+      "lane_id": "groqllama",
+      "latency_ms": null,
+      "ok": false,
+      "parsed": {
+        "blockers": [
+          "Error code: 413 - {'error': {'message': 'Request too large for model `llama-3.3-70b-versatile` in organization `org_01kmg5twh6f83byc0j3pnj7c8m` service tier `on_demand` on tokens per minute (TPM): Limit 12000, Requested 28093, please reduce your message size and try again. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}"
+        ],
+        "evidence_checked": [],
+        "explicit_disagreement": "Error code: 413 - {'error': {'message': 'Request too large for model `llama-3.3-70b-versatile` in organization `org_01kmg5twh6f83byc0j3pnj7c8m` service tier `on_demand` on tokens per minute (TPM): Limit 12000, Requested 28093, please reduce your message size and try again. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}",
+        "required_changes": [
+          "Make groq:llama-3.3-70b-versatile reachable or mark the lane optional with justification."
+        ],
+        "score": 0,
+        "summary": "groqllama could not run.",
+        "verdict": "blocked"
+      },
+      "provider": "groq",
+      "raw_response_preview": "",
+      "requested_model": "llama-3.3-70b-versatile",
+      "required": true
+    },
+    {
+      "actual_model": "",
+      "failure_reason": "Error code: 413 - {'error': {'message': 'Request too large for model `openai/gpt-oss-120b` in organization `org_01kmg5twh6f83byc0j3pnj7c8m` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 28305, please reduce your message size and try again. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}",
+      "failure_type": "APIStatusError",
+      "lane_id": "groqgptoss",
+      "latency_ms": null,
+      "ok": false,
+      "parsed": {
+        "blockers": [
+          "Error code: 413 - {'error': {'message': 'Request too large for model `openai/gpt-oss-120b` in organization `org_01kmg5twh6f83byc0j3pnj7c8m` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 28305, please reduce your message size and try again. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}"
+        ],
+        "evidence_checked": [],
+        "explicit_disagreement": "Error code: 413 - {'error': {'message': 'Request too large for model `openai/gpt-oss-120b` in organization `org_01kmg5twh6f83byc0j3pnj7c8m` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 28305, please reduce your message size and try again. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}",
+        "required_changes": [
+          "Make groq:openai/gpt-oss-120b reachable or mark the lane optional with justification."
+        ],
+        "score": 0,
+        "summary": "groqgptoss could not run.",
+        "verdict": "blocked"
+      },
+      "provider": "groq",
+      "raw_response_preview": "",
+      "requested_model": "openai/gpt-oss-120b",
+      "required": true
+    }
+  ],
+  "generated_at": "20260630T235838Z",
+  "max_evidence_chars": 30000,
+  "max_output_tokens": 4000,
+  "persistent_agent_witness": {
+    "agent": "palantir-pilot",
+    "blocker": "",
+    "fresh": true,
+    "heartbeat_age_seconds": 10,
+    "heartbeat_timestamp": "2026-06-30T23:58:28Z",
+    "max_heartbeat_age_seconds": 300,
+    "raw_status": "status=running session=dharma_palantir_pilot_a2a_worker\nsubject=dharma.a2a.palantir-pilot\nconsumer=palantir_pilot_a2a\nstream=DHARMA_FLEET\nheartbeat=/Users/dhyana/.dharma/a2a_bus/worker_heartbeats/palantir-pilot.json\nlog=/Users/dhyana/.dharma/logs/palantir_pilot_a2a_worker/dharma_palantir_pilot_a2a_worker.log\n--- heartbeat ---\n{\n    \"agent_id\": \"palantir_pilot\",\n    \"callsign\": \"palantir-pilot\",\n    \"consumer\": \"palantir_pilot_a2a\",\n    \"cycle\": 1073,\n    \"last_receipt_path\": \"\",\n    \"receipt_count\": 0,\n    \"schema_version\": \"dharma.a2a.palantir_pilot.worker_heartbeat.v1\",\n    \"status\": \"IDLE\",\n    \"stream\": \"DHARMA_FLEET\",\n    \"subject\": \"dharma.a2a.palantir-pilot\",\n    \"suppress_no_messages\": true,\n    \"timestamp\": \"2026-06-30T23:58:28Z\"\n}\n--- consumer ---\n{\n  \"stream_name\": \"DHARMA_FLEET\",\n  \"name\": \"palantir_pilot_a2a\",\n  \"config\": {\n    \"ack_policy\": \"explicit\",\n    \"ack_wait\": 30000000000,\n    \"deliver_policy\": \"all\",\n    \"durable_name\": \"palantir_pilot_a2a\",\n    \"name\": \"palantir_pilot_a2a\",\n    \"filter_subject\": \"dharma.a2a.palantir-pilot\",\n    \"max_ack_pending\": 1000,\n    \"max_deliver\": -1,\n    \"max_waiting\": 512,\n    \"replay_policy\": \"instant\",\n    \"num_replicas\": 0,\n    \"metadata\": {\n      \"_nats.level\": \"3\",\n      \"_nats.req.level\": \"0\",\n      \"_nats.ver\": \"2.12.6\"\n    },\n    \"pause_until\": \"0001-01-01T00:00:00Z\"\n  },\n  \"created\": \"2026-06-15T16:08:32.524099Z\",\n  \"delivered\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"ack_floor\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"num_ack_pending\": 0,\n  \"num_redelivered\": 0,\n  \"num_waiting\": 1,\n  \"num_pending\": 0,\n  \"ts\": \"2026-06-30T23:58:38.160486Z\"\n}\n--- latest worker receipts ---\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260618T014416Z-palantir-pilot-codex_hardened_spec_notice_20260618T0155Z_palantir-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260618T013101Z-palantir-pilot-palantir_a2a_hardening_20260618T0001Z-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260617T135931Z-palantir-pilot-longrun_spec_95_vote_20260617T135751Z-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260617T131705Z-palantir-pilot-7215f005165f-PALANTIR_PILOT_REPLIED.json\n/Users/dhyana/dharma_swarm/reports/a2a/palantir_pilot_worker_receipts/20260617T130349Z-palantir-pilot-761445fa892d-PALANTIR_PILOT_REPLIED.json\n",
+    "status": "running"
+  },
+  "prompt_chars": 89185,
+  "prompt_file": "/Users/dhyana/dharma_swarm/reports/agentops/decorrelated_review_council/prompts/runtime_truth_nats_final_adversarial_20260701.md",
+  "prompt_words_estimate": 5714,
+  "required_critic_count": 6,
+  "schema_version": "codex.decorrelated_review_council.v1",
+  "score_avg": 50.0,
+  "score_min": 0,
+  "target_score": 100,
+  "timeout_seconds": 300
+}

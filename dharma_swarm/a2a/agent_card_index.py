@@ -745,4 +745,3 @@ def write_agent_card_index_reports(index: dict[str, Any], out_dir: Path | str) -
         "findings_json": str(findings_path),
         "index_markdown": str(markdown_path),
     }
-

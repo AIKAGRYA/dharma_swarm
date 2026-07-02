@@ -271,6 +271,14 @@ def _format_idea_line(shard) -> str:
     )
 
 
+def _format_governed_retrieval_line(candidate) -> str:
+    snippet = candidate.content.replace("\n", " ").strip()[:180]
+    return (
+        f"  [governed:{candidate.layer}] "
+        f"score={candidate.score:.3f} | {candidate.source} | {snippet}"
+    )
+
+
 # ── L1: VISION — The meta-layer ─────────────────────────────────────
 
 # Crown jewels and specs to look for (first found wins)
@@ -618,6 +626,7 @@ def read_memory_context(
     consumer: str = "context.read_memory_context",
     task_id: str | None = None,
     allow_semantic_search: bool = True,
+    allow_governed_retrieval: bool = True,
     memory_kernel_shadow: bool = False,
     memory_kernel_context_mode: str | None = None,
     memory_kernel_shadow_home: Path | None = None,
@@ -641,6 +650,15 @@ def read_memory_context(
             surface_ids=memory_kernel_shadow_surfaces,
             callback=memory_kernel_shadow_callback,
         )
+
+    if query and allow_governed_retrieval:
+        governed_result = read_governed_retrieval_context(
+            state_dir=base_dir,
+            query=query,
+            limit=limit,
+        )
+        if governed_result:
+            return finish(governed_result)
 
     if query and plane_path.exists():
         try:
@@ -702,6 +720,41 @@ def read_memory_context(
         return finish("\n".join(f"  [{r['layer']}] {r['content'][:100]}" for r in rows))
     except Exception as e:
         return finish(f"Memory unavailable: {e}")
+
+
+def read_governed_retrieval_context(
+    state_dir: Path | None = None,
+    *,
+    query: str | None,
+    limit: int = 5,
+) -> str:
+    """Read agent context through the governed wiki/vector retrieval door."""
+
+    text = (query or "").strip()
+    if not text:
+        return ""
+    base_dir = state_dir or STATE_DIR
+    if not (base_dir / "vectors.db").exists():
+        return ""
+    try:
+        from dharma_swarm.memory_retrieval import GovernedRetrievalEngine, RetrievalQuery
+
+        engine = GovernedRetrievalEngine(state_dir=base_dir)
+        result = engine.retrieve(
+            RetrievalQuery(
+                text=text,
+                top_k=max(1, limit),
+                include_content=True,
+            )
+        )
+        if not result.candidates:
+            return ""
+        lines = ["# Governed Retrieval Context"]
+        lines.extend(_format_governed_retrieval_line(candidate) for candidate in result.candidates)
+        return "\n".join(lines)
+    except Exception:
+        logger.debug("Governed retrieval context failed", exc_info=True)
+        return ""
 
 
 def _run_memory_kernel_context_shadow(
