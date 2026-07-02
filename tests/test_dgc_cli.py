@@ -657,6 +657,70 @@ def test_dgc_cli_memory_command():
             mock.assert_called_once()
 
 
+def test_dgc_cli_spine_tail_command_dispatch():
+    """main() dispatches 'spine tail' to cmd_spine_tail with limit/follow forwarded."""
+    from dharma_swarm.dgc_cli import main
+
+    with patch("sys.argv", ["dgc", "spine", "tail", "--limit", "5", "--follow"]):
+        with patch("dharma_swarm.operator_core.spine_tail.cmd_spine_tail", return_value=0) as mock:
+            main()
+            mock.assert_called_once()
+            assert mock.call_args.kwargs["limit"] == 5
+            assert mock.call_args.kwargs["follow"] is True
+
+
+def test_dgc_cli_spine_tail_default_limit_no_follow():
+    """`dgc spine tail` defaults to limit=20 and follow disabled."""
+    from dharma_swarm.dgc_cli import main
+
+    with patch("sys.argv", ["dgc", "spine", "tail"]):
+        with patch("dharma_swarm.operator_core.spine_tail.cmd_spine_tail", return_value=0) as mock:
+            main()
+            mock.assert_called_once()
+            assert mock.call_args.kwargs["limit"] == 20
+            assert mock.call_args.kwargs["follow"] is False
+
+
+def test_cmd_spine_tail_prints_receipts_and_graceful_absence(tmp_path, capsys):
+    """cmd_spine_tail prints one line per receipt; missing DB is graceful, rc 0."""
+    import sqlite3
+
+    from dharma_swarm.operator_core.spine_tail import cmd_spine_tail
+
+    # Absent DB -> graceful message, no exception, rc 0.
+    missing = tmp_path / "nope.db"
+    assert cmd_spine_tail(db_path=missing) == 0
+    assert "spine not live on this host" in capsys.readouterr().out
+
+    # Populated DB -> receipt line rendered.
+    db = tmp_path / "runtime.db"
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            "CREATE TABLE delegation_runs ("
+            "run_id TEXT PRIMARY KEY, task_id TEXT, status TEXT, "
+            "started_at TEXT, trace_id TEXT DEFAULT '', receipt_json TEXT)"
+        )
+        receipt = json.dumps(
+            {
+                "trace_id": "abc123def456ghi",
+                "provider": "anthropic",
+                "model": "opus-4",
+                "status": "ok",
+                "started_at": "2026-07-02T12:00:00+00:00",
+            }
+        )
+        conn.execute(
+            "INSERT INTO delegation_runs VALUES (?, ?, ?, ?, ?, ?)",
+            ("run-1", "task-1", "completed", "2026-07-02T12:00:00+00:00", "abc123def456ghi", receipt),
+        )
+
+    assert cmd_spine_tail(db_path=db, limit=10) == 0
+    out = capsys.readouterr().out
+    assert "anthropic" in out
+    assert "opus-4" in out
+    assert "abc123def456" in out  # trace short (12 chars)
+
+
 def test_build_chat_context_snapshot_includes_latent_gold(monkeypatch, tmp_path):
     import dharma_swarm.dgc_cli as cli
 

@@ -38,6 +38,10 @@ services:
       - TINY_ROUTER_BACKEND=heuristic
       - DHARMA_EVOLUTION_SHADOW=${DHARMA_EVOLUTION_SHADOW:-0}
       - DGC_AUTONOMY_LEVEL=${DGC_AUTONOMY_LEVEL:-2}
+      # D1 (organism-rewire-2026-07): spine dispatch is STANDING here — every
+      # production dispatch flows through invoke_agent() and emits exactly one
+      # EvidenceReceipt, so Loop-1 closure reads LIVE persistently on the daemon.
+      - DHARMA_SPINE_DISPATCH=1
       - DHARMA_STATE_DIR=/root/.dharma
       - GUARDIAN_INTERVAL_SECONDS=14400
     restart: unless-stopped

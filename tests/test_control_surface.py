@@ -7,6 +7,7 @@ Observed reality comes from code, runtime, evidence adapters — not YAML.
 from __future__ import annotations
 
 import hashlib
+import json
 import sqlite3
 import textwrap
 from pathlib import Path
@@ -397,6 +398,77 @@ class TestRuntimeTruthProjection:
             and "RuntimeTruthPacket" in evidence.provenance_chain
             for evidence in row.evidence
         )
+
+
+def _write_delegation_runs_db(db_path: Path) -> None:
+    """Minimal runtime DB with a delegation_runs receipt_json row (spine pulse source)."""
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime.now(timezone.utc)
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "CREATE TABLE delegation_runs ("
+            "run_id TEXT PRIMARY KEY, task_id TEXT, status TEXT, "
+            "started_at TEXT, trace_id TEXT DEFAULT '', receipt_json TEXT)"
+        )
+
+        def _mk(run_id: str, status: str, provider: str, ago_seconds: int) -> None:
+            ts = (now - timedelta(seconds=ago_seconds)).isoformat()
+            blob = json.dumps(
+                {
+                    "trace_id": f"trace-{run_id}",
+                    "provider": provider,
+                    "model": "m1",
+                    "status": status,
+                    "started_at": ts,
+                }
+            )
+            conn.execute(
+                "INSERT INTO delegation_runs VALUES (?, ?, ?, ?, ?, ?)",
+                (run_id, f"task-{run_id}", "completed", ts, f"trace-{run_id}", blob),
+            )
+
+        _mk("r1", "ok", "anthropic", 30)
+        _mk("r2", "ok", "openrouter", 120)
+        _mk("r3", "dropped", "none", 300)
+        _mk("r4", "ok", "groq", 5000)  # older than the 1h window
+
+
+class TestSpinePulseProjection:
+    def test_spine_pulse_row_projects_metrics_read_only(
+        self,
+        tmp_repo: Path,
+        tmp_path: Path,
+    ) -> None:
+        runtime_db = tmp_path / "runtime.db"
+        _write_delegation_runs_db(runtime_db)
+        before_hash = hashlib.sha256(runtime_db.read_bytes()).hexdigest()
+
+        rows = build_control_surface_rows(repo_root=tmp_repo, runtime_db=runtime_db)
+        row = next(item for item in rows if item.id == "spine.pulse")
+
+        after_hash = hashlib.sha256(runtime_db.read_bytes()).hexdigest()
+        assert before_hash == after_hash  # read-only, no mutation
+        assert row.coherence_state == "bound"
+        assert row.raw["present"] is True
+        assert row.raw["receipts_last_hour"] == 3
+        assert row.raw["dispatch_dropoff_count"] == 1
+        assert row.raw["last_receipt_age_seconds"] is not None
+        assert row.raw["last_receipt_age_seconds"] >= 0
+
+    def test_spine_pulse_row_graceful_absence(
+        self,
+        tmp_repo: Path,
+        tmp_path: Path,
+    ) -> None:
+        runtime_db = tmp_path / "absent-runtime.db"  # never created
+        rows = build_control_surface_rows(repo_root=tmp_repo, runtime_db=runtime_db)
+        row = next(item for item in rows if item.id == "spine.pulse")
+
+        assert row.raw["present"] is False
+        assert row.coherence_state == "declared_only"
+        assert "spine_not_live" in row.gap_codes
+        assert "spine not live on this host" in row.raw["detail"]
 
 
 # ---------------------------------------------------------------------------

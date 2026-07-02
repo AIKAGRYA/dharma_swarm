@@ -95,6 +95,13 @@ launchctl load ~/Library/LaunchAgents/com.dharma.swarm.plist
 launchctl unload ~/Library/LaunchAgents/com.dharma.swarm.plist
 ```
 
+**Spine dispatch (D1, organism-rewire-2026-07):** the Docker `swarm` service sets
+`DHARMA_SPINE_DISPATCH=1` standing. The launchd/Mac daemon does NOT inherit compose
+env, so set it on the daemon host too — either add a `<key>EnvironmentVariables</key>`
+dict to the plist (`<key>DHARMA_SPINE_DISPATCH</key><string>1</string>`) or run
+`launchctl setenv DHARMA_SPINE_DISPATCH 1` before load (a repo `.env` also works when
+launching via `make boot`). Confirm with `dgc spine tail` — receipts should appear.
+
 ## 4. Health Checks
 
 ### Quick status
