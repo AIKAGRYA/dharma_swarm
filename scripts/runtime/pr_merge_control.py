@@ -35,6 +35,7 @@ except ModuleNotFoundError:
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_NATS_CA_PEM_PATH = REPO_ROOT / "dharma_swarm" / "a2a" / "nats" / "agni-ws-ca.pem"
 DEFAULT_STATE_ROOT = Path("~/.dharma/pr_review")
 REQUIRED_COHERENCE_FIELDS = (
     "Organ touched",
@@ -1767,7 +1768,7 @@ def _nats_config(env: dict[str, str], *, require_devin_secrets: bool) -> NATSCon
             user=env.get("NATS_USER", ""),
             credential=env.get("NATS_PASSWORD", ""),
             missing=(),
-            ca_pem=_normalize_ca_pem(env.get("NATS_CA_PEM", "")),
+            ca_pem=_resolve_nats_ca_pem(env, "NATS_CA_PEM"),
             tls_hostname=env.get("NATS_TLS_HOSTNAME", "").strip(),
             credential_family="direct",
         )
@@ -1798,12 +1799,12 @@ def _nats_config(env: dict[str, str], *, require_devin_secrets: bool) -> NATSCon
         or env.get("NATS_PASSWORD")
         or ""
     )
-    ca_pem = (
-        env.get("MERGE_MASTER_MIKE_NATS_CA_PEM")
-        or env.get("DEVIN_NATS_CA_PEM")
-        or env.get("DHARMA_NATS_CA_PEM")
-        or env.get("NATS_CA_PEM")
-        or ""
+    ca_pem = _resolve_nats_ca_pem(
+        env,
+        "MERGE_MASTER_MIKE_NATS_CA_PEM",
+        "DEVIN_NATS_CA_PEM",
+        "DHARMA_NATS_CA_PEM",
+        "NATS_CA_PEM",
     )
     tls_hostname = (
         env.get("MERGE_MASTER_MIKE_NATS_TLS_HOSTNAME")
@@ -1822,7 +1823,7 @@ def _nats_config(env: dict[str, str], *, require_devin_secrets: bool) -> NATSCon
         user=user,
         credential=auth_value,
         missing=tuple(missing),
-        ca_pem=_normalize_ca_pem(ca_pem),
+        ca_pem=ca_pem,
         tls_hostname=tls_hostname.strip(),
         credential_family=credential_family,
     )
@@ -1833,6 +1834,16 @@ def _normalize_ca_pem(value: str) -> str:
     if "\\n" in normalized and "\n" not in normalized:
         normalized = normalized.replace("\\n", "\n")
     return normalized + "\n" if normalized and not normalized.endswith("\n") else normalized
+
+
+def _resolve_nats_ca_pem(env: dict[str, str], *preferred_names: str) -> str:
+    for name in preferred_names:
+        pem = env.get(name, "").strip()
+        if pem:
+            return _normalize_ca_pem(pem)
+    if DEFAULT_NATS_CA_PEM_PATH.exists():
+        return _normalize_ca_pem(DEFAULT_NATS_CA_PEM_PATH.read_text(encoding="utf-8"))
+    return ""
 
 
 def _redacted_nats_config(config: NATSConfig) -> dict[str, Any]:

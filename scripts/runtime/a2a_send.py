@@ -67,6 +67,7 @@ DEFAULT_RECEIPT_DIR = REPO_ROOT / "reports" / "a2a" / "send_receipts"
 STATUS_SECRETS_MISSING = "NATS_SECRETS_MISSING"
 STATUS_NATS_CLIENT_MISSING = "NATS_CLIENT_MISSING"
 STATUS_PUBLISH_FAILED = "PUBLISH_FAILED"
+STATUS_PERMISSIONS_DENIED = "NATS_PERMISSIONS_DENIED"
 STATUS_PUBLISH_ACKED = "PUBLISH_ACKED"
 STATUS_PUBLISH_DEDUPED = "PUBLISH_DEDUPED"
 ACK_TIER_NO_CONTACT = "NO_CONTACT"
@@ -107,6 +108,14 @@ def _status_agent_label(envelope: dict[str, Any]) -> str:
         raw = str(envelope.get("subject") or "agent").rsplit(".", 1)[-1]
     chars = [char.upper() if char.isalnum() else "_" for char in raw]
     return "".join(chars).strip("_") or "AGENT"
+
+
+def _permissions_denied_message(config: NATSConfig, subject: str) -> str:
+    user = config.user or "current"
+    return (
+        f"broker rejected publish to {subject}: the {user} NATS credential is "
+        "not authorized to publish to this lane (server-side ACL)"
+    )
 
 
 def build_envelope(
@@ -159,6 +168,7 @@ async def _publish_and_wait(
         "consumed": False,
         "replied": False,
         "reply_payload": None,
+        "permissions_denied_detail": None,
     }
     tls_kwargs = _nats_tls_kwargs(config)
     if insecure_tls and not config.ca_pem:
@@ -166,7 +176,15 @@ async def _publish_and_wait(
         insecure_ctx.check_hostname = False
         insecure_ctx.verify_mode = ssl.CERT_NONE
         tls_kwargs["tls"] = insecure_ctx
+    permission_violation = asyncio.Event()
+
     async def _quiet_error_cb(exc: Exception) -> None:
+        message = str(exc)
+        if "permissions violation" in message.lower():
+            result["permissions_denied_detail"] = _permissions_denied_message(
+                config, envelope["subject"]
+            )
+            permission_violation.set()
         result["last_connection_error"] = type(exc).__name__
 
     nc = await nats.connect(
@@ -182,6 +200,12 @@ async def _publish_and_wait(
     try:
         consumed_event: asyncio.Event = asyncio.Event()
         replied_event: asyncio.Event = asyncio.Event()
+
+        async def _safe_unsubscribe(subscription: Any) -> None:
+            try:
+                await subscription.unsubscribe()
+            except Exception:
+                pass
 
         async def on_ack(msg: Any) -> None:
             consumed_event.set()
@@ -210,8 +234,20 @@ async def _publish_and_wait(
             result["ack_tier"] = None
             result["transport_ack"] = "JETSTREAM_PUB_ACK_AMBIGUOUS"
             result["error"] = type(exc).__name__
-            await ack_sub.unsubscribe()
-            await reply_sub.unsubscribe()
+            if result["permissions_denied_detail"] is None:
+                try:
+                    await asyncio.wait_for(permission_violation.wait(), timeout=0.5)
+                except Exception:
+                    pass
+            if result["permissions_denied_detail"] is None and "permissions violation" in str(exc).lower():
+                result["permissions_denied_detail"] = _permissions_denied_message(
+                    config, envelope["subject"]
+                )
+            if result["permissions_denied_detail"] is not None:
+                result["status"] = STATUS_PERMISSIONS_DENIED
+                result["error"] = result["permissions_denied_detail"]
+            await _safe_unsubscribe(ack_sub)
+            await _safe_unsubscribe(reply_sub)
             return result
         result["status"] = STATUS_PUBLISH_ACKED
 
@@ -242,10 +278,13 @@ async def _publish_and_wait(
             result["consumed"] = True
             result["ack_tier"] = ACK_TIER_HANDLER_ACKED
             result["status"] = f"{agent}_REPLIED"
-        await ack_sub.unsubscribe()
-        await reply_sub.unsubscribe()
+        await _safe_unsubscribe(ack_sub)
+        await _safe_unsubscribe(reply_sub)
     finally:
-        await nc.close()
+        try:
+            await asyncio.wait_for(nc.close(), timeout=2.0)
+        except Exception:
+            pass
     return result
 
 
@@ -465,7 +504,7 @@ def _evidence_status_for_publish(receipt: dict[str, Any]) -> tuple[str, str, str
         return "dropped", "guardrail_blocked", error_detail, False
     if status == STATUS_NATS_CLIENT_MISSING:
         return "failed", "provider_unreachable", error_detail, False
-    if status == STATUS_PUBLISH_FAILED:
+    if status in {STATUS_PUBLISH_FAILED, STATUS_PERMISSIONS_DENIED}:
         return "failed", "provider_failed", error_detail, True
     if status == STATUS_PUBLISH_DEDUPED:
         return "dropped", "guardrail_blocked", "duplicate publish skipped by idempotency", False
@@ -539,7 +578,16 @@ def _complete_runtime_publish(dispatch: dict[str, Any], receipt: dict[str, Any])
     identity = dispatch["identity"]
     side_effect_key = str(dispatch["side_effect_key"])
     status = str(receipt.get("status") or STATUS_PUBLISH_FAILED)
-    final_state = "completed" if status not in {STATUS_PUBLISH_FAILED, STATUS_NATS_CLIENT_MISSING} else "failed"
+    final_state = (
+        "completed"
+        if status
+        not in {
+            STATUS_PUBLISH_FAILED,
+            STATUS_NATS_CLIENT_MISSING,
+            STATUS_PERMISSIONS_DENIED,
+        }
+        else "failed"
+    )
     receipt_id = f"rr_{identity.run_id}_a2a_send_{status.lower()}"
     evidence_receipt = _build_publish_evidence_receipt(dispatch, receipt)
     evidence_ref = _evidence_receipt_ref(evidence_receipt)
@@ -633,7 +681,12 @@ def classify_contact_evidence(receipt: dict[str, Any]) -> dict[str, Any]:
             "collaboration_claim": "duplicate_publish_skipped",
             "operator_contact_note": "duplicate packet publish skipped by RuntimeStateStore idempotency",
         }
-    if status in {STATUS_SECRETS_MISSING, STATUS_NATS_CLIENT_MISSING, STATUS_PUBLISH_FAILED}:
+    if status in {
+        STATUS_SECRETS_MISSING,
+        STATUS_NATS_CLIENT_MISSING,
+        STATUS_PUBLISH_FAILED,
+        STATUS_PERMISSIONS_DENIED,
+    }:
         return {
             "contact_evidence_tier": ACK_TIER_NO_CONTACT,
             "live_contact_claim": False,
@@ -819,7 +872,7 @@ def main(argv: list[str] | None = None) -> int:
         return 3
     if receipt["status"] == STATUS_NATS_CLIENT_MISSING:
         return 4
-    if receipt["status"] == STATUS_PUBLISH_FAILED:
+    if receipt["status"] in {STATUS_PUBLISH_FAILED, STATUS_PERMISSIONS_DENIED}:
         return 1
     return 0
 
