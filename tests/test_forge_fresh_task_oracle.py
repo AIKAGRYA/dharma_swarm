@@ -102,6 +102,22 @@ def test_missing_fail_to_pass_suite_is_not_clean(tmp_path: Path) -> None:
     assert "missing_fail_to_pass_suite" in summary["skipped"][0]["blockers"]
 
 
+def test_test_files_alone_do_not_count_as_fail_to_pass(tmp_path: Path) -> None:
+    candidate = _pr_task(1, fail_to_pass=False)
+    candidate["test_files"] = ["tests/test_regression.py"]
+
+    summary = fresh_task_oracle.import_fresh_tasks(
+        [candidate],
+        model_cutoff="2026-06-01T00:00:00Z",
+        db_path=tmp_path / "taskbed.db",
+    )
+
+    assert summary["imported_count"] == 0
+    assert summary["skipped_count"] == 1
+    assert "missing_fail_to_pass_suite" in summary["skipped"][0]["blockers"]
+    assert taskbed_ledger.task_counts(db_path=tmp_path / "taskbed.db") == {}
+
+
 def test_jsonl_manifest_round_trip(tmp_path: Path) -> None:
     manifest = tmp_path / "tasks.jsonl"
     manifest.write_text(

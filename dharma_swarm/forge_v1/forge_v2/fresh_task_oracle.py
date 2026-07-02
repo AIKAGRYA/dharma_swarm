@@ -73,7 +73,7 @@ def _list_field(row: dict[str, Any], *names: str) -> list[Any]:
 
 
 def fail_to_pass_count(row: dict[str, Any]) -> int:
-    return len(_list_field(row, "fail_to_pass", "FAIL_TO_PASS", "tests", "test_files"))
+    return len(_list_field(row, "fail_to_pass", "FAIL_TO_PASS"))
 
 
 def evidence_timestamp(row: dict[str, Any]) -> datetime | None:
