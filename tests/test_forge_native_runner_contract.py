@@ -907,3 +907,107 @@ def test_sync_remote_receipts_copies_task_receipts_and_writes_manifest(tmp_path:
     assert manifest["live_apply_performed"] is False
     assert manifest["archive_fitness_mutated"] is False
     assert manifest["promotion_gate"] == nrc.PROMOTION_GATE
+
+
+def test_validate_no_source_mutation_refuses_official_score_claim() -> None:
+    # Invariant #5 (no self-report is evidence) + Workstream 7 ladder: a native
+    # worker receipt/manifest that positively claims an official score must fail
+    # closed, symmetric with the request-authority official_score_claimed check.
+    for truthy in (True, "true", "True", "1", "yes", 1):
+        with pytest.raises(ValueError, match="official_score_claimed"):
+            nrc.validate_no_source_mutation(
+                {"official_score_claimed": truthy, "promotion_gate": nrc.PROMOTION_GATE},
+                label="probe",
+            )
+    # Absent / falsey official-score fields remain allowed for honest receipts.
+    for value in (None, False, "false", 0, ""):
+        nrc.validate_no_source_mutation(
+            {"official_score_claimed": value, "promotion_gate": nrc.PROMOTION_GATE},
+            label="probe",
+        )
+
+
+def test_sync_remote_receipts_refuses_official_score_claim(tmp_path: Path) -> None:
+    remote = tmp_path / "remote" / "native-run-1"
+    receipts = remote / "task_receipts"
+    receipts.mkdir(parents=True)
+    (remote / "result_manifest.json").write_text(
+        json.dumps(
+            {
+                "run_id": "native-run-1",
+                "source_of_truth_mutated": False,
+                "live_apply_performed": False,
+                "archive_fitness_mutated": False,
+                "promotion_gate": nrc.PROMOTION_GATE,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (receipts / "task-a.json").write_text(
+        json.dumps(
+            {
+                "task_id": "task-a",
+                "status": "resolved",
+                "resolved": True,
+                "official_score_claimed": True,
+                "promotion_gate": nrc.PROMOTION_GATE,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="official_score_claimed"):
+        nrc.sync_remote_receipts(
+            remote_result_root=remote,
+            local_sync_root=tmp_path / "sync",
+            expected_run_id="native-run-1",
+        )
+
+
+def test_load_task_receipts_fails_closed_on_non_object_receipt(tmp_path: Path) -> None:
+    # A hostile/native worker that writes a JSON array (or scalar) instead of an
+    # object must not crash the local orchestrator with an AttributeError deep in
+    # sync/resume; it must fail closed with a controlled ValueError naming the
+    # offending file so the evidence gap is visible, not swallowed.
+    receipts = tmp_path / "remote" / "task_receipts"
+    receipts.mkdir(parents=True)
+    (receipts / "evil_array.json").write_text(json.dumps(["not", "a", "dict"]), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="task_receipt_not_object:evil_array.json"):
+        nrc.load_task_receipts(tmp_path / "remote")
+
+
+def test_load_task_receipts_fails_closed_on_malformed_json(tmp_path: Path) -> None:
+    # Truncated/corrupt JSON from a crashed native worker must raise a controlled
+    # ValueError, not an uncontrolled json.JSONDecodeError, so both
+    # sync_remote_receipts and worker-side resume can report the bad receipt.
+    receipts = tmp_path / "remote" / "task_receipts"
+    receipts.mkdir(parents=True)
+    (receipts / "truncated.json").write_text('{"task_id": "task-b", "status": "res', encoding="utf-8")
+
+    with pytest.raises(ValueError, match="malformed_task_receipt_json:truncated.json"):
+        nrc.load_task_receipts(tmp_path / "remote")
+
+
+def test_run_native_runner_request_fails_closed_on_corrupt_existing_receipt(tmp_path: Path) -> None:
+    # The worker harness loads existing receipts before planning resume.  A
+    # corrupt pre-existing receipt from a prior crashed attempt must make the
+    # harness fail closed rather than crash uncontrolled, so resume cannot
+    # silently discard prior evidence.
+    request_write = nrc.write_native_runner_request(
+        run_id="native-corrupt-existing",
+        output_root=tmp_path / "requests",
+        split="explore",
+        candidate_packet={"candidate_id": "cand", "task_predictions": {"task-a": "diff --git a/x b/x\n"}},
+        task_allocation={"allocation_id": "alloc", "task_ids": ["task-a"]},
+    )
+    result_root = tmp_path / "result"
+    (result_root / "task_receipts").mkdir(parents=True)
+    (result_root / "task_receipts" / "corrupt.json").write_text("{ broken", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="malformed_task_receipt_json:corrupt.json"):
+        nrc.run_native_runner_request(
+            request_dir=request_write["request_dir"],
+            result_root=result_root,
+            grade_fn=lambda payload: {"status": "resolved", "resolved": True},
+        )

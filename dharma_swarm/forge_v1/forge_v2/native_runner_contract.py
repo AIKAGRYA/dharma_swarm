@@ -373,7 +373,22 @@ def load_task_receipts(remote_result_root: Path | str) -> list[dict[str, Any]]:
     root = Path(remote_result_root).expanduser()
     receipts: list[dict[str, Any]] = []
     for path in _task_receipt_paths(root):
-        receipt = _read_json(path)
+        try:
+            receipt = _read_json(path)
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            # Fail closed against an untrusted/native worker.  This function is
+            # the single ingestion point for both sync_remote_receipts and
+            # worker-side resume, so an unparseable receipt file must raise a
+            # controlled ValueError naming the offending file -- not crash the
+            # local orchestrator with an uncontrolled exception type, and not be
+            # silently skipped (which would let a worker hide evidence).
+            raise ValueError(f"malformed_task_receipt_json:{path.name}:{exc}") from exc
+        if not isinstance(receipt, dict):
+            # A JSON array/scalar receipt is an integrity failure: every
+            # legitimate producer writes an object.  Reject rather than let the
+            # later ``receipt.get(...)`` / ``setdefault(...)`` calls raise
+            # AttributeError deep inside sync/resume.
+            raise ValueError(f"task_receipt_not_object:{path.name}")
         receipt.setdefault("_source_path", str(path))
         receipts.append(receipt)
     return receipts
@@ -387,6 +402,13 @@ def validate_no_source_mutation(payload: dict[str, Any], *, label: str) -> None:
         raise ValueError(f"{label}:live_apply_performed")
     if _asserts_true(payload.get("archive_fitness_mutated")):
         raise ValueError(f"{label}:archive_fitness_mutated")
+    if _asserts_true(payload.get("official_score_claimed")):
+        # Invariant #5 (no model self-report is evidence) + Workstream 7 ladder
+        # (nothing is promotable/official before Level 3).  A native worker
+        # receipt or result manifest that positively claims an official score is
+        # exactly the self-report this boundary must reject, symmetric with the
+        # official_score_claimed check already enforced on the request authority.
+        raise ValueError(f"{label}:official_score_claimed")
     if payload.get("promotion_decision") in {"accepted", "promoted", "live_apply"}:
         raise ValueError(f"{label}:remote_promotion_decision_forbidden")
     gate = payload.get("promotion_gate")
