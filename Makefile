@@ -82,6 +82,7 @@ help:
 	@echo "  make operator-prod-smoke Run fast read-only operator production smoke"
 	@echo "  make onboard      Render current operating reality (active track, live ops, broken register, axioms)"
 	@echo "  make orient       Render the whole organism at once (identity, organs, tracks, custody, liveness)"
+	@echo "  make agent-onboard Fleet-identity join route + identity-surface drift check (new A2A agents)"
 	@echo "  make agent-build-preflight Run onboarding + hygiene integrity before agent work"
 	@echo "  make agent-build-closeout Run hygiene scan + full governance bundle after agent work"
 	@echo "  make status       Quick cross-agent state snapshot (PRs, stale, hotlist, track)"
@@ -424,6 +425,14 @@ onboard:
 # artifacts from existing owners; the artifacts own no facts.
 orient:
 	$(PYTHON) scripts/governance/orientation_graph.py --write-context
+
+# Fleet-identity onboarding: the join route for a NEW persistent A2A agent
+# (card, runtime registration, roster, git seat, announcement, presence) plus
+# a drift check across the identity surfaces. Read-only; always exits 0.
+# `make onboard` orients a session; this onboards an identity.
+# See docs/ops/A2A_AGENT_ONBOARDING.md.
+agent-onboard:
+	$(PYTHON) scripts/governance/a2a_agent_onboard.py $(ARGS)
 
 # Quick cross-agent state snapshot: active track, open PRs, stale items,
 # broken register, hotlist. Any agent on any platform can run this.
