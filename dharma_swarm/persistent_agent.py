@@ -305,6 +305,10 @@ class PersistentAgent:
                 await self._task_queue.put(
                     f"Urgent message from {top.from_agent}: {top.subject}"
                 )
+                # Only the queued message is handled; mark it read so it is
+                # not re-queued on every cron tick. Other previewed messages
+                # stay unread (act-then-mark, cf. contracts/runtime_adapters.py).
+                await bus.mark_read(top.id)
                 return f"urgent={len(urgent)}, queued_response"
             return f"inbox={len(msgs)}, no_urgent"
         except Exception as exc:
@@ -386,6 +390,11 @@ class PersistentAgent:
                 top_msg = messages[0]
                 task_text = f"Respond to message from {top_msg.from_agent}: {top_msg.subject} — {top_msg.body[:300]}"
                 task_source = "message"
+                # This message has been adopted as this cycle's task; mark it
+                # read so subsequent wakes do not re-fetch and re-respond to
+                # the same message forever (act-then-mark, cf.
+                # contracts/runtime_adapters.py).
+                await bus.mark_read(top_msg.id)
             else:
                 task_text = self._generate_self_task(hot_paths, salient_marks)
                 task_source = "self"

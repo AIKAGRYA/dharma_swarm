@@ -836,3 +836,37 @@ class TestSaveRunReport:
         assert data["agent"] == "reporter"
         assert data["turns"] == 3
         assert data["tokens_in"] == 100
+
+
+class TestCheckInboxMarksRead:
+    """Regression: _check_inbox must mark fetched messages read so the same
+    unread message is not re-injected into the system prompt every cycle
+    (mirrors the consumer pattern in contracts/runtime_adapters.py)."""
+
+    @pytest.mark.asyncio
+    async def test_handled_message_not_refetched(self, tmp_path):
+        from dharma_swarm.message_bus import MessageBus
+        from dharma_swarm.models import Message
+
+        bus = MessageBus(tmp_path / "messages.db")
+        await bus.init_db()
+        await bus.send(Message(
+            from_agent="peer", to_agent="listener",
+            subject="ping", body="please look at this",
+        ))
+
+        ident = AgentIdentity(name="listener", role="r", system_prompt="s")
+        agent = AutonomousAgent(ident)
+        agent._message_bus = bus
+
+        first = await agent._check_inbox()
+        assert len(first) == 1
+        assert "ping" in first[0]
+
+        # Second cycle: the handled message must NOT come back.
+        second = await agent._check_inbox()
+        assert second == []
+
+        # Underlying store confirms the message was marked read, not deleted.
+        assert await bus.receive("listener", status="unread") == []
+        assert len(await bus.receive("listener", status="read")) == 1

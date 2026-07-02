@@ -1232,10 +1232,17 @@ class AutonomousAgent:
             bus = await self._get_message_bus()
             if bus:
                 messages = await bus.receive(self.identity.name, limit=5)
-                return [
+                inbox = [
                     f"From {m.from_agent}: {m.subject} — {m.body[:200]}"
                     for m in messages
                 ]
+                # Each fetched message is delivered into the system-prompt
+                # inbox (handled); mark it read so the next cycle does not
+                # re-inject the same message forever. Mirrors the consumer
+                # pattern in contracts/runtime_adapters.py.
+                for m in messages:
+                    await bus.mark_read(m.id)
+                return inbox
         except Exception:
             logger.debug("Message bus read failed", exc_info=True)
         return []

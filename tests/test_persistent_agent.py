@@ -149,3 +149,61 @@ class TestGateCheck:
         # May return None if telos_gates has import issues, or a dict
         if result is not None:
             assert not result.get("blocked", False)
+
+
+class TestWakeMarksMessageRead:
+    """Regression: when the wake loop adopts an inbox message as its task,
+    it must mark that message read so subsequent wakes do not re-fetch and
+    re-respond to the same message forever (act-then-mark, cf.
+    contracts/runtime_adapters.py)."""
+
+    @pytest.mark.asyncio
+    async def test_adopted_message_not_refetched(self, tmp_path):
+        from dharma_swarm.autonomous_agent import AgentResult
+        from dharma_swarm.message_bus import MessageBus
+        from dharma_swarm.models import Message
+
+        bus = MessageBus(tmp_path / "messages.db")
+        await bus.init_db()
+        await bus.send(Message(
+            from_agent="peer", to_agent="waker",
+            subject="need help", body="investigate the drift",
+        ))
+
+        agent = PersistentAgent(
+            name="waker",
+            role=AgentRole.CONDUCTOR,
+            provider_type=ProviderType.ANTHROPIC,
+            model="test-model",
+            state_dir=tmp_path,
+        )
+
+        # Inject the real test bus; neutralise the heavy wake collaborators so
+        # the message-selection path runs without a provider or shared state.
+        agent._bus = bus
+        agent._cron._jobs = {}
+        stig = MagicMock()
+        stig.hot_paths = AsyncMock(return_value=[])
+        stig.high_salience = AsyncMock(return_value=[])
+        stig.leave_mark = AsyncMock()
+        agent._get_stigmergy = AsyncMock(return_value=stig)
+        agent._agent.memory = MagicMock()
+        agent._agent.memory.load = AsyncMock()
+        agent._agent.memory.remember = AsyncMock()
+        agent._agent.memory.save = AsyncMock()
+        agent._agent.wake = AsyncMock(
+            return_value=AgentResult(summary="handled", turns=1)
+        )
+
+        info = await agent.wake()
+        assert info["success"] is True
+        assert info["task_source"] == "message"
+
+        # The adopted message must be marked read, not left unread for replay.
+        assert await bus.receive("waker", status="unread") == []
+        assert len(await bus.receive("waker", status="read")) == 1
+
+        # A second wake with an empty inbox falls back to a self-task rather
+        # than re-responding to the same message.
+        info2 = await agent.wake()
+        assert info2["task_source"] == "self"
