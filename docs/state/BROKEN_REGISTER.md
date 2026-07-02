@@ -21,7 +21,7 @@
 
 ---
 
-## OPEN ITEMS (6 open/partial — BR-023 added 2026-07-03; rest re-verified 2026-06-15)
+## OPEN ITEMS (7 open/partial — BR-007 reopened 2026-07-01; BR-023 added 2026-07-03; rest re-verified 2026-06-15)
 
 > **Re-verification pass executed 2026-06-15 (perplexity-computer, Stage 1 EVIDENCE_ONLY):** the register had drifted 22 days since the 2026-05-24 git touch. All 5 OPEN items below have refreshed `last_verified` dates with a `re-verification 2026-06-15` note. No new BRs opened in this pass. No status flips: behavior on disk is unchanged for BR-003 / BR-004 / BR-005 / BR-013 / BR-014. Anti-Slop note: PROD-issue #521 cites this BR-003 as 'Owner doc' but its own owner doc `docs/governance/PROD_READINESS_TOP10.md` does not exist on any branch — BR-003 is real and tracked here; the PROD-issue is the orphan.
 
@@ -29,7 +29,18 @@
 
 > **Convergence pass executed 2026-05-07 18:00–18:10:** Plan at `~/.claude/plans/yes-write-a-plan-wobbly-cerf.md`. Closed items moved to CLOSED section: BR-001 (cron daemon plist fixed), BR-016 (SOVEREIGN_MANIFEST counts refreshed and now DocOps-verified), BR-017 (BUILD_SESSION_ENTRYPOINT.md present), BR-018 (MEGAFILE_INDEX referenced from CLAUDE.md + README), BR-019 (Coherence Delta CI validator installed). BR-015 was already CLOSED. Total CLOSED = 6; OPEN = 13.
 
-*(BR-001, BR-002, BR-006, BR-007, and BR-008 moved to CLOSED ITEMS — see below)*
+*(BR-001, BR-002, BR-006, and BR-008 moved to CLOSED ITEMS — see below. BR-007's historical closure entry is retained in CLOSED ITEMS but is superseded by the reopened entry here.)*
+
+### BR-007 — REOPENED 2026-07-01 — runtime.db and ontology.db sync still broken
+- **first_observed:** 2026-05-10 closure later disproven; independently re-confirmed 2026-06-10 and 2026-07-01.
+- **last_verified:** 2026-07-01
+- **age_days:** 52 since original closure claim; 21 since the 2026-06-10 re-confirmation.
+- **severity:** BLOCKER
+- **domain:** runtime / state
+- **root_cause:** The closure evidence assumed one canonical ontology/runtime path and an enabled sync path. The 2026-07-01 audit found the live `store_sync` cron disabled in `~/.dharma/cron/jobs.json`, no sync-derived rows in the live runtime DB, and two diverged `ontology.db` copies with materially different object populations.
+- **blast_radius:** Ontology/runtime self-recognition remains split; status surfaces can claim closure from code presence while live state never converges.
+- **evidence:** `docs/governance/AUDIT_2026-07-01.md`; `dharma_swarm/cron_runner.py` still exposes `store_sync`, but live scheduler state has `store_sync.enabled=false`; ontology path resolution remains split between repo-local `dharma_swarm/ontology.db` and `~/.dharma/ontology.db`.
+- **status:** OPEN — documentation corrected. Do not re-enable `store_sync` or consolidate database files until the operator chooses the canonical `ontology.db` copy and a backup/merge plan exists.
 
 ### BR-003 — Apply gate present but closed (self-evolution loop)
 - **first_observed:** 2026-05-07
