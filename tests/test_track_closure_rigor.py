@@ -21,11 +21,16 @@ from check_track_status import (  # type: ignore  # noqa: E402
     RIGOROUS_KINDS,
     Finding,
     check_commit_on_main,
+    check_json_collection_values_match,
+    check_json_count_equals,
+    check_json_count_greater_than,
+    check_json_mapping_keys_nonempty,
     check_receipt_valid,
     check_test_passes,
     evaluate_criterion,
     evaluate_track,
     normalize_portfolio,
+    _parse_minimal_yaml,
     validate_portfolio_graph,
 )
 
@@ -133,12 +138,130 @@ def test_receipt_valid_requires_keys(tmp_path):
     assert check_receipt_valid(str(tmp_path / "nope.json"), []).passed is False
 
 
+def test_json_count_equals_counts_structured_rows(tmp_path):
+    audit = tmp_path / "audit.json"
+    audit.write_text(
+        json.dumps({
+            "loop_statuses": [
+                {"verdict": "HARNESS_PROVEN"},
+                {"verdict": "HARNESS_PROVEN"},
+                {"verdict": "BLOCKED"},
+            ],
+        }),
+        encoding="utf-8",
+    )
+
+    assert check_json_count_equals(str(audit), "loop_statuses", "verdict", "HARNESS_PROVEN", 2).passed
+    assert not check_json_count_equals(str(audit), "loop_statuses", "verdict", "CLOSED_LIVE", 1).passed
+    assert "0 == 0" in check_json_count_equals(
+        str(audit), "loop_statuses", "verdict", "CLOSED_LIVE", 0
+    ).detail
+    assert check_json_count_greater_than(
+        str(audit), "loop_statuses", "verdict", "HARNESS_PROVEN", 0
+    ).passed
+    assert not check_json_count_greater_than(
+        str(audit), "loop_statuses", "verdict", "CLOSED_LIVE", 0
+    ).passed
+    assert check_json_collection_values_match(
+        str(audit),
+        "loop_statuses",
+        "verdict",
+        "verdict",
+        {"HARNESS_PROVEN": "HARNESS_PROVEN", "BLOCKED": "BLOCKED"},
+    ).passed
+    assert not check_json_collection_values_match(
+        str(audit),
+        "loop_statuses",
+        "verdict",
+        "verdict",
+        {"HARNESS_PROVEN": "BLOCKED"},
+    ).passed
+
+
+def test_json_mapping_keys_nonempty_checks_required_keys(tmp_path):
+    audit = tmp_path / "audit.json"
+    audit.write_text(
+        json.dumps({"live_owner_surface_criteria": {"loop1": "criterion", "loop2": ""}}),
+        encoding="utf-8",
+    )
+
+    assert check_json_mapping_keys_nonempty(
+        str(audit), "live_owner_surface_criteria", ["loop1"]
+    ).passed
+    assert not check_json_mapping_keys_nonempty(
+        str(audit), "live_owner_surface_criteria", ["loop1", "loop2"]
+    ).passed
+
+
+def test_minimal_yaml_parser_unquotes_mapping_keys():
+    parsed = _parse_minimal_yaml(
+        """
+expected:
+  "1": HARNESS_PROVEN
+  '2': BLOCKED
+  3: CLOSED_LIVE
+""".strip()
+    )
+
+    assert parsed["expected"] == {
+        "1": "HARNESS_PROVEN",
+        "2": "BLOCKED",
+        3: "CLOSED_LIVE",
+    }
+
+
 def test_new_kinds_dispatch_through_evaluate_criterion():
     r = evaluate_criterion({"id": "x", "kind": "commit_on_main", "commit": "deadbeef"})
     assert r.kind == "commit_on_main" and r.passed is False
     # malformed -> failing result, never an exception
     assert evaluate_criterion({"id": "y", "kind": "test_passes"}).passed is False
     assert evaluate_criterion({"id": "z", "kind": "receipt_valid"}).passed is False
+    assert evaluate_criterion({"id": "j", "kind": "json_count_equals"}).passed is False
+    assert evaluate_criterion({"id": "g", "kind": "json_count_greater_than"}).passed is False
+    assert evaluate_criterion({
+        "id": "jv",
+        "kind": "json_count_equals",
+        "file": "reports/loop_closure/cybernetics_codex/latest_audit.json",
+        "collection": "loop_statuses",
+        "field": "verdict",
+        "expected": 0,
+    }).passed is False
+    assert evaluate_criterion({
+        "id": "gv",
+        "kind": "json_count_greater_than",
+        "file": "reports/loop_closure/cybernetics_codex/latest_audit.json",
+        "collection": "loop_statuses",
+        "field": "verdict",
+        "threshold": 0,
+    }).passed is False
+    assert evaluate_criterion({"id": "m", "kind": "json_collection_values_match"}).passed is False
+    assert evaluate_criterion({"id": "k", "kind": "json_mapping_keys_nonempty"}).passed is False
+
+
+def test_json_count_criteria_require_explicit_value() -> None:
+    base = {
+        "file": "reports/loop_closure/cybernetics_codex/latest_audit.json",
+        "collection": "loop_statuses",
+        "field": "verdict",
+    }
+
+    equals_missing_value = evaluate_criterion({
+        "id": "j",
+        "kind": "json_count_equals",
+        "expected": 0,
+        **base,
+    })
+    greater_missing_value = evaluate_criterion({
+        "id": "g",
+        "kind": "json_count_greater_than",
+        "threshold": 0,
+        **base,
+    })
+
+    assert equals_missing_value.passed is False
+    assert "missing value" in equals_missing_value.detail
+    assert greater_missing_value.passed is False
+    assert "missing value" in greater_missing_value.detail
 
 
 # ------------------------------------------------------------------ rigor gate
@@ -184,6 +307,31 @@ def test_open_blocker_blocks_shippable_even_with_rigorous_evidence():
     assert r["open_blocker_count"] == 1
     assert r["shippable"] is False  # ...but an open blocker still blocks it
     assert any("open blocker" in b for b in r["ship_blocks"])
+
+
+def test_ship_veto_blocks_shippable_even_when_criteria_pass(tmp_path):
+    audit = tmp_path / "audit.json"
+    audit.write_text(
+        json.dumps({"loop_statuses": [{"verdict": "HARNESS_PROVEN"}]}),
+        encoding="utf-8",
+    )
+    t = _track([{"id": "c", "kind": "commit_on_main", "commit": _root_commit()}])
+    t["ship_vetoes"] = [{
+        "id": "harness_blocks_ship",
+        "kind": "json_count_greater_than",
+        "file": str(audit),
+        "collection": "loop_statuses",
+        "field": "verdict",
+        "value": "HARNESS_PROVEN",
+        "threshold": 0,
+    }]
+
+    r = evaluate_track(t)
+
+    assert r["criteria_pass"] is True
+    assert r["shippable"] is False
+    assert r["active_ship_veto_count"] == 1
+    assert any("active ship veto" in b for b in r["ship_blocks"])
 
 
 def test_rigorous_evidence_plus_no_blockers_earns_shippable():
@@ -466,6 +614,10 @@ def test_valid_final_boss_receipt_allows_substrate_claim(tmp_path):
 def test_rigor_kind_sets_are_disjoint_and_sane():
     assert RIGOROUS_KINDS.isdisjoint(EXISTENCE_KINDS)
     assert "test_passes" in RIGOROUS_KINDS and "commit_on_main" in RIGOROUS_KINDS
+    assert "json_count_equals" in RIGOROUS_KINDS
+    assert "json_count_greater_than" in RIGOROUS_KINDS
+    assert "json_collection_values_match" in RIGOROUS_KINDS
+    assert "json_mapping_keys_nonempty" in RIGOROUS_KINDS
     assert "file_exists" in EXISTENCE_KINDS and "file_contains" in EXISTENCE_KINDS
 
 

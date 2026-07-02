@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
@@ -35,10 +36,166 @@ _DEFAULT_WEIGHTS: dict[str, float] = {
 }
 
 FITNESS_DIMENSIONS: tuple[str, ...] = tuple(_DEFAULT_WEIGHTS)
+ONE_WIRE_REQUIRED_CONFIRMED = 5
+ONE_WIRE_REQUIRED_DOMAINS = 3
+ONE_WIRE_GUARDIAN_RECEIPT = (
+    Path("forge_measurement_guardian")
+    / "cycle-003-fitness-quorum-guard.json"
+)
 
 
 def _clamp01(value: float) -> float:
     return max(0.0, min(1.0, float(value)))
+
+
+class OneWireFitnessAuthorityError(PermissionError):
+    """Raised when archive fitness would move without One Wire authority."""
+
+
+@dataclass(frozen=True)
+class OneWireFitnessAuthority:
+    """Read-only projection of the guardian receipt that can authorize fitness."""
+
+    receipt_path: Path
+    exists: bool
+    confirmed: int = 0
+    domains: int = 0
+    required_confirmed: int = ONE_WIRE_REQUIRED_CONFIRMED
+    required_domains: int = ONE_WIRE_REQUIRED_DOMAINS
+    eligible_to_set_archive_fitness: bool = False
+    fitness_authority_granted: bool = False
+    archive_fitness_changed: bool = False
+    blocker: str = ""
+
+    @property
+    def allowed(self) -> bool:
+        return (
+            self.exists
+            and self.confirmed >= self.required_confirmed
+            and self.domains >= self.required_domains
+            and self.eligible_to_set_archive_fitness
+            and self.fitness_authority_granted
+        )
+
+
+def _int_field(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _bool_field(value: Any) -> bool:
+    return value is True
+
+
+def read_one_wire_fitness_authority(state_dir: Path | str) -> OneWireFitnessAuthority:
+    """Read the guardian quorum receipt that authorizes archive fitness writes.
+
+    The archive treats internal metadata on an entry as non-authoritative. Only
+    this guardian receipt can grant fitness authority, and it must carry both
+    the quorum counts and explicit authority flag.
+    """
+    state = Path(state_dir)
+    receipt_path = state / ONE_WIRE_GUARDIAN_RECEIPT
+    if not receipt_path.exists():
+        return OneWireFitnessAuthority(
+            receipt_path=receipt_path,
+            exists=False,
+            blocker="guardian quorum receipt missing",
+        )
+
+    try:
+        payload = json.loads(receipt_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return OneWireFitnessAuthority(
+            receipt_path=receipt_path,
+            exists=True,
+            blocker=f"guardian receipt unreadable: {type(exc).__name__}",
+        )
+
+    if not isinstance(payload, dict):
+        return OneWireFitnessAuthority(
+            receipt_path=receipt_path,
+            exists=True,
+            blocker="guardian receipt payload is not an object",
+        )
+
+    authority = payload.get("authority_result")
+    threshold = payload.get("threshold_guard")
+    authority = authority if isinstance(authority, dict) else {}
+    threshold = threshold if isinstance(threshold, dict) else {}
+
+    required_confirmed = max(
+        ONE_WIRE_REQUIRED_CONFIRMED,
+        _int_field(
+            threshold.get("required_confirmed_receipts"),
+            ONE_WIRE_REQUIRED_CONFIRMED,
+        ),
+    )
+    required_domains = max(
+        ONE_WIRE_REQUIRED_DOMAINS,
+        _int_field(
+            threshold.get("required_distinct_domains"),
+            ONE_WIRE_REQUIRED_DOMAINS,
+        ),
+    )
+    confirmed = _int_field(
+        threshold.get(
+            "observed_confirmed_receipts",
+            authority.get("confirmed_receipt_count", payload.get("confirmed")),
+        )
+    )
+    domains = _int_field(
+        threshold.get(
+            "observed_distinct_domains",
+            authority.get("domain_count", payload.get("domains")),
+        )
+    )
+    eligible = _bool_field(
+        payload.get(
+            "eligible",
+            authority.get("eligible_to_set_archive_fitness", False),
+        )
+    )
+    fitness_authority_granted = _bool_field(
+        payload.get(
+            "fitness_authority_granted",
+            authority.get("fitness_authority_granted", False),
+        )
+    )
+    archive_fitness_changed = _bool_field(
+        payload.get(
+            "archive_fitness_changed",
+            authority.get("archive_fitness_changed", False),
+        )
+    )
+
+    blocker = ""
+    if confirmed < required_confirmed or domains < required_domains:
+        blocker = (
+            "guardian quorum below threshold: "
+            f"N={confirmed}/{required_confirmed}, M={domains}/{required_domains}"
+        )
+    elif not eligible or not fitness_authority_granted:
+        blocker = (
+            "guardian authority flags missing: "
+            f"eligible_to_set_archive_fitness={eligible}, "
+            f"fitness_authority_granted={fitness_authority_granted}"
+        )
+
+    return OneWireFitnessAuthority(
+        receipt_path=receipt_path,
+        exists=True,
+        confirmed=confirmed,
+        domains=domains,
+        required_confirmed=required_confirmed,
+        required_domains=required_domains,
+        eligible_to_set_archive_fitness=eligible,
+        fitness_authority_granted=fitness_authority_granted,
+        archive_fitness_changed=archive_fitness_changed,
+        blocker=blocker,
+    )
 
 
 def normalize_fitness_weights(
@@ -300,19 +457,86 @@ class MAPElitesGrid:
 _DEFAULT_ARCHIVE_PATH = Path.home() / ".dharma" / "evolution" / "archive.jsonl"
 
 
+def _state_dir_for_governed_archive(path: Path) -> Path | None:
+    expanded = path.expanduser()
+    if expanded.name != "archive.jsonl" or expanded.parent.name != "evolution":
+        return None
+    state_dir = expanded.parent.parent
+    return state_dir
+
+
+def _moves_archive_fitness(entry: ArchiveEntry) -> bool:
+    values = [
+        float(getattr(entry.fitness, dimension, 0.0) or 0.0)
+        for dimension in FITNESS_DIMENSIONS
+    ]
+    if any(value < 0.0 or value > 1.0 for value in values):
+        return True
+    return entry.fitness.weighted() != 0.0
+
+
 class EvolutionArchive:
     """Append-only evolution archive with lineage tracking.
 
     All file I/O is async.  Entries are indexed in-memory after ``load()``.
     """
 
-    def __init__(self, path: Path | None = None, grid_bins: int | None = None) -> None:
-        self.path: Path = path or _DEFAULT_ARCHIVE_PATH
+    def __init__(
+        self,
+        path: Path | None = None,
+        grid_bins: int | None = None,
+        *,
+        fitness_guard_state_dir: Path | str | None = None,
+        enforce_one_wire: bool | None = None,
+    ) -> None:
+        self.path: Path = Path(path) if path is not None else _DEFAULT_ARCHIVE_PATH
+        inferred_guard_state = _state_dir_for_governed_archive(self.path)
+        self.fitness_guard_state_dir = (
+            Path(fitness_guard_state_dir)
+            if fitness_guard_state_dir is not None
+            else inferred_guard_state
+        )
+        self.enforce_one_wire = (
+            self.fitness_guard_state_dir is not None
+            if enforce_one_wire is None
+            else bool(enforce_one_wire)
+        )
         self._entries: dict[str, ArchiveEntry] = {}
         self.grid = MAPElitesGrid(n_bins=grid_bins)
         # Merkle log for tamper-evident audit trail
         merkle_path = self.path.parent / "merkle_log.json"
         self.merkle_log = MerkleLog(merkle_path)
+
+    def _fitness_bearing_entries(self) -> list[ArchiveEntry]:
+        return [
+            entry
+            for entry in self._entries.values()
+            if entry.status in FITNESS_BEARING_STATUSES
+        ]
+
+    def _rebuild_grid(self) -> None:
+        self.grid.rebuild(self._fitness_bearing_entries())
+
+    def _assert_fitness_authority(
+        self,
+        entry: ArchiveEntry,
+        *,
+        operation: str,
+    ) -> None:
+        if not self.enforce_one_wire or not _moves_archive_fitness(entry):
+            return
+        if self.fitness_guard_state_dir is None:
+            raise OneWireFitnessAuthorityError(
+                f"One Wire archive fitness guard blocked {operation}: "
+                "fitness guard state_dir missing"
+            )
+        authority = read_one_wire_fitness_authority(self.fitness_guard_state_dir)
+        if authority.allowed:
+            return
+        raise OneWireFitnessAuthorityError(
+            f"One Wire archive fitness guard blocked {operation}: "
+            f"{authority.blocker}; guardian={authority.receipt_path}"
+        )
 
     # -- persistence ---------------------------------------------------------
 
@@ -335,7 +559,8 @@ class EvolutionArchive:
                         data["fitness"] = FitnessScore(**data["fitness"])
                     entry = ArchiveEntry(**data)
                     self._entries[entry.id] = entry
-                    self.grid.try_insert(entry)
+                    if entry.status in FITNESS_BEARING_STATUSES:
+                        self.grid.try_insert(entry)
                 except (json.JSONDecodeError, ValueError, KeyError):
                     continue
 
@@ -386,6 +611,8 @@ class EvolutionArchive:
         Returns:
             The entry id.
         """
+        self._assert_fitness_authority(entry, operation="add_entry")
+
         # Get parent's merkle root if this has a parent
         if entry.parent_id:
             parent = self._entries.get(entry.parent_id)
@@ -410,7 +637,8 @@ class EvolutionArchive:
 
         # Add to in-memory structures
         self._entries[entry.id] = entry
-        self.grid.try_insert(entry)
+        if entry.status in FITNESS_BEARING_STATUSES:
+            self.grid.try_insert(entry)
 
         # Persist to JSONL
         await self._append_line(entry)
@@ -420,12 +648,7 @@ class EvolutionArchive:
     def reconfigure_grid(self, n_bins: int) -> None:
         """Change MAP-Elites granularity and rebuild from current applied entries."""
         self.grid = MAPElitesGrid(n_bins=n_bins)
-        applied_entries = [
-            entry
-            for entry in self._entries.values()
-            if entry.status in FITNESS_BEARING_STATUSES
-        ]
-        self.grid.rebuild(applied_entries)
+        self._rebuild_grid()
 
     async def get_entry(self, entry_id: str) -> ArchiveEntry | None:
         """Look up a single entry by id."""
@@ -526,9 +749,15 @@ class EvolutionArchive:
         entry = self._entries.get(entry_id)
         if entry is None:
             return
+        old_status = entry.status
+        if old_status in FITNESS_BEARING_STATUSES or status in FITNESS_BEARING_STATUSES:
+            guarded = entry.model_copy(update={"status": status})
+            self._assert_fitness_authority(guarded, operation="update_status")
         entry.status = status
         if reason is not None:
             entry.rollback_reason = reason
+        if old_status in FITNESS_BEARING_STATUSES or status in FITNESS_BEARING_STATUSES:
+            self._rebuild_grid()
         await self._rewrite()
 
     async def rollback_entry(self, entry_id: str, reason: str) -> bool:
@@ -539,8 +768,11 @@ class EvolutionArchive:
         entry = self._entries.get(entry_id)
         if entry is None:
             return False
+        guarded = entry.model_copy(update={"status": "rolled_back"})
+        self._assert_fitness_authority(guarded, operation="rollback_entry")
         entry.status = "rolled_back"
         entry.rollback_reason = reason
+        self._rebuild_grid()
         await self._rewrite()
         return True
 
@@ -561,12 +793,22 @@ class EvolutionArchive:
                 has_children.add(e.parent_id)
         entries_by_time = sorted(entries, key=lambda e: e.timestamp)
         old_entries = entries_by_time[:-min_age_entries] if len(entries_by_time) > min_age_entries else []
-        composted = 0
+        candidates: list[ArchiveEntry] = []
         for e in old_entries:
-            if (e.status in FITNESS_BEARING_STATUSES + ("proposed",) and e.fitness.weighted() < threshold and e.id not in has_children):
-                e.status = "composted"
-                composted += 1
+            if (
+                e.status in FITNESS_BEARING_STATUSES + ("proposed",)
+                and e.fitness.weighted() < threshold
+                and e.id not in has_children
+            ):
+                candidates.append(e)
+        for e in candidates:
+            guarded = e.model_copy(update={"status": "composted"})
+            self._assert_fitness_authority(guarded, operation="compact")
+        for e in candidates:
+            e.status = "composted"
+        composted = len(candidates)
         if composted > 0:
+            self._rebuild_grid()
             await self._rewrite()
         return composted
 

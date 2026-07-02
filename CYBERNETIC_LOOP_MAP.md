@@ -1,14 +1,24 @@
 # Cybernetic Loop Map — dharma_swarm
 
-**Last audit:** 2026-06-23T14:15:48Z by `scripts/governance/cybernetics_codex_audit.py --json`
+**Last audit:** 2026-07-02T01:42:15Z by `scripts/governance/cybernetics_codex_audit.py --json`
 **Previous version:** 2026-05-20 (stale BR-012 surface, retained below as historical context)
 **Purpose:** Document every feedback loop's sense→act→evaluate→adapt path.
 Each loop is "closed" only when its output feeds back as input to a future cycle.
 
+> **Claim boundary:** `scripts/governance/cybernetics_codex_audit.py` is a
+> read-only verifier over receipts and bounded replay outputs. It does **not**
+> re-execute live owner-surface checks. `HARNESS_PROVEN` means a bounded replay
+> passed; `CLOSED_LIVE` requires a separate live owner-surface proof on the
+> daemon branch that actually runs. Current production-live closure claim:
+> `CLOSED_LIVE: 0/13`.
+> This PR does not claim production-live closure of any loop. `HARNESS_PROVEN
+> 11/13` means bounded replay harnesses pass; it does not mean the loops are
+> closed in production.
+
 > **Re-verification pass 2026-06-15 (perplexity-computer):** 26 days / 232 commits since last audit. Code-structural status of all 13 loops is unchanged in the static surface. Two notable code changes since 2026-05-20 worth flagging here without flipping status (runtime closure still depends on live `~/.dharma/` data not visible from cloud seat):
 >
-> - **Loop 1 (Swarm Task Loop) — spine is wired.** `dharma_swarm/agent_runner.py:55-62` now imports `invoke_agent` and `EvidenceReceipt` directly. The runtime-truth-spine-adoption-2026-06 track stands at 7/8 SHIPPABLE per `docs/governance/ACTIVE_TRACK.yaml`. The remaining gate is a *proven dispatchable provider in the live seat*; `claude_code` is keyless only when headless `claude -p` smokes green, and local Ollama may be the current live fallback.
-> - **Loop 8 (Recognition).** Wiring from 2026-05-20 (`cascade.py:386-491`, `shakti_executive/inputs.py:100`, `meta_daemon.py`) re-verified present. Status PARTIAL unchanged.
+> - **Loop 1 (Swarm Task Loop) — spine is wired.** `dharma_swarm/agent_runner.py:55-62` now imports `invoke_agent` and `EvidenceReceipt` directly. The runtime-truth-spine-adoption-2026-06 track currently has 7/8 criteria passing but remains unshipped under the rigorous bar. The remaining gate is a *proven dispatchable provider in the live seat*; `claude_code` is keyless only when headless `claude -p` smokes green, and local Ollama may be the current live fallback.
+> - **Loop 8 (Recognition).** Wiring from 2026-05-20 (`cascade.py:386-491`, `shakti_executive/inputs.py:100`, `meta_daemon.py`) was re-verified present. This historical PARTIAL note is superseded by the 2026-07-01 bounded replay closure below.
 >
 > No new BLOCKERs surfaced. The full re-running of "Evidence From ~/.dharma/" section requires live-seat access and is deferred.
 
@@ -22,6 +32,11 @@ The authoritative projection is now:
 python3 scripts/governance/cybernetics_codex_audit.py --json
 ```
 
+Latest machine projections:
+
+- JSON: `reports/loop_closure/cybernetics_codex/latest_audit.json`
+- Markdown: `reports/loop_closure/cybernetics_codex/latest_audit.md`
+
 `delegation_runs.receipt_json` is the orchestrator/spine-dispatch witness column.
 It is not the universal closure witness. A2A-surface rows can be successful with
 empty `receipt_json` because their canonical witness is `runtime_receipts` plus
@@ -33,13 +48,13 @@ Live runtime truth from the latest audit:
 
 | Surface | Current value |
 |---------|---------------|
-| `delegation_runs` | 6,441 total, 3,034 completed, 3,349 failed, 57 running, 1 claimed |
-| `runtime_receipts` | 47,895 rows, latest 2026-06-23T14:15:48Z |
-| `receipt_json` | 1,225 rows, orchestrator surface only |
-| served provider/model truth | 999 completed delegation runs, 7,018 runtime receipts |
-| `dispatch_dropoff` | 1,486 failures, latest 2026-06-23T11:04:36Z |
+| `delegation_runs` | 8,669 total, 4,158 completed, 4,403 failed, 107 running, 1 claimed |
+| `runtime_receipts` | 98,566 rows, latest 2026-07-01T14:58:47Z |
+| `receipt_json` | 2,574 rows, orchestrator surface only |
+| served provider/model truth | 1,917 completed delegation runs, 20,607 runtime receipts |
+| `dispatch_dropoff` | 2,135 historical failures, latest 2026-07-01T03:42:49Z |
 | One Wire quorum | N=3/5, M=1/3, not eligible |
-| evolution archive | 11,726 entries, 11,227 internal-positive-fitness risk rows, 0 external authority markers |
+| evolution archive | 12,241 entries, 11,375 internal-positive-fitness risk rows, 0 external authority markers |
 
 Bounded Loop 1 replay proof (current code/provider lane):
 
@@ -59,29 +74,32 @@ Bounded Loop 1 replay proof (current code/provider lane):
 
 ## Loop Status Summary
 
-| # | Loop | Interval | Closed? | Remaining Blocker |
+| # | Loop | Interval | Current Verdict | Remaining Live-Closure Blocker |
 |---|------|----------|---------|-------------------|
-| 1 | Swarm Task Loop | 60s | **CLOSED in bounded replay; PARTIAL in all-history audit** | Current bounded replay closes with 3/3 completed tasks, zero dropoff, 3 ok evidence receipts, and served provider/model truth. Standing all-history audit still includes historical `dispatch_dropoff=1486`, so do not call the whole daemon history clean. |
-| 2 | Organism Heartbeat | 300s | **CLOSED in bounded replay; PARTIAL in standing daemon history** | `reports/loop_closure/cybernetics_codex/2026-06-23_loop2_heartbeat_closure.json` proves 3 cycles, all transitions receipted, and algedonic adaptive state feeding the next cycle; the always-on daemon history is still not cleanly closed. |
-| 3 | Evolution Loop / DarwinEngine | every 3rd tick | **PARTIAL** | Activity exists, but adaptation/fitness authority is not closure-proven. |
-| 4 | Consolidation Loop / Memory | configurable | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
-| 5 | Zeitgeist Scanner | configurable | **CLOSED in bounded replay (internal S3↔S4 arm only)** | `scripts/loop5_zeitgeist_closure_run.py` proves real internal gate-pressure feedback. This is not external-world zeitgeist closure; no real-world/external eyes are proven. |
-| 6 | Witness Auditor | 3600s | **CLOSED in bounded replay** | Bounded replay closes Loop 6: orchestrator now lands task_completed traces, the Witness senses real completions, flags telos-gate-coverage gaps, and appends governance marks (adapt fed forward). `scripts/loop6_witness_closure_run.py`. |
-| 7 | Training Flywheel | 300s | **PARTIAL** | Activity exists, but adaptation/fitness authority is not closure-proven. |
-| 8 | Recognition Loop / eigenform | 7200s | **PARTIAL** | Activity exists, but adaptation/fitness authority is not closure-proven. |
-| 9 | Conductors | 120s | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
-| 10 | Context Agent | 60s | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
-| 11 | Replication Monitor | 3600s | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
-| 12 | Self-Improvement | 3600s | **BLOCKED** | One Wire guardian quorum below threshold: N=3/5, M=1/3. |
-| 13 | Free Evolution Grind | 600s | **BLOCKED** | One Wire guardian quorum below threshold: N=3/5, M=1/3. |
+| 1 | Swarm Task Loop | 60s | **HARNESS_PROVEN; not CLOSED_LIVE** | Current bounded replay proves 3/3 completed tasks, zero replay dropoff, 3 ok evidence receipts, and served provider/model truth. Standing all-history audit still includes historical `dispatch_dropoff`, so do not call the daemon history clean. |
+| 2 | Organism Heartbeat | 300s | **HARNESS_PROVEN; not CLOSED_LIVE** | Receipt proves 3 harness cycles and fed-forward algedonic state. Live closure still needs standing daemon pulse/algedonic owner-surface evidence consumed by a later daemon cycle. |
+| 3 | Evolution Loop / DarwinEngine | every 3rd tick | **HARNESS_PROVEN; not CLOSED_LIVE** | Receipt proves scratch Darwin outcomes feed predictor/archive selection without touching live archive fitness. Live closure still needs governed non-scratch evolution owner-surface evidence. |
+| 4 | Consolidation Loop / Memory | configurable | **HARNESS_PROVEN; not CLOSED_LIVE** | Receipt proves memory/context mechanics, but the sensed work is harness-owned evidence. Live closure needs external/completed work consolidated from the memory owner surface and consumed by later context. |
+| 5 | Zeitgeist Scanner | configurable | **HARNESS_PROVEN; not CLOSED_LIVE** | Harness proves internal S3/S4 gate-pressure feedback. It does not prove external-world zeitgeist sensing or live environmental owner-surface closure. |
+| 6 | Witness Auditor | 3600s | **HARNESS_PROVEN; not CLOSED_LIVE** | Harness proves witness/governance mark feedback. Live closure needs production completions audited from the live witness/runtime receipt surface and consumed downstream. |
+| 7 | Training Flywheel | 300s | **HARNESS_PROVEN; not CLOSED_LIVE** | Harness seeds and scores its own trajectory JSONL. Live closure needs recent non-synthetic trajectory owner-surface rows that the flywheel scores and persists into later strategy selection. |
+| 8 | Recognition Loop / eigenform | 7200s | **HARNESS_PROVEN; not CLOSED_LIVE** | Harness proves recognition seed mechanics from receipt history. Live closure needs non-scratch loop-history owner receipts generating a seed later consumed by agent context. |
+| 9 | Conductors | 120s | **HARNESS_PROVEN; not CLOSED_LIVE** | Harness proves conductor signal -> action -> scheduler state -> later scheduler read. Live closure needs production scheduler state changed by observed signals and consumed by a later tick. |
+| 10 | Context Agent | 60s | **HARNESS_PROVEN; not CLOSED_LIVE** | Harness proves context package mechanics. Live closure needs production memory inputs changing a served context package later read by an agent. |
+| 11 | Replication Monitor | 3600s | **HARNESS_PROVEN; not CLOSED_LIVE** | Harness proves durable proposal -> child/probation/roster -> later monitor read. Live closure needs a real proposal materialized into live roster/probation and observed later. |
+| 12 | Self-Improvement | 3600s | **BLOCKED** | One Wire guardian quorum below threshold: N=3/5, M=1/3; `tests/test_one_wire_archive_fitness_guard.py` proves archive fitness fails closed without N>=5, M>=3, and explicit authority. |
+| 13 | Free Evolution Grind | 600s | **BLOCKED** | Same One Wire guard: free-evolution authority remains blocked until external quorum and explicit archive-fitness authority exist. |
 
-**Summary: standing all-history audit is still 0 fully clean. Bounded replay currently closes Loops 1, 2, 5, and 6 (with Loop 5 explicitly internal-arm-only); Loops 3/4/7/8/9/10/11 remain PARTIAL; Loops 12/13 remain BLOCKED behind One Wire. Do not promote bounded-replay closure to always-on daemon closure without fresh live-loop evidence.**
+**Summary: standing all-history audit is still not daemon-clean because historical `dispatch_dropoff` rows remain. Bounded replays now prove regression harnesses for Loops 1-11; they do not prove production-live closure. Loops 12/13 remain BLOCKED behind One Wire. Promote a loop to `CLOSED_LIVE` only after its declared live owner-surface criterion passes on the daemon branch that actually runs.**
 
 ---
 
-## Evidence From ~/.dharma/ (Audited 2026-05-05)
+## Historical Evidence From ~/.dharma/ (Audited 2026-05-05; Superseded)
 
-Data on disk proves the system has been exercised:
+Historical data on disk proved the system had been exercised as of 2026-05-05.
+This section is retained for archaeology only and is superseded by
+`reports/loop_closure/cybernetics_codex/latest_audit.json` for current counts
+and by the `HARNESS_PROVEN`/`CLOSED_LIVE` verdict tiers for current claims.
 
 | Data Source | Rows/Files | Source |
 |-------------|-----------|--------|
@@ -186,7 +204,7 @@ ADAPT:   Archive mutation + fitness in evolution/archive.jsonl
          Population control spawns/retires agents based on fitness
 ```
 
-**Current state (updated):** AutoProposer stigmergy guard fixed (MM-10 RESOLVED). MetaEvolutionEngine has recorded 3 meta-parameter updates (meta_fitness=0.58494, n_object_cycles=2). DarwinEngine signature fixed (NEW-02: `_provider` attr removed). **The evolution machinery runs and records data. Real fitness computation blocked on Loop 1 producing completed tasks.**
+**Current state (updated 2026-07-02): HARNESS_PROVEN, not CLOSED_LIVE.** `scripts/loop3_evolution_closure_run.py` runs local DarwinEngine behavioral probes, constrains a bounded scratch-only proposal, gate-checks it, records evaluated fitness in a scratch archive, then proves a later proposal/predictor/parent-selection cycle reads the changed predictor/archive state. It explicitly does not write live archive fitness.
 
 ---
 
@@ -207,7 +225,7 @@ ADAPT:   MemoryLattice.index_document() — add to searchable memory
          Next agent context compilation includes consolidated knowledge
 ```
 
-**Current state (updated):** 89 organism_memory entities exist. Consolidation deduplication is working — entities are marked with `invalidation_reason: "consolidated_duplicate_of:..."` and `invalidated_at` timestamps. 11 valid (non-invalidated) entities remain after dedup. **The consolidation pipeline works on organism heartbeat data. No agent-produced outputs exist to consolidate yet.**
+**Current state (updated 2026-07-02): HARNESS_PROVEN, not CLOSED_LIVE.** `scripts/loop4_10_memory_context_closure_run.py` senses completed work artifacts, admits only completed/hash-backed evidence, writes real StrangeLoopMemory rows, consolidates META memory, then proves later `get_context()` and `read_recent_memories()` read the marker. Live closure still needs external/completed owner-surface work rather than the closure harness's own file evidence.
 
 ---
 
@@ -225,7 +243,7 @@ ADAPT:   Next cycle: telos gates read gate_pressure.json and adjust strictness
          This closes VSM Gap #1: S3↔S4 bidirectional feedback
 ```
 
-**Current state (updated 2026-06-23): CLOSED via bounded replay for the internal S3↔S4 arm only.** The internal S3↔S4 arm now closes end-to-end on real data. `scripts/loop5_zeitgeist_closure_run.py` drives real gate checks on genuinely harmful actions through the `TelosGatekeeper` (each BLOCK lands a real `BLOCKED` witness entry — sense), the `InternalPressureScanner` reads the block rate (interpret), a high block rate becomes a "High gate block rate" threat signal (constrain), `_write_gate_pressure` writes `gate_pressure.json` (act), and the gatekeeper's `_apply_gate_pressure` then resolves trust mode `internal_yolo → external_strict` on its next check (adapt — VSM Gap #1 closed). Proof: 8 real blocks, `before=internal_yolo / after=external_strict`, fed forward, no tick errors; cybernetics-codex audit recomputes `CLOSED_BOUNDED_REPLAY`. This does **not** prove real-world/external zeitgeist sensing.
+**Current state (updated 2026-07-02): HARNESS_PROVEN, not CLOSED_LIVE, for the internal S3/S4 arm only.** `scripts/loop5_zeitgeist_closure_run.py` drives gate checks on harmful actions through the `TelosGatekeeper` (each BLOCK lands a `BLOCKED` witness entry), the `InternalPressureScanner` reads the block rate, a high block rate becomes a threat signal, `_write_gate_pressure` writes `gate_pressure.json`, and the gatekeeper's `_apply_gate_pressure` resolves trust mode `internal_yolo -> external_strict` on its next check. This does **not** prove real-world/external zeitgeist sensing.
 
 ---
 
@@ -240,7 +258,7 @@ ADAPT:   Record witness observation to ~/.dharma/witness/
          Evolution engine uses witness scores as fitness signal
 ```
 
-**Current state (updated 2026-06-23): CLOSED via bounded replay.** The gap was an interface mismatch: task completions emitted progress/lifecycle/bus events but never a `task_completed` *trace*, so the Witness (which senses from `TraceStore`) only ever saw `boot`/`heartbeat` and never real agent work. Fixed by wiring `orchestrator._emit_completion_trace` so every completion lands a `task_completed` trace carrying duration and gate_results. With that, `scripts/loop6_witness_closure_run.py` drives the full cycle on real data: dispatch real tasks through a provider proven live by `dispatchable_now()` → Witness samples the real completion traces (sense) → evaluates telos alignment / mimicry / gate sufficiency (interpret) → classifies actionable findings (constrain) → publishes them to the stigmergy governance channel + operator memory (act) → governance marks strictly grow, feeding governance and downstream loops (adapt). The cybernetics-codex audit independently recomputes `CLOSED_BOUNDED_REPLAY` from the receipt (real_data, all 5 transitions, adapt before≠after fed forward, no tick errors). Prior history: 1,013 witness entries across 2 days; correctly BLOCKED destructive filesystem commands (AHIMSA).
+**Current state (updated 2026-07-02): HARNESS_PROVEN, not CLOSED_LIVE.** The harness exercises the completion-trace -> Witness -> governance-mark feedback path and the audit recomputes that the receipt has all five transitions and fed-forward adaptation. Live closure still requires production completions from the live witness/runtime receipt owner surface and downstream consumption of those governance marks.
 
 ---
 
@@ -256,7 +274,7 @@ ADAPT:   dataset_builder creates training JSONL for fine-tuning
          UCB exploration/exploitation balance shifts based on accumulated evidence
 ```
 
-**Current state (updated):** 182 trace entries exist. Quality gate evaluations running (structural scorer). No real agent trajectories to score yet — traces are from test fixtures.
+**Current state (updated 2026-07-02): HARNESS_PROVEN, not CLOSED_LIVE.** `scripts/loop7_training_flywheel_closure_run.py` seeds persisted trajectory JSONL in its own replay state, scores it with `ThinkodynamicScorer`, applies score thresholds, writes strategy and dataset state, then proves a fresh `StrategyReinforcer` changes the next prompt from the persisted pattern. Live closure requires recent non-synthetic trajectory owner-surface rows.
 
 ---
 
@@ -272,7 +290,7 @@ ADAPT:   Write recognition_seed.md to ~/.dharma/meta/
          The recognition seed influences future agent system prompts
 ```
 
-**Current state (updated 2026-05-20):** Recognition seed computation is wired: `cascade.py:386-491` feeds loop results back into the seed, `shakti_executive/inputs.py:100` reads it as an executive signal, `meta_daemon.py` includes it in context health. 89 organism_memory entities provide input. Periodic trigger depends on LoopEngine schedule activation.
+**Current state (updated 2026-07-02): HARNESS_PROVEN, not CLOSED_LIVE.** `scripts/loop8_recognition_closure_run.py` reads loop-history receipts, derives a receipt-hash-bound self-model, runs `RecognitionEngine.synthesize()` into private replay state, and proves later `build_agent_context()` reads the recognition seed. Live closure requires non-scratch loop-history owner receipts and a later live context consumer.
 
 ---
 
@@ -280,35 +298,39 @@ ADAPT:   Write recognition_seed.md to ~/.dharma/meta/
 
 | Loop | Status | Update |
 |------|--------|--------|
-| 9: Conductors | PARTIAL | Cron health tracks 7 jobs. Conductor configs use proper enums. Blocked on LLM provider for actual conductor work. |
-| 10: Context Agent | NO | Depends on Loop 1 (running AgentRunner). MM-01 resolved. Dispatch requires a provider proven by `dispatchable_now()`. |
-| 11: Replication Monitor | PARTIAL | MM-02/03 RESOLVED. Replication path structurally correct. No trigger events yet. |
-| 12: Self-Improvement | NO | DarwinEngine instantiable. `auto_evolve()` fixed. Requires `DHARMA_SELF_IMPROVE` (dispatch is available, see below). |
-| 13: Free Evolution Grind | NO | Router works; dispatch requires a provider proven by `dispatchable_now()`. Still gated by One Wire before archive-fitness authority. |
+| 9: Conductors | HARNESS_PROVEN | `scripts/loop9_11_conductor_replication_closure_run.py` proves conductor signal -> action -> scheduler state -> later scheduler read. Live closure still needs production scheduler owner-surface evidence. |
+| 10: Context Agent | HARNESS_PROVEN | `scripts/loop4_10_memory_context_closure_run.py` proves context assembly reads consolidated memory and writes a changed context package. Live closure still needs production memory inputs changing a served context package. |
+| 11: Replication Monitor | HARNESS_PROVEN | `scripts/loop9_11_conductor_replication_closure_run.py` proves durable proposal -> materialized child/probation/roster -> later monitor read. Live closure still needs live proposal/roster/probation evidence. |
+| 12: Self-Improvement | BLOCKED | One Wire N=3/5, M=1/3. `dharma_swarm/archive.py` now fails closed for governed nonzero archive-fitness writes without N>=5, M>=3, and explicit authority. |
+| 13: Free Evolution Grind | BLOCKED | Same One Wire guard. Free-evolution/archive-fitness authority remains unavailable until external quorum truth exists. |
 
 ---
 
-## Which Loops Close First — first prove live dispatch in this seat
+## Live-Closure Promotion Sketch — non-claim roadmap
 
 **Correction (2026-06-23):** the long-standing "needs a provider key / no real provider" claim was too broad. The `claude_code` lane uses the Claude Code login rather than a project API key, but it is live only when headless `claude -p` can complete now; a binary on PATH is not enough. The single source of truth is `key_oracle.dispatchable_now()` (surfaced in `make onboard`), NOT a frozen line in this map. If `claude -p` fails authentication, Loop 1 is not live on that host until Claude Code auth is repaired or another provider is proven live.
 
 **Step 1: confirm dispatch** — `python3 -c "from dharma_swarm.key_oracle import dispatchable_now; print(dispatchable_now())"`. `claude_code` is keyless only if the command's headless smoke proves it; add/repair Ollama or keyed providers to widen the roster.
 
-**Immediately closeable when `dispatchable_now()` is non-empty:**
+The bullets below are planning notes, not closure assertions. A loop only
+promotes to `CLOSED_LIVE` after the declared live owner-surface criterion passes
+on the daemon branch that actually runs.
+
+**First candidates after `dispatchable_now()` is non-empty:**
 - Loop 1 (Swarm Task) — routing works and dispatch path is clear; needs a proven live provider and `AgentRunner` wired into the live loop
 - Loop 6 (Witness) — already works on test data, will audit real actions immediately
 - Loop 2 (Organism Heartbeat) — invariants will compute real data
 
-**Closeable after first task completes:**
+**Candidates after first task completes:**
 - Loop 5 (Zeitgeist) — witness logs + gate check data enable real scanning
 - Loop 9 (Conductors) — conductor configs are correct, just need provider
 
-**Closeable after ~10 tasks complete:**
+**Candidates after ~10 tasks complete:**
 - Loop 3 (Evolution) — enough fitness data for real DarwinEngine proposals
 - Loop 4 (Consolidation) — enough agent outputs to consolidate
 - Loop 7 (Flywheel) — enough trajectories to score and reinforce
 
-**Closeable after ~100 tasks:**
+**Candidates after ~100 tasks:**
 - Loop 8 (Recognition) — enough data for eigenform convergence
 - Loops 10-13 (dependent loops) — enough system stability
 

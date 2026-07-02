@@ -47,6 +47,7 @@ def test_zhipu_resolves_to_first_party_endpoint() -> None:
     assert cfg.available is True
     assert cfg.default_model == "glm-5.2"
     # First-party z.ai endpoint — NOT openrouter.ai
+    assert cfg.base_url == "https://api.z.ai/api/coding/paas/v4"
     assert "z.ai" in (cfg.base_url or "")
     assert "openrouter" not in (cfg.base_url or "")
 

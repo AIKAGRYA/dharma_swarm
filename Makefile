@@ -8,6 +8,7 @@
 PYTHON ?= $(shell test -x .venv/bin/python && echo .venv/bin/python || echo python3)
 REPO_PYTHON ?= PYTHONPATH=. $(PYTHON)
 PYTEST ?= pytest
+MUTATION_THRESHOLD ?= 0.60
 # Test targets need the repo venv (pytest-timeout etc. live there, not in system pythons).
 VENV_PYTHON := $(if $(wildcard .venv/bin/python),.venv/bin/python,$(PYTHON))
 GO ?= go
@@ -379,7 +380,9 @@ operator-prod-smoke:
 # `make spine-check` target stays as an operator-convenience alias only.
 governance-all: semgrep gitleaks test-hygiene test-contracts nats-substrate-contract uplift-guards module-budget docops-integrity claim-evidence-check
 
-# Pudgala Forge (graded claim/evidence binding). claim-evidence-check is
+# Pudgala Autopoiesis Protostar (graded claim/evidence binding). This is the
+# anti-slop quality membrane, not Dharma Forge / Forge Swarm Evolution Arena.
+# claim-evidence-check is
 # STAGE-DRIVEN: it blocks iff the AI-M1 hygiene pattern is at stage 'enforced'
 # (operator-promoted via scripts/governance/hygiene/promote.py). AI-M1 is advisory
 # today and binding_stage() fail-safes to advisory, so this exits 0 in
@@ -394,12 +397,12 @@ claim-evidence-check:
 claim-evidence:
 	$(REPO_PYTHON) scripts/governance/check_claim_evidence_binding.py --warn-only --emit-receipt
 
-# S6 mutation gate (Pudgala Forge P3-09): runs mutmut on the configured surfaces
+# S6 mutation gate (Pudgala Autopoiesis Protostar P3-09): runs mutmut on the configured surfaces
 # (pyproject [tool.mutmut]) and writes reports/governance/mutation_score.json, the
 # report the `mutation_score_gte` criterion reads. SLOW — a separate step, NOT in
 # governance-all. Needs `pip install mutmut`.
 mutation-test:
-	$(REPO_PYTHON) scripts/governance/run_mutation_score.py
+	$(REPO_PYTHON) scripts/governance/run_mutation_score.py --threshold $(MUTATION_THRESHOLD)
 
 agent-build-preflight: verifier-selfcheck onboard hygiene-check
 	@printf "\nAgent build preflight complete. Use the task route from make onboard; close out with: make agent-build-closeout\n"

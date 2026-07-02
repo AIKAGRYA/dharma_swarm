@@ -132,6 +132,7 @@ def main(argv: list[str] | None = None) -> int:
             DiscoveryTriageCategory.MEMORY_WRITER_NEEDS_SPEC,
             DiscoveryTriageCategory.SURFACE_NEEDS_REGISTRY,
         }
+        and not _write_decision_reviewed(discovery)
         for discovery in discoveries
     ):
         return 5
@@ -262,6 +263,12 @@ def _write_decision_surface(item) -> str:
         return ""
     value = item.write_decision.get("resolved_surface_id")
     return value if isinstance(value, str) else ""
+
+
+def _write_decision_reviewed(item) -> bool:
+    if not item.write_decision:
+        return False
+    return bool(item.write_decision.get("reviewed_baseline"))
 
 
 if __name__ == "__main__":

@@ -1,0 +1,101 @@
+{
+  "dimensions": [
+    "anti_slop_code_quality",
+    "architecture_integration",
+    "future_maintainability",
+    "governance_truthfulness",
+    "production_engineering",
+    "security_supply_chain",
+    "sre_failure_modes"
+  ],
+  "dossier": {
+    "dossier_json": "/Users/dhyana/ds_final_boss_operational_20260701/reports/governance/final_boss/runtime-truth-nats-2026-06-substrate_trusted.json",
+    "dossier_markdown": "/Users/dhyana/ds_final_boss_operational_20260701/reports/governance/final_boss/runtime-truth-nats-2026-06-substrate_trusted.md",
+    "review_prompt": "/Users/dhyana/ds_final_boss_operational_20260701/reports/governance/final_boss/runtime-truth-nats-2026-06-substrate_trusted-prompt.md"
+  },
+  "dry_run": true,
+  "generated_at": "2026-07-01T12:50:11+09:00",
+  "graduation_profile": "runtime_transport",
+  "latest_manifest_json": "/Users/dhyana/ds_final_boss_operational_20260701/reports/governance/final_boss/runs/latest-runtime-truth-nats-2026-06-substrate_trusted-manifest.json",
+  "manifest_json": "/Users/dhyana/ds_final_boss_operational_20260701/reports/governance/final_boss/runs/20260701T035011Z-runtime-truth-nats-2026-06-substrate_trusted-manifest.json",
+  "note": "Prompts generated only; no council receipts and no final_boss_review packet.",
+  "prompt_count": 14,
+  "prompts": [
+    {
+      "dimension": "anti_slop_code_quality",
+      "prompt": "/Users/dhyana/ds_final_boss_operational_20260701/reports/governance/final_boss/prompts/runtime-truth-nats-2026-06-substrate_trusted-round-1-anti_slop_code_quality.md",
+      "round": 1
+    },
+    {
+      "dimension": "architecture_integration",
+      "prompt": "/Users/dhyana/ds_final_boss_operational_20260701/reports/governance/final_boss/prompts/runtime-truth-nats-2026-06-substrate_trusted-round-1-architecture_integration.md",
+      "round": 1
+    },
+    {
+      "dimension": "future_maintainability",
+      "prompt": "/Users/dhyana/ds_final_boss_operational_20260701/reports/governance/final_boss/prompts/runtime-truth-nats-2026-06-substrate_trusted-round-1-future_maintainability.md",
+      "round": 1
+    },
+    {
+      "dimension": "governance_truthfulness",
+      "prompt": "/Users/dhyana/ds_final_boss_operational_20260701/reports/governance/final_boss/prompts/runtime-truth-nats-2026-06-substrate_trusted-round-1-governance_truthfulness.md",
+      "round": 1
+    },
+    {
+      "dimension": "production_engineering",
+      "prompt": "/Users/dhyana/ds_final_boss_operational_20260701/reports/governance/final_boss/prompts/runtime-truth-nats-2026-06-substrate_trusted-round-1-production_engineering.md",
+      "round": 1
+    },
+    {
+      "dimension": "security_supply_chain",
+      "prompt": "/Users/dhyana/ds_final_boss_operational_20260701/reports/governance/final_boss/prompts/runtime-truth-nats-2026-06-substrate_trusted-round-1-security_supply_chain.md",
+      "round": 1
+    },
+    {
+      "dimension": "sre_failure_modes",
+      "prompt": "/Users/dhyana/ds_final_boss_operational_20260701/reports/governance/final_boss/prompts/runtime-truth-nats-2026-06-substrate_trusted-round-1-sre_failure_modes.md",
+      "round": 1
+    },
+    {
+      "dimension": "anti_slop_code_quality",
+      "prompt": "/Users/dhyana/ds_final_boss_operational_20260701/reports/governance/final_boss/prompts/runtime-truth-nats-2026-06-substrate_trusted-round-2-anti_slop_code_quality.md",
+      "round": 2
+    },
+    {
+      "dimension": "architecture_integration",
+      "prompt": "/Users/dhyana/ds_final_boss_operational_20260701/reports/governance/final_boss/prompts/runtime-truth-nats-2026-06-substrate_trusted-round-2-architecture_integration.md",
+      "round": 2
+    },
+    {
+      "dimension": "future_maintainability",
+      "prompt": "/Users/dhyana/ds_final_boss_operational_20260701/reports/governance/final_boss/prompts/runtime-truth-nats-2026-06-substrate_trusted-round-2-future_maintainability.md",
+      "round": 2
+    },
+    {
+      "dimension": "governance_truthfulness",
+      "prompt": "/Users/dhyana/ds_final_boss_operational_20260701/reports/governance/final_boss/prompts/runtime-truth-nats-2026-06-substrate_trusted-round-2-governance_truthfulness.md",
+      "round": 2
+    },
+    {
+      "dimension": "production_engineering",
+      "prompt": "/Users/dhyana/ds_final_boss_operational_20260701/reports/governance/final_boss/prompts/runtime-truth-nats-2026-06-substrate_trusted-round-2-production_engineering.md",
+      "round": 2
+    },
+    {
+      "dimension": "security_supply_chain",
+      "prompt": "/Users/dhyana/ds_final_boss_operational_20260701/reports/governance/final_boss/prompts/runtime-truth-nats-2026-06-substrate_trusted-round-2-security_supply_chain.md",
+      "round": 2
+    },
+    {
+      "dimension": "sre_failure_modes",
+      "prompt": "/Users/dhyana/ds_final_boss_operational_20260701/reports/governance/final_boss/prompts/runtime-truth-nats-2026-06-substrate_trusted-round-2-sre_failure_modes.md",
+      "round": 2
+    }
+  ],
+  "rounds": 2,
+  "schema_version": "dharma.active_track_final_boss.run_manifest.v1",
+  "ship_safe": false,
+  "status": "dry_run_only",
+  "target_closure_kind": "SUBSTRATE_TRUSTED",
+  "track_id": "runtime-truth-nats-2026-06"
+}

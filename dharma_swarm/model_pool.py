@@ -42,35 +42,13 @@ from dharma_swarm.model_defaults import (
 )
 from dharma_swarm.models import ProviderType
 
-# ═══════════════════════════════════════════════════════════════════════════
-# THE POWER FLOOR — the unmistakable demarcation in the DATA
-# ═══════════════════════════════════════════════════════════════════════════
-# Operator word (2026-06-17): "sub-floor models can exist just for real grunt
-# work only but ONLY with a very clear demarcation."
-#
-# :data:`MODEL_POWER_FLOOR` (re-exported from ``evolution_roster``, and equal to
-# :data:`K2_FLOOR_ID`) is the documented line: Kimi K2.6-class. Every roster slot
-# carries a ``below_floor`` boolean; the pool propagates it onto each
-# :class:`ModelEntry` (``below_floor`` == True iff a grouped slot is sub-floor).
-#
-# REAL path  (``below_floor == False``): the default chat brain, the frontier,
-#            and the model picker's main list — sourced via :func:`floor_entries`.
-# GRUNT path (``below_floor == True``):  old / weak / genuinely-local weights the
-#            K2.6 floor banishes from the real path. Reachable ONLY via an
-#            explicit grunt opt-in (:func:`grunt_entries`) — NEVER the
-#            default/frontier path or the picker's main list.
-#
-# The demarcation lives in the data so no consumer can route a sub-floor model
-# onto the frontier by accident: they read one boolean.
-# ═══════════════════════════════════════════════════════════════════════════
+# THE POWER FLOOR: the documented Kimi K2.6-class line. Roster slots carry
+# ``below_floor`` and the pool propagates it. ``floor_entries`` feeds real paths;
+# ``grunt_entries`` is the explicit opt-in for old/weak/local weights.
 K2_FLOOR_ID = MODEL_POWER_FLOOR  # "kimi-k2.6" — single documented source
 
-# The per-provider default model strings live in :mod:`model_defaults` (a leaf
-# that imports only ``models``, so it sits below the roster→ollama_config→
-# model_hierarchy import cycle). The pool re-exports :func:`default_for_provider`
-# (imported above) so it remains the public model-grain owner the consolidation
-# goal names; ``_PROVIDER_DEFAULTS`` is reused below for the import-time coherence
-# guard against the roster route table.
+# Provider defaults live in :mod:`model_defaults` to avoid import cycles; the
+# pool re-exports :func:`default_for_provider` and validates those defaults below.
 
 
 # ---------------------------------------------------------------------------
@@ -136,6 +114,7 @@ _PROVIDER_RANK: dict[ProviderType, int] = {
     ProviderType.CLAUDE_CODE: 0,
     ProviderType.OPENAI: 1,
     ProviderType.CODEX: 1,
+    ProviderType.KIMI_CODE: 2,
     ProviderType.OLLAMA: 2,
     ProviderType.NVIDIA_NIM: 3,
     ProviderType.GROQ: 4,
@@ -309,6 +288,29 @@ def entry_for_model_id(model_id: str) -> ModelEntry | None:
     return None
 
 
+def _required_provider_route(logical_id: str, provider: ProviderType) -> str:
+    entry = get_entry(logical_id)
+    if entry is None:
+        raise AssertionError(f"missing model-pool entry for {logical_id!r}")
+    for route in entry.routes:
+        if route.provider is provider:
+            return route.model_id
+    raise AssertionError(f"missing {provider.value!r} route for {logical_id!r}")
+
+
+FORGE_KIMI_CODE_MODEL_ID = default_for_provider(ProviderType.KIMI_CODE)
+FORGE_KIMI_27_CODE_LOGICAL_ID = "kimi-k2.7-code"
+FORGE_KIMI_27_CODE_CLOUD_MODEL_ID = _required_provider_route(
+    FORGE_KIMI_27_CODE_LOGICAL_ID,
+    ProviderType.OLLAMA,
+)
+FORGE_NVIDIA_KIMI_MODEL_ID = _required_provider_route(K2_FLOOR_ID, ProviderType.NVIDIA_NIM)
+FORGE_NVIDIA_LLAMA_VERIFIER_MODEL_ID = _required_provider_route(
+    "llama-3.3-70b-instruct",
+    ProviderType.NVIDIA_NIM,
+)
+
+
 # Providers whose default is a deliberate operator pin that supersedes the
 # legacy roster (the roster predates gpt-5 / opus-4.6 / codex gpt-5.4). These are
 # still owned by _PROVIDER_DEFAULTS; the coherence guard below only exempts them
@@ -469,6 +471,11 @@ __all__ = [
     "get_entry",
     "entry_for_model_id",
     "default_for_provider",
+    "FORGE_KIMI_CODE_MODEL_ID",
+    "FORGE_KIMI_27_CODE_LOGICAL_ID",
+    "FORGE_KIMI_27_CODE_CLOUD_MODEL_ID",
+    "FORGE_NVIDIA_KIMI_MODEL_ID",
+    "FORGE_NVIDIA_LLAMA_VERIFIER_MODEL_ID",
     "live_routes",
     "best_live_route",
     "provider_model_ids",

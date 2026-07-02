@@ -89,6 +89,16 @@ def test_json_mode_is_machine_parseable():
     assert "identity" in payload and "organs" in payload
 
 
+def test_normalize_context_path_redacts_absolute_paths():
+    home_based = str(Path.home() / ".dharma/a2a_bus")
+    assert og._normalize_context_path(home_based).startswith("~/")
+
+    repo_based = str(og.REPO_ROOT / "reports/orientation/nats_e2e_receipt.json")
+    assert og._normalize_context_path(repo_based).startswith("$REPO_ROOT/")
+
+    assert og._normalize_context_path("/opt/private/location") == "<absolute-path>"
+
+
 # ── Graph-shaped query tests ──────────────────────────────────────────
 
 

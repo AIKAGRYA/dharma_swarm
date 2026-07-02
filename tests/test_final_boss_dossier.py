@@ -186,6 +186,39 @@ def test_runtime_transport_packet_requires_explicit_runtime_evidence(tmp_path):
     assert "ready_for_yaml_attach" not in packet  # validation is computed by the runner/consumer
 
 
+def test_runtime_transport_packet_does_not_invent_failure_modes(tmp_path):
+    dossier_paths = write_artifacts(
+        build_dossier("runtime-truth-nats-2026-06", "SUBSTRATE_TRUSTED"),
+        tmp_path,
+    )
+    receipts = _passing_council_receipts(
+        tmp_path,
+        FINAL_BOSS_MIN_ROUNDS * len(FINAL_BOSS_DIMENSIONS),
+    )
+
+    packet = build_review_packet(
+        dossier_path=dossier_paths["dossier_json"],
+        receipt_paths=receipts,
+        dimensions=sorted(FINAL_BOSS_DIMENSIONS),
+        rounds=FINAL_BOSS_MIN_ROUNDS,
+        runtime_evidence=[],
+        failure_modes_tested=[],
+        mock_only=False,
+        local_verifier_results=_passing_local_verifiers(dossier_paths["dossier_json"]),
+    )
+
+    assert packet["failure_modes_tested"] == []
+    blocks = validation_blocks_for_packet(
+        track_id="runtime-truth-nats-2026-06",
+        target_closure_kind="SUBSTRATE_TRUSTED",
+        packet=packet,
+    )
+    assert any("requires runtime_evidence" in block for block in blocks)
+    assert any("runtime_transport missing failure modes" in block for block in blocks)
+    snippet = yaml_snippet(packet)
+    assert "failure_modes_tested: []" in snippet
+
+
 def test_one_council_receipt_cannot_cover_all_final_boss_dimensions(tmp_path):
     dossier_paths = write_artifacts(
         build_dossier("runtime-truth-nats-2026-06", "SUBSTRATE_TRUSTED"),
