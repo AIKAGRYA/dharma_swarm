@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-02T07:06:42+00:00",
+  "generated_at": "2026-07-02T10:32:47+00:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-spine-adoption-2026-06",
   "shippable": false,
@@ -81,7 +81,7 @@
     }
   ],
   "portfolio_summary": {
-    "active": 4,
+    "active": 5,
     "max_active": 10,
     "warn_active": 5,
     "shippable": 0
@@ -620,6 +620,61 @@
           "executed": true
         }
       ]
+    },
+    {
+      "id": "organism-rewire-2026-07",
+      "name": "Organism Rewire \u2014 dormant organs to production, spine standing-on, external gradients",
+      "status": "ACTIVE",
+      "closure_kind": null,
+      "target_closure_kind": "VERIFIED_SLICE",
+      "graduation_profile": "generic",
+      "serves": "substrate-nativeness",
+      "complements": [
+        "runtime-truth-spine-adoption-2026-06",
+        "loop-closure-2026-06",
+        "orchestration-arena-v1-2026-06"
+      ],
+      "depends_on": [],
+      "conflicts_with": [],
+      "owned_surfaces": [
+        "tools/world_scout_go/**",
+        "tools/world_signal_ingestor_go/**",
+        "tools/github_ingestor_go/**",
+        "tools/evidence_ingestor_go/**",
+        "dharma_swarm/world_radar/**",
+        "dharma_swarm/organism.py",
+        "dharma_swarm/strange_loop.py",
+        "dharma_swarm/diversity_archive.py",
+        "dharma_swarm/archive.py",
+        "docker-compose.yml",
+        "Dockerfile.swarm"
+      ],
+      "moves_vital_signs": [
+        "quality_gates",
+        "eval_coverage"
+      ],
+      "verified_at": "2026-07-02",
+      "ttl_days": 21,
+      "owner": "@AmitabhainArunachala",
+      "shippable": false,
+      "criteria_pass": false,
+      "ship_blocks": [
+        "2 open blocker next-item(s)",
+        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)",
+        "strongest evidence S0_EXISTS < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
+      ],
+      "final_boss_blocks": [],
+      "has_rigorous_evidence": false,
+      "strongest_grade": 0,
+      "strongest_grade_name": "S0_EXISTS",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
+      "prerequisites_ok": true,
+      "completion_progress": {
+        "passed": 0,
+        "total": 0
+      },
+      "criteria": []
     }
   ],
   "findings": [

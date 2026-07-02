@@ -1,7 +1,7 @@
 # Track Portfolio Evidence
 
-Generated: 2026-07-02T07:06:42+00:00 (schema v2)
-Active tracks: **4** (warn 5, max 10) — shippable 0
+Generated: 2026-07-02T10:32:47+00:00 (schema v2)
+Active tracks: **5** (warn 5, max 10) — shippable 0
 
 ## Spine coverage
 
@@ -79,6 +79,13 @@ Active tracks: **4** (warn 5, max 10) — shippable 0
   - ✓ `github_review_bridge_tested` (file_exists) — tests/test_pr_merge_control_github_reviews.py present
   - ✓ `automerge_enrolls_all_nondraft` (file_contains) — pattern 'mike-watch' found in .github/workflows/automerge.yml
   - ✗ `mike_cloud_heartbeat` (file_contains) — pattern 'schedule:' NOT FOUND in .github/workflows/merge-master-mike-backlog.yml
+
+## `organism-rewire-2026-07` — 0/0
+
+- serves: `substrate-nativeness` · complements: ['runtime-truth-spine-adoption-2026-06', 'loop-closure-2026-06', 'orchestration-arena-v1-2026-06'] · depends_on: [] · conflicts_with: []
+- owned_surfaces: ['tools/world_scout_go/**', 'tools/world_signal_ingestor_go/**', 'tools/github_ingestor_go/**', 'tools/evidence_ingestor_go/**', 'dharma_swarm/world_radar/**', 'dharma_swarm/organism.py', 'dharma_swarm/strange_loop.py', 'dharma_swarm/diversity_archive.py', 'dharma_swarm/archive.py', 'docker-compose.yml', 'Dockerfile.swarm']
+- moves_vital_signs: ['quality_gates', 'eval_coverage']
+
 
 ## Findings
 
