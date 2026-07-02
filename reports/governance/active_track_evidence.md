@@ -1,6 +1,6 @@
 # Track Portfolio Evidence
 
-Generated: 2026-07-02T13:05:35+09:00 (schema v2)
+Generated: 2026-07-02T14:11:26+09:00 (schema v2)
 Active tracks: **4** (warn 5, max 10) — shippable 0
 
 ## Spine coverage
@@ -14,6 +14,7 @@ Active tracks: **4** (warn 5, max 10) — shippable 0
 - serves: `substrate-nativeness` · complements: ['runtime-truth-reconciliation-2026-06', 'runtime-truth-nats-2026-06'] · depends_on: [] · conflicts_with: []
 - owned_surfaces: ['dharma_swarm/spine/**', 'dharma_swarm/a2a/a2a_bridge.py', 'dharma_swarm/orchestrator.py', 'dharma_swarm/agent_runner.py', 'scripts/uplift_guards/check_spine_ownership.py']
 - moves_vital_signs: ['quality_gates', 'tool_coverage']
+- ship_blocks: 4 open blocker next-item(s); no rigorous evidence (criteria are existence-only: file_exists/file_contains — add test_passes / commit_on_main / receipt_valid); strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)
 
   - ✓ `spine_package_exists` (file_exists) — dharma_swarm/spine/__init__.py present
   - ✓ `invoke_agent_defined` (file_contains) — pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py
@@ -26,11 +27,15 @@ Active tracks: **4** (warn 5, max 10) — shippable 0
   - ✓ `adoption_narrative_docs` (file_exists) — docs/architecture/SPINE_ADOPTION_NARRATIVE.md present
   - ✓ `gate1_witnessed` (file_exists) — reports/governance/GATE1_WITNESSED.md present
 
-## `loop-closure-2026-06` — 27/38
+## `loop-closure-2026-06` — 29/29
 
 - serves: `substrate-nativeness` · complements: ['runtime-truth-reconciliation-2026-06'] · depends_on: [] · conflicts_with: []
 - owned_surfaces: ['reports/loop_closure/**', 'CYBERNETIC_LOOP_MAP.md']
 - moves_vital_signs: ['quality_gates', 'eval_coverage']
+- claim_boundary: CLOSED_LIVE 0/13; HARNESS_PROVEN 11/13; BLOCKED 2/13. Completion criteria only prove the claim-boundary artifact set, not production-live closure.
+- ship_blocks: 2 open blocker next-item(s); 1 active ship veto(es): cybernetics_codex_harness_proven_blocks_live_ship: reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses[].verdict == 'HARNESS_PROVEN': 11 > 0
+
+  - ACTIVE ship veto `cybernetics_codex_harness_proven_blocks_live_ship` (json_count_greater_than) — reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses[].verdict == 'HARNESS_PROVEN': 11 > 0
 
   - ✓ `loop_map_exists` (file_exists) — CYBERNETIC_LOOP_MAP.md present
   - ✓ `loop_supervisor_exists` (file_exists) — dharma_swarm/loop_supervisor.py present
@@ -46,21 +51,12 @@ Active tracks: **4** (warn 5, max 10) — shippable 0
   - ✓ `cybernetics_codex_audit_script_exists` (file_exists) — scripts/governance/cybernetics_codex_audit.py present
   - ✓ `cybernetics_codex_registration_script_exists` (file_exists) — scripts/governance/register_cybernetics_codex.py present
   - ✓ `cybernetics_codex_latest_audit_exists` (file_exists) — reports/loop_closure/cybernetics_codex/latest_audit.json present
-  - ✓ `cybernetics_codex_latest_audit_valid` (receipt_valid) — receipt reports/loop_closure/cybernetics_codex/latest_audit.json valid (5 keys present)
-  - ✓ `cybernetics_codex_11_harness_proven` (file_contains) — pattern '\\| 11 \\| Replication Monitor \\| HARNESS_PROVEN \\|' found in reports/loop_closure/cybernetics_codex/latest_audit.md
-  - ✓ `cybernetics_codex_12_blocked` (file_contains) — pattern '\\| 12 \\| Self-Improvement \\| BLOCKED \\|' found in reports/loop_closure/cybernetics_codex/latest_audit.md
-  - ✓ `cybernetics_codex_13_blocked` (file_contains) — pattern '\\| 13 \\| Free Evolution Grind \\| BLOCKED \\|' found in reports/loop_closure/cybernetics_codex/latest_audit.md
-  - ✗ `cybernetics_codex_loop1_closed_live` (file_contains) — pattern '\\| 1 \\| Swarm Task Loop \\| CLOSED_LIVE \\|' NOT FOUND in reports/loop_closure/cybernetics_codex/latest_audit.md
-  - ✗ `cybernetics_codex_loop2_closed_live` (file_contains) — pattern '\\| 2 \\| Organism Heartbeat \\| CLOSED_LIVE \\|' NOT FOUND in reports/loop_closure/cybernetics_codex/latest_audit.md
-  - ✗ `cybernetics_codex_loop3_closed_live` (file_contains) — pattern '\\| 3 \\| Evolution Loop / DarwinEngine \\| CLOSED_LIVE \\|' NOT FOUND in reports/loop_closure/cybernetics_codex/latest_audit.md
-  - ✗ `cybernetics_codex_loop4_closed_live` (file_contains) — pattern '\\| 4 \\| Consolidation Loop / Memory \\| CLOSED_LIVE \\|' NOT FOUND in reports/loop_closure/cybernetics_codex/latest_audit.md
-  - ✗ `cybernetics_codex_loop5_closed_live` (file_contains) — pattern '\\| 5 \\| Zeitgeist Scanner \\| CLOSED_LIVE \\|' NOT FOUND in reports/loop_closure/cybernetics_codex/latest_audit.md
-  - ✗ `cybernetics_codex_loop6_closed_live` (file_contains) — pattern '\\| 6 \\| Witness Auditor \\| CLOSED_LIVE \\|' NOT FOUND in reports/loop_closure/cybernetics_codex/latest_audit.md
-  - ✗ `cybernetics_codex_loop7_closed_live` (file_contains) — pattern '\\| 7 \\| Training Flywheel \\| CLOSED_LIVE \\|' NOT FOUND in reports/loop_closure/cybernetics_codex/latest_audit.md
-  - ✗ `cybernetics_codex_loop8_closed_live` (file_contains) — pattern '\\| 8 \\| Recognition Loop / eigenform \\| CLOSED_LIVE \\|' NOT FOUND in reports/loop_closure/cybernetics_codex/latest_audit.md
-  - ✗ `cybernetics_codex_loop9_closed_live` (file_contains) — pattern '\\| 9 \\| Conductors \\| CLOSED_LIVE \\|' NOT FOUND in reports/loop_closure/cybernetics_codex/latest_audit.md
-  - ✗ `cybernetics_codex_loop10_closed_live` (file_contains) — pattern '\\| 10 \\| Context Agent \\| CLOSED_LIVE \\|' NOT FOUND in reports/loop_closure/cybernetics_codex/latest_audit.md
-  - ✗ `cybernetics_codex_loop11_closed_live` (file_contains) — pattern '\\| 11 \\| Replication Monitor \\| CLOSED_LIVE \\|' NOT FOUND in reports/loop_closure/cybernetics_codex/latest_audit.md
+  - ✓ `cybernetics_codex_latest_audit_valid` (receipt_valid) — receipt reports/loop_closure/cybernetics_codex/latest_audit.json valid (5 keys present, fresh)
+  - ✓ `cybernetics_codex_loop_verdict_map_matches_claim_boundary` (json_collection_values_match) — reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses 13 expected verdict value(s) matched
+  - ✓ `cybernetics_codex_live_owner_criteria_declared` (json_mapping_keys_nonempty) — reports/loop_closure/cybernetics_codex/latest_audit.json.live_owner_surface_criteria has non-empty values for 13 key(s)
+  - ✓ `cybernetics_codex_closed_live_count_zero` (json_count_equals) — reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses[].verdict == 'CLOSED_LIVE': 0 == 0
+  - ✓ `cybernetics_codex_harness_proven_count_11` (json_count_equals) — reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses[].verdict == 'HARNESS_PROVEN': 11 == 11
+  - ✓ `cybernetics_codex_blocked_count_2` (json_count_equals) — reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses[].verdict == 'BLOCKED': 2 == 2
   - ✓ `cybernetics_codex_loop3_receipt_valid` (receipt_valid) — receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop3_evolution_closure.json valid (6 keys present)
   - ✓ `cybernetics_codex_loop4_receipt_valid` (receipt_valid) — receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop4_memory_context_closure.json valid (6 keys present)
   - ✓ `cybernetics_codex_loop7_receipt_valid` (receipt_valid) — receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop7_training_flywheel_closure.json valid (6 keys present)
@@ -69,7 +65,7 @@ Active tracks: **4** (warn 5, max 10) — shippable 0
   - ✓ `cybernetics_codex_loop10_receipt_valid` (receipt_valid) — receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop10_context_agent_closure.json valid (6 keys present)
   - ✓ `cybernetics_codex_loop11_receipt_valid` (receipt_valid) — receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop11_replication_monitor_closure.json valid (6 keys present)
   - ✓ `cybernetics_codex_one_wire_guard_test_exists` (file_exists) — tests/test_one_wire_archive_fitness_guard.py present
-  - ✓ `cybernetics_codex_one_wire_guard_test_passes` (test_passes) — pytest tests/test_one_wire_archive_fitness_guard.py: PASS — 9 passed in 0.21s
+  - ✓ `cybernetics_codex_one_wire_guard_test_passes` (test_passes) — pytest tests/test_one_wire_archive_fitness_guard.py: PASS — 9 passed in 0.11s
   - ✓ `cybernetics_codex_loop12_13_guard_receipt_exists` (file_exists) — reports/loop_closure/cybernetics_codex/2026-07-01_loop12_13_one_wire_archive_fitness_guard.json present
   - ✓ `cybernetics_codex_loop12_13_guard_receipt_valid` (receipt_valid) — receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop12_13_one_wire_archive_fitness_guard.json valid (5 keys present)
 
@@ -78,6 +74,7 @@ Active tracks: **4** (warn 5, max 10) — shippable 0
 - serves: `substrate-nativeness` · complements: ['provider-routing-consolidation-2026-06', 'loop-closure-2026-06'] · depends_on: [] · conflicts_with: []
 - owned_surfaces: ['dharma_swarm/coordination/**', 'dharma_swarm/council/**', 'tests/test_arena_v1.py', 'tests/test_dpi.py', 'tests/test_orchestration_genome.py', 'tests/test_orchestrator_v1.py', 'tests/test_council_profiles.py', 'tests/test_coordination_closure_checks.py']
 - moves_vital_signs: ['eval_coverage', 'quality_gates']
+- ship_blocks: 1 open blocker next-item(s); no rigorous evidence (criteria are existence-only: file_exists/file_contains — add test_passes / commit_on_main / receipt_valid); strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)
 
   - ✓ `arena_runner_exists` (file_exists) — dharma_swarm/coordination/arena/runner.py present
   - ✓ `arena_scorer_exists` (file_exists) — dharma_swarm/coordination/arena/scorer.py present
@@ -97,6 +94,7 @@ Active tracks: **4** (warn 5, max 10) — shippable 0
 - serves: `substrate-nativeness` · complements: ['runtime-truth-reconciliation-2026-06'] · depends_on: [] · conflicts_with: []
 - owned_surfaces: ['scripts/runtime/pr_merge_control.py', 'scripts/runtime/merge_master_mike_daemon.py', '.github/workflows/automerge.yml', '.github/workflows/codex-mention-router.yml', '.github/workflows/merge-master-mike-backlog.yml', 'tests/test_pr_merge_control_github_reviews.py']
 - moves_vital_signs: ['quality_gates', 'tool_coverage']
+- ship_blocks: 2 open blocker next-item(s); no rigorous evidence (criteria are existence-only: file_exists/file_contains — add test_passes / commit_on_main / receipt_valid); strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)
 
   - ✓ `pr_merge_control_exists` (file_exists) — scripts/runtime/pr_merge_control.py present
   - ✓ `mike_daemon_exists` (file_exists) — scripts/runtime/merge_master_mike_daemon.py present
@@ -113,6 +111,6 @@ Active tracks: **4** (warn 5, max 10) — shippable 0
 - **WARN** `spine-uncovered:revenue-external-humans-served`: Spine objective 'revenue-external-humans-served' has no ACTIVE track serving it (coverage gap).
 - **WARN** `track-stale:runtime-truth-spine-adoption-2026-06`: [runtime-truth-spine-adoption-2026-06] verified_at is 22 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.
 - **INFO** `track-in-progress:runtime-truth-spine-adoption-2026-06`: [runtime-truth-spine-adoption-2026-06] 7/8 completion criteria pass.
-- **INFO** `track-in-progress:loop-closure-2026-06`: [loop-closure-2026-06] 27/38 completion criteria pass.
+- **INFO** `track-provisional:loop-closure-2026-06`: [loop-closure-2026-06] 29/29 criteria pass but NOT shippable under the rigorous bar: 2 open blocker next-item(s); 1 active ship veto(es): cybernetics_codex_harness_proven_blocks_live_ship: reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses[].verdict == 'HARNESS_PROVEN': 11 > 0. Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).
 - **INFO** `track-provisional:orchestration-arena-v1-2026-06`: [orchestration-arena-v1-2026-06] 9/9 criteria pass but NOT shippable under the rigorous bar: 1 open blocker next-item(s); no rigorous evidence (criteria are existence-only: file_exists/file_contains — add test_passes / commit_on_main / receipt_valid); strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).
 - **INFO** `track-in-progress:merge-master-mike-d4-2026-06`: [merge-master-mike-d4-2026-06] 3/4 completion criteria pass.

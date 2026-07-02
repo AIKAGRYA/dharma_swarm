@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Render the read-only cybernetics_codex closure-ledger audit."""
+"""Render the read-only cybernetics_codex closure-ledger audit.
+
+This command reads receipts and bounded replay artifacts. It does not dispatch
+agents, rerun live owner-surface checks, or prove production-live closure.
+"""
 
 from __future__ import annotations
 

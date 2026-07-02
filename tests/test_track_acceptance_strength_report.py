@@ -39,6 +39,10 @@ def test_supported_rigorous_kinds_are_scored_from_main_checker() -> None:
         "file_exists": 0,
         "file_contains": 1,
         "commit_on_main": 2,
+        "json_collection_values_match": 2,
+        "json_count_equals": 2,
+        "json_count_greater_than": 2,
+        "json_mapping_keys_nonempty": 2,
         "pr_merged": 2,
         "test_passes": 3,
         "receipt_valid": 5,
@@ -49,6 +53,31 @@ def test_supported_rigorous_kinds_are_scored_from_main_checker() -> None:
             crit["file"] = "CLAUDE.md"
         if kind == "file_contains":
             crit["pattern"] = "dharma"
+        if kind in {"json_count_equals", "json_count_greater_than"}:
+            crit.update({
+                "file": "reports/loop_closure/cybernetics_codex/latest_audit.json",
+                "collection": "loop_statuses",
+                "field": "verdict",
+                "value": "CLOSED_LIVE",
+            })
+            if kind == "json_count_equals":
+                crit["expected"] = 0
+            else:
+                crit["threshold"] = 0
+        if kind == "json_collection_values_match":
+            crit.update({
+                "file": "reports/loop_closure/cybernetics_codex/latest_audit.json",
+                "collection": "loop_statuses",
+                "key_field": "number",
+                "value_field": "verdict",
+                "expected": {"1": "HARNESS_PROVEN"},
+            })
+        if kind == "json_mapping_keys_nonempty":
+            crit.update({
+                "file": "reports/loop_closure/cybernetics_codex/latest_audit.json",
+                "mapping": "live_owner_surface_criteria",
+                "keys": ["loop1"],
+            })
         if kind == "commit_on_main":
             crit["commit"] = "deadbeef"
         if kind == "test_passes":

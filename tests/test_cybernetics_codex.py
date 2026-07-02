@@ -297,6 +297,11 @@ def test_loop_closure_track_requires_steward_packet():
     assert "cybernetics_codex_context_desk_exists" in criteria
     assert "cybernetics_codex_audit_script_exists" in criteria
     assert "cybernetics_codex_registration_script_exists" in criteria
+    assert "cybernetics_codex_loop_verdict_map_matches_claim_boundary" in criteria
+    assert "cybernetics_codex_live_owner_criteria_declared" in criteria
+    assert "cybernetics_codex_closed_live_count_zero" in criteria
+    assert "cybernetics_codex_harness_proven_count_11" in criteria
+    assert not any(criterion.endswith("_closed_live") for criterion in criteria)
 
 
 def test_agent_seed_and_context_desk_are_registered():

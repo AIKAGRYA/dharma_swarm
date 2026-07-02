@@ -69,6 +69,10 @@ oracle_dependent_downgrade_to: 2   # S3 -> S2 when oracle == track owner
 kind_maturity:
   file_exists: 0
   file_contains: 1
+  json_collection_values_match: 2
+  json_count_equals: 2
+  json_count_greater_than: 2
+  json_mapping_keys_nonempty: 2
   pr_merged: 2
   commit_on_main: 2
   test_passes: 3
@@ -91,8 +95,10 @@ grades:
   - grade: 2
     name: S2_LANDED
     status: active
-    kinds: [commit_on_main]
-    meaning: "A cited commit is an ancestor of origin/main — the work LANDED."
+    kinds: [commit_on_main, json_count_equals, json_count_greater_than, json_collection_values_match, json_mapping_keys_nonempty]
+    meaning: "A cited commit is an ancestor of origin/main, or a structured JSON
+              assertion matched an owned evidence artifact. Landed/structured
+              evidence, not independent runtime execution."
 
   - grade: 3
     name: S3_TESTED

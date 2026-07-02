@@ -5,6 +5,16 @@
 **Purpose:** Document every feedback loop's sense→act→evaluate→adapt path.
 Each loop is "closed" only when its output feeds back as input to a future cycle.
 
+> **Claim boundary:** `scripts/governance/cybernetics_codex_audit.py` is a
+> read-only verifier over receipts and bounded replay outputs. It does **not**
+> re-execute live owner-surface checks. `HARNESS_PROVEN` means a bounded replay
+> passed; `CLOSED_LIVE` requires a separate live owner-surface proof on the
+> daemon branch that actually runs. Current production-live closure claim:
+> `CLOSED_LIVE: 0/13`.
+> This PR does not claim production-live closure of any loop. `HARNESS_PROVEN
+> 11/13` means bounded replay harnesses pass; it does not mean the loops are
+> closed in production.
+
 > **Re-verification pass 2026-06-15 (perplexity-computer):** 26 days / 232 commits since last audit. Code-structural status of all 13 loops is unchanged in the static surface. Two notable code changes since 2026-05-20 worth flagging here without flipping status (runtime closure still depends on live `~/.dharma/` data not visible from cloud seat):
 >
 > - **Loop 1 (Swarm Task Loop) — spine is wired.** `dharma_swarm/agent_runner.py:55-62` now imports `invoke_agent` and `EvidenceReceipt` directly. The runtime-truth-spine-adoption-2026-06 track currently has 7/8 criteria passing but remains unshipped under the rigorous bar. The remaining gate is a *proven dispatchable provider in the live seat*; `claude_code` is keyless only when headless `claude -p` smokes green, and local Ollama may be the current live fallback.
@@ -84,9 +94,12 @@ Bounded Loop 1 replay proof (current code/provider lane):
 
 ---
 
-## Evidence From ~/.dharma/ (Audited 2026-05-05)
+## Historical Evidence From ~/.dharma/ (Audited 2026-05-05; Superseded)
 
-Data on disk proves the system has been exercised:
+Historical data on disk proved the system had been exercised as of 2026-05-05.
+This section is retained for archaeology only and is superseded by
+`reports/loop_closure/cybernetics_codex/latest_audit.json` for current counts
+and by the `HARNESS_PROVEN`/`CLOSED_LIVE` verdict tiers for current claims.
 
 | Data Source | Rows/Files | Source |
 |-------------|-----------|--------|
@@ -293,27 +306,31 @@ ADAPT:   Write recognition_seed.md to ~/.dharma/meta/
 
 ---
 
-## Which Loops Close First — first prove live dispatch in this seat
+## Live-Closure Promotion Sketch — non-claim roadmap
 
 **Correction (2026-06-23):** the long-standing "needs a provider key / no real provider" claim was too broad. The `claude_code` lane uses the Claude Code login rather than a project API key, but it is live only when headless `claude -p` can complete now; a binary on PATH is not enough. The single source of truth is `key_oracle.dispatchable_now()` (surfaced in `make onboard`), NOT a frozen line in this map. If `claude -p` fails authentication, Loop 1 is not live on that host until Claude Code auth is repaired or another provider is proven live.
 
 **Step 1: confirm dispatch** — `python3 -c "from dharma_swarm.key_oracle import dispatchable_now; print(dispatchable_now())"`. `claude_code` is keyless only if the command's headless smoke proves it; add/repair Ollama or keyed providers to widen the roster.
 
-**Immediately closeable when `dispatchable_now()` is non-empty:**
+The bullets below are planning notes, not closure assertions. A loop only
+promotes to `CLOSED_LIVE` after the declared live owner-surface criterion passes
+on the daemon branch that actually runs.
+
+**First candidates after `dispatchable_now()` is non-empty:**
 - Loop 1 (Swarm Task) — routing works and dispatch path is clear; needs a proven live provider and `AgentRunner` wired into the live loop
 - Loop 6 (Witness) — already works on test data, will audit real actions immediately
 - Loop 2 (Organism Heartbeat) — invariants will compute real data
 
-**Closeable after first task completes:**
+**Candidates after first task completes:**
 - Loop 5 (Zeitgeist) — witness logs + gate check data enable real scanning
 - Loop 9 (Conductors) — conductor configs are correct, just need provider
 
-**Closeable after ~10 tasks complete:**
+**Candidates after ~10 tasks complete:**
 - Loop 3 (Evolution) — enough fitness data for real DarwinEngine proposals
 - Loop 4 (Consolidation) — enough agent outputs to consolidate
 - Loop 7 (Flywheel) — enough trajectories to score and reinforce
 
-**Closeable after ~100 tasks:**
+**Candidates after ~100 tasks:**
 - Loop 8 (Recognition) — enough data for eigenform convergence
 - Loops 10-13 (dependent loops) — enough system stability
 
