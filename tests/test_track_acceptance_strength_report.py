@@ -203,6 +203,38 @@ closed_tracks: []
     assert any(w["code"] == "malformed_criteria" for w in track["warnings"])
 
 
+def test_json_count_kinds_require_kind_specific_keys() -> None:
+    base = {
+        "id": "json-count",
+        "file": "reports/loop_closure/cybernetics_codex/latest_audit.json",
+        "collection": "loop_statuses",
+        "field": "verdict",
+        "value": "CLOSED_LIVE",
+    }
+
+    equals_missing_expected = strength.classify_criterion(
+        {"kind": "json_count_equals", "threshold": 0, **base},
+        0,
+    )
+    greater_missing_threshold = strength.classify_criterion(
+        {"kind": "json_count_greater_than", "expected": 0, **base},
+        1,
+    )
+    equals_valid = strength.classify_criterion(
+        {"kind": "json_count_equals", "expected": 0, **base},
+        2,
+    )
+    greater_valid = strength.classify_criterion(
+        {"kind": "json_count_greater_than", "threshold": 0, **base},
+        3,
+    )
+
+    assert equals_missing_expected.malformed is True
+    assert greater_missing_threshold.malformed is True
+    assert equals_valid.malformed is False
+    assert greater_valid.malformed is False
+
+
 def test_non_active_statuses_are_not_counted_as_active(tmp_path: Path) -> None:
     track_file = tmp_path / "ACTIVE_TRACK.yaml"
     _write_track_yaml(
