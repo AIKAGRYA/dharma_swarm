@@ -42,7 +42,11 @@ from dharma_swarm.spine.receipt import EvidenceReceipt
 from dharma_swarm.spine.routing import RoutingDecision
 from dharma_swarm.world_radar.analysis import build_world_signal_board
 from dharma_swarm.world_radar.go_bridge import _run_go_scout
-from dharma_swarm.world_radar.theme_window import run_theme_window_update
+from dharma_swarm.world_radar.theme_window import (
+    load_theme_window,
+    save_theme_window,
+    update_theme_window,
+)
 
 DEFAULT_MAX_VERIFICATIONS = 8
 
@@ -186,8 +190,15 @@ async def run_deep_sweep(
     board = build_world_signal_board(scout_rows) if scout_rows else {"movements": []}
     movements = [m for m in board.get("movements", []) if isinstance(m, dict)]
 
-    window_summary = run_theme_window_update(state)
-    newly_seen_ids = set(window_summary.get("newly_seen_movement_ids", []))
+    # Fold THIS cycle's own beat-derived movements into the rolling window --
+    # not meta/world_signal_board.json (that's the separate, hourly
+    # world_scout job's file; reading it here would silently track the wrong
+    # job's movements, or nothing at all if world_scout hasn't run recently).
+    window_path = radar / "theme_window.json"
+    window = load_theme_window(window_path)
+    updated_window, newly_seen = update_theme_window(window, movements)
+    save_theme_window(window_path, updated_window)
+    newly_seen_ids = set(newly_seen)
 
     candidates = [m for m in movements if m.get("movement_id") in newly_seen_ids] or list(movements)
     candidates.sort(key=lambda m: float(m.get("weighted_score", 0.0) or 0.0), reverse=True)

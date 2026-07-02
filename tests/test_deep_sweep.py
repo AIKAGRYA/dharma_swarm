@@ -15,6 +15,7 @@ import pytest
 from dharma_swarm.knowledge_ops.deep_sweep import run_deep_sweep
 from dharma_swarm.spine.receipt import EvidenceReceipt
 from dharma_swarm.spine.routing import RoutingDecision
+from dharma_swarm.world_radar.theme_window import load_theme_window
 
 
 def _fake_scout_rows(n: int) -> list[dict[str, object]]:
@@ -154,6 +155,56 @@ async def test_likely_fabricated_count_is_surfaced(tmp_path: Path) -> None:
         dispatch_fn=dispatch_fn,
     )
     assert result["likely_fabricated_count"] == result["verifications_count"]
+
+
+@pytest.mark.asyncio
+async def test_own_movements_are_persisted_into_the_theme_window(tmp_path: Path) -> None:
+    # Regression for a real bug (Greptile review, PR #738): the theme window
+    # must be updated from THIS cycle's own beat-derived movements, not from
+    # meta/world_signal_board.json (the separate, hourly world_scout job's
+    # file -- reading that here would silently track the wrong job's
+    # movements, or nothing if world_scout hasn't run recently).
+    result = await run_deep_sweep(
+        tmp_path,
+        max_verifications=2,
+        scout_fn=_fake_scout_ok(n_rows=3),
+        dispatch_fn=_fake_dispatch_ok,
+    )
+    window_path = tmp_path / "meta" / "world_radar" / "theme_window.json"
+    assert window_path.exists()
+    window = load_theme_window(window_path)
+    assert len(window) == result["movements_count"] > 0
+
+    # A second cycle must recognize the SAME movements as recurring, not new.
+    result2 = await run_deep_sweep(
+        tmp_path,
+        max_verifications=2,
+        scout_fn=_fake_scout_ok(n_rows=3),
+        dispatch_fn=_fake_dispatch_ok,
+    )
+    assert result2["newly_seen_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_theme_window_ignores_unrelated_world_scout_board(tmp_path: Path) -> None:
+    # Even if the hourly world_scout job already wrote its own (unrelated)
+    # board.json, the deep sweep's theme window must reflect ITS OWN
+    # movements, not silently adopt world_scout's.
+    meta = tmp_path / "meta"
+    meta.mkdir(parents=True)
+    (meta / "world_signal_board.json").write_text(
+        json.dumps({"movements": [{"movement_id": "unrelated-from-world-scout", "title": "X", "weighted_score": 0.9}]}),
+        encoding="utf-8",
+    )
+    result = await run_deep_sweep(
+        tmp_path,
+        max_verifications=2,
+        scout_fn=_fake_scout_ok(n_rows=3),
+        dispatch_fn=_fake_dispatch_ok,
+    )
+    window = load_theme_window(tmp_path / "meta" / "world_radar" / "theme_window.json")
+    assert "unrelated-from-world-scout" not in window
+    assert len(window) == result["movements_count"]
 
 
 @pytest.mark.asyncio
