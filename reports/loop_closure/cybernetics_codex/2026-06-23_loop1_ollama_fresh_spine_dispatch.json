@@ -10,7 +10,7 @@
   "tasks_failed": 0,
   "dispatch_dropoffs": 0,
   "served_provider_truth": {
-    "runtime_db": "/Users/dhyana/.dharma/state/runtime.db",
+    "runtime_db": "$DHARMA_STATE/state/runtime.db",
     "exists": true,
     "completed_runs_with_truth": 999,
     "delegation_receipts_with_truth": 26,
@@ -35,7 +35,7 @@
   "stigmergy_marks_for_run": 3,
   "adapt_fired": true,
   "stigmergy_hot_paths": [],
-  "state_dir": "/Users/dhyana/.dharma",
+  "state_dir": "$DHARMA_STATE",
   "canonical_state": true,
   "tasks": [
     {

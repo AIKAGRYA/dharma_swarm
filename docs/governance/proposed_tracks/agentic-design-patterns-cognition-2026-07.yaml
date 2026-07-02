@@ -1,0 +1,217 @@
+# Agentic Design Patterns — Intra-Agent Cognition track block — DRAFT, not active
+#
+# Source: claude-code (repo-implementation-planning session), 2026-07-01, at
+# operator direction after a deep read of Antonio Gulli's "Agentic Design
+# Patterns: A Hands-On Guide to Building Intelligent Systems" (21 chapters +
+# 7 appendices) mapped against the dharma_swarm substrate (~770 modules).
+#
+# THE MAPPING (why this scope and not "implement all 21"):
+#   A full pattern-by-pattern coverage audit found the repo already ships 13 of
+#   the 21 patterns at STRONG (mature + tested) coverage — the entire MULTI-AGENT
+#   / INFRASTRUCTURE layer:
+#     Routing(2) orchestrator.py+spine/routing.py; Parallelization(3)
+#     orchestrator.py+workflow_graph.py; Tool Use(5) tool_registry.py; Multi-
+#     Agent(7) a2a/+council/; Memory(8) agent_memory_manager.py+memory_kernel/;
+#     Exception Handling(12) resilience.py; Human-in-the-Loop(13) telos_gates.py;
+#     RAG(14) vector_store.py; A2A(15) a2a/; Resource-Aware(16) cost_tracker.py;
+#     Guardrails(18) telos_gates.py; Evaluation(19) verify/+langgraph_parity/;
+#     Exploration(21) diversity_archive.py.
+#   Two patterns are DELIBERATELY out of scope and MUST stay so:
+#     Learning/Adaptation(9) — zero-weight BY DESIGN; owned by
+#       orchestration-arena-v1-2026-06 ("Do not introduce trained weights").
+#     MCP(10) — a transport/integration concern owned by the A2A/NATS lanes.
+#   What remains PARTIAL is a single coherent cluster — the INTRA-AGENT
+#   reasoning loop, i.e. how ONE agent thinks before the swarm coordinates it:
+#     Prompt Chaining(1), Reflection(4), Planning(6), Reasoning Techniques(17),
+#     Goal Setting & Monitoring(11), Prioritization(20).
+#   These exist only implicitly (emergent from the ReAct loop + cascade domains),
+#   never as first-class, composable, tested organs. This track makes the
+#   highest-leverage four first-class. Per the Transcendence Principle this is
+#   "diversity of competence" (condition 1): the swarm's aggregation math only
+#   pays off if each agent's individual reasoning is genuinely competent.
+#
+# WHY DRAFT, NOT IMMEDIATELY ACTIVE (the honest WIP accounting):
+#   The portfolio holds 4 ACTIVE tracks today, ALL serving substrate-nativeness;
+#   the other two spine objectives (revenue-external-humans-served, research-
+#   depth) have ZERO active tracks. Promoting this to a 5th ACTIVE substrate
+#   track hits warn_active (5) and deepens the single-objective concentration.
+#   So this sits as a reviewable DRAFT (mirroring sattva-quality-lattice-2026-06)
+#   until a promotion decision is genuinely earned — see promotion_preconditions.
+#
+# SLOT (documentation home): the Phase-0 coverage atlas lands under MEGAFILE
+#   Slot 4 (Limbs Atlas) as a new substrate reference,
+#   docs/architecture/AGENTIC_PATTERNS_ATLAS.md, linked from LIMBS_ATLAS.md — a
+#   "which limb implements which canonical agentic pattern" lens. NOT a new
+#   megafile; a substrate pointer under an existing slot (MEGAFILE_INDEX rule 1).
+#
+# WORKTREE (parallel lane): work proceeds first as a declared lane on a
+#   dedicated worktree mapped 1:1 to this track, NOT on the canonical tree:
+#     branch/worktree : claude/agentic-cognition-patterns  (worktree ../ds-cognition)
+#     allowed surfaces: exactly the owned_surfaces below (new dharma_swarm/
+#                       cognition/** package + atlas doc + tests) — surface-
+#                       disjoint from all 4 active tracks, so no god object
+#                       (agent_runner.py, orchestrator.py) owned by spine-
+#                       adoption is edited; existing modules are ADAPTED, not moved.
+#     verification cmd : python3 -m pytest tests/test_cognition_*.py -q
+#     receipt path     : reports/cognition/PHASE0_ATLAS_RECEIPT.md
+#   Worktree budget check: 4 active tracks + 1 canonical + <=2 scratch allows
+#   this lane comfortably (1 worktree open today).
+#
+# Promotion preconditions (all three) are declared as a field inside the track
+# block below (promotion_preconditions:), keeping this file a single valid YAML
+# list item like the other proposals.
+
+- id: agentic-design-patterns-cognition-2026-07
+  name: Agentic Design Patterns — intra-agent cognition (Reflection, Reasoning, Planning, Chaining)
+  status: DRAFT
+  opened_at: "2026-07-01"
+  verified_at: "2026-07-01"
+  ttl_days: 30
+  owner: "@AmitabhainArunachala"
+  serves: substrate-nativeness
+  complements:
+    - orchestration-arena-v1-2026-06
+  moves_vital_signs:
+    - eval_coverage
+    - quality_gates
+
+  promotion_preconditions:
+    - "Phase 0 atlas (docs/architecture/AGENTIC_PATTERNS_ATLAS.md) merged to main
+       and linked from LIMBS_ATLAS.md — a no-code, provable-value Slot-4 reference
+       that stands on its own even if the code phases never promote."
+    - "At least one ACTIVE substrate-nativeness track closes (keep the portfolio
+       <= warn_active 5), OR the operator explicitly accepts a 5th concurrent
+       substrate track."
+    - "Operator has explicitly weighed this against opening a
+       revenue-external-humans-served or research-depth track — those objectives
+       currently have zero active tracks and outrank a 5th substrate track on the
+       portfolio-balance argument."
+
+  description: |
+    Make the intra-agent reasoning loop a first-class, composable, tested layer.
+    The swarm/infrastructure patterns (routing, parallelization, A2A, memory,
+    guardrails, RAG, evaluation) are already STRONG; what is only implicit today
+    is how a SINGLE agent thinks: it chains prompts inside the ReAct message
+    accumulator, "reflects" only as post-hoc gate validation (no corrective
+    loop), "plans" only in domain-specific research code, and delegates all
+    reasoning to the model with no CoT/ToT/self-consistency orchestration.
+
+    This track ships a new dharma_swarm/cognition/ package with four composable
+    organs — Chain, Reflection, Reasoning, Planner — each wired through the
+    existing spine (invoke_agent) rather than around it, each with its own
+    behavior test, and each proven (not asserted) via the frozen arena /
+    langgraph_parity benchmark harness under BUDGET PARITY. No capability claim
+    ships without a best-single-model control and significance gating, per the
+    arena doctrine this track complements.
+
+    Doctrine line: this deepens per-agent competence, never per-agent weight.
+    Reasoning here is prompt-orchestration over the existing providers; it
+    introduces ZERO trained weights (that domain belongs to the arena track).
+
+  owned_surfaces:
+    - dharma_swarm/cognition/**
+    - docs/architecture/AGENTIC_PATTERNS_ATLAS.md
+    - tests/test_cognition_chain.py
+    - tests/test_cognition_reflection.py
+    - tests/test_cognition_reasoning.py
+    - tests/test_cognition_planner.py
+    - reports/cognition/**
+
+  # Same {id, kind, file, pattern} shape the live checker accepts
+  # (file_exists, file_contains, pr_merged).
+  completion_criteria:
+    - id: patterns_atlas_exists
+      kind: file_exists
+      file: docs/architecture/AGENTIC_PATTERNS_ATLAS.md
+    - id: patterns_atlas_maps_all_21
+      kind: file_contains
+      file: docs/architecture/AGENTIC_PATTERNS_ATLAS.md
+      pattern: "Exploration and Discovery"
+    - id: atlas_linked_from_slot4
+      kind: file_contains
+      file: docs/architecture/LIMBS_ATLAS.md
+      pattern: "AGENTIC_PATTERNS_ATLAS"
+    - id: cognition_package_exists
+      kind: file_exists
+      file: dharma_swarm/cognition/__init__.py
+    - id: reflection_correction_loop
+      kind: file_contains
+      file: dharma_swarm/cognition/reflection.py
+      pattern: "class Reflection"
+    - id: reasoning_self_consistency
+      kind: file_contains
+      file: dharma_swarm/cognition/reasoning.py
+      pattern: "def self_consistency"
+    - id: planner_goal_decomposition
+      kind: file_contains
+      file: dharma_swarm/cognition/planner.py
+      pattern: "def decompose"
+    - id: prompt_chain_primitive
+      kind: file_contains
+      file: dharma_swarm/cognition/chain.py
+      pattern: "class Chain"
+    - id: cognition_routes_through_spine
+      kind: file_contains
+      file: dharma_swarm/cognition/reasoning.py
+      pattern: '(?m)^\s*from dharma_swarm\.spine'
+    - id: chain_tested
+      kind: file_exists
+      file: tests/test_cognition_chain.py
+    - id: reflection_tested
+      kind: file_exists
+      file: tests/test_cognition_reflection.py
+    - id: reasoning_tested
+      kind: file_exists
+      file: tests/test_cognition_reasoning.py
+    - id: planner_tested
+      kind: file_exists
+      file: tests/test_cognition_planner.py
+    - id: benchmark_lift_receipt
+      kind: file_exists
+      file: reports/cognition/BENCHMARK_LIFT_RECEIPT.md
+    - id: benchmark_asserts_budget_parity
+      kind: file_contains
+      file: reports/cognition/BENCHMARK_LIFT_RECEIPT.md
+      pattern: "budget parity"
+
+  non_goals:
+    - Do not introduce trained weights / SFT / GRPO / learned policies; reasoning
+      is prompt-orchestration only. Trained adaptation belongs to
+      orchestration-arena-v1 (Pattern 9 stays zero-weight by design).
+    - Do not implement MCP or any new transport; Pattern 10 and inter-process
+      messaging belong to the A2A/NATS lanes.
+    - Do not edit or decompose the god objects owned by spine-adoption
+      (agent_runner.py, orchestrator.py, a2a_bridge.py). Adapt them via
+      invoke_agent(); the new organs are surface-disjoint.
+    - Do not make any capability claim without a best-single-model control and
+      significance gating under budget parity (arena doctrine).
+    - Do not create parallel naming schemes; resolve organ/API names against the
+      ADR-008 API-name grammar (or Semantic Commons manifests if present on main).
+    - Do not re-implement patterns already STRONG (routing, parallelization,
+      tool use, memory, RAG, A2A, guardrails, evaluation, exploration).
+
+  next_items:
+    - id: 1
+      what: "Phase 0 (no build code): author docs/architecture/AGENTIC_PATTERNS_ATLAS.md — the 21-pattern -> module coverage table with STRONG/PARTIAL/GAP verdicts and cited paths; link it from LIMBS_ATLAS.md (Slot 4). Provable value even if code phases never promote."
+      kind: docs
+      blocker: true
+    - id: 2
+      what: "Phase 1: dharma_swarm/cognition/reflection.py — an explicit critique->revise->recheck loop (not post-hoc gate validation), wired through invoke_agent, with tests. Highest leverage: turns the existing verify/ scorers into a corrective loop."
+      kind: code
+      blocker: false
+    - id: 3
+      what: "Phase 2: dharma_swarm/cognition/reasoning.py — CoT / self-consistency (N-sample + vote/synthesis) as first-class, spine-routed. Directly serves the Transcendence 'quality aggregation' condition at the single-agent scale."
+      kind: code
+      blocker: false
+    - id: 4
+      what: "Phase 3: dharma_swarm/cognition/planner.py — general goal->subtree decomposition (generalize the domain-specific auto_research/planner.py into a reusable organ)."
+      kind: code
+      blocker: false
+    - id: 5
+      what: "Phase 4: dharma_swarm/cognition/chain.py — a composable prompt-chaining primitive the three organs above compose over."
+      kind: code
+      blocker: false
+    - id: 6
+      what: "Phase 5: prove lift on the frozen arena / langgraph_parity harness under budget parity vs best-single-model; write reports/cognition/BENCHMARK_LIFT_RECEIPT.md. No capability claim before this receipt exists."
+      kind: code
+      blocker: false

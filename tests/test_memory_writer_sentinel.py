@@ -204,6 +204,31 @@ def test_writer_sentinel_cli_action_required_gate_passes_for_triaged_repo(capsys
     assert '"action_required_count": 0' in out
 
 
+def test_loop4_10_state_sentinel_write_has_reviewed_baseline() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+
+    discoveries = MemoryWriterSentinel(repo_root=repo_root).discover_write_paths(
+        scan_roots=("scripts/loop4_10_memory_context_closure_run.py",),
+    )
+    sentinel_write = next(
+        discovery
+        for discovery in discoveries
+        if discovery.source_path == "scripts/loop4_10_memory_context_closure_run.py"
+        and discovery.symbol == "_prepare_state_dir"
+        and "STATE_SENTINEL_CONTENT" in discovery.target
+    )
+
+    assert sentinel_write.triage_category is DiscoveryTriageCategory.MEMORY_WRITER_NEEDS_SPEC
+    assert sentinel_write.write_decision is not None
+    assert sentinel_write.write_decision["reviewed_baseline"] is True
+    assert (
+        sentinel_write.write_decision["reviewed_baseline_id"]
+        == "scripts/loop4_10_memory_context_closure_run.py:_prepare_state_dir:"
+        "path_write:fff3e82d4cdf"
+    )
+    assert sentinel_write.write_decision["decision"] == "warn"
+
+
 def test_writer_sentinel_cli_ci_profile_runs_discovery_and_gates(capsys) -> None:
     repo_root = Path(__file__).resolve().parents[1]
 

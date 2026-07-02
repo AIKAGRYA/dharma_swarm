@@ -199,11 +199,14 @@ class MemoryWriterSentinel:
                 1
                 for row in rows
                 if (
-                    row.triage_category
-                    in {
-                        DiscoveryTriageCategory.MEMORY_WRITER_NEEDS_SPEC,
-                        DiscoveryTriageCategory.SURFACE_NEEDS_REGISTRY,
-                    }
+                    (
+                        row.triage_category
+                        in {
+                            DiscoveryTriageCategory.MEMORY_WRITER_NEEDS_SPEC,
+                            DiscoveryTriageCategory.SURFACE_NEEDS_REGISTRY,
+                        }
+                        and not _discovery_reviewed(row)
+                    )
                     or (
                         _discovery_decision(row) == WriteDecisionOutcome.DENY.value
                         and not _discovery_reviewed(row)

@@ -66,7 +66,7 @@ is no longer a forced first-read surface.
 | Architecture / invariants / axioms | `docs/governance/SOVEREIGN_MANIFEST.md`, `docs/doctrine/` | — |
 | Doc ownership | `docs/governance/CANONICAL_DOC_STACK.md` (this file) | — |
 | Anti-slop / repo-rule discipline | `docs/governance/ANTI_SLOP_RULES.md` + `.semgrep/dharma-anti-slop.yml` | — |
-| Forge naming boundary | `docs/governance/FORGE_NAMING_BOUNDARY.md` | Dharma Forge / Hydra docs, Forge Swarm Evolution Arena docs, Pudgala Autopoiesis Protostar governance surfaces |
+| Forge / Pudgala naming rule | `docs/governance/SOVEREIGN_MANIFEST.md` | `docs/governance/FORGE_NAMING_BOUNDARY.md` is reference-only and defers to the manifest |
 | Vibe-code and AI-agent hygiene lifecycle | `docs/governance/hygiene/README.md` + `docs/governance/hygiene/AI_AGENT_GOVERNANCE.md` + `docs/governance/hygiene/patterns/*.yaml` | `ANTI_SLOP_RULES.md` and `docs/ops/PR_REVIEW_CONTROL.md` when a pattern is promoted to a hard gate |
 | Vibe-code antipattern catalogue (54 patterns × 12 clusters, scan-backed) | `docs/governance/VIBE_CODE_HYGIENE.md` + `scripts/governance/vibe_code_scan.sh` + `reports/governance/vibe_code_baseline_2026-06-07.txt` | `ANTI_SLOP_RULES.md` (companion); signals promote into enforced rules via PR |
 | Semantic Commons agent identity and naming ontology | `docs/ontology/SEMANTIC_COMMONS.md` | A2A cards, contact registries, `docs/ontology/semantic_objects.yaml`, `docs/ontology/semantic_aliases.yaml`, runtime resolver names |

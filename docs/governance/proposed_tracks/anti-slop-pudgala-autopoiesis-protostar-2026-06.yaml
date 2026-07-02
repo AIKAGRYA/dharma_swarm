@@ -27,7 +27,7 @@
     - scripts/governance/check_claim_evidence_binding.py
     - scripts/governance/run_mutation_score.py
     - docs/governance/hygiene/patterns/AI-M1.yaml
-    - .claude/workflows/antislop-evolve.js
+    - scripts/workflows/antislop-evolve.js
     - tests/test_claim_evidence_binding.py
   moves_vital_signs:
     - quality_gates
@@ -77,9 +77,10 @@
       oracle_source: "ci"   # independent of track owner -> keeps S3 (not downgraded)
     # S6 — optional high-assurance local oracle produced by explicit operator run.
     - id: mutation_oracle_available
-      kind: file_contains
-      file: scripts/governance/check_track_status.py
-      pattern: "mutation_score_gte"
+      kind: mutation_score_gte
+      file: reports/governance/mutation_score.json
+      threshold: 0.60
+      fresh_ttl_days: 14
 
   non_goals:
     - Do not create a new truth store, daemon, receipt system, or authority surface.

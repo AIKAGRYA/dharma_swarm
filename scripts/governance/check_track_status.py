@@ -39,6 +39,43 @@ REPORTS_DIR = REPO_ROOT / "reports/governance"
 SCHEMA_VERSION = 2                       # current schema authored by this checker
 SUPPORTED_SCHEMA_VERSIONS = {1, 2}       # v1 (singular active_track) read via adapter
 EDGE_KINDS = ("complements", "depends_on", "conflicts_with")
+FINAL_BOSS_EFFECTIVE_DATE = date(2026, 6, 30)
+FINAL_BOSS_MIN_ROUNDS = 2
+NON_PRODUCTION_CLOSURE_KINDS = frozenset({"VERIFIED_SLICE", "CLOSED_NOT_PROD", "RETIRED", "SUPERSEDED"})
+PRODUCTION_CLOSURE_KINDS = frozenset({"PRODUCTION_READY", "SUBSTRATE_TRUSTED"})
+CLOSURE_KINDS = NON_PRODUCTION_CLOSURE_KINDS | PRODUCTION_CLOSURE_KINDS
+GRADUATION_PROFILES = frozenset({
+    "generic",
+    "runtime_transport",
+    "runtime_truth",
+    "provider_routing",
+    "filesystem_substrate",
+    "agent_identity",
+    "governance_gate",
+    "orchestration",
+    "revenue_external",
+    "research_depth",
+    "truth_graph",
+    "holon_bridge",
+})
+FINAL_BOSS_DIMENSIONS = frozenset({
+    "production_engineering",
+    "sre_failure_modes",
+    "architecture_integration",
+    "anti_slop_code_quality",
+    "governance_truthfulness",
+    "security_supply_chain",
+    "future_maintainability",
+})
+RUNTIME_TRANSPORT_FAILURE_MODES = frozenset({
+    "real_broker_e2e",
+    "ack_nack_failure",
+    "idempotency_duplicate_publish",
+    "handler_failure",
+    "execution_identity",
+    "receipt_durability",
+    "reconnect_or_degradation",
+})
 
 
 def repo_path(path: str | Path) -> Path:
@@ -134,7 +171,7 @@ def _parse_minimal_yaml(text: str) -> dict[str, Any]:
                 # Sequence item could be a scalar or an inline `key: value`
                 if ":" in item_content and not item_content.startswith("\""):
                     key, _, val = item_content.partition(":")
-                    inline = {key.strip(): _scalar(val.strip())}
+                    inline = {_scalar(key.strip()): _scalar(val.strip())}
                     pos += 1
                     # Subsequent indented lines belong to this item
                     sub = parse_block(base_indent + 2)
@@ -147,7 +184,7 @@ def _parse_minimal_yaml(text: str) -> dict[str, Any]:
                 continue
             if ":" in content:
                 key, _, val = content.partition(":")
-                key = key.strip()
+                key = _scalar(key.strip())
                 val = val.strip()
                 if result is None:
                     result = {}
@@ -250,6 +287,144 @@ def check_file_contains(file_path: str, pattern: str) -> CriterionResult:
     )
 
 
+def check_json_count_equals(
+    file_path: str,
+    collection: str,
+    field: str,
+    value: object,
+    expected: int,
+) -> CriterionResult:
+    """Count structured JSON rows instead of regex-matching generated prose."""
+    path = repo_path(file_path)
+    if not path.exists():
+        return CriterionResult(id="", kind="json_count_equals", passed=False,
+                               detail=f"{file_path} missing")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        return CriterionResult(id="", kind="json_count_equals", passed=False,
+                               detail=f"{file_path} unreadable: {type(exc).__name__}")
+    rows = data.get(collection)
+    if not isinstance(rows, list):
+        return CriterionResult(id="", kind="json_count_equals", passed=False,
+                               detail=f"{file_path}.{collection} is not a list")
+    actual = sum(1 for row in rows if isinstance(row, dict) and row.get(field) == value)
+    passed = actual == expected
+    return CriterionResult(
+        id="", kind="json_count_equals", passed=passed,
+        detail=(
+            f"{file_path}.{collection}[].{field} == {value!r}: "
+            f"{actual} {'==' if passed else '!='} {expected}"
+        ),
+    )
+
+
+def check_json_count_greater_than(
+    file_path: str,
+    collection: str,
+    field: str,
+    value: object,
+    threshold: int,
+) -> CriterionResult:
+    path = repo_path(file_path)
+    if not path.exists():
+        return CriterionResult(id="", kind="json_count_greater_than", passed=False,
+                               detail=f"{file_path} missing")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        return CriterionResult(id="", kind="json_count_greater_than", passed=False,
+                               detail=f"{file_path} unreadable: {type(exc).__name__}")
+    rows = data.get(collection)
+    if not isinstance(rows, list):
+        return CriterionResult(id="", kind="json_count_greater_than", passed=False,
+                               detail=f"{file_path}.{collection} is not a list")
+    actual = sum(1 for row in rows if isinstance(row, dict) and row.get(field) == value)
+    passed = actual > threshold
+    return CriterionResult(
+        id="", kind="json_count_greater_than", passed=passed,
+        detail=(
+            f"{file_path}.{collection}[].{field} == {value!r}: "
+            f"{actual} {'>' if passed else '<='} {threshold}"
+        ),
+    )
+
+
+def check_json_collection_values_match(
+    file_path: str,
+    collection: str,
+    key_field: str,
+    value_field: str,
+    expected: dict[Any, Any],
+) -> CriterionResult:
+    path = repo_path(file_path)
+    if not path.exists():
+        return CriterionResult(id="", kind="json_collection_values_match", passed=False,
+                               detail=f"{file_path} missing")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        return CriterionResult(id="", kind="json_collection_values_match", passed=False,
+                               detail=f"{file_path} unreadable: {type(exc).__name__}")
+    rows = data.get(collection)
+    if not isinstance(rows, list):
+        return CriterionResult(id="", kind="json_collection_values_match", passed=False,
+                               detail=f"{file_path}.{collection} is not a list")
+    actual = {
+        str(row.get(key_field)): row.get(value_field)
+        for row in rows
+        if isinstance(row, dict) and key_field in row
+    }
+    missing: list[str] = []
+    mismatched: list[str] = []
+    for raw_key, expected_value in expected.items():
+        key = str(raw_key)
+        if key not in actual:
+            missing.append(key)
+        elif actual[key] != expected_value:
+            mismatched.append(f"{key}: {actual[key]!r} != {expected_value!r}")
+    passed = not missing and not mismatched
+    if passed:
+        detail = f"{file_path}.{collection} {len(expected)} expected {value_field} value(s) matched"
+    else:
+        bits = []
+        if missing:
+            bits.append(f"missing keys {missing}")
+        if mismatched:
+            bits.append(f"mismatched {mismatched}")
+        detail = f"{file_path}.{collection} value map mismatch: {'; '.join(bits)}"
+    return CriterionResult(id="", kind="json_collection_values_match", passed=passed, detail=detail)
+
+
+def check_json_mapping_keys_nonempty(
+    file_path: str,
+    mapping: str,
+    keys: list[str],
+) -> CriterionResult:
+    path = repo_path(file_path)
+    if not path.exists():
+        return CriterionResult(id="", kind="json_mapping_keys_nonempty", passed=False,
+                               detail=f"{file_path} missing")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        return CriterionResult(id="", kind="json_mapping_keys_nonempty", passed=False,
+                               detail=f"{file_path} unreadable: {type(exc).__name__}")
+    obj = data.get(mapping)
+    if not isinstance(obj, dict):
+        return CriterionResult(id="", kind="json_mapping_keys_nonempty", passed=False,
+                               detail=f"{file_path}.{mapping} is not a mapping")
+    missing = [key for key in keys if not str(obj.get(key) or "").strip()]
+    passed = not missing
+    return CriterionResult(
+        id="", kind="json_mapping_keys_nonempty", passed=passed,
+        detail=(
+            f"{file_path}.{mapping} has non-empty values for {len(keys)} key(s)"
+            if passed else f"{file_path}.{mapping} missing/empty keys: {missing}"
+        ),
+    )
+
+
 def check_pr_merged(pr_number: int) -> CriterionResult:
     """Best-effort PR merge check via gh CLI. UNKNOWN does not fail."""
     if shutil.which("gh") is None:
@@ -289,6 +464,10 @@ RIGOROUS_KINDS = frozenset({
     "receipt_valid",
     "pr_merged",
     "mutation_score_gte",
+    "json_count_equals",
+    "json_count_greater_than",
+    "json_collection_values_match",
+    "json_mapping_keys_nonempty",
 })
 EXISTENCE_KINDS = frozenset({"file_exists", "file_contains"})
 
@@ -324,6 +503,10 @@ def _load_grade_ladder() -> dict[str, Any]:
         "file_contains": 1,
         "pr_merged": 1,
         "commit_on_main": 2,
+        "json_count_equals": 2,
+        "json_count_greater_than": 2,
+        "json_collection_values_match": 2,
+        "json_mapping_keys_nonempty": 2,
         "receipt_valid": 2,
         "test_passes": 3,
         "mutation_score_gte": 6,
@@ -472,7 +655,14 @@ def _recompute_digest(row: dict[str, Any]) -> str:
 
 
 def _receipt_timestamp(row: dict[str, Any]) -> str | None:
-    for key in ("produced_at", "generated_at", "finished_at", "started_at", "verified_at"):
+    for key in (
+        "produced_at",
+        "generated_at",
+        "observed_at",
+        "finished_at",
+        "started_at",
+        "verified_at",
+    ):
         val = row.get(key)
         if isinstance(val, str) and val.strip():
             return val
@@ -671,6 +861,95 @@ def evaluate_criterion(crit: dict[str, Any]) -> CriterionResult:
                                       detail="malformed criterion: empty 'file' or 'pattern'")
             else:
                 res = check_file_contains(crit["file"], crit["pattern"])
+        elif kind == "json_count_equals":
+            required = ("file", "collection", "field", "value", "expected")
+            missing = [key for key in required if key not in crit]
+            if missing:
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail=f"malformed criterion: missing {', '.join(missing)}")
+            elif (
+                not isinstance(crit.get("file"), str)
+                or not isinstance(crit.get("collection"), str)
+                or not isinstance(crit.get("field"), str)
+                or crit.get("value") is None
+            ):
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail="malformed criterion: 'file', 'collection', and 'field' "
+                                             "must be strings and 'value' must be set")
+            else:
+                res = check_json_count_equals(
+                    crit["file"],
+                    crit["collection"],
+                    crit["field"],
+                    crit["value"],
+                    int(crit["expected"]),
+                )
+        elif kind == "json_count_greater_than":
+            required = ("file", "collection", "field", "value", "threshold")
+            missing = [key for key in required if key not in crit]
+            if missing:
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail=f"malformed criterion: missing {', '.join(missing)}")
+            elif (
+                not isinstance(crit.get("file"), str)
+                or not isinstance(crit.get("collection"), str)
+                or not isinstance(crit.get("field"), str)
+                or crit.get("value") is None
+            ):
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail="malformed criterion: 'file', 'collection', and 'field' "
+                                             "must be strings and 'value' must be set")
+            else:
+                res = check_json_count_greater_than(
+                    crit["file"],
+                    crit["collection"],
+                    crit["field"],
+                    crit["value"],
+                    int(crit["threshold"]),
+                )
+        elif kind == "json_collection_values_match":
+            required = ("file", "collection", "key_field", "value_field", "expected")
+            missing = [key for key in required if key not in crit]
+            if missing:
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail=f"malformed criterion: missing {', '.join(missing)}")
+            elif (
+                not isinstance(crit.get("file"), str)
+                or not isinstance(crit.get("collection"), str)
+                or not isinstance(crit.get("key_field"), str)
+                or not isinstance(crit.get("value_field"), str)
+                or not isinstance(crit.get("expected"), dict)
+            ):
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail="malformed criterion: expected file/collection/key_field/"
+                                             "value_field strings and expected mapping")
+            else:
+                res = check_json_collection_values_match(
+                    crit["file"],
+                    crit["collection"],
+                    crit["key_field"],
+                    crit["value_field"],
+                    crit["expected"],
+                )
+        elif kind == "json_mapping_keys_nonempty":
+            required = ("file", "mapping", "keys")
+            missing = [key for key in required if key not in crit]
+            if missing:
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail=f"malformed criterion: missing {', '.join(missing)}")
+            elif (
+                not isinstance(crit.get("file"), str)
+                or not isinstance(crit.get("mapping"), str)
+                or not isinstance(crit.get("keys"), list)
+            ):
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail="malformed criterion: expected file/mapping strings and keys list")
+            else:
+                res = check_json_mapping_keys_nonempty(
+                    crit["file"],
+                    crit["mapping"],
+                    [str(key) for key in crit["keys"]],
+                )
         elif kind == "pr_merged":
             res = check_pr_merged(int(crit["pr"]))
         elif kind == "commit_on_main":
@@ -698,7 +977,9 @@ def evaluate_criterion(crit: dict[str, Any]) -> CriterionResult:
                     expect_chain=bool(crit.get("expect_chain")),
                 )
         elif kind == "mutation_score_gte":
-            report = crit.get("file") or "reports/governance/mutation_score.json"
+            report = crit.get("file")
+            if report is None:
+                report = "reports/governance/mutation_score.json"
             if not isinstance(report, str) or not report:
                 res = CriterionResult(id="", kind=kind, passed=False,
                                       detail="malformed criterion: 'file' must be a non-empty string")
@@ -734,6 +1015,382 @@ def days_since(date_str: str) -> int | None:
     except (TypeError, ValueError):
         return None
     return (date.today() - when).days
+
+
+def _parse_iso_date(value: object) -> date | None:
+    try:
+        return datetime.strptime(str(value), "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return None
+
+
+def _as_upper_token(value: object) -> str:
+    return str(value or "").strip().upper().replace("-", "_")
+
+
+def _as_lower_token(value: object) -> str:
+    return str(value or "").strip().lower().replace("-", "_")
+
+
+def _as_str_set(value: object) -> set[str]:
+    if value is None:
+        return set()
+    if isinstance(value, str):
+        return {_as_lower_token(value)} if value.strip() else set()
+    if isinstance(value, list):
+        return {_as_lower_token(v) for v in value if str(v or "").strip()}
+    return set()
+
+
+def _int_field(row: dict[str, Any], key: str, default: int = 0) -> int:
+    try:
+        return int(row.get(key, default))
+    except (TypeError, ValueError):
+        return default
+
+
+def _float_field(row: dict[str, Any], key: str, default: float = 0.0) -> float:
+    try:
+        return float(row.get(key, default))
+    except (TypeError, ValueError):
+        return default
+
+
+def _declared_closure_kind(t: dict[str, Any]) -> str:
+    return _as_upper_token(
+        t.get("closure_kind")
+        or t.get("graduation_target")
+        or t.get("target_closure_kind")
+    )
+
+
+def _graduation_profile(t: dict[str, Any]) -> str:
+    return _as_lower_token(t.get("graduation_profile") or t.get("track_profile") or "generic")
+
+
+def _read_json_object(path: str) -> tuple[dict[str, Any] | None, str]:
+    resolved = repo_path(path)
+    try:
+        data = json.loads(resolved.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None, f"does not exist: {path}"
+    except (OSError, json.JSONDecodeError) as exc:
+        return None, f"unreadable JSON {path}: {type(exc).__name__}: {exc}"
+    if not isinstance(data, dict):
+        return None, f"JSON is not an object: {path}"
+    return data, ""
+
+
+def _validate_final_boss_dossier(
+    path: str,
+    track_id: str,
+    closure_kind: str,
+    profile: str,
+) -> list[str]:
+    data, err = _read_json_object(path)
+    if err:
+        return [f"final_boss_review.dossier {err}"]
+    assert data is not None
+    blocks: list[str] = []
+    if data.get("track_id") != track_id:
+        blocks.append(
+            f"final_boss_review.dossier track_id {data.get('track_id')!r} != {track_id!r}")
+    if _as_upper_token(data.get("target_closure_kind")) != closure_kind:
+        blocks.append(
+            "final_boss_review.dossier target_closure_kind "
+            f"{data.get('target_closure_kind')!r} != {closure_kind!r}")
+    if _as_lower_token(data.get("graduation_profile")) != profile:
+        blocks.append(
+            "final_boss_review.dossier graduation_profile "
+            f"{data.get('graduation_profile')!r} != {profile!r}")
+    dimensions = _as_str_set(data.get("review_dimensions") or data.get("dimensions"))
+    missing_dimensions = sorted(FINAL_BOSS_DIMENSIONS - dimensions)
+    if missing_dimensions:
+        blocks.append("final_boss_review.dossier missing dimensions: " + ", ".join(missing_dimensions))
+    requirements = data.get("profile_requirements")
+    if not isinstance(requirements, dict):
+        blocks.append("final_boss_review.dossier profile_requirements missing")
+    else:
+        hard_rejects = requirements.get("hard_rejects") or data.get("hard_rejects") or []
+        if not isinstance(hard_rejects, list) or not hard_rejects:
+            blocks.append("final_boss_review.dossier profile_requirements.hard_rejects missing")
+        evidence_themes = requirements.get("required_evidence_themes") or []
+        if not isinstance(evidence_themes, list) or not evidence_themes:
+            blocks.append("final_boss_review.dossier profile_requirements.required_evidence_themes missing")
+        if profile == "runtime_transport":
+            failure_modes = _as_str_set(requirements.get("required_failure_modes"))
+            missing_modes = sorted(RUNTIME_TRANSPORT_FAILURE_MODES - failure_modes)
+            if missing_modes:
+                blocks.append(
+                    "final_boss_review.dossier runtime_transport missing required failure modes: "
+                    + ", ".join(missing_modes)
+                )
+    return blocks
+
+
+def _validate_council_receipt(path: str, reviewer_count: int) -> list[str]:
+    data, err = _read_json_object(path)
+    if err:
+        return [f"final_boss_review.council_receipt {err}"]
+    assert data is not None
+    blocks: list[str] = []
+    if data.get("conviction_gate") != "pass_fullness":
+        blocks.append(
+            f"council_receipt {path} conviction_gate {data.get('conviction_gate')!r} != 'pass_fullness'")
+    if _float_field(data, "target_score") < 100:
+        blocks.append(f"council_receipt {path} target_score < 100")
+    if _float_field(data, "score_min") < 100:
+        blocks.append(f"council_receipt {path} score_min < 100")
+    blockers = data.get("blockers") or []
+    if blockers:
+        blocks.append(f"council_receipt {path} has blockers: {blockers[:3]}")
+    required_count = _int_field(data, "required_critic_count") or _int_field(data, "critic_count")
+    if required_count < reviewer_count:
+        blocks.append(
+            f"council_receipt {path} required critic count {required_count} < reviewer_count {reviewer_count}")
+    witness = data.get("persistent_agent_witness") or {}
+    if not isinstance(witness, dict) or witness.get("fresh") is not True:
+        blocks.append(f"council_receipt {path} persistent witness is not fresh")
+
+    critics = data.get("critics") or []
+    if not isinstance(critics, list):
+        blocks.append(f"council_receipt {path} critics is not a list")
+        return blocks
+    required_rows = [row for row in critics if isinstance(row, dict) and row.get("required", True)]
+    if len(required_rows) < reviewer_count:
+        blocks.append(
+            f"council_receipt {path} required reviewer rows {len(required_rows)} < reviewer_count {reviewer_count}")
+    for row in required_rows:
+        lane = row.get("lane_id") or row.get("provider") or "unknown"
+        parsed = row.get("parsed") or {}
+        if not row.get("ok"):
+            blocks.append(f"council_receipt {path} lane {lane} not ok")
+            continue
+        if not isinstance(parsed, dict):
+            blocks.append(f"council_receipt {path} lane {lane} parsed review missing")
+            continue
+        if str(parsed.get("verdict") or "").lower() not in {"pass", "approve"}:
+            blocks.append(
+                f"council_receipt {path} lane {lane} verdict {parsed.get('verdict')!r} is not pass/approve")
+        if _float_field(parsed, "score") < 100:
+            blocks.append(f"council_receipt {path} lane {lane} score < 100")
+        if str(parsed.get("explicit_disagreement") or "").strip():
+            blocks.append(f"council_receipt {path} lane {lane} has explicit disagreement")
+    return blocks
+
+
+def _council_receipt_paths(review: dict[str, Any]) -> list[str]:
+    paths: list[str] = []
+    raw_many = review.get("council_receipts")
+    if isinstance(raw_many, list):
+        paths.extend(str(p) for p in raw_many if str(p or "").strip())
+    raw_one = str(review.get("council_receipt") or "").strip()
+    if raw_one:
+        paths.append(raw_one)
+    deduped: list[str] = []
+    for path in paths:
+        if path not in deduped:
+            deduped.append(path)
+    return deduped
+
+
+def _final_boss_coverage_blocks(
+    review: dict[str, Any],
+    *,
+    receipt_paths: list[str],
+    rounds: int,
+    dimensions: set[str],
+) -> list[str]:
+    """Verify each Final Boss dimension has a distinct council receipt per round."""
+    blocks: list[str] = []
+    required_dimensions = FINAL_BOSS_DIMENSIONS & dimensions
+    expected_pairs = {
+        (round_index, dimension)
+        for round_index in range(1, rounds + 1)
+        for dimension in required_dimensions
+    }
+    expected_count = len(expected_pairs)
+    if len(receipt_paths) < expected_count:
+        blocks.append(
+            "final_boss_review has "
+            f"{len(receipt_paths)} distinct council receipt(s) but requires at least "
+            f"{expected_count} ({rounds} round(s) x {len(required_dimensions)} required dimensions)"
+        )
+
+    raw_coverage = review.get("council_coverage")
+    if not isinstance(raw_coverage, list):
+        blocks.append("final_boss_review.council_coverage missing")
+        return blocks
+
+    receipt_set = set(receipt_paths)
+    covered_pairs: set[tuple[int, str]] = set()
+    coverage_receipts: set[str] = set()
+    for index, row in enumerate(raw_coverage):
+        if not isinstance(row, dict):
+            blocks.append(f"final_boss_review.council_coverage[{index}] is not a mapping")
+            continue
+        round_index = _int_field(row, "round")
+        dimension = _as_lower_token(row.get("dimension"))
+        receipt = str(row.get("council_receipt") or row.get("receipt") or "").strip()
+        if round_index < 1 or round_index > rounds:
+            blocks.append(
+                f"final_boss_review.council_coverage[{index}] round {round_index} outside 1..{rounds}")
+        if dimension not in FINAL_BOSS_DIMENSIONS:
+            blocks.append(
+                f"final_boss_review.council_coverage[{index}] unknown dimension {dimension!r}")
+        if not receipt:
+            blocks.append(f"final_boss_review.council_coverage[{index}] council_receipt missing")
+        elif receipt not in receipt_set:
+            blocks.append(
+                f"final_boss_review.council_coverage[{index}] receipt {receipt!r} "
+                "is not listed in council_receipts")
+        if (
+            round_index >= 1
+            and round_index <= rounds
+            and dimension in required_dimensions
+            and receipt in receipt_set
+        ):
+            covered_pairs.add((round_index, dimension))
+            coverage_receipts.add(receipt)
+
+    missing_pairs = sorted(expected_pairs - covered_pairs)
+    if missing_pairs:
+        preview = ", ".join(f"round {round_index}:{dimension}" for round_index, dimension in missing_pairs[:10])
+        suffix = "" if len(missing_pairs) <= 10 else f", ... +{len(missing_pairs) - 10} more"
+        blocks.append("final_boss_review.council_coverage missing: " + preview + suffix)
+    if len(coverage_receipts) < expected_count:
+        blocks.append(
+            "final_boss_review requires a distinct council receipt for each "
+            f"round/dimension pair ({len(coverage_receipts)} distinct covered < {expected_count})"
+        )
+    return blocks
+
+
+def _final_boss_local_verifier_blocks(
+    review: dict[str, Any],
+    *,
+    dossier_path: str,
+) -> list[str]:
+    blocks: list[str] = []
+    if review.get("local_verifiers_passed") is not True:
+        blocks.append("final_boss_review.local_verifiers_passed must be true")
+    results = review.get("local_verifier_results")
+    if not isinstance(results, list) or not results:
+        blocks.append("final_boss_review.local_verifier_results missing")
+        return blocks
+    for index, row in enumerate(results):
+        if not isinstance(row, dict):
+            blocks.append(f"final_boss_review.local_verifier_results[{index}] is not a mapping")
+            continue
+        verifier_id = str(row.get("id") or f"#{index}")
+        command = str(row.get("command") or "").strip()
+        if not command:
+            blocks.append(f"final_boss_review.local_verifier_results[{index}] command missing")
+        if row.get("passed") is not True:
+            blocks.append(f"final_boss_review local verifier {verifier_id!r} did not pass")
+        if row.get("returncode") != 0:
+            blocks.append(f"final_boss_review local verifier {verifier_id!r} returncode is not 0")
+    if dossier_path:
+        dossier, err = _read_json_object(dossier_path)
+        if not err and dossier is not None:
+            expected_ids = {
+                str(row.get("id") or "").strip()
+                for row in dossier.get("local_verifiers") or []
+                if isinstance(row, dict) and str(row.get("id") or "").strip()
+            }
+            result_ids = {
+                str(row.get("id") or "").strip()
+                for row in results
+                if isinstance(row, dict) and str(row.get("id") or "").strip()
+            }
+            missing = sorted(expected_ids - result_ids)
+            if missing:
+                blocks.append("final_boss_review missing local verifier results: " + ", ".join(missing))
+    return blocks
+
+
+def _final_boss_blocks(t: dict[str, Any], closure_kind: str | None = None) -> list[str]:
+    """Return blockers for any claim that asks to become production substrate.
+
+    The generic rigorous bar proves a useful slice. It does not prove a track is
+    production-ready or substrate-trusted. Those claims need an explicit
+    final_boss_review packet with decorrelated review, dimensions, and any
+    profile-specific runtime proof.
+    """
+    kind = _as_upper_token(closure_kind or _declared_closure_kind(t))
+    if kind not in PRODUCTION_CLOSURE_KINDS:
+        return []
+
+    blocks: list[str] = []
+    profile = _graduation_profile(t)
+    if profile not in GRADUATION_PROFILES:
+        blocks.append(f"unknown graduation_profile {profile!r}")
+
+    review = t.get("final_boss_review")
+    if not isinstance(review, dict):
+        return blocks + [
+            f"{kind} requires final_boss_review with dossier, council receipt, "
+            ">=6 reviewers, score_min=100, zero disagreements, and all required dimensions"
+        ]
+
+    track_id = str(t.get("id") or "")
+    dossier = str(review.get("dossier") or "").strip()
+    if not dossier:
+        blocks.append("final_boss_review.dossier missing")
+    else:
+        blocks.extend(_validate_final_boss_dossier(dossier, track_id, kind, profile))
+
+    receipt_paths = _council_receipt_paths(review)
+    if not receipt_paths:
+        blocks.append("final_boss_review.council_receipt missing")
+
+    reviewer_count = _int_field(review, "reviewer_count")
+    if reviewer_count < 6:
+        blocks.append(f"final_boss_review.reviewer_count {reviewer_count} < 6")
+
+    score_min = _int_field(review, "score_min")
+    if score_min < 100:
+        blocks.append(f"final_boss_review.score_min {score_min} < 100")
+
+    if _int_field(review, "explicit_disagreements", 0) != 0:
+        blocks.append("final_boss_review.explicit_disagreements must be 0")
+
+    blocks.extend(_final_boss_local_verifier_blocks(review, dossier_path=dossier))
+
+    rounds = _int_field(review, "rounds", 1)
+    if rounds < FINAL_BOSS_MIN_ROUNDS:
+        blocks.append(f"final_boss_review.rounds {rounds} < {FINAL_BOSS_MIN_ROUNDS}")
+    dimensions = _as_str_set(review.get("dimensions"))
+    missing_dimensions = sorted(FINAL_BOSS_DIMENSIONS - dimensions)
+    if missing_dimensions:
+        blocks.append("final_boss_review missing dimensions: " + ", ".join(missing_dimensions))
+    extra_dimensions = sorted(dimensions - FINAL_BOSS_DIMENSIONS)
+    if extra_dimensions:
+        blocks.append("final_boss_review unknown dimensions: " + ", ".join(extra_dimensions))
+
+    if rounds >= 1 and not missing_dimensions and not extra_dimensions:
+        blocks.extend(_final_boss_coverage_blocks(
+            review,
+            receipt_paths=receipt_paths,
+            rounds=rounds,
+            dimensions=dimensions,
+        ))
+
+    if profile == "runtime_transport":
+        runtime_evidence = review.get("runtime_evidence") or t.get("runtime_evidence") or []
+        if not runtime_evidence:
+            blocks.append("runtime_transport production claim requires runtime_evidence")
+        failure_modes = _as_str_set(review.get("failure_modes_tested"))
+        missing_modes = sorted(RUNTIME_TRANSPORT_FAILURE_MODES - failure_modes)
+        if missing_modes:
+            blocks.append("runtime_transport missing failure modes: " + ", ".join(missing_modes))
+        if bool(review.get("mock_only")):
+            blocks.append("runtime_transport cannot be mock_only for production/substrate closure")
+
+    for path in receipt_paths:
+        blocks.extend(_validate_council_receipt(path, reviewer_count))
+
+    return blocks
 
 
 def normalize_portfolio(track: dict[str, Any] | None) -> dict[str, Any]:
@@ -828,6 +1485,27 @@ def validate_portfolio_graph(p: dict[str, Any], findings: list[Finding]) -> None
             findings.append(Finding("ERROR", f"spine-unresolved:{ctid}",
                 f"Closed track '{ctid}' serves unknown spine objective '{cserves}'. "
                 f"Known: {sorted(spine_ids)}"))
+        closed_at = _parse_iso_date(ct.get("closed_at"))
+        requires_final_boss_metadata = (
+            closed_at is not None and closed_at >= FINAL_BOSS_EFFECTIVE_DATE)
+        closure_kind = _declared_closure_kind(ct)
+        if requires_final_boss_metadata and not closure_kind:
+            findings.append(Finding("ERROR", f"closure-kind-missing:{ctid}",
+                f"Closed track '{ctid}' is dated {ct.get('closed_at')} and must declare "
+                "`closure_kind` (VERIFIED_SLICE / CLOSED_NOT_PROD / RETIRED / "
+                "SUPERSEDED / PRODUCTION_READY / SUBSTRATE_TRUSTED)."))
+        elif closure_kind and closure_kind not in CLOSURE_KINDS:
+            findings.append(Finding("ERROR", f"closure-kind-invalid:{ctid}",
+                f"Closed track '{ctid}' declares invalid closure_kind {closure_kind!r}. "
+                f"Known: {sorted(CLOSURE_KINDS)}"))
+        profile = _graduation_profile(ct)
+        if profile and profile not in GRADUATION_PROFILES:
+            findings.append(Finding("ERROR", f"graduation-profile-invalid:{ctid}",
+                f"Closed track '{ctid}' declares unknown graduation_profile {profile!r}. "
+                f"Known: {sorted(GRADUATION_PROFILES)}"))
+        for block in _final_boss_blocks(ct, closure_kind):
+            findings.append(Finding("ERROR", f"final-boss-block:{ctid}",
+                f"[{ctid}] cannot claim {closure_kind}: {block}"))
 
     # WIP limit — focus as flow discipline, not a mutex.
     n = len(active)
@@ -945,6 +1623,7 @@ def detect_dependency_cycle(tracks: list[dict[str, Any]], findings: list[Finding
 def evaluate_track(t: dict[str, Any]) -> dict[str, Any]:
     prereqs = [evaluate_criterion(c) for c in (t.get("prerequisites") or [])]
     comps = [evaluate_criterion(c) for c in (t.get("completion_criteria") or [])]
+    ship_vetoes = [evaluate_criterion(c) for c in (t.get("ship_vetoes") or [])]
     prereqs_ok = all(c.passed for c in prereqs) if prereqs else True
     completion_ok = all(c.passed for c in comps) if comps else False
     # Lenient bar (legacy): all completion criteria pass while the track occupies
@@ -984,22 +1663,37 @@ def evaluate_track(t: dict[str, Any]) -> dict[str, Any]:
             f"strongest evidence {grade_name(strongest_grade)} "
             f"< required {grade_name(min_evidence_grade)} "
             "(raise evidence strength or lower min_evidence_grade with justification)")
+    active_vetoes = [c for c in ship_vetoes if c.passed]
+    if active_vetoes:
+        details = "; ".join(f"{c.id}: {c.detail}" for c in active_vetoes)
+        ship_blocks.append(f"{len(active_vetoes)} active ship veto(es): {details}")
+    target_closure_kind = _declared_closure_kind(t)
+    if target_closure_kind and target_closure_kind not in CLOSURE_KINDS:
+        ship_blocks.append(
+            f"invalid target closure kind {target_closure_kind!r}; known {sorted(CLOSURE_KINDS)}")
+    final_boss_blocks = _final_boss_blocks(t, target_closure_kind)
+    ship_blocks.extend(final_boss_blocks)
     shippable = criteria_pass and not ship_blocks
 
     return {
         "id": t.get("id"),
         "prereqs": prereqs,
         "completion": comps,
+        "ship_vetoes": ship_vetoes,
         "prereqs_ok": prereqs_ok,
         "shippable": shippable,            # RIGOROUS + GRADED bar
         "criteria_pass": criteria_pass,    # legacy lenient bar (existence checks)
         "ship_blocks": ship_blocks,
+        "final_boss_blocks": final_boss_blocks,
+        "target_closure_kind": target_closure_kind or "VERIFIED_SLICE",
+        "graduation_profile": _graduation_profile(t),
         "has_rigorous_evidence": has_rigorous_evidence,
         "strongest_grade": strongest_grade,
         "strongest_grade_name": grade_name(strongest_grade),
         "min_evidence_grade": min_evidence_grade,
         "min_evidence_grade_name": grade_name(min_evidence_grade),
         "open_blocker_count": len(open_blockers),
+        "active_ship_veto_count": len(active_vetoes),
         "passed": sum(1 for c in comps if c.passed),
         "total": len(comps),
     }
@@ -1102,7 +1796,10 @@ def run(args: argparse.Namespace) -> int:
                 (not c.passed) and getattr(c, "executed", True)
                 for c in (r["completion"] + r["prereqs"]))
             real_false_claim = (
-                r["open_blocker_count"] > 0 or not declares_rigorous or executed_failure)
+                r["open_blocker_count"] > 0
+                or r.get("active_ship_veto_count", 0) > 0
+                or not declares_rigorous
+                or executed_failure)
             if real_false_claim:
                 blocks = "; ".join(r["ship_blocks"]) or "rigorous bar not met"
                 findings.append(Finding("ERROR", f"false-shippable-claim:{tid}",
@@ -1160,6 +1857,9 @@ def _track_payload(t: dict[str, Any], r: dict[str, Any]) -> dict[str, Any]:
         "id": t.get("id"),
         "name": t.get("name"),
         "status": t.get("status"),
+        "closure_kind": t.get("closure_kind"),
+        "target_closure_kind": r.get("target_closure_kind", "VERIFIED_SLICE"),
+        "graduation_profile": r.get("graduation_profile", _graduation_profile(t)),
         "serves": t.get("serves"),
         "complements": t.get("complements") or [],
         "depends_on": t.get("depends_on") or [],
@@ -1172,6 +1872,8 @@ def _track_payload(t: dict[str, Any], r: dict[str, Any]) -> dict[str, Any]:
         "shippable": r["shippable"],
         "criteria_pass": r.get("criteria_pass", r["shippable"]),
         "ship_blocks": r.get("ship_blocks", []),
+        "final_boss_blocks": r.get("final_boss_blocks", []),
+        "claim_boundary": t.get("claim_boundary"),
         "has_rigorous_evidence": r.get("has_rigorous_evidence", False),
         "strongest_grade": r.get("strongest_grade", 0),
         "strongest_grade_name": r.get("strongest_grade_name", "S0"),
@@ -1180,6 +1882,7 @@ def _track_payload(t: dict[str, Any], r: dict[str, Any]) -> dict[str, Any]:
         "prerequisites_ok": r["prereqs_ok"],
         "completion_progress": {"passed": r["passed"], "total": r["total"]},
         "criteria": [asdict(c) for c in (r["prereqs"] + r["completion"])],
+        "ship_vetoes": [asdict(c) for c in r.get("ship_vetoes", [])],
     }
 
 
@@ -1250,7 +1953,16 @@ def emit_reports(findings: list[Finding], portfolio: dict[str, Any] | None,
                   f"depends_on: {tp['depends_on']} · conflicts_with: {tp['conflicts_with']}")
         md.append(f"- owned_surfaces: {tp['owned_surfaces']}")
         md.append(f"- moves_vital_signs: {tp['moves_vital_signs']}")
+        if tp.get("claim_boundary"):
+            md.append(f"- claim_boundary: {tp['claim_boundary']}")
+        if not tp["shippable"] and tp.get("ship_blocks"):
+            md.append(f"- ship_blocks: {'; '.join(tp['ship_blocks'])}")
         md.append("")
+        for c in tp.get("ship_vetoes") or []:
+            mark = "ACTIVE" if c["passed"] else "clear"
+            md.append(f"  - {mark} ship veto `{c['id']}` ({c['kind']}) — {c['detail']}")
+        if tp.get("ship_vetoes"):
+            md.append("")
         for c in tp["criteria"]:
             mark = "✓" if c["passed"] else "✗"
             md.append(f"  - {mark} `{c['id']}` ({c['kind']}) — {c['detail']}")

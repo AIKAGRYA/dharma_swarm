@@ -7,17 +7,28 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BOUNDARY_DOC = REPO_ROOT / "docs/governance/FORGE_NAMING_BOUNDARY.md"
+HISTORICAL_PREFIXES = (
+    "reports/governance/cleanup_convergence_20260615_25/",
+    "reports/governance/worktree_readiness_2026-06-30/",
+)
 
 
-def _tracked_files() -> list[Path]:
+def _git_grep_fixed(terms: tuple[str, ...]) -> list[str]:
+    args = ["git", "grep", "-lF"]
+    for term in terms:
+        args.extend(["-e", term])
+    args.append("--")
     result = subprocess.run(
-        ["git", "ls-files"],
+        args,
         cwd=REPO_ROOT,
-        check=True,
         capture_output=True,
         text=True,
     )
-    return [REPO_ROOT / line for line in result.stdout.splitlines() if line.strip()]
+    if result.returncode == 1:
+        return []
+    if result.returncode != 0:
+        raise AssertionError(result.stderr.strip() or "git grep failed")
+    return [line for line in result.stdout.splitlines() if line.strip()]
 
 
 def test_forge_boundary_doc_names_both_surfaces() -> None:
@@ -34,15 +45,10 @@ def test_old_pudgala_quality_name_is_not_reintroduced() -> None:
         "pudgala-" + "forge",
         "anti-slop-pudgala-" + "forge",
     )
-    offenders: list[str] = []
-    for path in _tracked_files():
-        try:
-            text = path.read_text(encoding="utf-8")
-        except (UnicodeDecodeError, OSError):
-            continue
-        for term in legacy_terms:
-            if term in text:
-                offenders.append(str(path.relative_to(REPO_ROOT)))
-                break
+    offenders = [
+        path
+        for path in _git_grep_fixed(legacy_terms)
+        if not path.startswith(HISTORICAL_PREFIXES)
+    ]
 
     assert offenders == []

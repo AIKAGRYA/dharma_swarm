@@ -1,7 +1,8 @@
 # Forge Naming Boundary
 
-This repository uses `Forge` for the whole-swarm evolution and hardening arena.
-Do not reuse that name for anti-slop governance mechanisms.
+Role: reference. The authoritative repo-level rule lives in
+`docs/governance/SOVEREIGN_MANIFEST.md` under "Forge / Pudgala Naming
+Boundary". This page explains the terms and points at concrete surfaces.
 
 ## Dharma Forge
 

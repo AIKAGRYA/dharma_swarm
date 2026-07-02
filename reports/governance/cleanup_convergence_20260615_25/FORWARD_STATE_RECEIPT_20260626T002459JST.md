@@ -22,7 +22,7 @@ this addendum is authoritative.
 
 Actions performed:
 
-- PR #693 (`anti-slop/pudgala-autopoiesis-protostar-2026-06`) received review-blocker fixes,
+- PR #693 (`anti-slop/pudgala-forge-2026-06`) received review-blocker fixes,
   committed as `b3cf8f855` and pushed to origin.
 - PR #698 (`codex/governance-fitness-ci-20260625-225920`) received the explicit
   raw-LOC ratchet rebaseline, committed as `791801e0f` and pushed to origin.
@@ -74,9 +74,14 @@ Current GitHub PR state after the follow-up push:
 | #700 | `codex/mike-nonstop-dedupe-20260626` | yes | `CLEAN` | none | `ACTIVE_LANE` draft Mike dedupe lane |
 | #699 | `devin/1782396598-thinkodynamic-director-remix` | no | `CLEAN` | none | `ACTIVE_LANE` external experimental lane; review judgment still required |
 | #698 | `codex/governance-fitness-ci-20260625-225920` | yes | `CLEAN` | none | `NEEDS_OPERATOR_DECISION`; policy rebaseline applied, still draft |
-| #693 | `anti-slop/pudgala-autopoiesis-protostar-2026-06` | no | `CLEAN` | none | `ACTIVE_LANE`; CI-ready but review-thread/receipt gate remains |
+| #693 | `anti-slop/pudgala-forge-2026-06` | no | `CLEAN` | none | `ACTIVE_LANE`; CI-ready but review-thread/receipt gate remains |
 | #689 | `claude/refine-local-plan-mhj9bg` | yes | `CLEAN` | none | `NEEDS_OPERATOR_DECISION` draft cockpit reconciliation PR |
 | #687 | `ops/report-2026-06-25T0000Z` | yes | `CLEAN` | none | `DUPLICATE_OR_SUPERSEDED` / report-only draft unless operator wants it |
+
+Naming note: later governance taxonomy reserves Forge for the whole-swarm arena
+and names this anti-slop mechanism Pudgala Autopoiesis Protostar. This dated
+receipt intentionally preserves the historical PR #693 branch/worktree names as
+captured at the time so archive lookup remains possible.
 
 Current registered worktree sweep:
 
@@ -103,9 +108,9 @@ Current registered worktree sweep:
 
 Additional non-registered branch/path observations:
 
-- `/Users/dhyana/worktrees/ds_pudgala_autopoiesis_protostar_20260625` is no longer a
+- `/Users/dhyana/worktrees/ds_pudgala_forge_20260625` is no longer a
   registered worktree and the path is absent.
-- Local branch `anti-slop/pudgala-autopoiesis-protostar-2026-06` remains present at
+- Local branch `anti-slop/pudgala-forge-2026-06` remains present at
   `b3cf8f855` and tracks origin at the same commit.
 - `/Users/dhyana/worktrees/ds_pudgala_p3_09_696` exists as a non-registered git
   checkout on `devin/1782374246-reconcile-693-pudgala`, ahead of
@@ -255,7 +260,7 @@ Live open PR state from `gh pr list`:
 |---|---|---:|---|---|---|
 | #699 | `devin/1782396598-thinkodynamic-director-remix` | no | `CLEAN` | none, 34 checks | `ACTIVE_LANE` experimental external PR; green but Greptile review notes remain operator judgment |
 | #698 | `codex/governance-fitness-ci-20260625-225920` | yes | `UNSTABLE` | quality ratchet failure; pytest 3.11 failure; pytest 3.12 failure | `NEEDS_OPERATOR_DECISION` |
-| #693 | `anti-slop/pudgala-autopoiesis-protostar-2026-06` | no | `CLEAN` | none, 28 checks | `ACTIVE_LANE` and highest ready forward PR |
+| #693 | `anti-slop/pudgala-forge-2026-06` | no | `CLEAN` | none, 28 checks | `ACTIVE_LANE` and highest ready forward PR |
 | #689 | `claude/refine-local-plan-mhj9bg` | yes | `CLEAN` | none, 30 checks | `NEEDS_OPERATOR_DECISION` draft cockpit reconciliation PR |
 | #687 | `ops/report-2026-06-25T0000Z` | yes | `CLEAN` | none, 30 checks | `DUPLICATE_OR_SUPERSEDED` / report-only draft unless operator wants it |
 
@@ -284,7 +289,7 @@ There are 17 registered worktrees.
 | `/Users/dhyana/worktrees/dharma_swarm_reconcile_20260622` | detached | `726bc9d4d` | none | n/a | 10 | `ARCHIVE_ONLY` + `GOVERNANCE_MEMBRANE` | Detached reconciliation tree; contains raw dumps and keeper reports. Keep as evidence/archive; do not delete without exact approval. |
 | `/Users/dhyana/worktrees/ds_mandala_cockpit_throwaway_20260624` | `scratch/mandala-cockpit-v1-20260624` | `63c4937b3` | none | n/a | 5 | `NEEDS_OPERATOR_DECISION` | Throwaway cockpit experiment with dirty dashboard files and untracked `CockpitTopology.tsx`. Compare for ideas only; do not port directly. |
 | `/Users/dhyana/worktrees/ds_pr674_rebase_20260624` | `repair/pr674-track-closure-gate-20260624` | `ebccfb1e2` | gone | n/a | 4 | `DUPLICATE_OR_SUPERSEDED` but dirty | PR #674 is merged, but dirty `uv.lock` and generated governance files block removal. Exact discard/removal approval required. |
-| `/Users/dhyana/worktrees/ds_pudgala_autopoiesis_protostar_20260625` | `anti-slop/pudgala-autopoiesis-protostar-2026-06` | `f699e0c26` | `origin/anti-slop/pudgala-autopoiesis-protostar-2026-06` | 0/0 | 0 | `ACTIVE_LANE` | Clean PR #693 branch. Highest ready lane: open, non-draft, merge state clean, all reported checks green. |
+| `/Users/dhyana/worktrees/ds_pudgala_forge_20260625` | `anti-slop/pudgala-forge-2026-06` | `f699e0c26` | `origin/anti-slop/pudgala-forge-2026-06` | 0/0 | 0 | `ACTIVE_LANE` | Clean PR #693 branch. Highest ready lane: open, non-draft, merge state clean, all reported checks green. |
 
 ## Relevant Non-Registered Trees
 
@@ -309,7 +314,7 @@ history make raw branch ancestry an advisory signal only.
 `git branch --no-merged origin/main` remains large. The relevant active/unmerged
 heads from this receipt are:
 
-- `anti-slop/pudgala-autopoiesis-protostar-2026-06` - PR #693 clean/green.
+- `anti-slop/pudgala-forge-2026-06` - PR #693 clean/green.
 - `codex/governance-fitness-ci-20260625-225920` - PR #698 draft/red.
 - `forge-v1/tokenbroker-scoreboard-20260620` - clean local source-bearing lane.
 - `helm/worldclass-20260612` - ahead 57 and dirty.

@@ -278,6 +278,9 @@ class DarwinEngine:
             Defaults to ``~/.dharma/evolution/predictor_data.jsonl``.
         custom_fitness_weights: Optional custom weighting for fitness scoring.
             Partial overrides are merged onto canonical defaults.
+        archive_enforce_one_wire: Override archive One Wire enforcement. Leave
+            as ``None`` for archive-path inference; pass ``False`` only for
+            bounded scratch replays that must never touch live archive fitness.
     """
 
     def __init__(
@@ -308,8 +311,12 @@ class DarwinEngine:
         quality_gate_enabled: bool = False,
         quality_gate_use_llm: bool = False,
         quality_gate_provider: Any = None,
+        archive_enforce_one_wire: bool | None = None,
     ) -> None:
-        self.archive = EvolutionArchive(path=archive_path)
+        self.archive = EvolutionArchive(
+            path=archive_path,
+            enforce_one_wire=archive_enforce_one_wire,
+        )
         self.traces = TraceStore(base_path=traces_path)
         self.predictor = FitnessPredictor(history_path=predictor_path)
         self.experiment_log = ExperimentLog(

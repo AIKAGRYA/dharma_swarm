@@ -38,6 +38,15 @@ real data, each transition emits a receipt to its owner surface, and a fresh
 agent can replay an automated check. Proof-of-life, smoke tests, demos, and
 handoff prose do not count as production closure.
 
+Verdict tiers:
+
+- `HARNESS_PROVEN`: a bounded replay/regression harness passed. This is useful
+  regression evidence, but it may be scratch or self-seeded and is not a live
+  daemon closure claim.
+- `CLOSED_LIVE`: the loop's declared live owner surface proves the cycle and
+  later-cycle consumption without scratch-only or self-seeded evidence standing
+  in for production state.
+
 Surface split: `delegation_runs.receipt_json` is the orchestrator/spine-dispatch
 witness column. A2A-surface rows are allowed to leave it empty because their
 canonical witness path is `runtime_receipts` plus idempotency records. For Loop
