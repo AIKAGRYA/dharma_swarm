@@ -395,7 +395,11 @@ async def run_deep_sweep(
     (cycle_dir / "verifications.json").write_text(json.dumps(verifications, indent=2), encoding="utf-8")
     (cycle_dir / "digest.md").write_text(digest_text, encoding="utf-8")
 
-    likely_fabricated = [v for v in verifications if "likely_fabricated" in (v.get("output") or "")]
+    likely_fabricated = [
+        v
+        for v in verifications
+        if "likely_fabricated" in str(v.get("output") or "").lower()
+    ]
 
     return {
         "context_id": context_id,

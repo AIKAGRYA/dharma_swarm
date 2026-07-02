@@ -346,7 +346,7 @@ async def test_likely_fabricated_count_is_surfaced(tmp_path: Path) -> None:
             agent_id="signal_deep_sweep",
             provider="claude_code",
             status="ok",
-            attributes={"output_text": "likely_fabricated: no corroboration anywhere."},
+            attributes={"output_text": "LIKELY_FABRICATED: no corroboration anywhere."},
         )
 
     result = await run_deep_sweep(
