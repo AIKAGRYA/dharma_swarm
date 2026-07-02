@@ -6,7 +6,7 @@
       "057ff41a76694df8",
       "c1bd24a7ccba4803"
     ],
-    "memory_db": "/private/tmp/dharma_loop4_10_memory_context_closure_state/db/memory.db",
+    "memory_db": "$TMPDIR/dharma_loop4_10_memory_context_closure_state/db/memory.db",
     "memory_rows_after": 5
   },
   "adapt_evidence": {

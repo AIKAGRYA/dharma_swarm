@@ -4,13 +4,13 @@
     "recognition_history_archive": {
       "bytes": 957,
       "exists": true,
-      "path": "/private/tmp/dharma_loop8_recognition_closure/2026-07-01_loop8_recognition_closure/meta/history/seed_20260701_000000.md",
+      "path": "$TMPDIR/dharma_loop8_recognition_closure/2026-07-01_loop8_recognition_closure/meta/history/seed_20260701_000000.md",
       "sha256": "eef7a4ccd95d225ce0d613c3a3043757608101f7520f950b93ad47d27bb563ee"
     },
     "recognition_seed": {
       "bytes": 957,
       "exists": true,
-      "path": "/private/tmp/dharma_loop8_recognition_closure/2026-07-01_loop8_recognition_closure/meta/recognition_seed.md",
+      "path": "$TMPDIR/dharma_loop8_recognition_closure/2026-07-01_loop8_recognition_closure/meta/recognition_seed.md",
       "sha256": "eef7a4ccd95d225ce0d613c3a3043757608101f7520f950b93ad47d27bb563ee"
     },
     "seed_contains_marker": true,
@@ -49,7 +49,7 @@
     },
     "fed_forward": true,
     "field": "recognition_seed.md -> later build_agent_context() L9 block",
-    "seed_path": "/private/tmp/dharma_loop8_recognition_closure/2026-07-01_loop8_recognition_closure/meta/recognition_seed.md"
+    "seed_path": "$TMPDIR/dharma_loop8_recognition_closure/2026-07-01_loop8_recognition_closure/meta/recognition_seed.md"
   },
   "closed": true,
   "constrain_evidence": {
@@ -65,7 +65,7 @@
       "cascade_records": 10,
       "cycle": 1,
       "history_digest": "ffbc6f2a7cfb21f874b3e71584f331d2cd9be5574bcc25b69aacfeeaf3deb643",
-      "history_dir": "/Users/dhyana/dw-worktrees/g/reports/loop_closure/cybernetics_codex",
+      "history_dir": "$REPO_ROOT/reports/loop_closure/cybernetics_codex",
       "required_closed": true,
       "required_loops": [
         1,
@@ -208,25 +208,25 @@
       "autocatalytic_graph": {
         "bytes": 3809,
         "exists": true,
-        "path": "/private/tmp/dharma_loop8_recognition_closure/2026-07-01_loop8_recognition_closure/meta/cc_catalytic_graph.json",
+        "path": "$TMPDIR/dharma_loop8_recognition_closure/2026-07-01_loop8_recognition_closure/meta/cc_catalytic_graph.json",
         "sha256": "6b357da7e81d09662b81c7151e20a2ba45a74b8655a5c6ce37bc3efcad304e32"
       },
       "cascade_history": {
         "bytes": 4298,
         "exists": true,
-        "path": "/private/tmp/dharma_loop8_recognition_closure/2026-07-01_loop8_recognition_closure/meta/cascade_history.jsonl",
+        "path": "$TMPDIR/dharma_loop8_recognition_closure/2026-07-01_loop8_recognition_closure/meta/cascade_history.jsonl",
         "sha256": "c96e7287814689046262695607e319f516bd2722bbea50944435c93a78cce641"
       },
       "self_model": {
         "bytes": 4465,
         "exists": true,
-        "path": "/private/tmp/dharma_loop8_recognition_closure/2026-07-01_loop8_recognition_closure/meta/loop8_eigenform_self_model.json",
+        "path": "$TMPDIR/dharma_loop8_recognition_closure/2026-07-01_loop8_recognition_closure/meta/loop8_eigenform_self_model.json",
         "sha256": "004cafaf35fcf31e86c52a5c0cefd78713deacde3fc89acdaf10884f01d2b5cb"
       },
       "system_rv": {
         "bytes": 158,
         "exists": true,
-        "path": "/private/tmp/dharma_loop8_recognition_closure/2026-07-01_loop8_recognition_closure/meta/system_rv.json",
+        "path": "$TMPDIR/dharma_loop8_recognition_closure/2026-07-01_loop8_recognition_closure/meta/system_rv.json",
         "sha256": "2332f75454662c88ae6354db783c8f4beadedf37ab1b3eba964ca1879c3c6872"
       }
     },
@@ -337,7 +337,7 @@
   "real_data": true,
   "sense_evidence": {
     "history_digest": "ffbc6f2a7cfb21f874b3e71584f331d2cd9be5574bcc25b69aacfeeaf3deb643",
-    "history_dir": "/Users/dhyana/dw-worktrees/g/reports/loop_closure/cybernetics_codex",
+    "history_dir": "$REPO_ROOT/reports/loop_closure/cybernetics_codex",
     "reader": "scripts.loop8_recognition_closure_run.read_loop_history",
     "receipts_read": [
       {
@@ -442,5 +442,5 @@
     "interpret": true,
     "sense": true
   },
-  "work_dir": "/private/tmp/dharma_loop8_recognition_closure/2026-07-01_loop8_recognition_closure"
+  "work_dir": "$TMPDIR/dharma_loop8_recognition_closure/2026-07-01_loop8_recognition_closure"
 }

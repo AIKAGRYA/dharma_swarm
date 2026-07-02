@@ -15,10 +15,10 @@
       "weighted": 0.5689
     },
     "live_archive_used": false,
-    "predictor_history_path": "/var/folders/2n/h27kz83n6dn90pzkb_8v3pm80000gn/T/loop3_evolution_closure_sfeg8g2y/evolution/predictor_data.jsonl",
+    "predictor_history_path": "$TMPDIR/loop3_evolution_closure/evolution/predictor_data.jsonl",
     "predictor_outcomes_after_archive": 1,
     "scratch_archive_is_live_archive": false,
-    "scratch_archive_path": "/var/folders/2n/h27kz83n6dn90pzkb_8v3pm80000gn/T/loop3_evolution_closure_sfeg8g2y/evolution/archive.jsonl"
+    "scratch_archive_path": "$TMPDIR/loop3_evolution_closure/evolution/archive.jsonl"
   },
   "adapt_evidence": {
     "later_proposal_id": "42a456ddd0a54ae0",

@@ -2,7 +2,7 @@
   "act_evidence": {
     "package_checksum": "1c4db89bb0f858b1e2469a6617866809257a63533ad5bc176106ee1acdec0cb3",
     "package_exists": true,
-    "package_path": "/private/tmp/dharma_loop4_10_memory_context_closure_state/context/packages/loop4_10_memory_context.md"
+    "package_path": "$TMPDIR/dharma_loop4_10_memory_context_closure_state/context/packages/loop4_10_memory_context.md"
   },
   "adapt_evidence": {
     "package_checksum_after": "1c4db89bb0f858b1e2469a6617866809257a63533ad5bc176106ee1acdec0cb3",
@@ -14,7 +14,7 @@
     "before": "missing",
     "fed_forward": true,
     "field": "memory-aware context package checksum, then later context/package read",
-    "package_path": "/private/tmp/dharma_loop4_10_memory_context_closure_state/context/packages/loop4_10_memory_context.md"
+    "package_path": "$TMPDIR/dharma_loop4_10_memory_context_closure_state/context/packages/loop4_10_memory_context.md"
   },
   "constrain_evidence": {
     "admitted_to_package": true,
@@ -60,7 +60,7 @@
   "real_data": true,
   "sense_evidence": {
     "contains_marker": true,
-    "memory_db": "/private/tmp/dharma_loop4_10_memory_context_closure_state/db/memory.db",
+    "memory_db": "$TMPDIR/dharma_loop4_10_memory_context_closure_state/db/memory.db",
     "reader": "dharma_swarm.context.read_memory_context"
   },
   "tick_errors": [],

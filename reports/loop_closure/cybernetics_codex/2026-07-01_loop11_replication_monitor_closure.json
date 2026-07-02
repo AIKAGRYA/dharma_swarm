@@ -32,8 +32,8 @@
       "system_prompt": "You are the SYSTEMS ARCHITECT of dharma_swarm \u2014 the builder. You own the codebase: 118K+ lines, 260+ modules, 4300+ tests. You understand how every subsystem connects and breaks. You spawn code workers for implementation, but YOU make the architectural decisions: where to put new code, how to wire subsystems, when to refactor vs extend. Interface canonicalization is your north star \u2014 better contracts between fewer components, not more components. REVERSIBILITY: every code change must be revertable. WITNESS: log architectural decisions with rationale.\n\n\n## Specialization (Replication monitor closure verification)\nYou were created to fill a capability gap: loop11 replication monitor closure proof\n\nTrack proposal lifecycle state and probation receipts.\n\nYou inherit all kernel axioms and telos gates from your parent.\nYour actions are monitored during probation.",
       "vsm_function": "Replicated from systems_architect for: loop11 replication monitor closure proof"
     },
-    "dynamic_roster_path": "/var/folders/2n/h27kz83n6dn90pzkb_8v3pm80000gn/T/loop9_11_closure_home_tw6m7hgr/.dharma/replication/dynamic_roster.json",
-    "genome_path": "/var/folders/2n/h27kz83n6dn90pzkb_8v3pm80000gn/T/loop9_11_closure_home_tw6m7hgr/.dharma/replication/genomes/replication_monitor_closure_analyst_g1_20260701.json",
+    "dynamic_roster_path": "$TMPDIR/.dharma/replication/dynamic_roster.json",
+    "genome_path": "$TMPDIR/.dharma/replication/genomes/replication_monitor_closure_analyst_g1_20260701.json",
     "surface": "ReplicationProtocol._materialize",
     "witness_events": [
       "G1_PASS",
@@ -296,10 +296,10 @@
         "status": "proposed"
       }
     ],
-    "proposals_path": "/var/folders/2n/h27kz83n6dn90pzkb_8v3pm80000gn/T/loop9_11_closure_home_tw6m7hgr/.dharma/replication/proposals.jsonl",
+    "proposals_path": "$TMPDIR/.dharma/replication/proposals.jsonl",
     "surface": "ReplicationProtocol.get_pending_proposals"
   },
-  "state_dir": "/var/folders/2n/h27kz83n6dn90pzkb_8v3pm80000gn/T/loop9_11_closure_home_tw6m7hgr/.dharma",
+  "state_dir": "$TMPDIR/.dharma",
   "tick_errors": [],
   "transitions_receipted": {
     "act": true,

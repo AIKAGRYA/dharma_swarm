@@ -45,6 +45,11 @@ def _normalize_local_paths(value: str, replacements: list[tuple[str, str]]) -> s
         normalized,
     )
     normalized = re.sub(
+        r"/private/var/folders(?:/[^\s:=`'\"]+)?",
+        "$TMPDIR",
+        normalized,
+    )
+    normalized = re.sub(
         r"/var/folders(?:/[^\s:=`'\"]+)?",
         "$TMPDIR",
         normalized,

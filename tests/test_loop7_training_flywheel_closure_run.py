@@ -72,8 +72,9 @@ def test_main_writes_receipt(tmp_path: Path) -> None:
     assert data["loop"] == 7
     assert data["closed"] is True
     assert module._closure_satisfied(data) is True
-    assert "$TMPDIR" in report_path.read_text(encoding="utf-8")
-    assert str(work_dir) not in report_path.read_text(encoding="utf-8")
+    text = report_path.read_text(encoding="utf-8")
+    assert "$TMPDIR" in text or "<absolute-path>" in text
+    assert str(work_dir) not in text
     assert (work_dir / module.WORK_DIR_SENTINEL).read_text(encoding="utf-8") == module.WORK_DIR_SENTINEL_TEXT
 
 

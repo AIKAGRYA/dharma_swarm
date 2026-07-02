@@ -484,13 +484,14 @@ def test_audit_output_normalizes_local_paths(tmp_path):
 
 def test_committed_cybernetics_audit_artifacts_do_not_commit_machine_paths():
     repo_root = Path(__file__).resolve().parents[1]
-    artifacts = (
+    loop_reports = repo_root / "reports/loop_closure/cybernetics_codex"
+    council_reports = repo_root / "reports/agentops/decorrelated_review_council"
+    artifacts = [
         repo_root / "reports/loop_closure/cybernetics_codex/latest_audit.md",
         repo_root / "reports/loop_closure/cybernetics_codex/latest_audit.json",
-        repo_root / "reports/loop_closure/cybernetics_codex/2026-07-01_loop7_training_flywheel_closure.json",
-        repo_root / "reports/loop_closure/cybernetics_codex/2026-07-01_loop9_conductor_closure.json",
-        repo_root / "reports/agentops/decorrelated_review_council/20260702T051005Z-pr749-closed-loop-claim-red-team-compact-after-json-gates-hold_blockers.json",
-    )
+        *loop_reports.glob("2026-07-01_loop*.json"),
+        *council_reports.glob("20260702T*.json"),
+    ]
     for artifact in artifacts:
         text = artifact.read_text(encoding="utf-8")
         assert "/Users/dhyana" not in text
