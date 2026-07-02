@@ -743,6 +743,34 @@ def test_signal_deep_sweep_llm_phase_error_marks_cron_failed(monkeypatch, tmp_pa
     assert "verification receipt" in result.error
 
 
+def test_signal_deep_sweep_ingest_error_marks_cron_failed(monkeypatch, tmp_path):
+    # Codex review finding: a broken/missing ingestor after a successful
+    # scout must not be reported as a clean COMPLETED run.
+    async def fake_run_deep_sweep(*args, **kwargs):
+        return _deep_sweep_result(
+            ingest_error="missing Go ingestor module",
+            movements_count=0,
+            newly_seen_count=0,
+            verifications_count=0,
+        )
+
+    monkeypatch.setattr(
+        "dharma_swarm.knowledge_ops.deep_sweep.run_deep_sweep",
+        fake_run_deep_sweep,
+    )
+
+    result = execute_cron_job(
+        {
+            "handler": "signal_deep_sweep",
+            "fetch": True,
+            "state_dir": str(tmp_path),
+        }
+    )
+
+    assert result.status is CronJobRunStatus.FAILED
+    assert "ingestor module" in result.error
+
+
 def test_execute_cron_job_maps_overnight_waiting_summary_to_waiting_external():
     async def _fake_run_overnight(**kwargs):
         assert kwargs["external_wait_handoff"] is True

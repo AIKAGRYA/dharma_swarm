@@ -245,7 +245,13 @@ async def run_deep_sweep(
             correlation_id=context_id,
         )
 
-    board_rows = ingested_rows or scout_rows
+    # Only fall back to raw scout rows when ingestion actually FAILED
+    # (ingest_error set), not merely because a successful ingest legitimately
+    # accepted zero rows -- `ingested_rows or scout_rows` would resurrect
+    # rejected/unscored raw observations as verification candidates even when
+    # the ingestor correctly rejected all of them (Codex review finding,
+    # deep_sweep.py:248).
+    board_rows = ingested_rows if (ingested_rows or ingest_error is None) else scout_rows
     board = build_world_signal_board(board_rows) if board_rows else {"movements": []}
     movements = [m for m in board.get("movements", []) if isinstance(m, dict)]
 
@@ -261,16 +267,16 @@ async def run_deep_sweep(
     candidates = [m for m in movements if _movement_id(m) in newly_seen_ids]
     candidates.sort(key=_weighted_score, reverse=True)
     capped = candidates[: max(0, max_verifications)]
-    attempted_ids = {_movement_id(m) for m in capped}
-    persist_movements = [
-        m for m in movements if _movement_id(m) not in newly_seen_ids or _movement_id(m) in attempted_ids
-    ]
-    updated_window, _ = update_theme_window(window, persist_movements)
-    save_theme_window(window_path, updated_window)
 
     verifications: list[dict[str, Any]] = []
     verification_error: str | None = None
     failed_receipts = 0
+    # Only a movement whose verification actually SUCCEEDED is persisted into
+    # the window as "seen" this cycle; a capped movement that times out or
+    # gets a failed receipt must remain newly_seen so a rerun retries it,
+    # instead of looking "already seen" and never getting another attempt
+    # (Codex review finding, deep_sweep.py:266).
+    succeeded_ids: set[str] = set()
     for movement in capped:
         title = str(movement.get("title") or "")
         summary = str(movement.get("summary") or "")
@@ -291,7 +297,9 @@ async def run_deep_sweep(
                     "receipt_id": str(receipt.receipt_id),
                 }
             )
-            if not _receipt_succeeded(receipt):
+            if _receipt_succeeded(receipt):
+                succeeded_ids.add(_movement_id(movement))
+            else:
                 failed_receipts += 1
         except Exception as exc:  # noqa: BLE001 -- one bad verification must not sink the cycle
             verification_error = str(exc)[:200]
@@ -307,6 +315,22 @@ async def run_deep_sweep(
             )
     if failed_receipts and verification_error is None:
         verification_error = f"{failed_receipts} verification receipt(s) failed or timed out"
+
+    persist_movements = [
+        m for m in movements if _movement_id(m) not in newly_seen_ids or _movement_id(m) in succeeded_ids
+    ]
+    updated_window, _ = update_theme_window(window, persist_movements)
+    save_theme_window(window_path, updated_window)
+
+    # The synthesis prompt asks the model to flag high-occurrence recurring
+    # themes, but build_world_signal_board's movements never carry
+    # occurrence_count -- that field only lives in the theme window. Merge it
+    # in so the prompt can actually reference what it's told to (Codex review
+    # finding, deep_sweep.py:316).
+    for movement in movements:
+        entry = updated_window.get(_movement_id(movement))
+        if entry is not None:
+            movement["occurrence_count"] = entry.occurrence_count
 
     digest_text = ""
     synthesis_error: str | None = None

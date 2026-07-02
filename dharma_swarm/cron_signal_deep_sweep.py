@@ -119,6 +119,12 @@ def run_signal_deep_sweep_job(job: dict[str, Any]) -> CronJobExecutionResult:
             status = CronJobRunStatus.FAILED
         if result.get("verification_error") or result.get("synthesis_error"):
             status = CronJobRunStatus.FAILED
+        if result.get("ingest_error"):
+            # A broken/missing ingestor after a successful scout must not be
+            # reported as a clean COMPLETED run -- KaizenOps/scheduler treat
+            # COMPLETED as healthy (Codex review finding,
+            # cron_signal_deep_sweep.py:121).
+            status = CronJobRunStatus.FAILED
         return CronJobExecutionResult(
             status=status,
             output=output,

@@ -209,6 +209,34 @@ async def test_failed_verification_receipts_are_surfaced(tmp_path: Path) -> None
 
 
 @pytest.mark.asyncio
+async def test_failed_verification_leaves_movement_eligible_for_retry(tmp_path: Path) -> None:
+    # Codex review finding: a movement whose verification failed/timed out
+    # must NOT be persisted into the window as "seen" -- otherwise a rerun
+    # sees newly_seen_count == 0 and never retries it.
+    result = await run_deep_sweep(
+        tmp_path,
+        max_verifications=2,
+        scout_fn=_fake_scout_ok(n_rows=2),
+        ingest_fn=_fake_ingest_ok,
+        dispatch_fn=_fake_dispatch_failed_receipt,
+    )
+    assert result["movements_count"] == 2
+    assert result["failed_verification_count"] == 2
+    window = load_theme_window(tmp_path / "meta" / "world_radar" / "theme_window.json")
+    assert len(window) == 0  # nothing succeeded, so nothing is "seen" yet
+
+    result2 = await run_deep_sweep(
+        tmp_path,
+        max_verifications=2,
+        scout_fn=_fake_scout_ok(n_rows=2),
+        ingest_fn=_fake_ingest_ok,
+        dispatch_fn=_fake_dispatch_ok,
+    )
+    assert result2["newly_seen_count"] == 2  # both still eligible for retry
+    assert result2["verifications_count"] == 2
+
+
+@pytest.mark.asyncio
 async def test_failed_synthesis_receipt_is_surfaced_not_written_as_digest(tmp_path: Path) -> None:
     async def dispatch_fn(prompt, *, context_id, task_id, reason, timeout=300):
         if task_id == "synthesis":
@@ -382,3 +410,57 @@ async def test_context_ids_are_collision_resistant(tmp_path: Path) -> None:
 
     assert result1["context_id"] != result2["context_id"]
     assert Path(result1["cycle_dir"]) != Path(result2["cycle_dir"])
+
+
+@pytest.mark.asyncio
+async def test_successful_empty_ingest_yields_no_candidates(tmp_path: Path) -> None:
+    # Codex review finding: `ingested_rows or scout_rows` resurrected raw,
+    # unscored scout rows as verification candidates even when the ingestor
+    # legitimately accepted zero of them. A successful empty ingest must
+    # produce zero movements, not a fallback to raw scout data.
+    def ingest_rejects_everything(*, input_path, output_path, min_score, timeout_s, receipt_dir=None, correlation_id=""):
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text("", encoding="utf-8")
+        return [], None  # success, zero accepted rows
+
+    result = await run_deep_sweep(
+        tmp_path,
+        max_verifications=2,
+        scout_fn=_fake_scout_ok(n_rows=3),
+        ingest_fn=ingest_rejects_everything,
+        dispatch_fn=_fake_dispatch_ok,
+    )
+    assert result["ingest_error"] is None
+    assert result["movements_count"] == 0
+    assert result["verifications_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_synthesis_prompt_receives_theme_window_occurrence_counts(tmp_path: Path) -> None:
+    # Codex review finding: the synthesis prompt asks the model to flag
+    # high-occurrence recurring themes, but build_world_signal_board's
+    # movements never carry occurrence_count -- only the theme window does.
+    seen_prompts: list[str] = []
+
+    async def dispatch_fn(prompt, *, context_id, task_id, reason, timeout=300):
+        if task_id == "synthesis":
+            seen_prompts.append(prompt)
+        return await _fake_dispatch_ok(prompt, context_id=context_id, task_id=task_id, reason=reason, timeout=timeout)
+
+    await run_deep_sweep(
+        tmp_path,
+        max_verifications=2,
+        scout_fn=_fake_scout_ok(n_rows=2),
+        ingest_fn=_fake_ingest_ok,
+        dispatch_fn=dispatch_fn,
+    )
+    # Second cycle: the same movements now recur, so occurrence_count > 1.
+    await run_deep_sweep(
+        tmp_path,
+        max_verifications=2,
+        scout_fn=_fake_scout_ok(n_rows=2),
+        ingest_fn=_fake_ingest_ok,
+        dispatch_fn=dispatch_fn,
+    )
+    assert len(seen_prompts) == 2
+    assert '"occurrence_count": 2' in seen_prompts[1]
