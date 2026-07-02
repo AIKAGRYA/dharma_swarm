@@ -369,6 +369,36 @@ def test_routing_adaptation_chunks_large_truth_run_sets():
     assert summary["has_later_causal_read"] is True
 
 
+def test_routing_adaptation_counts_after_each_run_truth_timestamp():
+    conn = sqlite3.connect(":memory:")
+    conn.executescript(
+        """
+        create table routing_decisions (
+            id text primary key,
+            run_id text,
+            created_at text
+        );
+        insert into routing_decisions
+        values ('rd1', 'run_a', '2026-06-13T00:02:00Z');
+        """
+    )
+
+    summary = _routing_adaptation_after_truth_summary(
+        conn,
+        latest_truth="2026-06-13T00:05:00Z",
+        truth_run_ids={"run_a", "run_b"},
+        truth_timestamps_by_run_id={
+            "run_a": "2026-06-13T00:01:00Z",
+            "run_b": "2026-06-13T00:05:00Z",
+        },
+    )
+
+    table = summary["tables"]["routing_decisions"]
+    assert table["rows_after_served_truth"] == 0
+    assert table["correlated_rows_after_served_truth"] == 1
+    assert summary["has_later_causal_read"] is True
+
+
 def test_steward_declares_forbidden_actions_and_verifier_commands(tmp_path):
     report = build_audit(repo_root=tmp_path, state_dir=tmp_path / ".dharma")
 

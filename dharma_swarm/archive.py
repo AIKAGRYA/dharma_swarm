@@ -459,13 +459,7 @@ _DEFAULT_ARCHIVE_PATH = Path.home() / ".dharma" / "evolution" / "archive.jsonl"
 
 def _state_dir_for_governed_archive(path: Path) -> Path | None:
     expanded = path.expanduser()
-    if expanded == _DEFAULT_ARCHIVE_PATH:
-        return expanded.parent.parent
-    if (
-        expanded.name == "archive.jsonl"
-        and expanded.parent.name == "evolution"
-        and expanded.parent.parent.name == ".dharma"
-    ):
+    if expanded.name == "archive.jsonl" and expanded.parent.name == "evolution":
         return expanded.parent.parent
     return None
 
@@ -755,7 +749,7 @@ class EvolutionArchive:
         if entry is None:
             return
         old_status = entry.status
-        if old_status not in FITNESS_BEARING_STATUSES and status in FITNESS_BEARING_STATUSES:
+        if old_status in FITNESS_BEARING_STATUSES or status in FITNESS_BEARING_STATUSES:
             guarded = entry.model_copy(update={"status": status})
             self._assert_fitness_authority(guarded, operation="update_status")
         entry.status = status

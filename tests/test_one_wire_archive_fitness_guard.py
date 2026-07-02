@@ -245,6 +245,17 @@ async def test_fully_eligible_synthetic_guardian_allows_temp_archive_fitness(tmp
 
 
 @pytest.mark.asyncio
+async def test_custom_state_dir_archive_requires_one_wire_authority(tmp_path):
+    state = tmp_path / "custom-dharma-state"
+    archive = EvolutionArchive(path=state / "evolution" / "archive.jsonl")
+
+    with pytest.raises(OneWireFitnessAuthorityError, match="receipt missing"):
+        await archive.add_entry(_fitness_entry())
+
+    assert not (state / "evolution" / "archive.jsonl").exists()
+
+
+@pytest.mark.asyncio
 async def test_status_promotion_to_fitness_bearing_state_is_guarded(tmp_path):
     state = _state(tmp_path)
     archive_path = state / "evolution" / "archive.jsonl"
@@ -261,6 +272,25 @@ async def test_status_promotion_to_fitness_bearing_state_is_guarded(tmp_path):
     got = await archive.get_entry(legacy.id)
     assert got is not None
     assert got.status == "proposed"
+
+
+@pytest.mark.asyncio
+async def test_status_demotion_from_fitness_bearing_state_is_guarded(tmp_path):
+    state = _state(tmp_path)
+    archive_path = state / "evolution" / "archive.jsonl"
+    archive_path.parent.mkdir(parents=True)
+    applied = _fitness_entry(status="applied")
+    archive_path.write_text(applied.model_dump_json() + "\n", encoding="utf-8")
+
+    archive = _archive(state)
+    await archive.load()
+
+    with pytest.raises(OneWireFitnessAuthorityError, match="receipt missing"):
+        await archive.update_status(applied.id, "proposed")
+
+    got = await archive.get_entry(applied.id)
+    assert got is not None
+    assert got.status == "applied"
 
 
 @pytest.mark.asyncio

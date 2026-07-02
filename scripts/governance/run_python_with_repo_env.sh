@@ -16,11 +16,19 @@ if [[ "${TARGET_SCRIPT}" != /* && -f "${REPO_ROOT}/${TARGET_SCRIPT}" ]]; then
 fi
 
 if [[ -n "${DHARMA_PYTHON:-}" ]]; then
-  if [[ ! -x "${DHARMA_PYTHON}" ]]; then
+  if [[ "${DHARMA_PYTHON}" == */* ]]; then
+    if [[ ! -x "${DHARMA_PYTHON}" ]]; then
+      echo "error: DHARMA_PYTHON is not executable: ${DHARMA_PYTHON}" >&2
+      exit 1
+    fi
+    PY="${DHARMA_PYTHON}"
+  else
+    PY="$(command -v "${DHARMA_PYTHON}" || true)"
+  fi
+  if [[ -z "${PY}" ]]; then
     echo "error: DHARMA_PYTHON is not executable: ${DHARMA_PYTHON}" >&2
     exit 1
   fi
-  PY="${DHARMA_PYTHON}"
 elif [[ -x "${REPO_ROOT}/.venv/bin/python" ]]; then
   PY="${REPO_ROOT}/.venv/bin/python"
 else

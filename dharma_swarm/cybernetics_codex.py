@@ -527,6 +527,7 @@ def _served_provider_truth_summary(
     since: str | None = None,
 ) -> dict[str, Any]:
     truth_run_ids: set[str] = set()
+    truth_run_timestamps: dict[str, str] = {}
     out: dict[str, Any] = {
         "definition": (
             "Counts rows carrying actual served provider/model truth. "
@@ -587,7 +588,13 @@ def _served_provider_truth_summary(
                 if status == "completed":
                     out["delegation_runs"]["completed_with_served_provider_model"] += 1
                     if row["run_id"]:
-                        truth_run_ids.add(str(row["run_id"]))
+                        run_id = str(row["run_id"])
+                        truth_run_ids.add(run_id)
+                        _record_truth_timestamp(
+                            truth_run_timestamps,
+                            run_id=run_id,
+                            observed_at=row["observed_at"],
+                        )
                 observed_at = row["observed_at"]
                 if (
                     observed_at
@@ -620,7 +627,13 @@ def _served_provider_truth_summary(
                 continue
             out["runtime_receipts"]["rows_with_served_provider_model"] += 1
             if row["run_id"]:
-                truth_runs.add(str(row["run_id"]))
+                run_id = str(row["run_id"])
+                truth_runs.add(run_id)
+                _record_truth_timestamp(
+                    truth_run_timestamps,
+                    run_id=run_id,
+                    observed_at=row["created_at"],
+                )
             observed_at = row["created_at"]
             if (
                 observed_at
@@ -653,8 +666,23 @@ def _served_provider_truth_summary(
         conn,
         latest_truth=latest_truth,
         truth_run_ids=truth_run_ids,
+        truth_timestamps_by_run_id=truth_run_timestamps,
     )
     return out
+
+
+def _record_truth_timestamp(
+    timestamps: dict[str, str],
+    *,
+    run_id: str,
+    observed_at: Any,
+) -> None:
+    if not run_id or not observed_at:
+        return
+    observed = str(observed_at)
+    previous = timestamps.get(run_id)
+    if previous is None or observed > previous:
+        timestamps[run_id] = observed
 
 
 def _timestamp_column(conn: sqlite3.Connection, table: str) -> str | None:
@@ -670,10 +698,14 @@ def _routing_adaptation_after_truth_summary(
     *,
     latest_truth: str | None,
     truth_run_ids: set[str],
+    truth_timestamps_by_run_id: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     out: dict[str, Any] = {
         "latest_served_truth": latest_truth,
         "truth_run_ids_sample": sorted(truth_run_ids)[:20],
+        "truth_run_timestamps_sample": dict(
+            sorted((truth_timestamps_by_run_id or {}).items())[:20]
+        ),
         "has_later_causal_read": False,
         "tables": {},
     }
@@ -711,6 +743,7 @@ def _routing_adaptation_after_truth_summary(
                     timestamp_column=timestamp_column,
                     latest_truth=latest_truth,
                     truth_run_ids=truth_run_ids,
+                    truth_timestamps_by_run_id=truth_timestamps_by_run_id,
                 )
         out["tables"][table] = {
             "exists": True,
@@ -732,7 +765,25 @@ def _count_correlated_rows_after_truth(
     timestamp_column: str,
     latest_truth: str,
     truth_run_ids: set[str],
+    truth_timestamps_by_run_id: dict[str, str] | None = None,
 ) -> int:
+    if truth_timestamps_by_run_id:
+        total = 0
+        for run_id, served_truth_at in truth_timestamps_by_run_id.items():
+            if run_id not in truth_run_ids:
+                continue
+            total += int(
+                conn.execute(
+                    (
+                        f"select count(*) from {table} "
+                        f"where {timestamp_column} > ? and run_id = ?"
+                    ),
+                    (served_truth_at, run_id),
+                ).fetchone()[0]
+                or 0
+            )
+        return total
+
     total = 0
     ordered = sorted(truth_run_ids)
     for offset in range(0, len(ordered), SQLITE_IN_CHUNK_SIZE):
