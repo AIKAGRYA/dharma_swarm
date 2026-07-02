@@ -316,6 +316,48 @@ def test_memory_query_filters_high_risk_projection_and_unsafe_atoms(
     assert MemoryQuery(include_unsafe=True).allows_atom(unsafe_atom)
 
 
+def test_memory_query_filters_atoms_by_text_query(
+    tmp_path: Path,
+) -> None:
+    home, repo = _fixture_memory_home(tmp_path)
+    _write(
+        home / ".dharma/witness/2026-05-12.jsonl",
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "content": "alpha governed memory for live graph context",
+                        "timestamp": "2026-05-12T01:00:00Z",
+                    }
+                ),
+                json.dumps(
+                    {
+                        "content": "unrelated operational note",
+                        "timestamp": "2026-05-12T01:01:00Z",
+                    }
+                ),
+            ]
+        )
+        + "\n",
+    )
+    kernel = _kernel(home, repo)
+
+    atoms = list(
+        kernel.iter_witness_events(
+            query=MemoryQuery(
+                text_query="alpha governed memory",
+                limit_total=None,
+                limit_per_surface=10,
+                include_content=True,
+                include_high_risk=False,
+            )
+        )
+    )
+
+    assert len(atoms) == 1
+    assert atoms[0].content == "alpha governed memory for live graph context"
+
+
 def test_jsonl_adapter_skips_live_tail_without_metadata_warning(
     tmp_path: Path,
 ) -> None:

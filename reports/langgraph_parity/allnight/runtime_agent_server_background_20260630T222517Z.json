@@ -1,0 +1,103 @@
+{
+  "schema_version": "langgraph_parity_round_receipt.v1",
+  "generated_at": "2026-06-30T22:25:17Z",
+  "round_id": "runtime-agent-server-background-surfaces",
+  "target_gate": "Phase 7 assistants/configurations and background/cron runtime surfaces",
+  "score_after_round": 73,
+  "status": "completed_partial",
+  "summary": {
+    "claim": "Runtime Agent Server-style assistant/configuration snapshots and background/cron job snapshots are now inspectable through RuntimeStateStore-backed operator/API views and the dashboard runtime cockpit.",
+    "rationale": "This closes two explicit Phase 7 platform-surface gaps without creating a parallel truth store. Assistant/configuration state is derived from sessions and delegation runs; background state is derived from existing cron scheduler storage plus runtime background events and delegation runs. Approval/reject/resume action endpoints, A2A strict readiness, remaining memory hardening, and exhaustive provider proof remain incomplete."
+  },
+  "changes": [
+    "Added dharma_swarm/runtime_agent_server_views.py with RuntimeAgentServerViews.runtime_assistants() and runtime_background_jobs().",
+    "Added OperatorViews.runtime_assistants() and OperatorViews.runtime_background_jobs() facades.",
+    "Added FastAPI GET /api/runtime/assistants and GET /api/runtime/background-jobs.",
+    "Extended tests/test_runtime_graph_api.py to seed assistant metadata, a background delegation run, a background session event, and a temporary cron job/output, then prove operator and API readback.",
+    "Extended dashboard runtime types, API helpers, useRuntimeControlPlane(), runtimeControlPlane snapshot normalization, and /dashboard/runtime rendering for assistants/configurations plus background/cron state."
+  ],
+  "files_touched": [
+    "dharma_swarm/runtime_agent_server_views.py",
+    "dharma_swarm/operator_views.py",
+    "api/routers/runtime.py",
+    "tests/test_runtime_graph_api.py",
+    "dashboard/src/lib/types.ts",
+    "dashboard/src/lib/api.ts",
+    "dashboard/src/lib/runtimeControlPlane.ts",
+    "dashboard/src/lib/runtimeControlPlane.test.ts",
+    "dashboard/src/hooks/useRuntimeControlPlane.ts",
+    "dashboard/src/app/dashboard/runtime/page.tsx",
+    "reports/langgraph_parity/allnight/runtime_agent_server_background_20260630T222517Z.json",
+    "reports/langgraph_parity/allnight/ALLNIGHT_LOG.md",
+    "reports/langgraph_parity/allnight/SCOREBOARD.json",
+    "reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md"
+  ],
+  "verification": [
+    {
+      "command": "make agent-build-preflight",
+      "result": "pass; compileall clean, F821 clean, 12347 tests collected, onboard OK, hygiene integrity OK"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_runtime_graph_api.py",
+      "result": "6 passed in 1.78s"
+    },
+    {
+      "command": ".venv/bin/ruff check dharma_swarm/runtime_agent_server_views.py dharma_swarm/operator_views.py api/routers/runtime.py tests/test_runtime_graph_api.py",
+      "result": "pass"
+    },
+    {
+      "command": ".venv/bin/python -m compileall -q dharma_swarm/runtime_agent_server_views.py dharma_swarm/operator_views.py api/routers/runtime.py tests/test_runtime_graph_api.py",
+      "result": "pass"
+    },
+    {
+      "command": "node --experimental-strip-types --test src/lib/runtimeControlPlane.test.ts",
+      "cwd": "dashboard",
+      "result": "11 passed; Node emitted experimental type-stripping warnings only"
+    },
+    {
+      "command": "npm run lint -- --quiet",
+      "cwd": "dashboard",
+      "result": "pass"
+    },
+    {
+      "command": "npm run build",
+      "cwd": "dashboard",
+      "result": "pass; /dashboard/runtime prerendered successfully"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_runtime_graph_api.py tests/test_operator_views.py tests/test_api_main_bootstrap.py tests/test_runtime_state.py tests/test_orchestrator.py tests/test_topology_execution.py",
+      "result": "59 passed in 197.43s"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD",
+      "result": "pass with existing warnings"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45",
+      "result": "pass; green=true"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/spine_dispatch_mode_report.py --strict",
+      "result": "pass; orchestrator_mode=spine_default_on"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/check_a2a_readiness.py --strict",
+      "result": "expected fail exit 2; ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19"
+    },
+    {
+      "command": "git diff --check",
+      "result": "pass"
+    }
+  ],
+  "closed_or_improved_gates": [
+    "Phase 7 assistants/configurations read surface now has operator, API, dashboard, and test evidence.",
+    "Phase 7 background/cron jobs read surface now has cron storage, runtime event/run projection, API, dashboard, and test evidence."
+  ],
+  "remaining_blockers": [
+    "A2A strict readiness remains red: ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19.",
+    "Approval/reject/resume action endpoints are still not implemented; only control-event state is visible.",
+    "Memory stale rejection, curated-source coverage, retrieval telemetry, and full tool-exposure isolation remain incomplete or unproven.",
+    "Provider truth still lacks exhaustive live-provider served-model matrix proof.",
+    "Closeout governance remains blocked by aggregate full-history gitleaks findings."
+  ]
+}

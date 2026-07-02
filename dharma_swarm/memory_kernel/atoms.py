@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import StrEnum
@@ -176,6 +177,7 @@ class TruthState(StrEnum):
 class MemoryQuery:
     limit_total: int | None = 100
     limit_per_surface: int | None = 25
+    text_query: str | None = None
     order_by: MemoryOrder = MemoryOrder.STABLE_ID
     since: str | None = None
     cursor: str | None = None
@@ -273,6 +275,8 @@ class MemoryQuery:
         if self.require_source_row_key and not atom.source_row_key:
             return False
         if self.since and not _timestamp_at_or_after(atom.timestamp, self.since):
+            return False
+        if self.text_query and not _matches_text_query(atom, self.text_query):
             return False
         return True
 
@@ -604,6 +608,91 @@ def stable_digest(value: Any) -> str:
         payload = json.dumps(value, sort_keys=True, default=str, separators=(",", ":"))
     digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
     return f"sha256:{digest}"
+
+
+_TEXT_QUERY_STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "for",
+    "from",
+    "in",
+    "into",
+    "is",
+    "it",
+    "of",
+    "on",
+    "or",
+    "please",
+    "the",
+    "to",
+    "use",
+    "with",
+}
+
+
+def _matches_text_query(atom: MemoryAtom, query: str) -> bool:
+    terms = _text_query_terms(query)
+    if not terms:
+        return True
+    haystack = _atom_text_haystack(atom)
+    hits = sum(1 for term in terms if term in haystack)
+    if hits == 0:
+        return False
+    if len(terms) <= 3:
+        return hits == len(terms)
+    required = max(1, int((len(terms) * 0.6) + 0.999))
+    return hits >= required
+
+
+def _text_query_terms(query: str) -> tuple[str, ...]:
+    terms = []
+    for raw in re.findall(r"[a-z0-9][a-z0-9_-]*", query.lower()):
+        if len(raw) < 3 or raw in _TEXT_QUERY_STOPWORDS:
+            continue
+        terms.append(raw)
+    return tuple(dict.fromkeys(terms))
+
+
+def _atom_text_haystack(atom: MemoryAtom) -> str:
+    metadata_text = _metadata_text(atom.metadata)
+    parts = (
+        atom.atom_id,
+        atom.surface_id,
+        atom.atom_type.value,
+        atom.content_ref,
+        atom.content or "",
+        atom.source_path,
+        " ".join(atom.source_refs),
+        metadata_text,
+    )
+    return " ".join(str(part).lower() for part in parts if part)
+
+
+def _metadata_text(value: Any, *, _depth: int = 0) -> str:
+    if _depth > 3:
+        return ""
+    if isinstance(value, dict):
+        return " ".join(
+            _metadata_text(item, _depth=_depth + 1)
+            for key, item in value.items()
+            if not _looks_sensitive_metadata_key(str(key))
+        )
+    if isinstance(value, (list, tuple, set)):
+        return " ".join(_metadata_text(item, _depth=_depth + 1) for item in value)
+    if isinstance(value, (str, int, float, bool)):
+        return str(value)
+    return ""
+
+
+def _looks_sensitive_metadata_key(key: str) -> bool:
+    lowered = key.lower()
+    return any(
+        token in lowered
+        for token in ("api_key", "apikey", "password", "private_key", "secret", "token")
+    )
 
 
 def freshness_lag(

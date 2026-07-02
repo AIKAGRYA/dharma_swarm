@@ -78,6 +78,24 @@ CREATE TABLE IF NOT EXISTS delegation_runs (
     receipt_json TEXT
 )"""
 
+_TOPOLOGY_STATES_DDL = """
+CREATE TABLE IF NOT EXISTS topology_states (
+    run_id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL DEFAULT '',
+    task_id TEXT NOT NULL,
+    topology TEXT NOT NULL,
+    active_agent TEXT NOT NULL DEFAULT '',
+    current_node TEXT NOT NULL DEFAULT '',
+    checkpoint_id TEXT NOT NULL DEFAULT '',
+    parent_run_id TEXT NOT NULL DEFAULT '',
+    child_run_ids_json TEXT NOT NULL DEFAULT '[]',
+    allowed_handoffs_json TEXT NOT NULL DEFAULT '{}',
+    handoff_receipts_json TEXT NOT NULL DEFAULT '[]',
+    state_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+)"""
+
 _WORKSPACE_LEASES_DDL = """
 CREATE TABLE IF NOT EXISTS workspace_leases (
     lease_id TEXT PRIMARY KEY,
@@ -270,6 +288,9 @@ _INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_claims_agent_status ON task_claims(agent_id, status)",
     "CREATE INDEX IF NOT EXISTS idx_runs_task_status ON delegation_runs(task_id, status)",
     "CREATE INDEX IF NOT EXISTS idx_runs_session_started ON delegation_runs(session_id, started_at)",
+    "CREATE INDEX IF NOT EXISTS idx_topology_states_session_updated ON topology_states(session_id, updated_at)",
+    "CREATE INDEX IF NOT EXISTS idx_topology_states_task_updated ON topology_states(task_id, updated_at)",
+    "CREATE INDEX IF NOT EXISTS idx_topology_states_topology_updated ON topology_states(topology, updated_at)",
     "CREATE INDEX IF NOT EXISTS idx_leases_zone_released ON workspace_leases(zone_path, released_at)",
     "CREATE INDEX IF NOT EXISTS idx_artifacts_task_created ON artifact_records(task_id, created_at)",
     "CREATE INDEX IF NOT EXISTS idx_artifacts_run_created ON artifact_records(run_id, created_at)",
@@ -317,6 +338,8 @@ RUNTIME_RECEIPT_TYPES = frozenset(
         "identity_mapping",
         "idempotency_consumed",
         "runtime_warrant",
+        "topology_state",
+        "topology_handoff",
         "ontology_action_requested",
         "ontology_action_applied",
         "child_spawned",
@@ -413,6 +436,7 @@ def ensure_runtime_state_schema_sync(
         _SESSIONS_DDL,
         _TASK_CLAIMS_DDL,
         _DELEGATION_RUNS_DDL,
+        _TOPOLOGY_STATES_DDL,
         _WORKSPACE_LEASES_DDL,
         _ARTIFACT_RECORDS_DDL,
         _ARTIFACT_LINKS_DDL,
@@ -455,6 +479,7 @@ async def ensure_runtime_state_schema_async(
         _SESSIONS_DDL,
         _TASK_CLAIMS_DDL,
         _DELEGATION_RUNS_DDL,
+        _TOPOLOGY_STATES_DDL,
         _WORKSPACE_LEASES_DDL,
         _ARTIFACT_RECORDS_DDL,
         _ARTIFACT_LINKS_DDL,
@@ -531,6 +556,25 @@ class DelegationRun:
     completed_at: datetime | None = None
     failure_code: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class TopologyStateRecord:
+    run_id: str
+    task_id: str
+    topology: str
+    schema_version: str = "topology_state_record.v1"
+    session_id: str = ""
+    active_agent: str = ""
+    current_node: str = ""
+    checkpoint_id: str = ""
+    parent_run_id: str = ""
+    child_run_ids: list[str] = field(default_factory=list)
+    allowed_handoffs: dict[str, list[str]] = field(default_factory=dict)
+    handoff_receipts: list[dict[str, Any]] = field(default_factory=list)
+    state: dict[str, Any] = field(default_factory=dict)
+    created_at: datetime = field(default_factory=_utc_now)
+    updated_at: datetime = field(default_factory=_utc_now)
 
 
 @dataclass(frozen=True)
@@ -716,6 +760,38 @@ def _row_to_run(row: sqlite3.Row | aiosqlite.Row) -> DelegationRun:
         completed_at=_parse_dt(row["completed_at"]),
         failure_code=str(row["failure_code"] or ""),
         metadata=_json_load(row["metadata_json"], {}),
+    )
+
+
+def _row_to_topology_state(row: sqlite3.Row | aiosqlite.Row) -> TopologyStateRecord:
+    child_run_ids = _json_load(row["child_run_ids_json"], [])
+    if not isinstance(child_run_ids, list):
+        child_run_ids = []
+    allowed = _json_load(row["allowed_handoffs_json"], {})
+    if not isinstance(allowed, dict):
+        allowed = {}
+    normalized_allowed: dict[str, list[str]] = {}
+    for key, value in allowed.items():
+        if isinstance(value, (list, tuple, set)):
+            normalized_allowed[str(key)] = [str(item) for item in value]
+    handoffs = _json_load(row["handoff_receipts_json"], [])
+    if not isinstance(handoffs, list):
+        handoffs = []
+    return TopologyStateRecord(
+        run_id=str(row["run_id"]),
+        session_id=str(row["session_id"] or ""),
+        task_id=str(row["task_id"]),
+        topology=str(row["topology"]),
+        active_agent=str(row["active_agent"] or ""),
+        current_node=str(row["current_node"] or ""),
+        checkpoint_id=str(row["checkpoint_id"] or ""),
+        parent_run_id=str(row["parent_run_id"] or ""),
+        child_run_ids=[str(item) for item in child_run_ids],
+        allowed_handoffs=normalized_allowed,
+        handoff_receipts=[item for item in handoffs if isinstance(item, dict)],
+        state=_json_load(row["state_json"], {}),
+        created_at=_parse_dt(row["created_at"]) or _utc_now(),
+        updated_at=_parse_dt(row["updated_at"]) or _utc_now(),
     )
 
 
@@ -1705,6 +1781,123 @@ class RuntimeStateStore:
             db.row_factory = aiosqlite.Row
             rows = await (await db.execute(query, params)).fetchall()
         return [_row_to_run(row) for row in rows]
+
+    async def record_topology_state(
+        self,
+        state: TopologyStateRecord,
+    ) -> TopologyStateRecord:
+        await self.init_db()
+        now = _utc_now()
+        created_at = state.created_at or now
+        updated_at = state.updated_at or now
+        async with aiosqlite.connect(self.db_path) as db:
+            await _apply_connection_pragmas_async(db)
+            await db.execute(
+                "INSERT INTO topology_states (run_id, session_id, task_id, topology,"
+                " active_agent, current_node, checkpoint_id, parent_run_id,"
+                " child_run_ids_json, allowed_handoffs_json, handoff_receipts_json,"
+                " state_json, created_at, updated_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                " ON CONFLICT(run_id) DO UPDATE SET"
+                " session_id = excluded.session_id,"
+                " task_id = excluded.task_id,"
+                " topology = excluded.topology,"
+                " active_agent = excluded.active_agent,"
+                " current_node = excluded.current_node,"
+                " checkpoint_id = excluded.checkpoint_id,"
+                " parent_run_id = excluded.parent_run_id,"
+                " child_run_ids_json = excluded.child_run_ids_json,"
+                " allowed_handoffs_json = excluded.allowed_handoffs_json,"
+                " handoff_receipts_json = excluded.handoff_receipts_json,"
+                " state_json = excluded.state_json,"
+                " updated_at = excluded.updated_at",
+                (
+                    state.run_id,
+                    state.session_id,
+                    state.task_id,
+                    state.topology,
+                    state.active_agent,
+                    state.current_node,
+                    state.checkpoint_id,
+                    state.parent_run_id,
+                    _json_dump([str(item) for item in state.child_run_ids]),
+                    _json_dump(state.allowed_handoffs),
+                    _json_dump(state.handoff_receipts),
+                    _json_dump(state.state),
+                    created_at.isoformat(),
+                    updated_at.isoformat(),
+                ),
+            )
+            await db.commit()
+        loaded = await self.get_topology_state(state.run_id)
+        assert loaded is not None
+        return loaded
+
+    async def get_topology_state(self, run_id: str) -> TopologyStateRecord | None:
+        await self.init_db()
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            row = await (
+                await db.execute(
+                    "SELECT run_id, session_id, task_id, topology, active_agent,"
+                    " current_node, checkpoint_id, parent_run_id, child_run_ids_json,"
+                    " allowed_handoffs_json, handoff_receipts_json, state_json,"
+                    " created_at, updated_at FROM topology_states WHERE run_id = ?",
+                    (run_id,),
+                )
+            ).fetchone()
+        return _row_to_topology_state(row) if row is not None else None
+
+    async def get_latest_topology_state_for_task(
+        self,
+        task_id: str,
+    ) -> TopologyStateRecord | None:
+        await self.init_db()
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            row = await (
+                await db.execute(
+                    "SELECT run_id, session_id, task_id, topology, active_agent,"
+                    " current_node, checkpoint_id, parent_run_id, child_run_ids_json,"
+                    " allowed_handoffs_json, handoff_receipts_json, state_json,"
+                    " created_at, updated_at FROM topology_states"
+                    " WHERE task_id = ? ORDER BY updated_at DESC LIMIT 1",
+                    (task_id,),
+                )
+            ).fetchone()
+        return _row_to_topology_state(row) if row is not None else None
+
+    async def list_topology_states(
+        self,
+        *,
+        session_id: str | None = None,
+        task_id: str | None = None,
+        topology: str | None = None,
+        limit: int = 20,
+    ) -> list[TopologyStateRecord]:
+        await self.init_db()
+        query = (
+            "SELECT run_id, session_id, task_id, topology, active_agent,"
+            " current_node, checkpoint_id, parent_run_id, child_run_ids_json,"
+            " allowed_handoffs_json, handoff_receipts_json, state_json,"
+            " created_at, updated_at FROM topology_states WHERE 1=1"
+        )
+        params: list[Any] = []
+        if session_id is not None:
+            query += " AND session_id = ?"
+            params.append(session_id)
+        if task_id is not None:
+            query += " AND task_id = ?"
+            params.append(task_id)
+        if topology is not None:
+            query += " AND topology = ?"
+            params.append(topology)
+        query += " ORDER BY updated_at DESC LIMIT ?"
+        params.append(max(1, limit))
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            rows = await (await db.execute(query, params)).fetchall()
+        return [_row_to_topology_state(row) for row in rows]
 
     # ── Sync helpers (for non-async callers like OpportunityDispatcher) ──
 
@@ -3450,6 +3643,7 @@ class RuntimeStateStore:
         receipts = await self.list_runtime_receipts(run_id=run_id, limit=200)
         mappings = await self.list_mapping_receipts(run_id=run_id, limit=200)
         children = await self.list_child_runs(run_id)
+        topology_state = await self.get_topology_state(run_id)
         idempotency_records: list[IdempotencyRecord] = []
         await self.init_db()
         async with aiosqlite.connect(self.db_path) as db:
@@ -3472,6 +3666,7 @@ class RuntimeStateStore:
             "receipts": receipts,
             "mappings": mappings,
             "children": children,
+            "topology_state": topology_state,
             "idempotency_records": idempotency_records,
         }
 

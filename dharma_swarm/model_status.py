@@ -15,6 +15,10 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from dharma_swarm import key_oracle
+from dharma_swarm.model_live_results import (
+    TRANSIENT_LIVE_FAILURES as _TRANSIENT_LIVE_FAILURES,
+    load_live_call_results,
+)
 from dharma_swarm import model_pool
 from dharma_swarm.daemon_config import dharma_state_dir
 from dharma_swarm.model_pool import ModelEntry, Route
@@ -24,8 +28,12 @@ MODEL_STATUS_SCHEMA_VERSION = "dharma.model_status.v1"
 LIVE_MODEL_E2E_ENV = "DHARMA_LIVE_MODEL_E2E"
 PROFILE_PATH_ENV = "DHARMA_MODEL_PROFILE_PATH"
 LIVE_CALL_MATRIX_PATH_ENV = "DHARMA_MODEL_LIVE_CALL_MATRIX_PATH"
+LIVE_CALL_MATRIX_DIR_ENV = "DHARMA_MODEL_LIVE_CALL_MATRIX_DIR"
+LIVE_CALL_MATRIX_MAX_AGE_HOURS_ENV = "DHARMA_MODEL_LIVE_CALL_MATRIX_MAX_AGE_HOURS"
 
 _PROFILE_FILE_NAME = "model_pool_profiles.json"
+_DEFAULT_LIVE_CALL_MATRIX_MAX_AGE_HOURS = 24.0
+_LIVE_CALL_MATRIX_GLOBS = ("provider_live_matrix_*.json",)
 
 _PROVIDER_LABELS: dict[str, str] = {
     "anthropic": "Anthropic",
@@ -69,9 +77,6 @@ _SAFE_DKEYS_FIELDS = (
     "status",
     "env_var",
 )
-
-_TRANSIENT_LIVE_FAILURES = frozenset({"rate_limited"})
-
 
 @dataclass(frozen=True, slots=True)
 class RouteStatus:
@@ -195,66 +200,86 @@ def _status_data() -> dict[str, Any] | None:
 def _live_call_matrix_path() -> Path | None:
     raw = os.getenv(LIVE_CALL_MATRIX_PATH_ENV)
     if not raw:
-        return None
+        return _discover_live_call_matrix_path()
     return Path(raw).expanduser()
 
 
-def _merge_live_result(
-    existing: dict[str, Any] | None,
-    candidate: dict[str, Any],
-) -> dict[str, Any]:
-    if existing is None:
-        return candidate
-    existing_status = str(existing.get("status", "")).strip()
-    candidate_status = str(candidate.get("status", "")).strip()
-    candidate_failure = str(candidate.get("failure_class") or "").strip()
-    existing_failure = str(existing.get("failure_class") or "").strip()
-    if candidate_status == "ok":
-        return candidate
-    if candidate_status == "failed" and candidate_failure in _TRANSIENT_LIVE_FAILURES:
-        return existing
-    if existing_status == "failed" and existing_failure in _TRANSIENT_LIVE_FAILURES:
-        return candidate
-    if existing_status == "failed":
-        return candidate if candidate_status == "failed" else existing
-    if candidate_status == "failed":
-        return candidate
-    return candidate
+def _live_call_matrix_dir() -> Path:
+    raw = os.getenv(LIVE_CALL_MATRIX_DIR_ENV)
+    if raw:
+        return Path(raw).expanduser()
+    return Path(__file__).resolve().parents[1] / "reports" / "langgraph_parity" / "allnight"
+
+
+def _live_call_matrix_max_age_hours() -> float:
+    raw = os.getenv(LIVE_CALL_MATRIX_MAX_AGE_HOURS_ENV)
+    if not raw:
+        return _DEFAULT_LIVE_CALL_MATRIX_MAX_AGE_HOURS
+    try:
+        return max(float(raw), 0.0)
+    except ValueError:
+        return _DEFAULT_LIVE_CALL_MATRIX_MAX_AGE_HOURS
+
+
+def _parse_receipt_time(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    candidate = value.strip()
+    if candidate.endswith("Z"):
+        candidate = f"{candidate[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(candidate)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _receipt_generated_at(path: Path) -> datetime | None:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, OSError, json.JSONDecodeError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    schema = str(data.get("schema_version") or "")
+    if schema and schema != "dharma.provider_live_matrix_closeout.v1":
+        return None
+    parsed = _parse_receipt_time(data.get("generated_at"))
+    if parsed is not None:
+        return parsed
+    try:
+        return datetime.fromtimestamp(path.stat().st_mtime, timezone.utc)
+    except OSError:
+        return None
+
+
+def _discover_live_call_matrix_path(now: datetime | None = None) -> Path | None:
+    directory = _live_call_matrix_dir()
+    if not directory.exists():
+        return None
+    current = now or datetime.now(timezone.utc)
+    max_age = _live_call_matrix_max_age_hours()
+    candidates: list[tuple[datetime, Path]] = []
+    for pattern in _LIVE_CALL_MATRIX_GLOBS:
+        for path in directory.glob(pattern):
+            if not path.is_file():
+                continue
+            generated_at = _receipt_generated_at(path)
+            if generated_at is None:
+                continue
+            age_hours = max((current - generated_at).total_seconds(), 0.0) / 3600.0
+            if age_hours <= max_age:
+                candidates.append((generated_at, path))
+    if not candidates:
+        return None
+    return max(candidates, key=lambda item: (item[0], item[1].name))[1]
 
 
 def _live_call_results(path: Path | None = None) -> dict[str, dict[str, Any]]:
     target = path or _live_call_matrix_path()
-    if target is None:
-        return {}
-    try:
-        data = json.loads(target.read_text(encoding="utf-8"))
-    except (FileNotFoundError, OSError, json.JSONDecodeError, ValueError):
-        return {}
-    if not isinstance(data, dict):
-        return {}
-    results: dict[str, dict[str, Any]] = {}
-    models = data.get("models")
-    if not isinstance(models, list):
-        return results
-    for model in models:
-        if not isinstance(model, dict):
-            continue
-        actual = model.get("actual_live_call")
-        if not isinstance(actual, dict):
-            actual = None
-        actual_items: list[Any] = []
-        if actual is not None:
-            actual_items.append(actual)
-        actual_many = model.get("actual_live_calls")
-        if isinstance(actual_many, list):
-            actual_items.extend(actual_many)
-        for item in actual_items:
-            if not isinstance(item, dict):
-                continue
-            route = item.get("route")
-            if isinstance(route, str) and route:
-                results[route] = _merge_live_result(results.get(route), item)
-    return results
+    return load_live_call_results(target)
 
 
 def _provider_row_key(provider: ProviderType | str) -> str | None:
@@ -443,7 +468,8 @@ def _model_status(
         for route_status in route_statuses
         if route_status.status == "live_routable"
     ]
-    oracle_unknown = live is None
+    has_live_evidence = any(live_results.get(route_status.route) is not None for route_status in route_statuses)
+    oracle_unknown = live is None and not has_live_evidence
     available = bool(available_routes)
     status = "unverified" if oracle_unknown else ("live_routable" if available else "unavailable")
     reason = "key_status_unknown" if oracle_unknown else _dominant_reason(route_statuses)

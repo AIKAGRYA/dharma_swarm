@@ -13,6 +13,7 @@ from dharma_swarm.langgraph_parity.benchmark_types import (
     BenchmarkTask,
     ProviderProfile,
 )
+from dharma_swarm.langgraph_parity.benchmark_tasks import default_benchmark_tasks
 from dharma_swarm.langgraph_parity.isolation import (
     AgentIsolationView,
     IsolationPolicy,
@@ -24,73 +25,6 @@ from dharma_swarm.langgraph_parity.isolation import (
     default_memory_kernel,
     default_semantic_commons,
 )
-
-
-def default_benchmark_tasks() -> tuple[BenchmarkTask, ...]:
-    """Return a stable suite with distractors and one two-agent multi-hop task."""
-
-    return (
-        BenchmarkTask(
-            id="climate_finance_multihop",
-            prompt=(
-                "Estimate welfare-ton upside for a mangrove restoration pilot, "
-                "then convert that into a risk-bounded deployment cash budget."
-            ),
-            required_domains=("climate_ops", "finance_risk"),
-            expected_tools={
-                "climate_ops": (
-                    "carbon_project_lookup",
-                    "welfare_ton_calculator",
-                ),
-                "finance_risk": (
-                    "risk_budget_calculator",
-                    "cashflow_projection",
-                ),
-            },
-        ),
-        BenchmarkTask(
-            id="security_patch_review",
-            prompt=(
-                "Review a dependency patch for CVE exposure and static-analysis "
-                "regression risk."
-            ),
-            required_domains=("code_security",),
-            expected_tools={
-                "code_security": (
-                    "dependency_cve_lookup",
-                    "patch_diff_reader",
-                )
-            },
-        ),
-        BenchmarkTask(
-            id="contract_policy_check",
-            prompt=(
-                "Check a cancellation clause against jurisdiction and compliance "
-                "policy constraints."
-            ),
-            required_domains=("legal_policy",),
-            expected_tools={
-                "legal_policy": (
-                    "contract_clause_search",
-                    "jurisdiction_check",
-                )
-            },
-        ),
-        BenchmarkTask(
-            id="supply_eta_risk",
-            prompt=(
-                "Assess vendor lead time, customs delay risk, and inventory buffer "
-                "for a fulfillment lane."
-            ),
-            required_domains=("supply_chain",),
-            expected_tools={
-                "supply_chain": (
-                    "vendor_eta_lookup",
-                    "inventory_buffer_model",
-                )
-            },
-        ),
-    )
 
 
 def run_benchmark(

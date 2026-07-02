@@ -152,3 +152,72 @@ async def test_orchestrator_accepts_topology_genome_without_breaking_enum_dispat
     assert len(enum_dispatches) == 1
     assert "topology_genome_id" not in enum_dispatches[0].metadata
     assert enum_dispatches[0].topology == TopologyType.PIPELINE
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_live_langgraph_topologies_stamp_graph_state() -> None:
+    task = Task(
+        title="Live topology task",
+        metadata={
+            "active_agent": "agent-2",
+            "allowed_handoffs": {"agent-2": ["agent-1"]},
+        },
+    )
+
+    class _Pool:
+        async def get_idle_agents(self) -> list[AgentState]:
+            return [
+                AgentState(id="agent-1", name="Agent 1", role=AgentRole.RESEARCHER),
+                AgentState(id="agent-2", name="Agent 2", role=AgentRole.RESEARCHER),
+                AgentState(id="agent-3", name="Agent 3", role=AgentRole.RESEARCHER),
+            ]
+
+        async def assign(self, agent_id: str, task_id: str) -> None:
+            return None
+
+        async def release(self, agent_id: str) -> None:
+            return None
+
+        async def get_result(self, agent_id: str) -> str | None:
+            return None
+
+        async def get(self, agent_id: str) -> Any:
+            return None
+
+    orchestrator = Orchestrator(agent_pool=_Pool())
+
+    async def _record_only(td):
+        return None
+
+    orchestrator._assign_dispatch = _record_only  # type: ignore[method-assign]
+
+    swarm = (await orchestrator.dispatch(task, topology=TopologyType.SWARM))[0]
+    supervisor = (
+        await orchestrator.dispatch(
+            Task(title="Supervisor task"),
+            topology=TopologyType.SUPERVISOR,
+        )
+    )[0]
+    tools = (
+        await orchestrator.dispatch(
+            Task(title="Subagents as tools task"),
+            topology=TopologyType.SUBAGENTS_AS_TOOLS,
+        )
+    )[0]
+
+    assert swarm.topology == TopologyType.SWARM
+    assert swarm.agent_id == "agent-2"
+    assert swarm.metadata["active_agent"] == "agent-2"
+    assert swarm.metadata["allowed_handoffs"] == {"agent-2": ["agent-1"]}
+    assert swarm.metadata["topology_state"]["mode"] == "swarm"
+
+    assert supervisor.topology == TopologyType.SUPERVISOR
+    assert supervisor.metadata["supervisor_final_output_only"] is True
+    assert supervisor.metadata["delegated_agent_ids"] == ["agent-2", "agent-3"]
+    assert supervisor.metadata["topology_state"]["user_visible_output"] == "supervisor_final"
+
+    assert tools.topology == TopologyType.SUBAGENTS_AS_TOOLS
+    assert tools.metadata["child_agent_ids"] == ["agent-2", "agent-3"]
+    assert tools.metadata["subagent_tool_names"] == ["call_agent-2", "call_agent-3"]
+    assert len(tools.metadata["parent_graph_state"]["child_run_ids"]) == 2
+    assert tools.metadata["child_run_ids"] == tools.metadata["parent_graph_state"]["child_run_ids"]
