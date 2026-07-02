@@ -1000,7 +1000,9 @@ def build_loop_statuses(
         runtime_receipt_truth.get("rows_with_served_provider_model") or 0
     )
     routing_adaptation = provider_truth.get("routing_adaptation") or {}
-    loop1_has_later_routing = bool(routing_adaptation.get("has_later_causal_read"))
+    loop1_has_later_routing = _has_later_correlated_routing_adaptation(
+        routing_adaptation
+    )
     failure_counts = {
         str(r.get("failure_code")): int(r.get("count") or 0)
         for r in runtime.get("failure_codes") or []
@@ -1152,6 +1154,18 @@ def build_loop_statuses(
             "live_owner_surface_criterion": LIVE_OWNER_SURFACE_CRITERIA[number],
         })
     return rows
+
+
+def _has_later_correlated_routing_adaptation(
+    routing_adaptation: dict[str, Any],
+) -> bool:
+    tables = routing_adaptation.get("tables") or {}
+    for table_summary in tables.values():
+        if not isinstance(table_summary, dict):
+            continue
+        if int(table_summary.get("correlated_rows_after_served_truth") or 0) > 0:
+            return True
+    return False
 
 
 def _table_summary(conn: sqlite3.Connection, table: str) -> dict[str, Any]:

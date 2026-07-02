@@ -211,6 +211,14 @@ def test_loop1_closed_live_requires_later_correlated_routing_read():
     runtime["provider_truth"]["routing_adaptation"] = {
         "has_later_causal_read": True,
         "latest_served_truth": "2026-06-13T00:01:00Z",
+        "tables": {},
+    }
+    rows = {row["number"]: row for row in build_loop_statuses(runtime, {}, {}, bounded_replays=bounded)}
+    assert rows[1]["verdict"] == "HARNESS_PROVEN"
+
+    runtime["provider_truth"]["routing_adaptation"] = {
+        "has_later_causal_read": True,
+        "latest_served_truth": "2026-06-13T00:01:00Z",
         "tables": {
             "routing_decisions": {
                 "correlated_rows_after_served_truth": 1,
