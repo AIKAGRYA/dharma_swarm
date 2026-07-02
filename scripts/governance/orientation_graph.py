@@ -85,6 +85,15 @@ def _normalize_context_path(value: str) -> str:
         return "<absolute-path>"
 
 
+def _is_repo_root_context_path(value: str) -> bool:
+    if value in {"$REPO_ROOT", "$REPO_ROOT/."}:
+        return True
+    try:
+        return Path(value).expanduser().resolve() == REPO_ROOT.resolve()
+    except (OSError, RuntimeError, ValueError):
+        return False
+
+
 def _census_receipt_path() -> Path | None:
     """Receipt path declared by the census owner (scripts/runtime/live_ops_census.py).
 
@@ -776,16 +785,13 @@ def build_lanes() -> list[Lane]:
 
 def _stable_lane(lane: Lane) -> Lane:
     """Avoid repo_context churn from moving lane SHAs."""
-    try:
-        if Path(lane.path).resolve() == REPO_ROOT.resolve():
-            return Lane(
-                path=lane.path,
-                branch=lane.branch,
-                head="CURRENT_CHECKOUT",
-                status=lane.status,
-            )
-    except OSError:
-        pass
+    if _is_repo_root_context_path(lane.path):
+        return Lane(
+            path=lane.path,
+            branch=lane.branch,
+            head="CURRENT_CHECKOUT",
+            status=lane.status,
+        )
     if lane.head:
         return Lane(
             path=lane.path,
