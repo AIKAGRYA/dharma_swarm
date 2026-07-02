@@ -1,14 +1,14 @@
 # Cybernetic Loop Map — dharma_swarm
 
-**Last audit:** 2026-06-23T14:15:48Z by `scripts/governance/cybernetics_codex_audit.py --json`
+**Last audit:** 2026-07-01T15:27:50Z by `scripts/governance/cybernetics_codex_audit.py --json`
 **Previous version:** 2026-05-20 (stale BR-012 surface, retained below as historical context)
 **Purpose:** Document every feedback loop's sense→act→evaluate→adapt path.
 Each loop is "closed" only when its output feeds back as input to a future cycle.
 
 > **Re-verification pass 2026-06-15 (perplexity-computer):** 26 days / 232 commits since last audit. Code-structural status of all 13 loops is unchanged in the static surface. Two notable code changes since 2026-05-20 worth flagging here without flipping status (runtime closure still depends on live `~/.dharma/` data not visible from cloud seat):
 >
-> - **Loop 1 (Swarm Task Loop) — spine is wired.** `dharma_swarm/agent_runner.py:55-62` now imports `invoke_agent` and `EvidenceReceipt` directly. The runtime-truth-spine-adoption-2026-06 track stands at 7/8 SHIPPABLE per `docs/governance/ACTIVE_TRACK.yaml`. The remaining gate is a *proven dispatchable provider in the live seat*; `claude_code` is keyless only when headless `claude -p` smokes green, and local Ollama may be the current live fallback.
-> - **Loop 8 (Recognition).** Wiring from 2026-05-20 (`cascade.py:386-491`, `shakti_executive/inputs.py:100`, `meta_daemon.py`) re-verified present. Status PARTIAL unchanged.
+> - **Loop 1 (Swarm Task Loop) — spine is wired.** `dharma_swarm/agent_runner.py:55-62` now imports `invoke_agent` and `EvidenceReceipt` directly. The runtime-truth-spine-adoption-2026-06 track currently has 7/8 criteria passing but remains unshipped under the rigorous bar. The remaining gate is a *proven dispatchable provider in the live seat*; `claude_code` is keyless only when headless `claude -p` smokes green, and local Ollama may be the current live fallback.
+> - **Loop 8 (Recognition).** Wiring from 2026-05-20 (`cascade.py:386-491`, `shakti_executive/inputs.py:100`, `meta_daemon.py`) was re-verified present. This historical PARTIAL note is superseded by the 2026-07-01 bounded replay closure below.
 >
 > No new BLOCKERs surfaced. The full re-running of "Evidence From ~/.dharma/" section requires live-seat access and is deferred.
 
@@ -22,6 +22,11 @@ The authoritative projection is now:
 python3 scripts/governance/cybernetics_codex_audit.py --json
 ```
 
+Latest machine projections:
+
+- JSON: `reports/loop_closure/cybernetics_codex/latest_audit.json`
+- Markdown: `reports/loop_closure/cybernetics_codex/latest_audit.md`
+
 `delegation_runs.receipt_json` is the orchestrator/spine-dispatch witness column.
 It is not the universal closure witness. A2A-surface rows can be successful with
 empty `receipt_json` because their canonical witness is `runtime_receipts` plus
@@ -33,13 +38,13 @@ Live runtime truth from the latest audit:
 
 | Surface | Current value |
 |---------|---------------|
-| `delegation_runs` | 6,441 total, 3,034 completed, 3,349 failed, 57 running, 1 claimed |
-| `runtime_receipts` | 47,895 rows, latest 2026-06-23T14:15:48Z |
-| `receipt_json` | 1,225 rows, orchestrator surface only |
-| served provider/model truth | 999 completed delegation runs, 7,018 runtime receipts |
-| `dispatch_dropoff` | 1,486 failures, latest 2026-06-23T11:04:36Z |
+| `delegation_runs` | 8,669 total, 4,158 completed, 4,403 failed, 107 running, 1 claimed |
+| `runtime_receipts` | 98,566 rows, latest 2026-07-01T14:58:47Z |
+| `receipt_json` | 2,574 rows, orchestrator surface only |
+| served provider/model truth | 1,917 completed delegation runs, 20,607 runtime receipts |
+| `dispatch_dropoff` | 2,135 historical failures, latest 2026-07-01T03:42:49Z |
 | One Wire quorum | N=3/5, M=1/3, not eligible |
-| evolution archive | 11,726 entries, 11,227 internal-positive-fitness risk rows, 0 external authority markers |
+| evolution archive | 12,241 entries, 11,375 internal-positive-fitness risk rows, 0 external authority markers |
 
 Bounded Loop 1 replay proof (current code/provider lane):
 
@@ -61,21 +66,21 @@ Bounded Loop 1 replay proof (current code/provider lane):
 
 | # | Loop | Interval | Closed? | Remaining Blocker |
 |---|------|----------|---------|-------------------|
-| 1 | Swarm Task Loop | 60s | **CLOSED in bounded replay; PARTIAL in all-history audit** | Current bounded replay closes with 3/3 completed tasks, zero dropoff, 3 ok evidence receipts, and served provider/model truth. Standing all-history audit still includes historical `dispatch_dropoff=1486`, so do not call the whole daemon history clean. |
+| 1 | Swarm Task Loop | 60s | **CLOSED in bounded replay; PARTIAL in all-history audit** | Current bounded replay closes with 3/3 completed tasks, zero dropoff, 3 ok evidence receipts, and served provider/model truth. Standing all-history audit still includes historical `dispatch_dropoff=2135`, so do not call the whole daemon history clean. |
 | 2 | Organism Heartbeat | 300s | **CLOSED in bounded replay; PARTIAL in standing daemon history** | `reports/loop_closure/cybernetics_codex/2026-06-23_loop2_heartbeat_closure.json` proves 3 cycles, all transitions receipted, and algedonic adaptive state feeding the next cycle; the always-on daemon history is still not cleanly closed. |
-| 3 | Evolution Loop / DarwinEngine | every 3rd tick | **PARTIAL** | Activity exists, but adaptation/fitness authority is not closure-proven. |
-| 4 | Consolidation Loop / Memory | configurable | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
+| 3 | Evolution Loop / DarwinEngine | every 3rd tick | **CLOSED in bounded replay** | `reports/loop_closure/cybernetics_codex/2026-07-01_loop3_evolution_closure.json` proves scratch Darwin outcomes feed predictor/archive selection on a later cycle without touching live archive fitness. |
+| 4 | Consolidation Loop / Memory | configurable | **CLOSED in bounded replay** | `reports/loop_closure/cybernetics_codex/2026-07-01_loop4_memory_context_closure.json` proves completed work consolidates into StrangeLoopMemory and later memory/context readers consume it. |
 | 5 | Zeitgeist Scanner | configurable | **CLOSED in bounded replay (internal S3↔S4 arm only)** | `scripts/loop5_zeitgeist_closure_run.py` proves real internal gate-pressure feedback. This is not external-world zeitgeist closure; no real-world/external eyes are proven. |
 | 6 | Witness Auditor | 3600s | **CLOSED in bounded replay** | Bounded replay closes Loop 6: orchestrator now lands task_completed traces, the Witness senses real completions, flags telos-gate-coverage gaps, and appends governance marks (adapt fed forward). `scripts/loop6_witness_closure_run.py`. |
-| 7 | Training Flywheel | 300s | **PARTIAL** | Activity exists, but adaptation/fitness authority is not closure-proven. |
-| 8 | Recognition Loop / eigenform | 7200s | **PARTIAL** | Activity exists, but adaptation/fitness authority is not closure-proven. |
-| 9 | Conductors | 120s | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
-| 10 | Context Agent | 60s | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
-| 11 | Replication Monitor | 3600s | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
-| 12 | Self-Improvement | 3600s | **BLOCKED** | One Wire guardian quorum below threshold: N=3/5, M=1/3. |
-| 13 | Free Evolution Grind | 600s | **BLOCKED** | One Wire guardian quorum below threshold: N=3/5, M=1/3. |
+| 7 | Training Flywheel | 300s | **CLOSED in bounded replay** | `reports/loop_closure/cybernetics_codex/2026-07-01_loop7_training_flywheel_closure.json` proves traces are scored, strategy/dataset state changes, and a fresh strategy selector reads the persisted pattern. |
+| 8 | Recognition Loop / eigenform | 7200s | **CLOSED in bounded replay** | `reports/loop_closure/cybernetics_codex/2026-07-01_loop8_recognition_closure.json` proves recognition seed generation from closed loop-history receipts and later context consumption. |
+| 9 | Conductors | 120s | **CLOSED in bounded replay** | `reports/loop_closure/cybernetics_codex/2026-07-01_loop9_conductor_closure.json` proves conductor-visible signals produce action and a later scheduler tick reads changed cron state. |
+| 10 | Context Agent | 60s | **CLOSED in bounded replay** | `reports/loop_closure/cybernetics_codex/2026-07-01_loop10_context_agent_closure.json` proves context assembly reads consolidated memory and writes a changed context package. |
+| 11 | Replication Monitor | 3600s | **CLOSED in bounded replay** | `reports/loop_closure/cybernetics_codex/2026-07-01_loop11_replication_monitor_closure.json` proves pending proposal state materializes into child/probation/roster state and later monitor reads see the change. |
+| 12 | Self-Improvement | 3600s | **BLOCKED** | One Wire guardian quorum below threshold: N=3/5, M=1/3; `tests/test_one_wire_archive_fitness_guard.py` proves archive fitness fails closed without N>=5, M>=3, and explicit authority. |
+| 13 | Free Evolution Grind | 600s | **BLOCKED** | Same One Wire guard: free-evolution authority remains blocked until external quorum and explicit archive-fitness authority exist. |
 
-**Summary: standing all-history audit is still 0 fully clean. Bounded replay currently closes Loops 1, 2, 5, and 6 (with Loop 5 explicitly internal-arm-only); Loops 3/4/7/8/9/10/11 remain PARTIAL; Loops 12/13 remain BLOCKED behind One Wire. Do not promote bounded-replay closure to always-on daemon closure without fresh live-loop evidence.**
+**Summary: standing all-history audit is still not daemon-clean because historical `dispatch_dropoff` rows remain. Bounded replay now closes Loops 1-11 (with Loop 5 explicitly internal-arm-only); Loops 12/13 remain BLOCKED behind One Wire. Do not promote bounded-replay closure to always-on daemon closure without fresh live-loop evidence.**
 
 ---
 
@@ -186,7 +191,7 @@ ADAPT:   Archive mutation + fitness in evolution/archive.jsonl
          Population control spawns/retires agents based on fitness
 ```
 
-**Current state (updated):** AutoProposer stigmergy guard fixed (MM-10 RESOLVED). MetaEvolutionEngine has recorded 3 meta-parameter updates (meta_fitness=0.58494, n_object_cycles=2). DarwinEngine signature fixed (NEW-02: `_provider` attr removed). **The evolution machinery runs and records data. Real fitness computation blocked on Loop 1 producing completed tasks.**
+**Current state (updated 2026-07-01): CLOSED via bounded replay.** `scripts/loop3_evolution_closure_run.py` runs local DarwinEngine behavioral probes, constrains a bounded scratch-only proposal, gate-checks it, records evaluated fitness in a scratch archive, then proves a later proposal/predictor/parent-selection cycle reads the changed predictor/archive state. It explicitly does not write live archive fitness.
 
 ---
 
@@ -207,7 +212,7 @@ ADAPT:   MemoryLattice.index_document() — add to searchable memory
          Next agent context compilation includes consolidated knowledge
 ```
 
-**Current state (updated):** 89 organism_memory entities exist. Consolidation deduplication is working — entities are marked with `invalidation_reason: "consolidated_duplicate_of:..."` and `invalidated_at` timestamps. 11 valid (non-invalidated) entities remain after dedup. **The consolidation pipeline works on organism heartbeat data. No agent-produced outputs exist to consolidate yet.**
+**Current state (updated 2026-07-01): CLOSED via bounded replay.** `scripts/loop4_10_memory_context_closure_run.py` senses completed work artifacts, admits only completed/hash-backed evidence, writes real StrangeLoopMemory rows, consolidates META memory, then proves later `get_context()` and `read_recent_memories()` read the marker.
 
 ---
 
@@ -256,7 +261,7 @@ ADAPT:   dataset_builder creates training JSONL for fine-tuning
          UCB exploration/exploitation balance shifts based on accumulated evidence
 ```
 
-**Current state (updated):** 182 trace entries exist. Quality gate evaluations running (structural scorer). No real agent trajectories to score yet — traces are from test fixtures.
+**Current state (updated 2026-07-01): CLOSED via bounded replay.** `scripts/loop7_training_flywheel_closure_run.py` loads persisted trajectory JSONL, scores it with `ThinkodynamicScorer`, applies score thresholds, writes strategy and dataset state, then proves a fresh `StrategyReinforcer` changes the next prompt from the persisted pattern.
 
 ---
 
@@ -272,7 +277,7 @@ ADAPT:   Write recognition_seed.md to ~/.dharma/meta/
          The recognition seed influences future agent system prompts
 ```
 
-**Current state (updated 2026-05-20):** Recognition seed computation is wired: `cascade.py:386-491` feeds loop results back into the seed, `shakti_executive/inputs.py:100` reads it as an executive signal, `meta_daemon.py` includes it in context health. 89 organism_memory entities provide input. Periodic trigger depends on LoopEngine schedule activation.
+**Current state (updated 2026-07-01): CLOSED via bounded replay.** `scripts/loop8_recognition_closure_run.py` reads the closed loop-history receipts for Loops 1,2,3,4,5,6,7,9,10,11, derives a receipt-hash-bound self-model, runs `RecognitionEngine.synthesize()` into private replay state, and proves later `build_agent_context()` reads the recognition seed.
 
 ---
 
@@ -280,11 +285,11 @@ ADAPT:   Write recognition_seed.md to ~/.dharma/meta/
 
 | Loop | Status | Update |
 |------|--------|--------|
-| 9: Conductors | PARTIAL | Cron health tracks 7 jobs. Conductor configs use proper enums. Blocked on LLM provider for actual conductor work. |
-| 10: Context Agent | NO | Depends on Loop 1 (running AgentRunner). MM-01 resolved. Dispatch requires a provider proven by `dispatchable_now()`. |
-| 11: Replication Monitor | PARTIAL | MM-02/03 RESOLVED. Replication path structurally correct. No trigger events yet. |
-| 12: Self-Improvement | NO | DarwinEngine instantiable. `auto_evolve()` fixed. Requires `DHARMA_SELF_IMPROVE` (dispatch is available, see below). |
-| 13: Free Evolution Grind | NO | Router works; dispatch requires a provider proven by `dispatchable_now()`. Still gated by One Wire before archive-fitness authority. |
+| 9: Conductors | CLOSED_BOUNDED_REPLAY | `scripts/loop9_11_conductor_replication_closure_run.py` proves conductor signal -> action -> scheduler state -> later scheduler read. |
+| 10: Context Agent | CLOSED_BOUNDED_REPLAY | `scripts/loop4_10_memory_context_closure_run.py` proves context assembly reads consolidated memory and writes a changed context package. |
+| 11: Replication Monitor | CLOSED_BOUNDED_REPLAY | `scripts/loop9_11_conductor_replication_closure_run.py` proves durable proposal -> materialized child/probation/roster -> later monitor read. |
+| 12: Self-Improvement | BLOCKED | One Wire N=3/5, M=1/3. `dharma_swarm/archive.py` now fails closed for governed nonzero archive-fitness writes without N>=5, M>=3, and explicit authority. |
+| 13: Free Evolution Grind | BLOCKED | Same One Wire guard. Free-evolution/archive-fitness authority remains unavailable until external quorum truth exists. |
 
 ---
 

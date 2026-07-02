@@ -246,7 +246,7 @@ active_tracks:
     name: Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
     status: ACTIVE
     opened_at: "2026-06-11"
-    verified_at: "2026-06-11"
+    verified_at: "2026-07-01"
     ttl_days: 21
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
@@ -319,6 +319,80 @@ active_tracks:
       - id: cybernetics_codex_registration_script_exists
         kind: file_exists
         file: scripts/governance/register_cybernetics_codex.py
+      - id: cybernetics_codex_latest_audit_exists
+        kind: file_exists
+        file: reports/loop_closure/cybernetics_codex/latest_audit.json
+      - id: cybernetics_codex_latest_audit_valid
+        kind: receipt_valid
+        file: reports/loop_closure/cybernetics_codex/latest_audit.json
+        requires_keys:
+          - bounded_replays
+          - loop_statuses
+          - one_wire
+      - id: cybernetics_codex_11_bounded_replay_closed
+        kind: file_contains
+        file: reports/loop_closure/cybernetics_codex/latest_audit.md
+        pattern: "| 11 | Replication Monitor | CLOSED_BOUNDED_REPLAY |"
+      - id: cybernetics_codex_12_blocked
+        kind: file_contains
+        file: reports/loop_closure/cybernetics_codex/latest_audit.md
+        pattern: "| 12 | Self-Improvement | BLOCKED |"
+      - id: cybernetics_codex_13_blocked
+        kind: file_contains
+        file: reports/loop_closure/cybernetics_codex/latest_audit.md
+        pattern: "| 13 | Free Evolution Grind | BLOCKED |"
+      - id: cybernetics_codex_loop3_receipt_valid
+        kind: receipt_valid
+        file: reports/loop_closure/cybernetics_codex/2026-07-01_loop3_evolution_closure.json
+        requires_keys: &loop_closure_receipt_keys
+          - loop
+          - loop_id
+          - observed_at
+          - transitions_receipted
+          - adapt_proof
+          - later_cycle_read_evidence
+      - id: cybernetics_codex_loop4_receipt_valid
+        kind: receipt_valid
+        file: reports/loop_closure/cybernetics_codex/2026-07-01_loop4_memory_context_closure.json
+        requires_keys: *loop_closure_receipt_keys
+      - id: cybernetics_codex_loop7_receipt_valid
+        kind: receipt_valid
+        file: reports/loop_closure/cybernetics_codex/2026-07-01_loop7_training_flywheel_closure.json
+        requires_keys: *loop_closure_receipt_keys
+      - id: cybernetics_codex_loop8_receipt_valid
+        kind: receipt_valid
+        file: reports/loop_closure/cybernetics_codex/2026-07-01_loop8_recognition_closure.json
+        requires_keys: *loop_closure_receipt_keys
+      - id: cybernetics_codex_loop9_receipt_valid
+        kind: receipt_valid
+        file: reports/loop_closure/cybernetics_codex/2026-07-01_loop9_conductor_closure.json
+        requires_keys: *loop_closure_receipt_keys
+      - id: cybernetics_codex_loop10_receipt_valid
+        kind: receipt_valid
+        file: reports/loop_closure/cybernetics_codex/2026-07-01_loop10_context_agent_closure.json
+        requires_keys: *loop_closure_receipt_keys
+      - id: cybernetics_codex_loop11_receipt_valid
+        kind: receipt_valid
+        file: reports/loop_closure/cybernetics_codex/2026-07-01_loop11_replication_monitor_closure.json
+        requires_keys: *loop_closure_receipt_keys
+      - id: cybernetics_codex_one_wire_guard_test_exists
+        kind: file_exists
+        file: tests/test_one_wire_archive_fitness_guard.py
+      - id: cybernetics_codex_one_wire_guard_test_passes
+        kind: test_passes
+        test: tests/test_one_wire_archive_fitness_guard.py
+      - id: cybernetics_codex_loop12_13_guard_receipt_exists
+        kind: file_exists
+        file: reports/loop_closure/cybernetics_codex/2026-07-01_loop12_13_one_wire_archive_fitness_guard.json
+      - id: cybernetics_codex_loop12_13_guard_receipt_valid
+        kind: receipt_valid
+        file: reports/loop_closure/cybernetics_codex/2026-07-01_loop12_13_one_wire_archive_fitness_guard.json
+        requires_keys:
+          - verdict
+          - do_not_close_loop
+          - one_wire_live_state
+          - command_to_replay
+          - tests_run
 
     non_goals:
       - Do not weaken, bypass, or hard-code any telos gate to close a loop.
@@ -329,16 +403,12 @@ active_tracks:
 
     next_items:
       - id: 1
-        what: "Phase 1a: provider chain hardening — separate failure state classes, fallback ordering, honest smoke receipts (no real key required)."
+        what: "Residual: drain or quarantine historical dispatch_dropoff rows before any standing all-history daemon-clean claim."
         kind: code
-        blocker: true
-      - id: 2
-        what: "CORRECTED 2026-06-23: NO operator key is required to close Loop 1. Dispatch is keyless via the claude_code lane (live whenever the claude binary is present; key_oracle.dispatchable_now()). The old 'one real provider key (OPENROUTER recommended)' item was the propagated 'no provider' lie — a key only widens the roster."
-        kind: ops
         blocker: false
-      - id: 3
-        what: "Phase 1b: Loop 1 closure under orchestrate_live with DHARMA_SPINE_DISPATCH=1, dispatch_dropoff receipted, closure check in make orient."
-        kind: code
+      - id: 2
+        what: "Future boundary: keep Loops 12/13 blocked until One Wire has N>=5, M>=3, and explicit archive-fitness authority."
+        kind: governance
         blocker: false
 
   - id: orchestration-arena-v1-2026-06
