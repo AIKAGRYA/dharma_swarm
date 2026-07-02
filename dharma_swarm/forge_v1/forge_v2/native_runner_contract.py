@@ -101,6 +101,17 @@ def repo_slug_from_task_id(task_id: str) -> str | None:
     return slug or None
 
 
+def is_swebench_task_id(task_id: str) -> bool:
+    """Best-effort check for standard SWE-bench ids like ``django__django-12209``."""
+    text = str(task_id or "").strip()
+    if text.startswith("pr::"):
+        return False
+    if "__" not in text or "-" not in text:
+        return False
+    repo_part, issue_part = text.rsplit("-", 1)
+    return bool(repo_part and issue_part.isdigit())
+
+
 def build_prewarm_manifest(
     task_ids: Iterable[str],
     *,
@@ -484,6 +495,49 @@ def default_native_grade(payload: dict[str, Any]) -> dict[str, Any]:
             "grader": "pr_suite",
             "grader_receipt_path": result.receipt_path,
             "grader_receipt_sha256": result.receipt_sha256,
+            "patch_len": len(model_patch),
+            "patch_sha256": canonical_sha256({"patch": model_patch}),
+            "task_id": task_id,
+        }
+
+    if is_swebench_task_id(task_id):
+        from dharma_swarm.forge_v1 import swebench_real
+
+        task_instances = candidate_packet.get("task_instances")
+        instance: dict[str, Any] | None = None
+        if isinstance(task_instances, dict) and isinstance(task_instances.get(task_id), dict):
+            instance = dict(task_instances[task_id])
+        if instance is None:
+            instances = swebench_real.verified_instances(instance_ids=[task_id])
+            if not instances:
+                return _unresolved_grade(task_id=task_id, error="swebench_instance_not_found")
+            instance = dict(instances[0])
+        instance.setdefault("instance_id", task_id)
+        namespace_value = worker_config.get("swebench_namespace", swebench_real.DEFAULT_NAMESPACE)
+        namespace = None if namespace_value in (None, "", "none", "None") else str(namespace_value)
+        force_rebuild = bool(worker_config.get("swebench_force_rebuild", False))
+        keep_logs = bool(worker_config.get("swebench_keep_logs", True))
+        max_workers = int(worker_config.get("swebench_max_workers", 1) or 1)
+        run_id = str(worker_config.get("swebench_run_id") or f"{request.get('run_id', 'native')}_{_safe_task_fragment(task_id)}")
+        started = time.time()
+        resolved = swebench_real.verify_prediction(
+            instance,
+            model_patch,
+            namespace=namespace,
+            timeout=timeout,
+            force_rebuild=force_rebuild,
+            run_id=run_id,
+            keep_logs=keep_logs,
+            max_workers=max_workers,
+        )
+        return {
+            "status": "resolved" if resolved else "unresolved",
+            "resolved": bool(resolved),
+            "grade_seconds": round(time.time() - started, 1),
+            "grade_error": None,
+            "grader": "swebench",
+            "swebench_run_id": run_id,
+            "swebench_namespace": namespace,
             "patch_len": len(model_patch),
             "patch_sha256": canonical_sha256({"patch": model_patch}),
             "task_id": task_id,
@@ -882,6 +936,7 @@ __all__ = [
     "build_prewarm_manifest",
     "build_parser",
     "default_native_grade",
+    "is_swebench_task_id",
     "load_task_receipts",
     "main",
     "orchestrate_native_request",

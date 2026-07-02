@@ -10,6 +10,7 @@ import pytest
 from dharma_swarm.forge_v1.forge_v2 import native_runner_contract as nrc
 from dharma_swarm.forge_v1.forge_v2 import pr_suite_grader
 from dharma_swarm.forge_v1.forge_v2 import taskbed_ledger
+from dharma_swarm.forge_v1 import swebench_real
 
 
 def _read_json(path: Path) -> dict:
@@ -186,6 +187,86 @@ def test_run_native_runner_request_uses_default_pr_suite_grade(monkeypatch, tmp_
     receipt = _read_json(next((tmp_path / "worker-result" / "task_receipts").glob("*.json")))
     assert receipt["grader"] == "pr_suite"
     assert receipt["resolved"] is True
+
+
+def test_is_swebench_task_id_detects_standard_ids() -> None:
+    assert nrc.is_swebench_task_id("django__django-12209") is True
+    assert nrc.is_swebench_task_id("sympy__sympy-22914") is True
+    assert nrc.is_swebench_task_id("pr::pallets/click#3208") is False
+    assert nrc.is_swebench_task_id("plain-task") is False
+
+
+def test_default_native_grade_dispatches_swebench_inline_instance(monkeypatch) -> None:
+    captured: dict = {}
+
+    def fake_verify_prediction(instance, model_patch, **kwargs):
+        captured["instance"] = dict(instance)
+        captured["model_patch"] = model_patch
+        captured["kwargs"] = kwargs
+        return True
+
+    monkeypatch.setattr(swebench_real, "verify_prediction", fake_verify_prediction)
+    result = nrc.default_native_grade(
+        {
+            "task_id": "django__django-12209",
+            "candidate_packet": {
+                "candidate_id": "cand",
+                "task_predictions": {"django__django-12209": "diff --git a/x b/x\n"},
+                "task_instances": {"django__django-12209": {"instance_id": "django__django-12209", "repo": "django/django"}},
+            },
+            "request": {
+                "run_id": "native-run",
+                "task_ids": ["django__django-12209"],
+                "worker_config": {
+                    "grade_timeout": 321,
+                    "swebench_namespace": "swebench",
+                    "swebench_run_id": "unit-swebench-run",
+                },
+            },
+        }
+    )
+
+    assert result["status"] == "resolved"
+    assert result["resolved"] is True
+    assert result["grader"] == "swebench"
+    assert result["swebench_run_id"] == "unit-swebench-run"
+    assert captured["instance"]["instance_id"] == "django__django-12209"
+    assert captured["model_patch"] == "diff --git a/x b/x\n"
+    assert captured["kwargs"]["timeout"] == 321
+    assert captured["kwargs"]["namespace"] == "swebench"
+
+
+def test_default_native_grade_loads_swebench_instance_when_not_embedded(monkeypatch) -> None:
+    captured: dict = {}
+
+    def fake_verified_instances(*, instance_ids):
+        captured["instance_ids"] = instance_ids
+        return [{"instance_id": instance_ids[0], "repo": "sympy/sympy"}]
+
+    def fake_verify_prediction(instance, model_patch, **_kwargs):
+        captured["instance"] = dict(instance)
+        captured["model_patch"] = model_patch
+        return False
+
+    monkeypatch.setattr(swebench_real, "verified_instances", fake_verified_instances)
+    monkeypatch.setattr(swebench_real, "verify_prediction", fake_verify_prediction)
+    result = nrc.default_native_grade(
+        {
+            "task_id": "sympy__sympy-22914",
+            "candidate_packet": {
+                "candidate_id": "cand",
+                "task_predictions": {"sympy__sympy-22914": "diff --git a/y b/y\n"},
+            },
+            "request": {"run_id": "native-run", "task_ids": ["sympy__sympy-22914"], "worker_config": {}},
+        }
+    )
+
+    assert captured["instance_ids"] == ["sympy__sympy-22914"]
+    assert captured["instance"]["repo"] == "sympy/sympy"
+    assert captured["model_patch"] == "diff --git a/y b/y\n"
+    assert result["status"] == "unresolved"
+    assert result["resolved"] is False
+    assert result["grader"] == "swebench"
 
 
 def test_run_native_runner_request_writes_grade_only_receipts_and_syncs(tmp_path: Path) -> None:
