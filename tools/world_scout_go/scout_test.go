@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -95,6 +96,41 @@ func TestFetchSourcesHonorsContextCancellation(t *testing.T) {
 	)
 	if err == nil || len(observations) != 0 || result.FailedSources != 1 {
 		t.Fatalf("expected cancellation failure, observations=%+v result=%+v err=%v", observations, result, err)
+	}
+}
+
+func TestFetchSourcesRunsConcurrentlyNotSequentially(t *testing.T) {
+	// Codex review finding: sequential fetching over ~50 sources (default +
+	// beat-derived) risked exceeding the cron scout timeout before any
+	// observation was persisted. Prove fetches actually overlap: with N
+	// sources each taking `delay`, sequential time is N*delay but bounded
+	// concurrency should keep wall time close to one round.
+	const sources = 16
+	const delay = 30 * time.Millisecond
+	client := &http.Client{Transport: scoutRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+		time.Sleep(delay)
+		return scoutTextResponse(http.StatusOK, "Agentic AI benchmark release", nil), nil
+	})}
+
+	sourceList := make([]Source, sources)
+	for i := range sourceList {
+		sourceList[i] = Source{Name: fmt.Sprintf("s%d", i), URL: fmt.Sprintf("https://example.test/%d", i), Kind: "html"}
+	}
+
+	started := time.Now()
+	observations, result, err := fetchSourcesWithClient(context.Background(), sourceList, client)
+	elapsed := time.Since(started)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.SuccessfulSources != sources || len(observations) != sources {
+		t.Fatalf("unexpected result: observations=%d result=%+v", len(observations), result)
+	}
+	// Sequential would take sources*delay (480ms here); concurrent (capped at
+	// scoutFetchConcurrency=8) needs ceil(16/8)=2 rounds, ~2*delay plus slack.
+	if elapsed >= time.Duration(sources)*delay {
+		t.Fatalf("fetch did not run concurrently: elapsed=%v sequential_bound=%v", elapsed, time.Duration(sources)*delay)
 	}
 }
 
