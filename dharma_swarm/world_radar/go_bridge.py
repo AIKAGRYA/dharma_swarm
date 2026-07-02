@@ -903,34 +903,48 @@ def _render_health_markdown(health: dict[str, Any]) -> str:
     )
 
 
+def _coerce_int(value: Any) -> int:
+    """Best-effort int coercion for untrusted Go-subprocess health JSON.
+
+    Never raises: a malformed/non-numeric field (missing, null, or a string
+    that isn't a number) becomes 0 instead of crashing the caller -- health
+    parsing must stay advisory, never fatal to the scout (Copilot review
+    finding, go_bridge.py:933).
+    """
+    try:
+        return int(float(value or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
 def _source_counts(health: Any) -> dict[str, int | str]:
     if not isinstance(health, dict):
         return {"successful_sources": 0, "failed_sources": 0}
     return {
-        "successful_sources": int(float(health.get("successful_sources", 0) or 0)),
-        "failed_sources": int(float(health.get("failed_sources", 0) or 0)),
-        "retry_count": int(float(health.get("retry_count", 0) or 0)),
+        "successful_sources": _coerce_int(health.get("successful_sources")),
+        "failed_sources": _coerce_int(health.get("failed_sources")),
+        "retry_count": _coerce_int(health.get("retry_count")),
         "archive_enabled": bool(health.get("archive_enabled", False)),
-        "archive_count": int(float(health.get("archive_count", 0) or 0)),
-        "dedupe_count": int(float(health.get("dedupe_count", 0) or 0)),
+        "archive_count": _coerce_int(health.get("archive_count")),
+        "dedupe_count": _coerce_int(health.get("dedupe_count")),
         "archive_dir": str(health.get("archive_dir", "") or ""),
         "archive_index_path": str(health.get("archive_index_path", "") or ""),
         "archive_replay_index_path": str(health.get("archive_replay_index_path", "") or ""),
         "archive_manifest_path": str(health.get("archive_manifest_path", "") or ""),
-        "archive_discovered_count": int(float(health.get("archive_discovered_count", 0) or 0)),
-        "archive_workers": int(float(health.get("archive_workers", 0) or 0)),
-        "archive_total_bytes": int(float(health.get("archive_total_bytes", 0) or 0)),
-        "archive_clean_text_count": int(float(health.get("archive_clean_text_count", 0) or 0)),
-        "archive_clean_text_bytes": int(float(health.get("archive_clean_text_bytes", 0) or 0)),
-        "archive_error_count": int(float(health.get("archive_error_count", 0) or 0)),
+        "archive_discovered_count": _coerce_int(health.get("archive_discovered_count")),
+        "archive_workers": _coerce_int(health.get("archive_workers")),
+        "archive_total_bytes": _coerce_int(health.get("archive_total_bytes")),
+        "archive_clean_text_count": _coerce_int(health.get("archive_clean_text_count")),
+        "archive_clean_text_bytes": _coerce_int(health.get("archive_clean_text_bytes")),
+        "archive_error_count": _coerce_int(health.get("archive_error_count")),
     }
 
 
 def _partial_source_error(health: Any) -> str | None:
     if not isinstance(health, dict):
         return None
-    successful = int(float(health.get("successful_sources", 0) or 0))
-    failed = int(float(health.get("failed_sources", 0) or 0))
+    successful = _coerce_int(health.get("successful_sources"))
+    failed = _coerce_int(health.get("failed_sources"))
     if failed <= 0:
         return None
     if successful > 0:

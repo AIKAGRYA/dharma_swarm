@@ -277,6 +277,24 @@ def test_partial_source_error_still_reports_total_source_failure() -> None:
     assert "partial source failures=2" in error
 
 
+def test_partial_source_error_never_raises_on_malformed_health() -> None:
+    # Copilot review finding: a non-numeric health field must not crash the
+    # scout -- health parsing is advisory, never fatal.
+    error = bridge._partial_source_error(
+        {"successful_sources": "not-a-number", "failed_sources": None, "errors": "not-a-list"}
+    )
+    assert error is None  # failed coerces to 0 -> failed <= 0 -> no error
+
+
+def test_source_counts_never_raises_on_malformed_health() -> None:
+    counts = bridge._source_counts(
+        {"successful_sources": "N/A", "failed_sources": [], "retry_count": {}}
+    )
+    assert counts["successful_sources"] == 0
+    assert counts["failed_sources"] == 0
+    assert counts["retry_count"] == 0
+
+
 def test_world_radar_imports_go_archive_rows_as_untrusted_evidence(monkeypatch, tmp_path: Path) -> None:
     state = tmp_path / ".dharma"
     archive_dir = tmp_path / "archive"

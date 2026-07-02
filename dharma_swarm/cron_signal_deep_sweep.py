@@ -36,6 +36,20 @@ def _as_int(value: Any, default: int, *, minimum: int = 1) -> int:
     return parsed if parsed >= minimum else default
 
 
+def _as_verification_cap(value: Any, default: int) -> int:
+    """Parse max_verifications: a non-numeric value falls back to default,
+    but a NEGATIVE value clamps to 0 (no LLM calls) rather than silently
+    escalating to the default spend budget -- this field drives real LLM
+    cost, so a misconfigured negative must fail closed, not fail open
+    (Copilot review finding, cron_signal_deep_sweep.py:73).
+    """
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(parsed, 0)
+
+
 def run_signal_deep_sweep_job(job: dict[str, Any]) -> CronJobExecutionResult:
     """Run the capped, automated deep sweep (separate, lower-cadence cousin
     of world_scout -- widens to DefaultBeats() and runs a bounded LLM
@@ -66,10 +80,9 @@ def run_signal_deep_sweep_job(job: dict[str, Any]) -> CronJobExecutionResult:
 
         state_dir = job.get("state_dir") or None
         state_path = Path(str(state_dir)).expanduser() if state_dir else dharma_state_dir()
-        max_verifications = _as_int(
+        max_verifications = _as_verification_cap(
             job.get("max_verifications"),
             DEFAULT_MAX_VERIFICATIONS,
-            minimum=0,
         )
         result = asyncio.run(
             run_deep_sweep(

@@ -664,6 +664,33 @@ def test_signal_deep_sweep_preserves_explicit_zero_verification_cap(monkeypatch,
     assert result.metadata["max_verifications"] == 0
 
 
+def test_signal_deep_sweep_negative_verification_cap_clamps_to_zero(monkeypatch, tmp_path):
+    # Copilot review finding: a misconfigured negative cap must fail closed
+    # (0 LLM calls), not silently fall back to DEFAULT_MAX_VERIFICATIONS.
+    seen: dict[str, object] = {}
+
+    async def fake_run_deep_sweep(*args, **kwargs):
+        seen.update(kwargs)
+        return _deep_sweep_result(verifications_count=0)
+
+    monkeypatch.setattr(
+        "dharma_swarm.knowledge_ops.deep_sweep.run_deep_sweep",
+        fake_run_deep_sweep,
+    )
+
+    result = execute_cron_job(
+        {
+            "handler": "signal_deep_sweep",
+            "fetch": True,
+            "state_dir": str(tmp_path),
+            "max_verifications": -1,
+        }
+    )
+
+    assert seen["max_verifications"] == 0
+    assert result.metadata["max_verifications"] == 0
+
+
 def test_signal_deep_sweep_total_scout_failure_marks_cron_failed(monkeypatch, tmp_path):
     async def fake_run_deep_sweep(*args, **kwargs):
         return _deep_sweep_result(
