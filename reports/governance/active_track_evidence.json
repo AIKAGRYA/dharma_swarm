@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-02T14:11:26+09:00",
+  "generated_at": "2026-07-02T12:55:46+00:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-spine-adoption-2026-06",
   "shippable": false,
@@ -271,7 +271,7 @@
       "ttl_days": 21,
       "owner": "@AmitabhainArunachala",
       "shippable": false,
-      "criteria_pass": true,
+      "criteria_pass": false,
       "ship_blocks": [
         "2 open blocker next-item(s)",
         "1 active ship veto(es): cybernetics_codex_harness_proven_blocks_live_ship: reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses[].verdict == 'HARNESS_PROVEN': 11 > 0"
@@ -285,7 +285,7 @@
       "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 29,
+        "passed": 28,
         "total": 29
       },
       "criteria": [
@@ -488,9 +488,9 @@
         {
           "id": "cybernetics_codex_one_wire_guard_test_passes",
           "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_one_wire_archive_fitness_guard.py: PASS \u2014 9 passed in 0.11s",
-          "executed": true
+          "passed": false,
+          "detail": "pytest tests/test_one_wire_archive_fitness_guard.py: pytest not installed (could not execute)",
+          "executed": false
         },
         {
           "id": "cybernetics_codex_loop12_13_guard_receipt_exists",
@@ -790,8 +790,14 @@
     },
     {
       "severity": "INFO",
-      "check": "track-provisional:loop-closure-2026-06",
-      "message": "[loop-closure-2026-06] 29/29 criteria pass but NOT shippable under the rigorous bar: 2 open blocker next-item(s); 1 active ship veto(es): cybernetics_codex_harness_proven_blocks_live_ship: reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses[].verdict == 'HARNESS_PROVEN': 11 > 0. Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).",
+      "check": "unverified:loop-closure-2026-06:cybernetics_codex_one_wire_guard_test_passes",
+      "message": "[loop-closure-2026-06] UNVERIFIED \u2014 'cybernetics_codex_one_wire_guard_test_passes' could not run here (not a regression): pytest tests/test_one_wire_archive_fitness_guard.py: pytest not installed (could not execute)",
+      "criterion_id": "cybernetics_codex_one_wire_guard_test_passes"
+    },
+    {
+      "severity": "INFO",
+      "check": "track-in-progress:loop-closure-2026-06",
+      "message": "[loop-closure-2026-06] 28/29 completion criteria pass.",
       "criterion_id": null
     },
     {
