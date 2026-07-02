@@ -11,6 +11,11 @@ every run, and so a downstream consumer (e.g. the deep sweep) can cheaply
 answer "which of today's movements are actually NEW" instead of re-processing
 everything every cycle.
 
+Actually rolling, not monotonically accumulating: entries not seen again
+within MAX_WINDOW_AGE_DAYS are pruned on the next update, so the state file
+stays bounded by the recent-activity set rather than growing forever
+(Copilot review finding, theme_window.py:16).
+
 Read-only with respect to memory/canon: this module only maintains its own
 small rolling-window state file under meta/world_radar/theme_window.json.
 """
@@ -19,9 +24,14 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+
+# Generous default: at daily cadence this is ~90 cycles of recurrence memory,
+# comfortably longer than any realistic verification backlog, while still
+# bounding the state file's growth over months/years of continuous operation.
+MAX_WINDOW_AGE_DAYS = 90
 
 
 @dataclass(frozen=True)
@@ -44,8 +54,19 @@ class ThemeWindowEntry:
         }
 
 
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+def _is_stale(entry: ThemeWindowEntry, now: datetime, max_age_days: int) -> bool:
+    """An entry not seen again within max_age_days is stale and gets pruned.
+
+    An unparseable/missing last_seen_at (garbled state) is treated as stale
+    too -- fail closed toward pruning rather than accumulating unboundedly.
+    """
+    try:
+        last_seen = datetime.fromisoformat(entry.last_seen_at)
+    except (TypeError, ValueError):
+        return True
+    if last_seen.tzinfo is None:
+        last_seen = last_seen.replace(tzinfo=timezone.utc)
+    return (now - last_seen) > timedelta(days=max_age_days)
 
 
 def _weighted_score(value: Any) -> float:
@@ -96,17 +117,23 @@ def save_theme_window(path: Path, window: dict[str, ThemeWindowEntry]) -> None:
 def update_theme_window(
     window: dict[str, ThemeWindowEntry],
     movements: list[dict[str, Any]],
+    *,
+    max_age_days: int = MAX_WINDOW_AGE_DAYS,
 ) -> tuple[dict[str, ThemeWindowEntry], tuple[str, ...]]:
-    """Fold this cycle's movements into the rolling window.
+    """Fold this cycle's movements into the rolling window, then prune.
 
     Returns (updated_window, newly_seen_movement_ids) -- the latter is the
     cheap "what's actually new this cycle" signal a capped downstream
     consumer (e.g. deep_sweep's verification budget) can use instead of
     re-processing every movement every time.
+
+    Prunes any entry not seen again within max_age_days -- this is what makes
+    it an actual rolling window instead of an unbounded accumulator.
     """
     updated = dict(window)
     newly_seen: list[str] = []
-    now = _now_iso()
+    now_dt = datetime.now(timezone.utc)
+    now = now_dt.isoformat()
     for movement in movements:
         movement_id = str(movement.get("movement_id") or "")
         if not movement_id:
@@ -134,7 +161,12 @@ def update_theme_window(
                 # clustering, not a stable key); keep the latest.
                 title=title or existing.title,
             )
-    return updated, tuple(newly_seen)
+    pruned = {
+        movement_id: entry
+        for movement_id, entry in updated.items()
+        if not _is_stale(entry, now_dt, max_age_days)
+    }
+    return pruned, tuple(newly_seen)
 
 
 def run_theme_window_update(state_dir: Path) -> dict[str, object]:
@@ -174,6 +206,7 @@ def run_theme_window_update(state_dir: Path) -> dict[str, object]:
 
 
 __all__ = [
+    "MAX_WINDOW_AGE_DAYS",
     "ThemeWindowEntry",
     "load_theme_window",
     "save_theme_window",

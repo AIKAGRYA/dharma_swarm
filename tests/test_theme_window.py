@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from dharma_swarm.world_radar.theme_window import (
+    ThemeWindowEntry,
     load_theme_window,
     run_theme_window_update,
     save_theme_window,
@@ -117,3 +119,62 @@ def test_run_theme_window_update_missing_board_is_defensive(tmp_path: Path) -> N
     summary = run_theme_window_update(tmp_path)
     assert summary["movements_this_cycle"] == 0
     assert summary["total_tracked_themes"] == 0
+
+
+def test_stale_entry_is_pruned_not_accumulated_forever() -> None:
+    # Copilot review finding: the module is named a "rolling window" but
+    # never evicted anything, so it would grow unbounded forever. An entry
+    # not seen again within max_age_days must be pruned on the next update.
+    stale_entry = ThemeWindowEntry(
+        movement_id="stale-1",
+        title="Old Theme",
+        first_seen_at=(datetime.now(timezone.utc) - timedelta(days=200)).isoformat(),
+        last_seen_at=(datetime.now(timezone.utc) - timedelta(days=200)).isoformat(),
+        occurrence_count=1,
+        best_weighted_score=0.5,
+    )
+    window = {"stale-1": stale_entry}
+    updated, newly_seen = update_theme_window(window, [_movement("m1", "Fresh Theme", 0.7)])
+    assert "stale-1" not in updated
+    assert "m1" in updated
+    assert newly_seen == ("m1",)
+
+
+def test_recent_entry_survives_pruning() -> None:
+    recent_entry = ThemeWindowEntry(
+        movement_id="recent-1",
+        title="Recent Theme",
+        first_seen_at=(datetime.now(timezone.utc) - timedelta(days=5)).isoformat(),
+        last_seen_at=(datetime.now(timezone.utc) - timedelta(days=5)).isoformat(),
+        occurrence_count=3,
+        best_weighted_score=0.5,
+    )
+    window = {"recent-1": recent_entry}
+    updated, _ = update_theme_window(window, [])
+    assert "recent-1" in updated
+
+
+def test_garbled_last_seen_at_is_pruned_not_crashed() -> None:
+    garbled = ThemeWindowEntry(
+        movement_id="garbled-1",
+        title="Garbled",
+        first_seen_at="not-a-timestamp",
+        last_seen_at="not-a-timestamp",
+        occurrence_count=1,
+        best_weighted_score=0.5,
+    )
+    updated, _ = update_theme_window({"garbled-1": garbled}, [])
+    assert "garbled-1" not in updated
+
+
+def test_custom_max_age_days_is_honored() -> None:
+    entry = ThemeWindowEntry(
+        movement_id="m1",
+        title="Theme",
+        first_seen_at=(datetime.now(timezone.utc) - timedelta(days=2)).isoformat(),
+        last_seen_at=(datetime.now(timezone.utc) - timedelta(days=2)).isoformat(),
+        occurrence_count=1,
+        best_weighted_score=0.5,
+    )
+    updated, _ = update_theme_window({"m1": entry}, [], max_age_days=1)
+    assert "m1" not in updated
