@@ -71,10 +71,7 @@ def _reset_work_dir(work_dir: Path) -> None:
             raise RuntimeError(f"refusing to reset non-owned work dir: {work_dir}")
         shutil.rmtree(work_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
-    (work_dir / WORK_DIR_SENTINEL).write_text(
-        WORK_DIR_SENTINEL_TEXT,
-        encoding="utf-8",
-    )
+    (work_dir / WORK_DIR_SENTINEL).write_text(WORK_DIR_SENTINEL_TEXT, encoding="utf-8")
 
 
 def _sha256(path: Path) -> str:

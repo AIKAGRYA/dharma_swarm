@@ -200,6 +200,22 @@ def test_new_kinds_dispatch_through_evaluate_criterion():
     assert evaluate_criterion({"id": "z", "kind": "receipt_valid"}).passed is False
     assert evaluate_criterion({"id": "j", "kind": "json_count_equals"}).passed is False
     assert evaluate_criterion({"id": "g", "kind": "json_count_greater_than"}).passed is False
+    assert evaluate_criterion({
+        "id": "jv",
+        "kind": "json_count_equals",
+        "file": "reports/loop_closure/cybernetics_codex/latest_audit.json",
+        "collection": "loop_statuses",
+        "field": "verdict",
+        "expected": 0,
+    }).passed is False
+    assert evaluate_criterion({
+        "id": "gv",
+        "kind": "json_count_greater_than",
+        "file": "reports/loop_closure/cybernetics_codex/latest_audit.json",
+        "collection": "loop_statuses",
+        "field": "verdict",
+        "threshold": 0,
+    }).passed is False
     assert evaluate_criterion({"id": "m", "kind": "json_collection_values_match"}).passed is False
     assert evaluate_criterion({"id": "k", "kind": "json_mapping_keys_nonempty"}).passed is False
 

@@ -90,7 +90,7 @@ def test_reset_work_dir_refuses_non_owned_existing_directory(tmp_path: Path) -> 
 
 def test_reset_work_dir_refuses_non_owned_empty_directory(tmp_path: Path) -> None:
     module = _load_module()
-    work_dir = tmp_path / "important"
+    work_dir = tmp_path / "empty"
     work_dir.mkdir()
 
     with pytest.raises(RuntimeError, match="refusing to reset non-owned work dir"):
@@ -111,7 +111,6 @@ def test_reset_work_dir_refuses_bad_sentinel_contents(tmp_path: Path) -> None:
         module._reset_work_dir(work_dir)
 
     assert keep.read_text(encoding="utf-8") == "do not delete\n"
-
 
 def test_replay_does_not_close_when_reinforcement_threshold_not_met(tmp_path: Path) -> None:
     module = _load_module()

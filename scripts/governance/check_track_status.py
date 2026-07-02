@@ -842,10 +842,11 @@ def evaluate_criterion(crit: dict[str, Any]) -> CriterionResult:
                 not isinstance(crit.get("file"), str)
                 or not isinstance(crit.get("collection"), str)
                 or not isinstance(crit.get("field"), str)
+                or crit.get("value") is None
             ):
                 res = CriterionResult(id="", kind=kind, passed=False,
                                       detail="malformed criterion: 'file', 'collection', and 'field' "
-                                             "must be strings")
+                                             "must be strings and 'value' must be set")
             else:
                 res = check_json_count_equals(
                     crit["file"],
@@ -864,10 +865,11 @@ def evaluate_criterion(crit: dict[str, Any]) -> CriterionResult:
                 not isinstance(crit.get("file"), str)
                 or not isinstance(crit.get("collection"), str)
                 or not isinstance(crit.get("field"), str)
+                or crit.get("value") is None
             ):
                 res = CriterionResult(id="", kind=kind, passed=False,
                                       detail="malformed criterion: 'file', 'collection', and 'field' "
-                                             "must be strings")
+                                             "must be strings and 'value' must be set")
             else:
                 res = check_json_count_greater_than(
                     crit["file"],

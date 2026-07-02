@@ -48,7 +48,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from dharma_swarm.a2a.agent_presence import list_agent_presence
+from dharma_swarm.a2a.agent_presence import list_agent_presence  # noqa: E402
 
 ORGANISM_DOC = REPO_ROOT / "foundations/THE_ORGANISM.md"
 NORTH_STAR_DOC = REPO_ROOT / "docs/vision_maps/NORTH_STAR.md"
@@ -63,6 +63,26 @@ REPO_CONTEXT_MD = REPO_CONTEXT_DIR / "repo_context.md"
 A2A_BUS = Path.home() / ".dharma/a2a_bus"
 DEPLOY_RECEIPT = Path.home() / ".dharma/ops/deploy_receipt.json"
 LANE_MAP = Path.home() / ".dharma/ops/parallel_lane_map.json"
+
+
+def _normalize_context_path(value: str) -> str:
+    """Normalize host-specific absolute paths for portable committed artifacts."""
+    if not value:
+        return ""
+    try:
+        path = Path(value).expanduser()
+    except Exception:
+        return value
+    if not path.is_absolute():
+        return value
+    try:
+        return f"$REPO_ROOT/{path.relative_to(REPO_ROOT)}"
+    except ValueError:
+        pass
+    try:
+        return f"~/{path.relative_to(Path.home())}"
+    except ValueError:
+        return "<absolute-path>"
 
 
 def _census_receipt_path() -> Path | None:
@@ -588,7 +608,7 @@ def build_liveness() -> Liveness:
     try:
         payload = json.loads(receipt_path.read_text(encoding="utf-8"))
     except Exception:
-        return Liveness(receipt=f"unreadable receipt at {receipt_path}")
+        return Liveness(receipt=f"unreadable receipt at {_normalize_context_path(str(receipt_path))}")
     surfaces = []
     for surface in payload.get("surfaces") or []:
         if not isinstance(surface, dict):
@@ -601,7 +621,7 @@ def build_liveness() -> Liveness:
             }
         )
     return Liveness(
-        receipt=str(receipt_path),
+        receipt=_normalize_context_path(str(receipt_path)),
         generated_at=str(payload.get("generated_at", "")),
         surfaces=surfaces,
     )
@@ -713,7 +733,7 @@ def build_lanes() -> list[Lane]:
                     continue
                 lanes.append(
                     Lane(
-                        path=str(item.get("path") or item.get("worktree") or ""),
+                        path=_normalize_context_path(str(item.get("path") or item.get("worktree") or "")),
                         branch=str(item.get("branch") or ""),
                         head=str(item.get("head") or item.get("sha") or ""),
                         status=str(item.get("status") or ""),
@@ -740,7 +760,7 @@ def build_lanes() -> list[Lane]:
                 lanes.append(
                     _stable_lane(
                         Lane(
-                            path=current.get("worktree", ""),
+                            path=_normalize_context_path(current.get("worktree", "")),
                             branch=current.get("branch", "").removeprefix("refs/heads/")
                             or "(detached)",
                             head=current.get("HEAD", ""),
@@ -781,6 +801,9 @@ def build_agents() -> list[dict[str, Any]]:
     for agent in list_agent_presence():
         payload = agent.to_dict()
         payload.pop("age_hours", None)
+        source_path = payload.get("source_path")
+        if isinstance(source_path, str):
+            payload["source_path"] = _normalize_context_path(source_path)
         agents.append(payload)
     return agents
 
@@ -807,7 +830,7 @@ def build_receipts_tail(limit: int = 8) -> list[ReceiptTail]:
     candidates.sort(key=lambda p: p.stat().st_mtime if p.exists() else 0, reverse=True)
     tail: list[ReceiptTail] = []
     for path in candidates[:limit]:
-        tail.append(ReceiptTail(path=str(path), modified_at=_mtime_iso(path)))
+        tail.append(ReceiptTail(path=_normalize_context_path(str(path)), modified_at=_mtime_iso(path)))
     return tail
 
 
@@ -820,26 +843,26 @@ def build_a2a_bus_state() -> A2ABusState:
     task_log = Path.home() / ".dharma/a2a/task_log.jsonl"
     nats_receipt = REPO_CONTEXT_DIR / "nats_e2e_receipt.json"
     return A2ABusState(
-        root=str(A2A_BUS),
+        root=_normalize_context_path(str(A2A_BUS)),
         inbox_files=inbox_files,
         quarantine_files=quarantine_files,
-        node_registry=str(node_registry) if node_registry.exists() else "",
-        task_log=str(task_log) if task_log.exists() else "",
-        nats_e2e_receipt=str(nats_receipt) if nats_receipt.exists() else "",
+        node_registry=_normalize_context_path(str(node_registry)) if node_registry.exists() else "",
+        task_log=_normalize_context_path(str(task_log)) if task_log.exists() else "",
+        nats_e2e_receipt=_normalize_context_path(str(nats_receipt)) if nats_receipt.exists() else "",
     )
 
 
 def build_body_state() -> BodyState:
     if not DEPLOY_RECEIPT.exists():
-        return BodyState(receipt=str(DEPLOY_RECEIPT), status="missing")
+        return BodyState(receipt=_normalize_context_path(str(DEPLOY_RECEIPT)), status="missing")
     try:
         payload = json.loads(DEPLOY_RECEIPT.read_text(encoding="utf-8"))
     except Exception:
-        return BodyState(receipt=str(DEPLOY_RECEIPT), status="unreadable")
+        return BodyState(receipt=_normalize_context_path(str(DEPLOY_RECEIPT)), status="unreadable")
     return BodyState(
-        receipt=str(DEPLOY_RECEIPT),
+        receipt=_normalize_context_path(str(DEPLOY_RECEIPT)),
         status=str(payload.get("status") or ""),
-        worktree=str(payload.get("worktree") or ""),
+        worktree=_normalize_context_path(str(payload.get("worktree") or "")),
         old_sha=str(payload.get("old_sha") or ""),
         new_sha=str(payload.get("new_sha") or ""),
         observed_at=str(payload.get("observed_at") or ""),
