@@ -29,7 +29,7 @@ seed, and it says so on every number it produces.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Iterable, Mapping, Optional
+from typing import Any, Iterable, Mapping
 
 # --- Seed constants (public estimates; rebuttable; NOT legal-grade) -----------------
 
@@ -52,7 +52,14 @@ _DEFAULT_ENERGY_WH = {"wh": 1.0, "lo": 0.3, "hi": 10.0, "src": "no model match -
 _PUE = 1.15            # datacentre power-usage effectiveness (typical; provider-private)
 _GRID_GCO2_PER_KWH = 175.0   # grid carbon intensity, gCO2e/kWh (varies ~5x by region/time)
 _GRID_LO, _GRID_HI = 0.4, 2.6   # grid-intensity multiplicative band
-_REFERENCE_OUTPUT_TOKENS = 500  # the table values are calibrated to a ~typical response
+_REFERENCE_TOTAL_TOKENS = 500  # the table values are calibrated to a ~typical response
+_NON_MODEL_PROVIDERS = {"a2a", "nats", "spine", "transport", "kernel"}
+_UNMETERED_ENERGY_WH = {
+    "wh": 0.0,
+    "lo": 1.0,
+    "hi": 1.0,
+    "src": "no model or token usage -> unmetered non-model receipt",
+}
 
 REBUTTABLE_NOTE = (
     "estimate, rebuttable, NOT legal-grade (~1-2 orders-of-magnitude uncertainty; "
@@ -76,14 +83,18 @@ class CarbonEstimate:
     method: str
     source: str
 
-    def to_compute_unit_dict(self) -> dict[str, float]:
+    def to_compute_unit_dict(self) -> dict[str, float | str]:
         """Project to a ``gaia_ledger.ComputeUnit``-shaped dict (energy_mwh,
         carbon_intensity) — the bridge between the throat and the credit-world that
         ``08`` found missing. Returns a plain dict the ledger *could* consume; this
         module never imports or mutates the ledger (projection only)."""
         energy_mwh = self.energy_wh / 1_000_000.0
         carbon_intensity = (self.gco2 / 1_000_000.0) / energy_mwh if energy_mwh else 0.0
-        return {"energy_mwh": energy_mwh, "carbon_intensity": carbon_intensity}
+        return {
+            "provider": self.provider,
+            "energy_mwh": energy_mwh,
+            "carbon_intensity": carbon_intensity,
+        }
 
     def footprint_line(self) -> str:
         """The one line that prints on every verification this organ produces.
@@ -101,16 +112,26 @@ class SisDebit:
 
     count: int
     total_gco2: float
-    p05_gco2: float
-    p95_gco2: float
+    lower_bound_gco2: float
+    upper_bound_gco2: float
     total_energy_wh: float
     by_model: dict[str, float] = field(default_factory=dict)
+
+    @property
+    def p05_gco2(self) -> float:
+        """Compatibility alias for the summed conservative lower bound."""
+        return self.lower_bound_gco2
+
+    @property
+    def p95_gco2(self) -> float:
+        """Compatibility alias for the summed conservative upper bound."""
+        return self.upper_bound_gco2
 
     def footprint_report(self) -> str:
         head = (
             f"SIS self-debit over {self.count} dispatch(es): "
             f"~{self.total_gco2:.3g} gCO2e "
-            f"(p05 {self.p05_gco2:.2g} – p95 {self.p95_gco2:.2g}), "
+            f"(lower {self.lower_bound_gco2:.2g} – upper {self.upper_bound_gco2:.2g}), "
             f"~{self.total_energy_wh:.3g} Wh. {REBUTTABLE_NOTE}."
         )
         lines = [head]
@@ -139,19 +160,31 @@ def _model_entry(model: str) -> dict[str, Any]:
     return _DEFAULT_ENERGY_WH
 
 
+def _token_count(value: Any) -> float:
+    if isinstance(value, (int, float)) and value > 0:
+        return float(value)
+    return 0.0
+
+
 def estimate_receipt(receipt: Any) -> CarbonEstimate:
     """Project one already-emitted receipt to an estimated SIS debit. Pure; read-only."""
     model = _get(receipt, "model") or ""
     provider = _get(receipt, "provider") or ""
     trace_id = _get(receipt, "trace_id") or ""
+    in_tok = _get(receipt, "input_tokens")
     out_tok = _get(receipt, "output_tokens")
+    total_tokens = _token_count(in_tok) + _token_count(out_tok)
 
-    entry = _model_entry(model)
+    provider_key = str(provider).strip().lower()
+    if not model and total_tokens == 0 and provider_key in _NON_MODEL_PROVIDERS:
+        entry = _UNMETERED_ENERGY_WH
+    else:
+        entry = _model_entry(model)
     base_wh = float(entry["wh"])
-    # crude, honestly-banded scaling: energy tracks output tokens against a reference.
+    # Crude, honestly-banded scaling: energy tracks total receipt tokens against a reference.
     scale = 1.0
-    if isinstance(out_tok, (int, float)) and out_tok > 0:
-        scale = max(0.1, min(10.0, float(out_tok) / _REFERENCE_OUTPUT_TOKENS))
+    if total_tokens > 0:
+        scale = max(0.1, min(10.0, total_tokens / _REFERENCE_TOTAL_TOKENS))
     energy_wh = base_wh * scale
 
     def _g(grid: float) -> float:
@@ -170,7 +203,7 @@ def estimate_receipt(receipt: Any) -> CarbonEstimate:
         p95_gco2=max(p95, central),
         method=(
             f"Wh(model)xPUE({_PUE})xgrid({_GRID_GCO2_PER_KWH}gCO2/kWh), "
-            f"output-token-scaled; band = grid x model-energy contestation"
+            f"input+output-token-scaled; band = grid x model-energy contestation"
         ),
         source=str(entry["src"]),
     )
@@ -190,7 +223,7 @@ def aggregate(receipts: Iterable[Any]) -> SisDebit:
         wh += e.energy_wh
         by_model[e.model or "unknown"] = by_model.get(e.model or "unknown", 0.0) + e.gco2
     return SisDebit(
-        count=n, total_gco2=tot, p05_gco2=p05, p95_gco2=p95,
+        count=n, total_gco2=tot, lower_bound_gco2=p05, upper_bound_gco2=p95,
         total_energy_wh=wh, by_model=by_model,
     )
 

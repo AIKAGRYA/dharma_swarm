@@ -8,6 +8,7 @@ shape — the wire 08_LOOP_TRACE found missing.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 
 from dharma_swarm.gaia_sis_projection import (
@@ -58,13 +59,32 @@ def test_unknown_model_falls_back_and_says_so():
 
 
 def test_compute_unit_bridge_shape_matches_gaia_ledger():
-    # The bridge 08 found missing: project to ComputeUnit(energy_mwh, carbon_intensity).
-    e = estimate_receipt(_FakeReceipt(model="claude-sonnet", output_tokens=500))
+    # The bridge 08 found missing: project to ComputeUnit(provider, energy_mwh, carbon_intensity).
+    e = estimate_receipt(_FakeReceipt(provider="anthropic", model="claude-sonnet", output_tokens=500))
     cu = e.to_compute_unit_dict()
-    assert set(cu) == {"energy_mwh", "carbon_intensity"}
+    assert set(cu) == {"provider", "energy_mwh", "carbon_intensity"}
+    assert cu["provider"] == "anthropic"
     assert cu["energy_mwh"] > 0 and cu["carbon_intensity"] > 0
     # round-trips: energy_mwh * carbon_intensity (tCO2e) ~= gco2 (g) / 1e6
     assert abs(cu["energy_mwh"] * cu["carbon_intensity"] - e.gco2 / 1_000_000.0) < 1e-12
+
+
+def test_prompt_tokens_drive_energy_scaling():
+    prompt_heavy = estimate_receipt(
+        _FakeReceipt(model="claude-sonnet", input_tokens=100_000, output_tokens=10)
+    )
+    terse = estimate_receipt(_FakeReceipt(model="claude-sonnet", output_tokens=10))
+
+    assert prompt_heavy.energy_wh > terse.energy_wh
+    assert "input+output-token-scaled" in prompt_heavy.method
+
+
+def test_transport_receipt_without_model_or_tokens_is_unmetered():
+    e = estimate_receipt(_FakeReceipt(provider="nats"))
+
+    assert e.energy_wh == 0.0
+    assert e.gco2 == 0.0
+    assert "unmetered non-model receipt" in e.source
 
 
 def test_aggregate_is_the_recursive_n1():
@@ -75,11 +95,14 @@ def test_aggregate_is_the_recursive_n1():
     ]
     debit = aggregate(receipts)
     assert debit.count == 3
-    assert debit.p05_gco2 < debit.total_gco2 < debit.p95_gco2
+    assert debit.lower_bound_gco2 < debit.total_gco2 < debit.upper_bound_gco2
+    assert debit.p05_gco2 == debit.lower_bound_gco2
+    assert debit.p95_gco2 == debit.upper_bound_gco2
     assert len(debit.by_model) == 3
     report = footprint_report(receipts)
     assert "mints nothing" in report  # the debit is not a welfare-ton
     assert "self-debit" in report
+    assert "lower" in report and "upper" in report
 
 
 def test_projection_imports_neither_spine_nor_ledger():
@@ -87,6 +110,6 @@ def test_projection_imports_neither_spine_nor_ledger():
     # the owned spine/ledger surfaces.
     import dharma_swarm.gaia_sis_projection as mod
 
-    src = open(mod.__file__).read()
+    src = Path(mod.__file__).read_text(encoding="utf-8")
     assert "import spine" not in src and "from dharma_swarm.spine" not in src
     assert "import gaia_ledger" not in src and "from dharma_swarm.gaia_ledger" not in src
