@@ -102,6 +102,7 @@ def test_main_json_includes_outbound_reachability(monkeypatch, capsys):
         assert live_subjects == ["dharma.a2a.codex"]
         return [{"lane": "codex", "subject": "dharma.a2a.codex", "status": "ALLOWED", "detail": ""}]
 
+    monkeypatch.setitem(sys.modules, "nats", types.SimpleNamespace())
     monkeypatch.setattr(a2a_doctor, "_load_registration", lambda: {"metadata": {}})
     monkeypatch.setattr(a2a_doctor, "_gather", fake_gather)
     monkeypatch.setattr(a2a_doctor, "_probe_outbound_reachability", fake_probe)
