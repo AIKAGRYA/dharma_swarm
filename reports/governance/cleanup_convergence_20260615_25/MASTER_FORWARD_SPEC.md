@@ -71,9 +71,9 @@ At the last audit, after `git fetch --all --prune`:
   with review-blocker fixes applied. GitHub checks are now green, but review
   threads remain unresolved because resolving them is a separate GitHub write
   action.
-- `/Users/dhyana/worktrees/ds_pudgala_forge_20260625` was present during the
+- `/Users/dhyana/worktrees/ds_pudgala_autopoiesis_protostar_20260625` was present during the
   initial audit but is no longer a registered worktree or existing path. The
-  branch `anti-slop/pudgala-forge-2026-06` remains present locally and pushed.
+  branch `anti-slop/pudgala-autopoiesis-protostar-2026-06` remains present locally and pushed.
 
 These facts must be refreshed before acting.
 
@@ -163,7 +163,7 @@ For each classification, record evidence:
 
 Refresh before acting, but use this as the expected ordering:
 
-1. PR #693, Pudgala Forge:
+1. PR #693, Pudgala Autopoiesis Protostar:
    - Treat as the highest-ready active forward lane.
    - CI is green at `b3cf8f855`.
    - Remaining work is GitHub review-thread/receipt/human-gate handling, not

@@ -187,7 +187,27 @@ class TrackStrength:
 
 def criterion_text(criterion: dict[str, Any]) -> str:
     parts: list[str] = []
-    for key in ("id", "kind", "file", "pattern", "commit", "test", "pr", "requires_keys", "what", "description"):
+    for key in (
+        "id",
+        "kind",
+        "file",
+        "pattern",
+        "collection",
+        "field",
+        "key_field",
+        "value_field",
+        "value",
+        "expected",
+        "threshold",
+        "mapping",
+        "keys",
+        "commit",
+        "test",
+        "pr",
+        "requires_keys",
+        "what",
+        "description",
+    ):
         value = criterion.get(key)
         if value is not None:
             parts.append(str(value))
@@ -206,6 +226,50 @@ def is_malformed_criterion(criterion: dict[str, Any]) -> bool:
             or not criterion.get("file")
             or not isinstance(criterion.get("pattern"), str)
             or not criterion.get("pattern")
+        )
+    if kind == "json_count_equals":
+        return (
+            not isinstance(criterion.get("file"), str)
+            or not criterion.get("file")
+            or not isinstance(criterion.get("collection"), str)
+            or not criterion.get("collection")
+            or not isinstance(criterion.get("field"), str)
+            or not criterion.get("field")
+            or "value" not in criterion
+            or criterion.get("value") is None
+            or "expected" not in criterion
+        )
+    if kind == "json_count_greater_than":
+        return (
+            not isinstance(criterion.get("file"), str)
+            or not criterion.get("file")
+            or not isinstance(criterion.get("collection"), str)
+            or not criterion.get("collection")
+            or not isinstance(criterion.get("field"), str)
+            or not criterion.get("field")
+            or "value" not in criterion
+            or criterion.get("value") is None
+            or "threshold" not in criterion
+        )
+    if kind == "json_collection_values_match":
+        return (
+            not isinstance(criterion.get("file"), str)
+            or not criterion.get("file")
+            or not isinstance(criterion.get("collection"), str)
+            or not criterion.get("collection")
+            or not isinstance(criterion.get("key_field"), str)
+            or not criterion.get("key_field")
+            or not isinstance(criterion.get("value_field"), str)
+            or not criterion.get("value_field")
+            or not isinstance(criterion.get("expected"), dict)
+        )
+    if kind == "json_mapping_keys_nonempty":
+        return (
+            not isinstance(criterion.get("file"), str)
+            or not criterion.get("file")
+            or not isinstance(criterion.get("mapping"), str)
+            or not criterion.get("mapping")
+            or not isinstance(criterion.get("keys"), list)
         )
     if kind == "commit_on_main":
         return not isinstance(criterion.get("commit"), str) or not criterion.get("commit")
@@ -271,6 +335,13 @@ def strength_reason(kind: str, supported: bool, malformed: bool, text: str, stre
         return "landed commit evidence; proves inclusion, not behavior by itself"
     if kind == "pr_merged":
         return "merge receipt evidence; proves workflow state, not behavior by itself"
+    if kind in {
+        "json_count_equals",
+        "json_count_greater_than",
+        "json_collection_values_match",
+        "json_mapping_keys_nonempty",
+    }:
+        return "structured JSON assertion; stronger than prose grep, weaker than independent execution"
     if kind == "test_passes" and strength >= 4:
         return "passing adversarial/failure-mode pytest target"
     if kind == "test_passes":

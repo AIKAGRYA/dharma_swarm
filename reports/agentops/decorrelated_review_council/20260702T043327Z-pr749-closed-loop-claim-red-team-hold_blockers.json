@@ -1,0 +1,71 @@
+{
+  "blockers": [
+    "openrouter-free-minimaxm3: verdict=revise",
+    "openrouter-free-minimaxm3: disagreement=The PR's intent and audit implementation are honest and correct. The only material defect is the ACTIVE_TRACK.yaml completion criteria that contradict the intended claim boundary. Once those 11 CLOSED_LIVE criteria are removed, the claim bo",
+    "persistent-agent:palantir-pilot: persistent A2A worker is not currently running"
+  ],
+  "conviction_gate": "hold_blockers",
+  "critic_count": 1,
+  "critics": [
+    {
+      "actual_model": "nvidia/nemotron-3-ultra-550b-a55b-20260604:free",
+      "lane_id": "openrouter-free-minimaxm3",
+      "latency_ms": 25646,
+      "ok": true,
+      "parsed": {
+        "blockers": [
+          "ACTIVE_TRACK.yaml loop-closure-2026-06 track has 11 completion criteria checking for 'CLOSED_LIVE' verdicts in latest_audit.md (cybernetics_codex_loop1_closed_live through cybernetics_codex_loop11_closed_live). All 11 are failing per active_track_evidence.md.",
+          "These CLOSED_LIVE criteria contradict the track's declared target_closure_kind: CLOSED_NOT_PROD and the actual audit output which correctly shows HARNESS_PROVEN for loops 1-11.",
+          "The presence of these criteria prevents the track from ever becoming SHIPPABLE while creating ambiguity about the true claim boundary."
+        ],
+        "evidence_checked": [
+          "docs/governance/ACTIVE_TRACK.yaml - loop-closure-2026-06 track completion_criteria lines 320-360",
+          "reports/governance/active_track_evidence.md - shows all 11 CLOSED_LIVE criteria failing (\u2717)",
+          "reports/loop_closure/cybernetics_codex/latest_audit.json - loop_statuses shows HARNESS_PROVEN for loops 1-11, BLOCKED for 12-13",
+          "reports/loop_closure/cybernetics_codex/latest_audit.md - markdown table shows HARNESS_PROVEN with 'not CLOSED_LIVE' boundary explanations",
+          "CYBERNETIC_LOOP_MAP.md - loop status summary correctly shows HARNESS_PROVEN; not CLOSED_LIVE for loops 1-11",
+          "reports/loop_closure/RETROSPECTIVE.md - correctly states 'not a claim that Loops 1-11 are CLOSED_LIVE'",
+          "docs/ops/CYBERNETICS_CODEX.md - correctly defines HARNESS_PROVEN vs CLOSED_LIVE verdict tiers",
+          "dharma_swarm/cybernetics_codex.py - build_loop_statuses() correctly implements HARNESS_PROVEN logic, not CLOSED_LIVE",
+          "tests/test_loop_closure_cascade_replay.py - validates harness_proven requires structural evidence, not bare 'closed' boolean"
+        ],
+        "explicit_disagreement": "The PR's intent and audit implementation are honest and correct. The only material defect is the ACTIVE_TRACK.yaml completion criteria that contradict the intended claim boundary. Once those 11 CLOSED_LIVE criteria are removed, the claim boundary becomes precise and enforceable.",
+        "required_changes": [
+          "Remove all 11 cybernetics_codex_loop*_closed_live completion criteria from ACTIVE_TRACK.yaml (lines ~340-360 in the track's completion_criteria section).",
+          "Retain only the correct criteria: cybernetics_codex_11_harness_proven, cybernetics_codex_12_blocked, cybernetics_codex_13_blocked, and the per-loop receipt_valid criteria.",
+          "Add explicit criterion verifying the audit reports HARNESS_PROVEN for loops 1-11 (cybernetics_codex_11_harness_proven already exists but should be the primary gate).",
+          "Make the 'receipt-reader not live re-executor' limitation more prominent in the track description or PR-facing language (currently only in next_build_packet of audit output)."
+        ],
+        "score": 75,
+        "summary": "The audit implementation correctly distinguishes HARNESS_PROVEN from CLOSED_LIVE, but ACTIVE_TRACK.yaml contains 11 completion criteria that explicitly check for CLOSED_LIVE verdicts (cybernetics_codex_loop1_closed_live through loop11_closed_live). These criteria are currently failing, contradict the track's target_closure_kind: CLOSED_NOT_PROD, and could mislead maintainers into thinking CLOSED_LIVE is required for the track to ship.",
+        "verdict": "revise"
+      },
+      "provider": "openrouter_free",
+      "raw_response": "{\n  \"verdict\": \"revise\",\n  \"score\": 75,\n  \"summary\": \"The audit implementation correctly distinguishes HARNESS_PROVEN from CLOSED_LIVE, but ACTIVE_TRACK.yaml contains 11 completion criteria that explicitly check for CLOSED_LIVE verdicts (cybernetics_codex_loop1_closed_live through loop11_closed_live). These criteria are currently failing, contradict the track's target_closure_kind: CLOSED_NOT_PROD, and could mislead maintainers into thinking CLOSED_LIVE is required for the track to ship.\",\n  \"blockers\": [\n    \"ACTIVE_TRACK.yaml loop-closure-2026-06 track has 11 completion criteria checking for 'CLOSED_LIVE' verdicts in latest_audit.md (cybernetics_codex_loop1_closed_live through cybernetics_codex_loop11_closed_live). All 11 are failing per active_track_evidence.md.\",\n    \"These CLOSED_LIVE criteria contradict the track's declared target_closure_kind: CLOSED_NOT_PROD and the actual audit output which correctly shows HARNESS_PROVEN for loops 1-11.\",\n    \"The presence of these criteria prevents the track from ever becoming SHIPPABLE while creating ambiguity about the true claim boundary.\"\n  ],\n  \"required_changes\": [\n    \"Remove all 11 cybernetics_codex_loop*_closed_live completion criteria from ACTIVE_TRACK.yaml (lines ~340-360 in the track's completion_criteria section).\",\n    \"Retain only the correct criteria: cybernetics_codex_11_harness_proven, cybernetics_codex_12_blocked, cybernetics_codex_13_blocked, and the per-loop receipt_valid criteria.\",\n    \"Add explicit criterion verifying the audit reports HARNESS_PROVEN for loops 1-11 (cybernetics_codex_11_harness_proven already exists but should be the primary gate).\",\n    \"Make the 'receipt-reader not live re-executor' limitation more prominent in the track description or PR-facing language (currently only in next_build_packet of audit output).\"\n  ],\n  \"evidence_checked\": [\n    \"docs/governance/ACTIVE_TRACK.yaml - loop-closure-2026-06 track completion_criteria lines 320-360\",\n    \"reports/governance/active_track_evidence.md - shows all 11 CLOSED_LIVE criteria failing (\u2717)\",\n    \"reports/loop_closure/cybernetics_codex/latest_audit.json - loop_statuses shows HARNESS_PROVEN for loops 1-11, BLOCKED for 12-13\",\n    \"reports/loop_closure/cybernetics_codex/latest_audit.md - markdown table shows HARNESS_PROVEN with 'not CLOSED_LIVE' boundary explanations\",\n    \"CYBERNETIC_LOOP_MAP.md - loop status summary correctly shows HARNESS_PROVEN; not CLOSED_LIVE for loops 1-11\",\n    \"reports/loop_closure/RETROSPECTIVE.md - correctly states 'not a claim that Loops 1-11 are CLOSED_LIVE'\",\n    \"docs/ops/CYBERNETICS_CODEX.md - correctly defines HARNESS_PROVEN vs CLOSED_LIVE verdict tiers\",\n    \"dharma_swarm/cybernetics_codex.py - build_loop_statuses() correctly implements HARNESS_PROVEN logic, not CLOSED_LIVE\",\n    \"tests/test_loop_closure_cascade_replay.py - validates harness_proven requires structural evidence, not bare 'closed' boolean\"\n  ],\n  \"explicit_disagreement\": \"The PR's intent and audit implementation are honest and correct. The only material defect is the ACTIVE_TRACK.yaml completion criteria that contradict the intended claim boundary. Once those 11 CLOSED_LIVE criteria are removed, the claim boundary becomes precise and enforceable.\"\n}",
+      "requested_model": "minimax/minimax-m3",
+      "required": true
+    }
+  ],
+  "generated_at": "20260702T043327Z",
+  "max_evidence_chars": 0,
+  "max_output_tokens": 12000,
+  "persistent_agent_witness": {
+    "agent": "palantir-pilot",
+    "blocker": "persistent A2A worker is not currently running",
+    "fresh": false,
+    "heartbeat_age_seconds": 45259,
+    "heartbeat_timestamp": "2026-07-01T15:59:08Z",
+    "max_heartbeat_age_seconds": 300,
+    "raw_status": "status=stopped session=dharma_palantir_pilot_a2a_worker\nsubject=dharma.a2a.palantir-pilot\nconsumer=palantir_pilot_a2a\nstream=DHARMA_FLEET\nheartbeat=$HOME/.dharma/a2a_bus/worker_heartbeats/palantir-pilot.json\nlog=$HOME/.dharma/logs/palantir_pilot_a2a_worker/dharma_palantir_pilot_a2a_worker.log\n--- heartbeat ---\n{\n    \"agent_id\": \"palantir_pilot\",\n    \"callsign\": \"palantir-pilot\",\n    \"consumer\": \"palantir_pilot_a2a\",\n    \"cycle\": 2932,\n    \"last_receipt_path\": \"\",\n    \"receipt_count\": 0,\n    \"schema_version\": \"dharma.a2a.palantir_pilot.worker_heartbeat.v1\",\n    \"status\": \"IDLE\",\n    \"stream\": \"DHARMA_FLEET\",\n    \"subject\": \"dharma.a2a.palantir-pilot\",\n    \"suppress_no_messages\": true,\n    \"timestamp\": \"2026-07-01T15:59:08Z\"\n}\n--- consumer ---\n{\n  \"stream_name\": \"DHARMA_FLEET\",\n  \"name\": \"palantir_pilot_a2a\",\n  \"config\": {\n    \"ack_policy\": \"explicit\",\n    \"ack_wait\": 30000000000,\n    \"deliver_policy\": \"all\",\n    \"durable_name\": \"palantir_pilot_a2a\",\n    \"name\": \"palantir_pilot_a2a\",\n    \"filter_subject\": \"dharma.a2a.palantir-pilot\",\n    \"max_ack_pending\": 1000,\n    \"max_deliver\": -1,\n    \"max_waiting\": 512,\n    \"replay_policy\": \"instant\",\n    \"num_replicas\": 0,\n    \"metadata\": {\n      \"_nats.level\": \"3\",\n      \"_nats.req.level\": \"0\",\n      \"_nats.ver\": \"2.12.6\"\n    },\n    \"pause_until\": \"0001-01-01T00:00:00Z\"\n  },\n  \"created\": \"2026-06-15T16:08:32.524099Z\",\n  \"delivered\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"ack_floor\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"num_ack_pending\": 0,\n  \"num_redelivered\": 0,\n  \"num_waiting\": 0,\n  \"num_pending\": 0,\n  \"ts\": \"2026-07-02T04:33:27.253598Z\"\n}\n",
+    "status": "stopped"
+  },
+  "prompt_chars": 205997,
+  "prompt_file": "$REPO_ROOT/reports/agentops/decorrelated_review_council/prompts/pr749_closed_loop_claim_red_team.md",
+  "prompt_words_estimate": 18977,
+  "required_critic_count": 1,
+  "schema_version": "codex.decorrelated_review_council.v1",
+  "score_avg": 75.0,
+  "score_min": 75,
+  "target_score": 95,
+  "timeout_seconds": 900
+}

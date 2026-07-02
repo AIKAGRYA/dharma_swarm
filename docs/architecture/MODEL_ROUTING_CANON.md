@@ -87,7 +87,14 @@ curation:
 ---
 # Model Routing Canon
 
-This is the single story for model and provider selection in `dharma_swarm`.
+Current operator source of truth: [Model & Key Routing - The One Way](../ops/MODEL_KEY_ROUTING.md).
+
+This file is architectural background. If it disagrees with
+`docs/ops/MODEL_KEY_ROUTING.md`, trust the ops document, `make onboard`, the
+filesystem, and `git log`.
+
+Historically, this was the single story for model and provider selection in
+`dharma_swarm`.
 
 ## Source Of Truth
 

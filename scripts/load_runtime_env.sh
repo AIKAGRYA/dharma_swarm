@@ -19,7 +19,7 @@ _load_env_file() {
 if [[ -f "$HOME/.zshrc" ]]; then
     eval "$(
         grep -E '^export ' "$HOME/.zshrc" 2>/dev/null \
-            | grep -E '(API_KEY|BASE_URL|OPENROUTER|OLLAMA|GROQ|CEREBRAS|SILICONFLOW|MOONSHOT|NIM_API_KEY|NVIDIA_NIM_API_KEY)' \
+            | grep -E '(API_KEY|BASE_URL|OPENROUTER|OLLAMA|GROQ|CEREBRAS|SILICONFLOW|KIMI|MOONSHOT|NIM_API_KEY|NVIDIA_NIM_API_KEY)' \
             || true
     )"
 fi
@@ -49,6 +49,7 @@ _load_keychain_var "ANTHROPIC_API_KEY" "$USER" "anthropic-api-key"
 _load_keychain_var "OPENAI_API_KEY" "$USER" "openai-api-key"
 _load_keychain_var "OPENROUTER_API_KEY" "$USER" "openrouter-api-key"
 _load_keychain_var "OLLAMA_API_KEY" "$USER" "ollama-api-key"
+_load_keychain_var "KIMI_API_KEY" "$USER" "kimi-api-key"
 _load_keychain_var "GROQ_API_KEY" "$USER" "groq-api-key"
 _load_keychain_var "NIM_API_KEY" "$USER" "nim-api-key"
 

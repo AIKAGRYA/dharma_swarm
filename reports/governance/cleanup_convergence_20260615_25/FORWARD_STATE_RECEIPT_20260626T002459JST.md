@@ -78,6 +78,11 @@ Current GitHub PR state after the follow-up push:
 | #689 | `claude/refine-local-plan-mhj9bg` | yes | `CLEAN` | none | `NEEDS_OPERATOR_DECISION` draft cockpit reconciliation PR |
 | #687 | `ops/report-2026-06-25T0000Z` | yes | `CLEAN` | none | `DUPLICATE_OR_SUPERSEDED` / report-only draft unless operator wants it |
 
+Naming note: later governance taxonomy reserves Forge for the whole-swarm arena
+and names this anti-slop mechanism Pudgala Autopoiesis Protostar. This dated
+receipt intentionally preserves the historical PR #693 branch/worktree names as
+captured at the time so archive lookup remains possible.
+
 Current registered worktree sweep:
 
 | Path | HEAD | Dirty count | Status header | Classification |

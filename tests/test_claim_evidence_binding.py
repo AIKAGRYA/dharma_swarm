@@ -1,4 +1,4 @@
-"""Tests for the Pudgala Forge graded claim/evidence binding (Phase 1).
+"""Tests for the Pudgala Autopoiesis Protostar graded claim/evidence binding (Phase 1).
 
 These guard the anti-slop bar itself: existence-only evidence is not closure,
 self-owned tests are not independent oracles, and a machine receipt that is
@@ -6,8 +6,8 @@ tampered or stale is not evidence. They are small and fast — structural
 invariants over the extended governance gate, not the live portfolio contents.
 
 This module is the *independent oracle* (oracle_source: ci) for the proposed
-anti-slop-pudgala-forge track: it is authored to verify the kernel, not by the
-code's owner asserting its own correctness.
+anti-slop-pudgala-autopoiesis-protostar track: it is authored to verify the
+kernel, not by the code's owner asserting its own correctness.
 """
 from __future__ import annotations
 
@@ -21,18 +21,19 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts/governance"))
 
 from check_track_status import (  # type: ignore  # noqa: E402
+    CriterionResult,
+    check_mutation_score_gte,
     check_receipt_valid,
     evaluate_track,
-    grade_of_criterion,
     grade_name,
-    CriterionResult,
+    grade_of_criterion,
 )
 
 from dharma_swarm.spine.receipt import (  # noqa: E402
     VerifiedMachineReceipt,
-    append_machine_receipt,
     _canonical_json as _spine_canonical_json,
     _stable_digest as _spine_stable_digest,
+    append_machine_receipt,
 )
 from dharma_swarm.memory_kernel.write_receipts import (  # noqa: E402
     canonical_json as _wr_canonical_json,
@@ -88,15 +89,20 @@ def test_resolve_enforcement_precedence(tmp_path: Path) -> None:
     pattern.write_text(json.dumps({"stage": "enforced"}), encoding="utf-8")
     assert binding_stage(pattern) == "enforced"
     assert binding_stage(tmp_path / "missing.json") == "advisory"
+    # The shipped AI-M1 pattern is advisory today, so the bare gate stays advisory.
+    assert binding_stage() == "advisory"
 
 
 def test_receipt_command_line_records_actual_flags() -> None:
     from check_claim_evidence_binding import receipt_command_line  # type: ignore  # noqa: E402
 
-    assert receipt_command_line(
-        ["scripts/governance/check_claim_evidence_binding.py", "--warn-only", "--emit-receipt"],
-        executable="python3",
-    ) == "python3 scripts/governance/check_claim_evidence_binding.py --warn-only --emit-receipt"
+    assert (
+        receipt_command_line(
+            ["scripts/governance/check_claim_evidence_binding.py", "--warn-only", "--emit-receipt"],
+            executable="python3",
+        )
+        == "python3 scripts/governance/check_claim_evidence_binding.py --warn-only --emit-receipt"
+    )
 
 
 def test_mutation_score_gte_grades_s6_and_reads_report(tmp_path: Path) -> None:
@@ -104,35 +110,51 @@ def test_mutation_score_gte_grades_s6_and_reads_report(tmp_path: Path) -> None:
     READS a mutation-score report — above threshold passes; below / missing /
     stale fail (fail-closed). The slow mutmut run that produces the report is a
     separate `make mutation-test` step (the gate never runs mutmut inline)."""
-    from check_track_status import check_mutation_score_gte  # type: ignore  # noqa: E402
 
     assert grade_of_criterion({"kind": "mutation_score_gte"}, _passing("mutation_score_gte"), {}) == 6
     assert grade_name(6).startswith("S6")
 
     rpt = tmp_path / "mutation_score.json"
-    rpt.write_text(json.dumps({"score": 0.72, "killed": 36, "total": 50,
-                               "produced_at": "2026-06-25T00:00:00Z"}), encoding="utf-8")
-    assert check_mutation_score_gte(str(rpt), 0.6).passed              # 0.72 >= 0.60
-    assert not check_mutation_score_gte(str(rpt), 0.8).passed          # 0.72 <  0.80
-    assert not check_mutation_score_gte(str(tmp_path / "nope.json"), 0.6).passed  # missing -> fail-closed
+    rpt.write_text(
+        json.dumps(
+            {
+                "score": 0.72,
+                "killed": 36,
+                "total": 50,
+                "produced_at": "2026-06-25T00:00:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert check_mutation_score_gte(str(rpt), 0.6).passed
+    assert not check_mutation_score_gte(str(rpt), 0.8).passed
+    assert not check_mutation_score_gte(str(tmp_path / "nope.json"), 0.6).passed
     old = tmp_path / "old.json"
-    old.write_text(json.dumps({"score": 0.99, "produced_at": "2020-01-01T00:00:00Z"}), encoding="utf-8")
-    assert not check_mutation_score_gte(str(old), 0.6, fresh_ttl_days=1).passed   # stale -> fail
+    old.write_text(
+        json.dumps({"score": 0.99, "produced_at": "2020-01-01T00:00:00Z"}),
+        encoding="utf-8",
+    )
+    assert not check_mutation_score_gte(str(old), 0.6, fresh_ttl_days=1).passed
 
 
 def test_run_mutation_score_build_report() -> None:
-    """The mutmut-3.5 runner (run_mutation_score.py, grafted from #696) projects
-    `mutmut export-cicd-stats` into the report the S6 gate reads:
-    score = (killed + caught_by_type_check) / (total - skipped), with `passed` vs
-    threshold and a produced_at for the freshness check. Pure function — no run."""
+    """The mutmut-3.5 runner projects `mutmut export-cicd-stats` into the report
+    the S6 gate reads."""
     from run_mutation_score import build_report  # type: ignore  # noqa: E402
 
-    stats = {"killed": 36, "caught_by_type_check": 0, "survived": 12,
-             "timeout": 1, "suspicious": 1, "skipped": 4, "total": 54}
-    r = build_report(stats, threshold=0.6, command="mutmut run")
-    assert r["killed"] == 36 and r["total"] == 50            # 54 raw - 4 skipped
-    assert r["score"] == 0.72 and r["passed"] is True
-    assert "produced_at" in r                                # the S6 freshness field
+    stats = {
+        "killed": 36,
+        "caught_by_type_check": 0,
+        "survived": 12,
+        "timeout": 1,
+        "suspicious": 1,
+        "skipped": 4,
+        "total": 54,
+    }
+    report = build_report(stats, threshold=0.6, command="mutmut run")
+    assert report["killed"] == 36 and report["total"] == 50
+    assert report["score"] == 0.72 and report["passed"] is True
+    assert "produced_at" in report
     assert build_report({"total": 0}, threshold=0.6, command="x")["score"] == 0.0
 
 
@@ -147,15 +169,20 @@ def test_single_owner_no_second_strength_ladder() -> None:
     import track_acceptance_strength_report as tas  # type: ignore  # noqa: E402
 
     raw = load_active_track(REPO_ROOT / "docs/governance/evidence_grades.yaml")
-    km = raw.get("kind_maturity")
-    assert isinstance(km, dict) and km, "evidence_grades.yaml must carry kind_maturity (the single source)"
+    kind_maturity = raw.get("kind_maturity")
+    assert isinstance(kind_maturity, dict) and kind_maturity, (
+        "evidence_grades.yaml must carry kind_maturity (the single source)"
+    )
     for kind, strength in tas.KIND_STRENGTH.items():
-        assert int(km.get(kind, -999)) == strength, (
+        assert int(kind_maturity.get(kind, -999)) == strength, (
             f"track_acceptance strength for {kind}={strength} drifted from "
-            f"evidence_grades.yaml kind_maturity={km.get(kind)}")
-    assert "mutation_score_gte" in tas.KIND_STRENGTH  # the gap the review caught is now closed
+            f"evidence_grades.yaml kind_maturity={kind_maturity.get(kind)}"
+        )
+    assert "mutation_score_gte" in tas.KIND_STRENGTH
 
-    cli_src = (REPO_ROOT / "scripts/governance/check_claim_evidence_binding.py").read_text(encoding="utf-8")
+    cli_src = (REPO_ROOT / "scripts/governance/check_claim_evidence_binding.py").read_text(
+        encoding="utf-8"
+    )
     assert "from check_track_status import" in cli_src and "evaluate_track" in cli_src
     assert "def evaluate_track" not in cli_src, "the thin CLI must not re-implement the evaluator"
 
@@ -163,6 +190,7 @@ def test_single_owner_no_second_strength_ladder() -> None:
 # --------------------------------------------------------------------------- #
 # Grade ladder + graded conjunct                                              #
 # --------------------------------------------------------------------------- #
+
 
 def _passing(kind: str) -> CriterionResult:
     return CriterionResult(id="x", kind=kind, passed=True, detail="")
@@ -187,16 +215,22 @@ def test_empty_grade_config_preserves_builtin_ladder(tmp_path: Path) -> None:
         grade_file.write_text("schema_version: 1\ngrades: []\n", encoding="utf-8")
         cts.EVIDENCE_GRADES_PATH = grade_file
         cts._GRADE_LADDER_CACHE = None
-        assert grade_of_criterion(
-            {"kind": "test_passes", "oracle_source": "ci"},
-            _passing("test_passes"),
-            {},
-        ) == 3
-        assert grade_of_criterion(
-            {"kind": "commit_on_main"},
-            _passing("commit_on_main"),
-            {},
-        ) == 2
+        assert (
+            grade_of_criterion(
+                {"kind": "test_passes", "oracle_source": "ci"},
+                _passing("test_passes"),
+                {},
+            )
+            == 3
+        )
+        assert (
+            grade_of_criterion(
+                {"kind": "commit_on_main"},
+                _passing("commit_on_main"),
+                {},
+            )
+            == 2
+        )
     finally:
         cts.EVIDENCE_GRADES_PATH = old_path
         cts._GRADE_LADDER_CACHE = old_cache
@@ -229,15 +263,19 @@ def test_track_on_file_contains_only_is_not_shippable() -> None:
         "status": "ACTIVE",
         "owner": "@alice",
         "completion_criteria": [
-            {"id": "c1", "kind": "file_contains",
-             "file": "docs/governance/evidence_grades.yaml", "pattern": "grades"},
+            {
+                "id": "c1",
+                "kind": "file_contains",
+                "file": "docs/governance/evidence_grades.yaml",
+                "pattern": "grades",
+            },
         ],
     }
-    r = evaluate_track(track)
-    assert r["strongest_grade"] == 1
-    assert r["min_evidence_grade"] == 2  # default floor S2
-    assert not r["shippable"]
-    assert any("strongest evidence" in b for b in r["ship_blocks"])
+    result = evaluate_track(track)
+    assert result["strongest_grade"] == 1
+    assert result["min_evidence_grade"] == 2
+    assert not result["shippable"]
+    assert any("strongest evidence" in block for block in result["ship_blocks"])
 
 
 def test_track_meets_floor_on_receipt_valid_s2(tmp_path: Path) -> None:
@@ -246,21 +284,62 @@ def test_track_meets_floor_on_receipt_valid_s2(tmp_path: Path) -> None:
     # graded conjunct is satisfied when strongest_grade meets the floor.
     log = tmp_path / "receipt.jsonl"
     append_machine_receipt(
-        VerifiedMachineReceipt(claim_id="C1", command="x", exit_code=0), path=log)
+        VerifiedMachineReceipt(claim_id="C1", command="x", exit_code=0), path=log
+    )
     track = {
         "id": "t-landed",
         "status": "ACTIVE",
         "owner": "@alice",
         "min_evidence_grade": 2,
         "completion_criteria": [
-            {"id": "c1", "kind": "receipt_valid", "file": str(log),
-             "requires_keys": ["claim_id"], "expect_chain": True},
+            {
+                "id": "c1",
+                "kind": "receipt_valid",
+                "file": str(log),
+                "requires_keys": ["claim_id"],
+                "expect_chain": True,
+            },
         ],
     }
-    r = evaluate_track(track)
-    assert r["strongest_grade"] >= 2
-    assert not any("strongest evidence" in b for b in r["ship_blocks"])
-    assert r["shippable"]
+    result = evaluate_track(track)
+    assert result["strongest_grade"] >= 2
+    assert not any("strongest evidence" in block for block in result["ship_blocks"])
+    assert result["shippable"]
+
+
+def test_track_meets_s6_floor_on_mutation_score(tmp_path: Path) -> None:
+    from dharma_swarm.spine.receipt import _utc_now  # type: ignore
+
+    report = tmp_path / "mutation_score.json"
+    report.write_text(
+        json.dumps(
+            {
+                "score": 0.75,
+                "killed": 3,
+                "total": 4,
+                "produced_at": _utc_now(),
+            }
+        ),
+        encoding="utf-8",
+    )
+    track = {
+        "id": "t-mutated",
+        "status": "ACTIVE",
+        "owner": "@alice",
+        "min_evidence_grade": 6,
+        "completion_criteria": [
+            {
+                "id": "c1",
+                "kind": "mutation_score_gte",
+                "file": str(report),
+                "threshold": 0.6,
+                "fresh_ttl_days": 7,
+            },
+        ],
+    }
+    result = evaluate_track(track)
+    assert result["strongest_grade"] == 6
+    assert result["shippable"], result["ship_blocks"]
 
 
 def test_grade_name_is_human_readable() -> None:
@@ -272,21 +351,25 @@ def test_grade_name_is_human_readable() -> None:
 # VerifiedMachineReceipt: chain, digest, freshness                            #
 # --------------------------------------------------------------------------- #
 
+
 def test_machine_receipt_roundtrips_and_chains(tmp_path: Path) -> None:
     log = tmp_path / "receipts.jsonl"
     c1 = append_machine_receipt(
-        VerifiedMachineReceipt(claim_id="C1", command="pytest a", exit_code=0), path=log)
+        VerifiedMachineReceipt(claim_id="C1", command="pytest a", exit_code=0), path=log
+    )
     c2 = append_machine_receipt(
-        VerifiedMachineReceipt(claim_id="C1", command="pytest b", exit_code=0), path=log)
+        VerifiedMachineReceipt(claim_id="C1", command="pytest b", exit_code=0), path=log
+    )
     assert c1.verify() and c2.verify()
-    assert c2.prev_digest == c1.digest          # linked
-    assert c1.prev_digest == ""                  # genesis
+    assert c2.prev_digest == c1.digest
+    assert c1.prev_digest == ""
 
 
 def test_checker_accepts_intact_chain(tmp_path: Path) -> None:
     log = tmp_path / "receipts.jsonl"
     append_machine_receipt(
-        VerifiedMachineReceipt(claim_id="C1", command="x", exit_code=0), path=log)
+        VerifiedMachineReceipt(claim_id="C1", command="x", exit_code=0), path=log
+    )
     res = check_receipt_valid(str(log), ["claim_id", "command"], expect_chain=True)
     assert res.passed, res.detail
 
@@ -294,10 +377,11 @@ def test_checker_accepts_intact_chain(tmp_path: Path) -> None:
 def test_checker_rejects_tampered_digest(tmp_path: Path) -> None:
     log = tmp_path / "receipts.jsonl"
     append_machine_receipt(
-        VerifiedMachineReceipt(claim_id="C1", command="x", exit_code=0), path=log)
-    rows = [json.loads(l) for l in log.read_text().splitlines() if l.strip()]
-    rows[0]["command"] = "rm -rf /"            # tamper, keep stale digest
-    log.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+        VerifiedMachineReceipt(claim_id="C1", command="x", exit_code=0), path=log
+    )
+    rows = [json.loads(line) for line in log.read_text().splitlines() if line.strip()]
+    rows[0]["command"] = "rm -rf /"
+    log.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
     res = check_receipt_valid(str(log), [], expect_chain=True)
     assert not res.passed
     assert "digest mismatch" in res.detail
@@ -312,8 +396,9 @@ def test_checker_rejects_non_object_chain_row(tmp_path: Path) -> None:
 
 
 def test_checker_rejects_missing_genesis_anchor(tmp_path: Path) -> None:
-    log = tmp_path / "receipts.jsonl"
     from dharma_swarm.spine.receipt import _stable_digest  # type: ignore
+
+    log = tmp_path / "receipts.jsonl"
     row = {"claim_id": "C1", "command": "x", "prev_digest": "external"}
     row["digest"] = _stable_digest(row)
     log.write_text(json.dumps(row) + "\n", encoding="utf-8")
@@ -323,17 +408,18 @@ def test_checker_rejects_missing_genesis_anchor(tmp_path: Path) -> None:
 
 
 def test_checker_rejects_broken_chain_link(tmp_path: Path) -> None:
+    from dharma_swarm.spine.receipt import _stable_digest  # type: ignore
+
     log = tmp_path / "receipts.jsonl"
     append_machine_receipt(VerifiedMachineReceipt(claim_id="C1", command="x"), path=log)
     append_machine_receipt(VerifiedMachineReceipt(claim_id="C1", command="y"), path=log)
-    rows = [json.loads(l) for l in log.read_text().splitlines() if l.strip()]
+    rows = [json.loads(line) for line in log.read_text().splitlines() if line.strip()]
     # Re-digest row 1 with a wrong prev_digest so its own digest stays valid but
     # the link is broken.
-    from dharma_swarm.spine.receipt import _stable_digest  # type: ignore
     rows[1]["prev_digest"] = "deadbeef"
     payload = {k: v for k, v in rows[1].items() if k != "digest"}
     rows[1]["digest"] = _stable_digest(payload)
-    log.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    log.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
     res = check_receipt_valid(str(log), [], expect_chain=True)
     assert not res.passed
     assert "broken" in res.detail
@@ -343,21 +429,21 @@ def test_append_machine_receipt_refuses_to_extend_tampered_earlier_row(tmp_path:
     log = tmp_path / "receipts.jsonl"
     append_machine_receipt(VerifiedMachineReceipt(claim_id="C1", command="x"), path=log)
     append_machine_receipt(VerifiedMachineReceipt(claim_id="C1", command="y"), path=log)
-    rows = [json.loads(l) for l in log.read_text(encoding="utf-8").splitlines() if l.strip()]
+    rows = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines() if line.strip()]
     rows[0]["command"] = "tampered earlier row"
-    log.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+    log.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match="row 0 digest is broken"):
         append_machine_receipt(VerifiedMachineReceipt(claim_id="C1", command="z"), path=log)
 
 
 def test_checker_rejects_stale_receipt(tmp_path: Path) -> None:
-    log = tmp_path / "receipt.json"
-    # Single-object receipt with an old produced_at and a matching digest.
     from dharma_swarm.spine.receipt import _stable_digest  # type: ignore
+
+    log = tmp_path / "receipt.json"
     row = {"claim_id": "C1", "produced_at": "2000-01-01T00:00:00Z"}
     row["digest"] = _stable_digest({k: v for k, v in row.items() if k != "digest"})
-    log.write_text(json.dumps(row))
+    log.write_text(json.dumps(row), encoding="utf-8")
     res = check_receipt_valid(str(log), ["claim_id"], expect_digest=True, fresh_ttl_days=7)
     assert not res.passed
     assert "stale" in res.detail
@@ -365,9 +451,96 @@ def test_checker_rejects_stale_receipt(tmp_path: Path) -> None:
 
 def test_checker_accepts_fresh_single_receipt(tmp_path: Path) -> None:
     from dharma_swarm.spine.receipt import _stable_digest, _utc_now  # type: ignore
+
     log = tmp_path / "receipt.json"
     row = {"claim_id": "C1", "produced_at": _utc_now()}
     row["digest"] = _stable_digest({k: v for k, v in row.items() if k != "digest"})
-    log.write_text(json.dumps(row))
+    log.write_text(json.dumps(row), encoding="utf-8")
     res = check_receipt_valid(str(log), ["claim_id"], expect_digest=True, fresh_ttl_days=7)
     assert res.passed, res.detail
+
+
+# --------------------------------------------------------------------------- #
+# Mutation score report                                                       #
+# --------------------------------------------------------------------------- #
+
+
+def test_checker_accepts_passing_mutation_score(tmp_path: Path) -> None:
+    from dharma_swarm.spine.receipt import _utc_now  # type: ignore
+
+    report = tmp_path / "mutation_score.json"
+    report.write_text(
+        json.dumps(
+            {
+                "score": 0.75,
+                "killed": 3,
+                "total": 4,
+                "produced_at": _utc_now(),
+            }
+        ),
+        encoding="utf-8",
+    )
+    res = check_mutation_score_gte(str(report), 0.6, fresh_ttl_days=7)
+    assert res.passed, res.detail
+    assert "0.75 >= 0.60" in res.detail
+
+
+def test_checker_rejects_low_mutation_score(tmp_path: Path) -> None:
+    from dharma_swarm.spine.receipt import _utc_now  # type: ignore
+
+    report = tmp_path / "mutation_score.json"
+    report.write_text(
+        json.dumps(
+            {
+                "score": 0.5,
+                "killed": 1,
+                "total": 2,
+                "produced_at": _utc_now(),
+            }
+        ),
+        encoding="utf-8",
+    )
+    res = check_mutation_score_gte(str(report), 0.6, fresh_ttl_days=7)
+    assert not res.passed
+    assert "0.50 < 0.60" in res.detail
+
+
+def test_checker_rejects_stale_mutation_score(tmp_path: Path) -> None:
+    report = tmp_path / "mutation_score.json"
+    report.write_text(
+        json.dumps(
+            {
+                "score": 1.0,
+                "killed": 2,
+                "total": 2,
+                "produced_at": "2000-01-01T00:00:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    res = check_mutation_score_gte(str(report), 0.6, fresh_ttl_days=7)
+    assert not res.passed
+    assert "stale" in res.detail
+
+
+def test_mutation_score_report_builder_counts_bad_mutants_against_score() -> None:
+    from run_mutation_score import build_report  # type: ignore
+
+    report = build_report(
+        {
+            "killed": 3,
+            "caught_by_type_check": 1,
+            "survived": 1,
+            "no_tests": 1,
+            "timeout": 0,
+            "suspicious": 0,
+            "skipped": 2,
+            "total": 8,
+        },
+        threshold=0.6,
+        command="normalize-mutmut-stats",
+    )
+    assert report["killed"] == 4
+    assert report["total"] == 6
+    assert report["score"] == 0.666667
+    assert report["passed"] is True

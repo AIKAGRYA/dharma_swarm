@@ -22,6 +22,8 @@ func main() {
 	health := flag.String("health", "", "health JSON output path")
 	fetch := flag.Bool("fetch", false, "perform public network fetches")
 	cascadeFor := flag.String("cascade-for", "", "movement id for cascade observations")
+	beats := flag.Bool("beats", false, "additionally sweep DefaultBeats() -- the capped, curated research-beat set used by the (separate, lower-cadence) deep sweep")
+	maxBeatSources := flag.Int("max-beat-sources", MaxDeepSweepBeatSources, "maximum beat-derived query sources when --beats is set; 0 disables beat fanout")
 	var queries multiFlag
 	flag.Var(&queries, "query", "cascade query to scan; repeatable")
 	flag.Parse()
@@ -42,6 +44,13 @@ func main() {
 		sources := LoadSources(*stateDir)
 		if len(queries) > 0 {
 			sources = SourcesForQueries([]string(queries), *cascadeFor)
+		}
+		if *beats {
+			// Additive, not a replacement: the deep sweep still wants the
+			// normal curated source list plus the capped beat set, not one
+			// instead of the other. Existing --fetch/--query behavior is
+			// unchanged when --beats is not passed.
+			sources = append(sources, DeepSweepBeatSources(DefaultBeats(), *maxBeatSources)...)
 		}
 		observations, result, err = FetchSources(sources)
 		if err != nil {

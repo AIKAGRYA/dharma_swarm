@@ -7,15 +7,26 @@ Do not hand-edit the generated block.
 | Metric | Value |
 |---|---:|
 | Dharma Python modules | 812 |
+| Dharma Python modules | 840 |
 | Top-level Dharma Python modules | 420 |
 | Dharma Python LOC | 327,057 |
 | Test files | 777 |
 | Test function occurrences | 12,150 |
 | Markdown files | 1,171 |
 | Markdown total lines | 260,068 |
+| Dharma Python LOC | 331,030 |
+| Test files | 782 |
+| Test function occurrences | 12,198 |
+| Markdown files | 1,171 |
+| Markdown total lines | 260,083 |
+| Dharma Python LOC | 326,297 |
+| Test files | 777 |
+| Test function occurrences | 12,164 |
+| Markdown files | 1,238 |
+| Markdown total lines | 270,022 |
 | Bridge files | 26 |
 | Adapter files | 25 |
 | Orchestrator files | 6 |
 | Router files | 16 |
-| Authority candidate docs | 544 |
+| Authority candidate docs | 558 |
 <!-- DOCOPS:END -->

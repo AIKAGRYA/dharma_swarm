@@ -28,6 +28,7 @@ SAMBANOVA_API_KEY_ENV = "SAMBANOVA_API_KEY"
 MISTRAL_API_KEY_ENV = "MISTRAL_API_KEY"
 CHUTES_API_KEY_ENV = "CHUTES_API_KEY"
 ZHIPU_API_KEY_ENV = "ZHIPU_API_KEY"
+KIMI_API_KEY_ENV = "KIMI_API_KEY"
 MOONSHOT_API_KEY_ENV = "MOONSHOT_API_KEY"
 NGC_API_KEY_ENV = "NGC_API_KEY"
 NVIDIA_API_KEY_ENV = "NVIDIA_API_KEY"
@@ -60,6 +61,7 @@ SAMBANOVA_BASE_URL_ENV = "SAMBANOVA_BASE_URL"
 MISTRAL_BASE_URL_ENV = "MISTRAL_BASE_URL"
 CHUTES_BASE_URL_ENV = "CHUTES_BASE_URL"
 ZHIPU_BASE_URL_ENV = "ZHIPU_BASE_URL"
+KIMI_BASE_URL_ENV = "KIMI_BASE_URL"
 MOONSHOT_BASE_URL_ENV = "MOONSHOT_BASE_URL"
 
 
@@ -91,6 +93,7 @@ PROVIDER_API_KEY_ENV_KEYS: dict[str, str] = {
     "mistral": MISTRAL_API_KEY_ENV,
     "chutes": CHUTES_API_KEY_ENV,
     "zhipu": ZHIPU_API_KEY_ENV,
+    "kimi_code": KIMI_API_KEY_ENV,
 }
 
 CHAT_PROVIDER_API_KEY_ENV_KEYS: dict[str, str] = {
@@ -102,6 +105,8 @@ CHAT_PROVIDER_API_KEY_ENV_KEYS: dict[str, str] = {
     "together": TOGETHER_API_KEY_ENV,
     "fireworks": FIREWORKS_API_KEY_ENV,
     "nvidia_nim": NVIDIA_NIM_API_KEY_ENV,
+    "zhipu": ZHIPU_API_KEY_ENV,
+    "kimi_code": KIMI_API_KEY_ENV,
 }
 
 PROVIDER_BASE_URL_ENV_KEYS: dict[str, str] = {
@@ -120,6 +125,7 @@ PROVIDER_BASE_URL_ENV_KEYS: dict[str, str] = {
     "mistral": MISTRAL_BASE_URL_ENV,
     "chutes": CHUTES_BASE_URL_ENV,
     "zhipu": ZHIPU_BASE_URL_ENV,
+    "kimi_code": KIMI_BASE_URL_ENV,
 }
 
 GINKO_API_KEY_ENV_VARS: dict[str, str] = {
@@ -177,6 +183,10 @@ ENV_ALIASES: dict[str, str] = {
     "GLM_API_KEY": ZHIPU_API_KEY_ENV,
     "ZAI_API_KEY": ZHIPU_API_KEY_ENV,
     "ZHIPUAI_API_KEY": ZHIPU_API_KEY_ENV,
+    "BIGMODEL_API_KEY": ZHIPU_API_KEY_ENV,
+    # Kimi Code membership API. This is not the pay-as-you-go Moonshot
+    # Platform lane; callers should prefer KIMI_API_KEY for Kimi Code.
+    "MOONSHOT_KIMI_API_KEY": KIMI_API_KEY_ENV,
     # dkeys may export DEEPSEEK_API_KEY; no first-class provider yet but
     # OpenRouter is the canonical lane — alias for forward-compat
     "DEEPSEEK_API_KEY": "DEEPSEEK_API_KEY",
@@ -400,6 +410,8 @@ __all__ = [
     "GROQ_API_KEY_ENV",
     "GROQ_BASE_URL_ENV",
     "has_any_llm",
+    "KIMI_API_KEY_ENV",
+    "KIMI_BASE_URL_ENV",
     "MISTRAL_API_KEY_ENV",
     "MISTRAL_BASE_URL_ENV",
     "MOONSHOT_API_KEY_ENV",
