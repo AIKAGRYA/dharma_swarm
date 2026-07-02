@@ -210,6 +210,18 @@ func TestDefaultBeatsAreWellFormedAndCapped(t *testing.T) {
 	}
 }
 
+func TestDefaultBeatsIncludeAgenticEngineering(t *testing.T) {
+	for _, b := range DefaultBeats() {
+		queryText := strings.Join(b.Queries, " ")
+		if strings.Contains(b.ID, "agentic_engineering") &&
+			strings.Contains(queryText, "agentic engineering") &&
+			strings.Contains(queryText, "design patterns") {
+			return
+		}
+	}
+	t.Fatal("DefaultBeats() missing agentic-engineering design-patterns beat")
+}
+
 func TestBeatSourcesTagsEachSourceWithItsBeatID(t *testing.T) {
 	beats := []Beat{
 		{ID: "test_beat_a", Name: "A", Queries: []string{"query a"}},

@@ -41,7 +41,6 @@ from dharma_swarm.spine.invoke import invoke_agent
 from dharma_swarm.spine.receipt import EvidenceReceipt
 from dharma_swarm.spine.routing import RoutingDecision
 from dharma_swarm.world_radar.analysis import build_world_signal_board
-from dharma_swarm.world_radar.go_bridge import _run_go_ingestor, _run_go_scout
 from dharma_swarm.world_radar.theme_window import (
     load_theme_window,
     save_theme_window,
@@ -51,9 +50,23 @@ from dharma_swarm.world_radar.theme_window import (
 DEFAULT_MAX_VERIFICATIONS = 8
 SUCCESS_RECEIPT_STATUSES = {"ok", "completed", "success"}
 
-ScoutFn = Callable[..., tuple[list[dict[str, Any]], str | None, dict[str, int | str | bool]]]
-IngestFn = Callable[..., tuple[list[dict[str, Any]], str | None]]
+ScoutResult = tuple[list[dict[str, Any]], str | None, dict[str, int | str | bool]]
+IngestResult = tuple[list[dict[str, Any]], str | None]
+ScoutFn = Callable[..., ScoutResult]
+IngestFn = Callable[..., IngestResult]
 DispatchFn = Callable[..., Awaitable[EvidenceReceipt]]
+
+
+def _default_go_scout(**kwargs: Any) -> ScoutResult:
+    from dharma_swarm.world_radar.go_bridge import _run_go_scout
+
+    return _run_go_scout(**kwargs)
+
+
+def _default_go_ingestor(**kwargs: Any) -> IngestResult:
+    from dharma_swarm.world_radar.go_bridge import _run_go_ingestor
+
+    return _run_go_ingestor(**kwargs)
 
 
 def _receipt_succeeded(receipt: EvidenceReceipt) -> bool:
@@ -223,8 +236,8 @@ async def run_deep_sweep(
     scout_timeout_s: int = 300,
     verification_timeout_s: int = 300,
     synthesis_timeout_s: int = 300,
-    scout_fn: ScoutFn = _run_go_scout,
-    ingest_fn: IngestFn = _run_go_ingestor,
+    scout_fn: ScoutFn = _default_go_scout,
+    ingest_fn: IngestFn = _default_go_ingestor,
     dispatch_fn: DispatchFn = _dispatch,
 ) -> dict[str, Any]:
     """The capped, automated deep sweep.

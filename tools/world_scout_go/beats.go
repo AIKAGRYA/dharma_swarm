@@ -25,6 +25,7 @@ func DefaultBeats() []Beat {
 		{ID: "heterogeneous_ensemble_diversity", Name: "Heterogeneous ensemble diversity gains", Queries: []string{"heterogeneous LLM ensemble diversity benchmark 2026"}},
 		{ID: "self_improving_agents", Name: "Self-improving / self-modifying agent systems", Queries: []string{"self-improving agent system Darwin Godel machine 2026"}},
 		{ID: "agent_memory_context", Name: "Agent memory, sleep-time compute, context engineering", Queries: []string{"agent memory context engineering compaction 2026"}},
+		{ID: "agentic_engineering_design_patterns", Name: "Agentic engineering and design patterns", Queries: []string{"agentic engineering design patterns agents 2026"}},
 		{ID: "agent_protocols_orchestration", Name: "Agent protocols and orchestration infrastructure", Queries: []string{"agent orchestration protocol MCP A2A 2026"}},
 		{ID: "production_incidents_safety", Name: "Autonomous agent production incidents", Queries: []string{"autonomous agent production incident safety 2026"}},
 		{ID: "benchmark_trust_crisis", Name: "Agent benchmark trust and reward hacking", Queries: []string{"agent benchmark reward hacking trust crisis 2026"}},
