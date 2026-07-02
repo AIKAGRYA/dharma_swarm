@@ -33,6 +33,27 @@ SCHEMA_VERSION = "forge_v2.pr_suite_fail_to_pass_validator.v1"
 DEFAULT_TEST_COMMAND_TEMPLATE = "{python} -m pytest -q {targets}"
 DEFAULT_RECEIPT_ROOT = dharma_state_dir() / "forge_v1" / "task_harvests" / "pr_suite_validation_receipts"
 
+# pytest exit-code semantics (documented contract, verified empirically):
+#   0 = all selected tests passed
+#   1 = tests ran and at least one FAILED
+#   2 = collection / internal error (e.g. ImportError because a new API/helper
+#       introduced by the PR does not exist on the base commit)
+#   3 = internal error while running tests
+#   4 = usage error / no tests were selected (e.g. a bad ``file::node`` id)
+#   5 = no tests were collected
+# Only exit 1 (a real test failure) and exit 2 (a real collection error that the
+# fix removes) count as an honest FAIL on the base commit.  Exit 4/5, a timeout
+# (our sentinel 124), or exit 3 mean "the test never really ran" -- treating any
+# of those as a base failure would mint FAIL_TO_PASS tasks that never observed a
+# regression, which is exactly the self-deception the Honest Loop must refuse.
+PYTEST_PASSED = 0
+PYTEST_BASE_FAILING_CODES = frozenset({1, 2})
+
+BASE_OUTCOME_FAILED = "failed_on_base"
+BASE_OUTCOME_PASSED = "passed_on_base"
+BASE_OUTCOME_INCONCLUSIVE_TIMEOUT = "inconclusive_timeout_on_base"
+BASE_OUTCOME_INCONCLUSIVE_NO_RUN = "inconclusive_no_real_run_on_base"
+
 
 @dataclass(frozen=True)
 class CommandResult:
@@ -61,6 +82,24 @@ class CommandResult:
 
 def now_stamp() -> str:
     return time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+
+
+def classify_base_outcome(result: "CommandResult") -> str:
+    """Classify a base-commit test run into an honest outcome bucket.
+
+    A FAIL_TO_PASS candidate is only real when the base commit *ran the test and
+    it genuinely failed*.  We therefore separate a real failure (exit 1/2) from
+    "the test never really ran" (timeout, no-tests-selected, no-tests-collected,
+    internal harness error), so the latter can never be counted as a regression.
+    """
+
+    if result.timed_out:
+        return BASE_OUTCOME_INCONCLUSIVE_TIMEOUT
+    if result.returncode == PYTEST_PASSED:
+        return BASE_OUTCOME_PASSED
+    if result.returncode in PYTEST_BASE_FAILING_CODES:
+        return BASE_OUTCOME_FAILED
+    return BASE_OUTCOME_INCONCLUSIVE_NO_RUN
 
 
 def _run(argv: list[str], *, cwd: Path, timeout_seconds: int) -> CommandResult:
@@ -333,17 +372,29 @@ def validate_candidate(
             fixed_result = _run(fixed_command, cwd=checkout, timeout_seconds=timeout_seconds)
             commands.append({"phase": "test_fixed", "target": target, **fixed_result.to_receipt()})
 
+            base_outcome = classify_base_outcome(base_result)
+            base_failed = base_outcome == BASE_OUTCOME_FAILED
             target_state = {
                 "target": target,
                 "base_returncode": base_result.returncode,
                 "fixed_returncode": fixed_result.returncode,
-                "base_failed": not base_result.passed,
+                "base_outcome": base_outcome,
+                "base_failed": base_failed,
                 "fixed_passed": fixed_result.passed,
-                "validated_fail_to_pass": (not base_result.passed) and fixed_result.passed,
+                "validated_fail_to_pass": base_failed and fixed_result.passed,
             }
             target_results.append(target_state)
             if target_state["validated_fail_to_pass"]:
                 validated_targets.append(target)
+            elif base_outcome in {
+                BASE_OUTCOME_INCONCLUSIVE_TIMEOUT,
+                BASE_OUTCOME_INCONCLUSIVE_NO_RUN,
+            }:
+                # The base test never actually ran to a real verdict; surface it
+                # explicitly so a non-run is never silently read as a regression.
+                blocker = f"base_test_inconclusive:{target}:{base_outcome}"
+                if blocker not in blockers:
+                    blockers.append(blocker)
 
         if validated_targets:
             status = "fail_to_pass_validated"

@@ -155,6 +155,7 @@ def test_validator_rejects_test_that_does_not_fail_on_base(tmp_path: Path) -> No
             "target": "tests/test_calculator.py",
             "base_returncode": 0,
             "fixed_returncode": 0,
+            "base_outcome": "passed_on_base",
             "base_failed": False,
             "fixed_passed": True,
             "validated_fail_to_pass": False,
@@ -203,3 +204,126 @@ def test_validator_can_write_jsonl_for_oracle(tmp_path: Path) -> None:
     assert len(rows) == 1
     assert rows[0]["fail_to_pass"] == ["tests/test_calculator.py"]
     assert rows[0]["validation_state"] == "fail_to_pass_validated"
+
+
+def _import_error_regression_repo(tmp_path: Path) -> dict[str, str]:
+    """A real FAIL_TO_PASS shape: the new test imports an API missing on base.
+
+    On the base commit the test collection raises ImportError -> pytest exit 2.
+    On the fixed commit the symbol exists and the test passes -> exit 0.
+    """
+
+    repo = _init_repo(tmp_path, "import-error-fix")
+    _write(repo / "calculator.py", "def answer():\n    return 1\n")
+    base_sha = _commit(repo, "base without new api")
+
+    _git(repo, "checkout", "-q", "-b", "feature")
+    _write(repo / "calculator.py", "def answer():\n    return 1\n\n\ndef doubled():\n    return 2\n")
+    _write(
+        repo / "tests" / "test_doubled.py",
+        "from calculator import doubled\n\n\ndef test_doubled():\n    assert doubled() == 2\n",
+    )
+    head_sha = _commit(repo, "add doubled() and its regression test")
+    _git(repo, "checkout", "-q", "main")
+    return {"repo": str(repo), "base_sha": base_sha, "head_sha": head_sha}
+
+
+def _empty_test_file_repo(tmp_path: Path) -> dict[str, str]:
+    """A false-positive trap: the PR adds a test *file* that collects NO tests.
+
+    On base the file is absent; we materialize the fixed file, but it has no test
+    functions, so pytest exits 5 (no tests collected) on BOTH base and fixed.
+    That must never be minted as a FAIL_TO_PASS regression.
+    """
+
+    repo = _init_repo(tmp_path, "empty-test-file")
+    _write(repo / "calculator.py", "def answer():\n    return 1\n")
+    base_sha = _commit(repo, "base")
+
+    _git(repo, "checkout", "-q", "-b", "feature")
+    _write(repo / "calculator.py", "def answer():\n    return 2\n")
+    _write(repo / "tests" / "test_empty.py", "# a docs/refactor PR that touches a test file but adds no test\nX = 1\n")
+    head_sha = _commit(repo, "touch a test file with no collectable tests")
+    _git(repo, "checkout", "-q", "main")
+    return {"repo": str(repo), "base_sha": base_sha, "head_sha": head_sha}
+
+
+def test_classify_base_outcome_covers_pytest_exit_codes() -> None:
+    def _cr(returncode: int, *, timed_out: bool = False) -> pr_suite_validator.CommandResult:
+        return pr_suite_validator.CommandResult(
+            argv=["pytest"], cwd=".", returncode=returncode, stdout="", stderr="", timed_out=timed_out
+        )
+
+    assert pr_suite_validator.classify_base_outcome(_cr(0)) == "passed_on_base"
+    # Real failing test and real collection error are the only honest base fails.
+    assert pr_suite_validator.classify_base_outcome(_cr(1)) == "failed_on_base"
+    assert pr_suite_validator.classify_base_outcome(_cr(2)) == "failed_on_base"
+    # "Never really ran" codes must not be read as regressions.
+    assert pr_suite_validator.classify_base_outcome(_cr(3)) == "inconclusive_no_real_run_on_base"
+    assert pr_suite_validator.classify_base_outcome(_cr(4)) == "inconclusive_no_real_run_on_base"
+    assert pr_suite_validator.classify_base_outcome(_cr(5)) == "inconclusive_no_real_run_on_base"
+    assert pr_suite_validator.classify_base_outcome(_cr(124, timed_out=True)) == "inconclusive_timeout_on_base"
+
+
+def test_validator_keeps_import_error_regression_as_fail_to_pass(tmp_path: Path) -> None:
+    refs = _import_error_regression_repo(tmp_path)
+    row = {
+        "repo": "fake/calculator",
+        "repo_path": refs["repo"],
+        "pr_number": 11,
+        "created_at": "2026-07-01T00:00:00Z",
+        "base_sha": refs["base_sha"],
+        "head_sha": refs["head_sha"],
+        "test_files": ["tests/test_doubled.py"],
+        "fail_to_pass": [],
+    }
+
+    summary = pr_suite_validator.validate_rows(
+        [row],
+        work_root=tmp_path / "work",
+        receipt_root=tmp_path / "receipts",
+        python=sys.executable,
+        timeout_seconds=30,
+    )
+
+    assert summary["validated_count"] == 1
+    out = summary["output_rows"][0]
+    assert out["fail_to_pass"] == ["tests/test_doubled.py"]
+    receipt = json.loads(Path(out["validation_receipt"]).read_text(encoding="utf-8"))
+    target = receipt["target_results"][0]
+    assert target["base_outcome"] == "failed_on_base"
+    assert target["base_returncode"] == 2  # ImportError -> pytest collection error
+    assert target["validated_fail_to_pass"] is True
+
+
+def test_validator_rejects_no_tests_collected_as_false_positive(tmp_path: Path) -> None:
+    refs = _empty_test_file_repo(tmp_path)
+    row = {
+        "repo": "fake/calculator",
+        "repo_path": refs["repo"],
+        "pr_number": 12,
+        "created_at": "2026-07-01T00:00:00Z",
+        "base_sha": refs["base_sha"],
+        "head_sha": refs["head_sha"],
+        "test_files": ["tests/test_empty.py"],
+        "fail_to_pass": [],
+    }
+
+    summary = pr_suite_validator.validate_rows(
+        [row],
+        work_root=tmp_path / "work",
+        receipt_root=tmp_path / "receipts",
+        python=sys.executable,
+        timeout_seconds=30,
+    )
+
+    assert summary["validated_count"] == 0
+    assert summary["output_rows"] == []
+    result = summary["results"][0]
+    receipt = json.loads(Path(result["receipt"]).read_text(encoding="utf-8"))
+    target = receipt["target_results"][0]
+    # No tests collected on base (exit 5) must be inconclusive, NOT a regression.
+    assert target["base_returncode"] == 5
+    assert target["base_outcome"] == "inconclusive_no_real_run_on_base"
+    assert target["validated_fail_to_pass"] is False
+    assert any(b.startswith("base_test_inconclusive:") for b in result["blockers"])
