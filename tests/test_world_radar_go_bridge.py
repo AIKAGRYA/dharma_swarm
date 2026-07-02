@@ -523,7 +523,9 @@ def test_run_go_scout_surfaces_structured_source_errors_and_mode(
     )
 
     assert rows[0]["source"] == "hacker_news_ai"
-    assert error is not None and "failures=2" in error
+    # Merged semantics (origin/main): the flat error string fires only when
+    # ALL sources fail; partial failures surface via structured source_errors.
+    assert error is None
     assert counts["invocation_mode"] in {"binary", "go_run"}
     assert counts["source_errors"] == [
         {

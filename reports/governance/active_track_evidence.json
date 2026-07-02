@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-02T13:03:15+00:00",
+  "generated_at": "2026-07-02T19:13:07+00:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-spine-adoption-2026-06",
   "shippable": false,
@@ -161,6 +161,7 @@
         "strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
       ],
       "final_boss_blocks": [],
+      "claim_boundary": null,
       "has_rigorous_evidence": false,
       "strongest_grade": 1,
       "strongest_grade_name": "S1_PRESENT",
@@ -242,14 +243,15 @@
           "detail": "reports/governance/GATE1_WITNESSED.md present",
           "executed": true
         }
-      ]
+      ],
+      "ship_vetoes": []
     },
     {
       "id": "loop-closure-2026-06",
       "name": "Cybernetic Loop Closure \u2014 wire all 13 loops with receipted closure checks",
       "status": "ACTIVE",
       "closure_kind": null,
-      "target_closure_kind": "VERIFIED_SLICE",
+      "target_closure_kind": "CLOSED_NOT_PROD",
       "graduation_profile": "generic",
       "serves": "substrate-nativeness",
       "complements": [
@@ -265,26 +267,26 @@
         "quality_gates",
         "eval_coverage"
       ],
-      "verified_at": "2026-06-11",
+      "verified_at": "2026-07-01",
       "ttl_days": 21,
       "owner": "@AmitabhainArunachala",
       "shippable": false,
       "criteria_pass": true,
       "ship_blocks": [
-        "1 open blocker next-item(s)",
-        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)",
-        "strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
+        "2 open blocker next-item(s)",
+        "1 active ship veto(es): cybernetics_codex_harness_proven_blocks_live_ship: reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses[].verdict == 'HARNESS_PROVEN': 11 > 0"
       ],
       "final_boss_blocks": [],
-      "has_rigorous_evidence": false,
-      "strongest_grade": 1,
-      "strongest_grade_name": "S1_PRESENT",
+      "claim_boundary": "CLOSED_LIVE 0/13; HARNESS_PROVEN 11/13; BLOCKED 2/13. Completion criteria only prove the claim-boundary artifact set, not production-live closure.",
+      "has_rigorous_evidence": true,
+      "strongest_grade": 2,
+      "strongest_grade_name": "S2_LANDED",
       "min_evidence_grade": 2,
       "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 11,
-        "total": 11
+        "passed": 29,
+        "total": 29
       },
       "criteria": [
         {
@@ -377,6 +379,141 @@
           "passed": true,
           "detail": "scripts/governance/register_cybernetics_codex.py present",
           "executed": true
+        },
+        {
+          "id": "cybernetics_codex_latest_audit_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "reports/loop_closure/cybernetics_codex/latest_audit.json present",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_latest_audit_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/loop_closure/cybernetics_codex/latest_audit.json valid (5 keys present, fresh)",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop_verdict_map_matches_claim_boundary",
+          "kind": "json_collection_values_match",
+          "passed": true,
+          "detail": "reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses 13 expected verdict value(s) matched",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_live_owner_criteria_declared",
+          "kind": "json_mapping_keys_nonempty",
+          "passed": true,
+          "detail": "reports/loop_closure/cybernetics_codex/latest_audit.json.live_owner_surface_criteria has non-empty values for 13 key(s)",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_closed_live_count_zero",
+          "kind": "json_count_equals",
+          "passed": true,
+          "detail": "reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses[].verdict == 'CLOSED_LIVE': 0 == 0",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_harness_proven_count_11",
+          "kind": "json_count_equals",
+          "passed": true,
+          "detail": "reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses[].verdict == 'HARNESS_PROVEN': 11 == 11",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_blocked_count_2",
+          "kind": "json_count_equals",
+          "passed": true,
+          "detail": "reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses[].verdict == 'BLOCKED': 2 == 2",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop3_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop3_evolution_closure.json valid (6 keys present)",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop4_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop4_memory_context_closure.json valid (6 keys present)",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop7_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop7_training_flywheel_closure.json valid (6 keys present)",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop8_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop8_recognition_closure.json valid (6 keys present)",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop9_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop9_conductor_closure.json valid (6 keys present)",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop10_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop10_context_agent_closure.json valid (6 keys present)",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop11_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop11_replication_monitor_closure.json valid (6 keys present)",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_one_wire_guard_test_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "tests/test_one_wire_archive_fitness_guard.py present",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_one_wire_guard_test_passes",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_one_wire_archive_fitness_guard.py: PASS \u2014 19 passed in 0.30s",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop12_13_guard_receipt_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "reports/loop_closure/cybernetics_codex/2026-07-01_loop12_13_one_wire_archive_fitness_guard.json present",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop12_13_guard_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop12_13_one_wire_archive_fitness_guard.json valid (5 keys present)",
+          "executed": true
+        }
+      ],
+      "ship_vetoes": [
+        {
+          "id": "cybernetics_codex_harness_proven_blocks_live_ship",
+          "kind": "json_count_greater_than",
+          "passed": true,
+          "detail": "reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses[].verdict == 'HARNESS_PROVEN': 11 > 0",
+          "executed": true
         }
       ]
     },
@@ -419,6 +556,7 @@
         "strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
       ],
       "final_boss_blocks": [],
+      "claim_boundary": null,
       "has_rigorous_evidence": false,
       "strongest_grade": 1,
       "strongest_grade_name": "S1_PRESENT",
@@ -514,7 +652,8 @@
           "detail": "tests/test_coordination_closure_checks.py present",
           "executed": true
         }
-      ]
+      ],
+      "ship_vetoes": []
     },
     {
       "id": "merge-master-mike-d4-2026-06",
@@ -552,6 +691,7 @@
         "strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
       ],
       "final_boss_blocks": [],
+      "claim_boundary": null,
       "has_rigorous_evidence": false,
       "strongest_grade": 1,
       "strongest_grade_name": "S1_PRESENT",
@@ -619,7 +759,8 @@
           "detail": "pattern 'schedule:' NOT FOUND in .github/workflows/merge-master-mike-backlog.yml",
           "executed": true
         }
-      ]
+      ],
+      "ship_vetoes": []
     },
     {
       "id": "organism-rewire-2026-07",
@@ -664,6 +805,7 @@
         "strongest evidence S0_EXISTS < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
       ],
       "final_boss_blocks": [],
+      "claim_boundary": null,
       "has_rigorous_evidence": false,
       "strongest_grade": 0,
       "strongest_grade_name": "S0_EXISTS",
@@ -674,7 +816,8 @@
         "passed": 0,
         "total": 0
       },
-      "criteria": []
+      "criteria": [],
+      "ship_vetoes": []
     }
   ],
   "findings": [
@@ -705,7 +848,7 @@
     {
       "severity": "INFO",
       "check": "track-provisional:loop-closure-2026-06",
-      "message": "[loop-closure-2026-06] 11/11 criteria pass but NOT shippable under the rigorous bar: 1 open blocker next-item(s); no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid); strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).",
+      "message": "[loop-closure-2026-06] 29/29 criteria pass but NOT shippable under the rigorous bar: 2 open blocker next-item(s); 1 active ship veto(es): cybernetics_codex_harness_proven_blocks_live_ship: reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses[].verdict == 'HARNESS_PROVEN': 11 > 0. Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).",
       "criterion_id": null
     },
     {
