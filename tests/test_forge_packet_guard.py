@@ -92,6 +92,94 @@ def _write_full_packet(packet: Path, *, task_count: int = 500, status: str = "po
     )
 
 
+def _write_low_power_smoke_packet(packet: Path, *, status: str = "inconclusive_low_power") -> None:
+    _write_json(
+        packet / "run_manifest.json",
+        {
+            "schema_version": "test",
+            "benchmark_family": "pr_suite",
+            "status": status,
+            "task_count": 1,
+            "taskbed_allocation": {
+                "split": "explore",
+                "task_count": 1,
+                "explore_separate_from_confirm": True,
+                "contamination_clean": None,
+            },
+        },
+    )
+    _write_json(
+        packet / "model_roster.json",
+        {"arms": [{"arm": "self_moa"}, {"arm": "verify_chain"}], "generator": "test", "verifier": "test"},
+    )
+    _write_jsonl(packet / "task_manifest.jsonl", [{"task_id": "pr::example/repo#1", "split": "explore"}])
+    _write_jsonl(
+        packet / "results.jsonl",
+        [
+            {"task_id": "pr::example/repo#1", "arm": "self_moa", "candidate_ok": True, "score": 0.0},
+            {"task_id": "pr::example/repo#1", "arm": "verify_chain", "candidate_ok": True, "score": 0.0},
+        ],
+    )
+    _write_jsonl(
+        packet / "budget_ledger.jsonl",
+        [
+            {
+                "task_id": "pr::example/repo#1",
+                "arm": "self_moa",
+                "cap_tokens": 60000,
+                "cap_usd": 0.25,
+                "actual_cost_usd": 0.0035,
+            },
+            {
+                "task_id": "pr::example/repo#1",
+                "arm": "verify_chain",
+                "cap_tokens": 60000,
+                "cap_usd": 0.25,
+                "actual_cost_usd": 0.0067,
+            },
+        ],
+    )
+    _write_jsonl(packet / "coordination_edges.jsonl", [])
+    (packet / "control_comparison.md").write_text("# Control comparison\n", encoding="utf-8")
+    (packet / "failure_taxonomy.md").write_text("# Failure taxonomy\n", encoding="utf-8")
+    (packet / "decision_record.md").write_text(f"# Decision\n\nVerdict: `{status}`\n", encoding="utf-8")
+
+
+def test_low_power_smoke_only_reports_expected_power_blockers(tmp_path: Path) -> None:
+    packet = tmp_path / "low_power_smoke"
+    _write_low_power_smoke_packet(packet)
+
+    deterministic = packet_guard.run_guard(packet_dir=packet)["deterministic_review"]
+    codes = {finding["code"] for finding in deterministic["findings"]}
+
+    assert deterministic["verdict"] == "revise_protocol"
+    assert deterministic["budget_parity"]["status"] == "pass"
+    assert deterministic["budget_parity"]["basis"] == "cap_tokens"
+    assert codes == {"low_power_under_3_tasks", "below_e4_confirm_floor"}
+
+
+def test_positive_claim_still_requires_controls_and_final_use_proof(tmp_path: Path) -> None:
+    packet = tmp_path / "positive_missing_proofs"
+    _write_low_power_smoke_packet(packet, status="positive_lift_candidate")
+    _write_json(
+        packet / "swarm_lift_report.json",
+        {
+            "status": "positive_lift_candidate",
+            "task_count": 10,
+            "swarm_lift": 0.06,
+            "paired_bootstrap_ci": {"lower": 0.01, "upper": 0.11, "n": 10},
+            "taskbed_allocation": {"split": "explore", "task_count": 10},
+        },
+    )
+
+    deterministic = packet_guard.run_guard(packet_dir=packet)["deterministic_review"]
+    codes = {finding["code"] for finding in deterministic["findings"]}
+
+    assert deterministic["verdict"] == "blocked_with_evidence"
+    assert "control_arms_incomplete" in codes
+    assert "final_use_proof_missing" in codes
+
+
 def test_superiority_claim_is_blocked_for_low_power_partial_packet(tmp_path: Path) -> None:
     packet = tmp_path / "partial"
     packet.mkdir()

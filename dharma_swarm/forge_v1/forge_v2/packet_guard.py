@@ -327,20 +327,55 @@ def final_use_ratio(packet: dict[str, Any]) -> float | None:
 
 
 def budget_parity(packet: dict[str, Any]) -> dict[str, Any]:
+    budget_rows = packet.get("budget_rows") or []
+    actuals: dict[str, float] = {}
+    for row in budget_rows:
+        arm = str(row.get("arm") or row.get("control_arm") or "").strip()
+        if not arm:
+            continue
+        if row.get("actual_cost_usd") is not None:
+            actuals[arm] = actuals.get(arm, 0.0) + safe_float(row.get("actual_cost_usd"))
+
+    # Budget parity is a proof about equal opportunity/caps, not equal actual
+    # spend after different arms choose different amounts of context/tooling.
+    # Prefer explicit caps when present; fall back to legacy token/cost totals
+    # for older packets that predate cap fields.
+    for basis in (
+        "cap_tokens",
+        "budget_tokens",
+        "cap_usd",
+        "total_tokens",
+        "tokens",
+        "cost_usd",
+        "actual_cost_usd",
+    ):
+        budgets: dict[str, float] = {}
+        for row in budget_rows:
+            arm = str(row.get("arm") or row.get("control_arm") or "").strip()
+            if not arm or row.get(basis) is None:
+                continue
+            budgets[arm] = budgets.get(arm, 0.0) + safe_float(row.get(basis))
+        values = [value for value in budgets.values() if value > 0]
+        if len(values) >= 2:
+            ratio = max(values) / min(values)
+            return {
+                "status": "pass" if ratio <= 1.10 else "mismatch",
+                "basis": basis,
+                "max_to_min_ratio": ratio,
+                "by_arm": budgets,
+                "actual_cost_usd_by_arm": actuals,
+            }
     budgets: dict[str, float] = {}
     for row in packet.get("budget_rows") or []:
         arm = str(row.get("arm") or row.get("control_arm") or "").strip()
         if not arm:
             continue
-        amount = row.get("total_tokens") or row.get("tokens") or row.get("budget_tokens") or row.get("cost_usd") or row.get("actual_cost_usd")
-        budgets[arm] = budgets.get(arm, 0.0) + safe_float(amount)
+        # Preserve the old diagnostic shape when rows exist but no comparable
+        # positive budget basis can be found.
+        budgets.setdefault(arm, 0.0)
     if not budgets:
-        return {"status": "missing", "by_arm": {}}
-    values = [value for value in budgets.values() if value > 0]
-    if len(values) < 2:
-        return {"status": "insufficient", "by_arm": budgets}
-    ratio = max(values) / min(values)
-    return {"status": "pass" if ratio <= 1.10 else "mismatch", "max_to_min_ratio": ratio, "by_arm": budgets}
+        return {"status": "missing", "by_arm": {}, "actual_cost_usd_by_arm": actuals}
+    return {"status": "insufficient", "by_arm": budgets, "actual_cost_usd_by_arm": actuals}
 
 
 def claim_requests_superiority(claim_text: str, report: dict[str, Any]) -> bool:
@@ -435,9 +470,17 @@ def evaluate_deterministic(packet: dict[str, Any], *, claim_text: str = "") -> d
             )
         )
 
+    evidence_required_for_claim = state == "positive_lift_candidate" or superiority_claim
     missing_arms = [arm for arm, ok in coverage.items() if not ok]
-    if missing_arms:
-        findings.append(Finding("warning", "control_arms_incomplete", "Not all canonical control arms are visible.", missing_arms))
+    if missing_arms and evidence_required_for_claim:
+        findings.append(
+            Finding(
+                "error",
+                "control_arms_incomplete",
+                "Not all canonical control arms are visible for a positive or superiority claim.",
+                missing_arms,
+            )
+        )
     if parity["status"] == "missing":
         findings.append(Finding("warning", "budget_ledger_missing", "No budget ledger rows found.", []))
     elif parity["status"] == "mismatch":
@@ -446,10 +489,11 @@ def evaluate_deterministic(packet: dict[str, Any], *, claim_text: str = "") -> d
         findings.append(Finding("warning", "invalid_run_rate_unknown", "No result rows available to compute invalid-run rate.", []))
     elif invalid_rate >= 0.05:
         findings.append(Finding("error", "invalid_run_rate_too_high", "Invalid-run rate is >= 5%.", [f"invalid_run_rate={invalid_rate:.4f}"]))
-    if use_ratio is None:
-        findings.append(Finding("warning", "final_use_proof_missing", "No coordination-edge final-use proof found.", []))
-    elif use_ratio < 0.30:
-        findings.append(Finding("error", "final_use_proof_below_gate", "Final-use proof covers less than 30% of relevant edges.", [f"final_use_ratio={use_ratio:.4f}"]))
+    if evidence_required_for_claim:
+        if use_ratio is None:
+            findings.append(Finding("error", "final_use_proof_missing", "No coordination-edge final-use proof found for a positive or superiority claim.", []))
+        elif use_ratio < 0.30:
+            findings.append(Finding("error", "final_use_proof_below_gate", "Final-use proof covers less than 30% of relevant edges.", [f"final_use_ratio={use_ratio:.4f}"]))
 
     authority = report.get("authority") if isinstance(report.get("authority"), dict) else {}
     mutated = [flag for flag in MUTATION_FLAGS if authority.get(flag) is True]
