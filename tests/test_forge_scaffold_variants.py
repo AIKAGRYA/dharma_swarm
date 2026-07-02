@@ -31,6 +31,12 @@ def test_static_sanity_check_rejects_invalid_arm() -> None:
     assert "invalid_arm:oracle_peek" in check["blockers"]
 
 
+def test_static_sanity_check_rejects_self_moa_as_tested_candidate_arm() -> None:
+    check = sv.static_sanity_check({**BASELINE, "arm": "self_moa", "selection_strategy": "self_moa"})
+    assert check["ok"] is False
+    assert "invalid_arm:self_moa" in check["blockers"]
+
+
 def test_static_sanity_check_rejects_verify_chain_without_verifier() -> None:
     check = sv.static_sanity_check({"arm": "verify_chain", "generator": "glm-5.2"})
     assert check["ok"] is False

@@ -35,6 +35,8 @@ class ArmSpec:
     generator: str = field(default_factory=_default_generator)
     verifier: str = field(default_factory=_default_verifier)
     mix_models: list[str] = field(default_factory=list)
+    window_chars: int = runner.DEFAULT_WINDOW_CHARS
+    selection_strategy: str = "verify_chain"
     label: str = "forge_fitness"
     scaffold_ref: str = "forge_v2.arm_spec.v1"
 
@@ -62,11 +64,20 @@ def _coerce_arm_spec(genome: ArmSpec | dict[str, Any]) -> ArmSpec:
         return genome
     if not isinstance(genome, dict):
         raise TypeError("genome must be ArmSpec or dict")
+    raw_window = genome.get("window_chars", runner.DEFAULT_WINDOW_CHARS)
+    try:
+        window_chars = int(raw_window)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"window_chars must be an integer, got {raw_window!r}") from exc
+    if window_chars <= 0:
+        raise ValueError("window_chars must be positive")
     return ArmSpec(
         arm=str(genome.get("arm", "verify_chain")),
         generator=str(genome.get("generator") or _default_generator()),
         verifier=str(genome.get("verifier") or _default_verifier()),
         mix_models=list(genome.get("mix_models", []) or []),
+        window_chars=window_chars,
+        selection_strategy=str(genome.get("selection_strategy") or "verify_chain"),
         label=str(genome.get("label", "forge_fitness")),
         scaffold_ref=str(genome.get("scaffold_ref", "forge_v2.arm_spec.v1")),
     )
@@ -142,6 +153,7 @@ def grade_genome(
         label=spec.label,
         arm=spec.arm,
         mix_ids=list(spec.mix_models),
+        window_chars=spec.window_chars,
     )
     fitness, ci = _fitness_from_receipt(receipt, split)
     closeout = str(receipt.get("closeout", ""))

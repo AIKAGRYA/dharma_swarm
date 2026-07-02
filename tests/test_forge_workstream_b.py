@@ -6,7 +6,8 @@ from pathlib import Path
 import pytest
 
 from dharma_swarm.dgm_loop import DGMLoop, run_dgm_evolution_task
-from dharma_swarm.forge_v1.forge_v2 import anchors, darwin_bridge, forge_fitness, promote, sequential, signals
+from dharma_swarm.forge_v1.forge_v2 import anchors, arms, darwin_bridge, forge_fitness, promote, sequential, signals
+from dharma_swarm.forge_v1.forge_v2.budget import Budget
 from dharma_swarm.forge_v1.forge_v2.forge_fitness import ArmSpec, grade_genome
 from dharma_swarm.forge_v1.forge_v2.verify_promotion import (
     sign_receipt,
@@ -49,9 +50,67 @@ def test_grade_genome_routes_scaffold_to_forge_runner_confirm() -> None:
     assert captured["arm"] == "verify_chain"
     assert captured["gen_id"] == "glm-5.2"
     assert captured["ver_id"] == "kimi-k2.7-code:cloud"
+    assert captured["window_chars"] == arms.DEFAULT_WINDOW_CHARS
     assert fitness.real_grade is True
     assert fitness.fitness == pytest.approx(0.06)
     assert fitness.promote_eligible is True
+
+
+def test_grade_genome_passes_track_a_window_chars_to_runner() -> None:
+    captured = {}
+
+    def fake_runner(instance_ids, **kwargs):
+        captured["instance_ids"] = instance_ids
+        captured.update(kwargs)
+        return _positive_receipt()
+
+    fitness = grade_genome(
+        {
+            "arm": "verify_chain",
+            "generator": "glm-5.2",
+            "verifier": "kimi-k2.7-code:cloud",
+            "window_chars": 9000,
+            "selection_strategy": "verify_chain",
+        },
+        ["task-a", "task-b"],
+        split="confirm",
+        runner_fn=fake_runner,
+    )
+
+    assert captured["window_chars"] == 9000
+    assert fitness.genome["window_chars"] == 9000
+
+
+def test_verify_chain_arm_applies_window_chars_override_symmetrically(monkeypatch) -> None:
+    seen_windows: list[int] = []
+
+    class Provider:
+        value = "ollama"
+
+    class Slot:
+        model_id = "glm-5.2"
+        provider = Provider()
+
+    def fake_propose_slot(*_args, **kwargs):
+        seen_windows.append(kwargs["window_chars"])
+        patch = "SEARCH\nold\nREPLACE\nnew" if len(seen_windows) == 1 else ""
+        return {"tokens": 10, "patch": patch}
+
+    monkeypatch.setattr(arms, "_propose_slot", fake_propose_slot)
+
+    result = arms.verify_chain_arm(
+        Slot(),
+        Slot(),
+        {"instance_id": "task-a"},
+        {"prompt": "context"},
+        Budget(cap_tokens=1000),
+        per_call_tokens=100,
+        timeout_s=1,
+        window_chars=9000,
+    )
+
+    assert result["final_patch"] == "SEARCH\nold\nREPLACE\nnew"
+    assert seen_windows == [9000, 9000]
 
 
 def test_grade_genome_blocks_underpowered_confirm() -> None:

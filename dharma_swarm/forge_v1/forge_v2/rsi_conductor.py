@@ -27,6 +27,7 @@ from dharma_swarm.dgm_loop import DGMLoop, DGMResult
 from . import taskbed_ledger
 from .packet_guard import run_guard
 from .runner import DEFAULT_FORGE_GENERATOR_MODEL, DEFAULT_FORGE_VERIFIER_MODEL
+from .arms import DEFAULT_WINDOW_CHARS
 from .scheduler import emit_canonical_packet
 from .signals import canonical_sha256
 from .verify_promotion import verify_promotion
@@ -133,6 +134,8 @@ def _state_from_result(
             "verifier": genome.get("verifier") or DEFAULT_FORGE_VERIFIER_MODEL,
             "arms": [arm],
             "mix_models": list(genome.get("mix_models") or []),
+            "window_chars": int(genome.get("window_chars") or DEFAULT_WINDOW_CHARS),
+            "selection_strategy": str(genome.get("selection_strategy") or arm),
             "taskbed": taskbed_allocation or None,
         },
         "taskbed_allocation": (
@@ -270,6 +273,8 @@ def run_conductor(
     genome = dict(genome or {"arm": "verify_chain"})
     genome.setdefault("generator", DEFAULT_FORGE_GENERATOR_MODEL)
     genome.setdefault("verifier", DEFAULT_FORGE_VERIFIER_MODEL)
+    genome.setdefault("window_chars", DEFAULT_WINDOW_CHARS)
+    genome.setdefault("selection_strategy", str(genome.get("arm") or "verify_chain"))
     run_dir = RUN_ROOT / f"{label}_{now_stamp()}"
     run_dir.mkdir(parents=True, exist_ok=True)
 
@@ -359,6 +364,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--instances", default="", help="Comma-separated explicit instance ids for smoke runs")
     parser.add_argument("--split", choices=["explore", "confirm"], default="explore")
     parser.add_argument("--arm", default="verify_chain")
+    parser.add_argument("--generator", default=DEFAULT_FORGE_GENERATOR_MODEL)
+    parser.add_argument("--verifier", default=DEFAULT_FORGE_VERIFIER_MODEL)
+    parser.add_argument("--mix-models", default="", help="Comma-separated pinned models for mixed_moa")
+    parser.add_argument("--window-chars", type=int, default=DEFAULT_WINDOW_CHARS)
+    parser.add_argument("--selection-strategy", default="")
+    parser.add_argument("--genome-json", default="", help="Inline JSON object merged before explicit CLI overrides")
     parser.add_argument("--epoch-id", default="epoch_0")
     parser.add_argument("--taskbed-db", default=str(taskbed_ledger.DEFAULT_DB))
     parser.add_argument("--taskbed-split", choices=["explore", "confirm"], default=None)
@@ -374,9 +385,30 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    genome = json.loads(args.genome_json) if args.genome_json.strip() else {}
+    if not isinstance(genome, dict):
+        raise TypeError("--genome-json must decode to a JSON object")
+    cli_genome = {
+        "arm": args.arm,
+        "generator": args.generator,
+        "verifier": args.verifier,
+        "window_chars": args.window_chars,
+        "selection_strategy": args.selection_strategy or args.arm,
+    }
+    if args.genome_json.strip():
+        # Treat --genome-json as the source of truth and fill only omitted
+        # defaults.  This prevents the parser's default --arm=verify_chain from
+        # silently erasing an archived Track A candidate genome.
+        for key, value in cli_genome.items():
+            genome.setdefault(key, value)
+    else:
+        genome.update(cli_genome)
+    mix_models = [item.strip() for item in args.mix_models.split(",") if item.strip()]
+    if mix_models:
+        genome["mix_models"] = mix_models
     result = run_conductor(
         label=args.label,
-        genome={"arm": args.arm},
+        genome=genome,
         instance_ids=[item.strip() for item in args.instances.split(",") if item.strip()],
         split=args.split,
         epoch_id=args.epoch_id,

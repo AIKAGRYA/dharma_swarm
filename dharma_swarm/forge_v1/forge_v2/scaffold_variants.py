@@ -29,10 +29,12 @@ from .signals import canonical_sha256
 
 SCHEMA_VERSION = "forge_v2.scaffold_variants.v1"
 
-# Valid arm/selection surface, derived from arms.py public arm functions
-# (self_moa_arm, verify_chain_arm, mixed_moa_arm).  A genome that names an arm
-# outside this set cannot be run by the Forge runner, so it is statically broken.
-VALID_ARMS = frozenset({"self_moa", "verify_chain", "mixed_moa"})
+# Valid tested-arm surface.  ``self_moa`` is the class-null arm that every
+# campaign runs for paired control; it is a valid selection strategy but not a
+# standalone tested candidate arm in the current Forge runner.  Marking it
+# broken here prevents Track A from spending grade budget on a no-op
+# self_moa-vs-self_moa scaffold.
+VALID_ARMS = frozenset({"verify_chain", "mixed_moa"})
 VALID_SELECTION_STRATEGIES = frozenset({"self_moa", "mixed_moa", "verify_chain"})
 
 # Bounds for numeric context policy.  The first-slice arms window every model to

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from dharma_swarm.dgm_loop import DGMResult
@@ -132,3 +133,38 @@ def test_conductor_emits_packet_guard_and_refuses_promotion(tmp_path: Path, monk
     }
     assert result["promotion_verdict"]["decision"] == "refused"
     assert "promotion_packet:e4_confirm_full_500" in result["promotion_verdict"]["blockers"]
+
+
+def test_conductor_preserves_full_track_a_genome_fields(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(rsi_conductor, "RUN_ROOT", tmp_path / "runs")
+
+    def fake_dgm_runner(genome, instance_ids, *, split):
+        assert genome["arm"] == "verify_chain"
+        assert genome["window_chars"] == 9000
+        assert genome["selection_strategy"] == "verify_chain"
+        assert genome["verifier"] == "deepseek-v4-pro:cloud"
+        assert instance_ids == ["fresh-task-1"]
+        assert split == "explore"
+        return _fake_dgm_result()
+
+    result = rsi_conductor.run_conductor(
+        label="unit_conductor_genome",
+        genome={
+            "arm": "verify_chain",
+            "generator": "glm-5.2",
+            "verifier": "deepseek-v4-pro:cloud",
+            "window_chars": 9000,
+            "selection_strategy": "verify_chain",
+        },
+        instance_ids=["fresh-task-1"],
+        split="explore",
+        epoch_id="epoch-test",
+        dgm_runner=fake_dgm_runner,
+        operator_lease={"lease_id": "unit"},
+    )
+
+    run_manifest = json.loads((Path(result["run_dir"]) / "run_manifest.json").read_text(encoding="utf-8"))
+    config = run_manifest["config"]
+    assert config["window_chars"] == 9000
+    assert config["selection_strategy"] == "verify_chain"
+    assert result["promotion_verdict"]["decision"] == "refused"

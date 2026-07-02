@@ -42,6 +42,7 @@ from dharma_swarm.model_pool import (  # noqa: E402
 from dharma_swarm.models import ProviderType  # noqa: E402
 
 from .arms import (
+    DEFAULT_WINDOW_CHARS,
     GEN_TEMPLATE,
     SYNTH_TEMPLATE,
     VERIFY_TEMPLATE,
@@ -322,11 +323,14 @@ def _grade_task(inst: dict, patch: str, *, timeout: int) -> tuple[bool, float, s
 
 def run(instance_ids, *, n_explore, replicates, budget_cap, budget_usd, per_call_tokens, k_self_moa,
         grade_timeout, timeout_s, strategy, roster_n, gen_id, ver_id, label,
-        arm="verify_chain", mix_ids: list[str] | None = None):
+        arm="verify_chain", mix_ids: list[str] | None = None, window_chars: int | None = None):
     out = RUN_ROOT / f"{label}_{int(time.time())}"
     out.mkdir(parents=True, exist_ok=True)
     ledger = Ledger(out / "ledger.jsonl")
     parity = scaffold_parity_hash(GEN_TEMPLATE, SYNTH_TEMPLATE, VERIFY_TEMPLATE)
+    context_window_chars = int(DEFAULT_WINDOW_CHARS if window_chars is None else window_chars)
+    if context_window_chars <= 0:
+        raise ValueError("window_chars must be positive")
 
     if arm not in {"verify_chain", "mixed_moa"}:
         raise ValueError(f"unknown Forge v2 arm: {arm}")
@@ -370,11 +374,13 @@ def run(instance_ids, *, n_explore, replicates, budget_cap, budget_usd, per_call
         selection_reasons = (f"arm=verify_chain; generator={gen.model_id} (strongest callable tier "
                              f"{getattr(gen.tier,'value',gen.tier)}); verifier={ver.model_id} "
                              f"(callable, family {_family(ver.model_id)} != generator family {_family(gen.model_id)}); "
+                             f"context_window_chars={context_window_chars}; "
                              f"callable_roster={[s.model_id for s in callable_slots]}")
         print(f"[forge_v2] arm=verify_chain generator={gen.model_id}  verifier={ver.model_id}", flush=True)
     else:
         selection_reasons = (f"arm=mixed_moa; selector={gen.model_id}; mix_models="
                              f"{[s.model_id for s in mix_slots]} (cross-family diversity control); "
+                             f"context_window_chars={context_window_chars}; "
                              f"callable_roster={[s.model_id for s in callable_slots]}")
         print(f"[forge_v2] arm=mixed_moa selector={gen.model_id}  models={[s.model_id for s in mix_slots]}", flush=True)
 
@@ -398,7 +404,7 @@ def run(instance_ids, *, n_explore, replicates, budget_cap, budget_usd, per_call
             b_sm = Budget(cap_tokens=budget_cap, cap_usd=budget_usd)
             t0 = time.time()
             sm = self_moa_arm(gen, inst, ctx, b_sm, k=k_self_moa, per_call_tokens=per_call_tokens,
-                              timeout_s=timeout_s)
+                              timeout_s=timeout_s, window_chars=context_window_chars)
             b_sm.wall_seconds = time.time() - t0
             sm_resolved, sm_secs, sm_err = (False, 0.0, None)
             if sm["final_patch"].strip() and not b_sm.invalid:
@@ -408,11 +414,11 @@ def run(instance_ids, *, n_explore, replicates, budget_cap, budget_usd, per_call
             t0 = time.time()
             if arm == "verify_chain":
                 arm_result = verify_chain_arm(gen, ver, inst, ctx, b_arm, per_call_tokens=per_call_tokens,
-                                              timeout_s=timeout_s)
+                                              timeout_s=timeout_s, window_chars=context_window_chars)
                 arm_verifier = ver.model_id
             else:
                 arm_result = mixed_moa_arm(mix_slots, gen, inst, ctx, b_arm, per_call_tokens=per_call_tokens,
-                                           timeout_s=timeout_s)
+                                           timeout_s=timeout_s, window_chars=context_window_chars)
                 arm_verifier = None
             b_arm.wall_seconds = time.time() - t0
             arm_resolved, arm_secs, arm_err = (False, 0.0, None)
@@ -495,6 +501,7 @@ def run(instance_ids, *, n_explore, replicates, budget_cap, budget_usd, per_call
         replicate_variance=var, critic_verdict=critic,
         contamination_state=run_contamination,
         budget_matched_proof={"cap_tokens": budget_cap, "cap_usd": budget_usd, "any_invalid": any_invalid,
+                              "window_chars": context_window_chars,
                               "self_moa_pass_rate": round(sum(sm_rates) / len(sm_rates), 3) if sm_rates else 0.0,
                               f"{arm}_pass_rate": round(sum(vc_rates) / len(vc_rates), 3) if vc_rates else 0.0,
                               "arm_pass_rate": round(sum(vc_rates) / len(vc_rates), 3) if vc_rates else 0.0},
@@ -536,6 +543,12 @@ def main(argv=None) -> int:
     ap.add_argument("--verifier", default=DEFAULT_FORGE_VERIFIER_MODEL, help="pin verifier model id (cross-family)")
     ap.add_argument("--arm", default="verify_chain", choices=["verify_chain", "mixed_moa"])
     ap.add_argument("--mix-models", default="", help="comma-separated pinned model ids for mixed_moa")
+    ap.add_argument(
+        "--window-chars",
+        type=int,
+        default=DEFAULT_WINDOW_CHARS,
+        help="Track A context-window genome field, applied symmetrically to all arms",
+    )
     ap.add_argument("--label", default="verifier_role")
     a = ap.parse_args(argv)
     ids = [x.strip() for x in a.instances.split(",") if x.strip()]
@@ -544,7 +557,7 @@ def main(argv=None) -> int:
         budget_usd=a.budget_usd,
         per_call_tokens=a.per_call_tokens, k_self_moa=a.k_self_moa, grade_timeout=a.grade_timeout,
         timeout_s=a.timeout_s, strategy=a.strategy, roster_n=a.roster_n, gen_id=a.generator,
-        ver_id=a.verifier, label=a.label, arm=a.arm, mix_ids=mix_ids)
+        ver_id=a.verifier, label=a.label, arm=a.arm, mix_ids=mix_ids, window_chars=a.window_chars)
     return 0
 
 
