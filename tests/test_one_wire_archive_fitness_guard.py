@@ -263,6 +263,30 @@ async def test_rollback_entry_from_legacy_positive_fitness_row_is_guarded(tmp_pa
 
 
 @pytest.mark.asyncio
+async def test_rollback_entry_from_fitness_bearing_row_is_guarded(tmp_path):
+    state = _state(tmp_path)
+    archive_path = state / "evolution" / "archive.jsonl"
+    archive_path.parent.mkdir(parents=True)
+    applied = _fitness_entry(status="applied")
+    archive_path.write_text(applied.model_dump_json() + "\n", encoding="utf-8")
+
+    archive = _archive(state)
+    await archive.load()
+
+    with pytest.raises(OneWireFitnessAuthorityError, match="receipt missing"):
+        await archive.rollback_entry(applied.id, "manual rollback")
+
+    got = await archive.get_entry(applied.id)
+    assert got is not None
+    assert got.status == "applied"
+    assert got.rollback_reason is None
+
+    row = json.loads(archive_path.read_text(encoding="utf-8").strip())
+    assert row["status"] == "applied"
+    assert row["rollback_reason"] is None
+
+
+@pytest.mark.asyncio
 async def test_zero_fitness_governed_archive_write_does_not_require_guardian(tmp_path):
     state = _state(tmp_path)
     archive = _archive(state)

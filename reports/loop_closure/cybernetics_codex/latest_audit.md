@@ -2,7 +2,7 @@
 
 > **READ-ONLY VERIFIER -- NOT LIVE RE-EXECUTION.** This report reads receipts and bounded replay outputs. It does not dispatch agents, rerun live owner-surface checks, or prove production-live closure.
 
-- observed_at: `2026-07-02T05:06:48.396851Z`
+- observed_at: `2026-07-02T13:47:19.514090Z`
 - mode: `read_only_verifier`
 - manifest_registered: `True`
 - loop_track_found: `True`
@@ -18,16 +18,16 @@
 
 ## Runtime
 
-- runtime_db: `/Users/dhyana/.dharma/state/runtime.db`
+- runtime_db: `$DHARMA_STATE/state/runtime.db`
 - read_ok: `True`
 - scope_since: `None`
-- delegation_runs: `8836` total, `4184` completed, `4531` failed
-- receipt_json: `2682` rows `(orchestrator surface; A2A empty is success)`
-- served_provider_truth: delegation completed `1943/4184`, runtime_receipts `24676` rows
+- delegation_runs: `8837` total, `4184` completed, `4532` failed
+- receipt_json: `2683` rows `(orchestrator surface; A2A empty is success)`
+- served_provider_truth: delegation completed `1943/4184`, runtime_receipts `24700` rows
 
 ## Harness Replays
 
-- loop1_report: `/Users/dhyana/dw-worktrees/g/reports/loop_closure/cybernetics_codex/2026-06-23_loop1_ollama_fresh_spine_dispatch.json`
+- loop1_report: `$REPO_ROOT/reports/loop_closure/cybernetics_codex/2026-06-23_loop1_ollama_fresh_spine_dispatch.json`
 - loop1_harness_proven: `True`
 - loop1_closed_live: `False`
 - loop1_tasks: `3/3`
@@ -79,7 +79,7 @@
 
 | # | Loop | Verdict | Boundary | Live Owner-Surface Criterion |
 |---|---|---|---|---|
-| 1 | Swarm Task Loop | HARNESS_PROVEN | bounded replay proves current Loop 1 harness (3/3 completed, dispatch_dropoff=0, evidence_receipts_ok=3, served_provider_truth=999); not CLOSED_LIVE while the audited daemon history still includes dispatch_dropoff=2191 | runtime.delegation_runs/runtime_receipts in the audited daemon scope show real completed provider work, zero dispatch_dropoff, and a later routing/adaptation read caused by that work |
+| 1 | Swarm Task Loop | HARNESS_PROVEN | bounded replay proves current Loop 1 harness (3/3 completed, dispatch_dropoff=0, evidence_receipts_ok=3, served_provider_truth=999); not CLOSED_LIVE: dispatch_dropoff=2191; no later correlated routing/adaptation read after served-provider truth | runtime.delegation_runs/runtime_receipts in the audited daemon scope show real completed provider work, zero dispatch_dropoff, and a later routing/adaptation read caused by that work |
 | 2 | Organism Heartbeat | HARNESS_PROVEN | bounded closure replay proves the loop 2 harness (cycles=3, all transitions receipted, adapt change fed the next cycle); not CLOSED_LIVE until live owner-surface criterion passes | standing organism pulse/algedonic owner surface shows a non-scratch daemon cycle whose adaptive state is consumed by a later daemon cycle |
 | 3 | Evolution Loop / DarwinEngine | HARNESS_PROVEN | bounded closure replay proves the loop 3 harness (cycles=2, all transitions receipted, adapt change fed the next cycle); not CLOSED_LIVE until live owner-surface criterion passes | live DarwinEngine/evolution archive owner surface shows a governed non-scratch proposal outcome consumed by a later predictor/archive selection without internal fitness contamination |
 | 4 | Consolidation Loop / Memory | HARNESS_PROVEN | bounded closure replay proves the loop 4 harness (cycles=2, all transitions receipted, adapt change fed the next cycle); not CLOSED_LIVE until live owner-surface criterion passes | live memory owner surface shows external/completed work, not the closure script itself, consolidated and consumed by later context |

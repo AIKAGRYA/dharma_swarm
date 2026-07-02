@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 import sqlite3
 
 import yaml
@@ -13,7 +14,7 @@ from dharma_swarm.cybernetics_codex import (
     build_loop_statuses,
     read_one_wire_summary,
 )
-from dharma_swarm.cybernetics_codex_format import format_markdown
+from dharma_swarm.cybernetics_codex_format import format_markdown, sanitize_audit_paths
 from dharma_swarm.cybernetics_codex_registration import build_external_worker_registration
 
 
@@ -366,6 +367,54 @@ def test_markdown_report_contains_all_13_loops(tmp_path):
     assert "loop1_closed:" not in text
     assert "Swarm Task Loop" in text
     assert "Free Evolution Grind" in text
+
+
+def test_markdown_replay_table_uses_closed_alias_for_harness_proven(tmp_path):
+    report = build_audit(repo_root=tmp_path, state_dir=tmp_path / ".dharma")
+    report["bounded_replays"] = {
+        "loop2": {
+            "closed": True,
+            "closed_live": False,
+            "path": str(tmp_path / "reports" / "loop2.json"),
+        }
+    }
+
+    text = format_markdown(report)
+
+    assert "| loop2 | True | False | n/a | `loop2.json` |" in text
+
+
+def test_audit_output_normalizes_local_paths(tmp_path):
+    report = build_audit(repo_root=tmp_path, state_dir=tmp_path / ".dharma")
+    report["repo_root"] = "/Users/dhyana/dw-worktrees/g"
+    report["state_dir"] = "/Users/dhyana/.dharma"
+    report["runtime"]["path"] = "/Users/dhyana/.dharma/state/runtime.db"
+    report["bounded_replays"]["loop1"]["path"] = (
+        "/Users/dhyana/dw-worktrees/g/reports/loop_closure/cybernetics_codex/loop1.json"
+    )
+
+    output_report = sanitize_audit_paths(report)
+    text = format_markdown(report)
+
+    assert output_report["runtime"]["path"] == "$DHARMA_STATE/state/runtime.db"
+    assert output_report["bounded_replays"]["loop1"]["path"] == (
+        "$REPO_ROOT/reports/loop_closure/cybernetics_codex/loop1.json"
+    )
+    assert "$DHARMA_STATE/state/runtime.db" in text
+    assert "$REPO_ROOT/reports/loop_closure/cybernetics_codex/loop1.json" in text
+    assert "/Users/dhyana" not in text
+
+
+def test_committed_cybernetics_audit_artifacts_do_not_commit_machine_paths():
+    repo_root = Path(__file__).resolve().parents[1]
+    artifacts = (
+        repo_root / "reports/loop_closure/cybernetics_codex/latest_audit.md",
+        repo_root / "reports/loop_closure/cybernetics_codex/latest_audit.json",
+    )
+    for artifact in artifacts:
+        text = artifact.read_text(encoding="utf-8")
+        assert "/Users/dhyana" not in text
+        assert "/private/tmp" not in text
 
 
 def test_manifest_registers_cybernetics_codex():

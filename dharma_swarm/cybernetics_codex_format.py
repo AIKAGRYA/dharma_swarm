@@ -2,9 +2,51 @@
 
 from __future__ import annotations
 
+import tempfile
 from collections import Counter
 from pathlib import Path
 from typing import Any
+
+
+def _path_replacements(report: dict[str, Any]) -> list[tuple[str, str]]:
+    raw_replacements = [
+        (report.get("state_dir"), "$DHARMA_STATE"),
+        (report.get("repo_root"), "$REPO_ROOT"),
+        (str(Path.home()), "$HOME"),
+        (tempfile.gettempdir(), "$TMPDIR"),
+        ("/private/tmp", "$TMPDIR"),
+    ]
+    replacements = [
+        (str(source).rstrip("/"), replacement)
+        for source, replacement in raw_replacements
+        if source
+    ]
+    return sorted(set(replacements), key=lambda item: len(item[0]), reverse=True)
+
+
+def _normalize_local_paths(value: str, replacements: list[tuple[str, str]]) -> str:
+    normalized = value
+    for source, replacement in replacements:
+        normalized = normalized.replace(source, replacement)
+    return normalized
+
+
+def _sanitize_value(value: Any, replacements: list[tuple[str, str]]) -> Any:
+    if isinstance(value, str):
+        return _normalize_local_paths(value, replacements)
+    if isinstance(value, list):
+        return [_sanitize_value(item, replacements) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_sanitize_value(item, replacements) for item in value)
+    if isinstance(value, dict):
+        return {key: _sanitize_value(item, replacements) for key, item in value.items()}
+    return value
+
+
+def sanitize_audit_paths(report: dict[str, Any]) -> dict[str, Any]:
+    """Return an audit packet copy with local filesystem paths normalized."""
+    replacements = _path_replacements(report)
+    return _sanitize_value(report, replacements)
 
 
 def _loop_sort_key(value: str) -> int:
@@ -16,6 +58,7 @@ def _loop_sort_key(value: str) -> int:
 
 def format_markdown(report: dict[str, Any]) -> str:
     """Render a compact human-readable audit packet."""
+    report = sanitize_audit_paths(report)
     lines = [
         "# cybernetics_codex Audit",
         "",
@@ -84,6 +127,7 @@ def format_markdown(report: dict[str, Any]) -> str:
     ])
     for key in sorted(bounded_replays, key=_loop_sort_key):
         replay = bounded_replays.get(key) or {}
+        harness_proven = bool(replay.get("harness_proven") or replay.get("closed"))
         evidence = []
         if "cycles" in replay:
             evidence.append(f"cycles={replay.get('cycles')}")
@@ -98,7 +142,7 @@ def format_markdown(report: dict[str, Any]) -> str:
         path = replay.get("path")
         source = Path(path).name if path else ""
         lines.append(
-            f"| {key} | {replay.get('harness_proven')} | "
+            f"| {key} | {harness_proven} | "
             f"{replay.get('closed_live')} | {', '.join(evidence) or 'n/a'} | "
             f"`{source}` |"
         )

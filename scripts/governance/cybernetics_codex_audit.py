@@ -16,7 +16,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
 from dharma_swarm.cybernetics_codex import build_audit  # noqa: E402
-from dharma_swarm.cybernetics_codex_format import format_markdown  # noqa: E402
+from dharma_swarm.cybernetics_codex_format import (  # noqa: E402
+    format_markdown,
+    sanitize_audit_paths,
+)
 from dharma_swarm.daemon_config import dharma_state_dir  # noqa: E402
 
 
@@ -45,10 +48,11 @@ def main(argv: list[str] | None = None) -> int:
         runtime_db=Path(args.runtime_db) if args.runtime_db else None,
         since=args.since,
     )
+    output_report = sanitize_audit_paths(report)
     text = (
-        json.dumps(report, indent=2, sort_keys=True) + "\n"
+        json.dumps(output_report, indent=2, sort_keys=True) + "\n"
         if args.json
-        else format_markdown(report) + "\n"
+        else format_markdown(output_report) + "\n"
     )
     if args.write_report:
         args.write_report.parent.mkdir(parents=True, exist_ok=True)

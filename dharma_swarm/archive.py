@@ -769,9 +769,8 @@ class EvolutionArchive:
         entry = self._entries.get(entry_id)
         if entry is None:
             return False
-        if entry.status not in FITNESS_BEARING_STATUSES:
-            guarded = entry.model_copy(update={"status": "rolled_back"})
-            self._assert_fitness_authority(guarded, operation="rollback_entry")
+        guarded = entry.model_copy(update={"status": "rolled_back"})
+        self._assert_fitness_authority(guarded, operation="rollback_entry")
         entry.status = "rolled_back"
         entry.rollback_reason = reason
         self._rebuild_grid()
