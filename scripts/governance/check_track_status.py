@@ -833,7 +833,7 @@ def evaluate_criterion(crit: dict[str, Any]) -> CriterionResult:
             else:
                 res = check_file_contains(crit["file"], crit["pattern"])
         elif kind == "json_count_equals":
-            required = ("file", "collection", "field", "expected")
+            required = ("file", "collection", "field", "value", "expected")
             missing = [key for key in required if key not in crit]
             if missing:
                 res = CriterionResult(id="", kind=kind, passed=False,
@@ -851,11 +851,11 @@ def evaluate_criterion(crit: dict[str, Any]) -> CriterionResult:
                     crit["file"],
                     crit["collection"],
                     crit["field"],
-                    crit.get("value"),
+                    crit["value"],
                     int(crit["expected"]),
                 )
         elif kind == "json_count_greater_than":
-            required = ("file", "collection", "field", "threshold")
+            required = ("file", "collection", "field", "value", "threshold")
             missing = [key for key in required if key not in crit]
             if missing:
                 res = CriterionResult(id="", kind=kind, passed=False,
@@ -873,7 +873,7 @@ def evaluate_criterion(crit: dict[str, Any]) -> CriterionResult:
                     crit["file"],
                     crit["collection"],
                     crit["field"],
-                    crit.get("value"),
+                    crit["value"],
                     int(crit["threshold"]),
                 )
         elif kind == "json_collection_values_match":

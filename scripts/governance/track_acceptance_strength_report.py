@@ -235,6 +235,7 @@ def is_malformed_criterion(criterion: dict[str, Any]) -> bool:
             or not criterion.get("collection")
             or not isinstance(criterion.get("field"), str)
             or not criterion.get("field")
+            or "value" not in criterion
             or "expected" not in criterion
         )
     if kind == "json_count_greater_than":
@@ -245,6 +246,7 @@ def is_malformed_criterion(criterion: dict[str, Any]) -> bool:
             or not criterion.get("collection")
             or not isinstance(criterion.get("field"), str)
             or not criterion.get("field")
+            or "value" not in criterion
             or "threshold" not in criterion
         )
     if kind == "json_collection_values_match":

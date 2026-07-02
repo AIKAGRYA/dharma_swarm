@@ -204,6 +204,32 @@ def test_new_kinds_dispatch_through_evaluate_criterion():
     assert evaluate_criterion({"id": "k", "kind": "json_mapping_keys_nonempty"}).passed is False
 
 
+def test_json_count_criteria_require_explicit_value() -> None:
+    base = {
+        "file": "reports/loop_closure/cybernetics_codex/latest_audit.json",
+        "collection": "loop_statuses",
+        "field": "verdict",
+    }
+
+    equals_missing_value = evaluate_criterion({
+        "id": "j",
+        "kind": "json_count_equals",
+        "expected": 0,
+        **base,
+    })
+    greater_missing_value = evaluate_criterion({
+        "id": "g",
+        "kind": "json_count_greater_than",
+        "threshold": 0,
+        **base,
+    })
+
+    assert equals_missing_value.passed is False
+    assert "missing value" in equals_missing_value.detail
+    assert greater_missing_value.passed is False
+    assert "missing value" in greater_missing_value.detail
+
+
 # ------------------------------------------------------------------ rigor gate
 def _track(criteria, *, next_items=None, status="ACTIVE"):
     return {

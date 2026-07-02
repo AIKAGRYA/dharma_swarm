@@ -72,7 +72,7 @@ def test_main_writes_receipt(tmp_path: Path) -> None:
     assert data["loop"] == 7
     assert data["closed"] is True
     assert module._closure_satisfied(data) is True
-    assert (work_dir / module.WORK_DIR_SENTINEL).exists()
+    assert (work_dir / module.WORK_DIR_SENTINEL).read_text(encoding="utf-8") == module.WORK_DIR_SENTINEL_TEXT
 
 
 def test_reset_work_dir_refuses_non_owned_existing_directory(tmp_path: Path) -> None:
@@ -81,6 +81,31 @@ def test_reset_work_dir_refuses_non_owned_existing_directory(tmp_path: Path) -> 
     work_dir.mkdir()
     keep = work_dir / "keep.txt"
     keep.write_text("do not delete\n", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="refusing to reset non-owned work dir"):
+        module._reset_work_dir(work_dir)
+
+    assert keep.read_text(encoding="utf-8") == "do not delete\n"
+
+
+def test_reset_work_dir_refuses_non_owned_empty_directory(tmp_path: Path) -> None:
+    module = _load_module()
+    work_dir = tmp_path / "important"
+    work_dir.mkdir()
+
+    with pytest.raises(RuntimeError, match="refusing to reset non-owned work dir"):
+        module._reset_work_dir(work_dir)
+
+    assert work_dir.exists()
+
+
+def test_reset_work_dir_refuses_bad_sentinel_contents(tmp_path: Path) -> None:
+    module = _load_module()
+    work_dir = tmp_path / "important"
+    work_dir.mkdir()
+    keep = work_dir / "keep.txt"
+    keep.write_text("do not delete\n", encoding="utf-8")
+    (work_dir / module.WORK_DIR_SENTINEL).write_text("spoofed\n", encoding="utf-8")
 
     with pytest.raises(RuntimeError, match="refusing to reset non-owned work dir"):
         module._reset_work_dir(work_dir)

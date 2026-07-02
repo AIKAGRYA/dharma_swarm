@@ -42,14 +42,14 @@ Projection from existing owners. This file owns no facts.
 - `warp_fable_weaver` status=missing heartbeat=RED last_seen=2026-06-12T05:03:50.658024+00:00
 
 ## A2A
-- root: `/Users/dhyana/.dharma/a2a_bus`
+- root: `$DHARMA_STATE/a2a_bus`
 - inbox_files: 1831
 - quarantine_files: 35653
-- nats_e2e_receipt: `/Users/dhyana/dw-worktrees/g/reports/orientation/nats_e2e_receipt.json`
+- nats_e2e_receipt: `$WORKTREE_ROOT/dw-worktrees/g/reports/orientation/nats_e2e_receipt.json`
 
 ## Body
 - status: `current`
-- worktree: `/Users/dhyana/dharma_swarm_main`
+- worktree: `$HOME/dharma_swarm_main`
 - old_sha: `86418541a9`
 - new_sha: `86418541a9`
 - note: no change
