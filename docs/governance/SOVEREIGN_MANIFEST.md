@@ -260,11 +260,16 @@ These are the ground-truth metrics. All other documents citing different numbers
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
+| Total Python modules | **812** | find dharma_swarm -name "*.py" -type f |
 | Total Python modules | **816** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **427 (52.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
 | Total Python modules | **840** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **420 (52.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
 | Total Python LOC | **326,297** | wc -l across dharma_swarm Python modules |
+| Test files | **777** | find tests -name "*.py" -type f |
+| Test functions | **12,150 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test files | **777** | find tests -name "*.py" -type f |
+| Test functions | **12,150 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Test files | **788** | find tests -name "*.py" -type f |
 | Test functions | **12,226 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Test files | **788** | find tests -name "*.py" -type f |
@@ -279,6 +284,10 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Markdown total lines | **265,077** | wc -l across all .md |
 | Markdown files | **1192** | find . -name "*.md" -type f |
 | Markdown total lines | **265,077** | wc -l across all .md |
+| Markdown files | **1171** | find . -name "*.md" -type f |
+| Markdown total lines | **260,068** | wc -l across all .md |
+| Markdown files | **1171** | find . -name "*.md" -type f |
+| Markdown total lines | **260,068** | wc -l across all .md |
 | Markdown files | **1171** | find . -name "*.md" -type f |
 | Markdown total lines | **260,083** | wc -l across all .md |
 | Markdown files | **1171** | find . -name "*.md" -type f |
