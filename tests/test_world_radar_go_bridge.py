@@ -288,11 +288,19 @@ def test_partial_source_error_never_raises_on_malformed_health() -> None:
 
 def test_source_counts_never_raises_on_malformed_health() -> None:
     counts = bridge._source_counts(
-        {"successful_sources": "N/A", "failed_sources": [], "retry_count": {}}
+        {
+            "successful_sources": "N/A",
+            "failed_sources": [],
+            "retry_count": {},
+            "archive_count": "inf",
+            "dedupe_count": "-1",
+        }
     )
     assert counts["successful_sources"] == 0
     assert counts["failed_sources"] == 0
     assert counts["retry_count"] == 0
+    assert counts["archive_count"] == 0
+    assert counts["dedupe_count"] == 0
 
 
 def test_world_radar_imports_go_archive_rows_as_untrusted_evidence(monkeypatch, tmp_path: Path) -> None:

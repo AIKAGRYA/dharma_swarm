@@ -912,9 +912,10 @@ def _coerce_int(value: Any) -> int:
     finding, go_bridge.py:933).
     """
     try:
-        return int(float(value or 0))
-    except (TypeError, ValueError):
+        parsed = int(float(value or 0))
+    except (TypeError, ValueError, OverflowError):
         return 0
+    return max(parsed, 0)
 
 
 def _source_counts(health: Any) -> dict[str, int | str]:
