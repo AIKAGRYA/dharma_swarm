@@ -75,6 +75,8 @@ def test_loop3_run_uses_scratch_archive_and_later_cycle_reads_it(tmp_path: Path)
 
 def test_loop3_refuses_live_archive_as_scratch_root(tmp_path: Path, monkeypatch) -> None:
     home = tmp_path / "home"
+    monkeypatch.delenv("DHARMA_STATE_DIR", raising=False)
+    monkeypatch.delenv("DHARMA_HOME", raising=False)
     monkeypatch.setenv("HOME", str(home))
     scratch = home / ".dharma"
     receipt = tmp_path / "receipt.json"

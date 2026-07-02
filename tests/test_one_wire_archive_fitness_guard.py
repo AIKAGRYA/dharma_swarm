@@ -257,11 +257,28 @@ async def test_custom_state_dir_archive_requires_one_wire_authority(tmp_path, mo
 
 
 @pytest.mark.asyncio
-async def test_scratch_archive_path_does_not_infer_one_wire_guard(tmp_path):
+async def test_custom_evolution_archive_is_guarded_by_default(tmp_path):
     scratch = tmp_path / "scratch"
     archive = EvolutionArchive(path=scratch / "evolution" / "archive.jsonl")
 
-    assert archive.fitness_guard_state_dir is None
+    assert archive.fitness_guard_state_dir == scratch
+    assert archive.enforce_one_wire is True
+
+    with pytest.raises(OneWireFitnessAuthorityError, match="receipt missing"):
+        await archive.add_entry(_fitness_entry())
+
+    assert not (scratch / "evolution" / "archive.jsonl").exists()
+
+
+@pytest.mark.asyncio
+async def test_scratch_archive_path_can_explicitly_opt_out_of_one_wire_guard(tmp_path):
+    scratch = tmp_path / "scratch"
+    archive = EvolutionArchive(
+        path=scratch / "evolution" / "archive.jsonl",
+        enforce_one_wire=False,
+    )
+
+    assert archive.fitness_guard_state_dir == scratch
     assert archive.enforce_one_wire is False
 
     entry_id = await archive.add_entry(_fitness_entry())
