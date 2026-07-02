@@ -69,11 +69,39 @@ def _log_auth_mode() -> None:
 
 
 def get_swarm():
-    """Get or create SwarmManager singleton."""
+    """Get or create SwarmManager singleton.
+
+    When DHARMA_ORGANISM_ROOT=1 (default: off), an Organism is composed
+    AROUND the SwarmManager singleton (composition root, D5 of
+    organism-rewire-2026-07): the Organism wraps the same SwarmManager
+    instance and owns identity/StrangeLoop/attractor/heartbeat, while
+    dispatch stays SwarmManager's. With the flag off this function is
+    behaviorally identical to the pre-flag version.
+    """
     if "swarm" not in _state:
         from dharma_swarm.swarm import SwarmManager
         _state["swarm"] = SwarmManager()
+        if os.environ.get("DHARMA_ORGANISM_ROOT") == "1":
+            try:
+                from dharma_swarm.organism import Organism, set_organism
+
+                organism = Organism(swarm=_state["swarm"])
+                _state["organism"] = organism
+                set_organism(organism)
+                logger.info(
+                    "Organism composition root active (DHARMA_ORGANISM_ROOT=1); "
+                    "strange_loop=%s",
+                    "reachable" if organism.strange_loop is not None else "unavailable",
+                )
+            except Exception as exc:
+                # The flag must never take down the default boot path.
+                logger.warning("Organism composition root init failed (non-fatal): %s", exc)
     return _state["swarm"]
+
+
+def get_organism():
+    """Return the Organism composition root, or None when the flag is off."""
+    return _state.get("organism")
 
 
 def get_trace_store():
@@ -147,6 +175,10 @@ async def lifespan(app: FastAPI):
             pending_swarm_init.cancel()
             with suppress(asyncio.CancelledError):
                 await pending_swarm_init
+        if _state.pop("organism", None) is not None:
+            from dharma_swarm.organism import set_organism
+
+            set_organism(None)
         _state.clear()
         _clear_operator_pid(operator_pid)
 
