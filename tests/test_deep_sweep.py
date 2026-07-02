@@ -118,6 +118,30 @@ async def test_headless_invoker_marks_claude_error_prefix_failed(monkeypatch) ->
 
 
 @pytest.mark.asyncio
+async def test_headless_invoker_requests_keyless_subscription_lane(monkeypatch) -> None:
+    # Codex review finding: run_claude_headless's own default (bare=True)
+    # fast-fails without ANTHROPIC_API_KEY, defeating the keyless
+    # claude_code/subscription lane this module is documented to use.
+    seen_kwargs: dict[str, object] = {}
+
+    def fake_run_claude_headless(*args, **kwargs):
+        seen_kwargs.update(kwargs)
+        return "confirmed_real: ok"
+
+    monkeypatch.setattr(
+        "dharma_swarm.knowledge_ops.deep_sweep.run_claude_headless",
+        fake_run_claude_headless,
+    )
+    await _headless_invoker(
+        task={"id": "verify", "prompt": "verify"},
+        agent_id="signal_deep_sweep",
+        context_id="ctx",
+        routing=RoutingDecision(agent_id="signal_deep_sweep", provider="claude_code", model=""),
+    )
+    assert seen_kwargs["bare"] is False
+
+
+@pytest.mark.asyncio
 async def test_deep_sweep_end_to_end_with_fakes(tmp_path: Path) -> None:
     result = await run_deep_sweep(
         tmp_path,
@@ -234,6 +258,57 @@ async def test_failed_verification_leaves_movement_eligible_for_retry(tmp_path: 
     )
     assert result2["newly_seen_count"] == 2  # both still eligible for retry
     assert result2["verifications_count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_missing_verdict_leaves_movement_eligible_for_retry(tmp_path: Path) -> None:
+    # Codex review finding: a dispatch-level success (status="ok") whose
+    # output never names a required verdict token must not be treated as a
+    # real verification -- otherwise malformed/empty model output permanently
+    # suppresses the claim.
+    async def dispatch_fn(prompt, *, context_id, task_id, reason, timeout=300):
+        return EvidenceReceipt(
+            context_id=context_id,
+            task_id=task_id,
+            agent_id="signal_deep_sweep",
+            provider="claude_code",
+            status="ok",
+            attributes={"output_text": "I'm not sure, let me think about this differently."},
+        )
+
+    result = await run_deep_sweep(
+        tmp_path,
+        max_verifications=2,
+        scout_fn=_fake_scout_ok(n_rows=2),
+        ingest_fn=_fake_ingest_ok,
+        dispatch_fn=dispatch_fn,
+    )
+    assert result["failed_verification_count"] == 2
+    window = load_theme_window(tmp_path / "meta" / "world_radar" / "theme_window.json")
+    assert len(window) == 0
+
+
+@pytest.mark.asyncio
+async def test_verification_prompt_includes_movement_primary_url(tmp_path: Path) -> None:
+    # Codex review finding: movements carry a concrete primary_url from
+    # arxiv/GitHub/Reddit/HN -- dropping it left the verifier guessing at an
+    # artifact from title/summary text alone.
+    seen_prompts: list[str] = []
+
+    async def dispatch_fn(prompt, *, context_id, task_id, reason, timeout=300):
+        if task_id != "synthesis":
+            seen_prompts.append(prompt)
+        return await _fake_dispatch_ok(prompt, context_id=context_id, task_id=task_id, reason=reason, timeout=timeout)
+
+    await run_deep_sweep(
+        tmp_path,
+        max_verifications=2,
+        scout_fn=_fake_scout_ok(n_rows=1),
+        ingest_fn=_fake_ingest_ok,
+        dispatch_fn=dispatch_fn,
+    )
+    assert seen_prompts
+    assert "https://example.com/paper-0" in seen_prompts[0]
 
 
 @pytest.mark.asyncio

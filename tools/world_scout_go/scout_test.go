@@ -272,6 +272,24 @@ func TestDeepSweepBeatSourcesCoversAllBeatsNotJustTheFirstFew(t *testing.T) {
 	}
 }
 
+func TestDeepSweepBeatSourcesMixesSourceKindsUnderTheCap(t *testing.T) {
+	// Codex review finding: SourcesForQueries always emits a beat's sources
+	// in the same fixed kind order (hn, github, arxiv, reddit), so a naive
+	// round-robin across beats still takes every beat's hn source before any
+	// beat's arxiv/reddit source -- under the default cap (16 for 10 beats),
+	// arxiv and reddit got ZERO representation. Every kind must appear.
+	capped := DeepSweepBeatSources(DefaultBeats(), MaxDeepSweepBeatSources)
+	seenKinds := map[string]bool{}
+	for _, s := range capped {
+		seenKinds[s.Kind] = true
+	}
+	for _, kind := range []string{"hn_algolia", "github_repos", "arxiv", "reddit"} {
+		if !seenKinds[kind] {
+			t.Fatalf("source kind %q has zero coverage in the capped set; got kinds: %+v", kind, seenKinds)
+		}
+	}
+}
+
 func TestScoutRetryDelayParsesRetryAfter(t *testing.T) {
 	if delay := scoutRetryDelay("0", 1); delay != 0 {
 		t.Fatalf("Retry-After seconds parsed incorrectly: %s", delay)

@@ -64,6 +64,14 @@ def _receipt_output(receipt: EvidenceReceipt) -> str:
     return str(receipt.attributes.get("output_text") or "")
 
 
+_VALID_VERIFICATION_VERDICTS = ("confirmed_real", "unverifiable", "likely_fabricated")
+
+
+def _has_valid_verification_verdict(output_text: str) -> bool:
+    lowered = output_text.lower()
+    return any(verdict in lowered for verdict in _VALID_VERIFICATION_VERDICTS)
+
+
 def _receipt_failure_detail(receipt: EvidenceReceipt) -> str:
     detail = str(receipt.error_detail or "").strip()
     return detail or _receipt_output(receipt) or f"receipt status={receipt.status}"
@@ -114,7 +122,12 @@ async def _headless_invoker(
     timeout = int(task.get("timeout", 300))
     started = datetime.now(timezone.utc)
     t0 = time.monotonic()
-    output = run_claude_headless(prompt, timeout=timeout)
+    # run_claude_headless's own default is bare=True, which fast-fails unless
+    # ANTHROPIC_API_KEY is set -- that's the opposite of the keyless
+    # claude_code/subscription lane this module is documented to use. Request
+    # bare=False explicitly so a Max/Pro subscription setup without an API
+    # key can actually dispatch (Codex review finding, deep_sweep.py:117).
+    output = run_claude_headless(prompt, timeout=timeout, bare=False)
     latency_ms = int((time.monotonic() - t0) * 1000)
     finished = datetime.now(timezone.utc)
 
@@ -175,10 +188,15 @@ async def _dispatch(
     )
 
 
-def _verification_prompt(title: str, summary: str) -> str:
+def _verification_prompt(title: str, summary: str, url: str = "") -> str:
+    # Movements from build_world_signal_board carry a concrete primary_url
+    # (arxiv/GitHub/Reddit/HN); omitting it left the verifier guessing at an
+    # artifact from title/summary text alone even when the exact URL to fetch
+    # was already known (Codex review finding, deep_sweep.py:285).
+    url_line = f'URL: "{url}". ' if url else ""
     return (
         "Verify this claim as rigorously as you can using web search/fetch if available. "
-        f'Title: "{title}". Summary: "{summary}". '
+        f'Title: "{title}". Summary: "{summary}". {url_line}'
         "Attempt to directly verify a claimed concrete artifact (URL, repo, paper ID) rather than "
         "just re-reading search snippets. Report exactly one of: confirmed_real / unverifiable / "
         "likely_fabricated, with 2-3 sentences of evidence."
@@ -280,9 +298,10 @@ async def run_deep_sweep(
     for movement in capped:
         title = str(movement.get("title") or "")
         summary = str(movement.get("summary") or "")
+        url = str(movement.get("primary_url") or "")
         try:
             receipt = await dispatch_fn(
-                _verification_prompt(title, summary),
+                _verification_prompt(title, summary, url),
                 context_id=context_id,
                 task_id=str(movement.get("movement_id", "")),
                 reason="deep_sweep verification",
@@ -297,7 +316,14 @@ async def run_deep_sweep(
                     "receipt_id": str(receipt.receipt_id),
                 }
             )
-            if _receipt_succeeded(receipt):
+            # A dispatch-level success (status="ok") is not the same as a
+            # USABLE verification: malformed/empty model output that never
+            # names one of the three required verdicts must not permanently
+            # suppress the claim by marking it "seen" (Codex review finding,
+            # deep_sweep.py:301).
+            if _receipt_succeeded(receipt) and _has_valid_verification_verdict(
+                _receipt_output(receipt)
+            ):
                 succeeded_ids.add(_movement_id(movement))
             else:
                 failed_receipts += 1

@@ -45,6 +45,10 @@ func BeatSources(beats []Beat) []Source {
 	return out
 }
 
+// sourceKindsPerQuery mirrors SourcesForQueries: every query always expands
+// to exactly 4 sources in this fixed order (hn, github, arxiv, reddit).
+const sourceKindsPerQuery = 4
+
 func DeepSweepBeatSources(beats []Beat, maxSources int) []Source {
 	if maxSources <= 0 {
 		return []Source{}
@@ -57,7 +61,23 @@ func DeepSweepBeatSources(beats []Beat, maxSources int) []Source {
 	// finding, beats.go:57).
 	perBeat := make([][]Source, len(beats))
 	for i, beat := range beats {
-		perBeat[i] = SourcesForQueries(beat.Queries, beat.ID)
+		sources := SourcesForQueries(beat.Queries, beat.ID)
+		// Every beat's sources start in the same fixed kind order
+		// (hn/github/arxiv/reddit), so round 0 of the round-robin below would
+		// take EVERY beat's hn source before any beat's github/arxiv/reddit
+		// source is ever reached -- under a tight cap (e.g. 16 for 10 beats),
+		// arxiv/reddit get zero representation across the whole beat set
+		// (Codex review finding, beats.go:13). Stagger each beat's starting
+		// kind by its index so a single round already mixes kinds.
+		if n := len(sources); n > 0 {
+			rotation := i % sourceKindsPerQuery
+			rotated := make([]Source, n)
+			for j := range sources {
+				rotated[j] = sources[(j+rotation)%n]
+			}
+			sources = rotated
+		}
+		perBeat[i] = sources
 	}
 	out := make([]Source, 0, maxSources)
 	for round := 0; len(out) < maxSources; round++ {
