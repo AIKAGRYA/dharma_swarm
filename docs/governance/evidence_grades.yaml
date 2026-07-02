@@ -1,4 +1,4 @@
-# evidence_grades.yaml — the graded evidence ladder (Pudgala Forge, Phase 1)
+# evidence_grades.yaml — the graded evidence ladder (Pudgala Autopoiesis Protostar, Phase 1)
 #
 # THE PLACE where criterion *strength* is declared, declaratively, so the
 # rigorous bar in scripts/governance/check_track_status.py can become a GRADED

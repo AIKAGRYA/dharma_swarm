@@ -505,6 +505,17 @@ These are the ground-truth metrics. All other documents citing different numbers
 - Config: environment variables override defaults in `config.py`
 - **Known inconsistency**: "bridge" vs "adapter" vs "connector" all mean "interface between systems". "orchestrator" vs "orchestrate" vs "director" all mean "coordinate work". "routing" vs "router" vs "selector" all mean "choose where to send".
 
+### Forge / Pudgala Naming Boundary
+- **Dharma Forge** names the whole-swarm evolution, benchmark, external-receipt,
+  candidate-control, Hydra, and arena family.
+- **Pudgala Autopoiesis Protostar** names the anti-slop governance mechanism for
+  graded claim/evidence binding, `min_evidence_grade` floors,
+  `VerifiedMachineReceipt` chains, oracle-independence downgrades, and advisory
+  quality gates.
+- Do not use Forge names for anti-slop governance mechanisms. Historical
+  receipts may preserve old branch names, but live docs and tracked surfaces
+  must use the boundary above.
+
 ### Legacy Quarantine Rules
 - Files in `docs/archive/` are dead. Do not reference them as current.
 - `swarmlens_app.py` is the old TUI (zero importers) (V). The current TUI is Bun/Ink in `tui/`.

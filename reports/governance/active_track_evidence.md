@@ -1,6 +1,5 @@
 # Track Portfolio Evidence
 
-Generated: 2026-07-02T13:07:15+00:00 (schema v2)
 Generated: 2026-07-02T13:43:27+00:00 (schema v2)
 Active tracks: **4** (warn 5, max 10) — shippable 0
 
