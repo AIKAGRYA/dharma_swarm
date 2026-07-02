@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-01T13:19:18+09:00",
+  "generated_at": "2026-07-02T13:05:35+09:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-spine-adoption-2026-06",
   "shippable": false,
@@ -249,7 +249,7 @@
       "name": "Cybernetic Loop Closure \u2014 wire all 13 loops with receipted closure checks",
       "status": "ACTIVE",
       "closure_kind": null,
-      "target_closure_kind": "VERIFIED_SLICE",
+      "target_closure_kind": "CLOSED_NOT_PROD",
       "graduation_profile": "generic",
       "serves": "substrate-nativeness",
       "complements": [
@@ -265,26 +265,24 @@
         "quality_gates",
         "eval_coverage"
       ],
-      "verified_at": "2026-06-11",
+      "verified_at": "2026-07-01",
       "ttl_days": 21,
       "owner": "@AmitabhainArunachala",
       "shippable": false,
       "criteria_pass": false,
       "ship_blocks": [
-        "1 open blocker next-item(s)",
-        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)",
-        "strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
+        "2 open blocker next-item(s)"
       ],
       "final_boss_blocks": [],
-      "has_rigorous_evidence": false,
-      "strongest_grade": 1,
-      "strongest_grade_name": "S1_PRESENT",
+      "has_rigorous_evidence": true,
+      "strongest_grade": 2,
+      "strongest_grade_name": "S2_LANDED",
       "min_evidence_grade": 2,
       "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 10,
-        "total": 11
+        "passed": 27,
+        "total": 38
       },
       "criteria": [
         {
@@ -332,8 +330,8 @@
         {
           "id": "campaign_retrospective_exists",
           "kind": "file_exists",
-          "passed": false,
-          "detail": "reports/loop_closure/RETROSPECTIVE.md MISSING",
+          "passed": true,
+          "detail": "reports/loop_closure/RETROSPECTIVE.md present",
           "executed": true
         },
         {
@@ -376,6 +374,195 @@
           "kind": "file_exists",
           "passed": true,
           "detail": "scripts/governance/register_cybernetics_codex.py present",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_latest_audit_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "reports/loop_closure/cybernetics_codex/latest_audit.json present",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_latest_audit_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/loop_closure/cybernetics_codex/latest_audit.json valid (5 keys present)",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_11_harness_proven",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern '\\\\| 11 \\\\| Replication Monitor \\\\| HARNESS_PROVEN \\\\|' found in reports/loop_closure/cybernetics_codex/latest_audit.md",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_12_blocked",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern '\\\\| 12 \\\\| Self-Improvement \\\\| BLOCKED \\\\|' found in reports/loop_closure/cybernetics_codex/latest_audit.md",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_13_blocked",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern '\\\\| 13 \\\\| Free Evolution Grind \\\\| BLOCKED \\\\|' found in reports/loop_closure/cybernetics_codex/latest_audit.md",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop1_closed_live",
+          "kind": "file_contains",
+          "passed": false,
+          "detail": "pattern '\\\\| 1 \\\\| Swarm Task Loop \\\\| CLOSED_LIVE \\\\|' NOT FOUND in reports/loop_closure/cybernetics_codex/latest_audit.md",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop2_closed_live",
+          "kind": "file_contains",
+          "passed": false,
+          "detail": "pattern '\\\\| 2 \\\\| Organism Heartbeat \\\\| CLOSED_LIVE \\\\|' NOT FOUND in reports/loop_closure/cybernetics_codex/latest_audit.md",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop3_closed_live",
+          "kind": "file_contains",
+          "passed": false,
+          "detail": "pattern '\\\\| 3 \\\\| Evolution Loop / DarwinEngine \\\\| CLOSED_LIVE \\\\|' NOT FOUND in reports/loop_closure/cybernetics_codex/latest_audit.md",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop4_closed_live",
+          "kind": "file_contains",
+          "passed": false,
+          "detail": "pattern '\\\\| 4 \\\\| Consolidation Loop / Memory \\\\| CLOSED_LIVE \\\\|' NOT FOUND in reports/loop_closure/cybernetics_codex/latest_audit.md",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop5_closed_live",
+          "kind": "file_contains",
+          "passed": false,
+          "detail": "pattern '\\\\| 5 \\\\| Zeitgeist Scanner \\\\| CLOSED_LIVE \\\\|' NOT FOUND in reports/loop_closure/cybernetics_codex/latest_audit.md",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop6_closed_live",
+          "kind": "file_contains",
+          "passed": false,
+          "detail": "pattern '\\\\| 6 \\\\| Witness Auditor \\\\| CLOSED_LIVE \\\\|' NOT FOUND in reports/loop_closure/cybernetics_codex/latest_audit.md",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop7_closed_live",
+          "kind": "file_contains",
+          "passed": false,
+          "detail": "pattern '\\\\| 7 \\\\| Training Flywheel \\\\| CLOSED_LIVE \\\\|' NOT FOUND in reports/loop_closure/cybernetics_codex/latest_audit.md",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop8_closed_live",
+          "kind": "file_contains",
+          "passed": false,
+          "detail": "pattern '\\\\| 8 \\\\| Recognition Loop / eigenform \\\\| CLOSED_LIVE \\\\|' NOT FOUND in reports/loop_closure/cybernetics_codex/latest_audit.md",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop9_closed_live",
+          "kind": "file_contains",
+          "passed": false,
+          "detail": "pattern '\\\\| 9 \\\\| Conductors \\\\| CLOSED_LIVE \\\\|' NOT FOUND in reports/loop_closure/cybernetics_codex/latest_audit.md",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop10_closed_live",
+          "kind": "file_contains",
+          "passed": false,
+          "detail": "pattern '\\\\| 10 \\\\| Context Agent \\\\| CLOSED_LIVE \\\\|' NOT FOUND in reports/loop_closure/cybernetics_codex/latest_audit.md",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop11_closed_live",
+          "kind": "file_contains",
+          "passed": false,
+          "detail": "pattern '\\\\| 11 \\\\| Replication Monitor \\\\| CLOSED_LIVE \\\\|' NOT FOUND in reports/loop_closure/cybernetics_codex/latest_audit.md",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop3_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop3_evolution_closure.json valid (6 keys present)",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop4_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop4_memory_context_closure.json valid (6 keys present)",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop7_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop7_training_flywheel_closure.json valid (6 keys present)",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop8_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop8_recognition_closure.json valid (6 keys present)",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop9_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop9_conductor_closure.json valid (6 keys present)",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop10_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop10_context_agent_closure.json valid (6 keys present)",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop11_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop11_replication_monitor_closure.json valid (6 keys present)",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_one_wire_guard_test_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "tests/test_one_wire_archive_fitness_guard.py present",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_one_wire_guard_test_passes",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_one_wire_archive_fitness_guard.py: PASS \u2014 9 passed in 0.21s",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop12_13_guard_receipt_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "reports/loop_closure/cybernetics_codex/2026-07-01_loop12_13_one_wire_archive_fitness_guard.json present",
+          "executed": true
+        },
+        {
+          "id": "cybernetics_codex_loop12_13_guard_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop12_13_one_wire_archive_fitness_guard.json valid (5 keys present)",
           "executed": true
         }
       ]
@@ -636,6 +823,12 @@
       "criterion_id": null
     },
     {
+      "severity": "WARN",
+      "check": "track-stale:runtime-truth-spine-adoption-2026-06",
+      "message": "[runtime-truth-spine-adoption-2026-06] verified_at is 22 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.",
+      "criterion_id": null
+    },
+    {
       "severity": "INFO",
       "check": "track-in-progress:runtime-truth-spine-adoption-2026-06",
       "message": "[runtime-truth-spine-adoption-2026-06] 7/8 completion criteria pass.",
@@ -644,7 +837,7 @@
     {
       "severity": "INFO",
       "check": "track-in-progress:loop-closure-2026-06",
-      "message": "[loop-closure-2026-06] 10/11 completion criteria pass.",
+      "message": "[loop-closure-2026-06] 27/38 completion criteria pass.",
       "criterion_id": null
     },
     {

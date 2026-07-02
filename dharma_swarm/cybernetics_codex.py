@@ -27,7 +27,7 @@ DEFAULT_STATE_DIR = dharma_state_dir()
 
 AGENT_ID = "cybernetics_codex"
 CALLSIGN = "cybernetics-codex"
-SCHEMA_VERSION = "cybernetics_codex.audit.v2"
+SCHEMA_VERSION = "cybernetics_codex.audit.v3"
 LOOP1_BOUNDED_REPLAY_GLOB = "reports/loop_closure/cybernetics_codex/*loop1*_spine_dispatch.json"
 # General per-loop closure receipts for the cascade (loops 2..11). Each proves
 # its OWN sense->interpret->constrain->act->adapt cycle on real data, mirroring
@@ -95,6 +95,70 @@ LOOPS = [
     (13, "free_evolution_grind", "Free Evolution Grind"),
 ]
 
+VERDICT_TIERS = {
+    "HARNESS_PROVEN": (
+        "A bounded replay/regression harness proves the loop can execute "
+        "sense -> interpret -> constrain -> act -> adapt, but the evidence may "
+        "be scratch or manufactured by the harness and is not production-live "
+        "closure."
+    ),
+    "CLOSED_LIVE": (
+        "The loop is proven from its declared live owner surface, with no "
+        "scratch-only or self-seeded evidence standing in for production state."
+    ),
+}
+
+LIVE_OWNER_SURFACE_CRITERIA = {
+    1: (
+        "runtime.delegation_runs/runtime_receipts in the audited daemon scope "
+        "show real completed provider work, zero dispatch_dropoff, and a later "
+        "routing/adaptation read caused by that work"
+    ),
+    2: (
+        "standing organism pulse/algedonic owner surface shows a non-scratch "
+        "daemon cycle whose adaptive state is consumed by a later daemon cycle"
+    ),
+    3: (
+        "live DarwinEngine/evolution archive owner surface shows a governed "
+        "non-scratch proposal outcome consumed by a later predictor/archive "
+        "selection without internal fitness contamination"
+    ),
+    4: (
+        "live memory owner surface shows external/completed work, not the "
+        "closure script itself, consolidated and consumed by later context"
+    ),
+    5: (
+        "live zeitgeist/environment owner surface shows non-synthetic external "
+        "signals changing a later gate/priority decision"
+    ),
+    6: (
+        "live witness/runtime receipt owner surface shows production completions "
+        "audited and governance marks consumed by downstream routing"
+    ),
+    7: (
+        "live trajectory owner surface contains non-synthetic recent trajectories "
+        "that the flywheel scores and persists into later strategy selection"
+    ),
+    8: (
+        "live recognition/context owner surface shows non-scratch loop-history "
+        "receipts generating a seed later consumed by an agent context build"
+    ),
+    9: (
+        "live conductor/cron owner surface shows production scheduler state "
+        "changed by observed signals and suppressing/altering a later tick"
+    ),
+    10: (
+        "live context-package owner surface shows production memory inputs "
+        "changing a served context package later read by an agent"
+    ),
+    11: (
+        "live replication owner surface shows a real proposal materialized into "
+        "roster/probation state and observed by a later monitor cycle"
+    ),
+    12: "One Wire quorum N>=5, M>=3, and explicit archive-fitness authority",
+    13: "One Wire quorum N>=5, M>=3, and explicit archive-fitness authority",
+}
+
 
 def build_audit(
     *,
@@ -149,11 +213,18 @@ def build_audit(
             archive,
             bounded_replays=bounded_replays,
         ),
+        "verdict_tiers": VERDICT_TIERS,
+        "live_owner_surface_criteria": {
+            f"loop{number}": criterion
+            for number, criterion in LIVE_OWNER_SURFACE_CRITERIA.items()
+        },
         "verifier_commands": VERIFIER_COMMANDS,
         "closure_rule": (
-            "A loop is closed only when sense -> interpret -> constrain -> act -> "
-            "adapt all fire on real data, every transition emits a receipt to its "
-            "owner surface, and a fresh agent can replay an automated check."
+            "A production-live loop is closed only when sense -> interpret -> "
+            "constrain -> act -> adapt all fire on live owner-surface data, "
+            "every transition emits a receipt to that owner surface, and a "
+            "fresh agent can replay an automated check. Scratch or self-seeded "
+            "bounded replays are HARNESS_PROVEN, not CLOSED_LIVE."
         ),
         "loop1_acceptance_rule": (
             "A2A-surface rows may legitimately leave delegation_runs.receipt_json "
@@ -163,7 +234,8 @@ def build_audit(
         ),
         "next_build_packet": [
             "Keep Loop 1 bounded replay green; do not claim all-history cleanliness while historical dispatch_dropoff remains.",
-            "Add dedicated closure receipts for Loops 2-11 that prove output changes later action/adaptation.",
+            "Promote HARNESS_PROVEN loops to CLOSED_LIVE only after one live-owner-surface criterion passes per loop.",
+            "Add an audit mode that can re-execute replay commands or record why re-execution was skipped.",
             "Add One Wire archive-fitness guard tests before enabling Loops 12/13.",
             "Regenerate the loop map from a live projection instead of hand-editing stale prose.",
         ],
@@ -329,6 +401,8 @@ def read_bounded_replays_summary(repo_root: Path) -> dict[str, Any]:
     loop1.update(
         {
             "closed": closed,
+            "harness_proven": closed,
+            "closed_live": False,
             "tasks_requested": tasks_requested,
             "tasks_completed": tasks_completed,
             "tasks_failed": int(data.get("tasks_failed") or 0),
@@ -352,10 +426,10 @@ def read_bounded_replays_summary(repo_root: Path) -> dict[str, Any]:
 
 
 def _evaluate_loop_closure_replay(data: dict[str, Any]) -> dict[str, Any]:
-    """Honest, loop-agnostic closure criterion for a cascade loop's replay.
+    """Honest, loop-agnostic harness criterion for a cascade loop's replay.
 
-    Closed only when the receipt proves, structurally, that the loop ran the full
-    cybernetic cycle on real data:
+    Harness-proven only when the receipt proves, structurally, that the loop ran
+    the full cybernetic cycle on bounded replay data:
       - cycles ran on real data (cycles > 0 and real_data true),
       - every sense/interpret/constrain/act/adapt transition emitted a receipt,
       - the adapt transition produced a real before != after change that fed the
@@ -363,6 +437,8 @@ def _evaluate_loop_closure_replay(data: dict[str, Any]) -> dict[str, Any]:
       - no tick errors.
     The boolean is COMPUTED here from the evidence; a receipt's own "closed" field
     is never trusted (FORBIDDEN_ACTIONS: claim closure from smoke tests/prose).
+    It still does not imply CLOSED_LIVE; live closure requires the declared owner
+    surface criterion for that loop.
     """
     transitions = data.get("transitions_receipted") or {}
     adapt = data.get("adapt_proof") or {}
@@ -374,7 +450,7 @@ def _evaluate_loop_closure_replay(data: dict[str, Any]) -> dict[str, Any]:
         and bool(adapt.get("fed_forward"))
         and adapt.get("before") != adapt.get("after")
     )
-    closed = (
+    harness_proven = (
         cycles > 0
         and bool(data.get("real_data"))
         and transitions_ok
@@ -383,14 +459,16 @@ def _evaluate_loop_closure_replay(data: dict[str, Any]) -> dict[str, Any]:
     )
     return {
         "exists": True,
-        "closed": closed,
+        "closed": harness_proven,
+        "harness_proven": harness_proven,
+        "closed_live": False,
         "cycles": cycles,
         "transitions_ok": transitions_ok,
         "adapt_real": adapt_real,
         "tick_errors": len(tick_errors),
         "adapt_proof": adapt or None,
         "blocker": (
-            "" if closed
+            "" if harness_proven
             else "general loop closure replay did not satisfy the strict cascade criterion"
         ),
     }
@@ -836,7 +914,13 @@ def build_loop_statuses(
     one_wire_eligible = bool(one_wire.get("eligible"))
     archive_risk = int(archive.get("positive_internal_fitness_risk") or 0)
     loop1_replay = ((bounded_replays or {}).get("loop1") or {})
-    loop1_bounded_closed = bool(loop1_replay.get("closed"))
+    loop1_harness_proven = bool(loop1_replay.get("harness_proven") or loop1_replay.get("closed"))
+    loop1_closed_live = (
+        loop1_harness_proven
+        and total_runs > 0
+        and failure_counts.get("dispatch_dropoff", 0) == 0
+        and (completed_with_truth > 0 or runtime_receipt_truth_rows > 0)
+    )
 
     for number, loop_id, label in LOOPS:
         status = "UNKNOWN"
@@ -844,21 +928,26 @@ def build_loop_statuses(
         evidence: list[str] = []
 
         # Cascade loops (2..11): a strict, structurally-verified closure replay
-        # closes the loop, mirroring Loop 1's bounded-replay verdict. Absent a
-        # receipt this is a no-op and the PARTIAL logic below still governs.
+        # proves the harness. It does not close the live loop unless the
+        # declared owner-surface criterion also passes.
         general_replay = (bounded_replays or {}).get(f"loop{number}") or {}
-        if number not in (1, 12, 13) and general_replay.get("closed"):
+        replay_harness_proven = bool(
+            general_replay.get("harness_proven") or general_replay.get("closed")
+        )
+        if number not in (1, 12, 13) and replay_harness_proven:
             rows.append({
                 "number": number,
                 "id": loop_id,
                 "label": label,
-                "verdict": "CLOSED_BOUNDED_REPLAY",
+                "verdict": "HARNESS_PROVEN",
                 "evidence": [f"bounded_replays.loop{number}"],
                 "blocker": (
-                    f"bounded closure replay closes loop {number} "
+                    f"bounded closure replay proves the loop {number} harness "
                     f"(cycles={general_replay.get('cycles')}, all transitions "
-                    "receipted, adapt change fed the next cycle)"
+                    "receipted, adapt change fed the next cycle); not CLOSED_LIVE "
+                    "until live owner-surface criterion passes"
                 ),
+                "live_owner_surface_criterion": LIVE_OWNER_SURFACE_CRITERIA[number],
             })
             continue
 
@@ -869,23 +958,30 @@ def build_loop_statuses(
                 "runtime.provider_truth",
                 "runtime.failure_codes",
             ]
-            if loop1_bounded_closed:
+            if loop1_harness_proven:
                 evidence.append("bounded_replays.loop1")
             if total_runs == 0:
                 status = "UNKNOWN"
                 blocker = "no delegation runs found"
-            elif loop1_bounded_closed:
-                status = "CLOSED_BOUNDED_REPLAY"
+            elif loop1_closed_live:
+                status = "CLOSED_LIVE"
                 blocker = (
-                    "bounded replay closes current Loop 1 lane "
+                    "audited runtime scope has served provider/model truth, "
+                    "zero dispatch_dropoff, and the Loop 1 replay proves current "
+                    "dispatch receipts"
+                )
+            elif loop1_harness_proven:
+                status = "HARNESS_PROVEN"
+                blocker = (
+                    "bounded replay proves current Loop 1 harness "
                     f"({loop1_replay.get('tasks_completed')}/"
                     f"{loop1_replay.get('tasks_requested')} completed, "
                     f"dispatch_dropoff={loop1_replay.get('dispatch_dropoffs')}, "
                     f"evidence_receipts_ok={loop1_replay.get('evidence_receipts_ok')}, "
                     f"served_provider_truth="
                     f"{loop1_replay.get('completed_runs_with_truth')}); "
-                    "standing all-history audit still includes historical "
-                    f"dispatch_dropoff={failure_counts.get('dispatch_dropoff', 0)}"
+                    "not CLOSED_LIVE while the audited daemon history still "
+                    f"includes dispatch_dropoff={failure_counts.get('dispatch_dropoff', 0)}"
                 )
             elif failure_counts.get("dispatch_dropoff", 0):
                 status = "PARTIAL"
@@ -945,6 +1041,7 @@ def build_loop_statuses(
             "verdict": status,
             "evidence": evidence,
             "blocker": blocker,
+            "live_owner_surface_criterion": LIVE_OWNER_SURFACE_CRITERIA[number],
         })
     return rows
 

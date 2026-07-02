@@ -41,7 +41,7 @@ def format_markdown(report: dict[str, Any]) -> str:
         f"{delegation_truth.get('completed', 0)}`, runtime_receipts "
         f"`{runtime_receipt_truth.get('rows_with_served_provider_model', 0)}` rows",
         "",
-        "## Bounded Replays",
+        "## Harness Replays",
         "",
     ])
     loop1_replay = ((report.get("bounded_replays") or {}).get("loop1") or {})
@@ -53,21 +53,26 @@ def format_markdown(report: dict[str, Any]) -> str:
         f"- loop1_dispatch_dropoffs: `{loop1_replay.get('dispatch_dropoffs', 0)}`",
         f"- loop1_evidence_receipts_ok: `{loop1_replay.get('evidence_receipts_ok', 0)}`",
         "",
+        "## Verdict Tiers",
+        "",
+        "- `HARNESS_PROVEN`: bounded replay/regression evidence passed; not production-live closure.",
+        "- `CLOSED_LIVE`: declared live owner-surface evidence passed.",
+        "",
         "## Loop Statuses",
         "",
-        "| # | Loop | Verdict | Blocker |",
-        "|---|---|---|---|",
+        "| # | Loop | Verdict | Boundary | Live Owner-Surface Criterion |",
+        "|---|---|---|---|---|",
     ])
     for row in report["loop_statuses"]:
         lines.append(
             f"| {row['number']} | {row['label']} | {row['verdict']} | "
-            f"{str(row['blocker']).replace('|', '/')} |"
+            f"{str(row['blocker']).replace('|', '/')} | "
+            f"{str(row.get('live_owner_surface_criterion', '')).replace('|', '/')} |"
         )
     lines.extend([
         "",
         "## Verifier Commands",
         "",
         *[f"- `{cmd}`" for cmd in report["verifier_commands"]],
-        "",
     ])
     return "\n".join(lines)

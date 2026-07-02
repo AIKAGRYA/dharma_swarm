@@ -110,7 +110,7 @@ def test_build_audit_marks_loop1_partial_when_dispatch_dropoff_exists(tmp_path):
     assert "receipt_json is orchestrator-surface only" in loop1["blocker"]
 
 
-def test_build_audit_marks_loop1_closed_when_bounded_replay_is_green(tmp_path):
+def test_build_audit_marks_loop1_harness_proven_when_bounded_replay_is_green(tmp_path):
     state = tmp_path / ".dharma"
     db = state / "state" / "runtime.db"
     db.parent.mkdir(parents=True)
@@ -154,11 +154,15 @@ def test_build_audit_marks_loop1_closed_when_bounded_replay_is_green(tmp_path):
     report = build_audit(repo_root=tmp_path, state_dir=state)
 
     loop1 = report["loop_statuses"][0]
-    assert loop1["verdict"] == "CLOSED_BOUNDED_REPLAY"
-    assert "bounded replay closes" in loop1["blocker"]
+    assert loop1["verdict"] == "HARNESS_PROVEN"
+    assert "bounded replay proves" in loop1["blocker"]
+    assert "not CLOSED_LIVE" in loop1["blocker"]
     assert "bounded_replays.loop1" in loop1["evidence"]
     assert report["bounded_replays"]["loop1"]["closed"] is True
+    assert report["bounded_replays"]["loop1"]["harness_proven"] is True
+    assert report["bounded_replays"]["loop1"]["closed_live"] is False
     assert report["bounded_replays"]["loop1"]["completed_runs_with_truth"] == 3
+    assert loop1["live_owner_surface_criterion"].startswith("runtime.delegation_runs")
 
 
 def test_loop1_accepts_a2a_runtime_receipt_truth_without_receipt_json(tmp_path):
@@ -246,6 +250,8 @@ def test_steward_declares_forbidden_actions_and_verifier_commands(tmp_path):
     assert "python3 scripts/governance/register_cybernetics_codex.py --dry-run" in report[
         "verifier_commands"
     ]
+    assert report["verdict_tiers"]["HARNESS_PROVEN"]
+    assert report["verdict_tiers"]["CLOSED_LIVE"]
 
 
 def test_markdown_report_contains_all_13_loops(tmp_path):
