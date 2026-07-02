@@ -142,8 +142,8 @@ def _filter_and_rank_vector_results(
 
 def _memory_retrieval_prefilter_available(conn: sqlite3.Connection) -> bool:
     try:
-        conn.execute("SELECT vec_doc_id FROM memory_retrieval_docs LIMIT 1").fetchone()
-        return True
+        row = conn.execute("SELECT vec_doc_id FROM memory_retrieval_docs LIMIT 1").fetchone()
+        return row is not None
     except Exception:
         return False
 

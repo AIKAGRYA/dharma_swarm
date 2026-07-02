@@ -346,6 +346,32 @@ class TestVectorStoreSearch:
         assert results[0]["id"] == doc_id
         assert stale_id not in {row["id"] for row in results}
 
+    def test_search_vector_ignores_empty_memory_retrieval_projection(self, tmp_path):
+        from dharma_swarm.vector_store import VectorStore
+
+        store = VectorStore(state_dir=tmp_path, dim=32)
+        doc = "Orchestrator async task routing engine"
+        doc_id = store.upsert(doc, source="doc:orchestrator", layer="source_file")
+        conn = store._connect()
+        try:
+            conn.execute(
+                """
+                CREATE TABLE memory_retrieval_docs (
+                    vec_doc_id INTEGER PRIMARY KEY,
+                    content TEXT NOT NULL,
+                    source TEXT DEFAULT '',
+                    valid_until TEXT
+                )
+                """
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        results = store.search_vector("orchestrator async task routing engine", top_k=3)
+
+        assert doc_id in {row["id"] for row in results}
+
     def test_search_vector_memory_projection_rejects_generic_false_positive(self, tmp_path):
         from dharma_swarm.vector_store import VectorStore
 
