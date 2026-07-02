@@ -95,7 +95,12 @@ def assign_diverse_lenses(
     roles: tuple[str, ...],
     candidate_providers: tuple[ProviderType, ...] = CANONICAL_SEED_ORDER,
 ) -> tuple[LensAssignment, ...]:
-    """Assign each role a DISTINCT provider, round-robin over the candidate pool.
+    """Assign each role a provider, round-robin over the candidate pool.
+
+    Providers are NOT guaranteed distinct (see below): this is the assignment
+    half only. Whether the resulting assignment actually achieves provider
+    diversity is judged separately by ``check_panel_diversity``, never
+    assumed here (Copilot review finding, panel_diversity.py:99).
 
     This is the routing half of the fix: wire ``preferred_provider`` (already
     supported by ``ProviderRouteRequest.context`` / ``ProviderPolicyRouter``,
