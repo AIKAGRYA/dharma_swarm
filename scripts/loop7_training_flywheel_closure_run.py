@@ -38,6 +38,7 @@ DEFAULT_TRACE_COUNT = 5
 REINFORCEMENT_THRESHOLD = 0.3
 DATASET_THRESHOLD = 0.7
 BASE_PROMPT = "You are a dharma_swarm task agent. Select a strategy for the next task."
+WORK_DIR_SENTINEL = ".dharma_loop7_training_flywheel_closure_owned"
 
 
 def _repo_root() -> Path:
@@ -60,8 +61,15 @@ def _default_work_dir(report_path: Path) -> Path:
 
 def _reset_work_dir(work_dir: Path) -> None:
     if work_dir.exists():
+        sentinel = work_dir / WORK_DIR_SENTINEL
+        if not sentinel.exists() and any(work_dir.iterdir()):
+            raise RuntimeError(f"refusing to reset non-owned work dir: {work_dir}")
         shutil.rmtree(work_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
+    (work_dir / WORK_DIR_SENTINEL).write_text(
+        "owned by scripts/loop7_training_flywheel_closure_run.py\n",
+        encoding="utf-8",
+    )
 
 
 def _sha256(path: Path) -> str:

@@ -4,6 +4,8 @@ import importlib.util
 import json
 from pathlib import Path
 
+import pytest
+
 
 _SCRIPT = (
     Path(__file__).resolve().parents[1]
@@ -56,12 +58,13 @@ def test_replay_closes_with_scored_traces_strategy_dataset_and_later_read(tmp_pa
 def test_main_writes_receipt(tmp_path: Path) -> None:
     module = _load_module()
     report_path = tmp_path / "2026-07-01_loop7_training_flywheel_closure.json"
+    work_dir = tmp_path / "state"
 
     rc = module.main([
         "--report",
         str(report_path),
         "--work-dir",
-        str(tmp_path / "state"),
+        str(work_dir),
     ])
 
     assert rc == 0
@@ -69,6 +72,20 @@ def test_main_writes_receipt(tmp_path: Path) -> None:
     assert data["loop"] == 7
     assert data["closed"] is True
     assert module._closure_satisfied(data) is True
+    assert (work_dir / module.WORK_DIR_SENTINEL).exists()
+
+
+def test_reset_work_dir_refuses_non_owned_existing_directory(tmp_path: Path) -> None:
+    module = _load_module()
+    work_dir = tmp_path / "important"
+    work_dir.mkdir()
+    keep = work_dir / "keep.txt"
+    keep.write_text("do not delete\n", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="refusing to reset non-owned work dir"):
+        module._reset_work_dir(work_dir)
+
+    assert keep.read_text(encoding="utf-8") == "do not delete\n"
 
 
 def test_replay_does_not_close_when_reinforcement_threshold_not_met(tmp_path: Path) -> None:
