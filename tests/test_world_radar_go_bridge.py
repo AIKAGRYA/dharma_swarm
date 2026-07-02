@@ -230,6 +230,79 @@ def test_run_go_scout_plumbs_archive_flags(monkeypatch, tmp_path: Path) -> None:
     assert "app.cofounder.co" in cmd
 
 
+def test_run_go_scout_treats_partial_source_failure_as_nonfatal(monkeypatch, tmp_path: Path) -> None:
+    state = tmp_path / ".dharma"
+    output_path = tmp_path / "observations.jsonl"
+    health_path = tmp_path / "health.json"
+
+    def fake_run(cmd, cwd, capture_output, text, timeout):  # type: ignore[no-untyped-def]
+        _write_jsonl(output_path, [_signal("github", score=0.74)])
+        health_path.write_text(
+            json.dumps(
+                {
+                    "successful_sources": 1,
+                    "failed_sources": 1,
+                    "errors": ["arxiv_agentic_design_patterns: 429"],
+                }
+            ),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(bridge.subprocess, "run", fake_run)
+
+    rows, error, counts = bridge._run_go_scout(
+        state=state,
+        output_path=output_path,
+        health_path=health_path,
+        timeout_s=30,
+    )
+
+    assert error is None
+    assert rows[0]["source"] == "github"
+    assert counts["successful_sources"] == 1
+    assert counts["failed_sources"] == 1
+
+
+def test_partial_source_error_still_reports_total_source_failure() -> None:
+    error = bridge._partial_source_error(
+        {
+            "successful_sources": 0,
+            "failed_sources": 2,
+            "errors": ["arxiv: 429", "hn: 503"],
+        }
+    )
+
+    assert error is not None
+    assert "partial source failures=2" in error
+
+
+def test_partial_source_error_never_raises_on_malformed_health() -> None:
+    # Copilot review finding: a non-numeric health field must not crash the
+    # scout -- health parsing is advisory, never fatal.
+    error = bridge._partial_source_error(
+        {"successful_sources": "not-a-number", "failed_sources": None, "errors": "not-a-list"}
+    )
+    assert error is None  # failed coerces to 0 -> failed <= 0 -> no error
+
+
+def test_source_counts_never_raises_on_malformed_health() -> None:
+    counts = bridge._source_counts(
+        {
+            "successful_sources": "N/A",
+            "failed_sources": [],
+            "retry_count": {},
+            "archive_count": "inf",
+            "dedupe_count": "-1",
+        }
+    )
+    assert counts["successful_sources"] == 0
+    assert counts["failed_sources"] == 0
+    assert counts["retry_count"] == 0
+    assert counts["archive_count"] == 0
+    assert counts["dedupe_count"] == 0
+
+
 def test_world_radar_imports_go_archive_rows_as_untrusted_evidence(monkeypatch, tmp_path: Path) -> None:
     state = tmp_path / ".dharma"
     archive_dir = tmp_path / "archive"

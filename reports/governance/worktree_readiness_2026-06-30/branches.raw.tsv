@@ -1,0 +1,238 @@
+_rebase_tmp	origin/codex/toolbelt-onboarding	31f0b8d1a	2026-06-02 10:07:16 +0000	fix(docops): correct manifest counts from docops metrics
+_rtmp	origin/devin/1779503110-staging-promote-hermes-wiring	eb6d8d883	2026-06-05 10:25:24 +0900	fix(ops): restrict review mark authority to operator [impact-checked]
+agent/artha-cream-seed		35bbcb9e5	2026-06-26 12:02:48 +0900	agent(artha_cream): seed ARTHA_CREAM — the Don, scrappy-revenue command holon
+agent/magpie-seed		260a11539	2026-06-28 01:24:09 +0900	snapshot: preserve agent/magpie-seed WIP before metabolize (rescue; guards intentionally bypassed)
+anti-slop/pudgala-forge-2026-06	origin/anti-slop/pudgala-forge-2026-06	b3cf8f855	2026-06-26 00:56:18 +0900	address pudgala forge review blockers
+archive/trust-build-compass-20260605		4bb47aedd	2026-06-03 06:09:48 +0800	docs(operator-os): close eight-hour mission
+audit/runtime-truth-2026-04-26		60666c387	2026-05-10 22:44:06 +0800	fix(runtime): normalize executive campaign datetimes [impact-checked]
+backup/memory-kernel-prep-2026-05-14		b14bea571	2026-05-14 06:31:33 +0800	feat(memory): add context shadow sweep [impact-checked]
+backup/route-witness-main-pre-rebase-2026-05-13		caf59efc2	2026-05-13 17:07:23 +0800	feat(routing): add route witness telemetry [impact-checked]
+backup/route-witness-pr297-pre-rebase-2026-05-13		7b2c08f9d	2026-05-13 22:48:23 +0800	docs(docops): refresh route witness inventory [impact-checked]
+base/brief-to-spec-seam-018ef60		018ef604a	2026-05-07 06:34:35 +0800	feat(build): brief_to_spec — synthesis→action seam + pilot00 pipeline
+cashclaw/revenue-hydra-v1	origin/cashclaw/revenue-hydra-v1	c487d2725	2026-06-14 05:10:35 +0900	scan: add farm detection (0-merge repos flagged as DO NOT CLAIM)
+chore/action-authority-gate-spec	origin/main	32e3eb224	2026-05-04 23:42:17 +0800	fix(governance): restore local telic seam writeback
+chore/agentops-base-check		b2ef97684	2026-05-04 22:18:10 +0800	test(governance): use active python for cli subprocesses
+chore/agentops-v0		a36b445b2	2026-05-04 23:00:26 +0800	chore(agentops): add governed work packet runner
+chore/authority-ptr-rollup	origin/main	25a02e555	2026-05-05 00:08:20 +0800	docs(governance): register ptr state ownership
+chore/brake-stabilization		d8a5cdcb0	2026-05-02 16:42:20 +0800	docs(cleanup): preserve current audit and control maps
+chore/capsule-coherence-tool		cc135f624	2026-05-03 23:04:39 +0800	chore(governance): add capsule coherence report
+chore/command-plane-nav-trim	origin/chore/command-plane-nav-trim	b7ab21759	2026-05-22 22:08:59 +0800	feat(cockpit): consume /api/manifest/command-plane via CommandPlaneTruthPanel
+chore/control-plane-stabilizer		d514f6ae1	2026-05-03 22:15:59 +0800	fix(control): restore CLI collection compatibility
+chore/core-four-ontology-phase3		5339d5091	2026-05-04 18:41:30 +0800	feat(ontology): add core four value metrics
+chore/current-truth-refresh	origin/main	ec74ee0c6	2026-05-06 13:40:04 +0800	docs(governance): refresh current repo truth
+chore/daily-brief-discovery-agentops		e4aa01e71	2026-05-04 23:34:55 +0800	chore(agentops): add governed work packet runner
+chore/docops-integrity-v0		93132013f	2026-05-05 23:23:12 +0800	docs(docops): add semantic codec readiness plan
+chore/docops-ttl-renewal-20260612	origin/chore/docops-ttl-renewal-20260612	4c65f017e	2026-06-12 01:06:32 +0900	chore(docops): re-verify assertions, renew TTL 2026-06-12
+chore/governance-truth-repairs		70908ab53	2026-05-04 14:54:12 +0800	fix(governance): sharpen assurance truth signals
+chore/invariant-daily-insight-seam		5dd1dfb5d	2026-05-03 22:28:02 +0800	fix(telic): preserve proposal linkage for insight chain
+chore/kaizen-review-v0		f01b79851	2026-05-05 00:10:16 +0800	chore(kaizen): add AgentOps review report
+chore/kimi-claw-agentops-task		e4aa01e71	2026-05-04 23:34:55 +0800	chore(agentops): add governed work packet runner
+chore/loop1-truth-registry		b329e1abe	2026-05-06 12:40:14 +0800	docs(governance): overlay current loop1 truth maps
+chore/memory-tail-proof		56b92d359	2026-05-03 22:35:13 +0800	fix(telic): preserve agent runner proposal linkage
+chore/opportunity-dispatcher-budget-fix		94f79b407	2026-05-03 18:44:32 +0800	fix(governance): route local semgrep through ca wrapper
+chore/opportunity-dispatcher-budget-surgeon		cd71d5d1a	2026-05-03 22:22:00 +0800	refactor(opportunity): extract dispatcher support capsules
+chore/phase2-governance-checkpoint		0ba34f6b9	2026-05-04 21:49:10 +0800	test(observability): isolate local trace store
+chore/phase2-governance-rollup	origin/chore/phase2-governance-rollup	e4aa01e71	2026-05-04 23:34:55 +0800	chore(agentops): add governed work packet runner
+chore/phase2-governance-rollup-core-four		74d14cba1	2026-05-04 21:43:32 +0800	feat(ontology): add core four value metrics
+chore/phase2-test-verify		94f79b407	2026-05-03 18:44:32 +0800	fix(governance): route local semgrep through ca wrapper
+chore/render-on-demand-stop-churn-20260625	origin/main	21ee18b36	2026-06-25 09:51:36 +0900	feat(governance): advisory track acceptance-strength membrane (#685)
+chore/repo-runway-daily-brief-seam	origin/main	bb64f2dcc	2026-05-07 22:52:42 +0800	feat(ops): add repo cleanup pressure cockpit [structural-delete-approved]
+chore/semgrep-high-risk-batch		fba32965d	2026-05-03 23:07:35 +0800	fix(governance): remove high-risk command and eval sinks
+chore/semgrep-rule-scope		5aa592bb6	2026-05-03 23:05:20 +0800	fix(governance): exclude semgrep test rules from local scans
+chore/semgrep-triage		94f79b407	2026-05-03 18:44:32 +0800	fix(governance): route local semgrep through ca wrapper
+chore/state-authority-map		94f79b407	2026-05-03 18:44:32 +0800	fix(governance): route local semgrep through ca wrapper
+chore/telic-seam-budget-exception		c71db6e74	2026-05-03 23:02:45 +0800	chore(governance): grandfather telic seam budget
+chore/uplift-guard-recovery		1f97b446a	2026-05-03 23:18:01 +0800	fix(governance): restore uplift guard runner
+claude/debug-corral	origin/claude/debug-corral	62cc51b85	2026-06-28 01:48:19 +0900	feat(debug): make debug-corral — one door for the whole self-debug system
+cleanup/action-authority-salvage-2026-05-13		afc962e22	2026-05-13 17:21:50 +0800	chore(cleanup): preserve action authority runtime wiring [impact-checked]
+cleanup/agent-truth-spine-salvage-2026-05-13		64f86b4bd	2026-05-13 18:48:48 +0800	chore(cleanup): preserve agent truth spine lane [impact-checked]
+cleanup/brake-stabilization-salvage-2026-05-13		1976329e1	2026-05-13 18:46:50 +0800	chore(cleanup): preserve brake stabilization residue [impact-checked]
+cleanup/convergence-20260615-25	origin/cleanup/convergence-20260615-25	cffd79ead	2026-06-25 10:48:22 +0900	docs(governance): refresh cleanup convergence evidence
+cleanup/core-operating-circuit-proof-salvage-2026-05-13		ac21e6fae	2026-05-13 18:47:28 +0800	chore(cleanup): preserve core operating circuit proof [impact-checked]
+cleanup/go-local-model-runtime-inventory-salvage-2026-05-13		9919a1f4f	2026-05-13 18:49:08 +0800	chore(cleanup): preserve go local model inventory lane [impact-checked]
+cleanup/kaizen-review-v0-salvage-2026-05-13		be2571eae	2026-05-13 18:48:32 +0800	chore(cleanup): preserve kaizen review human yds lane [impact-checked]
+cleanup/main-dirty-salvage-2026-05-12		49248cae1	2026-05-12 22:19:16 +0800	chore: preserve dirty main work for triage
+cleanup/main-late-dirty-salvage-2026-05-12		77aba9243	2026-05-12 23:13:52 +0800	chore(cleanup): preserve late dirty main work
+cleanup/main-recurring-live-salvage-2026-05-13		9848011cf	2026-05-13 18:50:00 +0800	chore(cleanup): preserve recurring live main residue [impact-checked]
+cleanup/memory-kernel-context-eval-2026-05-13		71ca01d72	2026-05-13 22:54:47 +0800	feat(memory): shadow context reads and sentinel ci [impact-checked]
+cleanup/memory-kernel-shadow-context-main-2026-05-13	origin/main	b1d20ccb3	2026-05-16 20:44:12 +0800	fix(memory): require strict readiness in operator smoke [impact-checked]
+cleanup/mixed-quality-recovery-2026-05-10	origin/cleanup/mixed-quality-recovery-2026-05-10	ddd674d5a	2026-05-10 21:43:44 +0800	feat(selection): catalytic-graph parent-selection bias (spine §9 closure) [impact-checked]
+cleanup/module-metabolism-strategy-salvage-2026-05-13		e28a4bbd2	2026-05-13 18:48:09 +0800	docs(cleanup): preserve core four ontology strategy notes [impact-checked]
+cleanup/opportunity-dispatcher-budget-fix-salvage-2026-05-13		2593169b9	2026-05-13 18:47:06 +0800	chore(cleanup): preserve opportunity dispatcher budget lane [impact-checked]
+cleanup/root-memory-context-salvage-2026-05-13		2427abe0f	2026-05-13 17:10:11 +0800	chore(memory): preserve context admission residue [impact-checked]
+cleanup/root-mixed-salvage-2026-05-12		8a083dcd2	2026-05-12 23:12:13 +0800	chore(cleanup): preserve late root residue
+cleanup/runtime-result-projector-salvage-2026-05-13		4666be110	2026-05-13 18:49:29 +0800	chore(cleanup): preserve runtime result projector lane [impact-checked]
+cleanup/viz-invariant-projection-2026-05-12		3d0868587	2026-05-12 23:09:45 +0800	feat(viz): project invariant measurements [impact-checked]
+codex/a2a-governance-readiness-20260626	origin/codex/a2a-governance-readiness-20260626	98d374d3f	2026-06-26 10:45:16 +0900	Merge origin/main into NATS readiness branch
+codex/cleanup-deletion-receipt-20260625	origin/codex/cleanup-deletion-receipt-20260625	8deded5c1	2026-06-25 12:16:14 +0900	cleanup: record approved worktree deletion receipt
+codex/cyber-loop-closure-provider-truth-20260619	origin/codex/cyber-loop-closure-provider-truth-20260619	5910bf17d	2026-06-19 04:11:09 +0900	test: make run daemon script test repo-relative
+codex/dharma-forge-proving-ground-10-10-20260626	origin/main	50c8e2b75	2026-06-26 09:26:35 +0900	Oz integration W1+W4: decorrelated verifier + cleanup janitor (#705)
+codex/exec10-lf5		dd53c8a46	2026-04-18 00:52:40 +0800	fix(guardian): dataclass auto-init detection — eliminates false-positive BLOCKER
+codex/fix-docops-autorefresh-dispatch-20260605	origin/codex/fix-docops-autorefresh-dispatch-20260605	a6561b3f6	2026-06-05 22:10:37 +0900	fix(ci): repair docops autorefresh dispatch
+codex/fix-docops-autorefresh-repo-arg-20260605	origin/codex/fix-docops-autorefresh-repo-arg-20260605	6fecf9624	2026-06-05 22:16:14 +0900	fix(ci): resolve docops manual dispatch repo context
+codex/fix-pr-398-coherence	origin/perplexity-computer/reply-to-claude-four-layer-stack	a39fde863	2026-05-31 19:05:35 +0800	docs: refresh docops counts for perplexity reply
+codex/go-idea-spark-ingest-spine-clean-20260604	origin/codex/go-idea-spark-ingest-spine-clean-20260604	0fe69fc3d	2026-06-04 20:54:10 +0900	chore(go-ingest): satisfy CI governance gates
+codex/governance-fitness-ci-20260620	origin/codex/governance-fitness-ci-20260620	c69f1cf05	2026-06-20 13:19:34 +0900	test: read daemon script from checkout
+codex/governance-fitness-ci-20260625-225920	origin/codex/governance-fitness-ci-20260625-225920	791801e0f	2026-06-26 00:59:31 +0900	adjudicate quality ratchet raw LOC baseline
+codex/live-ops-cockpit-v1	origin/codex/live-ops-cockpit-v1	03c077ece	2026-06-03 23:48:09 +0900	chore(ops): satisfy live cockpit PR gates
+codex/live-ops-cockpit-v1-docops-fix	origin/codex/live-ops-cockpit-v1	8c5c27bb4	2026-06-05 01:36:18 +0900	chore(ops): fix live cockpit docops gate
+codex/live-ops-cockpit-v1-docops-fix-mainbase	origin/main	dd47d7f00	2026-06-05 01:40:16 +0900	chore(ops): fix live cockpit docops gate
+codex/live-ops-cockpit-v2-slice-a	origin/main	8f67f8630	2026-06-05 01:43:49 +0900	feat(ops): add live ops state authority model
+codex/live-ops-cockpit-v2-slice-b		27861e0bc	2026-06-05 02:07:35 +0900	feat(ops): project PR queue into live cockpit
+codex/live-ops-cockpit-v2-slice-c		1d2049d3c	2026-06-05 01:45:52 +0900	feat(ops): add live ops proposal packets
+codex/main-review-blockers	origin/codex/main-review-blockers	7893937e3	2026-06-12 14:58:37 +0900	fix(security): close post-574 review blockers
+codex/memory-kernel-default-context-20260523	origin/codex/memory-kernel-default-context-20260523	0b0cd8b9a	2026-05-24 21:14:14 +0800	Merge remote-tracking branch 'origin/main' into codex/memory-kernel-default-context-20260523
+codex/mike-nonstop-dedupe-20260626	origin/codex/mike-nonstop-dedupe-20260626	3e46efe93	2026-06-26 10:06:44 +0900	fix(mike): patch workflow-dispatch comment update
+codex/pr388-disambig	origin/devin/2026-05-30-receipt-disambiguation	f24a2adf3	2026-06-01 21:22:37 +0800	test(receipts): add pr388 merge proof
+codex/pr408-schema-align	origin/perplexity/2026-06-01-schema-alignment-gate	598f05643	2026-06-01 19:01:10 +0800	fix(governance): distinguish stale ontology branches
+codex/pr409-oms-hardening	origin/devin/1780259643-oms-hardening	0f2525880	2026-06-01 17:31:56 +0800	fix(ontology): preserve adapter idempotency
+codex/pr468-docops-clean	origin/docs/runtime-truth-spine-plan-and-vel-rfc	7a19c7c3e	2026-06-04 21:37:07 +0900	docs(spine): resolve #468 DocOps conflicts after matrix merge
+codex/pr470-after-468-fix	origin/devin/1780551922-spine-a2a-hardening	a2a92a246	2026-06-04 21:57:56 +0900	merge main into #470 after spine RFC merge
+codex/pr470-docops-review	origin/devin/1780551922-spine-a2a-hardening	043c27037	2026-06-04 20:41:54 +0900	docs(spine): refresh DocOps counts after invariant tests
+codex/pr546-main-sync	origin/chore/hygiene/evidence-snapshots-to-release	ba4c7700f	2026-06-12 15:44:05 +0900	merge main into evidence snapshot lane after automerge lane [impact-checked] [large_diff_ack] [structural-delete-approved]
+codex/pr558-main-sync	origin/governance/ws4-gate-pep	09954a5cf	2026-06-12 15:43:54 +0900	merge main into telos gate lane after automerge lane [impact-checked] [large_diff_ack] [structural-delete-approved]
+codex/pr562-main-sync	origin/fix/evolution-archive-honesty	c1c4b4bf7	2026-06-12 14:54:29 +0900	merge main into evolution archive honesty [impact-checked] [large_diff_ack] [structural-delete-approved]
+codex/pr564-main-sync	origin/devin/honest-spine-handoff-20260611	7d2cdc6b6	2026-06-12 15:43:46 +0900	merge main into honest spine handoff after automerge lane [impact-checked] [large_diff_ack] [structural-delete-approved]
+codex/pr570-orientation-fixes		ebf11a792	2026-06-11 23:17:44 +0900	docs: harden north star orientation receipts
+codex/pr574-codeql-tests	origin/qwen/spine-adoption	3a813a798	2026-06-12 14:21:17 +0900	governance: re-render ACTIVE_TRACK managed block after main sync (gate: no drift) [impact-checked]
+codex/pr578-main-sync	origin/feat/trust-gate-scoreboard	1b843a3f4	2026-06-12 15:06:05 +0900	merge main into trust gate scoreboard lane [impact-checked] [large_diff_ack] [structural-delete-approved]
+codex/pr578-main-sync2	origin/feat/trust-gate-scoreboard	582137c5e	2026-06-12 15:43:35 +0900	merge main into trust gate scoreboard after automerge lane [impact-checked] [large_diff_ack] [structural-delete-approved]
+codex/pr584-main-sync	origin/copilot/close-duplicate-prs-and-enable-automerge	ab49f6dc0	2026-06-12 15:01:35 +0900	merge main into automerge dedupe lane [impact-checked] [large_diff_ack] [structural-delete-approved]
+codex/pr586-main-sync	origin/codex/truth-graph-v1	d85b525cd	2026-06-12 15:33:31 +0900	merge main into truth graph platform after automerge lane [impact-checked] [large_diff_ack] [structural-delete-approved]
+codex/reconciliation-promotion-20260626	origin/codex/reconciliation-promotion-20260626	fecff4b85	2026-06-26 10:36:41 +0900	docs: tighten promotion packet ownership and gates
+codex/repair-pr-392		236e9e8ef	2026-05-31 20:12:41 +0800	fix(guardian): refresh docops after dedup tests
+codex/repair-pr-399		066157dd9	2026-05-31 19:59:35 +0800	docs(track): refresh proposed cloud bridge docops
+codex/runtime-truth-nats-adapter-20260606	origin/codex/runtime-truth-nats-adapter-20260606	cee160f24	2026-06-06 11:32:32 +0900	chore(governance): refresh spine metric after NATS ack fix
+codex/semantic-commons-livingdock-composer-100	origin/main	c53721d5f	2026-06-25 16:56:49 +0900	fix(governance): rigor-aware track readiness + enforced gate + onboard trust verdict (#695)
+codex/toolbelt-onboarding	origin/codex/toolbelt-onboarding	8fc17f2bc	2026-05-21 17:01:55 +0800	docs(ops): publish Codex toolbelt onboarding
+codex/truth-graph-v1	origin/codex/truth-graph-v1	1c0a25a39	2026-06-12 14:02:42 +0900	feat(governance): add truth graph platform projection
+complexity-stress/replay-metamorphic-v1	origin/complexity-stress/replay-metamorphic-v1	9c8d75c92	2026-06-18 23:39:34 +0900	Clarify replay metamorphic fixture invariant
+copilot/close-duplicate-prs-and-enable-automerge	origin/copilot/close-duplicate-prs-and-enable-automerge	b26d69e30	2026-06-12 15:29:49 +0900	fix(ci): harden automerge governance lane [impact-checked]
+cutover/lf5-runtime-on-main-20260510-integrate-main		4a31d0e78	2026-05-10 23:15:12 +0800	feat(runtime): port lf5 daemon spine onto main cutover [impact-checked] [structural-delete-approved]
+daemon-lane-upgrade-20260616		69fda66ee	2026-06-16 01:21:51 +0900	feat(daemon): versioned provenance soak candidate [impact-checked] [large-diff-ack]
+daemon-versioning/v0.0.1	origin/main	bfd09a769	2026-06-15 01:33:15 +0900	feat(versioning): v0.0.1 soak-testable promote-on-verified-metrics scaffold
+dashboard-lf5-operator-lane		9d6a34500	2026-04-10 23:25:33 +0800	lf5: Live Fire 5 results — gauntlet baseline established
+devin/1778035620-wire-fractal-runtime		28823aa90	2026-05-06 13:44:48 +0800	fix(fractal): make runtime room wiring explicit [impact-checked]
+devin/1778037205-marathon-cleanup	origin/devin/1778037205-marathon-cleanup	c5f138117	2026-05-11 18:47:07 +0800	docs: refresh DocOps counts (556 modules, 567 test files, 688 md files) [impact-checked]
+devin/1778426210-ship-revenue-wedge-report		e447becf2	2026-05-11 21:21:21 +0800	docs: refresh revenue wedge docops counts [impact-checked]
+dgc-splash-art		36d55d9da	2026-04-03 23:55:57 +0900	fix(tui): pipe bridge stderr to prevent double-render corruption
+docs/adr-008-ontology-api-grammar	origin/docs/adr-008-ontology-api-grammar	ec4b4fb39	2026-06-01 12:43:34 +0800	docs(adr): ADR-008 — resolve open-Q3 sibling api_name conventions (Palantir-grounded)
+droid/dharma-forge-proving-ground-10-10-20260626	origin/main	50c8e2b75	2026-06-26 09:26:35 +0900	Oz integration W1+W4: decorrelated verifier + cleanup janitor (#705)
+feat/a2a-correlation-spine-phase2a	origin/main	98d9cf416	2026-05-28 23:38:03 +0800	docs(a2a): correlation spine architecture anchor note
+feat/brief-to-spec-seam-2026-05-07	origin/feat/brief-to-spec-seam-2026-05-07	e3d1eb997	2026-05-07 21:46:22 +0800	docs(state): record post-cron verification
+feat/codex-lane-runner-2026-05-13	origin/main	8c2629ad4	2026-05-14 06:36:20 +0800	fix(codex-lane): close subprocess stdin
+feat/cwt-v0-collector	origin/feat/cwt-v0-collector	242b67ce2	2026-05-21 16:58:34 +0800	feat(governance): CWT v0 read-only collector + report renderer [impact-checked]
+feat/governed-memory-recursive-preflight	origin/main	8dca25eab	2026-05-17 21:10:17 +0800	feat(governance): integrate recursive memory preflight proof [impact-checked]
+feat/inquiry-chain-phase1		d8a5cdcb0	2026-05-02 16:42:20 +0800	docs(cleanup): preserve current audit and control maps
+feat/ontology-telos-gate-hardwire	origin/main	592e7af48	2026-06-01 15:25:44 +0800	docs(governance): refresh telos count stamp
+feat/operator-idea-spark-ingest		2cb466977	2026-06-28 09:09:20 +0900	idea-spark PR15: multi-tier DEEPEN pipeline + Kimi-floored single routing
+feat/runtime-result-projector		ddd674d5a	2026-05-10 21:43:44 +0800	feat(selection): catalytic-graph parent-selection bias (spine §9 closure) [impact-checked]
+feat/trust-gate-scoreboard	origin/feat/trust-gate-scoreboard	7e823c7f6	2026-06-12 01:28:46 +0900	chore: drop unused import (pyright)
+feat/world-radar-live-integration-2026-05-13	origin/main	1ff15b98d	2026-05-13 22:35:54 +0800	feat(world): consolidate live radar shakti telos lane [impact-checked]
+feat/world-radar-shakti-telos-2026-05-13		be5ef013e	2026-05-13 17:00:24 +0800	feat(world): preserve radar shakti telos build lane [impact-checked]
+feat/world-radar-shakti-telos-docs-tests-2026-05-13		4c4eeb01c	2026-05-13 17:34:36 +0800	docs(world): preserve zeitgeist docs test residue [impact-checked]
+feat/world-radar-shakti-telos-final-residue-2026-05-13		b913b957a	2026-05-13 17:53:53 +0800	feat(world): preserve final scoring zeitgeist residue [impact-checked]
+feat/world-radar-shakti-telos-followup-2026-05-13		0200888a4	2026-05-13 17:28:20 +0800	feat(world): preserve recurring signal followup [impact-checked]
+feat/world-radar-shakti-telos-live-2026-05-13		b6e0342e0	2026-05-13 17:52:46 +0800	feat(world): preserve live recurring radar state [impact-checked]
+feat/world-radar-shakti-telos-residual-2026-05-13		86d1c0330	2026-05-13 17:31:22 +0800	feat(world): preserve runtime residual wiring [impact-checked]
+fix/e2e-1782573361-F-APS-01-001		d948987ef	2026-06-27 23:34:43 +0900	feat(loop): add agent backends and CI ratchet wiring
+fix/evolution-archive-honesty	origin/fix/evolution-archive-honesty	f8fb428bc	2026-06-12 01:54:49 +0900	Merge remote-tracking branch 'origin/main' into fix/evolution-archive-honesty
+fix/provider-discoverability	origin/fix/provider-discoverability	f4814580a	2026-06-23 23:47:13 +0900	fix(provider): require real dispatch before loop closure [impact-checked]
+fix/provider-honesty-g6	origin/fix/provider-honesty-g6	8e086e092	2026-06-10 23:39:00 +0900	providers_extended: route Ollama generate, NVIDIA NIM, Moonshot through honest extractor
+fix/runtime-spine-audit-followups		551b88e21	2026-06-15 10:14:56 +0900	gov(runtime-receipt): sanctioned fixture quarantine excludes fixture rows from 70->75 score gate
+forge-v1/tokenbroker-scoreboard-20260620	origin/main	d8bca7aab	2026-06-20 19:13:48 +0900	forge-v1: REAL coordinated multi-model coding agent (PLAN->BUILD->VERIFY)
+forge/dharma-reward-forge-v0		236006e54	2026-05-31 23:57:21 +0800	feat(forge): Dharma Reward Forge v0 — close the sealed-task loop
+governance/arena-v1-admission-20260623	origin/governance/arena-v1-admission-20260623	55e121b13	2026-06-23 23:40:12 +0900	governance: admit orchestration-arena-v1-2026-06 active track [impact-checked]
+governance/mike-trust-arbiter-2026-06	origin/governance/mike-trust-arbiter-2026-06	dc29826f9	2026-06-26 12:18:49 +0900	refactor(mike): use repo-convention package imports (scripts.runtime.*) not sys.path bare imports
+governance/operator-coherence-cockpit-20260623	origin/governance/operator-coherence-cockpit-20260623	f0d52830e	2026-06-24 00:23:54 +0900	chore(cockpit): retrigger CI after warrant acknowledgement [impact-checked]
+governance/parallel-lane-policy-2026-06-06		3ff3d44b4	2026-06-06 13:02:51 +0900	governance: support 1-10 active_tracks (schema v2, primary alias)
+governance/ws3-spine-dispatch	origin/governance/ws3-spine-dispatch	b930a9578	2026-06-09 21:25:28 +0900	spine: route orchestrator dispatch through invoke_agent behind flag (WS3) [impact-checked]
+governance/ws4-gate-pep	origin/governance/ws4-gate-pep	5d333431e	2026-06-10 00:02:23 +0900	telos: enforce gate on REVIEW-decision self-mods (WS4a) [impact-checked]
+helm/worldclass-20260612	origin/helm/worldclass-20260612	680b013c0	2026-06-16 23:56:28 +0900	helm(theme): Nihonga Mineral palette — bold mineral pigments on warm sumi-black
+holarchy/crossfalsify-20260619	origin/main	d2dd09ad5	2026-06-19 01:02:18 +0900	holarchy: Falsifiable Holarchy cross-falsification primitive (the acceptance test, as running code)
+integrate/chetana-grand-memory-2026-05-02	origin/integrate/chetana-grand-memory-2026-05-02	c509d4e8e	2026-05-04 23:12:06 +0800	feat(governance): add ptr shadow metric
+lane/cybernetics-codex	origin/main	b278bf4a6	2026-06-15 08:32:32 +0900	landing(cybernetics-codex): stewardship agent charter + audit/registration + tests
+lane/leftover-telos-cockpit	origin/main	e231fce0c	2026-06-15 08:31:54 +0900	landing(telos-cockpit): morning-refinery persona council + vision map + product surface
+lane/loop-closure-reconciled		12793ebd5	2026-06-16 01:58:42 +0900	loop-closure: graft Opus all-night closure harness onto Fable phase1b [docops-resync; additive manifest drift]
+lane/palantir-pilot	origin/main	80f06814c	2026-06-15 08:32:37 +0900	landing(palantir-pilot): pilot agent + research toolchain (separate lane, no track)
+lane/runtime-spine-hardening	origin/main	1e6668d7c	2026-06-15 08:33:05 +0900	landing(runtime-spine): runtime core + receipt/provenance + live-ops + A2A + governance evidence
+lane/untangle-manifest	origin/main	6c7e2b1cd	2026-06-15 08:39:09 +0900	docs(governance): UNTANGLE_MANIFEST for cc9c05f21 segmentation
+lf5-live-fire-clean	origin/lf5-live-fire-clean	dd53c8a46	2026-04-18 00:52:40 +0800	fix(guardian): dataclass auto-init detection — eliminates false-positive BLOCKER
+loop-closure/phase1b-2026-06	origin/loop-closure/phase1b-2026-06	c540f2edf	2026-06-14 08:40:52 +0900	loop-closure: campaign RETROSPECTIVE — what the map predicted vs reality (5th criterion)
+loop-closure/supplychain-bronze-20260620	origin/loop-closure/supplychain-bronze-20260620	11de04fb7	2026-06-20 19:23:54 +0900	loop-closure: close thin supply chain loop [impact-checked]
+main	origin/main	103311acc	2026-06-25 13:56:56 +0900	onboard: surface cleanup bulletins (#692)
+merge-master/pr399-restack	origin/main	5d5711b3c	2026-06-02 02:39:20 +0800	docs(governance): restack cloud bridge proposal [impact-checked]
+merge-master/pr411-restack	origin/main	aeabeec3f	2026-06-01 23:22:14 +0800	chore(inter-agent): restack inbound status after outbound merge [impact-checked]
+merge-master/pr435-restack	origin/main	0e2ed53b3	2026-06-02 02:59:45 +0800	feat(spine): restack adapter saturation slice [impact-checked]
+merge-master/pr436-restack	origin/main	b122f276c	2026-06-02 03:21:10 +0800	feat(spine): restack mapping receipt slice [impact-checked]
+migration/old-machine-main		662b16dd7	2026-03-31 00:12:00 +0900	feat(dashboard): Phase 1 Hokusai — indigo depths, telemetry strip, sharp panels
+mmm-nats-aiohttp	origin/mmm-nats-aiohttp	eb9d8fa81	2026-06-05 00:03:54 +0900	fix: install aiohttp for Mike NATS websocket
+mmm-nats-ca-pem	origin/mmm-nats-ca-pem	2eb6133d8	2026-06-05 00:19:26 +0900	fix: trust private CA for Mike NATS fanout
+mmm-nats-mike-credentials	origin/mmm-nats-mike-credentials	ab3fe2006	2026-06-05 00:34:27 +0900	fix: use Mike NATS credentials for backlog fanout
+mmm-nats-publish-deadline	origin/mmm-nats-publish-deadline	a32127ab7	2026-06-04 23:55:27 +0900	fix: bound Mike A2A publish deadline
+mmm-pin-actions	origin/mmm-pin-actions	fbc3a4e11	2026-06-04 23:34:21 +0900	fix: pin Mike workflow actions
+mmm-visible-backlog-router	origin/mmm-visible-backlog-router	11f68953b	2026-06-05 10:27:17 +0900	Make Mike mentions visibly route backlog requests
+model-routing/nim-bleeding-edge-20260618	origin/main	8ac5118ca	2026-06-18 23:40:58 +0900	model-routing: fix dead NIM routes + expand to wide bleeding-edge selection [impact-checked]
+model-routing/nim-live-catalog-fix-20260620	origin/model-routing/nim-live-catalog-fix-20260620	4394d81b2	2026-06-20 10:58:22 +0900	model-routing: fix NVIDIA DeepSeek catalog route
+organ/00-floor		af7991aab	2026-06-10 23:21:42 +0900	fix(floor): unblock dispatch — bound workspace scan, satisfy think-point, non-bare pulse (H02 P1) [impact-checked]
+organ/02-wounds		f3c926490	2026-06-11 00:28:22 +0900	fix(wounds): test fixtures no longer pollute the production witness stream (H02 P3.8) [impact-checked]
+organ/03-seat	origin/organ/03-seat	e67b91829	2026-06-11 07:55:23 +0900	docs(handoffs): H02 divergence audit harvested — 6/6 claim families VERIFIED, kill test re-run green (discharges ESCALATION-6)
+oz/integration-2026-06-25	origin/oz/integration-2026-06-25	2cdef3d78	2026-06-26 09:23:01 +0900	fix(oz): gate verifier on API key
+pr-344-backlog		2076897a7	2026-06-05 23:39:49 +0900	chore(docops): refresh counts for PR344 rebase
+pr-384-backlog		3f0497add	2026-06-05 23:42:17 +0900	chore(docops): refresh counts for PR384 rebase
+pr-388-backlog		807040cc0	2026-06-05 23:44:47 +0900	chore(docops): refresh counts for PR388 rebase
+pr-406-review-20260531		d960d2fb6	2026-06-01 02:23:25 +0800	feat(ontology): hard-wire telos gate into execute_action (W1)
+pr-465-backlog		8ea05b1f9	2026-06-05 23:58:03 +0900	chore(ops): repair live cockpit rebase gates
+pr-474-backlog		c33d8758b	2026-06-06 00:10:18 +0900	chore(docops): refresh counts for PR474 rebase
+pr-495-backlog		489f51ad8	2026-06-06 00:06:04 +0900	chore(mike): retrigger coherence delta
+pr-689-closure		91dfe4db2	2026-06-26 10:47:17 +0900	Merge remote-tracking branch 'origin/main' into pr-689-closure
+preserve/sandbox-uniques-2026-06-24	origin/preserve/sandbox-uniques-2026-06-24	326b38dc8	2026-06-24 21:41:17 +0900	preserve: rescue 6 unique-to-sandbox files from recover/dharma-capital tree
+qwen/spine-adoption	origin/qwen/spine-adoption	d87edb5d4	2026-06-13 11:54:19 +0900	ummm, just randomly starting a new codex chat and it happened to be in qwen, if anyone sees this find out what is not clean and metabolized from qwen and next time clean it up and see if we can close the branch if it is backed up and saved on main
+ratchet/loop-phases-1-3	origin/main	ca2518b67	2026-06-30 00:44:00 +0900	test(loop): add VAL-CI-003 fail-closed gate test for Phase-0 F1 marker strictness
+ratchet/phase0-tv01		ca5878e29	2026-06-26 00:48:15 +0900	gov(tv01): ratchet F1/F2/F3 slop classes into deterministic gates
+recover/dharma-capital-2026-06-24	origin/recover/dharma-capital-2026-06-24	01d22b94f	2026-06-26 09:49:38 +0900	capital_lab: checkpoint read-only agni bridge
+repair/pr-325-toolbelt	origin/codex/toolbelt-onboarding	548123e10	2026-05-24 19:30:26 +0800	Merge remote-tracking branch 'origin/main' into repair/pr-325-toolbelt
+repair/pr413-docops-rebase	origin/perplexity-grounding/1780286494-auto-grounded	b1cd7076b	2026-06-04 22:19:33 +0900	research(palantir-ontology): auto-grounding for PR#409 — gaps surfaced
+repair/pr674-track-closure-gate-20260624	origin/chore/reconcile-records-2026-06-22	ebccfb1e2	2026-06-24 07:18:31 +0900	ci: fetch history for pytest ancestry checks [impact-checked]
+research/moltbook-investigation	origin/main	2b6c3776a	2026-05-20 17:24:37 +0800	docs(research): round 1 follow-up — R_V calibration, schemas, corrections log
+research/persistent-agents-2026-05	origin/research/persistent-agents-2026-05	39291ad3d	2026-05-20 19:16:49 +0800	Add persistent agents landscape survey
+research/persistent-agents-deepdive-2026-05		39291ad3d	2026-05-20 19:16:49 +0800	Add persistent agents landscape survey
+review-pr393c	origin/main	11647bcc5	2026-06-01 22:35:53 +0800	chore(inter-agent): restack outbound responses after ops refresh
+review-pr411b	origin/main	ff8cd9e36	2026-06-01 22:35:53 +0800	chore(inter-agent): restack inbound status after ops refresh
+review/interop-fleet-2026-05-12		58e809eef	2026-05-12 23:10:34 +0800	chore(interop): park fleet interop control surface [impact-checked]
+review/memory-knowledge-2026-05-12		479528df5	2026-05-13 17:19:20 +0800	chore(memory): preserve context admission residue [impact-checked]
+review/root-governance-residue-2026-05-12		af374d108	2026-05-12 23:10:57 +0800	chore(governance): park root cleanup residue [impact-checked]
+routing-lane-source		ddcd720b2	2026-05-06 23:03:08 +0800	feat(cron): add shakti executive handler
+rss/FU-CONDUCTOR-MALFORMED-DB		4bb47aedd	2026-06-03 06:09:48 +0800	docs(operator-os): close eight-hour mission
+rss/FU-CONDUCTOR-UTF8		4bb47aedd	2026-06-03 06:09:48 +0800	docs(operator-os): close eight-hour mission
+rss/FU-CQ-PASSPORT-COUNT		4bb47aedd	2026-06-03 06:09:48 +0800	docs(operator-os): close eight-hour mission
+rss/FU-CRON-HANDLERS		4bb47aedd	2026-06-03 06:09:48 +0800	docs(operator-os): close eight-hour mission
+rss/FU-GOV-MODULE-BUDGET		4bb47aedd	2026-06-03 06:09:48 +0800	docs(operator-os): close eight-hour mission
+rss/FU-SEAM-KEY-CONTRACT		4bb47aedd	2026-06-03 06:09:48 +0800	docs(operator-os): close eight-hour mission
+rss/FU-SMOKE-PROFILE-ENUM		4bb47aedd	2026-06-03 06:09:48 +0800	docs(operator-os): close eight-hour mission
+rss/FU-SMOKE-SLEEPCYCLE-SIG		4bb47aedd	2026-06-03 06:09:48 +0800	docs(operator-os): close eight-hour mission
+rss/FU-SPINE-CORRELATION-JOIN		4bb47aedd	2026-06-03 06:09:48 +0800	docs(operator-os): close eight-hour mission
+rss/FU-SPINE-DB-PATH		4bb47aedd	2026-06-03 06:09:48 +0800	docs(operator-os): close eight-hour mission
+rss/FU-STIG-SCHEMA-BACKEND		4bb47aedd	2026-06-03 06:09:48 +0800	docs(operator-os): close eight-hour mission
+rss/FU-STIG-WRITE-PATH		4bb47aedd	2026-06-03 06:09:48 +0800	docs(operator-os): close eight-hour mission
+rss/FU-SUBPROC-NULLBYTE		4bb47aedd	2026-06-03 06:09:48 +0800	docs(operator-os): close eight-hour mission
+rss/FU-TOOL-LOOP-CONVERGE		4bb47aedd	2026-06-03 06:09:48 +0800	docs(operator-os): close eight-hour mission
+rss/FU-WIRE-MINIMAX		4bb47aedd	2026-06-03 06:09:48 +0800	docs(operator-os): close eight-hour mission
+rss/FU-WIRE-XAI		4bb47aedd	2026-06-03 06:09:48 +0800	docs(operator-os): close eight-hour mission
+rss/FU-WIRE-ZAI		4bb47aedd	2026-06-03 06:09:48 +0800	docs(operator-os): close eight-hour mission
+runtime-truth/nats-rebuild-preflight-20260618	origin/main	86418541a	2026-06-18 23:40:06 +0900	Merge pull request #633 from AmitabhainArunachala/devin/1781768310-stop-noise-prs-automerge-botpr
+sattva/quality-ratchet-2026-06	origin/sattva/quality-ratchet-2026-06	989f765b6	2026-06-13 00:41:25 +0900	docs(quality): reconcile draft track with landed assurance boundary
+scratch/cockpit-grafana-static-20260626		69506fc80	2026-06-24 13:20:05 +0900	recover: snapshot L4 holon substrate + orchestrate (rescue uncommitted work)
+scratch/mandala-cockpit-v1-20260624		63c4937b3	2026-06-24 00:19:47 +0900	fix(cockpit): satisfy manifest, Rule 10, and cockpit route tests [impact_checked] [large_diff_ack]
+slice/roast-skill	origin/slice/roast-skill	5288c8ea5	2026-06-28 01:32:32 +0900	feat(skills): land the roast anti-sycophancy council skill
+spec/shakti-ginko-organ	origin/spec/shakti-ginko-organ	22951df4b	2026-05-20 19:00:46 +0800	fix(docops): register 3 new architecture docs in canonical_guard
+spine-adoption/slice-b-adapter-saturation	origin/main	6c793fabd	2026-06-02 02:45:54 +0800	chore(spine): tighten slice B runlog wording [impact-checked]
+spine-adoption/slice-c-mapping-receipts	origin/main	71120f9f4	2026-06-02 02:45:54 +0800	chore(spine): tighten slice C runlog wording [impact-checked]
+tam/operator-seed-v1	origin/main	799f30400	2026-06-12 13:31:46 +0900	docs(plans): DHARMA_A2A retention proposal + outbound A2A reply packet (janitor lane) (#568)
+telos-ai-seed-2026-06-13	origin/main	7217fbe1e	2026-06-13 12:57:41 +0900	audit(telos-ai): substrate feasibility pass v0 (concept; seed not yet written)
+telos-ai-seed-v0-from-sandbox	origin/telos-ai-seed-v0-from-sandbox	cd610be3c	2026-06-19 00:52:44 +0900	docs(adr): ADR-009 Holarchy of Standing Holons + Falsifiable Internal Coherence
+telosproof-v0-advisory-spike		634495425	2026-05-30 13:40:31 +0800	TelosProof v0: advisory proof-carrying-telos gate (prove the body, not the ghost)
+telosproof-v1-verification-substrate		c8efcff28	2026-05-30 16:04:58 +0800	TelosProof v1 (increment 2): mutation-kill suite + close the aliased-import false-negative
+trust-build-compass		a3ea1ee9a	2026-06-06 13:46:24 +0900	doctrine(governance): implement multi-track with parallel_lane_policy (v2 schema)
+wip/orphaned-m2-m3-headstart		07fa0be4f	2026-06-27 23:00:46 +0900	wip: orphaned M2/M3 head-start work (DroidBackend/ApiBackend, wire_ci_gate, loop-ratchet-gates, stage-script rewires) — preserved from interrupted session; M2/M3 will be built fresh with TDD
+worktree-research-integration		f0158968a	2026-04-10 23:55:09 +0800	feat: research-informed evolution — 4 new modules + full integration

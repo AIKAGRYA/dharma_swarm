@@ -138,7 +138,7 @@ class EvidenceReceipt:
         return d
 
 
-# --- Verified machine receipt (Pudgala Forge Phase 1) -------------------------
+# --- Verified machine receipt (Pudgala Autopoiesis Protostar Phase 1) ---------
 # EvidenceReceipt proves a dispatch happened. It carries NO machine-execution
 # fields (the command run, the tree state, the exit code), so it cannot bind a
 # *claim* to *what actually ran*. VerifiedMachineReceipt is the sibling that

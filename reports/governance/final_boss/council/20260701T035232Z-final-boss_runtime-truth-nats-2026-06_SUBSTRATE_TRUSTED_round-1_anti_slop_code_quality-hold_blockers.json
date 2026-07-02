@@ -1,0 +1,202 @@
+{
+  "blockers": [
+    "glm52: RuntimeError Ollama cloud error after 1 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your weekly usage limit, add extra usage: https://ollama.com/settings (ref: 688c08ff-f3a2-43f7-903d-c54dbc0cb034)\"}\n",
+    "glm52: disagreement=Ollama cloud error after 1 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your weekly usage limit, add extra usage: https://ollama.com/settings (ref: 688c08ff-f3a2-43f7-903d-c54dbc0cb034)\"}\n",
+    "kimi27code: RuntimeError Ollama cloud error after 10 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your weekly usage limit, add extra usage: https://ollama.com/settings (ref: c1b4dc10-b567-4b37-9bbc-54ea2c55cc99)\"}\n",
+    "kimi27code: disagreement=Ollama cloud error after 10 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your weekly usage limit, add extra usage: https://ollama.com/settings (ref: c1b4dc10-b567-4b37-9bbc-54ea2c55cc99)\"}\n",
+    "qwen3coder: RuntimeError Ollama cloud error after 10 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your weekly usage limit, add extra usage: https://ollama.com/settings (ref: bd15b78a-1fa6-4d2c-9579-85610142a465)\"}\n",
+    "qwen3coder: disagreement=Ollama cloud error after 10 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your weekly usage limit, add extra usage: https://ollama.com/settings (ref: bd15b78a-1fa6-4d2c-9579-85610142a465)\"}\n",
+    "deepseekv4pro: RuntimeError Ollama cloud error after 10 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your weekly usage limit, add extra usage: https://ollama.com/settings (ref: f3b4142e-2903-4bd2-a573-6dce8219c945)\"}\n",
+    "deepseekv4pro: disagreement=Ollama cloud error after 10 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your weekly usage limit, add extra usage: https://ollama.com/settings (ref: f3b4142e-2903-4bd2-a573-6dce8219c945)\"}\n",
+    "minimaxm3: RuntimeError Ollama cloud error after 10 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your weekly usage limit, add extra usage: https://ollama.com/settings (ref: 0b6dfa27-8d29-464b-9179-744a63d24b49)\"}\n",
+    "minimaxm3: disagreement=Ollama cloud error after 10 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your weekly usage limit, add extra usage: https://ollama.com/settings (ref: 0b6dfa27-8d29-464b-9179-744a63d24b49)\"}\n",
+    "nemotron3ultra: verdict=reject",
+    "nemotron3ultra: disagreement=The track's own closeout receipt and governance docs explicitly classify this as VERIFIED_SLICE, not SUBSTRATE_TRUSTED. Pursuing SUBSTRATE_TRUSTED with the current mock-only evidence contradicts the project's own documented position and the"
+  ],
+  "conviction_gate": "hold_blockers",
+  "critic_count": 6,
+  "critics": [
+    {
+      "actual_model": "",
+      "failure_reason": "Ollama cloud error after 1 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your weekly usage limit, add extra usage: https://ollama.com/settings (ref: 688c08ff-f3a2-43f7-903d-c54dbc0cb034)\"}\n",
+      "failure_type": "RuntimeError",
+      "lane_id": "glm52",
+      "latency_ms": null,
+      "ok": false,
+      "parsed": {
+        "blockers": [
+          "Ollama cloud error after 1 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your weekly usage limit, add extra usage: https://ollama.com/settings (ref: 688c08ff-f3a2-43f7-903d-c54dbc0cb034)\"}\n"
+        ],
+        "evidence_checked": [],
+        "explicit_disagreement": "Ollama cloud error after 1 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your weekly usage limit, add extra usage: https://ollama.com/settings (ref: 688c08ff-f3a2-43f7-903d-c54dbc0cb034)\"}\n",
+        "required_changes": [
+          "Make ollama:glm-5.2:cloud reachable or mark the lane optional with justification."
+        ],
+        "score": 0,
+        "summary": "glm52 could not run.",
+        "verdict": "blocked"
+      },
+      "provider": "ollama",
+      "raw_response_preview": "",
+      "requested_model": "glm-5.2:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "",
+      "failure_reason": "Ollama cloud error after 10 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your weekly usage limit, add extra usage: https://ollama.com/settings (ref: c1b4dc10-b567-4b37-9bbc-54ea2c55cc99)\"}\n",
+      "failure_type": "RuntimeError",
+      "lane_id": "kimi27code",
+      "latency_ms": null,
+      "ok": false,
+      "parsed": {
+        "blockers": [
+          "Ollama cloud error after 10 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your weekly usage limit, add extra usage: https://ollama.com/settings (ref: c1b4dc10-b567-4b37-9bbc-54ea2c55cc99)\"}\n"
+        ],
+        "evidence_checked": [],
+        "explicit_disagreement": "Ollama cloud error after 10 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your weekly usage limit, add extra usage: https://ollama.com/settings (ref: c1b4dc10-b567-4b37-9bbc-54ea2c55cc99)\"}\n",
+        "required_changes": [
+          "Make ollama:kimi-k2.7-code:cloud reachable or mark the lane optional with justification."
+        ],
+        "score": 0,
+        "summary": "kimi27code could not run.",
+        "verdict": "blocked"
+      },
+      "provider": "ollama",
+      "raw_response_preview": "",
+      "requested_model": "kimi-k2.7-code:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "",
+      "failure_reason": "Ollama cloud error after 10 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your weekly usage limit, add extra usage: https://ollama.com/settings (ref: bd15b78a-1fa6-4d2c-9579-85610142a465)\"}\n",
+      "failure_type": "RuntimeError",
+      "lane_id": "qwen3coder",
+      "latency_ms": null,
+      "ok": false,
+      "parsed": {
+        "blockers": [
+          "Ollama cloud error after 10 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your weekly usage limit, add extra usage: https://ollama.com/settings (ref: bd15b78a-1fa6-4d2c-9579-85610142a465)\"}\n"
+        ],
+        "evidence_checked": [],
+        "explicit_disagreement": "Ollama cloud error after 10 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your weekly usage limit, add extra usage: https://ollama.com/settings (ref: bd15b78a-1fa6-4d2c-9579-85610142a465)\"}\n",
+        "required_changes": [
+          "Make ollama:qwen3-coder:480b-cloud reachable or mark the lane optional with justification."
+        ],
+        "score": 0,
+        "summary": "qwen3coder could not run.",
+        "verdict": "blocked"
+      },
+      "provider": "ollama",
+      "raw_response_preview": "",
+      "requested_model": "qwen3-coder:480b-cloud",
+      "required": true
+    },
+    {
+      "actual_model": "",
+      "failure_reason": "Ollama cloud error after 10 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your weekly usage limit, add extra usage: https://ollama.com/settings (ref: f3b4142e-2903-4bd2-a573-6dce8219c945)\"}\n",
+      "failure_type": "RuntimeError",
+      "lane_id": "deepseekv4pro",
+      "latency_ms": null,
+      "ok": false,
+      "parsed": {
+        "blockers": [
+          "Ollama cloud error after 10 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your weekly usage limit, add extra usage: https://ollama.com/settings (ref: f3b4142e-2903-4bd2-a573-6dce8219c945)\"}\n"
+        ],
+        "evidence_checked": [],
+        "explicit_disagreement": "Ollama cloud error after 10 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your weekly usage limit, add extra usage: https://ollama.com/settings (ref: f3b4142e-2903-4bd2-a573-6dce8219c945)\"}\n",
+        "required_changes": [
+          "Make ollama:deepseek-v4-pro:cloud reachable or mark the lane optional with justification."
+        ],
+        "score": 0,
+        "summary": "deepseekv4pro could not run.",
+        "verdict": "blocked"
+      },
+      "provider": "ollama",
+      "raw_response_preview": "",
+      "requested_model": "deepseek-v4-pro:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "",
+      "failure_reason": "Ollama cloud error after 10 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your weekly usage limit, add extra usage: https://ollama.com/settings (ref: 0b6dfa27-8d29-464b-9179-744a63d24b49)\"}\n",
+      "failure_type": "RuntimeError",
+      "lane_id": "minimaxm3",
+      "latency_ms": null,
+      "ok": false,
+      "parsed": {
+        "blockers": [
+          "Ollama cloud error after 10 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your weekly usage limit, add extra usage: https://ollama.com/settings (ref: 0b6dfa27-8d29-464b-9179-744a63d24b49)\"}\n"
+        ],
+        "evidence_checked": [],
+        "explicit_disagreement": "Ollama cloud error after 10 attempts: 429: {\"error\":\"you (johnvincentshrader) have reached your weekly usage limit, add extra usage: https://ollama.com/settings (ref: 0b6dfa27-8d29-464b-9179-744a63d24b49)\"}\n",
+        "required_changes": [
+          "Make ollama:minimax-m3:cloud reachable or mark the lane optional with justification."
+        ],
+        "score": 0,
+        "summary": "minimaxm3 could not run.",
+        "verdict": "blocked"
+      },
+      "provider": "ollama",
+      "raw_response_preview": "",
+      "requested_model": "minimax-m3:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "nvidia/nemotron-3-ultra-550b-a55b-20260604:free",
+      "lane_id": "nemotron3ultra",
+      "latency_ms": 45945,
+      "ok": true,
+      "parsed": {
+        "blockers": [
+          "All transport tests use hand-rolled fakes (_FakeJetStream, _FakeMessage) \u2014 zero real broker connection",
+          "No evidence of real broker E2E, reconnect, degradation, or cross-host behavior",
+          "Track explicitly closed as VERIFIED_SLICE with note 'not a production-live NATS substrate claim'",
+          "SUBSTRATE_TRUSTED target requires production/substrate evidence; mock-only fails hard reject"
+        ],
+        "evidence_checked": [
+          "tests/test_nats_transport.py \u2014 6 tests, all using _FakeJetStream/_FakeMessage mocks",
+          "tests/test_nats_substrate_contract.py \u2014 1 test calling check_nats_substrate_contract.main()",
+          "reports/governance/ACTIVE_TRACK_CLOSEOUT_2026-06-30.md \u2014 explicitly states 'not a production-live NATS substrate claim'",
+          "reports/governance/active_track_evidence.md \u2014 shows 4/4 criteria pass but evidence is mock-only",
+          "docs/governance/ACTIVE_TRACK.yaml \u2014 track closed as VERIFIED_SLICE, graduation_profile: runtime_transport"
+        ],
+        "explicit_disagreement": "The track's own closeout receipt and governance docs explicitly classify this as VERIFIED_SLICE, not SUBSTRATE_TRUSTED. Pursuing SUBSTRATE_TRUSTED with the current mock-only evidence contradicts the project's own documented position and the runtime_transport profile's hard rejects.",
+        "required_changes": [
+          "Add real NATS broker integration tests (Testcontainers or live broker) exercising: publish/consume, ack/nack, duplicate publish idempotency, handler failure, reconnect, degradation",
+          "Produce runtime evidence receipt (e.g., reports/runtime/nats_live_broker_e2e_receipt.json) demonstrating real broker behavior",
+          "Re-run Final Boss gate with runtime_evidence and failure_modes_tested covering all 7 required modes",
+          "Either downgrade target_closure_kind to VERIFIED_SLICE (honest) or provide production-grade evidence"
+        ],
+        "score": 0,
+        "summary": "The track's test evidence is entirely mock-based (hand-rolled _FakeJetStream, _FakeMessage, _InspectingAckMessage). No real NATS broker behavior is exercised. The track is currently closed as VERIFIED_SLICE with explicit note 'This is not a production-live NATS substrate claim.' Targeting SUBSTRATE_TRUSTED with mock-only evidence violates the runtime_transport profile's hard rejects: 'mock-only or fake-only evidence for a production/substrate transport claim' and 'real broker, reconnect, degradation, or cross-host behavior is unproven while claiming substrate trust'.",
+        "verdict": "reject"
+      },
+      "provider": "openrouter_free",
+      "raw_response": "{\n  \"verdict\": \"reject\",\n  \"score\": 0,\n  \"summary\": \"The track's test evidence is entirely mock-based (hand-rolled _FakeJetStream, _FakeMessage, _InspectingAckMessage). No real NATS broker behavior is exercised. The track is currently closed as VERIFIED_SLICE with explicit note 'This is not a production-live NATS substrate claim.' Targeting SUBSTRATE_TRUSTED with mock-only evidence violates the runtime_transport profile's hard rejects: 'mock-only or fake-only evidence for a production/substrate transport claim' and 'real broker, reconnect, degradation, or cross-host behavior is unproven while claiming substrate trust'.\",\n  \"blockers\": [\n    \"All transport tests use hand-rolled fakes (_FakeJetStream, _FakeMessage) \u2014 zero real broker connection\",\n    \"No evidence of real broker E2E, reconnect, degradation, or cross-host behavior\",\n    \"Track explicitly closed as VERIFIED_SLICE with note 'not a production-live NATS substrate claim'\",\n    \"SUBSTRATE_TRUSTED target requires production/substrate evidence; mock-only fails hard reject\"\n  ],\n  \"required_changes\": [\n    \"Add real NATS broker integration tests (Testcontainers or live broker) exercising: publish/consume, ack/nack, duplicate publish idempotency, handler failure, reconnect, degradation\",\n    \"Produce runtime evidence receipt (e.g., reports/runtime/nats_live_broker_e2e_receipt.json) demonstrating real broker behavior\",\n    \"Re-run Final Boss gate with runtime_evidence and failure_modes_tested covering all 7 required modes\",\n    \"Either downgrade target_closure_kind to VERIFIED_SLICE (honest) or provide production-grade evidence\"\n  ],\n  \"evidence_checked\": [\n    \"tests/test_nats_transport.py \u2014 6 tests, all using _FakeJetStream/_FakeMessage mocks\",\n    \"tests/test_nats_substrate_contract.py \u2014 1 test calling check_nats_substrate_contract.main()\",\n    \"reports/governance/ACTIVE_TRACK_CLOSEOUT_2026-06-30.md \u2014 explicitly states 'not a production-live NATS substrate claim'\",\n    \"reports/governance/active_track_evidence.md \u2014 shows 4/4 criteria pass but evidence is mock-only\",\n    \"docs/governance/ACTIVE_TRACK.yaml \u2014 track closed as VERIFIED_SLICE, graduation_profile: runtime_transport\"\n  ],\n  \"explicit_disagreement\": \"The track's own closeout receipt and governance docs explicitly classify this as VERIFIED_SLICE, not SUBSTRATE_TRUSTED. Pursuing SUBSTRATE_TRUSTED with the current mock-only evidence contradicts the project's own documented position and the runtime_transport profile's hard rejects.\"\n}",
+      "requested_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "required": true
+    }
+  ],
+  "generated_at": "20260701T035232Z",
+  "max_evidence_chars": 0,
+  "max_output_tokens": 12000,
+  "persistent_agent_witness": {
+    "agent": "palantir-pilot",
+    "blocker": "",
+    "fresh": true,
+    "heartbeat_age_seconds": 29,
+    "heartbeat_timestamp": "2026-07-01T03:52:03Z",
+    "max_heartbeat_age_seconds": 300,
+    "raw_status": "status=running session=dharma_palantir_pilot_a2a_worker\nsubject=dharma.a2a.palantir-pilot\nconsumer=palantir_pilot_a2a\nstream=DHARMA_FLEET\nheartbeat=/Users/dhyana/.dharma/a2a_bus/worker_heartbeats/palantir-pilot.json\nlog=/Users/dhyana/.dharma/logs/palantir_pilot_a2a_worker/dharma_palantir_pilot_a2a_worker.log\n--- heartbeat ---\n{\n    \"agent_id\": \"palantir_pilot\",\n    \"callsign\": \"palantir-pilot\",\n    \"consumer\": \"palantir_pilot_a2a\",\n    \"cycle\": 1525,\n    \"last_receipt_path\": \"\",\n    \"receipt_count\": 0,\n    \"schema_version\": \"dharma.a2a.palantir_pilot.worker_heartbeat.v1\",\n    \"status\": \"IDLE\",\n    \"stream\": \"DHARMA_FLEET\",\n    \"subject\": \"dharma.a2a.palantir-pilot\",\n    \"suppress_no_messages\": true,\n    \"timestamp\": \"2026-07-01T03:52:03Z\"\n}\n--- consumer ---\n{\n  \"stream_name\": \"DHARMA_FLEET\",\n  \"name\": \"palantir_pilot_a2a\",\n  \"config\": {\n    \"ack_policy\": \"explicit\",\n    \"ack_wait\": 30000000000,\n    \"deliver_policy\": \"all\",\n    \"durable_name\": \"palantir_pilot_a2a\",\n    \"name\": \"palantir_pilot_a2a\",\n    \"filter_subject\": \"dharma.a2a.palantir-pilot\",\n    \"max_ack_pending\": 1000,\n    \"max_deliver\": -1,\n    \"max_waiting\": 512,\n    \"replay_policy\": \"instant\",\n    \"num_replicas\": 0,\n    \"metadata\": {\n      \"_nats.level\": \"3\",\n      \"_nats.req.level\": \"0\",\n      \"_nats.ver\": \"2.12.6\"\n    },\n    \"pause_until\": \"0001-01-01T00:00:00Z\"\n  },\n  \"created\": \"2026-06-15T16:08:32.524099Z\",\n  \"delivered\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"ack_floor\": {\n    \"consumer_seq\": 20479,\n    \"stream_seq\": 8498\n  },\n  \"num_ack_pending\": 0,\n  \"num_redelivered\": 0,\n  \"num_waiting\": 1,\n  \"num_pending\": 0,\n  \"ts\": \"2026-07-01T03:52:32.523873Z\"\n}\n--- pane tail ---\nUsing CPython 3.12.13\nCreating virtual environment at: .venv\n   Building dharma-swarm @ file:///Users/dhyana/ds_active_track_graduation_20260\n630\n      Built dharma-swarm @ file:///Users/dhyana/ds_active_track_graduation_20260\n630\nInstalled 43 packages in 176ms\nInstalled 1 package in 1ms\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+    "status": "running"
+  },
+  "prompt_chars": 131236,
+  "prompt_file": "/Users/dhyana/ds_final_boss_operational_20260701/reports/governance/final_boss/prompts/runtime-truth-nats-2026-06-substrate_trusted-round-1-anti_slop_code_quality.md",
+  "prompt_words_estimate": 11191,
+  "required_critic_count": 6,
+  "schema_version": "codex.decorrelated_review_council.v1",
+  "score_avg": 0.0,
+  "score_min": 0,
+  "target_score": 100,
+  "timeout_seconds": 900
+}
