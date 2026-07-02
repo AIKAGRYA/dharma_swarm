@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
+from urllib.parse import urlsplit
 
 try:
     from scripts.runtime.ci_truth import DEFAULT_CONTRACT_PATH as DEFAULT_CI_TRUTH_CONTRACT
@@ -1763,12 +1764,13 @@ def required_reviewer_agents(args: argparse.Namespace) -> list[str]:
 
 def _nats_config(env: dict[str, str], *, require_devin_secrets: bool) -> NATSConfig:
     if not require_devin_secrets and env.get("NATS_URL"):
+        endpoint = env.get("NATS_URL", "")
         return NATSConfig(
-            endpoint=env.get("NATS_URL", ""),
+            endpoint=endpoint,
             user=env.get("NATS_USER", ""),
             credential=env.get("NATS_PASSWORD", ""),
             missing=(),
-            ca_pem=_resolve_nats_ca_pem(env, "NATS_CA_PEM"),
+            ca_pem=_resolve_nats_ca_pem(env, "NATS_CA_PEM", endpoint=endpoint),
             tls_hostname=env.get("NATS_TLS_HOSTNAME", "").strip(),
             credential_family="direct",
         )
@@ -1805,6 +1807,7 @@ def _nats_config(env: dict[str, str], *, require_devin_secrets: bool) -> NATSCon
         "DEVIN_NATS_CA_PEM",
         "DHARMA_NATS_CA_PEM",
         "NATS_CA_PEM",
+        endpoint=endpoint,
     )
     tls_hostname = (
         env.get("MERGE_MASTER_MIKE_NATS_TLS_HOSTNAME")
@@ -1836,14 +1839,33 @@ def _normalize_ca_pem(value: str) -> str:
     return normalized + "\n" if normalized and not normalized.endswith("\n") else normalized
 
 
-def _resolve_nats_ca_pem(env: dict[str, str], *preferred_names: str) -> str:
+def _nats_url_is_tls(endpoint: str) -> bool:
+    return urlsplit(endpoint.strip()).scheme.lower() in {"wss", "tls"}
+
+
+def _resolve_nats_ca_pem(
+    env: dict[str, str],
+    *preferred_names: str,
+    endpoint: str = "",
+) -> str:
     for name in preferred_names:
         pem = env.get(name, "").strip()
         if pem:
             return _normalize_ca_pem(pem)
-    if DEFAULT_NATS_CA_PEM_PATH.exists():
+    if DEFAULT_NATS_CA_PEM_PATH.exists() and _nats_url_is_tls(endpoint):
         return _normalize_ca_pem(DEFAULT_NATS_CA_PEM_PATH.read_text(encoding="utf-8"))
     return ""
+
+
+def _is_publish_permission_violation(message: str, subject: str) -> bool:
+    lowered = message.lower()
+    if "permissions violation" not in lowered or "publish" not in lowered:
+        return False
+    return (
+        subject in message
+        or f'publish to "{subject}"' in message
+        or f"publish to {subject}" in message
+    )
 
 
 def _redacted_nats_config(config: NATSConfig) -> dict[str, Any]:

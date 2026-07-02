@@ -22,7 +22,7 @@ def test_probe_outbound_reachability_reports_allowed_denied_and_no_stream(monkey
     reg = {
         "callsign": "devin",
         "metadata": {
-            "coordination_peers": ["codex", "perplexity-computer", "fable_composer"],
+            "coordination_peers": ["codex", "perplexity-computer", "warp_oz", "fable_composer"],
         }
     }
     calls: list[dict[str, object]] = []
@@ -39,6 +39,9 @@ def test_probe_outbound_reachability_reports_allowed_denied_and_no_stream(monkey
             if subject == "dharma.a2a.codex":
                 calls.append({"subject": subject, "data": json.loads(_data.decode("utf-8"))})
                 return types.SimpleNamespace(stream="DHARMA_A2A", seq=1)
+            if subject == "dharma.a2a.warp_oz":
+                calls.append({"subject": subject, "data": json.loads(_data.decode("utf-8"))})
+                raise RuntimeError("broker client error")
             calls.append({"subject": subject, "data": json.loads(_data.decode("utf-8"))})
             await self.conn.error_cb(
                 Exception(f"nats: permissions violation for publish to {subject}")
@@ -71,18 +74,24 @@ def test_probe_outbound_reachability_reports_allowed_denied_and_no_stream(monkey
     rows = asyncio.run(
         a2a_doctor._probe_outbound_reachability(  # noqa: SLF001
             reg,
-            ["dharma.a2a.codex", "dharma.a2a.perplexity"],
+            ["dharma.a2a.codex", "dharma.a2a.perplexity", "dharma.a2a.warp_oz"],
         )
     )
 
     assert [row["status"] for row in rows] == [
         "ALLOWED",
         "DENIED(permissions)",
+        "PUBLISH_FAILED",
         "NO_STREAM",
     ]
     assert "permissions violation for publish to dharma.a2a.perplexity" in rows[1]["detail"]
+    assert rows[2]["detail"] == "broker client error"
     published_subjects = [entry["subject"] for entry in calls if "subject" in entry]
-    assert published_subjects == ["dharma.a2a.codex", "dharma.a2a.perplexity"]
+    assert published_subjects == [
+        "dharma.a2a.codex",
+        "dharma.a2a.perplexity",
+        "dharma.a2a.warp_oz",
+    ]
     first_publish = next(entry for entry in calls if "data" in entry)
     assert first_publish["data"]["kind"] == "reachability_probe"
     assert first_publish["data"]["from"] == "devin"

@@ -185,7 +185,7 @@ def test_publish_and_wait_does_not_core_republish_after_ambiguous_jetstream_erro
     assert conn.closed is True
 
 
-def test_nats_config_uses_bundled_ca_fallback(tmp_path, monkeypatch):
+def test_nats_config_leaves_plaintext_nats_without_bundled_ca(tmp_path, monkeypatch):
     bundled = tmp_path / "agni-ws-ca.pem"
     bundled.write_text("BUNDLED-CA", encoding="utf-8")
     monkeypatch.setattr(pr_merge_control, "DEFAULT_NATS_CA_PEM_PATH", bundled)
@@ -202,8 +202,28 @@ def test_nats_config_uses_bundled_ca_fallback(tmp_path, monkeypatch):
         require_devin_secrets=False,
     )
 
-    assert config.ca_pem == "BUNDLED-CA\n"
+    assert config.ca_pem == ""
     assert config.credential_family == "direct"
+
+
+def test_nats_config_uses_bundled_ca_fallback_for_tls_urls(tmp_path, monkeypatch):
+    bundled = tmp_path / "agni-ws-ca.pem"
+    bundled.write_text("BUNDLED-CA", encoding="utf-8")
+    monkeypatch.setattr(pr_merge_control, "DEFAULT_NATS_CA_PEM_PATH", bundled)
+    monkeypatch.delenv("DEVIN_NATS_CA_PEM", raising=False)
+    monkeypatch.delenv("DHARMA_NATS_CA_PEM", raising=False)
+    monkeypatch.delenv("NATS_CA_PEM", raising=False)
+
+    config = pr_merge_control._nats_config(  # noqa: SLF001
+        {
+            "NATS_URL": "wss://127.0.0.1:4222",
+            "NATS_USER": "devin",
+            "NATS_PASSWORD": "secret",
+        },
+        require_devin_secrets=False,
+    )
+
+    assert config.ca_pem == "BUNDLED-CA\n"
 
 
 def test_nats_config_prefers_explicit_ca_env_over_bundled(tmp_path, monkeypatch):
@@ -288,6 +308,69 @@ def test_publish_and_wait_marks_permissions_denied_and_closes_connection(monkeyp
     assert result["status"] == a2a_send.STATUS_PERMISSIONS_DENIED
     assert "broker rejected publish to dharma.a2a.perplexity" in result["error"]
     assert result["permissions_denied_detail"] == result["error"]
+    assert conn.closed is True
+
+
+def test_publish_and_wait_ignores_subscribe_permission_violation(monkeypatch):
+    class FakeSubscription:
+        async def unsubscribe(self):
+            return None
+
+    class FakeJetStream:
+        async def publish(self, subject, _data, timeout=None):
+            await conn.error_cb(
+                Exception(
+                    f'nats: permissions violation for subscription to "{subject}.ack"'
+                )
+            )
+            raise TimeoutError("pub ack timed out")
+
+    class FakeConnection:
+        def __init__(self):
+            self.closed = False
+            self.error_cb = None
+
+        async def subscribe(self, *_args, **_kwargs):
+            return FakeSubscription()
+
+        def jetstream(self):
+            return FakeJetStream()
+
+        async def close(self):
+            self.closed = True
+
+    conn = FakeConnection()
+
+    async def fake_connect(**kwargs):
+        conn.error_cb = kwargs["error_cb"]
+        return conn
+
+    monkeypatch.setitem(sys.modules, "nats", types.SimpleNamespace(connect=fake_connect))
+    envelope = {
+        "subject": "dharma.a2a.perplexity",
+        "ack_subject": "dharma.a2a.perplexity.ack.abc123",
+        "reply_subject": "dharma.a2a.perplexity.reply.abc123",
+        "packet_id": "abc123",
+    }
+    config = a2a_send.NATSConfig(
+        endpoint="nats://127.0.0.1:4222",
+        user="devin",
+        credential="secret",
+        missing=(),
+    )
+
+    result = asyncio.run(
+        a2a_send._publish_and_wait(  # noqa: SLF001
+            config,
+            envelope,
+            wait_s=0.0,
+            timeout_s=0.1,
+        )
+    )
+
+    assert result["status"] == a2a_send.STATUS_PUBLISH_FAILED
+    assert result["permissions_denied_detail"] is None
+    assert result["error"] == "TimeoutError"
     assert conn.closed is True
 
 

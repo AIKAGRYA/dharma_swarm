@@ -47,6 +47,7 @@ from scripts.runtime.pr_merge_control import (  # noqa: E402
     _a2a_target_for_subject,
     _nats_config,
     _nats_tls_kwargs,
+    _is_publish_permission_violation,
     _redacted_nats_config,
     stamp,
     utc_now,
@@ -118,6 +119,10 @@ def _permissions_denied_message(config: NATSConfig, subject: str) -> str:
     )
 
 
+def _recorded_publish_permission_violation(message: str, subject: str) -> bool:
+    return _is_publish_permission_violation(message, subject)
+
+
 def build_envelope(
     *,
     to: str,
@@ -180,7 +185,7 @@ async def _publish_and_wait(
 
     async def _quiet_error_cb(exc: Exception) -> None:
         message = str(exc)
-        if "permissions violation" in message.lower():
+        if _recorded_publish_permission_violation(message, envelope["subject"]):
             result["permissions_denied_detail"] = _permissions_denied_message(
                 config, envelope["subject"]
             )
@@ -241,7 +246,7 @@ async def _publish_and_wait(
                     await asyncio.wait_for(permission_violation.wait(), timeout=0.5)
                 except Exception as wait_exc:
                     result["permission_wait_guard_error"] = type(wait_exc).__name__
-            if result["permissions_denied_detail"] is None and "permissions violation" in str(exc).lower():
+            if result["permissions_denied_detail"] is None and _recorded_publish_permission_violation(str(exc), envelope["subject"]):
                 result["permissions_denied_detail"] = _permissions_denied_message(
                     config, envelope["subject"]
                 )

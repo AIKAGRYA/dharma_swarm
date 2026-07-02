@@ -37,7 +37,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from scripts.runtime.pr_merge_control import _resolve_nats_ca_pem  # noqa: E402
+from scripts.runtime.pr_merge_control import (  # noqa: E402
+    _is_publish_permission_violation,
+    _resolve_nats_ca_pem,
+)
 
 REGISTRATION_FILE = REPO_ROOT / "examples" / "agents" / "devin.registration.json"
 
@@ -75,6 +78,7 @@ def _ca_pem() -> str:
         "DEVIN_NATS_CA_PEM",
         "DHARMA_NATS_CA_PEM",
         "NATS_CA_PEM",
+        endpoint=os.environ.get("DEVIN_NATS_URL", DEFAULT_URL),
     )
 
 
@@ -156,7 +160,7 @@ async def _probe_outbound_reachability(
         async def error_cb(exc: Exception) -> None:
             nonlocal permission_detail
             message = str(exc)
-            if "permissions violation" in message.lower():
+            if _is_publish_permission_violation(message, subject):
                 permission_detail = message
                 permission_seen.set()
 
@@ -190,7 +194,7 @@ async def _probe_outbound_reachability(
                         await asyncio.wait_for(permission_seen.wait(), timeout=0.5)
                     except Exception as wait_exc:
                         permission_wait_guard_error = type(wait_exc).__name__
-                if permission_detail is not None or "permissions violation" in message.lower():
+                if permission_detail is not None:
                     row = {
                         "lane": target["lane"],
                         "subject": subject,
@@ -214,7 +218,7 @@ async def _probe_outbound_reachability(
                         {
                             "lane": target["lane"],
                             "subject": subject,
-                            "status": "NO_STREAM",
+                            "status": "PUBLISH_FAILED",
                             "detail": message,
                         }
                     )
