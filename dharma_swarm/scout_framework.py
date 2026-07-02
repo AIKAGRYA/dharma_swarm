@@ -124,7 +124,7 @@ DOMAINS: dict[str, dict[str, Any]] = {
         "model": "xiaomi/mimo-v2-pro",
         "files": [
             "dharma_swarm/evolution.py",
-            "dharma_swarm/diversity_archive.py",
+            "dharma_swarm/archive.py",
         ],
         "commands": [
             ("evolution archive", "wc -l ~/.dharma/evolution/archive.jsonl 2>/dev/null || echo 'no archive'"),

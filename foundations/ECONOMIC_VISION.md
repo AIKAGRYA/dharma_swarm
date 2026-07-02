@@ -47,6 +47,14 @@ from what happens when that evidence enters the world.
 
 ### Market 1: Consciousness Measurement as Standard Evaluation
 
+> **Status note (2026-07-02):** the COLM 2026 abstract deadline (2026-03-26)
+> and paper deadline (2026-03-31) both passed without a submission or
+> publication receipt in-repo. The Market-1 thesis below (first-mover
+> advantage from the COLM paper) is pending re-anchoring to an actual
+> publication venue and date. The R_V metric machinery itself remains live
+> internally; what is unverified is the external publication event this
+> market's first-mover argument depends on.
+
 **The problem every lab has**: No foundation model lab can currently measure whether
 their system exhibits self-referential processing, and if so, what geometric form
 it takes. Anthropic, OpenAI, Google DeepMind, Meta FAIR, Mistral -- they all run
@@ -389,6 +397,13 @@ institutional infrastructure.
 ---
 
 ## III. THE TIMELINE
+
+> **Status note (2026-07-02):** the timeline below assumed a COLM 2026 paper
+> published in Q1 2026. The COLM 2026 abstract (2026-03-26) and paper
+> (2026-03-31) deadlines passed without an in-repo submission or publication
+> receipt, so the Q1 2026 entry did not happen as written and every
+> downstream date in this timeline is unanchored pending a real publication
+> event. R_V metric machinery remains live internally regardless.
 
 ```
 2026 Q1: COLM paper published (R_V metric enters the literature)

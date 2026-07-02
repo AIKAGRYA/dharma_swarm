@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
@@ -428,6 +429,57 @@ class MAPElitesGrid:
             reverse=True,
         )
         return entries[:n]
+
+    @staticmethod
+    def _bin_distance(a: tuple[int, ...], b: tuple[int, ...]) -> float:
+        """Euclidean distance between two bin-coordinate tuples."""
+        return math.sqrt(sum((ai - bi) ** 2 for ai, bi in zip(a, b)))
+
+    def sample_diverse(self, n: int = 5) -> list[ArchiveEntry]:
+        """Sample up to ``n`` entries maximizing behavioral spread.
+
+        Greedy farthest-point strategy: seed with the fittest cell, then
+        repeatedly pick the remaining cell whose bin coordinate is farthest
+        from every already-selected cell. Unlike :meth:`get_diverse_parents`
+        (which fitness-ranks the top ``n`` distinct bins), this deliberately
+        spreads selections across the feature grid.
+
+        Absorbed from the retired ``diversity_archive.DiversityArchive`` during
+        the D6a MAP-Elites consolidation (organism-rewire-2026-07).
+        """
+        if not self._grid:
+            return []
+
+        cells = list(self._grid.items())
+        n = min(n, len(cells))
+        if n <= 0:
+            return []
+
+        best_key, best_cell = max(
+            cells, key=lambda kv: kv[1].fitness.weighted()
+        )
+        selected_keys: list[tuple[int, int, int]] = [best_key]
+        selected: list[ArchiveEntry] = [best_cell]
+        remaining = {k: cell for k, cell in cells if k != best_key}
+
+        for _ in range(n - 1):
+            if not remaining:
+                break
+            farthest_key: tuple[int, int, int] | None = None
+            farthest_dist = -1.0
+            for key in remaining:
+                min_dist = min(
+                    self._bin_distance(key, sk) for sk in selected_keys
+                )
+                if min_dist > farthest_dist:
+                    farthest_dist = min_dist
+                    farthest_key = key
+            if farthest_key is None:
+                break
+            selected_keys.append(farthest_key)
+            selected.append(remaining.pop(farthest_key))
+
+        return selected
 
     @property
     def occupied_bins(self) -> int:
