@@ -252,6 +252,7 @@ async def _run_with_scratch(scratch_root: Path) -> dict[str, Any]:
         traces_path=traces_path,
         predictor_path=predictor_path,
         experiment_log_path=experiment_log_path,
+        archive_enforce_one_wire=False,
     )
 
     try:
@@ -310,6 +311,7 @@ async def _run_with_scratch(scratch_root: Path) -> dict[str, Any]:
                 "scratch_archive_path": str(archive_path),
                 "live_archive_used": False,
                 "scratch_archive_is_live_archive": scratch_archive_is_live_archive,
+                "scratch_archive_one_wire_enforced": engine.archive.enforce_one_wire,
             },
         }
         await engine.evaluate(proposal, test_results=test_results)
@@ -387,6 +389,7 @@ async def _run_with_scratch(scratch_root: Path) -> dict[str, Any]:
                 "scratch_archive_path": str(archive_path),
                 "live_archive_used": False,
                 "scratch_archive_is_live_archive": scratch_archive_is_live_archive,
+                "scratch_archive_one_wire_enforced": engine.archive.enforce_one_wire,
                 "fitness": _fitness_payload(proposal.actual_fitness, weighted_fitness),
                 "predictor_history_path": str(predictor_path),
                 "predictor_outcomes_after_archive": predictor_count_after,

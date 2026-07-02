@@ -63,6 +63,7 @@ def test_loop3_run_uses_scratch_archive_and_later_cycle_reads_it(tmp_path: Path)
 
     assert act["live_archive_used"] is False
     assert act["scratch_archive_is_live_archive"] is False
+    assert act["scratch_archive_one_wire_enforced"] is False
     assert str(tmp_path / "scratch") in act["scratch_archive_path"]
     assert act["fitness"]["weighted"] > 0.0
     assert adapt["prediction_after"] != adapt["prediction_before"]
