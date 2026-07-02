@@ -115,3 +115,37 @@ def test_runner_reports_needs_host_without_binary_or_toolchain(
     assert summary["status"] == "needs_host"
     # Host-aware: payload stays in place for a capable host to pick up.
     assert envelope.exists()
+
+
+def test_runner_reports_needs_host_when_binary_not_executable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A stale, non-executable file named like the binary must NOT count as a
+    usable host: _go_invocation() would fall back to `go run .`, so without a
+    toolchain the envelope must stay queued (needs_host), never fail/.
+    """
+    inbox = tmp_path / "inbox"
+    envelope = _drop_envelope(
+        inbox,
+        "pr_1.json",
+        {"event_type": "github_pull_request", "payload": {"number": 1}},
+    )
+    fake_module = tmp_path / "github_ingestor_go"
+    fake_module.mkdir()
+    # A file with the binary's name but no execute bit (e.g. a stale artifact).
+    stale_binary = fake_module / fake_module.name
+    stale_binary.write_text("not a real executable\n", encoding="utf-8")
+    stale_binary.chmod(0o644)
+    monkeypatch.setattr(runner.shutil, "which", lambda _name: None)
+
+    summary = runner.process_inbox(
+        inbox_dir=inbox,
+        receipt_dir=tmp_path / "receipts",
+        module_dir=fake_module,
+    )
+
+    assert summary["status"] == "needs_host"
+    # Inbox left intact: nothing quarantined to failed/.
+    assert envelope.exists()
+    assert not (inbox / "failed").exists()

@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -59,8 +60,16 @@ def default_receipt_dir() -> Path:
 
 
 def _host_ready(module_dir: Path) -> bool:
+    # Count the prebuilt binary only when it is actually executable, mirroring
+    # _go_invocation()'s own test (binary.is_file() and os.access(X_OK)). A
+    # stale/non-executable file named like the binary would otherwise pass this
+    # gate while _go_invocation() falls back to `go run .`, which fails without a
+    # Go toolchain and pushes queued envelopes to failed/ instead of leaving
+    # them for a capable host (needs_host).
     binary = module_dir / module_dir.name
-    return binary.is_file() or shutil.which("go") is not None
+    if binary.is_file() and os.access(binary, os.X_OK):
+        return True
+    return shutil.which("go") is not None
 
 
 def process_inbox(
