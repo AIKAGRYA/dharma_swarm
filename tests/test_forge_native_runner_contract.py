@@ -120,6 +120,73 @@ def test_plan_resume_quarantines_exhausted_infra_and_worker_flaky_tasks() -> Non
     ]
 
 
+def test_plan_resume_converges_for_unmodeled_statuses() -> None:
+    # A task whose receipts use a status outside the completed/quarantine/infra
+    # vocabularies (e.g. a worker "error" or a real forge closeout) must still
+    # count toward the retry budget so resume terminates instead of returning it
+    # as fresh forever.
+    request = {
+        "run_id": "native-smoke-1",
+        "candidate_id": "candidate-a",
+        "task_ids": ["task-weird"],
+        "max_infra_retries": 2,
+    }
+    receipts = [{"task_id": "task-weird", "status": "error"} for _ in range(3)]
+    plan = nrc.plan_resume(request, receipts)
+
+    assert plan["remaining_tasks"] == []
+    assert plan["quarantined_tasks"] == [
+        {
+            "task_id": "task-weird",
+            "reason": "attempts_exhausted",
+            "attempts": 3,
+            "infra_failures": 0,
+            "statuses": ["error", "error", "error"],
+            "max_infra_retries": 2,
+        }
+    ]
+
+
+def test_plan_resume_counts_unmodeled_attempts_toward_budget_before_exhaustion() -> None:
+    # Under budget, an unmodeled prior attempt is retried with an advanced
+    # attempt counter (not reset to 1), so progress is bounded and auditable.
+    request = {
+        "run_id": "native-smoke-1",
+        "candidate_id": "candidate-a",
+        "task_ids": ["task-weird"],
+        "max_infra_retries": 2,
+    }
+    plan = nrc.plan_resume(request, [{"task_id": "task-weird", "status": "error"}])
+
+    assert plan["quarantined_tasks"] == []
+    assert plan["remaining_tasks"] == [
+        {"task_id": "task-weird", "next_attempt": 2, "prior_infra_failures": 0}
+    ]
+
+
+def test_validate_no_source_mutation_fails_closed_on_nonbool_truthy() -> None:
+    # A remote worker's JSON receipt may encode booleans as strings/ints. The
+    # guard must fail closed on any positive assertion, not only Python True.
+    for flag in ("source_of_truth_mutated", "live_apply_performed", "archive_fitness_mutated"):
+        for truthy in ("true", "True", "1", "yes", 1):
+            with pytest.raises(ValueError):
+                nrc.validate_no_source_mutation({flag: truthy}, label="probe")
+
+
+def test_validate_no_source_mutation_allows_explicit_false_forms() -> None:
+    # Falsey / absent claims remain allowed so honest receipts pass.
+    for value in (False, "false", "no", 0, ""):
+        nrc.validate_no_source_mutation(
+            {
+                "source_of_truth_mutated": value,
+                "live_apply_performed": value,
+                "archive_fitness_mutated": value,
+                "promotion_gate": nrc.PROMOTION_GATE,
+            },
+            label="probe",
+        )
+
+
 def test_sync_remote_receipts_refuses_source_of_truth_mutation(tmp_path: Path) -> None:
     remote = tmp_path / "remote" / "native-run-1"
     remote.mkdir(parents=True)
@@ -128,6 +195,26 @@ def test_sync_remote_receipts_refuses_source_of_truth_mutation(tmp_path: Path) -
             {
                 "run_id": "native-run-1",
                 "source_of_truth_mutated": True,
+                "promotion_gate": nrc.PROMOTION_GATE,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="source_of_truth_mutated"):
+        nrc.sync_remote_receipts(remote_result_root=remote, local_sync_root=tmp_path / "sync")
+
+
+def test_sync_remote_receipts_refuses_string_encoded_mutation_claim(tmp_path: Path) -> None:
+    # Real workers serialize JSON; a string "true" must not slip past the sync
+    # boundary just because it is not a Python bool.
+    remote = tmp_path / "remote" / "native-run-1"
+    remote.mkdir(parents=True)
+    (remote / "result_manifest.json").write_text(
+        json.dumps(
+            {
+                "run_id": "native-run-1",
+                "source_of_truth_mutated": "true",
                 "promotion_gate": nrc.PROMOTION_GATE,
             }
         ),

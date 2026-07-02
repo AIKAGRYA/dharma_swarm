@@ -223,6 +223,33 @@ def _receipt_status(receipt: dict[str, Any]) -> str:
     return str(receipt.get("status") or receipt.get("closeout") or receipt.get("result") or "").strip()
 
 
+# Truthy tokens a remote/native worker might use to *assert* it did something
+# forbidden.  The mutation guard is a fail-closed boundary against an untrusted
+# worker, so it must treat these JSON-y encodings as an assertion, not only the
+# exact Python ``True`` object.
+_ASSERTED_TRUE_STRINGS = frozenset({"true", "1", "yes", "y", "on"})
+
+
+def _asserts_true(value: Any) -> bool:
+    """Return True iff ``value`` positively asserts a forbidden action.
+
+    Absent/None/falsey values are allowed (absence of a claim is fine); any
+    recognizable positive assertion — bool ``True``, a truthy int, or a truthy
+    string like ``"true"``/``"1"``/``"yes"`` — fails closed.  This makes the
+    guard robust to real JSON receipts, where booleans routinely arrive as
+    strings or ints, instead of only catching the exact Python ``True``.
+    """
+    if value is None or value is False:
+        return False
+    if value is True:
+        return True
+    if isinstance(value, str):
+        return value.strip().lower() in _ASSERTED_TRUE_STRINGS
+    if isinstance(value, (int, float)):
+        return value != 0
+    return False
+
+
 def plan_resume(
     request: dict[str, Any],
     task_receipts: Iterable[dict[str, Any]],
@@ -255,20 +282,40 @@ def plan_resume(
             quarantined.append({"task_id": task_id, "reason": "worker_quarantined_or_flaky", "statuses": statuses})
             continue
         infra_failures = sum(1 for status in statuses if status in INFRA_RETRYABLE_STATUSES)
-        if infra_failures > retry_budget:
-            quarantined.append(
-                {
-                    "task_id": task_id,
-                    "reason": "infra_retry_budget_exhausted",
-                    "infra_failures": infra_failures,
-                    "max_infra_retries": retry_budget,
-                }
-            )
+        # Count EVERY prior non-terminal attempt toward the budget, not only the
+        # infra-classified ones.  Otherwise a task whose receipts carry a status
+        # outside the three modeled vocabularies (e.g. a worker "error", or a
+        # real forge closeout like measured_negative) is returned as fresh
+        # forever and resume never converges.  Convergence is required by the
+        # Workstream 6 "resume without redoing completed grades / quarantine
+        # flaky tasks" done-when.
+        prior_attempts = len(statuses)
+        if prior_attempts > retry_budget:
+            if infra_failures > retry_budget:
+                quarantined.append(
+                    {
+                        "task_id": task_id,
+                        "reason": "infra_retry_budget_exhausted",
+                        "infra_failures": infra_failures,
+                        "max_infra_retries": retry_budget,
+                    }
+                )
+            else:
+                quarantined.append(
+                    {
+                        "task_id": task_id,
+                        "reason": "attempts_exhausted",
+                        "attempts": prior_attempts,
+                        "infra_failures": infra_failures,
+                        "statuses": statuses,
+                        "max_infra_retries": retry_budget,
+                    }
+                )
             continue
         remaining.append(
             {
                 "task_id": task_id,
-                "next_attempt": infra_failures + 1,
+                "next_attempt": prior_attempts + 1,
                 "prior_infra_failures": infra_failures,
             }
         )
@@ -310,11 +357,11 @@ def load_task_receipts(remote_result_root: Path | str) -> list[dict[str, Any]]:
 
 def validate_no_source_mutation(payload: dict[str, Any], *, label: str) -> None:
     """Fail closed if a remote/native result claims any source-of-truth mutation."""
-    if payload.get("source_of_truth_mutated") is True:
+    if _asserts_true(payload.get("source_of_truth_mutated")):
         raise ValueError(f"{label}:source_of_truth_mutated")
-    if payload.get("live_apply_performed") is True:
+    if _asserts_true(payload.get("live_apply_performed")):
         raise ValueError(f"{label}:live_apply_performed")
-    if payload.get("archive_fitness_mutated") is True:
+    if _asserts_true(payload.get("archive_fitness_mutated")):
         raise ValueError(f"{label}:archive_fitness_mutated")
     if payload.get("promotion_decision") in {"accepted", "promoted", "live_apply"}:
         raise ValueError(f"{label}:remote_promotion_decision_forbidden")
