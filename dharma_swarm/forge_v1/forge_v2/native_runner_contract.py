@@ -143,6 +143,7 @@ def write_native_runner_request(
     max_infra_retries: int = 2,
     prewarm: dict[str, Any] | None = None,
     sync_back_target: Path | str | None = None,
+    worker_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Write a native runner request packet and return its manifest.
 
@@ -183,6 +184,7 @@ def write_native_runner_request(
         "max_infra_retries": int(max_infra_retries),
         "prewarm_manifest": prewarm_manifest,
         "sync_back_target": str(sync_back_target or (DEFAULT_SYNC_ROOT / run_id)),
+        "worker_config": dict(worker_config or {}),
         "authority": {
             "no_source_of_truth_mutation": True,
             "source_of_truth_mutation_allowed": False,
@@ -401,6 +403,95 @@ def validate_request_authority(request: dict[str, Any]) -> None:
         raise ValueError(f"request_authority:unexpected_promotion_gate:{authority.get('promotion_gate')}")
 
 
+def prediction_for_task(candidate_packet: dict[str, Any], task_id: str, *, task_count: int = 1) -> str:
+    """Extract the model patch/prediction for ``task_id`` from a candidate packet.
+
+    Supported packet shapes are intentionally simple and deterministic:
+
+    * ``task_predictions`` / ``predictions`` / ``patches`` mapping task_id -> patch;
+    * a single global ``patch`` or ``model_patch`` only when the request has one
+      task (avoids accidentally applying one task's patch to a multi-task run).
+    """
+    for field in ("task_predictions", "predictions", "patches"):
+        mapping = candidate_packet.get(field)
+        if isinstance(mapping, dict) and task_id in mapping:
+            return str(mapping.get(task_id) or "")
+    if task_count == 1:
+        for field in ("patch", "model_patch"):
+            if field in candidate_packet:
+                return str(candidate_packet.get(field) or "")
+    return ""
+
+
+def _unresolved_grade(*, task_id: str, error: str, blockers: list[str] | None = None) -> dict[str, Any]:
+    return {
+        "status": "unresolved",
+        "resolved": False,
+        "grade_error": error,
+        "blockers": list(blockers or [error]),
+        "grader": "native_contract_default",
+        "grade_seconds": 0.0,
+        "task_id": task_id,
+    }
+
+
+def default_native_grade(payload: dict[str, Any]) -> dict[str, Any]:
+    """Default worker grade function for native requests.
+
+    This bridges the contract harness to the existing PR-suite grader for current
+    fresh taskbed rows.  It never trusts model self-report: it grades only the
+    concrete patch extracted from the candidate packet.  Missing predictions are
+    deterministic unresolved results, not infra failures, so they are not retried
+    forever.  Unsupported task families fail closed as unresolved until a real
+    SWE-bench worker integration is added.
+    """
+    task_id = str(payload.get("task_id") or "").strip()
+    if not task_id:
+        return _unresolved_grade(task_id="", error="missing_task_id")
+    request = dict(payload.get("request") or {})
+    candidate_packet = dict(payload.get("candidate_packet") or request.get("candidate_packet") or {})
+    task_count = len(request.get("task_ids") or [task_id])
+    model_patch = prediction_for_task(candidate_packet, task_id, task_count=task_count)
+    if not model_patch.strip():
+        return _unresolved_grade(task_id=task_id, error="missing_task_prediction")
+
+    worker_config = dict(request.get("worker_config") or {})
+    taskbed_db = worker_config.get("taskbed_db") or taskbed_ledger.DEFAULT_DB
+    timeout = int(worker_config.get("grade_timeout", 1800) or 1800)
+    receipt_root = worker_config.get("receipt_root")
+    work_root = worker_config.get("work_root")
+    python = str(worker_config.get("python") or sys.executable)
+    keep_workdir = bool(worker_config.get("keep_workdir", False))
+
+    from . import pr_suite_grader
+
+    if pr_suite_grader.is_pr_suite_task_id(task_id):
+        instance = pr_suite_grader.task_row_for_id(task_id, db_path=taskbed_db)
+        result = pr_suite_grader.grade_pr_suite_prediction(
+            instance,
+            model_patch,
+            timeout=timeout,
+            receipt_root=receipt_root or pr_suite_grader.DEFAULT_RECEIPT_ROOT,
+            work_root=Path(work_root).expanduser() if work_root else None,
+            python=python,
+            keep_workdir=keep_workdir,
+        )
+        return {
+            "status": "resolved" if result.resolved else "unresolved",
+            "resolved": bool(result.resolved),
+            "grade_seconds": float(result.seconds),
+            "grade_error": result.error,
+            "grader": "pr_suite",
+            "grader_receipt_path": result.receipt_path,
+            "grader_receipt_sha256": result.receipt_sha256,
+            "patch_len": len(model_patch),
+            "patch_sha256": canonical_sha256({"patch": model_patch}),
+            "task_id": task_id,
+        }
+
+    return _unresolved_grade(task_id=task_id, error="unsupported_task_family")
+
+
 def _task_receipt_path(receipt_dir: Path, task_id: str, receipt: dict[str, Any]) -> Path:
     digest = canonical_sha256(receipt)[:16]
     return receipt_dir / f"{_safe_task_fragment(task_id)}_{digest}.json"
@@ -449,7 +540,7 @@ def _worker_receipt(
 def run_native_runner_request(
     *,
     request_dir: Path | str,
-    grade_fn: GradeFn,
+    grade_fn: GradeFn | None = None,
     result_root: Path | str | None = None,
     worker_label: str = "native_contract_worker",
 ) -> dict[str, Any]:
@@ -466,6 +557,7 @@ def run_native_runner_request(
         raise FileNotFoundError(f"missing native runner request: {request_path}")
     request = _read_json(request_path)
     validate_request_authority(request)
+    grade_fn = grade_fn or default_native_grade
     if not callable(grade_fn):
         raise ValueError("grade_fn must be callable")
 
@@ -612,6 +704,7 @@ def orchestrate_native_request(
     max_infra_retries: int = 2,
     prewarm: dict[str, Any] | None = None,
     sync_back_target: Path | str | None = None,
+    worker_config: dict[str, Any] | None = None,
     allocation_id: str | None = None,
     min_count: int | None = None,
 ) -> dict[str, Any]:
@@ -661,6 +754,7 @@ def orchestrate_native_request(
         max_infra_retries=max_infra_retries,
         prewarm=prewarm,
         sync_back_target=sync_back_target,
+        worker_config={"taskbed_db": str(taskbed_db), **dict(worker_config or {})},
     )
     orchestration = {
         "schema": ORCHESTRATION_SCHEMA,
@@ -687,13 +781,16 @@ def orchestrate_native_request(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Orchestrate a grade-only native runner request from the taskbed ledger",
+        description="Orchestrate or execute a grade-only native runner request",
     )
-    parser.add_argument("--run-id", required=True)
-    parser.add_argument("--candidate-id", required=True, help="Scaffold/code candidate id to grade")
+    parser.add_argument("--execute-request-dir", default="", help="Worker mode: execute an existing request dir")
+    parser.add_argument("--result-root", default=None, help="Worker mode: where to write result_manifest/task_receipts")
+    parser.add_argument("--worker-label", default="native_contract_worker")
+    parser.add_argument("--run-id", default="")
+    parser.add_argument("--candidate-id", default="", help="Scaffold/code candidate id to grade")
     parser.add_argument("--candidate-json", default="", help="Inline JSON candidate packet (merged with --candidate-id)")
     parser.add_argument("--split", choices=["explore", "confirm"], default="explore")
-    parser.add_argument("--count", type=int, required=True)
+    parser.add_argument("--count", type=int, default=0)
     parser.add_argument("--epoch-id", default="epoch_0")
     parser.add_argument("--lane-id", default=None)
     parser.add_argument("--output-root", default=str(DEFAULT_RUN_ROOT))
@@ -706,7 +803,32 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.execute_request_dir:
+        result = run_native_runner_request(
+            request_dir=args.execute_request_dir,
+            result_root=args.result_root,
+            worker_label=args.worker_label,
+        )
+        if args.json:
+            print(json.dumps(result, indent=2, sort_keys=True, default=str))
+        else:
+            print(
+                "[native_runner_contract] executed run_id={run_id} wrote={written} result_root={root}".format(
+                    run_id=result.get("run_id"),
+                    written=result.get("written_receipt_count", 0),
+                    root=result.get("result_root"),
+                ),
+                flush=True,
+            )
+        return 0
+    if not args.run_id:
+        parser.error("--run-id is required unless --execute-request-dir is used")
+    if not args.candidate_id:
+        parser.error("--candidate-id is required unless --execute-request-dir is used")
+    if args.count <= 0:
+        parser.error("--count must be positive unless --execute-request-dir is used")
     candidate_packet: dict[str, Any] = {}
     if args.candidate_json.strip():
         candidate_packet = json.loads(args.candidate_json)
@@ -759,10 +881,12 @@ __all__ = [
     "WORKER_RESULT_SCHEMA",
     "build_prewarm_manifest",
     "build_parser",
+    "default_native_grade",
     "load_task_receipts",
     "main",
     "orchestrate_native_request",
     "plan_resume",
+    "prediction_for_task",
     "repo_slug_from_task_id",
     "run_native_runner_request",
     "sync_remote_receipts",

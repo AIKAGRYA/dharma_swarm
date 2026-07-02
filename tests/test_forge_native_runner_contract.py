@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 from dharma_swarm.forge_v1.forge_v2 import native_runner_contract as nrc
+from dharma_swarm.forge_v1.forge_v2 import pr_suite_grader
 from dharma_swarm.forge_v1.forge_v2 import taskbed_ledger
 
 
@@ -70,6 +73,119 @@ def test_write_native_runner_request_is_grade_only_and_prewarmable(tmp_path: Pat
     assert prewarm["docker_namespace"] == "swebench"
     assert len(tasks) == 2
     assert json.loads(tasks[0])["status"] == "pending_native_grade"
+
+
+def test_prediction_for_task_uses_mapping_and_rejects_global_patch_for_multi_task() -> None:
+    assert nrc.prediction_for_task({"task_predictions": {"task-a": "PATCH A"}}, "task-a", task_count=2) == "PATCH A"
+    assert nrc.prediction_for_task({"predictions": {"task-a": "PATCH B"}}, "task-a", task_count=2) == "PATCH B"
+    assert nrc.prediction_for_task({"patch": "GLOBAL"}, "task-a", task_count=2) == ""
+    assert nrc.prediction_for_task({"patch": "GLOBAL"}, "task-a", task_count=1) == "GLOBAL"
+
+
+def test_default_native_grade_dispatches_pr_suite_prediction(monkeypatch, tmp_path: Path) -> None:
+    captured: dict = {}
+
+    def fake_task_row_for_id(task_id: str, *, db_path):
+        captured["task_id"] = task_id
+        captured["db_path"] = str(db_path)
+        return {"task_id": task_id, "instance_id": task_id, "source_kind": "post_cutoff_pr_suite"}
+
+    def fake_grade_pr_suite_prediction(instance, model_patch, **kwargs):
+        captured["instance"] = dict(instance)
+        captured["model_patch"] = model_patch
+        captured["kwargs"] = kwargs
+        return pr_suite_grader.GradeResult(
+            resolved=True,
+            seconds=1.5,
+            error=None,
+            receipt_path=str(tmp_path / "grade.json"),
+            receipt_sha256="grade-sha",
+        )
+
+    monkeypatch.setattr(pr_suite_grader, "task_row_for_id", fake_task_row_for_id)
+    monkeypatch.setattr(pr_suite_grader, "grade_pr_suite_prediction", fake_grade_pr_suite_prediction)
+    result = nrc.default_native_grade(
+        {
+            "task_id": "pr::pallets/click#3208",
+            "candidate_packet": {
+                "candidate_id": "cand",
+                "task_predictions": {"pr::pallets/click#3208": "diff --git a/x b/x\n"},
+            },
+            "request": {
+                "task_ids": ["pr::pallets/click#3208"],
+                "worker_config": {
+                    "taskbed_db": str(tmp_path / "taskbed.db"),
+                    "grade_timeout": 123,
+                    "receipt_root": str(tmp_path / "receipts"),
+                    "work_root": str(tmp_path / "work"),
+                },
+            },
+        }
+    )
+
+    assert result["status"] == "resolved"
+    assert result["resolved"] is True
+    assert result["grader"] == "pr_suite"
+    assert result["grader_receipt_sha256"] == "grade-sha"
+    assert captured["task_id"] == "pr::pallets/click#3208"
+    assert captured["model_patch"] == "diff --git a/x b/x\n"
+    assert captured["kwargs"]["timeout"] == 123
+    assert str(captured["kwargs"]["receipt_root"]).endswith("receipts")
+    assert str(captured["kwargs"]["work_root"]).endswith("work")
+
+
+def test_default_native_grade_missing_prediction_is_unresolved_not_infra() -> None:
+    result = nrc.default_native_grade(
+        {
+            "task_id": "pr::pallets/click#3208",
+            "candidate_packet": {"candidate_id": "cand", "task_predictions": {}},
+            "request": {"task_ids": ["pr::pallets/click#3208"]},
+        }
+    )
+
+    assert result["status"] == "unresolved"
+    assert result["resolved"] is False
+    assert result["grade_error"] == "missing_task_prediction"
+    assert result["blockers"] == ["missing_task_prediction"]
+
+
+def test_run_native_runner_request_uses_default_pr_suite_grade(monkeypatch, tmp_path: Path) -> None:
+    def fake_task_row_for_id(task_id: str, *, db_path):
+        return {"task_id": task_id, "instance_id": task_id, "source_kind": "post_cutoff_pr_suite"}
+
+    def fake_grade_pr_suite_prediction(instance, model_patch, **_kwargs):
+        return pr_suite_grader.GradeResult(
+            resolved=True,
+            seconds=0.1,
+            error=None,
+            receipt_path=str(tmp_path / "grade.json"),
+            receipt_sha256="grade-sha",
+        )
+
+    monkeypatch.setattr(pr_suite_grader, "task_row_for_id", fake_task_row_for_id)
+    monkeypatch.setattr(pr_suite_grader, "grade_pr_suite_prediction", fake_grade_pr_suite_prediction)
+    request_write = nrc.write_native_runner_request(
+        run_id="native-default-grade",
+        output_root=tmp_path / "requests",
+        split="explore",
+        candidate_packet={
+            "candidate_id": "cand",
+            "task_predictions": {"pr::pallets/click#3208": "diff --git a/x b/x\n"},
+        },
+        task_allocation={"allocation_id": "explore-a", "task_ids": ["pr::pallets/click#3208"]},
+        worker_config={"taskbed_db": str(tmp_path / "taskbed.db")},
+    )
+
+    manifest = nrc.run_native_runner_request(
+        request_dir=request_write["request_dir"],
+        result_root=tmp_path / "worker-result",
+    )
+
+    assert manifest["written_receipt_count"] == 1
+    assert manifest["resume_plan_after"]["completed_task_ids"] == ["pr::pallets/click#3208"]
+    receipt = _read_json(next((tmp_path / "worker-result" / "task_receipts").glob("*.json")))
+    assert receipt["grader"] == "pr_suite"
+    assert receipt["resolved"] is True
 
 
 def test_run_native_runner_request_writes_grade_only_receipts_and_syncs(tmp_path: Path) -> None:
@@ -309,6 +425,44 @@ def test_orchestrate_then_run_worker_end_to_end(tmp_path: Path) -> None:
     assert manifest["written_receipt_count"] == 2
     assert manifest["resume_plan_after"]["remaining_tasks"] == []
     assert sorted(manifest["resume_plan_after"]["completed_task_ids"]) == ["fresh-0", "fresh-1"]
+
+
+def test_cli_execute_request_dir_runs_default_worker(tmp_path: Path) -> None:
+    request_write = nrc.write_native_runner_request(
+        run_id="native-cli-worker",
+        output_root=tmp_path / "requests",
+        split="explore",
+        candidate_packet={"candidate_id": "cand", "patch": "diff --git a/x b/x\n"},
+        task_allocation={"allocation_id": "alloc", "task_ids": ["task-a"]},
+    )
+    result_root = tmp_path / "result"
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "dharma_swarm.forge_v1.forge_v2.native_runner_contract",
+            "--execute-request-dir",
+            request_write["request_dir"],
+            "--result-root",
+            str(result_root),
+            "--json",
+        ],
+        cwd="/Users/dhyana/ds_forge_spine_v0",
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=30,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    manifest = json.loads(proc.stdout)
+    assert manifest["schema"] == nrc.WORKER_RESULT_SCHEMA
+    assert manifest["written_receipt_count"] == 1
+    assert manifest["source_of_truth_mutated"] is False
+    receipt = _read_json(next((result_root / "task_receipts").glob("*.json")))
+    assert receipt["status"] == "unresolved"
+    assert receipt["grade_error"] == "unsupported_task_family"
 
 
 def test_orchestrate_native_request_blocks_underpowered_confirm(tmp_path: Path) -> None:
