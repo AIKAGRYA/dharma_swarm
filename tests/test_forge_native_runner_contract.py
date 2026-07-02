@@ -546,6 +546,122 @@ def test_cli_execute_request_dir_runs_default_worker(tmp_path: Path) -> None:
     assert receipt["grade_error"] == "unsupported_task_family"
 
 
+def test_cli_orchestrated_dry_run_syncs_and_resumes_without_predictions(tmp_path: Path) -> None:
+    """Level-0 native proof: real taskbed allocation, no model patch, no grading mutation.
+
+    Missing predictions are intentionally used here as the safe dry-run candidate:
+    the default worker must emit deterministic unresolved receipts, treat those
+    receipts as terminal for resume, and let the local orchestrator sync them as
+    grade-only evidence.
+    """
+    db = tmp_path / "taskbed.db"
+    _seed_taskbed(db, ["pr::pallets/click#3420", "pr::pallets/click#3534"])
+    requests_root = tmp_path / "requests"
+    result_root = tmp_path / "worker-result"
+
+    orchestrate = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "dharma_swarm.forge_v1.forge_v2.native_runner_contract",
+            "--run-id",
+            "native-cli-dry-proof",
+            "--candidate-id",
+            "dry_missing_predictions",
+            "--split",
+            "explore",
+            "--count",
+            "2",
+            "--epoch-id",
+            "epoch-native-dry-proof",
+            "--taskbed-db",
+            str(db),
+            "--output-root",
+            str(requests_root),
+            "--json",
+        ],
+        cwd="/Users/dhyana/ds_forge_spine_v0",
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=30,
+    )
+    assert orchestrate.returncode == 0, orchestrate.stderr
+    orchestration = json.loads(orchestrate.stdout)
+    request_dir = orchestration["request"]["request_dir"]
+    assert orchestration["allocation_receipt"]["task_count"] == 2
+
+    first = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "dharma_swarm.forge_v1.forge_v2.native_runner_contract",
+            "--execute-request-dir",
+            request_dir,
+            "--result-root",
+            str(result_root),
+            "--json",
+        ],
+        cwd="/Users/dhyana/ds_forge_spine_v0",
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=30,
+    )
+    assert first.returncode == 0, first.stderr
+    first_manifest = json.loads(first.stdout)
+    assert first_manifest["written_receipt_count"] == 2
+    assert first_manifest["resume_plan_after"]["remaining_tasks"] == []
+    assert sorted(first_manifest["resume_plan_after"]["completed_task_ids"]) == [
+        "pr::pallets/click#3420",
+        "pr::pallets/click#3534",
+    ]
+
+    second = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "dharma_swarm.forge_v1.forge_v2.native_runner_contract",
+            "--execute-request-dir",
+            request_dir,
+            "--result-root",
+            str(result_root),
+            "--json",
+        ],
+        cwd="/Users/dhyana/ds_forge_spine_v0",
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=30,
+    )
+    assert second.returncode == 0, second.stderr
+    second_manifest = json.loads(second.stdout)
+    assert second_manifest["existing_receipt_count"] == 2
+    assert second_manifest["written_receipt_count"] == 0
+    assert second_manifest["resume_plan_before"]["remaining_tasks"] == []
+
+    receipts = sorted((result_root / "task_receipts").glob("*.json"))
+    assert len(receipts) == 2
+    for path in receipts:
+        receipt = _read_json(path)
+        assert receipt["status"] == "unresolved"
+        assert receipt["grade_error"] == "missing_task_prediction"
+        assert receipt["source_of_truth_mutated"] is False
+        assert receipt["live_apply_performed"] is False
+        assert receipt["archive_fitness_mutated"] is False
+        assert receipt["promotion_gate"] == nrc.PROMOTION_GATE
+
+    sync_manifest = nrc.sync_remote_receipts(
+        remote_result_root=result_root,
+        local_sync_root=tmp_path / "synced",
+        expected_run_id="native-cli-dry-proof",
+    )
+    assert sync_manifest["schema"] == nrc.SYNC_SCHEMA
+    assert sync_manifest["receipt_count"] == 2
+    assert (Path(sync_manifest["local_sync_dir"]) / "sync_manifest.json").exists()
+    assert sync_manifest["source_of_truth_mutated"] is False
+
+
 def test_orchestrate_native_request_blocks_underpowered_confirm(tmp_path: Path) -> None:
     db = tmp_path / "taskbed.db"
     _seed_taskbed(db, ["fresh-0"])
