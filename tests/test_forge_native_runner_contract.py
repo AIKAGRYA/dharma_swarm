@@ -54,6 +54,159 @@ def test_write_native_runner_request_is_grade_only_and_prewarmable(tmp_path: Pat
     assert json.loads(tasks[0])["status"] == "pending_native_grade"
 
 
+def test_run_native_runner_request_writes_grade_only_receipts_and_syncs(tmp_path: Path) -> None:
+    request_write = nrc.write_native_runner_request(
+        run_id="native-worker-1",
+        output_root=tmp_path / "requests",
+        split="explore",
+        candidate_packet={"candidate_id": "candidate-a", "task_predictions": {"task-a": "patch"}},
+        task_allocation={"allocation_id": "explore-a", "task_ids": ["task-a", "task-b"]},
+    )
+    calls: list[dict] = []
+
+    def fake_grade(payload: dict) -> dict:
+        calls.append(payload)
+        return {
+            "status": "resolved" if payload["task_id"] == "task-a" else "unresolved",
+            "resolved": payload["task_id"] == "task-a",
+            "grade_seconds": 1.25,
+        }
+
+    manifest = nrc.run_native_runner_request(
+        request_dir=request_write["request_dir"],
+        result_root=tmp_path / "worker-result",
+        grade_fn=fake_grade,
+        worker_label="unit-x86-worker",
+    )
+
+    assert [call["task_id"] for call in calls] == ["task-a", "task-b"]
+    assert manifest["schema"] == nrc.WORKER_RESULT_SCHEMA
+    assert manifest["written_receipt_count"] == 2
+    assert manifest["source_of_truth_mutated"] is False
+    assert manifest["live_apply_performed"] is False
+    assert manifest["promotion_gate"] == nrc.PROMOTION_GATE
+    receipt_files = sorted((tmp_path / "worker-result" / "task_receipts").glob("*.json"))
+    assert len(receipt_files) == 2
+    receipt = _read_json(receipt_files[0])
+    assert receipt["schema"] == nrc.TASK_RECEIPT_SCHEMA
+    assert receipt["worker_label"] == "unit-x86-worker"
+    assert receipt["source_of_truth_mutated"] is False
+
+    sync_manifest = nrc.sync_remote_receipts(
+        remote_result_root=tmp_path / "worker-result",
+        local_sync_root=tmp_path / "synced",
+        expected_run_id="native-worker-1",
+    )
+    assert sync_manifest["receipt_count"] == 2
+    assert sync_manifest["archive_fitness_mutated"] is False
+
+
+def test_run_native_runner_request_skips_completed_receipts_on_resume(tmp_path: Path) -> None:
+    request_write = nrc.write_native_runner_request(
+        run_id="native-worker-2",
+        output_root=tmp_path / "requests",
+        split="explore",
+        candidate_packet={"candidate_id": "candidate-a"},
+        task_allocation={"allocation_id": "explore-a", "task_ids": ["task-a", "task-b"]},
+    )
+    result_root = tmp_path / "worker-result"
+    receipt_dir = result_root / "task_receipts"
+    receipt_dir.mkdir(parents=True)
+    (receipt_dir / "task-a-existing.json").write_text(
+        json.dumps(
+            {
+                "schema": nrc.TASK_RECEIPT_SCHEMA,
+                "run_id": "native-worker-2",
+                "candidate_id": "candidate-a",
+                "task_id": "task-a",
+                "status": "resolved",
+                "resolved": True,
+                "source_of_truth_mutated": False,
+                "promotion_gate": nrc.PROMOTION_GATE,
+            }
+        ),
+        encoding="utf-8",
+    )
+    calls: list[str] = []
+
+    def fake_grade(payload: dict) -> dict:
+        calls.append(payload["task_id"])
+        return {"status": "unresolved", "resolved": False}
+
+    manifest = nrc.run_native_runner_request(
+        request_dir=request_write["request_dir"],
+        result_root=result_root,
+        grade_fn=fake_grade,
+    )
+
+    assert calls == ["task-b"]
+    assert manifest["existing_receipt_count"] == 1
+    assert manifest["written_receipt_count"] == 1
+    assert manifest["resume_plan_before"]["completed_task_ids"] == ["task-a"]
+    assert manifest["resume_plan_after"]["completed_task_ids"] == ["task-a", "task-b"]
+
+
+def test_run_native_runner_request_receipts_infra_failure_then_retries(tmp_path: Path) -> None:
+    request_write = nrc.write_native_runner_request(
+        run_id="native-worker-3",
+        output_root=tmp_path / "requests",
+        split="explore",
+        candidate_packet={"candidate_id": "candidate-a"},
+        task_allocation={"allocation_id": "explore-a", "task_ids": ["task-a"]},
+        max_infra_retries=2,
+    )
+    result_root = tmp_path / "worker-result"
+    calls = 0
+
+    def flaky_grade(payload: dict) -> dict:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise RuntimeError("docker unavailable")
+        return {"status": "resolved", "resolved": True}
+
+    first = nrc.run_native_runner_request(
+        request_dir=request_write["request_dir"],
+        result_root=result_root,
+        grade_fn=flaky_grade,
+    )
+    assert first["written_receipt_count"] == 1
+    assert first["resume_plan_after"]["remaining_tasks"] == [
+        {"task_id": "task-a", "next_attempt": 2, "prior_infra_failures": 1}
+    ]
+
+    second = nrc.run_native_runner_request(
+        request_dir=request_write["request_dir"],
+        result_root=result_root,
+        grade_fn=flaky_grade,
+    )
+    assert calls == 2
+    assert second["written_receipt_count"] == 1
+    assert second["resume_plan_after"]["completed_task_ids"] == ["task-a"]
+    assert second["resume_plan_after"]["remaining_tasks"] == []
+
+
+def test_run_native_runner_request_refuses_mutating_request_authority(tmp_path: Path) -> None:
+    request_write = nrc.write_native_runner_request(
+        run_id="native-worker-4",
+        output_root=tmp_path / "requests",
+        split="explore",
+        candidate_packet={"candidate_id": "candidate-a"},
+        task_allocation={"allocation_id": "explore-a", "task_ids": ["task-a"]},
+    )
+    request_path = Path(request_write["request_path"])
+    request = _read_json(request_path)
+    request["authority"]["live_apply_allowed"] = "true"
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="request_authority:live_apply_allowed"):
+        nrc.run_native_runner_request(
+            request_dir=request_write["request_dir"],
+            result_root=tmp_path / "worker-result",
+            grade_fn=lambda _payload: {"status": "resolved"},
+        )
+
+
 def test_build_prewarm_manifest_unions_explicit_and_inferred_inputs() -> None:
     manifest = nrc.build_prewarm_manifest(
         ["pr::pallets/click#3208", "plain-task"],
@@ -280,4 +433,5 @@ def test_sync_remote_receipts_copies_task_receipts_and_writes_manifest(tmp_path:
     assert (sync_dir / "sync_manifest.json").exists()
     assert manifest["source_of_truth_mutated"] is False
     assert manifest["live_apply_performed"] is False
+    assert manifest["archive_fitness_mutated"] is False
     assert manifest["promotion_gate"] == nrc.PROMOTION_GATE

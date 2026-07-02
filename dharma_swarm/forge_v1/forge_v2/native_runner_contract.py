@@ -23,7 +23,7 @@ import json
 import os
 import time
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 from dharma_swarm.daemon_config import dharma_state_dir
 
@@ -34,10 +34,13 @@ REQUEST_SCHEMA = f"{SCHEMA_VERSION}.request"
 PREWARM_SCHEMA = f"{SCHEMA_VERSION}.prewarm"
 RESUME_SCHEMA = f"{SCHEMA_VERSION}.resume_plan"
 SYNC_SCHEMA = f"{SCHEMA_VERSION}.sync_manifest"
+TASK_RECEIPT_SCHEMA = f"{SCHEMA_VERSION}.task_receipt"
+WORKER_RESULT_SCHEMA = f"{SCHEMA_VERSION}.worker_result_manifest"
 
 DEFAULT_RUN_ROOT = dharma_state_dir() / "forge_v1" / "native_runner"
 DEFAULT_SYNC_ROOT = DEFAULT_RUN_ROOT / "synced_receipts"
 PROMOTION_GATE = "verify_promotion_only"
+GradeFn = Callable[[dict[str, Any]], dict[str, Any]]
 
 # Worker task-result statuses.  The exact resolver may still use project-local
 # closeouts, but the contract needs a small common vocabulary for resume/retry.
@@ -72,6 +75,11 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 def _normal_task_id(row: dict[str, Any]) -> str:
     return str(row.get("task_id") or row.get("instance_id") or "").strip()
+
+
+def _safe_task_fragment(task_id: str) -> str:
+    text = str(task_id or "task").strip() or "task"
+    return "".join(ch if ch.isalnum() or ch in {"-", "_", "."} else "_" for ch in text)
 
 
 def _task_ids_from_allocation(task_allocation: dict[str, Any]) -> list[str]:
@@ -370,6 +378,164 @@ def validate_no_source_mutation(payload: dict[str, Any], *, label: str) -> None:
         raise ValueError(f"{label}:unexpected_promotion_gate:{gate}")
 
 
+def validate_request_authority(request: dict[str, Any]) -> None:
+    """Fail closed if a native request grants a worker source-of-truth authority."""
+    if request.get("schema") != REQUEST_SCHEMA:
+        raise ValueError(f"request:unexpected_schema:{request.get('schema')}")
+    validate_no_source_mutation(request, label="request")
+    authority = dict(request.get("authority") or {})
+    if not _asserts_true(authority.get("no_source_of_truth_mutation")):
+        raise ValueError("request_authority:no_source_of_truth_mutation_not_asserted")
+    for field in (
+        "source_of_truth_mutation_allowed",
+        "live_apply_allowed",
+        "archive_fitness_mutated",
+        "official_score_claimed",
+    ):
+        if _asserts_true(authority.get(field)):
+            raise ValueError(f"request_authority:{field}")
+    if authority.get("promotion_gate") != PROMOTION_GATE:
+        raise ValueError(f"request_authority:unexpected_promotion_gate:{authority.get('promotion_gate')}")
+
+
+def _task_receipt_path(receipt_dir: Path, task_id: str, receipt: dict[str, Any]) -> Path:
+    digest = canonical_sha256(receipt)[:16]
+    return receipt_dir / f"{_safe_task_fragment(task_id)}_{digest}.json"
+
+
+def _worker_receipt(
+    *,
+    request: dict[str, Any],
+    task_id: str,
+    attempt: int,
+    worker_label: str,
+    grade_result: dict[str, Any],
+) -> dict[str, Any]:
+    status = str(grade_result.get("status") or "").strip()
+    resolved_value = grade_result.get("resolved")
+    if not status:
+        if resolved_value is True:
+            status = "resolved"
+        elif resolved_value is False:
+            status = "unresolved"
+        else:
+            status = "done"
+    receipt = {
+        **dict(grade_result),
+        "schema": TASK_RECEIPT_SCHEMA,
+        "generated_at": utc_now(),
+        "run_id": request["run_id"],
+        "candidate_id": request["candidate_id"],
+        "task_id": task_id,
+        "split": request["split"],
+        "attempt": int(attempt),
+        "worker_label": worker_label,
+        "status": status,
+        "source_of_truth_mutated": False,
+        "live_apply_performed": False,
+        "archive_fitness_mutated": False,
+        "promotion_gate": PROMOTION_GATE,
+        "request_sha256": request.get("request_sha256", canonical_sha256(request)),
+        "candidate_packet_sha256": canonical_sha256(request.get("candidate_packet", {})),
+    }
+    validate_no_source_mutation(receipt, label=f"worker_receipt:{task_id}")
+    receipt["receipt_sha256"] = canonical_sha256(receipt)
+    return receipt
+
+
+def run_native_runner_request(
+    *,
+    request_dir: Path | str,
+    grade_fn: GradeFn,
+    result_root: Path | str | None = None,
+    worker_label: str = "native_contract_worker",
+) -> dict[str, Any]:
+    """Consume a native runner request and write worker result receipts.
+
+    This is still not a model runner or a Docker implementation; it is the
+    worker-side contract harness.  A real native/x86_64 worker plugs in
+    ``grade_fn`` to perform one task grade.  The harness owns authority checks,
+    resume planning, receipt shape, and result-manifest production so workers
+    cannot silently redo completed tasks or mutate source-of-truth state.
+    """
+    request_path = Path(request_dir).expanduser() / "native_runner_request.json"
+    if not request_path.exists():
+        raise FileNotFoundError(f"missing native runner request: {request_path}")
+    request = _read_json(request_path)
+    validate_request_authority(request)
+    if not callable(grade_fn):
+        raise ValueError("grade_fn must be callable")
+
+    output_root = Path(result_root).expanduser() if result_root is not None else Path(request_dir).expanduser() / "worker_result"
+    receipt_dir = output_root / "task_receipts"
+    existing_receipts = load_task_receipts(output_root) if output_root.exists() else []
+    for receipt in existing_receipts:
+        validate_no_source_mutation(receipt, label=f"existing_task_receipt:{_normal_task_id(receipt) or 'unknown'}")
+        if not _normal_task_id(receipt):
+            raise ValueError("existing_task_receipt_missing_task_id")
+
+    resume_before = plan_resume(request, existing_receipts)
+    written: list[str] = []
+    for item in resume_before["remaining_tasks"]:
+        task_id = str(item["task_id"])
+        attempt = int(item["next_attempt"])
+        payload = {
+            "run_id": request["run_id"],
+            "candidate_id": request["candidate_id"],
+            "task_id": task_id,
+            "split": request["split"],
+            "attempt": attempt,
+            "candidate_packet": dict(request.get("candidate_packet") or {}),
+            "task_allocation": dict(request.get("task_allocation") or {}),
+            "request": request,
+        }
+        try:
+            grade_result = dict(grade_fn(payload))
+            validate_no_source_mutation(grade_result, label=f"grade_result:{task_id}")
+        except Exception as exc:  # noqa: BLE001 - worker infra failures must receipt.
+            grade_result = {
+                "status": "infra_failed",
+                "resolved": None,
+                "error_type": type(exc).__name__,
+                "error": str(exc),
+            }
+        receipt = _worker_receipt(
+            request=request,
+            task_id=task_id,
+            attempt=attempt,
+            worker_label=worker_label,
+            grade_result=grade_result,
+        )
+        out = _task_receipt_path(receipt_dir, task_id, receipt)
+        _write_json(out, receipt)
+        written.append(str(out))
+
+    all_receipts = load_task_receipts(output_root) if output_root.exists() else []
+    resume_after = plan_resume(request, all_receipts)
+    manifest = {
+        "schema": WORKER_RESULT_SCHEMA,
+        "generated_at": utc_now(),
+        "run_id": request["run_id"],
+        "candidate_id": request["candidate_id"],
+        "request_sha256": request.get("request_sha256", canonical_sha256(request)),
+        "worker_label": worker_label,
+        "result_root": str(output_root),
+        "task_count": len(request.get("task_ids") or []),
+        "existing_receipt_count": len(existing_receipts),
+        "written_receipts": written,
+        "written_receipt_count": len(written),
+        "resume_plan_before": resume_before,
+        "resume_plan_after": resume_after,
+        "source_of_truth_mutated": False,
+        "live_apply_performed": False,
+        "archive_fitness_mutated": False,
+        "promotion_gate": PROMOTION_GATE,
+    }
+    manifest["result_manifest_sha256"] = canonical_sha256(manifest)
+    _write_json(output_root / "result_manifest.json", manifest)
+    return manifest
+
+
 def sync_remote_receipts(
     *,
     remote_result_root: Path | str,
@@ -416,6 +582,7 @@ def sync_remote_receipts(
         "synced_receipts": written,
         "source_of_truth_mutated": False,
         "live_apply_performed": False,
+        "archive_fitness_mutated": False,
         "promotion_gate": PROMOTION_GATE,
         "result_manifest_sha256": canonical_sha256(manifest),
     }
@@ -435,11 +602,15 @@ __all__ = [
     "RESUME_SCHEMA",
     "SCHEMA_VERSION",
     "SYNC_SCHEMA",
+    "TASK_RECEIPT_SCHEMA",
+    "WORKER_RESULT_SCHEMA",
     "build_prewarm_manifest",
     "load_task_receipts",
     "plan_resume",
     "repo_slug_from_task_id",
+    "run_native_runner_request",
     "sync_remote_receipts",
     "validate_no_source_mutation",
+    "validate_request_authority",
     "write_native_runner_request",
 ]
