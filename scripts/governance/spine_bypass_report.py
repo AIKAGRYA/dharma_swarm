@@ -38,16 +38,14 @@ _SUBMIT_RE = re.compile(r"(?:_server|(?<!\w)server)\.submit\(")
 # intentionally inside an invoke_agent() invoker closure.
 _SPINE_ADOPTED: set[tuple[str, int]] = {
     # a2a_bridge.submit_via_spine() invoker closure — wraps through invoke_agent
-    ("dharma_swarm/a2a/a2a_bridge.py", 124),
+    ("dharma_swarm/a2a/a2a_bridge.py", 126),
 }
 
 # Known intentional migration-bypass sites (allowlist).
 # Each entry: (relative_path, line_number, reason).
 _INTENTIONAL_BYPASS: dict[tuple[str, int], str] = {
-    ("dharma_swarm/a2a/a2a_bridge.py", 307): (
-        "ingest_trishula_inbox — legacy TRISHULA inbound path, "
-        "migration target for Slice 2"
-    ),
+    # Slice 2 landed: ingest_trishula_inbox now dispatches via
+    # a2a_bridge.submit_via_spine() (invoke_agent + EvidenceReceipt).
     ("dharma_swarm/a2a/node_gateway.py", 322): (
         "submit_task_v1 — HTTP API endpoint, "
         "migration target after A2A bridge default route"

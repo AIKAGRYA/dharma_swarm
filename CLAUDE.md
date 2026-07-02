@@ -52,7 +52,7 @@ status is main's standing declaration and is left to the operator.
 
 **Next items:**
 
-- [code] (blocker) Wire a2a_bridge.submit_via_spine into production dispatch (ingest_trishula_inbox bypass at a2a_bridge.py:307 — Slice 2 per scripts/governance/spine_bypass_report.py).
+- [code] DONE 2026-07-02: a2a_bridge.submit_via_spine wired into production dispatch — ingest_trishula_inbox (Slice 2) now dispatches through submit_via_spine (invoke_agent + exactly one EvidenceReceipt per ingest); the a2a_bridge.py:307 allowlist entry removed from scripts/governance/spine_bypass_report.py (intentional bypasses 5→4) and the spine_bypass_entries ratchet baseline lowered to 4.
 - [code] (blocker) orchestrator.py dispatch through invoke_agent behind DHARMA_SPINE_DISPATCH (landed via #557; operator confirms one live EvidenceReceipt on a real dispatch = GATE 1).
 - [code] (blocker) Migrate agent_runner.py run_task through invoke_agent(). Largest surface, last.
 - [code] (blocker) Drain the intentional-bypass allowlist (node_gateway submit endpoints, a2a_client._dispatch_local) and enable allow-list-at-zero in uplift_guards CI.
@@ -279,7 +279,7 @@ For machine-readable status, see [`reports/governance/active_track_evidence.md`]
 - When governing: telos gates and VSM channels are necessary but must be LIGHT. System 2 (damping) > System 3 (mandates). The governance cost of a gate is measured in diversity loss.
 
 **Where this lives in the codebase**:
-- `diversity_archive.py` — MAP-Elites quality-diversity optimization
+- `archive.py` (`MAPElitesGrid`, wired into `DarwinEngine` via `EvolutionArchive`) — production diversity preservation; `diversity_archive.py` is an unwired standalone implementation (candidate for consolidation); `coordination/genome.py` has the arena's own MAP-Elites
 - `orchestrator.py` — topology-based routing (fan-out/fan-in/pipeline/broadcast)
 - `evolution.py` — DarwinEngine with diversity-preserving selection
 - `vsm_channels.py` — Beer's S1-S5 nervous system (light governance)
