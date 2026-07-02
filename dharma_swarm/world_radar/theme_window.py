@@ -48,6 +48,13 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _weighted_score(value: Any) -> float:
+    try:
+        return float(value or 0.0)
+    except (TypeError, ValueError, OverflowError):
+        return 0.0
+
+
 def load_theme_window(path: Path) -> dict[str, ThemeWindowEntry]:
     """Defensive load. Missing or garbled state -> empty window, never a crash."""
     if not path.exists():
@@ -105,7 +112,7 @@ def update_theme_window(
         if not movement_id:
             continue
         title = str(movement.get("title") or "")
-        score = float(movement.get("weighted_score") or 0.0)
+        score = _weighted_score(movement.get("weighted_score"))
         existing = updated.get(movement_id)
         if existing is None:
             updated[movement_id] = ThemeWindowEntry(

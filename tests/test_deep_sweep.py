@@ -269,3 +269,19 @@ async def test_writes_only_under_state_dir_never_reports_directory(tmp_path: Pat
     cycle_dir = Path(result["cycle_dir"])
     assert cycle_dir.is_relative_to(tmp_path / "meta")
     assert "reports" not in cycle_dir.parts
+
+
+@pytest.mark.asyncio
+async def test_state_dir_is_resolved_before_writes(tmp_path: Path) -> None:
+    aliased_state = tmp_path / "nested" / ".."
+    result = await run_deep_sweep(
+        aliased_state,
+        max_verifications=1,
+        scout_fn=_fake_scout_ok(n_rows=2),
+        ingest_fn=_fake_ingest_ok,
+        dispatch_fn=_fake_dispatch_ok,
+    )
+
+    cycle_dir = Path(result["cycle_dir"])
+    assert cycle_dir.is_relative_to(tmp_path.resolve() / "meta")
+    assert ".." not in cycle_dir.parts

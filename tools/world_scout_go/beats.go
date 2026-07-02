@@ -12,9 +12,8 @@ type Beat struct {
 
 // DefaultBeats returns a DELIBERATELY CAPPED set of curated research beats
 // for the (separate, lower-cadence) deep sweep -- roughly ten, not the ~28
-// angles a one-off manual research run used. "Capped for now": widen via a
-// runtime beats.json override (same pattern as sources.json/LoadSources)
-// once the cadence and downstream verification cost are proven out in
+// angles a one-off manual research run used. "Capped for now": widen only
+// after the cadence and downstream verification cost are proven out in
 // practice, rather than growing this literal list first.
 func DefaultBeats() []Beat {
 	return []Beat{

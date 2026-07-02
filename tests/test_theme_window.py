@@ -44,6 +44,16 @@ def test_movement_without_id_is_skipped_not_crashed() -> None:
     assert newly_seen == ()
 
 
+def test_malformed_weighted_score_defaults_to_zero_not_crash() -> None:
+    window, newly_seen = update_theme_window(
+        {},
+        [{"movement_id": "m1", "title": "bad score", "weighted_score": "not-a-number"}],
+    )
+
+    assert newly_seen == ("m1",)
+    assert window["m1"].best_weighted_score == 0.0
+
+
 def test_save_and_load_round_trip(tmp_path: Path) -> None:
     window, _ = update_theme_window({}, [_movement("m1", "Theme One", 0.7)])
     path = tmp_path / "theme_window.json"

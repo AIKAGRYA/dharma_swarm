@@ -508,7 +508,7 @@ def _run_go_scout(
     archive_discover_llms: bool = False,
     archive_discover_sitemap: bool = False,
     archive_sitemap_max_urls: int = 100,
-) -> tuple[list[dict[str, Any]], str | None, dict[str, int | str]]:
+) -> tuple[list[dict[str, Any]], str | None, dict[str, int | str | bool]]:
     module_dir = _repo_root() / "tools" / "world_scout_go"
     if not module_dir.exists():
         return [], f"missing Go scout module: {module_dir}", {}
@@ -918,7 +918,7 @@ def _coerce_int(value: Any) -> int:
     return max(parsed, 0)
 
 
-def _source_counts(health: Any) -> dict[str, int | str]:
+def _source_counts(health: Any) -> dict[str, int | str | bool]:
     if not isinstance(health, dict):
         return {"successful_sources": 0, "failed_sources": 0}
     return {

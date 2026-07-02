@@ -14,8 +14,7 @@ silently). Orchestrates:
      this cycle" is cheap to answer instead of re-verifying everything daily
   4. a CAPPED verification pass (max_verifications, default small) on the
      newest/highest-scoring themes, dispatched through invoke_agent() -- the
-     spine's one blessed invocation path (see docs/architecture/
-     SIGNAL_SYNTHESIS_DESK.md) -- never an ad-hoc parallel dispatch
+     spine's one blessed invocation path -- never an ad-hoc parallel dispatch
   5. one synthesis call producing a short digest
 
 Governance floor held: this module writes ONLY under the runtime state dir
@@ -50,7 +49,7 @@ from dharma_swarm.world_radar.theme_window import (
 
 DEFAULT_MAX_VERIFICATIONS = 8
 
-ScoutFn = Callable[..., tuple[list[dict[str, Any]], str | None, dict[str, int | str]]]
+ScoutFn = Callable[..., tuple[list[dict[str, Any]], str | None, dict[str, int | str | bool]]]
 IngestFn = Callable[..., tuple[list[dict[str, Any]], str | None]]
 DispatchFn = Callable[..., Awaitable[EvidenceReceipt]]
 
@@ -180,7 +179,7 @@ async def run_deep_sweep(
     callers should never override them; the defaults are the real Go scout
     and the real invoke_agent-backed dispatcher.
     """
-    state = state_dir.expanduser()
+    state = state_dir.expanduser().resolve()
     meta = state / "meta"
     radar = meta / "world_radar"
     out_dir = radar / "deep_sweep"
