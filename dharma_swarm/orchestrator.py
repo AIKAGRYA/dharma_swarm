@@ -1976,20 +1976,6 @@ class Orchestrator:
             max_retries=max_retries,
             backoff=backoff,
         )
-        await self._runtime_lifecycle.record_task_claim(
-            td,
-            task=task,
-            status="failed",
-            failure_code=failure_class,
-            error=error,
-        )
-        await self._runtime_lifecycle.record_delegation_run(
-            td,
-            task=task,
-            status="failed",
-            failure_code=failure_class,
-            error=error,
-        )
         meta.pop("active_claim", None)
         meta["last_error"] = error
         meta["last_failure_class"] = failure_class
@@ -2051,6 +2037,20 @@ class Orchestrator:
                     "source": source,
                     "failure_class": failure_class,
                 },
+            )
+            await self._runtime_lifecycle.record_task_claim(
+                td,
+                task=task,
+                status="failed",
+                failure_code=failure_class,
+                error=error,
+            )
+            await self._runtime_lifecycle.record_delegation_run(
+                td,
+                task=task,
+                status="failed",
+                failure_code=failure_class,
+                error=error,
             )
             return
 
@@ -2128,6 +2128,20 @@ class Orchestrator:
             )
         except Exception:
             logger.debug("Algedonic signal emission failed", exc_info=True)
+        await self._runtime_lifecycle.record_task_claim(
+            td,
+            task=task,
+            status="failed",
+            failure_code=failure_class,
+            error=error,
+        )
+        await self._runtime_lifecycle.record_delegation_run(
+            td,
+            task=task,
+            status="failed",
+            failure_code=failure_class,
+            error=error,
+        )
 
     async def _assign_dispatch(self, td: TaskDispatch) -> None:
         """Record dispatch, update board + pool, kick off execution, notify via bus."""
