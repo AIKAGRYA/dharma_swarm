@@ -37,6 +37,26 @@ SCHEMA_VERSION = "forge_v2.scaffold_variants.v1"
 VALID_ARMS = frozenset({"verify_chain", "mixed_moa"})
 VALID_SELECTION_STRATEGIES = frozenset({"self_moa", "mixed_moa", "verify_chain"})
 
+# Structural genome knobs that the Forge runner does NOT yet read.  A single-
+# field mutation of one of these produces a candidate that runs byte-identically
+# to its parent, so queuing it for EXPLORE would spend real grade budget to
+# "measure" a behavioral no-op -- exactly the benchmark theater the RSI doctrine
+# forbids ("spend almost nothing on bad ideas"; "do not regrade unchanged
+# candidates").  They remain in the mutation menu so they are still enumerated
+# and receipted, but static sanity marks them broken until a runner actually
+# consumes them.  Remove a field from this set only in the same change that
+# wires it into ``runner.run`` (as was done for ``window_chars``).
+UNWIRED_GENOME_FIELDS = frozenset(
+    {
+        "retry_policy",
+        "patch_format_policy",
+        "context_policy",
+        "budget_policy",
+        "repair_prompt_variant",
+        "verification_prompt_variant",
+    }
+)
+
 # Bounds for numeric context policy.  The first-slice arms window every model to
 # DEFAULT_WINDOW_CHARS=11000; a candidate window outside a sane band is either a
 # no-op or a budget hazard, so it is statically rejected.
@@ -83,6 +103,19 @@ def static_sanity_check(genome: dict[str, Any]) -> dict[str, Any]:
     selection = genome.get("selection_strategy")
     if selection is not None and str(selection) not in VALID_SELECTION_STRATEGIES:
         blockers.append(f"invalid_selection_strategy:{selection}")
+    # ``selection_strategy`` is carried metadata that mirrors ``arm``; the runner
+    # dispatches on ``arm`` and never reads ``selection_strategy``.  A genome
+    # whose selection_strategy diverges from its arm therefore encodes an intent
+    # the runner cannot honor: it would run exactly like its parent.  Marking it
+    # broken keeps EXPLORE budget off inert candidates while still allowing the
+    # harmless mirror (selection_strategy == arm) that the baseline carries.
+    if (
+        selection is not None
+        and str(selection) in VALID_SELECTION_STRATEGIES
+        and arm
+        and str(selection) != arm
+    ):
+        blockers.append(f"selection_strategy_not_executable:{selection}!=arm:{arm}")
 
     window = genome.get("window_chars")
     if window is not None:
@@ -95,6 +128,12 @@ def static_sanity_check(genome: dict[str, Any]) -> dict[str, Any]:
                 blockers.append(
                     f"window_chars_out_of_band:{window_int}(allowed {MIN_WINDOW_CHARS}-{MAX_WINDOW_CHARS})"
                 )
+
+    # Structural knobs the runner cannot yet execute: any presence makes the
+    # candidate a no-op relative to its parent, so it is not EXPLORE-runnable.
+    for field in sorted(UNWIRED_GENOME_FIELDS):
+        if genome.get(field) is not None:
+            blockers.append(f"genome_field_not_executable:{field}")
 
     generator = str(genome.get("generator", "")).strip()
     if not generator:
@@ -254,6 +293,7 @@ __all__ = [
     "MAX_WINDOW_CHARS",
     "MIN_WINDOW_CHARS",
     "SCHEMA_VERSION",
+    "UNWIRED_GENOME_FIELDS",
     "VALID_ARMS",
     "VALID_SELECTION_STRATEGIES",
     "archive_generated_variants",

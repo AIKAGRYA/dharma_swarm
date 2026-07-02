@@ -37,6 +37,43 @@ def test_static_sanity_check_rejects_self_moa_as_tested_candidate_arm() -> None:
     assert "invalid_arm:self_moa" in check["blockers"]
 
 
+def test_static_sanity_check_rejects_divergent_selection_strategy() -> None:
+    # selection_strategy mirrors arm; the runner dispatches on arm only, so a
+    # divergent selection_strategy would run identically to the parent (a no-op
+    # EXPLORE candidate).  It must be receipted as broken, not queued for grade.
+    check = sv.static_sanity_check({**BASELINE, "selection_strategy": "mixed_moa"})
+    assert check["ok"] is False
+    assert any(b.startswith("selection_strategy_not_executable:") for b in check["blockers"])
+
+
+def test_static_sanity_check_allows_selection_strategy_mirroring_arm() -> None:
+    # The harmless mirror (selection_strategy == arm) that the baseline carries
+    # must remain ok so we do not reject legitimate carried metadata.
+    check = sv.static_sanity_check({**BASELINE, "selection_strategy": "verify_chain"})
+    assert check["ok"] is True
+    assert check["blockers"] == []
+
+
+def test_static_sanity_check_rejects_unwired_structural_fields() -> None:
+    # Fields in the mutation menu that the Forge runner never reads make a
+    # candidate a behavioral no-op; queuing them would spend grade budget to
+    # measure the baseline.  Each must be receipted as not-executable.
+    for field in ("retry_policy", "patch_format_policy"):
+        check = sv.static_sanity_check({**BASELINE, field: "single_repair"})
+        assert check["ok"] is False, field
+        assert f"genome_field_not_executable:{field}" in check["blockers"], field
+
+
+def test_generate_variants_only_marks_runner_executable_fields_ok() -> None:
+    # Regression guard: the only single-field mutations that survive as static-ok
+    # are ones the runner actually consumes (verifier, window_chars).  If a future
+    # change wires another field, wire it in runner.run and drop it from
+    # UNWIRED_GENOME_FIELDS in the SAME change.
+    gen = sv.generate_variants(BASELINE, max_variants=40, max_fields_per_mutation=1)
+    ok_fields = {f for v in gen["variants"] if v["static_check"]["ok"] for f in v["mutated_fields"]}
+    assert ok_fields == {"verifier", "window_chars"}
+
+
 def test_static_sanity_check_rejects_verify_chain_without_verifier() -> None:
     check = sv.static_sanity_check({"arm": "verify_chain", "generator": "glm-5.2"})
     assert check["ok"] is False
