@@ -673,10 +673,18 @@ async def test_rescue_recent_failures_requeues_transient_failure(swarm):
     task = await swarm.create_task("Transient rescue target")
     await swarm._task_board.assign(task.id, "agent-1")
     await swarm._task_board.start(task.id)
+    stale_claim = {"claim_id": "claim-old", "agent_id": "agent-old"}
     await swarm._task_board.fail(
         task.id,
         "Connection error.",
-        metadata={"last_failure_source": "execution_error"},
+        metadata={
+            "last_failure_source": "execution_error",
+            "runtime_run_id": "run-old",
+            "run_id": "run-old",
+            "idempotency_key": "idem-run-old",
+            "last_claim": stale_claim,
+            "active_claim": stale_claim,
+        },
     )
 
     rescued = await swarm.rescue_recent_failures(limit=4)
@@ -687,6 +695,18 @@ async def test_rescue_recent_failures_requeues_transient_failure(swarm):
     assert refreshed.status == TaskStatus.PENDING
     assert refreshed.metadata["auto_rescue_count"] == 1
     assert refreshed.metadata["last_failure_class"] == "connection_transient"
+    assert "runtime_run_id" not in refreshed.metadata
+    assert "run_id" not in refreshed.metadata
+    assert "idempotency_key" not in refreshed.metadata
+    assert "last_claim" not in refreshed.metadata
+    assert "active_claim" not in refreshed.metadata
+    assert refreshed.metadata["auto_rescue_previous_attempt_identity"] == {
+        "runtime_run_id": "run-old",
+        "run_id": "run-old",
+        "idempotency_key": "idem-run-old",
+        "active_claim": stale_claim,
+        "last_claim": stale_claim,
+    }
 
 
 @pytest.mark.asyncio

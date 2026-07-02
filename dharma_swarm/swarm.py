@@ -76,6 +76,18 @@ logger = logging.getLogger(__name__)
 
 _T = TypeVar("_T")
 
+_ATTEMPT_IDENTITY_METADATA_KEYS = (
+    "runtime_run_id",
+    "run_id",
+    "idempotency_key",
+    "claim_id",
+    "active_claim",
+    "last_claim",
+    "claim_timeout_seconds",
+    "claim_expires_monotonic",
+    "claim_expires_at_epoch",
+)
+
 
 class SubsystemNotReady(RuntimeError):
     """Raised when a required subsystem hasn't been initialized yet.
@@ -86,6 +98,21 @@ class SubsystemNotReady(RuntimeError):
 
 def _make_trace_id() -> str:
     return f"trc_{uuid4().hex}"
+
+
+def _clear_attempt_identity_metadata(
+    meta: dict[str, Any],
+    *,
+    archive_key: str,
+) -> None:
+    """Remove per-attempt execution identity before a fresh claim is prepared."""
+    previous = {
+        key: meta.pop(key)
+        for key in _ATTEMPT_IDENTITY_METADATA_KEYS
+        if key in meta
+    }
+    if previous:
+        meta[archive_key] = previous
 
 
 class SwarmCoordinationState(BaseModel):
@@ -2038,12 +2065,16 @@ class SwarmManager:
             meta["max_retries"] = max_retries
             meta["retry_backoff_seconds"] = backoff
             meta.pop("retry_not_before_epoch", None)
-            meta.pop("active_claim", None)
+            _clear_attempt_identity_metadata(
+                meta,
+                archive_key="auto_rescue_previous_attempt_identity",
+            )
             meta["last_failure_class"] = failure_class
             meta["auto_rescue_count"] = rescue_count + 1
             meta["auto_rescued_at"] = now.isoformat()
             meta["auto_rescue_reason"] = "daemon.failure_rescue_sweep"
 
+            await self._task_board.update_task(task.id, metadata=meta)
             await self._task_board.requeue(
                 task.id,
                 reason="Requeued by automatic failure rescue sweep",
