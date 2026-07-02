@@ -171,7 +171,7 @@ def _parse_minimal_yaml(text: str) -> dict[str, Any]:
                 # Sequence item could be a scalar or an inline `key: value`
                 if ":" in item_content and not item_content.startswith("\""):
                     key, _, val = item_content.partition(":")
-                    inline = {key.strip(): _scalar(val.strip())}
+                    inline = {_scalar(key.strip()): _scalar(val.strip())}
                     pos += 1
                     # Subsequent indented lines belong to this item
                     sub = parse_block(base_indent + 2)
@@ -184,7 +184,7 @@ def _parse_minimal_yaml(text: str) -> dict[str, Any]:
                 continue
             if ":" in content:
                 key, _, val = content.partition(":")
-                key = key.strip()
+                key = _scalar(key.strip())
                 val = val.strip()
                 if result is None:
                     result = {}
@@ -287,6 +287,144 @@ def check_file_contains(file_path: str, pattern: str) -> CriterionResult:
     )
 
 
+def check_json_count_equals(
+    file_path: str,
+    collection: str,
+    field: str,
+    value: object,
+    expected: int,
+) -> CriterionResult:
+    """Count structured JSON rows instead of regex-matching generated prose."""
+    path = repo_path(file_path)
+    if not path.exists():
+        return CriterionResult(id="", kind="json_count_equals", passed=False,
+                               detail=f"{file_path} missing")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        return CriterionResult(id="", kind="json_count_equals", passed=False,
+                               detail=f"{file_path} unreadable: {type(exc).__name__}")
+    rows = data.get(collection)
+    if not isinstance(rows, list):
+        return CriterionResult(id="", kind="json_count_equals", passed=False,
+                               detail=f"{file_path}.{collection} is not a list")
+    actual = sum(1 for row in rows if isinstance(row, dict) and row.get(field) == value)
+    passed = actual == expected
+    return CriterionResult(
+        id="", kind="json_count_equals", passed=passed,
+        detail=(
+            f"{file_path}.{collection}[].{field} == {value!r}: "
+            f"{actual} {'==' if passed else '!='} {expected}"
+        ),
+    )
+
+
+def check_json_count_greater_than(
+    file_path: str,
+    collection: str,
+    field: str,
+    value: object,
+    threshold: int,
+) -> CriterionResult:
+    path = repo_path(file_path)
+    if not path.exists():
+        return CriterionResult(id="", kind="json_count_greater_than", passed=False,
+                               detail=f"{file_path} missing")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        return CriterionResult(id="", kind="json_count_greater_than", passed=False,
+                               detail=f"{file_path} unreadable: {type(exc).__name__}")
+    rows = data.get(collection)
+    if not isinstance(rows, list):
+        return CriterionResult(id="", kind="json_count_greater_than", passed=False,
+                               detail=f"{file_path}.{collection} is not a list")
+    actual = sum(1 for row in rows if isinstance(row, dict) and row.get(field) == value)
+    passed = actual > threshold
+    return CriterionResult(
+        id="", kind="json_count_greater_than", passed=passed,
+        detail=(
+            f"{file_path}.{collection}[].{field} == {value!r}: "
+            f"{actual} {'>' if passed else '<='} {threshold}"
+        ),
+    )
+
+
+def check_json_collection_values_match(
+    file_path: str,
+    collection: str,
+    key_field: str,
+    value_field: str,
+    expected: dict[Any, Any],
+) -> CriterionResult:
+    path = repo_path(file_path)
+    if not path.exists():
+        return CriterionResult(id="", kind="json_collection_values_match", passed=False,
+                               detail=f"{file_path} missing")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        return CriterionResult(id="", kind="json_collection_values_match", passed=False,
+                               detail=f"{file_path} unreadable: {type(exc).__name__}")
+    rows = data.get(collection)
+    if not isinstance(rows, list):
+        return CriterionResult(id="", kind="json_collection_values_match", passed=False,
+                               detail=f"{file_path}.{collection} is not a list")
+    actual = {
+        str(row.get(key_field)): row.get(value_field)
+        for row in rows
+        if isinstance(row, dict) and key_field in row
+    }
+    missing: list[str] = []
+    mismatched: list[str] = []
+    for raw_key, expected_value in expected.items():
+        key = str(raw_key)
+        if key not in actual:
+            missing.append(key)
+        elif actual[key] != expected_value:
+            mismatched.append(f"{key}: {actual[key]!r} != {expected_value!r}")
+    passed = not missing and not mismatched
+    if passed:
+        detail = f"{file_path}.{collection} {len(expected)} expected {value_field} value(s) matched"
+    else:
+        bits = []
+        if missing:
+            bits.append(f"missing keys {missing}")
+        if mismatched:
+            bits.append(f"mismatched {mismatched}")
+        detail = f"{file_path}.{collection} value map mismatch: {'; '.join(bits)}"
+    return CriterionResult(id="", kind="json_collection_values_match", passed=passed, detail=detail)
+
+
+def check_json_mapping_keys_nonempty(
+    file_path: str,
+    mapping: str,
+    keys: list[str],
+) -> CriterionResult:
+    path = repo_path(file_path)
+    if not path.exists():
+        return CriterionResult(id="", kind="json_mapping_keys_nonempty", passed=False,
+                               detail=f"{file_path} missing")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        return CriterionResult(id="", kind="json_mapping_keys_nonempty", passed=False,
+                               detail=f"{file_path} unreadable: {type(exc).__name__}")
+    obj = data.get(mapping)
+    if not isinstance(obj, dict):
+        return CriterionResult(id="", kind="json_mapping_keys_nonempty", passed=False,
+                               detail=f"{file_path}.{mapping} is not a mapping")
+    missing = [key for key in keys if not str(obj.get(key) or "").strip()]
+    passed = not missing
+    return CriterionResult(
+        id="", kind="json_mapping_keys_nonempty", passed=passed,
+        detail=(
+            f"{file_path}.{mapping} has non-empty values for {len(keys)} key(s)"
+            if passed else f"{file_path}.{mapping} missing/empty keys: {missing}"
+        ),
+    )
+
+
 def check_pr_merged(pr_number: int) -> CriterionResult:
     """Best-effort PR merge check via gh CLI. UNKNOWN does not fail."""
     if shutil.which("gh") is None:
@@ -320,7 +458,17 @@ def check_pr_merged(pr_number: int) -> CriterionResult:
 # open blocker next-items. Pattern borrowed from
 # cybernetics_codex._evaluate_loop_closure_replay (compute closure from
 # structural evidence; never trust a bare boolean) and REALITY_DEBT_LEDGER.md.
-RIGOROUS_KINDS = frozenset({"test_passes", "commit_on_main", "receipt_valid", "pr_merged", "mutation_score_gte"})
+RIGOROUS_KINDS = frozenset({
+    "test_passes",
+    "commit_on_main",
+    "receipt_valid",
+    "pr_merged",
+    "mutation_score_gte",
+    "json_count_equals",
+    "json_count_greater_than",
+    "json_collection_values_match",
+    "json_mapping_keys_nonempty",
+})
 EXISTENCE_KINDS = frozenset({"file_exists", "file_contains"})
 
 
@@ -355,6 +503,10 @@ def _load_grade_ladder() -> dict[str, Any]:
         "file_contains": 1,
         "pr_merged": 1,
         "commit_on_main": 2,
+        "json_count_equals": 2,
+        "json_count_greater_than": 2,
+        "json_collection_values_match": 2,
+        "json_mapping_keys_nonempty": 2,
         "receipt_valid": 2,
         "test_passes": 3,
         "mutation_score_gte": 6,  # S6 active (Pudgala Forge P3-09): primary anti-gaming oracle
@@ -503,7 +655,14 @@ def _recompute_digest(row: dict[str, Any]) -> str:
 
 
 def _receipt_timestamp(row: dict[str, Any]) -> str | None:
-    for key in ("produced_at", "generated_at", "finished_at", "started_at", "verified_at"):
+    for key in (
+        "produced_at",
+        "generated_at",
+        "observed_at",
+        "finished_at",
+        "started_at",
+        "verified_at",
+    ):
         val = row.get(key)
         if isinstance(val, str) and val.strip():
             return val
@@ -673,6 +832,95 @@ def evaluate_criterion(crit: dict[str, Any]) -> CriterionResult:
                                       detail="malformed criterion: empty 'file' or 'pattern'")
             else:
                 res = check_file_contains(crit["file"], crit["pattern"])
+        elif kind == "json_count_equals":
+            required = ("file", "collection", "field", "value", "expected")
+            missing = [key for key in required if key not in crit]
+            if missing:
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail=f"malformed criterion: missing {', '.join(missing)}")
+            elif (
+                not isinstance(crit.get("file"), str)
+                or not isinstance(crit.get("collection"), str)
+                or not isinstance(crit.get("field"), str)
+                or crit.get("value") is None
+            ):
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail="malformed criterion: 'file', 'collection', and 'field' "
+                                             "must be strings and 'value' must be set")
+            else:
+                res = check_json_count_equals(
+                    crit["file"],
+                    crit["collection"],
+                    crit["field"],
+                    crit["value"],
+                    int(crit["expected"]),
+                )
+        elif kind == "json_count_greater_than":
+            required = ("file", "collection", "field", "value", "threshold")
+            missing = [key for key in required if key not in crit]
+            if missing:
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail=f"malformed criterion: missing {', '.join(missing)}")
+            elif (
+                not isinstance(crit.get("file"), str)
+                or not isinstance(crit.get("collection"), str)
+                or not isinstance(crit.get("field"), str)
+                or crit.get("value") is None
+            ):
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail="malformed criterion: 'file', 'collection', and 'field' "
+                                             "must be strings and 'value' must be set")
+            else:
+                res = check_json_count_greater_than(
+                    crit["file"],
+                    crit["collection"],
+                    crit["field"],
+                    crit["value"],
+                    int(crit["threshold"]),
+                )
+        elif kind == "json_collection_values_match":
+            required = ("file", "collection", "key_field", "value_field", "expected")
+            missing = [key for key in required if key not in crit]
+            if missing:
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail=f"malformed criterion: missing {', '.join(missing)}")
+            elif (
+                not isinstance(crit.get("file"), str)
+                or not isinstance(crit.get("collection"), str)
+                or not isinstance(crit.get("key_field"), str)
+                or not isinstance(crit.get("value_field"), str)
+                or not isinstance(crit.get("expected"), dict)
+            ):
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail="malformed criterion: expected file/collection/key_field/"
+                                             "value_field strings and expected mapping")
+            else:
+                res = check_json_collection_values_match(
+                    crit["file"],
+                    crit["collection"],
+                    crit["key_field"],
+                    crit["value_field"],
+                    crit["expected"],
+                )
+        elif kind == "json_mapping_keys_nonempty":
+            required = ("file", "mapping", "keys")
+            missing = [key for key in required if key not in crit]
+            if missing:
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail=f"malformed criterion: missing {', '.join(missing)}")
+            elif (
+                not isinstance(crit.get("file"), str)
+                or not isinstance(crit.get("mapping"), str)
+                or not isinstance(crit.get("keys"), list)
+            ):
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail="malformed criterion: expected file/mapping strings and keys list")
+            else:
+                res = check_json_mapping_keys_nonempty(
+                    crit["file"],
+                    crit["mapping"],
+                    [str(key) for key in crit["keys"]],
+                )
         elif kind == "pr_merged":
             res = check_pr_merged(int(crit["pr"]))
         elif kind == "commit_on_main":
@@ -1339,6 +1587,7 @@ def detect_dependency_cycle(tracks: list[dict[str, Any]], findings: list[Finding
 def evaluate_track(t: dict[str, Any]) -> dict[str, Any]:
     prereqs = [evaluate_criterion(c) for c in (t.get("prerequisites") or [])]
     comps = [evaluate_criterion(c) for c in (t.get("completion_criteria") or [])]
+    ship_vetoes = [evaluate_criterion(c) for c in (t.get("ship_vetoes") or [])]
     prereqs_ok = all(c.passed for c in prereqs) if prereqs else True
     completion_ok = all(c.passed for c in comps) if comps else False
     # Lenient bar (legacy): all completion criteria pass while the track occupies
@@ -1378,6 +1627,10 @@ def evaluate_track(t: dict[str, Any]) -> dict[str, Any]:
             f"strongest evidence {grade_name(strongest_grade)} "
             f"< required {grade_name(min_evidence_grade)} "
             "(raise evidence strength or lower min_evidence_grade with justification)")
+    active_vetoes = [c for c in ship_vetoes if c.passed]
+    if active_vetoes:
+        details = "; ".join(f"{c.id}: {c.detail}" for c in active_vetoes)
+        ship_blocks.append(f"{len(active_vetoes)} active ship veto(es): {details}")
     target_closure_kind = _declared_closure_kind(t)
     if target_closure_kind and target_closure_kind not in CLOSURE_KINDS:
         ship_blocks.append(
@@ -1390,6 +1643,7 @@ def evaluate_track(t: dict[str, Any]) -> dict[str, Any]:
         "id": t.get("id"),
         "prereqs": prereqs,
         "completion": comps,
+        "ship_vetoes": ship_vetoes,
         "prereqs_ok": prereqs_ok,
         "shippable": shippable,            # RIGOROUS + GRADED bar
         "criteria_pass": criteria_pass,    # legacy lenient bar (existence checks)
@@ -1403,6 +1657,7 @@ def evaluate_track(t: dict[str, Any]) -> dict[str, Any]:
         "min_evidence_grade": min_evidence_grade,
         "min_evidence_grade_name": grade_name(min_evidence_grade),
         "open_blocker_count": len(open_blockers),
+        "active_ship_veto_count": len(active_vetoes),
         "passed": sum(1 for c in comps if c.passed),
         "total": len(comps),
     }
@@ -1505,7 +1760,10 @@ def run(args: argparse.Namespace) -> int:
                 (not c.passed) and getattr(c, "executed", True)
                 for c in (r["completion"] + r["prereqs"]))
             real_false_claim = (
-                r["open_blocker_count"] > 0 or not declares_rigorous or executed_failure)
+                r["open_blocker_count"] > 0
+                or r.get("active_ship_veto_count", 0) > 0
+                or not declares_rigorous
+                or executed_failure)
             if real_false_claim:
                 blocks = "; ".join(r["ship_blocks"]) or "rigorous bar not met"
                 findings.append(Finding("ERROR", f"false-shippable-claim:{tid}",
@@ -1579,6 +1837,7 @@ def _track_payload(t: dict[str, Any], r: dict[str, Any]) -> dict[str, Any]:
         "criteria_pass": r.get("criteria_pass", r["shippable"]),
         "ship_blocks": r.get("ship_blocks", []),
         "final_boss_blocks": r.get("final_boss_blocks", []),
+        "claim_boundary": t.get("claim_boundary"),
         "has_rigorous_evidence": r.get("has_rigorous_evidence", False),
         "strongest_grade": r.get("strongest_grade", 0),
         "strongest_grade_name": r.get("strongest_grade_name", "S0"),
@@ -1587,6 +1846,7 @@ def _track_payload(t: dict[str, Any], r: dict[str, Any]) -> dict[str, Any]:
         "prerequisites_ok": r["prereqs_ok"],
         "completion_progress": {"passed": r["passed"], "total": r["total"]},
         "criteria": [asdict(c) for c in (r["prereqs"] + r["completion"])],
+        "ship_vetoes": [asdict(c) for c in r.get("ship_vetoes", [])],
     }
 
 
@@ -1657,7 +1917,16 @@ def emit_reports(findings: list[Finding], portfolio: dict[str, Any] | None,
                   f"depends_on: {tp['depends_on']} · conflicts_with: {tp['conflicts_with']}")
         md.append(f"- owned_surfaces: {tp['owned_surfaces']}")
         md.append(f"- moves_vital_signs: {tp['moves_vital_signs']}")
+        if tp.get("claim_boundary"):
+            md.append(f"- claim_boundary: {tp['claim_boundary']}")
+        if not tp["shippable"] and tp.get("ship_blocks"):
+            md.append(f"- ship_blocks: {'; '.join(tp['ship_blocks'])}")
         md.append("")
+        for c in tp.get("ship_vetoes") or []:
+            mark = "ACTIVE" if c["passed"] else "clear"
+            md.append(f"  - {mark} ship veto `{c['id']}` ({c['kind']}) — {c['detail']}")
+        if tp.get("ship_vetoes"):
+            md.append("")
         for c in tp["criteria"]:
             mark = "✓" if c["passed"] else "✗"
             md.append(f"  - {mark} `{c['id']}` ({c['kind']}) — {c['detail']}")

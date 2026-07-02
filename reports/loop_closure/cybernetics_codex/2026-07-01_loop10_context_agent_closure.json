@@ -1,0 +1,74 @@
+{
+  "act_evidence": {
+    "package_checksum": "1c4db89bb0f858b1e2469a6617866809257a63533ad5bc176106ee1acdec0cb3",
+    "package_exists": true,
+    "package_path": "$TMPDIR/dharma_loop4_10_memory_context_closure_state/context/packages/loop4_10_memory_context.md"
+  },
+  "adapt_evidence": {
+    "package_checksum_after": "1c4db89bb0f858b1e2469a6617866809257a63533ad5bc176106ee1acdec0cb3",
+    "package_checksum_before": "missing",
+    "package_read_contains_marker": true
+  },
+  "adapt_proof": {
+    "after": "1c4db89bb0f858b1e2469a6617866809257a63533ad5bc176106ee1acdec0cb3",
+    "before": "missing",
+    "fed_forward": true,
+    "field": "memory-aware context package checksum, then later context/package read",
+    "package_path": "$TMPDIR/dharma_loop4_10_memory_context_closure_state/context/packages/loop4_10_memory_context.md"
+  },
+  "constrain_evidence": {
+    "admitted_to_package": true,
+    "budget_exceeded_marker_present": false,
+    "context_budget": 33000,
+    "context_chars": 22157,
+    "recent_memory_section_required": true
+  },
+  "cycle_detail": [
+    {
+      "assembled_context_contains_marker": true,
+      "context_chars": 22157,
+      "cycle": 1,
+      "has_recent_memory_section": true,
+      "memory_reader_contains_marker": true,
+      "package_written": true,
+      "within_budget": true
+    },
+    {
+      "cycle": 2,
+      "later_context_assembly_contains_marker": true,
+      "later_package_read_contains_marker": true,
+      "package_checksum_after": "1c4db89bb0f858b1e2469a6617866809257a63533ad5bc176106ee1acdec0cb3",
+      "package_checksum_before": "missing"
+    }
+  ],
+  "cycles": 2,
+  "interpret_evidence": {
+    "assembler": "dharma_swarm.context.build_agent_context",
+    "context_contains_marker": true,
+    "context_snippet": "the eigenform S(x) = x. --- ### Axis 2: Self-Production Sustains Identity **Who sees it**: Kauffman, Varela, Beer, Jantsch # Operations Layer ## Trishula No trishula inbox found. ## Memory [meta] PATTERN: Recurring themes in witness layer: loop410memorycontextclosure(3), completed(3), loop4_10_m [development] DEVELOPMENT: loop410memorycontextclosure completed work consolidated into durable memory EVIDENCE: f [witness] loop410memorycontextclosure completed work loop4_10_memory_context_closure_replay_v1 ",
+    "role": "surgeon",
+    "thread": "mechanistic"
+  },
+  "later_cycle_read_evidence": {
+    "later_context_assembly_contains_marker": true,
+    "later_context_snippet": "the eigenform S(x) = x. --- ### Axis 2: Self-Production Sustains Identity **Who sees it**: Kauffman, Varela, Beer, Jantsch # Operations Layer ## Trishula No trishula inbox found. ## Memory [meta] PATTERN: Recurring themes in witness layer: loop410memorycontextclosure(3), completed(3), loop4_10_m [development] DEVELOPMENT: loop410memorycontextclosure completed work consolidated into durable memory EVIDENCE: f [witness] loop410memorycontextclosure completed work loop4_10_memory_context_closure_replay_v1 ",
+    "later_package_read_contains_marker": true
+  },
+  "loop": 10,
+  "loop_id": "context_agent",
+  "observed_at": "2026-07-01T15:16:39.133413Z",
+  "real_data": true,
+  "sense_evidence": {
+    "contains_marker": true,
+    "memory_db": "$TMPDIR/dharma_loop4_10_memory_context_closure_state/db/memory.db",
+    "reader": "dharma_swarm.context.read_memory_context"
+  },
+  "tick_errors": [],
+  "transitions_receipted": {
+    "act": true,
+    "adapt": true,
+    "constrain": true,
+    "interpret": true,
+    "sense": true
+  }
+}

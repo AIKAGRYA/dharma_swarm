@@ -66,7 +66,7 @@ status is main's standing declaration and is left to the operator.
 ### Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
 
 **Track id:** `loop-closure-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-11 (TTL 21 days)
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-07-01 (TTL 21 days)
 **Relations:** complements: runtime-truth-reconciliation-2026-06
 **Owns surfaces:** reports/loop_closure/**, CYBERNETIC_LOOP_MAP.md
 **Moves vital signs:** quality_gates, eval_coverage
@@ -85,11 +85,17 @@ Invariant that must hold throughout:
   Internal artifacts never touch archive fitness; only countersigned
   external acted receipts above quorum do.
 
+Claim boundary:
+  HARNESS_PROVEN means a bounded replay/regression harness passed. It is
+  not production-live closure. CLOSED_LIVE requires one live owner-surface
+  criterion per loop; those criteria intentionally remain open until the
+  daemon branch that actually runs proves them.
+
 **Next items:**
 
-- [code] (blocker) Phase 1a: provider chain hardening — separate failure state classes, fallback ordering, honest smoke receipts (no real key required).
-- [ops] CORRECTED 2026-06-23: NO operator key is required to close Loop 1. Dispatch is keyless via the claude_code lane (live whenever the claude binary is present; key_oracle.dispatchable_now()). The old 'one real provider key (OPENROUTER recommended)' item was the propagated 'no provider' lie — a key only widens the roster.
-- [code] Phase 1b: Loop 1 closure under orchestrate_live with DHARMA_SPINE_DISPATCH=1, dispatch_dropoff receipted, closure check in make orient.
+- [code] (blocker) Residual: drain or quarantine historical dispatch_dropoff rows before any standing all-history daemon-clean claim.
+- [governance] Future boundary: keep Loops 12/13 blocked until One Wire has N>=5, M>=3, and explicit archive-fitness authority.
+- [governance] (blocker) Promote each HARNESS_PROVEN loop only after its declared live owner-surface criterion passes on the daemon branch that actually runs.
 
 **Non-goals:**
 

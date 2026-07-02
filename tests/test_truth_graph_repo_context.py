@@ -28,8 +28,9 @@ def test_truth_graph_repo_context_writes_json_and_markdown(tmp_path: Path, monke
     payload = json.loads(json_path.read_text(encoding="utf-8"))
     assert payload["context_hash"] == first_hash
     assert "lanes" in payload
+    repo_context_path = og._normalize_context_path(str(og.REPO_ROOT))
     assert any(
-        lane["path"] == str(og.REPO_ROOT) and lane["head"] == "CURRENT_CHECKOUT"
+        lane["path"] == repo_context_path and lane["head"] == "CURRENT_CHECKOUT"
         for lane in payload["lanes"]
     )
     assert "agents" in payload

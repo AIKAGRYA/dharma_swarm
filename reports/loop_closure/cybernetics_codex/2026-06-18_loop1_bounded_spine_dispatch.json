@@ -10,7 +10,7 @@
   "tasks_failed": 0,
   "dispatch_dropoffs": 0,
   "served_provider_truth": {
-    "runtime_db": "/var/folders/2n/h27kz83n6dn90pzkb_8v3pm80000gn/T/loop1-closure-a7w_anpw/state/runtime.db",
+    "runtime_db": "$TMPDIR/loop1-closure-a7w_anpw/state/runtime.db",
     "exists": true,
     "completed_runs_with_truth": 3,
     "delegation_receipts_with_truth": 3,
@@ -30,7 +30,7 @@
   "tick_errors": [],
   "ticks": 20,
   "stigmergy_hot_paths": [],
-  "state_dir": "/var/folders/2n/h27kz83n6dn90pzkb_8v3pm80000gn/T/loop1-closure-a7w_anpw",
+  "state_dir": "$TMPDIR/loop1-closure-a7w_anpw",
   "tasks": [
     {
       "task_id": "d8e6c6ebc85547fc",
