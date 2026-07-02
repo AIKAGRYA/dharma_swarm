@@ -650,7 +650,7 @@ active_tracks:
         kind: code
         blocker: false
       - id: 8
-        what: "External-gradient portfolio spec (dedicated session): >=5 autoresearch nodes (arena/genome, router policy, prompt/policy evolution, memory promotion policy, gate calibration) each with frozen eval + mutation operator + diversity-preserving selection + receipts; benchmark loops iterate at volume, market P&L funds but never selects per-iteration."
+        what: "External-gradient portfolio spec (dedicated session): >=6 autoresearch nodes (arena/genome, router policy, prompt/policy evolution, memory promotion policy, gate calibration, AND the R_V/self-reference-attractor research lane — NORTH_STAR §2's measurable-awareness claim gets an owned, receipted eval loop again after the COLM calendar death) each with frozen eval + mutation operator + diversity-preserving selection + receipts; benchmark loops iterate at volume, market P&L funds but never selects per-iteration. Next track after this one lands MUST serve revenue-external-humans-served (NORTH_STAR §11 90-day: 'funds itself totally')."
         kind: docs
         blocker: false
       - id: 9
