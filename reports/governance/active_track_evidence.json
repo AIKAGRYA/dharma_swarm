@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-20T12:43:51+09:00",
+  "generated_at": "2026-06-25T00:27:03+09:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
@@ -98,7 +98,7 @@
     "active": 6,
     "max_active": 10,
     "warn_active": 5,
-    "shippable": 4
+    "shippable": 5
   },
   "spine_objectives": [
     {
@@ -417,10 +417,10 @@
       "verified_at": "2026-06-11",
       "ttl_days": 21,
       "owner": "@AmitabhainArunachala",
-      "shippable": false,
+      "shippable": true,
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 4,
+        "passed": 5,
         "total": 5
       },
       "criteria": [
@@ -463,8 +463,8 @@
         {
           "id": "campaign_retrospective_exists",
           "kind": "file_exists",
-          "passed": false,
-          "detail": "reports/loop_closure/RETROSPECTIVE.md MISSING"
+          "passed": true,
+          "detail": "reports/loop_closure/RETROSPECTIVE.md present"
         }
       ]
     },
@@ -749,8 +749,8 @@
     },
     {
       "severity": "INFO",
-      "check": "track-in-progress:loop-closure-2026-06",
-      "message": "[loop-closure-2026-06] 4/5 completion criteria pass.",
+      "check": "track-shippable:loop-closure-2026-06",
+      "message": "[loop-closure-2026-06] all 5 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
       "criterion_id": null
     },
     {

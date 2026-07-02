@@ -335,6 +335,13 @@ class TestPromptTournament:
     @pytest.mark.asyncio
     async def test_mutate_prompt_no_api_key(self, monkeypatch):
         monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+        async def _raise_missing_config(*args, **kwargs):
+            raise RuntimeError("missing_config")
+
+        monkeypatch.setattr(
+            "dharma_swarm.ginko_evolution.complete_via_preferred_runtime_providers",
+            _raise_missing_config,
+        )
         t = PromptTournament()
         result = await t.mutate_prompt("original prompt", {"success_rate": 0.5})
         assert result == "original prompt"  # Safe fallback

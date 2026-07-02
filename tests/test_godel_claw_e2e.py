@@ -267,11 +267,11 @@ async def test_canary_promote_and_rollback(tmp_dharma):
 # === Scenario 7: All 11 gates fire ===
 
 
-def test_all_eleven_gates_fire():
+def test_all_eleven_gates_fire(tmp_path):
     """All 11 gates should be present and evaluated."""
-    from dharma_swarm.telos_gates import TelosGatekeeper
+    from dharma_swarm.telos_gates import GateRegistry, TelosGatekeeper
 
-    gk = TelosGatekeeper()
+    gk = TelosGatekeeper(registry=GateRegistry(tmp_path / "gate_proposals.jsonl"))
     assert len(gk.GATES) == 11
 
     result = gk.check(action="echo test")

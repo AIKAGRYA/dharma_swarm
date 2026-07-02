@@ -286,9 +286,10 @@ async def test_replay_result_passed_requires_all_conditions():
 async def test_canonical_replay_cli():
     """CLI test runs successfully."""
     import subprocess
+    import sys
 
     result = subprocess.run(
-        ["python3", "-m", "dharma_swarm.canonical_replay"],
+        [sys.executable, "-m", "dharma_swarm.canonical_replay"],
         cwd=Path(__file__).parent.parent,
         capture_output=True,
         text=True,

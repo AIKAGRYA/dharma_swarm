@@ -34,9 +34,9 @@ class TestModelRoutingActivation:
 class TestPalacePopulation:
     """Test that agent outputs get indexed into the palace."""
 
-    def test_organism_on_agent_output_ingests_to_palace(self):
+    def test_organism_on_agent_output_ingests_to_palace(self, tmp_path):
         from dharma_swarm.organism import Organism
-        org = Organism()
+        org = Organism(state_dir=tmp_path)
         _run(org.boot())
         _run(org.on_agent_output(
             agent_id="test_agent",

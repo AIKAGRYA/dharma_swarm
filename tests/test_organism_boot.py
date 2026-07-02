@@ -46,9 +46,9 @@ class TestOrganismBoot:
         assert pulse.cycle_number == 1
         assert pulse.is_healthy
 
-    def test_organism_status(self):
+    def test_organism_status(self, tmp_path):
         from dharma_swarm.organism import Organism
-        org = Organism()
+        org = Organism(state_dir=tmp_path)
         _run(org.boot())
         status = org.status()
         assert "vsm" in status

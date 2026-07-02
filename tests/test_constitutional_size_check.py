@@ -80,9 +80,10 @@ def test_enforce_constitutional_size_logs_result(caplog):
 def test_constitutional_size_check_cli():
     """CLI test can be run standalone."""
     import subprocess
+    import sys
 
     result = subprocess.run(
-        ["python3", "-m", "dharma_swarm.constitutional_size_check"],
+        [sys.executable, "-m", "dharma_swarm.constitutional_size_check"],
         cwd=Path(__file__).parent.parent,
         capture_output=True,
         text=True,
