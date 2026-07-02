@@ -4,6 +4,8 @@ import asyncio
 import json
 from pathlib import Path
 
+import pytest
+
 from dharma_swarm.evolution import Proposal
 from scripts import loop3_evolution_closure_run as loop3
 
@@ -68,3 +70,15 @@ def test_loop3_run_uses_scratch_archive_and_later_cycle_reads_it(tmp_path: Path)
     assert later["prediction_changed"] is True
     assert later["later_proposal_read_after_prediction"] is True
     assert later["parent_selection_read_archive_entry"] is True
+
+
+def test_loop3_refuses_live_archive_as_scratch_root(tmp_path: Path, monkeypatch) -> None:
+    home = tmp_path / "home"
+    monkeypatch.setenv("HOME", str(home))
+    scratch = home / ".dharma"
+    receipt = tmp_path / "receipt.json"
+
+    with pytest.raises(RuntimeError, match="live Dharma archive"):
+        asyncio.run(loop3.run(report_path=receipt, scratch_root=scratch))
+
+    assert not receipt.exists()

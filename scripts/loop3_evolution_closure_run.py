@@ -241,6 +241,10 @@ async def _run_with_scratch(scratch_root: Path) -> dict[str, Any]:
     scratch_archive_is_live_archive = (
         archive_path.resolve() == live_archive_path.resolve()
     )
+    if scratch_archive_is_live_archive:
+        raise RuntimeError(
+            "refusing to use live Dharma archive as loop3 scratch archive"
+        )
     tick_errors: list[str] = []
     transitions_seen = {name: False for name in TRANSITIONS}
     engine = DarwinEngine(

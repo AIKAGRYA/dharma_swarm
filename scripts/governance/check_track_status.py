@@ -171,7 +171,7 @@ def _parse_minimal_yaml(text: str) -> dict[str, Any]:
                 # Sequence item could be a scalar or an inline `key: value`
                 if ":" in item_content and not item_content.startswith("\""):
                     key, _, val = item_content.partition(":")
-                    inline = {key.strip(): _scalar(val.strip())}
+                    inline = {_scalar(key.strip()): _scalar(val.strip())}
                     pos += 1
                     # Subsequent indented lines belong to this item
                     sub = parse_block(base_indent + 2)
@@ -184,7 +184,7 @@ def _parse_minimal_yaml(text: str) -> dict[str, Any]:
                 continue
             if ":" in content:
                 key, _, val = content.partition(":")
-                key = key.strip()
+                key = _scalar(key.strip())
                 val = val.strip()
                 if result is None:
                     result = {}

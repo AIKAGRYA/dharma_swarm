@@ -30,6 +30,7 @@ from check_track_status import (  # type: ignore  # noqa: E402
     evaluate_criterion,
     evaluate_track,
     normalize_portfolio,
+    _parse_minimal_yaml,
     validate_portfolio_graph,
 )
 
@@ -190,6 +191,23 @@ def test_json_mapping_keys_nonempty_checks_required_keys(tmp_path):
     assert not check_json_mapping_keys_nonempty(
         str(audit), "live_owner_surface_criteria", ["loop1", "loop2"]
     ).passed
+
+
+def test_minimal_yaml_parser_unquotes_mapping_keys():
+    parsed = _parse_minimal_yaml(
+        """
+expected:
+  "1": HARNESS_PROVEN
+  '2': BLOCKED
+  3: CLOSED_LIVE
+""".strip()
+    )
+
+    assert parsed["expected"] == {
+        "1": "HARNESS_PROVEN",
+        "2": "BLOCKED",
+        3: "CLOSED_LIVE",
+    }
 
 
 def test_new_kinds_dispatch_through_evaluate_criterion():

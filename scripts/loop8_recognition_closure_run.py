@@ -47,6 +47,7 @@ LOOP_IDS = {
 }
 MARKER = "loop8recognitionclosure"
 WORK_DIR_SENTINEL = ".loop8_recognition_closure_workdir"
+WORK_DIR_SENTINEL_CONTENT = "owned by scripts/loop8_recognition_closure_run.py\n"
 
 
 def _utc_now() -> str:
@@ -132,14 +133,17 @@ def _file_evidence(path: Path) -> dict[str, Any]:
 def _reset_work_dir(work_dir: Path) -> None:
     if work_dir.exists():
         sentinel = work_dir / WORK_DIR_SENTINEL
-        if not sentinel.exists() and any(work_dir.iterdir()):
+        try:
+            sentinel_valid = (
+                sentinel.read_text(encoding="utf-8") == WORK_DIR_SENTINEL_CONTENT
+            )
+        except OSError:
+            sentinel_valid = False
+        if not sentinel_valid:
             raise RuntimeError(f"refusing to reset non-owned work dir: {work_dir}")
         shutil.rmtree(work_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
-    (work_dir / WORK_DIR_SENTINEL).write_text(
-        "owned by scripts/loop8_recognition_closure_run.py\n",
-        encoding="utf-8",
-    )
+    (work_dir / WORK_DIR_SENTINEL).write_text(WORK_DIR_SENTINEL_CONTENT, encoding="utf-8")
 
 
 def _empty_transitions() -> dict[str, bool]:
@@ -187,6 +191,9 @@ def _evaluate_loop1(data: dict[str, Any]) -> dict[str, Any]:
     tick_errors = data.get("tick_errors") or []
     receipt_statuses = [str(status) for status in evidence_receipts.values()]
     completed_with_truth = int(served_truth.get("completed_runs_with_truth") or 0)
+    marks_before = int(data.get("stigmergy_marks_before") or 0)
+    marks_after = int(data.get("stigmergy_marks_after") or 0)
+    adapt_fed_forward = bool(data.get("adapt_fired")) and marks_before != marks_after
     closed = (
         tasks_requested > 0
         and tasks_completed == tasks_requested
@@ -195,6 +202,7 @@ def _evaluate_loop1(data: dict[str, Any]) -> dict[str, Any]:
         and bool(receipt_statuses)
         and all(status == "ok" for status in receipt_statuses)
         and completed_with_truth >= tasks_completed
+        and adapt_fed_forward
     )
     return {
         "closed": closed,
@@ -202,9 +210,9 @@ def _evaluate_loop1(data: dict[str, Any]) -> dict[str, Any]:
         "real_data": closed,
         "transitions_receipted": {name: closed for name in TRANSITIONS},
         "adapt_proof": {
-            "before": int(data.get("stigmergy_marks_before") or 0),
-            "after": int(data.get("stigmergy_marks_after") or 0),
-            "fed_forward": bool(data.get("adapt_fired")) and closed,
+            "before": marks_before,
+            "after": marks_after,
+            "fed_forward": adapt_fed_forward and closed,
             "field": "Loop 1 bounded spine dispatch marks fed into stigmergy state",
         },
         "tick_errors": tick_errors,

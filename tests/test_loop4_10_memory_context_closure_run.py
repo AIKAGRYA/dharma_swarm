@@ -4,10 +4,14 @@ import asyncio
 import json
 from pathlib import Path
 
+import pytest
+
 from dharma_swarm.cybernetics_codex import _evaluate_loop_closure_replay
 from scripts.loop4_10_memory_context_closure_run import (
     MARKER,
     TRANSITIONS,
+    _memory_db_path,
+    _prepare_state_dir,
     main,
     run_replay,
 )
@@ -84,6 +88,18 @@ def test_loop10_receipt_proves_context_assembly_reads_memory(tmp_path: Path) -> 
     assert loop10["adapt_proof"]["fed_forward"] is True
     assert loop10["later_cycle_read_evidence"]["later_context_assembly_contains_marker"] is True
     assert MARKER in loop10["later_cycle_read_evidence"]["later_context_snippet"]
+
+
+def test_state_reset_refuses_existing_memory_db_without_sentinel(tmp_path: Path) -> None:
+    state_dir = tmp_path / ".dharma"
+    db_path = _memory_db_path(state_dir)
+    db_path.parent.mkdir(parents=True)
+    db_path.write_text("live memory", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="refusing to reset non-owned state dir"):
+        _prepare_state_dir(state_dir, reset_state=True)
+
+    assert db_path.read_text(encoding="utf-8") == "live memory"
 
 
 def test_cli_writes_receipts_to_requested_directory(tmp_path: Path) -> None:

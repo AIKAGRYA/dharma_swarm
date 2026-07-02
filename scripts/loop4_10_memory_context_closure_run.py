@@ -43,6 +43,7 @@ MARKER = "loop410memorycontextclosure"
 WORK_ID = "loop4_10_memory_context_closure_replay_v1"
 DEFAULT_STATE_DIR = Path(tempfile.gettempdir()) / "dharma_loop4_10_memory_context_closure_state"
 STATE_SENTINEL = ".loop4_10_memory_context_closure_state"
+STATE_SENTINEL_CONTENT = "owned by scripts/loop4_10_memory_context_closure_run.py\n"
 
 
 def _utc_now() -> str:
@@ -99,18 +100,25 @@ def _context_package_path(state_dir: Path) -> Path:
 def _prepare_state_dir(state_dir: Path, *, reset_state: bool) -> None:
     state_dir.mkdir(parents=True, exist_ok=True)
     sentinel = state_dir / STATE_SENTINEL
+    reset_targets = (
+        _memory_db_path(state_dir),
+        Path(f"{_memory_db_path(state_dir)}-wal"),
+        Path(f"{_memory_db_path(state_dir)}-shm"),
+        _context_package_path(state_dir),
+    )
     if reset_state:
-        for path in (
-            _memory_db_path(state_dir),
-            Path(f"{_memory_db_path(state_dir)}-wal"),
-            Path(f"{_memory_db_path(state_dir)}-shm"),
-            _context_package_path(state_dir),
-        ):
+        try:
+            sentinel_valid = sentinel.read_text(encoding="utf-8") == STATE_SENTINEL_CONTENT
+        except OSError:
+            sentinel_valid = False
+        if any(path.exists() for path in reset_targets) and not sentinel_valid:
+            raise RuntimeError(f"refusing to reset non-owned state dir: {state_dir}")
+        for path in reset_targets:
             try:
                 path.unlink(missing_ok=True)
             except OSError:
                 pass
-    sentinel.write_text("owned by scripts/loop4_10_memory_context_closure_run.py\n", encoding="utf-8")
+    sentinel.write_text(STATE_SENTINEL_CONTENT, encoding="utf-8")
 
 
 def _memory_count(state_dir: Path, layer: str | None = None) -> int:

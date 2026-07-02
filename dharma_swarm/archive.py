@@ -85,6 +85,10 @@ def _int_field(value: Any, default: int = 0) -> int:
         return default
 
 
+def _bool_field(value: Any) -> bool:
+    return value is True
+
+
 def read_one_wire_fitness_authority(state_dir: Path | str) -> OneWireFitnessAuthority:
     """Read the guardian quorum receipt that authorizes archive fitness writes.
 
@@ -148,19 +152,19 @@ def read_one_wire_fitness_authority(state_dir: Path | str) -> OneWireFitnessAuth
             authority.get("domain_count", payload.get("domains")),
         )
     )
-    eligible = bool(
+    eligible = _bool_field(
         payload.get(
             "eligible",
             authority.get("eligible_to_set_archive_fitness", False),
         )
     )
-    fitness_authority_granted = bool(
+    fitness_authority_granted = _bool_field(
         payload.get(
             "fitness_authority_granted",
             authority.get("fitness_authority_granted", False),
         )
     )
-    archive_fitness_changed = bool(
+    archive_fitness_changed = _bool_field(
         payload.get(
             "archive_fitness_changed",
             authority.get("archive_fitness_changed", False),

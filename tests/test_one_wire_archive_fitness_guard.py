@@ -179,6 +179,32 @@ async def test_guardian_cannot_lower_required_quorum_thresholds(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_guardian_authority_flags_must_be_literal_booleans(tmp_path):
+    state = _state(tmp_path)
+    path = _write_guardian(
+        state,
+        confirmed=5,
+        domains=3,
+        eligible=True,
+        authority=True,
+    )
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["authority_result"]["eligible_to_set_archive_fitness"] = "false"
+    payload["authority_result"]["fitness_authority_granted"] = "false"
+    path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    archive = _archive(state)
+
+    authority = read_one_wire_fitness_authority(state)
+    assert authority.allowed is False
+    assert authority.eligible_to_set_archive_fitness is False
+    assert authority.fitness_authority_granted is False
+    with pytest.raises(OneWireFitnessAuthorityError, match="authority flags missing"):
+        await archive.add_entry(_fitness_entry())
+
+    _assert_no_archive_side_effects(state)
+
+
+@pytest.mark.asyncio
 async def test_negative_archive_fitness_requires_one_wire_authority(tmp_path):
     state = _state(tmp_path)
     archive = _archive(state)

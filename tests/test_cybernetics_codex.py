@@ -233,6 +233,35 @@ def test_loop1_closed_live_requires_later_correlated_routing_read():
     assert "runtime.provider_truth.routing_adaptation" in rows[1]["evidence"]
 
 
+def test_loop1_closed_live_requires_completed_delegation_work():
+    runtime = {
+        "delegation_runs": {"total": 1, "completed": 0},
+        "failure_codes": [],
+        "provider_truth": {
+            "delegation_runs": {"completed_with_served_provider_model": 0},
+            "runtime_receipts": {"rows_with_served_provider_model": 1},
+            "routing_adaptation": {
+                "has_later_causal_read": True,
+                "latest_served_truth": "2026-06-13T00:01:00Z",
+                "tables": {
+                    "routing_decisions": {
+                        "correlated_rows_after_served_truth": 1,
+                    },
+                },
+            },
+        },
+    }
+    bounded = {"loop1": {"harness_proven": True, "tasks_completed": 1, "tasks_requested": 1}}
+
+    rows = {
+        row["number"]: row
+        for row in build_loop_statuses(runtime, {}, {}, bounded_replays=bounded)
+    }
+
+    assert rows[1]["verdict"] == "HARNESS_PROVEN"
+    assert "no completed delegation runs" in rows[1]["blocker"]
+
+
 def test_one_wire_blocks_self_improvement_when_guardian_quorum_missing(tmp_path):
     state = tmp_path / ".dharma"
     db = state / "state" / "runtime.db"

@@ -4,6 +4,8 @@ import importlib.util
 import json
 from pathlib import Path
 
+import pytest
+
 from dharma_swarm.cybernetics_codex import _evaluate_loop_closure_replay
 
 
@@ -146,6 +148,42 @@ def test_replay_closes_loop8_with_seed_and_later_context_read(tmp_path: Path) ->
     assert report["provider_truth"]["external_provider_invoked"] is False
     assert report["provider_truth"]["provider_truth_claimed"] is False
     assert report_path.exists()
+
+
+def test_reset_work_dir_requires_exact_sentinel(tmp_path: Path) -> None:
+    module = _load_module()
+    work_dir = tmp_path / "state"
+    work_dir.mkdir()
+    (work_dir / module.WORK_DIR_SENTINEL).write_text("spoof\n", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="refusing to reset non-owned work dir"):
+        module._reset_work_dir(work_dir)
+
+    assert work_dir.exists()
+    assert (work_dir / module.WORK_DIR_SENTINEL).read_text(encoding="utf-8") == "spoof\n"
+
+
+def test_loop1_history_requires_fed_forward_adapt() -> None:
+    module = _load_module()
+    data = {
+        "tasks_requested": 1,
+        "tasks_completed": 1,
+        "tasks_failed": 0,
+        "dispatch_dropoffs": 0,
+        "tick_errors": [],
+        "ticks": 1,
+        "adapt_fired": False,
+        "stigmergy_marks_before": 1,
+        "stigmergy_marks_after": 1,
+        "evidence_receipts": {"task-1": "ok"},
+        "served_provider_truth": {"completed_runs_with_truth": 1},
+    }
+
+    evaluated = module._evaluate_loop1(data)
+
+    assert evaluated["closed"] is False
+    assert evaluated["adapt_proof"]["fed_forward"] is False
+    assert not any(evaluated["transitions_receipted"].values())
 
 
 def test_main_writes_requested_report(tmp_path: Path) -> None:

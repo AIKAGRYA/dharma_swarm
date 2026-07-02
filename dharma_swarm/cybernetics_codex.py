@@ -1003,6 +1003,7 @@ def build_loop_statuses(
     loop1_closed_live = (
         loop1_harness_proven
         and total_runs > 0
+        and completed > 0
         and failure_counts.get("dispatch_dropoff", 0) == 0
         and (completed_with_truth > 0 or runtime_receipt_truth_rows > 0)
         and loop1_has_later_routing
@@ -1064,6 +1065,8 @@ def build_loop_statuses(
                     missing.append(
                         f"dispatch_dropoff={failure_counts.get('dispatch_dropoff', 0)}"
                     )
+                if completed == 0:
+                    missing.append("no completed delegation runs in runtime scope")
                 if completed_with_truth == 0 and runtime_receipt_truth_rows == 0:
                     missing.append("no served provider/model truth in runtime scope")
                 if not loop1_has_later_routing:
