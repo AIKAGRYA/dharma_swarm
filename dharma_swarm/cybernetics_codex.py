@@ -528,6 +528,7 @@ def _served_provider_truth_summary(
 ) -> dict[str, Any]:
     truth_run_ids: set[str] = set()
     truth_run_timestamps: dict[str, str] = {}
+    completed_run_ids: set[str] = set()
     out: dict[str, Any] = {
         "definition": (
             "Counts rows carrying actual served provider/model truth. "
@@ -544,9 +545,13 @@ def _served_provider_truth_summary(
         "runtime_receipts": {
             "total": 0,
             "rows_with_served_provider_model": 0,
+            "completed_rows_with_served_provider_model": 0,
             "unique_runs_with_served_provider_model": 0,
+            "unique_completed_runs_with_served_provider_model": 0,
             "latest_truth_receipt": None,
+            "latest_completed_truth_receipt": None,
             "sample": None,
+            "completed_sample": None,
         },
     }
 
@@ -579,6 +584,8 @@ def _served_provider_truth_summary(
             status = str(row["status"] or "")
             if status == "completed":
                 out["delegation_runs"]["completed"] += 1
+                if row["run_id"]:
+                    completed_run_ids.add(str(row["run_id"]))
             truth = (
                 _extract_served_provider_truth(_loads_json(row["metadata_json"]))
                 or _extract_served_provider_truth(_loads_json(row["receipt_json"]))
@@ -617,6 +624,7 @@ def _served_provider_truth_summary(
         select_cols.append("payload_json" if "payload_json" in columns else "'{}' as payload_json")
         where_sql, where_args = _time_scope_sql(conn, "runtime_receipts", "created_at", since)
         truth_runs: set[str] = set()
+        completed_truth_runs: set[str] = set()
         for row in conn.execute(
             f"select {', '.join(select_cols)} from runtime_receipts {where_sql}",
             where_args,
@@ -629,11 +637,14 @@ def _served_provider_truth_summary(
             if row["run_id"]:
                 run_id = str(row["run_id"])
                 truth_runs.add(run_id)
-                _record_truth_timestamp(
-                    truth_run_timestamps,
-                    run_id=run_id,
-                    observed_at=row["created_at"],
-                )
+                if run_id in completed_run_ids:
+                    completed_truth_runs.add(run_id)
+                    out["runtime_receipts"]["completed_rows_with_served_provider_model"] += 1
+                    _record_truth_timestamp(
+                        truth_run_timestamps,
+                        run_id=run_id,
+                        observed_at=row["created_at"],
+                    )
             observed_at = row["created_at"]
             if (
                 observed_at
@@ -648,15 +659,34 @@ def _served_provider_truth_summary(
                     "run_id": row["run_id"],
                     **truth,
                 }
+            if row["run_id"] and str(row["run_id"]) in completed_run_ids:
+                if (
+                    observed_at
+                    and (
+                        out["runtime_receipts"]["latest_completed_truth_receipt"] is None
+                        or str(observed_at) > str(
+                            out["runtime_receipts"]["latest_completed_truth_receipt"]
+                        )
+                    )
+                ):
+                    out["runtime_receipts"]["latest_completed_truth_receipt"] = observed_at
+                    out["runtime_receipts"]["completed_sample"] = {
+                        "receipt_id": row["receipt_id"],
+                        "run_id": row["run_id"],
+                        **truth,
+                    }
         out["runtime_receipts"]["unique_runs_with_served_provider_model"] = len(truth_runs)
-        truth_run_ids.update(truth_runs)
+        out["runtime_receipts"]["unique_completed_runs_with_served_provider_model"] = len(
+            completed_truth_runs
+        )
+        truth_run_ids.update(completed_truth_runs)
 
     latest_truth = max(
         (
             str(value)
             for value in (
                 out["delegation_runs"]["latest_truth_run"],
-                out["runtime_receipts"]["latest_truth_receipt"],
+                out["runtime_receipts"]["latest_completed_truth_receipt"],
             )
             if value
         ),
@@ -1039,6 +1069,9 @@ def build_loop_statuses(
     runtime_receipt_truth_rows = int(
         runtime_receipt_truth.get("rows_with_served_provider_model") or 0
     )
+    runtime_receipt_completed_truth_rows = int(
+        runtime_receipt_truth.get("completed_rows_with_served_provider_model") or 0
+    )
     routing_adaptation = provider_truth.get("routing_adaptation") or {}
     loop1_has_later_routing = _has_later_correlated_routing_adaptation(
         routing_adaptation
@@ -1056,7 +1089,7 @@ def build_loop_statuses(
         and total_runs > 0
         and completed > 0
         and failure_counts.get("dispatch_dropoff", 0) == 0
-        and (completed_with_truth > 0 or runtime_receipt_truth_rows > 0)
+        and (completed_with_truth > 0 or runtime_receipt_completed_truth_rows > 0)
         and loop1_has_later_routing
     )
 
@@ -1118,8 +1151,8 @@ def build_loop_statuses(
                     )
                 if completed == 0:
                     missing.append("no completed delegation runs in runtime scope")
-                if completed_with_truth == 0 and runtime_receipt_truth_rows == 0:
-                    missing.append("no served provider/model truth in runtime scope")
+                if completed_with_truth == 0 and runtime_receipt_completed_truth_rows == 0:
+                    missing.append("no served provider/model truth from completed work")
                 if not loop1_has_later_routing:
                     missing.append(
                         "no later correlated routing/adaptation read after served-provider truth"
@@ -1142,25 +1175,34 @@ def build_loop_statuses(
                     f"activity exists ({completed}/{total_runs} completed), but "
                     f"dispatch_dropoff={failure_counts.get('dispatch_dropoff', 0)}; "
                     f"served_provider_truth completed={completed_with_truth}/{completed}, "
-                    f"runtime_receipts={runtime_receipt_truth_rows}. "
+                    f"runtime_receipts_completed={runtime_receipt_completed_truth_rows}/"
+                    f"{runtime_receipt_truth_rows}. "
                     "receipt_json is orchestrator-surface only, not an A2A closure requirement"
                 )
             elif completed == 0:
                 status = "PARTIAL"
                 blocker = "runtime activity exists, but no completed delegation runs in scope"
-            elif completed_with_truth == 0 and runtime_receipt_truth_rows == 0:
+            elif completed_with_truth == 0 and runtime_receipt_completed_truth_rows == 0:
                 status = "PARTIAL"
-                blocker = (
-                    f"{completed}/{total_runs} runs completed, but no actual "
-                    "served_provider/served_model truth was found on delegation "
-                    "metadata or runtime_receipts"
-                )
+                if runtime_receipt_truth_rows:
+                    blocker = (
+                        f"{completed}/{total_runs} runs completed; runtime_receipts "
+                        f"had {runtime_receipt_truth_rows} served_provider/served_model "
+                        "row(s), but none joined to completed delegation work"
+                    )
+                else:
+                    blocker = (
+                        f"{completed}/{total_runs} runs completed, but no actual "
+                        "served_provider/served_model truth was found on completed "
+                        "delegation metadata or runtime_receipts"
+                    )
             else:
                 status = "NEEDS_ADVERSARIAL_REVIEW"
                 blocker = (
                     f"served provider/model truth exists "
                     f"(delegation completed={completed_with_truth}/{completed}, "
-                    f"runtime_receipts={runtime_receipt_truth_rows}); still needs "
+                    f"runtime_receipts_completed={runtime_receipt_completed_truth_rows}/"
+                    f"{runtime_receipt_truth_rows}); still needs "
                     "bounded spine-dispatch replay proving tick N changes tick N+1"
                 )
         elif number in {12, 13}:

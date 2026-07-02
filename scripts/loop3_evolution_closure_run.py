@@ -35,6 +35,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from dharma_swarm.archive import FitnessScore  # noqa: E402
+from dharma_swarm.daemon_config import dharma_state_dir  # noqa: E402
 from dharma_swarm.evolution import (  # noqa: E402
     DarwinEngine,
     EvolutionStatus,
@@ -237,7 +238,11 @@ async def _run_with_scratch(scratch_root: Path) -> dict[str, Any]:
     predictor_path = scratch_root / "evolution" / "predictor_data.jsonl"
     traces_path = scratch_root / "traces"
     experiment_log_path = scratch_root / "evolution" / "experiments.jsonl"
-    live_archive_path = Path.home() / ".dharma" / "evolution" / "archive.jsonl"
+    live_archive_path = (
+        dharma_state_dir("DHARMA_STATE_DIR", "DHARMA_HOME")
+        / "evolution"
+        / "archive.jsonl"
+    )
     scratch_archive_is_live_archive = (
         archive_path.resolve() == live_archive_path.resolve()
     )

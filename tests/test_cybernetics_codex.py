@@ -10,6 +10,7 @@ from dharma_swarm.cybernetics_codex import (
     AGENT_ID,
     CALLSIGN,
     _routing_adaptation_after_truth_summary,
+    _served_provider_truth_summary,
     build_audit,
     build_loop_statuses,
     read_one_wire_summary,
@@ -189,6 +190,7 @@ def test_loop1_accepts_a2a_runtime_receipt_truth_without_receipt_json(tmp_path):
     assert report["runtime"]["receipt_json"]["a2a_empty_is_success"] is True
     truth = report["runtime"]["provider_truth"]
     assert truth["runtime_receipts"]["rows_with_served_provider_model"] == 1
+    assert truth["runtime_receipts"]["completed_rows_with_served_provider_model"] == 1
     assert truth["runtime_receipts"]["sample"]["served_provider"] == "anthropic"
 
 
@@ -260,6 +262,94 @@ def test_loop1_closed_live_requires_completed_delegation_work():
 
     assert rows[1]["verdict"] == "HARNESS_PROVEN"
     assert "no completed delegation runs" in rows[1]["blocker"]
+
+
+def test_loop1_closed_live_ignores_receipt_truth_from_non_completed_work():
+    runtime = {
+        "delegation_runs": {"total": 1, "completed": 1},
+        "failure_codes": [],
+        "provider_truth": {
+            "delegation_runs": {"completed_with_served_provider_model": 0},
+            "runtime_receipts": {
+                "rows_with_served_provider_model": 1,
+                "completed_rows_with_served_provider_model": 0,
+            },
+            "routing_adaptation": {
+                "has_later_causal_read": True,
+                "latest_served_truth": "2026-06-13T00:01:00Z",
+                "tables": {
+                    "routing_decisions": {
+                        "correlated_rows_after_served_truth": 1,
+                    },
+                },
+            },
+        },
+    }
+    bounded = {"loop1": {"harness_proven": True, "tasks_completed": 1, "tasks_requested": 1}}
+
+    rows = {
+        row["number"]: row
+        for row in build_loop_statuses(runtime, {}, {}, bounded_replays=bounded)
+    }
+
+    assert rows[1]["verdict"] == "HARNESS_PROVEN"
+    assert "no served provider/model truth from completed work" in rows[1]["blocker"]
+
+    runtime["provider_truth"]["runtime_receipts"][
+        "completed_rows_with_served_provider_model"
+    ] = 1
+    rows = {
+        row["number"]: row
+        for row in build_loop_statuses(runtime, {}, {}, bounded_replays=bounded)
+    }
+    assert rows[1]["verdict"] == "CLOSED_LIVE"
+
+
+def test_served_provider_truth_uses_only_completed_runs_for_causal_routing():
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    conn.executescript(
+        """
+        create table delegation_runs (
+            run_id text primary key,
+            status text,
+            started_at text,
+            completed_at text,
+            metadata_json text,
+            receipt_json text
+        );
+        create table runtime_receipts (
+            receipt_id text primary key,
+            run_id text,
+            status text,
+            payload_json text,
+            created_at text
+        );
+        create table routing_decisions (
+            id text primary key,
+            run_id text,
+            created_at text
+        );
+        insert into delegation_runs
+        values ('run_ok', 'completed', '2026-06-13T00:00:00Z',
+                '2026-06-13T00:01:00Z', '{}', null);
+        insert into delegation_runs
+        values ('run_failed', 'failed', '2026-06-13T00:02:00Z',
+                '2026-06-13T00:03:00Z', '{}', null);
+        insert into runtime_receipts
+        values ('rr_failed', 'run_failed', 'failed',
+                '{"served_provider": "anthropic", "served_model": "claude-opus-4"}',
+                '2026-06-13T00:03:00Z');
+        insert into routing_decisions
+        values ('route_failed', 'run_failed', '2026-06-13T00:04:00Z');
+        """
+    )
+
+    summary = _served_provider_truth_summary(conn)
+
+    assert summary["runtime_receipts"]["rows_with_served_provider_model"] == 1
+    assert summary["runtime_receipts"]["completed_rows_with_served_provider_model"] == 0
+    assert summary["routing_adaptation"]["has_later_causal_read"] is False
 
 
 def test_one_wire_blocks_self_improvement_when_guardian_quorum_missing(tmp_path):
@@ -458,8 +548,12 @@ def test_audit_output_normalizes_local_paths(tmp_path):
     report["runtime"]["raw_status"] = (
         "heartbeat=/Users/dhyana/.dharma/a2a_bus/worker.json\n"
         "log=/var/folders/zz/random/T/worker.log\n"
-        "fallback=/opt/foreign/private.log"
+        "fallback=/opt/foreign/private.log\n"
+        "mailbox=nats://dharma.agent.cybernetics_codex.inbox\n"
+        "docs=https://example.test/evidence/packet"
     )
+    report["live_registration"]["mailbox"] = "nats://dharma.agent.cybernetics_codex.inbox"
+    report["live_registration"]["evidence_url"] = "https://example.test/evidence/packet"
 
     output_report = sanitize_audit_paths(report)
     text = format_markdown(report)
@@ -477,7 +571,17 @@ def test_audit_output_normalizes_local_paths(tmp_path):
     assert output_report["runtime"]["raw_status"] == (
         "heartbeat=$DHARMA_STATE/a2a_bus/worker.json\n"
         "log=$TMPDIR\n"
-        "fallback=<absolute-path>"
+        "fallback=<absolute-path>\n"
+        "mailbox=nats://dharma.agent.cybernetics_codex.inbox\n"
+        "docs=https://example.test/evidence/packet"
+    )
+    assert (
+        output_report["live_registration"]["mailbox"]
+        == "nats://dharma.agent.cybernetics_codex.inbox"
+    )
+    assert (
+        output_report["live_registration"]["evidence_url"]
+        == "https://example.test/evidence/packet"
     )
     assert "/Users/dhyana" not in text
 

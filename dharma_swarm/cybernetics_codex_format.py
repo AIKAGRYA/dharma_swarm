@@ -55,7 +55,7 @@ def _normalize_local_paths(value: str, replacements: list[tuple[str, str]]) -> s
         normalized,
     )
     normalized = re.sub(
-        r"(^|(?<=[\s:=`'\"]))(/[^\s:=`'\"]+)",
+        r"(^|(?<=[\s=`'\"]))(/[^\s:=`'\"]+)",
         lambda match: f"{match.group(1)}<absolute-path>",
         normalized,
     )

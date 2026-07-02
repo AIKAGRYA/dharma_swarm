@@ -83,3 +83,16 @@ def test_loop3_refuses_live_archive_as_scratch_root(tmp_path: Path, monkeypatch)
         asyncio.run(loop3.run(report_path=receipt, scratch_root=scratch))
 
     assert not receipt.exists()
+
+
+def test_loop3_refuses_custom_state_archive_as_scratch_root(
+    tmp_path: Path, monkeypatch
+) -> None:
+    state = tmp_path / "custom-dharma-state"
+    monkeypatch.setenv("DHARMA_STATE_DIR", str(state))
+    receipt = tmp_path / "receipt.json"
+
+    with pytest.raises(RuntimeError, match="live Dharma archive"):
+        asyncio.run(loop3.run(report_path=receipt, scratch_root=state))
+
+    assert not receipt.exists()
