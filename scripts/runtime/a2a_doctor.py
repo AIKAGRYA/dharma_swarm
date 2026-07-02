@@ -150,6 +150,8 @@ async def _probe_outbound_reachability(
 
         permission_detail: str | None = None
         permission_seen = asyncio.Event()
+        permission_wait_guard_error: str | None = None
+        close_guard_error: str | None = None
 
         async def error_cb(exc: Exception) -> None:
             nonlocal permission_detail
@@ -186,17 +188,18 @@ async def _probe_outbound_reachability(
                 if permission_detail is None:
                     try:
                         await asyncio.wait_for(permission_seen.wait(), timeout=0.5)
-                    except Exception:
-                        pass
+                    except Exception as wait_exc:
+                        permission_wait_guard_error = type(wait_exc).__name__
                 if permission_detail is not None or "permissions violation" in message.lower():
-                    probes.append(
-                        {
-                            "lane": target["lane"],
-                            "subject": subject,
-                            "status": "DENIED(permissions)",
-                            "detail": permission_detail or message,
-                        }
-                    )
+                    row = {
+                        "lane": target["lane"],
+                        "subject": subject,
+                        "status": "DENIED(permissions)",
+                        "detail": permission_detail or message,
+                    }
+                    if permission_wait_guard_error:
+                        row["debug"] = {"permission_wait_guard_error": permission_wait_guard_error}
+                    probes.append(row)
                 elif "no response from stream" in message.lower() or type(exc).__name__ == "NoStreamResponseError":
                     probes.append(
                         {
@@ -219,8 +222,8 @@ async def _probe_outbound_reachability(
         finally:
             try:
                 await asyncio.wait_for(nc.close(), timeout=2.0)
-            except Exception:
-                pass
+            except Exception as close_exc:
+                close_guard_error = type(close_exc).__name__
 
         probes.append(
             {
@@ -228,6 +231,11 @@ async def _probe_outbound_reachability(
                 "subject": subject,
                 "status": "ALLOWED",
                 "detail": "",
+                **(
+                    {"debug": {"close_guard_error": close_guard_error}}
+                    if close_guard_error
+                    else {}
+                ),
             }
         )
     return probes

@@ -204,8 +204,10 @@ async def _publish_and_wait(
         async def _safe_unsubscribe(subscription: Any) -> None:
             try:
                 await subscription.unsubscribe()
-            except Exception:
-                pass
+            except Exception as exc:
+                result.setdefault("cleanup_errors", []).append(
+                    f"unsubscribe:{type(exc).__name__}"
+                )
 
         async def on_ack(msg: Any) -> None:
             consumed_event.set()
@@ -237,8 +239,8 @@ async def _publish_and_wait(
             if result["permissions_denied_detail"] is None:
                 try:
                     await asyncio.wait_for(permission_violation.wait(), timeout=0.5)
-                except Exception:
-                    pass
+                except Exception as wait_exc:
+                    result["permission_wait_guard_error"] = type(wait_exc).__name__
             if result["permissions_denied_detail"] is None and "permissions violation" in str(exc).lower():
                 result["permissions_denied_detail"] = _permissions_denied_message(
                     config, envelope["subject"]
@@ -283,8 +285,8 @@ async def _publish_and_wait(
     finally:
         try:
             await asyncio.wait_for(nc.close(), timeout=2.0)
-        except Exception:
-            pass
+        except Exception as exc:
+            result["close_guard_error"] = type(exc).__name__
     return result
 
 
