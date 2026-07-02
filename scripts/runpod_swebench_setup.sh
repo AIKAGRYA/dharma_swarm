@@ -47,10 +47,11 @@ echo "  available: ${AVAIL_GB}GB (need >=120GB for env-cache; >=150GB comfortabl
 
 echo "[5/5] ready. Run the real benchmark:"
 cat <<'RUN'
-  # Full Verified on the strongest live model (set the right key first):
-  python -m dharma_swarm.forge_v1.run_real --n 500 --model claude-opus-4.8 \
-      --champion-arm best_of_n --swarm-arm decorrelated \
-      --namespace ghcr.io/epoch-research --cache_level env --max_workers 8
+  # Forge wrapper on selected Verified instances (set provider keys first):
+  python -m dharma_swarm.forge_v1.run_real \
+      --instances django__django-12209 sympy__sympy-22914 \
+      --best-of-n 3 --budget 20000 --grade-timeout 1800 \
+      --swarm-second-model glm-5.2
 
   # Or directly via the official harness on a predictions file:
   python -m swebench.harness.run_evaluation \

@@ -15,6 +15,7 @@ from dharma_swarm.forge_v1.harness import (
     run_scoreboard,
     verify,
 )
+from dharma_swarm.forge_v1.run_real_patch import build_repair_prompt
 from dharma_swarm.forge_v1.models import FlakyStub, StrongStub, WeakStub
 
 
@@ -53,6 +54,26 @@ def test_agent_cannot_edit_gold_test():
         "solution.py": ADD_TASK.files["solution.py"],     # still buggy
     }
     assert verify(ADD_TASK, cheat) is False
+
+
+def test_verifier_rejects_candidate_path_traversal():
+    assert verify(ADD_TASK, {"../escape.py": "print('escaped')\n"}) is False
+
+
+def test_repair_prompt_example_uses_actual_target_path():
+    prompt = build_repair_prompt(
+        {"repo": "sympy/sympy", "problem_statement": "fix Add"},
+        {"sympy/core/add.py": "def broken():\n    pass\n"},
+    )
+
+    assert "<<<<<<< SEARCH path=sympy/core/add.py" in prompt
+    assert "django/db/models/base.py" not in prompt
+
+
+def test_autoloop_matrix_imports_without_cycle():
+    import dharma_swarm.forge_v1.autoloop_matrix as autoloop_matrix
+
+    assert callable(autoloop_matrix.run_matrix)
 
 
 # --- best-of-N ---

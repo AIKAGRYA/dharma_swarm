@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 
-from dharma_swarm.forge_v1.run_real import _read_files_from_image, _target_paths_from_gold
+from dharma_swarm.forge_v1.run_real_patch import _read_files_from_image, _target_paths_from_gold
 from dharma_swarm.forge_v1.swebench_real import verified_instances
 
 

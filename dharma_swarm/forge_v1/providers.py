@@ -33,8 +33,8 @@ def _provider_for_model(model_id: str):
     """
     from dharma_swarm.api_keys import bootstrap_runtime_env
     from dharma_swarm.model_pool import MODEL_POWER_FLOOR, entry_for_model_id
-    from dharma_swarm.model_hierarchy import ProviderType
     from dharma_swarm.runtime_provider import (
+        ProviderType,
         create_runtime_provider,
         resolve_runtime_provider_config,
     )

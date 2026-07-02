@@ -9,12 +9,19 @@ from dharma_swarm.forge_v1.forge_v2.arms import _win
 from dharma_swarm.forge_v1.forge_v2.budget import Budget
 from dharma_swarm.forge_v1.forge_v2.provenance import contamination_state, split_explore_confirm
 from dharma_swarm.forge_v1.forge_v2.receipts import AttemptReceipt, Ledger, scaffold_parity_hash
-from dharma_swarm.forge_v1.forge_v2.stats import benjamini_hochberg, paired_bootstrap_ci, replicate_variance
+from dharma_swarm.forge_v1.forge_v2.runner import _pick_generator_verifier
+from dharma_swarm.forge_v1.forge_v2.stats import (
+    benjamini_hochberg,
+    paired_bootstrap_ci,
+    positive_claim_gate,
+    replicate_variance,
+)
 
 
 @dataclass(frozen=True)
 class Slot:
     model_id: str
+    tier: str = "strong"
 
 
 def test_budget_accounts_unknown_price_as_shadow_and_invalidates_over_cap() -> None:
@@ -62,6 +69,28 @@ def test_stats_are_paired_and_fdr_ready() -> None:
     var = replicate_variance([1.0, 0.0, 1.0])
     assert var["n"] == 3
     assert var["var"] > 0
+
+
+def test_positive_claim_gate_requires_confirm_split() -> None:
+    overall = {"n": 4, "mean": 1.0, "lower": 1.0}
+    explore_only = {"explore": {"n": 4, "mean": 1.0, "lower": 1.0}, "confirm": {"n": 0}}
+
+    assert positive_claim_gate(overall, explore_only) is False
+    assert positive_claim_gate(overall, {"confirm": {"n": 2, "mean": 1.0, "lower": 1.0}}) is True
+
+
+def test_pick_generator_verifier_handles_empty_and_same_family_rosters() -> None:
+    assert _pick_generator_verifier([]) == (None, None)
+
+    gen, ver = _pick_generator_verifier(
+        [Slot("glm-5.2"), Slot("glm-4.6")],
+        gen_id="glm-5.2",
+        ver_id="glm-4.6",
+    )
+
+    assert gen is not None
+    assert gen.model_id == "glm-5.2"
+    assert ver is None
 
 
 def test_receipt_ledger_writes_attempt_rows_with_required_fields(tmp_path: Path) -> None:

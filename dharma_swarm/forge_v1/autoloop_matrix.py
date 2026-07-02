@@ -133,7 +133,6 @@ def run_matrix(
         except Exception as e:
             print(f"[matrix] {iid} context pull FAILED: {type(e).__name__}: {e}", flush=True)
             continue
-        instances_done.append(iid)
         # PROPOSE all models in parallel (independent provider APIs) so the slow
         # coding endpoints overlap the fast ones; GRADE serially (one Docker ctx).
         with ThreadPoolExecutor(max_workers=max(1, len(specs))) as ex:
@@ -158,6 +157,9 @@ def run_matrix(
                   f"{' ERR:'+(prop.error or gerr or '')[:50] if (prop.error or gerr) else ''}", flush=True)
             matrix["aggregate"] = _matrix_aggregate(per, instances_done, model_ids)
             (out / "matrix.json").write_text(json.dumps(matrix, indent=2))
+        instances_done.append(iid)
+        matrix["aggregate"] = _matrix_aggregate(per, instances_done, model_ids)
+        (out / "matrix.json").write_text(json.dumps(matrix, indent=2))
         agg = matrix["aggregate"]
         print(f"[matrix] after {iid}: champion={agg['champion_model']} "
               f"champ_rate={agg['champion_pass_rate']:.3f} swarm_rate={agg['swarm_pass_rate']:.3f} "

@@ -16,7 +16,6 @@ Ollama not running, etc.) those slots are simply skipped.
 from __future__ import annotations
 
 import logging
-import os
 import random
 import re
 from dataclasses import dataclass, field
@@ -25,7 +24,7 @@ from typing import Any
 
 import httpx
 
-from dharma_swarm.api_keys import PROVIDER_API_KEY_ENV_KEYS
+from dharma_swarm.api_keys import ENV_ALIASES, PROVIDER_API_KEY_ENV_KEYS, env_has_value
 from dharma_swarm.models import ProviderType
 
 logger = logging.getLogger(__name__)
@@ -596,7 +595,12 @@ def _provider_has_key(provider: ProviderType) -> bool:
     if env_key is None:
         # Ollama, Claude Code, Codex don't need API keys.
         return True
-    return bool(os.environ.get(env_key, "").strip())
+    if env_has_value(env_key):
+        return True
+    return any(
+        canonical == env_key and env_has_value(alias)
+        for alias, canonical in ENV_ALIASES.items()
+    )
 
 
 def _ollama_reachable() -> bool:

@@ -97,14 +97,17 @@ def _verify_uncached(task: RepairTask, candidate: dict[str, str] | None) -> bool
     its own grader (the DGM 'delete the detector' failure)."""
     with tempfile.TemporaryDirectory(prefix="forge_v1_") as tmp:
         root = Path(tmp)
-        for name, src in task.files.items():
-            _write(root, name, src)
-        for name, src in (candidate or {}).items():
-            if name in task.test_files:
-                continue  # agent may not edit the gold test
-            _write(root, name, src)
-        for name, src in task.test_files.items():  # gold test wins, restored last
-            _write(root, name, src)
+        try:
+            for name, src in task.files.items():
+                _write(root, name, src)
+            for name, src in (candidate or {}).items():
+                if name in task.test_files:
+                    continue  # agent may not edit the gold test
+                _write(root, name, src)
+            for name, src in task.test_files.items():  # gold test wins, restored last
+                _write(root, name, src)
+        except ValueError:
+            return False
         try:
             proc = subprocess.run(
                 [sys.executable, *task.test_args],
@@ -119,7 +122,12 @@ def _verify_uncached(task: RepairTask, candidate: dict[str, str] | None) -> bool
 
 
 def _write(root: Path, name: str, src: str) -> None:
-    path = root / name
+    root_resolved = root.resolve()
+    path = (root / name).resolve()
+    try:
+        path.relative_to(root_resolved)
+    except ValueError as exc:
+        raise ValueError(f"refusing to write outside verifier root: {name}") from exc
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(src)
 

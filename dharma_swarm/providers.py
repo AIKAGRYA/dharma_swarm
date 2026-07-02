@@ -1986,13 +1986,16 @@ class KimiCodeProvider(LLMProvider):
 
     async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
         client = self._client_or_raise()
-        resp = await client.chat.completions.create(
-            model=request.model or self._default_model,
-            stream=True,
-            messages=self._build_messages(request.messages, request.system),
-            max_tokens=request.max_tokens,
-            temperature=1,
-        )
+        kwargs: dict[str, Any] = {
+            "model": request.model or self._default_model,
+            "stream": True,
+            "messages": self._build_messages(request.messages, request.system),
+            "max_tokens": request.max_tokens,
+            "temperature": 1,
+        }
+        if request.tools:
+            kwargs["tools"] = request.tools
+        resp = await client.chat.completions.create(**kwargs)
         async for chunk in resp:
             delta = chunk.choices[0].delta if chunk.choices else None
             if delta and delta.content:

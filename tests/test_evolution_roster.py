@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import os
 from unittest.mock import patch
 
 import pytest
 
+from dharma_swarm.api_keys import ENV_ALIASES
 from dharma_swarm.evolution_roster import (
     EVOLUTION_ROSTER,
     ModelSlot,
@@ -20,6 +20,13 @@ from dharma_swarm.evolution_roster import (
     select_models_for_cycle,
 )
 from dharma_swarm.models import ProviderType
+
+
+def _clear_key_and_aliases(monkeypatch: pytest.MonkeyPatch, env_key: str) -> None:
+    monkeypatch.delenv(env_key, raising=False)
+    for alias, canonical in ENV_ALIASES.items():
+        if canonical == env_key:
+            monkeypatch.delenv(alias, raising=False)
 
 
 # ---------------------------------------------------------------------------
@@ -83,7 +90,7 @@ class TestProviderHasKey:
         assert _provider_has_key(ProviderType.ANTHROPIC) is True
 
     def test_anthropic_without_key(self, monkeypatch):
-        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        _clear_key_and_aliases(monkeypatch, "ANTHROPIC_API_KEY")
         assert _provider_has_key(ProviderType.ANTHROPIC) is False
 
     def test_openrouter_shares_key(self, monkeypatch):
@@ -108,15 +115,26 @@ class TestProviderHasKey:
         assert _provider_has_key(ProviderType.FIREWORKS) is True
 
     def test_kimi_code_requires_key(self, monkeypatch):
-        monkeypatch.delenv("KIMI_API_KEY", raising=False)
+        _clear_key_and_aliases(monkeypatch, "KIMI_API_KEY")
         assert _provider_has_key(ProviderType.KIMI_CODE) is False
         monkeypatch.setenv("KIMI_API_KEY", "test-key")
         assert _provider_has_key(ProviderType.KIMI_CODE) is True
 
+    def test_kimi_code_accepts_alias_key(self, monkeypatch):
+        _clear_key_and_aliases(monkeypatch, "KIMI_API_KEY")
+        monkeypatch.setenv("MOONSHOT_KIMI_API_KEY", "test-key")
+        assert _provider_has_key(ProviderType.KIMI_CODE) is True
+
     def test_zhipu_requires_key(self, monkeypatch):
-        monkeypatch.delenv("ZHIPU_API_KEY", raising=False)
+        _clear_key_and_aliases(monkeypatch, "ZHIPU_API_KEY")
         assert _provider_has_key(ProviderType.ZHIPU) is False
         monkeypatch.setenv("ZHIPU_API_KEY", "test-key")
+        assert _provider_has_key(ProviderType.ZHIPU) is True
+
+    @pytest.mark.parametrize("alias", ["GLM_API_KEY", "ZAI_API_KEY", "BIGMODEL_API_KEY"])
+    def test_zhipu_accepts_alias_keys(self, monkeypatch, alias):
+        _clear_key_and_aliases(monkeypatch, "ZHIPU_API_KEY")
+        monkeypatch.setenv(alias, "test-key")
         assert _provider_has_key(ProviderType.ZHIPU) is True
 
     def test_ollama_no_key_needed(self):
@@ -136,18 +154,17 @@ class TestProviderHasKey:
 class TestGetAvailableRoster:
     def test_filters_by_provider(self, monkeypatch):
         reset_ollama_cache()
-        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-        monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-        monkeypatch.delenv("NVIDIA_NIM_API_KEY", raising=False)
-        monkeypatch.delenv("SAMBANOVA_API_KEY", raising=False)
-        monkeypatch.delenv("FIREWORKS_API_KEY", raising=False)
-        monkeypatch.delenv("KIMI_API_KEY", raising=False)
-        monkeypatch.delenv("MOONSHOT_KIMI_API_KEY", raising=False)
-        monkeypatch.delenv("ZHIPU_API_KEY", raising=False)
-        monkeypatch.delenv("GLM_API_KEY", raising=False)
-        monkeypatch.delenv("ZAI_API_KEY", raising=False)
-        monkeypatch.delenv("ZHIPUAI_API_KEY", raising=False)
+        for env_key in (
+            "ANTHROPIC_API_KEY",
+            "OPENAI_API_KEY",
+            "OPENROUTER_API_KEY",
+            "NVIDIA_NIM_API_KEY",
+            "SAMBANOVA_API_KEY",
+            "FIREWORKS_API_KEY",
+            "KIMI_API_KEY",
+            "ZHIPU_API_KEY",
+        ):
+            _clear_key_and_aliases(monkeypatch, env_key)
         # Ollama not reachable
         with patch("dharma_swarm.evolution_roster._ollama_reachable", return_value=False):
             available = get_available_roster()
@@ -165,10 +182,10 @@ class TestGetAvailableRoster:
 
     def test_openrouter_gives_models(self, monkeypatch):
         reset_ollama_cache()
-        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        _clear_key_and_aliases(monkeypatch, "ANTHROPIC_API_KEY")
+        _clear_key_and_aliases(monkeypatch, "OPENAI_API_KEY")
         monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-        monkeypatch.delenv("NVIDIA_NIM_API_KEY", raising=False)
+        _clear_key_and_aliases(monkeypatch, "NVIDIA_NIM_API_KEY")
         with patch("dharma_swarm.evolution_roster._ollama_reachable", return_value=False):
             available = get_available_roster()
         assert len(available) > 0
@@ -191,8 +208,8 @@ class TestGetAvailableRoster:
         reset_ollama_cache()
         monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
         monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-        monkeypatch.delenv("NVIDIA_NIM_API_KEY", raising=False)
+        _clear_key_and_aliases(monkeypatch, "OPENAI_API_KEY")
+        _clear_key_and_aliases(monkeypatch, "NVIDIA_NIM_API_KEY")
 
         custom = (
             ModelSlot(ProviderType.ANTHROPIC, "claude-opus-4-20250514", "Direct", ModelTier.FRONTIER),
@@ -265,10 +282,10 @@ class TestSelectModels:
 
     def test_fallback_when_no_models(self, monkeypatch):
         reset_ollama_cache()
-        monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-        monkeypatch.delenv("NVIDIA_NIM_API_KEY", raising=False)
+        _clear_key_and_aliases(monkeypatch, "OPENROUTER_API_KEY")
+        _clear_key_and_aliases(monkeypatch, "ANTHROPIC_API_KEY")
+        _clear_key_and_aliases(monkeypatch, "OPENAI_API_KEY")
+        _clear_key_and_aliases(monkeypatch, "NVIDIA_NIM_API_KEY")
         # Use a keyed-only custom roster so the genuinely-empty branch is
         # reachable: the real roster now carries keyless FLOOR subscription
         # lanes (CLAUDE_CODE / CODEX) that never strand the fleet.
@@ -313,10 +330,10 @@ class TestRosterSummary:
 
     def test_no_models_message(self, monkeypatch):
         reset_ollama_cache()
-        monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-        monkeypatch.delenv("NVIDIA_NIM_API_KEY", raising=False)
+        _clear_key_and_aliases(monkeypatch, "OPENROUTER_API_KEY")
+        _clear_key_and_aliases(monkeypatch, "ANTHROPIC_API_KEY")
+        _clear_key_and_aliases(monkeypatch, "OPENAI_API_KEY")
+        _clear_key_and_aliases(monkeypatch, "NVIDIA_NIM_API_KEY")
         # Keyed-only custom roster reaches the genuinely-empty branch; the real
         # roster now keeps keyless FLOOR subscription lanes that never strand.
         keyed_only = (

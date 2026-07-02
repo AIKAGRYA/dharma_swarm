@@ -83,6 +83,7 @@ def build_repair_prompt(instance: dict, file_context: dict[str, str]) -> str:
             f"```python\n{content}\n```"
         )
     ctx = "\n\n".join(ctx_blocks) if ctx_blocks else "(no file context available)"
+    example_path = next(iter(file_context), "path/to/file.py")
     return (
         f"You are fixing a real bug in the `{repo}` repository.\n\n"
         f"## Bug report / problem statement\n{problem}\n\n"
@@ -95,7 +96,7 @@ def build_repair_prompt(instance: dict, file_context: dict[str, str]) -> str:
         "below and nothing else.\n\n"
         "Return ONE OR MORE edits in this exact SEARCH/REPLACE format, and NOTHING "
         "else:\n\n"
-        "<<<<<<< SEARCH path=django/db/models/base.py\n"
+        f"<<<<<<< SEARCH path={example_path}\n"
         "<the exact original lines to find, copied verbatim from the file above>\n"
         "=======\n"
         "<the replacement lines>\n"

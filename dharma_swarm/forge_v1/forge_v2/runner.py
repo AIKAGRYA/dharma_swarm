@@ -40,7 +40,7 @@ from .budget import Budget
 from .critic import _family, refute_pass
 from .provenance import contamination_state, split_explore_confirm
 from .receipts import AttemptReceipt, Ledger, RunReceipt, scaffold_parity_hash
-from .stats import paired_bootstrap_ci, replicate_variance
+from .stats import paired_bootstrap_ci, positive_claim_gate, replicate_variance
 
 RUN_ROOT = dharma_state_dir() / "forge_v1" / "forge_v2"
 _TIER = {"frontier": 0, "strong": 1, "fast": 2, "free": 3, "local": 4}
@@ -106,6 +106,8 @@ def _callable_roster(n: int, strategy: str, timeout_s: int = 40) -> tuple[list, 
 
 
 def _pick_generator_verifier(callable_slots, gen_id=None, ver_id=None):
+    if not callable_slots:
+        return None, None
     by_id = {s.model_id: s for s in callable_slots}
     if gen_id and gen_id in by_id:
         gen = by_id[gen_id]
@@ -116,6 +118,8 @@ def _pick_generator_verifier(callable_slots, gen_id=None, ver_id=None):
         ver = by_id[ver_id]
     else:
         ver = next((s for s in callable_slots if _family(s.model_id) != gfam), None)
+    if ver is not None and _family(ver.model_id) == gfam:
+        ver = None
     return gen, ver
 
 
@@ -140,6 +144,10 @@ def run(instance_ids, *, n_explore, replicates, budget_cap, budget_usd, per_call
         if gen is None or ver is None or not all(r["callable"] for r in probe_rows):
             gen = gen if (gen and probe_rows[0]["callable"]) else None
             ver = ver if (ver and probe_rows[1]["callable"]) else None
+        if gen is not None and ver is not None and _family(gen.model_id) == _family(ver.model_id):
+            probe_rows.append({"role": "pair", "model_id": f"{gen.model_id}+{ver.model_id}",
+                               "callable": False, "error": "same_family"})
+            ver = None
         callable_slots = [s for s in (gen, ver) if s is not None]
     else:
         print(f"[forge_v2] roster census (strategy={strategy}, n={roster_n}) ...", flush=True)
@@ -164,6 +172,7 @@ def run(instance_ids, *, n_explore, replicates, budget_cap, budget_usd, per_call
 
     attempts = []
     diffs = []                 # (verify_chain.resolved - self_moa.resolved) per (task,replicate)
+    split_diffs = {"explore": [], "confirm": []}
     sm_rates, vc_rates = [], []
     any_invalid = False
     contamination = {}
@@ -209,7 +218,9 @@ def run(instance_ids, *, n_explore, replicates, budget_cap, budget_usd, per_call
                 d = asdict(rec)
                 d["_row_id"] = rid
                 attempts.append(d)
-            diffs.append((1.0 if vc_resolved else 0.0) - (1.0 if sm_resolved else 0.0))
+            diff = (1.0 if vc_resolved else 0.0) - (1.0 if sm_resolved else 0.0)
+            diffs.append(diff)
+            split_diffs[split_of[iid]].append(diff)
             sm_rates.append(1.0 if sm_resolved else 0.0)
             vc_rates.append(1.0 if vc_resolved else 0.0)
             print(f"   rep {r}: self_moa={'PASS' if sm_resolved else 'fail'} "
@@ -217,15 +228,17 @@ def run(instance_ids, *, n_explore, replicates, budget_cap, budget_usd, per_call
                   f"(sm_tok={b_sm.spent} vc_tok={b_vc.spent})", flush=True)
 
     ci = paired_bootstrap_ci(diffs)
+    split_contrasts = {name: paired_bootstrap_ci(values) for name, values in split_diffs.items()}
     var = {"self_moa": replicate_variance(sm_rates), "verify_chain": replicate_variance(vc_rates)}
 
     # critic gate only on a POSITIVE interpretation
     critic = {"ran": False}
-    positive_interpretation = ci["mean"] > 0 and ci["lower"] > 0
+    positive_interpretation = positive_claim_gate(ci, split_contrasts)
     if positive_interpretation:
         claim = (f"verify_chain beats its class_null self_moa on verifier_role "
                  f"(paired lift mean={ci['mean']}, CI lower={ci['lower']}, n={ci['n']})")
-        critic = {"ran": True, **refute_pass(claim, {"ci": ci, "variance": var, "n_pairs": ci["n"],
+        critic = {"ran": True, **refute_pass(claim, {"ci": ci, "split_contrasts": split_contrasts,
+                                                      "variance": var, "n_pairs": ci["n"],
                                                       "contamination": contamination}, generator_family=_family(gen.model_id))}
 
     # closeout
@@ -257,7 +270,8 @@ def run(instance_ids, *, n_explore, replicates, budget_cap, budget_usd, per_call
     rr = RunReceipt(
         mission_class="verifier_role", arm="verify_chain", class_null="self_moa",
         timestamp=int(time.time()), n_pairs=ci["n"], comparisons_count=1,
-        contrast_vs_class_null=ci, replicate_variance=var, critic_verdict=critic,
+        contrast_vs_class_null=ci, split_contrasts=split_contrasts,
+        replicate_variance=var, critic_verdict=critic,
         contamination_state=contamination,
         budget_matched_proof={"cap_tokens": budget_cap, "cap_usd": budget_usd, "any_invalid": any_invalid,
                               "self_moa_pass_rate": round(sum(sm_rates) / len(sm_rates), 3) if sm_rates else 0.0,

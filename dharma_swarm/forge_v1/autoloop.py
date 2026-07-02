@@ -351,9 +351,6 @@ def run_loop(
     return scoreboard
 
 
-from dharma_swarm.forge_v1.autoloop_matrix import run_matrix, run_multi  # noqa: E402
-
-
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Forge v1 autoresearch loop")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -428,12 +425,16 @@ def main(argv=None) -> int:
         return 0
 
     if args.cmd == "matrix":
+        from dharma_swarm.forge_v1.autoloop_matrix import run_matrix
+
         ids = [x.strip() for x in args.instances.split(",") if x.strip()]
         models = [x.strip() for x in args.models.split(",") if x.strip()]
         run_matrix(ids, models, grade_timeout=args.grade_timeout, label=args.label)
         return 0
 
     if args.cmd == "multi":
+        from dharma_swarm.forge_v1.autoloop_matrix import run_multi
+
         ids = [x.strip() for x in args.instances.split(",") if x.strip()]
         champion = spec_for(args.champion)
         swarm = [spec_for(m.strip()) for m in args.swarm.split(",") if m.strip()]

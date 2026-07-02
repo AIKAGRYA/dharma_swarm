@@ -41,7 +41,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import time
 from dataclasses import asdict
@@ -49,10 +48,11 @@ from pathlib import Path
 
 # When run as `python dharma_swarm/forge_v1/run_real.py`, sys.path[0] is THIS
 # dir, and the sibling `swebench.py` (offline fixtures) shadows the real swebench
-# PyPI library. Drop the script dir so the library wins. (`python -m ...` is
-# clean already; this just makes both invocations work.)
-_here = os.path.dirname(os.path.abspath(__file__))
-sys.path[:] = [p for p in sys.path if os.path.abspath(p or ".") != _here]
+# PyPI library. Drop the script dir only for that direct-script invocation;
+# normal imports must not mutate process-wide import resolution.
+_here = Path(__file__).resolve().parent
+if __name__ == "__main__" and sys.path and Path(sys.path[0] or ".").resolve() == _here:
+    sys.path[:] = [p for p in sys.path if Path(p or ".").resolve() != _here]
 
 from dharma_swarm.daemon_config import dharma_state_dir  # noqa: E402
 from dharma_swarm.forge_v1.harness import TokenBroker  # noqa: E402

@@ -334,6 +334,17 @@ def arm_pbv(slots, inst, ctx, *, budget, grade_timeout, per_call_tokens, timeout
     verifier = slots[2 % len(slots)]
     broker = TokenBroker(cap=budget)
     edges = []
+    roles = {"planner": planner.model_id, "builder": builder.model_id, "verifier": verifier.model_id}
+
+    def _invalid_budget(stage: str, exc: Exception, rec: dict | None = None) -> dict:
+        if rec is not None:
+            safe_rec = {**rec, "patch": "", "error": f"budget_exhausted:{stage}: {exc}"}
+            _persist_rec(out, safe_rec, f"{tag}_{stage}_over_budget")
+        edges.append({"from": roles.get(stage, stage), "to": tag, "kind": "budget_exhausted",
+                      "error": str(exc)[:80]})
+        return {"arm": tag, "passed": False, "tokens": broker.spent, "samples": [],
+                "roles": roles, "edges": edges, "invalid": True,
+                "error": f"{stage} exceeded token budget before grading"}
     # 1) planner
     pctx = window_context(ctx, inst.get("problem_statement", ""), max_chars=11000) \
         if planner.model_id in WINDOW_MODELS else ctx
@@ -357,8 +368,8 @@ def arm_pbv(slots, inst, ctx, *, budget, grade_timeout, per_call_tokens, timeout
                          extra_instruction=build_instr)
     try:
         broker.charge(brec["tokens"])
-    except BudgetExhausted:
-        pass
+    except BudgetExhausted as exc:
+        return _invalid_budget("builder", exc, brec)
     _persist_rec(out, brec, f"{tag}_build")
     patch = brec["patch"]
     # 3) verifier repair (if builder produced something, ask verifier to review/fix)
@@ -368,8 +379,8 @@ def arm_pbv(slots, inst, ctx, *, budget, grade_timeout, per_call_tokens, timeout
                                                 "\nReview it. If correct, reproduce it. If wrong, output the corrected SEARCH/REPLACE block(s)."))
         try:
             broker.charge(vrec["tokens"])
-        except BudgetExhausted:
-            pass
+        except BudgetExhausted as exc:
+            return _invalid_budget("verifier", exc, vrec)
         _persist_rec(out, vrec, f"{tag}_verify")
         if vrec["patch"].strip():
             patch = vrec["patch"]
@@ -379,8 +390,7 @@ def arm_pbv(slots, inst, ctx, *, budget, grade_timeout, per_call_tokens, timeout
     if patch.strip():
         passed = bool(_grade_patch(inst, patch, broker, grade_timeout, samples, tag))
     return {"arm": tag, "passed": passed, "tokens": broker.spent, "samples": samples,
-            "roles": {"planner": planner.model_id, "builder": builder.model_id, "verifier": verifier.model_id},
-            "edges": edges}
+            "roles": roles, "edges": edges}
 
 
 def _persist_rec(out: Path, rec: dict, tag: str) -> None:
