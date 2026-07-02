@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -86,6 +88,9 @@ def test_run_python_with_repo_env_normalizes_relative_script_from_non_repo_cwd(t
 
 
 def test_run_python_with_repo_env_falls_back_to_path_python3_not_sibling_worktree(tmp_path: Path) -> None:
+    if (REPO_ROOT / ".venv" / "bin" / "python").exists():
+        pytest.skip("repo-local .venv intentionally takes precedence over PATH python3")
+
     marker = tmp_path / "python3-used.txt"
     shim_dir = tmp_path / "bin"
     shim_dir.mkdir()

@@ -237,7 +237,7 @@ def test_json_count_kinds_require_kind_specific_keys() -> None:
         {"kind": "json_count_greater_than", "threshold": 0, **base},
         5,
     )
-    equals_missing_value = strength.classify_criterion(
+    equals_missing_nested_value = strength.classify_criterion(
         {
             "kind": "json_count_equals",
             "expected": 0,
@@ -246,9 +246,9 @@ def test_json_count_kinds_require_kind_specific_keys() -> None:
             "field": base["field"],
             "id": base["id"],
         },
-        4,
+        6,
     )
-    greater_missing_value = strength.classify_criterion(
+    greater_missing_nested_value = strength.classify_criterion(
         {
             "kind": "json_count_greater_than",
             "threshold": 0,
@@ -257,13 +257,13 @@ def test_json_count_kinds_require_kind_specific_keys() -> None:
             "field": base["field"],
             "id": base["id"],
         },
-        5,
+        7,
     )
 
     assert equals_missing_expected.malformed is True
     assert greater_missing_threshold.malformed is True
-    assert equals_missing_value.malformed is True
-    assert greater_missing_value.malformed is True
+    assert equals_missing_nested_value.malformed is True
+    assert greater_missing_nested_value.malformed is True
     assert equals_valid.malformed is False
     assert greater_valid.malformed is False
     assert equals_missing_value.malformed is True

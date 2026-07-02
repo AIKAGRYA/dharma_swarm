@@ -418,7 +418,7 @@ def default_reviewed_write_baseline() -> tuple[ReviewedWriteBaselineEntry, ...]:
         ReviewedWriteBaselineEntry('scripts/lattice_test.py', 'build_lattice_db', 'sqlite_connect', '7b7dd5543675', 'test_or_experiment', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/lattice_test.py', 'main', 'path_write', 'e7f43d056757', 'test_or_experiment', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/loop2_heartbeat_closure_run.py', 'main', 'path_write', 'eebcfa85ce76', 'generated_artifact', occurrences=1),
-        ReviewedWriteBaselineEntry('scripts/loop4_10_memory_context_closure_run.py', '_prepare_state_dir', 'path_write', '29fcd38669e5', 'operational_state', occurrences=1),
+        ReviewedWriteBaselineEntry('scripts/loop4_10_memory_context_closure_run.py', '_prepare_state_dir', 'path_write', 'fff3e82d4cdf', 'operational_state', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/loop4_10_memory_context_closure_run.py', 'run_loop10', 'path_write', '51891e41d1c9', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/loop4_10_memory_context_closure_run.py', 'run_replay', 'path_write', '84f88386c2bb', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/loop5_zeitgeist_closure_run.py', 'main', 'path_write', 'eebcfa85ce76', 'generated_artifact', occurrences=1),
