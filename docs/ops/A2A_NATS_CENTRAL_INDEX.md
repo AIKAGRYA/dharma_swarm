@@ -69,6 +69,8 @@ Primary files:
 
 ## Source Disposition
 
+This table is the current operational index, not a claim that every historical A2A/NATS-adjacent branch has been exhaustively diffed. Historical archaeology is listed where it changes merge decisions; otherwise it remains representative background until a targeted diff proves unique value.
+
 | Source | Local address / branch | PR | Disposition |
 |---|---|---:|---|
 | Central A2A/NATS spine | `/Users/dhyana/ds_a2a_always_on_spine_20260701`, `codex/a2a-always-on-spine-20260701` | #744 | Canonical integration place. Keep building here. |
@@ -78,10 +80,20 @@ Primary files:
 | A2A governance readiness | `/Users/dhyana/worktrees/ds_a2a_governance_readiness_20260626`, `codex/a2a-governance-readiness-20260626` | #703 | Historical merged readiness lane. Treat as background evidence, not current implementation owner. |
 | NATS rebuild preflight | `/Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618`, `runtime-truth/nats-rebuild-preflight-20260618` | none/currently preserved | Historical/superseded by #739 and #744 unless a later targeted diff proves unique value. |
 | Worktree readiness closeout | `/Users/dhyana/ds_worktree_readiness_closeout_20260702`, `codex/worktree-readiness-closeout-20260702` | #745 | Merged into main and now merged into #744. Useful for inventory context. |
-| LangGraph parity | `/Users/dhyana/ds_langgraph_parity_20260701`, `codex/langgraph-orchestration-parity-20260701` | #732 | Related next layer. Do not fold into A2A/NATS core until canonical task transport is production-wired. |
-| LangGraph production candidate | `/Users/dhyana/ds_langgraph_prod_candidate_20260702`, `codex/langgraph-prod-candidate-20260702` | #746 | Related runtime orchestration lane. Sequence after transport truth. |
+| LangGraph parity | `/Users/dhyana/ds_langgraph_parity_20260701`, `codex/langgraph-orchestration-parity-20260701` | #732 | Related next layer. Current PR state: draft and DIRTY against main. Do not fold into A2A/NATS core until canonical task transport is production-wired. |
+| LangGraph parity verifier scratch | `/Users/dhyana/dharma_swarm/.claude/worktrees/langgraph-parity-verifier-20260701`, `worktree-langgraph-parity-verifier-20260701` | none/direct | Dirty verifier worktree with LangGraph/A2A verification scripts and reports. Human decision required before harvesting; do not merge wholesale. |
+| LangGraph PR #727 local temp checkout | `/private/tmp/dharma-lgp-pr`, `main` behind `origin/main` | #727 | Dirty temp checkout around merged LangGraph parity readiness work. Covered indirectly by #727/#732/#746, but local dirty evidence needs explicit keep/drop review before deletion or reuse. |
+| LangGraph production candidate | `/Users/dhyana/ds_langgraph_prod_candidate_20260702`, `codex/langgraph-prod-candidate-20260702` | #746 | Related runtime orchestration lane. Current PR state: draft, CLEAN, green. Sequence after transport truth. |
 | Agentic design-pattern atlas | remote `claude/repo-implementation-planning-u3cayh` | #738 | Related design/planning lane. Ideas are represented in the master plan; do not mix its repo-wide planning artifacts into the transport branch without review. |
-| Older A2A foundations | main history, including PRs #557, #566, #568, #709 | merged | Already part of main. Treat as inherited substrate. |
+| Older A2A foundations | main history, including representative PRs #361, #362, #399, #402, #416, #477, #479-#482, #514, #557, #566, #568, #623, #639, #709, #727, #730 | merged/closed | Already inherited or historical. Treat as archaeology unless a targeted diff proves unique current value. |
+| Remote historical A2A/NATS branches | examples: `codex/a2a-active-track-20260613`, `devin/1779946341-a2a-trace-persistence-e2e`, `devin/1780548631-spine-a2a-adoption`, `mmm-a2a-conditional-merge`, `perplexity-computer/a2a-activation-1780025504`, `preserve/runtime-truth-nats-rebuild-preflight-20260623` | mixed | Superseded or historical until proven otherwise by targeted diff. Do not block #744 on these without concrete unique code/evidence. |
+
+## Current LangGraph Truth
+
+- #732 is draft and currently DIRTY against main.
+- #746 is draft, currently CLEAN, and green.
+- Both are related orchestration lanes above transport truth.
+- Neither substitutes for proving one canonical A2A/NATS production send path through `A2ANatsTransport.publish_task`.
 
 ## Keep / Drop Rules
 
