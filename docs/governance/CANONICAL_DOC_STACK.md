@@ -64,6 +64,8 @@ is no longer a forced first-read surface.
 | Reality debt / guarded overclaim language | `docs/governance/REALITY_DEBT_LEDGER.md` | Defers to source owners for claim upgrades |
 | Runtime truth command cutover matrix | `docs/governance/RUNTIME_TRUTH_COMMAND_CUTOVER.md` | Defers to RuntimeStateStore, spine modules, and tests for proof |
 | Architecture / invariants / axioms | `docs/governance/SOVEREIGN_MANIFEST.md`, `docs/doctrine/` | — |
+| External-gradient / autoresearch-node portfolio (build spec) | `docs/architecture/EXTERNAL_GRADIENT_PORTFOLIO_SPEC.md` | Defers to `ACTIVE_TRACK.yaml` (track state), One Wire quorum owners, and receipts for live facts |
+| Memory first-token ordering (build spec) | `docs/architecture/MEMORY_FIRST_TOKEN_SPEC.md` | Defers to `context_compiler.py`/MemoryKernel code and trust-gate C5 for live state |
 | Doc ownership | `docs/governance/CANONICAL_DOC_STACK.md` (this file) | — |
 | Anti-slop / repo-rule discipline | `docs/governance/ANTI_SLOP_RULES.md` + `.semgrep/dharma-anti-slop.yml` | — |
 | Forge / Pudgala naming rule | `docs/governance/SOVEREIGN_MANIFEST.md` | `docs/governance/FORGE_NAMING_BOUNDARY.md` is reference-only and defers to the manifest |
