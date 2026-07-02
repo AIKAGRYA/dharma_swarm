@@ -309,6 +309,28 @@
     "prompt": "Materialize ontology Outcome objects into runtime ArtifactRecords."
   },
   {
+    "id": "provider_starvation_alert",
+    "name": "Provider Starvation Alert",
+    "trigger": "interval",
+    "interval_seconds": 900,
+    "handler": "provider_starvation_alert",
+    "threshold": 0.5,
+    "min_count": 3,
+    "timeout_sec": 30,
+    "enabled": true,
+    "prompt": "Query delegation_runs for ProviderChainExecutionError/429 receipt failures and emit an algedonic critical signal when recent failure fraction exceeds 50%."
+  },
+  {
+    "id": "algedonic_triage",
+    "name": "Algedonic P0 Triage",
+    "trigger": "interval",
+    "interval_seconds": 900,
+    "handler": "algedonic_triage",
+    "timeout_sec": 60,
+    "enabled": true,
+    "prompt": "Drain ~/.dharma/algedonic_signals.jsonl into ~/.dharma/triage and raise ALERT when P0 conditions are present."
+  },
+  {
     "id": "staging_promote",
     "name": "Knowledge Staging Promote",
     "trigger": "interval",
