@@ -24,21 +24,7 @@ if [[ -n "${DHARMA_PYTHON:-}" ]]; then
 elif [[ -x "${REPO_ROOT}/.venv/bin/python" ]]; then
   PY="${REPO_ROOT}/.venv/bin/python"
 else
-  PY=""
-  while IFS= read -r line; do
-    case "${line}" in
-      worktree\ *)
-        candidate="${line#worktree }/.venv/bin/python"
-        if [[ -x "${candidate}" ]]; then
-          PY="${candidate}"
-          break
-        fi
-        ;;
-    esac
-  done < <(git worktree list --porcelain 2>/dev/null || true)
-  if [[ -z "${PY}" ]]; then
-    PY="$(command -v python3 || true)"
-  fi
+  PY="$(command -v python3 || true)"
 fi
 
 if [[ -z "${PY}" ]]; then
