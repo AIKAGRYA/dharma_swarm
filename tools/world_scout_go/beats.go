@@ -10,6 +10,8 @@ type Beat struct {
 	Queries []string
 }
 
+const MaxDeepSweepBeatSources = 16
+
 // DefaultBeats returns a DELIBERATELY CAPPED set of curated research beats
 // for the (separate, lower-cadence) deep sweep -- roughly ten, not the ~28
 // angles a one-off manual research run used. "Capped for now": widen only
@@ -41,4 +43,15 @@ func BeatSources(beats []Beat) []Source {
 		out = append(out, SourcesForQueries(beat.Queries, beat.ID)...)
 	}
 	return out
+}
+
+func DeepSweepBeatSources(beats []Beat, maxSources int) []Source {
+	if maxSources <= 0 {
+		return []Source{}
+	}
+	sources := BeatSources(beats)
+	if len(sources) > maxSources {
+		return sources[:maxSources]
+	}
+	return sources
 }

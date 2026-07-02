@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from dharma_swarm.knowledge_ops.deep_sweep import run_deep_sweep
+from dharma_swarm.knowledge_ops.deep_sweep import _headless_invoker, run_deep_sweep
 from dharma_swarm.spine.receipt import EvidenceReceipt
 from dharma_swarm.spine.routing import RoutingDecision
 from dharma_swarm.world_radar.theme_window import load_theme_window
@@ -92,6 +92,32 @@ async def _fake_dispatch_failed_receipt(prompt, *, context_id, task_id, reason, 
 
 
 @pytest.mark.asyncio
+async def test_headless_invoker_marks_claude_error_prefix_failed(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "dharma_swarm.knowledge_ops.deep_sweep.run_claude_headless",
+        lambda *_args, **_kwargs: "Error (rc=1): Credit balance is too low",
+    )
+    receipt = await _headless_invoker(
+        task={"id": "verify", "prompt": "verify"},
+        agent_id="signal_deep_sweep",
+        context_id="ctx",
+        routing=RoutingDecision(
+            agent_id="signal_deep_sweep",
+            provider="claude_code",
+            model="",
+            reason="test",
+            router_name="test",
+            context_id="ctx",
+            task_id="verify",
+        ),
+    )
+
+    assert receipt.status == "failed"
+    assert receipt.error_source == "provider_failed"
+    assert "Credit balance" in str(receipt.error_detail)
+
+
+@pytest.mark.asyncio
 async def test_deep_sweep_end_to_end_with_fakes(tmp_path: Path) -> None:
     result = await run_deep_sweep(
         tmp_path,
@@ -135,13 +161,14 @@ async def test_zero_max_verifications_skips_verification_entirely(tmp_path: Path
         dispatch_fn=_fake_dispatch_ok,
     )
     assert result["verifications_count"] == 0
+    assert result["verification_backlog_count"] > 0
 
 
 @pytest.mark.asyncio
 async def test_scout_error_does_not_crash_the_cycle(tmp_path: Path) -> None:
     result = await run_deep_sweep(
         tmp_path,
-        max_verifications=2,
+        max_verifications=10,
         scout_fn=_fake_scout_error(),
         ingest_fn=_fake_ingest_ok,
         dispatch_fn=_fake_dispatch_ok,
@@ -182,6 +209,32 @@ async def test_failed_verification_receipts_are_surfaced(tmp_path: Path) -> None
 
 
 @pytest.mark.asyncio
+async def test_failed_synthesis_receipt_is_surfaced_not_written_as_digest(tmp_path: Path) -> None:
+    async def dispatch_fn(prompt, *, context_id, task_id, reason, timeout=300):
+        if task_id == "synthesis":
+            return EvidenceReceipt(
+                context_id=context_id,
+                task_id=task_id,
+                agent_id="signal_deep_sweep",
+                provider="claude_code",
+                status="failed",
+                attributes={"output_text": "Error (rc=1): synthesis provider failed"},
+            )
+        return await _fake_dispatch_ok(prompt, context_id=context_id, task_id=task_id, reason=reason, timeout=timeout)
+
+    result = await run_deep_sweep(
+        tmp_path,
+        max_verifications=2,
+        scout_fn=_fake_scout_ok(n_rows=3),
+        ingest_fn=_fake_ingest_ok,
+        dispatch_fn=dispatch_fn,
+    )
+
+    assert result["synthesis_error"] == "Error (rc=1): synthesis provider failed"
+    assert Path(result["digest_path"]).read_text(encoding="utf-8") == ""
+
+
+@pytest.mark.asyncio
 async def test_likely_fabricated_count_is_surfaced(tmp_path: Path) -> None:
     async def dispatch_fn(prompt, *, context_id, task_id, reason, timeout=300):
         return EvidenceReceipt(
@@ -195,7 +248,7 @@ async def test_likely_fabricated_count_is_surfaced(tmp_path: Path) -> None:
 
     result = await run_deep_sweep(
         tmp_path,
-        max_verifications=2,
+        max_verifications=10,
         scout_fn=_fake_scout_ok(n_rows=3),
         ingest_fn=_fake_ingest_ok,
         dispatch_fn=dispatch_fn,
@@ -212,7 +265,7 @@ async def test_own_movements_are_persisted_into_the_theme_window(tmp_path: Path)
     # movements, or nothing if world_scout hasn't run recently).
     result = await run_deep_sweep(
         tmp_path,
-        max_verifications=2,
+        max_verifications=10,
         scout_fn=_fake_scout_ok(n_rows=3),
         ingest_fn=_fake_ingest_ok,
         dispatch_fn=_fake_dispatch_ok,
@@ -225,13 +278,36 @@ async def test_own_movements_are_persisted_into_the_theme_window(tmp_path: Path)
     # A second cycle must recognize the SAME movements as recurring, not new.
     result2 = await run_deep_sweep(
         tmp_path,
-        max_verifications=2,
+        max_verifications=10,
         scout_fn=_fake_scout_ok(n_rows=3),
         ingest_fn=_fake_ingest_ok,
         dispatch_fn=_fake_dispatch_ok,
     )
     assert result2["newly_seen_count"] == 0
     assert result2["verifications_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_capped_new_themes_remain_eligible_next_cycle(tmp_path: Path) -> None:
+    result = await run_deep_sweep(
+        tmp_path,
+        max_verifications=1,
+        scout_fn=_fake_scout_ok(n_rows=4),
+        ingest_fn=_fake_ingest_ok,
+        dispatch_fn=_fake_dispatch_ok,
+    )
+    assert result["verifications_count"] == 1
+    assert result["verification_backlog_count"] > 0
+
+    result2 = await run_deep_sweep(
+        tmp_path,
+        max_verifications=10,
+        scout_fn=_fake_scout_ok(n_rows=4),
+        ingest_fn=_fake_ingest_ok,
+        dispatch_fn=_fake_dispatch_ok,
+    )
+    assert result2["newly_seen_count"] == result["verification_backlog_count"]
+    assert result2["verifications_count"] == result["verification_backlog_count"]
 
 
 @pytest.mark.asyncio
@@ -247,7 +323,7 @@ async def test_theme_window_ignores_unrelated_world_scout_board(tmp_path: Path) 
     )
     result = await run_deep_sweep(
         tmp_path,
-        max_verifications=2,
+        max_verifications=10,
         scout_fn=_fake_scout_ok(n_rows=3),
         ingest_fn=_fake_ingest_ok,
         dispatch_fn=_fake_dispatch_ok,
@@ -285,3 +361,24 @@ async def test_state_dir_is_resolved_before_writes(tmp_path: Path) -> None:
     cycle_dir = Path(result["cycle_dir"])
     assert cycle_dir.is_relative_to(tmp_path.resolve() / "meta")
     assert ".." not in cycle_dir.parts
+
+
+@pytest.mark.asyncio
+async def test_context_ids_are_collision_resistant(tmp_path: Path) -> None:
+    result1 = await run_deep_sweep(
+        tmp_path,
+        max_verifications=0,
+        scout_fn=_fake_scout_ok(n_rows=1),
+        ingest_fn=_fake_ingest_ok,
+        dispatch_fn=_fake_dispatch_ok,
+    )
+    result2 = await run_deep_sweep(
+        tmp_path,
+        max_verifications=0,
+        scout_fn=_fake_scout_ok(n_rows=1),
+        ingest_fn=_fake_ingest_ok,
+        dispatch_fn=_fake_dispatch_ok,
+    )
+
+    assert result1["context_id"] != result2["context_id"]
+    assert Path(result1["cycle_dir"]) != Path(result2["cycle_dir"])

@@ -195,6 +195,25 @@ func TestBeatSourcesTagsEachSourceWithItsBeatID(t *testing.T) {
 	}
 }
 
+func TestDeepSweepBeatSourcesCapsSequentialFanout(t *testing.T) {
+	all := BeatSources(DefaultBeats())
+	capped := DeepSweepBeatSources(DefaultBeats(), MaxDeepSweepBeatSources)
+	if len(all) <= MaxDeepSweepBeatSources {
+		t.Fatalf("test needs DefaultBeats to expand beyond cap; got %d <= %d", len(all), MaxDeepSweepBeatSources)
+	}
+	if len(capped) != MaxDeepSweepBeatSources {
+		t.Fatalf("DeepSweepBeatSources returned %d sources, want cap %d", len(capped), MaxDeepSweepBeatSources)
+	}
+	if disabled := DeepSweepBeatSources(DefaultBeats(), 0); len(disabled) != 0 {
+		t.Fatalf("DeepSweepBeatSources with cap 0 returned %d sources", len(disabled))
+	}
+	for _, s := range capped {
+		if s.CascadeFor == "" {
+			t.Fatalf("capped source %s missing beat attribution", s.Name)
+		}
+	}
+}
+
 func TestScoutRetryDelayParsesRetryAfter(t *testing.T) {
 	if delay := scoutRetryDelay("0", 1); delay != 0 {
 		t.Fatalf("Retry-After seconds parsed incorrectly: %s", delay)

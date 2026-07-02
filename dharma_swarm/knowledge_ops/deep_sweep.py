@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import json
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Awaitable, Callable
@@ -48,10 +49,50 @@ from dharma_swarm.world_radar.theme_window import (
 )
 
 DEFAULT_MAX_VERIFICATIONS = 8
+SUCCESS_RECEIPT_STATUSES = {"ok", "completed", "success"}
 
 ScoutFn = Callable[..., tuple[list[dict[str, Any]], str | None, dict[str, int | str | bool]]]
 IngestFn = Callable[..., tuple[list[dict[str, Any]], str | None]]
 DispatchFn = Callable[..., Awaitable[EvidenceReceipt]]
+
+
+def _receipt_succeeded(receipt: EvidenceReceipt) -> bool:
+    return str(receipt.status).lower() in SUCCESS_RECEIPT_STATUSES
+
+
+def _receipt_output(receipt: EvidenceReceipt) -> str:
+    return str(receipt.attributes.get("output_text") or "")
+
+
+def _receipt_failure_detail(receipt: EvidenceReceipt) -> str:
+    detail = str(receipt.error_detail or "").strip()
+    return detail or _receipt_output(receipt) or f"receipt status={receipt.status}"
+
+
+def _claude_output_failure(output: str) -> tuple[str, str, str | None]:
+    stripped = output.lstrip()
+    lowered = stripped.lower()
+    if lowered.startswith("timeout:"):
+        return "timeout", "timeout", output
+    if lowered.startswith(("error:", "error (", "error(")):
+        return "failed", "provider_failed", output
+    return "ok", "none", None
+
+
+def _new_context_id() -> str:
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    return f"signal-deep-sweep-{stamp}-{uuid.uuid4().hex[:8]}"
+
+
+def _movement_id(movement: dict[str, Any]) -> str:
+    return str(movement.get("movement_id") or "")
+
+
+def _weighted_score(movement: dict[str, Any]) -> float:
+    try:
+        return float(movement.get("weighted_score", 0.0) or 0.0)
+    except (TypeError, ValueError, OverflowError):
+        return 0.0
 
 
 async def _headless_invoker(
@@ -77,12 +118,7 @@ async def _headless_invoker(
     latency_ms = int((time.monotonic() - t0) * 1000)
     finished = datetime.now(timezone.utc)
 
-    if output.startswith("TIMEOUT:"):
-        status, error_source, error_detail = "timeout", "timeout", output
-    elif output.startswith("ERROR:"):
-        status, error_source, error_detail = "failed", "provider_failed", output
-    else:
-        status, error_source, error_detail = "ok", "none", None
+    status, error_source, error_detail = _claude_output_failure(output)
 
     return EvidenceReceipt(
         # trace_id is the cross-layer correlation identity (aliased
@@ -184,7 +220,7 @@ async def run_deep_sweep(
     radar = meta / "world_radar"
     out_dir = radar / "deep_sweep"
     out_dir.mkdir(parents=True, exist_ok=True)
-    context_id = f"signal-deep-sweep-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
+    context_id = _new_context_id()
 
     scout_rows, scout_error, scout_counts = scout_fn(
         state=state,
@@ -219,13 +255,18 @@ async def run_deep_sweep(
     # job's movements, or nothing at all if world_scout hasn't run recently).
     window_path = radar / "theme_window.json"
     window = load_theme_window(window_path)
-    updated_window, newly_seen = update_theme_window(window, movements)
-    save_theme_window(window_path, updated_window)
+    _, newly_seen = update_theme_window(window, movements)
     newly_seen_ids = set(newly_seen)
 
-    candidates = [m for m in movements if m.get("movement_id") in newly_seen_ids]
-    candidates.sort(key=lambda m: float(m.get("weighted_score", 0.0) or 0.0), reverse=True)
+    candidates = [m for m in movements if _movement_id(m) in newly_seen_ids]
+    candidates.sort(key=_weighted_score, reverse=True)
     capped = candidates[: max(0, max_verifications)]
+    attempted_ids = {_movement_id(m) for m in capped}
+    persist_movements = [
+        m for m in movements if _movement_id(m) not in newly_seen_ids or _movement_id(m) in attempted_ids
+    ]
+    updated_window, _ = update_theme_window(window, persist_movements)
+    save_theme_window(window_path, updated_window)
 
     verifications: list[dict[str, Any]] = []
     verification_error: str | None = None
@@ -250,7 +291,7 @@ async def run_deep_sweep(
                     "receipt_id": str(receipt.receipt_id),
                 }
             )
-            if str(receipt.status) not in {"ok", "completed", "success"}:
+            if not _receipt_succeeded(receipt):
                 failed_receipts += 1
         except Exception as exc:  # noqa: BLE001 -- one bad verification must not sink the cycle
             verification_error = str(exc)[:200]
@@ -278,7 +319,10 @@ async def run_deep_sweep(
                 reason="deep_sweep synthesis",
                 timeout=synthesis_timeout_s,
             )
-            digest_text = synthesis_receipt.attributes.get("output_text", "")
+            if _receipt_succeeded(synthesis_receipt):
+                digest_text = _receipt_output(synthesis_receipt)
+            else:
+                synthesis_error = _receipt_failure_detail(synthesis_receipt)[:200]
         except Exception as exc:  # noqa: BLE001
             synthesis_error = str(exc)[:200]
 
@@ -298,6 +342,7 @@ async def run_deep_sweep(
         "movements_count": len(movements),
         "newly_seen_count": len(newly_seen_ids),
         "verifications_count": len(verifications),
+        "verification_backlog_count": max(len(candidates) - len(capped), 0),
         "failed_verification_count": failed_receipts,
         "likely_fabricated_count": len(likely_fabricated),
         "verification_error": verification_error,

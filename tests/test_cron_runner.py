@@ -628,6 +628,7 @@ def _deep_sweep_result(**overrides):
         "newly_seen_count": 2,
         "verifications_count": 1,
         "failed_verification_count": 0,
+        "verification_backlog_count": 0,
         "likely_fabricated_count": 0,
         "verification_error": None,
         "synthesis_error": None,
@@ -715,6 +716,31 @@ def test_signal_deep_sweep_total_scout_failure_marks_cron_failed(monkeypatch, tm
 
     assert result.status is CronJobRunStatus.FAILED
     assert "all scout sources failed" in result.error
+
+
+def test_signal_deep_sweep_llm_phase_error_marks_cron_failed(monkeypatch, tmp_path):
+    async def fake_run_deep_sweep(*args, **kwargs):
+        return _deep_sweep_result(
+            verification_error="1 verification receipt(s) failed or timed out",
+            movements_count=3,
+            verifications_count=1,
+        )
+
+    monkeypatch.setattr(
+        "dharma_swarm.knowledge_ops.deep_sweep.run_deep_sweep",
+        fake_run_deep_sweep,
+    )
+
+    result = execute_cron_job(
+        {
+            "handler": "signal_deep_sweep",
+            "fetch": True,
+            "state_dir": str(tmp_path),
+        }
+    )
+
+    assert result.status is CronJobRunStatus.FAILED
+    assert "verification receipt" in result.error
 
 
 def test_execute_cron_job_maps_overnight_waiting_summary_to_waiting_external():

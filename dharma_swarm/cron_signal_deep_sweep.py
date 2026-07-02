@@ -117,6 +117,8 @@ def run_signal_deep_sweep_job(job: dict[str, Any]) -> CronJobExecutionResult:
         status = CronJobRunStatus.COMPLETED
         if result.get("scout_error") and int(result.get("movements_count") or 0) == 0:
             status = CronJobRunStatus.FAILED
+        if result.get("verification_error") or result.get("synthesis_error"):
+            status = CronJobRunStatus.FAILED
         return CronJobExecutionResult(
             status=status,
             output=output,
