@@ -63,6 +63,35 @@ FORBIDDEN_PREFIXES = (
 
 _DIFF_PATH_RE = re.compile(r"^(?:diff --git a/|--- a/|\+\+\+ b/)(\S+)")
 
+# Static semantic weakener patterns for Track-B code children.  The path
+# allowlist is necessary but not sufficient: some early allowed surfaces include
+# grader/adapter code, and the objective's Safety Gate #2 says a code child must
+# not weaken tests/gates.  These are intentionally conservative, high-signal
+# patterns that catch explicit success hard-coding or removal of critical
+# blocker strings without trying to prove arbitrary semantic equivalence.
+SUCCESS_HARDCODE_RE = re.compile(
+    r"\b("
+    r"resolved\s*=\s*True|"
+    r"resolved\s*:\s*True|"
+    r"GradeResult\s*\([^)]*resolved\s*=\s*True|"
+    r"promote_eligible\s*=\s*True|"
+    r"live_apply_allowed\s*=\s*True|"
+    r"official_score_claimed\s*=\s*True"
+    r")\b"
+)
+CRITICAL_BLOCKER_TOKENS = frozenset(
+    {
+        "missing_fail_to_pass",
+        "patch_touches_test_file",
+        "fail_to_pass_not_resolved",
+        "promotion_requires_confirm_split",
+        "confirm_n<500",
+        "split_confirm_not_allowed_for_promotion",
+        "final_use_proof_missing",
+        "budget_ledger_missing",
+    }
+)
+
 
 class Phase4SafetyError(RuntimeError):
     """Raised by strict callers when a Phase 4 candidate violates a safety gate."""
@@ -104,6 +133,51 @@ def _code_path_findings(paths: Iterable[str]) -> tuple[list[str], list[str]]:
     return sorted(set(forbidden)), sorted(set(outside_allowed))
 
 
+def semantic_weakening_findings(patch: str) -> list[dict[str, Any]]:
+    """Return explicit anti-gate weakening evidence found in a code diff.
+
+    The scanner only considers changed diff lines.  It refuses obvious success
+    hard-coding and deletion of named blocker tokens.  It is not a replacement
+    for tests/review; it is an early static tripwire before any grade budget is
+    spent on a Track-B child.
+    """
+    findings: list[dict[str, Any]] = []
+    for line_no, raw in enumerate((patch or "").splitlines(), start=1):
+        if raw.startswith("+++") or raw.startswith("---"):
+            continue
+        if raw.startswith("+"):
+            content = raw[1:].strip()
+            if SUCCESS_HARDCODE_RE.search(content):
+                findings.append(
+                    {
+                        "kind": "success_hardcode",
+                        "line": line_no,
+                        "text": content,
+                    }
+                )
+            if "return False" in content and "_patch_touches_tests" in (patch or ""):
+                findings.append(
+                    {
+                        "kind": "test_touch_guard_disabled",
+                        "line": line_no,
+                        "text": content,
+                    }
+                )
+        elif raw.startswith("-"):
+            content = raw[1:].strip()
+            for token in sorted(CRITICAL_BLOCKER_TOKENS):
+                if token in content:
+                    findings.append(
+                        {
+                            "kind": "critical_blocker_removed",
+                            "line": line_no,
+                            "token": token,
+                            "text": content,
+                        }
+                    )
+    return findings
+
+
 def evaluate_code_candidate_safety(
     *,
     patch: str,
@@ -120,9 +194,11 @@ def evaluate_code_candidate_safety(
     """
     paths = sorted(set(paths_from_diff(patch)) | {_normal_path(p) for p in changed_paths if str(p).strip()})
     forbidden, outside_allowed = _code_path_findings(paths)
+    semantic_findings = semantic_weakening_findings(patch)
     blockers: list[str] = []
     blockers.extend(f"forbidden_path:{path}" for path in forbidden)
     blockers.extend(f"outside_allowed_surface:{path}" for path in outside_allowed)
+    blockers.extend(f"semantic_weakening:{finding['kind']}" for finding in semantic_findings)
     if not paths:
         blockers.append("no_changed_paths_detected")
     if not str(isolated_worktree).strip():
@@ -139,6 +215,7 @@ def evaluate_code_candidate_safety(
         "forbidden_prefixes": list(FORBIDDEN_PREFIXES),
         "forbidden_hits": forbidden,
         "outside_allowed_hits": outside_allowed,
+        "semantic_weakening_findings": semantic_findings,
         "isolated_worktree": str(isolated_worktree),
         "patch_sha256": canonical_sha256({"patch": patch or ""}),
         "blockers": blockers,
@@ -378,5 +455,6 @@ __all__ = [
     "archive_scaffold_candidate",
     "evaluate_code_candidate_safety",
     "paths_from_diff",
+    "semantic_weakening_findings",
     "summarize_phase4_archive",
 ]

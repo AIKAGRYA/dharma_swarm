@@ -60,6 +60,65 @@ def test_code_candidate_safety_refuses_test_patch() -> None:
     assert "tests/test_forge_packet_guard.py" in receipt["forbidden_hits"]
 
 
+def test_code_candidate_safety_refuses_allowed_grader_success_hardcode() -> None:
+    patch = """diff --git a/dharma_swarm/forge_v1/forge_v2/pr_suite_grader.py b/dharma_swarm/forge_v1/forge_v2/pr_suite_grader.py
+--- a/dharma_swarm/forge_v1/forge_v2/pr_suite_grader.py
++++ b/dharma_swarm/forge_v1/forge_v2/pr_suite_grader.py
+@@
+-        resolved = test_result.passed
++        resolved = True
+"""
+
+    receipt = phase4_alpha.evaluate_code_candidate_safety(
+        patch=patch,
+        isolated_worktree="/tmp/isolated-child",
+    )
+
+    assert receipt["decision"] == "refused"
+    assert receipt["forbidden_hits"] == []
+    assert receipt["outside_allowed_hits"] == []
+    assert receipt["semantic_weakening_findings"][0]["kind"] == "success_hardcode"
+    assert "semantic_weakening:success_hardcode" in receipt["blockers"]
+
+
+def test_code_candidate_safety_refuses_critical_blocker_removal() -> None:
+    patch = """diff --git a/dharma_swarm/forge_v1/forge_v2/pr_suite_grader.py b/dharma_swarm/forge_v1/forge_v2/pr_suite_grader.py
+--- a/dharma_swarm/forge_v1/forge_v2/pr_suite_grader.py
++++ b/dharma_swarm/forge_v1/forge_v2/pr_suite_grader.py
+@@
+-            blockers.append("patch_touches_test_file")
++            pass
+"""
+
+    receipt = phase4_alpha.evaluate_code_candidate_safety(
+        patch=patch,
+        isolated_worktree="/tmp/isolated-child",
+    )
+
+    assert receipt["decision"] == "refused"
+    assert receipt["semantic_weakening_findings"][0]["kind"] == "critical_blocker_removed"
+    assert receipt["semantic_weakening_findings"][0]["token"] == "patch_touches_test_file"
+    assert "semantic_weakening:critical_blocker_removed" in receipt["blockers"]
+
+
+def test_code_candidate_safety_allows_benign_allowed_patch_semantically() -> None:
+    patch = """diff --git a/dharma_swarm/forge_v1/forge_v2/budget.py b/dharma_swarm/forge_v1/forge_v2/budget.py
+--- a/dharma_swarm/forge_v1/forge_v2/budget.py
++++ b/dharma_swarm/forge_v1/forge_v2/budget.py
+@@
+-SHADOW_USD_PER_MTOK = 0.50
++SHADOW_USD_PER_MTOK = 0.55
+"""
+
+    receipt = phase4_alpha.evaluate_code_candidate_safety(
+        patch=patch,
+        isolated_worktree="/tmp/isolated-child",
+    )
+
+    assert receipt["decision"] == "pass"
+    assert receipt["semantic_weakening_findings"] == []
+
+
 def test_archive_scaffold_candidate_records_lineage_and_receipts(tmp_path: Path) -> None:
     result = phase4_alpha.archive_scaffold_candidate(
         archive_root=tmp_path,
