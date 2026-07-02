@@ -73,6 +73,33 @@ def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     )
 
 
+def read_json(path: Path) -> dict[str, Any]:
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def read_jsonl(path: Path) -> list[dict[str, Any]]:
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return []
+    rows: list[dict[str, Any]] = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(row, dict):
+            rows.append(row)
+    return rows
+
+
 def cost_from_attempts(receipt: dict[str, Any]) -> float:
     total = 0.0
     for attempt in receipt.get("attempts", []):
@@ -369,6 +396,267 @@ def _canonical_coordination_rows(state: dict[str, Any]) -> list[dict[str, Any]]:
     return rows
 
 
+COST_LEDGER_SCHEMA = "forge_v2.cost_ledger.v1"
+
+
+def _cost_float(value: Any) -> float:
+    try:
+        result = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    if result != result:  # NaN guard
+        return 0.0
+    return result
+
+
+def cost_ledger_from_attempts(
+    history_attempts: list[dict[str, Any]],
+    *,
+    label: str | None = None,
+) -> dict[str, Any]:
+    """Aggregate measured per-attempt budgets into a visible cost ledger.
+
+    Workstream 1 build-task 4 (Cost ledger) requires the loop to *measure* rather
+    than guess: cost per task, cost per resolved task, and grade-failure rate, on
+    top of the raw ``budget_ledger.jsonl`` per-attempt rows. This is a pure
+    reducer over already-recorded attempt receipts (real
+    ``budget.total_cost_usd`` / ``spent_tokens`` / ``wall_seconds`` and the
+    graded ``resolved`` flag), so it invents no cost; missing fields contribute
+    zero and are still counted as attempts. It never claims promotion or mutates
+    any source of truth.
+
+    Cost-per-resolved is intentionally ``None`` when nothing resolved, so a run
+    with zero resolved tasks reports "not yet visible" instead of a
+    divide-by-zero or a misleading 0.0.
+    """
+    attempts = [a for a in history_attempts if isinstance(a, dict)]
+    total_attempts = len(attempts)
+    total_cost = 0.0
+    total_tokens = 0
+    total_wall = 0.0
+    resolved_attempts = 0
+    invalid_attempts = 0
+    grade_error_attempts = 0
+    per_task: dict[str, dict[str, Any]] = {}
+    per_arm: dict[str, dict[str, Any]] = {}
+
+    for attempt in attempts:
+        budget = attempt.get("budget") if isinstance(attempt.get("budget"), dict) else {}
+        cost = _cost_float(budget.get("total_cost_usd"))
+        tokens = int(_cost_float(budget.get("spent_tokens")))
+        wall = _cost_float(budget.get("wall_seconds"))
+        resolved = bool(attempt.get("resolved"))
+        invalid = bool(attempt.get("invalid")) or bool(budget.get("invalid"))
+        grade_error = attempt.get("grade_error") not in (None, "")
+
+        total_cost += cost
+        total_tokens += tokens
+        total_wall += wall
+        resolved_attempts += 1 if resolved else 0
+        invalid_attempts += 1 if invalid else 0
+        grade_error_attempts += 1 if grade_error else 0
+
+        task_id = str(attempt.get("task_id") or "")
+        task = per_task.setdefault(
+            task_id,
+            {
+                "task_id": task_id,
+                "attempts": 0,
+                "resolved": 0,
+                "invalid": 0,
+                "grade_errors": 0,
+                "cost_usd": 0.0,
+                "tokens": 0,
+                "wall_seconds": 0.0,
+            },
+        )
+        task["attempts"] += 1
+        task["resolved"] += 1 if resolved else 0
+        task["invalid"] += 1 if invalid else 0
+        task["grade_errors"] += 1 if grade_error else 0
+        task["cost_usd"] += cost
+        task["tokens"] += tokens
+        task["wall_seconds"] += wall
+
+        arm_id = str(attempt.get("arm") or "")
+        arm = per_arm.setdefault(
+            arm_id,
+            {
+                "arm": arm_id,
+                "attempts": 0,
+                "resolved": 0,
+                "invalid": 0,
+                "cost_usd": 0.0,
+                "tokens": 0,
+                "wall_seconds": 0.0,
+            },
+        )
+        arm["attempts"] += 1
+        arm["resolved"] += 1 if resolved else 0
+        arm["invalid"] += 1 if invalid else 0
+        arm["cost_usd"] += cost
+        arm["tokens"] += tokens
+        arm["wall_seconds"] += wall
+
+    distinct_tasks = len([t for t in per_task if t])
+
+    def _rate(numerator: int, denominator: int) -> float | None:
+        if denominator <= 0:
+            return None
+        return round(numerator / denominator, 6)
+
+    def _per(numerator: float, denominator: int) -> float | None:
+        if denominator <= 0:
+            return None
+        return round(numerator / denominator, 6)
+
+    for task in per_task.values():
+        task["cost_usd"] = round(task["cost_usd"], 6)
+        task["wall_seconds"] = round(task["wall_seconds"], 1)
+        task["cost_per_resolved_usd"] = _per(task["cost_usd"], task["resolved"])
+    for arm in per_arm.values():
+        arm["cost_usd"] = round(arm["cost_usd"], 6)
+        arm["wall_seconds"] = round(arm["wall_seconds"], 1)
+        arm["cost_per_resolved_usd"] = _per(arm["cost_usd"], arm["resolved"])
+
+    return {
+        "schema": COST_LEDGER_SCHEMA,
+        "label": label,
+        "measured": True,
+        "totals": {
+            "attempts": total_attempts,
+            "distinct_tasks": distinct_tasks,
+            "resolved_attempts": resolved_attempts,
+            "invalid_attempts": invalid_attempts,
+            "grade_error_attempts": grade_error_attempts,
+            "total_cost_usd": round(total_cost, 6),
+            "total_tokens": total_tokens,
+            "total_wall_seconds": round(total_wall, 1),
+        },
+        "cost_per_task_usd": _per(total_cost, distinct_tasks),
+        "cost_per_attempt_usd": _per(total_cost, total_attempts),
+        "cost_per_resolved_task_usd": _per(total_cost, resolved_attempts),
+        "grade_failure_rate": _rate(total_attempts - resolved_attempts, total_attempts),
+        "invalid_rate": _rate(invalid_attempts, total_attempts),
+        "grade_error_rate": _rate(grade_error_attempts, total_attempts),
+        "per_task": [per_task[k] for k in sorted(per_task)],
+        "per_arm": [per_arm[k] for k in sorted(per_arm)],
+        "source_of_truth_mutated": False,
+        "official_score_claimed": False,
+        "promotion_gate": "verify_promotion_only",
+    }
+
+
+def cost_ledger_markdown(ledger: dict[str, Any]) -> str:
+    totals = ledger.get("totals", {})
+
+    def _fmt(value: Any) -> str:
+        return "n/a (nothing resolved yet)" if value is None else str(value)
+
+    lines = [
+        "# Cost Ledger (measured, not guessed)",
+        "",
+        f"- attempts: {totals.get('attempts', 0)}",
+        f"- distinct_tasks: {totals.get('distinct_tasks', 0)}",
+        f"- resolved_attempts: {totals.get('resolved_attempts', 0)}",
+        f"- total_cost_usd: {totals.get('total_cost_usd', 0.0)}",
+        f"- total_tokens: {totals.get('total_tokens', 0)}",
+        f"- total_wall_seconds: {totals.get('total_wall_seconds', 0.0)}",
+        "",
+        f"- cost_per_task_usd: {_fmt(ledger.get('cost_per_task_usd'))}",
+        f"- cost_per_resolved_task_usd: {_fmt(ledger.get('cost_per_resolved_task_usd'))}",
+        f"- grade_failure_rate: {_fmt(ledger.get('grade_failure_rate'))}",
+        f"- invalid_rate: {_fmt(ledger.get('invalid_rate'))}",
+        "",
+        "## Per-task",
+        "",
+        "| task_id | attempts | resolved | cost_usd | cost_per_resolved_usd |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for row in ledger.get("per_task", []):
+        lines.append(
+            "| {task} | {att} | {res} | {cost} | {cpr} |".format(
+                task=row.get("task_id") or "(unlabeled)",
+                att=row.get("attempts", 0),
+                res=row.get("resolved", 0),
+                cost=row.get("cost_usd", 0.0),
+                cpr=_fmt(row.get("cost_per_resolved_usd")),
+            )
+        )
+    lines.append("")
+    lines.append(
+        "Cost is summed from measured per-attempt `budget.total_cost_usd`; "
+        "no cost is estimated or invented."
+    )
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _attempts_from_packet(run_dir: Path) -> list[dict[str, Any]]:
+    """Reconstruct attempt-shaped rows from an existing canonical packet.
+
+    Joins the measured ``budget_ledger.jsonl`` rows (cost/tokens/wall/invalid)
+    with ``results.jsonl`` (resolved / grade_error) by ``row_index`` so the cost
+    ledger can be computed post-hoc for runs emitted before the ledger existed.
+    No cost is invented: only fields already recorded in the packet are used.
+    """
+    budget_rows = read_jsonl(run_dir / "budget_ledger.jsonl")
+    result_rows = read_jsonl(run_dir / "results.jsonl")
+    results_by_index = {
+        row.get("row_index"): row for row in result_rows if isinstance(row, dict) and row.get("row_index") is not None
+    }
+    attempts: list[dict[str, Any]] = []
+    for row in budget_rows:
+        if not isinstance(row, dict):
+            continue
+        result = results_by_index.get(row.get("row_index"), {})
+        attempts.append(
+            {
+                "task_id": row.get("task_id") if row.get("task_id") is not None else result.get("task_id"),
+                "arm": row.get("arm") if row.get("arm") is not None else result.get("arm"),
+                "split": result.get("split"),
+                "resolved": bool(result.get("resolved")),
+                "invalid": bool(row.get("invalid")) or bool(result.get("invalid")),
+                "invalid_reason": row.get("invalid_reason") or result.get("invalid_reason"),
+                "grade_error": result.get("grade_error"),
+                "budget": {
+                    "total_cost_usd": row.get("actual_cost_usd", 0.0),
+                    "spent_tokens": row.get("spent_tokens", 0),
+                    "wall_seconds": row.get("wall_seconds", 0.0),
+                    "cap_tokens": row.get("cap_tokens"),
+                    "cap_usd": row.get("cap_usd"),
+                    "invalid": bool(row.get("invalid")),
+                },
+            }
+        )
+    return attempts
+
+
+def write_cost_ledger_for_run(run_dir: str | Path) -> dict[str, Any]:
+    """Compute and persist a cost ledger for an existing canonical packet dir.
+
+    Operator/post-hoc surface for Workstream 1's "Cost per task is visible" done
+    condition applied to already-emitted runs. Writes ``cost_ledger.json`` +
+    ``cost_ledger.md`` next to the packet and returns both the ledger and the
+    output paths. Pure read + derive + write; no source-of-truth mutation.
+    """
+    run_path = Path(run_dir).expanduser()
+    if not run_path.exists():
+        raise FileNotFoundError(f"run dir does not exist: {run_path}")
+    state = read_json(run_path / "state.json")
+    label = state.get("label") if isinstance(state, dict) else None
+    attempts = _attempts_from_packet(run_path)
+    ledger = cost_ledger_from_attempts(attempts, label=label)
+    write_json(run_path / "cost_ledger.json", ledger)
+    (run_path / "cost_ledger.md").write_text(cost_ledger_markdown(ledger))
+    return {
+        "cost_ledger": ledger,
+        "cost_ledger_json": str(run_path / "cost_ledger.json"),
+        "cost_ledger_md": str(run_path / "cost_ledger.md"),
+        "attempt_rows": len(attempts),
+    }
+
+
 def _canonical_model_roster(state: dict[str, Any], history_attempts: list[dict[str, Any]]) -> dict[str, Any]:
     config = dict(state.get("config", {}) or {})
     arms = {str(arm) for arm in config.get("arms", []) or [] if arm}
@@ -512,6 +800,9 @@ def emit_canonical_packet(
     (run_dir / "control_comparison.md").write_text(_control_comparison_markdown(state))
     (run_dir / "failure_taxonomy.md").write_text(_failure_taxonomy_markdown(state, result_rows))
     (run_dir / "decision_record.md").write_text(_decision_record_markdown(state))
+    cost_ledger = cost_ledger_from_attempts(history_attempts, label=state.get("label"))
+    write_json(run_dir / "cost_ledger.json", cost_ledger)
+    (run_dir / "cost_ledger.md").write_text(cost_ledger_markdown(cost_ledger))
     return {
         "schema": "forge_v2.canonical_packet_emit.v1",
         "run_dir": str(run_dir),
@@ -520,6 +811,12 @@ def emit_canonical_packet(
         "result_rows": len(result_rows),
         "budget_rows": len(budget_rows),
         "coordination_rows": len(coordination_rows),
+        "cost_ledger": {
+            "cost_per_task_usd": cost_ledger["cost_per_task_usd"],
+            "cost_per_resolved_task_usd": cost_ledger["cost_per_resolved_task_usd"],
+            "grade_failure_rate": cost_ledger["grade_failure_rate"],
+            "total_cost_usd": cost_ledger["totals"]["total_cost_usd"],
+        },
     }
 
 
@@ -821,6 +1118,12 @@ def run_scheduler(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Forge v2 overnight campaign scheduler")
+    parser.add_argument(
+        "--cost-ledger-for",
+        default="",
+        help="Post-hoc mode: read an existing canonical packet dir's budget/result rows, "
+        "write cost_ledger.json + cost_ledger.md, print the ledger, and exit.",
+    )
     parser.add_argument("--instances", default=",".join(DEFAULT_INSTANCES))
     parser.add_argument("--n-explore", type=int, default=3)
     parser.add_argument("--replicates", type=int, default=3)
@@ -868,6 +1171,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--taskbed-min-confirm-count", type=int, default=taskbed_ledger.MIN_CONFIRM_TASKS,
                         help="Minimum CONFIRM tasks required by the ledger allocation.")
     args = parser.parse_args(argv)
+
+    if args.cost_ledger_for:
+        result = write_cost_ledger_for_run(args.cost_ledger_for)
+        print(json.dumps(result["cost_ledger"], indent=2, sort_keys=True, default=str), flush=True)
+        return 0
 
     ids = [x.strip() for x in args.instances.split(",") if x.strip()]
     arms = [x.strip() for x in args.arms.split(",") if x.strip()]

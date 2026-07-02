@@ -62,6 +62,112 @@ def test_cost_from_attempts_sums_attempt_budgets() -> None:
     assert scheduler.cost_from_attempts(_fake_receipt(cost=0.123456)) == 0.123456
 
 
+def _cost_attempts() -> list[dict]:
+    return [
+        {"task_id": "a", "arm": "self_moa", "split": "explore", "resolved": False,
+         "budget": {"total_cost_usd": 0.01, "spent_tokens": 100, "wall_seconds": 2.0}},
+        {"task_id": "a", "arm": "verify_chain", "split": "explore", "resolved": True,
+         "budget": {"total_cost_usd": 0.03, "spent_tokens": 300, "wall_seconds": 5.0}},
+        {"task_id": "b", "arm": "verify_chain", "split": "explore", "resolved": False,
+         "grade_error": "docker_timeout", "invalid": True,
+         "budget": {"total_cost_usd": 0.02, "spent_tokens": 200, "wall_seconds": 4.0, "invalid": True}},
+    ]
+
+
+def test_cost_ledger_from_attempts_measures_cost_per_task_and_failure_rate() -> None:
+    ledger = scheduler.cost_ledger_from_attempts(_cost_attempts(), label="unit")
+    assert ledger["schema"] == scheduler.COST_LEDGER_SCHEMA
+    assert ledger["totals"]["attempts"] == 3
+    assert ledger["totals"]["distinct_tasks"] == 2
+    assert ledger["totals"]["resolved_attempts"] == 1
+    assert ledger["totals"]["total_cost_usd"] == 0.06
+    # cost per distinct task = 0.06 / 2
+    assert ledger["cost_per_task_usd"] == 0.03
+    # cost per resolved attempt = 0.06 / 1
+    assert ledger["cost_per_resolved_task_usd"] == 0.06
+    # 2 of 3 attempts did not resolve
+    assert ledger["grade_failure_rate"] == round(2 / 3, 6)
+    assert ledger["invalid_rate"] == round(1 / 3, 6)
+    assert ledger["grade_error_rate"] == round(1 / 3, 6)
+    # never claims promotion / mutation
+    assert ledger["source_of_truth_mutated"] is False
+    assert ledger["official_score_claimed"] is False
+    assert ledger["promotion_gate"] == "verify_promotion_only"
+
+
+def test_cost_ledger_is_none_not_zero_when_nothing_resolved() -> None:
+    ledger = scheduler.cost_ledger_from_attempts(
+        [{"task_id": "z", "arm": "self_moa", "resolved": False, "budget": {"total_cost_usd": 0.05}}]
+    )
+    # do not fabricate a misleading 0.0 cost-per-resolved when nothing resolved
+    assert ledger["cost_per_resolved_task_usd"] is None
+    assert ledger["grade_failure_rate"] == 1.0
+    # empty input is fully None, never a divide-by-zero
+    empty = scheduler.cost_ledger_from_attempts([])
+    assert empty["cost_per_task_usd"] is None
+    assert empty["grade_failure_rate"] is None
+
+
+def test_cost_ledger_does_not_invent_cost_for_missing_budget_fields() -> None:
+    # An attempt with no budget still counts as an attempt but contributes 0 cost.
+    ledger = scheduler.cost_ledger_from_attempts(
+        [
+            {"task_id": "a", "arm": "verify_chain", "resolved": True},
+            {"task_id": "a", "arm": "verify_chain", "resolved": True, "budget": {"total_cost_usd": 0.04}},
+        ]
+    )
+    assert ledger["totals"]["attempts"] == 2
+    assert ledger["totals"]["total_cost_usd"] == 0.04
+    assert ledger["cost_per_resolved_task_usd"] == 0.02
+
+
+def test_scheduler_emits_cost_ledger_artifacts(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(scheduler, "RUN_ROOT", tmp_path)
+    state = scheduler.run_scheduler(
+        instances=["a"], n_explore=0, replicates=1, budget_cap=60000, campaign_budget_usd=0.25,
+        per_call_tokens=3500, k_self_moa=1, grade_timeout=1200, timeout_s=240, strategy="confirm",
+        roster_n=14, generator="glm-5.2", verifier="moonshotai/kimi-k2.6", arms=["verify_chain"],
+        mix_models=[], label="costledger", max_campaigns=1, duration_hours=None,
+        total_budget_usd=5.0, invalid_run_cap=2, sleep_seconds=0.0,
+        runner=lambda *_a, **_k: _fake_receipt(cost=0.02),
+    )
+    run_dir = next(tmp_path.iterdir())
+    assert (run_dir / "cost_ledger.json").exists()
+    assert (run_dir / "cost_ledger.md").exists()
+    ledger = json.loads((run_dir / "cost_ledger.json").read_text())
+    assert ledger["schema"] == scheduler.COST_LEDGER_SCHEMA
+    assert ledger["totals"]["total_cost_usd"] == 0.02
+    # cost ledger summary is surfaced in the emit return / state
+    assert state["canonical_packet"]["cost_ledger"]["total_cost_usd"] == 0.02
+    # additive: the strict external-guard packet contract is unchanged
+    assert "cost_ledger.json" not in scheduler.CANONICAL_PACKET_FILES
+
+
+def test_write_cost_ledger_for_run_reconstructs_from_packet(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(scheduler, "RUN_ROOT", tmp_path)
+    scheduler.run_scheduler(
+        instances=["a"], n_explore=0, replicates=1, budget_cap=60000, campaign_budget_usd=0.25,
+        per_call_tokens=3500, k_self_moa=1, grade_timeout=1200, timeout_s=240, strategy="confirm",
+        roster_n=14, generator="glm-5.2", verifier="moonshotai/kimi-k2.6", arms=["verify_chain"],
+        mix_models=[], label="posthoc", max_campaigns=1, duration_hours=None,
+        total_budget_usd=5.0, invalid_run_cap=2, sleep_seconds=0.0,
+        runner=lambda *_a, **_k: _fake_receipt(cost=0.02),
+    )
+    run_dir = next(tmp_path.iterdir())
+    emitted = json.loads((run_dir / "cost_ledger.json").read_text())
+    # delete then rebuild post-hoc purely from budget_ledger.jsonl + results.jsonl
+    (run_dir / "cost_ledger.json").unlink()
+    (run_dir / "cost_ledger.md").unlink()
+    result = scheduler.write_cost_ledger_for_run(run_dir)
+    assert result["attempt_rows"] == 2
+    assert (run_dir / "cost_ledger.json").exists()
+    rebuilt = result["cost_ledger"]
+    assert rebuilt["cost_per_task_usd"] == emitted["cost_per_task_usd"]
+    assert rebuilt["cost_per_resolved_task_usd"] == emitted["cost_per_resolved_task_usd"]
+    assert rebuilt["grade_failure_rate"] == emitted["grade_failure_rate"]
+    assert rebuilt["totals"]["total_cost_usd"] == emitted["totals"]["total_cost_usd"]
+
+
 def test_stop_reason_order_and_caps() -> None:
     assert scheduler.stop_reason(
         completed=3,
