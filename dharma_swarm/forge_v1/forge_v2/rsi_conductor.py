@@ -24,6 +24,7 @@ from typing import Any, Callable
 from dharma_swarm.daemon_config import dharma_state_dir
 from dharma_swarm.dgm_loop import DGMLoop, DGMResult
 
+from . import native_runner_contract
 from . import taskbed_ledger
 from .packet_guard import run_guard
 from .runner import DEFAULT_FORGE_GENERATOR_MODEL, DEFAULT_FORGE_VERIFIER_MODEL
@@ -249,6 +250,114 @@ def _blocked_no_taskbed(
     return payload
 
 
+def run_native_request_only(
+    *,
+    label: str = "rsi_conductor_native",
+    genome: dict[str, Any] | None = None,
+    candidate_packet: dict[str, Any] | None = None,
+    split: str = "explore",
+    epoch_id: str = "epoch_0",
+    taskbed_db: Path | str = taskbed_ledger.DEFAULT_DB,
+    taskbed_count: int | None = None,
+    taskbed_min_confirm_count: int = taskbed_ledger.MIN_CONFIRM_TASKS,
+    taskbed_allocation_id: str | None = None,
+    taskbed_lane_id: str | None = None,
+    taskbed_candidate_id: str = "",
+    native_run_id: str | None = None,
+    native_output_root: Path | str | None = None,
+    native_runner_label: str = "native_x86_64",
+    native_max_infra_retries: int = 2,
+    native_sync_back_target: Path | str | None = None,
+    native_worker_config: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Write a grade-only native runner request from the conductor surface.
+
+    This is the Workstream 6 operator path for "Local Mac can orchestrate
+    without doing all grading."  It deliberately does *not* run the DGM runner,
+    packet guard, or promotion verifier.  The output is a sealed native request
+    with grade-only authority; synced receipts remain shadow evidence until the
+    normal packet guard + verify_promotion path consumes them.
+    """
+    if split not in {"explore", "confirm"}:
+        raise ValueError("split must be explore or confirm")
+    stamp = now_stamp()
+    run_dir = RUN_ROOT / f"{label}_{stamp}"
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    genome = dict(genome or {"arm": "verify_chain"})
+    genome.setdefault("generator", DEFAULT_FORGE_GENERATOR_MODEL)
+    genome.setdefault("verifier", DEFAULT_FORGE_VERIFIER_MODEL)
+    genome.setdefault("window_chars", DEFAULT_WINDOW_CHARS)
+    genome.setdefault("selection_strategy", str(genome.get("arm") or "verify_chain"))
+    candidate_id = str(
+        (candidate_packet or {}).get("candidate_id")
+        or taskbed_candidate_id
+        or f"{label}:{genome.get('arm', 'verify_chain')}"
+    )
+    packet = {
+        "candidate_id": candidate_id,
+        "track": "scaffold_genome",
+        "genome": genome,
+        **dict(candidate_packet or {}),
+    }
+    packet.setdefault("candidate_id", candidate_id)
+    count = int(taskbed_count or (taskbed_ledger.MIN_CONFIRM_TASKS if split == "confirm" else 1))
+    if count <= 0:
+        raise ValueError("taskbed_count must be positive for native request orchestration")
+
+    try:
+        orchestration = native_runner_contract.orchestrate_native_request(
+            run_id=native_run_id or f"{label}_{stamp}",
+            candidate_packet=packet,
+            split=split,
+            count=count,
+            epoch_id=epoch_id,
+            lane_id=taskbed_lane_id or f"{label}_native_request",
+            output_root=native_output_root or (run_dir / "native_runner_requests"),
+            taskbed_db=taskbed_db,
+            runner_label=native_runner_label,
+            max_infra_retries=native_max_infra_retries,
+            sync_back_target=native_sync_back_target,
+            worker_config=native_worker_config,
+            allocation_id=taskbed_allocation_id,
+            min_count=taskbed_min_confirm_count if split == "confirm" else count,
+        )
+    except Exception as exc:  # noqa: BLE001 - blocked allocation must receipt.
+        return _blocked_no_taskbed(
+            run_dir=run_dir,
+            label=label,
+            error=f"{type(exc).__name__}: {exc}",
+            split=split,
+            epoch_id=epoch_id,
+        )
+
+    closeout = {
+        "schema": SCHEMA_VERSION,
+        "label": label,
+        "run_dir": str(run_dir),
+        "status": "native_request_written",
+        "native_request_only": True,
+        "split": split,
+        "task_count": int(orchestration["allocation_receipt"]["task_count"]),
+        "taskbed_allocation": orchestration["allocation_receipt"],
+        "native_orchestration": orchestration,
+        "request_dir": orchestration["request"]["request_dir"],
+        "request_path": orchestration["request"]["request_path"],
+        "request_sha256": orchestration["request"]["request_sha256"],
+        "dgm_runner_attempted": False,
+        "packet_guard_attempted": False,
+        "promotion_attempted": False,
+        "source_of_truth_mutated": False,
+        "live_apply_performed": False,
+        "archive_fitness_mutated": False,
+        "promotion_gate": native_runner_contract.PROMOTION_GATE,
+        "next_action": "send request_dir to a native/x86_64 worker, then sync result receipts",
+    }
+    write_json(run_dir / "conductor_closeout.json", closeout)
+    write_json(run_dir / "state.json", closeout)
+    return closeout
+
+
 def run_conductor(
     *,
     label: str = "rsi_conductor",
@@ -379,6 +488,22 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--taskbed-lane-id", default=None)
     parser.add_argument("--taskbed-candidate-id", default="")
     parser.add_argument("--operator-lease-id", default="")
+    parser.add_argument(
+        "--native-request-only",
+        action="store_true",
+        help="Write a grade-only native runner request from the taskbed ledger and exit",
+    )
+    parser.add_argument("--native-run-id", default="", help="Run id for the native runner request")
+    parser.add_argument("--native-output-root", default="", help="Output root for native runner request packets")
+    parser.add_argument("--native-runner-label", default="native_x86_64")
+    parser.add_argument("--native-max-infra-retries", type=int, default=2)
+    parser.add_argument("--native-sync-back-target", default="")
+    parser.add_argument("--native-worker-config-json", default="", help="Inline JSON object for native worker_config")
+    parser.add_argument(
+        "--native-candidate-json",
+        default="",
+        help="Inline JSON candidate packet for --native-request-only (merged with the genome packet)",
+    )
     parser.add_argument("--json", action="store_true")
     return parser
 
@@ -406,6 +531,50 @@ def main(argv: list[str] | None = None) -> int:
     mix_models = [item.strip() for item in args.mix_models.split(",") if item.strip()]
     if mix_models:
         genome["mix_models"] = mix_models
+    if args.native_request_only:
+        candidate_packet = json.loads(args.native_candidate_json) if args.native_candidate_json.strip() else {}
+        if not isinstance(candidate_packet, dict):
+            raise TypeError("--native-candidate-json must decode to a JSON object")
+        worker_config = (
+            json.loads(args.native_worker_config_json)
+            if args.native_worker_config_json.strip()
+            else {}
+        )
+        if not isinstance(worker_config, dict):
+            raise TypeError("--native-worker-config-json must decode to a JSON object")
+        result = run_native_request_only(
+            label=args.label,
+            genome=genome,
+            candidate_packet=candidate_packet,
+            split=args.taskbed_split or args.split,
+            epoch_id=args.epoch_id,
+            taskbed_db=args.taskbed_db,
+            taskbed_count=args.taskbed_count or None,
+            taskbed_min_confirm_count=args.taskbed_min_confirm_count,
+            taskbed_allocation_id=args.taskbed_allocation_id,
+            taskbed_lane_id=args.taskbed_lane_id,
+            taskbed_candidate_id=args.taskbed_candidate_id,
+            native_run_id=args.native_run_id or None,
+            native_output_root=args.native_output_root or None,
+            native_runner_label=args.native_runner_label,
+            native_max_infra_retries=args.native_max_infra_retries,
+            native_sync_back_target=args.native_sync_back_target or None,
+            native_worker_config=worker_config,
+        )
+        if args.json:
+            print(json.dumps(result, indent=2, sort_keys=True, default=str))
+        else:
+            print(
+                "[rsi_conductor] status={status} native_request_only=true split={split} "
+                "task_count={task_count} request_dir={request_dir}".format(
+                    status=result.get("status"),
+                    split=result.get("split", ""),
+                    task_count=result.get("task_count", 0),
+                    request_dir=result.get("request_dir", ""),
+                ),
+                flush=True,
+            )
+        return 0
     result = run_conductor(
         label=args.label,
         genome=genome,
