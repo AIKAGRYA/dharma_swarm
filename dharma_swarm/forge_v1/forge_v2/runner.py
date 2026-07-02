@@ -51,6 +51,12 @@ from .arms import (
 )
 from .budget import Budget
 from .critic import _family, refute_pass
+from .pr_suite_grader import (
+    grade_pr_suite_prediction,
+    is_pr_suite_task,
+    is_pr_suite_task_id,
+    load_pr_suite_context,
+)
 from .provenance import aggregate_contamination_states, contamination_state, split_explore_confirm
 from .receipts import AttemptReceipt, Ledger, RunReceipt, scaffold_parity_hash
 from .stats import paired_bootstrap_ci, positive_claim_gate, replicate_variance
@@ -299,6 +305,21 @@ def _pick_mix_slots(callable_slots, gen, *, mix_ids: list[str] | None, timeout_s
     return selected, rows
 
 
+def _pull_task_context(instance_id: str):
+    if is_pr_suite_task_id(instance_id):
+        return load_pr_suite_context(instance_id)
+    return pull_context(instance_id)
+
+
+def _grade_task(inst: dict, patch: str, *, timeout: int) -> tuple[bool, float, str | None]:
+    if is_pr_suite_task(inst):
+        result = grade_pr_suite_prediction(inst, patch, timeout=timeout)
+        if result.error:
+            return bool(result.resolved), result.seconds, f"{result.error}; receipt={result.receipt_path}"
+        return bool(result.resolved), result.seconds, f"receipt={result.receipt_path}"
+    return grade(inst, patch, timeout=timeout)
+
+
 def run(instance_ids, *, n_explore, replicates, budget_cap, budget_usd, per_call_tokens, k_self_moa,
         grade_timeout, timeout_s, strategy, roster_n, gen_id, ver_id, label,
         arm="verify_chain", mix_ids: list[str] | None = None):
@@ -369,7 +390,7 @@ def run(instance_ids, *, n_explore, replicates, budget_cap, budget_usd, per_call
 
     for iid in instance_ids:
         print(f"\n[forge_v2] instance {iid} (split={split_of[iid]})", flush=True)
-        inst, ctx = pull_context(iid)
+        inst, ctx = _pull_task_context(iid)
         contamination = contamination_state(inst)
         contamination_by_task[iid] = contamination
         for r in range(replicates):
@@ -381,7 +402,7 @@ def run(instance_ids, *, n_explore, replicates, budget_cap, budget_usd, per_call
             b_sm.wall_seconds = time.time() - t0
             sm_resolved, sm_secs, sm_err = (False, 0.0, None)
             if sm["final_patch"].strip() and not b_sm.invalid:
-                sm_resolved, sm_secs, sm_err = grade(inst, sm["final_patch"], timeout=grade_timeout)
+                sm_resolved, sm_secs, sm_err = _grade_task(inst, sm["final_patch"], timeout=grade_timeout)
             # --- tested arm ---
             b_arm = Budget(cap_tokens=budget_cap, cap_usd=budget_usd)
             t0 = time.time()
@@ -396,7 +417,7 @@ def run(instance_ids, *, n_explore, replicates, budget_cap, budget_usd, per_call
             b_arm.wall_seconds = time.time() - t0
             arm_resolved, arm_secs, arm_err = (False, 0.0, None)
             if arm_result["final_patch"].strip() and not b_arm.invalid:
-                arm_resolved, arm_secs, arm_err = grade(inst, arm_result["final_patch"], timeout=grade_timeout)
+                arm_resolved, arm_secs, arm_err = _grade_task(inst, arm_result["final_patch"], timeout=grade_timeout)
 
             any_invalid = any_invalid or b_sm.invalid or b_arm.invalid
             for arm_name, slot_v, fp, res, secs, err, bud in [

@@ -346,6 +346,26 @@ def allocation_rows(allocation_id: str, *, db_path: Path | str = DEFAULT_DB) -> 
     return result
 
 
+def task_for_id(task_id: str, *, db_path: Path | str = DEFAULT_DB) -> dict[str, Any]:
+    """Return a registered task row by id, including its sealed payload."""
+    with closing(connect(db_path)) as conn:
+        row = conn.execute(
+            """
+            SELECT task_id, task_json, source, taskbed, contamination_state,
+                   provenance_json, created_at, active, max_uses_per_epoch
+              FROM taskbed_tasks
+             WHERE task_id=?
+            """,
+            (task_id,),
+        ).fetchone()
+    if row is None:
+        raise TaskbedLedgerError(f"unknown_task_id: {task_id}")
+    result = dict(row)
+    result["task"] = json.loads(result.pop("task_json"))
+    result["provenance"] = json.loads(result.pop("provenance_json") or "{}")
+    return result
+
+
 def allocation_receipt(
     allocation_id: str,
     *,
@@ -415,5 +435,6 @@ __all__ = [
     "connect",
     "register_task",
     "register_tasks",
+    "task_for_id",
     "task_counts",
 ]
