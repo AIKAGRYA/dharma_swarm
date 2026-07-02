@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-02T12:55:46+00:00",
+  "generated_at": "2026-07-02T13:07:15+00:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-spine-adoption-2026-06",
   "shippable": false,
@@ -787,12 +787,6 @@
       "check": "track-in-progress:runtime-truth-spine-adoption-2026-06",
       "message": "[runtime-truth-spine-adoption-2026-06] 7/8 completion criteria pass.",
       "criterion_id": null
-    },
-    {
-      "severity": "INFO",
-      "check": "unverified:loop-closure-2026-06:cybernetics_codex_one_wire_guard_test_passes",
-      "message": "[loop-closure-2026-06] UNVERIFIED \u2014 'cybernetics_codex_one_wire_guard_test_passes' could not run here (not a regression): pytest tests/test_one_wire_archive_fitness_guard.py: pytest not installed (could not execute)",
-      "criterion_id": "cybernetics_codex_one_wire_guard_test_passes"
     },
     {
       "severity": "INFO",
