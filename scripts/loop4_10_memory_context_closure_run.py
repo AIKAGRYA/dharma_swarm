@@ -30,6 +30,7 @@ import hashlib
 import json
 import sqlite3
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -40,7 +41,7 @@ sys.path.insert(0, str(REPO_ROOT))
 TRANSITIONS = ("sense", "interpret", "constrain", "act", "adapt")
 MARKER = "loop410memorycontextclosure"
 WORK_ID = "loop4_10_memory_context_closure_replay_v1"
-DEFAULT_STATE_DIR = Path("/private/tmp/dharma_loop4_10_memory_context_closure_state")
+DEFAULT_STATE_DIR = Path(tempfile.gettempdir()) / "dharma_loop4_10_memory_context_closure_state"
 STATE_SENTINEL = ".loop4_10_memory_context_closure_state"
 
 

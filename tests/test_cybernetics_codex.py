@@ -9,6 +9,7 @@ from dharma_swarm.cybernetics_codex import (
     AGENT_ID,
     CALLSIGN,
     build_audit,
+    build_loop_statuses,
 )
 from dharma_swarm.cybernetics_codex_format import format_markdown
 from dharma_swarm.cybernetics_codex_registration import build_external_worker_registration
@@ -186,6 +187,39 @@ def test_loop1_accepts_a2a_runtime_receipt_truth_without_receipt_json(tmp_path):
     truth = report["runtime"]["provider_truth"]
     assert truth["runtime_receipts"]["rows_with_served_provider_model"] == 1
     assert truth["runtime_receipts"]["sample"]["served_provider"] == "anthropic"
+
+
+def test_loop1_closed_live_requires_later_correlated_routing_read():
+    runtime = {
+        "delegation_runs": {"total": 1, "completed": 1},
+        "failure_codes": [],
+        "provider_truth": {
+            "delegation_runs": {"completed_with_served_provider_model": 1},
+            "runtime_receipts": {"rows_with_served_provider_model": 0},
+            "routing_adaptation": {
+                "has_later_causal_read": False,
+                "latest_served_truth": "2026-06-13T00:01:00Z",
+            },
+        },
+    }
+    bounded = {"loop1": {"harness_proven": True, "tasks_completed": 1, "tasks_requested": 1}}
+
+    rows = {row["number"]: row for row in build_loop_statuses(runtime, {}, {}, bounded_replays=bounded)}
+    assert rows[1]["verdict"] == "HARNESS_PROVEN"
+    assert "no later correlated routing/adaptation read" in rows[1]["blocker"]
+
+    runtime["provider_truth"]["routing_adaptation"] = {
+        "has_later_causal_read": True,
+        "latest_served_truth": "2026-06-13T00:01:00Z",
+        "tables": {
+            "routing_decisions": {
+                "correlated_rows_after_served_truth": 1,
+            },
+        },
+    }
+    rows = {row["number"]: row for row in build_loop_statuses(runtime, {}, {}, bounded_replays=bounded)}
+    assert rows[1]["verdict"] == "CLOSED_LIVE"
+    assert "runtime.provider_truth.routing_adaptation" in rows[1]["evidence"]
 
 
 def test_one_wire_blocks_self_improvement_when_guardian_quorum_missing(tmp_path):

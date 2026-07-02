@@ -26,6 +26,7 @@ import hashlib
 import json
 import shutil
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -54,7 +55,7 @@ def _default_report_path() -> Path:
 
 
 def _default_work_dir(report_path: Path) -> Path:
-    return Path("/private/tmp/dharma_loop7_training_flywheel_closure") / report_path.stem
+    return Path(tempfile.gettempdir()) / "dharma_loop7_training_flywheel_closure" / report_path.stem
 
 
 def _reset_work_dir(work_dir: Path) -> None:

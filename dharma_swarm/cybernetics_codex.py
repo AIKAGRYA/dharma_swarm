@@ -524,6 +524,7 @@ def _served_provider_truth_summary(
     *,
     since: str | None = None,
 ) -> dict[str, Any]:
+    truth_run_ids: set[str] = set()
     out: dict[str, Any] = {
         "definition": (
             "Counts rows carrying actual served provider/model truth. "
@@ -583,6 +584,8 @@ def _served_provider_truth_summary(
                 out["delegation_runs"]["rows_with_served_provider_model"] += 1
                 if status == "completed":
                     out["delegation_runs"]["completed_with_served_provider_model"] += 1
+                    if row["run_id"]:
+                        truth_run_ids.add(str(row["run_id"]))
                 observed_at = row["observed_at"]
                 if (
                     observed_at
@@ -631,7 +634,96 @@ def _served_provider_truth_summary(
                     **truth,
                 }
         out["runtime_receipts"]["unique_runs_with_served_provider_model"] = len(truth_runs)
+        truth_run_ids.update(truth_runs)
 
+    latest_truth = max(
+        (
+            str(value)
+            for value in (
+                out["delegation_runs"]["latest_truth_run"],
+                out["runtime_receipts"]["latest_truth_receipt"],
+            )
+            if value
+        ),
+        default=None,
+    )
+    out["routing_adaptation"] = _routing_adaptation_after_truth_summary(
+        conn,
+        latest_truth=latest_truth,
+        truth_run_ids=truth_run_ids,
+    )
+    return out
+
+
+def _timestamp_column(conn: sqlite3.Connection, table: str) -> str | None:
+    columns = _table_columns(conn, table)
+    for column in ("created_at", "updated_at", "recorded_at", "completed_at", "started_at"):
+        if column in columns:
+            return column
+    return None
+
+
+def _routing_adaptation_after_truth_summary(
+    conn: sqlite3.Connection,
+    *,
+    latest_truth: str | None,
+    truth_run_ids: set[str],
+) -> dict[str, Any]:
+    out: dict[str, Any] = {
+        "latest_served_truth": latest_truth,
+        "truth_run_ids_sample": sorted(truth_run_ids)[:20],
+        "has_later_causal_read": False,
+        "tables": {},
+    }
+    for table in ("routing_decisions", "model_routing_outcomes", "external_outcomes"):
+        if not _table_exists(conn, table):
+            out["tables"][table] = {
+                "exists": False,
+                "rows": 0,
+                "rows_after_served_truth": 0,
+                "correlated_rows_after_served_truth": 0,
+            }
+            continue
+        timestamp_column = _timestamp_column(conn, table)
+        rows = int(conn.execute(f"select count(*) from {table}").fetchone()[0] or 0)
+        latest = (
+            conn.execute(f"select max({timestamp_column}) from {table}").fetchone()[0]
+            if timestamp_column
+            else None
+        )
+        rows_after_truth = 0
+        correlated_after_truth = 0
+        if latest_truth and timestamp_column:
+            rows_after_truth = int(
+                conn.execute(
+                    f"select count(*) from {table} where {timestamp_column} > ?",
+                    (latest_truth,),
+                ).fetchone()[0]
+                or 0
+            )
+            columns = _table_columns(conn, table)
+            if "run_id" in columns and truth_run_ids:
+                placeholders = ",".join("?" for _ in truth_run_ids)
+                correlated_after_truth = int(
+                    conn.execute(
+                        (
+                            f"select count(*) from {table} "
+                            f"where {timestamp_column} > ? and run_id in ({placeholders})"
+                        ),
+                        (latest_truth, *sorted(truth_run_ids)),
+                    ).fetchone()[0]
+                    or 0
+                )
+        out["tables"][table] = {
+            "exists": True,
+            "rows": rows,
+            "timestamp_column": timestamp_column,
+            "latest": latest,
+            "rows_after_served_truth": rows_after_truth,
+            "correlated_rows_after_served_truth": correlated_after_truth,
+        }
+        if correlated_after_truth > 0:
+            out["has_later_causal_read"] = True
     return out
 
 
@@ -907,6 +999,8 @@ def build_loop_statuses(
     runtime_receipt_truth_rows = int(
         runtime_receipt_truth.get("rows_with_served_provider_model") or 0
     )
+    routing_adaptation = provider_truth.get("routing_adaptation") or {}
+    loop1_has_later_routing = bool(routing_adaptation.get("has_later_causal_read"))
     failure_counts = {
         str(r.get("failure_code")): int(r.get("count") or 0)
         for r in runtime.get("failure_codes") or []
@@ -920,6 +1014,7 @@ def build_loop_statuses(
         and total_runs > 0
         and failure_counts.get("dispatch_dropoff", 0) == 0
         and (completed_with_truth > 0 or runtime_receipt_truth_rows > 0)
+        and loop1_has_later_routing
     )
 
     for number, loop_id, label in LOOPS:
@@ -960,6 +1055,8 @@ def build_loop_statuses(
             ]
             if loop1_harness_proven:
                 evidence.append("bounded_replays.loop1")
+            if loop1_has_later_routing:
+                evidence.append("runtime.provider_truth.routing_adaptation")
             if total_runs == 0:
                 status = "UNKNOWN"
                 blocker = "no delegation runs found"
@@ -967,10 +1064,21 @@ def build_loop_statuses(
                 status = "CLOSED_LIVE"
                 blocker = (
                     "audited runtime scope has served provider/model truth, "
-                    "zero dispatch_dropoff, and the Loop 1 replay proves current "
-                    "dispatch receipts"
+                    "zero dispatch_dropoff, a later correlated routing/adaptation "
+                    "read, and the Loop 1 replay proves current dispatch receipts"
                 )
             elif loop1_harness_proven:
+                missing: list[str] = []
+                if failure_counts.get("dispatch_dropoff", 0):
+                    missing.append(
+                        f"dispatch_dropoff={failure_counts.get('dispatch_dropoff', 0)}"
+                    )
+                if completed_with_truth == 0 and runtime_receipt_truth_rows == 0:
+                    missing.append("no served provider/model truth in runtime scope")
+                if not loop1_has_later_routing:
+                    missing.append(
+                        "no later correlated routing/adaptation read after served-provider truth"
+                    )
                 status = "HARNESS_PROVEN"
                 blocker = (
                     "bounded replay proves current Loop 1 harness "
@@ -980,8 +1088,8 @@ def build_loop_statuses(
                     f"evidence_receipts_ok={loop1_replay.get('evidence_receipts_ok')}, "
                     f"served_provider_truth="
                     f"{loop1_replay.get('completed_runs_with_truth')}); "
-                    "not CLOSED_LIVE while the audited daemon history still "
-                    f"includes dispatch_dropoff={failure_counts.get('dispatch_dropoff', 0)}"
+                    "not CLOSED_LIVE: "
+                    + "; ".join(missing or ["live owner-surface criterion not fully met"])
                 )
             elif failure_counts.get("dispatch_dropoff", 0):
                 status = "PARTIAL"

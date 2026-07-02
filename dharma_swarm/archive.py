@@ -122,13 +122,19 @@ def read_one_wire_fitness_authority(state_dir: Path | str) -> OneWireFitnessAuth
     authority = authority if isinstance(authority, dict) else {}
     threshold = threshold if isinstance(threshold, dict) else {}
 
-    required_confirmed = _int_field(
-        threshold.get("required_confirmed_receipts"),
+    required_confirmed = max(
         ONE_WIRE_REQUIRED_CONFIRMED,
+        _int_field(
+            threshold.get("required_confirmed_receipts"),
+            ONE_WIRE_REQUIRED_CONFIRMED,
+        ),
     )
-    required_domains = _int_field(
-        threshold.get("required_distinct_domains"),
+    required_domains = max(
         ONE_WIRE_REQUIRED_DOMAINS,
+        _int_field(
+            threshold.get("required_distinct_domains"),
+            ONE_WIRE_REQUIRED_DOMAINS,
+        ),
     )
     confirmed = _int_field(
         threshold.get(
@@ -461,7 +467,13 @@ def _state_dir_for_governed_archive(path: Path) -> Path | None:
 
 
 def _moves_archive_fitness(entry: ArchiveEntry) -> bool:
-    return entry.fitness.weighted() > 0.0
+    values = [
+        float(getattr(entry.fitness, dimension, 0.0) or 0.0)
+        for dimension in FITNESS_DIMENSIONS
+    ]
+    if any(value < 0.0 or value > 1.0 for value in values):
+        return True
+    return entry.fitness.weighted() != 0.0
 
 
 class EvolutionArchive:

@@ -47,6 +47,8 @@ def _write_guardian(
     domains: int,
     eligible: bool,
     authority: bool,
+    required_confirmed: int = 5,
+    required_domains: int = 3,
 ) -> Path:
     path = state / ONE_WIRE_GUARDIAN_RECEIPT
     path.parent.mkdir(parents=True)
@@ -62,9 +64,9 @@ def _write_guardian(
                     "fitness_authority_granted": authority,
                 },
                 "threshold_guard": {
-                    "required_confirmed_receipts": 5,
+                    "required_confirmed_receipts": required_confirmed,
                     "observed_confirmed_receipts": confirmed,
-                    "required_distinct_domains": 3,
+                    "required_distinct_domains": required_domains,
                     "observed_distinct_domains": domains,
                     "observed_domains": [f"domain-{idx}" for idx in range(domains)],
                 },
@@ -149,6 +151,53 @@ async def test_internal_only_artifact_cannot_self_grant_fitness_authority(tmp_pa
     )
     with pytest.raises(OneWireFitnessAuthorityError, match="N=3/5, M=1/3"):
         await archive.add_entry(entry)
+
+    _assert_no_archive_side_effects(state)
+
+
+@pytest.mark.asyncio
+async def test_guardian_cannot_lower_required_quorum_thresholds(tmp_path):
+    state = _state(tmp_path)
+    _write_guardian(
+        state,
+        confirmed=1,
+        domains=1,
+        eligible=True,
+        authority=True,
+        required_confirmed=0,
+        required_domains=0,
+    )
+    archive = _archive(state)
+
+    authority = read_one_wire_fitness_authority(state)
+    assert authority.required_confirmed == 5
+    assert authority.required_domains == 3
+    with pytest.raises(OneWireFitnessAuthorityError, match="N=1/5, M=1/3"):
+        await archive.add_entry(_fitness_entry())
+
+    _assert_no_archive_side_effects(state)
+
+
+@pytest.mark.asyncio
+async def test_negative_archive_fitness_requires_one_wire_authority(tmp_path):
+    state = _state(tmp_path)
+    archive = _archive(state)
+
+    with pytest.raises(OneWireFitnessAuthorityError, match="receipt missing"):
+        await archive.add_entry(_fitness_entry(fitness=FitnessScore(correctness=-0.1)))
+
+    _assert_no_archive_side_effects(state)
+
+
+@pytest.mark.asyncio
+async def test_out_of_range_neutral_weighted_fitness_requires_one_wire_authority(tmp_path):
+    state = _state(tmp_path)
+    archive = _archive(state)
+    fitness = FitnessScore(correctness=2.0, safety=-6.0)
+    assert fitness.weighted() == 0.0
+
+    with pytest.raises(OneWireFitnessAuthorityError, match="receipt missing"):
+        await archive.add_entry(_fitness_entry(fitness=fitness))
 
     _assert_no_archive_side_effects(state)
 

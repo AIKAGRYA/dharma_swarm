@@ -23,6 +23,7 @@ import hashlib
 import json
 import shutil
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -67,7 +68,7 @@ def _default_history_dir() -> Path:
 
 
 def _default_work_dir(report_path: Path) -> Path:
-    return Path("/private/tmp/dharma_loop8_recognition_closure") / report_path.stem
+    return Path(tempfile.gettempdir()) / "dharma_loop8_recognition_closure" / report_path.stem
 
 
 def _observed_at_for_report(report_path: Path, override: str | None) -> str:
