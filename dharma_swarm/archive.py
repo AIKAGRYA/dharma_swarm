@@ -792,11 +792,20 @@ class EvolutionArchive:
                 has_children.add(e.parent_id)
         entries_by_time = sorted(entries, key=lambda e: e.timestamp)
         old_entries = entries_by_time[:-min_age_entries] if len(entries_by_time) > min_age_entries else []
-        composted = 0
+        candidates: list[ArchiveEntry] = []
         for e in old_entries:
-            if (e.status in FITNESS_BEARING_STATUSES + ("proposed",) and e.fitness.weighted() < threshold and e.id not in has_children):
-                e.status = "composted"
-                composted += 1
+            if (
+                e.status in FITNESS_BEARING_STATUSES + ("proposed",)
+                and e.fitness.weighted() < threshold
+                and e.id not in has_children
+            ):
+                candidates.append(e)
+        for e in candidates:
+            guarded = e.model_copy(update={"status": "composted"})
+            self._assert_fitness_authority(guarded, operation="compact")
+        for e in candidates:
+            e.status = "composted"
+        composted = len(candidates)
         if composted > 0:
             self._rebuild_grid()
             await self._rewrite()

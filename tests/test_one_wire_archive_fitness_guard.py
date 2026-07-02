@@ -343,6 +343,56 @@ async def test_rollback_entry_from_fitness_bearing_row_is_guarded(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_compact_from_legacy_positive_fitness_row_is_guarded(tmp_path):
+    state = _state(tmp_path)
+    archive_path = state / "evolution" / "archive.jsonl"
+    archive_path.parent.mkdir(parents=True)
+    legacy = _fitness_entry(
+        status="proposed",
+        fitness=FitnessScore(correctness=0.1),
+        timestamp="2026-01-01T00:00:00+00:00",
+    )
+    elite = _fitness_entry(
+        status="applied",
+        fitness=FitnessScore(
+            correctness=1.0,
+            dharmic_alignment=1.0,
+            swabhaav_alignment=1.0,
+            performance=1.0,
+            utilization=1.0,
+            economic_value=1.0,
+            elegance=1.0,
+            efficiency=1.0,
+            safety=1.0,
+        ),
+        timestamp="2026-01-02T00:00:00+00:00",
+    )
+    archive_path.write_text(
+        legacy.model_dump_json() + "\n" + elite.model_dump_json() + "\n",
+        encoding="utf-8",
+    )
+
+    archive = _archive(state)
+    await archive.load()
+
+    with pytest.raises(OneWireFitnessAuthorityError, match="receipt missing"):
+        await archive.compact(min_age_entries=1, fitness_percentile=0.0)
+
+    got = await archive.get_entry(legacy.id)
+    assert got is not None
+    assert got.status == "proposed"
+    rows = [
+        json.loads(line)
+        for line in archive_path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert [row["status"] for row in rows] == ["proposed", "applied"]
+
+    _write_guardian(state, confirmed=5, domains=3, eligible=True, authority=True)
+    assert await archive.compact(min_age_entries=1, fitness_percentile=0.0) == 1
+    assert (await archive.get_entry(legacy.id)).status == "composted"
+
+
+@pytest.mark.asyncio
 async def test_zero_fitness_governed_archive_write_does_not_require_guardian(tmp_path):
     state = _state(tmp_path)
     archive = _archive(state)
