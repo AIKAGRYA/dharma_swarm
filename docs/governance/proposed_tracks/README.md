@@ -31,6 +31,29 @@ next strategic `active_track:` once two conditions hold:
 
 ## Current proposals
 
+- `signal-synthesis-desk-2026-07.yaml` — a standing research-ingestion desk:
+  clusters world_radar signals into themes over a rolling window, debates
+  significance with a genuinely provider-diverse panel (gated by the new
+  `panel_diversity.py` fail-closed diversity check), and writes DRAFT
+  `proposed_tracks/*.yaml` entries only — never memory, never ACTIVE
+  promotion. Grew out of a live 4-lens adversarial research trial
+  (`reports/research/2026-07-01_signal_synthesis_live_run/DIGEST.md`) that
+  caught a real hallucinated paper mid-research and found its own panel
+  construction reproduced the exact same-model-no-diversity failure it was
+  meant to judge. Serves `research-depth` (currently zero active tracks),
+  not a 5th `substrate-nativeness` track. Named to avoid colliding with the
+  existing arena `Council` (different job: trace verification, not
+  significance judgment). Authored by claude-code, 2026-07-01.
+- `agentic-design-patterns-cognition-2026-07.yaml` — makes the intra-agent
+  reasoning loop first-class. Deep-read of Antonio Gulli's *Agentic Design
+  Patterns* (21 chapters) mapped against the substrate: 13 patterns already
+  STRONG (the multi-agent/infrastructure layer), 2 deliberately out of scope
+  (Learning/Adaptation is zero-weight by design → arena track; MCP → A2A/NATS
+  lanes), and one coherent PARTIAL cluster remaining — Reflection, Reasoning
+  (CoT/self-consistency), Planning, Prompt-Chaining. Ships a new surface-disjoint
+  `dharma_swarm/cognition/` package + a Slot-4 patterns atlas, benchmarked under
+  budget parity. DRAFT (not a 5th ACTIVE substrate track) pending the three
+  promotion preconditions in the file. Authored by claude-code, 2026-07-01.
 - `spine-adoption-2026-06.yaml` — successor to `runtime-truth-spine-2026-06`
   (which shipped 13/13 by the letter but has zero callers outside the spine
   package and tests as of 2026-05-31). Migrates the five god objects

@@ -741,20 +741,47 @@ def _run_world_scout(job: dict[str, Any]) -> CronJobExecutionResult:
                 state_dir=Path(str(state_dir)).expanduser() if state_dir else None
             ).scan()
         )
+        # Read-only follow-on: turn promotion-ready zeitgeist signals into
+        # MemoryKernel promotion PROPOSALS (READY_FOR_REVIEW, human-gated).
+        # Never mutates memory; defensively wrapped so it can't break the scout.
+        promotion_summary: dict[str, Any] = {}
+        try:
+            from dharma_swarm.knowledge_ops.zeitgeist_promotion import (
+                run_zeitgeist_promotion,
+            )
+
+            promotion_state = (
+                Path(str(state_dir)).expanduser()
+                if state_dir
+                else dharma_state_dir()
+            )
+            promotion_summary = run_zeitgeist_promotion(promotion_state)
+        except Exception as promo_exc:  # noqa: BLE001
+            promotion_summary = {"error": str(promo_exc)[:200]}
+        promotion_error = str(promotion_summary.get("error", ""))
         output = (
             "world_scout: "
             f"raw={result.raw_observations} signals={result.emitted_signals} "
             f"promotion_ready={result.promotion_ready} "
             f"incubations={result.incubations_written} "
             f"zeitgeist={len(canonical_signals)} "
+            f"promotion_proposals={promotion_summary.get('proposal_count', 0)} "
             f"brief={result.brief_path} health={result.health_path}"
         )
+        # Surface a promotion-hook failure so it is not reported identically to a
+        # clean run with zero proposals (the follow-on is non-fatal to the scout,
+        # but a silent write/import failure must be visible to the operator).
+        if promotion_error:
+            output = f"{output} promotion_error={promotion_error}"
         if result.errors:
             output = f"{output} errors={list(result.errors)}"
+        combined_error = "; ".join(result.errors)[:500] if result.errors else ""
+        if promotion_error and not combined_error:
+            combined_error = f"promotion_hook: {promotion_error}"
         return CronJobExecutionResult(
             status=CronJobRunStatus.COMPLETED if result.ok else CronJobRunStatus.FAILED,
             output=output,
-            error="; ".join(result.errors)[:500] if result.errors else "",
+            error=combined_error,
             metadata={
                 "fetch_enabled": True,
                 "raw_observations": result.raw_observations,
@@ -762,6 +789,9 @@ def _run_world_scout(job: dict[str, Any]) -> CronJobExecutionResult:
                 "promotion_ready": result.promotion_ready,
                 "incubations_written": result.incubations_written,
                 "canonical_zeitgeist_signals": len(canonical_signals),
+                "promotion_proposals": promotion_summary.get("proposal_count", 0),
+                "promotion_error": promotion_error,
+                "promotion_review_md": promotion_summary.get("review_md", ""),
                 "board_path": result.board_path,
                 "brief_path": result.brief_path,
                 "health_path": result.health_path,
@@ -877,6 +907,10 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         return _run_revenue_scout(job)
     if handler == "world_scout":
         return _run_world_scout(job)
+    if handler == "signal_deep_sweep":
+        from dharma_swarm.cron_signal_deep_sweep import run_signal_deep_sweep_job
+
+        return run_signal_deep_sweep_job(job)
     if handler == "store_sync":
         return _run_store_sync(job)
     if handler == "shell":

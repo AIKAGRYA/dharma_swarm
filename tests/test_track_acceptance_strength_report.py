@@ -39,6 +39,10 @@ def test_supported_rigorous_kinds_are_scored_from_main_checker() -> None:
         "file_exists": 0,
         "file_contains": 1,
         "commit_on_main": 2,
+        "json_collection_values_match": 2,
+        "json_count_equals": 2,
+        "json_count_greater_than": 2,
+        "json_mapping_keys_nonempty": 2,
         "pr_merged": 2,
         "test_passes": 3,
         "receipt_valid": 5,
@@ -49,6 +53,31 @@ def test_supported_rigorous_kinds_are_scored_from_main_checker() -> None:
             crit["file"] = "CLAUDE.md"
         if kind == "file_contains":
             crit["pattern"] = "dharma"
+        if kind in {"json_count_equals", "json_count_greater_than"}:
+            crit.update({
+                "file": "reports/loop_closure/cybernetics_codex/latest_audit.json",
+                "collection": "loop_statuses",
+                "field": "verdict",
+                "value": "CLOSED_LIVE",
+            })
+            if kind == "json_count_equals":
+                crit["expected"] = 0
+            else:
+                crit["threshold"] = 0
+        if kind == "json_collection_values_match":
+            crit.update({
+                "file": "reports/loop_closure/cybernetics_codex/latest_audit.json",
+                "collection": "loop_statuses",
+                "key_field": "number",
+                "value_field": "verdict",
+                "expected": {"1": "HARNESS_PROVEN"},
+            })
+        if kind == "json_mapping_keys_nonempty":
+            crit.update({
+                "file": "reports/loop_closure/cybernetics_codex/latest_audit.json",
+                "mapping": "live_owner_surface_criteria",
+                "keys": ["loop1"],
+            })
         if kind == "commit_on_main":
             crit["commit"] = "deadbeef"
         if kind == "test_passes":
@@ -172,6 +201,73 @@ closed_tracks: []
     assert track["maturity_floor"] == 0
     assert any(c["malformed"] for c in track["criteria"])
     assert any(w["code"] == "malformed_criteria" for w in track["warnings"])
+
+
+def test_json_count_kinds_require_kind_specific_keys() -> None:
+    base = {
+        "id": "json-count",
+        "file": "reports/loop_closure/cybernetics_codex/latest_audit.json",
+        "collection": "loop_statuses",
+        "field": "verdict",
+        "value": "CLOSED_LIVE",
+    }
+
+    equals_missing_expected = strength.classify_criterion(
+        {"kind": "json_count_equals", "threshold": 0, **base},
+        0,
+    )
+    greater_missing_threshold = strength.classify_criterion(
+        {"kind": "json_count_greater_than", "expected": 0, **base},
+        1,
+    )
+    base_without_value = {k: v for k, v in base.items() if k != "value"}
+    equals_missing_value = strength.classify_criterion(
+        {"kind": "json_count_equals", "expected": 0, **base_without_value},
+        2,
+    )
+    greater_missing_value = strength.classify_criterion(
+        {"kind": "json_count_greater_than", "threshold": 0, **base_without_value},
+        3,
+    )
+    equals_valid = strength.classify_criterion(
+        {"kind": "json_count_equals", "expected": 0, **base},
+        4,
+    )
+    greater_valid = strength.classify_criterion(
+        {"kind": "json_count_greater_than", "threshold": 0, **base},
+        5,
+    )
+    equals_missing_nested_value = strength.classify_criterion(
+        {
+            "kind": "json_count_equals",
+            "expected": 0,
+            "file": base["file"],
+            "collection": base["collection"],
+            "field": base["field"],
+            "id": base["id"],
+        },
+        6,
+    )
+    greater_missing_nested_value = strength.classify_criterion(
+        {
+            "kind": "json_count_greater_than",
+            "threshold": 0,
+            "file": base["file"],
+            "collection": base["collection"],
+            "field": base["field"],
+            "id": base["id"],
+        },
+        7,
+    )
+
+    assert equals_missing_expected.malformed is True
+    assert greater_missing_threshold.malformed is True
+    assert equals_missing_nested_value.malformed is True
+    assert greater_missing_nested_value.malformed is True
+    assert equals_valid.malformed is False
+    assert greater_valid.malformed is False
+    assert equals_missing_value.malformed is True
+    assert greater_missing_value.malformed is True
 
 
 def test_non_active_statuses_are_not_counted_as_active(tmp_path: Path) -> None:

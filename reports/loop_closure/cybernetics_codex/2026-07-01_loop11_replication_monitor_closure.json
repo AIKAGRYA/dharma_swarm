@@ -1,0 +1,311 @@
+{
+  "act_evidence": {
+    "child_agent_name": "replication_monitor_closure_analyst_g1_20260701",
+    "child_spec": {
+      "audit_cycle_seconds": 0.0,
+      "backup_models": [
+        "claude-sonnet-4-20250514",
+        "deepseek/deepseek-chat-v3-0324"
+      ],
+      "constitutional_gates": [
+        "REVERSIBILITY",
+        "WITNESS",
+        "SATYA",
+        "VYAVASTHIT"
+      ],
+      "default_model": "local-bounded-replay",
+      "default_provider": "openrouter_free",
+      "domain": "Replication monitor closure verification",
+      "layer": "director",
+      "max_concurrent_workers": 3,
+      "memory_namespace": "replication_monitor_closure_analyst_g1_20260701",
+      "metadata": {
+        "capability_gap": "loop11 replication monitor closure proof",
+        "generation": 1,
+        "parent": "systems_architect"
+      },
+      "name": "replication_monitor_closure_analyst_g1_20260701",
+      "role": "systems_architect",
+      "spawn_authority": [
+        "replication_auditor"
+      ],
+      "system_prompt": "You are the SYSTEMS ARCHITECT of dharma_swarm \u2014 the builder. You own the codebase: 118K+ lines, 260+ modules, 4300+ tests. You understand how every subsystem connects and breaks. You spawn code workers for implementation, but YOU make the architectural decisions: where to put new code, how to wire subsystems, when to refactor vs extend. Interface canonicalization is your north star \u2014 better contracts between fewer components, not more components. REVERSIBILITY: every code change must be revertable. WITNESS: log architectural decisions with rationale.\n\n\n## Specialization (Replication monitor closure verification)\nYou were created to fill a capability gap: loop11 replication monitor closure proof\n\nTrack proposal lifecycle state and probation receipts.\n\nYou inherit all kernel axioms and telos gates from your parent.\nYour actions are monitored during probation.",
+      "vsm_function": "Replicated from systems_architect for: loop11 replication monitor closure proof"
+    },
+    "dynamic_roster_path": "$TMPDIR/.dharma/replication/dynamic_roster.json",
+    "genome_path": "$TMPDIR/.dharma/replication/genomes/replication_monitor_closure_analyst_g1_20260701.json",
+    "surface": "ReplicationProtocol._materialize",
+    "witness_events": [
+      "G1_PASS",
+      "S_PASS",
+      "G2_PASS",
+      "M_MATERIALIZED"
+    ]
+  },
+  "adapt_evidence": {
+    "after": {
+      "child_agent_name": "replication_monitor_closure_analyst_g1_20260701",
+      "dynamic_roster_has_child": true,
+      "materialized_count": 1,
+      "pending_count": 0,
+      "probation_has_child": true,
+      "witness_entries": 4
+    },
+    "before": {
+      "dynamic_roster_count": 0,
+      "pending_count": 1,
+      "witness_entries": 0
+    },
+    "later_cycle_read": {
+      "child_loaded_from_restarted_roster": true,
+      "materialized_statuses": 1,
+      "pending_after": 0,
+      "pending_before": 1,
+      "probation_loaded_for_child": true,
+      "witness_events_after": [
+        "G1_PASS",
+        "S_PASS",
+        "G2_PASS",
+        "M_MATERIALIZED"
+      ]
+    },
+    "surface": "later monitor reads proposals, roster, probation from disk"
+  },
+  "adapt_proof": {
+    "after": {
+      "child_agent_name": "replication_monitor_closure_analyst_g1_20260701",
+      "dynamic_roster_has_child": true,
+      "materialized_count": 1,
+      "pending_count": 0,
+      "probation_has_child": true,
+      "witness_entries": 4
+    },
+    "before": {
+      "dynamic_roster_count": 0,
+      "pending_count": 1,
+      "witness_entries": 0
+    },
+    "fed_forward": true,
+    "field": "ReplicationProtocol durable proposals/dynamic_roster/probation state",
+    "later_cycle_read": {
+      "child_loaded_from_restarted_roster": true,
+      "materialized_statuses": 1,
+      "pending_after": 0,
+      "pending_before": 1,
+      "probation_loaded_for_child": true,
+      "witness_events_after": [
+        "G1_PASS",
+        "S_PASS",
+        "G2_PASS",
+        "M_MATERIALIZED"
+      ]
+    }
+  },
+  "constrain_evidence": {
+    "gate_results": {
+      "decision": "review",
+      "gate_results": {
+        "AHIMSA": [
+          "PASS",
+          ""
+        ],
+        "ANEKANTA": [
+          "FAIL",
+          "Insufficient epistemological diversity: only 0 frame(s)"
+        ],
+        "BHED_GNAN": [
+          "PASS",
+          "Doer-witness distinction noted"
+        ],
+        "CONSENT": [
+          "PASS",
+          "Permission system active"
+        ],
+        "DOGMA_DRIFT": [
+          "PASS",
+          "No dogma drift detected"
+        ],
+        "REVERSIBILITY": [
+          "PASS",
+          ""
+        ],
+        "SATYA": [
+          "PASS",
+          ""
+        ],
+        "STEELMAN": [
+          "PASS",
+          "No proposal context for steelman check"
+        ],
+        "SVABHAAVA": [
+          "FAIL",
+          "Low epistemological diversity: Insufficient epistemological diversity: only 0 frame(s)"
+        ],
+        "VYAVASTHIT": [
+          "PASS",
+          ""
+        ],
+        "WITNESS": [
+          "PASS",
+          "Not a reading operation"
+        ]
+      },
+      "reason": "Advisory: Low epistemological diversity: Insufficient epistemological diversity: only 0 frame(s); Insufficient epistemological diversity: only 0 frame(s)"
+    },
+    "population_cap": 8,
+    "surface": "ReplicationProtocol._assess_need + _check_gates"
+  },
+  "cycle_detail": [
+    {
+      "child_agent_name": "replication_monitor_closure_analyst_g1_20260701",
+      "cycle": 1,
+      "gate_results": {
+        "decision": "review",
+        "gate_results": {
+          "AHIMSA": [
+            "PASS",
+            ""
+          ],
+          "ANEKANTA": [
+            "FAIL",
+            "Insufficient epistemological diversity: only 0 frame(s)"
+          ],
+          "BHED_GNAN": [
+            "PASS",
+            "Doer-witness distinction noted"
+          ],
+          "CONSENT": [
+            "PASS",
+            "Permission system active"
+          ],
+          "DOGMA_DRIFT": [
+            "PASS",
+            "No dogma drift detected"
+          ],
+          "REVERSIBILITY": [
+            "PASS",
+            ""
+          ],
+          "SATYA": [
+            "PASS",
+            ""
+          ],
+          "STEELMAN": [
+            "PASS",
+            "No proposal context for steelman check"
+          ],
+          "SVABHAAVA": [
+            "FAIL",
+            "Low epistemological diversity: Insufficient epistemological diversity: only 0 frame(s)"
+          ],
+          "VYAVASTHIT": [
+            "PASS",
+            ""
+          ],
+          "WITNESS": [
+            "PASS",
+            "Not a reading operation"
+          ]
+        },
+        "reason": "Advisory: Low epistemological diversity: Insufficient epistemological diversity: only 0 frame(s); Insufficient epistemological diversity: only 0 frame(s)"
+      },
+      "outcome_success": true,
+      "pending_before": 1,
+      "phase": "monitor_read_and_materialize"
+    },
+    {
+      "child_loaded_from_restarted_roster": true,
+      "cycle": 2,
+      "materialized_statuses": 1,
+      "pending_after": 0,
+      "pending_before": 1,
+      "phase": "monitor_later_read",
+      "probation_loaded_for_child": true,
+      "witness_events_after": [
+        "G1_PASS",
+        "S_PASS",
+        "G2_PASS",
+        "M_MATERIALIZED"
+      ]
+    }
+  ],
+  "cycles": 2,
+  "interpret_evidence": {
+    "capability_gap": "loop11 replication monitor closure proof",
+    "parent_agent": "systems_architect",
+    "severity": 0.72,
+    "surface": "ReplicationProtocol._validate_proposal"
+  },
+  "later_cycle_read_evidence": {
+    "child_loaded_from_restarted_roster": true,
+    "materialized_statuses": 1,
+    "pending_after": 0,
+    "pending_before": 1,
+    "probation_loaded_for_child": true,
+    "witness_events_after": [
+      "G1_PASS",
+      "S_PASS",
+      "G2_PASS",
+      "M_MATERIALIZED"
+    ]
+  },
+  "loop": 11,
+  "loop_id": "replication_monitor",
+  "observed_at": "2026-07-01T15:16:39.397018Z",
+  "provider_truth": {
+    "boundary": "ReplicationProtocol local materialization; no provider dispatch",
+    "external_provider_called": false,
+    "served_model": null,
+    "served_provider": null
+  },
+  "real_data": true,
+  "sense_evidence": {
+    "pending_before": [
+      {
+        "capability_gap": "loop11 replication monitor closure proof",
+        "child_agent_name": null,
+        "evidence_cycles": [
+          9,
+          11
+        ],
+        "evidence_metadata": {
+          "bounded_replay": true,
+          "source": "scripts/loop9_11_conductor_replication_closure_run.py"
+        },
+        "failure_reason": null,
+        "generation": 0,
+        "justification": "Loop 11 bounded replay needs a durable child-lifecycle action.",
+        "materialized_at": null,
+        "parent_agent": "systems_architect",
+        "proposed_role": "replication monitor closure analyst",
+        "proposed_spec_delta": {
+          "domain": "Replication monitor closure verification",
+          "model": "local-bounded-replay",
+          "prompt_suffix": "Track proposal lifecycle state and probation receipts.",
+          "provider": "openrouter_free",
+          "spawn_authority": [
+            "replication_auditor"
+          ],
+          "wake_interval": 7200.0
+        },
+        "resource_estimate": {
+          "estimated_daily_tokens": 0,
+          "model_cost_per_day": 0.0
+        },
+        "severity": 0.72,
+        "status": "proposed"
+      }
+    ],
+    "proposals_path": "$TMPDIR/.dharma/replication/proposals.jsonl",
+    "surface": "ReplicationProtocol.get_pending_proposals"
+  },
+  "state_dir": "$TMPDIR/.dharma",
+  "tick_errors": [],
+  "transitions_receipted": {
+    "act": true,
+    "adapt": true,
+    "constrain": true,
+    "interpret": true,
+    "sense": true
+  }
+}

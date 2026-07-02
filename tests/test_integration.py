@@ -20,7 +20,12 @@ from pathlib import Path
 
 import pytest
 
-from dharma_swarm.archive import ArchiveEntry, EvolutionArchive, FitnessScore
+from dharma_swarm.archive import (
+    ArchiveEntry,
+    EvolutionArchive,
+    FitnessScore,
+    ONE_WIRE_GUARDIAN_RECEIPT,
+)
 from dharma_swarm.bridge import PairedMeasurement, ResearchBridge
 from dharma_swarm.elegance import EleganceScore, evaluate_diff_elegance, evaluate_elegance
 from dharma_swarm.evolution import (
@@ -89,8 +94,39 @@ def _gate_ready_description(summary: str) -> str:
     )
 
 
+def _write_test_one_wire_fitness_authority(state_dir: Path) -> Path:
+    """Seed the guardian receipt required by governed evolution archives."""
+    path = state_dir / ONE_WIRE_GUARDIAN_RECEIPT
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "test.one_wire_guardian.v1",
+                "authority_result": {
+                    "confirmed_receipt_count": 5,
+                    "domain_count": 3,
+                    "eligible_to_set_archive_fitness": True,
+                    "archive_fitness_changed": False,
+                    "fitness_authority_granted": True,
+                },
+                "threshold_guard": {
+                    "required_confirmed_receipts": 5,
+                    "observed_confirmed_receipts": 5,
+                    "required_distinct_domains": 3,
+                    "observed_distinct_domains": 3,
+                    "observed_domains": ["unit", "integration", "archive"],
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
 async def _init_engine(tmp_path: Path) -> DarwinEngine:
     """Create and initialize a DarwinEngine rooted in tmp_path."""
+    _write_test_one_wire_fitness_authority(tmp_path)
     paths = _engine_paths(tmp_path)
     engine = DarwinEngine(**paths)
     await engine.init()
