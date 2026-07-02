@@ -48,7 +48,7 @@ def test_grade_genome_routes_scaffold_to_forge_runner_confirm() -> None:
     assert captured["n_explore"] == 0
     assert captured["arm"] == "verify_chain"
     assert captured["gen_id"] == "glm-5.2"
-    assert captured["ver_id"] == "moonshotai/kimi-k2.6"
+    assert captured["ver_id"] == "kimi-k2.7-code:cloud"
     assert fitness.real_grade is True
     assert fitness.fitness == pytest.approx(0.06)
     assert fitness.promote_eligible is True

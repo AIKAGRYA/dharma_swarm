@@ -12,9 +12,6 @@ import sys
 from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Literal
 
-from dharma_swarm.model_hierarchy import default_model
-from dharma_swarm.models import ProviderType
-
 from . import runner
 from .promote import DEFAULT_PREREGISTERED_MDE, MIN_CONFIRM_N_FOR_PROMOTION, MIN_PROMOTION_EFFECT
 
@@ -23,11 +20,11 @@ SUBPROCESS_RESULT_PREFIX = "FORGE_GENOME_FITNESS_JSON "
 
 
 def _default_generator() -> str:
-    return default_model(ProviderType.ZHIPU)
+    return runner.DEFAULT_FORGE_GENERATOR_MODEL
 
 
 def _default_verifier() -> str:
-    return default_model(ProviderType.OPENROUTER)
+    return runner.DEFAULT_FORGE_VERIFIER_MODEL
 
 
 @dataclass(frozen=True)

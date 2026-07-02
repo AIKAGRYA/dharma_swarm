@@ -458,6 +458,42 @@ def strong_vendor_model_ids() -> tuple[str, ...]:
     return tuple(out)
 
 
+def forge_high_slot_model_ids() -> tuple[str, ...]:
+    """Provider-specific ids allowed for Forge generator/verifier high slots.
+
+    Forge's top-level evolution roles use the post-2026-04 frontier ladder: GLM
+    5.2 first-party first, then the newest Kimi/DeepSeek/MiniMax/Qwen routes.
+    This projection deliberately lives in the pool so Forge does not grow a
+    second hardcoded model list.
+    """
+    out: list[str] = []
+    zhipu_default = default_for_provider(ProviderType.ZHIPU)
+    if zhipu_default:
+        out.append(zhipu_default)
+    for entry_id in (
+        "kimi-k2.7-code",
+        "deepseek-v4-pro",
+        "minimax-m3",
+        "qwen3-coder:480b-cloud",
+        "kimi-for-coding",
+    ):
+        entry = get_entry(entry_id)
+        if entry is None or entry.below_floor:
+            continue
+        for route in entry.routes:
+            if route.model_id not in out:
+                out.append(route.model_id)
+    return tuple(out)
+
+
+def forge_default_high_slot_verifier_id() -> str:
+    """Default Forge verifier id from the high-slot pool projection."""
+    entry = get_entry("kimi-k2.7-code")
+    if entry is None or not entry.routes:
+        return default_for_provider(ProviderType.KIMI_CODE)
+    return entry.routes[0].model_id
+
+
 __all__ = [
     "Route",
     "ModelEntry",
@@ -472,6 +508,8 @@ __all__ = [
     "default_for_provider",
     "live_routes",
     "best_live_route",
+    "forge_default_high_slot_verifier_id",
+    "forge_high_slot_model_ids",
     "provider_model_ids",
     "ollama_cloud_model_ids",
     "strong_vendor_model_ids",

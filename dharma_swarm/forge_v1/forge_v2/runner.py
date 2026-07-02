@@ -14,6 +14,7 @@ Run:
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import os
 import sys
@@ -33,6 +34,12 @@ bootstrap_runtime_env()
 from dharma_swarm.daemon_config import dharma_state_dir  # noqa: E402
 from dharma_swarm.forge_v1.autoloop import grade, pull_context, _safe  # noqa: E402
 from dharma_swarm.forge_v1.canonical import _call, _provider_for_slot, pool_slots, KIMI_TEMP1  # noqa: E402
+from dharma_swarm.model_pool import (  # noqa: E402
+    default_for_provider,
+    forge_default_high_slot_verifier_id,
+    forge_high_slot_model_ids,
+)
+from dharma_swarm.models import ProviderType  # noqa: E402
 
 from .arms import (
     GEN_TEMPLATE,
@@ -50,6 +57,11 @@ from .stats import paired_bootstrap_ci, positive_claim_gate, replicate_variance
 
 RUN_ROOT = dharma_state_dir() / "forge_v1" / "forge_v2"
 _TIER = {"frontier": 0, "strong": 1, "fast": 2, "free": 3, "local": 4}
+FORGE_HIGH_SLOT_MIN_RELEASE_DATE = "2026-04-01"
+DEFAULT_FORGE_HIGH_SLOT_PROBE_TIMEOUT_S = 20
+DEFAULT_FORGE_GENERATOR_MODEL = default_for_provider(ProviderType.ZHIPU)
+DEFAULT_FORGE_VERIFIER_MODEL = forge_default_high_slot_verifier_id()
+FORGE_HIGH_SLOT_MODEL_IDS = forge_high_slot_model_ids()
 
 
 class _SimpleSlot:
@@ -102,17 +114,117 @@ def _slot_for_id(model_id: str):
     return None
 
 
+def _dedupe_model_ids(model_ids: list[str] | tuple[str, ...]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for model_id in model_ids:
+        mid = (model_id or "").strip()
+        key = mid.lower()
+        if not mid or key in seen:
+            continue
+        seen.add(key)
+        out.append(mid)
+    return out
+
+
+def _is_high_slot_model_id(model_id: str) -> bool:
+    """True iff ``model_id`` is allowed for Forge generator/verifier slots.
+
+    Forge high slots are deliberately stricter than the general Dharma router:
+    they may use only the operator-curated post-2026-04 frontier ladder. Older or
+    sub-floor models can still be used as delegated workhorses elsewhere, but not
+    as the top-level evolution grader/generator unless explicitly overridden.
+    """
+    if os.environ.get("FORGE_ALLOW_LEGACY_HIGH_SLOT") == "1":
+        return True
+    mid = (model_id or "").strip()
+    if mid in FORGE_HIGH_SLOT_MODEL_IDS:
+        return True
+    return False
+
+
+def _high_slot_candidate_ids(*preferred_ids: str | None) -> list[str]:
+    preferred = [model_id for model_id in preferred_ids if model_id]
+    return _dedupe_model_ids([*preferred, *FORGE_HIGH_SLOT_MODEL_IDS])
+
+
+def _high_slot_probe_timeout_s(timeout_s: int) -> int:
+    configured = int(
+        os.environ.get(
+            "FORGE_HIGH_SLOT_PROBE_TIMEOUT_S",
+            str(DEFAULT_FORGE_HIGH_SLOT_PROBE_TIMEOUT_S),
+        )
+    )
+    return max(1, min(int(timeout_s), configured))
+
+
 def _probe(slot, timeout_s=40) -> bool:
     try:
         prov, wire = _provider_for_slot(slot, timeout_s=timeout_s)
         temp = 1.0 if slot.model_id in KIMI_TEMP1 else 0.2
         # 256 (not 16): reasoning models (gemini-2.5-*) spend tokens on internal
         # thinking before visible output; 16 truncates to empty -> false-negative.
-        text, _, _ = _call(prov, wire, "Reply with the single word OK.", max_tokens=256,
-                           temperature=temp, timeout_s=timeout_s)
-        return bool((text or "").strip())
+        from dharma_swarm.models import LLMRequest
+
+        req = LLMRequest(
+            model=wire,
+            messages=[{"role": "user", "content": "Reply with the single word OK."}],
+            max_tokens=256,
+            temperature=temp,
+        )
+
+        async def _once():
+            return await asyncio.wait_for(prov.complete(req), timeout=timeout_s)
+
+        response = asyncio.run(_once())
+        return bool((getattr(response, "content", "") or "").strip())
     except Exception:
         return False
+
+
+def _resolve_high_slot_pair(gen_id: str | None, ver_id: str | None, *, timeout_s: int):
+    """Resolve Forge's generator/verifier through the recent-frontier ladder.
+
+    This is not the general Dharma Swarm fallback router. It is the stricter
+    Forge high-slot policy: exact pins are tried first only if they satisfy the
+    recent-frontier floor; then the curated >=2026-04 ladder is probed. The first
+    callable model becomes generator, and the first callable cross-family model
+    becomes verifier.
+    """
+    callable_slots: list = []
+    rows: list[dict] = []
+    probe_timeout_s = _high_slot_probe_timeout_s(timeout_s)
+    for model_id in _high_slot_candidate_ids(gen_id, ver_id):
+        slot = _slot_for_id(model_id)
+        row = {
+            "role": "forge_high_slot_candidate",
+            "model_id": model_id,
+            "high_slot_min_release_date": FORGE_HIGH_SLOT_MIN_RELEASE_DATE,
+            "probe_timeout_s": probe_timeout_s,
+        }
+        if slot is None:
+            row.update({"callable": False, "error": "unresolved_model_id"})
+            rows.append(row)
+            continue
+        row["provider"] = getattr(slot.provider, "value", str(slot.provider))
+        if not _is_high_slot_model_id(slot.model_id):
+            row.update({"callable": False, "error": "below_recent_high_slot_floor"})
+            rows.append(row)
+            continue
+        ok = _probe(slot, timeout_s=probe_timeout_s)
+        row["callable"] = ok
+        rows.append(row)
+        if ok:
+            callable_slots.append(slot)
+            if len({_family(candidate.model_id) for candidate in callable_slots}) >= 2:
+                break
+
+    gen = callable_slots[0] if callable_slots else None
+    ver = None
+    if gen is not None:
+        gfam = _family(gen.model_id)
+        ver = next((slot for slot in callable_slots[1:] if _family(slot.model_id) != gfam), None)
+    return gen, ver, callable_slots, rows
 
 
 def _callable_roster(n: int, strategy: str, timeout_s: int = 40) -> tuple[list, list]:
@@ -198,21 +310,19 @@ def run(instance_ids, *, n_explore, replicates, budget_cap, budget_usd, per_call
     if arm not in {"verify_chain", "mixed_moa"}:
         raise ValueError(f"unknown Forge v2 arm: {arm}")
 
-    # Reproducible fast path: both generator+verifier pinned -> resolve+probe them
-    # directly (skip the slow stochastic census). Else census the pool and pick.
-    if gen_id and ver_id:
-        gen, ver = _slot_for_id(gen_id), _slot_for_id(ver_id)
-        probe_rows = []
-        for tag, s in (("generator", gen), ("verifier", ver)):
-            ok = s is not None and _probe(s)
-            probe_rows.append({"role": tag, "model_id": getattr(s, "model_id", gen_id if tag == "generator" else ver_id),
-                               "callable": ok})
-            if not ok:
-                print(f"[forge_v2] pinned {tag} {gen_id if tag=='generator' else ver_id} not callable", flush=True)
-        if gen is None or ver is None or not all(r["callable"] for r in probe_rows):
-            gen = gen if (gen and probe_rows[0]["callable"]) else None
-            ver = ver if (ver and probe_rows[1]["callable"]) else None
-        callable_slots = [s for s in (gen, ver) if s is not None]
+    # Reproducible fast path: walk the explicit recent-frontier ladder instead
+    # of drawing a stochastic roster or silently downgrading to old workhorse
+    # lanes. The old stochastic census is opt-in for experiments only.
+    if gen_id or ver_id or os.environ.get("FORGE_ALLOW_STOCHASTIC_HIGH_SLOT") != "1":
+        gen, ver, callable_slots, probe_rows = _resolve_high_slot_pair(
+            gen_id,
+            ver_id,
+            timeout_s=timeout_s,
+        )
+        if gen_id and (gen is None or gen.model_id != gen_id):
+            print(f"[forge_v2] generator {gen_id} not callable; trying recent-frontier fallback", flush=True)
+        if ver_id and (ver is None or ver.model_id != ver_id):
+            print(f"[forge_v2] verifier {ver_id} not callable; trying recent-frontier fallback", flush=True)
     else:
         print(f"[forge_v2] roster census (strategy={strategy}, n={roster_n}) ...", flush=True)
         callable_slots, probe_rows = _callable_roster(roster_n, strategy)
@@ -229,8 +339,9 @@ def run(instance_ids, *, n_explore, replicates, budget_cap, budget_usd, per_call
         rr = RunReceipt(mission_class="verifier_role", timestamp=int(time.time()),
                         closeout="blocked_with_evidence",
                         arm=arm, class_null="self_moa", artifact_dir=str(out),
-                        next_experiment="no callable cross-family model set from pool this draw; "
-                                        "pin --generator/--verifier/--mix-models to known-callable ids")
+                        next_experiment="no callable cross-family model set inside the Forge "
+                                        f"recent-frontier floor (min_release_date={FORGE_HIGH_SLOT_MIN_RELEASE_DATE}); "
+                                        "restore a high-slot provider key or pin an explicit allowed route")
         (out / "decision_record.json").write_text(json.dumps(asdict(rr), indent=2, default=str))
         print("[forge_v2] BLOCKED: no callable cross-family model set.", flush=True)
         return asdict(rr)
@@ -400,8 +511,8 @@ def main(argv=None) -> int:
     ap.add_argument("--timeout-s", type=int, default=240)
     ap.add_argument("--strategy", default="explore")
     ap.add_argument("--roster-n", type=int, default=14)
-    ap.add_argument("--generator", default="glm-5.2", help="pin generator model id (reproducible)")
-    ap.add_argument("--verifier", default="moonshotai/kimi-k2.6", help="pin verifier model id (cross-family)")
+    ap.add_argument("--generator", default=DEFAULT_FORGE_GENERATOR_MODEL, help="pin generator model id (reproducible)")
+    ap.add_argument("--verifier", default=DEFAULT_FORGE_VERIFIER_MODEL, help="pin verifier model id (cross-family)")
     ap.add_argument("--arm", default="verify_chain", choices=["verify_chain", "mixed_moa"])
     ap.add_argument("--mix-models", default="", help="comma-separated pinned model ids for mixed_moa")
     ap.add_argument("--label", default="verifier_role")
