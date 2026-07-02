@@ -14,6 +14,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
+from dharma_swarm.daemon_config import dharma_state_dir
 from dharma_swarm.execution_profile import EvidenceTier, PromotionState
 from dharma_swarm.models import _new_id, _utc_now
 from dharma_swarm.merkle_log import MerkleLog
@@ -457,10 +458,25 @@ class MAPElitesGrid:
 _DEFAULT_ARCHIVE_PATH = Path.home() / ".dharma" / "evolution" / "archive.jsonl"
 
 
+def _same_path(left: Path, right: Path) -> bool:
+    return left.expanduser().resolve(strict=False) == right.expanduser().resolve(strict=False)
+
+
 def _state_dir_for_governed_archive(path: Path) -> Path | None:
     expanded = path.expanduser()
-    if expanded.name == "archive.jsonl" and expanded.parent.name == "evolution":
-        return expanded.parent.parent
+    if expanded.name != "archive.jsonl" or expanded.parent.name != "evolution":
+        return None
+    state_dir = expanded.parent.parent
+    if state_dir.name == ".dharma":
+        return state_dir
+    governed_roots = {
+        dharma_state_dir(),
+        dharma_state_dir("DHARMA_HOME"),
+        dharma_state_dir("DHARMA_STATE_DIR"),
+        dharma_state_dir("DHARMA_STATE_DIR", "DHARMA_HOME"),
+    }
+    if any(_same_path(state_dir, root) for root in governed_roots):
+        return state_dir
     return None
 
 

@@ -245,14 +245,31 @@ async def test_fully_eligible_synthetic_guardian_allows_temp_archive_fitness(tmp
 
 
 @pytest.mark.asyncio
-async def test_custom_state_dir_archive_requires_one_wire_authority(tmp_path):
+async def test_custom_state_dir_archive_requires_one_wire_authority(tmp_path, monkeypatch):
     state = tmp_path / "custom-dharma-state"
+    monkeypatch.setenv("DHARMA_STATE_DIR", str(state))
     archive = EvolutionArchive(path=state / "evolution" / "archive.jsonl")
 
     with pytest.raises(OneWireFitnessAuthorityError, match="receipt missing"):
         await archive.add_entry(_fitness_entry())
 
     assert not (state / "evolution" / "archive.jsonl").exists()
+
+
+@pytest.mark.asyncio
+async def test_scratch_archive_path_does_not_infer_one_wire_guard(tmp_path):
+    scratch = tmp_path / "scratch"
+    archive = EvolutionArchive(path=scratch / "evolution" / "archive.jsonl")
+
+    assert archive.fitness_guard_state_dir is None
+    assert archive.enforce_one_wire is False
+
+    entry_id = await archive.add_entry(_fitness_entry())
+
+    got = await archive.get_entry(entry_id)
+    assert got is not None
+    assert got.fitness.weighted() > 0.0
+    assert (scratch / "evolution" / "archive.jsonl").exists()
 
 
 @pytest.mark.asyncio
