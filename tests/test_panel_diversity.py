@@ -40,6 +40,31 @@ def test_two_or_more_distinct_providers_meets_floor() -> None:
     assert report.distinct_provider_count == 3
     assert report.verdict == "genuine_diversity"
     assert report.safe_to_trust_consensus is True
+    assert report.distinct_model_family_count == 3
+
+
+def test_two_provider_lanes_with_one_model_family_fail_floor() -> None:
+    assignments = (
+        LensAssignment(role="api", provider=ProviderType.ANTHROPIC),
+        LensAssignment(role="cli", provider=ProviderType.CLAUDE_CODE),
+    )
+    report = check_panel_diversity(assignments)
+    assert report.distinct_provider_count == 2
+    assert report.model_families_used == ("claude",)
+    assert report.meets_family_floor is False
+    assert report.verdict == "single_model_multi_persona"
+
+
+def test_hosted_lanes_with_same_default_family_fail_floor() -> None:
+    assignments = (
+        LensAssignment(role="a", provider=ProviderType.SILICONFLOW),
+        LensAssignment(role="b", provider=ProviderType.TOGETHER),
+        LensAssignment(role="c", provider=ProviderType.FIREWORKS),
+    )
+    report = check_panel_diversity(assignments)
+    assert report.distinct_provider_count == 3
+    assert report.model_families_used == ("qwen3-coder",)
+    assert report.verdict == "single_model_multi_persona"
 
 
 def test_empty_assignments_is_insufficient_data_not_a_crash() -> None:

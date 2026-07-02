@@ -233,7 +233,9 @@ def _proposal_from_signal(row: dict[str, Any]) -> MemoryPromotionProposal | None
         canon_risk="unknown",
         pii_risk="unknown",
         projection_of=(),
-        has_content=bool(description or title),
+        # These rows reference public external content for review; they are
+        # not themselves content-bearing MemoryKernel atoms.
+        has_content=False,
     )
 
 

@@ -28,12 +28,12 @@ def _as_bool(value: Any, default: bool = False) -> bool:
     return default
 
 
-def _as_int(value: Any, default: int) -> int:
+def _as_int(value: Any, default: int, *, minimum: int = 1) -> int:
     try:
         parsed = int(value)
     except (TypeError, ValueError):
         return default
-    return parsed if parsed > 0 else default
+    return parsed if parsed >= minimum else default
 
 
 def run_signal_deep_sweep_job(job: dict[str, Any]) -> CronJobExecutionResult:
@@ -66,7 +66,11 @@ def run_signal_deep_sweep_job(job: dict[str, Any]) -> CronJobExecutionResult:
 
         state_dir = job.get("state_dir") or None
         state_path = Path(str(state_dir)).expanduser() if state_dir else dharma_state_dir()
-        max_verifications = _as_int(job.get("max_verifications"), DEFAULT_MAX_VERIFICATIONS)
+        max_verifications = _as_int(
+            job.get("max_verifications"),
+            DEFAULT_MAX_VERIFICATIONS,
+            minimum=0,
+        )
         result = asyncio.run(
             run_deep_sweep(
                 state_path,
@@ -87,13 +91,21 @@ def run_signal_deep_sweep_job(job: dict[str, Any]) -> CronJobExecutionResult:
         )
         errors = [
             e
-            for e in (result.get("scout_error"), result.get("verification_error"), result.get("synthesis_error"))
+            for e in (
+                result.get("scout_error"),
+                result.get("ingest_error"),
+                result.get("verification_error"),
+                result.get("synthesis_error"),
+            )
             if e
         ]
         if errors:
             output = f"{output} errors={errors}"
+        status = CronJobRunStatus.COMPLETED
+        if result.get("scout_error") and int(result.get("movements_count") or 0) == 0:
+            status = CronJobRunStatus.FAILED
         return CronJobExecutionResult(
-            status=CronJobRunStatus.COMPLETED,
+            status=status,
             output=output,
             error="; ".join(errors)[:500] if errors else "",
             metadata={

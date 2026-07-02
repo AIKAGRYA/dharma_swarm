@@ -33,7 +33,7 @@ import re
 from dataclasses import dataclass
 from typing import Literal
 
-from dharma_swarm.model_hierarchy import CANONICAL_SEED_ORDER
+from dharma_swarm.model_hierarchy import CANONICAL_SEED_ORDER, default_model
 from dharma_swarm.models import ProviderType
 
 # Same floor as the Council's decorrelated moat (council/invariants.py). Kept
@@ -69,6 +69,8 @@ class LensAssignment:
 class PanelDiversityReport:
     distinct_provider_count: int
     provider_types_used: tuple[str, ...]
+    distinct_model_family_count: int
+    model_families_used: tuple[str, ...]
     meets_family_floor: bool
     suspected_memetic_drift: bool
     overlapping_role_pairs: tuple[tuple[str, str], ...]
@@ -79,6 +81,8 @@ class PanelDiversityReport:
         return {
             "distinct_provider_count": self.distinct_provider_count,
             "provider_types_used": list(self.provider_types_used),
+            "distinct_model_family_count": self.distinct_model_family_count,
+            "model_families_used": list(self.model_families_used),
             "meets_family_floor": self.meets_family_floor,
             "suspected_memetic_drift": self.suspected_memetic_drift,
             "overlapping_role_pairs": [list(pair) for pair in self.overlapping_role_pairs],
@@ -128,6 +132,8 @@ def check_panel_diversity(
         return PanelDiversityReport(
             distinct_provider_count=0,
             provider_types_used=(),
+            distinct_model_family_count=0,
+            model_families_used=(),
             meets_family_floor=False,
             suspected_memetic_drift=False,
             overlapping_role_pairs=(),
@@ -136,7 +142,8 @@ def check_panel_diversity(
         )
 
     provider_types_used = tuple(sorted({a.provider.value for a in assignments}))
-    meets_floor = len(provider_types_used) >= min_families
+    model_families_used = tuple(sorted({_model_family(a.provider) for a in assignments}))
+    meets_floor = len(model_families_used) >= min_families
 
     overlapping_pairs: list[tuple[str, str]] = []
     if reasoning_by_role and len(reasoning_by_role) >= 2:
@@ -164,12 +171,42 @@ def check_panel_diversity(
     return PanelDiversityReport(
         distinct_provider_count=len(provider_types_used),
         provider_types_used=provider_types_used,
+        distinct_model_family_count=len(model_families_used),
+        model_families_used=model_families_used,
         meets_family_floor=meets_floor,
         suspected_memetic_drift=suspected_drift,
         overlapping_role_pairs=tuple(overlapping_pairs),
         verdict=verdict,
         safe_to_trust_consensus=safe,
     )
+
+
+def _model_family(provider: ProviderType) -> str:
+    model = default_model(provider).strip().lower()
+    if not model:
+        return provider.value
+    normalized = model.replace("_", "-")
+    if "claude-" in normalized:
+        return "claude"
+    if "gpt-" in normalized:
+        return "gpt"
+    if "qwen3-coder" in normalized or "qwen-3-coder" in normalized:
+        return "qwen3-coder"
+    if "qwen3" in normalized or "qwen-3" in normalized:
+        return "qwen3"
+    if "llama-3.3" in normalized or "llama3.3" in normalized:
+        return "llama-3.3"
+    if "deepseek" in normalized:
+        return "deepseek"
+    if "kimi" in normalized:
+        return "kimi"
+    if "glm" in normalized:
+        return "glm"
+    if "gemini" in normalized:
+        return "gemini"
+    if "mistral" in normalized:
+        return "mistral"
+    return normalized.split("/", 1)[-1].split(":", 1)[0]
 
 
 def _shingle_jaccard(text_a: str, text_b: str, shingle_size: int = 3) -> float:

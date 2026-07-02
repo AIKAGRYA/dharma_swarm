@@ -86,6 +86,7 @@ def test_proposals_are_promotable_and_receipt_compatible() -> None:
     proposal = build_zeitgeist_promotion_queue([_signal("world-1")]).proposals[0]
     assert proposal.truth_state in _PROMOTABLE_TRUTH_STATES
     assert proposal.proposal_id.startswith("memory_promotion_proposal:")
+    assert proposal.has_content is False
 
 
 def test_rows_without_id_are_blocked_not_promoted() -> None:

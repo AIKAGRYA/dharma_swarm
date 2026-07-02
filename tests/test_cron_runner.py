@@ -618,6 +618,78 @@ def test_world_scout_job_fetch_runs_without_env(monkeypatch, tmp_path):
     assert seen["timeout_s"] == 7
 
 
+def _deep_sweep_result(**overrides):
+    base = {
+        "context_id": "ctx",
+        "scout_error": None,
+        "ingest_error": None,
+        "scout_source_counts": {},
+        "movements_count": 2,
+        "newly_seen_count": 2,
+        "verifications_count": 1,
+        "failed_verification_count": 0,
+        "likely_fabricated_count": 0,
+        "verification_error": None,
+        "synthesis_error": None,
+        "digest_path": "/tmp/digest.md",
+        "cycle_dir": "/tmp/cycle",
+    }
+    base.update(overrides)
+    return base
+
+
+def test_signal_deep_sweep_preserves_explicit_zero_verification_cap(monkeypatch, tmp_path):
+    seen: dict[str, object] = {}
+
+    async def fake_run_deep_sweep(*args, **kwargs):
+        seen.update(kwargs)
+        return _deep_sweep_result(verifications_count=0)
+
+    monkeypatch.setattr(
+        "dharma_swarm.knowledge_ops.deep_sweep.run_deep_sweep",
+        fake_run_deep_sweep,
+    )
+
+    result = execute_cron_job(
+        {
+            "handler": "signal_deep_sweep",
+            "fetch": True,
+            "state_dir": str(tmp_path),
+            "max_verifications": 0,
+        }
+    )
+
+    assert result.status is CronJobRunStatus.COMPLETED
+    assert seen["max_verifications"] == 0
+    assert result.metadata["max_verifications"] == 0
+
+
+def test_signal_deep_sweep_total_scout_failure_marks_cron_failed(monkeypatch, tmp_path):
+    async def fake_run_deep_sweep(*args, **kwargs):
+        return _deep_sweep_result(
+            scout_error="all scout sources failed",
+            movements_count=0,
+            newly_seen_count=0,
+            verifications_count=0,
+        )
+
+    monkeypatch.setattr(
+        "dharma_swarm.knowledge_ops.deep_sweep.run_deep_sweep",
+        fake_run_deep_sweep,
+    )
+
+    result = execute_cron_job(
+        {
+            "handler": "signal_deep_sweep",
+            "fetch": True,
+            "state_dir": str(tmp_path),
+        }
+    )
+
+    assert result.status is CronJobRunStatus.FAILED
+    assert "all scout sources failed" in result.error
+
+
 def test_execute_cron_job_maps_overnight_waiting_summary_to_waiting_external():
     async def _fake_run_overnight(**kwargs):
         assert kwargs["external_wait_handoff"] is True

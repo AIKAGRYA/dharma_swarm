@@ -41,7 +41,7 @@ from dharma_swarm.spine.invoke import invoke_agent
 from dharma_swarm.spine.receipt import EvidenceReceipt
 from dharma_swarm.spine.routing import RoutingDecision
 from dharma_swarm.world_radar.analysis import build_world_signal_board
-from dharma_swarm.world_radar.go_bridge import _run_go_scout
+from dharma_swarm.world_radar.go_bridge import _run_go_ingestor, _run_go_scout
 from dharma_swarm.world_radar.theme_window import (
     load_theme_window,
     save_theme_window,
@@ -51,6 +51,7 @@ from dharma_swarm.world_radar.theme_window import (
 DEFAULT_MAX_VERIFICATIONS = 8
 
 ScoutFn = Callable[..., tuple[list[dict[str, Any]], str | None, dict[str, int | str]]]
+IngestFn = Callable[..., tuple[list[dict[str, Any]], str | None]]
 DispatchFn = Callable[..., Awaitable[EvidenceReceipt]]
 
 
@@ -164,6 +165,7 @@ async def run_deep_sweep(
     verification_timeout_s: int = 300,
     synthesis_timeout_s: int = 300,
     scout_fn: ScoutFn = _run_go_scout,
+    ingest_fn: IngestFn = _run_go_ingestor,
     dispatch_fn: DispatchFn = _dispatch,
 ) -> dict[str, Any]:
     """The capped, automated deep sweep.
@@ -187,7 +189,23 @@ async def run_deep_sweep(
         beats=True,
     )
 
-    board = build_world_signal_board(scout_rows) if scout_rows else {"movements": []}
+    signal_path = radar / "deep_sweep_signals.jsonl"
+    ingest_error: str | None = None
+    ingested_rows: list[dict[str, Any]] = []
+    if scout_rows:
+        raw_path = radar / "deep_sweep_raw_observations.jsonl"
+        _write_jsonl(raw_path, scout_rows)
+        ingested_rows, ingest_error = ingest_fn(
+            input_path=raw_path,
+            output_path=signal_path,
+            min_score=0.0,
+            timeout_s=scout_timeout_s,
+            receipt_dir=radar / "deep_sweep_receipts",
+            correlation_id=context_id,
+        )
+
+    board_rows = ingested_rows or scout_rows
+    board = build_world_signal_board(board_rows) if board_rows else {"movements": []}
     movements = [m for m in board.get("movements", []) if isinstance(m, dict)]
 
     # Fold THIS cycle's own beat-derived movements into the rolling window --
@@ -200,12 +218,13 @@ async def run_deep_sweep(
     save_theme_window(window_path, updated_window)
     newly_seen_ids = set(newly_seen)
 
-    candidates = [m for m in movements if m.get("movement_id") in newly_seen_ids] or list(movements)
+    candidates = [m for m in movements if m.get("movement_id") in newly_seen_ids]
     candidates.sort(key=lambda m: float(m.get("weighted_score", 0.0) or 0.0), reverse=True)
     capped = candidates[: max(0, max_verifications)]
 
     verifications: list[dict[str, Any]] = []
     verification_error: str | None = None
+    failed_receipts = 0
     for movement in capped:
         title = str(movement.get("title") or "")
         summary = str(movement.get("summary") or "")
@@ -226,8 +245,11 @@ async def run_deep_sweep(
                     "receipt_id": str(receipt.receipt_id),
                 }
             )
+            if str(receipt.status) not in {"ok", "completed", "success"}:
+                failed_receipts += 1
         except Exception as exc:  # noqa: BLE001 -- one bad verification must not sink the cycle
             verification_error = str(exc)[:200]
+            failed_receipts += 1
             verifications.append(
                 {
                     "movement_id": movement.get("movement_id"),
@@ -237,6 +259,8 @@ async def run_deep_sweep(
                     "error": verification_error,
                 }
             )
+    if failed_receipts and verification_error is None:
+        verification_error = f"{failed_receipts} verification receipt(s) failed or timed out"
 
     digest_text = ""
     synthesis_error: str | None = None
@@ -264,16 +288,24 @@ async def run_deep_sweep(
     return {
         "context_id": context_id,
         "scout_error": scout_error,
+        "ingest_error": ingest_error,
         "scout_source_counts": scout_counts,
         "movements_count": len(movements),
         "newly_seen_count": len(newly_seen_ids),
         "verifications_count": len(verifications),
+        "failed_verification_count": failed_receipts,
         "likely_fabricated_count": len(likely_fabricated),
         "verification_error": verification_error,
         "synthesis_error": synthesis_error,
         "digest_path": str(cycle_dir / "digest.md"),
         "cycle_dir": str(cycle_dir),
     }
+
+
+def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = "".join(json.dumps(row, sort_keys=True, default=str) + "\n" for row in rows)
+    path.write_text(payload, encoding="utf-8")
 
 
 __all__ = [
