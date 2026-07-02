@@ -317,6 +317,17 @@
     "prompt": "Bulk-promote staging atoms (type=atomic, confidence>=0.5) to trusted wiki/concepts. Prevents unbounded staging growth (~1k atoms/day ingest with zero graduation)."
   },
   {
+    "id": "github_ingestor_inbox",
+    "name": "GitHub Ingestor Inbox Drain",
+    "trigger": "interval",
+    "interval_seconds": 900,
+    "handler": "shell",
+    "shell_command": "python3 scripts/runtime/github_ingestor_runner.py --max-files 20",
+    "timeout_sec": 120,
+    "enabled": true,
+    "prompt": "Drain ~/.dharma/meta/github_ingest_inbox/: run each dropped GitHub event payload envelope through tools/github_ingestor_go so it lands as a go_evidence_receipt.v0 in ~/.dharma/go_receipts/github/ (go-g04 live trigger; host-aware, no GitHub API calls)."
+  },
+  {
     "id": "hermes_heartbeat_poll",
     "name": "Hermes M5 Heartbeat + Queue Poll",
     "trigger": "interval",

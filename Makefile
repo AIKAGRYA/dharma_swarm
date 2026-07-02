@@ -90,6 +90,7 @@ help:
 	@echo "  make a2a-up       Run the persistent Devin A2A agent (registers on fleet, drains inbox)"
 	@echo "  make a2a-send     Send a packet: make a2a-send TO=codex FILE=path/to/packet.md"
 	@echo "  make go-ci        Run Go evidence sense-organ fmt/vet/test gates"
+	@echo "  make go-build     Compile the 4 Go tool mains into their module dirs (gitignored)"
 	@echo ""
 
 install:
@@ -486,6 +487,19 @@ go-vet:
 	done
 
 go-ci: go-fmt-check go-vet go-test
+
+# Compile the four Go tool mains into their module dirs (gitignored binaries,
+# e.g. tools/world_scout_go/world_scout_go). The Python bridge prefers these
+# prebuilt binaries and falls back to `go run .` when they are absent.
+GO_TOOL_MAIN_MODULES := $(GO_EVIDENCE_MODULE) $(GO_GITHUB_INGESTOR_MODULE) $(GO_WORLD_SIGNAL_INGESTOR_MODULE) $(GO_WORLD_SCOUT_MODULE)
+
+go-build:
+	@mkdir -p $(GO_CACHE_DIR) $(GO_MOD_CACHE_DIR)
+	@for mod in $(GO_TOOL_MAIN_MODULES); do \
+		bin=$$(basename $$mod); \
+		echo "go build -o $$bin in $$mod"; \
+		( cd $$mod && GOCACHE=$(GO_CACHE_DIR) GOMODCACHE=$(GO_MOD_CACHE_DIR) $(GO) build -o $$bin . ) || exit 1; \
+	done
 
 # ── Operational targets ──────────────────────────────────────────────────
 

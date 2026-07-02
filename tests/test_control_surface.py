@@ -777,6 +777,58 @@ class TestGoReceiptRows:
         )
         assert by_id["go.world_signal_receipts"].coherence_state == "declared_only"
 
+    def test_world_radar_health_row_surfaces_per_source_errors(
+        self,
+        tmp_repo: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from dharma_swarm.operator_core.control_surface_go import (
+            _go_world_radar_health_rows,
+        )
+
+        state = tmp_repo / ".dharma"
+        monkeypatch.setenv("DHARMA_STATE_DIR", str(state))
+
+        # No health file yet: the loop never ran on this host, no row.
+        assert _go_world_radar_health_rows() == []
+
+        health_path = state / "meta" / "world_radar" / "world_radar_health.json"
+        health_path.parent.mkdir(parents=True, exist_ok=True)
+        health_path.write_text(
+            json.dumps(
+                {
+                    "ok": False,
+                    "status": "degraded",
+                    "checked_at": "2026-07-02T00:00:00+00:00",
+                    "successful_sources": 3,
+                    "failed_sources": 1,
+                    "scout_invocation_mode": "binary",
+                    "ingestor_invocation_mode": "go_run",
+                    "source_errors": [
+                        {"source": "arxiv_agents", "stage": "scout", "error": "503"}
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        rows = _go_world_radar_health_rows()
+        assert len(rows) == 1
+        row = rows[0]
+        assert row.id == "go.world_radar_health"
+        assert row.coherence_state == "partial"
+        assert "1 failed sources" in row.observed_state
+        assert "go_world_radar_source_errors" in row.gap_codes
+        assert row.raw["scout_invocation_mode"] == "binary"
+        assert row.raw["ingestor_invocation_mode"] == "go_run"
+        assert row.raw["source_errors"] == [
+            {"source": "arxiv_agents", "stage": "scout", "error": "503"}
+        ]
+        error_evidence = [
+            item for item in row.evidence if "source_error source=arxiv_agents" in item.source
+        ]
+        assert len(error_evidence) == 1
+
 
 # ---------------------------------------------------------------------------
 # API endpoint tests

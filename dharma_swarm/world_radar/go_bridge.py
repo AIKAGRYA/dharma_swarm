@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import os
 import subprocess
 import time
 from typing import Any
@@ -70,6 +71,22 @@ class WorldRadarGoResult:
     archive_clean_text_bytes: int = 0
     archive_error_count: int = 0
     errors: tuple[str, ...] = ()
+    source_errors: tuple[dict[str, str], ...] = ()
+    scout_invocation_mode: str = ""
+    ingestor_invocation_mode: str = ""
+
+
+def _go_invocation(module_dir: Path) -> tuple[list[str], str]:
+    """Prefer a prebuilt module binary (see `make go-build`); fall back to `go run .`.
+
+    The binary convention matches plain ``go build`` output: the module dir
+    name inside the module dir (e.g. ``tools/world_scout_go/world_scout_go``).
+    Returns the argv prefix and the invocation mode ("binary" or "go_run").
+    """
+    binary = module_dir / module_dir.name
+    if binary.is_file() and os.access(binary, os.X_OK):
+        return [str(binary)], "binary"
+    return ["go", "run", "."], "go_run"
 
 
 def run_world_radar_go_once(
@@ -124,6 +141,9 @@ def run_world_radar_go_once(
     receipt_dir = world_receipts_dir(state)
     receipt_correlation_id = f"world_radar_go_{time.time_ns()}"
     errors: list[str] = []
+    source_errors: list[dict[str, str]] = []
+    scout_invocation_mode = ""
+    ingestor_invocation_mode = ""
     archive_enabled = False
     archive_count = 0
     dedupe_count = 0
@@ -203,13 +223,17 @@ def run_world_radar_go_once(
         archive_clean_text_count += int(scout_counts.get("archive_clean_text_count", 0) or 0)
         archive_clean_text_bytes += int(scout_counts.get("archive_clean_text_bytes", 0) or 0)
         archive_error_count += int(scout_counts.get("archive_error_count", 0) or 0)
+        scout_invocation_mode = str(scout_counts.get("invocation_mode", "") or scout_invocation_mode)
+        source_errors.extend(
+            _merged_source_errors(scout_counts, scout_error, source="world_scout_go", stage="scout")
+        )
         if scout_error:
             errors.append(scout_error)
         if archive_index_path:
             raw_rows.extend(_archive_index_to_raw_rows(Path(archive_index_path)))
     _write_jsonl(raw_path, raw_rows)
 
-    ingested_rows, ingest_error = _run_go_ingestor(
+    ingested_rows, ingest_error, ingestor_invocation_mode = _run_go_ingestor(
         input_path=raw_path,
         output_path=signal_path,
         min_score=min_score,
@@ -219,11 +243,14 @@ def run_world_radar_go_once(
     )
     if ingest_error:
         errors.append(ingest_error)
+        source_errors.append(
+            {"source": "world_signal_ingestor_go", "stage": "ingest", "error": ingest_error}
+        )
         ingested_rows = _read_jsonl(signal_path)
 
     board = build_world_signal_board(ingested_rows, source_weights=source_weights)
     if scout_fetch:
-        cascade_rows, cascade_errors, cascade_counts = _run_cascade(
+        cascade_rows, cascade_errors, cascade_counts, cascade_source_errors = _run_cascade(
             state=state,
             movements=incubating_movements(board),
             output_dir=radar,
@@ -232,7 +259,7 @@ def run_world_radar_go_once(
         if cascade_rows:
             raw_rows.extend(cascade_rows)
             _write_jsonl(raw_path, raw_rows)
-            ingested_rows, ingest_error = _run_go_ingestor(
+            ingested_rows, ingest_error, ingestor_invocation_mode = _run_go_ingestor(
                 input_path=raw_path,
                 output_path=signal_path,
                 min_score=min_score,
@@ -242,9 +269,13 @@ def run_world_radar_go_once(
             )
             if ingest_error:
                 errors.append(ingest_error)
+                source_errors.append(
+                    {"source": "world_signal_ingestor_go", "stage": "ingest", "error": ingest_error}
+                )
                 ingested_rows = _read_jsonl(signal_path)
             board = build_world_signal_board(ingested_rows, source_weights=source_weights)
         errors.extend(cascade_errors)
+        source_errors.extend(cascade_source_errors)
         successful_sources += cascade_counts.get("successful_sources", 0)
         failed_sources += cascade_counts.get("failed_sources", 0)
         retry_count += cascade_counts.get("retry_count", 0)
@@ -302,6 +333,7 @@ def run_world_radar_go_once(
         promotion_count=len(promotions),
         incubation_count=len(incubation_paths),
         errors=errors,
+        source_errors=source_errors,
         duration_s=duration_s,
         retry_count=retry_count,
         feedback_events_applied=len(applied_feedback_ids) - applied_before,
@@ -331,6 +363,8 @@ def run_world_radar_go_once(
             "freshest_receipt": ingest_summary["freshest_receipt"],
             "cost_event_recorded": cost_event_recorded,
             "nats_receipt_transport": nats_receipt_transport,
+            "scout_invocation_mode": scout_invocation_mode,
+            "ingestor_invocation_mode": ingestor_invocation_mode,
         }
     )
     _write_json_atomic(health_path, health)
@@ -364,6 +398,9 @@ def run_world_radar_go_once(
         archive_clean_text_bytes=archive_clean_text_bytes,
         archive_error_count=archive_error_count,
         errors=tuple(errors),
+        source_errors=tuple(source_errors),
+        scout_invocation_mode=scout_invocation_mode,
+        ingestor_invocation_mode=ingestor_invocation_mode,
     )
 
 
@@ -373,9 +410,10 @@ def _run_cascade(
     movements: list[dict[str, Any]],
     output_dir: Path,
     timeout_s: int,
-) -> tuple[list[dict[str, Any]], list[str], dict[str, int]]:
+) -> tuple[list[dict[str, Any]], list[str], dict[str, int], list[dict[str, str]]]:
     rows: list[dict[str, Any]] = []
     errors: list[str] = []
+    source_errors: list[dict[str, str]] = []
     counts = {"successful_sources": 0, "failed_sources": 0, "retry_count": 0}
     for movement in movements[:5]:
         movement_id = str(movement.get("movement_id") or "")
@@ -396,9 +434,14 @@ def _run_cascade(
         counts["successful_sources"] += int(scout_counts.get("successful_sources", 0) or 0)
         counts["failed_sources"] += int(scout_counts.get("failed_sources", 0) or 0)
         counts["retry_count"] += int(scout_counts.get("retry_count", 0) or 0)
+        source_errors.extend(
+            _merged_source_errors(
+                scout_counts, scout_error, source="world_scout_go", stage=f"cascade:{movement_id}"
+            )
+        )
         if scout_error:
             errors.append(scout_error)
-    return rows, errors, counts
+    return rows, errors, counts, source_errors
 
 
 def _collect_raw_rows(meta: Path) -> list[dict[str, Any]]:
@@ -507,14 +550,12 @@ def _run_go_scout(
     archive_discover_llms: bool = False,
     archive_discover_sitemap: bool = False,
     archive_sitemap_max_urls: int = 100,
-) -> tuple[list[dict[str, Any]], str | None, dict[str, int | str]]:
+) -> tuple[list[dict[str, Any]], str | None, dict[str, Any]]:
     module_dir = _repo_root() / "tools" / "world_scout_go"
     if not module_dir.exists():
         return [], f"missing Go scout module: {module_dir}", {}
-    cmd = [
-        "go",
-        "run",
-        ".",
+    cmd, invocation_mode = _go_invocation(module_dir)
+    cmd += [
         "--state-dir",
         str(state),
         "--output",
@@ -560,12 +601,17 @@ def _run_go_scout(
     try:
         proc = subprocess.run(cmd, cwd=module_dir, capture_output=True, text=True, timeout=timeout_s)
     except FileNotFoundError as exc:
-        return [], f"world_scout_go could not start: {exc}", {}
+        return [], f"world_scout_go could not start: {exc}", {"invocation_mode": invocation_mode}
     except subprocess.TimeoutExpired:
         health = _read_json(health_path, default={})
-        return [], f"world_scout_go timed out after {timeout_s}s", _source_counts(health)
+        counts = _source_counts(health)
+        counts["invocation_mode"] = invocation_mode
+        counts["source_errors"] = _health_source_errors(health)
+        return [], f"world_scout_go timed out after {timeout_s}s", counts
     health = _read_json(health_path, default={})
     counts = _source_counts(health)
+    counts["invocation_mode"] = invocation_mode
+    counts["source_errors"] = _health_source_errors(health)
     if proc.returncode != 0:
         return [], (proc.stderr or proc.stdout or "world_scout_go failed").strip()[:1000], counts
     return _read_jsonl(output_path), _partial_source_error(health), counts
@@ -579,14 +625,12 @@ def _run_go_ingestor(
     timeout_s: int,
     receipt_dir: Path | None = None,
     correlation_id: str = "",
-) -> tuple[list[dict[str, Any]], str | None]:
+) -> tuple[list[dict[str, Any]], str | None, str]:
     module_dir = _repo_root() / "tools" / "world_signal_ingestor_go"
     if not module_dir.exists():
-        return [], f"missing Go ingestor module: {module_dir}"
-    cmd = [
-        "go",
-        "run",
-        ".",
+        return [], f"missing Go ingestor module: {module_dir}", ""
+    cmd, invocation_mode = _go_invocation(module_dir)
+    cmd += [
         "--input",
         str(input_path),
         "--output",
@@ -599,16 +643,20 @@ def _run_go_ingestor(
     try:
         proc = subprocess.run(cmd, cwd=module_dir, capture_output=True, text=True, timeout=timeout_s)
     except FileNotFoundError as exc:
-        return [], f"world_signal_ingestor_go could not start: {exc}"
+        return [], f"world_signal_ingestor_go could not start: {exc}", invocation_mode
     except subprocess.TimeoutExpired:
-        return [], f"world_signal_ingestor_go timed out after {timeout_s}s"
+        return [], f"world_signal_ingestor_go timed out after {timeout_s}s", invocation_mode
     if proc.returncode != 0:
-        return [], (proc.stderr or proc.stdout or "world_signal_ingestor_go failed").strip()[:1000]
+        return (
+            [],
+            (proc.stderr or proc.stdout or "world_signal_ingestor_go failed").strip()[:1000],
+            invocation_mode,
+        )
     if receipt_dir is not None and correlation_id:
         projected_rows = _project_receipts_for_correlation(receipt_dir, correlation_id)
         if projected_rows:
-            return projected_rows, None
-    return _read_jsonl(output_path), None
+            return projected_rows, None, invocation_mode
+    return _read_jsonl(output_path), None, invocation_mode
 
 
 def _project_receipts_for_correlation(receipt_dir: Path, correlation_id: str) -> list[dict[str, Any]]:
@@ -810,6 +858,7 @@ def _build_health(
     promotion_count: int,
     incubation_count: int,
     errors: list[str],
+    source_errors: list[dict[str, str]] | None = None,
     duration_s: float,
     retry_count: int,
     feedback_events_applied: int,
@@ -867,14 +916,23 @@ def _build_health(
         "archive_clean_text_bytes": archive_clean_text_bytes,
         "archive_error_count": archive_error_count,
         "errors": errors[:10],
+        "source_errors": list(source_errors or [])[:20],
     }
 
 
 def _render_health_markdown(health: dict[str, Any]) -> str:
+    source_errors = health.get("source_errors") if isinstance(health.get("source_errors"), list) else []
+    source_error_lines = "".join(
+        f"  - [{entry.get('stage', '')}] {entry.get('source', '')}: {entry.get('error', '')}\n"
+        for entry in source_errors
+        if isinstance(entry, dict)
+    )
     return (
         "# World Radar Health\n\n"
         f"- status: {health.get('status')}\n"
         f"- ingest_run_id: {health.get('ingest_run_id', '')}\n"
+        f"- scout_invocation_mode: {health.get('scout_invocation_mode', '')}\n"
+        f"- ingestor_invocation_mode: {health.get('ingestor_invocation_mode', '')}\n"
         f"- fetch_enabled: {health.get('fetch_enabled')}\n"
         f"- successful_sources: {health.get('successful_sources')}\n"
         f"- failed_sources: {health.get('failed_sources')}\n"
@@ -897,10 +955,12 @@ def _render_health_markdown(health: dict[str, Any]) -> str:
         f"- archive_error_count: {health.get('archive_error_count', 0)}\n"
         f"- signals: {health.get('signals')}\n"
         f"- promotion_ready: {health.get('promotion_ready')}\n"
+        f"- source_errors: {len(source_errors)}\n"
+        f"{source_error_lines}"
     )
 
 
-def _source_counts(health: Any) -> dict[str, int | str]:
+def _source_counts(health: Any) -> dict[str, Any]:
     if not isinstance(health, dict):
         return {"successful_sources": 0, "failed_sources": 0}
     return {
@@ -921,6 +981,55 @@ def _source_counts(health: Any) -> dict[str, int | str]:
         "archive_clean_text_bytes": int(float(health.get("archive_clean_text_bytes", 0) or 0)),
         "archive_error_count": int(float(health.get("archive_error_count", 0) or 0)),
     }
+
+
+def _health_source_errors(health: Any, *, stage: str = "scout") -> list[dict[str, str]]:
+    """Parse the Go scout health ``errors`` list into structured per-source rows.
+
+    The Go side records failures as ``"<source_name>: <error>"`` strings
+    (tools/world_scout_go/scout.go); non-conforming entries keep the whole
+    string as the error with the module as the source.
+    """
+    if not isinstance(health, dict):
+        return []
+    raw_errors = health.get("errors") if isinstance(health.get("errors"), list) else []
+    structured: list[dict[str, str]] = []
+    for item in raw_errors:
+        text = str(item).strip()
+        if not text:
+            continue
+        source, sep, detail = text.partition(": ")
+        if sep and source and " " not in source:
+            structured.append({"source": source, "stage": stage, "error": detail.strip()})
+        else:
+            structured.append({"source": "world_scout_go", "stage": stage, "error": text})
+    return structured
+
+
+def _merged_source_errors(
+    counts: Any,
+    flat_error: str | None,
+    *,
+    source: str,
+    stage: str,
+) -> list[dict[str, str]]:
+    """Combine structured per-source errors from counts with a module-level error."""
+    structured: list[dict[str, str]] = []
+    raw = counts.get("source_errors") if isinstance(counts, dict) else None
+    if isinstance(raw, list):
+        for entry in raw:
+            if not isinstance(entry, dict):
+                continue
+            structured.append(
+                {
+                    "source": str(entry.get("source") or source),
+                    "stage": stage,
+                    "error": str(entry.get("error") or ""),
+                }
+            )
+    if flat_error and not structured:
+        structured.append({"source": source, "stage": stage, "error": str(flat_error)})
+    return structured
 
 
 def _partial_source_error(health: Any) -> str | None:
