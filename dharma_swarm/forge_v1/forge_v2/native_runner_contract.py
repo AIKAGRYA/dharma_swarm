@@ -19,14 +19,17 @@ shadow evidence only until normal packet guard + promotion gates consume it.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import os
+import sys
 import time
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
 from dharma_swarm.daemon_config import dharma_state_dir
 
+from . import taskbed_ledger
 from .signals import canonical_sha256
 
 SCHEMA_VERSION = "forge_v2.native_runner_contract.v1"
@@ -591,11 +594,161 @@ def sync_remote_receipts(
     return sync_manifest
 
 
+ORCHESTRATION_SCHEMA = f"{SCHEMA_VERSION}.orchestration"
+
+
+def orchestrate_native_request(
+    *,
+    run_id: str,
+    candidate_packet: dict[str, Any],
+    split: str,
+    count: int,
+    epoch_id: str,
+    lane_id: str | None = None,
+    output_root: Path | str = DEFAULT_RUN_ROOT,
+    taskbed_db: Path | str = taskbed_ledger.DEFAULT_DB,
+    budget: dict[str, Any] | None = None,
+    runner_label: str = "native_x86_64",
+    max_infra_retries: int = 2,
+    prewarm: dict[str, Any] | None = None,
+    sync_back_target: Path | str | None = None,
+    allocation_id: str | None = None,
+    min_count: int | None = None,
+) -> dict[str, Any]:
+    """Allocate a real taskbed slice and write a grade-only native request.
+
+    This is the local-Mac ORCHESTRATION half of Workstream 6: it turns a
+    candidate genome/packet + an epoch into a sealed native runner request by
+    pulling task ids from the durable ``taskbed_ledger`` (the same allocation
+    authority the conductor uses), rather than requiring a caller to hand-roll a
+    ``task_allocation`` dict.  It performs no grading and no model calls, so it
+    runs without provider budget; the actual grading is delegated to a native
+    worker via ``run_native_runner_request``.
+
+    EXPLORE and CONFIRM stay separated because allocation goes through the ledger,
+    which refuses to reuse an EXPLORE task for CONFIRM and enforces the clean
+    contamination / minimum-N rules for CONFIRM.  Promotion remains owned by
+    ``verify_promotion``; this request is grade-only.
+    """
+    if split not in {"explore", "confirm"}:
+        raise ValueError("split must be explore or confirm")
+    if count <= 0:
+        raise ValueError("count must be positive")
+    candidate_id = str(
+        candidate_packet.get("candidate_id")
+        or candidate_packet.get("id")
+        or run_id
+    )
+    lane = lane_id or f"native_{run_id}"
+    allocation = taskbed_ledger.allocate_tasks(
+        split=split,  # type: ignore[arg-type]
+        count=count,
+        epoch_id=epoch_id,
+        lane_id=lane,
+        db_path=taskbed_db,
+        allocation_id=allocation_id,
+        candidate_id=candidate_id,
+        min_count=min_count,
+    )
+    write_result = write_native_runner_request(
+        run_id=run_id,
+        candidate_packet=candidate_packet,
+        task_allocation=allocation,
+        output_root=output_root,
+        split=split,
+        budget=budget,
+        runner_label=runner_label,
+        max_infra_retries=max_infra_retries,
+        prewarm=prewarm,
+        sync_back_target=sync_back_target,
+    )
+    orchestration = {
+        "schema": ORCHESTRATION_SCHEMA,
+        "generated_at": utc_now(),
+        "run_id": run_id,
+        "candidate_id": candidate_id,
+        "split": split,
+        "epoch_id": epoch_id,
+        "lane_id": lane,
+        "taskbed_db": str(taskbed_db),
+        "allocation_id": allocation.get("allocation_id"),
+        "allocation_receipt": allocation,
+        "request": write_result,
+        "source_of_truth_mutated": False,
+        "live_apply_performed": False,
+        "archive_fitness_mutated": False,
+        "promotion_gate": PROMOTION_GATE,
+    }
+    orchestration["orchestration_sha256"] = canonical_sha256(orchestration)
+    request_dir = Path(write_result["request_dir"])
+    _write_json(request_dir / "orchestration.json", orchestration)
+    return orchestration
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Orchestrate a grade-only native runner request from the taskbed ledger",
+    )
+    parser.add_argument("--run-id", required=True)
+    parser.add_argument("--candidate-id", required=True, help="Scaffold/code candidate id to grade")
+    parser.add_argument("--candidate-json", default="", help="Inline JSON candidate packet (merged with --candidate-id)")
+    parser.add_argument("--split", choices=["explore", "confirm"], default="explore")
+    parser.add_argument("--count", type=int, required=True)
+    parser.add_argument("--epoch-id", default="epoch_0")
+    parser.add_argument("--lane-id", default=None)
+    parser.add_argument("--output-root", default=str(DEFAULT_RUN_ROOT))
+    parser.add_argument("--taskbed-db", default=str(taskbed_ledger.DEFAULT_DB))
+    parser.add_argument("--max-infra-retries", type=int, default=2)
+    parser.add_argument("--allocation-id", default=None)
+    parser.add_argument("--min-count", type=int, default=None)
+    parser.add_argument("--json", action="store_true", help="Print the orchestration receipt as JSON")
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    candidate_packet: dict[str, Any] = {}
+    if args.candidate_json.strip():
+        candidate_packet = json.loads(args.candidate_json)
+        if not isinstance(candidate_packet, dict):
+            raise TypeError("--candidate-json must decode to a JSON object")
+    candidate_packet.setdefault("candidate_id", args.candidate_id)
+    result = orchestrate_native_request(
+        run_id=args.run_id,
+        candidate_packet=candidate_packet,
+        split=args.split,
+        count=args.count,
+        epoch_id=args.epoch_id,
+        lane_id=args.lane_id,
+        output_root=args.output_root,
+        taskbed_db=args.taskbed_db,
+        max_infra_retries=args.max_infra_retries,
+        allocation_id=args.allocation_id,
+        min_count=args.min_count,
+    )
+    if args.json:
+        print(json.dumps(result, indent=2, sort_keys=True, default=str))
+    else:
+        request = result.get("request", {})
+        print(
+            "[native_runner_contract] orchestrated run_id={run_id} split={split} "
+            "tasks={tasks} request_dir={dir}".format(
+                run_id=result.get("run_id"),
+                split=result.get("split"),
+                tasks=request.get("task_rows", 0),
+                dir=request.get("request_dir"),
+            ),
+            flush=True,
+        )
+    return 0
+
+
 __all__ = [
     "COMPLETED_STATUSES",
     "DEFAULT_RUN_ROOT",
     "DEFAULT_SYNC_ROOT",
     "INFRA_RETRYABLE_STATUSES",
+    "ORCHESTRATION_SCHEMA",
     "PROMOTION_GATE",
     "QUARANTINE_STATUSES",
     "REQUEST_SCHEMA",
@@ -605,7 +758,10 @@ __all__ = [
     "TASK_RECEIPT_SCHEMA",
     "WORKER_RESULT_SCHEMA",
     "build_prewarm_manifest",
+    "build_parser",
     "load_task_receipts",
+    "main",
+    "orchestrate_native_request",
     "plan_resume",
     "repo_slug_from_task_id",
     "run_native_runner_request",
@@ -614,3 +770,7 @@ __all__ = [
     "validate_request_authority",
     "write_native_runner_request",
 ]
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -6,10 +6,28 @@ from pathlib import Path
 import pytest
 
 from dharma_swarm.forge_v1.forge_v2 import native_runner_contract as nrc
+from dharma_swarm.forge_v1.forge_v2 import taskbed_ledger
 
 
 def _read_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _seed_taskbed(db_path: Path, task_ids: list[str]) -> None:
+    taskbed_ledger.register_tasks(
+        [
+            {
+                "task_id": task_id,
+                "created_at": f"2026-06-01T00:00:{idx:02d}Z",
+                "contamination_state": "fresh_heldout",
+                "provenance": {"contamination_state": "fresh_heldout"},
+            }
+            for idx, task_id in enumerate(task_ids)
+        ],
+        db_path=db_path,
+        source="post_cutoff_pr_suite",
+        taskbed="fresh_pr_suite",
+    )
 
 
 def test_write_native_runner_request_is_grade_only_and_prewarmable(tmp_path: Path) -> None:
@@ -204,6 +222,109 @@ def test_run_native_runner_request_refuses_mutating_request_authority(tmp_path: 
             request_dir=request_write["request_dir"],
             result_root=tmp_path / "worker-result",
             grade_fn=lambda _payload: {"status": "resolved"},
+        )
+
+
+def test_orchestrate_native_request_allocates_from_taskbed_and_is_grade_only(tmp_path: Path) -> None:
+    db = tmp_path / "taskbed.db"
+    _seed_taskbed(db, ["pr::pallets/click#3208", "pr::pallets/werkzeug#3147", "pr::pallets/click#3211"])
+
+    orchestration = nrc.orchestrate_native_request(
+        run_id="native-orch-1",
+        candidate_packet={"candidate_id": "scaffold_window_9000", "genome": {"arm": "verify_chain", "window_chars": 9000}},
+        split="explore",
+        count=2,
+        epoch_id="epoch-orch",
+        output_root=tmp_path / "runs",
+        taskbed_db=db,
+    )
+
+    assert orchestration["schema"] == nrc.ORCHESTRATION_SCHEMA
+    assert orchestration["split"] == "explore"
+    assert orchestration["source_of_truth_mutated"] is False
+    assert orchestration["promotion_gate"] == nrc.PROMOTION_GATE
+    # allocation came from the real ledger (2 distinct fresh tasks)
+    assert orchestration["allocation_receipt"]["task_count"] == 2
+    assert len(orchestration["allocation_receipt"]["task_ids"]) == 2
+
+    request_dir = Path(orchestration["request"]["request_dir"])
+    request = _read_json(request_dir / "native_runner_request.json")
+    assert request["task_ids"] == orchestration["allocation_receipt"]["task_ids"]
+    assert request["authority"]["live_apply_allowed"] is False
+    assert (request_dir / "orchestration.json").exists()
+
+
+def test_orchestrate_native_request_keeps_explore_and_confirm_separated(tmp_path: Path) -> None:
+    # The ledger must not hand a CONFIRM allocation any task already used for
+    # EXPLORE; the orchestrator inherits that separation for free.
+    db = tmp_path / "taskbed.db"
+    _seed_taskbed(db, ["fresh-0", "fresh-1", "fresh-2"])
+
+    explore = nrc.orchestrate_native_request(
+        run_id="native-explore",
+        candidate_packet={"candidate_id": "cand"},
+        split="explore",
+        count=1,
+        epoch_id="epoch-sep",
+        output_root=tmp_path / "runs",
+        taskbed_db=db,
+    )
+    confirm = nrc.orchestrate_native_request(
+        run_id="native-confirm",
+        candidate_packet={"candidate_id": "cand"},
+        split="confirm",
+        count=2,
+        min_count=2,
+        epoch_id="epoch-sep",
+        output_root=tmp_path / "runs",
+        taskbed_db=db,
+    )
+
+    explore_ids = set(explore["allocation_receipt"]["task_ids"])
+    confirm_ids = set(confirm["allocation_receipt"]["task_ids"])
+    assert explore_ids.isdisjoint(confirm_ids)
+    assert confirm["allocation_receipt"]["explore_separate_from_confirm"] is True
+
+
+def test_orchestrate_then_run_worker_end_to_end(tmp_path: Path) -> None:
+    db = tmp_path / "taskbed.db"
+    _seed_taskbed(db, ["fresh-0", "fresh-1"])
+
+    orchestration = nrc.orchestrate_native_request(
+        run_id="native-e2e",
+        candidate_packet={"candidate_id": "cand"},
+        split="explore",
+        count=2,
+        epoch_id="epoch-e2e",
+        output_root=tmp_path / "runs",
+        taskbed_db=db,
+    )
+    request_dir = orchestration["request"]["request_dir"]
+
+    manifest = nrc.run_native_runner_request(
+        request_dir=request_dir,
+        result_root=tmp_path / "worker-result",
+        grade_fn=lambda payload: {"status": "resolved", "resolved": True},
+    )
+    assert manifest["written_receipt_count"] == 2
+    assert manifest["resume_plan_after"]["remaining_tasks"] == []
+    assert sorted(manifest["resume_plan_after"]["completed_task_ids"]) == ["fresh-0", "fresh-1"]
+
+
+def test_orchestrate_native_request_blocks_underpowered_confirm(tmp_path: Path) -> None:
+    db = tmp_path / "taskbed.db"
+    _seed_taskbed(db, ["fresh-0"])
+
+    with pytest.raises(taskbed_ledger.TaskbedLedgerError, match="insufficient_confirm_tasks"):
+        nrc.orchestrate_native_request(
+            run_id="native-underpowered",
+            candidate_packet={"candidate_id": "cand"},
+            split="confirm",
+            count=2,
+            min_count=2,
+            epoch_id="epoch-under",
+            output_root=tmp_path / "runs",
+            taskbed_db=db,
         )
 
 
