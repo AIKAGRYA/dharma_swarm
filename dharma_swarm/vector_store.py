@@ -30,6 +30,8 @@ from typing import Any, Protocol, runtime_checkable
 
 import numpy as np
 
+from dharma_swarm.vector_fallback_guard import fallback_vector_scan_allowed
+
 logger = logging.getLogger(__name__)
 
 
@@ -302,7 +304,9 @@ class TFIDFEmbedder:
             self._svd = None
             self._corpus = state.get("corpus", [])
             self._corpus_hash = state.get("corpus_hash", "")
-            self._fitted = False  # must refit since models aren't persisted
+            self._fitted = False
+            if self._corpus:
+                self._fit(self._corpus)
         except Exception as exc:
             logger.debug("TFIDFEmbedder._load_state failed: %s", exc)
 
@@ -325,7 +329,6 @@ class VectorStore:
     """
 
     _SCHEMA_VERSION = 1
-
     def __init__(
         self,
         state_dir: Path,
@@ -687,8 +690,12 @@ class VectorStore:
                         results.append(self._row_to_dict(row, distance=row["distance"]))
                 except Exception as vec_exc:
                     logger.debug("vec0 search failed, falling back: %s", vec_exc)
+                    if not fallback_vector_scan_allowed(self._db_path, conn):
+                        return []
                     results = self._fallback_vector_search(conn, query_vec, top_k, include_invalid)
             else:
+                if not fallback_vector_scan_allowed(self._db_path, conn):
+                    return []
                 results = self._fallback_vector_search(conn, query_vec, top_k, include_invalid)
 
             # Update access tracking

@@ -229,6 +229,39 @@ class TestVectorStoreSearch:
             assert doc["access_count"] >= 1
             assert doc["last_accessed"] is not None
 
+    def test_search_vector_skips_large_fallback_scan(self, monkeypatch, tmp_path):
+        """Without sqlite-vec, large fallback stores must not be full-scanned."""
+        store = self._seed_store(tmp_path)
+        monkeypatch.setenv("DHARMA_VECTOR_FALLBACK_MAX_ROWS", "1")
+        monkeypatch.setattr(store, "_has_vec0", lambda conn: False)
+
+        def _explode(*args, **kwargs):
+            raise AssertionError("fallback vector scan should not run")
+
+        monkeypatch.setattr(store, "_fallback_vector_search", _explode)
+
+        assert store.search_vector("heartbeat organism health", top_k=3) == []
+
+    def test_search_hybrid_degrades_to_fts_when_fallback_scan_skipped(
+        self,
+        monkeypatch,
+        tmp_path,
+    ):
+        """Skipping fallback vectors should preserve useful FTS retrieval."""
+        store = self._seed_store(tmp_path)
+        monkeypatch.setenv("DHARMA_VECTOR_FALLBACK_MAX_ROWS", "1")
+        monkeypatch.setattr(store, "_has_vec0", lambda conn: False)
+
+        def _explode(*args, **kwargs):
+            raise AssertionError("fallback vector scan should not run")
+
+        monkeypatch.setattr(store, "_fallback_vector_search", _explode)
+
+        results = store.search_hybrid("organism heartbeat", top_k=3)
+
+        assert results
+        assert any("heartbeat" in r["content"].lower() for r in results)
+
 
 # ---------------------------------------------------------------------------
 # Invalidation tests
