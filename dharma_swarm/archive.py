@@ -508,6 +508,16 @@ class EvolutionArchive:
         merkle_path = self.path.parent / "merkle_log.json"
         self.merkle_log = MerkleLog(merkle_path)
 
+    def _fitness_bearing_entries(self) -> list[ArchiveEntry]:
+        return [
+            entry
+            for entry in self._entries.values()
+            if entry.status in FITNESS_BEARING_STATUSES
+        ]
+
+    def _rebuild_grid(self) -> None:
+        self.grid.rebuild(self._fitness_bearing_entries())
+
     def _assert_fitness_authority(
         self,
         entry: ArchiveEntry,
@@ -639,12 +649,7 @@ class EvolutionArchive:
     def reconfigure_grid(self, n_bins: int) -> None:
         """Change MAP-Elites granularity and rebuild from current applied entries."""
         self.grid = MAPElitesGrid(n_bins=n_bins)
-        applied_entries = [
-            entry
-            for entry in self._entries.values()
-            if entry.status in FITNESS_BEARING_STATUSES
-        ]
-        self.grid.rebuild(applied_entries)
+        self._rebuild_grid()
 
     async def get_entry(self, entry_id: str) -> ArchiveEntry | None:
         """Look up a single entry by id."""
@@ -752,8 +757,8 @@ class EvolutionArchive:
         entry.status = status
         if reason is not None:
             entry.rollback_reason = reason
-        if status in FITNESS_BEARING_STATUSES:
-            self.grid.try_insert(entry)
+        if old_status in FITNESS_BEARING_STATUSES or status in FITNESS_BEARING_STATUSES:
+            self._rebuild_grid()
         await self._rewrite()
 
     async def rollback_entry(self, entry_id: str, reason: str) -> bool:
@@ -769,7 +774,7 @@ class EvolutionArchive:
             self._assert_fitness_authority(guarded, operation="rollback_entry")
         entry.status = "rolled_back"
         entry.rollback_reason = reason
-        self.grid.try_insert(entry)
+        self._rebuild_grid()
         await self._rewrite()
         return True
 
@@ -796,6 +801,7 @@ class EvolutionArchive:
                 e.status = "composted"
                 composted += 1
         if composted > 0:
+            self._rebuild_grid()
             await self._rewrite()
         return composted
 

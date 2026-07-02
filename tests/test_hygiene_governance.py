@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -61,3 +62,23 @@ def test_hygiene_scan_ai_agent_pattern_writes_output(tmp_path: Path) -> None:
     text = output.read_text(encoding="utf-8")
     assert "AI-A1 - Untrusted text treated as agent instruction" in text
     assert "exit_code:" in text
+
+
+def test_run_python_with_repo_env_normalizes_relative_script_from_non_repo_cwd(tmp_path: Path) -> None:
+    env = os.environ.copy()
+    env["DHARMA_PYTHON"] = sys.executable
+
+    result = subprocess.run(
+        [
+            str(REPO_ROOT / "scripts/governance/run_python_with_repo_env.sh"),
+            "scripts/governance/hygiene/scan.py",
+            "--help",
+        ],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    assert "--pattern" in result.stdout

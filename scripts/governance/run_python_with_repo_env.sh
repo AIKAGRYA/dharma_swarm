@@ -1,11 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd -P)"
 
 if [[ "$#" -lt 1 ]]; then
   echo "usage: $0 <script.py> [args...]" >&2
   exit 64
+fi
+
+TARGET_SCRIPT="$1"
+shift
+if [[ "${TARGET_SCRIPT}" != /* && -f "${REPO_ROOT}/${TARGET_SCRIPT}" ]]; then
+  TARGET_SCRIPT="${REPO_ROOT}/${TARGET_SCRIPT}"
 fi
 
 if [[ -n "${DHARMA_PYTHON:-}" ]]; then
@@ -39,4 +46,5 @@ if [[ -z "${PY}" ]]; then
   exit 1
 fi
 
-exec "${PY}" "$@"
+cd "${REPO_ROOT}"
+exec "${PY}" "${TARGET_SCRIPT}" "$@"
