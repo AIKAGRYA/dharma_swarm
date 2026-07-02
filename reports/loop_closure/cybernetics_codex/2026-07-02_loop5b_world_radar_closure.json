@@ -3,7 +3,7 @@
   "loop_id": "world_radar_go_chain",
   "arm": "external",
   "fixture": "tests/fixtures/world_radar_go/loop5b_observations.jsonl",
-  "observed_at": "2026-07-02T13:16:54.339403Z",
+  "observed_at": "2026-07-02T19:33:13.910392Z",
   "host_status": "OK",
   "host_detail": "prebuilt binary present: /home/user/dharma_swarm/tools/world_signal_ingestor_go/world_signal_ingestor_go",
   "invocation_mode": "binary",
@@ -19,7 +19,7 @@
   "adapt_proof": {
     "field": "world_radar_health.ingest_run_id + go receipt store total (each pass's board/feed are rebuilt from receipt-projected rows)",
     "before": "",
-    "after": "world_radar_go_1782998214372934884",
+    "after": "world_radar_go_1783020794042300237",
     "fed_forward": true,
     "accepted_receipts_total": 2
   },
@@ -33,7 +33,7 @@
       "projected_feed_rows": 1,
       "receipts_total_before": 0,
       "receipts_total_after": 1,
-      "ingest_run_id": "world_radar_go_1782998214340417402",
+      "ingest_run_id": "world_radar_go_1783020793911296125",
       "invocation_mode": "binary",
       "errors": [],
       "source_errors": []
@@ -46,7 +46,7 @@
       "projected_feed_rows": 1,
       "receipts_total_before": 1,
       "receipts_total_after": 2,
-      "ingest_run_id": "world_radar_go_1782998214372934884",
+      "ingest_run_id": "world_radar_go_1783020794042300237",
       "invocation_mode": "binary",
       "errors": [],
       "source_errors": []

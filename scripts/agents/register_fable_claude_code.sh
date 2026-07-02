@@ -7,7 +7,7 @@
 # dharma_swarm.roaming_onboarding.
 #
 # Witness:
-#   ~/.dharma/onboarding/receipts/receipts.jsonl  (kaizenops trail)
+#   ~/.dharma/onboarding/receipts.jsonl  (kaizenops trail)
 #   ~/.dharma/agents/fable_claude_code/
 #   ~/.dharma/a2a/cards/fable-claude-code.json
 #

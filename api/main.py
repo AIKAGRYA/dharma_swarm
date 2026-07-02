@@ -94,7 +94,10 @@ def get_swarm():
                     "reachable" if organism.strange_loop is not None else "unavailable",
                 )
             except Exception as exc:
-                # The flag must never take down the default boot path.
+                # The flag must never take down the default boot path; record the
+                # failure so get_organism() callers can diagnose why it is None.
+                _state.pop("organism", None)
+                _state["organism_init_error"] = f"{type(exc).__name__}: {exc}"
                 logger.warning("Organism composition root init failed (non-fatal): %s", exc)
     return _state["swarm"]
 

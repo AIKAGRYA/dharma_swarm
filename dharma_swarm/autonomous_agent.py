@@ -1274,12 +1274,16 @@ class AutonomousAgent:
         if bus is None:
             self._inbox_pending_ack = []
             return
+        failed_acks: list[str] = []
         for msg_id in self._inbox_pending_ack:
             try:
                 await bus.mark_read(msg_id)
             except Exception:
-                logger.debug("Message bus mark_read failed", exc_info=True)
-        self._inbox_pending_ack = []
+                failed_acks.append(msg_id)
+                logger.warning("Message bus mark_read failed for %s; retained for retry", msg_id, exc_info=True)
+        # Failed acks stay pending so the next wake retries them instead of
+        # silently losing the acknowledgement (hygiene AS-09).
+        self._inbox_pending_ack = failed_acks
 
     async def _get_message_bus(self) -> Any:
         if self._message_bus is None:

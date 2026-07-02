@@ -303,11 +303,12 @@ class PersistentAgent:
             if urgent:
                 top = urgent[0]
                 await self._task_queue.put(
-                    f"Urgent message from {top.from_agent}: {top.subject}"
+                    f"Urgent message from {top.from_agent}: {top.subject} — {top.body[:500]}"
                 )
-                # Only the queued message is handled; mark it read so it is
-                # not re-queued on every cron tick. Other previewed messages
-                # stay unread (act-then-mark, cf. contracts/runtime_adapters.py).
+                # The queued task now carries the message body, so marking
+                # read here is a terminal disposition — wake() consumes the
+                # queued task, not the (now-read) bus row. Other previewed
+                # messages stay unread (act-then-mark).
                 await bus.mark_read(top.id)
                 return f"urgent={len(urgent)}, queued_response"
             return f"inbox={len(msgs)}, no_urgent"

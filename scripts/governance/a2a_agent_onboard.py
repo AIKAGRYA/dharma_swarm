@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -29,6 +28,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from dharma_swarm.a2a.agent_card import AGENT_UID_ALIASES  # noqa: E402
 from dharma_swarm.a2a.agent_presence import REGISTERED_AGENT_UIDS  # noqa: E402
+from dharma_swarm.daemon_config import dharma_state_dir  # noqa: E402
 
 MANIFEST_DIR = REPO_ROOT / "examples" / "agents"
 SEAT_ROOT = REPO_ROOT / "inter_agent"
@@ -72,8 +72,9 @@ def load_manifests() -> dict[str, dict]:
 
 
 def runtime_receipt_callsigns() -> set[str]:
-    home = Path(os.environ.get("DHARMA_HOME", "")) if os.environ.get("DHARMA_HOME") else Path.home() / ".dharma"
-    receipts = home / "onboarding" / "receipts.jsonl"
+    # Canonical state-dir accessor (semgrep Rule 1): ~/.dharma resolution is
+    # owned by dharma_swarm.daemon_config, honoring the DHARMA_HOME override.
+    receipts = dharma_state_dir("DHARMA_HOME") / "onboarding" / "receipts.jsonl"
     seen: set[str] = set()
     if not receipts.exists():
         return seen

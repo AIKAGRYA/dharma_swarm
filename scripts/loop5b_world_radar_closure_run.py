@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import sys
 import tempfile
@@ -58,7 +59,7 @@ INGESTOR_MODULE = REPO_ROOT / "tools" / "world_signal_ingestor_go"
 def _host_status() -> tuple[str, str]:
     """Return (status, detail). NEEDS_HOST when neither binary nor toolchain exists."""
     binary = INGESTOR_MODULE / INGESTOR_MODULE.name
-    if binary.is_file():
+    if binary.is_file() and os.access(binary, os.X_OK):
         return "OK", f"prebuilt binary present: {binary}"
     go = shutil.which("go")
     if go:
