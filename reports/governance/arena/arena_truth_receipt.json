@@ -62,15 +62,15 @@
       "significant": true
     }
   },
-  "capability_claim": "none \u2014 hermetic fixture harness only. Lift shown is a control-machinery existence proof on the frozen synthetic taskpack, NOT a production capability claim (track non-goal 1). Live-lane runs must carry the same best-single + budget-parity + significance controls before any claim.",
+  "capability_claim": "none \u2014 hermetic fixture harness only. The fixture pool is CONSTRUCTED so that specialist routing beats best-single (Krogh-Vedelsby by design), so the lift shown is a control-machinery existence proof on the frozen synthetic taskpack, NOT a production capability claim (track non-goal 1) and NOT commensurable with trust-gate C2 (which reads only live benchmark runs). Live-lane runs must carry the same best-single + budget-parity + significance controls before any claim.",
   "corpus": {
     "path": "cold_start_corpus.jsonl",
     "rows": 48,
     "sha256": "05a3692e3b02d928ea6902ab47bfbcd14cef041fc637f3e7a33aab77e19c2054"
   },
-  "digest": "eca3eb677a4bbfacfec7c82305320ea4112d2936e7edda98e75a4b3e7f41db91",
+  "digest": "38c33ba2e9b6d35070803d9cc9e5f29e69692be1fbc92bf51dfb92947408f8bb",
   "evaluated": 17,
-  "generated_at": "2026-07-03T06:06:47Z",
+  "generated_at": "2026-07-03T08:00:18Z",
   "generations": 12,
   "hermetic": true,
   "schema": "arena_truth_report.v1",

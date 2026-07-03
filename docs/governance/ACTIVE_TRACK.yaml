@@ -663,6 +663,12 @@ active_tracks:
         what: "Slice 1 (blocker): bridge native GitHub reviews -> Mike receipts in the pr_merge_control gate (Codex App = codex, Copilot = copilot), trusted-login-gated and ADDITIVE (never removes a check). + tests."
         kind: code
         blocker: true
+        # Underclaim probe (2026-07-03): the bridge + its test file already
+        # exist on main (criteria github_review_receipt_bridge and
+        # github_review_bridge_tested both pass) — this item looks shipped but
+        # was never reconciled. The linked criterion makes check_track_status
+        # WARN track-underclaim until the owner reconciles it.
+        evidence_criterion: github_review_bridge_tested
       - id: 2
         what: "Slice 2: auto-enroll every non-draft PR into the automerge/Mike evaluate lane (not only bot-pr / automerge-labeled)."
         kind: code

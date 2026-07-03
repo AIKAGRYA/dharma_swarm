@@ -224,8 +224,8 @@ def check_assertions(
             )
             continue
         text = doc_path.read_text(encoding="utf-8", errors="ignore")
-        match = re.search(assertion["regex"], text, flags=re.MULTILINE)
-        if not match:
+        matches = list(re.finditer(assertion["regex"], text, flags=re.MULTILINE))
+        if not matches:
             findings.append(
                 Finding(
                     value_severity,
@@ -234,6 +234,24 @@ def check_assertions(
                 )
             )
             continue
+        # Duplicate-token tripwire: an asserted count must appear EXACTLY once.
+        # Refreshes that append instead of replace duplicated the SOVEREIGN
+        # MANIFEST count table row-by-row until 2026-07-03 (rows quadruplicated
+        # while the checker happily validated the first match). Duplicates are
+        # manufactured decay — flag them even when the values agree.
+        if len(matches) > 1:
+            findings.append(
+                Finding(
+                    value_severity,
+                    "assertion-duplicate",
+                    (
+                        f"{assertion_id}: asserted token appears {len(matches)}x in "
+                        f"{assertion['doc']} — refreshes must REPLACE the row, never "
+                        "append; dedupe to exactly one occurrence"
+                    ),
+                )
+            )
+        match = matches[0]
         observed = match.group(1).replace(",", "")
         if str(expected) != observed:
             verify = assertion.get("verify", metric_name)

@@ -1,9 +1,9 @@
 # Arena Truth — governance report surface (read-only)
 
-**Schema:** `arena_truth_report.v1` · **Generated:** 2026-07-03T06:06:47Z
+**Schema:** `arena_truth_report.v1` · **Generated:** 2026-07-03T08:00:18Z
 **Replay:** `python3 scripts/governance/arena_truth_report.py --check`
 
-> **NO CAPABILITY CLAIM.** none — hermetic fixture harness only. Lift shown is a control-machinery existence proof on the frozen synthetic taskpack, NOT a production capability claim (track non-goal 1). Live-lane runs must carry the same best-single + budget-parity + significance controls before any claim.
+> **NO CAPABILITY CLAIM.** none — hermetic fixture harness only. The fixture pool is CONSTRUCTED so that specialist routing beats best-single (Krogh-Vedelsby by design), so the lift shown is a control-machinery existence proof on the frozen synthetic taskpack, NOT a production capability claim (track non-goal 1) and NOT commensurable with trust-gate C2 (which reads only live benchmark runs). Live-lane runs must carry the same best-single + budget-parity + significance controls before any claim.
 
 ## Search summary (zero-weight, seeded, hermetic)
 

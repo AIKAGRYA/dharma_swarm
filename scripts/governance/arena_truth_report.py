@@ -62,10 +62,13 @@ SEED = 0
 GENERATIONS = 12
 
 CAPABILITY_CLAIM = (
-    "none — hermetic fixture harness only. Lift shown is a control-machinery "
-    "existence proof on the frozen synthetic taskpack, NOT a production "
-    "capability claim (track non-goal 1). Live-lane runs must carry the same "
-    "best-single + budget-parity + significance controls before any claim."
+    "none — hermetic fixture harness only. The fixture pool is CONSTRUCTED so "
+    "that specialist routing beats best-single (Krogh-Vedelsby by design), so "
+    "the lift shown is a control-machinery existence proof on the frozen "
+    "synthetic taskpack, NOT a production capability claim (track non-goal 1) "
+    "and NOT commensurable with trust-gate C2 (which reads only live "
+    "benchmark runs). Live-lane runs must carry the same best-single + "
+    "budget-parity + significance controls before any claim."
 )
 
 # Volatile receipt fields excluded from replay comparison (never from digest).

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-03T06:13:59+00:00",
+  "generated_at": "2026-07-03T08:02:08+00:00",
   "schema_version": 2,
   "active_track_id": "loop-closure-2026-06",
   "shippable": false,
@@ -209,7 +209,7 @@
       "id": "cybernetics_codex_one_wire_guard_test_passes",
       "kind": "test_passes",
       "passed": true,
-      "detail": "pytest tests/test_one_wire_archive_fitness_guard.py: PASS \u2014 19 passed in 0.26s",
+      "detail": "pytest tests/test_one_wire_archive_fitness_guard.py: PASS \u2014 19 passed in 0.25s",
       "executed": true
     },
     {
@@ -303,6 +303,7 @@
         "1 active ship veto(es): cybernetics_codex_harness_proven_blocks_live_ship: reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses[].verdict == 'HARNESS_PROVEN': 11 > 0"
       ],
       "final_boss_blocks": [],
+      "underclaims": [],
       "claim_boundary": "CLOSED_LIVE 0/13; HARNESS_PROVEN 11/13; BLOCKED 2/13. Completion criteria only prove the claim-boundary artifact set, not production-live closure.",
       "has_rigorous_evidence": true,
       "strongest_grade": 2,
@@ -515,7 +516,7 @@
           "id": "cybernetics_codex_one_wire_guard_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_one_wire_archive_fitness_guard.py: PASS \u2014 19 passed in 0.26s",
+          "detail": "pytest tests/test_one_wire_archive_fitness_guard.py: PASS \u2014 19 passed in 0.25s",
           "executed": true
         },
         {
@@ -583,6 +584,7 @@
         "1 open blocker next-item(s)"
       ],
       "final_boss_blocks": [],
+      "underclaims": [],
       "claim_boundary": null,
       "has_rigorous_evidence": true,
       "strongest_grade": 2,
@@ -683,14 +685,14 @@
           "id": "arena_v1_controls_tests_pass",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_arena_v1.py: PASS \u2014 15 passed in 0.39s",
+          "detail": "pytest tests/test_arena_v1.py: PASS \u2014 15 passed in 0.33s",
           "executed": true
         },
         {
           "id": "arena_truth_surface_tests_pass",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_arena_truth_report.py: PASS \u2014 8 passed in 3.10s",
+          "detail": "pytest tests/test_arena_truth_report.py: PASS \u2014 8 passed in 2.48s",
           "executed": true
         },
         {
@@ -739,6 +741,13 @@
         "strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
       ],
       "final_boss_blocks": [],
+      "underclaims": [
+        {
+          "item_id": 1,
+          "evidence_criterion": "github_review_bridge_tested",
+          "blocker": true
+        }
+      ],
       "claim_boundary": null,
       "has_rigorous_evidence": false,
       "strongest_grade": 1,
@@ -853,6 +862,7 @@
         "strongest evidence S0_EXISTS < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
       ],
       "final_boss_blocks": [],
+      "underclaims": [],
       "claim_boundary": null,
       "has_rigorous_evidence": false,
       "strongest_grade": 0,
@@ -892,6 +902,12 @@
       "check": "track-provisional:orchestration-arena-v1-2026-06",
       "message": "[orchestration-arena-v1-2026-06] 12/12 criteria pass but NOT shippable under the rigorous bar: 1 open blocker next-item(s). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).",
       "criterion_id": null
+    },
+    {
+      "severity": "WARN",
+      "check": "track-underclaim:merge-master-mike-d4-2026-06:1",
+      "message": "[merge-master-mike-d4-2026-06] blocker next-item 1 is still listed as open work but its linked evidence criterion 'github_review_bridge_tested' PASSES \u2014 the ledger may be behind reality. Reconcile: annotate the item DONE, narrow it to the remaining live edge, or strengthen the criterion.",
+      "criterion_id": "github_review_bridge_tested"
     },
     {
       "severity": "INFO",
