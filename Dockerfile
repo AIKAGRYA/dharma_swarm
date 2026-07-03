@@ -11,9 +11,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements-ginko.txt .
 RUN pip install --no-cache-dir -r requirements-ginko.txt
 
-# Copy source
+# Copy source (api/ is required: the web CMD serves api.main:app, which owns
+# the /api/fleet healthcheck endpoint)
 COPY dharma_swarm/ /app/dharma_swarm/
-COPY setup.py pyproject.toml README.md ./
+COPY api/ /app/api/
+COPY pyproject.toml README.md ./
 RUN pip install --no-cache-dir -e . 2>/dev/null || pip install --no-cache-dir .
 
 # Create data directories
@@ -26,7 +28,13 @@ RUN mkdir -p /root/.dharma/ginko/agents \
 
 EXPOSE 8080
 
+# /api/health is the only bare GET health probe (api/routers/health.py:28);
+# the old /api/fleet target has no root route — it 404'd on a correctly
+# running app, so the container could never report healthy.
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-    CMD curl -f http://localhost:8080/api/fleet || exit 1
+    CMD curl -f http://localhost:8080/api/health || exit 1
 
-CMD ["uvicorn", "dharma_swarm.swarmlens_app:app", "--host", "0.0.0.0", "--port", "8080"]
+# api.main:app is the real backend (ACTIVE_SURFACE_MANIFEST api_routers);
+# the previous target dharma_swarm.swarmlens_app does not exist on main and
+# failed every fresh deploy (found live on the VPS, 2026-07-03).
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8080"]
