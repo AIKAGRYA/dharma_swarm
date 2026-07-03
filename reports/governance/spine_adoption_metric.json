@@ -1,5 +1,5 @@
 {
-  "audit_sha": "48e965c1be5341d4e0c5f8aec57bdd338ed816c7",
+  "audit_sha": "4c4f5aa47c7b49d49e28608f39f0b650d236ad57",
   "classification_rule": "joined requires all joined evidence patterns; adapter-ready requires all adapter evidence patterns when joined is incomplete; quarantine and legacy require explicit source markers; missing means no tracked surface or insufficient evidence.",
   "classification_vocabulary": [
     "joined",
@@ -117,7 +117,7 @@
           "description": "runtime store symbol is present",
           "hits": [
             {
-              "line": 1070,
+              "line": 1146,
               "path": "dharma_swarm/runtime_state.py",
               "text": "class RuntimeStateStore:"
             }
@@ -137,7 +137,7 @@
           "description": "RuntimeStateStore type exists",
           "hits": [
             {
-              "line": 1070,
+              "line": 1146,
               "path": "dharma_swarm/runtime_state.py",
               "text": "class RuntimeStateStore:"
             }
@@ -150,7 +150,7 @@
           "description": "execution identity table is declared",
           "hits": [
             {
-              "line": 211,
+              "line": 229,
               "path": "dharma_swarm/runtime_state.py",
               "text": "CREATE TABLE IF NOT EXISTS execution_identities ("
             }
@@ -163,7 +163,7 @@
           "description": "runtime receipt table is declared",
           "hits": [
             {
-              "line": 234,
+              "line": 252,
               "path": "dharma_swarm/runtime_state.py",
               "text": "CREATE TABLE IF NOT EXISTS runtime_receipts ("
             }
@@ -176,7 +176,7 @@
           "description": "idempotency table is declared",
           "hits": [
             {
-              "line": 252,
+              "line": 270,
               "path": "dharma_swarm/runtime_state.py",
               "text": "CREATE TABLE IF NOT EXISTS idempotency_records ("
             }
@@ -189,7 +189,7 @@
           "description": "run ledger query exists",
           "hits": [
             {
-              "line": 3475,
+              "line": 3673,
               "path": "dharma_swarm/runtime_state.py",
               "text": "async def get_run_ledger(self, run_id: str) -> dict[str, Any]:"
             }
@@ -205,7 +205,7 @@
           "description": "legacy identity bypass flag is present",
           "hits": [
             {
-              "line": 915,
+              "line": 991,
               "path": "dharma_swarm/runtime_state.py",
               "text": "\"legacy_no_identity_allowed\": True,"
             }
@@ -229,7 +229,7 @@
           "description": "identity imported",
           "hits": [
             {
-              "line": 18,
+              "line": 16,
               "path": "dharma_swarm/runtime_lifecycle.py",
               "text": "from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity"
             }
@@ -249,7 +249,7 @@
           "description": "lifecycle can create/require identity",
           "hits": [
             {
-              "line": 76,
+              "line": 74,
               "path": "dharma_swarm/runtime_lifecycle.py",
               "text": "def ensure_execution_identity("
             }
@@ -262,7 +262,7 @@
           "description": "task claim lifecycle path exists",
           "hits": [
             {
-              "line": 211,
+              "line": 91,
               "path": "dharma_swarm/runtime_lifecycle.py",
               "text": "async def record_task_claim("
             }
@@ -275,7 +275,7 @@
           "description": "delegation run lifecycle path exists",
           "hits": [
             {
-              "line": 290,
+              "line": 213,
               "path": "dharma_swarm/runtime_lifecycle.py",
               "text": "async def record_delegation_run("
             }
@@ -288,7 +288,7 @@
           "description": "artifact lifecycle path exists",
           "hits": [
             {
-              "line": 399,
+              "line": 393,
               "path": "dharma_swarm/runtime_lifecycle.py",
               "text": "async def record_artifact("
             }
@@ -301,9 +301,9 @@
           "description": "runtime receipts are emitted",
           "hits": [
             {
-              "line": 14,
+              "line": 11,
               "path": "dharma_swarm/runtime_lifecycle.py",
-              "text": "RuntimeReceipt,"
+              "text": "from dharma_swarm.runtime_state import ArtifactRecord, DelegationRun, RuntimeReceipt, TaskClaim"
             }
           ],
           "key": "runtime_receipt",
@@ -412,7 +412,7 @@
           "description": "orchestrator has lifecycle adapter seam",
           "hits": [
             {
-              "line": 116,
+              "line": 121,
               "path": "dharma_swarm/orchestrator.py",
               "text": "self._runtime_lifecycle = RuntimeLifecycle(self._ledger)"
             }
@@ -432,7 +432,7 @@
           "description": "dispatch attaches identity",
           "hits": [
             {
-              "line": 2027,
+              "line": 2254,
               "path": "dharma_swarm/orchestrator.py",
               "text": "self._runtime_lifecycle.ensure_execution_identity(td, task=task_for_gate)"
             }
@@ -445,7 +445,7 @@
           "description": "dispatch records task claims",
           "hits": [
             {
-              "line": 1777,
+              "line": 2041,
               "path": "dharma_swarm/orchestrator.py",
               "text": "await self._runtime_lifecycle.record_task_claim("
             }
@@ -458,7 +458,7 @@
           "description": "dispatch records delegation runs",
           "hits": [
             {
-              "line": 1784,
+              "line": 2048,
               "path": "dharma_swarm/orchestrator.py",
               "text": "await self._runtime_lifecycle.record_delegation_run("
             }
@@ -1084,7 +1084,7 @@
               "text": "async def apply_and_test("
             },
             {
-              "line": 1258,
+              "line": 1265,
               "path": "dharma_swarm/evolution.py",
               "text": "candidate, test_results = await self.apply_diff_and_test("
             }
@@ -1102,7 +1102,7 @@
               "text": "\"\"\"Apply unified diffs to files with rollback and test integration."
             },
             {
-              "line": 1049,
+              "line": 1056,
               "path": "dharma_swarm/evolution.py",
               "text": "return (\"rollback\", \"rollback:apply_or_test\")"
             },
@@ -1489,7 +1489,7 @@
           "description": "NATS events carry execution identity",
           "hits": [
             {
-              "line": 28,
+              "line": 29,
               "path": "dharma_swarm/a2a/nats_transport.py",
               "text": "from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity"
             }
@@ -1502,7 +1502,7 @@
           "description": "NATS receiver is idempotency-gated",
           "hits": [
             {
-              "line": 158,
+              "line": 159,
               "path": "dharma_swarm/a2a/nats_transport.py",
               "text": "if not await self.runtime_state.try_begin_idempotent_side_effect("
             }
@@ -1515,7 +1515,7 @@
           "description": "ack/nack contract is visible",
           "hits": [
             {
-              "line": 47,
+              "line": 48,
               "path": "dharma_swarm/a2a/nats_transport.py",
               "text": "async def ack(self) -> Any:"
             },
@@ -1647,7 +1647,7 @@
           "description": "legacy bypass must stay explicit",
           "hits": [
             {
-              "line": 915,
+              "line": 991,
               "path": "dharma_swarm/runtime_state.py",
               "text": "\"legacy_no_identity_allowed\": True,"
             },
@@ -1759,5 +1759,5 @@
       "status": "legacy"
     }
   ],
-  "tracked_file_count": 3802
+  "tracked_file_count": 4477
 }
