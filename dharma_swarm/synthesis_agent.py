@@ -220,7 +220,6 @@ async def run_synthesis(model: str = "claude-opus-4-6") -> Path | None:
         from dharma_swarm.runtime_provider import (
             complete_via_preferred_runtime_providers,
         )
-        from dharma_swarm.models import ProviderType
 
         # Use the preferred runtime chain — Ollama Cloud first, then up
         # For synthesis we want quality, so override to a strong model

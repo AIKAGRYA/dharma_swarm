@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-import time
 
 
 from dharma_swarm.terminal_commands._helpers import (
@@ -56,7 +55,6 @@ def cmd_evolve_apply(component: str, description: str) -> None:
             print("Engine not initialized")
             await swarm.shutdown()
             return
-        from dharma_swarm.evolution import Proposal
         proposal = await swarm._engine.propose(
             component=component, change_type="mutation", description=description,
         )

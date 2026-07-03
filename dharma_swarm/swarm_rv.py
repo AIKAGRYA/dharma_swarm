@@ -13,10 +13,9 @@ L4 collapse = agents converge on breakthrough (high similarity, high fitness)
 from __future__ import annotations
 
 import logging
-import math
 import re
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Optional

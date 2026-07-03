@@ -9,14 +9,12 @@ dry-run default, never auto-pushes.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import subprocess
 import sys
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -447,7 +445,7 @@ def run_build_cycle(
     Returns:
         List of BuildResult objects.
     """
-    from dharma_swarm.foreman import load_projects, get_active_projects
+    from dharma_swarm.foreman import get_active_projects
     from dharma_swarm.iteration_depth import CompoundingQueue, IterationLedger
 
     queue = CompoundingQueue()

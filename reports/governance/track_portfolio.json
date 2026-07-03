@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-03T08:02:08+00:00",
+  "generated_at": "2026-07-03T09:08:52+00:00",
   "schema_version": 2,
   "active_track_id": "loop-closure-2026-06",
   "shippable": false,
@@ -209,7 +209,7 @@
       "id": "cybernetics_codex_one_wire_guard_test_passes",
       "kind": "test_passes",
       "passed": true,
-      "detail": "pytest tests/test_one_wire_archive_fitness_guard.py: PASS \u2014 19 passed in 0.25s",
+      "detail": "pytest tests/test_one_wire_archive_fitness_guard.py: PASS \u2014 19 passed in 0.35s",
       "executed": true
     },
     {
@@ -516,7 +516,7 @@
           "id": "cybernetics_codex_one_wire_guard_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_one_wire_archive_fitness_guard.py: PASS \u2014 19 passed in 0.25s",
+          "detail": "pytest tests/test_one_wire_archive_fitness_guard.py: PASS \u2014 19 passed in 0.35s",
           "executed": true
         },
         {
@@ -685,14 +685,14 @@
           "id": "arena_v1_controls_tests_pass",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_arena_v1.py: PASS \u2014 15 passed in 0.33s",
+          "detail": "pytest tests/test_arena_v1.py: PASS \u2014 15 passed in 0.49s",
           "executed": true
         },
         {
           "id": "arena_truth_surface_tests_pass",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_arena_truth_report.py: PASS \u2014 8 passed in 2.48s",
+          "detail": "pytest tests/test_arena_truth_report.py: PASS \u2014 8 passed in 3.83s",
           "executed": true
         },
         {

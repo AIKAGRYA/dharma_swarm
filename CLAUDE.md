@@ -317,10 +317,10 @@ make test-fast
 make test
 
 # Static analysis / repo inventory
-make xray
+python3 xray.py
 
 # Dashboard lint
-make dashboard-lint
+npm --prefix dashboard run lint
 ```
 
 - ALWAYS run tests after making code changes
@@ -366,7 +366,7 @@ bash run_operator.sh
 
 ## Navigation
 
-See [`docs/architecture/NAVIGATION.md`](docs/architecture/NAVIGATION.md) for the full module map (770+ modules under `dharma_swarm/`, 12 architectural layers; run `make xray` for the live count).
+See [`docs/architecture/NAVIGATION.md`](docs/architecture/NAVIGATION.md) for the full module map (770+ modules under `dharma_swarm/`, 12 architectural layers; run `python3 xray.py` for the live count).
 See [`docs/MEGAFILE_INDEX.md`](docs/MEGAFILE_INDEX.md) for the ten highest-system onboarding maps and their current status.
 See `README.md` for repo map and common commands.
 See `foundations/` for the 10-pillar intellectual genome.
@@ -378,7 +378,7 @@ See `foundations/` for the 10-pillar intellectual genome.
 **Highest-system map:** Read [`docs/MEGAFILE_INDEX.md`](docs/MEGAFILE_INDEX.md) before treating any large map as canonical. It points to the Attractor Closure synthesis, live ops dashboard, broken register, and missing slots.
 
 See [`INTERFACE_MISMATCH_MAP.md`](INTERFACE_MISMATCH_MAP.md) for the complete map of every interface mismatch between modules. **This is the #1 source of runtime failures.** The map documents:
-- **Live BLOCKER/DEGRADED status lives in the map itself — do not freeze a count here** (that duplication is exactly how this section rotted). Read `INTERFACE_MISMATCH_MAP.md` for the current tally. As of 2026-06-22 the recent `NEW-14` blocker (world-model loop ↔ `WorldModelAgent` API mismatch, which crashed the loop on every daemon boot) has a fix in flight; the 3 original BLOCKERs are resolved; `NEW-05` (guarded) and `NEW-07/08` (partial+) remain DEGRADED.
+- **Live BLOCKER/DEGRADED status lives in the map itself — do not freeze a count or a dated snapshot here** (this section rotted twice by doing so: the 2026-06-22 snapshot it used to carry said NEW-14's fix was "in flight" after the map already marked it RESOLVED, and omitted NEW-12 entirely). Read `INTERFACE_MISMATCH_MAP.md` for the current tally; cite nothing from memory.
 - A prioritized **Bootstrap Sequence** of fixes (most now resolved)
 
 **Rule for all sessions:** Before fixing a bug or adding a feature, check the mismatch map first. If the module pair you're touching has a known mismatch, fix the mismatch as part of your change. Do not add new callers to broken interfaces.

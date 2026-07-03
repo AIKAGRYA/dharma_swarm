@@ -38,17 +38,44 @@ async def test_seed_archived(engine, tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_seed_content_has_sections(engine):
+async def test_seed_content_has_sections(engine, monkeypatch, tmp_path):
+    import dharma_swarm.research_deadlines as rd
+
+    # With an active operator-owned deadline the Research section renders...
+    dl = tmp_path / "research_deadlines.json"
+    dl.write_text(
+        '{"deadlines": [{"venue": "TestVenue", '
+        '"abstract": "2099-01-01", "paper": "2099-01-06"}]}',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(rd, "deadlines_path", lambda: dl)
     seed = await engine.synthesize("light")
     assert "## System State" in seed
     assert "## Research" in seed
 
+    # ...and with none, the section is omitted (no stopped-clock countdown).
+    monkeypatch.setattr(rd, "deadlines_path", lambda: tmp_path / "absent.json")
+    seed = await engine.synthesize("light")
+    assert "## Research" not in seed
+
 
 @pytest.mark.asyncio
-async def test_research_signals(engine):
+async def test_research_signals(engine, monkeypatch, tmp_path):
+    # No deadlines file => the seed must NOT carry a stopped-clock countdown.
+    import dharma_swarm.research_deadlines as rd
+    monkeypatch.setattr(rd, "deadlines_path", lambda: tmp_path / "absent.json")
     seed = await engine.synthesize("light")
-    # Should contain COLM countdown
-    assert "abstract" in seed.lower() or "paper" in seed.lower()
+    assert "d to abstract" not in seed.lower()
+
+    # Operator writes a live deadline => the countdown returns, venue-named.
+    (tmp_path / "dl.json").write_text(
+        '{"deadlines": [{"venue": "TestVenue", '
+        '"abstract": "2099-01-01", "paper": "2099-01-06"}]}',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(rd, "deadlines_path", lambda: tmp_path / "dl.json")
+    seed = await engine.synthesize("light")
+    assert "d to abstract" in seed.lower()
 
 
 @pytest.mark.asyncio

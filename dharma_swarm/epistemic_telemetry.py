@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
-from typing import Any, Iterable, Sequence
+from typing import Any, Sequence
 
 from pydantic import BaseModel, Field
 

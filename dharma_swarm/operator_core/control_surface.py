@@ -39,22 +39,22 @@ from dharma_swarm.operator_core.control_surface_live_ops import (  # noqa: F401
     _rows_from_live_ops_census,
 )
 from dharma_swarm.operator_core.control_surface_models import (
-    AUTHORITY_ROLES,
+    AUTHORITY_ROLES,  # noqa: F401  (re-export)
     COHERENCE_STATES,
     PRIORITIES,
-    ROW_KINDS,
+    ROW_KINDS,  # noqa: F401  (re-export)
     AgentHandoffPrompt,  # noqa: F401
     ControlSurfaceEnvelope,  # noqa: F401
     ControlSurfaceRow,
     DisplayHints,  # noqa: F401
     EvidenceItem,  # noqa: F401
-    HumanDecisionContext,
+    HumanDecisionContext,  # noqa: F401  (re-export)
     SourceError,  # noqa: F401
     SourceRef,  # noqa: F401
     VerificationEvent,  # noqa: F401
     _build_human_decision_context,
     _compute_display_hints,
-    _needs_human_decision,
+    _needs_human_decision,  # noqa: F401  (re-export)
 )
 
 logger = logging.getLogger(__name__)

@@ -25,7 +25,12 @@ jobs:
       - name: Report missing Oz API key
         if: ${{ env.WARP_API_KEY == '' }}
         run: |
-          echo "::notice::WARP_API_KEY is not configured; Oz verification skipped."
+          # ::warning (not ::notice): a skipped verifier is a governance check
+          # NOT running while its check appears green — that must be loud on
+          # every run until the operator provisions the secret or removes the
+          # workflow (deliver-or-red doctrine, softened only because this is an
+          # unprovisioned feature rather than a failing delivery).
+          echo "::warning::WARP_API_KEY is not configured — Oz verification SKIPPED; this green check verified nothing."
           {
             echo "### Oz verification skipped"
             echo

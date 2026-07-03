@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from typing import Any, Sequence
+from typing import Any
 
 from dharma_swarm.semantic_gravity import (
     ConceptGraph,

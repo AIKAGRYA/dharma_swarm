@@ -13,6 +13,7 @@ Implementation is split across three sub-modules to satisfy the 1000-line budget
 All names that were public in this module remain importable from here for
 backward compatibility.
 """
+# ruff: noqa: F401  -- public API facade: imported names ARE the public surface
 
 from __future__ import annotations
 

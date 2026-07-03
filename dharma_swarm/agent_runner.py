@@ -12,7 +12,6 @@ import logging
 import os
 import re
 import time
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional, Protocol, runtime_checkable
@@ -58,9 +57,6 @@ from dharma_swarm.telos_gates import check_with_reflective_reroute
 # the actual call inside an invoke_agent() invoker closure to emit exactly one
 # EvidenceReceipt per dispatch. This import declares the surface's place in
 # the single blessed path; no god-object bypass of the spine for orchestrated work.
-from dharma_swarm.spine.invoke import invoke_agent
-from dharma_swarm.spine.receipt import EvidenceReceipt
-from dharma_swarm.spine.routing import RoutingDecision
 
 logger = logging.getLogger(__name__)
 

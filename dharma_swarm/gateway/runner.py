@@ -6,18 +6,16 @@ thread, and routes incoming messages to the swarm for processing.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
 import threading
-import time
 from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 import yaml
 
-from dharma_swarm.gateway.base import MessageEvent, PlatformAdapter
+from dharma_swarm.gateway.base import PlatformAdapter
 
 logger = logging.getLogger(__name__)
 

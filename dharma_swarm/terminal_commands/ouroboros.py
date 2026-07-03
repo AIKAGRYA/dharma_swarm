@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 import json
-import time
 
 
 from dharma_swarm.terminal_commands._helpers import (
@@ -16,7 +15,6 @@ from dharma_swarm.terminal_commands._helpers import (
     _load_ouroboros_observation,
     _normalize_optional_text,
     _run,
-    _tail,
     dharma_state_dir,
 )
 

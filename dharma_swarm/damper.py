@@ -17,7 +17,7 @@ import time
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, AsyncIterator
+from typing import AsyncIterator
 
 logger = logging.getLogger(__name__)
 

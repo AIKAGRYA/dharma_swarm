@@ -13,7 +13,7 @@ import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from dharma_swarm.models import GateDecision, GateResult, GateTier, _utc_now
-from dharma_swarm.telos_formal_math import EPS, validate_density_matrix, von_neumann_entropy
+from dharma_swarm.telos_formal_math import EPS, von_neumann_entropy
 
 __all__ = [
     "ActionContext",

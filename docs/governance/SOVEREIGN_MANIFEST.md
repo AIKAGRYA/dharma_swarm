@@ -355,10 +355,10 @@ append-style refreshes quadruplicated rows and broke `make docops-integrity`).
 | Total Python LOC | **339,354** | wc -l across dharma_swarm Python modules |
 | Test files | **816** | find tests -name "*.py" -type f |
 | Test functions | **12,487 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
-| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **1,297** | find . -name "*.md" -type f |
-| Markdown total lines | **278,269** | wc -l across all .md |
+| Tests collected (pytest) | **12,674 (measured 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
+| Collection errors | **0 (measured 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
+| Markdown files | **1,298** | find . -name "*.md" -type f |
+| Markdown total lines | **278,406** | wc -l across all .md |
 | Bridge files | **26** | find dharma_swarm -name "*bridge*.py" -type f |
 | Adapter files | **26** | find dharma_swarm -type f | rg -i "adapter" |
 | Router files | **16** | find dharma_swarm -type f | rg -i "rout" |

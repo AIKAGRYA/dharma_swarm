@@ -452,4 +452,4 @@ pip install py-spy  # Performance profiling
 
 **Status**: This is a roadmap, not working code. All adapter files need to be implemented.
 **Owner**: Research agent (assigned 2026-03-08)
-**Timeline**: 8 weeks to complete all benchmarks before COLM 2026 paper deadline
+**Timeline**: benchmark completion is re-anchored to the operator-owned venue deadline (`~/.dharma/research_deadlines.json`); the original COLM 2026 window lapsed

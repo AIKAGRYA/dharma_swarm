@@ -10,7 +10,6 @@ import json
 import logging
 import time
 from dataclasses import asdict, dataclass
-from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
 
 logger = logging.getLogger(__name__)

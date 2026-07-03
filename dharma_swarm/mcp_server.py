@@ -5,7 +5,6 @@ Requires the `mcp` optional dependency: pip install dharma-swarm[mcp]
 
 from __future__ import annotations
 
-import asyncio
 import json
 from typing import Any
 

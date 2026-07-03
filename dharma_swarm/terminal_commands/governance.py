@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 
 
 from dharma_swarm.terminal_commands._helpers import (

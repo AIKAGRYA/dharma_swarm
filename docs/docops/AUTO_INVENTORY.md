@@ -22,11 +22,11 @@ Do not hand-edit the generated block.
 | Markdown total lines | 277,964 |
 | Dharma Python modules | 872 |
 | Top-level Dharma Python modules | 431 |
-| Dharma Python LOC | 339,354 |
+| Dharma Python LOC | 339,183 |
 | Test files | 816 |
 | Test function occurrences | 12,487 |
-| Markdown files | 1,297 |
-| Markdown total lines | 278,269 |
+| Markdown files | 1,298 |
+| Markdown total lines | 278,406 |
 | Bridge files | 26 |
 | Adapter files | 26 |
 | Orchestrator files | 6 |

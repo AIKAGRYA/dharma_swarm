@@ -33,14 +33,12 @@ from dharma_swarm.models import (
     AgentConfig,
     AgentRole,
     AgentState,
-    AgentStatus,
     MemoryLayer,
     ProviderType,
     SwarmState,
     Task,
     TaskPriority,
     TaskStatus,
-    TopologyType,
 )
 from dharma_swarm.providers import create_default_router
 
@@ -71,7 +69,7 @@ if TYPE_CHECKING:
     from dharma_swarm.thinkodynamic_director import ThinkodynamicDirector
     from dharma_swarm.thread_manager import ThreadManager
     from dharma_swarm.traces import TraceStore
-    from dharma_swarm.organism import OrganismRuntime, HeartbeatResult
+    from dharma_swarm.organism import OrganismRuntime
     from dharma_swarm.witness import WitnessAuditor
 
 logger = logging.getLogger(__name__)

@@ -294,10 +294,10 @@ def test_generate_local_prompt_basic():
         file_signals="  foo.py: 200 lines (TODO=3)",
         prev_todo="  1. Fix flaky test",
         cycle_number=5,
-        colm_days=15,
+        deadline_line="TestVenue 2027 — abstract in 15d",
     )
     assert "Cycle 5" in prompt
-    assert "COLM deadline: 15 days" in prompt
+    assert "Research deadline: TestVenue 2027 — abstract in 15d" in prompt
     assert "Passed: 100" in prompt
     assert "foo.py" in prompt
     assert "Fix flaky test" in prompt

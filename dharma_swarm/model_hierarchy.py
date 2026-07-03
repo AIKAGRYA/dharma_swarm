@@ -8,7 +8,7 @@ import re
 from typing import TYPE_CHECKING, Mapping
 
 from dharma_swarm.models import LLMResponse, ProviderType
-from dharma_swarm.model_defaults import MODEL_POWER_FLOOR, default_for_provider
+from dharma_swarm.model_defaults import default_for_provider
 
 # Re-export the roster/pool power-floor line for provider-grain callers.
 __all_floor__ = ("MODEL_POWER_FLOOR",)

@@ -32,7 +32,6 @@ from dharma_swarm.signal_bus import (
 from dharma_swarm.transcendence import (
     AgentConfig,
     AggregationMethod,
-    EnsembleResult,
     TranscendenceMetrics,
     TranscendenceProtocol,
 )

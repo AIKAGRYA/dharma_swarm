@@ -53,7 +53,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
-from dataclasses import dataclass, field, fields, is_dataclass
+from dataclasses import dataclass, field, is_dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterable, TypeVar
 

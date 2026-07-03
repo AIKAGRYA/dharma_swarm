@@ -31,7 +31,7 @@ from dharma_swarm.api_keys import bootstrap_runtime_env  # noqa: E402
 bootstrap_runtime_env()
 
 from dharma_swarm.daemon_config import dharma_state_dir  # noqa: E402
-from dharma_swarm.forge_v1.autoloop import grade, pull_context, _safe  # noqa: E402
+from dharma_swarm.forge_v1.autoloop import grade, pull_context  # noqa: E402
 from dharma_swarm.forge_v1.canonical import _call, _provider_for_slot, pool_slots, KIMI_TEMP1  # noqa: E402
 from dharma_swarm.model_pool import FORGE_NVIDIA_KIMI_MODEL_ID  # noqa: E402
 

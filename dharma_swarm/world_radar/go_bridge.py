@@ -10,7 +10,6 @@ from typing import Any
 
 from dharma_swarm.daemon_config import dharma_state_dir
 from dharma_swarm.operator_core.world_radar.receipt_bridge import (
-    project_world_signal_receipts,
     receipt_paths,
     world_receipts_dir,
 )
@@ -42,7 +41,6 @@ from dharma_swarm.world_radar.io_utils import (
     read_json as _read_json,
     read_jsonl as _read_jsonl,
     release_lock as _release_lock,
-    repo_root as _repo_root,
     utc_now_iso as _utc_now_iso,
     write_json_atomic as _write_json_atomic,
     write_jsonl as _write_jsonl,

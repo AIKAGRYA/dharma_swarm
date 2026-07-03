@@ -7,7 +7,6 @@ import argparse
 import asyncio
 import json
 import os
-import re
 import signal
 import subprocess
 import sys
@@ -19,7 +18,6 @@ from dharma_swarm.terminal_commands._helpers import (
     DHARMA_SWARM,
     _first_daemon_like_process,
     _pid_alive,
-    _run,
     _tail,
 )
 

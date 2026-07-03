@@ -30,7 +30,7 @@ import json
 import logging
 import shutil
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir

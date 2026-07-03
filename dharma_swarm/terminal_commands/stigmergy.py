@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import asyncio
 import json
-import re
 
 
 from dharma_swarm.terminal_commands._helpers import (

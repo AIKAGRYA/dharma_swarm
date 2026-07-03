@@ -723,19 +723,43 @@ def render_manifest_health() -> None:
         tag = "stale" if days > SURFACE_MANIFEST_STALE_DAYS else "fresh"
         print(f"  Last git touch: {days}d ago ({tag})")
 
-    # Try to call manifest_health.build_health_report() if importable
+    # Render manifest_health.build_health_report()'s REAL schema. The previous
+    # version read a nonexistent top-level "entities" key and a green/yellow/red
+    # vocabulary that manifest_health never emits — every count was silently 0,
+    # so 47 registered entities (incl. degraded/broken/stub) rendered as a
+    # fabricated-clean "green=0 yellow=0 red=0" (fixed 2026-07-03).
     try:
         from dharma_swarm.manifest_health import build_health_report  # type: ignore
         report = build_health_report()
-        entities = report.get("entities", []) if isinstance(report, dict) else []
-        green = sum(1 for e in entities if e.get("status") == "green")
-        yellow = sum(1 for e in entities if e.get("status") == "yellow")
-        red = sum(1 for e in entities if e.get("status") == "red")
-        print(f"  Health        : green={green} yellow={yellow} red={red}")
-        if red:
-            print("  Top RED entities:")
-            for e in [e for e in entities if e.get("status") == "red"][:5]:
-                print(f"    - {e.get('id', '?')}: {e.get('gap', '')}")
+        summary = report.get("summary", {}) if isinstance(report, dict) else {}
+        if not summary:
+            print("  (manifest_health returned no summary — schema drift? "
+                  "inspect dharma_swarm/manifest_health.py)")
+        else:
+            print(
+                f"  Health        : total={summary.get('total', 0)}"
+                f" live={summary.get('live', 0)}"
+                f" degraded={summary.get('degraded', 0)}"
+                f" broken={summary.get('broken', 0)}"
+                f" stub={summary.get('stub', 0)}"
+                f" frozen={summary.get('frozen', 0)}"
+                f" unknown={summary.get('unknown', 0)}"
+            )
+            worst = [
+                e
+                for s in report.get("sections", [])
+                for e in s.get("entities", [])
+                if e.get("observed_status") in ("broken", "degraded")
+            ]
+            if worst:
+                order = {"broken": 0, "degraded": 1}
+                worst.sort(key=lambda e: order.get(e.get("observed_status"), 9))
+                print("  Worst entities (broken first):")
+                for e in worst[:5]:
+                    gap = e.get("gap") or e.get("next_action") or ""
+                    line = (f"    - [{e.get('observed_status')}] "
+                            f"{e.get('id', '?')}: {gap}")
+                    print(line[:110])
     except Exception as exc:  # pragma: no cover — informational only
         print(f"  (manifest_health unavailable: {type(exc).__name__}: {exc})")
 

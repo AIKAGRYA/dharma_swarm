@@ -71,8 +71,25 @@ jobs:
           # AUTO_INVENTORY DOCOPS:START/END sections; --write-manifest-counts
           # rewrites the asserted SOVEREIGN_MANIFEST count tokens. Both are
           # idempotent and driven by docs/docops/assertions.yaml.
+          #
+          # The overall exit code is tolerated (unrelated strict checks — TTL,
+          # path guards — may fail here and belong to docops.yml), but a WRITE
+          # failure is THIS job's purpose failing and must go red: a crashed
+          # writer leaves no diff, the next step says "already in sync", and we
+          # are back to silently-stale counts (the 102-run disease).
           python3 scripts/docops/check_docops_integrity.py \
-            --write-auto-sections --write-manifest-counts || true
+            --write-auto-sections --write-manifest-counts \
+            --report-json /tmp/reconcile-check.json || true
+          python3 - <<'PY'
+          import json, sys
+          findings = json.load(open("/tmp/reconcile-check.json"))["findings"]
+          write_failures = [f for f in findings
+                            if f["check"] in ("assertion-write", "auto-section")
+                            and f["severity"] == "FAIL"]
+          for f in write_failures:
+              print(f"::error::count writer failed: {f['message']}")
+          sys.exit(1 if write_failures else 0)
+          PY
 
       - name: Commit and deliver reconciled counts (only if changed)
         env:

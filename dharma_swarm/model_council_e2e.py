@@ -25,7 +25,6 @@ from typing import Any, Callable, Iterable
 from dharma_swarm.a2a.a2a_client import A2AClient
 from dharma_swarm.a2a.a2a_server import (
     A2AArtifact,
-    A2AMessage,
     A2APart,
     A2AServer,
     A2ATask,

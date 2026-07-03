@@ -95,7 +95,49 @@ surface + cold-start corpus + rigorous track criteria (`reports/governance/arena
    `DHARMA_ARENA_LIVE`, inheriting the hermetic control arms) needs provider
    keys and a ratified budget; until then C2 stays honestly RED.
 
-## 5. Anti-goals
+## 5. Fine-tooth-comb addendum (2026-07-03, second pass)
+
+A four-lane adversarial sweep (truth docs / workflow silent failures /
+declared-rule violations / ledger-vs-reality) plus a full-suite + lint pass.
+Fixed in this branch: the fabricated-clean surface-manifest health line in
+onboarding (double schema mismatch masked 47 entities); the dead COLM clock
+still broadcasting "crunch" months after the venue died despite handoffs
+claiming it fixed (deadlines now live in operator-owned
+`~/.dharma/research_deadlines.json` via `dharma_swarm/research_deadlines.py`);
+CLAUDE.md's four phantom make targets; the loop map's superseded second verdict
+table + stale hand-copied runtime numbers; LIVE_OPS_DASHBOARD claiming CURRENT
+at 18 days stale; BR-014's drifted line citation; pre-announced "CLOSED" counts
+in stale-pr/pr-dedupe (closes now counted only when they happen); the reconcile
+writer's residual `|| true` swallow; 4 git-tracked runtime receipts removed;
+~330 dead imports removed (re-export facades restored and marked); the
+algedonic-event memory-write swallow now logs.
+
+**Verified, deliberately NOT fixed here (owners in brackets):**
+
+- `codex-mention-router.yml` single-PR path: gate/merge failures produce a
+  green run (outcome is comment-visible; run status lies). Changing router
+  exit semantics belongs to the Mike track's owned surface and needs care to
+  not spam red on legitimately-unmergeable PRs. [merge-master-mike-d4]
+- `merge_group` skip-evasion: `fourfold-warrant.yml` and `structure.yml`
+  never re-check the batched tree at merge time (skipped required check =
+  satisfied). Documented-by-design, but worth an operator second look.
+- Credential reads bypassing `api_keys.py` (X_BEARER_TOKEN, TELEGRAM_BOT_TOKEN,
+  LANGFUSE keys, GITHUB_TOKEN and HF tokens in ~20 modules/scripts) and
+  hardcoded model pins at call-sites (worst: `subconscious_hum.py:178`,
+  `master_prompt_engineer.py:566`, `router_v1.py:460-504`). Each needs the
+  registry/resolver wiring done deliberately, not in a sweep. [routing/keys
+  doctrine owner]
+- 7 files added since 2026-06-25 already exceed the 500-line law (worst:
+  `scripts/governance/runtime_receipt_coverage_report.py` at 3,285).
+- Deep COLM references in the telos goal graph (`telos_substrate.py`,
+  `telos_graph.py`, `ontology.py`, `workflow.py` `colm_paper`,
+  `skills/researcher.skill.md`) — goal-graph semantics belong to the future
+  research-depth track, not a text sweep.
+- `manifest_health` reports two of its own checks as `unknown check_id`
+  (`go_world_receipts_present`, `recursive_discovery_module_exists`) — the
+  health checker itself has registry drift; now at least visible in onboard.
+
+## 6. Anti-goals
 
 - Do not soften deliver-or-red back to warnings to "reduce CI noise" — route
   noise into fixing the delivery path instead.

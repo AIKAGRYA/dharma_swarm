@@ -23,7 +23,6 @@ from typing import Any
 from dharma_swarm.terminal_bridge_text import (
     render_working_memory,
     render_git_summary_lines,
-    render_system_prompt,
     render_command_graph_text,
     render_command_registry_text,
     render_operator_snapshot_text,

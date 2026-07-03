@@ -21,8 +21,8 @@ import ipaddress
 import logging
 import re
 import time
-from dataclasses import dataclass, field
-from typing import Any, Optional
+from dataclasses import dataclass
+from typing import Any
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)

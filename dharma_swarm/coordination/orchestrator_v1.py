@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
-from dharma_swarm.coordination.arena.fixtures import ALL_MODEL_IDS, ROSTER_REGISTRY
+from dharma_swarm.coordination.arena.fixtures import ALL_MODEL_IDS
 from dharma_swarm.coordination.arena.runner import ArenaRunner, render_decision_packet
 from dharma_swarm.coordination.genome import (
     Lineage,

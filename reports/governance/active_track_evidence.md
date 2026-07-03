@@ -1,6 +1,6 @@
 # Track Portfolio Evidence
 
-Generated: 2026-07-03T08:02:08+00:00 (schema v2)
+Generated: 2026-07-03T09:08:52+00:00 (schema v2)
 Active tracks: **4** (warn 5, max 10) — shippable 0
 
 ## Spine coverage
@@ -47,7 +47,7 @@ Active tracks: **4** (warn 5, max 10) — shippable 0
   - ✓ `cybernetics_codex_loop10_receipt_valid` (receipt_valid) — receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop10_context_agent_closure.json valid (6 keys present)
   - ✓ `cybernetics_codex_loop11_receipt_valid` (receipt_valid) — receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop11_replication_monitor_closure.json valid (6 keys present)
   - ✓ `cybernetics_codex_one_wire_guard_test_exists` (file_exists) — tests/test_one_wire_archive_fitness_guard.py present
-  - ✓ `cybernetics_codex_one_wire_guard_test_passes` (test_passes) — pytest tests/test_one_wire_archive_fitness_guard.py: PASS — 19 passed in 0.25s
+  - ✓ `cybernetics_codex_one_wire_guard_test_passes` (test_passes) — pytest tests/test_one_wire_archive_fitness_guard.py: PASS — 19 passed in 0.35s
   - ✓ `cybernetics_codex_loop12_13_guard_receipt_exists` (file_exists) — reports/loop_closure/cybernetics_codex/2026-07-01_loop12_13_one_wire_archive_fitness_guard.json present
   - ✓ `cybernetics_codex_loop12_13_guard_receipt_valid` (receipt_valid) — receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop12_13_one_wire_archive_fitness_guard.json valid (5 keys present)
 
@@ -70,8 +70,8 @@ Active tracks: **4** (warn 5, max 10) — shippable 0
   - ✓ `arena_v1_test_exists` (file_contains) — pattern 'def test_positive_lift_candidate_beats_best_single_at_parity' found in tests/test_arena_v1.py
   - ✓ `dpi_test_exists` (file_exists) — tests/test_dpi.py present
   - ✓ `closure_checks_test_exists` (file_exists) — tests/test_coordination_closure_checks.py present
-  - ✓ `arena_v1_controls_tests_pass` (test_passes) — pytest tests/test_arena_v1.py: PASS — 15 passed in 0.33s
-  - ✓ `arena_truth_surface_tests_pass` (test_passes) — pytest tests/test_arena_truth_report.py: PASS — 8 passed in 2.48s
+  - ✓ `arena_v1_controls_tests_pass` (test_passes) — pytest tests/test_arena_v1.py: PASS — 15 passed in 0.49s
+  - ✓ `arena_truth_surface_tests_pass` (test_passes) — pytest tests/test_arena_truth_report.py: PASS — 8 passed in 3.83s
   - ✓ `arena_truth_receipt_valid` (receipt_valid) — receipt reports/governance/arena/arena_truth_receipt.json valid (9 keys present, digest intact, fresh)
 
 ## `merge-master-mike-d4-2026-06` — 3/4
