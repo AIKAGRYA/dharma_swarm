@@ -156,12 +156,22 @@ def _go_world_radar_health_rows() -> list[ControlSurfaceRow]:
         health.get("source_errors") if isinstance(health.get("source_errors"), list) else []
     )
     failed_sources = int(float(health.get("failed_sources", 0) or 0))
+    needs_host = "needs_host" in {
+        str(health.get("scout_invocation_mode", "") or ""),
+        str(health.get("ingestor_invocation_mode", "") or ""),
+    }
     gaps: list[str] = []
+    if needs_host:
+        gaps.append("go_world_radar_needs_host")
     if status == "ok":
         observed_state = "radar pass ok"
         coherence_state = "bound"
     else:
-        observed_state = f"radar degraded ({failed_sources} failed sources)"
+        observed_state = (
+            "Go organs not runnable on this host (needs_host)"
+            if needs_host
+            else f"radar degraded ({failed_sources} failed sources)"
+        )
         coherence_state = "partial"
         gaps.append("go_world_radar_degraded")
     if source_errors:
@@ -182,7 +192,9 @@ def _go_world_radar_health_rows() -> list[ControlSurfaceRow]:
         freshness=str(health.get("checked_at", "")),
         gap_codes=gaps,
         next_action=(
-            "Investigate per-source failures below" if source_errors else ""
+            "Provision Go on this host: run `make go-build` (or install a Go toolchain)"
+            if needs_host
+            else ("Investigate per-source failures below" if source_errors else "")
         ),
         raw={
             "health_path": str(health_path),

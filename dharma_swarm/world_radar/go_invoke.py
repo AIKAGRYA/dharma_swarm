@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import os
+import shutil
 import subprocess
 from typing import Any
 
@@ -31,12 +32,28 @@ def _go_invocation(module_dir: Path) -> tuple[list[str], str]:
 
     The binary convention matches plain ``go build`` output: the module dir
     name inside the module dir (e.g. ``tools/world_scout_go/world_scout_go``).
-    Returns the argv prefix and the invocation mode ("binary" or "go_run").
+    Returns the argv prefix and the invocation mode ("binary", "go_run", or
+    "needs_host"). Toolchain-checked (organism-rewire item 3): ``go run .`` is
+    only offered when a Go toolchain is actually on PATH; with neither a
+    prebuilt binary nor a toolchain the mode is ``needs_host`` with an empty
+    argv, and callers must NOT invoke — they return a structured per-source
+    error (see :func:`_needs_host_error`) instead of letting the subprocess
+    raise ``FileNotFoundError``.
     """
     binary = module_dir / module_dir.name
     if binary.is_file() and os.access(binary, os.X_OK):
         return [str(binary)], "binary"
-    return ["go", "run", "."], "go_run"
+    if shutil.which("go") is not None:
+        return ["go", "run", "."], "go_run"
+    return [], "needs_host"
+
+
+def _needs_host_error(module_name: str) -> str:
+    """Structured needs-host message naming the missing prerequisite + fix."""
+    return (
+        f"no prebuilt {module_name} binary and no Go toolchain on PATH — "
+        "run `make go-build` (or install Go) on this host"
+    )
 
 
 def _run_go_scout(
@@ -75,6 +92,20 @@ def _run_go_scout(
     if not module_dir.exists():
         return [], f"missing Go scout module: {module_dir}", {}
     cmd, invocation_mode = _go_invocation(module_dir)
+    if invocation_mode == "needs_host":
+        error = _needs_host_error("world_scout_go")
+        return (
+            [],
+            error,
+            {
+                "successful_sources": 0,
+                "failed_sources": 0,
+                "invocation_mode": invocation_mode,
+                "source_errors": [
+                    {"source": "world_scout_go", "stage": "scout", "error": error}
+                ],
+            },
+        )
     cmd += [
         "--state-dir",
         str(state),
@@ -152,6 +183,8 @@ def _run_go_ingestor(
     if not module_dir.exists():
         return [], f"missing Go ingestor module: {module_dir}", ""
     cmd, invocation_mode = _go_invocation(module_dir)
+    if invocation_mode == "needs_host":
+        return [], _needs_host_error("world_signal_ingestor_go"), invocation_mode
     cmd += [
         "--input",
         str(input_path),

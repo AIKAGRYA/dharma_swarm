@@ -56,7 +56,7 @@ Claim boundary:
 
 **Next items:**
 
-- [code] (blocker) Residual: drain or quarantine historical dispatch_dropoff rows before any standing all-history daemon-clean claim.
+- [code] (blocker) TOOL SHIPPED 2026-07-03 (execution on daemon host remains operator): scripts/runtime/dispatch_dropoff_quarantine.py — dry-run default, REQUIRED --before cutoff, --execute stamps quarantined_at/quarantine_reason on existing delegation_runs rows (idempotent ALTER, no new store, rows stay auditable) and writes a JSON receipt (counts + rowid-list sha256) under ~/.dharma/loop_closure/. Audit now reports dropoff_live=N / dropoff_quarantined_historical=M separately (cybernetics_codex excludes only explicitly-stamped rows and always reports the quarantined tally — never hides it). 7 fixture-DB tests green. REMAINING: operator runs it on the daemon host against the real runtime.db (~2191 historical rows), cutoff at/before the spine-dispatch fix timestamp.
 - [governance] Future boundary: keep Loops 12/13 blocked until One Wire has N>=5, M>=3, and explicit archive-fitness authority.
 - [governance] (blocker) Promote each HARNESS_PROVEN loop only after its declared live owner-surface criterion passes on the daemon branch that actually runs.
 
@@ -185,9 +185,9 @@ diversity of agents.
 
 **Next items:**
 
-- [code] (blocker) D1 (blocker): DHARMA_SPINE_DISPATCH=1 standing in docker-compose swarm service (+ documented Mac plist env path); Loop-1 closure reads LIVE persistently on the daemon host.
-- [code] Spine visibility: `dgc spine tail` (live EvidenceReceipt stream) + read-only cockpit pulse panel (receipts/hour, last-receipt age, dropoff count) so the operator can SEE and FEEL the spine working.
-- [code] Go sense-organ hardening + Loop 5b: compiled-binary or toolchain-checked invocation, per-source errors surfaced to cockpit, github_ingestor live trigger (go-g04), and a host-aware closure check covering the Go chain in the loop map.
+- [code] (blocker) D1 (blocker): CODE+DOCS DONE (docker-compose.yml swarm service carries DHARMA_SPINE_DISPATCH=1 standing; Mac plist env path documented in docs/ops/RUNBOOK.md §3d). REMAINING: operator observation that Loop-1 closure reads LIVE persistently on the daemon host (make orient on the host that actually runs; blocked on daemon host / VPS item 4).
+- [code] DONE 2026-07-03: `dgc spine tail` (operator_core/spine_tail.py, landed earlier) + read-only cockpit pulse panel now RENDERED in Cockpit V2 (dashboard SpinePulsePanel.tsx: receipts/hour, last-receipt age with LIVE/QUIET chip, dropoff count; reads /api/control-surface/rows/spine.pulse, refreshes 15s, graceful not-live-on-this-host state).
+- [code] DONE 2026-07-03: Go sense-organ hardening + Loop 5b complete. Most had landed via #755 (per-source errors → go.world_radar_health cockpit row; github_ingestor live trigger go-g04 via cron_jobs.json:github_ingestor_inbox; host-aware loop5b_world_radar_closure_run with NEEDS_HOST). This session closed the last gap: toolchain-checked invocation in world_radar/go_invoke.py (no binary AND no `go` on PATH → structured needs_host per-source error naming `make go-build`, never an exception into the caller loop; cockpit gap code go_world_radar_needs_host). Verified live: loop5b closure run → LOOP5B_CLOSED=yes; 126 tests green.
 - [ops] VPS shift: daemon (compose swarm service + NATS + litestream state replication) onto an always-on VPS; Mac demotes to dev seat/mirror. Operator provisions host + secrets.
 - [docs] D2 spec-first: memory position earned by evidence class (receipt-backed+TTL facts may go first-token), routing-time memory (kernel informs seat selection), diversity-preserving kernel sampling for worker seats. Spec then canary before flipping C5.
 - [code] D6a: consolidate MAP-Elites on archive.MAPElitesGrid; retire/absorb diversity_archive.py; arena keeps its genome-descriptor variant only if descriptors are shared.

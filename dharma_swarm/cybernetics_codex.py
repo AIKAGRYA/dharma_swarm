@@ -16,6 +16,11 @@ from typing import Any
 
 from dharma_swarm.archive import read_one_wire_fitness_authority
 from dharma_swarm.daemon_config import dharma_state_dir
+from dharma_swarm.loop_closure_quarantine import (
+    LIVE_ROW_PREDICATE,
+    has_quarantine_columns,
+    quarantined_failure_counts,
+)
 
 try:  # pragma: no cover - exercised by repo runtime; tests run with PyYAML.
     import yaml  # type: ignore
@@ -235,7 +240,7 @@ def build_audit(
             "dispatch_dropoff in the audited scope."
         ),
         "next_build_packet": [
-            "Keep Loop 1 bounded replay green; do not claim all-history cleanliness while historical dispatch_dropoff remains.",
+            "Keep Loop 1 bounded replay green; drain or quarantine historical dispatch_dropoff rows (scripts/runtime/dispatch_dropoff_quarantine.py, receipted) before any standing all-history daemon-clean claim.",
             "Promote HARNESS_PROVEN loops to CLOSED_LIVE only after one live-owner-surface criterion passes per loop.",
             "Add an audit mode that can re-execute replay commands or record why re-execution was skipped.",
             "Add One Wire archive-fitness guard tests before enabling Loops 12/13.",
@@ -252,6 +257,7 @@ def read_runtime_summary(db_path: Path, *, since: str | None = None) -> dict[str
         "tables": {},
         "delegation_runs": {},
         "failure_codes": [],
+        "quarantine": {},
         "receipt_json": {},
         "provider_truth": {},
     }
@@ -302,6 +308,13 @@ def read_runtime_summary(db_path: Path, *, since: str | None = None) -> dict[str
                 where_args,
             ).fetchone()
             summary["delegation_runs"] = dict(row or {})
+            # Live failure counts EXCLUDE quarantined-historical rows (marker
+            # columns owned by loop_closure_quarantine — no new store) while the
+            # quarantined tally is reported SEPARATELY below, never hidden.
+            quarantine_supported = has_quarantine_columns(conn)
+            live_failed = "status='failed'"
+            if quarantine_supported:
+                live_failed = f"{live_failed} and {LIVE_ROW_PREDICATE}"
             summary["failure_codes"] = [
                 dict(r)
                 for r in conn.execute(
@@ -311,7 +324,7 @@ def read_runtime_summary(db_path: Path, *, since: str | None = None) -> dict[str
                       count(*) as count,
                       max(coalesce(completed_at, started_at)) as last_seen
                     from delegation_runs
-                    {_and_where(where_sql, "status='failed'")}
+                    {_and_where(where_sql, live_failed)}
                     group by failure_code
                     order by count desc
                     limit 12
@@ -319,6 +332,22 @@ def read_runtime_summary(db_path: Path, *, since: str | None = None) -> dict[str
                     where_args,
                 ).fetchall()
             ]
+            quarantined_codes = quarantined_failure_counts(conn, where_sql, where_args)
+            summary["quarantine"] = {
+                "supported": quarantine_supported,
+                "failure_codes_quarantined": quarantined_codes,
+                "failed_rows_quarantined": sum(
+                    int(r.get("count") or 0) for r in quarantined_codes
+                ),
+                "dispatch_dropoff_quarantined": next(
+                    (
+                        int(r.get("count") or 0)
+                        for r in quarantined_codes
+                        if str(r.get("failure_code")) == "dispatch_dropoff"
+                    ),
+                    0,
+                ),
+            }
             if _column_exists(conn, "delegation_runs", "receipt_json"):
                 receipt_row = conn.execute(
                     f"""
@@ -1080,6 +1109,9 @@ def build_loop_statuses(
         str(r.get("failure_code")): int(r.get("count") or 0)
         for r in runtime.get("failure_codes") or []
     }
+    quarantined_dropoffs = int(
+        (runtime.get("quarantine") or {}).get("dispatch_dropoff_quarantined") or 0
+    )
     one_wire_eligible = bool(one_wire.get("eligible"))
     archive_risk = int(archive.get("positive_internal_fitness_risk") or 0)
     loop1_replay = ((bounded_replays or {}).get("loop1") or {})
@@ -1204,6 +1236,14 @@ def build_loop_statuses(
                     f"runtime_receipts_completed={runtime_receipt_completed_truth_rows}/"
                     f"{runtime_receipt_truth_rows}); still needs "
                     "bounded spine-dispatch replay proving tick N changes tick N+1"
+                )
+            if quarantined_dropoffs:
+                # Never hide the quarantined-historical tally: the live count
+                # above excludes these rows, but the claim stays honest only if
+                # the audit reports them alongside it.
+                blocker += (
+                    f"; dispatch_dropoff_quarantined_historical={quarantined_dropoffs} "
+                    "(excluded from live count; rows remain auditable in delegation_runs)"
                 )
         elif number in {12, 13}:
             evidence = ["one_wire.guardian_receipt", "evolution_archive"]

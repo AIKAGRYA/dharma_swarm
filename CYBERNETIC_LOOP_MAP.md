@@ -275,7 +275,11 @@ EVALUATE: receipt_bridge summarizes receipts; project_world_signal_receipts
 ADAPT:   the next pass's board/brief/health are rebuilt from receipt-projected
          rows; per-source failures surface as structured `source_errors` in
          world_radar_health.json and the control-surface `go.world_radar_health`
-         row; invocation mode (binary vs go_run) is receipted in health
+         row; invocation mode (binary vs go_run vs needs_host) is receipted in
+         health. Invocation is toolchain-checked (`go_invoke._go_invocation`):
+         with neither a prebuilt binary nor a Go toolchain the bridge never
+         invokes — it records a structured `needs_host` source error naming
+         `make go-build`, and the cockpit row flags `go_world_radar_needs_host`.
 ```
 
 **Current state (updated 2026-07-02, organism-rewire-2026-07): CLOSED via bounded replay on a committed fixture observation (no live fetch).** `scripts/loop5b_world_radar_closure_run.py` runs the REAL Go ingestor via `go_bridge` on `tests/fixtures/world_radar_go/loop5b_observations.jsonl`: fixture read (sense), Go process scores signals (interpret), min-score drops the noise row — emitted < raw (constrain), exactly one EvidenceReceipt per emitted signal with summarize + feed projection matching (act), and the receipt store grows across cycles while `world_radar_health.ingest_run_id` changes, fed forward into the next pass's board (adapt). Receipt: `reports/loop_closure/cybernetics_codex/2026-07-02_loop5b_world_radar_closure.json` (LOOP5B_CLOSED=yes, invocation_mode=binary). The check is HOST-AWARE per the rewire doctrine: on a host with neither a prebuilt binary (`make go-build`) nor a Go toolchain it reports `NEEDS_HOST` and exits 0 instead of failing. Live public-source fetch (world_scout_go against the network) is explicitly **not** proven by this closure.
