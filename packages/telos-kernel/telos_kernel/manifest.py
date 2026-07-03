@@ -21,6 +21,16 @@ from icontract import ensure, require
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from telos_kernel.canonical import JSONValue, canonicalize
+from telos_kernel.result import (
+    ERR_INVALID_SIGNATURE,
+    ERR_QUORUM_NOT_MET,
+    ERR_STUB_SIGNERS,
+    ERR_UNKNOWN_SIGNER,
+    Err,
+    KernelError,
+    Ok,
+    Result,
+)
 
 MANIFEST_SCHEMA_VERSION: Final[str] = "v3.0"
 
@@ -138,43 +148,61 @@ class Manifest(BaseModel):
     # ---- K-of-N quorum verification ----
 
     @require(lambda self, signatures: isinstance(signatures, dict))
-    @ensure(lambda result: isinstance(result, bool))
-    def verify_quorum(
+    def verify_quorum_result(
         self,
         payload_bytes: bytes,
         signatures: dict[str, bytes],
-    ) -> bool:
-        """Verify K-of-N Ed25519 quorum over the given `payload_bytes`.
+    ) -> Result:
+        """Structured K-of-N quorum verification.
 
-        `signatures` maps signer.key_id -> signature bytes. Signers with
-        `public_key_hex == 'STUB'` are excluded from the count; if excluding
-        stubs drops the available signer count below K, quorum fails closed.
+        Returns Ok({'valid_count': int, 'k': int}) on success or
+        Err(KernelError) naming the failure mode (stub signers,
+        quorum not met, unknown signer id, malformed signature).
+        Never raises.
         """
         if self.has_stub_signers():
-            # A manifest with stub signers cannot satisfy quorum. This is a
-            # deliberate fail-closed: Phase 1 refuses to activate U2
-            # enforcement until stubs are replaced.
-            return False
+            return Err(KernelError(
+                ERR_STUB_SIGNERS,
+                "manifest signer_set contains STUB entries; quorum disabled",
+            ))
 
         k = self.signer_set["k"]
         pk_by_id = dict(self.public_keys())
         valid = 0
         seen: set[str] = set()
+        unknown: list[str] = []
         for key_id, sig in signatures.items():
             if key_id in seen:
                 continue
             seen.add(key_id)
             pk = pk_by_id.get(key_id)
             if pk is None:
+                unknown.append(key_id)
                 continue
             try:
                 pk.verify(sig, payload_bytes)
                 valid += 1
             except (InvalidSignature, ValueError, TypeError):
+                # Malformed or wrong signature; count as a miss, not fatal
+                # because K-of-N can still be met by other signers.
                 continue
             if valid >= k:
-                return True
-        return False
+                return Ok({"valid_count": valid, "k": k})
+        return Err(KernelError(
+            ERR_QUORUM_NOT_MET,
+            f"only {valid} valid signatures, need K={k}",
+            detail={"valid_count": valid, "k": k, "unknown_signers": unknown},
+        ))
+
+    @require(lambda self, signatures: isinstance(signatures, dict))
+    @ensure(lambda result: isinstance(result, bool))
+    def verify_quorum(
+        self,
+        payload_bytes: bytes,
+        signatures: dict[str, bytes],
+    ) -> bool:
+        """Boolean shim over verify_quorum_result(). Prefer the Result variant."""
+        return self.verify_quorum_result(payload_bytes, signatures).is_ok
 
 
 # ---- Canonical-projection helpers ------------------------------------------

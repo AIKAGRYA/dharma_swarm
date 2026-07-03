@@ -28,6 +28,14 @@ from icontract import ensure, require
 
 from telos_kernel.canonical import canonicalize
 from telos_kernel.receipt import Leaf
+from telos_kernel.result import (
+    ERR_CHAIN_BROKEN,
+    ERR_UNCANONICALIZABLE,
+    Err,
+    KernelError,
+    Ok,
+    Result,
+)
 
 GENESIS_HASH: Final[bytes] = b"\x00" * 32
 GENESIS_HEX: Final[str] = GENESIS_HASH.hex()
@@ -166,36 +174,60 @@ class MerkleLog:
 
     # ---- Verify ----
 
-    def verify_chain(
+    def verify_chain_result(
         self, data_store: List[dict] | None = None
-    ) -> Tuple[bool, int | None]:
-        """Verify chain integrity.
+    ) -> Result:
+        """Structured chain-integrity check.
 
-        Spec §U5 contract: returns `(True, None)` on full validity, else
-        `(False, first_broken_index)`.
-
-        If `data_store` is None, uses the internally-stored payloads (the
-        Titanium path). If provided, compares against the given payloads
-        (legacy path — used by the shim).
+        Returns Ok({'length': N}) on full validity, or Err(KernelError)
+        with `detail={'broken_index': i}` on the first mismatch.
+        Never raises. `titanium-verify` proves the fail-closed contract.
         """
         if not self.hashes:
-            return True, None
+            return Ok({"length": 0})
 
         store = data_store if data_store is not None else self._payloads
         if len(store) != len(self.hashes):
-            return False, 0
+            return Err(KernelError(
+                ERR_CHAIN_BROKEN,
+                f"store length {len(store)} != hash count {len(self.hashes)}",
+                detail={"broken_index": 0},
+            ))
 
         prev = GENESIS_HASH
         for i, (payload, stored) in enumerate(zip(store, self.hashes)):
             try:
                 b = canonicalize(payload)
-            except (ValueError, TypeError):
-                return False, i
+            except (ValueError, TypeError) as e:
+                return Err(KernelError(
+                    ERR_UNCANONICALIZABLE,
+                    f"leaf {i}: {e}",
+                    detail={"broken_index": i},
+                ))
             computed = _compute_leaf_hash(prev, b)
             if computed != stored:
-                return False, i
+                return Err(KernelError(
+                    ERR_CHAIN_BROKEN,
+                    f"leaf {i} hash mismatch",
+                    detail={"broken_index": i},
+                ))
             prev = computed
-        return True, None
+        return Ok({"length": len(self.hashes)})
+
+    def verify_chain(
+        self, data_store: List[dict] | None = None
+    ) -> Tuple[bool, int | None]:
+        """Boolean-tuple compatibility over verify_chain_result().
+
+        Spec §U5 contract: returns `(True, None)` on full validity, else
+        `(False, first_broken_index)`. Prefer verify_chain_result() in new
+        code so you can see the specific failure mode.
+        """
+        r = self.verify_chain_result(data_store)
+        if r.is_ok:
+            return True, None
+        detail = r.error.detail or {}
+        return False, detail.get("broken_index", 0)
 
     def verify_chain_legacy(
         self, data_store: List[dict] | None = None
