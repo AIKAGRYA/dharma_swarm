@@ -21,11 +21,11 @@ tested by test_boot; the AST check here catches static drift.
 
 Exemptions
 ----------
-- `merkle_log.py::FileBackend` \u2014 kept in core for backwards compat with
-  the shim in `dharma_swarm.merkle_log`. Slated to move into `_io/` in
-  a follow-up PR once shim callers are migrated to `_io.FileBackendIO`.
-  The exemption is scoped tightly and named so it cannot be extended
-  silently.
+None. Every core file must be effect-free at the AST level; the earlier
+`FileBackend` shim was migrated to `_io.merkle_file_backend.FileBackendIO`
+in PR #1d, and the core-side `FileBackend` name is now a thin factory
+that imports from the rim inside the function body (verified by
+`test_rim_reachable_from_core_only_via_local_imports`).
 """
 from __future__ import annotations
 
@@ -58,15 +58,10 @@ FORBIDDEN_IMPORTS = {
     "httpx",
 }
 
-# (module_path_suffix, node_predicate_reason) \u2014 grep-friendly, one-off exemptions.
+# (module_path_suffix, node_predicate_reason) — grep-friendly, one-off exemptions.
 # Format: (posix path suffix, minimum line, maximum line, human reason).
-EXEMPTIONS = [
-    (
-        "telos_kernel/merkle_log.py",
-        1, 999,
-        "FileBackend kept in core for shim compatibility; moves to _io in next PR",
-    ),
-]
+# Empty in PR #1d onward — the earlier FileBackend exemption was closed.
+EXEMPTIONS: list[tuple[str, int, int, str]] = []
 
 
 def _is_exempt(path: Path, lineno: int) -> bool:
@@ -155,7 +150,7 @@ def test_rim_functions_are_tagged():
     io_root = Path(_io.__file__).parent
     untagged: list[str] = []
     for p in sorted(io_root.glob("*.py")):
-        if p.name in ("__init__.py", "effect.py"):
+        if p.name == "__init__.py":
             continue
         # Import the module and walk its top-level callables.
         mod_name = f"telos_kernel._io.{p.stem}"

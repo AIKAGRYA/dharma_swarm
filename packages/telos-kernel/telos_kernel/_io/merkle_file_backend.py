@@ -19,7 +19,7 @@ import tempfile
 from pathlib import Path
 from typing import Iterable
 
-from telos_kernel._io.effect import Effect, effect
+from telos_kernel.effects import Effect, effect
 from telos_kernel.merkle_log import Backend
 
 

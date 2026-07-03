@@ -21,7 +21,6 @@ from __future__ import annotations
 import abc
 import hashlib
 import json
-from pathlib import Path
 from typing import Any, Final, List, Tuple
 
 from icontract import ensure, require
@@ -69,46 +68,20 @@ class MemoryBackend(Backend):
         self._payloads = list(payloads)
 
 
-class FileBackend(Backend):
-    """Atomic append-only file. Compatible with legacy on-disk format
-    (hex hashes under `hashes` key) plus a new `payloads` key. Legacy files
-    without `payloads` are auto-migrated on first load: an in-memory
-    reconstruction is attempted; if the reconstruction diverges from the
-    stored hashes, the load fails loudly rather than silently."""
+def FileBackend(path):  # noqa: N802  — preserved for backwards-compat.
+    """Legacy alias. Real implementation lives in the I/O rim.
 
-    VERSION: Final[int] = 3
+    The core module used to hold `FileBackend` directly; PR #1d moved it
+    to `telos_kernel._io.merkle_file_backend.FileBackendIO` so the core
+    stays pure. This shim preserves the import surface for callers that
+    do `from telos_kernel.merkle_log import FileBackend`.
 
-    def __init__(self, path: str | Path):
-        self.path = Path(path).expanduser()
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-
-    def load(self) -> Tuple[List[bytes], List[dict]]:
-        if not self.path.exists():
-            return [], []
-        with open(self.path, "r", encoding="utf-8") as f:
-            raw = json.load(f)
-        hashes = [bytes.fromhex(h) for h in raw.get("hashes", [])]
-        payloads_raw = raw.get("payloads", None)
-        if payloads_raw is None:
-            # Legacy file with no payloads. We cannot fully verify these; the
-            # kernel enters QUARANTINE on such a boot until an operator
-            # explicitly acknowledges (Phase 1 will add the ack workflow).
-            return hashes, [{} for _ in hashes]
-        return hashes, list(payloads_raw)
-
-    def save(self, hashes: List[bytes], payloads: List[dict]) -> None:
-        data = {
-            "version": self.VERSION,
-            "algorithm": "sha256",
-            "canonicalization": "rfc-8785-jcs",
-            "encoding": "utf-8",
-            "hashes": [h.hex() for h in hashes],
-            "payloads": payloads,
-        }
-        tmp = self.path.with_suffix(".tmp")
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, sort_keys=True)
-        tmp.replace(self.path)
+    New code should import `FileBackendIO` from `telos_kernel._io`
+    directly — the FS_WRITE effect is then visible at the call site.
+    """
+    # Local import so the core module has no top-level dependency on _io.
+    from telos_kernel._io.merkle_file_backend import FileBackendIO
+    return FileBackendIO(path)
 
 
 # ---- MerkleLog --------------------------------------------------------------

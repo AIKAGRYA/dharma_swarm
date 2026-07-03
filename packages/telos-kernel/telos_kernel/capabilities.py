@@ -28,6 +28,7 @@ from typing import Callable, Final
 
 from icontract import ensure, require
 
+from telos_kernel.effects import Effect, effect
 from telos_kernel.result import (
     ERR_CAVEAT_FAILED,
     ERR_INVALID_SIGNATURE,
@@ -180,6 +181,11 @@ def verify(
 
 # ---- Root-key management ---------------------------------------------------
 
+@effect(Effect.NONDETERMINISTIC)
 def new_root_key() -> bytes:
-    """Generate a fresh 32-byte cryptographically random root key."""
+    """Generate a fresh 32-byte cryptographically random root key.
+
+    Effect: NONDETERMINISTIC — draws from `secrets.token_bytes`, which uses
+    OS entropy. This is the whole point of a root-key generator.
+    """
     return secrets.token_bytes(_SECRET_BYTES)

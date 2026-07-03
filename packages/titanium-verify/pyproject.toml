@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "titanium-verify"
+version = "0.1.0"
+description = "Bespoke sound verifier for the telos-kernel TCB dialect."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "dharma_swarm contributors" },
+]
+dependencies = [
+    "z3-solver>=4.13",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "mypy>=1.10",
+]
+cvc5 = [
+    "cvc5>=1.1",
+]
+
+[project.scripts]
+titanium-verify = "titanium_verify.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["titanium_verify"]
