@@ -148,7 +148,9 @@ class MerkleLog:
     def append(self, data: dict | Leaf) -> str:
         """Append a payload and return the new Merkle root (hex)."""
         if isinstance(data, Leaf):
-            payload_dict = data.model_dump()
+            # Hand-rolled projection, not `model_dump()`. Ensures the leaf
+            # hash covers exactly the bytes that were signed.
+            payload_dict = data.to_canonical_dict()
         else:
             payload_dict = dict(data)  # defensive copy
 
