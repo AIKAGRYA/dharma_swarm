@@ -1,0 +1,67 @@
+name: kernel-titanium-verify
+
+on:
+  pull_request:
+    paths:
+      - "packages/telos-kernel/**"
+      - "packages/titanium-verify/**"
+      - ".github/workflows/kernel-titanium-verify.yml"
+  push:
+    branches: [main]
+
+jobs:
+  titanium-verify:
+    name: titanium-verify — sound purity/effect certification
+    runs-on: ubuntu-latest
+    # BLOCKING gate. If this fails, the PR does not merge. This replaces the
+    # previous kernel-nagini job which was allowed to fail (continue-on-error).
+    #
+    # What this proves:
+    #   - Every public function in packages/telos-kernel/telos_kernel (excluding
+    #     the _io rim, tests, and boot shim) is either PURE or carries an
+    #     honest @effect(...) declaration whose declared set is a superset of
+    #     the transitive effects computed by a least-fixpoint dataflow
+    #     analysis (Kildall's monotone worklist, Kildall 1973) and
+    #     independently validated by Z3 SMT.
+    #   - The trust base is ~1180 LOC of Python + unmodified Z3, vs. Nagini's
+    #     ~350k LOC (Viper + silicon + JVM). See packages/titanium-verify/README.md.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install kernel + verifier
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e packages/telos-kernel
+          pip install -e packages/titanium-verify
+      - name: Verify kernel purity (blocking)
+        run: |
+          python -m titanium_verify.cli \
+            verify \
+            --package telos_kernel \
+            --property purity \
+            --json > titanium-verify-report.json
+          echo "--- titanium-verify report ---"
+          cat titanium-verify-report.json
+          python -c "
+          import json, sys
+          r = json.load(open('titanium-verify-report.json'))
+          print(f\"verdict={r['verdict']} checked={r['functions_checked']} verified={r['functions_verified']}\")
+          if r['verdict'] != 'VERIFIED' or r['functions_checked'] != r['functions_verified']:
+              print('FAIL: kernel is not fully verified')
+              for c in r.get('counterexamples', []):
+                  print(f\"  - {c['function']}: {c['detail']}\")
+              sys.exit(1)
+          print('OK: kernel is fully verified')
+          "
+      - name: Run titanium-verify unit tests
+        run: |
+          pip install pytest
+          pytest packages/titanium-verify/titanium_verify/tests -q --tb=short
+      - name: Upload verification report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: titanium-verify-report
+          path: titanium-verify-report.json

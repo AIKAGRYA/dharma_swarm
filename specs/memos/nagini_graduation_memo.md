@@ -62,8 +62,19 @@ Keep exceptions for genuinely exceptional paths (e.g. `RecursionError` in `canon
 
 Estimated total effort: **~3.5 weeks of focused kernel work**, ~250 net SLOC added to the TCB (rim excluded from the 5000 ceiling per §7 of the spec — needs a one-line spec amendment to make that explicit).
 
+## Phase 1 outcome (2026-07-03, appended)
+
+All three structural refactors landed as PRs #1a/#1b/#1c on top of #763. At the point of flipping the Nagini gate to blocking, we re-examined the tradeoff and made the honest call: **Nagini's own trust base (~350k LOC of Viper + silicon + JVM) is larger than the property it certifies is worth, and its subset rejects constructs the TCB legitimately needs (dataclass methods, Pydantic input validation at boundaries, icontract).** So the gate graduates by replacement, not by tightening:
+
+- **`kernel-nagini.yml` deleted** (this PR series). Replaced by `kernel-titanium-verify.yml`, blocking, no `continue-on-error`.
+- **`packages/titanium-verify/`** (PR #1d) — bespoke sound purity and effect verifier for the TCB dialect. ~1180 LOC of Python + unmodified Z3. Two-stage soundness: least-fixpoint dataflow (Kildall 1973) then independent Z3 validation. Certifies every core `telos_kernel` function as PURE or as honestly declaring its effects via `@effect(...)`. Current run: 82/82 functions verified, 0 counterexamples, ~93 ms.
+- **TCB SLOC:** 1951 (core 1703 + rim 248), well under the 5000 ceiling.
+- **What we still lose vs. Nagini:** full Hoare-triple contract discharge (pre/post-conditions as SMT goals). We keep icontract for runtime, Hypothesis for property-based falsification, and Crosshair for SMT-guided counterexample search on contracts. Phase 2 extends titanium-verify with a contract discharge property.
+
 ## References
 
+- Kildall, *A Unified Approach to Global Program Optimization* ([POPL 1973](https://dl.acm.org/doi/10.1145/512927.512945)).
+- de Moura & Bjørner, *Z3: An Efficient SMT Solver* ([TACAS 2008](https://link.springer.com/chapter/10.1007/978-3-540-78800-3_24)).
 - Eilers & Müller, *Nagini: A Static Verifier for Python* ([ETH IR](https://www.pm.inf.ethz.ch/publications/EilersMueller18.pdf); [arXiv:2510.05156 §A.4](https://arxiv.org/html/2510.05156v1)).
 - Zhang et al., *Runtime verification for scientific software* ([arXiv:1909.00427](https://arxiv.org/pdf/1909.00427)) on Nagini's non-Python integration limits.
 - Crosshair changelog notes on symbolic dict/string support ([crosshair 0.0.104 docs](https://crosshair.readthedocs.io/en/latest/changelog.html)).

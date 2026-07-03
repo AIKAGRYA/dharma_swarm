@@ -28,7 +28,6 @@ jobs:
         run: |
           pytest packages/telos-kernel/telos_kernel/tests \
             -q --tb=short --timeout=120 \
-            --ignore=packages/telos-kernel/telos_kernel/tests/test_nagini.py \
             --ignore=packages/telos-kernel/telos_kernel/tests/test_crosshair.py
       - name: Verify legacy shim
         run: |
