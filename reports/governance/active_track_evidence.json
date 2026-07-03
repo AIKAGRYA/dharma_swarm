@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-02T19:13:07+00:00",
+  "generated_at": "2026-07-03T01:41:39+00:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-spine-adoption-2026-06",
   "shippable": false,
@@ -489,7 +489,7 @@
           "id": "cybernetics_codex_one_wire_guard_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_one_wire_archive_fitness_guard.py: PASS \u2014 19 passed in 0.30s",
+          "detail": "pytest tests/test_one_wire_archive_fitness_guard.py: PASS \u2014 19 passed in 0.86s",
           "executed": true
         },
         {
@@ -836,7 +836,7 @@
     {
       "severity": "WARN",
       "check": "track-stale:runtime-truth-spine-adoption-2026-06",
-      "message": "[runtime-truth-spine-adoption-2026-06] verified_at is 22 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.",
+      "message": "[runtime-truth-spine-adoption-2026-06] verified_at is 23 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.",
       "criterion_id": null
     },
     {
