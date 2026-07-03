@@ -103,7 +103,7 @@ Claim boundary:
 **Track id:** `orchestration-arena-v1-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
 **Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-23 (TTL 21 days)
 **Relations:** complements: provider-routing-consolidation-2026-06, loop-closure-2026-06
-**Owns surfaces:** dharma_swarm/coordination/**, dharma_swarm/council/**, tests/test_arena_v1.py, tests/test_dpi.py, tests/test_orchestration_genome.py, tests/test_orchestrator_v1.py, tests/test_council_profiles.py, tests/test_coordination_closure_checks.py
+**Owns surfaces:** dharma_swarm/coordination/**, dharma_swarm/council/**, scripts/governance/arena_truth_report.py, reports/governance/arena/**, tests/test_arena_v1.py, tests/test_dpi.py, tests/test_orchestration_genome.py, tests/test_orchestrator_v1.py, tests/test_council_profiles.py, tests/test_coordination_closure_checks.py, tests/test_arena_truth_report.py
 **Moves vital signs:** eval_coverage, quality_gates
 
 Governance admission for the Arena/Orchestration substrate that LANDED on
@@ -124,9 +124,9 @@ trained weights — training is earned only after the arena produces labels.
 
 **Next items:**
 
-- [code] Wire arena scorecard + DPI receipts into a governance-visible report surface (read-only).
-- [code] (blocker) Add best-single-model controls + budget-parity proof to every arena run before any capability claim.
-- [code] Connect arena winners to a cold-start trace corpus (no training yet; corpus only).
+- [code] DONE 2026-07-03: arena scorecard + DPI receipts wired into a read-only governance surface — scripts/governance/arena_truth_report.py renders reports/governance/arena/ (digest-stamped receipt + ARENA_TRUTH.md + corpus), seeded/deterministic; --check fails if the committed surface does not replay byte-for-byte. Criterion arena_truth_receipt_valid verifies it.
+- [code] (blocker) HERMETIC CONTROLS SHIPPED (runner.run always executes best_single_full_budget gate + budget-parity ledger for every arm + seeded bootstrap significance; proven by arena_v1_controls_tests_pass). REMAINING (the blocker's live edge): any future live-lane arena run (DHARMA_ARENA_LIVE seam in fixtures.py) must inherit the SAME control arms before any capability claim — the hermetic lift on the fixture taskpack is a control-machinery existence proof, never a capability claim (non-goal 1). C2 stays owned by real benchmark evidence.
+- [code] DONE 2026-07-03: arena winners connected to the cold-start trace corpus — coordination/arena/corpus.py emits labeled winner traces (positive_lift_candidate only, scorer-labeled, deterministic) to reports/governance/arena/cold_start_corpus.jsonl, sha256-pinned in the report receipt. Labels only; zero training (v1 doctrine).
 
 **Non-goals:**
 

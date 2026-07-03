@@ -1,6 +1,6 @@
 # Track Portfolio Evidence
 
-Generated: 2026-07-03T02:30:47+00:00 (schema v2)
+Generated: 2026-07-03T06:13:59+00:00 (schema v2)
 Active tracks: **4** (warn 5, max 10) — shippable 0
 
 ## Spine coverage
@@ -47,16 +47,16 @@ Active tracks: **4** (warn 5, max 10) — shippable 0
   - ✓ `cybernetics_codex_loop10_receipt_valid` (receipt_valid) — receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop10_context_agent_closure.json valid (6 keys present)
   - ✓ `cybernetics_codex_loop11_receipt_valid` (receipt_valid) — receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop11_replication_monitor_closure.json valid (6 keys present)
   - ✓ `cybernetics_codex_one_wire_guard_test_exists` (file_exists) — tests/test_one_wire_archive_fitness_guard.py present
-  - ✓ `cybernetics_codex_one_wire_guard_test_passes` (test_passes) — pytest tests/test_one_wire_archive_fitness_guard.py: PASS — 19 passed in 0.28s
+  - ✓ `cybernetics_codex_one_wire_guard_test_passes` (test_passes) — pytest tests/test_one_wire_archive_fitness_guard.py: PASS — 19 passed in 0.26s
   - ✓ `cybernetics_codex_loop12_13_guard_receipt_exists` (file_exists) — reports/loop_closure/cybernetics_codex/2026-07-01_loop12_13_one_wire_archive_fitness_guard.json present
   - ✓ `cybernetics_codex_loop12_13_guard_receipt_valid` (receipt_valid) — receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop12_13_one_wire_archive_fitness_guard.json valid (5 keys present)
 
-## `orchestration-arena-v1-2026-06` — 9/9
+## `orchestration-arena-v1-2026-06` — 12/12
 
 - serves: `substrate-nativeness` · complements: ['provider-routing-consolidation-2026-06', 'loop-closure-2026-06'] · depends_on: [] · conflicts_with: []
-- owned_surfaces: ['dharma_swarm/coordination/**', 'dharma_swarm/council/**', 'tests/test_arena_v1.py', 'tests/test_dpi.py', 'tests/test_orchestration_genome.py', 'tests/test_orchestrator_v1.py', 'tests/test_council_profiles.py', 'tests/test_coordination_closure_checks.py']
+- owned_surfaces: ['dharma_swarm/coordination/**', 'dharma_swarm/council/**', 'scripts/governance/arena_truth_report.py', 'reports/governance/arena/**', 'tests/test_arena_v1.py', 'tests/test_dpi.py', 'tests/test_orchestration_genome.py', 'tests/test_orchestrator_v1.py', 'tests/test_council_profiles.py', 'tests/test_coordination_closure_checks.py', 'tests/test_arena_truth_report.py']
 - moves_vital_signs: ['eval_coverage', 'quality_gates']
-- ship_blocks: 1 open blocker next-item(s); no rigorous evidence (criteria are existence-only: file_exists/file_contains — add test_passes / commit_on_main / receipt_valid); strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)
+- ship_blocks: 1 open blocker next-item(s)
 
   - ✓ `arena_runner_exists` (file_exists) — dharma_swarm/coordination/arena/runner.py present
   - ✓ `arena_scorer_exists` (file_exists) — dharma_swarm/coordination/arena/scorer.py present
@@ -70,6 +70,9 @@ Active tracks: **4** (warn 5, max 10) — shippable 0
   - ✓ `arena_v1_test_exists` (file_contains) — pattern 'def test_positive_lift_candidate_beats_best_single_at_parity' found in tests/test_arena_v1.py
   - ✓ `dpi_test_exists` (file_exists) — tests/test_dpi.py present
   - ✓ `closure_checks_test_exists` (file_exists) — tests/test_coordination_closure_checks.py present
+  - ✓ `arena_v1_controls_tests_pass` (test_passes) — pytest tests/test_arena_v1.py: PASS — 15 passed in 0.39s
+  - ✓ `arena_truth_surface_tests_pass` (test_passes) — pytest tests/test_arena_truth_report.py: PASS — 8 passed in 3.10s
+  - ✓ `arena_truth_receipt_valid` (receipt_valid) — receipt reports/governance/arena/arena_truth_receipt.json valid (9 keys present, digest intact, fresh)
 
 ## `merge-master-mike-d4-2026-06` — 3/4
 
@@ -100,5 +103,5 @@ Active tracks: **4** (warn 5, max 10) — shippable 0
 - **WARN** `spine-uncovered:research-depth`: Spine objective 'research-depth' has no ACTIVE track serving it (coverage gap).
 - **WARN** `spine-uncovered:revenue-external-humans-served`: Spine objective 'revenue-external-humans-served' has no ACTIVE track serving it (coverage gap).
 - **INFO** `track-provisional:loop-closure-2026-06`: [loop-closure-2026-06] 29/29 criteria pass but NOT shippable under the rigorous bar: 2 open blocker next-item(s); 1 active ship veto(es): cybernetics_codex_harness_proven_blocks_live_ship: reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses[].verdict == 'HARNESS_PROVEN': 11 > 0. Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).
-- **INFO** `track-provisional:orchestration-arena-v1-2026-06`: [orchestration-arena-v1-2026-06] 9/9 criteria pass but NOT shippable under the rigorous bar: 1 open blocker next-item(s); no rigorous evidence (criteria are existence-only: file_exists/file_contains — add test_passes / commit_on_main / receipt_valid); strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).
+- **INFO** `track-provisional:orchestration-arena-v1-2026-06`: [orchestration-arena-v1-2026-06] 12/12 criteria pass but NOT shippable under the rigorous bar: 1 open blocker next-item(s). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).
 - **INFO** `track-in-progress:merge-master-mike-d4-2026-06`: [merge-master-mike-d4-2026-06] 3/4 completion criteria pass.
