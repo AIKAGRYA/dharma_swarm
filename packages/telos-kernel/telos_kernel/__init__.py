@@ -16,9 +16,6 @@ attribute mutation. See SECURITY.md.
 """
 from __future__ import annotations
 
-import hashlib
-import sys
-from pathlib import Path
 from typing import Any
 
 from telos_kernel.canonical import canonicalize
@@ -82,25 +79,13 @@ __version__ = "0.1.0"
 
 
 def _sbom_digest() -> str:
-    """Cheap software-bill-of-materials digest for the boot receipt.
+    """Backwards-compat shim. Delegates to the I/O rim.
 
-    Binds the boot leaf to (Python version, executable path, kernel version,
-    kernel source file digests). Any drift in the TCB itself is caught by
-    receipt diffing across boots.
+    New callers should import `compute_sbom_digest` from
+    `telos_kernel._io.sbom` directly so the FS_READ effect is visible.
     """
-    tcb_root = Path(__file__).parent
-    parts: list[str] = [
-        f"python={sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
-        f"executable_hash={hashlib.sha256(sys.executable.encode('utf-8')).hexdigest()}",
-        f"telos_kernel_version={__version__}",
-    ]
-    # Digest every kernel .py file (excluding tests). Deterministic order.
-    for p in sorted(tcb_root.rglob("*.py")):
-        if "/tests/" in str(p).replace("\\", "/"):
-            continue
-        with open(p, "rb") as f:
-            parts.append(f"{p.relative_to(tcb_root)}={hashlib.sha256(f.read()).hexdigest()}")
-    return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
+    from telos_kernel._io.sbom import compute_sbom_digest
+    return compute_sbom_digest()
 
 
 def boot(

@@ -16,9 +16,12 @@ import pytest
 
 KERNEL_ROOT = Path(__file__).resolve().parents[1]  # telos_kernel/
 
-# Phase 0 kernel allow-list. See pyproject.toml.
+# Phase 1 kernel core allow-list. The rim (telos_kernel/_io/) has a
+# broader allow-list because effect-carrying imports (os, tempfile,
+# functools) are the entire point of its existence. See SECURITY.md
+# and telos_kernel/_io/effect.py.
 ALLOWED_TOP_LEVEL_IMPORTS: frozenset[str] = frozenset({
-    # stdlib
+    # stdlib — pure or crypto primitives only
     "__future__", "abc", "dataclasses", "datetime", "enum", "hashlib",
     "hmac", "json", "math", "pathlib", "re", "secrets", "subprocess",
     "sys", "typing", "uuid",
@@ -27,6 +30,17 @@ ALLOWED_TOP_LEVEL_IMPORTS: frozenset[str] = frozenset({
     # first-party
     "telos_kernel",
 })
+
+# The I/O rim is the designated effect boundary. It may import a small
+# number of additional stdlib modules that would be banned in core.
+# Every function that uses these modules MUST be tagged with @effect(...)
+# from telos_kernel/_io/effect.py (enforced by test_io_rim.py).
+RIM_EXTRA_IMPORTS: frozenset[str] = frozenset({
+    "functools",  # decorator wrapping in effect.py
+    "os",         # os.replace for atomic file writes
+    "tempfile",   # atomic write staging
+})
+ALLOWED_RIM_IMPORTS: frozenset[str] = ALLOWED_TOP_LEVEL_IMPORTS | RIM_EXTRA_IMPORTS
 
 # AST nodes/names that are outright forbidden inside the TCB.
 FORBIDDEN_CALL_NAMES: frozenset[str] = frozenset({
@@ -41,23 +55,29 @@ def _kernel_py_files() -> list[Path]:
     ]
 
 
+def _is_rim_file(path: Path) -> bool:
+    rel = path.relative_to(KERNEL_ROOT).as_posix()
+    return rel.startswith("_io/") or rel == "_io.py"
+
+
 class TestImportAllowList:
     @pytest.mark.parametrize("path", _kernel_py_files(), ids=lambda p: str(p.name))
     def test_only_allowed_top_level_imports(self, path):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        allowed = ALLOWED_RIM_IMPORTS if _is_rim_file(path) else ALLOWED_TOP_LEVEL_IMPORTS
         offending: list[str] = []
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:
                     top = alias.name.split(".")[0]
-                    if top not in ALLOWED_TOP_LEVEL_IMPORTS:
+                    if top not in allowed:
                         offending.append(f"import {alias.name}")
             elif isinstance(node, ast.ImportFrom):
                 if node.level > 0:
                     # relative import — must resolve within telos_kernel
                     continue
                 mod = (node.module or "").split(".")[0]
-                if mod and mod not in ALLOWED_TOP_LEVEL_IMPORTS:
+                if mod and mod not in allowed:
                     offending.append(f"from {node.module} import ...")
         assert not offending, (
             f"{path.relative_to(KERNEL_ROOT)} imports outside the allow-list: "

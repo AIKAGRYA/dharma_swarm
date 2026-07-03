@@ -11,10 +11,8 @@ from __future__ import annotations
 
 import enum
 import hashlib
-from pathlib import Path
 from typing import Any, Final, Literal
 
-import yaml
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from icontract import ensure, require
@@ -249,16 +247,21 @@ def _coerce_json_manifest(value: Any) -> JSONValue:
 
 
 # ---- Loader ----------------------------------------------------------------
+#
+# The `load_manifest` function used to live here; it did `open()` +
+# `yaml.safe_load()`, both of which are Effect.FS_READ and must not live
+# in the verified core. It now lives in `telos_kernel._io.manifest_loader`
+# and is re-exported at package level for backwards compatibility.
+#
+# See `telos_kernel/_io/README.md` for the trust-boundary contract.
 
-DEFAULT_MANIFEST_PATH: Final[Path] = Path(__file__).resolve().parents[3] / "kernel" / "manifest.yaml"
 
+def load_manifest(path: object = None) -> Manifest:
+    """Backwards-compat re-export. Delegates to the I/O rim.
 
-def load_manifest(path: str | Path | None = None) -> Manifest:
-    """Load and validate the manifest from disk.
-
-    Raises pydantic.ValidationError on any schema violation.
+    New code should call `telos_kernel._io.load_manifest_from_disk`
+    directly so the effect is visible at the call site.
     """
-    p = Path(path) if path is not None else DEFAULT_MANIFEST_PATH
-    with open(p, "r", encoding="utf-8") as f:
-        raw = yaml.safe_load(f)
-    return Manifest.model_validate(raw)
+    # Local import to avoid pulling I/O into the core module's import graph.
+    from telos_kernel._io.manifest_loader import load_manifest_from_disk
+    return load_manifest_from_disk(path)
