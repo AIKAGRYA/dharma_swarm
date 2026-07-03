@@ -15,8 +15,6 @@ TRISHULA and agents using A2A can coexist and communicate.
 
 from __future__ import annotations
 
-import asyncio
-import concurrent.futures
 import json
 import logging
 from datetime import datetime, timezone
@@ -31,11 +29,12 @@ from dharma_swarm.a2a.a2a_server import (
     A2APartType,
     A2AServer,
     A2ATask,
-    A2ATaskStatus,
 )
-from dharma_swarm.spine.invoke import invoke_agent
+from dharma_swarm.a2a.spine_adapter import (
+    submit_task_via_spine,
+    submit_task_via_spine_sync,
+)
 from dharma_swarm.spine.receipt import EvidenceReceipt
-from dharma_swarm.spine.routing import RoutingDecision
 
 logger = logging.getLogger(__name__)
 
@@ -83,149 +82,24 @@ class A2ABridge:
     ) -> tuple[A2ATask, EvidenceReceipt]:
         """Submit an A2A task through the Runtime Truth Spine.
 
-        Dispatches via ``invoke_agent()`` and produces exactly one
-        ``EvidenceReceipt``.  The existing ``A2AServer.submit()`` path
-        is called inside the invoker so identity, idempotency, task-log,
-        and ``RuntimeReceipt`` handling are preserved unchanged.
-
-        Token/cost fields are left ``None`` because A2A dispatch does
-        not yet carry provider-level token counts.  Future work: wire
-        ``cost_tracker.py`` into the receipt after provider responses
-        surface token metadata.
+        Delegates to the shared :func:`submit_task_via_spine` adapter
+        (invoke_agent + exactly one ``EvidenceReceipt`` per dispatch).
 
         Returns:
             ``(result_task, evidence_receipt)``
         """
-        identity = self._server._ensure_execution_identity(task)
-        _proposal_id = str(
-            (task.metadata or {}).get("proposal_id")
-            or identity.proposal_id
-            or ""
+        return await submit_task_via_spine(
+            self._server, task, router_name="a2a_bridge",
         )
-
-        routing = RoutingDecision(
-            agent_id=task.to_agent,
-            provider="a2a",
-            model="",
-            reason=f"A2A capability dispatch: {task.capability}",
-            router_name="a2a_bridge",
-            context_id=task.context_id or "",
-            task_id=identity.task_id,
-        )
-
-        started = datetime.now(timezone.utc)
-        a2a_task = task  # capture for closure; inner 'task' is the dict
-
-        async def _a2a_invoker(
-            task: dict[str, Any],
-            agent_id: str,
-            context_id: str,
-            routing: RoutingDecision,
-        ) -> EvidenceReceipt:
-            try:
-                result = self._server.submit(a2a_task)
-            except Exception as exc:
-                finished = datetime.now(timezone.utc)
-                return EvidenceReceipt(
-                    trace_id=identity.trace_id,
-                    span_id=identity.run_id,
-                    parent_span_id=identity.parent_run_id or None,
-                    context_id=context_id,
-                    task_id=identity.task_id,
-                    claim_id=identity.claim_id or None,
-                    agent_id=agent_id,
-                    provider="a2a",
-                    operation="invoke_agent",
-                    provider_attempted=False,
-                    status="failed",
-                    error_source="internal_error",
-                    error_detail=str(exc),
-                    started_at=started,
-                    finished_at=finished,
-                    latency_ms=int((finished - started).total_seconds() * 1000),
-                    routing_decision_id=routing.decision_id,
-                    attributes={
-                        "correlation_id": identity.correlation_id,
-                        "proposal_id": _proposal_id,
-                    },
-                )
-
-            finished = datetime.now(timezone.utc)
-            latency_ms = int((finished - started).total_seconds() * 1000)
-
-            if result.status == A2ATaskStatus.COMPLETED:
-                r_status, r_error = "ok", "none"
-            elif result.status == A2ATaskStatus.FAILED:
-                r_status = "failed"
-                r_error = "provider_failed" if result.error else "internal_error"
-            elif result.status == A2ATaskStatus.CANCELLED:
-                r_status, r_error = "cancelled", "cancelled"
-            elif result.status == A2ATaskStatus.REJECTED:
-                r_status, r_error = "dropped", "guardrail_blocked"
-            else:
-                r_status, r_error = "ok", "none"
-
-            return EvidenceReceipt(
-                trace_id=identity.trace_id,
-                span_id=identity.run_id,
-                parent_span_id=identity.parent_run_id or None,
-                context_id=context_id,
-                task_id=identity.task_id,
-                claim_id=identity.claim_id or None,
-                agent_id=agent_id,
-                provider="a2a",
-                operation="invoke_agent",
-                provider_attempted=True,
-                status=r_status,
-                error_source=r_error,
-                error_detail=result.error if result.error else None,
-                started_at=started,
-                finished_at=finished,
-                latency_ms=latency_ms,
-                routing_decision_id=routing.decision_id,
-                attributes={
-                    "a2a_task_id": result.id,
-                    "context_id": result.context_id or "",
-                    "capability": result.capability or "",
-                    "a2a_status": result.status.value,
-                    "correlation_id": identity.correlation_id,
-                    "proposal_id": _proposal_id,
-                },
-            )
-
-        receipt = await invoke_agent(
-            task={
-                "id": identity.task_id,
-                "to_agent": task.to_agent,
-                "capability": task.capability,
-            },
-            agent_id=task.to_agent,
-            context_id=task.context_id or "",
-            routing=routing,
-            invoker=_a2a_invoker,
-        )
-
-        result_task = self._server.get_task(task.id) or task
-        return result_task, receipt
 
     def _submit_via_spine_sync(
         self,
         task: A2ATask,
     ) -> tuple[A2ATask, EvidenceReceipt]:
-        """Run :meth:`submit_via_spine` from a synchronous caller.
-
-        Uses ``asyncio.run()`` when no event loop is running.  If called
-        from within a running loop (a sync method invoked inside async
-        code), the coroutine executes on a dedicated worker thread with
-        its own loop so the running loop is never blocked on itself.
-        """
-        coro = self.submit_via_spine(task)
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            return asyncio.run(coro)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            return pool.submit(asyncio.run, coro).result()
+        """Run :meth:`submit_via_spine` from a synchronous caller."""
+        return submit_task_via_spine_sync(
+            self._server, task, router_name="a2a_bridge",
+        )
 
     # -- TRISHULA -> A2A (inbound) ------------------------------------------
 

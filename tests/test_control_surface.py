@@ -829,6 +829,54 @@ class TestGoReceiptRows:
         ]
         assert len(error_evidence) == 1
 
+    def test_world_radar_health_row_surfaces_needs_host(
+        self,
+        tmp_repo: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Toolchain-checked invocation: needs_host reaches the cockpit row."""
+        from dharma_swarm.operator_core.control_surface_go import (
+            _go_world_radar_health_rows,
+        )
+
+        state = tmp_repo / ".dharma"
+        monkeypatch.setenv("DHARMA_STATE_DIR", str(state))
+        health_path = state / "meta" / "world_radar" / "world_radar_health.json"
+        health_path.parent.mkdir(parents=True, exist_ok=True)
+        health_path.write_text(
+            json.dumps(
+                {
+                    "ok": False,
+                    "status": "degraded",
+                    "checked_at": "2026-07-03T00:00:00+00:00",
+                    "successful_sources": 0,
+                    "failed_sources": 0,
+                    "scout_invocation_mode": "needs_host",
+                    "ingestor_invocation_mode": "needs_host",
+                    "source_errors": [
+                        {
+                            "source": "world_scout_go",
+                            "stage": "scout",
+                            "error": (
+                                "no prebuilt world_scout_go binary and no Go toolchain "
+                                "on PATH — run `make go-build` (or install Go) on this host"
+                            ),
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        rows = _go_world_radar_health_rows()
+        assert len(rows) == 1
+        row = rows[0]
+        assert row.coherence_state == "partial"
+        assert "needs_host" in row.observed_state
+        assert "go_world_radar_needs_host" in row.gap_codes
+        assert "go_world_radar_source_errors" in row.gap_codes
+        assert "make go-build" in row.next_action
+
 
 # ---------------------------------------------------------------------------
 # API endpoint tests

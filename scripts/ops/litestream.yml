@@ -1,0 +1,16 @@
+# Litestream config for the organism host (docker compose `vps` profile).
+# Replicates the canonical runtime truth store (delegation_runs + receipts)
+# to any S3-compatible target. Receipts are append-heavy: snapshot cadence
+# matters more than realtime (RUNBOOK §3e).
+#
+# Configure via env (never commit values):
+#   LITESTREAM_REPLICA_URL        e.g. s3://my-bucket/dharma/runtime.db
+#   LITESTREAM_ACCESS_KEY_ID
+#   LITESTREAM_SECRET_ACCESS_KEY
+dbs:
+  - path: /data/state/runtime.db
+    replicas:
+      - url: ${LITESTREAM_REPLICA_URL}
+        sync-interval: 60s
+        snapshot-interval: 6h
+        retention: 168h

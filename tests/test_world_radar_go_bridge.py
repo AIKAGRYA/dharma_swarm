@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 
 from dharma_swarm.world_radar import go_bridge as bridge
+from dharma_swarm.world_radar import go_invoke
 
 
 def test_world_radar_promotes_operator_drop_with_fake_ingestor(
@@ -165,6 +166,9 @@ def test_run_go_scout_plumbs_archive_flags(monkeypatch, tmp_path: Path) -> None:
         return subprocess.CompletedProcess(cmd, 0, "", "")
 
     monkeypatch.setattr(bridge.subprocess, "run", fake_run)
+    # Host-independent: pretend a Go toolchain is on PATH so the toolchain-checked
+    # _go_invocation() offers `go run .` even on hosts without Go installed.
+    monkeypatch.setattr(go_invoke.shutil, "which", lambda _cmd: "/usr/local/bin/go")
 
     rows, error, counts = bridge._run_go_scout(
         state=state,
@@ -250,6 +254,9 @@ def test_run_go_scout_treats_partial_source_failure_as_nonfatal(monkeypatch, tmp
         return subprocess.CompletedProcess(cmd, 0, "", "")
 
     monkeypatch.setattr(bridge.subprocess, "run", fake_run)
+    # Host-independent: pretend a Go toolchain is on PATH so the toolchain-checked
+    # _go_invocation() offers `go run .` even on hosts without Go installed.
+    monkeypatch.setattr(go_invoke.shutil, "which", lambda _cmd: "/usr/local/bin/go")
 
     rows, error, counts = bridge._run_go_scout(
         state=state,
@@ -413,6 +420,9 @@ def test_run_go_ingestor_projects_current_run_receipts(monkeypatch, tmp_path: Pa
         return subprocess.CompletedProcess(cmd, 0, "", "")
 
     monkeypatch.setattr(bridge.subprocess, "run", fake_run)
+    # Host-independent: pretend a Go toolchain is on PATH so the toolchain-checked
+    # _go_invocation() offers `go run .` even on hosts without Go installed.
+    monkeypatch.setattr(go_invoke.shutil, "which", lambda _cmd: "/usr/local/bin/go")
 
     rows, error, invocation_mode = bridge._run_go_ingestor(
         input_path=input_path,
@@ -472,10 +482,12 @@ def test_world_radar_writes_ingest_summary_and_cost_event(monkeypatch, tmp_path:
     assert health["nats_receipt_transport"]["status"] == "disabled"
 
 
-def test_go_invocation_prefers_prebuilt_binary(tmp_path: Path) -> None:
+def test_go_invocation_prefers_prebuilt_binary(monkeypatch, tmp_path: Path) -> None:
     module_dir = tmp_path / "world_scout_go"
     module_dir.mkdir()
 
+    # No binary + toolchain on PATH -> `go run .` (host-independent via patch).
+    monkeypatch.setattr(go_invoke.shutil, "which", lambda _cmd: "/usr/local/bin/go")
     cmd, mode = bridge._go_invocation(module_dir)
     assert cmd == ["go", "run", "."]
     assert mode == "go_run"
@@ -487,6 +499,78 @@ def test_go_invocation_prefers_prebuilt_binary(tmp_path: Path) -> None:
     cmd, mode = bridge._go_invocation(module_dir)
     assert cmd == [str(binary)]
     assert mode == "binary"
+
+
+def test_go_invocation_needs_host_without_binary_or_toolchain(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """Toolchain-checked invocation: neither binary nor `go` -> needs_host, no argv."""
+    module_dir = tmp_path / "world_scout_go"
+    module_dir.mkdir()
+    monkeypatch.setattr(go_invoke.shutil, "which", lambda _cmd: None)
+
+    cmd, mode = bridge._go_invocation(module_dir)
+    assert cmd == []
+    assert mode == "needs_host"
+
+
+def test_run_go_scout_needs_host_returns_structured_error(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """needs_host never invokes a subprocess and names the fix (`make go-build`)."""
+    monkeypatch.setattr(
+        go_invoke, "_go_invocation", lambda _module_dir: ([], "needs_host")
+    )
+
+    def _no_subprocess(*args, **kwargs):  # type: ignore[no-untyped-def]
+        raise AssertionError("subprocess must not run when the host lacks Go")
+
+    monkeypatch.setattr(go_invoke.subprocess, "run", _no_subprocess)
+
+    rows, error, counts = bridge._run_go_scout(
+        state=tmp_path / ".dharma",
+        output_path=tmp_path / "observations.jsonl",
+        health_path=tmp_path / "health.json",
+        timeout_s=5,
+    )
+
+    assert rows == []
+    assert error is not None
+    assert "make go-build" in error
+    assert "world_scout_go" in error
+    assert counts["invocation_mode"] == "needs_host"
+    assert counts["source_errors"] == [
+        {"source": "world_scout_go", "stage": "scout", "error": error}
+    ]
+
+
+def test_run_go_ingestor_needs_host_returns_structured_error(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        go_invoke, "_go_invocation", lambda _module_dir: ([], "needs_host")
+    )
+
+    def _no_subprocess(*args, **kwargs):  # type: ignore[no-untyped-def]
+        raise AssertionError("subprocess must not run when the host lacks Go")
+
+    monkeypatch.setattr(go_invoke.subprocess, "run", _no_subprocess)
+
+    rows, error, invocation_mode = bridge._run_go_ingestor(
+        input_path=tmp_path / "observations.jsonl",
+        output_path=tmp_path / "signals.jsonl",
+        min_score=0.4,
+        timeout_s=5,
+    )
+
+    assert rows == []
+    assert error is not None
+    assert "make go-build" in error
+    assert "world_signal_ingestor_go" in error
+    assert invocation_mode == "needs_host"
 
 
 def test_run_go_scout_surfaces_structured_source_errors_and_mode(
@@ -514,6 +598,9 @@ def test_run_go_scout_surfaces_structured_source_errors_and_mode(
         return subprocess.CompletedProcess(cmd, 0, "", "")
 
     monkeypatch.setattr(bridge.subprocess, "run", fake_run)
+    # Host-independent: pretend a Go toolchain is on PATH so the toolchain-checked
+    # _go_invocation() offers `go run .` even on hosts without Go installed.
+    monkeypatch.setattr(go_invoke.shutil, "which", lambda _cmd: "/usr/local/bin/go")
 
     rows, error, counts = bridge._run_go_scout(
         state=tmp_path / ".dharma",

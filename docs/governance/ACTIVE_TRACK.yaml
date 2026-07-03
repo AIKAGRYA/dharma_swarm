@@ -130,118 +130,6 @@ vital_signs:
 #   prerequisites / completion_criteria / non_goals / next_items  (as in v1)
 # ---------------------------------------------------------------------------
 active_tracks:
-  - id: runtime-truth-spine-adoption-2026-06
-    name: Runtime Truth Spine — Adoption (god objects flow through invoke_agent)
-    status: ACTIVE
-    opened_at: "2026-06-06"
-    verified_at: "2026-06-10"
-    ttl_days: 21
-    owner: "@AmitabhainArunachala"
-    serves: substrate-nativeness
-    complements:
-      - runtime-truth-reconciliation-2026-06
-      - runtime-truth-nats-2026-06
-    owned_surfaces:
-      - dharma_swarm/spine/**
-      - dharma_swarm/a2a/a2a_bridge.py
-      - dharma_swarm/orchestrator.py
-      - dharma_swarm/agent_runner.py
-      - scripts/uplift_guards/check_spine_ownership.py
-    moves_vital_signs:
-      - quality_gates
-      - tool_coverage
-
-    description: |
-      spine-adoption ships end-to-end: every production dispatch flows through
-      invoke_agent() and emits exactly one EvidenceReceipt. This track migrates
-      the god objects (agent_runner.py, orchestrator.py, a2a_bridge.py) onto
-      the shipped spine substrate. Target: 3 production callers outside the
-      spine package, zero bypass paths. Substrate-nativeness moves toward 30%+.
-
-      Ported 2026-06-10 from the v1 declaration (opened 2026-06-06 on the
-      qwen/spine-adoption lane, commit c28951d5b, which closed reconciliation
-      in v1) into the v2 portfolio while merging origin/main. In the v2
-      multi-track model it runs as a co-equal peer of the reconciliation and
-      NATS lanes rather than requiring their closure; reconciliation's open
-      status is main's standing declaration and is left to the operator.
-
-    prerequisites:
-      - id: spine_package_exists
-        kind: file_exists
-        file: dharma_swarm/spine/__init__.py
-      - id: invoke_agent_defined
-        kind: file_contains
-        file: dharma_swarm/spine/invoke.py
-        pattern: "async def invoke_agent"
-
-    completion_criteria:
-      - id: a2a_bridge_calls_spine
-        kind: file_contains
-        file: dharma_swarm/a2a/a2a_bridge.py
-        pattern: '(?m)^\s*from dharma_swarm\.spine'
-      - id: orchestrator_calls_spine
-        kind: file_contains
-        file: dharma_swarm/orchestrator.py
-        pattern: '(?m)^\s*from dharma_swarm\.spine'
-      - id: agent_runner_calls_spine
-        kind: file_contains
-        file: dharma_swarm/agent_runner.py
-        pattern: '(?m)^\s*from dharma_swarm\.spine'
-      - id: dispatch_emits_evidence_receipt
-        kind: file_contains
-        file: tests/test_spine_adoption_dispatch.py
-        pattern: "test_every_dispatch_emits_exactly_one_evidence_receipt"
-      - id: zero_dropoff_sources
-        kind: file_contains
-        file: tests/test_spine_adoption_dispatch.py
-        pattern: "test_no_dropoff_sources_remain"
-      - id: bypass_allowlist_empty
-        kind: file_contains
-        file: scripts/governance/spine_bypass_report.py
-        pattern: '(?m)^_INTENTIONAL_BYPASS: dict\[tuple\[str, int\], str\] = \{\s*\}'
-        # Regex (checker re.search): matches the DRAINED dict only — `= {}` on
-        # one line or `= {\n}` — never the populated multi-line form (5 entries
-        # today). Passes exactly when zero intentional bypass sites remain.
-      - id: adoption_narrative_docs
-        kind: file_exists
-        file: docs/architecture/SPINE_ADOPTION_NARRATIVE.md
-      - id: gate1_witnessed
-        kind: file_exists
-        file: reports/governance/GATE1_WITNESSED.md
-        # Written ONLY by gate1_witness.sh --watch at the moment the operator
-        # observes a live receipt land (count moves; sha16 of the receipt JSON
-        # recorded, checkable against the DB). Wires the non-proxy gate into
-        # completion: the track cannot flip SHIPPABLE on file/test proxies alone.
-
-    non_goals:
-      - Do not create new spine sub-modules. Adopt invoke/receipt/routing/persistence.
-      - Do not decompose agent_runner.run_task beyond invoke_agent() routing.
-      - Do not change EvidenceReceipt schema; adopt shipped types unchanged.
-      - Do not introduce NATS, Redis, or gRPC in this track (transport belongs to the NATS lane).
-      - Do not broadly refactor swarm.py, providers.py, or SwarmManager.
-
-    next_items:
-      - id: 1
-        what: "DONE 2026-07-02: a2a_bridge.submit_via_spine wired into production dispatch — ingest_trishula_inbox (Slice 2) now dispatches through submit_via_spine (invoke_agent + exactly one EvidenceReceipt per ingest); the a2a_bridge.py:307 allowlist entry removed from scripts/governance/spine_bypass_report.py (intentional bypasses 5→4) and the spine_bypass_entries ratchet baseline lowered to 4."
-        kind: code
-        blocker: false
-      - id: 2
-        what: "orchestrator.py dispatch through invoke_agent behind DHARMA_SPINE_DISPATCH (landed via #557; operator confirms one live EvidenceReceipt on a real dispatch = GATE 1)."
-        kind: code
-        blocker: true
-      - id: 3
-        what: "Migrate agent_runner.py run_task through invoke_agent(). Largest surface, last."
-        kind: code
-        blocker: true
-      - id: 4
-        what: "Drain the intentional-bypass allowlist (node_gateway submit endpoints, a2a_client._dispatch_local) and enable allow-list-at-zero in uplift_guards CI."
-        kind: code
-        blocker: true
-      - id: 5
-        what: "Author docs/architecture/SPINE_ADOPTION_NARRATIVE.md"
-        kind: docs
-        blocker: false
-
   - id: loop-closure-2026-06
     name: Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
     status: ACTIVE
@@ -506,7 +394,7 @@ active_tracks:
 
     next_items:
       - id: 1
-        what: "Residual: drain or quarantine historical dispatch_dropoff rows before any standing all-history daemon-clean claim."
+        what: "TOOL SHIPPED 2026-07-03 (execution on daemon host remains operator): scripts/runtime/dispatch_dropoff_quarantine.py — dry-run default, REQUIRED --before cutoff, --execute stamps quarantined_at/quarantine_reason on existing delegation_runs rows (idempotent ALTER, no new store, rows stay auditable) and writes a JSON receipt (counts + rowid-list sha256) under ~/.dharma/loop_closure/. Audit now reports dropoff_live=N / dropoff_quarantined_historical=M separately (cybernetics_codex excludes only explicitly-stamped rows and always reports the quarantined tally — never hides it). 7 fixture-DB tests green. REMAINING: operator runs it on the daemon host against the real runtime.db (~2191 historical rows), cutoff at/before the spine-dispatch fix timestamp."
         kind: code
         blocker: true
       - id: 2
@@ -799,15 +687,15 @@ active_tracks:
     #     living agents earn always-on individually (start 2-3, monitored).
     next_items:
       - id: 1
-        what: "D1 (blocker): DHARMA_SPINE_DISPATCH=1 standing in docker-compose swarm service (+ documented Mac plist env path); Loop-1 closure reads LIVE persistently on the daemon host."
+        what: "D1 (blocker): CODE+DOCS DONE (docker-compose.yml swarm service carries DHARMA_SPINE_DISPATCH=1 standing; Mac plist env path documented in docs/ops/RUNBOOK.md §3d). REMAINING: operator observation that Loop-1 closure reads LIVE persistently on the daemon host (make orient on the host that actually runs; blocked on daemon host / VPS item 4)."
         kind: code
         blocker: true
       - id: 2
-        what: "Spine visibility: `dgc spine tail` (live EvidenceReceipt stream) + read-only cockpit pulse panel (receipts/hour, last-receipt age, dropoff count) so the operator can SEE and FEEL the spine working."
+        what: "DONE 2026-07-03: `dgc spine tail` (operator_core/spine_tail.py, landed earlier) + read-only cockpit pulse panel now RENDERED in Cockpit V2 (dashboard SpinePulsePanel.tsx: receipts/hour, last-receipt age with LIVE/QUIET chip, dropoff count; reads /api/control-surface/rows/spine.pulse, refreshes 15s, graceful not-live-on-this-host state)."
         kind: code
         blocker: false
       - id: 3
-        what: "Go sense-organ hardening + Loop 5b: compiled-binary or toolchain-checked invocation, per-source errors surfaced to cockpit, github_ingestor live trigger (go-g04), and a host-aware closure check covering the Go chain in the loop map."
+        what: "DONE 2026-07-03: Go sense-organ hardening + Loop 5b complete. Most had landed via #755 (per-source errors → go.world_radar_health cockpit row; github_ingestor live trigger go-g04 via cron_jobs.json:github_ingestor_inbox; host-aware loop5b_world_radar_closure_run with NEEDS_HOST). This session closed the last gap: toolchain-checked invocation in world_radar/go_invoke.py (no binary AND no `go` on PATH → structured needs_host per-source error naming `make go-build`, never an exception into the caller loop; cockpit gap code go_world_radar_needs_host). Verified live: loop5b closure run → LOOP5B_CLOSED=yes; 126 tests green."
         kind: code
         blocker: false
       - id: 4
@@ -847,6 +735,36 @@ active_tracks:
       - Do not touch surfaces owned by the four sibling tracks except through their own next-items.
 
 closed_tracks:
+  - id: runtime-truth-spine-adoption-2026-06
+    name: Runtime Truth Spine — Adoption (god objects flow through invoke_agent)
+    status: SHIPPED
+    closure_kind: VERIFIED_SLICE
+    opened_at: "2026-06-06"
+    closed_at: "2026-07-03"
+    closed_by: "claude/repo-audit-fable5-roadmap-l5oosz"
+    serves: substrate-nativeness
+    complements:
+      - runtime-truth-reconciliation-2026-06
+      - runtime-truth-nats-2026-06
+    evidence:
+      - "reports/governance/GATE1_WITNESSED.md - operator-witnessed live EvidenceReceipt (2026-06-11T21:16Z, sha16 82c65502d79eecc9 checkable against delegation_runs)"
+      - "tests/test_spine_allowlist_drain.py - 8 passed (one EvidenceReceipt per dispatch on every formerly-allowlisted surface; allow-list-at-zero guard green)"
+      - "tests/test_spine_adoption_dispatch.py - 10 passed (exactly-one-receipt + zero-dropoff-sources invariants)"
+      - "scripts/governance/spine_bypass_report.py - 0 intentional, 0 unknown; single blessed site a2a/spine_adapter.py"
+      - "docs/governance/hygiene/ratchet_baselines.json - spine_bypass_entries baseline 0 (hold-at-zero in quality-ratchet CI)"
+      - "scripts/uplift_guards/check_spine_ownership.py - invariant 3 (allow-list-at-zero, fail-closed) in the uplift_guards composition"
+    notes: |
+      Closed 2026-07-03 after the allowlist drain (node_gateway x2,
+      a2a_client._dispatch_local, nats_transport.consume_message → shared
+      a2a/spine_adapter.submit_task_via_spine) took the track to 9/9
+      criteria under the rigorous bar with zero open blockers.
+      agent_runner.run_task resolved architecturally as the execution LEAF
+      inside spine-wrapped callers (no bypass submit path exists).
+      closure_kind is VERIFIED_SLICE: receipt path shipped, test-proven,
+      GATE-1 witnessed, and held at zero bypasses by ratchet + uplift
+      guard — standing LIVE operation on the daemon host remains
+      organism-rewire-2026-07 (D1) / loop-closure territory.
+
   - id: runtime-truth-reconciliation-2026-06
     name: Runtime Truth Reconciliation - operator-visible truth packets
     status: SHIPPED
