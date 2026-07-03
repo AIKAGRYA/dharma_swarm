@@ -1,0 +1,30 @@
+name: kernel-crosshair
+
+on:
+  pull_request:
+    paths:
+      - "packages/telos-kernel/**"
+      - ".github/workflows/kernel-crosshair.yml"
+  push:
+    branches: [main]
+
+jobs:
+  crosshair:
+    name: Crosshair SMT counterexample search
+    runs-on: ubuntu-latest
+    # Crosshair is per-condition time-bounded; the job blocks merge on any
+    # counterexample discovered, but the time budget is intentionally
+    # modest in Phase 0 to keep CI fast.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install kernel + crosshair
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e packages/telos-kernel
+          pip install crosshair-tool pytest pydantic pyyaml cryptography icontract
+      - name: Run Crosshair
+        run: |
+          pytest packages/telos-kernel/telos_kernel/tests/test_crosshair.py -q -s
