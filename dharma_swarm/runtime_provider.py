@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
+import httpx
+
 from dharma_swarm.api_keys import (
     ANTHROPIC_API_KEY_ENV,
     CEREBRAS_API_KEY_ENV,
@@ -29,6 +31,8 @@ from dharma_swarm.api_keys import (
     KIMI_BASE_URL_ENV,
     MISTRAL_API_KEY_ENV,
     MISTRAL_BASE_URL_ENV,
+    MOONSHOT_API_KEY_ENV,
+    MOONSHOT_BASE_URL_ENV,
     NVIDIA_NIM_API_KEY_ENV,
     NVIDIA_NIM_BASE_URL_ENV,
     OLLAMA_API_KEY_ENV,
@@ -69,7 +73,8 @@ CHUTES_BASE_URL = "https://api.chutes.ai/v1"
 # endpoint can reject coding-plan keys as out of funds even when coding quota is
 # live, so this default is intentionally the coding endpoint.
 ZHIPU_BASE_URL = "https://api.z.ai/api/coding/paas/v4"
-KIMI_BASE_URL = "https://api.kimi.com/coding/v1"
+KIMI_BASE_URL = "https://api.moonshot.ai/v1"
+MOONSHOT_BASE_URL = "https://api.moonshot.ai/v1"
 from dharma_swarm.model_hierarchy import (
     CANONICAL_SEED_ORDER,
     default_model,
@@ -91,8 +96,20 @@ DEFAULT_CHUTES_MODEL = default_model(ProviderType.CHUTES)
 DEFAULT_GOOGLE_AI_MODEL = default_model(ProviderType.GOOGLE_AI)
 DEFAULT_ZHIPU_MODEL = default_model(ProviderType.ZHIPU)
 DEFAULT_KIMI_CODE_MODEL = default_model(ProviderType.KIMI_CODE)
+DEFAULT_MOONSHOT_MODEL = default_model(ProviderType.MOONSHOT)
 DEFAULT_CODEX_MODEL = default_model(ProviderType.CODEX)
 DEFAULT_PROVIDER_TIMEOUT_SECONDS = 300
+
+
+def _ollama_runtime_available(*, base_url: str, token: str | None) -> bool:
+    """Return whether the resolved Ollama endpoint can serve requests now."""
+    if ollama_transport_mode(base_url=base_url, api_key=token) == "cloud_api":
+        return bool(token)
+    try:
+        resp = httpx.get(f"{base_url.rstrip('/')}/api/tags", timeout=1.0)
+    except Exception:
+        return False
+    return resp.status_code == 200
 
 # Provider ordering sourced from model_hierarchy.py — the single source of truth.
 # All free providers first, then cheap, then paid.
@@ -111,7 +128,8 @@ PREFERRED_LOW_COST_RUNTIME_PROVIDERS: tuple[ProviderType, ...] = (
     ProviderType.TOGETHER,        # FREE: Qwen3-Coder 480B
     ProviderType.FIREWORKS,       # FREE: Qwen3-Coder 480B
     ProviderType.OPENROUTER_FREE, # FREE: auto-discovered
-    ProviderType.KIMI_CODE,       # CHEAP/SUBSCRIPTION: Kimi Code stable K2.x coding lane
+    ProviderType.KIMI_CODE,       # CHEAP: Kimi API Platform coding lane
+    ProviderType.MOONSHOT,        # CHEAP: Kimi API Platform / Moonshot global API
     ProviderType.ZHIPU,           # CHEAP: Z.ai coding-plan GLM-5.2 direct API
     ProviderType.MISTRAL,         # CHEAP
     ProviderType.GOOGLE_AI,       # CHEAP
@@ -129,6 +147,7 @@ PREFERRED_LOW_COST_WITH_ANTHROPIC_RUNTIME_PROVIDERS: tuple[ProviderType, ...] = 
     ProviderType.TOGETHER,
     ProviderType.FIREWORKS,
     ProviderType.KIMI_CODE,
+    ProviderType.MOONSHOT,
     ProviderType.ZHIPU,
     ProviderType.OPENROUTER,      # PAID (moonshotai/kimi-k2.5)
     ProviderType.ANTHROPIC,
@@ -265,7 +284,10 @@ def resolve_runtime_provider_config(
             base_url=resolved_base,
             api_key=token,
         )
-        available = bool(resolved_base)
+        available = bool(resolved_base) and _ollama_runtime_available(
+            base_url=resolved_base,
+            token=token,
+        )
         metadata: dict[str, Any] = {}
         try:
             metadata["headers"] = build_ollama_headers(
@@ -460,10 +482,15 @@ def resolve_runtime_provider_config(
         )
 
     if provider == ProviderType.KIMI_CODE:
-        token = api_key or _env_value(env_map, KIMI_API_KEY_ENV)
+        token = (
+            api_key
+            or _env_value(env_map, KIMI_API_KEY_ENV)
+            or _env_value(env_map, MOONSHOT_API_KEY_ENV)
+        )
         resolved_base = (
             base_url
             or _env_value(env_map, KIMI_BASE_URL_ENV)
+            or _env_value(env_map, MOONSHOT_BASE_URL_ENV)
             or KIMI_BASE_URL
         ).rstrip("/")
         return RuntimeProviderConfig(
@@ -471,6 +498,22 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=resolved_base,
             default_model=model or DEFAULT_KIMI_CODE_MODEL,
+            timeout_seconds=timeout,
+            available=bool(token),
+        )
+
+    if provider == ProviderType.MOONSHOT:
+        token = api_key or _env_value(env_map, MOONSHOT_API_KEY_ENV)
+        resolved_base = (
+            base_url
+            or _env_value(env_map, MOONSHOT_BASE_URL_ENV)
+            or MOONSHOT_BASE_URL
+        ).rstrip("/")
+        return RuntimeProviderConfig(
+            provider=provider,
+            api_key=token,
+            base_url=resolved_base,
+            default_model=model or DEFAULT_MOONSHOT_MODEL,
             timeout_seconds=timeout,
             available=bool(token),
         )
@@ -491,6 +534,7 @@ def create_runtime_provider(config: RuntimeProviderConfig) -> Any:
         GoogleAIProvider,
         GroqProvider,
         KimiCodeProvider,
+        MoonshotProvider,
         MistralProvider,
         NVIDIANIMProvider,
         OllamaProvider,
@@ -616,6 +660,16 @@ def create_runtime_provider(config: RuntimeProviderConfig) -> Any:
         if config.base_url is not None:
             kwargs["base_url"] = config.base_url
         return KimiCodeProvider(**kwargs)
+    if config.provider == ProviderType.MOONSHOT:
+        kwargs = {
+            "default_model": config.default_model or DEFAULT_MOONSHOT_MODEL,
+            "timeout": config.timeout_seconds or DEFAULT_PROVIDER_TIMEOUT_SECONDS,
+        }
+        if config.api_key is not None:
+            kwargs["api_key"] = config.api_key
+        if config.base_url is not None:
+            kwargs["base_url"] = config.base_url
+        return MoonshotProvider(**kwargs)
     raise ValueError(f"Unsupported runtime provider: {config.provider.value}")
 
 
@@ -635,7 +689,10 @@ def create_default_provider_map(
             timeout_seconds=timeout_seconds,
             env=env,
         )
-        providers[provider] = create_runtime_provider(cfg)
+        provider_instance = create_runtime_provider(cfg)
+        setattr(provider_instance, "available", cfg.available)
+        setattr(provider_instance, "runtime_config", cfg)
+        providers[provider] = provider_instance
     return providers
 
 
@@ -743,6 +800,7 @@ __all__ = [
     "DEFAULT_CLAUDE_MODEL",
     "DEFAULT_GROQ_MODEL",
     "DEFAULT_KIMI_CODE_MODEL",
+    "DEFAULT_MOONSHOT_MODEL",
     "DEFAULT_FIREWORKS_MODEL",
     "DEFAULT_NIM_MODEL",
     "DEFAULT_OPENAI_MODEL",
@@ -756,6 +814,7 @@ __all__ = [
     "GOOGLE_AI_BASE_URL",
     "GROQ_BASE_URL",
     "KIMI_BASE_URL",
+    "MOONSHOT_BASE_URL",
     "NVIDIA_NIM_BASE_URL",
     "OPENAI_BASE_URL",
     "OPENROUTER_BASE_URL",

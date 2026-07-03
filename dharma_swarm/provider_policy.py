@@ -99,6 +99,7 @@ class ProviderRoutingConfig:
     )
     japanese_quality_priority: tuple[ProviderType, ...] = (
         ProviderType.OPENROUTER,
+        ProviderType.MOONSHOT,
         ProviderType.OLLAMA,
         ProviderType.NVIDIA_NIM,
         ProviderType.SILICONFLOW,

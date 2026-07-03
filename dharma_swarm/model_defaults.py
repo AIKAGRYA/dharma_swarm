@@ -59,9 +59,11 @@ _PROVIDER_DEFAULTS: dict[ProviderType, str] = {
     # z.ai / Zhipu direct — first-party GLM lane (not routed via OpenRouter).
     # glm-5.2 is the current frontier GLM (mid-2026).
     ProviderType.ZHIPU: "glm-5.2",
-    # Kimi Code docs specify kimi-for-coding as the stable id; the backend maps
-    # it to the current K2.x coding model without client-side model churn.
-    ProviderType.KIMI_CODE: "kimi-for-coding",
+    # Kimi API Platform / Moonshot global OpenAI-compatible lane. Kimi K2.7
+    # Code is the stable non-highspeed default; highspeed is intentionally
+    # opt-in because it can have separate capacity/entitlement constraints.
+    ProviderType.KIMI_CODE: "kimi-k2.7-code",
+    ProviderType.MOONSHOT: "kimi-k2.7-code",
     ProviderType.OPENROUTER_FREE: "meta-llama/llama-3.3-70b-instruct:free",
     # Paid / subscription tier
     # FLOOR-compliant: the K2.6 floor route (not the superseded sub-floor K2.5).
