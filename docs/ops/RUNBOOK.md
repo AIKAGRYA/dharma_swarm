@@ -104,16 +104,35 @@ launching via `make boot`). Confirm with `dgc spine tail` — receipts should ap
 
 ### 3e. VPS deployment (organism-rewire-2026-07 item 4 — Mac demotes to dev seat)
 
-The compose stack (`web` + `swarm` + `cron`, persistent `dharma-state` volume,
-`swarm` service already carries `DHARMA_SPINE_DISPATCH=1` and
-`restart: unless-stopped`) is the deployment unit. Operator provisions the host
-and secrets; everything else is these steps:
+The compose stack (`web` + `swarm` + `cron` + optional `litestream` sidecar,
+persistent `dharma-state` volume, `swarm` service already carrying
+`DHARMA_SPINE_DISPATCH=1` and `restart: unless-stopped`) is the deployment
+unit. Two provisioning paths:
+
+**Path A — phone flow (cloud-init, recommended).** Everything except the two
+secret acts is unattended via `scripts/ops/vps_cloud_init.yaml`:
+
+1. In the provider console (Hetzner CX22 / DO 4GB droplet; Ubuntu 24.04),
+   create the server and paste the contents of `scripts/ops/vps_cloud_init.yaml`
+   into the *user data / cloud-init* field. Add your SSH key. Boot.
+2. Cloud-init installs docker+compose, 2G swap, ufw (ssh-only), litestream,
+   and generates a READ-ONLY GitHub deploy key. It writes
+   `/root/DHARMA_NEXT_STEPS.txt` containing the deploy pubkey.
+3. Two operator acts (the only manual steps, doable from GitHub mobile + one
+   ssh session): add the printed deploy key to the repo (Settings → Deploy
+   keys, write access OFF), and create `/root/dharma.env` from `.env.example`
+   with real provider keys (minimum: one of ANTHROPIC/OPENROUTER; optional:
+   `LITESTREAM_*`, `DEVIN_NATS_*`).
+4. `bash /root/dharma_bootstrap.sh` — clones, builds,
+   `docker compose --profile vps up -d`, waits for health, and prints the
+   felt-proof `dgc spine tail`.
+
+**Path B — manual (any Ubuntu box with docker):**
 
 ```bash
-# on the VPS (Ubuntu, docker + compose plugin installed; 2GB RAM is enough to start)
 git clone https://github.com/AmitabhainArunachala/dharma_swarm && cd dharma_swarm
 cp .env.example .env    # then fill: provider keys (dkeys export), DEVIN_NATS_PW if bridging AGNI
-docker compose up -d --build
+docker compose --profile vps up -d --build   # drop --profile vps to skip litestream
 docker compose exec swarm dgc spine tail --limit 5   # felt-proof: receipts flowing
 curl -s localhost:7433/health                        # daemon health
 ```
@@ -122,15 +141,29 @@ Notes:
 - **NATS**: the AGNI hub (`wss://157.245.193.15:8443`, stream `DHARMA_A2A`) already
   runs on a VPS — this host connects OUT to it (set the `DEVIN_NATS_*` env vars);
   no local broker service is required unless mirroring the Mac-local `DHARMA_FLEET`.
-- **State durability**: `dharma-state` is a named volume. For off-host replication,
-  run litestream against the volume's `runtime.db` (the Mac litestream plist config
-  is the template; on the VPS use the litestream Docker sidecar or a systemd unit).
-  Snapshot cadence matters more than realtime here — receipts are append-heavy.
+  Do NOT co-locate this daemon on the AGNI hub box: the hub is fleet transport
+  backbone; keeping the hot, evolving organism on its own host bounds blast radius.
+- **State durability**: the `litestream` compose service (profile `vps`) replicates
+  `dharma-state`'s `runtime.db` per `scripts/ops/litestream.yml` to any
+  S3-compatible target (`LITESTREAM_*` env). Snapshot cadence matters more than
+  realtime here — receipts are append-heavy.
+- **Arena / forge evolution cycles run on THIS SAME HOST** (decision 2026-07-03):
+  Arena v1 is zero-weight and API-token-bound, not CPU-bound, so a second box buys
+  nothing yet. Co-tenancy rules: arena runs as its own compose service/profile with
+  cpu/mem limits when it lands (Campaign 2); fitness evaluates ONLY clean
+  `CANONICAL_ORIGIN_MAIN` checkouts, never this daemon's working state; arena state
+  stays in its own directory; internal artifacts never touch archive fitness (One
+  Wire). Split to a dedicated box only when arena saturates CPU or the R_V/GPU
+  research lane starts (different machine class entirely).
+- **First CLOSED_LIVE sequence** once up: quarantine historical dropoffs
+  (`python3 scripts/runtime/dispatch_dropoff_quarantine.py --before <spine-fix-ts>`
+  dry-run then `--execute`), give an agent work, watch `dgc spine tail --follow`,
+  then promote Loop 1 on its live owner-surface criterion.
 - **Verification from anywhere**: once up, `make orient` on any checkout pointing at
   the same state (or the cockpit `spine.pulse` row via the web service) shows Loop-1
   LIVE; the Mac daemon can then be unloaded (`make stop`) and kept as a dev mirror.
-- **Not automated on purpose**: host provisioning, `.env` secrets, and DNS/firewall
-  are operator acts — no credentials in the repo, ever.
+- **Not automated on purpose**: creating the server, the deploy key grant, and
+  `.env` secrets are operator acts — no credentials in the repo, ever.
 
 ## 4. Health Checks
 

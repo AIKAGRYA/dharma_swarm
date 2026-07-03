@@ -77,6 +77,26 @@ while True:
 "]
     restart: unless-stopped
 
+  # Off-host replication of the runtime truth store (VPS profile only —
+  # `docker compose --profile vps up -d`). Local/Mac behavior unchanged.
+  # Configure LITESTREAM_* in .env; without a replica URL, do not enable
+  # this profile. See docs/ops/RUNBOOK.md §3e and scripts/ops/litestream.yml.
+  litestream:
+    image: litestream/litestream:0.3.13
+    container_name: dharma-litestream
+    profiles: ["vps"]
+    command: replicate -config /etc/litestream.yml
+    volumes:
+      - dharma-state:/data
+      - ./scripts/ops/litestream.yml:/etc/litestream.yml:ro
+    environment:
+      - LITESTREAM_REPLICA_URL=${LITESTREAM_REPLICA_URL:-}
+      - LITESTREAM_ACCESS_KEY_ID=${LITESTREAM_ACCESS_KEY_ID:-}
+      - LITESTREAM_SECRET_ACCESS_KEY=${LITESTREAM_SECRET_ACCESS_KEY:-}
+    restart: unless-stopped
+    depends_on:
+      - swarm
+
 volumes:
   dharma-state:
     driver: local
