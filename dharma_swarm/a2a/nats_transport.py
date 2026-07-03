@@ -14,6 +14,7 @@ from enum import Enum
 from typing import Any, Protocol
 from uuid import uuid4
 
+from dharma_swarm.a2a.spine_adapter import submit_task_via_spine
 from dharma_swarm.a2a.a2a_server import (
     A2AArtifact,
     A2AExtension,
@@ -298,7 +299,25 @@ class A2ANatsTransport:
 
         broker_acked = False
         try:
-            result = self.server.submit(task) if self.server is not None else task
+            if self.server is not None:
+                # Spine-adopted ingress: the local dispatch flows through
+                # invoke_agent() and emits exactly one EvidenceReceipt, on
+                # top of the transport-level RuntimeReceipt/idempotency
+                # records this method already writes.
+                result, spine_receipt = await submit_task_via_spine(
+                    self.server, task, router_name="nats_transport",
+                )
+                if (
+                    spine_receipt.status == "failed"
+                    and not spine_receipt.provider_attempted
+                ):
+                    # submit() raised pre-spine: preserve the exception →
+                    # nack contract of the original ingress path.
+                    raise NatsTransportError(
+                        spine_receipt.error_detail or "A2A submit failed"
+                    )
+            else:
+                result = task
             if result.status in {
                 A2ATaskStatus.FAILED,
                 A2ATaskStatus.REJECTED,

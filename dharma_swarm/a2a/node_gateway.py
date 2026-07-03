@@ -72,6 +72,7 @@ from dharma_swarm.a2a.a2a_server import (
     A2ATask,
     A2ATaskStatus,
 )
+from dharma_swarm.a2a.spine_adapter import submit_task_via_spine
 from dharma_swarm.a2a.agent_card import AgentCard, CardRegistry
 from dharma_swarm.daemon_config import dharma_state_dir
 
@@ -314,12 +315,22 @@ async def get_agent_card() -> JSONResponse:
 
 @router.post("/tasks", dependencies=[Depends(_verify_api_key)])
 async def submit_task_v1(request: Request) -> JSONResponse:
-    """Submit a task (A2A 1.0 spec path)."""
+    """Submit a task (A2A 1.0 spec path).
+
+    Spine-adopted: dispatches through the Runtime Truth Spine
+    (invoke_agent + exactly one EvidenceReceipt per submit).
+    """
     if _server is None:
         raise HTTPException(status_code=503, detail="Gateway not initialized")
     body = await request.json()
     task = _parse_task_from_body(body)
-    result = _server.submit(task)
+    result, receipt = await submit_task_via_spine(
+        _server, task, router_name="node_gateway",
+    )
+    if receipt.status == "failed" and not receipt.provider_attempted:
+        # Pre-spine contract: an internal submit() error surfaced as a 500,
+        # not a FAILED task payload. Preserve that boundary.
+        raise HTTPException(status_code=500, detail=receipt.error_detail or "submit failed")
     return JSONResponse(
         content=_task_to_dict(result),
         status_code=201 if result.status != A2ATaskStatus.FAILED else 422,
@@ -424,12 +435,20 @@ async def list_skills_v1() -> JSONResponse:
 
 @router.post("/a2a/tasks", dependencies=[Depends(_verify_api_key)])
 async def submit_task_legacy(request: Request) -> JSONResponse:
-    """Submit a task (legacy path)."""
+    """Submit a task (legacy path).
+
+    Spine-adopted: dispatches through the Runtime Truth Spine
+    (invoke_agent + exactly one EvidenceReceipt per submit).
+    """
     if _server is None:
         raise HTTPException(status_code=503, detail="Gateway not initialized")
     body = await request.json()
     task = _parse_task_from_body(body)
-    result = _server.submit(task)
+    result, receipt = await submit_task_via_spine(
+        _server, task, router_name="node_gateway",
+    )
+    if receipt.status == "failed" and not receipt.provider_attempted:
+        raise HTTPException(status_code=500, detail=receipt.error_detail or "submit failed")
     return JSONResponse(
         content=_task_to_dict(result),
         status_code=201 if result.status != A2ATaskStatus.FAILED else 422,
