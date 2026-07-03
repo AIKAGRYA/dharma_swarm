@@ -29,7 +29,7 @@ NOT mutable (loop write-access fenced to the genome dir; runner fails closed on 
 
 ## 4. The immutable eval
 
-The Improvement-2 arena harness, hash-pinned per campaign: sealed taskpack (rotating sealed holdouts), best-single-model control arm, strict budget parity (instrumented and asserted; run fails closed on parity break). **Selection metric:** significance-gated paired lift vs the best-single control. Reported but never selected on: cost, latency, Krogh-Vedelsby diversity term (`archive.py`), cross-seat error correlation. Market P&L is never a per-iteration signal (standing non-goal).
+The Improvement-2 arena harness, hash-pinned per campaign: sealed taskpack (rotating sealed holdouts), best-single-model control arm, strict budget parity (instrumented and asserted; run fails closed on parity break). **Selection metric:** significance-gated paired lift vs the best-single control. Reported but never selected on: cost, latency, Krogh-Vedelsby diversity term (owner: `dharma_swarm/transcendence_metrics.py`; the MAP-Elites diversity archive lives in `archive.py` — the 2026-07-03 roadmap's attribution of the KV term to `archive.py` is a recorded discrepancy), cross-seat error correlation. Market P&L is never a per-iteration signal (standing non-goal).
 
 ## 5. Ratchet mechanics
 
