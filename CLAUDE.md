@@ -291,7 +291,7 @@ For machine-readable status, see [`reports/governance/active_track_evidence.md`]
 - When governing: telos gates and VSM channels are necessary but must be LIGHT. System 2 (damping) > System 3 (mandates). The governance cost of a gate is measured in diversity loss.
 
 **Where this lives in the codebase**:
-- `archive.py` (`MAPElitesGrid`, wired into `DarwinEngine` via `EvolutionArchive`) — production diversity preservation; `diversity_archive.py` is an unwired standalone implementation (candidate for consolidation); `coordination/genome.py` has the arena's own MAP-Elites
+- `archive.py` (`MAPElitesGrid`, wired into `DarwinEngine` via `EvolutionArchive`) — production diversity preservation; MAP-Elites was consolidated here (D6a, 2026-07-02) and `diversity_archive.py` is now a deprecated re-export shim; `coordination/genome.py` has the arena's own MAP-Elites variant (shared-descriptor question still open)
 - `orchestrator.py` — topology-based routing (fan-out/fan-in/pipeline/broadcast)
 - `evolution.py` — DarwinEngine with diversity-preserving selection
 - `vsm_channels.py` — Beer's S1-S5 nervous system (light governance)
