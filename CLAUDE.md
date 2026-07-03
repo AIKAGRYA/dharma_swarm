@@ -310,11 +310,11 @@ python3 -m pytest tests/ -q
 # Run a single test file
 python3 -m pytest tests/test_cascade.py -q
 
-# Smoke test (fast subset)
-make test-smoke
+# Fast subset (10s per-test timeout, first failure stops)
+make test-fast
 
-# Full test suite
-make test-all
+# Standard suite (excludes slow/docker/network markers)
+make test
 
 # Static analysis / repo inventory
 make xray
