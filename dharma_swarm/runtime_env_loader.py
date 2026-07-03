@@ -188,20 +188,27 @@ def warn_on_split_key_stores(
     return names
 
 
+# Failures of the never-fatal hook steps, kept diagnosable (inspect from a
+# REPL / dgc doctor) instead of vanishing into debug logs.
+LAST_HOOK_ERRORS: list[str] = []
+
+
 def post_file_bootstrap_hook() -> None:
     """Steps the canonical bootstrap runs after loading env files.
 
     Called (late-imported) from api_keys.bootstrap_runtime_env(); must never
     raise — a broken keychain or unreadable .env cannot be allowed to take
-    down provider resolution.
+    down provider resolution. Failures are recorded in LAST_HOOK_ERRORS.
     """
     try:
         load_keychain_fallbacks()
-    except Exception:  # pragma: no cover - defensive
+    except Exception as exc:  # pragma: no cover - defensive
+        LAST_HOOK_ERRORS.append(f"keychain: {exc!r}")
         logger.debug("keychain fallback step failed", exc_info=True)
     try:
         warn_on_split_key_stores()
-    except Exception:  # pragma: no cover - defensive
+    except Exception as exc:  # pragma: no cover - defensive
+        LAST_HOOK_ERRORS.append(f"split-store-guard: {exc!r}")
         logger.debug("split-key-store guard failed", exc_info=True)
 
 
