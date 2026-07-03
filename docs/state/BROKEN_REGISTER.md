@@ -21,7 +21,7 @@
 
 ---
 
-## OPEN ITEMS (5 open/partial — re-verified 2026-06-15)
+## OPEN ITEMS (6 open/partial — BR-023 added 2026-07-03; rest re-verified 2026-06-15)
 
 > **Re-verification pass executed 2026-06-15 (perplexity-computer, Stage 1 EVIDENCE_ONLY):** the register had drifted 22 days since the 2026-05-24 git touch. All 5 OPEN items below have refreshed `last_verified` dates with a `re-verification 2026-06-15` note. No new BRs opened in this pass. No status flips: behavior on disk is unchanged for BR-003 / BR-004 / BR-005 / BR-013 / BR-014. Anti-Slop note: PROD-issue #521 cites this BR-003 as 'Owner doc' but its own owner doc `docs/governance/PROD_READINESS_TOP10.md` does not exist on any branch — BR-003 is real and tracked here; the PROD-issue is the orphan.
 
@@ -64,6 +64,17 @@
 - **blast_radius:** Organism cannot yet "feed itself" (no outward acted-receipt revenue loop) while the immune/governance layer keeps expanding uncosted. Risk is twofold: (a) vision tracks (campaigns, economic/legal/ecological build loops, recursive AI-building-AI) all sit downstream of an outward edge that has no owner; (b) ungoverned governance growth silently raises the coordination tax on every agent. Both are second-order, not blocking any single dispatch.
 - **evidence:** `docs/governance/ACTIVE_TRACK.yaml:61-63` (revenue objective, no serving track); `make onboard` render (spine objectives section: revenue + research-depth = no active track); `CLAUDE.md` Transcendence Principle ("Every governance mechanism must be evaluated against its diversity cost"); `dharma_swarm/diversity_archive.py` (Krogh-Vedelsby term exists, unwired to gate decisions). NOTE: claims (1) are ledger-confirmed; claim (2) is an asserted negative ("no instrument found") and must be verified by the working agent before action — search for any gate-cost/rent instrument before treating it as absent.
 - **status:** OPEN — shelved for a future agent per operator (2026-06-21). Two candidate work packets: (A) open a `revenue-external-humans-served` track with an owned outward surface + acted-receipt quorum (One Wire, N>=5/M>=3 per `loop-closure-2026-06`); (B) instrument per-gate metabolic rent (prevented-drift vs coordination-tax) so governance additions are decided against a measure, not a vibe. Do NOT auto-add governance to close this — that would deepen it.
+
+### BR-023 — Provider key-loading split-brain (four loaders, shadow stores, lying credit heuristic)
+- **first_observed:** 2026-07-03 (weeks of symptoms; formalized after tri-agent local audit + repo sweep)
+- **last_verified:** 2026-07-03
+- **age_days:** 0
+- **severity:** DEGRADED
+- **domain:** runtime / providers / ops
+- **root_cause:** Provider credential authority answered five questions with split owners and no parity: (1) key VALUES loaded by **four** loaders with two conflicting precedence semantics — `api_keys.bootstrap_runtime_env()` (never-overwrite) vs `scripts/load_runtime_env.sh` (`set -a` last-wins + keychain + narrower alias table) vs inline launchd plist snippets vs `~/.zshrc` — sharing one marker set in 2 places and checked in 1; (2) launchd plists bypassed both canon loaders; `com.dharma.swarm` did a no-op `source .env` (no `set -a`) while cron/semantic-responder plists `set -a; source` the project `.env` AFTER the vault, so a stale repo `.env` **shadowed** the vault's real `OPENAI_API_KEY` (observed live: 13-char placeholder over 164-char key); (3) liveness (`~/.dharma/keys_status.json`) written only by manual `dkeys test` on the Mac — stale (34h+), absent on the VPS, probe lighter than a real completion; (4) `scripts/check_provider_credits.py` measured env-presence + an UNWINDOWED log-grep whose regexes missed the live failure wording ("weekly usage limit"), so `likely_exhausted` was simultaneously sticky-forever for stale 402s and blind to the actually-capped chain-head (ollama); (5) the live fleet runs branch `agent/magpie-seed` (~330 behind main), so main describes a system that is not the one running. The `provider-routing-consolidation-2026-06` closeout (2026-06-30) explicitly deferred `.env.example` reconciliation (`docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md:128`) and its recommended successor track was never opened — this BR is that unowned residue.
+- **blast_radius:** Every seat (Mac daemons, VPS, cloud agents) computes a different answer to "which keys do we have / which lanes work"; agents repeatedly report "low on api keys" from heuristic echo; same host runs daemons with disjoint key sets; `chain=['ollama']` dispatch failures while the credit monitor reports 0 exhausted.
+- **evidence:** Tri-agent local audit 2026-07-03/04 (codex+, fable-5, fugu — length-13 vs length-164 OPENAI shadow proof; four-loader census; `swarm.err` weekly-usage-limit lines vs `likely_exhausted=0`); repo sweep same date (compose passed 3/17 lanes pre-fix; `tests/test_provider_env_parity.py` now guards that projection); `reports/governance/prod_readiness/PROD_GRADE_REVIEW_RESULTS_2026-06-22.md:234` (successor track demanded, never opened).
+- **status:** PARTIAL — repo-side slices landed 2026-07-03 on `claude/dharma-swarm-audit-rewire-gwo59q`: compose/.env.example/docs parity + registry-derived CI test; ONE-loader unification (`dharma_swarm/runtime_env_loader.py`: keychain step + split-store guard folded into `bootstrap_runtime_env()`; `load_runtime_env.sh` now a thin `emit-exports` wrapper with one precedence semantic; `com.dharma.swarm.plist` no longer sources `.env`); credit checker windowed (72h default) + patterns extended (429/usage-limit/resource-exhausted) + output labeled heuristic. REMAINING (operator/local): reinstall the fixed plist + fix the Mac-local cron/semantic-responder plists to stop `set -a` sourcing project `.env`; strip provider keys from the Mac repo `.env`; remove the ANTHROPIC→Kimi envelope from the vault (`KIMI_*` lanes already exist); put `dkeys test` on a clock and provide a keys_status writer on the VPS; converge `agent/magpie-seed` ↔ main. Do NOT add a new key store or a second registry to fix this.
 
 ### BR-004 — Cron split-brain (repo vs live)
 - **first_observed:** ≤ 2026-05-06
@@ -265,7 +276,9 @@
 
 ## ID Reservation
 
-Next id: `BR-020`. Append below. Do NOT renumber existing items.
+Next id: `BR-024`. Append below. Do NOT renumber existing items. (Reservation
+was stale at `BR-020` while BR-021/022 existed; corrected 2026-07-03 when
+BR-023 was filed.)
 
 ---
 
