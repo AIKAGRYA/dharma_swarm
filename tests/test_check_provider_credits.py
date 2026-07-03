@@ -48,3 +48,36 @@ def test_scan_logs_redacts_credit_error_excerpts(monkeypatch, tmp_path: Path) ->
     assert "sk-proj-sensitive123" not in excerpt
     assert "sk-or-v1-secret" not in excerpt
     assert "[REDACTED" in excerpt
+
+
+def test_scan_logs_ignores_files_outside_window(monkeypatch, tmp_path: Path) -> None:
+    import os as _os
+    import time as _time
+
+    stale = tmp_path / "stale.log"
+    stale.write_text("openai insufficient credits\n", encoding="utf-8")
+    week_ago = _time.time() - 7 * 24 * 3600
+    _os.utime(stale, (week_ago, week_ago))
+
+    fresh = tmp_path / "fresh.log"
+    fresh.write_text("groq: you have reached your weekly usage limit\n", encoding="utf-8")
+
+    results = {provider: {"credit_errors": []} for provider in cpc.PROVIDERS}
+    monkeypatch.setattr(cpc, "LOG_DIRS", [tmp_path])
+
+    cpc.scan_logs_for_credit_errors(results, window_hours=72.0)
+
+    # the week-old 402-style line no longer poisons the narrative...
+    assert results["openai"]["credit_errors"] == []
+    # ...while the live wording that previously matched nothing now counts
+    [excerpt] = results["groq"]["credit_errors"]
+    assert "weekly usage limit" in excerpt
+
+
+def test_new_exhaustion_wordings_match() -> None:
+    for line in (
+        "you have reached your weekly usage limit",
+        "HTTP 429 too many requests",
+        "RESOURCE_EXHAUSTED: quota",
+    ):
+        assert any(p.search(line) for p in cpc.CREDIT_ERROR_PATTERNS), line

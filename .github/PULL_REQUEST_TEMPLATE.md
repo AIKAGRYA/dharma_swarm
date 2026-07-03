@@ -60,8 +60,8 @@ A `pr-collision-detect` workflow runs on PR open and posts a warning comment if 
 
 How was the change verified end-to-end? Check all that apply.
 
-- [ ] `make test-smoke`
-- [ ] `make test-all` (full suite)
+- [ ] `make test-fast` (fast subset)
+- [ ] `make test` (standard suite)
 - [ ] `make semgrep` clean (or new findings triaged inline)
 - [ ] `make gitleaks` clean
 - [ ] `make docops-integrity` clean

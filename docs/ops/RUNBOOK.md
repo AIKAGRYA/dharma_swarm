@@ -121,8 +121,9 @@ secret acts is unattended via `scripts/ops/vps_cloud_init.yaml`:
 3. Two operator acts (the only manual steps, doable from GitHub mobile + one
    ssh session): add the printed deploy key to the repo (Settings → Deploy
    keys, write access OFF), and create `/root/dharma.env` from `.env.example`
-   with real provider keys (minimum: one of ANTHROPIC/OPENROUTER; optional:
-   `LITESTREAM_*`, `DEVIN_NATS_*`).
+   with real provider keys — ANY ONE live lane from `.env.example` goes live
+   (canonical lane registry: `dharma_swarm/api_keys.py`; e.g. KIMI, ZHIPU,
+   OPENROUTER, ANTHROPIC, GROQ…); optional: `LITESTREAM_*`, `DEVIN_NATS_*`.
 4. `bash /root/dharma_bootstrap.sh` — clones, builds,
    `docker compose --profile vps up -d`, waits for health, and prints the
    felt-proof `dgc spine tail`.

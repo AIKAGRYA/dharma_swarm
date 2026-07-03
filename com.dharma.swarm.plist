@@ -6,11 +6,17 @@
   <key>Label</key>
   <string>com.dharma.swarm</string>
 
+  <!-- Provider keys load in-process via dharma_swarm.api_keys
+       bootstrap_runtime_env() (vault ~/.dharma/agent_keys.env, keychain,
+       aliases: the ONE loader). Do NOT `source .env` here: without
+       `set -a` it was a no-op, and with it a project .env would SHADOW
+       vault keys (2026-07-03 audit: broken OPENAI key in sibling
+       daemons). Project .env is non-secret flags only on vault hosts. -->
   <key>ProgramArguments</key>
   <array>
     <string>/bin/bash</string>
     <string>-c</string>
-    <string>cd /Users/dhyana/dharma_swarm &amp;&amp; source .env &amp;&amp; TINY_ROUTER_BACKEND=heuristic dgc orchestrate-live</string>
+    <string>cd /Users/dhyana/dharma_swarm &amp;&amp; TINY_ROUTER_BACKEND=heuristic dgc orchestrate-live</string>
   </array>
 
   <key>WorkingDirectory</key>

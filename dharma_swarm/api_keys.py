@@ -303,6 +303,19 @@ def bootstrap_runtime_env(
         os.environ["DHARMA_RUNTIME_ENV_LOADED"] = "1"
         if include_files:
             load_runtime_env_files(env_paths or runtime_env_paths())
+        # Unified-loader steps (keychain fallback, split-key-store guard).
+        # Late import breaks the module cycle; failure here must never take
+        # down provider resolution.
+        try:
+            from dharma_swarm.runtime_env_loader import post_file_bootstrap_hook
+
+            post_file_bootstrap_hook()
+        except Exception:  # pragma: no cover - defensive
+            import logging
+
+            logging.getLogger(__name__).debug(
+                "runtime_env_loader post-bootstrap hook failed", exc_info=True
+            )
 
     return normalize_env_aliases()
 

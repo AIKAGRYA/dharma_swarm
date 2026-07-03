@@ -124,3 +124,5 @@ reports/model_pool/
 
 # Personal obey-plugin rule state belongs outside the repo.
 .claude/obey.rules.local.json
+xray_report.json
+xray_report.md

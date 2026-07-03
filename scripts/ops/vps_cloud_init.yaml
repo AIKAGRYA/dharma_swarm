@@ -74,7 +74,9 @@ write_files:
          ${PUB}
 
       2. SECRETS — create /root/dharma.env (copy of .env.example with real
-         values). Minimum to go live: ANTHROPIC_API_KEY or OPENROUTER_API_KEY.
+         values). ANY ONE live provider lane goes live (KIMI_API_KEY,
+         ZHIPU_API_KEY, OPENROUTER_API_KEY, ANTHROPIC_API_KEY, GROQ_API_KEY,
+         ... — full list in .env.example; registry: dharma_swarm/api_keys.py).
          Optional now: LITESTREAM_* for off-host state replication,
          DEVIN_NATS_* to join the AGNI hub.
 
