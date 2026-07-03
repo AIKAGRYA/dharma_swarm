@@ -303,8 +303,13 @@ class PersistentAgent:
             if urgent:
                 top = urgent[0]
                 await self._task_queue.put(
-                    f"Urgent message from {top.from_agent}: {top.subject}"
+                    f"Urgent message from {top.from_agent}: {top.subject} — {top.body[:500]}"
                 )
+                # The queued task now carries the message body, so marking
+                # read here is a terminal disposition — wake() consumes the
+                # queued task, not the (now-read) bus row. Other previewed
+                # messages stay unread (act-then-mark).
+                await bus.mark_read(top.id)
                 return f"urgent={len(urgent)}, queued_response"
             return f"inbox={len(msgs)}, no_urgent"
         except Exception as exc:
@@ -386,6 +391,13 @@ class PersistentAgent:
                 top_msg = messages[0]
                 task_text = f"Respond to message from {top_msg.from_agent}: {top_msg.subject} — {top_msg.body[:300]}"
                 task_source = "message"
+                # Adopted as this cycle's task. Deferred act-then-mark: read
+                # status is recorded only once the message reaches a terminal
+                # disposition (wake succeeded, or gate refused it — witnessed),
+                # so a wake() crash leaves it unread for retry next cycle. A
+                # gate refusal still marks read, else a poison message would
+                # outrank self-tasks and wedge every future wake.
+                adopted_msg_id = top_msg.id
             else:
                 task_text = self._generate_self_task(hot_paths, salient_marks)
                 task_source = "self"
@@ -411,6 +423,8 @@ class PersistentAgent:
                 result_info["blocked"] = True
                 result_info["gate_reason"] = gate_outcome.get("reason", "")
                 await self._write_witness("BLOCKED", task_text, gate_outcome.get("reason", ""))
+                if task_source == "message":
+                    await bus.mark_read(adopted_msg_id)
                 return result_info
             if gate_outcome:
                 self._profile.record_gate(passed=True)
@@ -419,6 +433,11 @@ class PersistentAgent:
 
             # 8. Execute via AutonomousAgent ReAct loop
             agent_result: AgentResult = await self._agent.wake(task_text)
+
+            # Wake succeeded — the adopted message reached its terminal
+            # disposition; acknowledge it now (deferred act-then-mark).
+            if task_source == "message":
+                await bus.mark_read(adopted_msg_id)
 
             # 9. Save learnings
             key_insight = self._extract_key_insight(agent_result.summary)

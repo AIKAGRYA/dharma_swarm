@@ -422,6 +422,7 @@ def default_reviewed_write_baseline() -> tuple[ReviewedWriteBaselineEntry, ...]:
         ReviewedWriteBaselineEntry('scripts/loop4_10_memory_context_closure_run.py', 'run_loop10', 'path_write', '51891e41d1c9', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/loop4_10_memory_context_closure_run.py', 'run_replay', 'path_write', '84f88386c2bb', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/loop5_zeitgeist_closure_run.py', 'main', 'path_write', 'eebcfa85ce76', 'generated_artifact', occurrences=1),
+        ReviewedWriteBaselineEntry('scripts/loop5b_world_radar_closure_run.py', 'main', 'path_write', 'eebcfa85ce76', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/loop6_witness_closure_run.py', 'main', 'path_write', 'eebcfa85ce76', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/loop8_recognition_closure_run.py', '_write_interpreted_history', 'path_write', '3efe0bf9f8c6', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/merge_snapshot.py', 'write_canonical_outputs', 'path_write', 'b75b71c07cd1', 'generated_artifact', occurrences=1),

@@ -76,6 +76,22 @@ Bounded Loop 1 replay proof (current code/provider lane):
 
 | # | Loop | Interval | Current Verdict | Remaining Live-Closure Blocker |
 |---|------|----------|---------|-------------------|
+| 1 | Swarm Task Loop | 60s | **CLOSED in bounded replay; PARTIAL in all-history audit** | Current bounded replay closes with 3/3 completed tasks, zero dropoff, 3 ok evidence receipts, and served provider/model truth. Standing all-history audit still includes historical `dispatch_dropoff=1486`, so do not call the whole daemon history clean. |
+| 2 | Organism Heartbeat | 300s | **CLOSED in bounded replay; PARTIAL in standing daemon history** | `reports/loop_closure/cybernetics_codex/2026-06-23_loop2_heartbeat_closure.json` proves 3 cycles, all transitions receipted, and algedonic adaptive state feeding the next cycle; the always-on daemon history is still not cleanly closed. |
+| 3 | Evolution Loop / DarwinEngine | every 3rd tick | **PARTIAL** | Activity exists, but adaptation/fitness authority is not closure-proven. |
+| 4 | Consolidation Loop / Memory | configurable | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
+| 5 | Zeitgeist Scanner | configurable | **CLOSED in bounded replay (internal S3↔S4 arm only)** | `scripts/loop5_zeitgeist_closure_run.py` proves real internal gate-pressure feedback. This is not external-world zeitgeist closure; no real-world/external eyes are proven. |
+| 5b | World Radar Go chain (external arm) | configurable | **CLOSED in bounded replay (fixture observation, no live fetch)** | `scripts/loop5b_world_radar_closure_run.py` proves the Go sense-organ chain fixture→ingestor→receipt→feed projection end-to-end (host-aware: reports NEEDS_HOST without Go binary/toolchain). Live public-source fetch closure is still unproven. |
+| 6 | Witness Auditor | 3600s | **CLOSED in bounded replay** | Bounded replay closes Loop 6: orchestrator now lands task_completed traces, the Witness senses real completions, flags telos-gate-coverage gaps, and appends governance marks (adapt fed forward). `scripts/loop6_witness_closure_run.py`. |
+| 7 | Training Flywheel | 300s | **PARTIAL** | Activity exists, but adaptation/fitness authority is not closure-proven. |
+| 8 | Recognition Loop / eigenform | 7200s | **PARTIAL** | Activity exists, but adaptation/fitness authority is not closure-proven. |
+| 9 | Conductors | 120s | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
+| 10 | Context Agent | 60s | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
+| 11 | Replication Monitor | 3600s | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
+| 12 | Self-Improvement | 3600s | **BLOCKED** | One Wire guardian quorum below threshold: N=3/5, M=1/3. |
+| 13 | Free Evolution Grind | 600s | **BLOCKED** | One Wire guardian quorum below threshold: N=3/5, M=1/3. |
+
+**Summary: standing all-history audit is still 0 fully clean. Bounded replay currently closes Loops 1, 2, 5, 5b, and 6 (Loop 5 internal-arm-only; Loop 5b covers the external Go chain on a committed fixture, not live fetch); Loops 3/4/7/8/9/10/11 remain PARTIAL; Loops 12/13 remain BLOCKED behind One Wire. Do not promote bounded-replay closure to always-on daemon closure without fresh live-loop evidence.**
 | 1 | Swarm Task Loop | 60s | **HARNESS_PROVEN; not CLOSED_LIVE** | Current bounded replay proves 3/3 completed tasks, zero replay dropoff, 3 ok evidence receipts, and served provider/model truth. Standing all-history audit still includes historical `dispatch_dropoff`, so do not call the daemon history clean. |
 | 2 | Organism Heartbeat | 300s | **HARNESS_PROVEN; not CLOSED_LIVE** | Receipt proves 3 harness cycles and fed-forward algedonic state. Live closure still needs standing daemon pulse/algedonic owner-surface evidence consumed by a later daemon cycle. |
 | 3 | Evolution Loop / DarwinEngine | every 3rd tick | **HARNESS_PROVEN; not CLOSED_LIVE** | Receipt proves scratch Darwin outcomes feed predictor/archive selection without touching live archive fitness. Live closure still needs governed non-scratch evolution owner-surface evidence. |
@@ -245,6 +261,33 @@ ADAPT:   Next cycle: telos gates read gate_pressure.json and adjust strictness
 
 **Current state (updated 2026-07-02): HARNESS_PROVEN, not CLOSED_LIVE, for the internal S3/S4 arm only.** `scripts/loop5_zeitgeist_closure_run.py` drives gate checks on harmful actions through the `TelosGatekeeper` (each BLOCK lands a `BLOCKED` witness entry), the `InternalPressureScanner` reads the block rate, a high block rate becomes a threat signal, `_write_gate_pressure` writes `gate_pressure.json`, and the gatekeeper's `_apply_gate_pressure` resolves trust mode `internal_yolo -> external_strict` on its next check. This does **not** prove real-world/external zeitgeist sensing.
 
+#### Loop 5b: World Radar Go chain (external arm)
+
+```
+SENSE:   go_bridge.run_world_radar_go_once() collects raw world observations
+         (operator drops, world feeds, optional world_scout_go fetch)
+ACT:     tools/world_signal_ingestor_go (prebuilt binary or `go run .`)
+         normalizes observations into scored signals; --min-score gate drops
+         low-signal rows; one go_evidence_receipt.v0 per accepted signal
+         lands in ~/.dharma/go_receipts/world/
+EVALUATE: receipt_bridge summarizes receipts; project_world_signal_receipts
+         projects accepted receipts back into the world-signal feed
+ADAPT:   the next pass's board/brief/health are rebuilt from receipt-projected
+         rows; per-source failures surface as structured `source_errors` in
+         world_radar_health.json and the control-surface `go.world_radar_health`
+         row; invocation mode (binary vs go_run) is receipted in health
+```
+
+**Current state (updated 2026-07-02, organism-rewire-2026-07): CLOSED via bounded replay on a committed fixture observation (no live fetch).** `scripts/loop5b_world_radar_closure_run.py` runs the REAL Go ingestor via `go_bridge` on `tests/fixtures/world_radar_go/loop5b_observations.jsonl`: fixture read (sense), Go process scores signals (interpret), min-score drops the noise row — emitted < raw (constrain), exactly one EvidenceReceipt per emitted signal with summarize + feed projection matching (act), and the receipt store grows across cycles while `world_radar_health.ingest_run_id` changes, fed forward into the next pass's board (adapt). Receipt: `reports/loop_closure/cybernetics_codex/2026-07-02_loop5b_world_radar_closure.json` (LOOP5B_CLOSED=yes, invocation_mode=binary). The check is HOST-AWARE per the rewire doctrine: on a host with neither a prebuilt binary (`make go-build`) nor a Go toolchain it reports `NEEDS_HOST` and exits 0 instead of failing. Live public-source fetch (world_scout_go against the network) is explicitly **not** proven by this closure.
+
+Verification:
+
+```bash
+make go-build   # optional: prebuilt binaries; falls back to `go run .`
+python3 scripts/loop5b_world_radar_closure_run.py --cycles 2
+# expect LOOP5B_CLOSED=yes (or NEEDS_HOST on a host without Go)
+```
+
 ---
 
 ### Loop 6: Witness Auditor (Random Audit)
@@ -355,6 +398,9 @@ dgc memory  # memory entries > 0
 
 # Loop 5: Did zeitgeist find signals?
 dgc loops  # Check signal bus status
+
+# Loop 5b: Does the world-radar Go chain close on a fixture?
+python3 scripts/loop5b_world_radar_closure_run.py  # LOOP5B_CLOSED=yes (or NEEDS_HOST)
 
 # Loop 6: Did witness produce observations?
 ls ~/.dharma/witness/  # witness log files exist with real agent actions

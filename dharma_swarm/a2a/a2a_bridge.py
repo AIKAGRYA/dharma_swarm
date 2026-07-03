@@ -15,6 +15,8 @@ TRISHULA and agents using A2A can coexist and communicate.
 
 from __future__ import annotations
 
+import asyncio
+import concurrent.futures
 import json
 import logging
 from datetime import datetime, timezone
@@ -206,6 +208,25 @@ class A2ABridge:
         result_task = self._server.get_task(task.id) or task
         return result_task, receipt
 
+    def _submit_via_spine_sync(
+        self,
+        task: A2ATask,
+    ) -> tuple[A2ATask, EvidenceReceipt]:
+        """Run :meth:`submit_via_spine` from a synchronous caller.
+
+        Uses ``asyncio.run()`` when no event loop is running.  If called
+        from within a running loop (a sync method invoked inside async
+        code), the coroutine executes on a dedicated worker thread with
+        its own loop so the running loop is never blocked on itself.
+        """
+        coro = self.submit_via_spine(task)
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(coro)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(asyncio.run, coro).result()
+
     # -- TRISHULA -> A2A (inbound) ------------------------------------------
 
     def trishula_message_to_a2a_task(
@@ -278,8 +299,10 @@ class A2ABridge:
         """Read TRISHULA inbox files and convert to A2A tasks.
 
         Reads JSON files from the inbox, converts each to an A2ATask,
-        and submits to the A2A server. Does NOT delete or move the files
-        (that's still TrishulaBridge's responsibility for backward compat).
+        and submits through the Runtime Truth Spine (``submit_via_spine``),
+        so every ingested dispatch emits exactly one ``EvidenceReceipt``.
+        Does NOT delete or move the files (that's still TrishulaBridge's
+        responsibility for backward compat).
 
         Args:
             inbox_path: Path to TRISHULA inbox. Defaults to ~/trishula/inbox.
@@ -304,13 +327,24 @@ class A2ABridge:
                     continue
 
                 task = self.trishula_message_to_a2a_task(data)
-                submitted = self._server.submit(task)
+                submitted, receipt = self._submit_via_spine_sync(task)
+                if receipt.status == "failed" and not receipt.provider_attempted:
+                    # Spine invoker caught a submit() exception: the task was
+                    # never dispatched.  Preserve the pre-spine contract —
+                    # warn and skip, do not report it as submitted.
+                    logger.warning(
+                        "Failed to ingest trishula message %s: %s",
+                        path.name,
+                        receipt.error_detail,
+                    )
+                    continue
                 tasks.append(submitted)
                 self._emit_signal(SIGNAL_A2A_TASK_SUBMITTED, {
                     "task_id": submitted.id,
                     "from": submitted.from_agent,
                     "to": submitted.to_agent,
                     "source": "trishula",
+                    "receipt_id": receipt.receipt_id,
                 })
             except Exception as exc:
                 logger.warning("Failed to ingest trishula message %s: %s", path.name, exc)

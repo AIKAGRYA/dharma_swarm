@@ -48,7 +48,7 @@ The governing principle: each track ships **one seam, end-to-end, with gates and
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active portfolio:** 4 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
+**Active portfolio:** 5 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
 
 **Spine objectives (each track serves one):**
 
@@ -79,7 +79,7 @@ status is main's standing declaration and is left to the operator.
 
 **Next items:**
 
-- [code] (blocker) Wire a2a_bridge.submit_via_spine into production dispatch (ingest_trishula_inbox bypass at a2a_bridge.py:307 — Slice 2 per scripts/governance/spine_bypass_report.py).
+- [code] DONE 2026-07-02: a2a_bridge.submit_via_spine wired into production dispatch — ingest_trishula_inbox (Slice 2) now dispatches through submit_via_spine (invoke_agent + exactly one EvidenceReceipt per ingest); the a2a_bridge.py:307 allowlist entry removed from scripts/governance/spine_bypass_report.py (intentional bypasses 5→4) and the spine_bypass_entries ratchet baseline lowered to 4.
 - [code] (blocker) orchestrator.py dispatch through invoke_agent behind DHARMA_SPINE_DISPATCH (landed via #557; operator confirms one live EvidenceReceipt on a real dispatch = GATE 1).
 - [code] (blocker) Migrate agent_runner.py run_task through invoke_agent(). Largest surface, last.
 - [code] (blocker) Drain the intentional-bypass allowlist (node_gateway submit endpoints, a2a_client._dispatch_local) and enable allow-list-at-zero in uplift_guards CI.
@@ -227,6 +227,49 @@ Doctrine that MUST hold (the gate's safety floor is never weakened):
 - Do not commit provider/API credentials; the credentialed Claude reviewer Action is operator-provisioned.
 - Do not accept a "review" from an untrusted login as a receipt; only trusted installed reviewer-App logins.
 - Do not create a new merge authority or receipt store; extend pr_merge_control and the existing workflows.
+
+### Organism Rewire — dormant organs to production, spine standing-on, external gradients
+
+**Track id:** `organism-rewire-2026-07` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-07-02 (TTL 21 days)
+**Relations:** complements: runtime-truth-spine-adoption-2026-06, loop-closure-2026-06, orchestration-arena-v1-2026-06
+**Owns surfaces:** tools/world_scout_go/**, tools/world_signal_ingestor_go/**, tools/github_ingestor_go/**, tools/evidence_ingestor_go/**, dharma_swarm/world_radar/**, dharma_swarm/organism.py, dharma_swarm/strange_loop.py, dharma_swarm/diversity_archive.py, dharma_swarm/archive.py, docker-compose.yml, Dockerfile.swarm
+**Moves vital signs:** quality_gates, eval_coverage
+
+Operator-ratified 2026-07-02 from the verified full-organism sweep
+(29 agents: 9 scanners, 16 adversarial verifiers, 3 judges; dossier in
+the sweep session). Converts the sweep's confirmed findings into wiring:
+the truth spine becomes standing-on (invariant provenance, not policy),
+the Go sense organs become known-working and closure-checked, the
+dormant organs (Organism/StrangeLoop via composition root, MAP-Elites
+consolidation, living-agent kernel earn-in) reach production, and the
+operator gains a felt, live view of the spine (receipt tail + cockpit
+pulse). Fitness doctrine ratified alongside: a PORTFOLIO of external
+gradients (verified benchmarks for high-iteration autoresearch loops,
+market P&L as funding + slow-horizon term only, paid human work as the
+C3 leg) — diversity of objective functions on the same math as
+diversity of agents.
+
+**Next items:**
+
+- [code] (blocker) D1 (blocker): DHARMA_SPINE_DISPATCH=1 standing in docker-compose swarm service (+ documented Mac plist env path); Loop-1 closure reads LIVE persistently on the daemon host.
+- [code] Spine visibility: `dgc spine tail` (live EvidenceReceipt stream) + read-only cockpit pulse panel (receipts/hour, last-receipt age, dropoff count) so the operator can SEE and FEEL the spine working.
+- [code] Go sense-organ hardening + Loop 5b: compiled-binary or toolchain-checked invocation, per-source errors surfaced to cockpit, github_ingestor live trigger (go-g04), and a host-aware closure check covering the Go chain in the loop map.
+- [ops] VPS shift: daemon (compose swarm service + NATS + litestream state replication) onto an always-on VPS; Mac demotes to dev seat/mirror. Operator provisions host + secrets.
+- [docs] D2 spec-first: memory position earned by evidence class (receipt-backed+TTL facts may go first-token), routing-time memory (kernel informs seat selection), diversity-preserving kernel sampling for worker seats. Spec then canary before flipping C5.
+- [code] D6a: consolidate MAP-Elites on archive.MAPElitesGrid; retire/absorb diversity_archive.py; arena keeps its genome-descriptor variant only if descriptors are shared.
+- [code] D5: Organism as composition root over SwarmManager (review + harden to EARN god-module status); StrangeLoop gains a production entry point.
+- [docs] External-gradient portfolio spec (dedicated session): >=6 autoresearch nodes (arena/genome, router policy, prompt/policy evolution, memory promotion policy, gate calibration, AND the R_V/self-reference-attractor research lane — NORTH_STAR §2's measurable-awareness claim gets an owned, receipted eval loop again after the COLM calendar death) each with frozen eval + mutation operator + diversity-preserving selection + receipts; benchmark loops iterate at volume, market P&L funds but never selects per-iteration. Next track after this one lands MUST serve revenue-external-humans-served (NORTH_STAR §11 90-day: 'funds itself totally').
+- [code] (blocker) D4 (sequenced LAST): BR-003 mechanism test (one canonical run, DHARMA_EVOLUTION_SHADOW=0, rollback receipt), standing unlock only after items 1+8 provide ungameable selection signal.
+- [code] D6b: living_agent_kernel earn-in — activate 2-3 kernels post-D1 (receipted wakes visible in presence), monitor, individually graduate to always-on.
+
+**Non-goals:**
+
+- Do not weaken, remove, or bypass any telos gate or ratchet to wire an organ (gates are hardest exactly when revenue/deadline pressure arrives).
+- Do not let market P&L act as per-iteration selection signal; funding + slow-horizon term only.
+- Do not unlock DarwinEngine standing apply before the external-gradient signal exists (item 9 sequencing is doctrine).
+- Do not broadcast identical first-token memory to worker seats; decorrelation of priors is preserved by design.
+- Do not touch surfaces owned by the four sibling tracks except through their own next-items.
 
 **Recently closed tracks:**
 

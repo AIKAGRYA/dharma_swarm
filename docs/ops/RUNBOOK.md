@@ -95,6 +95,43 @@ launchctl load ~/Library/LaunchAgents/com.dharma.swarm.plist
 launchctl unload ~/Library/LaunchAgents/com.dharma.swarm.plist
 ```
 
+**Spine dispatch (D1, organism-rewire-2026-07):** the Docker `swarm` service sets
+`DHARMA_SPINE_DISPATCH=1` standing. The launchd/Mac daemon does NOT inherit compose
+env, so set it on the daemon host too — either add a `<key>EnvironmentVariables</key>`
+dict to the plist (`<key>DHARMA_SPINE_DISPATCH</key><string>1</string>`) or run
+`launchctl setenv DHARMA_SPINE_DISPATCH 1` before load (a repo `.env` also works when
+launching via `make boot`). Confirm with `dgc spine tail` — receipts should appear.
+
+### 3e. VPS deployment (organism-rewire-2026-07 item 4 — Mac demotes to dev seat)
+
+The compose stack (`web` + `swarm` + `cron`, persistent `dharma-state` volume,
+`swarm` service already carries `DHARMA_SPINE_DISPATCH=1` and
+`restart: unless-stopped`) is the deployment unit. Operator provisions the host
+and secrets; everything else is these steps:
+
+```bash
+# on the VPS (Ubuntu, docker + compose plugin installed; 2GB RAM is enough to start)
+git clone https://github.com/AmitabhainArunachala/dharma_swarm && cd dharma_swarm
+cp .env.example .env    # then fill: provider keys (dkeys export), DEVIN_NATS_PW if bridging AGNI
+docker compose up -d --build
+docker compose exec swarm dgc spine tail --limit 5   # felt-proof: receipts flowing
+curl -s localhost:7433/health                        # daemon health
+```
+
+Notes:
+- **NATS**: the AGNI hub (`wss://157.245.193.15:8443`, stream `DHARMA_A2A`) already
+  runs on a VPS — this host connects OUT to it (set the `DEVIN_NATS_*` env vars);
+  no local broker service is required unless mirroring the Mac-local `DHARMA_FLEET`.
+- **State durability**: `dharma-state` is a named volume. For off-host replication,
+  run litestream against the volume's `runtime.db` (the Mac litestream plist config
+  is the template; on the VPS use the litestream Docker sidecar or a systemd unit).
+  Snapshot cadence matters more than realtime here — receipts are append-heavy.
+- **Verification from anywhere**: once up, `make orient` on any checkout pointing at
+  the same state (or the cockpit `spine.pulse` row via the web service) shows Loop-1
+  LIVE; the Mac daemon can then be unloaded (`make stop`) and kept as a dev mirror.
+- **Not automated on purpose**: host provisioning, `.env` secrets, and DNS/firewall
+  are operator acts — no credentials in the repo, ever.
+
 ## 4. Health Checks
 
 ### Quick status

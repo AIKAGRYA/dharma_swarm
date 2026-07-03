@@ -36,3 +36,6 @@ def test_agent_registry_presence_flags_stale_heartbeats(tmp_path: Path) -> None:
     missing = next(a for a in agents if a.agent_uid == "fable_composer")
     assert missing.status == "missing"
     assert missing.heartbeat_status == "RED"
+    fable_cc = next(a for a in agents if a.agent_uid == "fable_claude_code")
+    assert fable_cc.status == "missing"
+    assert fable_cc.heartbeat_status == "RED"
