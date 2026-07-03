@@ -1,0 +1,19 @@
+{
+  "candidates": 2191,
+  "cutoff": "2026-07-02T00:00:00Z",
+  "db_path": "/Users/dhyana/.dharma/state/runtime.db",
+  "dropoff_fresh_live_kept": 0,
+  "dropoff_live_after": 0,
+  "dropoff_live_before": 2191,
+  "dropoff_quarantined_prior": 0,
+  "dropoff_quarantined_total_after": 2191,
+  "dropoff_undated_kept": 0,
+  "executed": true,
+  "generated_at": "2026-07-03T14:38:49.532453Z",
+  "present": true,
+  "quarantined_at": "2026-07-03T14:38:49.540655Z",
+  "quarantined_now": 2191,
+  "quarantined_rowids_sha256": "01b11c825dfaad656ce20f2fd925e0f092da5dac4d55e537dd23adc618471a8f",
+  "reason": "historical dispatch_dropoff predating spine-dispatch fixes; quarantined for the all-history daemon-clean claim (loop-closure-2026-06 residual)",
+  "tool": "dispatch_dropoff_quarantine"
+}
