@@ -24,6 +24,7 @@ Grounding:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import time
@@ -799,6 +800,7 @@ class NeuralConsolidator:
         """
         self._corrections_dir.mkdir(parents=True, exist_ok=True)
         applied = 0
+        duplicates_dropped = 0
         agents_updated: set[str] = set()
 
         for correction in corrections:
@@ -817,9 +819,18 @@ class NeuralConsolidator:
 
             for agent_name in agents_to_update:
                 path = self._corrections_dir / f"{agent_name}.md"
-                self._append_correction(path, correction)
-                agents_updated.add(agent_name)
-                applied += 1
+                if self._append_correction(path, correction):
+                    agents_updated.add(agent_name)
+                    applied += 1
+                else:
+                    duplicates_dropped += 1
+
+        if duplicates_dropped:
+            logger.info(
+                "Neural consolidation: dropped %d exact-duplicate correction(s) "
+                "(idempotency key already present in target file)",
+                duplicates_dropped,
+            )
 
         # Expire old corrections
         expired = self._expire_old_corrections()
@@ -828,17 +839,52 @@ class NeuralConsolidator:
             "corrections_applied": applied,
             "agents_updated": sorted(agents_updated),
             "corrections_expired": expired,
+            "duplicates_dropped": duplicates_dropped,
         }
 
-    def _append_correction(self, path: Path, correction: BehavioralCorrection) -> None:
-        """Append a correction to an agent's correction file."""
-        existing = path.read_text() if path.exists() else ""
+    @staticmethod
+    def _correction_body(correction: BehavioralCorrection) -> str:
+        """Timestamp-free rendered body of one correction entry.
 
-        entry = (
-            f"\n## Correction ({correction.timestamp})\n"
+        This is the dedup identity surface: two emissions with the same body
+        targeting the same file are exact duplicates regardless of when the
+        consolidation cycle emitted them.
+        """
+        return (
             f"**Source**: {correction.source} | **Confidence**: {correction.confidence:.2f}\n"
             f"**Evidence**: {correction.evidence}\n\n"
             f"{correction.correction}\n"
+        )
+
+    @classmethod
+    def correction_idempotency_key(
+        cls, target_name: str, correction: BehavioralCorrection,
+    ) -> str:
+        """Stable hash of correction content + target (the idempotency key)."""
+        payload = f"{target_name}\n{cls._correction_body(correction)}"
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+    def _append_correction(self, path: Path, correction: BehavioralCorrection) -> bool:
+        """Append a correction to an agent's correction file.
+
+        Returns True when the entry was appended, False when it was dropped
+        as an exact duplicate. Duplicate = the idempotency key (stable hash
+        of correction content + target) is already stamped in the file, or a
+        legacy unkeyed entry with the identical body already exists. Entries
+        differing in any content field (evidence, confidence, source, text)
+        are not duplicates and still append.
+        """
+        existing = path.read_text() if path.exists() else ""
+        body = self._correction_body(correction)
+        key = self.correction_idempotency_key(path.stem, correction)
+
+        if f"**Key**: {key}" in existing or body in existing:
+            return False
+
+        entry = (
+            f"\n## Correction ({correction.timestamp})\n"
+            f"**Key**: {key}\n"
+            f"{body}"
         )
 
         # Prepend header if file is new
@@ -853,6 +899,7 @@ class NeuralConsolidator:
             existing = header
 
         path.write_text(existing + entry)
+        return True
 
     def _expire_old_corrections(self) -> int:
         """Remove correction files older than TTL."""
