@@ -99,3 +99,54 @@ def test_harvest_loop_imports_validated_rows_and_receipts_closeout(tmp_path: Pat
     assert payload["imported_count"] == 1
     assert payload["validation_receipt_count"] == 1
     assert payload["authority"]["archive_fitness_mutated"] is False
+
+
+def test_harvest_loop_dedupes_candidates_across_cycles(tmp_path: Path) -> None:
+    validation_invocations = 0
+
+    def fake_runner(argv: Sequence[str], _cwd: Path, _timeout: int) -> pr_suite_harvest_loop.CommandResult:
+        nonlocal validation_invocations
+        args = list(argv)
+        if "forge_pr_suite_harvester.py" in args[1]:
+            out = Path(args[args.index("--out") + 1])
+            out.write_text(
+                json.dumps(
+                    {
+                        "repo": "example/project",
+                        "pr_number": 7,
+                        "base_sha": "base",
+                        "head_sha": "head",
+                        "merge_commit_sha": "merge",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            return pr_suite_harvest_loop.CommandResult(args, 0, json.dumps({"candidate_count": 1}))
+        if "forge_pr_suite_validator.py" in args[1]:
+            validation_invocations += 1
+            out = Path(args[args.index("--out") + 1])
+            out.write_text("", encoding="utf-8")
+            assert "candidates_unique_c00" in args[args.index("--manifest") + 1]
+            return pr_suite_harvest_loop.CommandResult(args, 1, json.dumps({"validated_count": 0, "failed_count": 1}))
+        raise AssertionError(f"unexpected command: {args}")
+
+    closeout = pr_suite_harvest_loop.run_harvest_loop(
+        root=tmp_path,
+        repo_root=tmp_path,
+        db_path=tmp_path / "taskbed.db",
+        run_id="loop-dedupe",
+        repos=["example/project"],
+        duration_seconds=60,
+        max_cycles=2,
+        sleep_seconds=0,
+        command_runner=fake_runner,
+        sleep_fn=lambda _seconds: None,
+    )
+
+    assert validation_invocations == 1
+    assert closeout["candidate_count"] == 2
+    assert closeout["unique_candidate_count"] == 1
+    assert closeout["seen_candidate_count"] == 1
+    events = [event["event"] for event in closeout["events"]]
+    assert "validation_skipped_no_new_candidates" in events

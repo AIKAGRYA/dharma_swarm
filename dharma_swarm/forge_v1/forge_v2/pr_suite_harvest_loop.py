@@ -81,6 +81,70 @@ def _line_count(path: Path) -> int:
     return sum(1 for line in path.read_text(encoding="utf-8").splitlines() if line.strip())
 
 
+def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    if not path.exists():
+        return rows
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        payload = json.loads(line)
+        if isinstance(payload, dict):
+            rows.append(payload)
+    return rows
+
+
+def _write_jsonl(path: Path, rows: Sequence[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(
+        "".join(json.dumps(row, sort_keys=True, default=str) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+    tmp.replace(path)
+
+
+def candidate_key(row: dict[str, Any]) -> str:
+    """Stable identity for one harvested PR candidate across loop cycles."""
+
+    return "|".join(
+        str(row.get(key) or "").strip()
+        for key in ("repo", "pr_number", "base_sha", "head_sha", "merge_commit_sha")
+    )
+
+
+def _load_seen_candidate_keys(path: Path) -> set[str]:
+    return {str(row.get("candidate_key") or "").strip() for row in _read_jsonl(path) if row.get("candidate_key")}
+
+
+def _append_seen_candidate_keys(path: Path, rows: Sequence[dict[str, Any]], *, cycle: int) -> int:
+    existing = _load_seen_candidate_keys(path)
+    additions: list[dict[str, Any]] = []
+    for row in rows:
+        key = candidate_key(row)
+        if not key or key in existing:
+            continue
+        additions.append(
+            {
+                "schema": f"{SCHEMA_VERSION}.seen_candidate",
+                "candidate_key": key,
+                "repo": row.get("repo"),
+                "pr_number": row.get("pr_number"),
+                "base_sha": row.get("base_sha"),
+                "head_sha": row.get("head_sha"),
+                "merge_commit_sha": row.get("merge_commit_sha"),
+                "cycle": cycle,
+                "seen_at": utc_now(),
+            }
+        )
+        existing.add(key)
+    if additions:
+        with path.open("a", encoding="utf-8") as handle:
+            for item in additions:
+                handle.write(json.dumps(item, sort_keys=True, default=str) + "\n")
+    return len(additions)
+
+
 def _json_from_stdout(stdout: str) -> dict[str, Any]:
     text = stdout.strip()
     if not text:
@@ -190,6 +254,7 @@ def run_harvest_loop(
     root = Path(root).expanduser() / run_id
     root.mkdir(parents=True, exist_ok=True)
     log_path = root / "loop.log"
+    seen_candidates_path = root / "seen_candidates.jsonl"
     started = time.time()
     deadline = started + duration_seconds
     events: list[dict[str, Any]] = []
@@ -215,6 +280,7 @@ def run_harvest_loop(
     while time.time() < deadline and cycle < max_cycles:
         stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
         candidates_path = root / f"candidates_c{cycle:02d}_{stamp}.jsonl"
+        unique_candidates_path = root / f"candidates_unique_c{cycle:02d}_{stamp}.jsonl"
         validated_path = root / f"validated_c{cycle:02d}_{stamp}.jsonl"
 
         harvest_cmd = [
@@ -251,11 +317,44 @@ def run_harvest_loop(
         events.append(harvest_event)
 
         if candidates_path.exists() and candidates_path.stat().st_size > 0:
+            candidate_rows = _read_jsonl(candidates_path)
+            seen_keys = _load_seen_candidate_keys(seen_candidates_path)
+            unique_rows = [row for row in candidate_rows if candidate_key(row) not in seen_keys]
+            duplicate_count = len(candidate_rows) - len(unique_rows)
+            _write_jsonl(unique_candidates_path, unique_rows)
+            dedupe_event = {
+                "schema": f"{SCHEMA_VERSION}.event",
+                "ts": utc_now(),
+                "event": "dedupe_done",
+                "cycle": cycle,
+                "input_count": len(candidate_rows),
+                "new_candidate_count": len(unique_rows),
+                "duplicate_candidate_count": duplicate_count,
+                "seen_candidates_path": str(seen_candidates_path),
+                "out": str(unique_candidates_path),
+            }
+            _append_log(log_path, dedupe_event)
+            events.append(dedupe_event)
+            if not unique_rows:
+                skip_event = {
+                    "schema": f"{SCHEMA_VERSION}.event",
+                    "ts": utc_now(),
+                    "event": "validation_skipped_no_new_candidates",
+                    "cycle": cycle,
+                    "input": str(candidates_path),
+                    "seen_candidates_path": str(seen_candidates_path),
+                }
+                _append_log(log_path, skip_event)
+                events.append(skip_event)
+                cycle += 1
+                if time.time() < deadline and cycle < max_cycles and sleep_seconds:
+                    sleep_fn(sleep_seconds)
+                continue
             validation_cmd = [
                 python,
                 str(repo_root / "scripts/runtime/forge_pr_suite_validator.py"),
                 "--manifest",
-                str(candidates_path),
+                str(unique_candidates_path),
                 "--out",
                 str(validated_path),
                 "--receipt-root",
@@ -277,6 +376,18 @@ def run_harvest_loop(
             )
             _append_log(log_path, validation_event)
             events.append(validation_event)
+            if validation.returncode in {0, 1} and not validation.timed_out:
+                added_seen = _append_seen_candidate_keys(seen_candidates_path, unique_rows, cycle=cycle)
+                seen_event = {
+                    "schema": f"{SCHEMA_VERSION}.event",
+                    "ts": utc_now(),
+                    "event": "seen_candidates_recorded",
+                    "cycle": cycle,
+                    "added_seen_count": added_seen,
+                    "seen_candidates_path": str(seen_candidates_path),
+                }
+                _append_log(log_path, seen_event)
+                events.append(seen_event)
 
             if validated_path.exists() and validated_path.stat().st_size > 0:
                 import_cmd = [
@@ -331,9 +442,13 @@ def run_harvest_loop(
         "model_cutoff": model_cutoff,
         "cycle_count": cycle,
         "candidate_files": sorted(str(path) for path in root.glob("candidates_c*.jsonl")),
+        "unique_candidate_files": sorted(str(path) for path in root.glob("candidates_unique_c*.jsonl")),
         "validated_files": sorted(str(path) for path in root.glob("validated_c*.jsonl")),
+        "seen_candidates_path": str(seen_candidates_path),
+        "seen_candidate_count": len(_load_seen_candidate_keys(seen_candidates_path)),
         "validation_receipt_count": len(list((root / "validation_receipts").glob("*.json"))),
         "candidate_count": sum(_line_count(path) for path in root.glob("candidates_c*.jsonl")),
+        "unique_candidate_count": sum(_line_count(path) for path in root.glob("candidates_unique_c*.jsonl")),
         "validated_count": sum(_line_count(path) for path in root.glob("validated_c*.jsonl")),
         "imported_count": sum(int(summary.get("imported_count", 0) or 0) for summary in import_summaries),
         "skipped_count": sum(int(summary.get("skipped_count", 0) or 0) for summary in import_summaries),
@@ -420,6 +535,7 @@ __all__ = [
     "DEFAULT_ROOT",
     "SCHEMA_VERSION",
     "build_parser",
+    "candidate_key",
     "loop_authority",
     "main",
     "run_command",
