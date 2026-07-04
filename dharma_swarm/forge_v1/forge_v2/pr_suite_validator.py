@@ -196,6 +196,32 @@ def _command_for_target(template: str, *, python: str, target: str, checkout: Pa
     return argv
 
 
+def _setup_command(template: str, *, python: str, checkout: Path) -> list[str] | None:
+    """Render an optional environment-provisioning command for a checkout.
+
+    Returns ``None`` when no template is configured so the historical
+    "run pytest against a bare clone" behaviour is preserved exactly.  When a
+    template is provided (for example ``{python} -m pip install -e .``) the
+    validator installs the target project into the interpreter running the tests
+    *before* the base and fixed test runs, so a changed test can actually import
+    the project and its dependencies.  Without this, real FAIL_TO_PASS
+    candidates collapse into ``no_targets_failed_on_base_and_passed_on_fixed``
+    because pytest errors identically on both revisions.
+    """
+
+    text = str(template or "").strip()
+    if not text:
+        return None
+    command = text.format(
+        python=shlex.quote(python),
+        checkout=shlex.quote(str(checkout)),
+    )
+    argv = shlex.split(command)
+    if not argv:
+        raise ValueError("setup command template rendered to an empty command")
+    return argv
+
+
 def _clean_checkout(checkout: Path, *, timeout_seconds: int) -> list[CommandResult]:
     return [
         _git(checkout, "reset", "--hard", timeout_seconds=timeout_seconds),
@@ -303,6 +329,8 @@ def validate_candidate(
     local_repo_root: Path | None = None,
     keep_workdir: bool = False,
     use_merge_parent_base: bool = True,
+    setup_command_template: str = "",
+    setup_timeout_seconds: int | None = None,
 ) -> dict[str, Any]:
     """Validate one harvested PR-suite row and write a receipt."""
 
@@ -344,6 +372,10 @@ def validate_candidate(
         )
 
         for target in targets:
+            setup_argv = _setup_command(setup_command_template, python=python, checkout=checkout)
+            effective_setup_timeout = (
+                int(setup_timeout_seconds) if setup_timeout_seconds is not None else max(timeout_seconds, 600)
+            )
             base_checkout_commands = _checkout_ref(checkout, base_ref, timeout_seconds=timeout_seconds)
             commands.extend({"phase": "checkout_base", **result.to_receipt()} for result in base_checkout_commands)
             if not all(result.passed for result in base_checkout_commands):
@@ -359,6 +391,14 @@ def validate_candidate(
             if not materialize_result.passed:
                 blockers.append("fixed_test_materialization_failed")
                 break
+            if setup_argv is not None:
+                base_setup = _run(setup_argv, cwd=checkout, timeout_seconds=effective_setup_timeout)
+                commands.append({"phase": "setup_base", "target": target, **base_setup.to_receipt()})
+                if not base_setup.passed:
+                    blocker = f"base_setup_failed:{target}"
+                    if blocker not in blockers:
+                        blockers.append(blocker)
+                    break
             base_command = _command_for_target(test_command_template, python=python, target=target, checkout=checkout)
             base_result = _run(base_command, cwd=checkout, timeout_seconds=timeout_seconds)
             commands.append({"phase": "test_base", "target": target, **base_result.to_receipt()})
@@ -368,6 +408,14 @@ def validate_candidate(
             if not all(result.passed for result in fixed_checkout_commands):
                 blockers.append("fixed_checkout_failed")
                 break
+            if setup_argv is not None:
+                fixed_setup = _run(setup_argv, cwd=checkout, timeout_seconds=effective_setup_timeout)
+                commands.append({"phase": "setup_fixed", "target": target, **fixed_setup.to_receipt()})
+                if not fixed_setup.passed:
+                    blocker = f"fixed_setup_failed:{target}"
+                    if blocker not in blockers:
+                        blockers.append(blocker)
+                    break
             fixed_command = _command_for_target(test_command_template, python=python, target=target, checkout=checkout)
             fixed_result = _run(fixed_command, cwd=checkout, timeout_seconds=timeout_seconds)
             commands.append({"phase": "test_fixed", "target": target, **fixed_result.to_receipt()})
@@ -423,6 +471,7 @@ def validate_candidate(
         "caller_claimed_contamination_state": raw.get("contamination_state"),
         "contamination_state_trusted": False,
         "test_command_template": test_command_template,
+        "setup_command_template": str(setup_command_template or ""),
         "commands": commands,
         "blockers": blockers,
     }
@@ -469,6 +518,8 @@ def validate_rows(
     keep_workdir: bool = False,
     include_failed: bool = False,
     use_merge_parent_base: bool = True,
+    setup_command_template: str = "",
+    setup_timeout_seconds: int | None = None,
 ) -> dict[str, Any]:
     results: list[dict[str, Any]] = []
     output_rows: list[dict[str, Any]] = []
@@ -483,6 +534,8 @@ def validate_rows(
             local_repo_root=local_repo_root,
             keep_workdir=keep_workdir,
             use_merge_parent_base=use_merge_parent_base,
+            setup_command_template=setup_command_template,
+            setup_timeout_seconds=setup_timeout_seconds,
         )
         results.append({key: value for key, value in result.items() if key != "row"})
         if result["validated"] or include_failed:
@@ -508,6 +561,21 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--work-root", default="", help="Isolated checkout root; default uses a temporary directory")
     parser.add_argument("--local-repo-root", default="", help="Optional local mirror root used before GitHub clone URLs")
     parser.add_argument("--test-command-template", default=DEFAULT_TEST_COMMAND_TEMPLATE)
+    parser.add_argument(
+        "--setup-command-template",
+        default="",
+        help=(
+            "Optional environment provisioning command rendered per checkout before "
+            "the base and fixed test runs, e.g. '{python} -m pip install -e .'. "
+            "Empty (default) preserves the historical bare-clone behaviour."
+        ),
+    )
+    parser.add_argument(
+        "--setup-timeout-seconds",
+        type=int,
+        default=0,
+        help="Timeout for the setup command; 0 uses max(timeout_seconds, 600).",
+    )
     parser.add_argument("--python", default=sys.executable)
     parser.add_argument("--timeout-seconds", type=int, default=120)
     parser.add_argument("--keep-workdir", action="store_true")
@@ -522,6 +590,7 @@ def main(argv: list[str] | None = None) -> int:
     rows = read_manifest(Path(args.manifest).expanduser())
     receipt_root = Path(args.receipt_root).expanduser()
     local_repo_root = Path(args.local_repo_root).expanduser() if args.local_repo_root else None
+    setup_timeout = args.setup_timeout_seconds or None
 
     if args.work_root or args.keep_workdir:
         work_root = Path(args.work_root).expanduser() if args.work_root else receipt_root / "workdirs"
@@ -537,6 +606,8 @@ def main(argv: list[str] | None = None) -> int:
             keep_workdir=args.keep_workdir,
             include_failed=args.include_failed,
             use_merge_parent_base=not args.no_merge_parent_base,
+            setup_command_template=args.setup_command_template,
+            setup_timeout_seconds=setup_timeout,
         )
     else:
         with tempfile.TemporaryDirectory(prefix="forge-pr-suite-validator-") as temp:
@@ -551,6 +622,8 @@ def main(argv: list[str] | None = None) -> int:
                 keep_workdir=args.keep_workdir,
                 include_failed=args.include_failed,
                 use_merge_parent_base=not args.no_merge_parent_base,
+                setup_command_template=args.setup_command_template,
+                setup_timeout_seconds=setup_timeout,
             )
 
     write_jsonl(Path(args.out).expanduser(), list(summary["output_rows"]))

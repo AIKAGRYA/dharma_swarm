@@ -327,3 +327,107 @@ def test_validator_rejects_no_tests_collected_as_false_positive(tmp_path: Path) 
     assert target["base_outcome"] == "inconclusive_no_real_run_on_base"
     assert target["validated_fail_to_pass"] is False
     assert any(b.startswith("base_test_inconclusive:") for b in result["blockers"])
+
+
+def test_setup_command_runs_before_base_and_fixed_and_is_recorded(tmp_path: Path) -> None:
+    refs = _merge_fixing_pr_repo(tmp_path)
+    sentinel = tmp_path / "setup_hits.log"
+    # A portable setup command: append a line to a sentinel file. Proves the
+    # setup phase executes once per checkout (base + fixed) before the tests.
+    setup_template = f"{sys.executable} -c " + repr(
+        f"open({str(sentinel)!r}, 'a').write('hit\\n')"
+    )
+    row = {
+        "repo": "fake/calculator",
+        "repo_path": refs["repo"],
+        "pr_number": 11,
+        "base_sha": refs["base_sha"],
+        "head_sha": refs["head_sha"],
+        "merge_commit_sha": refs["merge_sha"],
+        "test_files": ["tests/test_calculator.py"],
+        "fail_to_pass": [],
+    }
+
+    summary = pr_suite_validator.validate_rows(
+        [row],
+        work_root=tmp_path / "work",
+        receipt_root=tmp_path / "receipts",
+        python=sys.executable,
+        timeout_seconds=30,
+        setup_command_template=setup_template,
+    )
+
+    result = summary["results"][0]
+    receipt = json.loads(Path(result["receipt"]).read_text(encoding="utf-8"))
+    phases = [c.get("phase") for c in receipt["commands"]]
+    assert "setup_base" in phases
+    assert "setup_fixed" in phases
+    # setup_base must precede test_base; setup_fixed must precede test_fixed.
+    assert phases.index("setup_base") < phases.index("test_base")
+    assert phases.index("setup_fixed") < phases.index("test_fixed")
+    assert receipt["setup_command_template"] == setup_template
+    assert sentinel.read_text(encoding="utf-8").count("hit") == 2
+
+
+def test_setup_failure_fails_closed_without_minting_task(tmp_path: Path) -> None:
+    refs = _merge_fixing_pr_repo(tmp_path)
+    # A setup command that always fails must block validation, never validate.
+    setup_template = f"{sys.executable} -c " + repr("import sys; sys.exit(7)")
+    row = {
+        "repo": "fake/calculator",
+        "repo_path": refs["repo"],
+        "pr_number": 12,
+        "base_sha": refs["base_sha"],
+        "head_sha": refs["head_sha"],
+        "merge_commit_sha": refs["merge_sha"],
+        "test_files": ["tests/test_calculator.py"],
+        "fail_to_pass": [],
+    }
+
+    summary = pr_suite_validator.validate_rows(
+        [row],
+        work_root=tmp_path / "work",
+        receipt_root=tmp_path / "receipts",
+        python=sys.executable,
+        timeout_seconds=30,
+        setup_command_template=setup_template,
+    )
+
+    result = summary["results"][0]
+    assert summary["validated_count"] == 0
+    assert result["validated"] is False
+    assert any(b.startswith("base_setup_failed:") for b in result["blockers"])
+    receipt = json.loads(Path(result["receipt"]).read_text(encoding="utf-8"))
+    phases = [c.get("phase") for c in receipt["commands"]]
+    # Setup failed on base, so the base test must never have run.
+    assert "setup_base" in phases
+    assert "test_base" not in phases
+
+
+def test_empty_setup_template_preserves_bare_clone_behaviour(tmp_path: Path) -> None:
+    refs = _merge_fixing_pr_repo(tmp_path)
+    row = {
+        "repo": "fake/calculator",
+        "repo_path": refs["repo"],
+        "pr_number": 13,
+        "base_sha": refs["base_sha"],
+        "head_sha": refs["head_sha"],
+        "merge_commit_sha": refs["merge_sha"],
+        "test_files": ["tests/test_calculator.py"],
+        "fail_to_pass": [],
+    }
+
+    summary = pr_suite_validator.validate_rows(
+        [row],
+        work_root=tmp_path / "work",
+        receipt_root=tmp_path / "receipts",
+        python=sys.executable,
+        timeout_seconds=30,
+    )
+
+    result = summary["results"][0]
+    receipt = json.loads(Path(result["receipt"]).read_text(encoding="utf-8"))
+    phases = [c.get("phase") for c in receipt["commands"]]
+    assert "setup_base" not in phases
+    assert "setup_fixed" not in phases
+    assert receipt["setup_command_template"] == ""

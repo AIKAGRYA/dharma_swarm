@@ -232,6 +232,8 @@ def run_harvest_loop(
     validation_timeout_seconds: int = 900,
     command_timeout_seconds: int = 3600,
     github_token_env: str = "GITHUB_TOKEN,GH_TOKEN",
+    setup_command_template: str = "",
+    setup_timeout_seconds: int = 0,
     python: str = sys.executable,
     command_runner: CommandRunner = run_command,
     sleep_fn: Callable[[float], None] = time.sleep,
@@ -363,6 +365,10 @@ def run_harvest_loop(
                 str(validation_timeout_seconds),
                 "--json",
             ]
+            if str(setup_command_template or "").strip():
+                validation_cmd.extend(["--setup-command-template", setup_command_template])
+                if int(setup_timeout_seconds or 0) > 0:
+                    validation_cmd.extend(["--setup-timeout-seconds", str(int(setup_timeout_seconds))])
             validation = command_runner(validation_cmd, repo_root, command_timeout_seconds)
             validation_summary = _json_from_stdout(validation.stdout)
             validation_event = _command_event(
@@ -483,6 +489,20 @@ def build_parser() -> argparse.ArgumentParser:
         default="GITHUB_TOKEN,GH_TOKEN",
         help="Comma-separated env var names checked for a GitHub API token.",
     )
+    parser.add_argument(
+        "--setup-command-template",
+        default="",
+        help=(
+            "Optional per-checkout provisioning command forwarded to the validator, "
+            "e.g. '{python} -m pip install -e .'. Empty preserves bare-clone behaviour."
+        ),
+    )
+    parser.add_argument(
+        "--setup-timeout-seconds",
+        type=int,
+        default=0,
+        help="Timeout for the validator setup command; 0 lets the validator choose.",
+    )
     parser.add_argument("--python", default=sys.executable)
     parser.add_argument("--json", action="store_true")
     return parser
@@ -515,6 +535,8 @@ def main(argv: list[str] | None = None) -> int:
         validation_timeout_seconds=args.validation_timeout_seconds,
         command_timeout_seconds=args.command_timeout_seconds,
         github_token_env=args.github_token_env,
+        setup_command_template=args.setup_command_template,
+        setup_timeout_seconds=args.setup_timeout_seconds,
         python=args.python,
     )
     if args.json:
