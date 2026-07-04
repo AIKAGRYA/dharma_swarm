@@ -1,0 +1,65 @@
+name: ci-parity
+
+# Guards the required-check set against drift. Asserts the committed
+# expected-guard manifest (scripts/governance/ci_parity_manifest.json) still
+# equals the live branch-protection required contexts, that every required
+# context maps to a real producing job, and that no required job has become a
+# false-green sensor (job-level continue-on-error, a regression-sensitive job
+# that swallows errors, or a regression-sensitive job that self-skips on
+# merge_group). Advisory until an Administration:read token lets the live
+# fetch run in CI; see the PR body for the Operator decision.
+
+on:
+  pull_request:
+    branches: [main, "promote/**", "governance/**"]
+  merge_group:
+
+concurrency:
+  group: ci-parity-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci-parity:
+    name: CI parity guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+
+      - name: Fetch live branch protection
+        id: fetch
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          branch="${{ github.event.repository.default_branch }}"
+          if [ -z "${branch}" ]; then branch="main"; fi
+          if gh api "repos/${{ github.repository }}/branches/${branch}/protection" \
+              > protection.json 2> fetch_err.txt; then
+            echo "have_protection=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "have_protection=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=ci-parity::Could not read live branch protection (token lacks Administration: read). Running structural checks only; live required-check parity NOT verified. Provision a token with Administration: read to enforce parity."
+            cat fetch_err.txt || true
+          fi
+
+      - name: Run CI parity guard (live)
+        if: steps.fetch.outputs.have_protection == 'true'
+        run: |
+          python3 scripts/governance/check_ci_parity.py \
+            --protection-json protection.json
+
+      - name: Run CI parity guard (structural only)
+        if: steps.fetch.outputs.have_protection == 'false'
+        run: |
+          python3 scripts/governance/check_ci_parity.py --allow-missing-live
