@@ -139,33 +139,10 @@ jobs:
           "
 
       - name: Check critical module imports
-        run: |
-          python3 -c "
-          import sys
-          sys.path.insert(0, '.')
-          critical = [
-              'dharma_swarm.world_actions',
-              'dharma_swarm.dgm_loop',
-              'dharma_swarm.archaeology_ingestion',
-              'dharma_swarm.guardian_crew',
-              'dharma_swarm.gnani_lodestone',
-              'dharma_swarm.swarm_health_api',
-          ]
-          failed = []
-          for m in critical:
-              try:
-                  __import__(m)
-                  print(f'OK: {m}')
-              except Exception as e:
-                  # Allow missing optional deps (lancedb, etc.)
-                  if 'lancedb' in str(e) or 'torch' in str(e) or 'No module named' in str(e):
-                      print(f'SKIP (optional dep): {m} — {e}')
-                  else:
-                      failed.append(f'{m}: {e}')
-                      print(f'FAIL: {m} — {e}')
-          if failed:
-              raise SystemExit(1)
-          "
+        # Fail-closed guardian import-smoke (AI-N1). Optional deps are
+        # allowlisted by NAME from the dependency manifest, never by a
+        # substring of the exception text; a missing critical module fails.
+        run: python3 scripts/governance/guardian_import_smoke.py
 
   go-evidence-ingestor:
     runs-on: ubuntu-latest

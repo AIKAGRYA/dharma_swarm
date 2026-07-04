@@ -78,13 +78,13 @@ def is_optional_absence(exc: BaseException, allowlist: frozenset[str]) -> bool:
     a syntax error surfaced at import) is treated as a real failure.
     """
 
-    # NOTE (commit A baseline): this reproduces the pre-fix rule in
-    # .github/workflows/tests.yml -- a substring match on the exception text.
-    # It forgives "No module named 'dharma_swarm.world_actions'" and so greens
-    # a dead critical module. The conformance sweep reds on it. Fixed in the
-    # next commit by allowlisting optional deps by NAME.
-    text = str(exc)
-    return "lancedb" in text or "torch" in text or "No module named" in text
+    if not isinstance(exc, ModuleNotFoundError):
+        return False
+    missing = getattr(exc, "name", None)
+    if not missing:
+        return False
+    root = missing.split(".", 1)[0]
+    return root in allowlist
 
 
 def run_smoke(
