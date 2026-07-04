@@ -91,3 +91,11 @@ def test_harvested_candidate_is_skipped_until_fail_to_pass_validated(tmp_path: P
     assert imported["skipped_count"] == 1
     assert imported["derived_state_counts"] == {"possible_pretrain": 1}
     assert "missing_fail_to_pass_suite" in imported["skipped"][0]["blockers"]
+
+
+def test_token_from_env_spec_uses_first_available_token(monkeypatch) -> None:
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.setenv("GH_TOKEN", "gh-token")
+    monkeypatch.setenv("OTHER_TOKEN", "other-token")
+
+    assert pr_suite_harvester.token_from_env_spec("GITHUB_TOKEN,GH_TOKEN,OTHER_TOKEN") == "gh-token"

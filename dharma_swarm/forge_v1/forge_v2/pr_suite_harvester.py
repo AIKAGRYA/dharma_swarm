@@ -36,6 +36,21 @@ def _headers(token: str | None = None) -> dict[str, str]:
     return headers
 
 
+def token_from_env_spec(env_spec: str) -> str | None:
+    """Return the first non-empty token from a comma-separated env-var spec.
+
+    The harvester historically defaulted to ``GITHUB_TOKEN`` only, while many
+    GitHub CLI shells expose ``GH_TOKEN``.  Accepting both avoids silently
+    dropping into the low unauthenticated rate limit during overnight harvests.
+    """
+
+    for name in str(env_spec or "").split(","):
+        token = os.environ.get(name.strip())
+        if token:
+            return token
+    return None
+
+
 def fetch_json(url: str, headers: dict[str, str]) -> Any:
     request = urllib.request.Request(url, headers=headers)
     try:
@@ -229,7 +244,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--limit-per-repo", type=int, default=25)
     parser.add_argument("--max-pages", type=int, default=5)
     parser.add_argument("--api-root", default=DEFAULT_API_ROOT)
-    parser.add_argument("--github-token-env", default="GITHUB_TOKEN")
+    parser.add_argument("--github-token-env", default="GITHUB_TOKEN,GH_TOKEN")
     parser.add_argument("--out", required=True, help="Output JSONL manifest")
     parser.add_argument("--json", action="store_true")
     return parser
@@ -251,7 +266,7 @@ def main(argv: list[str] | None = None) -> int:
         since=args.since,
         limit_per_repo=args.limit_per_repo,
         api_root=args.api_root,
-        token=os.environ.get(args.github_token_env),
+        token=token_from_env_spec(args.github_token_env),
         max_pages=args.max_pages,
     )
     write_manifest(Path(args.out).expanduser(), list(summary["rows"]))

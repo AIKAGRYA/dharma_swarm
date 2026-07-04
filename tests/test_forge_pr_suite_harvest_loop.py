@@ -42,6 +42,8 @@ def test_harvest_loop_continues_when_validator_finds_no_fail_to_pass(tmp_path: P
     assert closeout["authority"]["live_apply_performed"] is False
     assert (tmp_path / "loop-no-ftp" / "closeout.json").exists()
     assert not any("forge_fresh_task_oracle.py" in command[1] for command in commands)
+    harvest_command = next(command for command in commands if "forge_pr_suite_harvester.py" in command[1])
+    assert harvest_command[harvest_command.index("--github-token-env") + 1] == "GITHUB_TOKEN,GH_TOKEN"
 
 
 def test_harvest_loop_imports_validated_rows_and_receipts_closeout(tmp_path: Path) -> None:

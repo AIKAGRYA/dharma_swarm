@@ -145,8 +145,14 @@ python3 scripts/runtime/forge_pr_suite_harvest_loop.py \
   --sleep-seconds 600 \
   --limit-per-repo 2 \
   --max-pages 1 \
+  --github-token-env GITHUB_TOKEN,GH_TOKEN \
   --json
 ```
+
+If the host has either `GITHUB_TOKEN` or `GH_TOKEN` set, the harvester will use
+it for the GitHub REST API. Without a token, long loops may hit the low
+unauthenticated API quota and should fail as shadow evidence rather than minting
+tasks from incomplete harvests.
 
 Run it under `tmux` on Agni after the current `agni_rsi_harvest_2h` session
 finishes or is explicitly superseded. Do not overlap two taskbed-import loops

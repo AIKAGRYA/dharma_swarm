@@ -167,6 +167,7 @@ def run_harvest_loop(
     max_pages: int = 1,
     validation_timeout_seconds: int = 900,
     command_timeout_seconds: int = 3600,
+    github_token_env: str = "GITHUB_TOKEN,GH_TOKEN",
     python: str = sys.executable,
     command_runner: CommandRunner = run_command,
     sleep_fn: Callable[[float], None] = time.sleep,
@@ -230,6 +231,8 @@ def run_harvest_loop(
                 str(limit_per_repo),
                 "--max-pages",
                 str(max_pages),
+                "--github-token-env",
+                github_token_env,
                 "--out",
                 str(candidates_path),
                 "--json",
@@ -360,6 +363,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-pages", type=int, default=1)
     parser.add_argument("--validation-timeout-seconds", type=int, default=900)
     parser.add_argument("--command-timeout-seconds", type=int, default=3600)
+    parser.add_argument(
+        "--github-token-env",
+        default="GITHUB_TOKEN,GH_TOKEN",
+        help="Comma-separated env var names checked for a GitHub API token.",
+    )
     parser.add_argument("--python", default=sys.executable)
     parser.add_argument("--json", action="store_true")
     return parser
@@ -391,6 +399,7 @@ def main(argv: list[str] | None = None) -> int:
         max_pages=args.max_pages,
         validation_timeout_seconds=args.validation_timeout_seconds,
         command_timeout_seconds=args.command_timeout_seconds,
+        github_token_env=args.github_token_env,
         python=args.python,
     )
     if args.json:
