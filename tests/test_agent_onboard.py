@@ -86,8 +86,9 @@ def test_tooling_first_includes_wiki_and_memory():
         [sys.executable, str(ONBOARD_SCRIPT)],
         cwd=REPO_ROOT, capture_output=True, text=True, timeout=60,
     )
-    assert "wiki show" in result.stdout, "TOOLING-FIRST must mention wiki show"
-    assert "wiki search" in result.stdout, "TOOLING-FIRST must mention wiki search"
+    assert "dgc wiki show" in result.stdout, "TOOLING-FIRST must mention dgc wiki show"
+    assert "dgc wiki search" in result.stdout, "TOOLING-FIRST must mention dgc wiki search"
+    assert "dgc memory common" in result.stdout, "TOOLING-FIRST must mention Memory Common"
     assert "memory MCP" in result.stdout, "TOOLING-FIRST must mention memory MCP"
     assert "Tool availability" in result.stdout, "TOOLING-FIRST must probe tool availability"
 

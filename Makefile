@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check bug-corral-scan name-drift-preflight semantic-commons-check semantic-commons-project agent-admit onboard-agent codex-composer-bootstrap codex-composer-once codex-composer-status codex-composer-start codex-composer-stop docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop tmux-bootstrap tmux-status tmux-substrate-contract memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke runtime-truth-ci runtime-truth-closeout runtime-truth-burn-in runtime-truth-burn-in-smoke runtime-truth-100-audit runtime-task-firebreak ds-goal-longrun-preflight-check governance-all agent-build-preflight agent-build-closeout cybernetics-codex-audit spine-check onboard offboard orient status go-fmt-check go-test go-vet go-ci xray compile test-smoke test-all dashboard-lint dashboard-build
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check bug-corral-scan name-drift-preflight semantic-commons-check semantic-commons-project agent-admit onboard-agent codex-composer-bootstrap codex-composer-once codex-composer-status codex-composer-start codex-composer-stop docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop tmux-bootstrap tmux-status tmux-substrate-contract memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight wiki-gate memory-metabolize brain-lint karpathy-wiki-ci operator-prod-smoke runtime-truth-ci runtime-truth-closeout runtime-truth-burn-in runtime-truth-burn-in-smoke runtime-truth-100-audit runtime-task-firebreak ds-goal-longrun-preflight-check governance-all agent-build-preflight agent-build-closeout cybernetics-codex-audit spine-check onboard offboard orient status go-fmt-check go-test go-vet go-ci xray compile test-smoke test-all dashboard-lint dashboard-build
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently.
@@ -90,6 +90,10 @@ help:
 	@echo "  make memory-kernel-promotion-smoke Smoke M5 human-gated promotion receipts"
 	@echo "  make memory-kernel-knowledgeops-bridge-smoke Smoke KnowledgeOps to MemoryKernel promotion bridge"
 	@echo "  make memory-kernel-full-power-preflight Run M2-M5 governed live preflight"
+	@echo "  make wiki-gate Run the live wiki/vector retrieval gate"
+	@echo "  make memory-metabolize Run Memory Common ingest + gates + receipt"
+	@echo "  make brain-lint Validate repo-local BRAIN.md seed files"
+	@echo "  make karpathy-wiki-ci Run local Karpathy wiki contract checks"
 	@echo "  make operator-prod-smoke Run fast read-only operator production smoke"
 	@echo "  make runtime-truth-ci Run deterministic runtime truth invariant CI gates"
 	@echo "  make runtime-truth-closeout ARGS='--allow-paused' Run runtime truth closeout gate"
@@ -452,6 +456,27 @@ memory-kernel-full-power-preflight:
 	$(MAKE) memory-kernel-promotion-smoke
 	$(MAKE) memory-kernel-knowledgeops-bridge-smoke
 	DHARMA_MEMORY_KERNEL_ROLLOUT=live $(REPO_PYTHON) scripts/operator_prod_smoke.py --repo-root .
+
+wiki-gate:
+	$(REPO_PYTHON) scripts/wiki_vector_live_gate.py
+
+memory-metabolize:
+	$(REPO_PYTHON) -m dharma_swarm.dgc_cli memory metabolize
+
+brain-lint:
+	@test -f BRAIN.md
+	@test -f docs/brain/index.md
+	@test -f docs/brain/timeline.md
+	@grep -q "compiled_truth" docs/brain/index.md
+	@grep -q "timeline" docs/brain/timeline.md
+
+karpathy-wiki-ci: brain-lint
+	$(VENV_PYTHON) -m pytest -q \
+		tests/test_agent_onboard.py \
+		tests/test_dgc_cli.py::test_dgc_cli_wiki_search_command \
+		tests/test_dgc_cli.py::test_dgc_cli_wiki_show_command \
+		tests/test_memory_common.py::test_memory_common_pack_is_agent_handoff \
+		tests/test_wiki_vector_live_gate.py
 
 operator-prod-smoke:
 	$(REPO_PYTHON) scripts/operator_prod_smoke.py --repo-root .

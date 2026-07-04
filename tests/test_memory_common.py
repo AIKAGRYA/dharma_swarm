@@ -70,6 +70,9 @@ def test_memory_common_pack_is_agent_handoff(tmp_path: Path) -> None:
 
     assert "# Memory Common Pack" in rendered
     assert "Agent contract:" in rendered
+    assert "Required closeout fields:" in rendered
+    assert "`memory_sources_used`" in rendered
+    assert "`candidate_atom_path`" in rendered
     assert "wiki-concepts-mixture-of-experts" in rendered
 
 

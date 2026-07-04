@@ -877,6 +877,36 @@ def test_dgc_cli_memory_schedule_command():
             )
 
 
+def test_dgc_cli_wiki_search_command():
+    """main() dispatches `wiki search` to the governed wiki command surface."""
+    from dharma_swarm.dgc_cli import main
+
+    with patch("sys.argv", ["dgc", "wiki", "--top-k", "4", "search", "karpathy", "wiki"]):
+        with patch("dharma_swarm.dgc_cli.cmd_wiki") as mock:
+            main()
+            mock.assert_called_once_with(
+                "search",
+                text="karpathy wiki",
+                top_k=4,
+                as_json=False,
+            )
+
+
+def test_dgc_cli_wiki_show_command():
+    """main() dispatches `wiki show` to exact concept lookup/retrieval fallback."""
+    from dharma_swarm.dgc_cli import main
+
+    with patch("sys.argv", ["dgc", "wiki", "show", "memory", "common"]):
+        with patch("dharma_swarm.dgc_cli.cmd_wiki") as mock:
+            main()
+            mock.assert_called_once_with(
+                "show",
+                text="memory common",
+                top_k=5,
+                as_json=False,
+            )
+
+
 def test_build_chat_context_snapshot_includes_latent_gold(monkeypatch, tmp_path):
     import dharma_swarm.dgc_cli as cli
 

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 import json
 import os
+import re
 
 
 from dharma_swarm.terminal_commands._helpers import (
@@ -143,6 +144,91 @@ def cmd_memory(
                     )
 
     _run(_show())
+
+
+def cmd_wiki(
+    wiki_cmd: str | None = None,
+    *,
+    text: str = "",
+    top_k: int = 5,
+    as_json: bool = False,
+) -> None:
+    """Search or show the governed Dharma wiki projection."""
+    mode = (wiki_cmd or "status").strip().lower()
+    if mode == "status":
+        cmd_memory("status", top_k=top_k, as_json=as_json)
+        return
+    if mode in {"search", "query"}:
+        cmd_memory("query", text=text, top_k=top_k, as_json=as_json)
+        return
+    if mode == "show":
+        print(_render_wiki_show(text, top_k=top_k))
+        return
+    if mode == "gate":
+        cmd_memory("gate", top_k=top_k, as_json=as_json)
+        return
+    print("Unknown wiki mode. Use: dgc wiki [status|search|show|gate]")
+
+
+def _render_wiki_show(query: str, *, top_k: int = 5) -> str:
+    text = query.strip()
+    if not text:
+        return "Usage: dgc wiki show <topic>"
+    concepts_dir = DHARMA_STATE / "knowledge" / "wiki" / "concepts"
+    concept_path = _find_wiki_concept(concepts_dir, text)
+    if concept_path is not None:
+        return concept_path.read_text(encoding="utf-8", errors="replace")
+
+    from dharma_swarm.memory_common import render_memory_query
+
+    return "\n".join(
+        [
+            "# Wiki Show",
+            "",
+            f"No exact trusted concept file found for `{text}`.",
+            "Showing governed retrieval fallback from Memory Common.",
+            "",
+            render_memory_query(
+                text,
+                state_dir=DHARMA_STATE,
+                top_k=top_k,
+                include_content=True,
+            ),
+        ]
+    )
+
+
+def _find_wiki_concept(concepts_dir: Path, query: str) -> Path | None:
+    if not concepts_dir.is_dir():
+        return None
+    normalized_query = _normalize_wiki_lookup(query)
+    direct_path = concepts_dir / f"{normalized_query}.md"
+    if direct_path.exists():
+        return direct_path
+    for path in sorted(concepts_dir.glob("*.md")):
+        if _normalize_wiki_lookup(path.stem) == normalized_query:
+            return path
+        title = _frontmatter_title(path)
+        if title and _normalize_wiki_lookup(title) == normalized_query:
+            return path
+    return None
+
+
+def _normalize_wiki_lookup(value: str) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", "-", value.strip().lower())
+    return normalized.strip("-")
+
+
+def _frontmatter_title(path: Path) -> str | None:
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()[:40]
+    except OSError:
+        return None
+    for line in lines:
+        match = re.match(r"^title:\s*(.+?)\s*$", line.strip())
+        if match:
+            return match.group(1).strip().strip('"').strip("'")
+    return None
 
 
 def cmd_context(domain: str = "all") -> None:

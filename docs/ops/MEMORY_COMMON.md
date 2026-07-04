@@ -7,6 +7,8 @@ Memory Common is the one-door retrieval surface for swarm context.
 - `/memory` or `dgc memory`: show common memory status.
 - `/memory query <topic>` or `dgc memory query <topic>`: retrieve ranked governed memory.
 - `/memory common <task>` or `dgc memory common <task>`: build a copy-pasteable agent handoff pack.
+- `dgc wiki search <term>`: search the governed wiki projection through Memory Common.
+- `dgc wiki show <topic>`: show an exact trusted concept file, falling back to governed retrieval.
 - `/memory ingest`: backfill live wiki concepts into vector/common memory.
 - `/memory gate`: run the common memory regression gate.
 - `/memory metabolize`: run ingest + gates and write a metabolism receipt.
@@ -26,9 +28,37 @@ After work, write a receipt with:
 
 - task and outcome
 - memory sources used
+- accepted context
+- rejected context
 - new durable observations
 - contradictions or stale concepts found
 - failed or surprising queries that should become eval cases
+- Chetana staged atom path, or a `not durable` reason
+
+## Karpathy Wiki Contract
+
+The Karpathy LLM Wiki method is enforced locally through this loop:
+
+```text
+raw/source receipt -> staged atom -> governed promotion -> trusted wiki concept
+  -> vector/search projection -> Memory Common pack -> agent receipt
+```
+
+Agents must treat retrieval as context, not authority. When a task names a
+canonical owner file or schema, read that owner file directly. When a task
+produces durable knowledge, stage it through Chetana or record why it is not
+durable. Do not write directly into trusted wiki concepts except through a
+governed promotion path.
+
+For non-trivial work, the closeout must include:
+
+- `memory_sources_used`
+- `accepted_context`
+- `rejected_context`
+- `durable_observations`
+- `contradictions`
+- `dead_ends`
+- `candidate_atom_path`
 
 ## Metabolism Loop
 

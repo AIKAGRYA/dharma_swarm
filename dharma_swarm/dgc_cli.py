@@ -84,6 +84,7 @@ from dharma_swarm.terminal_commands.agents import (
 )
 from dharma_swarm.terminal_commands.memory import (
     cmd_memory,
+    cmd_wiki,
     cmd_context,
     cmd_context_search,
     cmd_witness,
@@ -533,6 +534,18 @@ def _build_parser() -> argparse.ArgumentParser:
         default="every 24h",
         help="Recurring cron schedule for Memory Common metabolism",
     )
+
+    # -- wiki --
+    p_wiki = sub.add_parser("wiki", help="Governed Dharma wiki projection")
+    p_wiki.add_argument("--top-k", type=int, default=5, help="Maximum retrieval hits for search/show fallback")
+    p_wiki.add_argument("--json", action="store_true", help="Emit JSON for supported wiki modes")
+    wiki_sub = p_wiki.add_subparsers(dest="wiki_cmd")
+    wiki_sub.add_parser("status", help="Show wiki/memory projection status")
+    p_wiki_search = wiki_sub.add_parser("search", help="Search governed wiki projection")
+    p_wiki_search.add_argument("wiki_query", nargs="+")
+    p_wiki_show = wiki_sub.add_parser("show", help="Show exact trusted concept, or retrieval fallback")
+    p_wiki_show.add_argument("wiki_query", nargs="+")
+    wiki_sub.add_parser("gate", help="Run the wiki/memory projection gate")
 
     # -- witness --
     p_wit = sub.add_parser("witness", help="Record a witness observation")
@@ -1527,6 +1540,16 @@ def main() -> None:
             cmd_memory(
                 args.memory_cmd,
                 text=memory_text,
+                top_k=args.top_k,
+                as_json=args.json,
+            )
+        case "wiki":
+            wiki_text = ""
+            if getattr(args, "wiki_cmd", None) in {"search", "show"}:
+                wiki_text = " ".join(args.wiki_query)
+            cmd_wiki(
+                args.wiki_cmd,
+                text=wiki_text,
                 top_k=args.top_k,
                 as_json=args.json,
             )
