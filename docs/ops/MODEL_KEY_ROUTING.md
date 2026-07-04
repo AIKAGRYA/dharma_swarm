@@ -1,6 +1,6 @@
 # Model & Key Routing - The One Way
 
-Current as of 2026-06-30.
+Current as of 2026-07-05.
 
 Read this before any agent touches provider keys, model IDs, routing, or Forge
 benchmarks. This is the operational source of truth. Older architecture notes
@@ -119,6 +119,35 @@ PYTHONPATH=$PWD DOCKER_CONTEXT=colima-forge-swebench python -m dharma_swarm.forg
   --replicates 1 --budget 60000 --label smoke
 ```
 
+## Host Boot & Liveness (audit-adjudicated 2026-07-05)
+
+One loader, one precedence. `dharma_swarm.api_keys.bootstrap_runtime_env()` is
+the only loader (never-overwrite, first writer wins); `scripts/load_runtime_env.sh`
+is its thin shell projection. Anything that boots a daemon must go through one
+of those two — never an inline `set -a; source ...` block in a launchd plist or
+wrapper script. Inline sourcing is how the same host ended up with daemons
+holding three different key environments at once.
+
+- Vault envelope rule: `~/.dharma/agent_keys.env` must never export
+  `ANTHROPIC_BASE_URL`, `ANTHROPIC_MODEL`, `ANTHROPIC_DEFAULT_*_MODEL`, or
+  `CLAUDE_CODE_SUBAGENT_MODEL`. Gateway lanes get their own namespaced vars
+  (`KIMI_*`, `AGNI_GLM_*`) plus an explicit opt-in wrapper (`claude-kimi`).
+  A global Anthropic-envelope override silently rewires every Anthropic-SDK
+  client on the host — including Claude Code's safety classifier.
+- Daemon restart rule: a vault edit changes nothing for already-running
+  daemons; their env snapshot is frozen at spawn. After `dkeys add`/`dkeys rm`,
+  kickstart the launchd jobs (or accept documented staleness).
+- Liveness is only real when probed through the same client the runtime uses
+  (`dharma_swarm` provider classes / `provider_smoke`). Raw curl probes get
+  bot-blocked (Groq 403s a bare urllib call that `GroqProvider` completes
+  in <1s) and light pings miss completion-path failures (NIM pinged "live"
+  while real completions timed out).
+- A provider chain must never lead with a lane in a known-exhausted state.
+  `key_oracle` reads `dkeys test` status; consult it (or recent 429 receipts)
+  before seeding the chain head. Ollama Cloud's weekly cap manifests as
+  `429 "weekly usage limit"` — quota language, not credit language, so
+  credit-error regexes must match rate/quota wordings too.
+
 ## Deprecated
 
 - `MODEL_ROUTING_MAP.md` is archived.
@@ -126,3 +155,5 @@ PYTHONPATH=$PWD DOCKER_CONTEXT=colima-forge-swebench python -m dharma_swarm.forg
 - OpenRouter-first routing is deprecated unless no first-party route is live.
 - Project `.env` key storage is deprecated.
 - Any hidden model literal outside routing/model-pool files is suspect.
+- Inline `set -a; source agent_keys.env` blocks in launchd plists / wrapper
+  scripts are deprecated boot paths — route through `load_runtime_env.sh`.
