@@ -1,7 +1,11 @@
 name: coherence-delta
 
-# Advisory PR-body coherence signal. It self-heals when possible and reports
-# missing fields, but malformed metadata must not block merge flow.
+# PR-body coherence gate. The self-heal step derives and posts a Coherence
+# Delta comment when automation-authored PRs skip the template; the validate
+# step then enforces that the body or a comment answers all four fields.
+# "Coherence Delta PR body" is a required branch-protection context, so the
+# validate step must be able to fail — a required check that cannot go red
+# protects nothing (2026-07-04 hardening; previously continue-on-error).
 
 on:
   pull_request:
@@ -11,7 +15,12 @@ on:
 
 concurrency:
   group: coherence-delta-${{ github.ref }}
-  cancel-in-progress: true
+  # Never cancel in-progress runs: this is a required context, and a
+  # cancelled conclusion left as the latest check run on a head SHA reads
+  # as a red X until another event fires (observed on PR #750, run
+  # 28702706071). Runs cost 10-30s, so queueing is cheaper than a
+  # stranded required check.
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -28,7 +37,12 @@ jobs:
     # SHAs); these PR-shaped validations already passed on the PR run
     # before the PR entered the queue. Skipped = satisfied for required
     # checks, so the queue is not blocked.
-    if: github.event_name != 'merge_group'
+    # Also skip closed/merged PRs: bots edit PR bodies post-merge, and an
+    # `edited` run spawned after merge can leave the required context in a
+    # non-success state on the head SHA with no later event to repair it.
+    if: >-
+      github.event_name != 'merge_group' &&
+      github.event.pull_request.state == 'open'
     timeout-minutes: 5
     steps:
       - name: Checkout
@@ -43,6 +57,8 @@ jobs:
             --paginate --jq '[.[] | {body: .body}]' > /tmp/pr_comments.json \
             || echo '[]' > /tmp/pr_comments.json
 
+      # Best-effort by design (continue-on-error): fork PRs get a read-only
+      # token and cannot post comments. The validate step below is the gate.
       - name: Self-heal — derive + post Coherence Delta if missing
         continue-on-error: true
         env:
@@ -69,7 +85,6 @@ jobs:
           fi
 
       - name: Validate Coherence Delta fields
-        continue-on-error: true
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
