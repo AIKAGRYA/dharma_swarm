@@ -1,0 +1,55 @@
+schema_version: dharma_lab.trust_base.v1
+fragment:
+  id: dharma_lab.fragment.v1
+  parent_fragment_id: dharma_swarm.core
+  authority_scope: research_organ
+  canonicality_scope: canonical_within_lab_fragment_only
+  transfer_rule: recheck_or_coercion_receipt_required
+  tcb_membership: excluded
+  description: >
+    Dharma Lab is an additive research organ. It may depend on core mediated
+    interfaces, but core must not depend on lab outputs without an explicit
+    coercion receipt.
+authority:
+  trust_base_id: dharma_lab.trust_base.v1
+  fragment_id: dharma_lab.fragment.v1
+  fragment_version_source: git_commit
+  parent_trust_base_id: dharma_swarm.core
+  challenge_base: dharma_lab.receipt_mesh.v1
+lyapunov_contribution_rules:
+  state_vector:
+    V_coh:
+      meaning: total incoherence between live lab receipts under join
+      legal_transition: weakly_decrease_or_emit_divergence_receipt
+    V_unres:
+      meaning: unresolved lab claims older than their declared resolution budget
+      legal_transition: weakly_decrease_or_extend_with_budget_receipt
+    V_drift:
+      meaning: distance between declared modality and admissible evidence
+      legal_transition: weakly_decrease_or_emit_modality_drift_receipt
+    V_auth:
+      meaning: lab claims crossing trust-base boundaries without coercion receipt
+      legal_transition: must_remain_zero_for_promotion
+  inherited_from:
+    - specs/naga_ir/core.md
+    - specs/naga_ir/dharma_lane/DHARMA_GATING.md
+promotion_policy:
+  lab_to_core:
+    required_receipt_class: dharma_lab.cross_fragment_coercion.v1
+    required_authority: dharma_swarm.core
+    required_evidence:
+      - original_lab_receipt_hash
+      - target_core_claim
+      - admissible_evidence_under_target_trust_base
+      - reviewer_or_verifier_identity
+  silent_promotion_allowed: false
+import_boundary:
+  lab_may_import_core_under_mediator: true
+  core_may_import_lab: false
+  dynamic_imports_allowed: false
+  eval_exec_allowed: false
+confidence:
+  fragment_parent_choice: "94/100 - user specified parent dharma_swarm.core"
+  lab_excluded_from_tcb: "96/100 - inherited K3 constraint"
+  lyapunov_mapping: "88/100 - direct projection of DHARMA_GATING V components to lab scope"
+
