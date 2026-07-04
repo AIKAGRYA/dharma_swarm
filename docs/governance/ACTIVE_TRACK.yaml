@@ -645,6 +645,13 @@ active_tracks:
         kind: file_contains
         file: .github/workflows/merge-master-mike-backlog.yml
         pattern: "schedule:"
+      # Grade-up (2026-07-04 Pudgala dive Phase 0): the criteria above are all
+      # existence-only (S1 ceiling). This binds the track to the Slice 1 work
+      # that actually LANDED on main — feat(mike): bridge native GitHub reviews
+      # to Mike receipts (D4) — an honest S2, no new claim.
+      - id: github_review_bridge_landed
+        kind: commit_on_main
+        commit: "751c5ba8a802e7116827c31bcf98631b2e2a1f8f"
 
     non_goals:
       - Do not weaken or remove any existing gate check (CI green, conflict, unresolved threads, CHANGES_REQUESTED stay hard).
@@ -738,6 +745,17 @@ active_tracks:
     #   D5 Organism: promote via composition root; god modules may EARN place
     #     through review + hardening. D6 MAP-Elites consolidate on archive.py;
     #     living agents earn always-on individually (start 2-3, monitored).
+
+    # Grade-up (2026-07-04 Pudgala dive Phase 0): this track had no
+    # completion_criteria at all (strongest evidence S0). This binds it to the
+    # commit that actually LANDED the DONE next-items on main (item 2 cockpit
+    # SpinePulsePanel.tsx render + item 3 go_invoke.py toolchain-checked
+    # needs_host closure, merged via PR #759) — an honest S2, no new claim.
+    completion_criteria:
+      - id: rewire_done_slices_landed
+        kind: commit_on_main
+        commit: "4c4f5aa47c7b49d49e28608f39f0b650d236ad57"
+
     next_items:
       - id: 1
         what: "D1 (blocker): CODE+DOCS DONE (docker-compose.yml swarm service carries DHARMA_SPINE_DISPATCH=1 standing; Mac plist env path documented in docs/ops/RUNBOOK.md §3d). REMAINING: operator observation that Loop-1 closure reads LIVE persistently on the daemon host (make orient on the host that actually runs; blocked on daemon host / VPS item 4)."
