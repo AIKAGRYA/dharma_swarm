@@ -26,7 +26,7 @@ The `signature` field encoding is profile-specific, but a canonical receipt requ
 
 ## Signature policy
 
-The measured object is `(signature, key_id, trust_base_id)`. [confidence: 94/100] The PR #2 profile admits `ed25519` signatures encoded as unpadded base64url strings matching `^base64url:[A-Za-z0-9_-]+$`. [confidence: 92/100] `key_id` must resolve through `authority.trust_base_id` or a checked-refinement receipt to a public key, signer role, key validity window, and non-revoked status at both `signed_at` and observation time `t`; otherwise `signatures_valid` fails closed. [confidence: 94/100] [A logical reconstruction of SPKI](https://arxiv.org/abs/cs/0208028), [RFC 8032](https://www.rfc-editor.org/rfc/rfc8032)
+The measured object is `(signature, key_id, trust_base_id)`. [confidence: 94/100] The PR #2 profile admits `ed25519` signatures encoded as unpadded base64url strings matching `^base64url:[A-Za-z0-9_-]+$` whose decoded payload is exactly 64 bytes; otherwise `signatures_valid` fails closed. [confidence: 94/100] [RFC 8032](https://www.rfc-editor.org/rfc/rfc8032) `key_id` must resolve through `authority.trust_base_id` or a checked-refinement receipt to a public key, signer role, key validity window, and non-revoked status at both `signed_at` and observation time `t`; otherwise `signatures_valid` fails closed. [confidence: 94/100] [A logical reconstruction of SPKI](https://arxiv.org/abs/cs/0208028), [RFC 8032](https://www.rfc-editor.org/rfc/rfc8032)
 
 ## Receipt object
 

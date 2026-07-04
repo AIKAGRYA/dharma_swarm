@@ -43,7 +43,7 @@ The semilattice claim is limited to receipt-event convergence; it does not claim
 
 ## Snapshot mechanics
 
-The measured object is a mesh snapshot; the threshold for `base_snapshot_hash` is the SHA-256 Merkle root over the content-addressed event ids in `EventSet` for every authority key in the snapshot, with the snapshot time recorded separately so that replicas can compare `base_snapshot_hash` for convergence without exchanging full event sets. [confidence: 92/100] [Conflict-free Replicated Data Types](https://arxiv.org/abs/1805.06358)
+The measured object is a mesh snapshot; the threshold for `base_snapshot_hash` is the SHA-256 Merkle root over lexicographically sorted content-addressed event ids, domain-separated by authority key, with the snapshot time recorded separately so replicas can compare `base_snapshot_hash` deterministically without exchanging full event sets. [confidence: 93/100] [Conflict-free Replicated Data Types](https://arxiv.org/abs/1805.06358)
 
 ## Challenge rule
 
@@ -73,7 +73,7 @@ The adversary is a first-class participant, not an out-of-band reviewer. [confid
 
 ## Non-normative bisim
 
-Define `Cut(H, S1, S2)` as the set of TTL boundaries, challenge resolution times, and snapshot observation times inside horizon `H`; define `Obs(S, k, t) = (canonical_status(S, k, t), unresolved_challenge_ids(S, k, t), expiry_status(S, k, t))`; snapshots `S1` and `S2` are authority-projection equivalent over challenge base `B` and horizon `H` iff for every authority key `k` named by `B` and every `t` in `Cut(H, S1, S2)`, `Obs(S1, k, t) = Obs(S2, k, t)`. [confidence: 95/100] [Bisimulation of Labelled State-to-Function Transition Systems Coalgebraically](https://arxiv.org/abs/1511.05866) This is a non-normative target for future reconciliation work and gives bounded authority-projection equivalence, weaker than full event-state equality and much weaker than semantic program equivalence; it does not import the evolution `bisimilar(...)` function as an implementation. [confidence: 96/100]
+Define `Cut(H, S1, S2)` as the finite set of event observation times and derived boundary times inside horizon `H` that can change `canonical_status`, including `claim_seen`, `evidence_seen`, `challenge_opened`, `challenge_resolved`, `receipt_superseded`, TTL boundaries, and snapshot observation times; define `Obs(S, k, t) = (canonical_status(S, k, t), unresolved_challenge_ids(S, k, t), expiry_status(S, k, t))`; snapshots `S1` and `S2` are authority-projection equivalent over challenge base `B` and horizon `H` iff for every authority key `k` named by `B` and every `t` in `Cut(H, S1, S2)`, `Obs(S1, k, t) = Obs(S2, k, t)`. [confidence: 94/100] [Bisimulation of Labelled State-to-Function Transition Systems Coalgebraically](https://arxiv.org/abs/1511.05866) This is a non-normative target for future reconciliation work and gives bounded authority-projection equivalence, weaker than full event-state equality and much weaker than semantic program equivalence; it does not import the evolution `bisimilar(...)` function as an implementation. [confidence: 96/100]
 
 ## Privacy rule
 
