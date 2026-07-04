@@ -377,12 +377,12 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
     ),
     ModelSlot(
         ProviderType.KIMI_CODE,
-        "kimi-k2.7-code",
-        "Kimi K2.7 Code (Kimi API Platform)",
+        "kimi-for-coding",
+        "Kimi Code (stable latest)",
         ModelTier.STRONG,
         ("code", "reasoning", "long_context", "synthesis"),
         256_000,
-        "Floor — direct Kimi API Platform coding lane",
+        "Floor — direct Kimi Code membership API; stable id maps to latest K2.x Code",
     ),
     # ── NEW floor frontier (>= K2.6) — Ollama-Cloud lanes, keyless ─────
     # The K2.6 floor the roster must SERVE. Live providers first: each rides

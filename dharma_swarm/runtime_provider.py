@@ -13,8 +13,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
-import httpx
-
 from dharma_swarm.api_keys import (
     ANTHROPIC_API_KEY_ENV,
     CEREBRAS_API_KEY_ENV,
@@ -102,14 +100,15 @@ DEFAULT_PROVIDER_TIMEOUT_SECONDS = 300
 
 
 def _ollama_runtime_available(*, base_url: str, token: str | None) -> bool:
-    """Return whether the resolved Ollama endpoint can serve requests now."""
+    """Return whether the resolved Ollama endpoint is configured for dispatch.
+
+    This resolver is used by no-network CI and hot routing paths, so it must not
+    perform an inline smoke. Actual liveness belongs to dkeys/provider-status
+    refresh and provider failure fallback.
+    """
     if ollama_transport_mode(base_url=base_url, api_key=token) == "cloud_api":
         return bool(token)
-    try:
-        resp = httpx.get(f"{base_url.rstrip('/')}/api/tags", timeout=1.0)
-    except Exception:
-        return False
-    return resp.status_code == 200
+    return bool(base_url)
 
 # Provider ordering sourced from model_hierarchy.py — the single source of truth.
 # All free providers first, then cheap, then paid.
@@ -534,7 +533,6 @@ def create_runtime_provider(config: RuntimeProviderConfig) -> Any:
         GoogleAIProvider,
         GroqProvider,
         KimiCodeProvider,
-        MoonshotProvider,
         MistralProvider,
         NVIDIANIMProvider,
         OllamaProvider,
@@ -546,6 +544,7 @@ def create_runtime_provider(config: RuntimeProviderConfig) -> Any:
         TogetherProvider,
         ZhipuProvider,
     )
+    from dharma_swarm.moonshot_provider import MoonshotProvider
 
     if config.provider == ProviderType.ANTHROPIC:
         kwargs: dict[str, Any] = {}

@@ -42,6 +42,12 @@ def _row(glyph: str, *, status: str = "", env_var: str = "X", present: bool = Tr
     }
 
 
+def _row_with_name(name: str, glyph: str, *, status: str = "", env_var: str = "X", present: bool = True) -> dict:
+    row = _row(glyph, status=status, env_var=env_var, present=present)
+    row["name"] = name
+    return row
+
+
 # ---------------------------------------------------------------------------
 # key_oracle.live_providers
 # ---------------------------------------------------------------------------
@@ -63,6 +69,26 @@ def test_live_providers_oauth_counts_live(tmp_path: Path) -> None:
     assert "codex" in live
     # Host-detected keyless providers (local/ollama/claude_code smoke) are
     # intentionally environment-dependent; this test isolates oauth/key rows.
+
+
+def test_live_providers_accepts_current_dkeys_array_rows(tmp_path: Path) -> None:
+    target = tmp_path / ".dharma"
+    target.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "last_test_ts": time.time(),
+        "rows": [
+            _row_with_name("groq", "✓", status="live"),
+            _row_with_name("openrouter", "✗", status="HTTP 404"),
+        ],
+    }
+    (target / "keys_status.json").write_text(json.dumps(payload), encoding="utf-8")
+
+    live = live_providers(home=tmp_path)
+
+    assert live is not None
+    assert "groq" in live
+    assert "openrouter" not in live
+    assert "openrouter_free" not in live
 
 
 def test_live_providers_429_is_pruned(tmp_path: Path) -> None:

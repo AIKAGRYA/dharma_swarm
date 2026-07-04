@@ -18,6 +18,7 @@ LOG_FILE="${STATE_DIR}/logs/dashboard-ui.log"
 PORT="${DASHBOARD_PORT:-3420}"
 HOST="${DASHBOARD_HOST:-127.0.0.1}"
 NPM_BIN="${NPM_BIN:-npm}"
+RUNTIME_ENV_HELPER="${REPO_ROOT}/scripts/load_runtime_env.sh"
 
 mkdir -p "${STATE_DIR}/logs"
 
@@ -92,14 +93,10 @@ ensure_dashboard_build() {
     ) >> "${LOG_FILE}" 2>&1
 }
 
-for envfile in "${HOME}/.env" "${HOME}/.dharma/.env" "${HOME}/.dharma/daemon.env"; do
-    if [[ -f "$envfile" ]]; then
-        set -a
-        # shellcheck disable=SC1090
-        source "$envfile"
-        set +a
-    fi
-done
+if [[ -f "$RUNTIME_ENV_HELPER" ]]; then
+    # shellcheck disable=SC1090
+    source "$RUNTIME_ENV_HELPER"
+fi
 
 if [[ -f "$PID_FILE" ]]; then
     old_pid="$(cat "$PID_FILE" 2>/dev/null || true)"

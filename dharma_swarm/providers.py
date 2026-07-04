@@ -2007,45 +2007,6 @@ class KimiCodeProvider(LLMProvider):
                 yield delta.content
 
 
-class MoonshotProvider(KimiCodeProvider):
-    """Kimi Open Platform / Moonshot global OpenAI-compatible provider."""
-
-    capabilities = ProviderCapabilities(
-        supports_streaming=True, supports_tools=True,
-        supports_thinking=True, supports_system_prompt=True,
-        max_context_tokens=256_000, provider_family="moonshot",
-    )
-
-    def __init__(
-        self,
-        api_key: str | None = None,
-        base_url: str | None = None,
-        default_model: str | None = None,
-        timeout: float = 300.0,
-    ) -> None:
-        self._api_key = api_key or os.environ.get(MOONSHOT_API_KEY_ENV)
-        self._base_url = (base_url or "https://api.moonshot.ai/v1").rstrip("/")
-        self._default_model = default_model or canonical_default_model(ProviderType.MOONSHOT)
-        self._timeout = float(timeout)
-        self._client: Any = None
-
-    def _client_or_raise(self) -> Any:
-        if self._client is not None:
-            return self._client
-        if not self._api_key:
-            raise RuntimeError(f"{MOONSHOT_API_KEY_ENV} not set")
-        try:
-            from openai import AsyncOpenAI
-        except ImportError as exc:
-            raise ImportError("pip install openai") from exc
-        self._client = AsyncOpenAI(
-            api_key=self._api_key,
-            base_url=self._base_url,
-            timeout=self._timeout,
-        )
-        return self._client
-
-
 class ZhipuProvider(LLMProvider):
     """z.ai / Zhipu -- first-party GLM lane (glm-5.2, GLM-4.6). OpenAI-compatible.
 

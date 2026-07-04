@@ -7,9 +7,9 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/opt/homebrew/bin/dgc</string>
-        <string>cron</string>
-        <string>daemon</string>
+        <string>/bin/bash</string>
+        <string>-lc</string>
+        <string>cd __DHARMA_SWARM_ROOT__ &amp;&amp; source scripts/load_runtime_env.sh &amp;&amp; exec dgc cron daemon</string>
     </array>
 
     <key>RunAtLoad</key>
@@ -31,7 +31,7 @@
     <string>~/.dharma/logs/cron-daemon.stderr.log</string>
 
     <key>WorkingDirectory</key>
-    <string>~</string>
+    <string>__DHARMA_SWARM_ROOT__</string>
 
     <key>EnvironmentVariables</key>
     <dict>

@@ -266,21 +266,21 @@ def test_install_launchd_service_writes_absolute_paths(tmp_path, monkeypatch):
     (scripts_dir / "com.dharma.cron-daemon.plist").write_text(
         """<?xml version="1.0" encoding="UTF-8"?>
 <plist version="1.0">
-<dict>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/opt/homebrew/bin/dgc</string>
-        <string>cron</string>
-        <string>daemon</string>
-    </array>
+	<dict>
+	    <key>ProgramArguments</key>
+	    <array>
+	        <string>/bin/bash</string>
+	        <string>-lc</string>
+	        <string>cd __DHARMA_SWARM_ROOT__ &amp;&amp; source scripts/load_runtime_env.sh &amp;&amp; exec dgc cron daemon</string>
+	    </array>
     <key>StandardOutPath</key>
     <string>~/.dharma/logs/cron-daemon.stdout.log</string>
     <key>StandardErrorPath</key>
     <string>~/.dharma/logs/cron-daemon.stderr.log</string>
-    <key>WorkingDirectory</key>
-    <string>~</string>
-</dict>
-</plist>
+	    <key>WorkingDirectory</key>
+	    <string>__DHARMA_SWARM_ROOT__</string>
+	</dict>
+	</plist>
 """,
         encoding="utf-8",
     )
@@ -305,7 +305,8 @@ def test_install_launchd_service_writes_absolute_paths(tmp_path, monkeypatch):
     assert "~" not in rendered
     assert f"{home}/.dharma/logs/cron-daemon.stdout.log" in rendered
     assert f"{home}/.dharma/logs/cron-daemon.stderr.log" in rendered
-    assert f"<string>{home}</string>" in rendered
+    assert "source scripts/load_runtime_env.sh" in rendered
+    assert f"<string>{repo_root}</string>" in rendered
 
     @patch("dharma_swarm.custodians._get_model_for_role", return_value="test-model/v1")
     def test_dry_run_no_files_changed(self, mock_model, py_tree, monkeypatch):

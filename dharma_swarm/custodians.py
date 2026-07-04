@@ -879,6 +879,7 @@ def install_launchd_service() -> bool:
         "<string>~</string>",
         f"<string>{home_str}</string>",
     )
+    plist_text = plist_text.replace("__DHARMA_SWARM_ROOT__", str(DHARMA_SWARM_ROOT))
     dest.write_text(plist_text, encoding="utf-8")
 
     # Load (unload first if already loaded)
