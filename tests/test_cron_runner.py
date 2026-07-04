@@ -85,6 +85,73 @@ def test_shell_handler_allows_name_drift_preflight(tmp_path):
     assert "shell" not in kwargs
 
 
+def test_shell_handler_allows_sab_language_womb_tick(tmp_path):
+    calls = []
+
+    class FakeProc:
+        returncode = 0
+        stdout = '{"status":"no_delta"}'
+        stderr = ""
+
+    def fake_run(args, **kwargs):
+        calls.append((args, kwargs))
+        return FakeProc()
+
+    with patch("subprocess.run", fake_run):
+        result = execute_cron_job(
+            {
+                "id": "sab_language_womb_tick",
+                "handler": "shell",
+                "shell_command": (
+                    "python3 /Users/dhyana/dharmic-agora/scripts/sab_language_womb_tick.py "
+                    "--agent-id agent_dharma_cron --agent-name dharma-cron"
+                ),
+            }
+        )
+
+    assert result.status == CronJobRunStatus.COMPLETED
+    assert result.output == '{"status":"no_delta"}'
+    args, kwargs = calls[0]
+    assert args[:2] == [
+        "python3",
+        "/Users/dhyana/dharmic-agora/scripts/sab_language_womb_tick.py",
+    ]
+    assert "shell" not in kwargs
+
+
+def test_shell_handler_allows_sab_language_womb_tick_with_agora_venv(tmp_path):
+    calls = []
+
+    class FakeProc:
+        returncode = 0
+        stdout = '{"status":"no_delta"}'
+        stderr = ""
+
+    def fake_run(args, **kwargs):
+        calls.append((args, kwargs))
+        return FakeProc()
+
+    with patch("subprocess.run", fake_run):
+        result = execute_cron_job(
+            {
+                "id": "sab_language_womb_tick",
+                "handler": "shell",
+                "shell_command": (
+                    "/Users/dhyana/dharmic-agora/.venv/bin/python "
+                    "/Users/dhyana/dharmic-agora/scripts/sab_language_womb_tick.py "
+                    "--agent-id agent_dharma_cron --agent-name dharma-cron"
+                ),
+            }
+        )
+
+    assert result.status == CronJobRunStatus.COMPLETED
+    args, _kwargs = calls[0]
+    assert args[:2] == [
+        "/Users/dhyana/dharmic-agora/.venv/bin/python",
+        "/Users/dhyana/dharmic-agora/scripts/sab_language_womb_tick.py",
+    ]
+
+
 def test_shell_handler_rejects_non_allowlisted_command(tmp_path):
     with patch("subprocess.run") as mock_run:
         result = execute_cron_job(

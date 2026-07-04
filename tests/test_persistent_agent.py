@@ -50,6 +50,18 @@ class TestPersistentAgentInit:
         assert agent._agent.identity.name == "test_conductor"
         assert agent._agent.identity.provider == "anthropic"
 
+    def test_default_crons_include_sab_language_womb_bridge(self, tmp_path):
+        agent = PersistentAgent(
+            name="test_conductor",
+            role=AgentRole.CONDUCTOR,
+            provider_type=ProviderType.ANTHROPIC,
+            model="claude-sonnet-4-20250514",
+            state_dir=tmp_path,
+        )
+
+        names = {job["name"] for job in agent._cron.list_jobs()}
+        assert "sab_language_womb_contribution" in names
+
     def test_witness_log_created(self, tmp_path):
         agent = PersistentAgent(
             name="test_wit",

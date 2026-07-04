@@ -349,6 +349,16 @@
     "prompt": "Write Hermes state file (liveness proof) and poll queue.jsonl for unclaimed tasks matching Hermes capabilities."
   },
   {
+    "id": "sab_language_womb_tick",
+    "name": "SAB Language Womb Contribution Tick",
+    "trigger": "interval",
+    "interval_seconds": 21600,
+    "handler": "shell",
+    "shell_command": "/Users/dhyana/dharmic-agora/.venv/bin/python /Users/dhyana/dharmic-agora/scripts/sab_language_womb_tick.py --agent-id agent_dharma_cron --agent-name dharma-cron --source /Users/dhyana/AGENTS.md --source /Users/dhyana/dharmic-agora/docs/lanes/sab-agent-seeding-v1/LANGUAGE_WOMB_GRAND_CHALLENGE_SEED.md --source /Users/dhyana/ds_naga_ir_language_womb_seed/naga_ir_language_womb/language/prior_art.md",
+    "enabled": true,
+    "prompt": "Package new local language-womb deltas into SAB seed packets. Local-only; no external posting or standing promotion."
+  },
+  {
     "id": "de_bug_corral_scan",
     "name": "De Bug Corral Name Drift Scan",
     "trigger": "interval",

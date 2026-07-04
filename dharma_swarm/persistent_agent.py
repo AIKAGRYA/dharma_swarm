@@ -213,6 +213,12 @@ class PersistentAgent:
             handler=self._cron_adapt_identity,
             description="Evolve profile based on accumulated performance",
         )
+        self._cron.register(
+            "sab_language_womb_contribution",
+            interval_seconds=21600.0,  # every 6 hours
+            handler=self._cron_sab_language_womb_contribution,
+            description="Package relevant witness-log deltas for SAB language-womb challenge",
+        )
 
     async def _cron_consolidate_memory(self) -> str:
         """p4 real sleep-time reorg: raw EPISODE -> FACT/EDGE proposals via MemoryKernel + writers inventory.
@@ -330,6 +336,19 @@ class PersistentAgent:
             )
             return f"adapted: {changes}"
         return "no_adaptation_needed"
+
+    async def _cron_sab_language_womb_contribution(self) -> str:
+        """Package relevant witness-log deltas for the SAB language-womb seed."""
+        try:
+            from dharma_swarm.sab_language_womb_bridge import write_witness_contribution
+
+            return write_witness_contribution(
+                agent_name=self.name,
+                witness_log=self._witness_log,
+                state_dir=self.state_dir,
+            )
+        except Exception as exc:
+            return f"error: {exc}"
 
     # -- Subsystem access (lazy init) ------------------------------------
 

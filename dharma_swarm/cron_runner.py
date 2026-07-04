@@ -41,6 +41,8 @@ _LOCAL_FALLBACK_ERROR_MARKERS = (
 _ALLOWED_SHELL_COMMAND_PREFIXES = (
     ("python3", "scripts/consume_review_marks.py"),
     ("python3", "scripts/hermes_heartbeat_poll.py"),
+    ("python3", "/Users/dhyana/dharmic-agora/scripts/sab_language_womb_tick.py"),
+    ("/Users/dhyana/dharmic-agora/.venv/bin/python", "/Users/dhyana/dharmic-agora/scripts/sab_language_womb_tick.py"),
     ("python3", "scripts/check_provider_credits.py"),
     ("python3", "scripts/governance/name_drift_preflight.py"),
     (".venv/bin/python", "scripts/governance/name_drift_preflight.py"),
