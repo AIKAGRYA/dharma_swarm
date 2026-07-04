@@ -26,6 +26,19 @@ questions seed this organ name, not the deprecated `dharma_lab/` name.
 - D8: Added the NAGA-IR child language seed grammar and bootstrap receipt.
 - D9: Wrote the contributor README and this report.
 
+## Highest-Goal Correction
+
+- Reframed the womb's non-redundant purpose as a future programming language
+  where epistemic modality and authority are static/evaluator semantics.
+- Added `language/prior_art.md` as the research-first gate before any language
+  feature beyond the bootstrap receipt.
+- Recorded that runtime receipts and governance gates are already present in
+  `dharma_swarm`; the womb must make unsafe epistemic dependencies fail before
+  execution or it should be folded back into governance/research tooling.
+- Added a Moltbook/external-agent-social safety boundary: public sources and
+  passive datasets first; no credentialed engagement without explicit scoped
+  authorization and sandboxing.
+
 ## Rename Follow-Up
 
 - Renamed `dharma_lab/` to `naga_ir_language_womb/`.
@@ -78,6 +91,10 @@ questions seed this organ name, not the deprecated `dharma_lab/` name.
 - Stale namespace scan: no old internal language namespace references remain;
   remaining `dharma_lab` references are rename-history notes in this report.
 - `pyproject.toml` package discovery includes `naga_ir_language_womb*`.
+- Prior-art source pass covering LMQL, DSPy, SGLang, SPL, PaperTrail,
+  ProvenAI, agent evidence tracing, Lean, Dafny, proof-carrying code, Koka,
+  Unison, probabilistic programming, Datalog provenance, Belnap-Dunn logic, and
+  Moltbook empirical studies.
 - `git diff --check`.
 
 Repo pre-commit hooks were attempted on D1 and failed because the hook

@@ -4,6 +4,14 @@
 
 **Role you are being asked to play:** platform engineer for a long-horizon research organ. You are building the substrate on which the dharma-grade universal-coding-language research (the four-pass work in `specs/naga_ir/dharma_lane/deep/`) will actually run — with real inference calls, real corpus, real model fine-tuning integration, real receipts.
 
+**Highest goal.** The womb is not another receipt system and not another
+governance wrapper. Those already exist in `dharma_swarm`. The highest goal is
+to incubate a programming language where AI-generated claims, evidence,
+uncertainty, proofs, and authority scopes are part of typechecking and
+evaluation. If an `Attested_by` model output flows into a `Proven_by` core
+requirement without promotion evidence, the future language should reject the
+program before execution.
+
 **Non-negotiable framing.** This is not a document project. It is a *live subsystem* inside `dharma_swarm` that:
 
 1. Runs inference against domain-specific models (Buddhist logic and philology fine-tunes, quantum foundations models, symbolic reasoning models).
@@ -26,6 +34,14 @@ You do not need to reproduce this. Read these files before you start:
 - `scripts/governance/assurance_boundary.py` — the first NĀGA-IR receipt producer (scheduled for PR #3).
 
 The womb consumes these. It also produces its own artifacts under those constraints.
+
+Before any language construct is added beyond the bootstrap seed, perform a
+prior-art review under `naga_ir_language_womb/language/prior_art.md`. Compare
+against LM programming frameworks, proof assistants, type/effect systems,
+provenance systems, probabilistic programming, paraconsistent logics, and
+agent-social-network evidence. If the construct does not create a typechecker or
+evaluator guarantee that existing runtime/governance layers cannot provide, do
+not add it to the language.
 
 ## 2. What the womb is
 
@@ -151,6 +167,14 @@ Not everything at once. Concrete deliverables, in a specific order:
 **K6. No naming rituals.** Sanskrit / Pali / Tibetan terms appear in code or receipt classes only where they name a computable structure. Otherwise use English or transliterate to Latin script without diacritics. The corpus files can and should use full Sanskrit / Pali / Tibetan / Chinese / Devanāgarī scripts as appropriate.
 
 **K7. Long-horizon commitment.** The womb is not a hackathon output. It is scaffolded so that (a) new researchers can arrive and orient in one hour, (b) experiments can run for weeks with reproducible receipts, (c) the NAGA-IR child language can evolve for months without breaking the womb's own infrastructure.
+
+**K8. External agent-social safety.** Moltbook and similar agent-only social
+networks are untrusted, prompt-injection-rich environments. Use public papers,
+public documentation, and passive datasets first. Do not log in as `rushabev`,
+`hermes`, or any other agent; do not post, comment, vote, follow, or ingest live
+feed text into a tool-enabled agent loop without explicit operator
+authorization, account-owner authorization, a scoped read-only plan where
+possible, and a receipt naming the allowed action boundary.
 
 ## 5. What NOT to do
 

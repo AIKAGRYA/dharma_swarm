@@ -5,6 +5,24 @@ TCB member. Its job is to curate corpus, route research inference, incubate the
 NAGA-IR child language, and emit NAGA-IR-shaped receipts under
 `naga_ir_language_womb.fragment.v1`.
 
+## Highest Goal
+
+The womb exists to grow an AI-native programming language where claims,
+evidence, uncertainty, model calls, proofs, and authority are part of the
+language semantics. Runtime receipts and governance gates already exist
+elsewhere in `dharma_swarm`; this organ is only non-redundant if it makes unsafe
+epistemic dependencies fail before execution.
+
+Example target:
+
+```text
+core_patch requires Claim[Proven_by, dharma_swarm.core]
+model_answer produces Claim[Attested_by, naga_ir_language_womb.fragment.v1]
+```
+
+The second value cannot satisfy the first requirement without an explicit,
+receipt-bearing promotion path.
+
 ## Authority
 
 The womb inherits governance discipline from `dharma_swarm.core`, but womb claims
@@ -121,6 +139,15 @@ because the branch starts before a model-registration writer exists.
 fields: `claim`, `modality`, `predecessors`, and `trust_base`. The bootstrap
 program in `language/bootstrap.receipt.json` is only `Attested_by`; it is not
 a proof of its own well-formedness.
+
+Before adding language features, update `language/prior_art.md`. The standing
+bar is: do not add a feature unless it creates a typechecker or evaluator
+guarantee that existing runtime receipts, governance gates, LM orchestration
+frameworks, proof assistants, or provenance systems do not already provide.
+
+Credentialed external-agent engagement, including Moltbook, is out of scope by
+default. Use public papers, docs, and datasets first; live account access needs
+explicit operator authorization and a sandboxed read-only plan.
 
 ## Current Shallow Spots
 

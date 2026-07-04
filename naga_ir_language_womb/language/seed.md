@@ -2,6 +2,17 @@
 
 Status: bootstrap seed, not a full language implementation.
 
+Highest goal: grow a language where claims carry epistemic modality and
+authority in their semantics, not merely in logs emitted after execution.
+Runtime receipt emission is already available elsewhere in `dharma_swarm`; the
+new language must eventually reject invalid epistemic dependencies at
+typecheck/evaluation time.
+
+Prior-art gate: before extending this seed, update `prior_art.md` and show why
+the proposed construct is not already solved by LM orchestration frameworks,
+proof assistants, type/effect systems, provenance systems, or probabilistic /
+paraconsistent languages.
+
 ## Smallest Viable Grammar
 
 There is one top-level syntactic form:

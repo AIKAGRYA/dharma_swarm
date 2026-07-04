@@ -23,6 +23,7 @@ All womb-owned classes use the `naga_ir_language_womb.*` prefix.
 | `naga_ir_language_womb.corpus_ingest.v1` | `naga_ir_language_womb/corpus/ingest.py` | `Attested_by` | implemented |
 | `naga_ir_language_womb.inference.v1` | `naga_ir_language_womb/inference/router.py` | `Attested_by` for single-model output | implemented |
 | `naga_ir_language_womb.model_registered.v1` | future model registry writer | `Attested_by` | reserved |
+| `naga_ir_language_womb.prior_art_review.v1` | future prior-art gate writer | `Attested_by` or stronger if independently reviewed | reserved |
 | `naga_ir_language_womb.language_extension.v1` | future NAGA-IR child language governance | `Attested_by` or `Tested_by` by consensus evidence | reserved |
 | `naga_ir_language_womb.cross_fragment_coercion.v1` | governance promotion workflow | target-dependent | reserved |
 

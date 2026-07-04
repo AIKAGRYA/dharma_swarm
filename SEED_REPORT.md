@@ -11,6 +11,10 @@ Summary:
 - Moved the language incubation surface to `naga_ir_language_womb/language/`.
 - Wired receipt classes, trust-base IDs, Python imports, CLI examples, and
   package discovery to the `naga_ir_language_womb.*` namespace.
+- Reframed the highest goal as AI-native programming-language semantics:
+  epistemic modality and authority should become typechecker/evaluator facts,
+  not only runtime receipts.
+- Added a prior-art gate before language expansion.
 - Updated the Pass 1 research handoff so disagreement questions seed
   `naga_ir_language_womb/`.
 - No push or PR has been performed.
