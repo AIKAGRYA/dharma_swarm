@@ -58,6 +58,7 @@ class SentenceTransformerEmbedder:
         self._dim = dim
         self._state_path = state_path  # unused but matches protocol shape
         self._model: Any = None
+        self._last_error: str | None = None
 
     @property
     def dim(self) -> int:
@@ -79,6 +80,7 @@ class SentenceTransformerEmbedder:
         except ImportError:
             logger.warning("sentence-transformers not installed, falling back to zero vectors")
         except Exception as exc:
+            self._last_error = f"model load failed: {exc}"
             logger.warning("SentenceTransformerEmbedder model load failed: %s", exc)
 
     def embed(self, texts: list[str]) -> list[list[float]]:
@@ -129,6 +131,7 @@ class TFIDFEmbedder:
         self._corpus: list[str] = []
         self._corpus_hash: str = ""
         self._fitted = False
+        self._last_error: str | None = None
         self._load_state()
 
     @property
@@ -268,6 +271,7 @@ class TFIDFEmbedder:
             self._save_state()
 
         except Exception as exc:
+            self._last_error = f"_fit failed: {exc}"
             logger.debug("TFIDFEmbedder._fit failed: %s", exc)
 
     def _save_state(self) -> None:
@@ -287,6 +291,7 @@ class TFIDFEmbedder:
             with open(self._state_path, "w", encoding="utf-8") as fh:
                 _json.dump(state, fh)
         except Exception as exc:
+            self._last_error = f"_save_state failed: {exc}"
             logger.debug("TFIDFEmbedder._save_state failed: %s", exc)
 
     def _load_state(self) -> None:
@@ -306,5 +311,6 @@ class TFIDFEmbedder:
             if self._corpus:
                 self._fit(self._corpus)
         except Exception as exc:
+            self._last_error = f"_load_state failed: {exc}"
             logger.debug("TFIDFEmbedder._load_state failed: %s", exc)
 
