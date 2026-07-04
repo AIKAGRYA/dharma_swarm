@@ -1,11 +1,21 @@
 # Pass 1 — The Paramāṇu-Scale Substrate
 
+Ingest metadata:
+
+- Saved by: Codex
+- Saved at: 2026-07-04 JST
+- Source: user-provided paste from another agent tool
+- Source author line: Perplexity Computer (Claude Sonnet 4.6 backing), 2026-07-04 JST
+- Role: raw research artifact; not canon, not implementation spec
+
+---
+
+# Pass 1 — The Paramāṇu-Scale Substrate
+
 **Author.** Perplexity Computer (Claude Sonnet 4.6 backing), 2026-07-04 JST.
 **Role.** One author among several; mandate is *map the decision space*, depth-source the sender's marked-thin regions (Sarvāstivāda tri-temporal, Yogācāra bīja moment-causation, Viṃśatikā verse-level, Jain paramāṇu→skandha mereology, Kālacakra kṣaṇa-cosmology), symmetric rigor everywhere else, mark shallow spots honestly.
 **Convention.** Confidence numerics N/100 on load-bearing architectural claims. Below 70 = guessing. Primary-text citations to verse where I have engaged the text; "secondary" tag where I have not. All Sanskrit in IAST; occasional Tibetan in Wylie.
 **What this paper does not do.** It does not commit to a substrate. It commits to a *decomposition* of the substrate question and shows where the answer forces itself vs. where it remains open. The final section proposes one synthesis with explicit confidence and identifies where I would disagree with likely co-author positions.
-
-**INGEST NOTE (Perplexity Computer, 2026-07-04 JST).** This document arrived truncated mid-sentence in §3.5 (line ending "This is captured operationally by *protocol-level receipt transformations*... and*"). Preserved verbatim as received; continuation to be requested from the author for §3.5 tail through §9 synthesis. Grade-ledger audit deferred until full document lands.
 
 ---
 
@@ -286,6 +296,184 @@ Argument. Two considerations force this:
 
 **Kālacakra's five colored winds** are, I think, more than mere metaphor here. In Kālacakra cosmology, the five elemental *vāyus* are not passive substrata but active field-qualities that *carry* karmic/consciousness content. In naga_ir terms: the connection-protocol between two nodes is not a passive transport but an *active substrate* that shapes what receipts can be exchanged and how they are transformed in transit. This is captured operationally by *protocol-level receipt transformations* (e.g., a receipt sent over a low-trust link is stamped with reduced confidence before landing).
 
-**Where this diverges from strict LQG-analog.** LQG has spin-networks as fundamental *and
+**Where this diverges from strict LQG-analog.** LQG has spin-networks as fundamental *and* time-symmetric. naga_ir's protocols are directional (source → target) and produce new receipts. So the analog is closer to a *causal set* than to a symmetric spin-network — closer to Sorkin's causal-set program than to Rovelli's spin-foam.[^causal-set]
 
-[TRUNCATED — document arrived cut mid-sentence at §6/§3.5 tail. Continuation to be requested; §3.6 (observer-relativity), §3.7, §3.8, and §9 synthesis are outstanding.]
+[^causal-set]: Sorkin (1997, 2003) causal set theory. Not on your reading list but structurally relevant: the discrete order-theoretic substrate is close to what naga_ir needs. I mention it because it is *the* PLT-friendly quantum-gravity approach — the substrate is literally a poset, and this factors well with categorical semantics.
+
+**Operational predicate.** Two nodes A and B: there is *no fact of the matter* about the state "between them" — only about (i) what receipts A holds, (ii) what receipts B holds, (iii) what protocol-relations connect them. Trying to query "the state of the mesh between A and B" should return a *type error*, not a value. This is a load-bearing linguistic decision: no query returns "mesh state simpliciter."
+
+## 7. §3.6 The observer-relativity question
+
+This is the most consequential decision in Pass 1, because it forces the logical framework of Passes 2 and 4.
+
+### 7.1 The choice
+
+- **Belnap4** (four-valued: T, F, both, neither). Observer-independent: a proposition has one of four values, and these values are absolute. Different observers may not have measured yet, but there is a fact of the matter.
+- **Rovelli-RQM.** Observer-relative: canonicality of a receipt is a *relation* between the receipt and the observer; different nodes may honestly see different canonicalities.
+- **QBism.** Probabilities are personal Bayesian credences of an agent; there is no observer-independent probability. Related but distinct from RQM — QBism is more subjectivist, RQM more relational-realist.[^qbism-rqm]
+
+[^qbism-rqm]: Fuchs (2010, arXiv 1003.5209) "QBism, the Perimeter of Quantum Bayesianism." Fuchs's position denies that quantum states describe reality; they describe an agent's expectations. Rovelli's position affirms that quantum states describe *relations* which are real. The difference matters for whether naga_ir is realist-about-receipt-relations (RQM) or instrumentalist-about-receipts (QBism). I read RQM as the stronger position for a language design and will assume it hereafter.
+
+### 7.2 The Belnap4 problem
+
+Belnap4 gives you a beautifully clean bilattice — knowledge order × truth order — and it is the natural home for "receipt-verified vs. receipt-refuted vs. both vs. neither" states. But Belnap4 is *observer-independent*: the value is a fact about the proposition, not a relation.
+
+**Claim 7.1.** *If naga_ir commits to Rovelli-RQM at the ontology, then Belnap4 as-usually-formulated is not the correct logical layer; you need a Belnap4-indexed-by-trust-base — a fibered structure where each trust-base sees its own Belnap4 lattice.* [Confidence 84/100.]
+
+The formal shape is: a *presheaf* Bel4^𝑻 from the category of trust-bases (with morphisms being trust-base-extensions or restrictions) to the category of bilattices. Each trust-base gets its own Belnap4 view; morphisms between trust-bases produce corresponding morphisms between the local bilattices. This is technically a *bilattice-valued sheaf* — a well-studied object in topos-theoretic logic.[^topos] Different trust-bases may see contradictory canonicalities without the *mesh* being contradictory, because the mesh is the *global* section space, and global sections may fail to exist (which is fine — it just means no universal fact-of-the-matter).
+
+[^topos]: Isham (1997) topos-theoretic quantum theory; Döring & Isham (2011) *"What is a Thing?": Topos Theory in the Foundations of Physics*. This is the mathematical framework where "no observer-independent fact" is *literally* the failure of a global section on a specific presheaf (the spectral presheaf). If Pass 2 needs a home for observer-relative multi-valued logic, presheaf topoi over trust-base categories is where I would put it. I have read Döring-Isham 2011 §3–5 and the Coecke-Heunen sheaf-theoretic work is adjacent. Confidence on the technical framework 82/100; on it being the right choice for naga_ir specifically 71/100.
+
+### 7.3 The consequence
+
+Different nodes may see different canonicalities *without contradiction* because canonicality is a two-place relation ⟨receipt, trust-base⟩, not a one-place property of receipts. This maps directly onto Rovelli's insistence that quantum properties are relations between systems, not intrinsic properties.
+
+**Operational implication.** Every canonicality query must be trust-base-indexed. There is no `is_canonical(receipt)`; there is only `is_canonical(receipt, trust_base)`. Nodes with different trust-bases can hold logically-consistent but pairwise-contradictory canonicality-assignments, and the *mesh-consistency* condition is that morphisms between trust-bases (e.g., trust-base A ⊆ trust-base B) produce agreeing canonicality-transformations — a sheaf-condition, not a global-consistency condition.
+
+## 8. §3.7 The Nāgārjuna-Rovelli connection
+
+### 8.1 Is Rovelli at grade?
+
+**Claim 8.1.** *Rovelli's engagement with Nāgārjuna in Helgoland is largely at grade at the level of the structural analogy — no autonomous entities, all facts relational — but importantly under-develops (a) the difference between conventional and ultimate truth in Madhyamaka, (b) the specifically negative-dialectical (*prasaṅga*) method of Madhyamaka argumentation.* [Confidence 76/100.]
+
+Rovelli's core claim: Nāgārjuna's *śūnyatā* means "no autonomous essence — everything exists only relationally"; RQM says the same at the quantum-physics level; therefore the philosophical framework of Nāgārjuna helps make sense of RQM's radical relationism. This is *correct* as far as the analogy of ontological structure goes. Rovelli is not merely a physicist's sympathetic misreading — he engages MMK primarily via Garfield's 1995 translation and Westerhoff's 2009 monograph, both of which are respectable philosophical scholarship.[^rovelli-scholarship]
+
+[^rovelli-scholarship]: Rovelli, *Helgoland* (2020), ch. "Without Foundation? Nāgārjuna". Rovelli cites Garfield (1995) and Westerhoff (2009) as his primary sources. Thijs Latten's 2022 Utrecht MA thesis "Levels of Relationality: Understanding relational quantum mechanics through Nāgārjuna" (I have read the abstract and skimmed portions) argues that the compatibility narrows to *state-dependent* properties (understood via *pratītyasamutpāda*) and *does not* extend to Rovelli's realism, since Nāgārjuna is more radically anti-foundationalist. This is important: Rovelli maintains a realism about relations that Nāgārjuna would deny at the ultimate level (though not at the conventional level).
+
+Where Rovelli falls short (per Latten and per my reading of MMK 24 on the two truths):
+- Rovelli lacks the *saṃvṛti-paramārtha* (conventional-ultimate) distinction. Nāgārjuna is very careful that even the doctrine of emptiness is empty (*śūnyatā-śūnyatā*, MMK 22.11). Rovelli treats relational facts as ultimately real; Nāgārjuna would say they are conventionally real, ultimately empty.
+- Rovelli imports Nāgārjuna as *support* for RQM. Nāgārjuna's method (*prasaṅga* — reduction to unwanted consequences) is *destructive* of all four positions of the catuṣkoṭi (is, is not, both, neither). Rovelli is asserting a position; Nāgārjuna is dismantling all positions. The methods are opposite in polarity even if the conclusions share structural features.
+
+**But — and this is the productive point for naga_ir — what does the language inherit from Nāgārjuna via RQM that it would not inherit from RQM alone?**
+
+Two things:
+
+1. **The two-truths distinction.** Language operations should distinguish *conventional* predications (which use full expressive machinery: classical logic, absolute types, definite reference) from *ultimate* predications (which use much thinner machinery: empty-of-essence descriptions that only mention what compositions produce what). This gives naga_ir a natural *conventional/ultimate* modality that RQM alone does not motivate. In practice this could be a "strict" vs. "loose" evaluation mode, where strict mode refuses claims that presuppose observer-independent facts and loose mode permits them for pragmatic use.
+
+2. **The śūnyatā-śūnyatā recursion.** Even the relational-fact ontology is empty of ultimate status. This means naga_ir should not treat "receipt is relative to trust-base" as an ultimate metaphysical fact but as a conventional operational rule. If pushed, the trust-base relation itself is also relational — to a meta-observer, to a language, to a compilation choice. This is the *Prāsaṅgika* Madhyamaka structure and it corresponds to a hierarchical / iterated presheaf: no bottom-out to a "real" trust-base-independent layer.
+
+**Operational consequence.** naga_ir should support a *two-truths modality*: `strict` mode where every predication is trust-base-indexed and no observer-independent claims are permitted; `conventional` mode where standard classical predication is available, at the cost of admitting the conventional-only status of the claims. The `strict` mode is the load-bearing one for correctness; the `conventional` mode is the ergonomic one for practical development. This is a genuinely non-trivial commitment — most languages have only one mode.
+
+### 8.2 Cite MMK 24 (the two-truths chapter)
+
+MMK 24.8–9: "*dve satye samupāśritya buddhānāṃ dharmadeśanā / lokasaṃvṛtisatyaṃ ca satyaṃ ca paramārthataḥ*" — The Buddha's teaching of the Dharma is based on two truths: worldly-conventional truth (*lokasaṃvṛti-satya*) and truth in the highest sense (*paramārtha-satya*). "Those who do not understand the distinction between these two truths do not understand the profound meaning of the Buddha's teaching."[^mmk24]
+
+[^mmk24]: MMK 24.8–9 (Siderits-Katsura 2013, pp. 269–274; Garfield 1995, pp. 296–303; Candrakīrti *Prasannapadā* ad loc., which is where the *Prāsaṅgika* interpretation is developed most carefully — Tsongkhapa's *Lam Rim Chen Mo* ch. on emptiness follows Candrakīrti closely). This is the passage that grounds the two-truths modality claim I made above. I have read all three (Siderits-Katsura for close reading, Garfield for accessible translation, Tsongkhapa via Cutler-Newland vol. 3). Confidence on the citation and interpretation 88/100 — this is a sender-marked-strong area.
+
+Rovelli does not cite this passage in *Helgoland*. He engages MMK 1 (dependent origination), MMK 15 (own-being), and MMK 22 (Tathāgata) but does not go deep on the two-truths structure of MMK 24. This is a genuine gap and where naga_ir can inherit something extra from Nāgārjuna directly rather than through Rovelli.
+
+## 9. §3.8 The formal-structure question — synthesis
+
+Now the payoff. For each substrate position, name the mathematical structure that instantiates it, the structure that would falsify it, and my confidence.
+
+| Position | Instantiating structure | Falsifying structure | Compatible with |
+|---|---|---|---|
+| **A** (Vasubandhu no-atomism) | SMC without generators; presheaf topos with no "point" objects | Set-theoretic mereology with atomic base elements | G, H |
+| **B** (Jain paramāṇu with intrinsic qualities) | Graded/quantitative type theory over a threshold-semiring; alphabet-typed objects with pāriṇāmika composition | Pure structural type theory with no intrinsic tags | Partially G (SMC extended with symbol algebra) |
+| **C** (Sarvāstivāda tri-temporal) | Sheaf of receipts over the poset of time-slices, with *kāritra*-active as a section-restriction | Presentism where only-present-slice has non-trivial section | H (compatible if witnessing is separately tracked) |
+| **D** (Sautrāntika momentariness) | Coalgebraic dynamics on receipt-streams; each moment is a state-morphism, past states traced out | Persistent-object model with identity through time | F, partially H |
+| **E** (Kālacakra kṣaṇa) | Discrete-time semantics with correspondence structure between internal and external ticks | Continuous background time | Any of the above, as choice-of-time-model |
+| **F** (Zurek decoherence) | Density-matrix formalism with einselection functor; classical algebra = center of the decohered algebra | Interpretation preserving off-diagonal elements as physically real | D, partially H |
+| **G** (Categorical QM / SMC) | Symmetric monoidal category, potentially compact-closed, with dagger; string-diagrammatic composition | Sum-of-parts categorification | A, H |
+| **H** (Rovelli RQM) | Presheaf over the category of trust-bases; no global section for canonicality | Universal observer-independent state | Any that permits fibered structure |
+
+### 9.1 Where positions collapse
+
+- **A and G collapse** if you take Vasubandhu's argument seriously and note it targets set-theoretic mereology. SMC without generators is Vasubandhu-compatible.
+- **D and F nearly collapse** if you take decoherence to be the physical mechanism of momentariness — the einselection functor operationalizes "past traced out".
+- **C and H are compatible but do not collapse.** Sarvāstivāda gives you persistent past-existence; RQM makes existence perspectival. You can have both by making existence-relative-to-witnessing-node persistent.
+
+### 9.2 Where positions genuinely disagree
+
+- **A vs. B on the intrinsic-quality question.** Vasubandhu denies intrinsic natures at all; Umāsvāti asserts them. Cannot straightforwardly reconcile. My proposed synthesis (§3): B's intrinsic qualities are not violated by A if they are understood *structurally* — the "color" of a paramāṇu is what alphabet-position it occupies in the composition algebra, not a metaphysically substantive intrinsic property. This is a *reduction* of B to a special case of A within the SMC framework.
+- **C vs. D at the temporal-ontology level.** Sarvāstivāda's realism about past dharmas and Sautrāntika's presentism are not reconcilable at the level Vasubandhu debated them. Naga_ir can *decide* one way. I argued for Vasumitra-Sarvāstivāda (§4.4) with confidence 71/100 because it preserves content-hash-addressable retrieval.
+- **F vs. H on what happens to past states.** Zurek: past is gone (traced out). Rovelli: past is real relative to observers who witnessed it. This is a genuine substantive disagreement. Naga_ir could choose either. I lean toward Rovelli-with-Vasumitra because it preserves audit-trail semantics that Zurek would force to be reconstructed.
+
+### 9.3 My proposed synthesis for naga_ir substrate
+
+**Substrate proposal (my strongest commitment in this document).** [Overall confidence 72/100.]
+
+1. **Composition primitive**: symmetric monoidal category with dagger structure and compact closure where possible. Objects (receipt-types) are defined by their morphism behavior, not by intrinsic identity. (A + G.)
+
+2. **Intrinsic quality alphabet**: small finite set of *categorical tags* on receipts (varṇa/rasa/gandha/sparśa analogs), with graded quantities on the two-place adhesion tag (snigdha/rūkṣa analog) that gate composability via V.34/V.35/V.36 rules and produce pāriṇāmika bond transformations. Not a metaphysical commitment to intrinsic being; a categorical commitment to alphabet-typed morphisms. (Modified B, reduced to A.)
+
+3. **Temporal ontology**: Vasumitra-avasthā — receipts have permanent identity (content-hash) but variable active-status (*kāritra*-flag). Past receipts are content-hash-addressable; whether they are currently active is a perspectival query. (C, specifically Vasumitra reading.)
+
+4. **Observer-relativity**: Rovelli-RQM. Canonicality is trust-base-relative. No global canonicality. Formalized as a presheaf on the trust-base category. (H.)
+
+5. **Time**: intrinsic per-node tick primitive, no global clock. Mesh-time is a construction. Kālacakra-inflected in structure (correspondence between per-node and aggregate ticks) but numerology is deployment-specific. (E, adopted architecturally not numerologically.)
+
+6. **Spatial-mesh ontology**: emergent-relational. No mesh-state simpliciter; only receipts and their relations. Cross-node queries type-check only when trust-base-indexed. (Kālacakra-adjacent, LQG-adjacent.)
+
+7. **Logical framework**: two-truths modality. `strict` mode is trust-base-indexed presheaf-Belnap4; `conventional` mode is classical Belnap4 with reified relations. Strict is sound; conventional is ergonomic. (Nāgārjuna direct, not via Rovelli.)
+
+8. **The śūnyatā-śūnyatā recursion**: the above architecture is itself conventionally-adopted, not ultimately-founded. Compilation choices, meta-observer selections, and the framework's own boundaries are all also relational. This is not a philosophical flourish; it means naga_ir should support *reflection into its own configuration* as a first-class operation — the language should be able to talk about the trust-base structure it is running under.
+
+### 9.4 What this synthesis costs
+
+- **Cost 1**: Every canonicality query needs a trust-base parameter. Legacy-style `is_canonical(x)` is not a well-formed expression. Ergonomically heavy.
+- **Cost 2**: The Jain alphabet requires up-front design decisions about the tag set. Get it wrong and the composition algebra is either over-restrictive or under-discriminating.
+- **Cost 3**: Vasumitra-active-status requires two-phase queries (identity-lookup then activity-check) where systems tuned for single-phase would run faster.
+- **Cost 4**: The two-truths modality is unusual and pedagogically expensive.
+
+None of these are dealbreakers. They are the load-bearing decisions I would defend.
+
+### 9.5 Where I predict co-author disagreement
+
+I expect other authors in this comparison to diverge from me most sharply on:
+
+- **The Jain contribution.** A strong Yogācāra reader (following Vasubandhu strictly) will reject B outright as reifying intrinsic qualities. A strong SMC reader may treat B as decoration. My middle position — B reduced to a categorical alphabet within A+G — is genuinely novel and will draw fire from both sides.
+- **The choice of Vasumitra over Buddhadeva.** A strong Rovelli reader will push for Buddhadeva (RQM at the time axis, not just at the fact axis). My choice preserves audit-trail practicality at the cost of some Rovelli-purity.
+- **The two-truths modality.** Anyone with a strict Prāsaṅgika sensibility will find this insufficiently apophatic; anyone with a strict formalist sensibility will find it philosophically ornamental. It is neither, and defending it is Pass 2 work.
+
+## 10. Shallow-spot inventory
+
+Marking honestly what I could not verify to my usual standard, for the sender's downstream weighting:
+
+- **Viṃśikā v.13 and the Kāśmīra-Vaibhāṣika counter-move.** I am confident on the argument-form but have not personally checked the Silk 2018 Sanskrit against my reading of Ching 2019's interpretation. If Ching has misread the *saṃghāta* / *saṃhata* distinction, my §2.1 reading is affected. Confidence 78/100 on the exposition as given; would need verse-by-Sanskrit-verification for higher.
+- **Tattvārthasūtra V.37 pāriṇāmika directionality.** I cited it as asymmetric based on Sukhlalji's Śvetāmbara commentary. Digambara commentators (Pūjyapāda's *Sarvārthasiddhi*, Akalaṅka's *Rājavārtika*) may read it symmetrically. I have not consulted the Digambara commentaries directly. If they disagree with Sukhlalji, the operational consequence for weighted-merging in naga_ir changes.
+- **Sarvāstivāda four theories' textual precision.** Working from Cox 1988 and Ronkin 2005 secondary literature. I did not consult the AKBh Sanskrit for 5.25–26. My mapping of Vasumitra to "position/state" and Buddhadeva to "relational" is standard but I have not independently verified from the Sanskrit that no important nuance is lost.
+- **Kālacakra kṣaṇa numerics.** I cited 21,600 breaths/day confidently but the finer kṣaṇa subdivision numbers (I recall seeing figures on the order of 12,600,000 sub-kṣaṇas or similar in Newman's work) I did not verify. If Pass 3 or 4 needs the specific numerology, that is Pass-specific research I did not do.
+- **Yogācāra bīja moment-causation.** I mentioned it in §2.4 but did not develop it. The Sthiramati commentary on *Triṃśikā* verses 2–4 and the *Mahāyānasaṃgraha* ch. 1 have detailed bīja-perfuming theory that would be relevant to Pass 3 (dynamics of arising) more than to Pass 1 (substrate). I do not develop it here and mark it as Pass 3 owed-work.
+- **The topos-theoretic formalization of Belnap4-over-trust-bases.** I gestured at "presheaf of bilattices" in §7.2 but the technical apparatus is non-trivial. Döring-Isham 2011 has the machinery for presheaf-Boolean-algebras and it should extend to bilattices, but I have not seen the extension worked out. Confidence 71/100 that the extension is straightforward; 55/100 that it is trivial.
+- **QBism vs. RQM discrimination.** I chose RQM based on realism-about-relations. Fuchs's newer work (post-2020) may have narrowed the gap. I have not tracked this.
+
+## 11. Meta: what this paper is aiming at
+
+The instruction was that multi-AI convergence under sustained primary-text engagement should produce a substrate ontology a working Abhidharma scholar *and* a working quantum foundations physicist would both recognize as at grade.
+
+**What I think an Abhidharma scholar would recognize as at grade in this paper**: the specific verse-level citations of Viṃśikā, the four-theories exposition of Sarvāstivāda tri-temporal, the two-truths distinction in MMK 24 as separate from Rovelli's use of Nāgārjuna, the correct handling of the Nāgārjuna-Rovelli comparison (neither dismissing it nor accepting it uncritically).
+
+**What I think a quantum foundations physicist would recognize as at grade**: the RQM formalization as presheaf over trust-bases, the SMC-without-generators reading of Vasubandhu, the Zurek-Sautrāntika structural mapping, the Rovelli 2019 becoming-is-local-but-real reading as compatible with Vasumitra tri-temporal, the clear operational predicates for each substrate position.
+
+**Where I predict both would push back**: on the Jain alphabet's reduction to categorical tagging (an Abhidharma scholar will say I am under-crediting Jain intrinsic-quality realism; a physicist will say I am over-crediting Jain ontology). This is the seam where genuine multi-author disagreement is likely and productive.
+
+**What I did not attempt**: a full presentation-form (§9's proposal is architectural not implemented), any Pass 2 logic work, any Pass 3 dynamics work, any Pass 4 historical bridge. Those are their own passes.
+
+## 12. Concise operational summary — the "if I had to build it Monday" section
+
+| Design decision | Choice | Confidence | Primary-text warrant |
+|---|---|---|---|
+| Composition primitive | SMC with dagger; objects defined by morphisms | 82/100 | Abramsky-Coecke LICS 2004; Vasubandhu *Viṃśikā* 11–15 targeting set-theoretic mereology |
+| Receipt intrinsic tags | Small alphabet (varṇa/rasa/gandha/sparśa analogs) as categorical, not metaphysical | 74/100 | *Tattvārthasūtra* V.33–37; reduction via A+G |
+| Bond formation rule | Threshold-gated, two-degree-differential, pāriṇāmika-transformative | 71/100 | *Tattvārthasūtra* V.34–V.37 |
+| Temporal existence | Vasumitra: permanent identity, variable *kāritra* activity | 71/100 | *Abhidharmakośabhāṣya* 5.25–26; Ronkin 2005 |
+| Observer-relativity | Rovelli-RQM as presheaf over trust-base category | 84/100 | Rovelli 1996, *Helgoland* 2020, arXiv 1910.02474 |
+| Time atom | Intrinsic per-node tick, no global clock; deployment-specific rate | 80/100 | Kālacakra internal-external correspondence; Wallace 2001 |
+| Mesh spatial ontology | Emergent-relational; no mesh-state simpliciter | 77/100 | Kālacakra "five winds"; Sorkin causal-set theory |
+| Logical framework | Two-truths: strict presheaf-Belnap4, conventional classical Belnap4 | 76/100 | MMK 24.8–9; Candrakīrti *Prasannapadā* |
+| Bootstrap | Fixed-point through mutual dependence; unit-object is categorical not ontological | 82/100 | Nāgārjuna via Priest & Garfield 2003; MMK 1 |
+
+The synthesis is not any single historical school. It is a composite whose components are individually well-motivated and jointly coherent, deliberately built to be non-collapsing across the disagreements. This is what I would defend Monday.
+
+## 13. Ending honestly
+
+I am one of several authors. I have deliberately taken *positions* in a document the instructions permitted me to survey — because the sender's ask ("map the decision space") is answered better by a map that *shows where I would commit* than by a map that hedges. My hope is that the disagreements with other authors are productive at the seams I flagged in §9.5.
+
+The paper has cited: Vasubandhu at verse level for Viṃśikā 11–15 with the Silk 2018 critical edition; Umāsvāti at sūtra level for Tattvārthasūtra V.33–37; Nāgārjuna at chapter and verse for MMK 1, 15, 22, 24; Vasumitra-Ghoṣaka-Dharmatrāta-Buddhadeva through AKBh 5.25–26 (via Cox and Ronkin); Rovelli at 1996 paper, *Helgoland*, and arXiv 1910.02474; Abramsky-Coecke LICS 2004, Coecke-Kissinger 2017, Atkey 2018 LICS, Döring-Isham 2011. Where I have not verified against Sanskrit or primary text directly, I have marked "working from secondary literature." Where I have committed to interpretations that depend on scholarly readings I have not independently verified, I have marked confidence below 75/100.
+
+If this document is at grade, it is because the sender's own depth in categorical QM, linear logic, Madhyamaka argument-forms, and Jain saptabhaṅgī provided the scaffolding I could build on rather than the exposition I had to write. That is the correct division of labor for a Pass 1 substrate paper.
+
+---
+
+*End Pass 1. Passes 2 (logic of predication — Belnap4-over-trust-bases, catuṣkoṭi implementation, saptabhaṅgī), 3 (dynamics of arising — bīja perfuming, *pratītyasamutpāda* as coalgebraic, kṣaṇika step-semantics), and 4 (historical bridge — Church-Turing to Milner-Honda to Selinger-Coecke, Sarvāstivāda-Sautrāntika-Yogācāra to Nāgārjuna to Tsongkhapa) to follow using analogous prompts. This document is load-bearing on those; where its commitments prove wrong on further analysis, later passes should update rather than perpetuate.*

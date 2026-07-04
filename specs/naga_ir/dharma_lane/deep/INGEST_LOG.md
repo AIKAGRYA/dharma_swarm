@@ -1,0 +1,11 @@
+# Dharma Lane Deep-Research Ingest Log
+
+This log records externally generated research artifacts pulled into this lane from the operator's local device (`~/dharma_swarm/telos_titanium/dharma_lane_research/` on `John's MacBook Pro`). Descriptive only; does not promote artifacts to canon.
+
+| Saved At | Artifact (this repo path) | Source | Notes |
+|---|---|---|---|
+| 2026-07-04 JST | [01_substrate_perplexity_r1.md](01_substrate_perplexity_r1.md) | Perplexity Computer / Claude Sonnet 4.6 backing | Pass 1 substrate ontology paper (479 lines, full). Answers the substrate-ontology prompt (§3.1–3.8), not the UCL genesis prompt. Sibling to codex's Pass-1 lane. |
+| 2026-07-04 JST | [language/01_ucl_genesis_fable5_r1.md](language/01_ucl_genesis_fable5_r1.md) | Claude Fable 5 session (workflow wf_ac2345f8-ca8): 6 stance drafts + 3 external model lanes (Kimi/DeepSeek-NIM/Nemotron) + 18-claim adversarial refutation | Same UCL-genesis prompt as codex. Independently constructed genesis receipt `sha256:bc5ae73fed7fe3e09a1cef1c2d5c8ab4900f2e8443ff44ae54535caa37de8faf`; every hash re-verified live. Refutation-coverage outage (16 of 36 lens runs died; 6 claims re-verified by orchestrator inline) disclosed in header. |
+| 2026-07-04 JST | [language/02_convergence_fable5_x_codex_r1.md](language/02_convergence_fable5_x_codex_r1.md) | Fable-5 session orchestrator, post-freeze | §5 comparison: 7 parallel-arrival clusters, 8 decidable disagreement forks each with cheapest settling test, complementary blind spots, Perplexity Pass-1 cross-prompt intersections (shared-lineage discount applied). |
+| 2026-07-04 JST | [language/03_ucl_genesis_codex_r1.md](language/03_ucl_genesis_codex_r1.md) | codex (six delegated agents; self-reported 91/100) | Same UCL-genesis prompt as Fable-5. Independent genesis construction `sha256:58f3b378...` (different bytes, same exclusion-scope architecture). |
+| 2026-07-04 JST | [language/ucl_genesis_receipt_bc5ae73f.json](language/ucl_genesis_receipt_bc5ae73f.json) | Fable-5 bootstrap-constructor lane | The 2,036-byte JCS-canonical genesis constant itself. Verified twice this session; storage hash `8f34148808193655665812b08b2c826e53d084c5eefc15a68e8ae9e2d61cd76a`. |
