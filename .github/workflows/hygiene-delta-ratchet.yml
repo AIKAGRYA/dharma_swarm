@@ -38,6 +38,9 @@ jobs:
         # wires it to CI. It is a touched-file ratchet: only files changed
         # between base and head are scanned, and only NET-NEW violations in
         # those files fail. Pre-existing violations are grandfathered.
+        # Pure code moves are credited: counts landing in a NEW file are
+        # classified MOVED (not a regression) when the net delta for that
+        # metric across all touched files is <= 0.
         run: |
           python3 scripts/governance/hygiene/delta_ratchet.py \
             --base-ref "${{ github.event.pull_request.base.sha }}" \

@@ -19,8 +19,15 @@ ones that are cheap and deterministic and enforces a *touched-file* rule:
     individual violation count.
 
 Files that drop below their baseline are encouraged (delta is reported).
-Net new files inherit a base count of 0 and must therefore introduce zero
-violations to land.
+
+New files (absent at the base ref) inherit a base count of 0, which would
+punish pure code moves: relocating existing violations into a new module
+reads as a per-file regression even when the repo-wide total is unchanged
+or improved. To keep move-refactors legal, a NEW file's count for a metric
+is evaluated against the NET delta of that metric across ALL touched files
+in the diff: if the net is <= 0 the count is classified MOVED (reported,
+not failing); if the net is > 0 the new file still fails. Files that
+existed at base keep the strict per-file ratchet.
 
 Usage:
     python scripts/governance/hygiene/delta_ratchet.py \\
@@ -29,8 +36,8 @@ Usage:
     python scripts/governance/hygiene/delta_ratchet.py --json
 
 Exit codes:
-    0   no touched file regressed any tracked dimension
-    1   at least one touched file added new violations
+    0   no touched file regressed any tracked dimension (moves are exit 0)
+    1   at least one touched file added net-new violations
     2   git / environment error
 """
 
@@ -212,10 +219,16 @@ class FileDelta:
     path: str
     base_counts: dict[str, int] = field(default_factory=dict)
     head_counts: dict[str, int] = field(default_factory=dict)
+    base_exists: bool = True
+    # Metrics reclassified from regression to MOVED by apply_move_credit
+    # (new-file counts covered by net improvement across the touched set).
+    moved: dict[str, tuple[int, int]] = field(default_factory=dict)
 
     def regressions(self) -> dict[str, tuple[int, int]]:
         out: dict[str, tuple[int, int]] = {}
         for name in DETECTORS:
+            if name in self.moved:
+                continue
             b = self.base_counts.get(name, 0)
             h = self.head_counts.get(name, 0)
             if h > b:
@@ -236,22 +249,56 @@ class FileDelta:
             "path": self.path,
             "base": self.base_counts,
             "head": self.head_counts,
+            "base_exists": self.base_exists,
             "regressions": {k: list(v) for k, v in self.regressions().items()},
             "improvements": {k: list(v) for k, v in self.improvements().items()},
+            "moved": {k: list(v) for k, v in self.moved.items()},
         }
+
+
+def net_deltas(deltas: list[FileDelta]) -> dict[str, int]:
+    """Net violation delta per metric across every touched file."""
+    net: dict[str, int] = {name: 0 for name in DETECTORS}
+    for d in deltas:
+        for name in DETECTORS:
+            net[name] += d.head_counts.get(name, 0) - d.base_counts.get(name, 0)
+    return net
+
+
+def apply_move_credit(deltas: list[FileDelta]) -> None:
+    """Reclassify new-file counts as MOVED when the touched set nets out.
+
+    A file absent at base has a 0 baseline for every metric, so relocating
+    existing violations into it reads as a regression even when the diff-wide
+    total is flat or improved (PR #774: 4 silent-excepts moved verbatim out
+    of vector_store.py into new embedders.py). For each metric where a NEW
+    file's head count exceeds its base, if the net delta across ALL touched
+    files is <= 0, the count is MOVED, not a regression. Net > 0 still fails.
+    Files that existed at base are never excused by the net.
+    """
+    net = net_deltas(deltas)
+    for d in deltas:
+        if d.base_exists:
+            continue
+        for name in DETECTORS:
+            b = d.base_counts.get(name, 0)
+            h = d.head_counts.get(name, 0)
+            if h > b and net.get(name, 0) <= 0:
+                d.moved[name] = (b, h)
 
 
 def evaluate(base: str, head: str, cwd: Path) -> list[FileDelta]:
     files = changed_python_files(base, head, cwd)
     deltas: list[FileDelta] = []
     for f in files:
-        d = FileDelta(path=f)
-        base_src = show_at_ref(base, f, cwd) or ""
-        head_src = show_at_ref(head, f, cwd) or ""
+        base_src = show_at_ref(base, f, cwd)
+        head_src = show_at_ref(head, f, cwd)
+        d = FileDelta(path=f, base_exists=base_src is not None)
         for name, fn in DETECTORS.items():
             d.base_counts[name] = fn(base_src) if base_src else 0
             d.head_counts[name] = fn(head_src) if head_src else 0
         deltas.append(d)
+    apply_move_credit(deltas)
     return deltas
 
 
@@ -264,8 +311,15 @@ def render_text(deltas: list[FileDelta]) -> str:
     out.append("")
 
     regressed = [d for d in deltas if d.regressions()]
-    improved = [d for d in deltas if d.improvements() and not d.regressions()]
-    stable = [d for d in deltas if not d.regressions() and not d.improvements()]
+    moved = [d for d in deltas if d.moved and not d.regressions()]
+    improved = [
+        d for d in deltas if d.improvements() and not d.regressions() and not d.moved
+    ]
+    stable = [
+        d
+        for d in deltas
+        if not d.regressions() and not d.improvements() and not d.moved
+    ]
 
     if regressed:
         out.append(f"## REGRESSIONS  ({len(regressed)})")
@@ -274,7 +328,21 @@ def render_text(deltas: list[FileDelta]) -> str:
                 out.append(f"  - {d.path}  {name}: {b} -> {h}  (+{h - b})")
         out.append("")
     else:
-        out.append("## REGRESSIONS  (0)  — no touched file added new violations")
+        out.append("## REGRESSIONS  (0)  — no touched file added net-new violations")
+        out.append("")
+
+    if moved:
+        net = net_deltas(deltas)
+        out.append(
+            f"## MOVED  ({len(moved)})  — new-file counts offset by improvements"
+            " elsewhere in this diff (net <= 0)"
+        )
+        for d in moved:
+            for name, (b, h) in d.moved.items():
+                out.append(
+                    f"  - {d.path}  {name}: {b} -> {h}"
+                    f"  (+{h - b} relocated; touched-set net {net[name]:+d})"
+                )
         out.append("")
 
     if improved:

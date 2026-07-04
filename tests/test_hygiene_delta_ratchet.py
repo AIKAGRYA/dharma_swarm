@@ -176,6 +176,133 @@ def test_evaluate_new_file_with_violation_is_regression(tmp_path):
     assert by_path["new.py"].regressions().get("sync_in_async") == (0, 1)
 
 
+def _silent_excepts(n: int) -> str:
+    """A module with exactly ``n`` silent except handlers."""
+    blocks = [
+        dedent(
+            f"""
+            def h{i}():
+                try:
+                    risky()
+                except Exception:
+                    pass
+            """
+        ).lstrip()
+        for i in range(n)
+    ]
+    return "\n".join(blocks)
+
+
+def test_pure_move_to_new_file_is_moved_not_regression(tmp_path):
+    # PR #774 shape: 4 silent-excepts leave vector_store.py (15 -> 11) and
+    # land verbatim in new embedders.py (0 -> 4). Net 0 => MOVED, exit 0.
+    repo = _init_repo(tmp_path)
+    _commit(repo, {"vector_store.py": _silent_excepts(15)}, "base")
+    _commit(
+        repo,
+        {
+            "vector_store.py": _silent_excepts(11),
+            "embedders.py": _silent_excepts(4),
+        },
+        "head",
+    )
+    deltas = mod.evaluate("HEAD~1", "HEAD", repo)
+    by_path = {d.path: d for d in deltas}
+    assert not by_path["embedders.py"].base_exists
+    assert by_path["embedders.py"].regressions() == {}
+    assert by_path["embedders.py"].moved.get("silent_excepts") == (0, 4)
+    assert by_path["vector_store.py"].improvements().get("silent_excepts") == (15, 11)
+    rc = mod.main(["--base-ref", "HEAD~1", "--head-ref", "HEAD", "--repo-root", str(repo)])
+    assert rc == 0
+
+
+def test_new_file_with_net_new_violations_still_fails(tmp_path):
+    # A new file whose counts are NOT covered by improvements elsewhere.
+    repo = _init_repo(tmp_path)
+    _commit(repo, {"clean.py": CLEAN_FILE}, "base")
+    _commit(repo, {"new.py": _silent_excepts(2)}, "head")
+    deltas = mod.evaluate("HEAD~1", "HEAD", repo)
+    by_path = {d.path: d for d in deltas}
+    assert by_path["new.py"].moved == {}
+    assert by_path["new.py"].regressions().get("silent_excepts") == (0, 2)
+    rc = mod.main(["--base-ref", "HEAD~1", "--head-ref", "HEAD", "--repo-root", str(repo)])
+    assert rc == 1
+
+
+def test_move_plus_genuinely_new_violation_fails(tmp_path):
+    # Move 4 out of the source (-4) but land 5 in the new file (+5): net +1.
+    repo = _init_repo(tmp_path)
+    _commit(repo, {"vector_store.py": _silent_excepts(15)}, "base")
+    _commit(
+        repo,
+        {
+            "vector_store.py": _silent_excepts(11),
+            "embedders.py": _silent_excepts(5),
+        },
+        "head",
+    )
+    deltas = mod.evaluate("HEAD~1", "HEAD", repo)
+    by_path = {d.path: d for d in deltas}
+    assert by_path["embedders.py"].moved == {}
+    assert by_path["embedders.py"].regressions().get("silent_excepts") == (0, 5)
+    rc = mod.main(["--base-ref", "HEAD~1", "--head-ref", "HEAD", "--repo-root", str(repo)])
+    assert rc == 1
+
+
+def test_net_credit_never_excuses_preexisting_file(tmp_path):
+    # A file that existed at base keeps the strict per-file ratchet even
+    # when improvements elsewhere make the touched-set net <= 0.
+    repo = _init_repo(tmp_path)
+    _commit(
+        repo,
+        {"a.py": CLEAN_FILE, "b.py": _silent_excepts(2)},
+        "base",
+    )
+    _commit(
+        repo,
+        {"a.py": _silent_excepts(1), "b.py": CLEAN_FILE},
+        "head",
+    )
+    deltas = mod.evaluate("HEAD~1", "HEAD", repo)
+    by_path = {d.path: d for d in deltas}
+    assert by_path["a.py"].moved == {}
+    assert by_path["a.py"].regressions().get("silent_excepts") == (0, 1)
+    rc = mod.main(["--base-ref", "HEAD~1", "--head-ref", "HEAD", "--repo-root", str(repo)])
+    assert rc == 1
+
+
+def test_render_text_reports_moved_section(tmp_path):
+    repo = _init_repo(tmp_path)
+    _commit(repo, {"src.py": _silent_excepts(3)}, "base")
+    _commit(
+        repo,
+        {"src.py": CLEAN_FILE, "dst.py": _silent_excepts(3)},
+        "head",
+    )
+    deltas = mod.evaluate("HEAD~1", "HEAD", repo)
+    text = mod.render_text(deltas)
+    assert "## REGRESSIONS  (0)" in text
+    assert "## MOVED  (1)" in text
+    assert "dst.py  silent_excepts: 0 -> 3" in text
+    assert "## IMPROVEMENTS  (1)" in text
+
+
+def test_to_dict_includes_moved(tmp_path):
+    repo = _init_repo(tmp_path)
+    _commit(repo, {"src.py": _silent_excepts(2)}, "base")
+    _commit(
+        repo,
+        {"src.py": CLEAN_FILE, "dst.py": _silent_excepts(2)},
+        "head",
+    )
+    deltas = mod.evaluate("HEAD~1", "HEAD", repo)
+    by_path = {d.path: d.to_dict() for d in deltas}
+    assert by_path["dst.py"]["moved"] == {"silent_excepts": [0, 2]}
+    assert by_path["dst.py"]["base_exists"] is False
+    assert by_path["dst.py"]["regressions"] == {}
+    assert by_path["src.py"]["base_exists"] is True
+
+
 def test_main_exit_code_on_regression(tmp_path, monkeypatch):
     repo = _init_repo(tmp_path)
     _commit(repo, {"a.py": CLEAN_FILE}, "base")
