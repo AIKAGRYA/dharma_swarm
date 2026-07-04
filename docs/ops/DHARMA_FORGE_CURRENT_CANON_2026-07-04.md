@@ -1,9 +1,21 @@
 # Dharma Forge Current Canon and Overnight Runbook
 
 Date: 2026-07-04  
-Status: source-of-truth map and run-readiness note; not a promotion receipt  
+Status: source-of-truth map, active-track pointer, and run evidence index; not a promotion receipt
 Branch/worktree: `/Users/dhyana/ds_forge_spine_v0` on `feat/rsi-lab`  
 Runtime root: `/Users/dhyana/.dharma/forge_v1` locally; `/root/.dharma/forge_v1` on Agni
+
+## Active Track Pointer
+
+The active governance track for the current Forge line is:
+
+- `forge-rsi-lab-swebench-2026-07` in `docs/governance/ACTIVE_TRACK.yaml`
+- canonical worktree: `/Users/dhyana/ds_forge_spine_v0`
+- canonical branch: `feat/rsi-lab`
+- current head for the 2026-07-04 evidence pass: `569187fac07aa9d4bbc9ea670cc4d126a249ca44`
+
+Older names such as `orchestration-arena-v1-2026-06`, Forge Hydra, and
+ForgeRealityArena are lineage labels, not the active track name.
 
 ## Canonical Names
 
@@ -117,17 +129,19 @@ It is **not** ready for a promotion/evolution-claim overnight. Remaining blocker
 
 ## Host Placement
 
-Use **Agni** as the current `NativeBenchmarkWorker`: it has the right role for
-x86_64/Docker/real benchmark execution, and current Forge focused tests pass
-there.
+Use **Meghadharma** as the proven `NativeBenchmarkConductor` for authenticated
+PR-suite harvest/import loops. It completed the 2026-07-04 8-hour
+`megha_pr_suite_controlsplit_auth_20260704T031305Z` pass at the canonical head,
+producing a closeout and three strict valid pytest tasks.
 
-Use **meghadharma** as a candidate `NativeBenchmarkConductor`, not automatically
-as the benchmark worker. It becomes "best worker" only after it proves:
+Use **Agni** as a proven `NativeBenchmarkWorker` candidate for exact-ID
+grade-only packets: it has the right role for x86_64/Docker/native benchmark
+execution and the current Forge focused tests pass there. Agni has not yet
+run the post-Megha exact-ID grade packet set.
 
-1. the canonical repo is checked out at `feat/rsi-lab`;
-2. Docker/native benchmark dependencies work;
-3. the focused Forge suite passes;
-4. an exact-ID grade-only packet resolves and syncs receipts without mutation.
+Use **model/provider lanes** only in the later solver/evolution phase. The
+Meghadharma harvest loop did not run Fugu, Claude, Kimi, GLM, DeepSeek, or any
+other LLM; it ran deterministic Python harness code.
 
 ## Repo-Native Harvest Loop
 
@@ -160,7 +174,17 @@ unless the DB locking/duplicate-import behavior is intentionally being tested.
 
 ## Current Recommendation
 
-Run one more all-night pass **only as shadow harvest + grade-only receipt
-generation on Agni**. Let `meghadharma` conduct only if it is polling and syncing
-Agni, not replacing Agni as the worker. Treat all results as candidate evidence
-until the full E4/promotion battery is satisfied.
+The latest completed pass is now preserved in:
+
+- `reports/forge_rsi_lab/megha_pr_suite_controlsplit_auth_20260704T031305Z/closeout.json`
+- `reports/forge_rsi_lab/megha_pr_suite_controlsplit_auth_20260704T031305Z/validated_c00_20260704T031306Z.jsonl`
+- `reports/forge_rsi_lab/megha_pr_suite_controlsplit_auth_20260704T031305Z/README.md`
+
+It is significant for harness readiness: 32 cycles, 2230 raw candidate
+observations, 50 strict validation attempts, and 3 imported post-cutoff pytest
+tasks. It is not significant as model-solver proof, capability lift, official
+SWE-bench score, or autonomous evolution.
+
+Next pass: run exact-ID grade-only native packets for the three imported pytest
+tasks, then launch a model-powered solver/evolution pass only after grade
+receipts are sealed and controls are explicit.

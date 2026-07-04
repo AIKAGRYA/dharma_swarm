@@ -314,42 +314,55 @@ Precedence the router must follow, documented in one place:
 - Do not commit provider API keys or any credentials.
 - Do not remove the learning overlays (affinity/EWMA/reward/canary); unify them under one precedence.
 
-### Orchestration Arena v1 — frozen hermetic fitness + zero-weight orchestrator + DPI
+### ForgeRSILab SWE Benchmark Spine — fresh PR-suite taskbed and grade-only proof
 
-**Track id:** `orchestration-arena-v1-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-23 (TTL 21 days)
+**Track id:** `forge-rsi-lab-swebench-2026-07` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-07-04 (TTL 7 days)
 **Relations:** complements: provider-routing-consolidation-2026-06, loop-closure-2026-06
-**Owns surfaces:** dharma_swarm/coordination/**, dharma_swarm/council/**, tests/test_arena_v1.py, tests/test_dpi.py, tests/test_orchestration_genome.py, tests/test_orchestrator_v1.py, tests/test_council_profiles.py, tests/test_coordination_closure_checks.py
+**Owns surfaces:** dharma_swarm/forge_v1/**, scripts/runtime/forge_*.py, tests/test_forge_*.py, docs/ops/DHARMA_FORGE_*.md, reports/forge_rsi_lab/**, reports/governance/rsi_lab_*.md
 **Moves vital signs:** eval_coverage, quality_gates
 
-Governance admission for the Arena/Orchestration substrate that LANDED on
-main (PRs #670 and adjacent) but was not yet represented in the active-track
-portfolio. The DGM substrate must be governance-visible: the system needs to
-know its own fitness function exists, is frozen/hermetic/replayable, and is
-not yet making production capability claims.
+Current Dharma Forge line for real SWE-style benchmark preparation. This
+track metabolizes the older ForgeRealityArena / Orchestration Arena naming
+into the active ForgeRSILab v2.2 spine: repo-native PR-suite harvesting,
+fail-to-pass validation, taskbed import, exact-ID grade-only execution, and
+evidence receipts.
 
-This is the keystone fitness layer for any future Dharma Forge: a frozen
-verifiable taskpack + deterministic scorer + zero-weight heuristic
-orchestrator over a MAP-Elites archive + a Decorrelation-Power-Index (DPI)
-that gates a decorrelated-correctness bonus on actual correctness, plus a
-minimal Council that verifies orchestration traces.
+Current canonical lane:
+  worktree: /Users/dhyana/ds_forge_spine_v0
+  branch: feat/rsi-lab
+  head: 569187fac07aa9d4bbc9ea670cc4d126a249ca44
+  remote conductor used for latest pass: meghadharma
 
-Doctrine that must hold: capability leads, trust multiplies (not the
-headline); only CANONICAL_ORIGIN_MAIN facts feed fitness; v1 carries ZERO
-trained weights — training is earned only after the arena produces labels.
+The 2026-07-04 Meghadharma pass was deterministic harness work, not an LLM
+solve. It harvested post-cutoff PRs, deduped candidates, ran fail-to-pass
+validation, imported three strict valid pytest tasks, and refused live
+apply/source mutation/archive fitness mutation/official score claims.
+
+Historical names remain valid as lineage only:
+  ForgeRealityArena = older arena/Hydra measurement line.
+  Orchestration Arena v1 = earlier frozen hermetic fitness/DPI substrate.
+  ForgeRSILab = current v2.2 SWE benchmark and RSI lab line.
+
+Doctrine that must hold: task generation and grading may produce benchmark
+evidence; only a controlled solver run with budget-matched controls can
+support an evolution or capability-lift claim.
 
 **Next items:**
 
-- [code] Wire arena scorecard + DPI receipts into a governance-visible report surface (read-only).
-- [code] (blocker) Add best-single-model controls + budget-parity proof to every arena run before any capability claim.
-- [code] Connect arena winners to a cold-start trace corpus (no training yet; corpus only).
+- [evidence] Closeout ingested: Meghadharma 2026-07-04 PR-suite pass produced 32 cycles, 2230 raw candidate observations, 50 validated candidates, and 3 strict imported pytest tasks.
+- [runtime] (blocker) Run exact-ID grade-only native packets for the 3 imported pytest tasks and sync receipts into reports/forge_rsi_lab/.
+- [runtime] (blocker) Launch the model-powered solver/evolution phase only after grade-only task packets are sealed; record model/provider chain separately from deterministic harness evidence.
+- [governance] Retire or relabel old local Forge/Arena worktrees as historical references; keep /Users/dhyana/ds_forge_spine_v0 on feat/rsi-lab as the canonical active worktree.
 
 **Non-goals:**
 
-- Do not make production capability claims; arena reports candidate lift only with budget-parity controls and significance gating.
-- Do not introduce trained weights / SFT / GRPO in v1; this track is zero-weight by design.
-- Do not let dirty/local/candidate state feed arena fitness; only canonical origin/main.
-- Do not couple admission to the full world-ingestion (#662) seam.
+- Do not claim solver capability lift from a harvest/validation run.
+- Do not claim autonomous self-evolution until budget-matched solver controls and E4 significance gates pass.
+- Do not mutate source code, live apply, archive fitness, or official benchmark state from harvest loops.
+- Do not let Fugu/provider semantic-responder failures overwrite Forge benchmark evidence.
+- Do not merge historical ForgeRealityArena/Hydra runtime logs into source canon; summarize them through receipts.
+- Do not commit provider API keys, GitHub tokens, tmux logs with secrets, or local runtime databases.
 
 ### Merge Master Mike — D4 persistent always-on merge agent
 

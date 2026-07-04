@@ -923,115 +923,138 @@ active_tracks:
         kind: code
         blocker: false
 
-# ---------------------------------------------------------------------------
-# Closed tracks (history, append-only; do not edit prior entries)
-# ---------------------------------------------------------------------------
-  - id: orchestration-arena-v1-2026-06
-    name: Orchestration Arena v1 — frozen hermetic fitness + zero-weight orchestrator + DPI
+  - id: forge-rsi-lab-swebench-2026-07
+    name: ForgeRSILab SWE Benchmark Spine — fresh PR-suite taskbed and grade-only proof
     status: ACTIVE
-    opened_at: "2026-06-23"
-    verified_at: "2026-06-23"
-    ttl_days: 21
+    opened_at: "2026-07-04"
+    verified_at: "2026-07-04"
+    ttl_days: 7
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
     complements:
       - provider-routing-consolidation-2026-06
       - loop-closure-2026-06
     owned_surfaces:
-      - dharma_swarm/coordination/**
-      - dharma_swarm/council/**
-      - tests/test_arena_v1.py
-      - tests/test_dpi.py
-      - tests/test_orchestration_genome.py
-      - tests/test_orchestrator_v1.py
-      - tests/test_council_profiles.py
-      - tests/test_coordination_closure_checks.py
+      - dharma_swarm/forge_v1/**
+      - scripts/runtime/forge_*.py
+      - tests/test_forge_*.py
+      - docs/ops/DHARMA_FORGE_*.md
+      - reports/forge_rsi_lab/**
+      - reports/governance/rsi_lab_*.md
     moves_vital_signs:
       - eval_coverage
       - quality_gates
 
     description: |
-      Governance admission for the Arena/Orchestration substrate that LANDED on
-      main (PRs #670 and adjacent) but was not yet represented in the active-track
-      portfolio. The DGM substrate must be governance-visible: the system needs to
-      know its own fitness function exists, is frozen/hermetic/replayable, and is
-      not yet making production capability claims.
+      Current Dharma Forge line for real SWE-style benchmark preparation. This
+      track metabolizes the older ForgeRealityArena / Orchestration Arena naming
+      into the active ForgeRSILab v2.2 spine: repo-native PR-suite harvesting,
+      fail-to-pass validation, taskbed import, exact-ID grade-only execution, and
+      evidence receipts.
 
-      This is the keystone fitness layer for any future Dharma Forge: a frozen
-      verifiable taskpack + deterministic scorer + zero-weight heuristic
-      orchestrator over a MAP-Elites archive + a Decorrelation-Power-Index (DPI)
-      that gates a decorrelated-correctness bonus on actual correctness, plus a
-      minimal Council that verifies orchestration traces.
+      Current canonical lane:
+        worktree: /Users/dhyana/ds_forge_spine_v0
+        branch: feat/rsi-lab
+        head: 569187fac07aa9d4bbc9ea670cc4d126a249ca44
+        remote conductor used for latest pass: meghadharma
 
-      Doctrine that must hold: capability leads, trust multiplies (not the
-      headline); only CANONICAL_ORIGIN_MAIN facts feed fitness; v1 carries ZERO
-      trained weights — training is earned only after the arena produces labels.
+      The 2026-07-04 Meghadharma pass was deterministic harness work, not an LLM
+      solve. It harvested post-cutoff PRs, deduped candidates, ran fail-to-pass
+      validation, imported three strict valid pytest tasks, and refused live
+      apply/source mutation/archive fitness mutation/official score claims.
+
+      Historical names remain valid as lineage only:
+        ForgeRealityArena = older arena/Hydra measurement line.
+        Orchestration Arena v1 = earlier frozen hermetic fitness/DPI substrate.
+        ForgeRSILab = current v2.2 SWE benchmark and RSI lab line.
+
+      Doctrine that must hold: task generation and grading may produce benchmark
+      evidence; only a controlled solver run with budget-matched controls can
+      support an evolution or capability-lift claim.
 
     prerequisites:
-      - id: arena_runner_exists
+      - id: forge_v2_package_exists
         kind: file_exists
-        file: dharma_swarm/coordination/arena/runner.py
-      - id: arena_scorer_exists
+        file: dharma_swarm/forge_v1/forge_v2/__init__.py
+      - id: forge_current_canon_exists
         kind: file_exists
-        file: dharma_swarm/coordination/arena/scorer.py
-      - id: orchestration_genome_exists
+        file: docs/ops/DHARMA_FORGE_CURRENT_CANON_2026-07-04.md
+      - id: repo_native_harvest_loop_exists
         kind: file_exists
-        file: dharma_swarm/coordination/genome.py
+        file: scripts/runtime/forge_pr_suite_harvest_loop.py
 
     completion_criteria:
-      - id: frozen_taskpack_present
+      - id: forge_canon_names_current_line
         kind: file_contains
-        file: dharma_swarm/coordination/arena/taskpack.py
-        pattern: "TASK_PACK_ID"
-      - id: deterministic_scorer_hash
-        kind: file_contains
-        file: dharma_swarm/coordination/arena/scorer.py
-        pattern: "def scorer_hash"
-      - id: orchestration_genome_class
-        kind: file_contains
-        file: dharma_swarm/coordination/genome.py
-        pattern: "class OrchestrationGenome"
-      - id: zero_weight_orchestrator_map_elites
-        kind: file_contains
-        file: dharma_swarm/coordination/orchestrator_v1.py
-        pattern: "class MapElitesArchive"
-      - id: dpi_decorrelation_gated_on_correctness
-        kind: file_contains
-        file: dharma_swarm/coordination/dpi.py
-        pattern: "def decorrelation_bonus"
-      - id: council_trace_verification
-        kind: file_contains
-        file: dharma_swarm/council/council.py
-        pattern: "class Council"
-      - id: arena_v1_test_exists
-        kind: file_contains
-        file: tests/test_arena_v1.py
-        pattern: "def test_positive_lift_candidate_beats_best_single_at_parity"
-      - id: dpi_test_exists
+        file: docs/ops/DHARMA_FORGE_CURRENT_CANON_2026-07-04.md
+        pattern: "Forge RSI Lab v2.2 current line"
+      - id: megha_closeout_receipt_valid
+        kind: receipt_valid
+        file: reports/forge_rsi_lab/megha_pr_suite_controlsplit_auth_20260704T031305Z/closeout.json
+        requires_keys:
+          - schema
+          - run_id
+          - started_at
+          - finished_at
+          - cycle_count
+          - candidate_count
+          - unique_candidate_count
+          - validated_count
+          - imported_count
+          - authority
+          - repos
+      - id: megha_validated_rows_present
         kind: file_exists
-        file: tests/test_dpi.py
-      - id: closure_checks_test_exists
-        kind: file_exists
-        file: tests/test_coordination_closure_checks.py
+        file: reports/forge_rsi_lab/megha_pr_suite_controlsplit_auth_20260704T031305Z/validated_c00_20260704T031306Z.jsonl
+      - id: pytest_14647_validated
+        kind: file_contains
+        file: reports/forge_rsi_lab/megha_pr_suite_controlsplit_auth_20260704T031305Z/validated_c00_20260704T031306Z.jsonl
+        pattern: "https://github.com/pytest-dev/pytest/pull/14647"
+      - id: pytest_14588_validated
+        kind: file_contains
+        file: reports/forge_rsi_lab/megha_pr_suite_controlsplit_auth_20260704T031305Z/validated_c00_20260704T031306Z.jsonl
+        pattern: "https://github.com/pytest-dev/pytest/pull/14588"
+      - id: pytest_14624_validated
+        kind: file_contains
+        file: reports/forge_rsi_lab/megha_pr_suite_controlsplit_auth_20260704T031305Z/validated_c00_20260704T031306Z.jsonl
+        pattern: "https://github.com/pytest-dev/pytest/pull/14624"
+      - id: pr_suite_harvest_loop_test_passes
+        kind: test_passes
+        test: "tests/test_forge_pr_suite_harvest_loop.py"
+        oracle_source: "repo-local-pytest"
+      - id: semantic_commons_guard_passes
+        kind: test_passes
+        test: "tests/test_model_key_routing_guard.py::test_semantic_commons_is_registered_or_branch_local_guarded"
+        oracle_source: "repo-local-pytest"
+      - id: taskbed_ledger_guard_exists
+        kind: file_contains
+        file: tests/test_forge_taskbed_ledger.py
+        pattern: "fresh_heldout"
 
     non_goals:
-      - Do not make production capability claims; arena reports candidate lift only with budget-parity controls and significance gating.
-      - Do not introduce trained weights / SFT / GRPO in v1; this track is zero-weight by design.
-      - Do not let dirty/local/candidate state feed arena fitness; only canonical origin/main.
-      - Do not couple admission to the full world-ingestion (#662) seam.
+      - Do not claim solver capability lift from a harvest/validation run.
+      - Do not claim autonomous self-evolution until budget-matched solver controls and E4 significance gates pass.
+      - Do not mutate source code, live apply, archive fitness, or official benchmark state from harvest loops.
+      - Do not let Fugu/provider semantic-responder failures overwrite Forge benchmark evidence.
+      - Do not merge historical ForgeRealityArena/Hydra runtime logs into source canon; summarize them through receipts.
+      - Do not commit provider API keys, GitHub tokens, tmux logs with secrets, or local runtime databases.
 
     next_items:
       - id: 1
-        what: "Wire arena scorecard + DPI receipts into a governance-visible report surface (read-only)."
-        kind: code
+        what: "Closeout ingested: Meghadharma 2026-07-04 PR-suite pass produced 32 cycles, 2230 raw candidate observations, 50 validated candidates, and 3 strict imported pytest tasks."
+        kind: evidence
         blocker: false
       - id: 2
-        what: "Add best-single-model controls + budget-parity proof to every arena run before any capability claim."
-        kind: code
+        what: "Run exact-ID grade-only native packets for the 3 imported pytest tasks and sync receipts into reports/forge_rsi_lab/."
+        kind: runtime
         blocker: true
       - id: 3
-        what: "Connect arena winners to a cold-start trace corpus (no training yet; corpus only)."
-        kind: code
+        what: "Launch the model-powered solver/evolution phase only after grade-only task packets are sealed; record model/provider chain separately from deterministic harness evidence."
+        kind: runtime
+        blocker: true
+      - id: 4
+        what: "Retire or relabel old local Forge/Arena worktrees as historical references; keep /Users/dhyana/ds_forge_spine_v0 on feat/rsi-lab as the canonical active worktree."
+        kind: governance
         blocker: false
 
   - id: merge-master-mike-d4-2026-06

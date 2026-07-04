@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-26T10:44:18+09:00",
+  "generated_at": "2026-07-04T22:47:49+09:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
@@ -111,7 +111,7 @@
       "id": "operator_core_contracts_pass",
       "kind": "test_passes",
       "passed": true,
-      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.41s",
+      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed, 2 warnings in 0.99s",
       "executed": true
     }
   ],
@@ -119,7 +119,7 @@
     "active": 10,
     "max_active": 10,
     "warn_active": 5,
-    "shippable": 6
+    "shippable": 3
   },
   "spine_objectives": [
     {
@@ -298,7 +298,7 @@
           "id": "operator_core_contracts_pass",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.41s",
+          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed, 2 warnings in 0.99s",
           "executed": true
         }
       ]
@@ -324,8 +324,8 @@
       "verified_at": "2026-06-07",
       "ttl_days": 21,
       "owner": "@codex",
-      "shippable": true,
-      "criteria_pass": true,
+      "shippable": false,
+      "criteria_pass": false,
       "ship_blocks": [],
       "has_rigorous_evidence": true,
       "strongest_grade": 2,
@@ -334,7 +334,7 @@
       "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 4,
+        "passed": 3,
         "total": 4
       },
       "criteria": [
@@ -362,15 +362,15 @@
         {
           "id": "nats_transport_tests_pass",
           "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_nats_transport.py: PASS \u2014 6 passed in 0.84s",
+          "passed": false,
+          "detail": "pytest tests/test_nats_transport.py: FAIL \u2014 6 failed, 8 warnings in 0.61s",
           "executed": true
         },
         {
           "id": "nats_substrate_contract_test_pass",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_nats_substrate_contract.py: PASS \u2014 1 passed in 0.28s",
+          "detail": "pytest tests/test_nats_substrate_contract.py: PASS \u2014 1 passed, 2 warnings in 0.80s",
           "executed": true
         }
       ]
@@ -799,7 +799,7 @@
           "id": "repo_context_projection_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 1.42s",
+          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed, 2 warnings in 2.74s",
           "executed": true
         },
         {
@@ -839,8 +839,8 @@
       "verified_at": "2026-06-23",
       "ttl_days": 14,
       "owner": "@AmitabhainArunachala",
-      "shippable": true,
-      "criteria_pass": true,
+      "shippable": false,
+      "criteria_pass": false,
       "ship_blocks": [],
       "has_rigorous_evidence": true,
       "strongest_grade": 2,
@@ -849,7 +849,7 @@
       "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 8,
+        "passed": 7,
         "total": 8
       },
       "criteria": [
@@ -919,8 +919,8 @@
         {
           "id": "holon_bridge_verifier_passes",
           "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_holon_bridge.py: PASS \u2014 16 passed in 0.19s",
+          "passed": false,
+          "detail": "pytest tests/test_holon_bridge.py: FAIL \u2014 3 failed, 13 passed, 2 warnings in 0.53s",
           "executed": true
         },
         {
@@ -1051,7 +1051,7 @@
           "id": "precedence_invariant_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.26s",
+          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed, 2 warnings in 0.49s",
           "executed": true
         },
         {
@@ -1064,8 +1064,8 @@
       ]
     },
     {
-      "id": "orchestration-arena-v1-2026-06",
-      "name": "Orchestration Arena v1 \u2014 frozen hermetic fitness + zero-weight orchestrator + DPI",
+      "id": "forge-rsi-lab-swebench-2026-07",
+      "name": "ForgeRSILab SWE Benchmark Spine \u2014 fresh PR-suite taskbed and grade-only proof",
       "status": "ACTIVE",
       "serves": "substrate-nativeness",
       "complements": [
@@ -1075,32 +1075,28 @@
       "depends_on": [],
       "conflicts_with": [],
       "owned_surfaces": [
-        "dharma_swarm/coordination/**",
-        "dharma_swarm/council/**",
-        "tests/test_arena_v1.py",
-        "tests/test_dpi.py",
-        "tests/test_orchestration_genome.py",
-        "tests/test_orchestrator_v1.py",
-        "tests/test_council_profiles.py",
-        "tests/test_coordination_closure_checks.py"
+        "dharma_swarm/forge_v1/**",
+        "scripts/runtime/forge_*.py",
+        "tests/test_forge_*.py",
+        "docs/ops/DHARMA_FORGE_*.md",
+        "reports/forge_rsi_lab/**",
+        "reports/governance/rsi_lab_*.md"
       ],
       "moves_vital_signs": [
         "eval_coverage",
         "quality_gates"
       ],
-      "verified_at": "2026-06-23",
-      "ttl_days": 21,
+      "verified_at": "2026-07-04",
+      "ttl_days": 7,
       "owner": "@AmitabhainArunachala",
       "shippable": false,
       "criteria_pass": true,
       "ship_blocks": [
-        "1 open blocker next-item(s)",
-        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)",
-        "strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
+        "2 open blocker next-item(s)"
       ],
-      "has_rigorous_evidence": false,
-      "strongest_grade": 1,
-      "strongest_grade_name": "S1_PRESENT",
+      "has_rigorous_evidence": true,
+      "strongest_grade": 3,
+      "strongest_grade_name": "S3_TESTED",
       "min_evidence_grade": 2,
       "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
@@ -1110,87 +1106,87 @@
       },
       "criteria": [
         {
-          "id": "arena_runner_exists",
+          "id": "forge_v2_package_exists",
           "kind": "file_exists",
           "passed": true,
-          "detail": "dharma_swarm/coordination/arena/runner.py present",
+          "detail": "dharma_swarm/forge_v1/forge_v2/__init__.py present",
           "executed": true
         },
         {
-          "id": "arena_scorer_exists",
+          "id": "forge_current_canon_exists",
           "kind": "file_exists",
           "passed": true,
-          "detail": "dharma_swarm/coordination/arena/scorer.py present",
+          "detail": "docs/ops/DHARMA_FORGE_CURRENT_CANON_2026-07-04.md present",
           "executed": true
         },
         {
-          "id": "orchestration_genome_exists",
+          "id": "repo_native_harvest_loop_exists",
           "kind": "file_exists",
           "passed": true,
-          "detail": "dharma_swarm/coordination/genome.py present",
+          "detail": "scripts/runtime/forge_pr_suite_harvest_loop.py present",
           "executed": true
         },
         {
-          "id": "frozen_taskpack_present",
+          "id": "forge_canon_names_current_line",
           "kind": "file_contains",
           "passed": true,
-          "detail": "pattern 'TASK_PACK_ID' found in dharma_swarm/coordination/arena/taskpack.py",
+          "detail": "pattern 'Forge RSI Lab v2.2 current line' found in docs/ops/DHARMA_FORGE_CURRENT_CANON_2026-07-04.md",
           "executed": true
         },
         {
-          "id": "deterministic_scorer_hash",
-          "kind": "file_contains",
+          "id": "megha_closeout_receipt_valid",
+          "kind": "receipt_valid",
           "passed": true,
-          "detail": "pattern 'def scorer_hash' found in dharma_swarm/coordination/arena/scorer.py",
+          "detail": "receipt reports/forge_rsi_lab/megha_pr_suite_controlsplit_auth_20260704T031305Z/closeout.json valid (11 keys present)",
           "executed": true
         },
         {
-          "id": "orchestration_genome_class",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'class OrchestrationGenome' found in dharma_swarm/coordination/genome.py",
-          "executed": true
-        },
-        {
-          "id": "zero_weight_orchestrator_map_elites",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'class MapElitesArchive' found in dharma_swarm/coordination/orchestrator_v1.py",
-          "executed": true
-        },
-        {
-          "id": "dpi_decorrelation_gated_on_correctness",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'def decorrelation_bonus' found in dharma_swarm/coordination/dpi.py",
-          "executed": true
-        },
-        {
-          "id": "council_trace_verification",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'class Council' found in dharma_swarm/council/council.py",
-          "executed": true
-        },
-        {
-          "id": "arena_v1_test_exists",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'def test_positive_lift_candidate_beats_best_single_at_parity' found in tests/test_arena_v1.py",
-          "executed": true
-        },
-        {
-          "id": "dpi_test_exists",
+          "id": "megha_validated_rows_present",
           "kind": "file_exists",
           "passed": true,
-          "detail": "tests/test_dpi.py present",
+          "detail": "reports/forge_rsi_lab/megha_pr_suite_controlsplit_auth_20260704T031305Z/validated_c00_20260704T031306Z.jsonl present",
           "executed": true
         },
         {
-          "id": "closure_checks_test_exists",
-          "kind": "file_exists",
+          "id": "pytest_14647_validated",
+          "kind": "file_contains",
           "passed": true,
-          "detail": "tests/test_coordination_closure_checks.py present",
+          "detail": "pattern 'https://github.com/pytest-dev/pytest/pull/14647' found in reports/forge_rsi_lab/megha_pr_suite_controlsplit_auth_20260704T031305Z/validated_c00_20260704T031306Z.jsonl",
+          "executed": true
+        },
+        {
+          "id": "pytest_14588_validated",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'https://github.com/pytest-dev/pytest/pull/14588' found in reports/forge_rsi_lab/megha_pr_suite_controlsplit_auth_20260704T031305Z/validated_c00_20260704T031306Z.jsonl",
+          "executed": true
+        },
+        {
+          "id": "pytest_14624_validated",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'https://github.com/pytest-dev/pytest/pull/14624' found in reports/forge_rsi_lab/megha_pr_suite_controlsplit_auth_20260704T031305Z/validated_c00_20260704T031306Z.jsonl",
+          "executed": true
+        },
+        {
+          "id": "pr_suite_harvest_loop_test_passes",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_forge_pr_suite_harvest_loop.py: PASS \u2014 6 passed, 2 warnings in 0.51s",
+          "executed": true
+        },
+        {
+          "id": "semantic_commons_guard_passes",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_model_key_routing_guard.py::test_semantic_commons_is_registered_or_branch_local_guarded: PASS \u2014 1 passed, 2 warnings in 0.30s",
+          "executed": true
+        },
+        {
+          "id": "taskbed_ledger_guard_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'fresh_heldout' found in tests/test_forge_taskbed_ledger.py",
           "executed": true
         }
       ]
@@ -1326,8 +1322,8 @@
       "verified_at": "2026-06-24",
       "ttl_days": 21,
       "owner": "@AmitabhainArunachala",
-      "shippable": true,
-      "criteria_pass": true,
+      "shippable": false,
+      "criteria_pass": false,
       "ship_blocks": [],
       "has_rigorous_evidence": true,
       "strongest_grade": 2,
@@ -1336,7 +1332,7 @@
       "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 12,
+        "passed": 10,
         "total": 12
       },
       "criteria": [
@@ -1392,8 +1388,8 @@
         {
           "id": "stage_contract_test_passes",
           "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_stage_contracts.py: PASS \u2014 13 passed in 0.18s",
+          "passed": false,
+          "detail": "pytest tests/test_stage_contracts.py: FAIL \u2014 3 failed, 10 passed, 2 warnings in 0.35s",
           "executed": true
         },
         {
@@ -1407,7 +1403,7 @@
           "id": "okf_roundtrip_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_okf_projection.py: PASS \u2014 8 passed in 0.19s",
+          "detail": "pytest tests/test_okf_projection.py: PASS \u2014 8 passed, 2 warnings in 0.42s",
           "executed": true
         },
         {
@@ -1421,7 +1417,7 @@
           "id": "semantic_fs_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_semantic_fs.py: PASS \u2014 5 passed in 0.19s",
+          "detail": "pytest tests/test_semantic_fs.py: PASS \u2014 5 passed, 2 warnings in 0.39s",
           "executed": true
         },
         {
@@ -1435,14 +1431,14 @@
           "id": "organizer_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_organizer.py: PASS \u2014 5 passed in 0.16s",
+          "detail": "pytest tests/test_organizer.py: PASS \u2014 5 passed, 2 warnings in 0.35s",
           "executed": true
         },
         {
           "id": "fs_substrate_e2e_passes",
           "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_fs_substrate_e2e.py: PASS \u2014 4 passed in 4.08s",
+          "passed": false,
+          "detail": "pytest tests/test_fs_substrate_e2e.py: FAIL \u2014 1 failed, 3 passed, 2 warnings in 3.82s",
           "executed": true
         }
       ]
@@ -1474,15 +1470,33 @@
       "criterion_id": null
     },
     {
+      "severity": "WARN",
+      "check": "track-stale:runtime-truth-nats-2026-06",
+      "message": "[runtime-truth-nats-2026-06] verified_at is 27 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.",
+      "criterion_id": null
+    },
+    {
       "severity": "INFO",
-      "check": "track-shippable:runtime-truth-nats-2026-06",
-      "message": "[runtime-truth-nats-2026-06] all 4 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
+      "check": "track-in-progress:runtime-truth-nats-2026-06",
+      "message": "[runtime-truth-nats-2026-06] 3/4 completion criteria pass.",
+      "criterion_id": null
+    },
+    {
+      "severity": "WARN",
+      "check": "track-stale:runtime-truth-spine-adoption-2026-06",
+      "message": "[runtime-truth-spine-adoption-2026-06] verified_at is 24 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.",
       "criterion_id": null
     },
     {
       "severity": "INFO",
       "check": "track-in-progress:runtime-truth-spine-adoption-2026-06",
       "message": "[runtime-truth-spine-adoption-2026-06] 7/8 completion criteria pass.",
+      "criterion_id": null
+    },
+    {
+      "severity": "WARN",
+      "check": "track-stale:loop-closure-2026-06",
+      "message": "[loop-closure-2026-06] verified_at is 23 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.",
       "criterion_id": null
     },
     {
@@ -1499,8 +1513,8 @@
     },
     {
       "severity": "INFO",
-      "check": "track-shippable:composer-holon-spine-longrun-2026-06",
-      "message": "[composer-holon-spine-longrun-2026-06] all 8 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
+      "check": "track-in-progress:composer-holon-spine-longrun-2026-06",
+      "message": "[composer-holon-spine-longrun-2026-06] 7/8 completion criteria pass.",
       "criterion_id": null
     },
     {
@@ -1511,8 +1525,8 @@
     },
     {
       "severity": "INFO",
-      "check": "track-provisional:orchestration-arena-v1-2026-06",
-      "message": "[orchestration-arena-v1-2026-06] 9/9 criteria pass but NOT shippable under the rigorous bar: 1 open blocker next-item(s); no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid); strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).",
+      "check": "track-provisional:forge-rsi-lab-swebench-2026-07",
+      "message": "[forge-rsi-lab-swebench-2026-07] 9/9 criteria pass but NOT shippable under the rigorous bar: 2 open blocker next-item(s). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).",
       "criterion_id": null
     },
     {
@@ -1523,8 +1537,8 @@
     },
     {
       "severity": "INFO",
-      "check": "track-shippable:filesystem-native-substrate-2026-06",
-      "message": "[filesystem-native-substrate-2026-06] all 12 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
+      "check": "track-in-progress:filesystem-native-substrate-2026-06",
+      "message": "[filesystem-native-substrate-2026-06] 10/12 completion criteria pass.",
       "criterion_id": null
     }
   ]

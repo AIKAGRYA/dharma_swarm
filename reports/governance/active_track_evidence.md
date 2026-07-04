@@ -1,7 +1,7 @@
 # Track Portfolio Evidence
 
-Generated: 2026-06-26T10:44:18+09:00 (schema v2)
-Active tracks: **10** (warn 5, max 10) — shippable 6
+Generated: 2026-07-04T22:47:49+09:00 (schema v2)
+Active tracks: **10** (warn 5, max 10) — shippable 3
 
 ## Spine coverage
 
@@ -29,9 +29,9 @@ Active tracks: **10** (warn 5, max 10) — shippable 6
   - ✓ `correlation_spine_manifest_still_declared` (file_contains) — pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml
   - ✓ `evidence_receipt_still_defined` (file_contains) — pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py
   - ✓ `runtime_receipt_still_defined` (file_contains) — pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py
-  - ✓ `operator_core_contracts_pass` (test_passes) — pytest tests/test_operator_core_contracts.py: PASS — 7 passed in 0.41s
+  - ✓ `operator_core_contracts_pass` (test_passes) — pytest tests/test_operator_core_contracts.py: PASS — 7 passed, 2 warnings in 0.99s
 
-## `runtime-truth-nats-2026-06` — SHIPPABLE
+## `runtime-truth-nats-2026-06` — 3/4
 
 - serves: `substrate-nativeness` · complements: ['runtime-truth-reconciliation-2026-06'] · depends_on: [] · conflicts_with: []
 - owned_surfaces: ['docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md', 'dharma_swarm/a2a/a2a_nats_contact.py', 'dharma_swarm/a2a/a2a_core_contact.py']
@@ -40,8 +40,8 @@ Active tracks: **10** (warn 5, max 10) — shippable 6
   - ✓ `nats_master_spec_exists` (file_exists) — docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present
   - ✓ `nats_master_spec_present` (file_exists) — docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present
   - ✓ `nats_transport_landed` (file_contains) — pattern 'NATS' found in docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
-  - ✓ `nats_transport_tests_pass` (test_passes) — pytest tests/test_nats_transport.py: PASS — 6 passed in 0.84s
-  - ✓ `nats_substrate_contract_test_pass` (test_passes) — pytest tests/test_nats_substrate_contract.py: PASS — 1 passed in 0.28s
+  - ✗ `nats_transport_tests_pass` (test_passes) — pytest tests/test_nats_transport.py: FAIL — 6 failed, 8 warnings in 0.61s
+  - ✓ `nats_substrate_contract_test_pass` (test_passes) — pytest tests/test_nats_substrate_contract.py: PASS — 1 passed, 2 warnings in 0.80s
 
 ## `runtime-truth-spine-adoption-2026-06` — 7/8
 
@@ -104,10 +104,10 @@ Active tracks: **10** (warn 5, max 10) — shippable 6
   - ✓ `nats_e2e_shell_wrapper_exists` (file_exists) — scripts/governance/run_truth_graph_nats_e2e_demo.sh present
   - ✓ `a2a_gate_tests_exist` (file_contains) — pattern "receipt or it didn't happen" found in tests/test_a2a_gate.py
   - ✓ `registry_presence_tests_exist` (file_contains) — pattern 'heartbeat_status' found in tests/test_agent_registry_presence.py
-  - ✓ `repo_context_projection_passes` (test_passes) — pytest tests/test_truth_graph_repo_context.py: PASS — 1 passed in 1.42s
+  - ✓ `repo_context_projection_passes` (test_passes) — pytest tests/test_truth_graph_repo_context.py: PASS — 1 passed, 2 warnings in 2.74s
   - ✓ `truth_graph_projection_on_main` (commit_on_main) — 936d365db is an ancestor of origin/main
 
-## `composer-holon-spine-longrun-2026-06` — SHIPPABLE
+## `composer-holon-spine-longrun-2026-06` — 7/8
 
 - serves: `substrate-nativeness` · complements: ['runtime-truth-reconciliation-2026-06', 'runtime-truth-nats-2026-06'] · depends_on: ['runtime-truth-spine-adoption-2026-06'] · conflicts_with: []
 - owned_surfaces: ['docs/sovereign_holons/**', 'reports/sovereign_holons/**', 'dharma_swarm/holon_*.py', 'scripts/holon_*.py', 'tests/test_holon_*.py']
@@ -122,7 +122,7 @@ Active tracks: **10** (warn 5, max 10) — shippable 6
   - ✓ `holon_bridge_verifier_exists` (file_exists) — tests/test_holon_bridge.py present
   - ✓ `holon_runtime_verifier_exists` (file_exists) — tests/test_holon_runtime.py present
   - ✓ `composer_wake_witness_pending` (file_exists) — reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md present
-  - ✓ `holon_bridge_verifier_passes` (test_passes) — pytest tests/test_holon_bridge.py: PASS — 16 passed in 0.19s
+  - ✗ `holon_bridge_verifier_passes` (test_passes) — pytest tests/test_holon_bridge.py: FAIL — 3 failed, 13 passed, 2 warnings in 0.53s
   - ✓ `holon_substrate_on_main` (commit_on_main) — 9c76b210 is an ancestor of origin/main
 
 ## `provider-routing-consolidation-2026-06` — SHIPPABLE
@@ -141,27 +141,27 @@ Active tracks: **10** (warn 5, max 10) — shippable 6
   - ✓ `power_first_default` (file_contains) — pattern 'power_first' found in dharma_swarm/provider_policy.py
   - ✓ `zhipu_provider_enum` (file_contains) — pattern 'ZHIPU' found in dharma_swarm/models.py
   - ✓ `zhipu_provider_class` (file_contains) — pattern 'class ZhipuProvider' found in dharma_swarm/providers.py
-  - ✓ `precedence_invariant_test_passes` (test_passes) — pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS — 1 passed in 0.26s
+  - ✓ `precedence_invariant_test_passes` (test_passes) — pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS — 1 passed, 2 warnings in 0.49s
   - ✓ `stage4_precedence_locked_on_main` (commit_on_main) — bc110d84 is an ancestor of origin/main
 
-## `orchestration-arena-v1-2026-06` — 9/9
+## `forge-rsi-lab-swebench-2026-07` — 9/9
 
 - serves: `substrate-nativeness` · complements: ['provider-routing-consolidation-2026-06', 'loop-closure-2026-06'] · depends_on: [] · conflicts_with: []
-- owned_surfaces: ['dharma_swarm/coordination/**', 'dharma_swarm/council/**', 'tests/test_arena_v1.py', 'tests/test_dpi.py', 'tests/test_orchestration_genome.py', 'tests/test_orchestrator_v1.py', 'tests/test_council_profiles.py', 'tests/test_coordination_closure_checks.py']
+- owned_surfaces: ['dharma_swarm/forge_v1/**', 'scripts/runtime/forge_*.py', 'tests/test_forge_*.py', 'docs/ops/DHARMA_FORGE_*.md', 'reports/forge_rsi_lab/**', 'reports/governance/rsi_lab_*.md']
 - moves_vital_signs: ['eval_coverage', 'quality_gates']
 
-  - ✓ `arena_runner_exists` (file_exists) — dharma_swarm/coordination/arena/runner.py present
-  - ✓ `arena_scorer_exists` (file_exists) — dharma_swarm/coordination/arena/scorer.py present
-  - ✓ `orchestration_genome_exists` (file_exists) — dharma_swarm/coordination/genome.py present
-  - ✓ `frozen_taskpack_present` (file_contains) — pattern 'TASK_PACK_ID' found in dharma_swarm/coordination/arena/taskpack.py
-  - ✓ `deterministic_scorer_hash` (file_contains) — pattern 'def scorer_hash' found in dharma_swarm/coordination/arena/scorer.py
-  - ✓ `orchestration_genome_class` (file_contains) — pattern 'class OrchestrationGenome' found in dharma_swarm/coordination/genome.py
-  - ✓ `zero_weight_orchestrator_map_elites` (file_contains) — pattern 'class MapElitesArchive' found in dharma_swarm/coordination/orchestrator_v1.py
-  - ✓ `dpi_decorrelation_gated_on_correctness` (file_contains) — pattern 'def decorrelation_bonus' found in dharma_swarm/coordination/dpi.py
-  - ✓ `council_trace_verification` (file_contains) — pattern 'class Council' found in dharma_swarm/council/council.py
-  - ✓ `arena_v1_test_exists` (file_contains) — pattern 'def test_positive_lift_candidate_beats_best_single_at_parity' found in tests/test_arena_v1.py
-  - ✓ `dpi_test_exists` (file_exists) — tests/test_dpi.py present
-  - ✓ `closure_checks_test_exists` (file_exists) — tests/test_coordination_closure_checks.py present
+  - ✓ `forge_v2_package_exists` (file_exists) — dharma_swarm/forge_v1/forge_v2/__init__.py present
+  - ✓ `forge_current_canon_exists` (file_exists) — docs/ops/DHARMA_FORGE_CURRENT_CANON_2026-07-04.md present
+  - ✓ `repo_native_harvest_loop_exists` (file_exists) — scripts/runtime/forge_pr_suite_harvest_loop.py present
+  - ✓ `forge_canon_names_current_line` (file_contains) — pattern 'Forge RSI Lab v2.2 current line' found in docs/ops/DHARMA_FORGE_CURRENT_CANON_2026-07-04.md
+  - ✓ `megha_closeout_receipt_valid` (receipt_valid) — receipt reports/forge_rsi_lab/megha_pr_suite_controlsplit_auth_20260704T031305Z/closeout.json valid (11 keys present)
+  - ✓ `megha_validated_rows_present` (file_exists) — reports/forge_rsi_lab/megha_pr_suite_controlsplit_auth_20260704T031305Z/validated_c00_20260704T031306Z.jsonl present
+  - ✓ `pytest_14647_validated` (file_contains) — pattern 'https://github.com/pytest-dev/pytest/pull/14647' found in reports/forge_rsi_lab/megha_pr_suite_controlsplit_auth_20260704T031305Z/validated_c00_20260704T031306Z.jsonl
+  - ✓ `pytest_14588_validated` (file_contains) — pattern 'https://github.com/pytest-dev/pytest/pull/14588' found in reports/forge_rsi_lab/megha_pr_suite_controlsplit_auth_20260704T031305Z/validated_c00_20260704T031306Z.jsonl
+  - ✓ `pytest_14624_validated` (file_contains) — pattern 'https://github.com/pytest-dev/pytest/pull/14624' found in reports/forge_rsi_lab/megha_pr_suite_controlsplit_auth_20260704T031305Z/validated_c00_20260704T031306Z.jsonl
+  - ✓ `pr_suite_harvest_loop_test_passes` (test_passes) — pytest tests/test_forge_pr_suite_harvest_loop.py: PASS — 6 passed, 2 warnings in 0.51s
+  - ✓ `semantic_commons_guard_passes` (test_passes) — pytest tests/test_model_key_routing_guard.py::test_semantic_commons_is_registered_or_branch_local_guarded: PASS — 1 passed, 2 warnings in 0.30s
+  - ✓ `taskbed_ledger_guard_exists` (file_contains) — pattern 'fresh_heldout' found in tests/test_forge_taskbed_ledger.py
 
 ## `merge-master-mike-d4-2026-06` — 3/4
 
@@ -178,7 +178,7 @@ Active tracks: **10** (warn 5, max 10) — shippable 6
   - ✓ `automerge_enrolls_all_nondraft` (file_contains) — pattern 'mike-watch' found in .github/workflows/automerge.yml
   - ✗ `mike_cloud_heartbeat` (file_contains) — pattern 'schedule:' NOT FOUND in .github/workflows/merge-master-mike-backlog.yml
 
-## `filesystem-native-substrate-2026-06` — SHIPPABLE
+## `filesystem-native-substrate-2026-06` — 10/12
 
 - serves: `substrate-nativeness` · complements: ['truth-graph-platform-2026-06', 'runtime-truth-spine-adoption-2026-06'] · depends_on: [] · conflicts_with: []
 - owned_surfaces: ['docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md', 'docs/research/FILESYSTEM_SUBSTRATE_SLICE_A_SPEC.md', 'docs/research/palantir-ontology/ONTOLOGY_PROPOSAL_LOG.md', 'dharma_swarm/fs_substrate/**', 'tests/test_stage_contracts.py', 'tests/test_okf_projection.py', 'tests/test_semantic_fs.py', 'tests/test_organizer.py', 'tests/test_fs_substrate_e2e.py']
@@ -191,14 +191,14 @@ Active tracks: **10** (warn 5, max 10) — shippable 6
   - ✓ `dossier_carries_organism_tie` (file_contains) — pattern 'How this serves the organism' found in docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md
   - ✓ `stage_contract_reader_exists` (file_contains) — pattern 'class StageContract' found in dharma_swarm/fs_substrate/stage_contracts.py
   - ✓ `stage_reader_routes_through_spine` (file_contains) — pattern 'invoke_agent' found in dharma_swarm/fs_substrate/stage_executor.py
-  - ✓ `stage_contract_test_passes` (test_passes) — pytest tests/test_stage_contracts.py: PASS — 13 passed in 0.18s
+  - ✗ `stage_contract_test_passes` (test_passes) — pytest tests/test_stage_contracts.py: FAIL — 3 failed, 10 passed, 2 warnings in 0.35s
   - ✓ `okf_projector_exists` (file_contains) — pattern 'def project_semantic_objects' found in dharma_swarm/fs_substrate/okf.py
-  - ✓ `okf_roundtrip_test_passes` (test_passes) — pytest tests/test_okf_projection.py: PASS — 8 passed in 0.19s
+  - ✓ `okf_roundtrip_test_passes` (test_passes) — pytest tests/test_okf_projection.py: PASS — 8 passed, 2 warnings in 0.42s
   - ✓ `semantic_fs_facade_exists` (file_contains) — pattern 'def semantic_retrieve' found in dharma_swarm/fs_substrate/semantic_fs.py
-  - ✓ `semantic_fs_test_passes` (test_passes) — pytest tests/test_semantic_fs.py: PASS — 5 passed in 0.19s
+  - ✓ `semantic_fs_test_passes` (test_passes) — pytest tests/test_semantic_fs.py: PASS — 5 passed, 2 warnings in 0.39s
   - ✓ `organizer_dry_run_first_exists` (file_contains) — pattern 'def propose_organization' found in dharma_swarm/fs_substrate/organizer.py
-  - ✓ `organizer_test_passes` (test_passes) — pytest tests/test_organizer.py: PASS — 5 passed in 0.16s
-  - ✓ `fs_substrate_e2e_passes` (test_passes) — pytest tests/test_fs_substrate_e2e.py: PASS — 4 passed in 4.08s
+  - ✓ `organizer_test_passes` (test_passes) — pytest tests/test_organizer.py: PASS — 5 passed, 2 warnings in 0.35s
+  - ✗ `fs_substrate_e2e_passes` (test_passes) — pytest tests/test_fs_substrate_e2e.py: FAIL — 1 failed, 3 passed, 2 warnings in 3.82s
 
 ## Findings
 
@@ -206,12 +206,15 @@ Active tracks: **10** (warn 5, max 10) — shippable 6
 - **WARN** `spine-uncovered:research-depth`: Spine objective 'research-depth' has no ACTIVE track serving it (coverage gap).
 - **WARN** `spine-uncovered:revenue-external-humans-served`: Spine objective 'revenue-external-humans-served' has no ACTIVE track serving it (coverage gap).
 - **INFO** `track-shippable:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] all 12 criteria pass, rigorous evidence present, no open blockers — SHIPPABLE (rigorous bar). Close it.
-- **INFO** `track-shippable:runtime-truth-nats-2026-06`: [runtime-truth-nats-2026-06] all 4 criteria pass, rigorous evidence present, no open blockers — SHIPPABLE (rigorous bar). Close it.
+- **WARN** `track-stale:runtime-truth-nats-2026-06`: [runtime-truth-nats-2026-06] verified_at is 27 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.
+- **INFO** `track-in-progress:runtime-truth-nats-2026-06`: [runtime-truth-nats-2026-06] 3/4 completion criteria pass.
+- **WARN** `track-stale:runtime-truth-spine-adoption-2026-06`: [runtime-truth-spine-adoption-2026-06] verified_at is 24 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.
 - **INFO** `track-in-progress:runtime-truth-spine-adoption-2026-06`: [runtime-truth-spine-adoption-2026-06] 7/8 completion criteria pass.
+- **WARN** `track-stale:loop-closure-2026-06`: [loop-closure-2026-06] verified_at is 23 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.
 - **INFO** `track-in-progress:loop-closure-2026-06`: [loop-closure-2026-06] 10/11 completion criteria pass.
 - **INFO** `track-shippable:truth-graph-platform-2026-06`: [truth-graph-platform-2026-06] all 17 criteria pass, rigorous evidence present, no open blockers — SHIPPABLE (rigorous bar). Close it.
-- **INFO** `track-shippable:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] all 8 criteria pass, rigorous evidence present, no open blockers — SHIPPABLE (rigorous bar). Close it.
+- **INFO** `track-in-progress:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] 7/8 completion criteria pass.
 - **INFO** `track-shippable:provider-routing-consolidation-2026-06`: [provider-routing-consolidation-2026-06] all 9 criteria pass, rigorous evidence present, no open blockers — SHIPPABLE (rigorous bar). Close it.
-- **INFO** `track-provisional:orchestration-arena-v1-2026-06`: [orchestration-arena-v1-2026-06] 9/9 criteria pass but NOT shippable under the rigorous bar: 1 open blocker next-item(s); no rigorous evidence (criteria are existence-only: file_exists/file_contains — add test_passes / commit_on_main / receipt_valid); strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).
+- **INFO** `track-provisional:forge-rsi-lab-swebench-2026-07`: [forge-rsi-lab-swebench-2026-07] 9/9 criteria pass but NOT shippable under the rigorous bar: 2 open blocker next-item(s). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).
 - **INFO** `track-in-progress:merge-master-mike-d4-2026-06`: [merge-master-mike-d4-2026-06] 3/4 completion criteria pass.
-- **INFO** `track-shippable:filesystem-native-substrate-2026-06`: [filesystem-native-substrate-2026-06] all 12 criteria pass, rigorous evidence present, no open blockers — SHIPPABLE (rigorous bar). Close it.
+- **INFO** `track-in-progress:filesystem-native-substrate-2026-06`: [filesystem-native-substrate-2026-06] 10/12 completion criteria pass.
