@@ -61,6 +61,12 @@ jobs:
     timeout-minutes: 10
     env:
       GH_TOKEN: ${{ github.token }}
+      # PAT (contents+PR+actions write) used ONLY to dispatch the router
+      # workflow. A run triggered by the built-in GITHUB_TOKEN cannot create
+      # a new workflow run, so the router dispatch below silently no-ops and
+      # Mike's merge arm never fires. Falls back to GITHUB_TOKEN when unset
+      # (dispatch stays a no-op until the MIKE_PAT secret is added).
+      MIKE_PAT: ${{ secrets.MIKE_PAT }}
       GH_REPO: ${{ github.repository }}
       EVENT_NAME: ${{ github.event_name }}
       EVENT_PR: ${{ github.event.pull_request.number || github.event.inputs.pr || '' }}
@@ -211,7 +217,9 @@ jobs:
 
             # 5. Hand off to Merge Master Mike (full deterministic gate runs
             #    there; auto-merge is armed only when merge_when_clean=true).
-            gh workflow run codex-mention-router.yml --repo "$GH_REPO" \
+            #    Dispatch with MIKE_PAT so the router run is actually created;
+            #    a GITHUB_TOKEN-triggered workflow_dispatch does not spawn one.
+            GH_TOKEN="${MIKE_PAT:-$GH_TOKEN}" gh workflow run codex-mention-router.yml --repo "$GH_REPO" \
               -f pr="$pr" -f merge_when_clean="${merge_when_clean}"
             if [ "${merge_when_clean}" = "true" ]; then
               mode_line="dispatched **Merge Master Mike** with \`merge_when_clean: true\` (will auto-merge once the gate is clean)"
