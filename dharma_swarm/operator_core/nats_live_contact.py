@@ -61,7 +61,7 @@ async def _round_trip(endpoint: str, timeout: float) -> dict[str, Any]:
             StreamConfig(
                 name=stream_name,
                 subjects=[f"_dharma_live_probe.{token}.>"],
-                storage=StorageType.MEMORY,
+                storage=StorageType.FILE,
                 max_msgs=16,
             )
         )

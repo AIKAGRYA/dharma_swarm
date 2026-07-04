@@ -403,6 +403,48 @@ async def _drain_running_tasks(orch: Orchestrator, *, attempts: int = 500) -> No
     await orch._collect_completed()
 
 
+def _ledger_event_names(path):
+    if not path.exists():
+        return []
+    return [
+        json.loads(line)["event"]
+        for line in path.read_text().splitlines()
+        if line.strip()
+    ]
+
+
+async def _drain_until_task_ledger_event(
+    orch,
+    task_path,
+    progress_path,
+    expected_event,
+    *,
+    attempts=100,
+    delay_seconds=0.01,
+):
+    terminal_progress_events = {
+        "result_persist_failed",
+        "task_blocked",
+        "task_failed",
+        "task_retry_scheduled",
+        "task_dead_lettered",
+    }
+    task_events = []
+    progress_events = []
+    for _ in range(attempts):
+        await orch._collect_completed()
+        task_events = _ledger_event_names(task_path)
+        progress_events = _ledger_event_names(progress_path)
+        if expected_event in task_events:
+            break
+        if terminal_progress_events.intersection(progress_events):
+            break
+        await asyncio.sleep(delay_seconds)
+
+    await orch._collect_completed()
+    return _ledger_event_names(task_path), _ledger_event_names(progress_path)
+
+
 # ---------------------------------------------------------------------------
 # New tests — coverage expansion
 # ---------------------------------------------------------------------------
@@ -873,19 +915,26 @@ async def test_orchestrator_writes_task_and_progress_ledgers(tmp_path):
         session_id="sess_test",
     )
 
-    await orch.route_next()
-    await _drain_running_tasks(orch)
-
     task_path = tmp_path / "sess_test" / "task_ledger.jsonl"
     progress_path = tmp_path / "sess_test" / "progress_ledger.jsonl"
+    dispatches = await orch.route_next()
+    assert len(dispatches) == 1
+
+    task_events, progress_events = await _drain_until_task_ledger_event(
+        orch,
+        task_path,
+        progress_path,
+        "result_persisted",
+    )
+
     assert task_path.exists()
     assert progress_path.exists()
 
-    task_events = [json.loads(line)["event"] for line in task_path.read_text().splitlines() if line.strip()]
-    progress_events = [json.loads(line)["event"] for line in progress_path.read_text().splitlines() if line.strip()]
-
     assert "dispatch_assigned" in task_events
-    assert "result_persisted" in task_events
+    assert "result_persisted" in task_events, {
+        "task_events": task_events,
+        "progress_events": progress_events,
+    }
     assert "task_started" in progress_events
     assert "task_completed" in progress_events
     assert any(topic == "orchestrator.lifecycle" for topic, _ in bus.published)

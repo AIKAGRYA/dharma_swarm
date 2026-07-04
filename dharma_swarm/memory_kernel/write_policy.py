@@ -414,6 +414,8 @@ def default_reviewed_write_baseline() -> tuple[ReviewedWriteBaselineEntry, ...]:
         ReviewedWriteBaselineEntry('scripts/allout_autopilot.py', 'execute_single_step', 'path_write', 'c77238abb207', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/experiments/test_full_loop.py', 'main', 'path_write', '0ade2c85a8ba', 'test_or_experiment', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/experiments/test_full_loop.py', 'main', 'path_write', '99c83aa2bd78', 'test_or_experiment', occurrences=1),
+        ReviewedWriteBaselineEntry('scripts/governance/run_nats_live_production_matrix.py', 'MatrixRunner.run', 'path_write', 'c5b7b9f59aa9', 'generated_artifact', occurrences=1, review_note='NATS live matrix success path updates repo evidence latest.json pointer only.'),
+        ReviewedWriteBaselineEntry('scripts/governance/run_nats_live_production_matrix.py', 'async_main', 'path_write', '92e4ec17921e', 'generated_artifact', occurrences=1, review_note='NATS live matrix failure path updates repo evidence latest.json pointer only.'),
         ReviewedWriteBaselineEntry('scripts/governance/hygiene/scan.py', 'main', 'path_write', 'ca40bd1a2c8e', 'operational_state', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/lattice_test.py', 'build_lattice_db', 'sqlite_connect', '7b7dd5543675', 'test_or_experiment', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/lattice_test.py', 'main', 'path_write', 'e7f43d056757', 'test_or_experiment', occurrences=1),

@@ -1485,20 +1485,23 @@ def render_spine_bypass() -> None:
 
 def render_model_key_routing() -> None:
     section("MODEL & KEY ROUTING — THE ONE WAY")
-    # Dispatch availability RIGHT NOW — the canonical, runtime-computed answer.
-    # This line exists to kill the recurring "we have no provider" lie without
-    # replacing it with a new one: claude_code is KEYLESS only when headless
-    # `claude -p` smokes green; local/ollama are also detected here.
+    # Keep onboarding bounded. The full dispatchability oracle may run a
+    # headless Claude Code smoke; that belongs in explicit provider checks, not
+    # in the front-door command that tests call repeatedly.
     try:
-        from dharma_swarm.key_oracle import dispatchable_now  # noqa: PLC0415
+        from dharma_swarm.key_oracle import live_providers  # noqa: PLC0415
 
-        live = sorted(dispatchable_now())
-        if live:
+        live = live_providers()
+        if live is None:
+            print("  Dispatch: quick view inconclusive — keys_status is missing/stale/unreadable")
+            print("            run `dkeys test`, or explicit full smoke:")
+            print("            python3 -c \"from dharma_swarm.key_oracle import dispatchable_now; print(dispatchable_now())\"")
+        elif live:
             keyless_note = " (claude_code = KEYLESS — no API key needed)" if "claude_code" in live else ""
-            print(f"  Dispatch: LIVE NOW -> {', '.join(live)}{keyless_note}")
-            print("            'no provider' is almost always FALSE — check key_oracle.dispatchable_now(), not a frozen doc")
+            print(f"  Dispatch: quick view -> {', '.join(sorted(live))}{keyless_note}")
+            print("            full smoke: key_oracle.dispatchable_now()")
         else:
-            print("  Dispatch: no keyless lane detected and no keyed providers live — run `dkeys test` / add a key")
+            print("  Dispatch: no keyed providers live in the latest dkeys snapshot — run `dkeys test` / add a key")
     except Exception as exc:  # pragma: no cover - onboarding must never crash on this
         print(f"  Dispatch: unavailable ({type(exc).__name__}: {str(exc)[:120]})")
     print("  Keys:  ONE home ~/.dharma/agent_keys.env  ·  ONE tool: dkeys (add / test / find)")

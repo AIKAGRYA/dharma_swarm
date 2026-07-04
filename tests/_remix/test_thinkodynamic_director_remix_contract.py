@@ -83,8 +83,12 @@ def remix(engine: ThinkodynamicDirector) -> ThinkodynamicDirectorRemix:
 
 # --- 1. behaviour preserved -------------------------------------------------
 def test_survey_matches_engine_signals_and_opportunities(
-    engine: ThinkodynamicDirector, remix: ThinkodynamicDirectorRemix
+    engine: ThinkodynamicDirector,
+    remix: ThinkodynamicDirectorRemix,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr("dharma_swarm.thinkodynamic_director.time.time", lambda: 1782922342.0)
+
     direct_signals = engine.rank_file_signals()
     direct_opps = engine.build_opportunities(direct_signals)
 
@@ -102,8 +106,12 @@ def test_survey_matches_engine_signals_and_opportunities(
 
 
 def test_seams_delegate_to_the_proven_engine(
-    engine: ThinkodynamicDirector, remix: ThinkodynamicDirectorRemix
+    engine: ThinkodynamicDirector,
+    remix: ThinkodynamicDirectorRemix,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr("dharma_swarm.thinkodynamic_director.time.time", lambda: 1782922342.0)
+
     # Feathers: the capability views are the engine, exposed through narrow protocols.
     signals_via_seam = remix.signals.rank_file_signals()
     assert [s.path for s in signals_via_seam] == [s.path for s in engine.rank_file_signals()]
