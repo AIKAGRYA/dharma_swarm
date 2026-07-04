@@ -64,7 +64,7 @@ _INTENTIONAL_BYPASS_SNIPPETS: dict[tuple[str, str], str] = {}
 
 # Known non-production lines (docstring examples, etc.)
 _NON_PRODUCTION: set[tuple[str, int]] = {
-    ("dharma_swarm/a2a/a2a_server.py", 259),  # docstring example
+    ("dharma_swarm/a2a/a2a_server.py", 327),  # docstring example
 }
 
 
