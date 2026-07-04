@@ -6,7 +6,7 @@ Review target: PR #2 witness mesh
 
 ## Mesh role
 
-The witness mesh records, merges, and expires receipt-state observations; it does not prove the underlying program correct by itself. [confidence: 94/100] The measured object is a set of receipt events keyed by `(subject_id, claim_hash, trust_base_id, fragment_id, fragment_version)`, and the threshold for mesh convergence is deterministic equality of canonical state after replicas have received the same event set. [confidence: 91/100] [Conflict-free Replicated Data Types](https://arxiv.org/abs/1805.06358)
+The witness mesh records, merges, and expires receipt-state observations; it does not prove the underlying program correct by itself. [confidence: 94/100] The measured object is a set of receipt events keyed by `(subject_id, claim_hash, trust_base_id, fragment_id, fragment_version)`, and the threshold for mesh convergence is deterministic equality of canonical state after replicas have received the same content-addressed event set and evaluate it under the same finite `current` authority context and observation time `t`. [confidence: 92/100] [Conflict-free Replicated Data Types](https://arxiv.org/abs/1805.06358)
 
 ## Event types
 
