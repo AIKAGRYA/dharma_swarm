@@ -50,7 +50,7 @@ dharma-swarm = "dharma_swarm.cli:app"
 dgc = "dharma_swarm.dgc_cli:main"
 
 [tool.setuptools.packages.find]
-include = ["dharma_swarm*"]
+include = ["dharma_swarm*", "naga_ir_language_womb*"]
 exclude = ["hooks*", "scripts*", "tests*"]
 
 [tool.pytest.ini_options]

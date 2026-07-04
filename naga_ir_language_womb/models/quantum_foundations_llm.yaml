@@ -1,0 +1,36 @@
+schema_version: naga_ir_language_womb.model_reference.v1
+name: Quantum foundations model gap
+status: no_grade_model_available
+hf_id: null
+candidate_hf_ids:
+  - MCES10-Software/YouToks-Instruct-Quantum-Physics-III-Llama-3.2-3B-Instruct
+  - Kylan12/qwen-25-14b-instruct-quantum-physics
+  - IcosaComputingHF/quantum-physics-teacher-mert
+source_urls:
+  - https://huggingface.co/MCES10-Software/YouToks-Instruct-Quantum-Physics-III-Llama-3.2-3B-Instruct
+  - https://huggingface.co/Kylan12/qwen-25-14b-instruct-quantum-physics
+  - https://huggingface.co/IcosaComputingHF/quantum-physics-teacher-mert
+license: candidate_specific
+domain:
+  - quantum_foundations
+  - physics_tuned_gap
+training_notes: >
+  HF search shows quantum-physics-tuned small or adapter models, but no
+  quantum-foundations-grade model with Bell/Kochen-Specker/decoherence/RQM
+  benchmark evidence.
+known_limitations:
+  - Visible candidates appear instruction or teaching tuned, not foundations-grade.
+  - No benchmark validates primary-literature fidelity.
+  - Route frontier general models plus corpus search before any specialized candidate.
+evaluation_bench:
+  status: missing
+  proposed:
+    - bell_kochen_specker_claim_fidelity
+    - decoherence_pointer_basis_explanation
+    - relational_qm_nagarjuna_boundary_check
+first_added_receipt_hash: null
+first_added_receipt_status: seed_gap_pending_model_registered_receipt
+verification:
+  checked_at: "2026-07-04"
+  method: "Hugging Face API search: quantum physics"
+  confidence: "83/100 - candidate existence verified; grade judgment is conservative and unbenchmarked"

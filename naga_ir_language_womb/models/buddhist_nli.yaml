@@ -1,0 +1,39 @@
+schema_version: naga_ir_language_womb.model_reference.v1
+name: Buddhist Sanskrit classification/NLI gap
+status: no_grade_buddhist_nli_verified
+hf_id: null
+candidate_hf_ids:
+  - Matej/bert-base-buddhist-sanskrit
+  - Matej/bert-base-buddhist-sanskrit-v2
+  - Matej/bert-small-buddhist-nonbuddhist-sanskrit
+  - buddhist-nlp/sanskrit-classification
+source_urls:
+  - https://huggingface.co/Matej/bert-base-buddhist-sanskrit
+  - https://huggingface.co/Matej/bert-base-buddhist-sanskrit-v2
+  - https://huggingface.co/Matej/bert-small-buddhist-nonbuddhist-sanskrit
+  - https://huggingface.co/buddhist-nlp/sanskrit-classification
+license: unknown_or_model_specific
+domain:
+  - buddhist_sanskrit
+  - classification_candidate
+  - nli_gap
+training_notes: >
+  HF search found Buddhist/Sanskrit fill-mask and classification candidates,
+  but no verified natural-language-inference model with a womb-grade premise /
+  hypothesis benchmark.
+known_limitations:
+  - This is a visible gap entry, not a routed NLI model.
+  - Candidate model cards must be inspected before use.
+  - No entailment benchmark is attached.
+evaluation_bench:
+  status: missing
+  proposed:
+    - buddhist_claim_entailment_microbench
+    - translation_pair_consistency
+    - contradiction_detection_against_corpus_cards
+first_added_receipt_hash: null
+first_added_receipt_status: seed_gap_pending_model_registered_receipt
+verification:
+  checked_at: "2026-07-04"
+  method: "Hugging Face API search: buddhist sanskrit"
+  confidence: "78/100 - gap is verified enough for registry visibility; candidates are not graded"

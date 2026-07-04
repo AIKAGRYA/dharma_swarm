@@ -150,7 +150,7 @@ If two positions imply incompatible structures, name the incompatibility and pro
 
 ## 5. What happens with your response
 
-The response lands in `specs/naga_ir/dharma_lane/deep/01_substrate_<author>.md` in the `dharma_swarm` repository. Multiple authors' responses are compared for parallel-arrival convergence and for genuine disagreement. Where multiple authors converge, the convergence becomes structural anchor. Where they disagree, the disagreement becomes a receipt-emitting research question that seeds the `dharma_lab/` research organ (see companion prompt).
+The response lands in `specs/naga_ir/dharma_lane/deep/01_substrate_<author>.md` in the `dharma_swarm` repository. Multiple authors' responses are compared for parallel-arrival convergence and for genuine disagreement. Where multiple authors converge, the convergence becomes structural anchor. Where they disagree, the disagreement becomes a receipt-emitting research question that seeds the `naga_ir_language_womb/` research organ (see companion prompt).
 
 Pass 2 (logic of predication), Pass 3 (dynamics of arising), and Pass 4 (historical bridge) will follow, using analogous prompts. Pass 1 must land first because it is load-bearing on the other three.
 

@@ -1,0 +1,30 @@
+schema_version: naga_ir_language_womb.model_reference.v1
+name: Monlam AI Tibetan RoBERTa seed reference
+status: verified_hf_org_model_not_chat_llm
+hf_id: MonlamAI/tibetan_RoBERTa_S_e6
+source_url: https://huggingface.co/MonlamAI/tibetan_RoBERTa_S_e6
+registry_url: https://huggingface.co/MonlamAI
+license: unknown_on_hf_api_result
+domain:
+  - tibetan
+  - buddhist_text_processing
+training_notes: >
+  Hugging Face author query for MonlamAI returned a Tibetan RoBERTa fill-mask
+  model. The user-requested "Monlam AI Tibetan LLM" should be rechecked before
+  merge if a chat/instruction model is required.
+known_limitations:
+  - Verified model is fill-mask RoBERTa, not a frontier Tibetan chat LLM.
+  - License was not present in the HF API search result.
+  - No womb benchmark has been run.
+evaluation_bench:
+  status: not_run
+  proposed:
+    - classical_tibetan_token_fill_mask_smoke
+    - kangyur_tengyur_term_recovery
+    - source_quote_nonhallucination_check
+first_added_receipt_hash: null
+first_added_receipt_status: seed_entry_pending_model_registered_receipt
+verification:
+  checked_at: "2026-07-04"
+  method: "Hugging Face API author query: /api/models?author=MonlamAI"
+  confidence: "82/100 - org/model verified, requested LLM status not verified"
