@@ -26,7 +26,7 @@ The `signature` field encoding is profile-specific, but a canonical receipt requ
 
 ## Signature policy
 
-The measured object is `(signature, key_id, trust_base_id)`. [confidence: 94/100] The PR #2 profile admits `ed25519` signatures encoded as unpadded base64url strings matching `^base64url:[A-Za-z0-9_-]+$`. [confidence: 92/100] `key_id` must resolve through `authority.trust_base_id` or a checked-refinement receipt to a public key, signer role, and key validity window; otherwise `signatures_valid` fails closed. [confidence: 93/100]
+The measured object is `(signature, key_id, trust_base_id)`. [confidence: 94/100] The PR #2 profile admits `ed25519` signatures encoded as unpadded base64url strings matching `^base64url:[A-Za-z0-9_-]+$`. [confidence: 92/100] `key_id` must resolve through `authority.trust_base_id` or a checked-refinement receipt to a public key, signer role, and key validity window; otherwise `signatures_valid` fails closed. [confidence: 93/100] [RFC 8032](https://www.rfc-editor.org/rfc/rfc8032)
 
 ## Receipt object
 
@@ -54,7 +54,7 @@ The measured object is one JSON object. [confidence: 98/100] The admission thres
 
 `subject` identifies the artifact whose authority is under review. [confidence: 94/100] The threshold is one of `content_hash`, `path + git_commit`, `symbol + git_commit`, or `packet_id + payload_hash`; path-only subjects are non-canonical. [confidence: 93/100]
 
-`subject_id` is derived, not chosen. [confidence: 94/100] If `content_hash` is present, `subject_id == content_hash`; otherwise `subject_id` is `sha256:` plus the SHA-256 digest of the JCS object containing the admitted selector fields. [confidence: 93/100]
+`subject_id` is defined by derivation, not chosen. [confidence: 94/100] If `content_hash` is present, `subject_id == content_hash`; otherwise `subject_id` is `sha256:` plus the SHA-256 digest of the JCS object containing the admitted selector fields. [confidence: 93/100]
 
 ```json
 {
@@ -68,9 +68,9 @@ The measured object is one JSON object. [confidence: 98/100] The admission thres
 
 ## Claim
 
-`claim` states one typed proposition about one fragment. [confidence: 92/100] A claim with multiple independent propositions must be split unless one verifier discharges the conjunction as a single obligation. [confidence: 90/100] This keeps `Proven_by` evidence from silently covering only part of an English sentence. [confidence: 93/100]
+`claim` is defined as one typed proposition about one fragment. [confidence: 92/100] A claim with multiple independent propositions must be split unless one verifier discharges the conjunction as a single obligation. [confidence: 90/100] This keeps `Proven_by` evidence from silently covering only part of an English sentence. [confidence: 93/100]
 
-`claim_hash` is derived, not chosen. [confidence: 95/100] The derivation is `sha256:` plus the SHA-256 digest of the JCS canonical claim object covering `claim_id`, `claim_class`, `claim_strength`, normalized `statement`, `scope`, `fragment_id`, and `obligation_hash` when present; `authority_key` must use `claim_hash`, not bare `claim_id`. [confidence: 95/100]
+`claim_hash` is defined by derivation, not chosen. [confidence: 95/100] The derivation is `sha256:` plus the SHA-256 digest of the JCS canonical claim object covering `claim_id`, `claim_class`, `claim_strength`, normalized `statement`, `scope`, `fragment_id`, and `obligation_hash` when present; `authority_key` must use `claim_hash`, not bare `claim_id`. [confidence: 95/100]
 
 ```json
 {
@@ -139,7 +139,7 @@ Required body fields:
 
 ## Witnessed_by
 
-`Witnessed_by` records runtime observation bound to identity and freshness. [confidence: 91/100] The threshold is a runtime identity, observed value hash, replay or trace hash, TTL, observed time, and maximum clock skew; a witness beyond TTL or beyond allowed skew is historical evidence but cannot support canonization. [confidence: 94/100]
+`Witnessed_by` records runtime observation bound to identity and freshness. [confidence: 91/100] The threshold is a runtime identity, observed value hash, replay or trace hash, TTL, observed time, and maximum clock skew; a witness beyond TTL or beyond allowed skew is historical evidence but cannot support canonization. [confidence: 94/100] The `observed_at` and `max_clock_skew_ms` body fields are wire-only freshness-envelope extensions beyond the core required fields. [confidence: 93/100]
 
 Required body fields:
 
@@ -177,7 +177,7 @@ Required body fields:
 
 ## Authority key
 
-`authority_key` is derived, not chosen. [confidence: 95/100] The derivation is `sha256:` plus the SHA-256 digest of the JCS canonical object `{subject_id, claim_hash, trust_base_id, fragment_id, fragment_version}`; the result must equal `challenge_base.authority_key`. [confidence: 95/100]
+`authority_key` is defined by derivation, not chosen. [confidence: 95/100] The derivation is `sha256:` plus the SHA-256 digest of the JCS canonical object `{subject_id, claim_hash, trust_base_id, fragment_id, fragment_version}`; the result must equal `challenge_base.authority_key`. [confidence: 95/100]
 
 ## Origin
 

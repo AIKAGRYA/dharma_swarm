@@ -69,7 +69,7 @@ Two finite mesh snapshots are authority-equivalent for a fixed challenge base an
 
 ## Privacy rule
 
-Mesh events may carry redacted payloads, but redaction cannot remove the measured fields needed by the modality threshold. [confidence: 93/100] If a payload is private, the event must include a redaction policy, payload hash, and verifier-access statement; otherwise the event is historical but inadmissible for canonization. [confidence: 90/100]
+The privacy rule defines redaction limits: mesh events may carry redacted payloads, but redaction cannot remove the measured fields needed by the modality threshold. [confidence: 93/100] If a payload is private, the event must include a redaction policy, payload hash, and verifier-access statement; otherwise the event is historical but inadmissible for canonization. [confidence: 90/100]
 
 ## Failure states
 
@@ -77,4 +77,4 @@ The mesh must represent at least six failure states: `invalid_schema`, `signatur
 
 ## Local mapping
 
-Current repo integration is limited to spec compatibility. [confidence: 99/100] `dharma_swarm/coalgebra.py` can inform the later reconciler shape, but this PR #2 mesh spec does not claim a reconciler exists or that receipt events are already emitted in this checkout. [confidence: 98/100]
+Current repo integration is limited to spec compatibility. [confidence: 99/100] [dharma_swarm/coalgebra.py](../../dharma_swarm/coalgebra.py) can inform the later reconciler shape, but this PR #2 mesh spec does not claim a reconciler exists or that receipt events are already emitted in this checkout. [confidence: 98/100]
