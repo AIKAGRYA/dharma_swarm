@@ -190,6 +190,43 @@ def test_harvest_loop_forwards_setup_command_template(tmp_path: Path) -> None:
     assert cmd[cmd.index("--setup-timeout-seconds") + 1] == "1200"
 
 
+def test_harvest_loop_forwards_separate_validator_python(tmp_path: Path) -> None:
+    validation_commands: list[list[str]] = []
+
+    def fake_runner(argv: Sequence[str], _cwd: Path, _timeout: int) -> pr_suite_harvest_loop.CommandResult:
+        args = list(argv)
+        if "forge_pr_suite_harvester.py" in args[1]:
+            out = Path(args[args.index("--out") + 1])
+            out.write_text(json.dumps({"repo": "example/project", "pr_number": 8}) + "\n", encoding="utf-8")
+            return pr_suite_harvest_loop.CommandResult(args, 0, json.dumps({"candidate_count": 1}))
+        if "forge_pr_suite_validator.py" in args[1]:
+            validation_commands.append(args)
+            out = Path(args[args.index("--out") + 1])
+            out.write_text("", encoding="utf-8")
+            return pr_suite_harvest_loop.CommandResult(args, 1, json.dumps({"validated_count": 0, "failed_count": 1}))
+        raise AssertionError(f"unexpected command: {args}")
+
+    pr_suite_harvest_loop.run_harvest_loop(
+        root=tmp_path,
+        repo_root=tmp_path,
+        db_path=tmp_path / "taskbed.db",
+        run_id="loop-validator-python",
+        repos=["example/project"],
+        duration_seconds=60,
+        max_cycles=1,
+        sleep_seconds=0,
+        python="/repo/python",
+        validator_python="/target/venv/python",
+        command_runner=fake_runner,
+        sleep_fn=lambda _seconds: None,
+    )
+
+    assert validation_commands, "validator should have been invoked"
+    cmd = validation_commands[0]
+    assert cmd[0] == "/repo/python"
+    assert cmd[cmd.index("--python") + 1] == "/target/venv/python"
+
+
 def test_harvest_loop_omits_setup_flag_when_not_configured(tmp_path: Path) -> None:
     validation_commands: list[list[str]] = []
 

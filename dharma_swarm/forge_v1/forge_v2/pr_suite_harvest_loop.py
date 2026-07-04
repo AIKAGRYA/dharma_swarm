@@ -235,6 +235,7 @@ def run_harvest_loop(
     setup_command_template: str = "",
     setup_timeout_seconds: int = 0,
     python: str = sys.executable,
+    validator_python: str = "",
     command_runner: CommandRunner = run_command,
     sleep_fn: Callable[[float], None] = time.sleep,
 ) -> dict[str, Any]:
@@ -251,6 +252,7 @@ def run_harvest_loop(
         raise ValueError("duration_seconds must be positive")
     if sleep_seconds < 0:
         raise ValueError("sleep_seconds must be non-negative")
+    validator_python = str(validator_python or python)
 
     run_id = _safe_run_id(run_id or time.strftime("loop_%Y%m%dT%H%M%SZ", time.gmtime()))
     root = Path(root).expanduser() / run_id
@@ -363,6 +365,8 @@ def run_harvest_loop(
                 str(root / "validation_receipts"),
                 "--timeout-seconds",
                 str(validation_timeout_seconds),
+                "--python",
+                validator_python,
                 "--json",
             ]
             if str(setup_command_template or "").strip():
@@ -504,6 +508,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Timeout for the validator setup command; 0 lets the validator choose.",
     )
     parser.add_argument("--python", default=sys.executable)
+    parser.add_argument(
+        "--validator-python",
+        default="",
+        help=(
+            "Python executable used by the validator for target-project setup/tests. "
+            "When empty, defaults to --python. Use this to run loop/oracle code with "
+            "the repo interpreter while test checkouts use an isolated venv."
+        ),
+    )
     parser.add_argument("--json", action="store_true")
     return parser
 
@@ -538,6 +551,7 @@ def main(argv: list[str] | None = None) -> int:
         setup_command_template=args.setup_command_template,
         setup_timeout_seconds=args.setup_timeout_seconds,
         python=args.python,
+        validator_python=args.validator_python,
     )
     if args.json:
         print(json.dumps(closeout, indent=2, sort_keys=True, default=str))
