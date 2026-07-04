@@ -117,6 +117,9 @@
       "plugin://*",
       "file://*",
       "reports/docops/**",
+      "*reports/governance/active_track_evidence.*",
+      "*reports/governance/track_portfolio.json",
+      "*reports/governance/trust_gate_status.json",
       "foo.py",
       "test_foo.py"
     ]

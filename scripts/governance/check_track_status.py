@@ -36,6 +36,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 ACTIVE_TRACK_PATH = REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml"
 EVIDENCE_GRADES_PATH = REPO_ROOT / "docs/governance/evidence_grades.yaml"
 REPORTS_DIR = REPO_ROOT / "reports/governance"
+# Derived status is published here by CI (active-track.yml, push:main), not
+# tracked on main — see the eviction rationale in .gitignore.
+STATUS_BRANCH = "generated/status"
 SCHEMA_VERSION = 2                       # current schema authored by this checker
 SUPPORTED_SCHEMA_VERSIONS = {1, 2}       # v1 (singular active_track) read via adapter
 EDGE_KINDS = ("complements", "depends_on", "conflicts_with")
@@ -1805,15 +1808,52 @@ def evaluate_track(t: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _load_prior_passed() -> dict[str, set[str]]:
+def _load_prior_passed(findings: list[Finding]) -> dict[str, set[str]]:
     """Read the previous evidence JSON so we can flag REGRESSION drift —
-    a completion criterion that passed before and now fails (Terraform-plan style)."""
+    a completion criterion that passed before and now fails (Terraform-plan style).
+
+    The evidence files are derived status, not tracked in git (evicted
+    2026-07-04; they hard-conflicted in every concurrent rebase train). The
+    baseline resolves in order:
+      1. local reports/governance/active_track_evidence.json — gitignored,
+         written by the previous local run;
+      2. the CI-published copy on the generated/status branch
+         (active-track.yml publishes it on every push to main); tried as both
+         a local and an origin-prefixed ref so fresh clones work;
+      3. empty baseline + WARN — regression detection is off for this run
+         only, never silently.
+    """
+    rel = "reports/governance/active_track_evidence.json"
+    raw: str | None = None
     path = REPORTS_DIR / "active_track_evidence.json"
-    if not path.exists():
+    if path.exists():
+        try:
+            raw = path.read_text(encoding="utf-8")
+        except OSError:
+            raw = None
+    if raw is None:
+        for ref in (STATUS_BRANCH, f"origin/{STATUS_BRANCH}"):
+            try:
+                proc = subprocess.run(
+                    ["git", "-C", str(REPO_ROOT), "show", f"{ref}:{rel}"],
+                    capture_output=True, text=True, timeout=30)
+            except (OSError, subprocess.TimeoutExpired):
+                continue
+            if proc.returncode == 0 and proc.stdout.strip():
+                raw = proc.stdout
+                break
+    if raw is None:
+        findings.append(Finding("WARN", "no-regression-baseline",
+            f"no prior evidence baseline (local {rel} missing and "
+            f"{STATUS_BRANCH} branch unavailable) — regression drift "
+            "detection is disabled for this run"))
         return {}
     try:
-        prior = json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+        prior = json.loads(raw)
+    except json.JSONDecodeError:
+        findings.append(Finding("WARN", "no-regression-baseline",
+            "prior evidence baseline is not valid JSON — regression drift "
+            "detection is disabled for this run"))
         return {}
     out: dict[str, set[str]] = {}
     for tr in prior.get("active_tracks", []) or []:
@@ -1850,7 +1890,7 @@ def run(args: argparse.Namespace) -> int:
     validate_portfolio_graph(p, findings)
     detect_dependency_cycle(p["active_tracks"], findings)
 
-    prior_passed = _load_prior_passed()
+    prior_passed = _load_prior_passed(findings)
     track_results: list[tuple[dict[str, Any], dict[str, Any]]] = []
 
     for t in p["active_tracks"]:
