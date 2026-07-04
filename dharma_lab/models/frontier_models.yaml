@@ -1,0 +1,53 @@
+schema_version: dharma_lab.model_reference.v1
+name: Frontier API reference set
+status: reference_only_no_weights
+hf_id: null
+api_reference:
+  anthropic:
+    source_url: https://platform.claude.com/docs/en/about-claude/models/overview
+    model_families:
+      - claude-sonnet-5
+      - claude-opus-4-8
+    routing_note: >
+      dharma_swarm runtime_provider maps ProviderType.ANTHROPIC to the
+      subscription-backed Claude Code route unless forced to raw API.
+  openai:
+    source_url: https://developers.openai.com/api/docs/models
+    model_families:
+      - gpt-5.5
+      - gpt-5.4
+    routing_note: >
+      User prompt asked for GPT-5; current official docs list GPT-5.5 and
+      GPT-5.4 families. Keep references family-level until router policy pins.
+  google:
+    source_url: https://ai.google.dev/gemini-api/docs/models
+    model_families:
+      - gemini-3.5-flash
+      - gemini-3.1-pro-preview
+    routing_note: >
+      User prompt asked for Gemini 3 Pro; current official docs list Gemini
+      3.1 Pro as preview and Gemini 3.5 Flash as stable.
+license: provider_terms
+domain:
+  - frontier_general_reasoning
+  - reference_only
+training_notes: >
+  These entries reference provider APIs and public model-family docs only.
+  They do not vendor weights and do not claim availability in the local runtime.
+known_limitations:
+  - API availability, pricing, and model IDs are temporally unstable.
+  - Single-model responses remain `Attested_by`.
+  - Ensemble agreement can become `Tested_by` only through explicit agreement receipts.
+evaluation_bench:
+  status: not_run
+  proposed:
+    - pass1_substrate_response_quality
+    - citation_fidelity
+    - cross_model_disagreement_map
+first_added_receipt_hash: null
+first_added_receipt_status: seed_entry_pending_model_registered_receipt
+verification:
+  checked_at: "2026-07-04"
+  method: "Official provider model documentation"
+  confidence: "88/100 - official docs checked; model IDs should be revalidated before push/merge"
+

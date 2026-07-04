@@ -1,0 +1,32 @@
+schema_version: dharma_lab.model_reference.v1
+name: Pali analyzer gap with Sanskrit analyzer fallback
+status: no_verified_pali_analyzer_available
+hf_id: null
+fallback_candidate_hf_id: buddhist-nlp/byt5-sanskrit-analyzer-hackathon
+source_url: https://huggingface.co/buddhist-nlp/byt5-sanskrit-analyzer-hackathon
+license: unknown_on_hf_api_result
+domain:
+  - pali_gap
+  - sanskrit_analyzer_candidate
+  - philology
+training_notes: >
+  HF search for "pali" returned mostly unrelated Paligemma/palindrome matches.
+  A Buddhist NLP Sanskrit analyzer candidate is recorded only as a fallback
+  until a real Pali analyzer is found and evaluated.
+known_limitations:
+  - Do not route Pali analysis to the fallback without explicit caller consent.
+  - Candidate model card and training data remain uninspected.
+  - Pali morphology and Sanskrit analysis are not interchangeable.
+evaluation_bench:
+  status: missing
+  proposed:
+    - pali_morphology_goldset
+    - tipitaka_lemma_disambiguation
+    - pali_to_english_gloss_precision
+first_added_receipt_hash: null
+first_added_receipt_status: seed_gap_pending_model_registered_receipt
+verification:
+  checked_at: "2026-07-04"
+  method: "Hugging Face API searches: pali, buddhist sanskrit"
+  confidence: "74/100 - absence search is shallow; gap is intentionally marked"
+
