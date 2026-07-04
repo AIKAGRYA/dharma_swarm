@@ -33,6 +33,32 @@
   ],
   "advisory": [
     {
+      "id": "gitleaks",
+      "names": ["gitleaks"],
+      "owner": "security",
+      "local_command": "make gitleaks",
+      "failure_category": "secret_scan",
+      "autofix": "forbidden"
+    },
+    {
+      "id": "tests_py311",
+      "names": ["pytest (3.11)"],
+      "owner": "runtime",
+      "local_command": "make test",
+      "failure_category": "test_failure",
+      "autofix": "manual"
+    },
+    {
+      "id": "tests_py312",
+      "names": ["pytest (3.12)"],
+      "owner": "runtime",
+      "local_command": "make test",
+      "failure_category": "test_failure",
+      "autofix": "manual"
+    }
+  ],
+  "advisory": [
+    {
       "id": "active_track",
       "names": ["ACTIVE_TRACK governance gate"],
       "owner": "governance",
@@ -137,14 +163,6 @@
       "autofix": "manual"
     },
     {
-      "id": "gitleaks",
-      "names": ["gitleaks"],
-      "owner": "security",
-      "local_command": "make gitleaks",
-      "failure_category": "secret_scan",
-      "autofix": "forbidden"
-    },
-    {
       "id": "go_adapter_contracts",
       "names": ["go-adapter-contracts"],
       "owner": "go",
@@ -166,22 +184,6 @@
       "owner": "runtime",
       "local_command": "make syntax-check",
       "failure_category": "syntax_or_import",
-      "autofix": "manual"
-    },
-    {
-      "id": "tests_py311",
-      "names": ["pytest (3.11)"],
-      "owner": "runtime",
-      "local_command": "make test",
-      "failure_category": "test_failure",
-      "autofix": "manual"
-    },
-    {
-      "id": "tests_py312",
-      "names": ["pytest (3.12)"],
-      "owner": "runtime",
-      "local_command": "make test",
-      "failure_category": "test_failure",
       "autofix": "manual"
     },
     {
