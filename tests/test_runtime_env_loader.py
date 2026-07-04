@@ -112,6 +112,10 @@ def test_emit_shell_exports_quotes_newly_set_vars(tmp_path, restore_environ):
     env_file = tmp_path / "agent_keys.env"
     env_file.write_text('DHARMA_TEST_LOADER_VAR="value with spaces"\n')
     os.environ.pop("DHARMA_TEST_LOADER_VAR", None)
+    # The loaded marker is asserted as newly set below, but import-time
+    # bootstraps elsewhere in the suite may have already set it; emit diffs
+    # against the current environ, so it must be absent going in.
+    os.environ.pop("DHARMA_RUNTIME_ENV_LOADED", None)
 
     output = rel.emit_shell_exports(env_paths=[env_file])
 
