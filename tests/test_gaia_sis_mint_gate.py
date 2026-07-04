@@ -99,6 +99,39 @@ def test_correlated_oracles_collapse_to_one_family_blocks():
     assert any("independent_evidence_families" in m for m in d.missing)
 
 
+def test_zero_valued_mrv_evidence_is_present_not_missing():
+    # Review fix: a legitimate measured zero (leakage: 0.0) is evidence, not absence.
+    # The gate must fail closed on ABSENT or None only, never on numeric zero.
+    p = _full_external_packet()
+    zero_leakage = ClaimPacket(
+        claim_id=p.claim_id, bounded_welfare_assurance_score=p.bounded_welfare_assurance_score,
+        mrv_integrity={**p.mrv_integrity, "leakage": 0.0},
+        custody=p.custody, attestations=p.attestations,
+        external_countersignature=p.external_countersignature,
+        issuer_id=p.issuer_id, countersigner_id=p.countersigner_id,
+        receipt_envelope_signed=p.receipt_envelope_signed,
+    )
+    d = evaluate(zero_leakage)
+    assert d.status == "ALLOW"
+    assert not any("mrv_integrity" in m for m in d.missing)
+
+
+def test_none_valued_mrv_evidence_still_blocks():
+    # None means the measurement was never made -> still missing, still BLOCKED.
+    p = _full_external_packet()
+    none_leakage = ClaimPacket(
+        claim_id=p.claim_id, bounded_welfare_assurance_score=p.bounded_welfare_assurance_score,
+        mrv_integrity={**p.mrv_integrity, "leakage": None},
+        custody=p.custody, attestations=p.attestations,
+        external_countersignature=p.external_countersignature,
+        issuer_id=p.issuer_id, countersigner_id=p.countersigner_id,
+        receipt_envelope_signed=p.receipt_envelope_signed,
+    )
+    d = evaluate(none_leakage)
+    assert d.status == "BLOCKED"
+    assert any("mrv_integrity[leakage]" in m for m in d.missing)
+
+
 def test_only_full_external_evidence_allows():
     d = evaluate(_full_external_packet())
     assert d.status == "ALLOW"

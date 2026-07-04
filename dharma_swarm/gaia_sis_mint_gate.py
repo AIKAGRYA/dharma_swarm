@@ -104,8 +104,13 @@ def evaluate(packet: ClaimPacket) -> MintDecision:
     missing: list[str] = []
     reasons: list[str] = []
 
-    # 1. MRV integrity inputs (lens 2): all required, externally modelled.
-    miss_mrv = [k for k in _REQUIRED_MRV_INPUTS if not packet.mrv_integrity.get(k)]
+    # 1. MRV integrity inputs (lens 2): all required, externally modelled. Fail closed
+    # on ABSENT or None only — a legitimate zero-valued measurement (leakage: 0.0) is
+    # present evidence, not missing evidence.
+    miss_mrv = [
+        k for k in _REQUIRED_MRV_INPUTS
+        if k not in packet.mrv_integrity or packet.mrv_integrity[k] is None
+    ]
     if miss_mrv:
         missing.append(f"mrv_integrity[{','.join(miss_mrv)}]")
 
