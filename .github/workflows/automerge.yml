@@ -13,6 +13,11 @@ name: automerge
 #   - The advisory governance signal (ACTIVE_TRACK) is ignored by this raw
 #     green-check filter; it continues to report in CI Truth. Coherence Delta
 #     is a required branch-protection check and must be green like any other.
+#   - The green filter is fail-closed on the branch-protection required set
+#     (REQUIRED_CHECKS below): a required check that has not reported on the
+#     head SHA is NOT green. Only ADVISORY_CHECKS are ignored.
+#   - Large or hot-path PRs are demoted to gate-and-status (mike-watch
+#     behavior) unless a human approved or the operator labeled the PR.
 #   - This workflow never merges directly; it only asks Mike.
 #   - Draft PRs and PRs with CHANGES_REQUESTED are never dispatched.
 #   - One dispatch per readiness fingerprint, so later reviews/receipt comments
@@ -23,11 +28,13 @@ name: automerge
 #   Bot lanes should label their PRs `bot-pr` at creation time.
 #
 # Auto-enrollment (no manual labeling needed):
-#   PRs authored by bots (login ends in `[bot]`, is_bot, or `Copilot`) and PRs
-#   whose title carries an automation marker (`[automated]` / `[auto]`) are
-#   automatically given the `bot-pr` label by the enroll step below, so they
-#   enter this lane without anyone remembering to label them. Remove the label
-#   to opt a PR out.
+#   PRs authored by real bot accounts (login ends in `[bot]`, is_bot, or
+#   `Copilot`) are automatically given the `bot-pr` label by the enroll step
+#   below. Title markers (`[automated]` / `[auto]`) no longer grant `bot-pr`:
+#   that label waives Mike's reviewer receipts, and a self-authored title must
+#   not be able to grant its own review waiver. Title-marked agent PRs still
+#   get `mike-watch` coverage from the D4 step. Remove the label to opt a PR
+#   out.
 
 on:
   pull_request:
@@ -62,6 +69,19 @@ jobs:
     timeout-minutes: 10
     env:
       GH_TOKEN: ${{ github.token }}
+      # Branch-protection required contexts. The lane fails CLOSED when any of
+      # these has not reported on the head SHA — absence is not green.
+      # Keep in lockstep with repo Settings → Branches → main.
+      REQUIRED_CHECKS: "DocOps integrity gate,Coherence Delta PR body,pytest (3.11),pytest (3.12),gitleaks"
+      # Advisory names the lane may ignore. MUST NOT overlap REQUIRED_CHECKS.
+      ADVISORY_CHECKS: "ACTIVE_TRACK governance gate,active-track-governance"
+      # Unattended-merge ceiling: above this many changed files, or touching a
+      # hot path (single oracle: dharma_swarm.shakti_warrant._HOT_PATHS), the
+      # lane demotes to mike-watch unless a human approved or the operator
+      # labeled the PR.
+      MAX_UNATTENDED_FILES: "25"
+      HOT_PATHS: ".pre-commit-config.yaml,api/main.py,api/routers/chat.py,api/ws.py,dharma_swarm/agent_runner.py,dharma_swarm/dgc_cli.py,dharma_swarm/orchestrator.py,dharma_swarm/runtime_state.py,dharma_swarm/swarm.py,dharma_swarm/telic_seam.py"
+      OPERATOR_LABEL: "operator-approved"
       # PAT (contents+PR+actions write) used ONLY to dispatch the router
       # workflow. A run triggered by the built-in GITHUB_TOKEN cannot create
       # a new workflow run, so the router dispatch below silently no-ops and
@@ -76,11 +96,12 @@ jobs:
       - name: Auto-enroll bot and automated PRs
         run: |
           set -euo pipefail
-          # Apply `bot-pr` to every open PR that is bot-authored or carries an
-          # automation marker in its title but has no opt-in label yet, so the
-          # lane engages without manual labeling. Drafts are still never
-          # dispatched (step below), and removing the label opts a PR out
-          # permanently for that evaluation pass.
+          # Apply `bot-pr` to every open PR that is bot-authored but has no
+          # opt-in label yet, so the lane engages without manual labeling.
+          # Title markers deliberately do NOT enroll: `bot-pr` waives Mike's
+          # reviewer receipts, and a self-authored `[auto]` title must not
+          # grant that waiver. Drafts are still never dispatched (step below),
+          # and removing the label opts a PR out for that evaluation pass.
           gh pr list --repo "$GH_REPO" --state open --limit 200 \
             --json number,title,labels,author \
             --jq '.[]
@@ -89,7 +110,6 @@ jobs:
                   (.author.is_bot == true)
                   or (.author.login | test("\\[bot\\]$"))
                   or (.author.login == "Copilot")
-                  or (.title | ascii_downcase | test("\\[automated\\]|\\[auto\\]"))
                 )
               | .number' > /tmp/enroll.txt || true
           while IFS= read -r pr; do
@@ -173,25 +193,44 @@ jobs:
               skipped=$((skipped + 1)); continue
             fi
 
-            # 3. Required checks must be completed and green. Ignore this
-            #    workflow plus governance checks that are advisory signals.
-            #    Coherence Delta is NOT excluded: it is a required
-            #    branch-protection context with a real failure mode.
-            not_green="$(echo "$view" | jq -r '
-              [ .statusCheckRollup[]?
-                | select((.name // .context // .workflowName // "") | test("automerge") | not)
-                | select((.name // .context // .workflowName // "")
-                    | IN("ACTIVE_TRACK governance gate", "active-track-governance") | not)
-                | select(
-                    ((.status // "COMPLETED") != "COMPLETED")
-                    or (((.conclusion // .state // "") | ascii_upcase)
-                        | IN("SUCCESS","NEUTRAL","SKIPPED","") | not)
-                  )
-              ] | length')"
-            if [ "$not_green" != "0" ]; then
-              summary+="- #${pr}: skipped (${not_green} checks not green/completed)\n"
+            # 2b. Size / hot-path demotion: large or hot-path PRs never get
+            #     unattended merge without a human approval or operator label.
+            demotion=""
+            if [ "${merge_when_clean}" = "true" ]; then
+              changed="$(gh pr view "$pr" --repo "$GH_REPO" --json changedFiles --jq '.changedFiles')"
+              gh api "repos/${GH_REPO}/pulls/${pr}/files" --paginate --jq '.[].filename' > /tmp/files.txt
+              hot="$(grep -Fx -f <(tr ',' '\n' <<< "$HOT_PATHS") /tmp/files.txt | paste -sd, - || true)"
+              approved="$(echo "$view" | jq -r '.reviewDecision == "APPROVED"')"
+              operator_ok="$(echo "$view" | jq -r --arg l "$OPERATOR_LABEL" '.labels | map(.name) | any(. == $l)')"
+              if { [ "${changed}" -gt "${MAX_UNATTENDED_FILES}" ] || [ -n "${hot}" ]; } \
+                 && [ "${approved}" != "true" ] && [ "${operator_ok}" != "true" ]; then
+                merge_when_clean=false
+                demotion="demoted to gate-and-status: ${changed} files (ceiling ${MAX_UNATTENDED_FILES}), hot paths [${hot:-none}]; add an approving review or the \`${OPERATOR_LABEL}\` label to arm unattended merge"
+              fi
+            fi
+
+            # 3. Evaluate every reporting check on the head SHA, then assert
+            #    the branch-protection required set is PRESENT and green.
+            #    Absence is NOT green (an empty rollup used to read as "all
+            #    status checks are green" — the 2026-07-04 incident).
+            echo "$view" | jq '[ .statusCheckRollup[]?
+                | {name: (.name // .context // .workflowName // "unnamed"),
+                   state: (if ((.status // "COMPLETED") != "COMPLETED") then "PENDING"
+                           else (((.conclusion // .state // "") | ascii_upcase)
+                                 | if . == "" then "NO_CONCLUSION" else . end) end)}
+              ]' > /tmp/checks.json
+            missing_required="$(jq -r --arg req "$REQUIRED_CHECKS" \
+              '(($req | split(",")) - [.[].name]) | join(", ")' /tmp/checks.json)"
+            not_green="$(jq -r --arg adv "$ADVISORY_CHECKS" '
+              [ .[] | select(.name | test("automerge") | not)
+                | select(.name | IN($adv | split(",")[]) | not)
+                | select(.state | IN("SUCCESS","NEUTRAL","SKIPPED") | not)
+              ] | map("\(.name)=\(.state)") | join(", ")' /tmp/checks.json)"
+            if [ -n "$not_green" ] || [ -n "$missing_required" ]; then
+              summary+="- #${pr}: skipped (not green: ${not_green:-none}; required not reported: ${missing_required:-none})\n"
               skipped=$((skipped + 1)); continue
             fi
+            evaluated="$(jq -r '[.[] | "`\(.name)`=\(.state)"] | join(", ")' /tmp/checks.json)"
 
             # 4. One dispatch per readiness fingerprint. Mike may block on
             #    reviewer receipts or unresolved threads that arrive after
@@ -203,7 +242,8 @@ jobs:
                 .headRefOid,
                 (.reviewDecision // ""),
                 ([.statusCheckRollup[]?] | length | tostring),
-                ([.comments[]?] | length | tostring),
+                ([.comments[]? | select(.body | test("automerge-dispatch|dharma-pr-review-control") | not)]
+                  | length | tostring),
                 ([.latestReviews[]?] | length | tostring)
               ] | join(":")')"
             # Include the merge intent so flipping mike-watch -> automerge (or
@@ -231,8 +271,12 @@ jobs:
             gh pr comment "$pr" --repo "$GH_REPO" --body "${marker}
           ## 🟢 Automerge lane engaged
 
-          All status checks are green and no review requests changes, so the
-          automerge lane ${mode_line} for head \`${sha}\`.
+          Checks evaluated on head \`${sha}\` (every reporting check named;
+          required set \`${REQUIRED_CHECKS}\` verified present):
+          ${evaluated}
+          Advisory (ignored): \`${ADVISORY_CHECKS}\`. No review requests changes.
+          ${demotion:+**Note:** ${demotion}}
+          The automerge lane ${mode_line}.
 
           Mike still runs the full deterministic gate (fourfold-warrant,
           reviewer receipts, unresolved threads, and required CI before any
