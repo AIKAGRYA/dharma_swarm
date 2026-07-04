@@ -126,3 +126,14 @@ reports/model_pool/
 .claude/obey.rules.local.json
 xray_report.json
 xray_report.md
+
+# Derived governance status rollups — evicted from tracking 2026-07-04.
+# They are rewritten in place with a generated_at timestamp on every run, so
+# tracking them hard-conflicted every concurrent rebase train. Regenerate with
+# scripts/governance/check_track_status.py (first three) and
+# scripts/governance/trust_gate_status.py (fourth); CI publishes fresh copies
+# to the generated/status branch on every push to main (active-track.yml).
+reports/governance/active_track_evidence.json
+reports/governance/active_track_evidence.md
+reports/governance/track_portfolio.json
+reports/governance/trust_gate_status.json
