@@ -425,6 +425,73 @@ def check_json_mapping_keys_nonempty(
     )
 
 
+def _compact_command_output(text: str, *, limit: int = 500) -> str:
+    compact = " | ".join(line.strip() for line in text.splitlines() if line.strip())
+    if len(compact) <= limit:
+        return compact
+    return compact[: limit - 3] + "..."
+
+
+def _resolve_command_for_current_runtime(command: list[str]) -> list[str]:
+    """Keep executable criteria portable across worktrees.
+
+    ACTIVE_TRACK criteria are written as literal commands so operators can see
+    what is being proven. In isolated worktrees, though, the repository-local
+    virtualenv may not exist even when this checker is already running under a
+    dependency-complete Python. Resolve those common Python entrypoints to the
+    current interpreter instead of making track truth depend on one checkout's
+    `.venv` path.
+    """
+    if not command:
+        return command
+    executable = command[0]
+    if executable == "pytest":
+        return [sys.executable, "-m", "pytest", *command[1:]]
+    if executable in {"./.venv/bin/python", ".venv/bin/python"} and not Path(executable).exists():
+        return [sys.executable, *command[1:]]
+    return command
+
+
+def check_command_passes(
+    command: list[str],
+    *,
+    timeout_s: int = 120,
+    cwd: str | None = None,
+) -> CriterionResult:
+    kind = "command_passes"
+    resolved_command = _resolve_command_for_current_runtime(command)
+    try:
+        result = subprocess.run(
+            resolved_command,
+            cwd=cwd or None,
+            capture_output=True,
+            text=True,
+            timeout=max(1, timeout_s),
+        )
+    except subprocess.TimeoutExpired as exc:
+        return CriterionResult(
+            id="",
+            kind=kind,
+            passed=False,
+            detail=f"{' '.join(resolved_command)} timed out after {exc.timeout}s",
+        )
+    except OSError as exc:
+        return CriterionResult(
+            id="",
+            kind=kind,
+            passed=False,
+            detail=f"{' '.join(resolved_command)} failed to start: {exc}",
+        )
+
+    output = _compact_command_output((result.stdout or "") + "\n" + (result.stderr or ""))
+    detail = f"{' '.join(resolved_command)} exited {result.returncode}"
+    if resolved_command != command:
+        detail += f" (resolved from {' '.join(command)})"
+    if output:
+        detail += f"; output: {output}"
+    return CriterionResult(id="", kind=kind, passed=result.returncode == 0, detail=detail)
+
+
 def check_pr_merged(pr_number: int) -> CriterionResult:
     """Best-effort PR merge check via gh CLI. UNKNOWN does not fail."""
     if shutil.which("gh") is None:
@@ -949,6 +1016,20 @@ def evaluate_criterion(crit: dict[str, Any]) -> CriterionResult:
                     crit["file"],
                     crit["mapping"],
                     [str(key) for key in crit["keys"]],
+                )
+        elif kind == "command_passes":
+            command = crit.get("command")
+            if not isinstance(command, list) or not command or not all(isinstance(part, str) and part for part in command):
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail="malformed criterion: 'command' must be a non-empty list of strings")
+            elif crit.get("cwd") is not None and not isinstance(crit.get("cwd"), str):
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail="malformed criterion: 'cwd' must be a string when present")
+            else:
+                res = check_command_passes(
+                    command,
+                    timeout_s=int(crit.get("timeout_s", 120)),
+                    cwd=crit.get("cwd"),
                 )
         elif kind == "pr_merged":
             res = check_pr_merged(int(crit["pr"]))
@@ -1638,6 +1719,30 @@ def evaluate_track(t: dict[str, Any]) -> dict[str, Any]:
     open_blockers = [ni for ni in next_items if ni.get("blocker") is True]
     has_rigorous_evidence = any(c.passed and c.kind in RIGOROUS_KINDS for c in comps)
 
+    # --- UNDERCLAIM detection (the inverse of the false-shippable trap) --------
+    # Every defense above catches claims AHEAD of reality. Nothing caught the
+    # ledger falling BEHIND reality: a next-item still listed as open work whose
+    # own evidence criterion already passes (observed live 2026-07-03: the arena
+    # controls blocker and Mike Slice 1 were both shipped-but-still-open).
+    # A next_item may declare `evidence_criterion: <criterion id>`; when that
+    # criterion PASSES while the item text does not start with DONE, the ledger
+    # is flagged for reconciliation. Read-only: this adds no gate, only a WARN.
+    passed_ids = {c.id for c in comps if c.passed} | {c.id for c in prereqs if c.passed}
+    underclaims: list[dict[str, Any]] = []
+    for ni in next_items:
+        ev = ni.get("evidence_criterion")
+        if not (isinstance(ev, str) and ev):
+            continue
+        if ev not in passed_ids:
+            continue
+        if str(ni.get("what", "")).strip().upper().startswith("DONE"):
+            continue  # already reconciled in prose
+        underclaims.append({
+            "item_id": ni.get("id"),
+            "evidence_criterion": ev,
+            "blocker": ni.get("blocker") is True,
+        })
+
     # --- GRADED bar (Pudgala Autopoiesis Protostar Phase 1) --------------------
     # Pair each completion criterion with its declared criterion dict so we can
     # read per-criterion ladder hints (oracle_source). zip is safe: comps is
@@ -1694,6 +1799,7 @@ def evaluate_track(t: dict[str, Any]) -> dict[str, Any]:
         "min_evidence_grade_name": grade_name(min_evidence_grade),
         "open_blocker_count": len(open_blockers),
         "active_ship_veto_count": len(active_vetoes),
+        "underclaims": underclaims,
         "passed": sum(1 for c in comps if c.passed),
         "total": len(comps),
     }
@@ -1808,9 +1914,22 @@ def run(args: argparse.Namespace) -> int:
                     "(test_passes / commit_on_main / receipt_valid / pr_merged) and zero "
                     "open blockers. Either add real evidence or change status back to ACTIVE."))
 
+        # Underclaims => the ledger is BEHIND reality (inverse of false-shippable).
+        # WARN, not ERROR: the owner reconciles by annotating the item DONE, by
+        # narrowing it to the genuinely-remaining edge, or by strengthening the
+        # criterion — this detector never closes items itself.
+        for uc in r.get("underclaims", []):
+            kind = "blocker next-item" if uc["blocker"] else "next-item"
+            findings.append(Finding("WARN", f"track-underclaim:{tid}:{uc['item_id']}",
+                f"[{tid}] {kind} {uc['item_id']} is still listed as open work but its "
+                f"linked evidence criterion '{uc['evidence_criterion']}' PASSES — the "
+                "ledger may be behind reality. Reconcile: annotate the item DONE, "
+                "narrow it to the remaining live edge, or strengthen the criterion.",
+                criterion_id=uc["evidence_criterion"]))
+
         # Prerequisite failures => track mis-declared.
         for c in r["prereqs"]:
-            if not c.passed and c.kind in {"file_exists", "file_contains"}:
+            if not c.passed and c.kind in {"file_exists", "file_contains", "command_passes"}:
                 findings.append(Finding("ERROR", f"prerequisite:{tid}:{c.id}",
                     f"[{tid}] prerequisite failed: {c.detail}. The work it builds on "
                     "does not exist.", criterion_id=c.id))
@@ -1873,6 +1992,7 @@ def _track_payload(t: dict[str, Any], r: dict[str, Any]) -> dict[str, Any]:
         "criteria_pass": r.get("criteria_pass", r["shippable"]),
         "ship_blocks": r.get("ship_blocks", []),
         "final_boss_blocks": r.get("final_boss_blocks", []),
+        "underclaims": r.get("underclaims", []),
         "claim_boundary": t.get("claim_boundary"),
         "has_rigorous_evidence": r.get("has_rigorous_evidence", False),
         "strongest_grade": r.get("strongest_grade", 0),

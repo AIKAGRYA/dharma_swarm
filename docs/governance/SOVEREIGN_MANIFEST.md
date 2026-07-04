@@ -26,43 +26,6 @@
 - `revenue-external-humans-served` — Revenue & external humans served — value leaves the house and someone acts on it (**no active track**)
 - `research-depth` — Research depth — the contemplative-mechanistic bridge (R_V, geometric lens) deepens (**no active track**)
 
-### Runtime Truth Spine — Adoption (god objects flow through invoke_agent)
-
-**Track id:** `runtime-truth-spine-adoption-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-10 (TTL 21 days)
-**Relations:** complements: runtime-truth-reconciliation-2026-06, runtime-truth-nats-2026-06
-**Owns surfaces:** dharma_swarm/spine/**, dharma_swarm/a2a/a2a_bridge.py, dharma_swarm/orchestrator.py, dharma_swarm/agent_runner.py, scripts/uplift_guards/check_spine_ownership.py
-**Moves vital signs:** quality_gates, tool_coverage
-
-spine-adoption ships end-to-end: every production dispatch flows through
-invoke_agent() and emits exactly one EvidenceReceipt. This track migrates
-the god objects (agent_runner.py, orchestrator.py, a2a_bridge.py) onto
-the shipped spine substrate. Target: 3 production callers outside the
-spine package, zero bypass paths. Substrate-nativeness moves toward 30%+.
-
-Ported 2026-06-10 from the v1 declaration (opened 2026-06-06 on the
-qwen/spine-adoption lane, commit c28951d5b, which closed reconciliation
-in v1) into the v2 portfolio while merging origin/main. In the v2
-multi-track model it runs as a co-equal peer of the reconciliation and
-NATS lanes rather than requiring their closure; reconciliation's open
-status is main's standing declaration and is left to the operator.
-
-**Next items:**
-
-- [code] (blocker) Wire a2a_bridge.submit_via_spine into production dispatch (ingest_trishula_inbox bypass at a2a_bridge.py:307 — Slice 2 per scripts/governance/spine_bypass_report.py).
-- [code] (blocker) orchestrator.py dispatch through invoke_agent behind DHARMA_SPINE_DISPATCH (landed via #557; operator confirms one live EvidenceReceipt on a real dispatch = GATE 1).
-- [code] (blocker) Migrate agent_runner.py run_task through invoke_agent(). Largest surface, last.
-- [code] (blocker) Drain the intentional-bypass allowlist (node_gateway submit endpoints, a2a_client._dispatch_local) and enable allow-list-at-zero in uplift_guards CI.
-- [docs] Author docs/architecture/SPINE_ADOPTION_NARRATIVE.md
-
-**Non-goals:**
-
-- Do not create new spine sub-modules. Adopt invoke/receipt/routing/persistence.
-- Do not decompose agent_runner.run_task beyond invoke_agent() routing.
-- Do not change EvidenceReceipt schema; adopt shipped types unchanged.
-- Do not introduce NATS, Redis, or gRPC in this track (transport belongs to the NATS lane).
-- Do not broadly refactor swarm.py, providers.py, or SwarmManager.
-
 ### Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
 
 **Track id:** `loop-closure-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
@@ -93,7 +56,7 @@ Claim boundary:
 
 **Next items:**
 
-- [code] (blocker) Residual: drain or quarantine historical dispatch_dropoff rows before any standing all-history daemon-clean claim.
+- [code] (blocker) TOOL SHIPPED 2026-07-03 (execution on daemon host remains operator): scripts/runtime/dispatch_dropoff_quarantine.py — dry-run default, REQUIRED --before cutoff, --execute stamps quarantined_at/quarantine_reason on existing delegation_runs rows (idempotent ALTER, no new store, rows stay auditable) and writes a JSON receipt (counts + rowid-list sha256) under ~/.dharma/loop_closure/. Audit now reports dropoff_live=N / dropoff_quarantined_historical=M separately (cybernetics_codex excludes only explicitly-stamped rows and always reports the quarantined tally — never hides it). 7 fixture-DB tests green. REMAINING: operator runs it on the daemon host against the real runtime.db (~2191 historical rows), cutoff at/before the spine-dispatch fix timestamp.
 - [governance] Future boundary: keep Loops 12/13 blocked until One Wire has N>=5, M>=3, and explicit archive-fitness authority.
 - [governance] (blocker) Promote each HARNESS_PROVEN loop only after its declared live owner-surface criterion passes on the daemon branch that actually runs.
 
@@ -110,7 +73,7 @@ Claim boundary:
 **Track id:** `orchestration-arena-v1-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
 **Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-23 (TTL 21 days)
 **Relations:** complements: provider-routing-consolidation-2026-06, loop-closure-2026-06
-**Owns surfaces:** dharma_swarm/coordination/**, dharma_swarm/council/**, tests/test_arena_v1.py, tests/test_dpi.py, tests/test_orchestration_genome.py, tests/test_orchestrator_v1.py, tests/test_council_profiles.py, tests/test_coordination_closure_checks.py
+**Owns surfaces:** dharma_swarm/coordination/**, dharma_swarm/council/**, scripts/governance/arena_truth_report.py, reports/governance/arena/**, tests/test_arena_v1.py, tests/test_dpi.py, tests/test_orchestration_genome.py, tests/test_orchestrator_v1.py, tests/test_council_profiles.py, tests/test_coordination_closure_checks.py, tests/test_arena_truth_report.py
 **Moves vital signs:** eval_coverage, quality_gates
 
 Governance admission for the Arena/Orchestration substrate that LANDED on
@@ -131,9 +94,9 @@ trained weights — training is earned only after the arena produces labels.
 
 **Next items:**
 
-- [code] Wire arena scorecard + DPI receipts into a governance-visible report surface (read-only).
-- [code] (blocker) Add best-single-model controls + budget-parity proof to every arena run before any capability claim.
-- [code] Connect arena winners to a cold-start trace corpus (no training yet; corpus only).
+- [code] DONE 2026-07-03: arena scorecard + DPI receipts wired into a read-only governance surface — scripts/governance/arena_truth_report.py renders reports/governance/arena/ (digest-stamped receipt + ARENA_TRUTH.md + corpus), seeded/deterministic; --check fails if the committed surface does not replay byte-for-byte. Criterion arena_truth_receipt_valid verifies it.
+- [code] (blocker) HERMETIC CONTROLS SHIPPED (runner.run always executes best_single_full_budget gate + budget-parity ledger for every arm + seeded bootstrap significance; proven by arena_v1_controls_tests_pass). REMAINING (the blocker's live edge): any future live-lane arena run (DHARMA_ARENA_LIVE seam in fixtures.py) must inherit the SAME control arms before any capability claim — the hermetic lift on the fixture taskpack is a control-machinery existence proof, never a capability claim (non-goal 1). C2 stays owned by real benchmark evidence.
+- [code] DONE 2026-07-03: arena winners connected to the cold-start trace corpus — coordination/arena/corpus.py emits labeled winner traces (positive_lift_candidate only, scorer-labeled, deterministic) to reports/governance/arena/cold_start_corpus.jsonl, sha256-pinned in the report receipt. Labels only; zero training (v1 doctrine).
 
 **Non-goals:**
 
@@ -198,11 +161,54 @@ Doctrine that MUST hold (the gate's safety floor is never weakened):
 - Do not accept a "review" from an untrusted login as a receipt; only trusted installed reviewer-App logins.
 - Do not create a new merge authority or receipt store; extend pr_merge_control and the existing workflows.
 
+### Organism Rewire — dormant organs to production, spine standing-on, external gradients
+
+**Track id:** `organism-rewire-2026-07` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-07-02 (TTL 21 days)
+**Relations:** complements: runtime-truth-spine-adoption-2026-06, loop-closure-2026-06, orchestration-arena-v1-2026-06
+**Owns surfaces:** tools/world_scout_go/**, tools/world_signal_ingestor_go/**, tools/github_ingestor_go/**, tools/evidence_ingestor_go/**, dharma_swarm/world_radar/**, dharma_swarm/organism.py, dharma_swarm/strange_loop.py, dharma_swarm/diversity_archive.py, dharma_swarm/archive.py, docker-compose.yml, Dockerfile.swarm
+**Moves vital signs:** quality_gates, eval_coverage
+
+Operator-ratified 2026-07-02 from the verified full-organism sweep
+(29 agents: 9 scanners, 16 adversarial verifiers, 3 judges; dossier in
+the sweep session). Converts the sweep's confirmed findings into wiring:
+the truth spine becomes standing-on (invariant provenance, not policy),
+the Go sense organs become known-working and closure-checked, the
+dormant organs (Organism/StrangeLoop via composition root, MAP-Elites
+consolidation, living-agent kernel earn-in) reach production, and the
+operator gains a felt, live view of the spine (receipt tail + cockpit
+pulse). Fitness doctrine ratified alongside: a PORTFOLIO of external
+gradients (verified benchmarks for high-iteration autoresearch loops,
+market P&L as funding + slow-horizon term only, paid human work as the
+C3 leg) — diversity of objective functions on the same math as
+diversity of agents.
+
+**Next items:**
+
+- [code] (blocker) D1 (blocker): CODE+DOCS DONE (docker-compose.yml swarm service carries DHARMA_SPINE_DISPATCH=1 standing; Mac plist env path documented in docs/ops/RUNBOOK.md §3d). REMAINING: operator observation that Loop-1 closure reads LIVE persistently on the daemon host (make orient on the host that actually runs; blocked on daemon host / VPS item 4).
+- [code] DONE 2026-07-03: `dgc spine tail` (operator_core/spine_tail.py, landed earlier) + read-only cockpit pulse panel now RENDERED in Cockpit V2 (dashboard SpinePulsePanel.tsx: receipts/hour, last-receipt age with LIVE/QUIET chip, dropoff count; reads /api/control-surface/rows/spine.pulse, refreshes 15s, graceful not-live-on-this-host state).
+- [code] DONE 2026-07-03: Go sense-organ hardening + Loop 5b complete. Most had landed via #755 (per-source errors → go.world_radar_health cockpit row; github_ingestor live trigger go-g04 via cron_jobs.json:github_ingestor_inbox; host-aware loop5b_world_radar_closure_run with NEEDS_HOST). This session closed the last gap: toolchain-checked invocation in world_radar/go_invoke.py (no binary AND no `go` on PATH → structured needs_host per-source error naming `make go-build`, never an exception into the caller loop; cockpit gap code go_world_radar_needs_host). Verified live: loop5b closure run → LOOP5B_CLOSED=yes; 126 tests green.
+- [ops] VPS shift: daemon (compose swarm service + NATS + litestream state replication) onto an always-on VPS; Mac demotes to dev seat/mirror. Operator provisions host + secrets.
+- [docs] D2 spec-first: memory position earned by evidence class (receipt-backed+TTL facts may go first-token), routing-time memory (kernel informs seat selection), diversity-preserving kernel sampling for worker seats. Spec then canary before flipping C5.
+- [code] D6a: consolidate MAP-Elites on archive.MAPElitesGrid; retire/absorb diversity_archive.py; arena keeps its genome-descriptor variant only if descriptors are shared.
+- [code] D5: Organism as composition root over SwarmManager (review + harden to EARN god-module status); StrangeLoop gains a production entry point.
+- [docs] External-gradient portfolio spec (dedicated session): >=6 autoresearch nodes (arena/genome, router policy, prompt/policy evolution, memory promotion policy, gate calibration, AND the R_V/self-reference-attractor research lane — NORTH_STAR §2's measurable-awareness claim gets an owned, receipted eval loop again after the COLM calendar death) each with frozen eval + mutation operator + diversity-preserving selection + receipts; benchmark loops iterate at volume, market P&L funds but never selects per-iteration. Next track after this one lands MUST serve revenue-external-humans-served (NORTH_STAR §11 90-day: 'funds itself totally').
+- [code] (blocker) D4 (sequenced LAST): BR-003 mechanism test (one canonical run, DHARMA_EVOLUTION_SHADOW=0, rollback receipt), standing unlock only after items 1+8 provide ungameable selection signal.
+- [code] D6b: living_agent_kernel earn-in — activate 2-3 kernels post-D1 (receipted wakes visible in presence), monitor, individually graduate to always-on.
+
+**Non-goals:**
+
+- Do not weaken, remove, or bypass any telos gate or ratchet to wire an organ (gates are hardest exactly when revenue/deadline pressure arrives).
+- Do not let market P&L act as per-iteration selection signal; funding + slow-horizon term only.
+- Do not unlock DarwinEngine standing apply before the external-gradient signal exists (item 9 sequencing is doctrine).
+- Do not broadcast identical first-token memory to worker seats; decorrelation of priors is preserved by design.
+- Do not touch surfaces owned by the four sibling tracks except through their own next-items.
+
 **Recently closed tracks:**
 
+- `runtime-truth-spine-adoption-2026-06` — Runtime Truth Spine — Adoption (god objects flow through invoke_agent) (SHIPPED, closed 2026-07-03)
 - `runtime-truth-reconciliation-2026-06` — Runtime Truth Reconciliation - operator-visible truth packets (SHIPPED, closed 2026-06-30)
 - `runtime-truth-nats-2026-06` — Runtime Truth NATS - internal live transport for A2A dispatch (SHIPPED, closed 2026-06-30)
-- `truth-graph-platform-2026-06` — Truth Graph Platform v1 - repo context + receipted A2A presence (SHIPPED, closed 2026-06-30)
 
 For machine-readable status, see [`reports/governance/active_track_evidence.md`](../../reports/governance/active_track_evidence.md) (generated by `scripts/governance/check_track_status.py`).
 
@@ -254,9 +260,11 @@ Do not inject machine-readable YAML frontmatter into governance or architecture 
 
 ---
 
-## VERIFIED NUMBERS (2026-06-30 COUNT REFRESH)
+## VERIFIED NUMBERS (2026-07-03 COUNT REFRESH)
 
 These are the ground-truth metrics. All other documents citing different numbers are stale.
+One row per metric — refreshes REPLACE this table (never append; the 2026-06/07
+append-style refreshes quadruplicated rows and broke `make docops-integrity`).
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
@@ -296,8 +304,17 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Markdown total lines | **270,022** | wc -l across all .md |
 | Markdown files | **1238** | find . -name "*.md" -type f |
 | Markdown total lines | **270,022** | wc -l across all .md |
+| Total Python modules | **880** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **435 (49.4%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **339,354** | wc -l across dharma_swarm Python modules |
+| Test files | **824** | find tests -name "*.py" -type f |
+| Test functions | **12,557 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Tests collected (pytest) | **12,674 (measured 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
+| Collection errors | **0 (measured 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
+| Markdown files | **1,314** | find . -name "*.md" -type f |
+| Markdown total lines | **280,913** | wc -l across all .md |
 | Bridge files | **26** | find dharma_swarm -name "*bridge*.py" -type f |
-| Adapter files | **25** | find dharma_swarm -type f | rg -i "adapter" |
+| Adapter files | **26** | find dharma_swarm -type f | rg -i "adapter" |
 | Router files | **16** | find dharma_swarm -type f | rg -i "rout" |
 
 ## SYSTEM TOPOGRAPHY

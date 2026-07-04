@@ -43,6 +43,26 @@ def db_path(tmp_path):
     return tmp_path / "test.db"
 
 
+@pytest.fixture(autouse=True)
+def _restore_os_environ():
+    """Snapshot and restore os.environ around every test.
+
+    Library code raw-writes env vars (e.g. api_keys.py sets
+    DHARMA_RUNTIME_ENV_LOADED), which monkeypatch cannot undo when the test
+    never registered the write. Conftest-level autouse setup runs before
+    per-test fixtures, so this teardown runs after monkeypatch's undo — the
+    two compose.
+    """
+    snapshot = os.environ.copy()
+    yield
+    for k in list(os.environ):
+        if k not in snapshot:
+            del os.environ[k]
+    for k, v in snapshot.items():
+        if os.environ.get(k) != v:
+            os.environ[k] = v
+
+
 # Prefixes whose env vars leak runtime config into routing/scheduling tests.
 _DGC_LEAK_PREFIXES = ("DGC_ROUTER_", "DGC_AGENT_")
 

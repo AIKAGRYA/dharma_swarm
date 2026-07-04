@@ -12,10 +12,9 @@ import logging
 import os
 import re
 import time
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Dict, Optional, Protocol, runtime_checkable
 
 from dharma_swarm.contracts.intelligence_agents import communication_topics
 from dharma_swarm.models import (
@@ -56,11 +55,12 @@ from dharma_swarm.telos_gates import check_with_reflective_reroute
 # The core execution (run_task) is the leaf invoked by spine-wrapped callers
 # (Orchestrator._run_task_via_spine, A2ABridge.submit_via_spine) which wrap
 # the actual call inside an invoke_agent() invoker closure to emit exactly one
-# EvidenceReceipt per dispatch. This import declares the surface's place in
-# the single blessed path; no god-object bypass of the spine for orchestrated work.
-from dharma_swarm.spine.invoke import invoke_agent
-from dharma_swarm.spine.receipt import EvidenceReceipt
-from dharma_swarm.spine.routing import RoutingDecision
+# EvidenceReceipt per dispatch. These imports DECLARE the surface's place in
+# the single blessed path (declaration-by-import, kept deliberately unused);
+# no god-object bypass of the spine for orchestrated work.
+from dharma_swarm.spine.invoke import invoke_agent  # noqa: F401  (spine-adoption declaration)
+from dharma_swarm.spine.receipt import EvidenceReceipt  # noqa: F401  (spine-adoption declaration)
+from dharma_swarm.spine.routing import RoutingDecision  # noqa: F401  (spine-adoption declaration)
 
 logger = logging.getLogger(__name__)
 
@@ -1648,6 +1648,10 @@ class AgentRunner:
         # Sprint 3: Economic tracking
         self._economic_spine: Any = None
         self._tokens_used_total: int = 0
+        self._last_route_request: Optional[Any] = None
+        self._last_route_decision: Optional[Any] = None
+        self._last_response: Optional[LLMResponse] = None
+        self._last_usage: Dict[str, int] = {}
 
     def set_economic_spine(self, spine: Any) -> None:
         """Attach an EconomicSpine for cost tracking."""
@@ -2125,6 +2129,10 @@ class AgentRunner:
         active_inference_engine: Any | None = None
         active_inference_prediction: Any | None = None
         observed_quality_score: float | None = None
+        self._last_route_request = None
+        self._last_route_decision = None
+        self._last_response = None
+        self._last_usage = {}
 
         _task_tracer = _jikoku_tracer()
         _task_span = _task_tracer.start(
@@ -2377,6 +2385,10 @@ class AgentRunner:
                 result_text=result,
                 quality_score_override=observed_quality_score,
             )
+            self._last_route_request = route_request
+            self._last_route_decision = route_decision
+            self._last_response = response
+            self._last_usage = dict(response.usage or {}) if response else {}
 
             # ── Langfuse / local observability trace ──
             try:
@@ -2601,6 +2613,10 @@ class AgentRunner:
                 result_text=str(exc),
                 quality_score_override=observed_quality_score,
             )
+            self._last_route_request = route_request
+            self._last_route_decision = route_decision
+            self._last_response = response
+            self._last_usage = dict(response.usage or {}) if response else {}
             self._observe_active_inference(
                 active_inference_engine,
                 active_inference_prediction,

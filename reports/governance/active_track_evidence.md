@@ -1,6 +1,6 @@
 # Track Portfolio Evidence
 
-Generated: 2026-07-02T13:43:27+00:00 (schema v2)
+Generated: 2026-07-03T09:08:52+00:00 (schema v2)
 Active tracks: **4** (warn 5, max 10) — shippable 0
 
 ## Spine coverage
@@ -9,25 +9,7 @@ Active tracks: **4** (warn 5, max 10) — shippable 0
 - `revenue-external-humans-served` — ✗ (no active track)
 - `research-depth` — ✗ (no active track)
 
-## `runtime-truth-spine-adoption-2026-06` — 7/8
-
-- serves: `substrate-nativeness` · complements: ['runtime-truth-reconciliation-2026-06', 'runtime-truth-nats-2026-06'] · depends_on: [] · conflicts_with: []
-- owned_surfaces: ['dharma_swarm/spine/**', 'dharma_swarm/a2a/a2a_bridge.py', 'dharma_swarm/orchestrator.py', 'dharma_swarm/agent_runner.py', 'scripts/uplift_guards/check_spine_ownership.py']
-- moves_vital_signs: ['quality_gates', 'tool_coverage']
-- ship_blocks: 4 open blocker next-item(s); no rigorous evidence (criteria are existence-only: file_exists/file_contains — add test_passes / commit_on_main / receipt_valid); strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)
-
-  - ✓ `spine_package_exists` (file_exists) — dharma_swarm/spine/__init__.py present
-  - ✓ `invoke_agent_defined` (file_contains) — pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py
-  - ✓ `a2a_bridge_calls_spine` (file_contains) — pattern '(?m)^\\s*from dharma_swarm\\.spine' found in dharma_swarm/a2a/a2a_bridge.py
-  - ✓ `orchestrator_calls_spine` (file_contains) — pattern '(?m)^\\s*from dharma_swarm\\.spine' found in dharma_swarm/orchestrator.py
-  - ✓ `agent_runner_calls_spine` (file_contains) — pattern '(?m)^\\s*from dharma_swarm\\.spine' found in dharma_swarm/agent_runner.py
-  - ✓ `dispatch_emits_evidence_receipt` (file_contains) — pattern 'test_every_dispatch_emits_exactly_one_evidence_receipt' found in tests/test_spine_adoption_dispatch.py
-  - ✓ `zero_dropoff_sources` (file_contains) — pattern 'test_no_dropoff_sources_remain' found in tests/test_spine_adoption_dispatch.py
-  - ✗ `bypass_allowlist_empty` (file_contains) — pattern '(?m)^_INTENTIONAL_BYPASS: dict\\[tuple\\[str, int\\], str\\] = \\{\\s*\\}' NOT FOUND in scripts/governance/spine_bypass_report.py
-  - ✓ `adoption_narrative_docs` (file_exists) — docs/architecture/SPINE_ADOPTION_NARRATIVE.md present
-  - ✓ `gate1_witnessed` (file_exists) — reports/governance/GATE1_WITNESSED.md present
-
-## `loop-closure-2026-06` — 28/29
+## `loop-closure-2026-06` — 29/29
 
 - serves: `substrate-nativeness` · complements: ['runtime-truth-reconciliation-2026-06'] · depends_on: [] · conflicts_with: []
 - owned_surfaces: ['reports/loop_closure/**', 'CYBERNETIC_LOOP_MAP.md']
@@ -65,16 +47,16 @@ Active tracks: **4** (warn 5, max 10) — shippable 0
   - ✓ `cybernetics_codex_loop10_receipt_valid` (receipt_valid) — receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop10_context_agent_closure.json valid (6 keys present)
   - ✓ `cybernetics_codex_loop11_receipt_valid` (receipt_valid) — receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop11_replication_monitor_closure.json valid (6 keys present)
   - ✓ `cybernetics_codex_one_wire_guard_test_exists` (file_exists) — tests/test_one_wire_archive_fitness_guard.py present
-  - ✗ `cybernetics_codex_one_wire_guard_test_passes` (test_passes) — pytest tests/test_one_wire_archive_fitness_guard.py: pytest not installed (could not execute)
+  - ✓ `cybernetics_codex_one_wire_guard_test_passes` (test_passes) — pytest tests/test_one_wire_archive_fitness_guard.py: PASS — 19 passed in 0.35s
   - ✓ `cybernetics_codex_loop12_13_guard_receipt_exists` (file_exists) — reports/loop_closure/cybernetics_codex/2026-07-01_loop12_13_one_wire_archive_fitness_guard.json present
   - ✓ `cybernetics_codex_loop12_13_guard_receipt_valid` (receipt_valid) — receipt reports/loop_closure/cybernetics_codex/2026-07-01_loop12_13_one_wire_archive_fitness_guard.json valid (5 keys present)
 
-## `orchestration-arena-v1-2026-06` — 9/9
+## `orchestration-arena-v1-2026-06` — 12/12
 
 - serves: `substrate-nativeness` · complements: ['provider-routing-consolidation-2026-06', 'loop-closure-2026-06'] · depends_on: [] · conflicts_with: []
-- owned_surfaces: ['dharma_swarm/coordination/**', 'dharma_swarm/council/**', 'tests/test_arena_v1.py', 'tests/test_dpi.py', 'tests/test_orchestration_genome.py', 'tests/test_orchestrator_v1.py', 'tests/test_council_profiles.py', 'tests/test_coordination_closure_checks.py']
+- owned_surfaces: ['dharma_swarm/coordination/**', 'dharma_swarm/council/**', 'scripts/governance/arena_truth_report.py', 'reports/governance/arena/**', 'tests/test_arena_v1.py', 'tests/test_dpi.py', 'tests/test_orchestration_genome.py', 'tests/test_orchestrator_v1.py', 'tests/test_council_profiles.py', 'tests/test_coordination_closure_checks.py', 'tests/test_arena_truth_report.py']
 - moves_vital_signs: ['eval_coverage', 'quality_gates']
-- ship_blocks: 1 open blocker next-item(s); no rigorous evidence (criteria are existence-only: file_exists/file_contains — add test_passes / commit_on_main / receipt_valid); strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)
+- ship_blocks: 1 open blocker next-item(s)
 
   - ✓ `arena_runner_exists` (file_exists) — dharma_swarm/coordination/arena/runner.py present
   - ✓ `arena_scorer_exists` (file_exists) — dharma_swarm/coordination/arena/scorer.py present
@@ -88,6 +70,9 @@ Active tracks: **4** (warn 5, max 10) — shippable 0
   - ✓ `arena_v1_test_exists` (file_contains) — pattern 'def test_positive_lift_candidate_beats_best_single_at_parity' found in tests/test_arena_v1.py
   - ✓ `dpi_test_exists` (file_exists) — tests/test_dpi.py present
   - ✓ `closure_checks_test_exists` (file_exists) — tests/test_coordination_closure_checks.py present
+  - ✓ `arena_v1_controls_tests_pass` (test_passes) — pytest tests/test_arena_v1.py: PASS — 15 passed in 0.49s
+  - ✓ `arena_truth_surface_tests_pass` (test_passes) — pytest tests/test_arena_truth_report.py: PASS — 8 passed in 3.83s
+  - ✓ `arena_truth_receipt_valid` (receipt_valid) — receipt reports/governance/arena/arena_truth_receipt.json valid (9 keys present, digest intact, fresh)
 
 ## `merge-master-mike-d4-2026-06` — 3/4
 
@@ -105,12 +90,19 @@ Active tracks: **4** (warn 5, max 10) — shippable 0
   - ✓ `automerge_enrolls_all_nondraft` (file_contains) — pattern 'mike-watch' found in .github/workflows/automerge.yml
   - ✗ `mike_cloud_heartbeat` (file_contains) — pattern 'schedule:' NOT FOUND in .github/workflows/merge-master-mike-backlog.yml
 
+## `organism-rewire-2026-07` — 0/0
+
+- serves: `substrate-nativeness` · complements: ['runtime-truth-spine-adoption-2026-06', 'loop-closure-2026-06', 'orchestration-arena-v1-2026-06'] · depends_on: [] · conflicts_with: []
+- owned_surfaces: ['tools/world_scout_go/**', 'tools/world_signal_ingestor_go/**', 'tools/github_ingestor_go/**', 'tools/evidence_ingestor_go/**', 'dharma_swarm/world_radar/**', 'dharma_swarm/organism.py', 'dharma_swarm/strange_loop.py', 'dharma_swarm/diversity_archive.py', 'dharma_swarm/archive.py', 'docker-compose.yml', 'Dockerfile.swarm']
+- moves_vital_signs: ['quality_gates', 'eval_coverage']
+- ship_blocks: 2 open blocker next-item(s); no rigorous evidence (criteria are existence-only: file_exists/file_contains — add test_passes / commit_on_main / receipt_valid); strongest evidence S0_EXISTS < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)
+
+
 ## Findings
 
 - **WARN** `spine-uncovered:research-depth`: Spine objective 'research-depth' has no ACTIVE track serving it (coverage gap).
 - **WARN** `spine-uncovered:revenue-external-humans-served`: Spine objective 'revenue-external-humans-served' has no ACTIVE track serving it (coverage gap).
-- **WARN** `track-stale:runtime-truth-spine-adoption-2026-06`: [runtime-truth-spine-adoption-2026-06] verified_at is 22 days old (ttl_days=21). Re-verify and bump verified_at, or retire the track.
-- **INFO** `track-in-progress:runtime-truth-spine-adoption-2026-06`: [runtime-truth-spine-adoption-2026-06] 7/8 completion criteria pass.
-- **INFO** `track-in-progress:loop-closure-2026-06`: [loop-closure-2026-06] 28/29 completion criteria pass.
-- **INFO** `track-provisional:orchestration-arena-v1-2026-06`: [orchestration-arena-v1-2026-06] 9/9 criteria pass but NOT shippable under the rigorous bar: 1 open blocker next-item(s); no rigorous evidence (criteria are existence-only: file_exists/file_contains — add test_passes / commit_on_main / receipt_valid); strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).
+- **INFO** `track-provisional:loop-closure-2026-06`: [loop-closure-2026-06] 29/29 criteria pass but NOT shippable under the rigorous bar: 2 open blocker next-item(s); 1 active ship veto(es): cybernetics_codex_harness_proven_blocks_live_ship: reports/loop_closure/cybernetics_codex/latest_audit.json.loop_statuses[].verdict == 'HARNESS_PROVEN': 11 > 0. Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).
+- **INFO** `track-provisional:orchestration-arena-v1-2026-06`: [orchestration-arena-v1-2026-06] 12/12 criteria pass but NOT shippable under the rigorous bar: 1 open blocker next-item(s). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).
+- **WARN** `track-underclaim:merge-master-mike-d4-2026-06:1`: [merge-master-mike-d4-2026-06] blocker next-item 1 is still listed as open work but its linked evidence criterion 'github_review_bridge_tested' PASSES — the ledger may be behind reality. Reconcile: annotate the item DONE, narrow it to the remaining live edge, or strengthen the criterion.
 - **INFO** `track-in-progress:merge-master-mike-d4-2026-06`: [merge-master-mike-d4-2026-06] 3/4 completion criteria pass.

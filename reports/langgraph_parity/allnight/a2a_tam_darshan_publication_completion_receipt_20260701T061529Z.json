@@ -1,0 +1,68 @@
+{
+  "agent_uid": "codex_composer",
+  "artifacts": [
+    "/Users/dhyana/ds_langgraph_parity_20260701/reports/tam/packets/darshan-publication/SOURCE_PACK_OUTLINE_wp_dfa4e1134277.md"
+  ],
+  "authority": "task_execution_read_only_source_pack_outline",
+  "closed_at": "2026-07-01T06:15:29Z",
+  "completion_via": "codex_langgraph_parity_a2a_tam_completion",
+  "content_hash": "sha256:28999848e43cf625843d55b74ef5464d2139b2398664bcadfa169acc5b7f3f0d",
+  "created_at": "2026-07-01T06:15:29Z",
+  "evaluation": {
+    "criteria_results": [
+      {
+        "criterion": "outline_file_created_under_requested_report_dir",
+        "passed": true
+      },
+      {
+        "criterion": "lists_5_to_8_sources_with_why_it_matters",
+        "passed": true
+      },
+      {
+        "criterion": "uses_existing_darshan_notes_only",
+        "passed": true
+      },
+      {
+        "criterion": "no_publishing_or_external_outreach",
+        "passed": true
+      }
+    ],
+    "gate_results": [],
+    "overall_verdict": "completed_read_only_outline_created"
+  },
+  "evidence": {
+    "deliverable_path": "/Users/dhyana/ds_langgraph_parity_20260701/reports/tam/packets/darshan-publication/SOURCE_PACK_OUTLINE_wp_dfa4e1134277.md",
+    "forbidden_actions_performed": [],
+    "original_status": "pending",
+    "original_to": "",
+    "room": "darshan-publication",
+    "source_count": 8,
+    "source_paths": [
+      "/Users/dhyana/.dharma/knowledge/wiki/concepts/darshan-publication-venture-cell.md",
+      "/Users/dhyana/.dharma/knowledge/wiki/concepts/darshan-attention-engineering.md",
+      "/Users/dhyana/.dharma/knowledge/wiki/concepts/darshan--after-the-feed.md",
+      "/Users/dhyana/.dharma/knowledge/wiki/concepts/darshan--task-metadata.md",
+      "/Users/dhyana/.dharma/knowledge/wiki/concepts/long-now-temporal-attractor-for-dharma-swarm.md",
+      "/Users/dhyana/.dharma/knowledge/wiki/concepts/dokka-reading-fire.md",
+      "/Users/dhyana/.dharma/knowledge/wiki/connections/darshan-publication-venture-cell--dharma-swarm.md",
+      "/Users/dhyana/.dharma/knowledge/wiki/connections/darshan-attention-engineering--darshan-publication-venture-cell.md"
+    ],
+    "supervisor_scope": "task_execution_only_no_external_action"
+  },
+  "receipt_id": "a2a-task-receipt:tam-wp-wp_dfa4e1134277:ea0da34fc920",
+  "receipt_summary": "Completed the TAM darshan-publication read-only source-pack outline from existing local Darshan notes; no outreach, publishing, CMS, paywall, or deployment action was performed.",
+  "return_address": {
+    "agent_uid": "codex_composer",
+    "base_case": "status in completed|failed|blocked with valid receipt",
+    "depth": 0,
+    "obligation": "close_task_with_receipt",
+    "resume_ref": "a2a_task:tam-wp-wp_dfa4e1134277",
+    "resume_surface": "a2a_task_queue",
+    "schema_version": "dharma_return_address.v0"
+  },
+  "schema_version": "dharma_a2a_task_receipt.v1",
+  "status": "completed",
+  "summary": "Completed the TAM darshan-publication read-only source-pack outline from existing local Darshan notes; no outreach, publishing, CMS, paywall, or deployment action was performed.",
+  "task_id": "tam-wp-wp_dfa4e1134277",
+  "timestamp": "2026-07-01T06:15:29Z"
+}

@@ -1,0 +1,421 @@
+#!/usr/bin/env python3
+"""Validate live Runtime Truth NATS production evidence."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import sys
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from typing import Any
+
+
+ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_EVIDENCE = ROOT / "reports" / "governance" / "nats_live_production_matrix" / "latest.json"
+
+PUBLISH_ENTRYPOINT = "dharma_swarm.a2a.nats_transport.A2ANatsTransport.publish_task"
+CONSUME_ENTRYPOINT = "dharma_swarm.a2a.nats_transport.A2ANatsTransport.consume_message"
+TRANSPORT_CLASS = "dharma_swarm.a2a.nats_transport.A2ANatsTransport"
+CONSUMER_CLASS = "dharma_swarm.a2a.a2a_server.A2AServer"
+
+REQUIRED_ROWS = [
+    "topology",
+    "happy_path",
+    "duplicate_path",
+    "publish_failure_path",
+    "handler_failure_redelivery_path",
+    "stale_started_idempotency_path",
+    "concurrent_duplicate_path",
+    "ack_failure_path",
+    "max_deliver_path",
+    "dlq_failure_path",
+    "restart_path",
+    "compatibility_bypass_contract",
+    "governance_negative_path",
+]
+
+TASK_ROWS = [
+    name
+    for name in REQUIRED_ROWS
+    if name not in {"topology", "compatibility_bypass_contract", "governance_negative_path"}
+]
+
+SOURCE_FRESHNESS_PATHS = [
+    "dharma_swarm/a2a/nats_transport.py",
+    "dharma_swarm/a2a/nats_transport_support.py",
+    "dharma_swarm/a2a/a2a_server.py",
+    "dharma_swarm/a2a/a2a_bridge.py",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/operator_core/nats_live_contact.py",
+    "dharma_swarm/operator_core/nats_substrate_status.py",
+    "dharma_swarm/a2a/a2a_cloud_contact.py",
+    "scripts/runtime/a2a_send.py",
+    "scripts/runtime/a2a_inbox_bridge.py",
+    "scripts/runtime/a2a_domain_reply_worker.py",
+    "scripts/runtime/a2a_reply_capture.py",
+    "scripts/governance/check_nats_substrate_contract.py",
+    "scripts/governance/check_nats_live_production_evidence.py",
+    "scripts/governance/run_nats_live_production_matrix.py",
+    "scripts/governance/check_track_status.py",
+    "tests/test_nats_transport.py",
+    "tests/test_nats_substrate_contract.py",
+    "tests/test_a2a_cloud_contact.py",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
+]
+
+
+class EvidenceError(RuntimeError):
+    pass
+
+
+def parse_timestamp(value: str) -> datetime:
+    if value.endswith("Z"):
+        value = value[:-1] + "+00:00"
+    parsed = datetime.fromisoformat(value)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+def require(condition: bool, message: str) -> None:
+    if not condition:
+        raise EvidenceError(message)
+
+
+def is_broker_acked(ack: dict[str, Any] | None) -> bool:
+    if not ack:
+        return False
+    return ack.get("status") in {"ack", "dlq", "duplicate"} and ack.get("action") in {"ack", "dlq"}
+
+
+def file_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def row_map(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    rows = payload.get("rows")
+    require(isinstance(rows, list), "evidence rows must be a list")
+    mapped: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        require(isinstance(row, dict), "each evidence row must be an object")
+        name = row.get("name")
+        require(isinstance(name, str) and name, "each evidence row must have a name")
+        mapped[name] = row
+    return mapped
+
+
+def validate_source_freshness(
+    payload: dict[str, Any],
+    *,
+    generated_at: datetime,
+    source_grace_seconds: float,
+) -> None:
+    command = payload.get("command")
+    require(isinstance(command, list) and command, "evidence missing generating command")
+    fingerprints = payload.get("source_fingerprints")
+    require(isinstance(fingerprints, dict), "evidence missing source_fingerprints")
+    latest_allowed_mtime = generated_at.timestamp() + source_grace_seconds
+    for rel in SOURCE_FRESHNESS_PATHS:
+        path = ROOT / rel
+        require(path.exists(), f"source freshness path missing from repo: {rel}")
+        fingerprint = fingerprints.get(rel)
+        require(isinstance(fingerprint, dict), f"evidence missing source fingerprint: {rel}")
+        require(fingerprint.get("exists") is True, f"evidence source fingerprint says missing: {rel}")
+        require(fingerprint.get("sha256") == file_sha256(path), f"evidence source hash is stale: {rel}")
+        mtime = path.stat().st_mtime
+        require(
+            mtime <= latest_allowed_mtime,
+            f"evidence predates current source mtime: {rel}",
+        )
+
+
+def validate_common(
+    payload: dict[str, Any],
+    max_age_hours: float,
+    *,
+    source_grace_seconds: float,
+) -> dict[str, dict[str, Any]]:
+    require(payload.get("schema") == "dharma.nats.live_production_matrix.v1", "wrong evidence schema")
+    require(payload.get("status") == "pass", "evidence status is not pass")
+    generated_at = parse_timestamp(str(payload.get("generated_at")))
+    age = datetime.now(UTC) - generated_at
+    require(age <= timedelta(hours=max_age_hours), f"evidence is stale: age={age}")
+    validate_source_freshness(
+        payload,
+        generated_at=generated_at,
+        source_grace_seconds=source_grace_seconds,
+    )
+    require(payload.get("broker_url"), "missing broker_url")
+    require(payload.get("stream_name") == "DS_TASKS", "stream_name must be DS_TASKS")
+    require(payload.get("dlq_stream_name") == "DS_DLQ", "dlq_stream_name must be DS_DLQ")
+    require(payload.get("consumer_name") == "a2a_task_handler", "consumer_name must be a2a_task_handler")
+    rows = row_map(payload)
+    missing = [name for name in REQUIRED_ROWS if name not in rows]
+    require(not missing, f"missing required rows: {missing}")
+    failed = [name for name, row in rows.items() if name in REQUIRED_ROWS and row.get("status") != "pass"]
+    require(not failed, f"required rows failed: {failed}")
+    for name in TASK_ROWS:
+        row = rows[name]
+        for field in [
+            "timestamp",
+            "broker_url",
+            "stream_name",
+            "consumer_name",
+            "message_id",
+            "trace_id",
+            "task_id",
+            "agent_id",
+            "model_provider_id",
+        ]:
+            require(row.get(field), f"{name} missing {field}")
+        require(row["stream_name"] == "DS_TASKS", f"{name} used wrong stream")
+        require(row["consumer_name"] == "a2a_task_handler", f"{name} used wrong consumer")
+    return rows
+
+
+def validate_topology(row: dict[str, Any]) -> None:
+    require(row.get("stream_name") == "DS_TASKS", "topology stream mismatch")
+    require("dharma.a2a.task.>" in (row.get("stream_subjects") or []), "DS_TASKS subject missing")
+    require(row.get("dlq_stream_name") == "DS_DLQ", "topology DLQ stream mismatch")
+    require("dharma.dlq.>" in (row.get("dlq_subjects") or []), "DS_DLQ subject missing")
+    require(row.get("consumer_filter_subject") == "dharma.a2a.task.>", "consumer filter mismatch")
+    require("EXPLICIT" in str(row.get("consumer_ack_policy", "")).upper(), "consumer ack policy is not explicit")
+    require(row.get("consumer_max_deliver") == 3, "consumer max_deliver must be 3")
+    ack_wait = row.get("consumer_ack_wait_seconds")
+    require(isinstance(ack_wait, (int, float)) and ack_wait >= 30, "consumer ack_wait is not production-grade")
+
+
+def validate_production_path(
+    row: dict[str, Any],
+    *,
+    expects_consume: bool = True,
+    expects_handler: bool = True,
+) -> None:
+    contract = row.get("production_path_contract")
+    require(isinstance(contract, dict), f"{row.get('name')} missing production_path_contract")
+    require(contract.get("publish_entrypoint") == PUBLISH_ENTRYPOINT, f"{row.get('name')} publish entrypoint mismatch")
+    require(contract.get("transport_class") == TRANSPORT_CLASS, f"{row.get('name')} transport class mismatch")
+    require(
+        contract.get("compatibility_publishers_can_satisfy_production_gate") is False,
+        f"{row.get('name')} allows compatibility publishers to satisfy production gate",
+    )
+    if expects_consume:
+        require(contract.get("consume_entrypoint") == CONSUME_ENTRYPOINT, f"{row.get('name')} consume entrypoint mismatch")
+        require(contract.get("consumer_class") == CONSUMER_CLASS, f"{row.get('name')} consumer class mismatch")
+        require(
+            contract.get("consumer_require_execution_identity") is True,
+            f"{row.get('name')} did not prove require_execution_identity=True",
+        )
+    if expects_handler:
+        handler = contract.get("handler_contract")
+        require(isinstance(handler, dict), f"{row.get('name')} missing handler contract")
+        require(handler.get("callable"), f"{row.get('name')} missing handler callable")
+
+
+def validate_happy(row: dict[str, Any]) -> None:
+    validate_production_path(row)
+    publish = row.get("publish_ack") or {}
+    consume = row.get("consume_ack") or {}
+    envelope = row.get("envelope_contract") or {}
+    headers = row.get("headers") or {}
+    require(publish.get("status") == "ack", "happy path did not publish through transport")
+    require(is_broker_acked(consume), "happy path was not broker-acked")
+    require(row.get("side_effect_count") == 1, "happy path side effect count is not exactly 1")
+    require(envelope.get("schema") == "dharma.nats.envelope.v1", "happy path envelope schema mismatch")
+    require(envelope.get("message_id") == row.get("message_id"), "happy path envelope message_id mismatch")
+    actor = envelope.get("actor")
+    require(isinstance(actor, dict), "happy path envelope missing actor fields")
+    require(actor.get("from_agent"), "happy path envelope actor.from_agent missing")
+    require(actor.get("to_agent"), "happy path envelope actor.to_agent missing")
+    require(actor.get("execution_agent"), "happy path envelope actor.execution_agent missing")
+    causality = envelope.get("causality")
+    require(isinstance(causality, dict), "happy path envelope missing causality fields")
+    for field in ["message_id", "trace_id", "span_id", "correlation_id", "causation_id"]:
+        require(causality.get(field), f"happy path causality missing {field}")
+    require(causality.get("message_id") == row.get("message_id"), "happy path causality message_id mismatch")
+    require(causality.get("trace_id") == row.get("trace_id"), "happy path causality trace_id mismatch")
+    require(envelope.get("payload_schema") == "dharma.a2a.nats_task.v1", "happy path payload schema mismatch")
+    require(envelope.get("nats_msg_id") == row.get("message_id"), "happy path Nats-Msg-Id mismatch")
+    require(headers.get("Nats-Msg-Id") == row.get("message_id"), "happy path header Nats-Msg-Id mismatch")
+    receipt = Path(str(row.get("receipt_path")))
+    require(receipt.exists(), f"semantic receipt does not exist: {receipt}")
+    receipt_payload = json.loads(receipt.read_text(encoding="utf-8"))
+    require(receipt_payload.get("schema") == "dharma.nats.live_matrix.semantic_receipt.v1", "semantic receipt schema mismatch")
+    require(receipt_payload.get("provider"), "semantic receipt missing provider")
+    require(receipt_payload.get("response_model"), "semantic receipt missing response_model")
+    require(receipt_payload.get("content"), "semantic receipt missing model content")
+
+
+def validate_duplicate(row: dict[str, Any]) -> None:
+    validate_production_path(row, expects_consume=False, expects_handler=False)
+    runtime_ack = row.get("runtime_duplicate_publish_ack") or {}
+    broker_probe = row.get("broker_duplicate_probe") or {}
+    require(row.get("side_effect_count_after_replay") == 1, "duplicate replay changed side effect count")
+    require(
+        row.get("broker_duplicate_probe_entrypoint") == "nats.aio.client.JetStreamContext.publish",
+        "duplicate path did not identify direct broker probe entrypoint",
+    )
+    require(
+        "not a production task publisher" in str(row.get("broker_duplicate_probe_purpose", "")),
+        "duplicate broker probe can be mistaken for production publish path",
+    )
+    require(
+        runtime_ack.get("status") == "duplicate" or broker_probe.get("duplicate") is True,
+        "duplicate path did not prove runtime or broker duplicate suppression",
+    )
+
+
+def validate_publish_failure(row: dict[str, Any]) -> None:
+    validate_production_path(row)
+    require(row.get("forced_failure"), "publish failure path did not record forced failure")
+    retry = row.get("retry_publish_ack") or {}
+    consume = row.get("consume_ack") or {}
+    require(retry.get("status") == "ack", "publish retry did not publish")
+    require(is_broker_acked(consume), "publish failure retry was not consumed and acked")
+
+
+def validate_handler_redelivery(row: dict[str, Any]) -> None:
+    validate_production_path(row)
+    require(not is_broker_acked(row.get("first_consume_ack") or {}), "first handler failure was incorrectly acked")
+    require(is_broker_acked(row.get("second_consume_ack") or {}), "redelivered handler success was not acked")
+    require(row.get("handler_attempts") == 2, "handler redelivery attempt count mismatch")
+
+
+def validate_stale(row: dict[str, Any]) -> None:
+    validate_production_path(row)
+    require(row.get("preexisting_idempotency_status") == "started", "stale path did not seed a started record")
+    require(is_broker_acked(row.get("consume_ack") or {}), "stale idempotency retry was not acked")
+
+
+def validate_concurrent(row: dict[str, Any]) -> None:
+    validate_production_path(row)
+    require(row.get("preexisting_idempotency_status") == "started", "concurrent path did not seed an in-progress record")
+    require(not is_broker_acked(row.get("blocked_consume_ack") or {}), "concurrent duplicate was falsely acked")
+    require(is_broker_acked(row.get("cleanup_consume_ack") or {}), "concurrent duplicate cleanup was not acked")
+    require(row.get("side_effect_count") == 1, "concurrent duplicate side effects not exactly once after cleanup")
+
+
+def validate_ack_failure(row: dict[str, Any]) -> None:
+    validate_production_path(row)
+    require(not is_broker_acked(row.get("failed_ack") or {}), "ack failure was falsely reported as acked")
+    require(is_broker_acked(row.get("cleanup_ack") or {}), "ack failure cleanup redelivery was not acked")
+
+
+def validate_max_deliver(row: dict[str, Any]) -> None:
+    validate_production_path(row)
+    require(len(row.get("deliveries") or []) >= 3, "max deliver path did not record three deliveries")
+    require(is_broker_acked(row.get("final_ack") or {}), "max deliver final original message was not acked")
+    dlq = row.get("dlq_envelope") or {}
+    payload = dlq.get("payload") or {}
+    require(dlq.get("schema") == "dharma.nats.envelope.v1", "DLQ outer envelope schema mismatch")
+    require(isinstance(dlq.get("actor"), dict), "DLQ envelope missing actor fields")
+    require(isinstance(dlq.get("causality"), dict), "DLQ envelope missing causality fields")
+    require(payload.get("schema") == "dharma.nats.dlq_failure.v1", "DLQ payload schema mismatch")
+    require(payload.get("original_message_id") == row.get("message_id"), "DLQ original message mismatch")
+    require(str(row.get("dlq_subject", "")).startswith("dharma.dlq."), "DLQ subject mismatch")
+
+
+def validate_dlq_failure(row: dict[str, Any]) -> None:
+    validate_production_path(row)
+    final = row.get("final_ack") or {}
+    require(final.get("dlq_failed") is True, "DLQ failure path did not surface dlq_failed")
+    require(not is_broker_acked(final), "DLQ failure path acked the original")
+    require(row.get("operator_visible") is True, "DLQ failure path did not leave original operator-visible")
+    state = row.get("operator_visible_state") or {}
+    require(
+        (state.get("ack_floor") or {}).get("stream_seq", -1) < state.get("final_stream_sequence", -1),
+        "DLQ failure original is not beyond the consumer ack floor",
+    )
+
+
+def validate_restart(row: dict[str, Any]) -> None:
+    validate_production_path(row)
+    require(is_broker_acked(row.get("cleanup_ack") or {}), "restart path cleanup was not acked")
+    first = row.get("first_delivery_metadata") or {}
+    second = row.get("redelivery_metadata") or {}
+    require(first.get("stream_sequence") == second.get("stream_sequence"), "restart path did not redeliver same stream sequence")
+    require((second.get("num_delivered") or 0) >= 2, "restart path did not prove redelivery after restart")
+
+
+def validate_compatibility_bypass(row: dict[str, Any]) -> None:
+    require(row.get("status") == "pass", "compatibility bypass contract row failed")
+    require(
+        row.get("compatibility_publishers_can_satisfy_production_gate") is False,
+        "compatibility publishers can satisfy production gate",
+    )
+    require(
+        row.get("canonical_runtime_truth_nats_task_path") == PUBLISH_ENTRYPOINT,
+        "compatibility row names wrong canonical production path",
+    )
+    checks = row.get("checks") or {}
+    for key in [
+        "a2a_send_marks_noncanonical",
+        "a2a_send_declares_gate_ineligible",
+        "a2a_send_names_canonical_transport",
+        "domain_reply_worker_uses_domain_receipt_schema",
+        "domain_reply_worker_does_not_mint_nats_envelope_v1",
+    ]:
+        require(checks.get(key) is True, f"compatibility bypass check failed: {key}")
+    gate_enforced_by = row.get("gate_enforced_by") or []
+    require(
+        "scripts/governance/check_nats_live_production_evidence.py" in gate_enforced_by,
+        "compatibility bypass is not enforced by live evidence checker",
+    )
+    surfaces = row.get("compatibility_surfaces") or []
+    require(isinstance(surfaces, list) and surfaces, "compatibility surfaces missing")
+    for surface in surfaces:
+        require(surface.get("may_satisfy_production_gate") is False, "compatibility surface may satisfy production gate")
+
+
+def validate_governance_negative(row: dict[str, Any]) -> None:
+    require(row.get("negative_return_code") not in (None, 0), "governance negative path did not fail")
+    require(row.get("tampered_row_removed") == "happy_path", "governance negative path mutation is not explicit")
+    expected = str(row.get("expected_failure_contains") or "")
+    output = f"{row.get('negative_stdout') or ''}\n{row.get('negative_stderr') or ''}"
+    require(expected and expected in output, "governance negative path did not record the expected failure")
+
+
+def validate(payload: dict[str, Any], max_age_hours: float, *, source_grace_seconds: float) -> None:
+    rows = validate_common(payload, max_age_hours, source_grace_seconds=source_grace_seconds)
+    validate_topology(rows["topology"])
+    validate_happy(rows["happy_path"])
+    validate_duplicate(rows["duplicate_path"])
+    validate_publish_failure(rows["publish_failure_path"])
+    validate_handler_redelivery(rows["handler_failure_redelivery_path"])
+    validate_stale(rows["stale_started_idempotency_path"])
+    validate_concurrent(rows["concurrent_duplicate_path"])
+    validate_ack_failure(rows["ack_failure_path"])
+    validate_max_deliver(rows["max_deliver_path"])
+    validate_dlq_failure(rows["dlq_failure_path"])
+    validate_restart(rows["restart_path"])
+    validate_compatibility_bypass(rows["compatibility_bypass_contract"])
+    validate_governance_negative(rows["governance_negative_path"])
+
+
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--evidence", default=str(DEFAULT_EVIDENCE))
+    parser.add_argument("--max-age-hours", type=float, default=24)
+    parser.add_argument("--source-grace-seconds", type=float, default=2.0)
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(sys.argv[1:] if argv is None else argv)
+    evidence_path = Path(args.evidence)
+    try:
+        require(evidence_path.exists(), f"evidence file does not exist: {evidence_path}")
+        payload = json.loads(evidence_path.read_text(encoding="utf-8"))
+        validate(payload, args.max_age_hours, source_grace_seconds=args.source_grace_seconds)
+    except Exception as exc:
+        print(f"NATS_LIVE_PRODUCTION_EVIDENCE_FAILED {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 1
+    print(f"NATS_LIVE_PRODUCTION_EVIDENCE_OK {evidence_path}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

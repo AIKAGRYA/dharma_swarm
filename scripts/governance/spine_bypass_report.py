@@ -37,34 +37,30 @@ _SUBMIT_RE = re.compile(r"(?:_server|(?<!\w)server)\.submit\(")
 # Known spine-adopted call sites: file:line pairs where .submit() is
 # intentionally inside an invoke_agent() invoker closure.
 _SPINE_ADOPTED: set[tuple[str, int]] = {
-    # a2a_bridge.submit_via_spine() invoker closure — wraps through invoke_agent
-    ("dharma_swarm/a2a/a2a_bridge.py", 124),
+    # submit_task_via_spine() invoker closure — the ONE blessed A2A submit
+    # path. All production surfaces (bridge ingest, node_gateway endpoints,
+    # a2a_client._dispatch_local, nats_transport.consume_message) route
+    # through this single call site.
+    ("dharma_swarm/a2a/spine_adapter.py", 88),
 }
 
 # Known intentional migration-bypass sites (allowlist).
 # Each entry: (relative_path, line_number, reason).
-_INTENTIONAL_BYPASS: dict[tuple[str, int], str] = {
-    ("dharma_swarm/a2a/a2a_bridge.py", 307): (
-        "ingest_trishula_inbox — legacy TRISHULA inbound path, "
-        "migration target for Slice 2"
-    ),
-    ("dharma_swarm/a2a/node_gateway.py", 322): (
-        "submit_task_v1 — HTTP API endpoint, "
-        "migration target after A2A bridge default route"
-    ),
-    ("dharma_swarm/a2a/node_gateway.py", 432): (
-        "submit_task_legacy — legacy HTTP API endpoint, "
-        "migration target after A2A bridge default route"
-    ),
-    ("dharma_swarm/a2a/a2a_client.py", 361): (
-        "_dispatch_local — in-process delegation, "
-        "migration target after node_gateway"
-    ),
-    ("dharma_swarm/a2a/nats_transport.py", 301): (
-        "consume_message — NATS ingress handoff after transport-level "
-        "ExecutionIdentity, idempotency, and ack/nack receipts"
-    ),
-}
+#
+# DRAINED TO ZERO 2026-07-03 (spine-adoption item 4). Doctrine
+# (docs/plans/ORGANISM_REWIRE_DOCTRINE_2026-07-02.md §1): this stays empty.
+# The ONLY sanctioned way to add an entry is a PR that also raises the
+# `spine_bypass_entries` ratchet baseline
+# (docs/governance/hygiene/ratchet_baselines.json) with review — a visible
+# governance act, never a runtime escape hatch.
+_INTENTIONAL_BYPASS: dict[tuple[str, int], str] = {}
+
+# Stable snippet-keyed fallback for intentional sites whose line numbers
+# drift during transport hardening. Keys are (relative_path, exact code
+# line). Kept EMPTY for the same doctrine reason as _INTENTIONAL_BYPASS:
+# every previously allowlisted dispatch path has been drained through
+# submit_task_via_spine(). Adding an entry is a reviewed governance act.
+_INTENTIONAL_BYPASS_SNIPPETS: dict[tuple[str, str], str] = {}
 
 # Known non-production lines (docstring examples, etc.)
 _NON_PRODUCTION: set[tuple[str, int]] = {
@@ -128,6 +124,13 @@ def _scan_production_submits() -> list[BypassEntry]:
                         file=rel, line=i,
                         classification="intentional",
                         reason=_INTENTIONAL_BYPASS[key],
+                        code=code,
+                    ))
+                elif (rel, code) in _INTENTIONAL_BYPASS_SNIPPETS:
+                    entries.append(BypassEntry(
+                        file=rel, line=i,
+                        classification="intentional",
+                        reason=_INTENTIONAL_BYPASS_SNIPPETS[(rel, code)],
                         code=code,
                     ))
                 else:

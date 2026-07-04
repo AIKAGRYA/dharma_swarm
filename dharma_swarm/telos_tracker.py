@@ -4,10 +4,8 @@ Closes the perception loop: the system now knows what it has accomplished.
 Called non-fatally from orchestrator on every task completion.
 """
 
-import asyncio
 import logging
 from pathlib import Path
-from typing import Any
 
 logger = logging.getLogger(__name__)
 

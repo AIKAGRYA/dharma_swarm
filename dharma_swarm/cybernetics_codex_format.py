@@ -120,6 +120,16 @@ def format_markdown(report: dict[str, Any]) -> str:
     runtime = report["runtime"]
     delegation = runtime.get("delegation_runs") or {}
     receipt = runtime.get("receipt_json") or {}
+    quarantine = runtime.get("quarantine") or {}
+    dropoff_live = next(
+        (
+            int(row.get("count") or 0)
+            for row in runtime.get("failure_codes") or []
+            if str(row.get("failure_code")) == "dispatch_dropoff"
+        ),
+        0,
+    )
+    dropoff_quarantined = int(quarantine.get("dispatch_dropoff_quarantined") or 0)
     provider_truth = runtime.get("provider_truth") or {}
     delegation_truth = provider_truth.get("delegation_runs") or {}
     runtime_receipt_truth = provider_truth.get("runtime_receipts") or {}
@@ -133,6 +143,9 @@ def format_markdown(report: dict[str, Any]) -> str:
         f"`{delegation.get('failed', 0)}` failed",
         f"- receipt_json: `{receipt.get('rows_with_receipt_json', 0)}` rows "
         "`(orchestrator surface; A2A empty is success)`",
+        f"- dispatch_dropoff: dropoff_live=`{dropoff_live}`, "
+        f"dropoff_quarantined_historical=`{dropoff_quarantined}` "
+        "`(quarantined rows are excluded from live counts but remain auditable)`",
         f"- served_provider_truth: delegation completed "
         f"`{delegation_truth.get('completed_with_served_provider_model', 0)}/"
         f"{delegation_truth.get('completed', 0)}`, runtime_receipts "

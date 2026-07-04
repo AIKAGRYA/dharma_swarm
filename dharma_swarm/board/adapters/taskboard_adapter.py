@@ -21,9 +21,7 @@ facade consumers see TaskBoard tasks as Cards with proper status mapping.
 
 from __future__ import annotations
 
-import asyncio
 import logging
-from pathlib import Path
 from typing import Any
 
 from dharma_swarm.board.event_log import BoardEvent, BoardEventLog
@@ -31,10 +29,7 @@ from dharma_swarm.board.models import (
     Card,
     CardId,
     CardStatus,
-    EventId,
     IsoDatetime,
-    ObjectiveId,
-    SourceSurface,
     Version,
 )
 from dharma_swarm.models import Task, TaskPriority, TaskStatus

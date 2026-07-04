@@ -37,6 +37,7 @@ import {
   V2Panel,
   V2Section,
 } from "./CockpitV2Primitives";
+import { SpinePulsePanel } from "@/components/cockpit/SpinePulsePanel";
 
 export function CockpitV2Board({
   report,
@@ -79,6 +80,8 @@ export function CockpitV2Board({
           <V2Panel key={panel.id} panel={panel} onInspect={setInspect} />
         ))}
       </div>
+
+      <SpinePulsePanel />
 
       {mode === "overview" ? (
         <OverviewMode

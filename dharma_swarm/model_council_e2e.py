@@ -12,6 +12,7 @@ model calls.
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
@@ -25,7 +26,6 @@ from typing import Any, Callable, Iterable
 from dharma_swarm.a2a.a2a_client import A2AClient
 from dharma_swarm.a2a.a2a_server import (
     A2AArtifact,
-    A2AMessage,
     A2APart,
     A2AServer,
     A2ATask,
@@ -317,6 +317,19 @@ def _task_to_dict(task: A2ATask | None) -> dict[str, Any] | None:
     }
 
 
+def _run_coro_blocking(coro: Any) -> Any:
+    # Handlers run synchronously inside A2AServer._dispatch, which the spine
+    # adapter now drives from a running event loop (submit_task_via_spine).
+    # asyncio.run() would raise there; mirror spine_adapter's sync bridge and
+    # give the coroutine its own loop on a worker thread instead.
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(asyncio.run, coro).result()
+
+
 def _make_handler(
     spec: CouncilAgentSpec,
     *,
@@ -328,7 +341,7 @@ def _make_handler(
 ) -> Callable[[A2ATask], A2ATask]:
     def _handler(task: A2ATask) -> A2ATask:
         prompt = _message_text(task)
-        completion = asyncio.run(
+        completion = _run_coro_blocking(
             _complete_once(
                 spec,
                 prompt,

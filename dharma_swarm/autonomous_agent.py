@@ -424,6 +424,10 @@ class AutonomousAgent:
         self._openai_client: Any = None
         self._message_bus: Any = None
         self._stigmergy: Any = None
+        # Ids of inbox messages fetched into the current wake's prompt but not
+        # yet acknowledged; marked read only after the wake completes (see
+        # _check_inbox / _ack_inbox).
+        self._inbox_pending_ack: list[str] = []
 
     # -- Public API ----------------------------------------------------------
 
@@ -458,6 +462,11 @@ class AutonomousAgent:
 
         # 6. Write run report
         await self._save_run_report(task, result)
+
+        # 7. Wake completed: acknowledge the inbox messages delivered into this
+        #    wake's prompt. Reached only if steps 4-6 did not raise, so a failed
+        #    wake leaves the messages unread for the next cycle to retry.
+        await self._ack_inbox()
 
         logger.info(
             "[%s] wake done: %d turns, %d tokens, %d tools, %.1fs",
@@ -1228,17 +1237,53 @@ class AutonomousAgent:
     # -- Infrastructure wiring -----------------------------------------------
 
     async def _check_inbox(self) -> list[str]:
+        # A fresh wake starts with no deferred acknowledgements.
+        self._inbox_pending_ack = []
         try:
             bus = await self._get_message_bus()
             if bus:
                 messages = await bus.receive(self.identity.name, limit=5)
-                return [
+                inbox = [
                     f"From {m.from_agent}: {m.subject} — {m.body[:200]}"
                     for m in messages
                 ]
+                # Defer acknowledgement: each fetched message is delivered into
+                # the system-prompt inbox, but we mark it read only after the
+                # wake's reason+act loop completes successfully (_ack_inbox).
+                # Marking read here would permanently hide up to 5 messages if
+                # the wake later fails (provider/tool/memory error) before it
+                # could act on them; leaving them unread lets the next cycle
+                # retry. Mirrors the consumer pattern in
+                # contracts/runtime_adapters.py.
+                self._inbox_pending_ack = [m.id for m in messages]
+                return inbox
         except Exception:
             logger.debug("Message bus read failed", exc_info=True)
         return []
+
+    async def _ack_inbox(self) -> None:
+        """Mark this wake's fetched inbox messages read.
+
+        Called only on the wake success path so a failed wake leaves the
+        messages unread for a later retry. No-op when nothing was fetched or
+        no message bus was available.
+        """
+        if not self._inbox_pending_ack:
+            return
+        bus = self._message_bus
+        if bus is None:
+            self._inbox_pending_ack = []
+            return
+        failed_acks: list[str] = []
+        for msg_id in self._inbox_pending_ack:
+            try:
+                await bus.mark_read(msg_id)
+            except Exception:
+                failed_acks.append(msg_id)
+                logger.warning("Message bus mark_read failed for %s; retained for retry", msg_id, exc_info=True)
+        # Failed acks stay pending so the next wake retries them instead of
+        # silently losing the acknowledgement (hygiene AS-09).
+        self._inbox_pending_ack = failed_acks
 
     async def _get_message_bus(self) -> Any:
         if self._message_bus is None:

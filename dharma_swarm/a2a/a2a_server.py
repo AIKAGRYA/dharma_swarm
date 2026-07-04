@@ -27,7 +27,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
@@ -331,6 +331,7 @@ class A2AServer:
 
         identity = self._ensure_execution_identity(task)
         side_effect_key = f"a2a_handler:{task.id}:{task.capability or 'default'}"
+        effective_side_effect_key = side_effect_key
         if self._runtime_state is not None:
             self._runtime_state.record_execution_identity_sync(
                 identity,
@@ -342,17 +343,45 @@ class A2AServer:
                     "status": task.status.value,
                 },
             )
+            handler_metadata = {"source": "a2a_server.submit"}
             if not self._runtime_state.try_begin_idempotent_side_effect_sync(
                 identity,
                 side_effect_key,
-                metadata={"source": "a2a_server.submit"},
+                metadata=handler_metadata,
             ):
-                existing = self._tasks.get(task.id)
-                if existing is not None:
-                    return existing
-                task.metadata["idempotency_status"] = "duplicate"
-                self._tasks[task.id] = task
-                return task
+                existing_record = self._runtime_state.get_idempotency_record_sync(
+                    identity.idempotency_key,
+                    side_effect_key,
+                )
+                existing_status = str(existing_record.status if existing_record is not None else "")
+                if existing_status in {"failed", "stale"}:
+                    retry_key = f"{side_effect_key}:retry:{uuid.uuid4().hex[:12]}"
+                    retry_metadata = {
+                        **handler_metadata,
+                        "retry_of_side_effect_key": side_effect_key,
+                        "retry_of_status": existing_status,
+                        "retry_of_result_receipt_id": (
+                            existing_record.result_receipt_id if existing_record is not None else ""
+                        ),
+                    }
+                    if self._runtime_state.try_begin_idempotent_side_effect_sync(
+                        identity,
+                        retry_key,
+                        metadata=retry_metadata,
+                    ):
+                        effective_side_effect_key = retry_key
+                        task.metadata["idempotency_status"] = "retry"
+                    else:
+                        task.metadata["idempotency_status"] = "retry_blocked"
+                        self._tasks[task.id] = task
+                        return task
+                else:
+                    existing = self._tasks.get(task.id)
+                    if existing is not None:
+                        return existing
+                    task.metadata["idempotency_status"] = "duplicate"
+                    self._tasks[task.id] = task
+                    return task
 
         self._tasks[task.id] = task
 
@@ -379,7 +408,7 @@ class A2AServer:
                     parent_run_id=identity.parent_run_id,
                     agent_id=identity.agent_id,
                     idempotency_key=identity.idempotency_key,
-                    side_effect_key=side_effect_key,
+                    side_effect_key=effective_side_effect_key,
                     payload={
                         "external_a2a_task_id": result.id,
                         "context_id": result.context_id,
@@ -389,7 +418,17 @@ class A2AServer:
             )
             self._runtime_state.complete_idempotent_side_effect_sync(
                 identity,
-                side_effect_key,
+                effective_side_effect_key,
+                status=(
+                    "failed"
+                    if result.status
+                    in {
+                        A2ATaskStatus.FAILED,
+                        A2ATaskStatus.REJECTED,
+                        A2ATaskStatus.CANCELLED,
+                    }
+                    else "completed"
+                ),
                 result_receipt_id=receipt_id,
                 metadata={"status": result.status.value},
             )
@@ -404,8 +443,8 @@ class A2AServer:
         if self._require_execution_identity and not trace_id:
             raise MissingExecutionIdentity("A2A task requires trace_id")
         identity = ExecutionIdentity.new(
-            task_id=str(meta.get("task_id") or task.dharma_task_id or task.id),
-            agent_id=task.to_agent or str(meta.get("agent_id") or ""),
+            task_id=str(explicit.get("task_id") or meta.get("task_id") or task.dharma_task_id or task.id),
+            agent_id=str(explicit.get("agent_id") or meta.get("agent_id") or task.to_agent or ""),
             session_id=str(meta.get("session_id") or explicit.get("session_id") or ""),
             trace_id=trace_id,
             correlation_id=str(meta.get("correlation_id") or explicit.get("correlation_id") or trace_id),
@@ -415,6 +454,10 @@ class A2AServer:
             claim_id=str(meta.get("claim_id") or explicit.get("claim_id") or ""),
             idempotency_key=str(meta.get("idempotency_key") or explicit.get("idempotency_key") or ""),
             external_a2a_task_id=task.id,
+            message_id=str(meta.get("message_id") or explicit.get("message_id") or ""),
+            event_id=str(meta.get("event_id") or explicit.get("event_id") or ""),
+            artifact_id=str(meta.get("artifact_id") or explicit.get("artifact_id") or ""),
+            proposal_id=str(meta.get("proposal_id") or explicit.get("proposal_id") or ""),
             metadata={"context_id": task.context_id, "capability": task.capability},
         )
         task.trace_id = identity.trace_id

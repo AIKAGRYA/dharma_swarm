@@ -1,6 +1,6 @@
 {
   "schema": "dharma_swarm.trust_gate_status.v1",
-  "generated_at": "2026-06-12T06:04:59Z",
+  "generated_at": "2026-07-03T07:59:45Z",
   "fact_owner": "docs/vision_maps/NORTH_STAR.md \u00a78",
   "authority": "projection_only",
   "gate_open": false,
@@ -9,11 +9,12 @@
       "id": "C1",
       "condition": "Pointed audit reports a clean working repo, high-quality code, and deep flow understanding",
       "evidence": [
-        "git -C /Users/dhyana/dharma_swarm_live status --porcelain -> 1 dirty entries",
-        "latest pointed audit: reports/anatomy_altitude_2026-06-10 (dated 2026-06-10, 2d old)",
+        "runtime tree /root/dharma_swarm_live not found \u2014 measured /home/user/dharma_swarm instead",
+        "git -C /home/user/dharma_swarm status --porcelain -> 11 dirty entries",
+        "latest pointed audit: reports/anatomy_altitude_2026-06-10 (dated 2026-06-10, 23d old)",
         "flow-chain verification (GO intake -> ... -> semantic ontology) not yet a measured artifact \u2014 capped at AMBER"
       ],
-      "score": 0.79,
+      "score": 0.475,
       "verdict": "AMBER",
       "owner_of_truth": "git status (runtime tree) + reports/anatomy_*/"
     },
@@ -22,6 +23,7 @@
       "condition": "Swarm scores higher than single models on coding benchmarks (published bar: DGM 20%->50% SWE-bench)",
       "evidence": [
         "published bar (NORTH_STAR \u00a78): DGM self-improved 20%->50% SWE-bench (arXiv:2505.22954)",
+        "admissibility: hermetic arena lift (reports/governance/arena/, fixture-constructed routing win) is NOT commensurable with this condition and is never read here; C2 moves only on live runs with >=2 model families under the same budget-parity + significance controls",
         "latest measured lift = -0.1 (reports/anatomy_altitude_2026-06-10/lane_E_organism_vision.md)",
         "swarm currently loses to its best single agent"
       ],
@@ -46,12 +48,12 @@
       "id": "C4",
       "condition": "All seeded parts wired in and functioning consistently",
       "evidence": [
-        "BROKEN_REGISTER: total=23 open-like=5 closed-like=8",
-        "remote heads: 257 total; seed/gold/vault-pattern unmerged-to-main candidates: 3",
-        "pattern branches: ['devin/1779281950-track-transition-and-seeds', 'feat/gplot-lodestone-seed', 'feat/knowledge-ops-organ-seed']"
+        "BROKEN_REGISTER: total=25 open-like=7 closed-like=8",
+        "remote heads: 293 total; seed/gold/vault-pattern unmerged-to-main candidates: 6",
+        "pattern branches: ['agent/magpie-seed', 'devin/1779281950-track-transition-and-seeds', 'feat/gplot-lodestone-seed', 'feat/knowledge-ops-organ-seed', 'rescue/provenance-sentinel-go-track-20260612']"
       ],
-      "score": 0.433,
-      "verdict": "AMBER",
+      "score": 0.338,
+      "verdict": "RED",
       "owner_of_truth": "git ls-remote --heads origin + docs/state/BROKEN_REGISTER.md"
     },
     {

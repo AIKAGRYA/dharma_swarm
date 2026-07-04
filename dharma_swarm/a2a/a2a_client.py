@@ -37,6 +37,7 @@ from typing import Any
 import httpx
 
 from dharma_swarm.a2a.agent_card import AgentCard, CardRegistry
+from dharma_swarm.a2a.spine_adapter import submit_task_via_spine_sync
 from dharma_swarm.a2a.a2a_server import (
     A2AMessage,
     A2AServer,
@@ -343,7 +344,11 @@ class A2AClient:
         metadata: dict[str, Any] | None,
         context_id: str = "",
     ) -> DelegationResult:
-        """Dispatch to local A2AServer (in-process)."""
+        """Dispatch to local A2AServer through the Runtime Truth Spine.
+
+        Spine-adopted: every in-process delegation flows through
+        ``invoke_agent()`` and emits exactly one ``EvidenceReceipt``.
+        """
         trace_id = _current_trace_id()
         task = A2ATask(
             from_agent=from_agent,
@@ -358,7 +363,18 @@ class A2AClient:
             "Local delegation to %s: capability=%s, message=%s...",
             card.name, capability, message[:80],
         )
-        result_task = self._server.submit(task)
+        result_task, receipt = submit_task_via_spine_sync(
+            self._server, task, router_name="a2a_client",
+        )
+        if receipt.status == "failed" and not receipt.provider_attempted:
+            # submit() itself errored before dispatch: no task lifecycle to
+            # report — surface the failure as an unsuccessful delegation.
+            return DelegationResult(
+                success=False,
+                task=result_task,
+                agent_name=card.name,
+                error=receipt.error_detail or "spine dispatch failed",
+            )
         # Auto-release chain entry when task reaches terminal state
         if result_task.is_terminal():
             self.notify_terminal(context_id, from_agent, card.name, capability)

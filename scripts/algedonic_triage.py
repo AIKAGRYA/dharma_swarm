@@ -18,7 +18,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
-DHARMA = Path(os.path.expanduser("~/.dharma"))
+DHARMA = Path(os.environ.get("DHARMA_STATE_DIR") or os.path.expanduser("~/.dharma"))
 STREAM = DHARMA / "algedonic_signals.jsonl"
 TRIAGE_DIR = DHARMA / "triage"
 STATE = TRIAGE_DIR / "state.json"

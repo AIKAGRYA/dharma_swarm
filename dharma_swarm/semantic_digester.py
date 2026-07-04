@@ -25,7 +25,7 @@ import logging
 import re
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 from dharma_swarm.metrics import BehavioralSignature, MetricsAnalyzer
 from dharma_swarm.semantic_gravity import (

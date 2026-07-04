@@ -46,6 +46,7 @@ jobs:
             "CYBERNETIC_LOOP_MAP.md"
             "AGENT_IDENTITY_UNIFICATION.md"
             "QWEN.md"
+            "PRODUCT_SURFACE.md"
           )
 
           new_root_md=$(git diff --name-only --diff-filter=A "${base}" "${head}" \

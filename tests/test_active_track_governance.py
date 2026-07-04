@@ -98,3 +98,54 @@ def test_onboard_command_succeeds() -> None:
     assert "ACTIVE PORTFOLIO" in result.stdout
     assert "LIVING AXIOMS" in result.stdout
     assert "WHAT TO DO NEXT" in result.stdout
+
+
+def test_underclaim_detector_flags_shipped_but_open_items() -> None:
+    """A next-item whose linked evidence criterion passes must WARN track-underclaim.
+
+    This is the inverse of the false-shippable trap: every other defense catches
+    claims ahead of reality; this one catches the ledger falling behind it.
+    """
+    sys.path.insert(0, str(REPO_ROOT / "scripts/governance"))
+    from check_track_status import evaluate_track  # type: ignore
+
+    track = {
+        "id": "t-underclaim",
+        "status": "ACTIVE",
+        "completion_criteria": [
+            {"id": "shipped_thing", "kind": "file_exists",
+             "file": "docs/governance/ACTIVE_TRACK.yaml"},
+        ],
+        "next_items": [
+            # open blocker whose evidence already passes -> underclaim
+            {"id": 1, "what": "(blocker) build the shipped thing",
+             "kind": "code", "blocker": True,
+             "evidence_criterion": "shipped_thing"},
+            # reconciled in prose -> NOT an underclaim
+            {"id": 2, "what": "DONE 2026-07-03: other thing", "kind": "code",
+             "blocker": False, "evidence_criterion": "shipped_thing"},
+            # evidence criterion does not pass -> NOT an underclaim
+            {"id": 3, "what": "future thing", "kind": "code", "blocker": False,
+             "evidence_criterion": "no_such_criterion"},
+            # no evidence link -> NOT an underclaim (opt-in mechanism)
+            {"id": 4, "what": "unlinked thing", "kind": "code", "blocker": True},
+        ],
+    }
+    r = evaluate_track(track)
+    ucs = r["underclaims"]
+    assert [uc["item_id"] for uc in ucs] == [1]
+    assert ucs[0]["evidence_criterion"] == "shipped_thing"
+    assert ucs[0]["blocker"] is True
+
+
+def test_underclaims_surface_in_evidence_payload() -> None:
+    """Every track payload carries the underclaims field, and any underclaim in
+    the payload also surfaces as a WARN line in the checker output — the ledger
+    can fall behind reality, but never silently."""
+    result = _run(CHECK_SCRIPT)
+    payload = json.loads(EVIDENCE.read_text(encoding="utf-8"))
+    out = result.stdout + result.stderr
+    for tr in payload.get("active_tracks", []):
+        assert "underclaims" in tr, f"track {tr.get('id')} missing underclaims field"
+        for uc in tr["underclaims"]:
+            assert f"track-underclaim:{tr['id']}:{uc['item_id']}" in out

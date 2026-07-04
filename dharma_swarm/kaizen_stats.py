@@ -11,8 +11,7 @@ Implements rigorous metrics from KAIZEN_EFFICIENCY_ANALYSIS.md:
 """
 
 import numpy as np
-from datetime import datetime
-from typing import List, Dict, Any, Tuple, Optional
+from typing import List, Dict, Any, Tuple
 from dataclasses import dataclass
 from scipy import stats
 

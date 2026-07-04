@@ -48,6 +48,11 @@ range), Devin inbox state (filter, pending, ack floor), and a live roster of
 who has published recently (by `from`/`kind`). Exit code `0` = connected,
 `2` = could not reach the hub (usually `DEVIN_NATS_PW` not set).
 
+Under blocked or slow WSS egress (e.g. sandboxed cloud sessions), the command
+can take 40-90+s or hang rather than fail fast with exit `2` — verified
+2026-07-02. Do not read a long hang as a hard failure; give it time or check
+egress before assuming the hub is unreachable.
+
 ## Start the persistent agent
 
 ```bash

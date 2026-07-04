@@ -1,0 +1,144 @@
+{
+  "counts": {
+    "failed": 0,
+    "live_calls_attempted": 2,
+    "ok": 2,
+    "planned_models": 1,
+    "probe_cases_per_model": 2,
+    "skipped_models": 0
+  },
+  "failure_classes": [
+    "key_missing",
+    "provider_dead",
+    "model_missing",
+    "rate_limited",
+    "quota",
+    "unsupported_route",
+    "timeout",
+    "schema_failure",
+    "routing_bug"
+  ],
+  "generated_at": "2026-07-01T02:53:26Z",
+  "live_calls_enabled": true,
+  "live_env": "DHARMA_LIVE_MODEL_E2E",
+  "mode": "live",
+  "planned": [
+    {
+      "display_name": "GPT-5.5",
+      "logical_model_id": "gpt-5.5",
+      "max_context": 256000,
+      "model_id": "gpt-5.5",
+      "provider": "codex",
+      "rank": 3,
+      "route": "codex:gpt-5.5",
+      "strengths": [
+        "code",
+        "reasoning",
+        "architecture"
+      ]
+    }
+  ],
+  "profile": "standard",
+  "projection": {
+    "generated_at": "2026-07-01T02:53:01Z",
+    "live_providers": [
+      "anthropic",
+      "claude_code",
+      "codex",
+      "deepseek",
+      "groq",
+      "kimi",
+      "local",
+      "minimax",
+      "nvidia_nim",
+      "ollama",
+      "qwen",
+      "zai_coding"
+    ],
+    "oracle_state": "fresh",
+    "schema_version": "dharma.model_status.v1"
+  },
+  "results": [
+    {
+      "display_name": "GPT-5.5",
+      "elapsed_ms": 15741,
+      "error": null,
+      "failure_class": null,
+      "live_call_attempted": true,
+      "logical_model_id": "gpt-5.5",
+      "max_context": 256000,
+      "model_id": "gpt-5.5",
+      "probe": "pong_exact",
+      "provider": "codex",
+      "rank": 3,
+      "response_preview": "PONG",
+      "response_sha256": "9597e5d74f44f182ebb56b65a79c6b1b84829735af1ff583d44c3384d8a0a45e",
+      "route": "codex:gpt-5.5",
+      "runtime_config": {
+        "api_key_present": false,
+        "available": true,
+        "base_url": null,
+        "binary_path": "/Users/dhyana/.npm-global/bin/codex",
+        "default_model": "gpt-5.5",
+        "provider": "codex",
+        "source": "binary",
+        "timeout_seconds": 120,
+        "transport_mode": null,
+        "working_dir": "/Users/dhyana/ds_langgraph_parity_20260701"
+      },
+      "served_model": "codex",
+      "served_provider": null,
+      "started_at": "2026-07-01T02:53:01Z",
+      "status": "ok",
+      "stop_reason": null,
+      "strengths": [
+        "code",
+        "reasoning",
+        "architecture"
+      ],
+      "usage": {}
+    },
+    {
+      "display_name": "GPT-5.5",
+      "elapsed_ms": 9767,
+      "error": null,
+      "failure_class": null,
+      "live_call_attempted": true,
+      "logical_model_id": "gpt-5.5",
+      "max_context": 256000,
+      "model_id": "gpt-5.5",
+      "probe": "json_schema",
+      "provider": "codex",
+      "rank": 3,
+      "response_preview": "{\"ok\":true,\"token\":\"MODEL_PROBE\"}",
+      "response_sha256": "3f46074e7c375a7d239ac50a6029b8b450c944cca5e8d8938d577cd9d44a813a",
+      "route": "codex:gpt-5.5",
+      "runtime_config": {
+        "api_key_present": false,
+        "available": true,
+        "base_url": null,
+        "binary_path": "/Users/dhyana/.npm-global/bin/codex",
+        "default_model": "gpt-5.5",
+        "provider": "codex",
+        "source": "binary",
+        "timeout_seconds": 120,
+        "transport_mode": null,
+        "working_dir": "/Users/dhyana/ds_langgraph_parity_20260701"
+      },
+      "served_model": "codex",
+      "served_provider": null,
+      "started_at": "2026-07-01T02:53:17Z",
+      "status": "ok",
+      "stop_reason": null,
+      "strengths": [
+        "code",
+        "reasoning",
+        "architecture"
+      ],
+      "usage": {}
+    }
+  ],
+  "schema_version": "dharma.model_routing_live_probe.v1",
+  "skipped": [],
+  "status": "passed"
+}

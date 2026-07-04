@@ -31,27 +31,30 @@ from dharma_swarm.operator_core.control_surface_go import (  # noqa: F401
     _go_world_receipt_summary_rows,
 )
 from dharma_swarm.operator_core.control_surface_memory import memory_kernel_control_rows
+from dharma_swarm.operator_core.control_surface_spine import (  # noqa: F401
+    _spine_pulse_row,
+)
 from dharma_swarm.operator_core.control_surface_live_ops import (  # noqa: F401
     _live_ops_census_rows,
     _rows_from_live_ops_census,
 )
 from dharma_swarm.operator_core.control_surface_models import (
-    AUTHORITY_ROLES,
+    AUTHORITY_ROLES,  # noqa: F401  (re-export)
     COHERENCE_STATES,
     PRIORITIES,
-    ROW_KINDS,
+    ROW_KINDS,  # noqa: F401  (re-export)
     AgentHandoffPrompt,  # noqa: F401
     ControlSurfaceEnvelope,  # noqa: F401
     ControlSurfaceRow,
     DisplayHints,  # noqa: F401
     EvidenceItem,  # noqa: F401
-    HumanDecisionContext,
+    HumanDecisionContext,  # noqa: F401  (re-export)
     SourceError,  # noqa: F401
     SourceRef,  # noqa: F401
     VerificationEvent,  # noqa: F401
     _build_human_decision_context,
     _compute_display_hints,
-    _needs_human_decision,
+    _needs_human_decision,  # noqa: F401  (re-export)
 )
 
 logger = logging.getLogger(__name__)
@@ -983,6 +986,9 @@ def build_control_surface_rows(
 
     # N) Go receipts (optional)
     rows.extend(_go_receipt_rows(root))
+
+    # O) Spine pulse (read-only cockpit projection over the receipt stream)
+    rows.append(_spine_pulse_row(root, runtime_db=runtime_db))
 
     # Apply human-decision policy with structured context
     for row in rows:

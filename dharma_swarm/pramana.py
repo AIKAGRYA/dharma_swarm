@@ -23,7 +23,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from dharma_swarm.models import _new_id, _utc_now
+from dharma_swarm.models import _new_id
 
 logger = logging.getLogger(__name__)
 

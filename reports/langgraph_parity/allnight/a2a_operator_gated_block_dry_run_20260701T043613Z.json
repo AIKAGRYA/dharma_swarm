@@ -1,0 +1,131 @@
+{
+  "actions": [
+    {
+      "a2a_receipt_id": "a2a-task-receipt:ts-evo-0611-1:024fcf3e60db",
+      "age_hours": 484.657,
+      "claimed_at": "2026-06-10T23:56:47.979898+00:00",
+      "claimed_by": "hermes-m5",
+      "matched_phrase": "operator approval required",
+      "reason": "explicit_operator_gate_stale_without_terminal_receipt",
+      "row_index": 9,
+      "status": "claimed",
+      "task_id": "ts-evo-0611-1",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:ts-evo-0611-2:024fcf3e60db",
+      "age_hours": 484.657,
+      "claimed_at": "2026-06-10T23:56:47.979898+00:00",
+      "claimed_by": "hermes-m5",
+      "matched_phrase": "operator-gated",
+      "reason": "explicit_operator_gate_stale_without_terminal_receipt",
+      "row_index": 10,
+      "status": "claimed",
+      "task_id": "ts-evo-0611-2",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:ts-evo-0611-3:024fcf3e60db",
+      "age_hours": 484.657,
+      "claimed_at": "2026-06-10T23:56:47.979898+00:00",
+      "claimed_by": "hermes-m5",
+      "matched_phrase": "operator sign-off",
+      "reason": "explicit_operator_gate_stale_without_terminal_receipt",
+      "row_index": 11,
+      "status": "claimed",
+      "task_id": "ts-evo-0611-3",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:yatagarasu-20260619-gap-scan-fix:024fcf3e60db",
+      "age_hours": 286.338,
+      "claimed_at": "2026-06-19T06:15:57.262155+00:00",
+      "claimed_by": "hermes-m5",
+      "matched_phrase": "operator-gated",
+      "reason": "explicit_operator_gate_stale_without_terminal_receipt",
+      "row_index": 22,
+      "status": "claimed",
+      "task_id": "yatagarasu-20260619-gap-scan-fix",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:yatagarasu-20260619-credit-monitor:024fcf3e60db",
+      "age_hours": 286.338,
+      "claimed_at": "2026-06-19T06:15:57.262155+00:00",
+      "claimed_by": "hermes-m5",
+      "matched_phrase": "operator-gated",
+      "reason": "explicit_operator_gate_stale_without_terminal_receipt",
+      "row_index": 23,
+      "status": "claimed",
+      "task_id": "yatagarasu-20260619-credit-monitor",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:yatagarasu-20260619-staging-decay:024fcf3e60db",
+      "age_hours": 286.338,
+      "claimed_at": "2026-06-19T06:15:57.262155+00:00",
+      "claimed_by": "hermes-m5",
+      "matched_phrase": "operator-gated",
+      "reason": "explicit_operator_gate_stale_without_terminal_receipt",
+      "row_index": 24,
+      "status": "claimed",
+      "task_id": "yatagarasu-20260619-staging-decay",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    }
+  ],
+  "agent_uid": "a2a_supervisor",
+  "applied": false,
+  "applied_count": 0,
+  "applied_rows": [],
+  "backup_path": "",
+  "candidate_count": 6,
+  "explicit_gate_phrases": [
+    "operator-gated",
+    "operator gated",
+    "operator approval required",
+    "operator sign-off",
+    "operator signoff",
+    "operator sign off",
+    "dhyana sign-off",
+    "dhyana signoff"
+  ],
+  "generated_at": "2026-07-01T04:36:13Z",
+  "post_readiness": {
+    "open_tasks": 17,
+    "ready": false,
+    "reasons": [
+      "open_or_claimed_tasks_present"
+    ],
+    "unknown_status_tasks": 0,
+    "unverified_closed_tasks": 0
+  },
+  "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+  "schema_version": 1,
+  "skip_count": 0,
+  "skips": [],
+  "stale_after_hours": 24.0
+}

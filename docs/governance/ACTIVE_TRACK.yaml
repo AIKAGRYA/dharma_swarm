@@ -130,118 +130,6 @@ vital_signs:
 #   prerequisites / completion_criteria / non_goals / next_items  (as in v1)
 # ---------------------------------------------------------------------------
 active_tracks:
-  - id: runtime-truth-spine-adoption-2026-06
-    name: Runtime Truth Spine — Adoption (god objects flow through invoke_agent)
-    status: ACTIVE
-    opened_at: "2026-06-06"
-    verified_at: "2026-06-10"
-    ttl_days: 21
-    owner: "@AmitabhainArunachala"
-    serves: substrate-nativeness
-    complements:
-      - runtime-truth-reconciliation-2026-06
-      - runtime-truth-nats-2026-06
-    owned_surfaces:
-      - dharma_swarm/spine/**
-      - dharma_swarm/a2a/a2a_bridge.py
-      - dharma_swarm/orchestrator.py
-      - dharma_swarm/agent_runner.py
-      - scripts/uplift_guards/check_spine_ownership.py
-    moves_vital_signs:
-      - quality_gates
-      - tool_coverage
-
-    description: |
-      spine-adoption ships end-to-end: every production dispatch flows through
-      invoke_agent() and emits exactly one EvidenceReceipt. This track migrates
-      the god objects (agent_runner.py, orchestrator.py, a2a_bridge.py) onto
-      the shipped spine substrate. Target: 3 production callers outside the
-      spine package, zero bypass paths. Substrate-nativeness moves toward 30%+.
-
-      Ported 2026-06-10 from the v1 declaration (opened 2026-06-06 on the
-      qwen/spine-adoption lane, commit c28951d5b, which closed reconciliation
-      in v1) into the v2 portfolio while merging origin/main. In the v2
-      multi-track model it runs as a co-equal peer of the reconciliation and
-      NATS lanes rather than requiring their closure; reconciliation's open
-      status is main's standing declaration and is left to the operator.
-
-    prerequisites:
-      - id: spine_package_exists
-        kind: file_exists
-        file: dharma_swarm/spine/__init__.py
-      - id: invoke_agent_defined
-        kind: file_contains
-        file: dharma_swarm/spine/invoke.py
-        pattern: "async def invoke_agent"
-
-    completion_criteria:
-      - id: a2a_bridge_calls_spine
-        kind: file_contains
-        file: dharma_swarm/a2a/a2a_bridge.py
-        pattern: '(?m)^\s*from dharma_swarm\.spine'
-      - id: orchestrator_calls_spine
-        kind: file_contains
-        file: dharma_swarm/orchestrator.py
-        pattern: '(?m)^\s*from dharma_swarm\.spine'
-      - id: agent_runner_calls_spine
-        kind: file_contains
-        file: dharma_swarm/agent_runner.py
-        pattern: '(?m)^\s*from dharma_swarm\.spine'
-      - id: dispatch_emits_evidence_receipt
-        kind: file_contains
-        file: tests/test_spine_adoption_dispatch.py
-        pattern: "test_every_dispatch_emits_exactly_one_evidence_receipt"
-      - id: zero_dropoff_sources
-        kind: file_contains
-        file: tests/test_spine_adoption_dispatch.py
-        pattern: "test_no_dropoff_sources_remain"
-      - id: bypass_allowlist_empty
-        kind: file_contains
-        file: scripts/governance/spine_bypass_report.py
-        pattern: '(?m)^_INTENTIONAL_BYPASS: dict\[tuple\[str, int\], str\] = \{\s*\}'
-        # Regex (checker re.search): matches the DRAINED dict only — `= {}` on
-        # one line or `= {\n}` — never the populated multi-line form (5 entries
-        # today). Passes exactly when zero intentional bypass sites remain.
-      - id: adoption_narrative_docs
-        kind: file_exists
-        file: docs/architecture/SPINE_ADOPTION_NARRATIVE.md
-      - id: gate1_witnessed
-        kind: file_exists
-        file: reports/governance/GATE1_WITNESSED.md
-        # Written ONLY by gate1_witness.sh --watch at the moment the operator
-        # observes a live receipt land (count moves; sha16 of the receipt JSON
-        # recorded, checkable against the DB). Wires the non-proxy gate into
-        # completion: the track cannot flip SHIPPABLE on file/test proxies alone.
-
-    non_goals:
-      - Do not create new spine sub-modules. Adopt invoke/receipt/routing/persistence.
-      - Do not decompose agent_runner.run_task beyond invoke_agent() routing.
-      - Do not change EvidenceReceipt schema; adopt shipped types unchanged.
-      - Do not introduce NATS, Redis, or gRPC in this track (transport belongs to the NATS lane).
-      - Do not broadly refactor swarm.py, providers.py, or SwarmManager.
-
-    next_items:
-      - id: 1
-        what: "Wire a2a_bridge.submit_via_spine into production dispatch (ingest_trishula_inbox bypass at a2a_bridge.py:307 — Slice 2 per scripts/governance/spine_bypass_report.py)."
-        kind: code
-        blocker: true
-      - id: 2
-        what: "orchestrator.py dispatch through invoke_agent behind DHARMA_SPINE_DISPATCH (landed via #557; operator confirms one live EvidenceReceipt on a real dispatch = GATE 1)."
-        kind: code
-        blocker: true
-      - id: 3
-        what: "Migrate agent_runner.py run_task through invoke_agent(). Largest surface, last."
-        kind: code
-        blocker: true
-      - id: 4
-        what: "Drain the intentional-bypass allowlist (node_gateway submit endpoints, a2a_client._dispatch_local) and enable allow-list-at-zero in uplift_guards CI."
-        kind: code
-        blocker: true
-      - id: 5
-        what: "Author docs/architecture/SPINE_ADOPTION_NARRATIVE.md"
-        kind: docs
-        blocker: false
-
   - id: loop-closure-2026-06
     name: Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
     status: ACTIVE
@@ -506,7 +394,7 @@ active_tracks:
 
     next_items:
       - id: 1
-        what: "Residual: drain or quarantine historical dispatch_dropoff rows before any standing all-history daemon-clean claim."
+        what: "TOOL SHIPPED 2026-07-03 (execution on daemon host remains operator): scripts/runtime/dispatch_dropoff_quarantine.py — dry-run default, REQUIRED --before cutoff, --execute stamps quarantined_at/quarantine_reason on existing delegation_runs rows (idempotent ALTER, no new store, rows stay auditable) and writes a JSON receipt (counts + rowid-list sha256) under ~/.dharma/loop_closure/. Audit now reports dropoff_live=N / dropoff_quarantined_historical=M separately (cybernetics_codex excludes only explicitly-stamped rows and always reports the quarantined tally — never hides it). 7 fixture-DB tests green. REMAINING: operator runs it on the daemon host against the real runtime.db (~2191 historical rows), cutoff at/before the spine-dispatch fix timestamp."
         kind: code
         blocker: true
       - id: 2
@@ -532,12 +420,15 @@ active_tracks:
     owned_surfaces:
       - dharma_swarm/coordination/**
       - dharma_swarm/council/**
+      - scripts/governance/arena_truth_report.py
+      - reports/governance/arena/**
       - tests/test_arena_v1.py
       - tests/test_dpi.py
       - tests/test_orchestration_genome.py
       - tests/test_orchestrator_v1.py
       - tests/test_council_profiles.py
       - tests/test_coordination_closure_checks.py
+      - tests/test_arena_truth_report.py
     moves_vital_signs:
       - eval_coverage
       - quality_gates
@@ -605,6 +496,31 @@ active_tracks:
       - id: closure_checks_test_exists
         kind: file_exists
         file: tests/test_coordination_closure_checks.py
+      # Rigorous criteria (2026-07-03): the onboarding TRUST CHECK capped this
+      # track at existence-only evidence. These make readiness a number a real
+      # check produced — the controls/parity/significance battery must PASS and
+      # the governance surface must replay + verify as a digest-intact receipt.
+      - id: arena_v1_controls_tests_pass
+        kind: test_passes
+        test: tests/test_arena_v1.py
+      - id: arena_truth_surface_tests_pass
+        kind: test_passes
+        test: tests/test_arena_truth_report.py
+      - id: arena_truth_receipt_valid
+        kind: receipt_valid
+        file: reports/governance/arena/arena_truth_receipt.json
+        expect_digest: true
+        fresh_ttl_days: 21
+        requires_keys:
+          - schema
+          - generated_at
+          - hermetic
+          - capability_claim
+          - task_manifest_hash
+          - scorer_hash
+          - sealed_oracle_hash
+          - best
+          - corpus
 
     non_goals:
       - Do not make production capability claims; arena reports candidate lift only with budget-parity controls and significance gating.
@@ -614,15 +530,34 @@ active_tracks:
 
     next_items:
       - id: 1
-        what: "Wire arena scorecard + DPI receipts into a governance-visible report surface (read-only)."
+        what: >-
+          DONE 2026-07-03: arena scorecard + DPI receipts wired into a read-only
+          governance surface — scripts/governance/arena_truth_report.py renders
+          reports/governance/arena/ (digest-stamped receipt + ARENA_TRUTH.md +
+          corpus), seeded/deterministic; --check fails if the committed surface
+          does not replay byte-for-byte. Criterion arena_truth_receipt_valid
+          verifies it.
         kind: code
         blocker: false
       - id: 2
-        what: "Add best-single-model controls + budget-parity proof to every arena run before any capability claim."
+        what: >-
+          HERMETIC CONTROLS SHIPPED (runner.run always executes
+          best_single_full_budget gate + budget-parity ledger for every arm +
+          seeded bootstrap significance; proven by arena_v1_controls_tests_pass).
+          REMAINING (the blocker's live edge): any future live-lane arena run
+          (DHARMA_ARENA_LIVE seam in fixtures.py) must inherit the SAME control
+          arms before any capability claim — the hermetic lift on the fixture
+          taskpack is a control-machinery existence proof, never a capability
+          claim (non-goal 1). C2 stays owned by real benchmark evidence.
         kind: code
         blocker: true
       - id: 3
-        what: "Connect arena winners to a cold-start trace corpus (no training yet; corpus only)."
+        what: >-
+          DONE 2026-07-03: arena winners connected to the cold-start trace
+          corpus — coordination/arena/corpus.py emits labeled winner traces
+          (positive_lift_candidate only, scorer-labeled, deterministic) to
+          reports/governance/arena/cold_start_corpus.jsonl, sha256-pinned in
+          the report receipt. Labels only; zero training (v1 doctrine).
         kind: code
         blocker: false
 
@@ -710,6 +645,13 @@ active_tracks:
         kind: file_contains
         file: .github/workflows/merge-master-mike-backlog.yml
         pattern: "schedule:"
+      # Grade-up (2026-07-04 Pudgala dive Phase 0): the criteria above are all
+      # existence-only (S1 ceiling). This binds the track to the Slice 1 work
+      # that actually LANDED on main — feat(mike): bridge native GitHub reviews
+      # to Mike receipts (D4) — an honest S2, no new claim.
+      - id: github_review_bridge_landed
+        kind: commit_on_main
+        commit: "751c5ba8a802e7116827c31bcf98631b2e2a1f8f"
 
     non_goals:
       - Do not weaken or remove any existing gate check (CI green, conflict, unresolved threads, CHANGES_REQUESTED stay hard).
@@ -728,6 +670,12 @@ active_tracks:
         what: "Slice 1 (blocker): bridge native GitHub reviews -> Mike receipts in the pr_merge_control gate (Codex App = codex, Copilot = copilot), trusted-login-gated and ADDITIVE (never removes a check). + tests."
         kind: code
         blocker: true
+        # Underclaim probe (2026-07-03): the bridge + its test file already
+        # exist on main (criteria github_review_receipt_bridge and
+        # github_review_bridge_tested both pass) — this item looks shipped but
+        # was never reconciled. The linked criterion makes check_track_status
+        # WARN track-underclaim until the owner reconciles it.
+        evidence_criterion: github_review_bridge_tested
       - id: 2
         what: "Slice 2: auto-enroll every non-draft PR into the automerge/Mike evaluate lane (not only bot-pr / automerge-labeled)."
         kind: code
@@ -745,7 +693,149 @@ active_tracks:
         kind: governance
         blocker: true
 
+  - id: organism-rewire-2026-07
+    name: Organism Rewire — dormant organs to production, spine standing-on, external gradients
+    status: ACTIVE
+    opened_at: "2026-07-02"
+    verified_at: "2026-07-02"
+    ttl_days: 21
+    owner: "@AmitabhainArunachala"
+    serves: substrate-nativeness
+    complements:
+      - runtime-truth-spine-adoption-2026-06
+      - loop-closure-2026-06
+      - orchestration-arena-v1-2026-06
+    owned_surfaces:
+      - tools/world_scout_go/**
+      - tools/world_signal_ingestor_go/**
+      - tools/github_ingestor_go/**
+      - tools/evidence_ingestor_go/**
+      - dharma_swarm/world_radar/**
+      - dharma_swarm/organism.py
+      - dharma_swarm/strange_loop.py
+      - dharma_swarm/diversity_archive.py
+      - dharma_swarm/archive.py
+      - docker-compose.yml
+      - Dockerfile.swarm
+    moves_vital_signs:
+      - quality_gates
+      - eval_coverage
+
+    description: |
+      Operator-ratified 2026-07-02 from the verified full-organism sweep
+      (29 agents: 9 scanners, 16 adversarial verifiers, 3 judges; dossier in
+      the sweep session). Converts the sweep's confirmed findings into wiring:
+      the truth spine becomes standing-on (invariant provenance, not policy),
+      the Go sense organs become known-working and closure-checked, the
+      dormant organs (Organism/StrangeLoop via composition root, MAP-Elites
+      consolidation, living-agent kernel earn-in) reach production, and the
+      operator gains a felt, live view of the spine (receipt tail + cockpit
+      pulse). Fitness doctrine ratified alongside: a PORTFOLIO of external
+      gradients (verified benchmarks for high-iteration autoresearch loops,
+      market P&L as funding + slow-horizon term only, paid human work as the
+      C3 leg) — diversity of objective functions on the same math as
+      diversity of agents.
+
+    # OPERATOR RATIFICATIONS (2026-07-02):
+    #   Invariant: bypass allowlist to zero + hold-at-zero (executes under
+    #     spine-adoption track item 4; recorded here for doctrine).
+    #   D1 spine standing-on: YES. D2 memory: evidence-class-earned position,
+    #     routing-time memory, diversity-preserving sampling for workers.
+    #   D4 apply unlock: YES, sequenced last (after D1+external gradients).
+    #   D5 Organism: promote via composition root; god modules may EARN place
+    #     through review + hardening. D6 MAP-Elites consolidate on archive.py;
+    #     living agents earn always-on individually (start 2-3, monitored).
+
+    # Grade-up (2026-07-04 Pudgala dive Phase 0): this track had no
+    # completion_criteria at all (strongest evidence S0). This binds it to the
+    # commit that actually LANDED the DONE next-items on main (item 2 cockpit
+    # SpinePulsePanel.tsx render + item 3 go_invoke.py toolchain-checked
+    # needs_host closure, merged via PR #759) — an honest S2, no new claim.
+    completion_criteria:
+      - id: rewire_done_slices_landed
+        kind: commit_on_main
+        commit: "4c4f5aa47c7b49d49e28608f39f0b650d236ad57"
+
+    next_items:
+      - id: 1
+        what: "D1 (blocker): CODE+DOCS DONE (docker-compose.yml swarm service carries DHARMA_SPINE_DISPATCH=1 standing; Mac plist env path documented in docs/ops/RUNBOOK.md §3d). REMAINING: operator observation that Loop-1 closure reads LIVE persistently on the daemon host (make orient on the host that actually runs; blocked on daemon host / VPS item 4)."
+        kind: code
+        blocker: true
+      - id: 2
+        what: "DONE 2026-07-03: `dgc spine tail` (operator_core/spine_tail.py, landed earlier) + read-only cockpit pulse panel now RENDERED in Cockpit V2 (dashboard SpinePulsePanel.tsx: receipts/hour, last-receipt age with LIVE/QUIET chip, dropoff count; reads /api/control-surface/rows/spine.pulse, refreshes 15s, graceful not-live-on-this-host state)."
+        kind: code
+        blocker: false
+      - id: 3
+        what: "DONE 2026-07-03: Go sense-organ hardening + Loop 5b complete. Most had landed via #755 (per-source errors → go.world_radar_health cockpit row; github_ingestor live trigger go-g04 via cron_jobs.json:github_ingestor_inbox; host-aware loop5b_world_radar_closure_run with NEEDS_HOST). This session closed the last gap: toolchain-checked invocation in world_radar/go_invoke.py (no binary AND no `go` on PATH → structured needs_host per-source error naming `make go-build`, never an exception into the caller loop; cockpit gap code go_world_radar_needs_host). Verified live: loop5b closure run → LOOP5B_CLOSED=yes; 126 tests green."
+        kind: code
+        blocker: false
+      - id: 4
+        what: "VPS shift: daemon (compose swarm service + NATS + litestream state replication) onto an always-on VPS; Mac demotes to dev seat/mirror. Operator provisions host + secrets."
+        kind: ops
+        blocker: false
+      - id: 5
+        what: "D2 spec-first: memory position earned by evidence class (receipt-backed+TTL facts may go first-token), routing-time memory (kernel informs seat selection), diversity-preserving kernel sampling for worker seats. Spec then canary before flipping C5."
+        kind: docs
+        blocker: false
+      - id: 6
+        what: "D6a: consolidate MAP-Elites on archive.MAPElitesGrid; retire/absorb diversity_archive.py; arena keeps its genome-descriptor variant only if descriptors are shared."
+        kind: code
+        blocker: false
+      - id: 7
+        what: "D5: Organism as composition root over SwarmManager (review + harden to EARN god-module status); StrangeLoop gains a production entry point."
+        kind: code
+        blocker: false
+      - id: 8
+        what: "External-gradient portfolio spec (dedicated session): >=6 autoresearch nodes (arena/genome, router policy, prompt/policy evolution, memory promotion policy, gate calibration, AND the R_V/self-reference-attractor research lane — NORTH_STAR §2's measurable-awareness claim gets an owned, receipted eval loop again after the COLM calendar death) each with frozen eval + mutation operator + diversity-preserving selection + receipts; benchmark loops iterate at volume, market P&L funds but never selects per-iteration. Next track after this one lands MUST serve revenue-external-humans-served (NORTH_STAR §11 90-day: 'funds itself totally')."
+        kind: docs
+        blocker: false
+      - id: 9
+        what: "D4 (sequenced LAST): BR-003 mechanism test (one canonical run, DHARMA_EVOLUTION_SHADOW=0, rollback receipt), standing unlock only after items 1+8 provide ungameable selection signal."
+        kind: code
+        blocker: true
+      - id: 10
+        what: "D6b: living_agent_kernel earn-in — activate 2-3 kernels post-D1 (receipted wakes visible in presence), monitor, individually graduate to always-on."
+        kind: code
+        blocker: false
+
+    non_goals:
+      - Do not weaken, remove, or bypass any telos gate or ratchet to wire an organ (gates are hardest exactly when revenue/deadline pressure arrives).
+      - Do not let market P&L act as per-iteration selection signal; funding + slow-horizon term only.
+      - Do not unlock DarwinEngine standing apply before the external-gradient signal exists (item 9 sequencing is doctrine).
+      - Do not broadcast identical first-token memory to worker seats; decorrelation of priors is preserved by design.
+      - Do not touch surfaces owned by the four sibling tracks except through their own next-items.
+
 closed_tracks:
+  - id: runtime-truth-spine-adoption-2026-06
+    name: Runtime Truth Spine — Adoption (god objects flow through invoke_agent)
+    status: SHIPPED
+    closure_kind: VERIFIED_SLICE
+    opened_at: "2026-06-06"
+    closed_at: "2026-07-03"
+    closed_by: "claude/repo-audit-fable5-roadmap-l5oosz"
+    serves: substrate-nativeness
+    complements:
+      - runtime-truth-reconciliation-2026-06
+      - runtime-truth-nats-2026-06
+    evidence:
+      - "reports/governance/GATE1_WITNESSED.md - operator-witnessed live EvidenceReceipt (2026-06-11T21:16Z, sha16 82c65502d79eecc9 checkable against delegation_runs)"
+      - "tests/test_spine_allowlist_drain.py - 8 passed (one EvidenceReceipt per dispatch on every formerly-allowlisted surface; allow-list-at-zero guard green)"
+      - "tests/test_spine_adoption_dispatch.py - 10 passed (exactly-one-receipt + zero-dropoff-sources invariants)"
+      - "scripts/governance/spine_bypass_report.py - 0 intentional, 0 unknown; single blessed site a2a/spine_adapter.py"
+      - "docs/governance/hygiene/ratchet_baselines.json - spine_bypass_entries baseline 0 (hold-at-zero in quality-ratchet CI)"
+      - "scripts/uplift_guards/check_spine_ownership.py - invariant 3 (allow-list-at-zero, fail-closed) in the uplift_guards composition"
+    notes: |
+      Closed 2026-07-03 after the allowlist drain (node_gateway x2,
+      a2a_client._dispatch_local, nats_transport.consume_message → shared
+      a2a/spine_adapter.submit_task_via_spine) took the track to 9/9
+      criteria under the rigorous bar with zero open blockers.
+      agent_runner.run_task resolved architecturally as the execution LEAF
+      inside spine-wrapped callers (no bypass submit path exists).
+      closure_kind is VERIFIED_SLICE: receipt path shipped, test-proven,
+      GATE-1 witnessed, and held at zero bypasses by ratchet + uplift
+      guard — standing LIVE operation on the daemon host remains
+      organism-rewire-2026-07 (D1) / loop-closure territory.
+
   - id: runtime-truth-reconciliation-2026-06
     name: Runtime Truth Reconciliation - operator-visible truth packets
     status: SHIPPED

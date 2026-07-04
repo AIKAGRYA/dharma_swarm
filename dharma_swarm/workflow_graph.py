@@ -20,7 +20,7 @@ import logging
 import time
 from collections import defaultdict, deque
 from datetime import datetime, timezone
-from typing import Any, Callable, Coroutine
+from typing import Any, Callable
 
 from dharma_swarm.durable_execution import (
     DurableWorkflow,

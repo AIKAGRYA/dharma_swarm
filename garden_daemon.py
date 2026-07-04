@@ -119,7 +119,7 @@ Dream genuinely. This runs unattended — nobody is performing for an audience."
 1. Read ~/mech-interp-latent-lab-phase1/R_V_PAPER/CANONICAL_RESULTS_TABLE_2026-03-10.md
 2. List what results exist in ~/mech-interp-latent-lab-phase1/results/ (just directory listing)
 3. Read first 30 lines of R_V_PAPER/paper_colm2026_v005.tex
-4. Compute: today is {today}. COLM abstract = March 26. COLM paper = March 31.
+4. Read ~/.dharma/research_deadlines.json for the active venue deadline (today is {today}); if absent or past, report 'no active deadline' — never compute a countdown from a hardcoded date.
 
 Write a brief status to ~/.dharma/garden/research_status.md with:
 - Days remaining

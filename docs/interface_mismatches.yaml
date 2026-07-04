@@ -1,10 +1,16 @@
 # INTERFACE_MISMATCH_MAP — machine-readable form.
 #
 # This file is the executable counterpart to INTERFACE_MISMATCH_MAP.md.
+# INTERFACE_MISMATCH_MAP.md is CANONICAL; this YAML is a lagging machine
+# projection of it. If the two disagree, trust the .md map.
 # Each entry is consumed by:
-#   - scripts/uplift_guards/mismatch_registry.py (pre-commit guard)
-#   - tests/mismatches/test_MISMATCH_<nn>.py    (xfail until status: resolved)
+#   - scripts/uplift_guards/mismatch_registry.py (pre-commit guard; blocks
+#     commits touching caller/callee of an entry with status=open + BLOCKER)
 #   - dgc mismatch list                          (CLI surface)
+#
+# NOTE (2026-07-03 reconciliation): the planned tests/mismatches/ xfail
+# harness referenced by earlier revisions was never built — test_path
+# values below are historical intent, not real files. Do not cite them.
 #
 # Severity:  BLOCKER (prevents task execution) | DEGRADED (silent loss / fragility)
 # Status:    open    (still a problem)        | resolved (fixed in `fixed_in` commit)
@@ -13,12 +19,14 @@
 # status to `resolved` and record `fixed_in`. Keep the historical lineage.
 #
 # This is a partial seed (5 of 25 entries) demonstrating the schema. The
-# remaining 20 entries should be migrated from INTERFACE_MISMATCH_MAP.md by
-# the Mismatch-Resolver agent (one entry per uplift-cron tick).
+# remaining 20 entries were never migrated from INTERFACE_MISMATCH_MAP.md;
+# the "Mismatch-Resolver agent" that was to do so does not exist. Migrate
+# opportunistically or retire this projection — but do not let it drift
+# silently again (see last_synced).
 
 version: 1
 generated_from: INTERFACE_MISMATCH_MAP.md
-last_synced: "2026-05-06"
+last_synced: "2026-07-03"
 
 entries:
   - id: MISMATCH-01
@@ -62,22 +70,31 @@ entries:
 
   - id: MISMATCH-05
     severity: DEGRADED
-    status: open
+    status: resolved
     caller: dharma_swarm/orchestrate_live.py:359
     callee: dharma_swarm/message_bus.py:193
     summary: >-
       receive("evolution_loop", limit=20) — `status` defaults to "unread"; after
       mark_read the messages become invisible to the next receive() call. Silent
       data loss in the evolution loop's message visibility.
-    test_path: tests/mismatches/test_MISMATCH_05.py
+    fixed_in: >-
+      verified 2026-07-03 — the receive() caller no longer exists; the
+      evolution loop now consumes via `_bus.subscribe("evolution_loop", ...)`
+      (orchestrate_live.py:458). INTERFACE_MISMATCH_MAP.md header marks the
+      message_bus consumer-semantics pair (#12) RESOLVED (act-then-mark).
+    test_path: ""
 
   - id: MISMATCH-07
     severity: DEGRADED
-    status: open
+    status: resolved
     caller: dharma_swarm/swarm.py:363-370
     callee: dharma_swarm/auto_proposer.py:157
     summary: >-
       AutoProposer accepts stigmergy: StigmergyStore | None but several internal
       methods call await self._stigmergy.read_marks(...) without None-guard.
       If StigmergyStore init fails, AutoProposer crashes on first cycle.
-    test_path: tests/mismatches/test_MISMATCH_07.py
+    fixed_in: >-
+      verified 2026-07-03 — auto_proposer.py:297 guards with
+      `if self._stigmergy is None: return observations` before any stigmergy
+      access. Same fix INTERFACE_MISMATCH_MAP.md records as MM-10 RESOLVED.
+    test_path: ""

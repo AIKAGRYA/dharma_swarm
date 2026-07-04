@@ -847,7 +847,6 @@ def install_launchd_service() -> bool:
     Creates log directory. Returns True on success.
     """
     import platform
-    import shutil
 
     if platform.system() != "Darwin":
         logger.info("Launchd is macOS-only; skipping service install")

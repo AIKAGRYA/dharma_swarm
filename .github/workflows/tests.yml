@@ -84,7 +84,6 @@ jobs:
           set -o pipefail
           set +e
           python -m pytest tests/ -q --tb=short \
-            -x \
             --timeout=30 \
             -m "not slow and not docker and not network" \
             2>&1 | tee pytest_output.txt

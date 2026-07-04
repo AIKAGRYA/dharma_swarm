@@ -69,6 +69,26 @@ def test_compute_unit_bridge_shape_matches_gaia_ledger():
     assert abs(cu["energy_mwh"] * cu["carbon_intensity"] - e.gco2 / 1_000_000.0) < 1e-12
 
 
+def test_compute_unit_bridge_validates_against_real_ledger_model():
+    # Review fix proof: the projected dict must construct a REAL gaia_ledger.ComputeUnit
+    # (pydantic validation), not merely match a hand-asserted key set. The import lives
+    # in the test only; the module itself stays projection-only.
+    try:
+        from dharma_swarm.gaia_ledger import ComputeUnit
+    except Exception:  # pragma: no cover - ledger optional in minimal envs
+        import pytest
+
+        pytest.skip("gaia_ledger not importable in this environment")
+    e = estimate_receipt(
+        _FakeReceipt(provider="anthropic", model="claude-sonnet", output_tokens=500)
+    )
+    cu = ComputeUnit(**e.to_compute_unit_dict())
+    assert cu.provider == "anthropic"
+    assert cu.energy_mwh > 0 and cu.carbon_intensity > 0
+    # the ledger's own derived quantity agrees with the projector's central estimate
+    assert abs(cu.co2e_tons - e.gco2 / 1_000_000.0) < 1e-12
+
+
 def test_prompt_tokens_drive_energy_scaling():
     prompt_heavy = estimate_receipt(
         _FakeReceipt(model="claude-sonnet", input_tokens=100_000, output_tokens=10)

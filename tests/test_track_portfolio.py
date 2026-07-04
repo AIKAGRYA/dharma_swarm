@@ -19,6 +19,7 @@ from check_track_status import (  # type: ignore  # noqa: E402
     validate_portfolio_graph,
     detect_dependency_cycle,
     _parse_minimal_yaml,
+    _resolve_command_for_current_runtime,
     Finding,
 )
 
@@ -267,6 +268,23 @@ def test_scalar_nested_flow_list_degrades_gracefully() -> None:
     raw = {"schema_version": 2, "active_tracks": [{"id": "a", "depends_on": out["k"]}]}
     p = normalize_portfolio(raw)
     assert p["active_tracks"][0]["id"] == "a"
+
+
+# --- executable criteria portability ---------------------------------------
+
+def test_command_passes_resolves_pytest_to_current_interpreter() -> None:
+    resolved = _resolve_command_for_current_runtime(["pytest", "-q", "tests/test_nats_transport.py"])
+
+    assert resolved[:3] == [sys.executable, "-m", "pytest"]
+    assert resolved[3:] == ["-q", "tests/test_nats_transport.py"]
+
+
+def test_command_passes_resolves_missing_repo_venv(monkeypatch) -> None:
+    monkeypatch.setattr("check_track_status.Path.exists", lambda _path: False)
+
+    resolved = _resolve_command_for_current_runtime(["./.venv/bin/python", "scripts/check.py"])
+
+    assert resolved == [sys.executable, "scripts/check.py"]
 
 
 # --- closed_tracks shape validation -----------------------------------------

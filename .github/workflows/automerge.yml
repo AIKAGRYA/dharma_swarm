@@ -10,8 +10,9 @@ name: automerge
 # Guard rails:
 #   - Mike's deterministic gate still runs required CI, fourfold-warrant,
 #     unresolved review threads, and reviewer receipts before auto-merge is armed.
-#   - Advisory governance signals (Coherence Delta / ACTIVE_TRACK) are ignored
-#     by this raw green-check filter; they continue to report in CI Truth.
+#   - The advisory governance signal (ACTIVE_TRACK) is ignored by this raw
+#     green-check filter; it continues to report in CI Truth. Coherence Delta
+#     is a required branch-protection check and must be green like any other.
 #   - This workflow never merges directly; it only asks Mike.
 #   - Draft PRs and PRs with CHANGES_REQUESTED are never dispatched.
 #   - One dispatch per readiness fingerprint, so later reviews/receipt comments
@@ -61,6 +62,12 @@ jobs:
     timeout-minutes: 10
     env:
       GH_TOKEN: ${{ github.token }}
+      # PAT (contents+PR+actions write) used ONLY to dispatch the router
+      # workflow. A run triggered by the built-in GITHUB_TOKEN cannot create
+      # a new workflow run, so the router dispatch below silently no-ops and
+      # Mike's merge arm never fires. Falls back to GITHUB_TOKEN when unset
+      # (dispatch stays a no-op until the MIKE_PAT secret is added).
+      MIKE_PAT: ${{ secrets.MIKE_PAT }}
       GH_REPO: ${{ github.repository }}
       EVENT_NAME: ${{ github.event_name }}
       EVENT_PR: ${{ github.event.pull_request.number || github.event.inputs.pr || '' }}
@@ -168,12 +175,13 @@ jobs:
 
             # 3. Required checks must be completed and green. Ignore this
             #    workflow plus governance checks that are advisory signals.
+            #    Coherence Delta is NOT excluded: it is a required
+            #    branch-protection context with a real failure mode.
             not_green="$(echo "$view" | jq -r '
               [ .statusCheckRollup[]?
                 | select((.name // .context // .workflowName // "") | test("automerge") | not)
                 | select((.name // .context // .workflowName // "")
-                    | IN("ACTIVE_TRACK governance gate", "active-track-governance",
-                         "Coherence Delta PR body", "coherence-delta") | not)
+                    | IN("ACTIVE_TRACK governance gate", "active-track-governance") | not)
                 | select(
                     ((.status // "COMPLETED") != "COMPLETED")
                     or (((.conclusion // .state // "") | ascii_upcase)
@@ -211,7 +219,9 @@ jobs:
 
             # 5. Hand off to Merge Master Mike (full deterministic gate runs
             #    there; auto-merge is armed only when merge_when_clean=true).
-            gh workflow run codex-mention-router.yml --repo "$GH_REPO" \
+            #    Dispatch with MIKE_PAT so the router run is actually created;
+            #    a GITHUB_TOKEN-triggered workflow_dispatch does not spawn one.
+            GH_TOKEN="${MIKE_PAT:-$GH_TOKEN}" gh workflow run codex-mention-router.yml --repo "$GH_REPO" \
               -f pr="$pr" -f merge_when_clean="${merge_when_clean}"
             if [ "${merge_when_clean}" = "true" ]; then
               mode_line="dispatched **Merge Master Mike** with \`merge_when_clean: true\` (will auto-merge once the gate is clean)"
@@ -226,7 +236,7 @@ jobs:
 
           Mike still runs the full deterministic gate (fourfold-warrant,
           reviewer receipts, unresolved threads, and required CI before any
-          merge is armed. Coherence Delta / ACTIVE_TRACK remain advisory. This dispatch marker is keyed to readiness state
+          merge is armed. ACTIVE_TRACK remains advisory. This dispatch marker is keyed to readiness state
           \`${ready_key}\`; later review/comment/check changes can dispatch
           again for the same head SHA. Remove the \`automerge\`/\`bot-pr\`/\`mike-watch\`
           label to leave this lane." || true

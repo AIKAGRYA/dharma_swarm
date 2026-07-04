@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status a2a-status a2a-up a2a-send go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status a2a-status a2a-up a2a-send go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently.
@@ -83,6 +83,7 @@ help:
 	@echo "  make operator-prod-smoke Run fast read-only operator production smoke"
 	@echo "  make onboard      Render current operating reality (active track, live ops, broken register, axioms)"
 	@echo "  make orient       Render the whole organism at once (identity, organs, tracks, custody, liveness)"
+	@echo "  make agent-onboard Fleet-identity join route + identity-surface drift check (new A2A agents)"
 	@echo "  make agent-build-preflight Run onboarding + hygiene integrity before agent work"
 	@echo "  make agent-build-closeout Run hygiene scan + full governance bundle after agent work"
 	@echo "  make status       Quick cross-agent state snapshot (PRs, stale, hotlist, track)"
@@ -90,6 +91,7 @@ help:
 	@echo "  make a2a-up       Run the persistent Devin A2A agent (registers on fleet, drains inbox)"
 	@echo "  make a2a-send     Send a packet: make a2a-send TO=codex FILE=path/to/packet.md"
 	@echo "  make go-ci        Run Go evidence sense-organ fmt/vet/test gates"
+	@echo "  make go-build     Compile the 4 Go tool mains into their module dirs (gitignored)"
 	@echo ""
 
 install:
@@ -236,8 +238,10 @@ test-contracts:
 
 nats-substrate-contract:
 	$(REPO_PYTHON) scripts/governance/check_nats_substrate_contract.py
+	$(REPO_PYTHON) scripts/governance/check_nats_live_production_evidence.py --max-age-hours 24
 	$(PYTEST) -q \
 		tests/test_nats_live_contact.py \
+		tests/test_nats_substrate_contract.py \
 		tests/test_nats_transport.py \
 		tests/test_a2a_send.py \
 		tests/test_a2a_inbox_bridge.py \
@@ -246,8 +250,11 @@ nats-substrate-contract:
 		tests/test_a2a_reply_capture.py \
 		--tb=line
 
+nats-live-production-matrix:
+	$(REPO_PYTHON) scripts/governance/run_nats_live_production_matrix.py --endpoint $${NATS_URL:-nats://127.0.0.1:4222} --broker-profile $${NATS_PROFILE:-local-live-jetstream}
+
 uplift-guards:
-	python3 scripts/uplift_guards/run_pre_commit.py
+	$(REPO_PYTHON) scripts/uplift_guards/run_pre_commit.py
 
 module-budget:
 	$(PYTHON) scripts/governance/check_module_budget.py \
@@ -428,6 +435,14 @@ onboard:
 orient:
 	$(PYTHON) scripts/governance/orientation_graph.py --write-context
 
+# Fleet-identity onboarding: the join route for a NEW persistent A2A agent
+# (card, runtime registration, roster, git seat, announcement, presence) plus
+# a drift check across the identity surfaces. Read-only; always exits 0.
+# `make onboard` orients a session; this onboards an identity.
+# See docs/ops/A2A_AGENT_ONBOARDING.md.
+agent-onboard:
+	$(PYTHON) scripts/governance/a2a_agent_onboard.py $(ARGS)
+
 # Quick cross-agent state snapshot: active track, open PRs, stale items,
 # broken register, hotlist. Any agent on any platform can run this.
 status:
@@ -480,6 +495,19 @@ go-vet:
 	done
 
 go-ci: go-fmt-check go-vet go-test
+
+# Compile the four Go tool mains into their module dirs (gitignored binaries,
+# e.g. tools/world_scout_go/world_scout_go). The Python bridge prefers these
+# prebuilt binaries and falls back to `go run .` when they are absent.
+GO_TOOL_MAIN_MODULES := $(GO_EVIDENCE_MODULE) $(GO_GITHUB_INGESTOR_MODULE) $(GO_WORLD_SIGNAL_INGESTOR_MODULE) $(GO_WORLD_SCOUT_MODULE)
+
+go-build:
+	@mkdir -p $(GO_CACHE_DIR) $(GO_MOD_CACHE_DIR)
+	@for mod in $(GO_TOOL_MAIN_MODULES); do \
+		bin=$$(basename $$mod); \
+		echo "go build -o $$bin in $$mod"; \
+		( cd $$mod && GOCACHE=$(GO_CACHE_DIR) GOMODCACHE=$(GO_MOD_CACHE_DIR) $(GO) build -o $$bin . ) || exit 1; \
+	done
 
 # ── Operational targets ──────────────────────────────────────────────────
 

@@ -37,6 +37,7 @@ Run (needs the swebench venv + Docker up; SLOW — ~11 min/instance under qemu):
 Artifacts (full result JSON) go to ~/.dharma/forge_v1/real_run_<ts>.json — never
 the repo.
 """
+# ruff: noqa: F401  -- re-export seam consumed by tests/test_forge_v2.py: imported names ARE the public surface
 from __future__ import annotations
 
 import argparse

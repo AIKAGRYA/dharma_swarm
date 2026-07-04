@@ -614,7 +614,7 @@ def _draft_brief(
     room_section = ""
     try:
         from dharma_swarm.fractal.room_configs import bootstrap_registry
-        from dharma_swarm.fractal.room_brief import render_room_section, render_room_summary_line
+        from dharma_swarm.fractal.room_brief import render_room_section
         registry = bootstrap_registry()
         room_section = render_room_section(registry)
     except Exception:

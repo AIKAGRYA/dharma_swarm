@@ -9,7 +9,13 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 BOUNDARY_DOC = REPO_ROOT / "docs/governance/FORGE_NAMING_BOUNDARY.md"
 HISTORICAL_PREFIXES = (
     "reports/governance/cleanup_convergence_20260615_25/",
+    "reports/governance/metabolization_sweep_final_report_2026-07-01.md",
+    "reports/governance/metabolization_sweep_ledger.jsonl",
     "reports/governance/worktree_readiness_2026-06-30/",
+    # 2026-07-01 metabolization sweep artifacts landed on main documenting
+    # the legacy name's own removal; dated historical reports, not live use.
+    "reports/governance/metabolization_sweep_final_report_2026-07-01.md",
+    "reports/governance/metabolization_sweep_ledger.jsonl",
 )
 
 

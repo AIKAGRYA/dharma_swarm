@@ -16,7 +16,6 @@ All amounts in USD equivalent for unified accounting.
 
 from __future__ import annotations
 
-import json
 import logging
 import time
 from enum import Enum

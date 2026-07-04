@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import logging
 import os
-import time
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -30,8 +29,6 @@ from dharma_swarm.runtime_state import (
     RuntimeStateStore,
     TaskClaim,
     _new_id,
-    _utc_now,
-    _utc_now_iso,
 )
 from dharma_swarm.spine.identity import ExecutionIdentity
 

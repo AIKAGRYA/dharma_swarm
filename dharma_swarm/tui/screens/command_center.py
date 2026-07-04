@@ -36,7 +36,7 @@ from ..widgets.health_panel import (
     StatsPanel,
 )
 from ..widgets.lineage_explorer import LineageStatsBar, LineageTab
-from ..widgets.ontology_browser import OntologyDetail, OntologyTab, OntologyTree
+from ..widgets.ontology_browser import OntologyTab, OntologyTree
 
 logger = logging.getLogger(__name__)
 

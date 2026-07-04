@@ -64,6 +64,8 @@ is no longer a forced first-read surface.
 | Reality debt / guarded overclaim language | `docs/governance/REALITY_DEBT_LEDGER.md` | Defers to source owners for claim upgrades |
 | Runtime truth command cutover matrix | `docs/governance/RUNTIME_TRUTH_COMMAND_CUTOVER.md` | Defers to RuntimeStateStore, spine modules, and tests for proof |
 | Architecture / invariants / axioms | `docs/governance/SOVEREIGN_MANIFEST.md`, `docs/doctrine/` | — |
+| External-gradient / autoresearch-node portfolio (build spec) | `docs/architecture/EXTERNAL_GRADIENT_PORTFOLIO_SPEC.md` | Defers to `ACTIVE_TRACK.yaml` (track state), One Wire quorum owners, and receipts for live facts |
+| Memory first-token ordering (build spec) | `docs/architecture/MEMORY_FIRST_TOKEN_SPEC.md` | Defers to `context_compiler.py`/MemoryKernel code and trust-gate C5 for live state |
 | Doc ownership | `docs/governance/CANONICAL_DOC_STACK.md` (this file) | — |
 | Anti-slop / repo-rule discipline | `docs/governance/ANTI_SLOP_RULES.md` + `.semgrep/dharma-anti-slop.yml` | — |
 | Forge / Pudgala naming rule | `docs/governance/SOVEREIGN_MANIFEST.md` | `docs/governance/FORGE_NAMING_BOUNDARY.md` is reference-only and defers to the manifest |
@@ -71,6 +73,7 @@ is no longer a forced first-read surface.
 | Vibe-code antipattern catalogue (54 patterns × 12 clusters, scan-backed) | `docs/governance/VIBE_CODE_HYGIENE.md` + `scripts/governance/vibe_code_scan.sh` + `reports/governance/vibe_code_baseline_2026-06-07.txt` | `ANTI_SLOP_RULES.md` (companion); signals promote into enforced rules via PR |
 | Semantic Commons agent identity and naming ontology | `docs/ontology/SEMANTIC_COMMONS.md` | A2A cards, contact registries, `docs/ontology/semantic_objects.yaml`, `docs/ontology/semantic_aliases.yaml`, runtime resolver names |
 | Internal live transport decision | `docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md` | A2A docs, runtime plans, onboarding output, Live Ops Cockpit |
+| Always-on A2A spine implementation plan | `docs/architecture/A2A_ALWAYS_ON_SPINE_MASTER_PLAN.md` | Defers to `docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md`, `ACTIVE_TRACK.yaml`, `RuntimeStateStore`, and `A2ANatsTransport` for executable truth |
 | LangGraph parity local acceptance contract | `docs/langgraph_parity/LANGGRAPH_PARITY_CONTRACT.md` | parity benchmark, readiness report, future adapter work |
 | LangGraph parity operator runbook | `docs/langgraph_parity/OPERATOR_RUNBOOK.md` | benchmark/readiness commands and human verification flow |
 | LangGraph parity task graph | `docs/langgraph_parity/TASK_GRAPH.md` | future parity adapter sequencing; defers to the acceptance contract |
@@ -83,7 +86,7 @@ is no longer a forced first-read surface.
 | Action warrant | `docs/governance/FOURFOLD_ACTION_WARRANT.md` | — |
 | Cybernetic loop closure state | `CYBERNETIC_LOOP_MAP.md` | Generated from `scripts/governance/cybernetics_codex_audit.py --json`; per-loop packets defer to it for current closure verdicts |
 | Cybernetics Codex operating protocol | `docs/agents/cybernetics_codex/PROTOCOLS.md` | Defers to Cybernetics Codex audit, `CYBERNETIC_LOOP_MAP.md`, and `reports/loop_closure/cybernetics_codex/` for live loop truth |
-| Agent onboarding (ops) | `docs/ops/AGENT_ONBOARDING.md`, `docs/ops/CODEX_TOOLBELT_ONBOARDING.md` | — |
+| Agent onboarding (ops) | `docs/ops/AGENT_ONBOARDING.md`, `docs/ops/CODEX_TOOLBELT_ONBOARDING.md`, `docs/ops/A2A_AGENT_ONBOARDING.md`, `docs/ops/A2A_QUICKSTART.md` | — |
 | Module-level what-does-what | `docs/architecture/NAVIGATION.md` | — |
 | Router/TaskBoard domain pinning | `docs/architecture/ROUTERS_AND_TASKBOARD.md` | — |
 | VentureCell portfolio (which cells exist, status, instrument, separation) | `docs/governance/VENTURE_CELL_PORTFOLIO.yaml` | per-cell `VENTURE_CELL_*.md` declarations defer to it |

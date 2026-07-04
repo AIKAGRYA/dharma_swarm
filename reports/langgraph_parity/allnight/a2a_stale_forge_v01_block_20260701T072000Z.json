@@ -1,0 +1,114 @@
+{
+  "actions": [
+    {
+      "a2a_receipt_id": "a2a-task-receipt:forge-v0.1-001:2d5412f5269e",
+      "age_hours": 733.833,
+      "handoff_paths": [
+        {
+          "exists": false,
+          "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_forgewright/20260601T172816Z_forge_v0_1_handoff.json"
+        },
+        {
+          "exists": false,
+          "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_forgewright/archive/20260601T172816Z_forge_v0_1_handoff.json"
+        },
+        {
+          "exists": false,
+          "path": "/Users/dhyana/.dharma/autonomy_spine/20260531T172816Z-dharma-reward-forge-v0-1-x-chain-forge-council-v-97f649/20260601T172816Z_forge_v0_1_handoff.json"
+        },
+        {
+          "exists": false,
+          "path": "/Users/dhyana/.dharma/autonomy_spine/20260531T172816Z-dharma-reward-forge-v0-1-x-chain-forge-council-v-97f649/inbox/20260601T172816Z_forge_v0_1_handoff.json"
+        }
+      ],
+      "mission_evidence": {
+        "brief_exists": true,
+        "brief_path": "/Users/dhyana/.dharma/autonomy_spine/20260531T172816Z-dharma-reward-forge-v0-1-x-chain-forge-council-v-97f649/brief.md",
+        "builder_tasks": [
+          {
+            "claimed_by": "codex_forgewright",
+            "receipt_id": "r-099cde40c5b64803",
+            "status": "completed",
+            "task_id": "20260531T172816Z-dharma-reward-forge-v0-1-x-chain-forge-council-v-97f649-t02-builder"
+          }
+        ],
+        "mission_dir": "/Users/dhyana/.dharma/autonomy_spine/20260531T172816Z-dharma-reward-forge-v0-1-x-chain-forge-council-v-97f649",
+        "mission_dir_exists": true,
+        "task_counts": {
+          "blocked": 0,
+          "completed": 1,
+          "open": 4,
+          "total": 5
+        },
+        "tasks_exists": true,
+        "tasks_path": "/Users/dhyana/.dharma/autonomy_spine/20260531T172816Z-dharma-reward-forge-v0-1-x-chain-forge-council-v-97f649/tasks.jsonl"
+      },
+      "mission_id": "20260531T172816Z-dharma-reward-forge-v0-1-x-chain-forge-council-v-97f649",
+      "reason": "stale_forge_v01_missing_source_packet_and_external_target_gated",
+      "row_index": 4,
+      "spec_paths": [
+        {
+          "exists": false,
+          "path": "/Users/dhyana/ds_langgraph_parity_20260701/docs/specs/forge_packets/v0.1.1-transfer-gate.md"
+        },
+        {
+          "exists": false,
+          "path": "/Users/dhyana/dharma_swarm/docs/specs/forge_packets/v0.1.1-transfer-gate.md"
+        }
+      ],
+      "target_agent": "codex_forgewright",
+      "target_policy": {
+        "age_hours": 734.263,
+        "agent_uid": "codex_forgewright",
+        "authority": "external_worker_evidence_only",
+        "can_write_source": false,
+        "cannot_certify_own_lane": true,
+        "canonical_dharma_dir_writes_allowed": false,
+        "heartbeat_status": "RED",
+        "last_seen_at": "2026-05-31T17:04:12.385566+00:00",
+        "living_agent_exists": true,
+        "living_agent_path": "/Users/dhyana/.dharma/agents/codex_forgewright/living_agent.json",
+        "registration_exists": true,
+        "registration_path": "/Users/dhyana/.dharma/external_agents/codex_forgewright/registration.json",
+        "repo_writes_allowed": false,
+        "requires_approval": true,
+        "requires_decorrelated_evaluator": true,
+        "status": "starting"
+      },
+      "task_id": "forge-v0.1-001",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    }
+  ],
+  "agent_uid": "a2a_supervisor",
+  "applied": true,
+  "applied_count": 1,
+  "applied_rows": [
+    {
+      "receipt_id": "a2a-task-receipt:forge-v0.1-001:2d5412f5269e",
+      "status": "blocked",
+      "target_agent": "codex_forgewright",
+      "task_id": "forge-v0.1-001"
+    }
+  ],
+  "backup_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-stale-forge-v01-block-20260701T072000Z.bak",
+  "candidate_count": 1,
+  "generated_at": "2026-07-01T07:20:00Z",
+  "heartbeat_stale_hours": 24.0,
+  "post_readiness": {
+    "open_tasks": 0,
+    "ready": true,
+    "reasons": [],
+    "unknown_status_tasks": 0,
+    "unverified_closed_tasks": 0
+  },
+  "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+  "schema_version": 1,
+  "skip_count": 0,
+  "skips": [],
+  "stale_after_hours": 24.0,
+  "task_id": "forge-v0.1-001"
+}

@@ -40,7 +40,6 @@ from dharma_swarm.revenue.spine import (
     TargetStatus,
 )
 from dharma_swarm.revenue.intelligence import RevenueIntelligenceIngestor
-from dharma_swarm.revenue.intel_parser import IntelSource
 
 logger = logging.getLogger(__name__)
 

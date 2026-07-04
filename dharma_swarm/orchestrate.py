@@ -368,7 +368,7 @@ def plan_research_deep_dive() -> SwarmPlan:
                 prompt=(
                     "Focus on R_V paper: read ~/mech-interp-latent-lab-phase1/R_V_PAPER/, "
                     "the gap analysis, and MI_AGENT_TO_CODEX_RV_ANSWERS.md. "
-                    "Identify exactly what's missing for COLM submission. "
+                    "Identify exactly what's missing for the active research submission (deadline owner: ~/.dharma/research_deadlines.json). "
                     "Write to ~/.dharma/shared/rv_paper_status.md."
                 ),
                 priority=1,

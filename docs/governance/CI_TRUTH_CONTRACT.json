@@ -1,6 +1,6 @@
 {
   "schema": "dharma.ci_truth_contract.v1",
-  "version": 2,
+  "version": 3,
   "description": "Machine-readable CI membrane consumed by local ACI tooling and Merge Master Mike. Required checks block merge when missing, pending, failed, cancelled, timed out, or action-required. Advisory checks are reported with local repro commands but do not block automated merge flow.",
   "required": [
     {
@@ -21,9 +21,7 @@
       "local_command": "make quality-ratchet-check",
       "failure_category": "quality_ratchet",
       "autofix": "forbidden"
-    }
-  ],
-  "advisory": [
+    },
     {
       "id": "coherence_delta",
       "names": ["Coherence Delta PR body"],
@@ -31,7 +29,9 @@
       "local_command": "python3 scripts/governance/check_pr_coherence_delta.py",
       "failure_category": "pr_body_contract",
       "autofix": "limited"
-    },
+    }
+  ],
+  "advisory": [
     {
       "id": "active_track",
       "names": ["ACTIVE_TRACK governance gate"],

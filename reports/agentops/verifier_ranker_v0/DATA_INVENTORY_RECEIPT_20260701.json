@@ -1,0 +1,515 @@
+{
+  "created_at": "2026-06-30T16:43:10.465352+00:00",
+  "inventory_scope": "metadata_only_no_raw_message_body_readout",
+  "raw_private_body_readout": false,
+  "repo_root": "/Users/dhyana/dharma_swarm",
+  "schema_version": "dharma.verifier_ranker_v0.data_inventory.v1",
+  "sqlite_metadata": {
+    "a2a_messages_db": {
+      "excluded_columns": {
+        "artifacts": [
+          "content"
+        ],
+        "events": [
+          "payload"
+        ],
+        "messages": [
+          "body"
+        ]
+      },
+      "exists": true,
+      "path": "/Users/dhyana/.dharma/db/messages.db",
+      "sha256": "sha256:864cfefa1c6d2cc1b34a35041b091b20764c0775edb6ec2f6a62e5bff6454282",
+      "table_columns": {
+        "artifacts": [
+          "id",
+          "message_id",
+          "artifact_type",
+          "content",
+          "summary",
+          "files_touched",
+          "metadata",
+          "created_at"
+        ],
+        "events": [
+          "event_id",
+          "event_type",
+          "task_id",
+          "agent_id",
+          "source_pid",
+          "occurred_at",
+          "consumed_at",
+          "payload"
+        ],
+        "messages": [
+          "id",
+          "from_agent",
+          "to_agent",
+          "subject",
+          "body",
+          "priority",
+          "status",
+          "created_at",
+          "read_at",
+          "reply_to",
+          "metadata"
+        ],
+        "subscriptions": [
+          "agent_id",
+          "topic",
+          "created_at"
+        ]
+      },
+      "table_counts": {
+        "artifacts": 0,
+        "events": 13231,
+        "messages": 992069,
+        "subscriptions": 75
+      }
+    },
+    "agent_memory_db": {
+      "excluded_columns": {
+        "memories": [
+          "content"
+        ],
+        "shared_memories": [
+          "content"
+        ]
+      },
+      "exists": true,
+      "path": "/Users/dhyana/.dharma/agent_memory/memories.db",
+      "sha256": "sha256:5e855b0f853d402fedf7cf07eddaba3e82a102b00ecb29eef2d5ea638cd8a611",
+      "table_columns": {
+        "memories": [
+          "id",
+          "agent_id",
+          "key",
+          "content",
+          "scope",
+          "created_at",
+          "accessed_at",
+          "access_count",
+          "ttl",
+          "embedding_hash",
+          "lane"
+        ],
+        "shared_memories": [
+          "id",
+          "agent_id",
+          "key",
+          "content",
+          "created_at",
+          "tags"
+        ]
+      },
+      "table_counts": {
+        "memories": 347,
+        "shared_memories": 0
+      }
+    },
+    "runtime_state_db": {
+      "exists": true,
+      "path": "/Users/dhyana/.dharma/state/runtime.db",
+      "sha256": "sha256:c56f8eb869096e79dd60f7ae050b026bb1c7a319771510465c050be13d8fa51e",
+      "table_columns": {
+        "artifact_records": [
+          "artifact_id",
+          "session_id",
+          "task_id",
+          "run_id",
+          "artifact_kind",
+          "manifest_path",
+          "payload_path",
+          "checksum",
+          "parent_artifact_id",
+          "promotion_state",
+          "created_at",
+          "metadata_json",
+          "trace_id"
+        ],
+        "delegation_runs": [
+          "run_id",
+          "session_id",
+          "task_id",
+          "claim_id",
+          "parent_run_id",
+          "assigned_by",
+          "assigned_to",
+          "requested_output_json",
+          "current_artifact_id",
+          "status",
+          "started_at",
+          "completed_at",
+          "failure_code",
+          "metadata_json",
+          "trace_id",
+          "receipt_json"
+        ],
+        "external_outcomes": [
+          "outcome_id",
+          "session_id",
+          "task_id",
+          "run_id",
+          "outcome_kind",
+          "subject_id",
+          "value",
+          "unit",
+          "confidence",
+          "status",
+          "summary",
+          "metadata_json",
+          "created_at"
+        ],
+        "model_routing_outcomes": [
+          "outcome_id",
+          "session_id",
+          "task_id",
+          "run_id",
+          "company_id",
+          "task_class",
+          "risk_tier",
+          "action_name",
+          "route_path",
+          "provider",
+          "model",
+          "artifact_id",
+          "deterministic_success",
+          "acceptance_verdict",
+          "downstream_signal_type",
+          "downstream_signal_value",
+          "outcome_score",
+          "cost_usd",
+          "latency_ms",
+          "retry_count",
+          "prompt_hash",
+          "sakshi_ref",
+          "metadata_json",
+          "created_at",
+          "trace_id"
+        ],
+        "provider_attempts": [
+          "decision_id",
+          "attempt_idx",
+          "provider",
+          "model",
+          "tier",
+          "success",
+          "outcome",
+          "error_class",
+          "error_detail",
+          "duration_ms",
+          "stop_reason",
+          "usage_json",
+          "cost_estimate_usd",
+          "circuit_state",
+          "schema_version",
+          "created_at"
+        ],
+        "routing_decisions": [
+          "decision_id",
+          "session_id",
+          "task_id",
+          "run_id",
+          "action_name",
+          "route_path",
+          "selected_provider",
+          "selected_model_hint",
+          "confidence",
+          "requires_human",
+          "reasons_json",
+          "metadata_json",
+          "created_at",
+          "schema_version",
+          "task_signature",
+          "task_type",
+          "caller",
+          "decision_class",
+          "selected_tier",
+          "widened_from",
+          "candidate_chain_json",
+          "n_attempts",
+          "outcome",
+          "duration_ms",
+          "total_tokens",
+          "cost_estimate_usd",
+          "trace_id"
+        ],
+        "runtime_receipts": [
+          "receipt_id",
+          "receipt_type",
+          "run_id",
+          "task_id",
+          "trace_id",
+          "correlation_id",
+          "causation_id",
+          "parent_run_id",
+          "agent_id",
+          "idempotency_key",
+          "side_effect_key",
+          "status",
+          "payload_json",
+          "created_at"
+        ],
+        "task_claims": [
+          "claim_id",
+          "task_id",
+          "session_id",
+          "agent_id",
+          "status",
+          "claimed_at",
+          "acked_at",
+          "heartbeat_at",
+          "stale_after",
+          "recovered_at",
+          "retry_count",
+          "metadata_json",
+          "trace_id"
+        ]
+      },
+      "table_counts": {
+        "artifact_records": 3977,
+        "delegation_runs": 8073,
+        "external_outcomes": 16894,
+        "model_routing_outcomes": 0,
+        "provider_attempts": 4328,
+        "routing_decisions": 8534,
+        "runtime_receipts": 87159,
+        "task_claims": 8380
+      }
+    }
+  },
+  "status": "pass_metadata_inventory_written",
+  "surfaces": [
+    {
+      "candidate_record_types": [
+        "a2a_delivery",
+        "artifact_ref",
+        "claim_evidence"
+      ],
+      "default_decision": "metadata_and_redacted_content_only",
+      "exists": true,
+      "file_count": 21214,
+      "leakage_risk": "medium",
+      "notes": "Contains transport receipts and reply artifacts; raw payload fields must be hashed/redacted.",
+      "path": "/Users/dhyana/dharma_swarm/reports/a2a",
+      "source_kind": "json_receipts",
+      "surface_id": "repo_a2a_receipts",
+      "total_bytes": 18945378,
+      "training_value": "high"
+    },
+    {
+      "candidate_record_types": [
+        "semantic_receipt",
+        "verifier_outcome",
+        "claim_evidence"
+      ],
+      "default_decision": "metadata_and_redacted_content_only",
+      "exists": true,
+      "file_count": 40,
+      "leakage_risk": "medium",
+      "notes": "Closest existing surface to verifier/ranker labels and council outcomes.",
+      "path": "/Users/dhyana/dharma_swarm/reports/agentops/semantic_receipts",
+      "source_kind": "json_receipts",
+      "surface_id": "repo_agentops_semantic_receipts",
+      "total_bytes": 97359,
+      "training_value": "high"
+    },
+    {
+      "candidate_record_types": [
+        "human_or_council_label",
+        "claim_evidence"
+      ],
+      "default_decision": "include_after_hash_lock",
+      "exists": true,
+      "file_count": 5,
+      "leakage_risk": "low",
+      "notes": "Sanitized external ML lead response and council synthesis.",
+      "path": "/Users/dhyana/dharma_swarm/reports/agentops/deepseek_ml_lead_council",
+      "source_kind": "strategy_receipts",
+      "surface_id": "repo_deepseek_ml_lead_council",
+      "total_bytes": 24857,
+      "training_value": "medium"
+    },
+    {
+      "candidate_record_types": [
+        "agent_event",
+        "semantic_receipt",
+        "a2a_delivery"
+      ],
+      "default_decision": "metadata_and_redacted_content_only",
+      "exists": true,
+      "file_count": 139,
+      "leakage_risk": "medium",
+      "notes": "Useful for route/action/receipt quality labels; outreach text must remain redacted.",
+      "path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel",
+      "source_kind": "json_and_markdown_receipts",
+      "surface_id": "repo_sab_flywheel_receipts",
+      "total_bytes": 535929,
+      "training_value": "medium"
+    },
+    {
+      "candidate_record_types": [
+        "provider_attempt",
+        "routing_decision",
+        "agent_event",
+        "verifier_outcome"
+      ],
+      "default_decision": "schema_counts_and_selected_redacted_rows_only",
+      "exists": true,
+      "file_count": 1,
+      "leakage_risk": "medium",
+      "notes": "Provider attempts, routing decisions, runtime receipts, external outcomes, task claims.",
+      "path": "/Users/dhyana/.dharma/state/runtime.db",
+      "source_kind": "sqlite_metadata",
+      "surface_id": "runtime_state_db",
+      "total_bytes": 380669952,
+      "training_value": "high"
+    },
+    {
+      "candidate_record_types": [
+        "a2a_delivery",
+        "artifact_ref"
+      ],
+      "default_decision": "exclude_raw_message_bodies",
+      "exists": true,
+      "file_count": 1,
+      "leakage_risk": "high",
+      "notes": "Message bodies are explicitly excluded for v0; only IDs, hashes, routing metadata, and timestamps are eligible.",
+      "path": "/Users/dhyana/.dharma/db/messages.db",
+      "source_kind": "sqlite_metadata",
+      "surface_id": "a2a_messages_db",
+      "total_bytes": 1060352000,
+      "training_value": "high"
+    },
+    {
+      "candidate_record_types": [
+        "agent_event"
+      ],
+      "default_decision": "quarantine_until_redacted_and_relabelled",
+      "exists": true,
+      "file_count": 66,
+      "jsonl_rows": 220002,
+      "leakage_risk": "high",
+      "notes": "Existing chat-format datasets contain content fields and are not train-ready for this model without redaction.",
+      "path": "/Users/dhyana/.dharma/datasets",
+      "source_kind": "jsonl_training_corpus",
+      "surface_id": "generated_training_datasets",
+      "total_bytes": 96411124,
+      "training_value": "medium"
+    },
+    {
+      "candidate_record_types": [
+        "eval_result",
+        "claim_evidence",
+        "verifier_outcome"
+      ],
+      "default_decision": "metadata_and_redacted_content_only",
+      "exists": true,
+      "file_count": 3599,
+      "leakage_risk": "medium",
+      "notes": "Forge outputs provide pass/fail, ranking, contamination, budget, and downstream-lift signals.",
+      "path": "/Users/dhyana/.dharma/forge_v1",
+      "source_kind": "measurement_artifacts",
+      "surface_id": "forge_measurement_artifacts",
+      "total_bytes": 40850206,
+      "training_value": "high"
+    },
+    {
+      "candidate_record_types": [
+        "claim_evidence",
+        "artifact_ref"
+      ],
+      "default_decision": "hash_locked_references_only",
+      "exists": true,
+      "file_count": 61,
+      "leakage_risk": "medium",
+      "notes": "Use as evidence-reference metadata, not as unsupervised private text corpus.",
+      "path": "/Users/dhyana/sis/docs",
+      "source_kind": "evidence_docs",
+      "surface_id": "sis_docs",
+      "total_bytes": 333191,
+      "training_value": "medium"
+    },
+    {
+      "candidate_record_types": [
+        "eval_result",
+        "verifier_outcome"
+      ],
+      "default_decision": "use_as_baseline_reference_not_training_text",
+      "exists": true,
+      "file_count": 2750,
+      "leakage_risk": "low",
+      "notes": "Existing evaluator, semantic receipt, and rule scorer modules define deterministic baselines.",
+      "path": "/Users/dhyana/dharma_swarm/dharma_swarm",
+      "source_kind": "code_surface",
+      "surface_id": "repo_eval_and_validator_code",
+      "total_bytes": 44346823,
+      "training_value": "medium"
+    },
+    {
+      "candidate_record_types": [
+        "eval_result",
+        "claim_evidence"
+      ],
+      "default_decision": "metadata_and_redacted_content_only",
+      "exists": true,
+      "file_count": 9,
+      "leakage_risk": "medium",
+      "notes": "Generated verification reports can seed eval examples after redaction and source hash locking.",
+      "path": "/Users/dhyana/dharma_swarm/reports/generated/verification",
+      "source_kind": "verification_reports",
+      "surface_id": "repo_generated_verification_reports",
+      "total_bytes": 195680,
+      "training_value": "medium"
+    },
+    {
+      "candidate_record_types": [
+        "human_or_council_label",
+        "eval_result",
+        "claim_evidence"
+      ],
+      "default_decision": "metadata_and_redacted_content_only",
+      "exists": true,
+      "file_count": 691,
+      "leakage_risk": "medium",
+      "notes": "Governance reports include baselines and scans; large generated reports require hash locks and redaction.",
+      "path": "/Users/dhyana/dharma_swarm/reports/governance",
+      "source_kind": "governance_reports",
+      "surface_id": "repo_governance_reports",
+      "total_bytes": 697555104,
+      "training_value": "medium"
+    },
+    {
+      "candidate_record_types": [
+        "agent_event",
+        "claim_evidence"
+      ],
+      "default_decision": "exclude_content_hash_metadata_only",
+      "exists": true,
+      "file_count": 146,
+      "leakage_risk": "high",
+      "notes": "Agent memories contain content fields; v0 may use ids, scopes, timestamps, and hashes only.",
+      "path": "/Users/dhyana/.dharma/agent_memory",
+      "source_kind": "agent_memory",
+      "surface_id": "agent_memory_store",
+      "total_bytes": 4995207,
+      "training_value": "low"
+    },
+    {
+      "candidate_record_types": [
+        "agent_event",
+        "artifact_ref"
+      ],
+      "default_decision": "quarantine_until_schema_and_redaction_review",
+      "exists": true,
+      "file_count": 130556,
+      "leakage_risk": "high",
+      "notes": "Trace archives are large and may contain raw interaction state; do not export content in v0.",
+      "path": "/Users/dhyana/.dharma/traces",
+      "source_kind": "trace_archives",
+      "surface_id": "trace_archives",
+      "total_bytes": 88582888,
+      "training_value": "medium"
+    }
+  ]
+}

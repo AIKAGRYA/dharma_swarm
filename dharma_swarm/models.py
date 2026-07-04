@@ -101,6 +101,9 @@ class TopologyType(str, Enum):
     FAN_IN = "fan_in"
     PIPELINE = "pipeline"
     BROADCAST = "broadcast"
+    SWARM = "swarm"
+    SUPERVISOR = "supervisor"
+    SUBAGENTS_AS_TOOLS = "subagents_as_tools"
 
 
 class MemoryLayer(str, Enum):

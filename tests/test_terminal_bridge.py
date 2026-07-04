@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
+from dharma_swarm.model_status import LIVE_CALL_MATRIX_DIR_ENV
 from dharma_swarm.terminal_bridge import TerminalBridge, system_commands_module
 from dharma_swarm.terminal_bridge_text import render_model_policy_text
 
@@ -28,12 +31,13 @@ def test_terminal_bridge_bootstraps_commands_and_adapters() -> None:
         asyncio.run(bridge.close())
 
 
-def test_model_policy_summary_uses_canonical_status_projection(monkeypatch) -> None:
+def test_model_policy_summary_uses_canonical_status_projection(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(
         "dharma_swarm.key_oracle.live_providers",
         lambda: {"claude_code", "codex", "ollama"},
     )
     monkeypatch.setattr("dharma_swarm.model_status._status_data", lambda: None)
+    monkeypatch.setenv(LIVE_CALL_MATRIX_DIR_ENV, str(tmp_path / "no-live-matrix"))
     bridge = TerminalBridge()
 
     try:

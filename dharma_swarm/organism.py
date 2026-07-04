@@ -109,10 +109,19 @@ class OrganismPulse:
 
 
 class Organism:
-    """The legacy organism integration layer."""
+    """The organism integration layer — identity/lifecycle/self-reference.
 
-    def __init__(self, state_dir: Path | None = None) -> None:
+    Composition root (organism-rewire-2026-07 / D5): an Organism may WRAP an
+    existing ``SwarmManager`` (``Organism(swarm=...)`` or ``attach_swarm``)
+    instead of owning a parallel runtime. Dispatch stays SwarmManager's;
+    the Organism owns identity/recognition state, the StrangeLoop, the
+    attractor, and the heartbeat. Attaching a swarm changes no existing
+    behavior — it only records the reference and exposes it read-only.
+    """
+
+    def __init__(self, state_dir: Path | None = None, swarm: Any = None) -> None:
         self._state_dir = state_dir or (dharma_state_dir())
+        self.swarm = swarm  # SwarmManager | None — dispatch owner, never re-owned here
         self._cycle = 0
         self._running = False
         self._pulses: list[OrganismPulse] = []
@@ -565,6 +574,27 @@ class Organism:
         """Request graceful shutdown."""
         self._running = False
 
+    # ── Composition root (D5): wrap an existing SwarmManager ─────────
+
+    def attach_swarm(self, swarm: Any) -> None:
+        """Attach an existing SwarmManager instance (composition root).
+
+        The Organism does NOT take over dispatch — the SwarmManager keeps
+        owning the task board, agent pool, and orchestrator. The Organism
+        holds the reference so identity/self-reference layers (StrangeLoop,
+        attractor, heartbeat) can observe the runtime they belong to.
+        """
+        self.swarm = swarm
+
+    def strange_loop_status(self) -> dict[str, Any]:
+        """Read-only StrangeLoop status (production-reachable surface)."""
+        if self.strange_loop is None:
+            return {"available": False}
+        try:
+            return {"available": True, **self.strange_loop.stats}
+        except Exception as exc:  # stats must never take the caller down
+            return {"available": True, "error": str(exc)}
+
     # ── Sprint 3: Economic / correction helpers ──────────────────────
 
     def set_economic_spine(self, spine: Any) -> None:
@@ -832,8 +862,10 @@ class Organism:
                     description=f"[{signal.severity}] {signal.title}: {signal.recommended_action}",
                     metadata={"severity": signal.severity, "title": signal.title},
                 )
-        except Exception:
-            pass
+        except Exception as exc:
+            # An algedonic signal IS a pain report — losing its memory record
+            # silently would blind the very channel meant to surface trouble.
+            logger.warning("algedonic event memory write failed: %s", exc)
 
     def _check_scaling_needs(self, pulse: OrganismPulse) -> dict[str, Any] | None:
         """Check whether the legacy organism should recommend crew scaling."""
@@ -937,6 +969,7 @@ class Organism:
         result: dict[str, Any] = {
             "alive": self._running,
             "cycle": self._cycle,
+            "swarm_attached": self.swarm is not None,
             "last_pulse": pulse.to_dict() if pulse else None,
             "vsm": self.vsm.status(),
             "amiros": self.amiros.stats(),
