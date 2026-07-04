@@ -51,6 +51,7 @@ import ast
 import json
 import re
 import sys
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Iterator
@@ -386,13 +387,37 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--contract", help="show evidence for one contract id (AB-01..AB-05)"
     )
+    parser.add_argument(
+        "--emit-receipts",
+        dest="emit_receipts",
+        action="store_true",
+        default=True,
+        help="emit dharma.naga_receipt.v1 receipts alongside the verdict (default)",
+    )
+    parser.add_argument(
+        "--no-emit-receipts",
+        dest="emit_receipts",
+        action="store_false",
+        help="suppress NĀGA-IR receipt emission (pre-PR-#3 behavior)",
+    )
     args = parser.parse_args(argv)
+
+    # Generated once per invocation. Used for receipt run identity even
+    # if --no-emit-receipts is passed, so behavior stays uniform.
+    boundary_run_id = "urn:uuid:" + str(uuid.uuid4())
 
     try:
         report = run_boundary(args.repo_root.resolve())
     except BrokenBoundary as exc:
         print(f"assurance-boundary: BROKEN — {exc}", file=sys.stderr)
         return EXIT_BROKEN
+
+    if args.emit_receipts:
+        _emit_naga_receipts_safely(
+            report=report,
+            repo_root=args.repo_root.resolve(),
+            boundary_run_id=boundary_run_id,
+        )
 
     if args.contract:
         wanted = args.contract.upper()
@@ -424,6 +449,63 @@ def main(argv: list[str] | None = None) -> int:
             print(f"    {violation.render()}")
 
     return EXIT_VIOLATED if report.hold_at_zero else EXIT_HOLDS
+
+
+def _emit_naga_receipts_safely(
+    *,
+    report: BoundaryReport,
+    repo_root: Path,
+    boundary_run_id: str,
+) -> None:
+    """Emit NĀGA-IR receipts without ever converting an exit-0 into exit-2.
+
+    Receipt emission is additive; any failure logs to stderr and returns.
+    The existing verdict output and exit codes are the higher authority.
+    """
+    try:
+        try:
+            from scripts.governance.naga_receipt_emit import (
+                emit_boundary_receipts,
+                rfc3339_utc_now,
+                write_receipts_jsonl,
+            )
+        except ImportError:
+            # Fall back to a sibling import when this file is run as a
+            # script (no `scripts` package on sys.path).
+            _here = Path(__file__).resolve().parent
+            if str(_here) not in sys.path:
+                sys.path.insert(0, str(_here))
+            from naga_receipt_emit import (  # type: ignore
+                emit_boundary_receipts,
+                rfc3339_utc_now,
+                write_receipts_jsonl,
+            )
+    except Exception as exc:  # pragma: no cover — defensive
+        print(
+            f"assurance-boundary: NĀGA receipt emitter unavailable — {exc}",
+            file=sys.stderr,
+        )
+        return
+
+    try:
+        now_utc_iso = rfc3339_utc_now()
+        receipts = emit_boundary_receipts(
+            report,
+            boundary_run_id=boundary_run_id,
+            now_utc_iso=now_utc_iso,
+            repo_root=repo_root,
+        )
+        write_receipts_jsonl(
+            receipts,
+            repo_root=repo_root,
+            boundary_run_id=boundary_run_id,
+            now_utc_iso=now_utc_iso,
+        )
+    except Exception as exc:
+        print(
+            f"assurance-boundary: NĀGA receipt emission failed — {exc}",
+            file=sys.stderr,
+        )
 
 
 if __name__ == "__main__":
