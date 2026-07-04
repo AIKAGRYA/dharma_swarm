@@ -11,6 +11,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
+from dharma_swarm.daemon_config import dharma_state_dir  # noqa: E402
 from dharma_swarm.operator_core.a2a_task_lifecycle import (  # noqa: E402
     OPEN_STATUSES,
     build_task_receipt,
@@ -64,7 +65,7 @@ def _body_excerpt(row: dict[str, Any], limit: int = 420) -> str:
     body = " ".join(str(row.get("body") or "").split())
     return body if len(body) <= limit else f"{body[:limit]}..."
 def _state_base(state_root: Path | None) -> Path:
-    return state_root if state_root is not None else Path.home() / ".dharma"
+    return state_root if state_root is not None else dharma_state_dir("DHARMA_STATE_DIR", "DHARMA_HOME")
 def _load_json(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
