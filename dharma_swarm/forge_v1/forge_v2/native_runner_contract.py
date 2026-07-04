@@ -495,6 +495,9 @@ def default_native_grade(payload: dict[str, Any]) -> dict[str, Any]:
     work_root = worker_config.get("work_root")
     python = str(worker_config.get("python") or sys.executable)
     keep_workdir = bool(worker_config.get("keep_workdir", False))
+    setup_command_template = str(worker_config.get("setup_command_template") or "")
+    setup_timeout_seconds = worker_config.get("setup_timeout_seconds")
+    setup_timeout = int(setup_timeout_seconds) if setup_timeout_seconds else None
 
     from . import pr_suite_grader
 
@@ -508,6 +511,8 @@ def default_native_grade(payload: dict[str, Any]) -> dict[str, Any]:
             work_root=Path(work_root).expanduser() if work_root else None,
             python=python,
             keep_workdir=keep_workdir,
+            setup_command_template=setup_command_template,
+            setup_timeout_seconds=setup_timeout,
         )
         return {
             "status": "resolved" if result.resolved else "unresolved",

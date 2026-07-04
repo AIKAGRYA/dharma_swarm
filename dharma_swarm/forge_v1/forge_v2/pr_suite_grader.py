@@ -253,6 +253,20 @@ def _command_for_targets(template: str, *, python: str, targets: list[str], chec
     return argv
 
 
+def _setup_command(template: str, *, python: str, checkout: Path) -> list[str] | None:
+    text = str(template or "").strip()
+    if not text:
+        return None
+    command = text.format(
+        python=shlex.quote(python),
+        checkout=shlex.quote(str(checkout)),
+    )
+    argv = shlex.split(command)
+    if not argv:
+        raise ValueError("setup command template rendered to an empty command")
+    return argv
+
+
 def _changed_files(checkout: Path, refs: dict[str, str], *, timeout_seconds: int) -> list[str]:
     result = _git(checkout, "diff", "--name-only", refs["base_sha"], refs["fixed_sha"], timeout_seconds=timeout_seconds)
     if not result.passed:
@@ -380,6 +394,8 @@ def grade_pr_suite_prediction(
     work_root: Path | None = None,
     python: str = sys.executable,
     keep_workdir: bool = False,
+    setup_command_template: str = "",
+    setup_timeout_seconds: int | None = None,
 ) -> GradeResult:
     """Grade a model patch on a validated PR-suite task."""
     task_id = str(instance.get("task_id") or instance.get("instance_id") or "")
@@ -450,6 +466,15 @@ def grade_pr_suite_prediction(
             blockers.append("patch_apply_failed")
             grade_error = "patch_apply_failed"
             raise RuntimeError("patch apply failed")
+        setup_argv = _setup_command(setup_command_template, python=python, checkout=checkout)
+        if setup_argv is not None:
+            setup_timeout = int(setup_timeout_seconds) if setup_timeout_seconds is not None else max(min(timeout, 900), 600)
+            setup = _run(setup_argv, cwd=checkout, timeout_seconds=setup_timeout)
+            commands.append({"phase": "setup_after_patch", **setup.to_receipt()})
+            if not setup.passed:
+                blockers.append("patch_environment_setup_failed")
+                grade_error = "patch_environment_setup_failed"
+                raise RuntimeError("patch environment setup failed")
         command = _command_for_targets(_command_template(row), python=python, targets=targets, checkout=checkout)
         test_result = _run(command, cwd=checkout, timeout_seconds=timeout)
         commands.append({"phase": "test_after_patch", **test_result.to_receipt()})
@@ -475,6 +500,7 @@ def grade_pr_suite_prediction(
         "fail_to_pass": targets,
         "patch_len": len(model_patch or ""),
         "patch_sha256": canonical_sha256({"patch": model_patch or ""}),
+        "setup_command_template": str(setup_command_template or ""),
         "resolved_refs": refs,
         "validation_receipt": row.get("validation_receipt", ""),
         "checkout_path": str(checkout) if keep_workdir else "",

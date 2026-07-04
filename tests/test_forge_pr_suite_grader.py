@@ -150,6 +150,55 @@ def test_grade_pr_suite_prediction_resolves_valid_patch(tmp_path: Path) -> None:
     assert receipt["blockers"] == []
 
 
+def test_grade_pr_suite_prediction_runs_setup_before_test(tmp_path: Path) -> None:
+    _repo, row = _repo_with_validated_pr(tmp_path)
+    inst = {**row, "instance_id": "pr::fake/pkg#1", "task_id": "pr::fake/pkg#1"}
+    sentinel = tmp_path / "grade_setup_hits.log"
+    setup_template = f"{sys.executable} -c " + repr(
+        f"open({str(sentinel)!r}, 'a').write('hit\\n')"
+    )
+
+    result = pr_suite_grader.grade_pr_suite_prediction(
+        inst,
+        _fix_patch(),
+        timeout=60,
+        receipt_root=tmp_path / "grade_receipts",
+        python=sys.executable,
+        setup_command_template=setup_template,
+    )
+
+    assert result.resolved is True
+    receipt = json.loads(Path(result.receipt_path).read_text(encoding="utf-8"))
+    phases = [c.get("phase") for c in receipt["commands"]]
+    assert "setup_after_patch" in phases
+    assert phases.index("setup_after_patch") < phases.index("test_after_patch")
+    assert receipt["setup_command_template"] == setup_template
+    assert sentinel.read_text(encoding="utf-8").count("hit") == 1
+
+
+def test_grade_pr_suite_prediction_setup_failure_fails_closed(tmp_path: Path) -> None:
+    _repo, row = _repo_with_validated_pr(tmp_path)
+    inst = {**row, "instance_id": "pr::fake/pkg#1", "task_id": "pr::fake/pkg#1"}
+    setup_template = f"{sys.executable} -c " + repr("import sys; sys.exit(7)")
+
+    result = pr_suite_grader.grade_pr_suite_prediction(
+        inst,
+        _fix_patch(),
+        timeout=60,
+        receipt_root=tmp_path / "grade_receipts",
+        python=sys.executable,
+        setup_command_template=setup_template,
+    )
+
+    assert result.resolved is False
+    assert result.error == "patch_environment_setup_failed"
+    receipt = json.loads(Path(result.receipt_path).read_text(encoding="utf-8"))
+    phases = [c.get("phase") for c in receipt["commands"]]
+    assert "setup_after_patch" in phases
+    assert "test_after_patch" not in phases
+    assert "patch_environment_setup_failed" in receipt["blockers"]
+
+
 def test_grade_pr_suite_prediction_blocks_test_patch(tmp_path: Path) -> None:
     _repo, row = _repo_with_validated_pr(tmp_path)
     inst = {**row, "instance_id": "pr::fake/pkg#1", "task_id": "pr::fake/pkg#1"}

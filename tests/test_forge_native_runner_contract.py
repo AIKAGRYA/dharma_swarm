@@ -122,6 +122,8 @@ def test_default_native_grade_dispatches_pr_suite_prediction(monkeypatch, tmp_pa
                     "grade_timeout": 123,
                     "receipt_root": str(tmp_path / "receipts"),
                     "work_root": str(tmp_path / "work"),
+                    "setup_command_template": "{python} -m pip install -e .",
+                    "setup_timeout_seconds": 456,
                 },
             },
         }
@@ -136,6 +138,8 @@ def test_default_native_grade_dispatches_pr_suite_prediction(monkeypatch, tmp_pa
     assert captured["kwargs"]["timeout"] == 123
     assert str(captured["kwargs"]["receipt_root"]).endswith("receipts")
     assert str(captured["kwargs"]["work_root"]).endswith("work")
+    assert captured["kwargs"]["setup_command_template"] == "{python} -m pip install -e ."
+    assert captured["kwargs"]["setup_timeout_seconds"] == 456
 
 
 def test_default_native_grade_missing_prediction_is_unresolved_not_infra() -> None:
