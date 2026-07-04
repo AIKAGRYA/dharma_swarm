@@ -75,6 +75,38 @@ objects:
     kind: routing_telemetry
     owner: dharma_swarm/routing_memory.py
     description: Provider-learning evidence store for route outcomes; telemetry, not semantic canon.
+  ForgeProvingGround:
+    kind: measurement_system
+    owner: docs/ops/DHARMA_FORGE_CURRENT_CANON_2026-07-04.md
+    description: Canonical falsification and benchmark-evidence system for proving whether Dharma Swarm improved against real controls.
+    canonical_components:
+      current_lab: ForgeRSILab
+      historical_arena: ForgeRealityArena
+      worker_role: NativeBenchmarkWorker
+      conductor_role: NativeBenchmarkConductor
+    deprecated_patterns:
+      - scattered forge history
+      - unqualified forge arena
+      - promotion by self-report
+  ForgeRealityArena:
+    kind: historical_mission_line
+    owner: docs/ops/DHARMA_FORGE_HYDRA_ARCHAEOLOGY_2026-06-11.md
+    description: Historical Forge Hydra / Reality Arena missions, work packets, and dense internal status-gym evidence.
+    successor: ForgeRSILab
+  ForgeRSILab:
+    kind: benchmark_lab
+    owner: dharma_swarm/forge_v1/forge_v2
+    description: Current Forge v2.2 Honest Loop; taskbed ledger, PR-suite harvest/validate/grade path, canonical receipts, packet guard, and promotion verifier.
+    runtime_root: ~/.dharma/forge_v1
+    source_branch: feat/rsi-lab
+  NativeBenchmarkWorker:
+    kind: worker_role
+    owner: dharma_swarm/forge_v1/forge_v2/native_runner_contract.py
+    description: Native x86/Docker host allowed to execute grade-only benchmark packets and emit receipts without source, live, archive, or promotion mutation.
+  NativeBenchmarkConductor:
+    kind: conductor_role
+    owner: dharma_swarm/forge_v1/forge_v2/native_runner_contract.py
+    description: Coordinator host that schedules native worker packets, polls remote runs, syncs receipts, and preserves promotion boundaries.
   IntelligenceSupplyChainRawReceipt:
     kind: evidence_receipt
     owner: dharma_swarm.world_radar.bronze

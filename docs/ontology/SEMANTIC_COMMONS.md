@@ -49,6 +49,20 @@ Deprecated names resolve back into `ModelKeyRouting`; do not create a
 `parallel model routing layer`, read `project .env keys`, instantiate a
 `direct provider factory`, or maintain `scattered model order`.
 
+## Canonical Forge Vocabulary
+
+| Object | Meaning | Runtime projection |
+| --- | --- | --- |
+| `ForgeProvingGround` | The whole measurement/falsification system for proving whether the organism improved against real controls. | `docs/ops/DHARMA_FORGE_CURRENT_CANON_2026-07-04.md` |
+| `ForgeRealityArena` | Historical Hydra/arena mission line and dense internal status gym. | `docs/ops/DHARMA_FORGE_HYDRA_ARCHAEOLOGY_2026-06-11.md` |
+| `ForgeRSILab` | Current v2.2 "Honest Loop" implementation and taskbed/promotion machinery. | `dharma_swarm/forge_v1/forge_v2` |
+| `NativeBenchmarkWorker` | Native x86/Docker host that executes grade-only benchmark packets. | Agni worker checkout `/root/ds_forge_spine_v0` |
+| `NativeBenchmarkConductor` | Coordinator host that schedules, polls, and syncs benchmark workers. | Conductor candidates such as `meghadharma` |
+
+Deprecated or fuzzy names such as `dharma forge arena`, `forge hydra`, and
+`forge v2.1` must resolve to one of these objects before a new receipt or runbook
+adds another label.
+
 ## Boundary
 
 NATS is the internal fleet transport. A2A HTTP and public Agent Cards remain

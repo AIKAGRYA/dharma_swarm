@@ -30,6 +30,42 @@ aliases:
   routing_memory:
     canonical: RoutingMemory
     kind: routing_telemetry_alias
+  dharma_forge:
+    canonical: ForgeProvingGround
+    kind: measurement_system_alias
+  forge:
+    canonical: ForgeProvingGround
+    kind: measurement_system_alias
+  forge_proving_ground:
+    canonical: ForgeProvingGround
+    kind: measurement_system_alias
+  dharma_forge_arena:
+    canonical: ForgeRealityArena
+    kind: historical_mission_alias
+  forge_arena:
+    canonical: ForgeRealityArena
+    kind: historical_mission_alias
+  forge_hydra:
+    canonical: ForgeRealityArena
+    kind: historical_mission_alias
+  rsi_lab:
+    canonical: ForgeRSILab
+    kind: benchmark_lab_alias
+  forge_rsi_lab:
+    canonical: ForgeRSILab
+    kind: benchmark_lab_alias
+  forge_v2_1:
+    canonical: ForgeRSILab
+    kind: benchmark_lab_alias
+  forge_v2_2:
+    canonical: ForgeRSILab
+    kind: benchmark_lab_alias
+  agni_benchmark_worker:
+    canonical: NativeBenchmarkWorker
+    kind: worker_role_alias
+  meghadharma_conductor:
+    canonical: NativeBenchmarkConductor
+    kind: conductor_role_alias
   "parallel model routing layer":
     canonical: ModelKeyRouting
     kind: deprecated_pattern
