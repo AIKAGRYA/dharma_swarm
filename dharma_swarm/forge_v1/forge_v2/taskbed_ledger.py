@@ -293,6 +293,148 @@ def allocate_tasks(
     return allocation_receipt(allocation_id, db_path=db_path, min_confirm_count=min_count or MIN_CONFIRM_TASKS)
 
 
+def _eligible_rows_for_task_ids(
+    conn: sqlite3.Connection,
+    *,
+    split: SplitName,
+    epoch_id: str,
+    task_ids: list[str],
+) -> list[sqlite3.Row]:
+    """Return eligible rows for an explicit task-id allocation.
+
+    This is the exact-id companion to :func:`_eligible_rows`.  Native workers
+    often build candidate predictions before writing a request packet; if the
+    ledger then picks a different "next eligible" slice, the request grades the
+    wrong tasks.  Exact allocation keeps prediction ids and allocation ids bound
+    while preserving the same contamination, opposite-split, active-task, and
+    max-uses invariants as ordinary allocation.
+    """
+    if not task_ids:
+        return []
+    opposite = "confirm" if split == "explore" else "explore"
+    clean_filter = ""
+    params: list[Any] = []
+    if split == "confirm":
+        clean_filter = (
+            "AND t.contamination_state IN ({})".format(
+                ",".join("?" for _ in sorted(CLEAN_CONFIRM_STATES))
+            )
+        )
+        params.extend(sorted(CLEAN_CONFIRM_STATES))
+    placeholders = ",".join("?" for _ in task_ids)
+    params.extend([*task_ids, opposite, epoch_id])
+    rows = conn.execute(
+        f"""
+        SELECT t.*
+          FROM taskbed_tasks t
+         WHERE t.active=1
+           {clean_filter}
+           AND t.task_id IN ({placeholders})
+           AND NOT EXISTS (
+             SELECT 1
+               FROM taskbed_allocations prior
+              WHERE prior.task_id=t.task_id
+                AND prior.split=?
+           )
+           AND (
+             SELECT COUNT(*)
+               FROM taskbed_allocations used
+              WHERE used.task_id=t.task_id
+                AND used.epoch_id=?
+                AND used.status='allocated'
+           ) < t.max_uses_per_epoch
+         ORDER BY t.created_at ASC, t.first_seen_at ASC, t.task_id ASC
+        """,
+        params,
+    ).fetchall()
+    return rows
+
+
+def allocate_task_ids(
+    *,
+    split: SplitName,
+    task_ids: list[str],
+    epoch_id: str,
+    lane_id: str,
+    db_path: Path | str = DEFAULT_DB,
+    allocation_id: str | None = None,
+    candidate_id: str = "",
+    min_count: int | None = None,
+    now: float | None = None,
+) -> dict[str, Any]:
+    """Allocate an explicit task-id set while preserving ledger gates.
+
+    Use this when an upstream campaign has already produced task-specific
+    predictions/patches and must prevent the ledger from silently substituting a
+    different eligible slice.  All requested ids must be eligible; otherwise the
+    allocation fails closed and no rows are written.
+    """
+    if split not in {"explore", "confirm"}:
+        raise ValueError("split must be explore or confirm")
+    task_ids = [str(item) for item in task_ids if str(item).strip()]
+    if not task_ids:
+        raise ValueError("task_ids must be non-empty")
+    if len(set(task_ids)) != len(task_ids):
+        raise ValueError("task_ids must be unique")
+    if not epoch_id:
+        raise ValueError("epoch_id is required")
+    if split == "confirm" and min_count is None:
+        min_count = MIN_CONFIRM_TASKS
+    required = max(len(task_ids), min_count or 0)
+    allocation_id = allocation_id or f"{split}_{epoch_id}_{uuid.uuid4().hex[:12]}"
+    ts = utc_seconds() if now is None else now
+
+    with closing(connect(db_path)) as conn:
+        conn.isolation_level = None
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            rows = _eligible_rows_for_task_ids(
+                conn,
+                split=split,
+                epoch_id=epoch_id,
+                task_ids=task_ids,
+            )
+            row_ids = {str(row["task_id"]) for row in rows}
+            missing_or_ineligible = sorted(set(task_ids) - row_ids)
+            if len(rows) < required or missing_or_ineligible:
+                conn.execute("ROLLBACK")
+                detail = (
+                    f" requested={len(task_ids)} required={required}"
+                    f" available={len(rows)} missing_or_ineligible={missing_or_ineligible}"
+                )
+                raise TaskbedLedgerError(f"insufficient_explicit_{split}_tasks:{detail}")
+            conn.executemany(
+                """
+                INSERT INTO taskbed_allocations (
+                  allocation_id, task_id, split, epoch_id, lane_id,
+                  candidate_id, allocated_at, status
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'allocated')
+                """,
+                [
+                    (
+                        allocation_id,
+                        row["task_id"],
+                        split,
+                        epoch_id,
+                        lane_id,
+                        candidate_id,
+                        ts,
+                    )
+                    for row in rows
+                ],
+            )
+            conn.execute("COMMIT")
+        except Exception:
+            try:
+                conn.execute("ROLLBACK")
+            except sqlite3.OperationalError:
+                pass
+            raise
+
+    return allocation_receipt(allocation_id, db_path=db_path, min_confirm_count=min_count or MIN_CONFIRM_TASKS)
+
+
 def allocate_explore(
     *,
     count: int,
@@ -761,6 +903,7 @@ __all__ = [
     "TaskbedLedgerError",
     "allocate_confirm",
     "allocate_explore",
+    "allocate_task_ids",
     "allocate_tasks",
     "allocation_receipt",
     "allocation_rows",

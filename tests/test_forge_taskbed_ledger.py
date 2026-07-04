@@ -149,6 +149,59 @@ def test_max_uses_per_epoch_rotates_confirm_tasks(tmp_path: Path) -> None:
     assert next_epoch["task_ids"] == ["fresh-0"]
 
 
+def test_allocate_task_ids_binds_exact_prediction_slice(tmp_path: Path) -> None:
+    db = tmp_path / "taskbed.db"
+    taskbed_ledger.register_tasks(
+        [_task("fresh-0"), _task("fresh-1"), _task("fresh-2")],
+        db_path=db,
+        source="post_cutoff_pr_suite",
+    )
+
+    allocation = taskbed_ledger.allocate_task_ids(
+        split="explore",
+        task_ids=["fresh-2", "fresh-0"],
+        epoch_id="epoch-exact",
+        lane_id="native-worker",
+        allocation_id="explore-exact",
+        candidate_id="candidate-with-specific-predictions",
+        db_path=db,
+    )
+
+    assert allocation["split"] == "explore"
+    assert allocation["task_count"] == 2
+    assert set(allocation["task_ids"]) == {"fresh-0", "fresh-2"}
+    assert allocation["task_ids"] != ["fresh-0", "fresh-1"]
+
+
+def test_allocate_task_ids_fails_closed_for_ineligible_id(tmp_path: Path) -> None:
+    db = tmp_path / "taskbed.db"
+    taskbed_ledger.register_tasks(
+        [_task("fresh-0"), _task("fresh-1")],
+        db_path=db,
+        source="post_cutoff_pr_suite",
+    )
+    taskbed_ledger.allocate_explore(
+        count=1,
+        epoch_id="epoch-1",
+        lane_id="explore-lane",
+        allocation_id="explore-prior",
+        db_path=db,
+    )
+
+    with pytest.raises(taskbed_ledger.TaskbedLedgerError, match="missing_or_ineligible=\\['fresh-0'\\]"):
+        taskbed_ledger.allocate_task_ids(
+            split="confirm",
+            task_ids=["fresh-0", "fresh-1"],
+            epoch_id="epoch-confirm",
+            lane_id="confirm-lane",
+            allocation_id="confirm-exact",
+            min_count=2,
+            db_path=db,
+        )
+
+    assert taskbed_ledger.allocation_rows("confirm-exact", db_path=db) == []
+
+
 def test_task_counts_group_by_contamination_state(tmp_path: Path) -> None:
     db = tmp_path / "taskbed.db"
     taskbed_ledger.register_tasks(

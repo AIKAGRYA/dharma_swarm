@@ -511,6 +511,34 @@ def test_orchestrate_then_run_worker_end_to_end(tmp_path: Path) -> None:
     assert sorted(manifest["resume_plan_after"]["completed_task_ids"]) == ["fresh-0", "fresh-1"]
 
 
+def test_orchestrate_native_request_can_bind_explicit_task_ids(tmp_path: Path) -> None:
+    db = tmp_path / "taskbed.db"
+    _seed_taskbed(db, ["fresh-0", "fresh-1", "fresh-2"])
+
+    orchestration = nrc.orchestrate_native_request(
+        run_id="native-explicit-task-ids",
+        candidate_packet={
+            "candidate_id": "cand",
+            "task_predictions": {
+                "fresh-2": "patch-two",
+                "fresh-0": "patch-zero",
+            },
+        },
+        split="explore",
+        count=0,
+        task_ids=["fresh-2", "fresh-0"],
+        epoch_id="epoch-explicit",
+        output_root=tmp_path / "runs",
+        taskbed_db=db,
+    )
+
+    assert orchestration["explicit_task_ids"] == ["fresh-2", "fresh-0"]
+    assert set(orchestration["allocation_receipt"]["task_ids"]) == {"fresh-0", "fresh-2"}
+    request = _read_json(Path(orchestration["request"]["request_path"]))
+    assert set(request["task_allocation"]["task_ids"]) == {"fresh-0", "fresh-2"}
+    assert set(request["candidate_packet"]["task_predictions"]) == {"fresh-0", "fresh-2"}
+
+
 def test_cli_execute_request_dir_runs_default_worker(tmp_path: Path) -> None:
     request_write = nrc.write_native_runner_request(
         run_id="native-cli-worker",
@@ -547,6 +575,52 @@ def test_cli_execute_request_dir_runs_default_worker(tmp_path: Path) -> None:
     receipt = _read_json(next((result_root / "task_receipts").glob("*.json")))
     assert receipt["status"] == "unresolved"
     assert receipt["grade_error"] == "unsupported_task_family"
+
+
+def test_cli_orchestrate_supports_explicit_task_ids(tmp_path: Path) -> None:
+    db = tmp_path / "taskbed.db"
+    _seed_taskbed(db, ["fresh-0", "fresh-1", "fresh-2"])
+    candidate = {
+        "task_predictions": {
+            "fresh-1": "patch-one",
+            "fresh-2": "patch-two",
+        }
+    }
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "dharma_swarm.forge_v1.forge_v2.native_runner_contract",
+            "--run-id",
+            "native-cli-explicit",
+            "--candidate-id",
+            "explicit-candidate",
+            "--split",
+            "explore",
+            "--task-ids",
+            "fresh-1,fresh-2",
+            "--epoch-id",
+            "epoch-cli-explicit",
+            "--taskbed-db",
+            str(db),
+            "--output-root",
+            str(tmp_path / "requests"),
+            "--candidate-json",
+            json.dumps(candidate),
+            "--json",
+        ],
+        cwd=REPO_ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=30,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    orchestration = json.loads(proc.stdout)
+    assert orchestration["explicit_task_ids"] == ["fresh-1", "fresh-2"]
+    assert set(orchestration["allocation_receipt"]["task_ids"]) == {"fresh-1", "fresh-2"}
 
 
 def test_cli_orchestrated_dry_run_syncs_and_resumes_without_predictions(tmp_path: Path) -> None:

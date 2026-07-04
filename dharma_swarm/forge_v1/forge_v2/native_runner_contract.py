@@ -775,6 +775,7 @@ def orchestrate_native_request(
     lane_id: str | None = None,
     output_root: Path | str = DEFAULT_RUN_ROOT,
     taskbed_db: Path | str = taskbed_ledger.DEFAULT_DB,
+    task_ids: list[str] | None = None,
     budget: dict[str, Any] | None = None,
     runner_label: str = "native_x86_64",
     max_infra_retries: int = 2,
@@ -801,24 +802,37 @@ def orchestrate_native_request(
     """
     if split not in {"explore", "confirm"}:
         raise ValueError("split must be explore or confirm")
-    if count <= 0:
-        raise ValueError("count must be positive")
+    task_ids = [str(item) for item in (task_ids or []) if str(item).strip()]
+    if count <= 0 and not task_ids:
+        raise ValueError("count must be positive unless task_ids are provided")
     candidate_id = str(
         candidate_packet.get("candidate_id")
         or candidate_packet.get("id")
         or run_id
     )
     lane = lane_id or f"native_{run_id}"
-    allocation = taskbed_ledger.allocate_tasks(
-        split=split,  # type: ignore[arg-type]
-        count=count,
-        epoch_id=epoch_id,
-        lane_id=lane,
-        db_path=taskbed_db,
-        allocation_id=allocation_id,
-        candidate_id=candidate_id,
-        min_count=min_count,
-    )
+    if task_ids:
+        allocation = taskbed_ledger.allocate_task_ids(
+            split=split,  # type: ignore[arg-type]
+            task_ids=task_ids,
+            epoch_id=epoch_id,
+            lane_id=lane,
+            db_path=taskbed_db,
+            allocation_id=allocation_id,
+            candidate_id=candidate_id,
+            min_count=min_count,
+        )
+    else:
+        allocation = taskbed_ledger.allocate_tasks(
+            split=split,  # type: ignore[arg-type]
+            count=count,
+            epoch_id=epoch_id,
+            lane_id=lane,
+            db_path=taskbed_db,
+            allocation_id=allocation_id,
+            candidate_id=candidate_id,
+            min_count=min_count,
+        )
     write_result = write_native_runner_request(
         run_id=run_id,
         candidate_packet=candidate_packet,
@@ -841,6 +855,7 @@ def orchestrate_native_request(
         "epoch_id": epoch_id,
         "lane_id": lane,
         "taskbed_db": str(taskbed_db),
+        "explicit_task_ids": task_ids,
         "allocation_id": allocation.get("allocation_id"),
         "allocation_receipt": allocation,
         "request": write_result,
@@ -867,6 +882,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--candidate-json", default="", help="Inline JSON candidate packet (merged with --candidate-id)")
     parser.add_argument("--split", choices=["explore", "confirm"], default="explore")
     parser.add_argument("--count", type=int, default=0)
+    parser.add_argument("--task-ids", default="", help="Comma-separated explicit task ids to allocate")
     parser.add_argument("--epoch-id", default="epoch_0")
     parser.add_argument("--lane-id", default=None)
     parser.add_argument("--output-root", default=str(DEFAULT_RUN_ROOT))
@@ -903,8 +919,9 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--run-id is required unless --execute-request-dir is used")
     if not args.candidate_id:
         parser.error("--candidate-id is required unless --execute-request-dir is used")
-    if args.count <= 0:
-        parser.error("--count must be positive unless --execute-request-dir is used")
+    task_ids = [item.strip() for item in args.task_ids.split(",") if item.strip()]
+    if args.count <= 0 and not task_ids:
+        parser.error("--count must be positive unless --task-ids or --execute-request-dir is used")
     candidate_packet: dict[str, Any] = {}
     if args.candidate_json.strip():
         candidate_packet = json.loads(args.candidate_json)
@@ -920,6 +937,7 @@ def main(argv: list[str] | None = None) -> int:
         lane_id=args.lane_id,
         output_root=args.output_root,
         taskbed_db=args.taskbed_db,
+        task_ids=task_ids,
         max_infra_retries=args.max_infra_retries,
         allocation_id=args.allocation_id,
         min_count=args.min_count,
