@@ -62,7 +62,7 @@ README doc-list reconcile, open-PR collision check, the peer's `06` Darshan/SAB 
 `~/.dharma/agents/sis_steward/living_agent.json` (presence), `last_receipt.json` (last
 wake), `trajectory.jsonl` (append-only log), `scratch/` (working files);
 `~/.dharma/a2a/cards/sis-steward.json` (A2A card);
-`~/.dharma/external_agents/sis_steward/registration.json` (canonical registration).
+`~/.dharma/external_agents/sis_steward/registration.json` (registration of record).
 On wake, append a wake line to `trajectory.jsonl` and refresh `last_receipt.json`.
 
 ## 7. The reflex

@@ -13,7 +13,7 @@ This directory is the git-tracked **contract + pointer index** only.
 | Living-agent presence | `~/.dharma/agents/sis_steward/living_agent.json` |
 | Last wake / onboarding receipt | `~/.dharma/agents/sis_steward/last_receipt.json` |
 | Append-only trajectory log | `~/.dharma/agents/sis_steward/trajectory.jsonl` |
-| Canonical registration | `~/.dharma/external_agents/sis_steward/registration.json` |
+| Registration of record | `~/.dharma/external_agents/sis_steward/registration.json` |
 | A2A card | `~/.dharma/a2a/cards/sis-steward.json` |
 | Verification footprint records *(prospective, SEED-1)* | `~/.dharma/agents/sis_steward/footprint/*.json` |
 
