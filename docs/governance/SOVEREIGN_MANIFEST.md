@@ -268,97 +268,15 @@ append-style refreshes quadruplicated rows and broke `make docops-integrity`).
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **877** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **433 (52.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python modules | **877** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **433 (52.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **326,297** | wc -l across dharma_swarm Python modules |
-| Test files | **820** | find tests -name "*.py" -type f |
-| Test functions | **12,523 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Test files | **820** | find tests -name "*.py" -type f |
-| Test functions | **12,523 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Test files | **820** | find tests -name "*.py" -type f |
-| Test functions | **12,523 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Test files | **820** | find tests -name "*.py" -type f |
-| Test functions | **12,523 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
-| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **1300** | find . -name "*.md" -type f |
-| Markdown total lines | **279,738** | wc -l across all .md |
-| Markdown files | **1300** | find . -name "*.md" -type f |
-| Markdown total lines | **279,738** | wc -l across all .md |
-| Markdown files | **1300** | find . -name "*.md" -type f |
-| Markdown total lines | **279,738** | wc -l across all .md |
-| Markdown files | **1300** | find . -name "*.md" -type f |
-| Markdown total lines | **279,738** | wc -l across all .md |
-| Test files | **820** | find tests -name "*.py" -type f |
-| Test functions | **12,523 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Test files | **820** | find tests -name "*.py" -type f |
-| Test functions | **12,523 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Total Python modules | **877** | find dharma_swarm -name "*.py" -type f |
-| Total Python modules | **877** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **433 (52.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python modules | **877** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **433 (52.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **326,297** | wc -l across dharma_swarm Python modules |
-| Test files | **820** | find tests -name "*.py" -type f |
-| Test functions | **12,523 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Test files | **820** | find tests -name "*.py" -type f |
-| Test functions | **12,523 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Test files | **820** | find tests -name "*.py" -type f |
-| Test functions | **12,523 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Test files | **820** | find tests -name "*.py" -type f |
-| Test functions | **12,523 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Test files | **820** | find tests -name "*.py" -type f |
-| Test functions | **12,523 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Test files | **820** | find tests -name "*.py" -type f |
-| Test functions | **12,523 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
-| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **1300** | find . -name "*.md" -type f |
-| Markdown total lines | **279,738** | wc -l across all .md |
-| Markdown files | **1300** | find . -name "*.md" -type f |
-| Markdown total lines | **279,738** | wc -l across all .md |
-| Markdown files | **1300** | find . -name "*.md" -type f |
-| Markdown total lines | **279,738** | wc -l across all .md |
-| Markdown files | **1300** | find . -name "*.md" -type f |
-| Markdown total lines | **279,738** | wc -l across all .md |
-| Markdown files | **1300** | find . -name "*.md" -type f |
-| Markdown total lines | **279,738** | wc -l across all .md |
-| Markdown files | **1300** | find . -name "*.md" -type f |
-| Markdown total lines | **279,738** | wc -l across all .md |
-| Test files | **820** | find tests -name "*.py" -type f |
-| Test functions | **12,523 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Test files | **820** | find tests -name "*.py" -type f |
-| Test functions | **12,523 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
-| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **1300** | find . -name "*.md" -type f |
-| Markdown total lines | **279,738** | wc -l across all .md |
-| Markdown files | **1300** | find . -name "*.md" -type f |
-| Markdown total lines | **279,738** | wc -l across all .md |
-| Total Python modules | **877** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **433 (53.1%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **319,298** | wc -l across dharma_swarm Python modules |
-| Test files | **820** | find tests -name "*.py" -type f |
-| Test functions | **12,523 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Test files | **820** | find tests -name "*.py" -type f |
-| Test functions | **12,523 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
-| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **1300** | find . -name "*.md" -type f |
-| Markdown total lines | **279,738** | wc -l across all .md |
-| Markdown files | **1300** | find . -name "*.md" -type f |
-| Markdown total lines | **279,738** | wc -l across all .md |
-| Total Python modules | **872** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **431 (49.4%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python modules | **880** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **435 (49.4%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
 | Total Python LOC | **339,354** | wc -l across dharma_swarm Python modules |
-| Test files | **816** | find tests -name "*.py" -type f |
-| Test functions | **12,487 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test files | **824** | find tests -name "*.py" -type f |
+| Test functions | **12,557 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **12,674 (measured 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
 | Collection errors | **0 (measured 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
-| Markdown files | **1,298** | find . -name "*.md" -type f |
-| Markdown total lines | **278,406** | wc -l across all .md |
+| Markdown files | **1,314** | find . -name "*.md" -type f |
+| Markdown total lines | **280,913** | wc -l across all .md |
 | Bridge files | **26** | find dharma_swarm -name "*bridge*.py" -type f |
 | Adapter files | **26** | find dharma_swarm -type f | rg -i "adapter" |
 | Router files | **16** | find dharma_swarm -type f | rg -i "rout" |
