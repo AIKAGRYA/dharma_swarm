@@ -28,4 +28,3 @@ Discovery sources used for the seed:
 
 No entry is a claim of domain-grade reliability. Evaluation remains required
 before routing can produce anything stronger than `Attested_by`.
-

@@ -44,4 +44,3 @@ Each run writes:
 Future reruns should compare question hash, route config hash, response hash,
 and receipt hash. Drift is expected for live frontier calls and must be
 reported explicitly in `report.md`.
-

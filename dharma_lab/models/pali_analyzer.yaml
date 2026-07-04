@@ -29,4 +29,3 @@ verification:
   checked_at: "2026-07-04"
   method: "Hugging Face API searches: pali, buddhist sanskrit"
   confidence: "74/100 - absence search is shallow; gap is intentionally marked"
-

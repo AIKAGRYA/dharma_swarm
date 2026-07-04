@@ -27,4 +27,3 @@ verification:
   checked_at: "2026-07-04"
   method: "Hugging Face API search: sanskrit ocr"
   confidence: "90/100 - HF id/license/domain tags verified via API result"
-

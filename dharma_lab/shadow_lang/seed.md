@@ -51,4 +51,3 @@ policy in `specs/naga_ir/dharma_lane/COLLECTIVE_LANGUAGE_PROMPT.md`.
 Confidence: 83/100. This seed is intentionally small and may be too permissive
 around opaque `claim`; it is sufficient to host the bootstrap receipt without
 pretending the full language exists.
-

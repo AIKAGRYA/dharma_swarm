@@ -50,4 +50,3 @@ verification:
   checked_at: "2026-07-04"
   method: "Official provider model documentation"
   confidence: "88/100 - official docs checked; model IDs should be revalidated before push/merge"
-

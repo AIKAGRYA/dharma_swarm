@@ -293,4 +293,3 @@ def _record_to_json(record: InferenceRunRecord, repo_root: Path) -> dict[str, st
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -28,4 +28,3 @@ verification:
   checked_at: "2026-07-04"
   method: "Hugging Face API author query: /api/models?author=MonlamAI"
   confidence: "82/100 - org/model verified, requested LLM status not verified"
-

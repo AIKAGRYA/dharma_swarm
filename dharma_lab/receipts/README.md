@@ -33,4 +33,3 @@ field shape, but they are intentionally unsigned bootstrap records. They are
 not canonical for cross-fragment transfer until a signer/verifier layer is
 wired. Their epistemic origin records `noncanonical_unsigned_bootstrap` for
 that reason.
-

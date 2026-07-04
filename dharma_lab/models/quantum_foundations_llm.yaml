@@ -34,4 +34,3 @@ verification:
   checked_at: "2026-07-04"
   method: "Hugging Face API search: quantum physics"
   confidence: "83/100 - candidate existence verified; grade judgment is conservative and unbenchmarked"
-

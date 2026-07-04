@@ -37,4 +37,3 @@ verification:
   checked_at: "2026-07-04"
   method: "Hugging Face API search: buddhist sanskrit"
   confidence: "78/100 - gap is verified enough for registry visibility; candidates are not graded"
-

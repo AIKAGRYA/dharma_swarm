@@ -52,4 +52,3 @@ confidence:
   fragment_parent_choice: "94/100 - user specified parent dharma_swarm.core"
   lab_excluded_from_tcb: "96/100 - inherited K3 constraint"
   lyapunov_mapping: "88/100 - direct projection of DHARMA_GATING V components to lab scope"
-

@@ -36,4 +36,3 @@ agreement predicate and benchmark evidence are recorded. Do not use
 
 For reruns, compare response hashes and receipt hashes. Explain every drift
 rather than overwriting prior results.
-

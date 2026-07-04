@@ -47,4 +47,3 @@ references as `Attested_by` or `Assumed`, never as proof.
 Confidence: 91/100. This policy directly implements the requested modality
 discipline, but full mechanical enforcement depends on later receipt verifier
 integration.
-
