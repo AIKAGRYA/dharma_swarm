@@ -1,0 +1,23 @@
+# tests/QUARANTINE.txt — nightly flake quarantine list.
+#
+# Consumed by .github/workflows/nightly-tests.yml: every entry is passed to
+# pytest as --deselect=<test-id>, so quarantined tests are skipped in the
+# nightly full-suite run until their expiry forces a decision.
+#
+# Format — one test id per line, with a REQUIRED trailing comment:
+#
+#   tests/test_foo.py::TestClass::test_bar  # quarantined 2026-07-04 issue:#123 owner:dhyana expiry:2026-07-18
+#
+# The trailing comment must carry:
+#   issue:<#NNN or full URL>   the tracking issue for fixing the flake
+#   expiry:<YYYY-MM-DD>        absolute date; expired entries FAIL the gate
+#
+# Rules (enforced by scripts/governance/check_quarantine.py, which runs as
+# the first step of the nightly workflow):
+#   - every entry must carry an issue link and an expiry date
+#   - an expired entry fails the gate: fix the test or explicitly
+#     re-quarantine it with a new issue-justified expiry
+#   - hard cap: 15 entries; the gate fails at 16
+#
+# Quarantine is not deletion. A growing list is a system signal.
+# Policy source: dive_test_depth.md section 4b.
