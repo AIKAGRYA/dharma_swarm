@@ -13,6 +13,9 @@ from dharma_swarm.forge_v1.forge_v2 import taskbed_ledger
 from dharma_swarm.forge_v1 import swebench_real
 
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
 def _read_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -529,7 +532,7 @@ def test_cli_execute_request_dir_runs_default_worker(tmp_path: Path) -> None:
             str(result_root),
             "--json",
         ],
-        cwd="/Users/dhyana/ds_forge_spine_v0",
+        cwd=REPO_ROOT,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -580,7 +583,7 @@ def test_cli_orchestrated_dry_run_syncs_and_resumes_without_predictions(tmp_path
             str(requests_root),
             "--json",
         ],
-        cwd="/Users/dhyana/ds_forge_spine_v0",
+        cwd=REPO_ROOT,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -602,7 +605,7 @@ def test_cli_orchestrated_dry_run_syncs_and_resumes_without_predictions(tmp_path
             str(result_root),
             "--json",
         ],
-        cwd="/Users/dhyana/ds_forge_spine_v0",
+        cwd=REPO_ROOT,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -628,7 +631,7 @@ def test_cli_orchestrated_dry_run_syncs_and_resumes_without_predictions(tmp_path
             str(result_root),
             "--json",
         ],
-        cwd="/Users/dhyana/ds_forge_spine_v0",
+        cwd=REPO_ROOT,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
