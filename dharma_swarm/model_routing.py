@@ -21,7 +21,6 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir

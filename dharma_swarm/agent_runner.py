@@ -12,7 +12,6 @@ import logging
 import os
 import re
 import time
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional, Protocol, runtime_checkable
@@ -56,11 +55,12 @@ from dharma_swarm.telos_gates import check_with_reflective_reroute
 # The core execution (run_task) is the leaf invoked by spine-wrapped callers
 # (Orchestrator._run_task_via_spine, A2ABridge.submit_via_spine) which wrap
 # the actual call inside an invoke_agent() invoker closure to emit exactly one
-# EvidenceReceipt per dispatch. This import declares the surface's place in
-# the single blessed path; no god-object bypass of the spine for orchestrated work.
-from dharma_swarm.spine.invoke import invoke_agent
-from dharma_swarm.spine.receipt import EvidenceReceipt
-from dharma_swarm.spine.routing import RoutingDecision
+# EvidenceReceipt per dispatch. These imports DECLARE the surface's place in
+# the single blessed path (declaration-by-import, kept deliberately unused);
+# no god-object bypass of the spine for orchestrated work.
+from dharma_swarm.spine.invoke import invoke_agent  # noqa: F401  (spine-adoption declaration)
+from dharma_swarm.spine.receipt import EvidenceReceipt  # noqa: F401  (spine-adoption declaration)
+from dharma_swarm.spine.routing import RoutingDecision  # noqa: F401  (spine-adoption declaration)
 
 logger = logging.getLogger(__name__)
 

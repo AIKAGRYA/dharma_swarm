@@ -2474,8 +2474,8 @@ def test_cmd_sprint_falls_back_to_local_on_non_runtime_error(
         raising=True,
     )
     monkeypatch.setattr(
-        "dharma_swarm.master_prompt_engineer._days_to_colm",
-        lambda: (14, 19),
+        "dharma_swarm.research_deadlines.deadline_line",
+        lambda *a, **k: "TestVenue — abstract in 14d, paper in 19d",
         raising=True,
     )
     monkeypatch.setattr(

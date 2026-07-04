@@ -157,8 +157,24 @@ def find_swarm_lift(repo_root: Path) -> tuple[float, str] | None:
 
 
 def score_c2(repo_root: Path) -> ConditionResult:
-    """Swarm-vs-single benchmark lift, against the published DGM bar."""
+    """Swarm-vs-single benchmark lift, against the published DGM bar.
+
+    ADMISSIBILITY (the commensurability rule, 2026-07-03): only live benchmark
+    measurements under reports/anatomy_*/ feed this condition. The hermetic
+    Arena Truth surface (reports/governance/arena/) is deliberately NOT read
+    here and never will be: its fixture pool is constructed so that routing
+    beats best-single (Krogh-Vedelsby is baked into the recorded data), which
+    makes its positive lift a control-machinery existence proof — an object of
+    a different kind than a benchmark result. A C2-admissible number requires:
+    live (non-fixture) seats, >=2 model families, the same best-single +
+    budget-parity + significance control arms the hermetic runner enforces.
+    """
     evidence = ["published bar (NORTH_STAR §8): DGM self-improved 20%->50% SWE-bench (arXiv:2505.22954)"]
+    evidence.append(
+        "admissibility: hermetic arena lift (reports/governance/arena/, fixture-"
+        "constructed routing win) is NOT commensurable with this condition and is "
+        "never read here; C2 moves only on live runs with >=2 model families under "
+        "the same budget-parity + significance controls")
     found = find_swarm_lift(repo_root)
     if found is None:
         evidence.append("no swarm-lift measurement found under reports/anatomy_*/ — condition unmeasured")

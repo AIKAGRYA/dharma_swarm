@@ -21,17 +21,15 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from itertools import combinations
-from typing import Any, Sequence
+from typing import Any
 
 from dharma_swarm.semantic_gravity import (
     ClusterFileSpec,
-    ConceptEdge,
     ConceptGraph,
     ConceptNode,
     EdgeType,
     FileClusterSpec,
     ResearchAnnotation,
-    ResearchConnectionType,
 )
 
 logger = logging.getLogger(__name__)

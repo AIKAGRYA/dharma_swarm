@@ -16,7 +16,6 @@ from typing import Any, Sequence
 
 from pydantic import BaseModel, Field
 
-from dharma_swarm.archive import FitnessScore
 from dharma_swarm.gaia_fitness import ECOLOGICAL_HARM_WORDS, EcologicalFitness
 from dharma_swarm.gaia_ledger import (
     ComputeUnit,

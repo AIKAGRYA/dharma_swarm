@@ -15,7 +15,6 @@ This closes the gap identified in the synthesis:
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import sqlite3

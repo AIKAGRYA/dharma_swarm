@@ -21,7 +21,6 @@ import asyncio
 import html
 import json
 import logging
-import os
 import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone

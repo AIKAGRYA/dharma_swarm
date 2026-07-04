@@ -407,7 +407,7 @@ def _parse_timestamp(value: Any) -> Optional[float]:
         return float(value)
     if isinstance(value, str):
         try:
-            from datetime import datetime, timezone
+            from datetime import datetime
             # Try ISO format
             dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
             return dt.timestamp()

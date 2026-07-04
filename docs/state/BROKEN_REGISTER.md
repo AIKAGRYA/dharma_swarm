@@ -177,7 +177,8 @@
 - **blast_radius:** Recognition layer's hardest gate is a no-op. Witness emits but doesn't gate.
 - **evidence:** vision_maps `01_gnani_prakruti.md`; `telos_gates.py:512-513`.
 - **status:** OPEN — direct edits to `telos_gates.py` are governance-forbidden by `CLAUDE.md`; closure must go through `GateRegistry.propose()` / gate pressure policy rather than a hard-coded gate mutation.
-- **re-verification 2026-06-15 (perplexity-computer):** literal hard-pass at `dharma_swarm/telos_gates.py:512-513` still in place per direct read. Closure path unchanged (must route through GateRegistry per governance). Status OPEN unchanged.
+- **re-verification 2026-06-15 (perplexity-computer):** literal hard-pass still in place per direct read. Closure path unchanged (must route through GateRegistry per governance). Status OPEN unchanged.
+- **re-verification 2026-07-03:** hard-pass confirmed still present; the code moved — now at `dharma_swarm/telos_gates.py:538-539` (`results["BHED_GNAN"] = (GateResult.PASS, ...)` under the `(always passes)` comment). Earlier `:512-513` citations in this row are the pre-drift line numbers.
 
 ### BR-015 — `.FOCUS` writer with stale claim "no reader"
 - **first_observed:** 2026-05-07

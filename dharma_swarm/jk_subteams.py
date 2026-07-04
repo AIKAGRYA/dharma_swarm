@@ -15,8 +15,7 @@ Design: 2026-03-21, from the Ruthless Critique session.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)

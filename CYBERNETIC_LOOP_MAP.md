@@ -46,15 +46,18 @@ bounded replay proving completed tasks leave an adaptive signal for later routin
 
 Live runtime truth from the latest audit:
 
+(hand-copied from `reports/loop_closure/cybernetics_codex/latest_audit.json`
+observed 2026-07-02T13:47Z — if this table disagrees with that JSON, trust the JSON)
+
 | Surface | Current value |
 |---------|---------------|
-| `delegation_runs` | 8,669 total, 4,158 completed, 4,403 failed, 107 running, 1 claimed |
-| `runtime_receipts` | 98,566 rows, latest 2026-07-01T14:58:47Z |
-| `receipt_json` | 2,574 rows, orchestrator surface only |
-| served provider/model truth | 1,917 completed delegation runs, 20,607 runtime receipts |
-| `dispatch_dropoff` | 2,135 historical failures, latest 2026-07-01T03:42:49Z |
+| `delegation_runs` | 8,837 total, 4,184 completed, 4,532 failed, 120 running, 1 claimed |
+| `runtime_receipts` | 105,029 rows, latest 2026-07-02T13:15:59Z |
+| `receipt_json` | 8,837 rows |
+| served provider/model truth | 1,943 completed delegation runs, 24,700 runtime receipts |
+| `dispatch_dropoff` | 2,191 historical failures, latest 2026-07-01T16:45:35Z |
 | One Wire quorum | N=3/5, M=1/3, not eligible |
-| evolution archive | 12,241 entries, 11,375 internal-positive-fitness risk rows, 0 external authority markers |
+| evolution archive | 12,273 entries, 11,391 internal-positive-fitness risk rows, 0 external authority markers |
 
 Bounded Loop 1 replay proof (current code/provider lane):
 
@@ -76,22 +79,6 @@ Bounded Loop 1 replay proof (current code/provider lane):
 
 | # | Loop | Interval | Current Verdict | Remaining Live-Closure Blocker |
 |---|------|----------|---------|-------------------|
-| 1 | Swarm Task Loop | 60s | **CLOSED in bounded replay; PARTIAL in all-history audit** | Current bounded replay closes with 3/3 completed tasks, zero dropoff, 3 ok evidence receipts, and served provider/model truth. Standing all-history audit still includes historical `dispatch_dropoff=1486`, so do not call the whole daemon history clean. |
-| 2 | Organism Heartbeat | 300s | **CLOSED in bounded replay; PARTIAL in standing daemon history** | `reports/loop_closure/cybernetics_codex/2026-06-23_loop2_heartbeat_closure.json` proves 3 cycles, all transitions receipted, and algedonic adaptive state feeding the next cycle; the always-on daemon history is still not cleanly closed. |
-| 3 | Evolution Loop / DarwinEngine | every 3rd tick | **PARTIAL** | Activity exists, but adaptation/fitness authority is not closure-proven. |
-| 4 | Consolidation Loop / Memory | configurable | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
-| 5 | Zeitgeist Scanner | configurable | **CLOSED in bounded replay (internal S3↔S4 arm only)** | `scripts/loop5_zeitgeist_closure_run.py` proves real internal gate-pressure feedback. This is not external-world zeitgeist closure; no real-world/external eyes are proven. |
-| 5b | World Radar Go chain (external arm) | configurable | **CLOSED in bounded replay (fixture observation, no live fetch)** | `scripts/loop5b_world_radar_closure_run.py` proves the Go sense-organ chain fixture→ingestor→receipt→feed projection end-to-end (host-aware: reports NEEDS_HOST without Go binary/toolchain). Live public-source fetch closure is still unproven. |
-| 6 | Witness Auditor | 3600s | **CLOSED in bounded replay** | Bounded replay closes Loop 6: orchestrator now lands task_completed traces, the Witness senses real completions, flags telos-gate-coverage gaps, and appends governance marks (adapt fed forward). `scripts/loop6_witness_closure_run.py`. |
-| 7 | Training Flywheel | 300s | **PARTIAL** | Activity exists, but adaptation/fitness authority is not closure-proven. |
-| 8 | Recognition Loop / eigenform | 7200s | **PARTIAL** | Activity exists, but adaptation/fitness authority is not closure-proven. |
-| 9 | Conductors | 120s | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
-| 10 | Context Agent | 60s | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
-| 11 | Replication Monitor | 3600s | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
-| 12 | Self-Improvement | 3600s | **BLOCKED** | One Wire guardian quorum below threshold: N=3/5, M=1/3. |
-| 13 | Free Evolution Grind | 600s | **BLOCKED** | One Wire guardian quorum below threshold: N=3/5, M=1/3. |
-
-**Summary: standing all-history audit is still 0 fully clean. Bounded replay currently closes Loops 1, 2, 5, 5b, and 6 (Loop 5 internal-arm-only; Loop 5b covers the external Go chain on a committed fixture, not live fetch); Loops 3/4/7/8/9/10/11 remain PARTIAL; Loops 12/13 remain BLOCKED behind One Wire. Do not promote bounded-replay closure to always-on daemon closure without fresh live-loop evidence.**
 | 1 | Swarm Task Loop | 60s | **HARNESS_PROVEN; not CLOSED_LIVE** | Current bounded replay proves 3/3 completed tasks, zero replay dropoff, 3 ok evidence receipts, and served provider/model truth. Standing all-history audit still includes historical `dispatch_dropoff`, so do not call the daemon history clean. |
 | 2 | Organism Heartbeat | 300s | **HARNESS_PROVEN; not CLOSED_LIVE** | Receipt proves 3 harness cycles and fed-forward algedonic state. Live closure still needs standing daemon pulse/algedonic owner-surface evidence consumed by a later daemon cycle. |
 | 3 | Evolution Loop / DarwinEngine | every 3rd tick | **HARNESS_PROVEN; not CLOSED_LIVE** | Receipt proves scratch Darwin outcomes feed predictor/archive selection without touching live archive fitness. Live closure still needs governed non-scratch evolution owner-surface evidence. |
@@ -416,4 +403,4 @@ ls ~/.dharma/witness/  # witness log files exist with real agent actions
 
 ---
 
-*This document was last audited on 2026-05-05 against HEAD `74d015c`. Previous version: 2026-04-04. See `INTERFACE_MISMATCH_MAP.md` for the current mismatch status (0 BLOCKERs, 4 DEGRADED).*
+*Verdicts and runtime numbers are owned by `reports/loop_closure/cybernetics_codex/latest_audit.json` (header carries the last-audit date). See `INTERFACE_MISMATCH_MAP.md` for current mismatch status — no counts frozen here.*

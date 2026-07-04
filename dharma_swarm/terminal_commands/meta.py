@@ -11,7 +11,6 @@ import sys
 from dharma_swarm.terminal_commands._helpers import (
     DHARMA_STATE,
     DHARMA_SWARM,
-    _run,
 )
 
 def cmd_xray(

@@ -6,7 +6,7 @@ This module owns `build_query_packet`, `build_answer_packet`,
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 

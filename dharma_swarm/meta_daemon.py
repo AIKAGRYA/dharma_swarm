@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
 from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
@@ -271,19 +270,27 @@ class RecognitionEngine:
             return {"status": "error reading cascade history"}
 
     def _read_research(self) -> dict[str, Any]:
-        """Read research state (COLM countdown)."""
-        now = _utc_now()
-        # COLM 2026 deadlines
-        abstract_deadline = datetime(2026, 3, 26, tzinfo=timezone.utc)
-        paper_deadline = datetime(2026, 3, 31, tzinfo=timezone.utc)
+        """Read research state from operator-owned research_deadlines.json.
 
-        days_to_abstract = (abstract_deadline - now).days
-        days_to_paper = (paper_deadline - now).days
+        The old hardcoded COLM 2026 clock broadcast "crunch" for months after
+        the venue died (days_to_abstract went negative, and negative <= 7).
+        No active deadline now means NO countdown keys — the seed builder
+        drops the research line entirely (fixed 2026-07-03).
+        """
+        from dharma_swarm.research_deadlines import active_deadline
 
+        dl = active_deadline()
+        if dl is None:
+            return {"status": "no active research deadline"}
+        days_to_abstract = dl.days_to_abstract()
+        days_to_paper = dl.days_to_paper()
         return {
-            "days_to_abstract": max(0, days_to_abstract),
-            "days_to_paper": max(0, days_to_paper),
-            "phase": "crunch" if days_to_abstract <= 7 else "active",
+            "venue": dl.venue,
+            "days_to_abstract": max(0, days_to_abstract or 0),
+            "days_to_paper": max(0, days_to_paper or 0),
+            "phase": "crunch"
+            if days_to_abstract is not None and 0 <= days_to_abstract <= 7
+            else "active",
         }
 
     def _build_seed(

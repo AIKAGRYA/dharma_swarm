@@ -6,10 +6,9 @@ Wraps dharma_swarm.web_search.SearchRouter into the AutoResearch protocol.
 from __future__ import annotations
 
 import asyncio
-from typing import Any
 
-from .models import ResearchBrief, ResearchQuery, SourceDocument
-from .search import SearchBackend, RawSourceDocument
+from .models import ResearchBrief, ResearchQuery
+from .search import RawSourceDocument
 
 
 class WebSearchBackend:

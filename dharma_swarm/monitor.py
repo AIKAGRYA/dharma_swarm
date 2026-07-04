@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import statistics
 from collections import Counter, defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Optional
 

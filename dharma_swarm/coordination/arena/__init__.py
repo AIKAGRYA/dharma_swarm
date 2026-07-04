@@ -6,6 +6,10 @@ under budget parity*; a genome wins only by beating the best single model at
 equal compute, with significance.
 """
 
+from dharma_swarm.coordination.arena.corpus import (
+    build_cold_start_corpus,
+    corpus_sha256,
+)
 from dharma_swarm.coordination.arena.curator import TaskCurator
 from dharma_swarm.coordination.arena.fixtures import FixturePool
 from dharma_swarm.coordination.arena.runner import (
@@ -23,6 +27,8 @@ __all__ = [
     "FixturePool",
     "TaskCurator",
     "Taskpack",
+    "build_cold_start_corpus",
+    "corpus_sha256",
     "render_decision_packet",
     "score_submission",
     "scorer_hash",

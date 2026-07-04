@@ -22,7 +22,6 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timezone
-from pathlib import Path
 
 from dharma_swarm import model_pool as _model_pool
 from dharma_swarm.models import AgentRole, ProviderType, TaskPriority
@@ -100,7 +99,7 @@ _PROVIDER_MAP = {
 
 
 # Model selection sourced from model_hierarchy.py — the single source of truth.
-from dharma_swarm.model_hierarchy import DEFAULT_MODELS, TIER_FREE
+from dharma_swarm.model_hierarchy import DEFAULT_MODELS
 
 
 def _has_openrouter_key() -> bool:

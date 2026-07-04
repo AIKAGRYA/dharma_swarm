@@ -14,7 +14,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
@@ -24,18 +24,10 @@ from dharma_swarm.runtime_provider import (
     complete_via_preferred_runtime_providers,
 )
 
-# COLM 2026 deadlines
-_COLM_ABSTRACT_DATE = date(2026, 3, 26)
-_COLM_PAPER_DATE = date(2026, 3, 31)
-
-
-def _days_to_colm() -> tuple[int, int]:
-    """Return (days_to_abstract, days_to_paper) from today."""
-    today = date.today()
-    return (
-        max(0, (_COLM_ABSTRACT_DATE - today).days),
-        max(0, (_COLM_PAPER_DATE - today).days),
-    )
+# Research deadlines are operator DATA (~/.dharma/research_deadlines.json),
+# never code constants — the hardcoded COLM 2026 clock kept broadcasting a
+# 0-day countdown for three months after the venue died (fixed 2026-07-03).
+from dharma_swarm.research_deadlines import deadline_line as _research_deadline_line
 
 _STATE_DIR = dharma_state_dir()
 _SHARED_DIR = _STATE_DIR / "shared"
@@ -89,7 +81,7 @@ Look across the last {history_depth} evolution cycles. Detect patterns.
 
 **Trajectory analysis**:
 - Which areas are improving? Which are stagnant?
-- Are we approaching any deadlines (COLM: {colm_days} days)?
+- Are we approaching any deadlines ({deadline_line})?
 - What threads have been neglected for >3 cycles?
 - Are the GRANULAR items serving the META goals, or drifting?
 
@@ -476,7 +468,7 @@ async def generate_evolved_prompt(
     file_signals: str = "",
     prev_todo: str = "",
     cycle_number: int = 0,
-    colm_days: int | None = None,
+    deadline_line: str | None = None,
     history_depth: int = 5,
     llm_timeout_sec: float = 12.0,
 ) -> str:
@@ -494,16 +486,17 @@ async def generate_evolved_prompt(
         file_signals: Files reviewed with signals.
         prev_todo: Previous cycle TODO items.
         cycle_number: Current cycle number.
-        colm_days: Days until COLM deadline.
+        deadline_line: Override for the research-deadline line; when None the
+            operator-owned research_deadlines.json is consulted.
         history_depth: How many past cycles to analyze.
         llm_timeout_sec: Timeout for the OpenRouter call before callers may fall back.
 
     Returns:
         The generated evolved prompt text.
     """
-    # Auto-calculate COLM days if not provided
-    if colm_days is None:
-        colm_days, _ = _days_to_colm()
+    # Resolve the research-deadline line from operator-owned data.
+    if deadline_line is None:
+        deadline_line = _research_deadline_line()
 
     # Auto-gather state if not provided
     if system_state is None:
@@ -533,7 +526,7 @@ async def generate_evolved_prompt(
     meta = _META_LAYER.format(
         history_depth=history_depth,
         cycle_history=_format_cycle_history(history),
-        colm_days=colm_days,
+        deadline_line=deadline_line,
     )
 
     # Build QUALITY layer
@@ -583,7 +576,7 @@ def generate_local_prompt(
     file_signals: str = "",
     prev_todo: str = "",
     cycle_number: int = 0,
-    colm_days: int = 20,
+    deadline_line: str | None = None,
     history_depth: int = 5,
 ) -> str:
     """Generate a prompt locally without LLM call (for offline/testing).
@@ -597,7 +590,8 @@ def generate_local_prompt(
         file_signals: Files reviewed with signals.
         prev_todo: Previous cycle TODO items.
         cycle_number: Current cycle number.
-        colm_days: Days until COLM deadline.
+        deadline_line: Override for the research-deadline line; when None the
+            operator-owned research_deadlines.json is consulted.
         history_depth: How many past cycles to analyze.
 
     Returns:
@@ -619,7 +613,7 @@ def generate_local_prompt(
     sections = [
         f"# Evolved Prompt -- Cycle {cycle_number}",
         f"Generated: {datetime.now(timezone.utc).isoformat()}",
-        f"COLM deadline: {colm_days} days",
+        f"Research deadline: {deadline_line if deadline_line is not None else _research_deadline_line()}",
         f"Quality verdict: {verdict}",
         "",
         "## GRANULAR (this cycle)",

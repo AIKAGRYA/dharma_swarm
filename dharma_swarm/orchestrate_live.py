@@ -255,7 +255,6 @@ async def run_swarm_loop(
         _pending = _board_stats.get("pending", 0) + _board_stats.get("running", 0)
         if _pending == 0:
             from dharma_swarm.mission_contract import load_latest_mission
-            from pathlib import Path
             _handoff = STATE_DIR / "shared" / "thinkodynamic_director_handoff.md"
             _contract_path = STATE_DIR / "logs" / "thinkodynamic_director" / "latest.json"
             if _contract_path.exists():
@@ -1701,7 +1700,6 @@ async def _run_gauntlet_loop(shutdown_event: asyncio.Event) -> None:
     Tier 4+5 (adversarial + emergent): every 12 hours.
     Scores written to ~/.dharma/gauntlet/ and fed back to BenchmarkRegistry.
     """
-    import random as _random
     _log("gauntlet", "Gauntlet loop starting")
     _cycle = 0
     while not shutdown_event.is_set():

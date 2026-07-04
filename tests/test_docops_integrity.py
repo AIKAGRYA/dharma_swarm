@@ -259,3 +259,44 @@ def test_generated_docops_reports_are_ignored_by_metrics(tmp_path: Path) -> None
     metrics = docops.collect_metrics(repo)
     assert metrics["markdown_files"] == 1
     assert metrics["markdown_total_lines"] == 1
+
+
+def test_duplicate_asserted_token_is_flagged(tmp_path: Path) -> None:
+    """An asserted count appearing more than once is manufactured decay: the
+    2026-06/07 append-style refreshes quadruplicated SOVEREIGN_MANIFEST rows
+    while the checker validated only the first match. Duplicates must be
+    flagged even when every copy agrees with the metric."""
+    repo = tmp_path
+    write(repo / "dharma_swarm" / "a.py", "x = 1\n")
+    write(
+        repo / "docs" / "governance" / "SOVEREIGN_MANIFEST.md",
+        "Total Python modules | **1** |\nTotal Python modules | **1** |\n",
+    )
+    config_path = base_config(repo)
+    config = load_config(config_path)
+    config["assertions"] = [
+        {
+            "id": "total-python",
+            "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
+            "regex": r"Total Python modules \| \*\*(\d+)\*\*",
+            "metric": "dharma_python_modules",
+            "verify": "find dharma_swarm -name '*.py' -type f",
+        }
+    ]
+    save_config(config_path, config)
+
+    findings, _metrics = docops.run_checks(
+        repo, config_path, None, docops.parse_iso_date("2026-05-05"), False
+    )
+    dupes = [f for f in findings if f.check == "assertion-duplicate"]
+    assert len(dupes) == 1
+    assert "2x" in dupes[0].message
+    assert dupes[0].severity == "FAIL"
+
+    # counts-advisory mode (the PR gate) demotes it to WARN, never silence
+    findings, _metrics = docops.run_checks(
+        repo, config_path, None, docops.parse_iso_date("2026-05-05"), False,
+        counts_advisory=True,
+    )
+    dupes = [f for f in findings if f.check == "assertion-duplicate"]
+    assert len(dupes) == 1 and dupes[0].severity == "WARN"

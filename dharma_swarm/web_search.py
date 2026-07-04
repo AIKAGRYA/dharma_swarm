@@ -21,7 +21,7 @@ import asyncio
 import logging
 import os
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 from urllib.parse import quote_plus
 
@@ -325,7 +325,6 @@ class DuckDuckGoSearchBackend(SearchBackend):
 
     async def search(self, query: str, max_results: int = 5) -> list[SearchResult]:
         import httpx
-        from html.parser import HTMLParser
 
         # Rate-limit: 1 req/sec
         now = time.time()

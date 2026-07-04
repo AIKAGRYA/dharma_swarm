@@ -862,8 +862,10 @@ class Organism:
                     description=f"[{signal.severity}] {signal.title}: {signal.recommended_action}",
                     metadata={"severity": signal.severity, "title": signal.title},
                 )
-        except Exception:
-            pass
+        except Exception as exc:
+            # An algedonic signal IS a pain report — losing its memory record
+            # silently would blind the very channel meant to surface trouble.
+            logger.warning("algedonic event memory write failed: %s", exc)
 
     def _check_scaling_needs(self, pulse: OrganismPulse) -> dict[str, Any] | None:
         """Check whether the legacy organism should recommend crew scaling."""

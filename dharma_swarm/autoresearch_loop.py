@@ -33,14 +33,12 @@ import logging
 import subprocess
 import time
 from pathlib import Path
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
 from dharma_swarm.archive import ArchiveEntry, EvolutionArchive, FitnessScore
 from dharma_swarm.elegance import evaluate_elegance
-from dharma_swarm.evolution import DarwinEngine, EvolutionStatus, Proposal
-from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType, _new_id, _utc_now
+from dharma_swarm.models import _new_id
 from dharma_swarm.traces import TraceEntry, TraceStore
 
 logger = logging.getLogger(__name__)

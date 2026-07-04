@@ -2,7 +2,7 @@
 
 **Path:** `docs/state/LIVE_OPS_DASHBOARD.md`
 **Snapshot date:** 2026-06-15
-**Status:** CURRENT — refreshed to main at `9c76b210` (933 commits)
+**Status:** HISTORICAL SNAPSHOT (2026-06-15, main `9c76b210`) — the track portfolio it describes has since turned over (the runtime-truth tracks it lists as ACTIVE closed 2026-06-30..07-03). For live state run `make onboard`; trust it over any line below.
 **Read first if tired:** this is the place to learn what shipped, where the live swarm is running, and what not to rediscover tomorrow.
 
 The previous 2026-05-29 dashboard was archived to `docs/state/_archive/LIVE_OPS_DASHBOARD_2026-05-29.md`.

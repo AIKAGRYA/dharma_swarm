@@ -7,7 +7,6 @@ the detail panel with role info, current task, and recent notes.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 

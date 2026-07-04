@@ -11,7 +11,6 @@ Anti-noise: flags shallow implementations, queues improvement tasks.
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import os
 import subprocess

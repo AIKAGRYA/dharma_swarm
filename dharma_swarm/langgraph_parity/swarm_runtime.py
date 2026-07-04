@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Mapping, Protocol
+from typing import Mapping, Protocol
 
 from dharma_swarm.langgraph_parity.state import SwarmState, TransferReceipt
 from dharma_swarm.langgraph_parity.tools import (

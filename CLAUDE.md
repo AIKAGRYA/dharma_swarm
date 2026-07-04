@@ -76,7 +76,7 @@ Claim boundary:
 **Track id:** `orchestration-arena-v1-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
 **Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-23 (TTL 21 days)
 **Relations:** complements: provider-routing-consolidation-2026-06, loop-closure-2026-06
-**Owns surfaces:** dharma_swarm/coordination/**, dharma_swarm/council/**, tests/test_arena_v1.py, tests/test_dpi.py, tests/test_orchestration_genome.py, tests/test_orchestrator_v1.py, tests/test_council_profiles.py, tests/test_coordination_closure_checks.py
+**Owns surfaces:** dharma_swarm/coordination/**, dharma_swarm/council/**, scripts/governance/arena_truth_report.py, reports/governance/arena/**, tests/test_arena_v1.py, tests/test_dpi.py, tests/test_orchestration_genome.py, tests/test_orchestrator_v1.py, tests/test_council_profiles.py, tests/test_coordination_closure_checks.py, tests/test_arena_truth_report.py
 **Moves vital signs:** eval_coverage, quality_gates
 
 Governance admission for the Arena/Orchestration substrate that LANDED on
@@ -97,9 +97,9 @@ trained weights — training is earned only after the arena produces labels.
 
 **Next items:**
 
-- [code] Wire arena scorecard + DPI receipts into a governance-visible report surface (read-only).
-- [code] (blocker) Add best-single-model controls + budget-parity proof to every arena run before any capability claim.
-- [code] Connect arena winners to a cold-start trace corpus (no training yet; corpus only).
+- [code] DONE 2026-07-03: arena scorecard + DPI receipts wired into a read-only governance surface — scripts/governance/arena_truth_report.py renders reports/governance/arena/ (digest-stamped receipt + ARENA_TRUTH.md + corpus), seeded/deterministic; --check fails if the committed surface does not replay byte-for-byte. Criterion arena_truth_receipt_valid verifies it.
+- [code] (blocker) HERMETIC CONTROLS SHIPPED (runner.run always executes best_single_full_budget gate + budget-parity ledger for every arm + seeded bootstrap significance; proven by arena_v1_controls_tests_pass). REMAINING (the blocker's live edge): any future live-lane arena run (DHARMA_ARENA_LIVE seam in fixtures.py) must inherit the SAME control arms before any capability claim — the hermetic lift on the fixture taskpack is a control-machinery existence proof, never a capability claim (non-goal 1). C2 stays owned by real benchmark evidence.
+- [code] DONE 2026-07-03: arena winners connected to the cold-start trace corpus — coordination/arena/corpus.py emits labeled winner traces (positive_lift_candidate only, scorer-labeled, deterministic) to reports/governance/arena/cold_start_corpus.jsonl, sha256-pinned in the report receipt. Labels only; zero training (v1 doctrine).
 
 **Non-goals:**
 
@@ -317,10 +317,10 @@ make test-fast
 make test
 
 # Static analysis / repo inventory
-make xray
+python3 xray.py
 
 # Dashboard lint
-make dashboard-lint
+npm --prefix dashboard run lint
 ```
 
 - ALWAYS run tests after making code changes
@@ -366,7 +366,7 @@ bash run_operator.sh
 
 ## Navigation
 
-See [`docs/architecture/NAVIGATION.md`](docs/architecture/NAVIGATION.md) for the full module map (770+ modules under `dharma_swarm/`, 12 architectural layers; run `make xray` for the live count).
+See [`docs/architecture/NAVIGATION.md`](docs/architecture/NAVIGATION.md) for the full module map (770+ modules under `dharma_swarm/`, 12 architectural layers; run `python3 xray.py` for the live count).
 See [`docs/MEGAFILE_INDEX.md`](docs/MEGAFILE_INDEX.md) for the ten highest-system onboarding maps and their current status.
 See `README.md` for repo map and common commands.
 See `foundations/` for the 10-pillar intellectual genome.
@@ -378,7 +378,7 @@ See `foundations/` for the 10-pillar intellectual genome.
 **Highest-system map:** Read [`docs/MEGAFILE_INDEX.md`](docs/MEGAFILE_INDEX.md) before treating any large map as canonical. It points to the Attractor Closure synthesis, live ops dashboard, broken register, and missing slots.
 
 See [`INTERFACE_MISMATCH_MAP.md`](INTERFACE_MISMATCH_MAP.md) for the complete map of every interface mismatch between modules. **This is the #1 source of runtime failures.** The map documents:
-- **Live BLOCKER/DEGRADED status lives in the map itself — do not freeze a count here** (that duplication is exactly how this section rotted). Read `INTERFACE_MISMATCH_MAP.md` for the current tally. As of 2026-06-22 the recent `NEW-14` blocker (world-model loop ↔ `WorldModelAgent` API mismatch, which crashed the loop on every daemon boot) has a fix in flight; the 3 original BLOCKERs are resolved; `NEW-05` (guarded) and `NEW-07/08` (partial+) remain DEGRADED.
+- **Live BLOCKER/DEGRADED status lives in the map itself — do not freeze a count or a dated snapshot here** (this section rotted twice by doing so: the 2026-06-22 snapshot it used to carry said NEW-14's fix was "in flight" after the map already marked it RESOLVED, and omitted NEW-12 entirely). Read `INTERFACE_MISMATCH_MAP.md` for the current tally; cite nothing from memory.
 - A prioritized **Bootstrap Sequence** of fixes (most now resolved)
 
 **Rule for all sessions:** Before fixing a bug or adding a feature, check the mismatch map first. If the module pair you're touching has a known mismatch, fix the mismatch as part of your change. Do not add new callers to broken interfaces.

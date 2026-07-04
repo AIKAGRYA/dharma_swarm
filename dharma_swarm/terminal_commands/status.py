@@ -4,12 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
-import asyncio
 import json
 import os
-import re
-import subprocess
-import time
 
 
 # ---------------------------------------------------------------------------
@@ -19,25 +15,18 @@ import time
 
 from dharma_swarm.terminal_commands._helpers import (
     DHARMA_STATE,
-    HOME,
-    _get_swarm,
     _run,
-    _tail,
 )
 from dharma_swarm.terminal_commands._status_helpers import (
     MISSION_AUTONOMY_PROFILES,
     MISSION_TRACKED_PATHS,
     _accelerators_enabled,
     _build_status_data,
-    _canonical_gate_count,
-    _canonical_pulse_summary,
-    _control_plane_snapshot,
     _core_mission_checks,
     _read_openclaw_summary,
     _resolve_mission_profile,
     _tracked_paths,
 )
-from dharma_swarm.daemon_config import dharma_state_dir
 
 def cmd_status(*, as_json: bool = False) -> None:
     """System status overview."""

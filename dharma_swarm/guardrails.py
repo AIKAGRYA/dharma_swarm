@@ -32,7 +32,7 @@ import time
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Coroutine
+from typing import Any, Callable
 from uuid import uuid4
 
 from pydantic import BaseModel, Field

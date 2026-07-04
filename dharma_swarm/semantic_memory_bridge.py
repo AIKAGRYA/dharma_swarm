@@ -26,7 +26,6 @@ from dharma_swarm.semantic_gravity import (
     ConceptGraph,
     ConceptNode,
     FileClusterSpec,
-    HardeningReport,
     ResearchAnnotation,
     ResearchConnectionType,
     SemanticGravity,

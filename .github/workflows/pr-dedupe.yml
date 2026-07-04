@@ -126,9 +126,12 @@ jobs:
           If this was a real change, reopen and retitle so it no longer matches a
           snapshot intent."
               gh pr comment "$number" --repo "$GH_REPO" --body "$close_msg" || true
-              gh pr close "$number" --repo "$GH_REPO" || true
-              gh api --method DELETE "repos/${GH_REPO}/git/refs/heads/${head_ref}" 2>/dev/null || true
-              closed_count=$((closed_count + 1))
+              if gh pr close "$number" --repo "$GH_REPO"; then
+                gh api --method DELETE "repos/${GH_REPO}/git/refs/heads/${head_ref}" 2>/dev/null || true
+                closed_count=$((closed_count + 1))
+              else
+                echo "::warning::close of #${number} was rejected — not counted as closed"
+              fi
             fi
           done < /tmp/snapshot_prs.jsonl
 
@@ -205,9 +208,12 @@ jobs:
           If this close is wrong, reopen and rename the title so it no longer
           matches the duplicate group."
                 gh pr comment "$number" --repo "$GH_REPO" --body "$close_msg" || true
-                gh pr close "$number" --repo "$GH_REPO" || true
-                gh api --method DELETE "repos/${GH_REPO}/git/refs/heads/${head_ref}" 2>/dev/null || true
-                closed_count=$((closed_count + 1))
+                if gh pr close "$number" --repo "$GH_REPO"; then
+                  gh api --method DELETE "repos/${GH_REPO}/git/refs/heads/${head_ref}" 2>/dev/null || true
+                  closed_count=$((closed_count + 1))
+                else
+                  echo "::warning::close of #${number} was rejected — not counted as closed"
+                fi
               fi
             done < <(echo "$group" | jq -c '.[:-1][]')
           done < /tmp/dupe_groups.jsonl
