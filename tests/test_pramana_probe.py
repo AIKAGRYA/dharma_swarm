@@ -54,6 +54,62 @@ def test_select_gates_rejects_unknown_tier():
         pp.select_gates(pp.default_gates(), "ludicrous")
 
 
+# --- registry integrity (the 2026-07-04 phantom-gate fix) -------------------- #
+
+
+def test_default_registry_has_no_phantom_targets():
+    # Every declared target of every default gate must exist on THIS checkout.
+    # This is the regression test for the 2026-07-04 audit: three gates pointed
+    # at review-branch-only files and the probe reported REFUTED 0.0 on main.
+    assert pp.validate_gates(pp.default_gates()) == []
+
+
+def test_default_registry_covers_pratyaksha():
+    # The highest-weighted pramana (0.30, direct perception) previously had NO
+    # gate at all; the registry must keep one.
+    modes = {g.mode for g in pp.default_gates()}
+    assert pp.PRATYAKSHA in modes
+    assert pp.ARTHAPATTI in modes
+
+
+def test_default_blocking_gate_targets_exist():
+    blocking = [g for g in pp.default_gates() if g.blocking]
+    assert blocking, "registry must keep a blocking arthapatti floor"
+    for g in blocking:
+        assert g.requires, "blocking gates must declare their targets"
+        for req in g.requires:
+            assert (REPO_ROOT / req).exists(), f"blocking gate target missing: {req}"
+
+
+def test_cargo_gates_are_existence_guarded():
+    has_crate = (REPO_ROOT / "native" / "dharma_kernels" / "Cargo.toml").is_file()
+    cargo_gates = [g for g in pp.default_gates() if g.name.startswith("cargo-")]
+    assert bool(cargo_gates) == has_crate
+
+
+def test_validate_gates_flags_missing_target_and_cwd():
+    phantom = pp.GateSpec("ghost", pp.ARTHAPATTI, "deep",
+                          ["pytest", "tests/no_such_file.py"],
+                          blocking=True, requires=("tests/no_such_file.py",))
+    lost = pp.GateSpec("lost-cwd", pp.UPAMANA, "fast", ["cargo", "test"],
+                       cwd=REPO_ROOT / "no" / "such" / "dir")
+    errors = pp.validate_gates([phantom, lost])
+    assert len(errors) == 2
+    assert any("ghost" in e and "tests/no_such_file.py" in e for e in errors)
+    assert any("lost-cwd" in e and "cwd" in e for e in errors)
+
+
+def test_main_refuses_phantom_registry_with_config_exit(monkeypatch, capsys):
+    phantom = pp.GateSpec("ghost", pp.ARTHAPATTI, "deep",
+                          ["pytest", "tests/no_such_file.py"],
+                          blocking=True, requires=("tests/no_such_file.py",))
+    monkeypatch.setattr(pp, "default_gates", lambda target="dharma_swarm/": [phantom])
+    rc = pp.main(["--tier", "deep"])
+    assert rc == 3  # distinct config-error exit: no verdict was produced
+    err = capsys.readouterr().err
+    assert "CONFIG ERROR" in err and "ghost" in err
+
+
 # --- evidence tiers --------------------------------------------------------- #
 
 

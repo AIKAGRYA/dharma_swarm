@@ -20,10 +20,17 @@ self-improvement is only safe if every candidate change is gated by trustworthy,
 multi-pramana verification with a hard blocking floor. This is that gate.
 
 Tiers (escalating cost; deeper tiers include the cheaper ones):
-    fast    every change   — pratyaksha (tests), anumana (ruff/mypy/clippy),
-                             upamana (reference vectors)
+    fast    every change   — pratyaksha (scoped tests), anumana (ruff; clippy
+                             when the native crate is present), upamana
+                             (reference vectors, when present)
     medium  pre-commit     — agama (hygiene, module-budget, verify-corral, trust)
     deep    pre-PR/period  — arthapatti (invariant/property/adversarial) — BLOCKING
+
+Registry integrity (post the 2026-07-04 phantom-gate audit): every path a
+default gate depends on is declared in ``GateSpec.requires`` and asserted to
+exist by ``validate_gates()`` before anything runs. A gate pointing at a
+nonexistent target is a CONFIG ERROR (exit 3), never a silent instant failure
+that masquerades as a REFUTED code verdict.
 
 The pure core (GateSpec -> PramanaResult -> CompositeValidation -> tier) has no
 I/O and is unit-tested with an injected runner; the subprocess shell is a thin
@@ -80,6 +87,10 @@ class GateSpec:
     cwd: Path | None = None
     # If True, a failure of THIS gate cannot be outweighed (true blocking).
     blocking: bool = False
+    # Repo-relative paths this gate targets. validate_gates() asserts each
+    # exists BEFORE anything runs, so a phantom target is a config error
+    # rather than an instant gate failure that reads as a code verdict.
+    requires: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -181,6 +192,26 @@ def select_gates(gates: Iterable[GateSpec], tier: str) -> list[GateSpec]:
     return [g for g in gates if _TIER_RANK[g.tier] <= ceiling]
 
 
+def validate_gates(gates: Iterable[GateSpec], root: Path | None = None) -> list[str]:
+    """Assert every gate's declared targets exist. Returns config errors.
+
+    A phantom gate (one whose ``requires`` path or ``cwd`` is missing) must be
+    a DISTINCT config error, not a REFUTED verdict: on 2026-07-04 the registry
+    shipped three gates pointing at files that existed only on a review branch,
+    and the probe reported REFUTED 0.0 on main for reasons that had nothing to
+    do with code truth. Callers must refuse to run when this returns errors.
+    """
+    base = root if root is not None else REPO_ROOT
+    errors: list[str] = []
+    for g in gates:
+        if g.cwd is not None and not g.cwd.is_dir():
+            errors.append(f"gate {g.name!r}: cwd does not exist: {g.cwd}")
+        for req in g.requires:
+            if not (base / req).exists():
+                errors.append(f"gate {g.name!r}: required target does not exist: {req}")
+    return errors
+
+
 # --------------------------------------------------------------------------- #
 # I/O shell — thin; the runner is injectable so the core stays pure            #
 # --------------------------------------------------------------------------- #
@@ -270,30 +301,58 @@ _NATIVE_CRATE = REPO_ROOT / "native" / "dharma_kernels"
 
 
 def default_gates(target: str = "dharma_swarm/") -> list[GateSpec]:
-    """A representative, runnable gate set. `target` scopes the path-based gates."""
+    """A representative, runnable gate set. `target` scopes the path-based gates.
+
+    Registry rules (2026-07-04 phantom-gate fix):
+    - Every path a gate depends on is declared in ``requires`` so
+      ``validate_gates()`` can refuse to run a phantom registry.
+    - The native-crate gates (cargo test/clippy) are existence-GUARDED: the
+      crate is deferred work absent on main (A2A_LOCAL_RECONCILIATION_HANDOFF),
+      so they join the registry only on checkouts that actually have it.
+    - mypy was dropped: it is not installed in the repo venv or CI, so the old
+      gate exited in ~36ms having verified nothing. Re-add it together with the
+      dependency, or not at all.
+    """
     gates = [
+        # fast — pratyaksha (direct perception: scoped tests actually executed;
+        # the highest-weighted pramana previously had NO gate at all)
+        GateSpec("pytest-scoped", PRATYAKSHA, "fast",
+                 ["python3", "-m", "pytest",
+                  "tests/test_pramana.py", "tests/test_pramana_probe.py", "-q"],
+                 requires=("tests/test_pramana.py", "tests/test_pramana_probe.py")),
         # fast — anumana (inference from static signs)
-        GateSpec("ruff", ANUMANA, "fast", ["ruff", "check", target, "--select=E,F,W", "--ignore=E501"]),
-        GateSpec("mypy", ANUMANA, "fast", ["python3", "-m", "mypy", target,
-                                           "--ignore-missing-imports", "--follow-imports=silent"]),
-        # fast — upamana (comparison to a frozen reference): native reference vectors
-        GateSpec("cargo-test", UPAMANA, "fast", ["cargo", "test", "--release", "--quiet"], cwd=_NATIVE_CRATE),
-        GateSpec("cargo-clippy", ANUMANA, "fast",
-                 ["cargo", "clippy", "--release", "--all-targets", "--", "-D", "warnings"], cwd=_NATIVE_CRATE),
+        GateSpec("ruff", ANUMANA, "fast",
+                 ["ruff", "check", target, "--select=E,F,W", "--ignore=E501"],
+                 requires=(target,)),
         # medium — agama (trusted testimony: governance/hygiene owners)
         GateSpec("hygiene-check", AGAMA, "medium",
-                 ["python3", "scripts/governance/hygiene/check_hygiene_integrity.py"]),
+                 ["python3", "scripts/governance/hygiene/check_hygiene_integrity.py"],
+                 requires=("scripts/governance/hygiene/check_hygiene_integrity.py",)),
         GateSpec("module-budget", AGAMA, "medium",
                  ["python3", "scripts/governance/check_module_budget.py",
-                  "--base-ref", "origin/main", "--head-ref", "HEAD"]),
+                  "--base-ref", "origin/main", "--head-ref", "HEAD"],
+                 requires=("scripts/governance/check_module_budget.py",)),
         GateSpec("verify-corral", AGAMA, "medium",
-                 ["python3", "scripts/governance/verify_corral_findings.py"]),
-        # deep — arthapatti (what MUST hold): the security/correctness invariants.
+                 ["python3", "scripts/governance/verify_corral_findings.py"],
+                 requires=("scripts/governance/verify_corral_findings.py",)),
+        # deep — arthapatti (what MUST hold): the computable invariants plus
+        # the NATS substrate contract — both real on main, both fast (<1s).
         # BLOCKING: a failure here cannot be outweighed by any amount of green.
         GateSpec("invariant-tests", ARTHAPATTI, "deep",
-                 ["python3", "-m", "pytest", "tests/test_canalization_ratchet.py", "-q"],
-                 blocking=True),
+                 ["python3", "-m", "pytest",
+                  "tests/test_invariants.py", "tests/test_nats_substrate_contract.py", "-q"],
+                 blocking=True,
+                 requires=("tests/test_invariants.py", "tests/test_nats_substrate_contract.py")),
     ]
+    if (_NATIVE_CRATE / "Cargo.toml").is_file():
+        gates.extend([
+            # fast — upamana (comparison to a frozen reference): native vectors
+            GateSpec("cargo-test", UPAMANA, "fast",
+                     ["cargo", "test", "--release", "--quiet"], cwd=_NATIVE_CRATE),
+            GateSpec("cargo-clippy", ANUMANA, "fast",
+                     ["cargo", "clippy", "--release", "--all-targets", "--", "-D", "warnings"],
+                     cwd=_NATIVE_CRATE),
+        ])
     return gates
 
 
@@ -305,7 +364,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     p.add_argument("--receipt", default=None, help="also write the receipt to this path")
     args = p.parse_args(argv)
 
-    report = run_probe(default_gates(args.target), tier=args.tier, runner=subprocess_runner)
+    gates = default_gates(args.target)
+    config_errors = validate_gates(gates)
+    if config_errors:
+        for err in config_errors:
+            print(f"PRAMANA PROBE CONFIG ERROR: {err}", file=sys.stderr)
+        print("refusing to run: a phantom gate is a config error, not a verdict",
+              file=sys.stderr)
+        return 3
+
+    report = run_probe(gates, tier=args.tier, runner=subprocess_runner)
     receipt = report.to_receipt()
 
     if args.receipt:
@@ -325,8 +393,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         if report.blocking_failures:
             print(f"  blocking failures: {report.blocking_failures}")
 
-    # CI semantics: green only when every gate passed AND the blocking floor
-    # holds. The verdict label still carries the nuanced tier for humans.
+    # CI semantics: 0 only when every gate passed (the verdict label still
+    # carries the nuanced tier for humans); 1 = at least one gate failed;
+    # 3 = phantom registry (config error — nothing ran, no verdict exists).
     return 0 if report.all_gates_passed else 1
 
 
