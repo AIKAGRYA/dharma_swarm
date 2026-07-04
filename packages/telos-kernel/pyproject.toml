@@ -36,8 +36,8 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["telos_kernel*"]
+include = ["telos_kernel*", "ucl_0*"]
 
 [tool.pytest.ini_options]
-testpaths = ["telos_kernel/tests"]
+testpaths = ["telos_kernel/tests", "ucl_0/tests"]
 timeout = 120
