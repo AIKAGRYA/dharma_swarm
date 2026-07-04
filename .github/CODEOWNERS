@@ -17,6 +17,19 @@
 /dharma_swarm/runtime_state.py          @AmitabhainArunachala
 /dharma_swarm/providers.py              @AmitabhainArunachala
 
+# Governance switch-set — the files that decide what the gates enforce.
+# Editing any of these changes the ceiling itself, so they are routed
+# explicitly and reviewed apart from ordinary code. The ratchet and
+# module-budget gates additionally grade their baselines from the
+# merge-base, so a PR cannot loosen these in the same diff it needs them.
+/docs/governance/hygiene/patterns/AI-M1.yaml            @AmitabhainArunachala
+/docs/governance/evidence_grades.yaml                   @AmitabhainArunachala
+/docs/governance/hygiene/ratchet_baselines.json         @AmitabhainArunachala
+/scripts/governance/check_module_budget.py              @AmitabhainArunachala
+/.github/workflows/pudgala-rigor.yml                    @AmitabhainArunachala
+/.github/workflows/quality-ratchet.yml                  @AmitabhainArunachala
+/.github/workflows/module-budget.yml                    @AmitabhainArunachala
+
 # Governance config — touch carefully
 /.github/                               @AmitabhainArunachala
 /.semgrep/                              @AmitabhainArunachala
