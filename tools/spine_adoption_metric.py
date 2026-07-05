@@ -233,7 +233,7 @@ SURFACE_RULES: tuple[SurfaceRule, ...] = (
         path_patterns=(
             "dharma_swarm/workflow.py",
             "dharma_swarm/checkpoint.py",
-            "dharma_swarm/durable_execution.py",
+            "dharma_swarm/graph/checkpoint.py",
             "dharma_swarm/canonical_replay.py",
         ),
         joined=(
