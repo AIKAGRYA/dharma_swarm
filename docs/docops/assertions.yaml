@@ -274,7 +274,8 @@
       "docs/ontology/SEMANTIC_COMMONS.md",
       "spec-forge/living-agent-kernel/MASTER_SPEC.md",
       "packages/telos-kernel/SECURITY.md",
-      "specs/TITANIUM_TELOS_GATES_SPEC_v3.md"
+      "specs/TITANIUM_TELOS_GATES_SPEC_v3.md",
+      "specs/memos/nagini_graduation_memo.md"
     ]
   },
   "auto_sections": {
