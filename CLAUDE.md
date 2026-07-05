@@ -377,7 +377,7 @@ Four separate registries; do not cross-pollinate formats:
 
 - `dharma_swarm/skills/*.skill.md` — **swarm subagent role definitions**, parsed by `dharma_swarm/skills.py` (`SkillRegistry`). Format contract: yaml-lite frontmatter ONLY (flat `key: value`, inline arrays `[a, b]`, one-level nesting for `context_weights`; block lists (`- item`) are silently dropped by the parser); first body block = description used for keyword matching; everything after = the agent's system prompt. Also discovered from `~/.dharma/skills/` and `.dharma/skills/`.
 - `.agents/skills/*/SKILL.md` — testing/verification playbooks for external coding agents (Devin etc.). Standard `name`/`description` frontmatter.
-- `.warp/skills/*/SKILL.md` — Warp/Oz operator skills (janitor, verifier, roast council). Each declares a hard authority boundary; never widen one to "get something done".
+- `.warp/skills/*/SKILL.md` — Warp/Oz operator skills (janitor, verifier, roast council, session-close ledger). Each declares a hard authority boundary; never widen one to "get something done".
 - `dharma_swarm/chetana/claude_code_plugin/` — the chetana memory plugin (skill + slash commands + hooks).
 
 **Gotcha:** `.claude/*` is gitignored (only `.claude/hooks/` and `.claude/settings.json` are tracked), so personal `.claude/skills/` and `.claude/agents/` never reach remote/cloud sessions. Anything an agent must see in every checkout belongs in one of the tracked registries above, not in `.claude/`.
