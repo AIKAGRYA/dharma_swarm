@@ -19,6 +19,11 @@ updated_at: 2026-07-05
   `docs/plans/2026-07-05-karpathy-llm-wiki-system-integration.md`.
 - The NAGA-IR language-womb research wiki is high priority and lives at
   `docs/research/naga-ir-language-womb-wiki.md`.
+- The commercial/evolutionary follow-on is high priority and lives at
+  `docs/research/2026-07-05-karpathy-wiki-obsidian-mcp-rsi-money-engine.md`.
+  Its current thesis is: sell verified evidence work first, use Obsidian as
+  cockpit, broker MCP through NAGA effects, and feed RSI through staged
+  experiment receipts rather than raw memory.
 
 ## open_contradictions
 
@@ -31,6 +36,8 @@ updated_at: 2026-07-05
 - NAGA-IR language-womb must prove it adds typechecker/evaluator semantics. If
   it only emits receipts after Python execution, it should fold back into
   governance.
+- The "money engine" is still a plan until a paid pilot closes. Track revenue
+  receipts separately from technical readiness.
 
 ## write_rules
 

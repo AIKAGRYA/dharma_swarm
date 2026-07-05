@@ -10,6 +10,7 @@ Start here:
 - [Brain Index](docs/brain/index.md)
 - [Brain Timeline](docs/brain/timeline.md)
 - [Karpathy LLM Wiki Integration Plan](docs/plans/2026-07-05-karpathy-llm-wiki-system-integration.md)
+- [Karpathy Wiki, Obsidian MCP, RSI, and Revenue Engine Deep Dive](docs/research/2026-07-05-karpathy-wiki-obsidian-mcp-rsi-money-engine.md)
 
 Rules:
 
@@ -18,4 +19,3 @@ Rules:
 - Append events to `docs/brain/timeline.md`; do not rewrite history there.
 - If a decision changes, update compiled truth and add a timeline entry with
   source refs.
-

@@ -323,3 +323,15 @@ The highest-leverage first slice is:
 
 That slice converts the current state from "healthy retrieval projection" into
 "agents are forced to use and improve the wiki method."
+
+## Follow-On Commercial And RSI Deep Dive
+
+The high-priority follow-on plan for turning this substrate into a revenue
+engine and self-evolution tool lives at:
+
+`docs/research/2026-07-05-karpathy-wiki-obsidian-mcp-rsi-money-engine.md`.
+
+Its core decision is to sell verified evidence work first, keep Obsidian as the
+operator cockpit, expose Obsidian MCP only through a Dharma/NAGA policy broker,
+and feed RSI through staged experiment receipts, contradiction queues, and
+dead-end ledgers.

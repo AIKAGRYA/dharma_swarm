@@ -12,3 +12,7 @@ This timeline is append-only. Add dated events when compiled truth changes.
   `docs/plans/2026-07-05-karpathy-llm-wiki-system-integration.md`.
 - Added the high-priority NAGA-IR language-womb research wiki:
   `docs/research/naga-ir-language-womb-wiki.md`.
+- Added the five-agent commercial/evolutionary deep dive for the Karpathy Wiki,
+  Obsidian MCP, NAGA authority gateway, Evidence Loom revenue wedge, and RSI
+  memory loop:
+  `docs/research/2026-07-05-karpathy-wiki-obsidian-mcp-rsi-money-engine.md`.
