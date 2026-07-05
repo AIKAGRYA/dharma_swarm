@@ -110,7 +110,11 @@ class GraphCheckpointStore:
             created_at=_utc_now_iso(),
         )
         self._checkpoints.append(record)
-        target = self._write_state()
+        try:
+            target = self._write_state()
+        except BaseException:
+            self._checkpoints.pop()
+            raise
         self._record_runtime_receipt(
             "checkpointed",
             {

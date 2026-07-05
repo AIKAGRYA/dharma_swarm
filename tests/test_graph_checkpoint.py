@@ -118,6 +118,29 @@ def test_superstep_regression_raises(tmp_path):
         store.checkpoint(superstep=1, node_id="b", state_ref="ref-1")
 
 
+def test_failed_write_rolls_back_in_memory_record(tmp_path, monkeypatch):
+    import os as os_module
+
+    store = GraphCheckpointStore("run-rollback", persist_dir=tmp_path / "ckpt")
+    store.checkpoint(superstep=0, node_id="a", state_ref="ref-0")
+
+    def _boom(src, dst):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(os_module, "replace", _boom)
+    with pytest.raises(OSError, match="disk full"):
+        store.checkpoint(superstep=1, node_id="failed", state_ref="ref-failed")
+    monkeypatch.undo()
+
+    latest = store.latest()
+    assert latest is not None
+    assert latest.node_id == "a"
+
+    store.checkpoint(superstep=1, node_id="b", state_ref="ref-1")
+    restored = GraphCheckpointStore.restore("run-rollback", persist_dir=tmp_path / "ckpt")
+    assert [c.node_id for c in restored.checkpoints] == ["a", "b"]
+
+
 def test_latest_empty_is_none(tmp_path):
     store = GraphCheckpointStore("run-empty", persist_dir=tmp_path / "ckpt")
     assert store.latest() is None
