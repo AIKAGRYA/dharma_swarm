@@ -30,16 +30,27 @@ services:
       - "7433:7433"   # health API: curl http://localhost:7433/health
     volumes:
       - dharma-state:/root/.dharma
-      - ./dharma_swarm:/app/dharma_swarm:ro  # hot-reload source
+      - ./dharma_swarm:/app/dharma_swarm:ro  # source is READ-ONLY (never mutable)
+      # PR-001: writable evolution surfaces are SEPARATE volumes, never source.
+      - evolution-worktrees:/evolution_worktrees          # scratch worktrees (rw)
+      - evolution-archive:/evolution_archive:ro           # immutable experiment artifacts
+      # Protected evaluator is mounted READ-ONLY when present. If absent,
+      # promotion-grade evaluation is unavailable (fail-closed).
+      - ${DHARMA_EVAL_MOUNT:-/dev/null}:/mnt/dharma_eval:ro
     environment:
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - GROQ_API_KEY=${GROQ_API_KEY:-}
-      - TINY_ROUTER_BACKEND=heuristic
-      - DHARMA_EVOLUTION_SHADOW=${DHARMA_EVOLUTION_SHADOW:-0}
-      - DGC_AUTONOMY_LEVEL=${DGC_AUTONOMY_LEVEL:-2}
-      - DHARMA_STATE_DIR=/root/.dharma
-      - GUARDIAN_INTERVAL_SECONDS=14400
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      TINY_ROUTER_BACKEND: heuristic
+      DHARMA_EVOLUTION_SHADOW: ${DHARMA_EVOLUTION_SHADOW:-1}
+      DGC_AUTONOMY_LEVEL: ${DGC_AUTONOMY_LEVEL:-1}
+      DHARMA_SELF_IMPROVE: ${DHARMA_SELF_IMPROVE:-0}
+      DHARMA_ALLOW_LIVE_MUTATION: ${DHARMA_ALLOW_LIVE_MUTATION:-0}
+      DHARMA_ALLOW_CUSTODIAN_MERGE: ${DHARMA_ALLOW_CUSTODIAN_MERGE:-0}
+      DHARMA_EVOLUTION_WORKTREE_ROOT: /evolution_worktrees
+      DHARMA_SPINE_DISPATCH: "1"
+      DHARMA_STATE_DIR: /root/.dharma
+      GUARDIAN_INTERVAL_SECONDS: "14400"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:7433/health"]
@@ -77,4 +88,9 @@ volumes:
   dharma-state:
     driver: local
   ginko-data:
+    driver: local
+  # PR-001: evolution surfaces kept SEPARATE from runtime state and from source.
+  evolution-worktrees:      # writable scratch worktrees for isolated experiments
+    driver: local
+  evolution-archive:        # immutable experiment artifacts (mounted read-only)
     driver: local
