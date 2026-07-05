@@ -16,12 +16,16 @@ from dharma_swarm.graph.durable_invoker import (
     receipt_from_dict,
     wrap_invoker,
 )
+from dharma_swarm.graph.effects import EffectsProvider, LiveEffects, SimulatedEffects
 
 __all__ = [
     "DispatchCheckpoint",
     "DuplicateDispatchInFlight",
     "DurableInvoker",
+    "EffectsProvider",
     "GraphCheckpointStore",
+    "LiveEffects",
+    "SimulatedEffects",
     "derive_graph_side_effect_key",
     "persist_evidence_receipt",
     "receipt_from_dict",

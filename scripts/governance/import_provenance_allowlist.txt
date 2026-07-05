@@ -16,6 +16,7 @@ huggingface_hub
 hypothesis
 lancedb
 langfuse
+langgraph
 mcp
 nats
 numpy
