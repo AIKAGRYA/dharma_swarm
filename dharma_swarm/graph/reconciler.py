@@ -130,8 +130,16 @@ class GraphReconciler:
 
     # -- boot / tick scan ---------------------------------------------------
 
-    async def reconcile(self, *, now: datetime | None = None) -> ReconcileReport:
-        """Scan for orphaned in-flight rows and requeue/quarantine/complete them."""
+    async def reconcile(
+        self, *, now: datetime | None = None, stale_only: bool = False
+    ) -> ReconcileReport:
+        """Scan for orphaned in-flight rows and requeue/quarantine/complete them.
+
+        At boot (``stale_only=False``) anything in-flight is orphaned by
+        definition (single-host daemon). On tick, dispatch tasks may still be
+        live in this process, so ``stale_only=True`` settles only runs whose
+        claim has expired (``stale_after < now``) or that carry a receipt.
+        """
         now = now or _utc_now()
         report = ReconcileReport()
         await self._runtime_state.init_db()
@@ -150,7 +158,9 @@ class GraphReconciler:
             ).fetchall()
             for row in rows:
                 try:
-                    await self._reconcile_run_row(db, row, now, report)
+                    await self._reconcile_run_row(
+                        db, row, now, report, stale_only=stale_only
+                    )
                 except (aiosqlite.Error, ValueError, KeyError) as exc:
                     logger.error(
                         "reconciler: failed to reconcile run %s: %s",
@@ -179,6 +189,8 @@ class GraphReconciler:
         row: aiosqlite.Row,
         now: datetime,
         report: ReconcileReport,
+        *,
+        stale_only: bool = False,
     ) -> None:
         run_id = str(row["run_id"])
         claim_id = str(row["claim_id"] or "")
@@ -188,6 +200,9 @@ class GraphReconciler:
         if receipt:
             await self._complete_from_receipt(db, row, claim_row, receipt, now)
             report.completed_from_receipt.append(run_id)
+            return
+
+        if stale_only and not self._claim_is_stale(claim_row, now):
             return
 
         started = claim_row is not None and bool(
@@ -363,6 +378,13 @@ class GraphReconciler:
                 (claim_id,),
             )
         ).fetchone()
+
+    @staticmethod
+    def _claim_is_stale(claim_row: aiosqlite.Row | None, now: datetime) -> bool:
+        if claim_row is None:
+            return False
+        stale_after = parse_ts(claim_row["stale_after"])
+        return stale_after is not None and stale_after < now
 
     async def _stamp_claim_recovered(
         self,

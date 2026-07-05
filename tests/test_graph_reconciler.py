@@ -262,6 +262,61 @@ async def test_unexpired_claim_not_recovered(runtime):
 
 
 # ---------------------------------------------------------------------------
+# stale_only (tick-time) gating
+# ---------------------------------------------------------------------------
+
+
+async def test_stale_only_skips_live_run(runtime):
+    _insert_run(runtime, "run-live", status="running", claim_id="claim-live")
+    _insert_claim(
+        runtime,
+        "claim-live",
+        status="running",
+        acked_at=(NOW - timedelta(minutes=1)).isoformat(),
+        stale_after=(NOW + timedelta(minutes=30)).isoformat(),
+    )
+
+    report = await GraphReconciler(runtime).reconcile(now=NOW, stale_only=True)
+
+    assert report.total_reconciled == 0
+    assert _get_run(runtime, "run-live")["status"] == "running"
+
+
+async def test_stale_only_settles_expired_claim_run(runtime):
+    _insert_run(runtime, "run-exp", status="running", claim_id="claim-exp")
+    _insert_claim(
+        runtime,
+        "claim-exp",
+        status="running",
+        acked_at=(NOW - timedelta(minutes=20)).isoformat(),
+        stale_after=(NOW - timedelta(minutes=5)).isoformat(),
+    )
+
+    report = await GraphReconciler(runtime).reconcile(now=NOW, stale_only=True)
+
+    assert report.requeued_runs == ["run-exp"]
+    assert _get_run(runtime, "run-exp")["status"] == "failed"
+
+
+async def test_stale_only_still_completes_from_receipt(runtime):
+    receipt = json.dumps({"status": "ok"})
+    _insert_run(
+        runtime, "run-sr", status="running", claim_id="claim-sr", receipt_json=receipt
+    )
+    _insert_claim(
+        runtime,
+        "claim-sr",
+        status="running",
+        stale_after=(NOW + timedelta(minutes=30)).isoformat(),
+    )
+
+    report = await GraphReconciler(runtime).reconcile(now=NOW, stale_only=True)
+
+    assert report.completed_from_receipt == ["run-sr"]
+    assert _get_run(runtime, "run-sr")["status"] == "completed"
+
+
+# ---------------------------------------------------------------------------
 # Idempotency and live-row predicate
 # ---------------------------------------------------------------------------
 

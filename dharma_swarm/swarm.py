@@ -1798,9 +1798,9 @@ class SwarmManager:
             )
         return self._graph_reconciler
 
-    async def reconcile_graph_runs(self) -> ReconcileReport:
+    async def reconcile_graph_runs(self, *, stale_only: bool = False) -> ReconcileReport:
         """Requeue-or-quarantine orphaned dispatch state (graph reconciler)."""
-        return await self._get_graph_reconciler().reconcile()
+        return await self._get_graph_reconciler().reconcile(stale_only=stale_only)
 
     async def reap_orphaned_tasks(self, *, stale_minutes: int = 30) -> list[Task]:
         """Requeue ASSIGNED/RUNNING tasks whose agents no longer exist in the pool.
@@ -2332,7 +2332,7 @@ class SwarmManager:
             # and heartbeat live claims (runs with rescue scan cadence).
             try:
                 tick_report = await asyncio.wait_for(
-                    self.reconcile_graph_runs(), timeout=10.0
+                    self.reconcile_graph_runs(stale_only=True), timeout=10.0
                 )
                 result["graph_reconciled"] = tick_report.total_reconciled
                 beaten = self._get_graph_reconciler().heartbeat_live_claims()
