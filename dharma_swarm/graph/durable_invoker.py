@@ -55,6 +55,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Optional
 from uuid import UUID
 
+from dharma_swarm.graph.effects import EffectsProvider, LiveEffects
 from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
 from dharma_swarm.spine.invoke import AgentInvoker
 from dharma_swarm.spine.receipt import EvidenceReceipt
@@ -230,6 +231,7 @@ class DurableInvoker:
         side_effect_key: str,
         stale_after_seconds: Optional[float] = None,
         result_provider: Optional[Callable[[], Any]] = None,
+        effects: Optional[EffectsProvider] = None,
     ) -> None:
         self._inner = inner
         self._store = store
@@ -237,6 +239,7 @@ class DurableInvoker:
         self._side_effect_key = side_effect_key
         self._stale_after_seconds = stale_after_seconds
         self._result_provider = result_provider
+        self._effects: EffectsProvider = effects or LiveEffects()
         self.memo_hit: bool = False
         self.memo_result: Any = None
         # Set when a completed claim's result was deliberately not memoized
@@ -335,7 +338,10 @@ class DurableInvoker:
             return False
         if updated.tzinfo is None:
             updated = updated.replace(tzinfo=timezone.utc)
-        age = (datetime.now(timezone.utc) - updated).total_seconds()
+        # The wrapper's OWN clock decides takeover (injectable via
+        # graph.effects) so a simulated run can drive stale takeover
+        # deterministically even though the store stale-marks on wall time.
+        age = (self._effects.now() - updated).total_seconds()
         return age >= self._stale_after_seconds
 
     # -- the wrapped call -----------------------------------------------------
@@ -636,6 +642,7 @@ def wrap_invoker(
     side_effect_key: str,
     stale_after_seconds: Optional[float] = None,
     result_provider: Optional[Callable[[], Any]] = None,
+    effects: Optional[EffectsProvider] = None,
 ) -> DurableInvoker:
     """Wrap an ``AgentInvoker`` with memo-check + begin/complete idempotency.
 
@@ -659,6 +666,10 @@ def wrap_invoker(
         Zero-arg callable returning the run result AFTER the inner call (the
         orchestrator's ``captured["result"]``); memoized alongside the
         receipt so a replay can return it.
+    effects:
+        Injectable clock/rng/dispatch-order provider (``graph.effects``);
+        defaults to ``LiveEffects``. Simulated runs pass ``SimulatedEffects``
+        so staleness decisions replay deterministically from a seed.
     """
     if not side_effect_key:
         raise ValueError("side_effect_key is required")
@@ -669,4 +680,5 @@ def wrap_invoker(
         side_effect_key=side_effect_key,
         stale_after_seconds=stale_after_seconds,
         result_provider=result_provider,
+        effects=effects,
     )
