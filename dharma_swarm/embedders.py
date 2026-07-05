@@ -8,6 +8,7 @@ Embedder, SentenceTransformerEmbedder, and TFIDFEmbedder.
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import logging
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
@@ -142,12 +143,11 @@ class TFIDFEmbedder:
         """Embed texts. Fits on first call if not already fitted."""
         if not texts:
             return []
-        try:
-            from sklearn.feature_extraction.text import TfidfVectorizer
-            from sklearn.decomposition import TruncatedSVD
-        except ImportError as exc:
-            logger.debug("scikit-learn not available: %s", exc)
-            # Fallback: zero vectors
+        if (
+            importlib.util.find_spec("sklearn.feature_extraction.text") is None
+            or importlib.util.find_spec("sklearn.decomposition") is None
+        ):
+            logger.debug("scikit-learn not available")
             return [[0.0] * self._dim for _ in texts]
 
         try:
@@ -313,4 +313,3 @@ class TFIDFEmbedder:
         except Exception as exc:
             self._last_error = f"_load_state failed: {exc}"
             logger.debug("TFIDFEmbedder._load_state failed: %s", exc)
-
