@@ -44,6 +44,7 @@ from dharma_swarm.a2a.a2a_server import (
     A2AServer,
     A2ATask,
     A2ATaskStatus,
+    A2ATransitionError,
 )
 from dharma_swarm.a2a.a2a_client import A2AClient
 from dharma_swarm.a2a.a2a_bridge import A2ABridge
@@ -77,6 +78,7 @@ __all__ = [
     "A2AServer",
     "A2ATask",
     "A2ATaskStatus",
+    "A2ATransitionError",
     "A2AClient",
     "A2ABridge",
     "A2ANatsTransport",
