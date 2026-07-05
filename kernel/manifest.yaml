@@ -1,0 +1,275 @@
+# Titanium Telos Gates v3 — machine-readable manifest
+#
+# Loaded and validated by `telos_kernel.manifest.load_manifest`.
+# Any change to this file requires a K=3/N=5 Ed25519 quorum signature
+# per U2 (Phase 1 activates enforcement; Phase 0 loads and boot-binds it).
+#
+# Signer set below is a STUB. Real Ed25519 public keys must replace the
+# placeholders before U2 transitions to enforced. Until then, the kernel
+# emits a WARN boot receipt (`signature_status: STUB`).
+#
+# TODO(signers): replace all `public_key_hex: STUB` entries with real
+# 32-byte Ed25519 public keys (64 hex chars) before Phase 1 lands
+# enforcement. Track in issue: <link when opened>.
+
+schema_version: v3.0
+version: phase-0.1
+
+invariants:
+  - id: U0
+    name: anekanta_context_indexing
+    predicate: >
+      Every gate-touching assertion carries an explicit context index φ
+      such that the compiled form is ∀x[φ(x) → p(x)]; unqualified claims
+      of svabhāva-like fact are violations.
+    measure: >
+      Count of distinct context_indices across {dravya, kṣetra, kāla, bhāva}
+      on proposal metadata; distinct-index check ¬[φᵢ ↔ φⱼ].
+    threshold:
+      min_indices: 3
+      require_non_overlap: true
+    receipt_type: U0_anekanta
+    falsification_test: benchmarks/telos_redteam/u0_pseudo_context.py
+    tier: A+B
+    citations:
+      - "[Ghose & Patra 2025](https://arxiv.org/html/2505.09333v1)"
+      - "[Abramsky & Brandenburger 2011](https://arxiv.org/abs/1102.0264)"
+    enforcement_status: declared
+
+  - id: U1
+    name: bypass_cost_asymmetry
+    predicate: >
+      Legitimate satisfaction is O(1); bypass is super-polynomial
+      (proof-of-work, cryptographic quorum, or capability-token forgery).
+    measure: bypass_cost_ratio = expected_bypass_cost / expected_compliant_cost
+    threshold:
+      high_salience_min_ratio: 1000
+      low_salience_min_ratio: 10
+    receipt_type: U1_bypass
+    falsification_test: benchmarks/telos_redteam/u1_jailbreak_bypass.py
+    tier: A+B
+    citations:
+      - "[Miller 2006, Robust Composition](https://worrydream.com/refs/Miller_2006_-_Robust_Composition.pdf)"
+    enforcement_status: declared
+
+  - id: U2
+    name: k2_quorum_on_manifest_edits
+    predicate: >
+      Any change to kernel/manifest.yaml requires K-of-N signed quorum
+      where signers are drawn from a capability-scoped signer set.
+    measure: valid Ed25519 signatures over SHA-256(manifest_diff || prev_root)
+    threshold:
+      k: 3
+      n: 5
+      require_prev_root_binding: true
+    receipt_type: U2_k2quorum
+    falsification_test: benchmarks/telos_redteam/u2_replay.py
+    tier: A+B
+    citations:
+      - "[Fagin, Halpern, Moses, Vardi — Reasoning About Knowledge](https://www.cs.rice.edu/~vardi/papers/book.pdf)"
+    enforcement_status: declared
+
+  - id: U3
+    name: sandbagging_self_model_divergence
+    predicate: >
+      Agent's stated capability profile must agree with revealed behavior
+      on a rolling capability probe within a bounded consistency margin.
+    measure: >
+      Ensemble of KL(P_stated || P_revealed), Anthropic defection probe,
+      Apart noise-injection sandbagging classifier, LM monitor.
+    threshold:
+      require_two_independent_detectors: true
+      fpr_calibration: 0.01
+    receipt_type: U3_sandbag
+    falsification_test: benchmarks/telos_redteam/u3_password_locked.py
+    tier: A+B
+    citations:
+      - "[Ward et al., Tall Tales at Different Scales](https://openreview.net/forum?id=YRXDl6I3j5)"
+      - "[Hubinger et al., Sleeper Agents](https://arxiv.org/abs/2401.05566)"
+      - "[Apollo Research, arXiv:2412.04984](https://arxiv.org/abs/2412.04984)"
+      - "[van der Weij et al., arXiv:2406.07358](https://arxiv.org/abs/2406.07358)"
+      - "[Apart, arXiv:2412.01784](https://arxiv.org/abs/2412.01784)"
+    enforcement_status: declared
+
+  - id: U4
+    name: no_hidden_causal_harm
+    predicate: >
+      For every (tainted source T, protected sink S) pair,
+      P(S | do(T=t)) = P(S | do(T=t')) for all t, t' (no derived causal flow).
+    measure: >
+      Tier A: O(V+E) reachability on labeled provenance DAG.
+      Tier B: y0 symbolic identification over ADMG.
+      Tier C: DoWhy identify_effect + refute_estimate cross-check.
+    threshold:
+      tier_a_reachability: zero_unlabeled_path
+      tier_b_require_identifiable_and_estimand_independent: true
+      tier_c_refutation_p_gt: 0.05
+    receipt_type: U4_pratitya
+    falsification_test: benchmarks/telos_redteam/u4_verma_hidden_flow.py
+    tier: A+B+C
+    citations:
+      - "[Shpitser & Pearl, JMLR 2008](https://www.jmlr.org/papers/volume9/shpitser08a/shpitser08a.pdf)"
+      - "[Huang & Valtorta, arXiv:1206.6831](https://arxiv.org/pdf/1206.6831.pdf)"
+    enforcement_status: declared
+
+  - id: U5
+    name: kernel_tamper_evidence_hash_chain
+    predicate: >
+      Every Merkle leaf L_i is bound to L_{i-1} such that
+      H(L_i) = SHA-256(JCS(payload_i) || H(L_{i-1})).
+    measure: verify_chain() returns (True, None) or (False, first_broken_index)
+    threshold:
+      any_break_triggers_quarantine: true
+      require_periodic_notary_anchor: true
+    receipt_type: U5_merkle
+    falsification_test: packages/telos-kernel/telos_kernel/tests/test_leaf_tamper.py
+    tier: A
+    citations:
+      - "[RFC 9162 Certificate Transparency](https://datatracker.ietf.org/doc/html/rfc9162)"
+      - "[RFC 8785 JCS](https://datatracker.ietf.org/doc/html/rfc8785)"
+    enforcement_status: enforced
+
+  - id: U6
+    name: monotone_wisdom_pressure
+    predicate: >
+      DarwinEngine acceptance requires composite fitness F non-decreasing on
+      the accepted-lineage front, with bypass_risk as a lexicographic hard
+      Pareto constraint.
+    measure: Pareto front over (F, -bypass_risk)
+    threshold:
+      bypass_risk_epsilon: 0.01
+    receipt_type: U6_paramita
+    falsification_test: benchmarks/telos_redteam/u6_dgm_poison.py
+    tier: B
+    citations:
+      - "[Wiegand PhD thesis, coevolutionary pathologies](https://www.cs.ucf.edu/~ecl/papers/03thesis.wiegand.pdf)"
+    enforcement_status: declared
+
+  - id: U7
+    name: contextual_fraction_device_independence
+    predicate: >
+      Empirical model admits non-contextual decomposition e = λ·e_NC + (1−λ)·e_SC
+      with CF(e) = 1 − λ ≤ ε_CF; high CF signals hidden-strategy-inexplicable
+      context dependence.
+    measure: >
+      Tier A: H^1 cohomological pre-witness.
+      Tier B: contextual-fraction LP via HiGHS + delayed column generation.
+      Tier C: Contextuality-by-Default for signalling models.
+    threshold:
+      cf_max: 0.05
+      cf_block_at: 0.20
+    receipt_type: U7_cf
+    falsification_test: benchmarks/telos_redteam/u7_ghz_ks_synthetic.py
+    tier: A+B+C
+    citations:
+      - "[Abramsky, Barbosa, Mansfield, arXiv:1705.07918](http://arxiv.org/abs/1705.07918)"
+      - "[Abramsky & Brandenburger, arXiv:1102.0264](https://arxiv.org/abs/1102.0264)"
+      - "[Kujala & Dzhafarov, arXiv:1903.07170](http://arxiv.org/abs/1903.07170)"
+    enforcement_status: declared
+
+  - id: U8
+    name: homotopy_invariance_of_telos_self
+    predicate: >
+      Every self-modification M: Self(t) → Self(t+1) requires a
+      telos-preserving path p: PathP (λi. Self(i)) pre post such that
+      transport p compliance_pre ≡ compliance_post.
+    measure: >
+      Tier A: bottleneck distance between persistent-homology diagrams over
+      sliding self-model embedding window.
+      Tier B: contraction proxy ‖z_t − z_{t−1}‖ / ‖z_{t−1} − z_{t−2}‖ < 1 − δ.
+      Tier C: Cubical Agda proof `agda --safe --cubical` exit 0, no unsolved metas.
+    threshold:
+      s_H_max: calibrated_per_embedding
+      contraction_max: 0.95
+      tier_c_required_for_u_invariant_touching_mods: true
+    receipt_type: U8_homotopy
+    falsification_test: benchmarks/telos_redteam/u8_identity_reset.py
+    tier: A+B+C
+    citations:
+      - "[Vezzosi–Mörtberg–Abel, ICFP 2019](https://dl.acm.org/doi/10.1145/3341691)"
+      - "[Poernomo, arXiv:2506.09671](https://arxiv.org/abs/2506.09671)"
+    enforcement_status: declared
+
+  - id: U9
+    name: epistemic_positive_introspection
+    predicate: >
+      For every fact φ tracked in the witness self-model, if K_w(φ) then
+      K_w(K_w(φ)) must be present as an explicit entry.
+    measure: >
+      Tier A: bounded propositional S4-4 closure check.
+      Tier B: persistent internal/external belief-set mismatch over τ_persist cycles.
+      Tier C: offline MCMAS CTLK verification of interpreted-system model.
+    threshold:
+      tier_a_missing_intros_max: 0
+      tier_b_tau_persist: 3
+    receipt_type: U9_introspect
+    falsification_test: benchmarks/telos_redteam/u9_missing_awareness.py
+    tier: A+B+C
+    citations:
+      - "[Fagin, Halpern, Moses, Vardi](https://www.cs.rice.edu/~vardi/papers/book.pdf)"
+      - "[Artemov, Justification Logic](https://sartemov.ws.gc.cuny.edu/files/2013/01/PhilCollSept2008.pdf)"
+      - "[Lomuscio et al., MCMAS CAV 2009](https://www.doc.ic.ac.uk/~alessio/papers/09/CAV-AL+.pdf)"
+    enforcement_status: declared
+
+  - id: U10
+    name: compositional_gate_semantics
+    predicate: >
+      Composition of gates across living layers is a well-typed morphism in
+      a symmetric monoidal category (Markov / discard-only causal SMC).
+      Bending wires is not the default; safety data must not flow backward.
+    measure: DisCoPy Diagram.normal_form() hash equality vs kernel reference
+    threshold:
+      require_normal_form_hash_match: true
+    receipt_type: U10_composition
+    falsification_test: benchmarks/telos_redteam/u10_uncopyable_data_forge.py
+    tier: B
+    citations:
+      - "[Coecke & Kissinger, Picturing Quantum Processes](https://api.pageplace.de/preview/DT0400.9781108110440_A29473090/preview-9781108110440_A29473090.pdf)"
+      - "[Tull, arXiv:1907.05172](http://arxiv.org/pdf/1907.05172.pdf)"
+    enforcement_status: declared
+
+  - id: U11
+    name: proof_carrying_self_modification
+    predicate: >
+      Every self-modification proposal ships a certificate that the modified
+      manifest preserves the prior invariant conjunction ⋀_i U_i.
+    measure: >
+      v1: Fiat-Shamir Σ-protocol over CF-witness (commit to
+      (modified_manifest, invariant_check_trace), challenge = merkle_log.head_hash).
+      v2 (roadmap): Nova/HyperNova folding IVC over relaxed R1CS.
+      v3 (long-horizon): RISC Zero / SP1 single-gate re-implementation.
+    threshold:
+      verify_time_ms_max: 100
+      reject_on_verify_failure: true
+    receipt_type: U11_pcc
+    falsification_test: benchmarks/telos_redteam/u11_forged_cert.py
+    tier: B
+    citations:
+      - "[Necula, PCC POPL 1997](https://www.cs.umd.edu/~jkatz/TEACHING/comp_sec_F04/downloads/pcc.pdf)"
+      - "[Nova ePrint 2021/370](https://par.nsf.gov/servlets/purl/10440508)"
+    enforcement_status: declared
+
+signer_set:
+  k: 3
+  n: 5
+  signers:
+    - key_id: signer_1
+      public_key_hex: STUB
+      role: kernel_maintainer
+      stub: true
+    - key_id: signer_2
+      public_key_hex: STUB
+      role: kernel_maintainer
+      stub: true
+    - key_id: signer_3
+      public_key_hex: STUB
+      role: safety_reviewer
+      stub: true
+    - key_id: signer_4
+      public_key_hex: STUB
+      role: safety_reviewer
+      stub: true
+    - key_id: signer_5
+      public_key_hex: STUB
+      role: external_auditor
+      stub: true

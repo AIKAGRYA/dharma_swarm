@@ -25,6 +25,8 @@ dependencies = [
     "uvicorn>=0.24",
     "numpy>=1.24",
     "pyyaml>=6.0",
+    "cryptography>=42.0",
+    "icontract>=2.6",
     "croniter>=2.0",
 ]
 

@@ -84,6 +84,9 @@ is no longer a forced first-read surface.
 | PR review / merge-control operations | `docs/ops/PR_REVIEW_CONTROL.md` | Merge Master Mike workflows, PR janitor playbook |
 | Merge authority charter (Merge Master Mike) | `docs/governance/MMM_CHARTER.md` | Defers to `docs/ops/PR_REVIEW_CONTROL.md` for operations and to `examples/agents/merge_master_mike.registration.json` for capabilities |
 | Action warrant | `docs/governance/FOURFOLD_ACTION_WARRANT.md` | — |
+| Titanium Telos kernel specification | `specs/TITANIUM_TELOS_GATES_SPEC_v3.md` | Defers to `kernel/manifest.yaml` and `packages/telos-kernel/` tests for executable enforcement |
+| Titanium Telos hardwiring plan | `docs/plans/TITANIUM_TELOS_HARDWIRING_PLAN.md` | Defers to PR state and CI for live readiness |
+| Telos kernel trust boundary | `packages/telos-kernel/SECURITY.md` | Defers to `packages/telos-kernel/telos_kernel/tests/test_import_boundary.py` and `packages/telos-kernel/telos_kernel/tests/test_tcb_loc.py` for enforcement |
 | Cybernetic loop closure state | `CYBERNETIC_LOOP_MAP.md` | Generated from `scripts/governance/cybernetics_codex_audit.py --json`; per-loop packets defer to it for current closure verdicts |
 | Cybernetics Codex operating protocol | `docs/agents/cybernetics_codex/PROTOCOLS.md` | Defers to Cybernetics Codex audit, `CYBERNETIC_LOOP_MAP.md`, and `reports/loop_closure/cybernetics_codex/` for live loop truth |
 | Agent onboarding (ops) | `docs/ops/AGENT_ONBOARDING.md`, `docs/ops/CODEX_TOOLBELT_ONBOARDING.md`, `docs/ops/A2A_AGENT_ONBOARDING.md`, `docs/ops/A2A_QUICKSTART.md` | — |
