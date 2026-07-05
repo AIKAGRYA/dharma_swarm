@@ -53,6 +53,7 @@ from telos_kernel.receipt import (
     new_proposal_id,
     now_iso_utc,
 )
+from telos_kernel.result import Err, KernelError, Ok, Result
 
 __all__ = [
     # Merkle
@@ -66,6 +67,8 @@ __all__ = [
     "new_root_key",
     # Notary
     "LocalFileAnchor", "NotaryAnchor", "AnchorReceipt",
+    # Result ADT
+    "Ok", "Err", "Result", "KernelError",
     # Certificate
     "Certificate", "verify_certificate",
     # Top-level ops
