@@ -14,7 +14,25 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 KIT = REPO_ROOT / "scripts" / "revenue_wedge" / "audit_kit.py"
-FIXTURE = Path(__file__).resolve().parent / "fixtures" / "revenue_wedge_target_repo"
+# The synthetic target repo's Python sources are committed as `*.py.txt` so the
+# parent repository's own CI (import-provenance ratchet, pytest collection)
+# never scans this fixture's planted slop. The kit must see real `.py` files, so
+# each test materializes the template tree into a tmp dir first.
+FIXTURE_TEMPLATE = Path(__file__).resolve().parent / "fixtures" / "revenue_wedge_target_repo"
+
+
+def materialize_fixture(dest: Path) -> Path:
+    """Copy the fixture template tree into ``dest``, renaming ``*.py.txt`` -> ``*.py``."""
+    for src in FIXTURE_TEMPLATE.rglob("*"):
+        if src.is_dir():
+            continue
+        rel = src.relative_to(FIXTURE_TEMPLATE)
+        if src.name.endswith(".py.txt"):
+            rel = rel.with_name(src.name[: -len(".txt")])
+        target = dest / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(src.read_bytes())
+    return dest
 
 EXPECTED_DETECTORS = {
     "hardcoded_secret_like",
@@ -36,10 +54,11 @@ def run_kit(*args: str) -> subprocess.CompletedProcess[str]:
 
 
 def scan_fixture(output_dir: Path, *extra: str) -> subprocess.CompletedProcess[str]:
+    target = materialize_fixture(output_dir / "_target")
     return run_kit(
         "scan",
         "--target-repo",
-        str(FIXTURE),
+        str(target),
         "--output-dir",
         str(output_dir),
         "--max-module-lines",
@@ -117,7 +136,7 @@ def test_git_provenance_counts_ai_attributed_commits(tmp_path: Path) -> None:
         pytest.skip("git binary unavailable")
 
     repo = tmp_path / "client_repo"
-    shutil.copytree(FIXTURE, repo)
+    materialize_fixture(repo)
 
     def git(*args: str) -> None:
         subprocess.run(
