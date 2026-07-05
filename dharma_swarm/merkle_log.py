@@ -62,6 +62,9 @@ class MerkleLog:
         This creates a tamper-evident chain where modifying any entry
         breaks all subsequent hashes.
         """
+        if self._corrupt:
+            raise ValueError("cannot append to corrupt Merkle log; repair or archive it first")
+
         # Get previous hash (or genesis hash)
         prev_root = self.hashes[-1] if self.hashes else b'\x00' * 32
 

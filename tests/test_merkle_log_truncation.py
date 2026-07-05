@@ -11,6 +11,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from dharma_swarm.merkle_log import MerkleLog
 
 
@@ -60,6 +62,23 @@ def test_entry_truncation_with_stale_count_fails_verify(tmp_path: Path) -> None:
 
     reloaded = MerkleLog(path)
     assert reloaded.verify_chain() == (False, 0)
+
+
+def test_append_to_corrupt_log_does_not_overwrite_evidence(tmp_path: Path) -> None:
+    path = tmp_path / "merkle.json"
+    _populated_log(path)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["hashes"] = data["hashes"][:-1]
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    corrupt_bytes = path.read_bytes()
+
+    reloaded = MerkleLog(path)
+    assert reloaded.verify_chain() == (False, 0)
+    with pytest.raises(ValueError, match="cannot append to corrupt Merkle log"):
+        reloaded.append({"mutation": "erase corrupt state"})
+
+    assert path.read_bytes() == corrupt_bytes
+    assert MerkleLog(path).verify_chain() == (False, 0)
 
 
 def test_bad_hex_hash_fails_verify(tmp_path: Path) -> None:
