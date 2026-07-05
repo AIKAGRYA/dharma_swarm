@@ -2299,6 +2299,14 @@ class SwarmManager:
             except Exception as me_exc:
                 logger.debug("Meta-evolution observation error: %s", me_exc)
 
+        # Heartbeat live claims every tick, before any staleness-gated
+        # reconcile: claim windows can be shorter than the rescue cadence.
+        try:
+            beaten = self._get_graph_reconciler().heartbeat_live_claims()
+            result["claims_heartbeaten"] = beaten
+        except Exception as exc:
+            logger.warning("Claim heartbeat failed (non-fatal): %s", exc)
+
         rescued: list[Task] = []
         now = datetime.now(timezone.utc)
         if (self._last_auto_rescue_scan is None
@@ -2329,14 +2337,12 @@ class SwarmManager:
                 logger.debug("Orphan reaper error", exc_info=True)
 
             # Graph reconciler: settle orphaned delegation_runs/task_claims
-            # and heartbeat live claims (runs with rescue scan cadence).
+            # (runs with rescue scan cadence; heartbeat already ran this tick).
             try:
                 tick_report = await asyncio.wait_for(
                     self.reconcile_graph_runs(stale_only=True), timeout=10.0
                 )
                 result["graph_reconciled"] = tick_report.total_reconciled
-                beaten = self._get_graph_reconciler().heartbeat_live_claims()
-                result["claims_heartbeaten"] = beaten
             except asyncio.TimeoutError:
                 logger.warning("reconcile_graph_runs timed out after 10s")
             except Exception as exc:
