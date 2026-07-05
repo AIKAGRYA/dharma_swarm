@@ -822,9 +822,17 @@ active_tracks:
       - dharma_swarm/workflow.py
       - dharma_swarm/topology_genome.py
       - dharma_swarm/checkpoint.py
+      - dharma_swarm/swarm.py            # Phase 0b reconciler wiring only (hot-path; [impact-checked])
+      - dharma_swarm/orchestrator.py     # Phase 0b seam call only (at module-budget ceiling; minimal edit)
+      - pyproject.toml                   # [test-oracle] extra only (shared file; coordinate)
+      - .github/workflows/langgraph-oracle.yml
       - tests/test_workflow.py
       - tests/test_topology_execution.py
       - tests/test_checkpoint.py
+      - tests/test_graph_checkpoint.py
+      - tests/test_graph_reconciler.py
+      - tests/test_graph_durable_invoker.py
+      - tests/test_langgraph_differential_oracle.py
       - docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md
       - docs/plans/handoffs/DHARMAGRAPH_HANDOFF_DEVIN.md
       - docs/plans/handoffs/DHARMAGRAPH_HANDOFF_CLAUDE.md
@@ -872,7 +880,7 @@ active_tracks:
         file: docs/plans/handoffs/DHARMAGRAPH_HANDOFF_DEVIN.md
       - id: phase0a_dead_engines_deleted
         kind: command_passes
-        command: ["test", "!", "-f", "dharma_swarm/workflow_graph.py"]
+        command: ["bash", "-c", "test ! -f dharma_swarm/workflow_graph.py && test ! -f dharma_swarm/durable_execution.py && ! grep -rE 'import (workflow_graph|durable_execution)|from dharma_swarm(\\.| import )(workflow_graph|durable_execution)' dharma_swarm/ tests/ --include='*.py' -q"]
       - id: phase0b_reconciler_tests_pass
         kind: test_passes
         test: tests/test_graph_reconciler.py
