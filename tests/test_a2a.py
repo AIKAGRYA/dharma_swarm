@@ -518,6 +518,26 @@ class TestA2ATerminalAbsorbing:
         with pytest.raises(A2ATransitionError):
             server.submit(done)
 
+    @pytest.mark.parametrize(
+        "status",
+        [A2ATaskStatus.WORKING, A2ATaskStatus.INPUT_REQUIRED, A2ATaskStatus.AUTH_REQUIRED],
+    )
+    def test_resubmit_in_flight_task_rejected(self, server, status):
+        calls = 0
+
+        def handler(task: A2ATask) -> A2ATask:
+            nonlocal calls
+            calls += 1
+            return task
+
+        server.set_default_handler(handler)
+        task = A2ATask(capability="x", status=status)
+        with pytest.raises(A2ATransitionError):
+            server.submit(task)
+
+        assert calls == 0
+        assert task.status == status
+
     def test_terminal_task_cannot_be_cancelled(self, server):
         for terminal in A2ATaskStatus.terminal_states():
             task = A2ATask(capability="x", status=terminal)

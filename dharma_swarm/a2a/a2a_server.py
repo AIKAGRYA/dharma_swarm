@@ -417,8 +417,7 @@ class A2AServer:
                 f"Cannot submit terminal task {task.id}: status "
                 f"{task.status.value} is absorbing"
             )
-        task.status = A2ATaskStatus.SUBMITTED
-        task.updated_at = datetime.now(timezone.utc).isoformat()
+        self._set_status(task, A2ATaskStatus.SUBMITTED)
 
         if not task.trace_id:
             task.trace_id = _inherit_trace_id()
