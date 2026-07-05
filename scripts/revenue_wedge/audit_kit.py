@@ -461,7 +461,15 @@ def main(argv: list[str] | None = None) -> int:
         print(f"wrote {report_path}")
         score = receipt["summary"]["slop_score_per_kloc"]
         if args.fail_threshold is not None and score > args.fail_threshold:
-            print(f"slop score {score} exceeds threshold {args.fail_threshold}")
+            # Explicit numeric coercion: both operands are floats (a slop ratio
+            # and a CLI threshold), never secrets. The cast is also a sanitizer
+            # barrier for CodeQL's clear-text-logging taint, which otherwise
+            # coarsely treats the whole receipt (built from scanned file text)
+            # as sensitive even though detect_secrets stores only labels.
+            print(
+                f"slop score {float(score):.4f} exceeds threshold "
+                f"{float(args.fail_threshold):.4f}"
+            )
             return 2
         return 0
 
