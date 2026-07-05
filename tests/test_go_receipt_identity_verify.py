@@ -168,6 +168,20 @@ def test_flipped_source_breaks_event_uid_chain(tmp_path: Path) -> None:
         load_go_evidence_receipt(path)
 
 
+def test_empty_source_url_is_rejected_even_when_identity_matches(tmp_path: Path) -> None:
+    event_uid = derive_event_uid(GOLDEN[0]["source"], "", GOLDEN[0]["content_hash"])
+    receipt_id = derive_receipt_id(GOLDEN[0]["correlation_id"], event_uid)
+    path = _write_receipt(
+        tmp_path / "missing_source_url.json",
+        GOLDEN[0],
+        source_url="",
+        event_uid=event_uid,
+        receipt_id=receipt_id,
+    )
+    with pytest.raises(GoEvidenceBridgeError, match="missing required identity fields"):
+        load_go_evidence_receipt(path)
+
+
 def test_cross_receipt_id_splice_is_rejected(tmp_path: Path) -> None:
     # Splice a receipt_id from a different correlation_id onto this event_uid.
     path = _write_receipt(

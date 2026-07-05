@@ -44,6 +44,7 @@ class GoEvidenceReceipt:
             self.receipt_id,
             self.correlation_id,
             self.source,
+            self.source_url,
             self.observed_at,
             self.content_hash,
             self.event_uid,
