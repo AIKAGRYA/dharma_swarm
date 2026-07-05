@@ -28,6 +28,7 @@ from telos_kernel.capabilities import (
     verify as verify_capability,
 )
 from telos_kernel.checker import Certificate, verify_certificate
+from telos_kernel.effects import Effect, effect
 from telos_kernel.manifest import (
     EnforcementStatus,
     InvariantSpec,
@@ -78,6 +79,7 @@ __version__ = "0.1.0"
 # explicit MerkleLog in. See SECURITY.md §4 (no ambient authority).
 
 
+@effect(Effect.FS_READ)
 def _sbom_digest() -> str:
     """Backwards-compat shim. Delegates to the I/O rim.
 
@@ -88,6 +90,7 @@ def _sbom_digest() -> str:
     return compute_sbom_digest()
 
 
+@effect(Effect.FS_READ, Effect.NONDETERMINISTIC)
 def boot(
     log: MerkleLog,
     manifest: Manifest,
@@ -129,6 +132,7 @@ def boot(
     return leaf
 
 
+@effect(Effect.NONDETERMINISTIC)
 def check(
     gate: str,
     tier: Tier,

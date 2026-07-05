@@ -88,6 +88,7 @@ is no longer a forced first-read surface.
 | Titanium Telos hardwiring plan | `docs/plans/TITANIUM_TELOS_HARDWIRING_PLAN.md` | Defers to PR state and CI for live readiness |
 | Telos kernel trust boundary | `packages/telos-kernel/SECURITY.md` | Defers to `packages/telos-kernel/telos_kernel/tests/test_import_boundary.py` and `packages/telos-kernel/telos_kernel/tests/test_tcb_loc.py` for enforcement |
 | Nagini graduation memo | `specs/memos/nagini_graduation_memo.md` | Defers to `packages/telos-kernel/telos_kernel/tests/test_nagini.py` and the kernel CI jobs for executable status |
+| Titanium verifier README | `packages/titanium-verify/README.md` | Defers to `packages/titanium-verify/titanium_verify/tests/` and the verifier CI job for executable status |
 | Cybernetic loop closure state | `CYBERNETIC_LOOP_MAP.md` | Generated from `scripts/governance/cybernetics_codex_audit.py --json`; per-loop packets defer to it for current closure verdicts |
 | Cybernetics Codex operating protocol | `docs/agents/cybernetics_codex/PROTOCOLS.md` | Defers to Cybernetics Codex audit, `CYBERNETIC_LOOP_MAP.md`, and `reports/loop_closure/cybernetics_codex/` for live loop truth |
 | Agent onboarding (ops) | `docs/ops/AGENT_ONBOARDING.md`, `docs/ops/CODEX_TOOLBELT_ONBOARDING.md`, `docs/ops/A2A_AGENT_ONBOARDING.md`, `docs/ops/A2A_QUICKSTART.md` | — |

@@ -24,6 +24,7 @@ import abc
 import datetime as _dt
 from dataclasses import dataclass
 
+from telos_kernel.effects import Effect, effect
 from telos_kernel.result import ERR_GIT_UNAVAILABLE, Err, KernelError, Ok, Result
 
 
@@ -41,6 +42,7 @@ class NotaryAnchor(abc.ABC):
         raise NotImplementedError
 
 
+@effect(Effect.NONDETERMINISTIC)
 def _now_iso_utc() -> str:
     return (
         _dt.datetime.now(_dt.timezone.utc)
@@ -75,6 +77,7 @@ class LocalFileAnchor(NotaryAnchor):
             "from telos_kernel._io.notary_fs instead",
         ))
 
+    @effect(Effect.NONDETERMINISTIC)
     def _build_receipt(self, root_hash: str) -> AnchorReceipt:
         head_r = self._git_head_result()
         head = head_r.unwrap() if head_r.is_ok else "no-git"
@@ -85,6 +88,7 @@ class LocalFileAnchor(NotaryAnchor):
             scheme="local-file+git",
         )
 
+    @effect(Effect.NONDETERMINISTIC)
     def anchor(self, root_hash: str) -> AnchorReceipt:
         """Pure receipt-construction. Persistence lives in the rim subclass."""
         return self._build_receipt(root_hash)

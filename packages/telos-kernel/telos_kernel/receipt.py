@@ -33,6 +33,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from telos_kernel.canonical import JSONValue, canonicalize
+from telos_kernel.effects import Effect, effect
 from telos_kernel.result import (
     ERR_INVALID_SIGNATURE,
     ERR_MALFORMED_HEX,
@@ -232,9 +233,14 @@ def _coerce_json(value: Any) -> JSONValue:
     )
 
 
+@effect(Effect.NONDETERMINISTIC)
 def now_iso_utc() -> str:
-    """Deterministic-timezone helper. Tests should monkeypatch this or
-    pass an explicit timestamp for determinism."""
+    """Deterministic-timezone helper.
+
+    Effect: NONDETERMINISTIC — reads the system clock via datetime.now().
+    Tests should monkeypatch this or pass an explicit timestamp for
+    determinism.
+    """
     return (
         _dt.datetime.now(_dt.timezone.utc)
         .replace(microsecond=0)
@@ -243,5 +249,11 @@ def now_iso_utc() -> str:
     )
 
 
+@effect(Effect.NONDETERMINISTIC)
 def new_proposal_id() -> str:
+    """Generate a fresh proposal id.
+
+    Effect: NONDETERMINISTIC — uuid.uuid4() draws from OS entropy.
+    Callers that want deterministic ids must pass an explicit id string.
+    """
     return str(uuid.uuid4())

@@ -11,7 +11,7 @@ import hashlib
 import sys
 from pathlib import Path
 
-from telos_kernel._io.effect import Effect, effect
+from telos_kernel.effects import Effect, effect
 
 
 @effect(Effect.FS_READ)

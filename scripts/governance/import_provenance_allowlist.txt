@@ -51,3 +51,4 @@ tree_sitter_typescript
 typer
 yaml
 yfinance
+z3

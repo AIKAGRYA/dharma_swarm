@@ -18,7 +18,7 @@ level that no core module calls into `_io`.
 """
 from __future__ import annotations
 
-from telos_kernel._io.effect import Effect, effect
+from telos_kernel.effects import Effect, effect
 from telos_kernel._io.manifest_loader import load_manifest_from_disk
 from telos_kernel._io.merkle_file_backend import FileBackendIO
 from telos_kernel._io.notary_fs import GitBoundLocalFileAnchor

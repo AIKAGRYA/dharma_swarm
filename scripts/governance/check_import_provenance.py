@@ -181,9 +181,15 @@ def declared_dists(root: Path) -> set[str]:
                 token = token.split(sep)[0]
             if token:
                 dists.add(_normalize_dist(token))
-    # pyproject.toml
-    pyproject = root / "pyproject.toml"
-    if pyproject.exists() and tomllib is not None:
+    # pyproject.toml. This repo also carries installable packages under
+    # packages/*, so their pyprojects are dependency manifests too.
+    pyprojects = [root / "pyproject.toml"]
+    packages_dir = root / "packages"
+    if packages_dir.exists():
+        pyprojects.extend(sorted(packages_dir.glob("*/pyproject.toml")))
+    for pyproject in pyprojects:
+        if not pyproject.exists() or tomllib is None:
+            continue
         try:
             data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
         except (tomllib.TOMLDecodeError, OSError):

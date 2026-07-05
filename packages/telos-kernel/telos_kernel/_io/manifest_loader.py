@@ -12,7 +12,7 @@ from typing import Any
 
 import yaml
 
-from telos_kernel._io.effect import Effect, effect
+from telos_kernel.effects import Effect, effect
 from telos_kernel.manifest import Manifest
 
 

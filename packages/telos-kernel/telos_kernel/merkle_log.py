@@ -21,13 +21,13 @@ from __future__ import annotations
 import abc
 import hashlib
 import math
-import json
 from pathlib import Path
 from typing import Any, Final, List, Tuple
 
 from icontract import ensure, require
 
 from telos_kernel.canonical import canonicalize
+from telos_kernel.effects import Effect, effect
 from telos_kernel.receipt import Leaf
 from telos_kernel.result import (
     ERR_CHAIN_BROKEN,
@@ -70,62 +70,21 @@ class MemoryBackend(Backend):
         self._payloads = list(payloads)
 
 
-class FileBackend(Backend):
-    """Atomic append-only file. Compatible with legacy on-disk format
-    (hex hashes under `hashes` key) plus a new `payloads` key. Legacy files
-    without `payloads` are auto-migrated on first load: an in-memory
-    reconstruction is attempted; if the reconstruction diverges from the
-    stored hashes, the load fails loudly rather than silently."""
+@effect(Effect.FS_READ, Effect.FS_WRITE)
+def FileBackend(path):  # noqa: N802  — preserved for backwards-compat.
+    """Legacy alias. Real implementation lives in the I/O rim.
 
-    VERSION: Final[int] = 3
+    The core module used to hold `FileBackend` directly; PR #1d moved it
+    to `telos_kernel._io.merkle_file_backend.FileBackendIO` so the core
+    stays pure. This shim preserves the import surface for callers that
+    do `from telos_kernel.merkle_log import FileBackend`.
 
-    def __init__(self, path: str | Path):
-        self.path = Path(path).expanduser()
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-
-    def load(self) -> Tuple[List[bytes], List[dict]]:
-        if not self.path.exists():
-            return [], []
-        try:
-            with open(self.path, "r", encoding="utf-8") as f:
-                raw = json.load(f)
-        except (OSError, json.JSONDecodeError, ValueError) as exc:
-            raise ValueError("corrupt Merkle log: unreadable JSON") from exc
-        if not isinstance(raw, dict) or not isinstance(raw.get("hashes"), list):
-            raise ValueError("corrupt Merkle log: expected object with hashes list")
-        try:
-            hashes = [bytes.fromhex(h) for h in raw["hashes"]]
-        except (TypeError, ValueError) as exc:
-            raise ValueError("corrupt Merkle log: bad hash encoding") from exc
-        if any(len(h) != 32 for h in hashes):
-            raise ValueError("corrupt Merkle log: bad hash length")
-        stored_count = raw.get("count")
-        if stored_count is not None and stored_count != len(hashes):
-            raise ValueError("corrupt Merkle log: stored count mismatch")
-        payloads_raw = raw.get("payloads", None)
-        if payloads_raw is None:
-            # Legacy file with no payloads. We cannot fully verify these; the
-            # kernel enters QUARANTINE on such a boot until an operator
-            # explicitly acknowledges (Phase 1 will add the ack workflow).
-            return hashes, [{} for _ in hashes]
-        if not isinstance(payloads_raw, list) or len(payloads_raw) != len(hashes):
-            raise ValueError("corrupt Merkle log: payload count mismatch")
-        return hashes, list(payloads_raw)
-
-    def save(self, hashes: List[bytes], payloads: List[dict]) -> None:
-        data = {
-            "version": self.VERSION,
-            "algorithm": "sha256",
-            "canonicalization": "rfc-8785-jcs",
-            "encoding": "utf-8",
-            "hashes": [h.hex() for h in hashes],
-            "count": len(hashes),
-            "payloads": payloads,
-        }
-        tmp = self.path.with_suffix(".tmp")
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, sort_keys=True)
-        tmp.replace(self.path)
+    New code should import `FileBackendIO` from `telos_kernel._io`
+    directly — the FS_WRITE effect is then visible at the call site.
+    """
+    # Local import so the core module has no top-level dependency on _io.
+    from telos_kernel._io.merkle_file_backend import FileBackendIO
+    return FileBackendIO(path)
 
 
 # ---- MerkleLog --------------------------------------------------------------
@@ -164,6 +123,7 @@ class MerkleLog:
                      Live gate checks should return REVIEW while quarantined.
     """
 
+    @effect(Effect.FS_READ, Effect.FS_WRITE)
     def __init__(self, backend: Backend | None = None,
                  log_file: str | Path | None = None):
         if backend is not None and log_file is not None:
