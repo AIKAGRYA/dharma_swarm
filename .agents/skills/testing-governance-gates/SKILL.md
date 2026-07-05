@@ -5,26 +5,24 @@ description: Test dharma_swarm CI governance gates, CI Truth rollups, and autome
 
 # Testing dharma_swarm Governance Gates
 
-Use this skill when validating changes to advisory/required CI gate semantics, automerge readiness, or CI Truth rollup evaluation.
+**Purpose:** prove the advisory/required split holds after a change — advisory governance checks may fail without blocking merge, while required checks always block. The invariant under test, in one sentence: **a governance failure is a warning; a required-CI failure is a merge blocker; a change that flips either direction is a bug.**
 
-## Devin Secrets Needed
-
-- None for local shell-only testing of CI Truth and automerge jq filters.
-- GitHub access is handled by Devin's built-in git/PR tools; do not require `GITHUB_TOKEN` for local rollup tests.
+Definitions (from `docs/governance/CI_TRUTH_CONTRACT.json`):
+- **Required check** — listed as required in the contract; failure ⇒ `verdict: FAIL` and an entry in `merge_blockers`.
+- **Advisory check** — governance signal (Coherence Delta, ACTIVE_TRACK gate, ...); failure ⇒ `verdict: DEGRADED`, `merge_blockers: []`.
 
 ## Environment
 
-- Prefer a clean checkout of merged `origin/main` or the PR branch under test.
-- If the checkout lacks `.venv`, you can run Python using the repo snapshot venv from the primary clone, for example:
-  ```bash
-  PYTHONPATH=/path/to/clean/checkout PATH=/home/ubuntu/repos/dharma-swarm/.venv/bin:$PATH \
-    /home/ubuntu/repos/dharma-swarm/.venv/bin/python ...
-  ```
-- Run `make onboard` in the primary repo before code investigation; it may update generated governance reports, so avoid using that dirty worktree for final assertions if those files affect the test.
+- Prefer a clean checkout of `origin/main` or the PR branch under test; run from its repo root (`cd "$(git rev-parse --show-toplevel)"`).
+- If the checkout lacks a `.venv`, either `python3 -m pip install -e ".[dev]"` or point `PYTHONPATH` at the clean checkout while borrowing another checkout's venv binary — but only after confirming that venv belongs to this repo and dependency set.
+- `make onboard` may regenerate governance reports and dirty the worktree; don't run final assertions in a worktree it just dirtied if those files feed the test.
+- No secrets or `GITHUB_TOKEN` needed for local rollup tests — everything below is shell-only against synthetic JSON.
 
-## Minimal Advisory-Gate Test
+## Procedure
 
-Create a synthetic rollup where required checks pass and advisory governance checks fail:
+### 1. Advisory-gate test (governance fails, required passes)
+
+Write a synthetic rollup to a temp file:
 
 ```json
 [
@@ -34,41 +32,46 @@ Create a synthetic rollup where required checks pass and advisory governance che
 ]
 ```
 
-Run:
-
 ```bash
 python scripts/runtime/ci_truth.py --rollup-json /path/to/rollup.json --json
 ```
 
-Expected:
+Expected: `verdict` = `DEGRADED`; `merge_blockers` = `[]`; `coherence_delta` and `active_track` appear under `advisory` with `status: "FAIL"`.
 
-- `verdict` is `DEGRADED`.
-- `merge_blockers` is `[]`.
-- `coherence_delta` and `active_track` appear in `advisory` with `status: "FAIL"`.
+### 2. Required-check control test (proves the gate still bites)
 
-## Required-Check Control Test
+Same rollup, but set `DocOps integrity gate` to `FAILURE`.
 
-Create the same rollup but set `DocOps integrity gate` to `FAILURE`.
+Expected: `verdict` = `FAIL`; `merge_blockers` contains a required-CI blocker for `docops_integrity`; the governance failures remain warnings. **Never ship the advisory test without this control** — a filter that ignores everything also "passes" test 1.
 
-Expected:
+### 3. Automerge filter test
 
-- `verdict` is `FAIL`.
-- `merge_blockers` contains a required-CI blocker for `docops_integrity`.
-- Governance failures remain warnings, not merge blockers.
+Extract the jq filter from `.github/workflows/automerge.yml` (read it from the workflow at test time — do not paste a remembered copy) and run it against two synthetic `statusCheckRollup` fixtures:
 
-## Automerge Filter Test
+1. Failed `Coherence Delta PR body` + failed `ACTIVE_TRACK governance gate` + failed `pytest (3.12)` → expect `not_green=1`.
+2. Only the two failed governance checks → expect `not_green=0`.
 
-Use the jq filter from `.github/workflows/automerge.yml` against two synthetic `statusCheckRollup` fixtures:
+Together these prove advisory checks are ignored without ignoring real blocking test failures.
 
-1. Failed `Coherence Delta PR body`, failed `ACTIVE_TRACK governance gate`, and failed `pytest (3.12)`.
-   - Expected `not_green=1`.
-2. Only failed `Coherence Delta PR body` and failed `ACTIVE_TRACK governance gate`.
-   - Expected `not_green=0`.
+## Output Format
 
-This proves advisory checks are ignored without ignoring real blocking test failures.
+```
+GOVERNANCE GATE VERDICT: PASS | FAIL
+- advisory-gate test:   verdict=<...> merge_blockers=<...>  (expected DEGRADED / [])
+- required-control test: verdict=<...> blocker=<...>         (expected FAIL / docops_integrity)
+- automerge filter:     case1 not_green=<n> case2 not_green=<n> (expected 1 / 0)
+```
+
+Attach the exact commands and rollup JSON used as artifacts. Command output is the evidence; do not record a screen video for shell-only tests.
 
 ## Common Gotchas
 
-- PR check runs may be stale after a PR is merged; verify the clean target checkout separately instead of assuming stale PR checks describe current `main`.
-- Synthetic rollups with only a few checks will produce many missing advisory warnings because the contract includes many advisory entries. This is okay if `merge_blockers` and the targeted advisory statuses match expectations.
-- Do not record a screen video for shell-only governance tests; provide command output artifacts instead.
+- PR check runs go stale after merge — verify against a clean target checkout, not stale PR check UI.
+- Small synthetic rollups produce many "missing advisory" warnings because the contract lists many advisory entries. That's fine as long as `merge_blockers` and the targeted advisory statuses match expectations.
+
+## Do NOT
+
+- Do not run only the advisory test — the required-check control is mandatory (a dead filter passes the first test).
+- Do not weaken or reclassify a required check to make a test pass; that's the exact failure this skill exists to catch.
+- Do not test against a jq filter pasted from memory — read it out of the workflow file in the checkout under test.
+- Do not require `GITHUB_TOKEN` or any secret for local rollup tests.

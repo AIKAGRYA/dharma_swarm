@@ -805,6 +805,126 @@ active_tracks:
       - Do not broadcast identical first-token memory to worker seats; decorrelation of priors is preserved by design.
       - Do not touch surfaces owned by the four sibling tracks except through their own next-items.
 
+  - id: dharmagraph-engine-2026-07
+    name: DharmaGraph — sovereign durable graph runtime consolidation
+    status: ACTIVE
+    opened_at: "2026-07-05"
+    verified_at: "2026-07-05"
+    ttl_days: 21
+    owner: "@AmitabhainArunachala"
+    serves: substrate-nativeness
+    complements:
+      - loop-closure-2026-06
+      - orchestration-arena-v1-2026-06
+      - organism-rewire-2026-07
+    owned_surfaces:
+      - dharma_swarm/graph/**
+      - dharma_swarm/workflow.py
+      - dharma_swarm/topology_genome.py
+      - dharma_swarm/checkpoint.py
+      - dharma_swarm/swarm.py            # Phase 0b reconciler wiring only (hot-path; [impact-checked])
+      - dharma_swarm/orchestrator.py     # Phase 0b seam call only (at module-budget ceiling; minimal edit)
+      - pyproject.toml                   # [test-oracle] extra only (shared file; coordinate)
+      - .github/workflows/langgraph-oracle.yml
+      - tests/test_workflow.py
+      - tests/test_topology_execution.py
+      - tests/test_checkpoint.py
+      - tests/test_graph_checkpoint.py
+      - tests/test_graph_reconciler.py
+      - tests/test_graph_durable_invoker.py
+      - tests/test_langgraph_differential_oracle.py
+      - docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md
+      - docs/plans/handoffs/DHARMAGRAPH_HANDOFF_DEVIN.md
+      - docs/plans/handoffs/DHARMAGRAPH_HANDOFF_CLAUDE.md
+    moves_vital_signs:
+      - quality_gates
+      - eval_coverage
+    target_closure_kind: CLOSED_NOT_PROD
+    claim_boundary: "Phases 0a-3 consolidate the engine federation onto one durable graph runtime. No production capability claim before the differential oracle is in CI; no topology-evolution unlock (Phase 6 wall stays operator-gated per organism-rewire D4)."
+
+    description: |
+      Operator-ratified 2026-07-05 from the engine audit + four-lane research
+      convoy (spec: docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md). The
+      sovereign LangGraph-class campaign: consolidate 5+ executors, 3
+      checkpoint mechanisms, and 3 workflow compilers onto ONE crash-resumable
+      graph engine in dharma_swarm/graph/, built on snapshot-per-superstep
+      durability over the existing runtime.db tables (zero new truth stores),
+      with the spine receipt log as the side-effect journal.
+
+      Phase order is doctrine: 0a dead-engine deletion; 0b run-level
+      crash-resume + exactly-once dispatch (chaos receipt is the gate for
+      everything downstream); 1 differential oracle vs real langgraph 1.2.4 +
+      DST harness BEFORE migration; 2 crown CompiledWorkflow / strangle the
+      god-classes; 3 channels+cycles+Send+fork; 4 receipt unification and
+      in-toto/Merkle/witness rungs (EU AI Act Art. 12 applicable 2026-08-02);
+      5 honest ratchet re-baseline; 6 evolution hook behind the zero-weight
+      wall.
+
+      Two agents run simultaneously on disjoint file lanes (Devin: 0a + 0b
+      reconciler; Claude instance: 0b durable_invoker + 1 oracle). Briefs in
+      docs/plans/handoffs/. Daemon host decision: ONE VPS for now (the
+      existing DigitalOcean droplet per RUNBOOK section 3e); a second host is
+      not justified until the daemon + oracle CI both run green on the first.
+
+    prerequisites:
+      - id: dharmagraph_spec_exists
+        kind: file_exists
+        file: docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md
+      - id: spine_invoke_seam_exists
+        kind: file_exists
+        file: dharma_swarm/spine/invoke.py
+
+    completion_criteria:
+      - id: handoff_briefs_exist
+        kind: file_exists
+        file: docs/plans/handoffs/DHARMAGRAPH_HANDOFF_DEVIN.md
+      - id: phase0a_dead_engines_deleted
+        kind: command_passes
+        command: ["bash", "-c", "test ! -f dharma_swarm/workflow_graph.py && test ! -f dharma_swarm/durable_execution.py && ! grep -rE 'import (workflow_graph|durable_execution)|from dharma_swarm(\\.| import )(workflow_graph|durable_execution)' dharma_swarm/ tests/ --include='*.py' -q"]
+      - id: phase0b_reconciler_tests_pass
+        kind: test_passes
+        test: tests/test_graph_reconciler.py
+      - id: phase0b_durable_invoker_tests_pass
+        kind: test_passes
+        test: tests/test_graph_durable_invoker.py
+      - id: phase1_oracle_tests_pass
+        kind: test_passes
+        test: tests/test_langgraph_differential_oracle.py
+      - id: spec_kill_criteria_stated
+        kind: file_contains
+        file: docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md
+        pattern: "Kill criterion"
+
+    next_items:
+      - id: 1
+        what: "Phase 0a (Devin lane): delete workflow_graph.py + test; absorb durable_execution.py atomic checkpoint/restore + _record_runtime_receipt hook into dharma_swarm/graph/checkpoint.py, then delete. Brief: docs/plans/handoffs/DHARMAGRAPH_HANDOFF_DEVIN.md"
+        kind: code
+        blocker: false
+      - id: 2
+        what: "Phase 0b reconciler (Devin lane): generalize operator_bridge.recover_stale_tasks pattern to delegation_runs; boot scan owned by SwarmManager.init + tick beside reap_orphaned_tasks; write recovered_at; heartbeat cadence; quarantine per loop_closure_quarantine convention. Chaos receipt (kill -9 -> reconcile -> zero double-execution) is the phase gate."
+        kind: code
+        blocker: true
+      - id: 3
+        what: "Phase 0b durable_invoker (Claude lane): new module dharma_swarm/graph/durable_invoker.py wrapping _orch_invoker (orchestrator.py:2471-2524) with idempotency begin/complete around runner.run_task + receipt memo-check. orchestrator.py is at module-budget ceiling — wrapper is a NEW module."
+        kind: code
+        blocker: true
+      - id: 4
+        what: "Phase 1 (Claude lane): differential oracle — [test-oracle] extra installing langgraph 1.2.4, dual-run diff harness over parity scenarios, CI job advisory then blocking. Net-new work (the parity harness is a self-graded clone). Gates all Phase 2/3 merges."
+        kind: code
+        blocker: true
+      - id: 5
+        what: "Operator: provision the ONE daemon VPS (existing droplet, RUNBOOK section 3e) so the Phase 0b reconciler runs against a live daemon; second VPS deferred until daemon + oracle CI green."
+        kind: ops
+        blocker: false
+
+    non_goals:
+      - Do not adopt langgraph as the runtime engine; it is reference semantics and a differential-test oracle only.
+      - Do not create any new truth store; durability lives on existing runtime.db tables + the CheckpointStore atomic-write pattern.
+      - Do not weaken any gate, ratchet, or the spine-ownership guard; new sqlite-touching modules carry spine headers where required.
+      - Do not wire arena elites into production routing (zero-weight doctrine; Phase 6 wall is an operator capability decision, sequenced per organism-rewire D4).
+      - Do not edit orchestrator.py beyond the minimal seam call (module-budget ceiling); new logic goes in dharma_swarm/graph/.
+      - Do not touch surfaces owned by sibling tracks except through their own next-items.
+
 closed_tracks:
   - id: runtime-truth-spine-adoption-2026-06
     name: Runtime Truth Spine — Adoption (god objects flow through invoke_agent)

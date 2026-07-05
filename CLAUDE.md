@@ -21,7 +21,7 @@ If this file disagrees with that output on anything live (track id, prereqs, rec
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active portfolio:** 4 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
+**Active portfolio:** 5 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
 
 **Spine objectives (each track serves one):**
 
@@ -207,6 +207,54 @@ diversity of agents.
 - Do not broadcast identical first-token memory to worker seats; decorrelation of priors is preserved by design.
 - Do not touch surfaces owned by the four sibling tracks except through their own next-items.
 
+### DharmaGraph — sovereign durable graph runtime consolidation
+
+**Track id:** `dharmagraph-engine-2026-07` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-07-05 (TTL 21 days)
+**Relations:** complements: loop-closure-2026-06, orchestration-arena-v1-2026-06, organism-rewire-2026-07
+**Owns surfaces:** dharma_swarm/graph/**, dharma_swarm/workflow.py, dharma_swarm/topology_genome.py, dharma_swarm/checkpoint.py, dharma_swarm/swarm.py, dharma_swarm/orchestrator.py, pyproject.toml, .github/workflows/langgraph-oracle.yml, tests/test_workflow.py, tests/test_topology_execution.py, tests/test_checkpoint.py, tests/test_graph_checkpoint.py, tests/test_graph_reconciler.py, tests/test_graph_durable_invoker.py, tests/test_langgraph_differential_oracle.py, docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md, docs/plans/handoffs/DHARMAGRAPH_HANDOFF_DEVIN.md, docs/plans/handoffs/DHARMAGRAPH_HANDOFF_CLAUDE.md
+**Moves vital signs:** quality_gates, eval_coverage
+
+Operator-ratified 2026-07-05 from the engine audit + four-lane research
+convoy (spec: docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md). The
+sovereign LangGraph-class campaign: consolidate 5+ executors, 3
+checkpoint mechanisms, and 3 workflow compilers onto ONE crash-resumable
+graph engine in dharma_swarm/graph/, built on snapshot-per-superstep
+durability over the existing runtime.db tables (zero new truth stores),
+with the spine receipt log as the side-effect journal.
+
+Phase order is doctrine: 0a dead-engine deletion; 0b run-level
+crash-resume + exactly-once dispatch (chaos receipt is the gate for
+everything downstream); 1 differential oracle vs real langgraph 1.2.4 +
+DST harness BEFORE migration; 2 crown CompiledWorkflow / strangle the
+god-classes; 3 channels+cycles+Send+fork; 4 receipt unification and
+in-toto/Merkle/witness rungs (EU AI Act Art. 12 applicable 2026-08-02);
+5 honest ratchet re-baseline; 6 evolution hook behind the zero-weight
+wall.
+
+Two agents run simultaneously on disjoint file lanes (Devin: 0a + 0b
+reconciler; Claude instance: 0b durable_invoker + 1 oracle). Briefs in
+docs/plans/handoffs/. Daemon host decision: ONE VPS for now (the
+existing DigitalOcean droplet per RUNBOOK section 3e); a second host is
+not justified until the daemon + oracle CI both run green on the first.
+
+**Next items:**
+
+- [code] Phase 0a (Devin lane): delete workflow_graph.py + test; absorb durable_execution.py atomic checkpoint/restore + _record_runtime_receipt hook into dharma_swarm/graph/checkpoint.py, then delete. Brief: docs/plans/handoffs/DHARMAGRAPH_HANDOFF_DEVIN.md
+- [code] (blocker) Phase 0b reconciler (Devin lane): generalize operator_bridge.recover_stale_tasks pattern to delegation_runs; boot scan owned by SwarmManager.init + tick beside reap_orphaned_tasks; write recovered_at; heartbeat cadence; quarantine per loop_closure_quarantine convention. Chaos receipt (kill -9 -> reconcile -> zero double-execution) is the phase gate.
+- [code] (blocker) Phase 0b durable_invoker (Claude lane): new module dharma_swarm/graph/durable_invoker.py wrapping _orch_invoker (orchestrator.py:2471-2524) with idempotency begin/complete around runner.run_task + receipt memo-check. orchestrator.py is at module-budget ceiling — wrapper is a NEW module.
+- [code] (blocker) Phase 1 (Claude lane): differential oracle — [test-oracle] extra installing langgraph 1.2.4, dual-run diff harness over parity scenarios, CI job advisory then blocking. Net-new work (the parity harness is a self-graded clone). Gates all Phase 2/3 merges.
+- [ops] Operator: provision the ONE daemon VPS (existing droplet, RUNBOOK section 3e) so the Phase 0b reconciler runs against a live daemon; second VPS deferred until daemon + oracle CI green.
+
+**Non-goals:**
+
+- Do not adopt langgraph as the runtime engine; it is reference semantics and a differential-test oracle only.
+- Do not create any new truth store; durability lives on existing runtime.db tables + the CheckpointStore atomic-write pattern.
+- Do not weaken any gate, ratchet, or the spine-ownership guard; new sqlite-touching modules carry spine headers where required.
+- Do not wire arena elites into production routing (zero-weight doctrine; Phase 6 wall is an operator capability decision, sequenced per organism-rewire D4).
+- Do not edit orchestrator.py beyond the minimal seam call (module-budget ceiling); new logic goes in dharma_swarm/graph/.
+- Do not touch surfaces owned by sibling tracks except through their own next-items.
+
 **Recently closed tracks:**
 
 - `runtime-truth-spine-adoption-2026-06` — Runtime Truth Spine — Adoption (god objects flow through invoke_agent) (SHIPPED, closed 2026-07-03)
@@ -260,7 +308,7 @@ For machine-readable status, run `python3 scripts/governance/check_track_status.
 - **LoopEngine** (`dharma_swarm/cascade.py`): F(S)=S universal convergence loop across 5 domains.
 - **DharmaKernel** (`dharma_swarm/dharma_kernel.py`): 25 immutable axioms (SHA-256 signed).
 - **MemoryKernel** (`dharma_swarm/memory_kernel/`): Canonical front door for agent memory context; legacy MemoryPlane, RuntimeState facts, MemoryPalace, MemoryLattice, vector, graph, log, and wiki stores are subordinate sources, adapters, projections, or promotion feeds.
-- **TelosGatekeeper** (`dharma_swarm/telos_gates.py`): 11 dharmic safety gates.
+- **TelosGatekeeper** (`dharma_swarm/telos_gates.py`): the dharmic safety gate battery (AHIMSA, SATYA, CONSENT, SVABHAAVA, ...). The gate count lives in the code, not here — this file has frozen wrong counts before; read `telos_gates.py` for the live battery.
 - **StigmergyStore** (`dharma_swarm/stigmergy.py`): Pheromone-trail coordination.
 - **CatalyticGraph** (`dharma_swarm/catalytic_graph.py`): Autocatalytic set detection (Tarjan SCC).
 - **StrangeLoop** (`dharma_swarm/strange_loop.py`): Organism self-modification engine.
@@ -277,7 +325,7 @@ For machine-readable status, run `python3 scripts/governance/check_track_status.
 3. **Skill generalization** — recombining capabilities beyond any single agent
 
 **Three necessary conditions** (all must hold, or transcendence fails):
-1. **Diversity of competence** — agents must have genuinely different capabilities, trained on different data, using different approaches. Same model prompted differently may NOT suffice. Different model families, different specializations, different error profiles. Measured via MAP-Elites behavioral diversity (`diversity_archive.py`).
+1. **Diversity of competence** — agents must have genuinely different capabilities, trained on different data, using different approaches. Same model prompted differently may NOT suffice. Different model families, different specializations, different error profiles. Measured via MAP-Elites behavioral diversity (`archive.py` `MAPElitesGrid`; `diversity_archive.py` is a deprecated shim).
 2. **Error decorrelation** — agent errors must be independent. If agents fail on the same inputs in the same way, aggregation provides no benefit. Correlated errors compound; decorrelated errors cancel. This is arithmetic: `E_ensemble = E_mean - E_diversity` (Krogh-Vedelsby). The diversity term directly subtracts from ensemble error.
 3. **Quality aggregation** — the mechanism that combines agent outputs must amplify agreement and suppress noise. Temperature concentration, weighted voting, Brier-scored selection, telos-gated filtering. Bad aggregation (simple averaging, loudest-voice-wins) kills the signal.
 
@@ -286,7 +334,7 @@ For machine-readable status, run `python3 scripts/governance/check_track_status.
 **What this means for every session**:
 - When adding agents: maximize behavioral diversity, not count. The 5th agent from a different model family adds more than the 50th agent from the same family.
 - When designing orchestration: route by specialty (skill selection), aggregate by quality weighting (skill denoising), recombine in cascade loops (skill generalization).
-- When evolving agents: DarwinEngine MUST preserve diversity. Pure fitness pressure → convergence → transcendence death. Use diversity-preserving selection (MAP-Elites in `diversity_archive.py`).
+- When evolving agents: DarwinEngine MUST preserve diversity. Pure fitness pressure → convergence → transcendence death. Use diversity-preserving selection (MAP-Elites in `archive.py`).
 - When measuring success: track the Krogh-Vedelsby diversity term, not just individual agent fitness. If diversity is falling, transcendence is dying regardless of individual performance.
 - When governing: telos gates and VSM channels are necessary but must be LIGHT. System 2 (damping) > System 3 (mandates). The governance cost of a gate is measured in diversity loss.
 
@@ -370,6 +418,17 @@ See [`docs/architecture/NAVIGATION.md`](docs/architecture/NAVIGATION.md) for the
 See [`docs/MEGAFILE_INDEX.md`](docs/MEGAFILE_INDEX.md) for the ten highest-system onboarding maps and their current status.
 See `README.md` for repo map and common commands.
 See `foundations/` for the 10-pillar intellectual genome.
+
+### Skills & Agent Role Registries (who reads which instruction files)
+
+Four separate registries; do not cross-pollinate formats:
+
+- `dharma_swarm/skills/*.skill.md` — **swarm subagent role definitions**, parsed by `dharma_swarm/skills.py` (`SkillRegistry`). Format contract: yaml-lite frontmatter ONLY (flat `key: value`, inline arrays `[a, b]`, one-level nesting for `context_weights`; block lists (`- item`) are silently dropped by the parser); first body block = description used for keyword matching; everything after = the agent's system prompt. Also discovered from `~/.dharma/skills/` and `.dharma/skills/`.
+- `.agents/skills/*/SKILL.md` — testing/verification playbooks for external coding agents (Devin etc.). Standard `name`/`description` frontmatter.
+- `.warp/skills/*/SKILL.md` — Warp/Oz operator skills (janitor, verifier, roast council, session-close ledger). Each declares a hard authority boundary; never widen one to "get something done".
+- `dharma_swarm/chetana/claude_code_plugin/` — the chetana memory plugin (skill + slash commands + hooks).
+
+**Gotcha:** `.claude/*` is gitignored (only `.claude/hooks/` and `.claude/settings.json` are tracked), so personal `.claude/skills/` and `.claude/agents/` never reach remote/cloud sessions. Anything an agent must see in every checkout belongs in one of the tracked registries above, not in `.claude/`.
 
 ## CRITICAL: Read Before Any Code Changes
 
