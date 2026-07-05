@@ -339,26 +339,57 @@ class GraphReconciler:
         )
 
     async def _requeue_tasks(self, report: ReconcileReport, now: datetime) -> None:
-        """Return requeued runs' underlying tasks to PENDING on the task board."""
-        if self._task_board is None or not report.requeued_runs:
+        """Settle reconciled runs' underlying tasks on the task board.
+
+        Requeued runs go back to PENDING; receipt-completed and quarantined
+        runs settle their board rows terminally so stale/orphan reapers do
+        not re-dispatch work the reconciler already decided.
+        """
+        if self._task_board is None:
             return
-        for run_id in report.requeued_runs:
+        settled = (
+            [(run_id, "requeue") for run_id in report.requeued_runs]
+            + [(run_id, "receipt") for run_id in report.completed_from_receipt]
+            + [(run_id, "quarantine") for run_id in report.quarantined_runs]
+        )
+        for run_id, action in settled:
             run = await self._runtime_state.get_delegation_run(run_id)
             if run is None or not run.task_id:
                 continue
             try:
-                await self._task_board.requeue(
-                    run.task_id,
-                    reason=f"Graph reconciler: orphaned run {run_id[:12]} requeued",
-                    metadata={"reconciled_at": now.isoformat()},
-                )
+                if action == "requeue":
+                    await self._task_board.requeue(
+                        run.task_id,
+                        reason=f"Graph reconciler: orphaned run {run_id[:12]} requeued",
+                        metadata={"reconciled_at": now.isoformat()},
+                    )
+                elif action == "receipt" and run.status == "completed":
+                    await self._task_board.complete(
+                        run.task_id,
+                        result=f"Graph reconciler: run {run_id[:12]} completed from receipt",
+                        metadata={"reconciled_at": now.isoformat()},
+                    )
+                else:
+                    await self._task_board.fail(
+                        run.task_id,
+                        error=(
+                            f"Graph reconciler: run {run_id[:12]} "
+                            + (
+                                "quarantined (retry-exhausted)"
+                                if action == "quarantine"
+                                else "failed per receipt"
+                            )
+                        ),
+                        metadata={"reconciled_at": now.isoformat()},
+                    )
             except KeyError:
                 logger.warning(
                     "reconciler: task %s for run %s not on board", run.task_id, run_id
                 )
             except Exception as exc:
                 logger.error(
-                    "reconciler: task board requeue failed for %s: %s",
+                    "reconciler: task board settle (%s) failed for %s: %s",
+                    action,
                     run.task_id,
                     exc,
                     exc_info=True,
@@ -373,18 +404,35 @@ class GraphReconciler:
         return await (
             await db.execute(
                 "SELECT claim_id, task_id, status, acked_at, heartbeat_at,"
-                " stale_after, recovered_at, retry_count, metadata_json"
+                " claimed_at, stale_after, recovered_at, retry_count, metadata_json"
                 " FROM task_claims WHERE claim_id = ?",
                 (claim_id,),
             )
         ).fetchone()
 
-    @staticmethod
-    def _claim_is_stale(claim_row: aiosqlite.Row | None, now: datetime) -> bool:
+    def _claim_is_stale(
+        self, claim_row: aiosqlite.Row | sqlite3.Row | None, now: datetime
+    ) -> bool:
+        """A claim is stale only past ``stale_after`` AND past its heartbeat lease.
+
+        ``heartbeat_claim_sync`` refreshes ``heartbeat_at`` but not
+        ``stale_after``, so a dispatch running past its original window is
+        still live as long as it keeps heartbeating within the lease.
+        """
         if claim_row is None:
             return False
         stale_after = parse_ts(claim_row["stale_after"])
-        return stale_after is not None and stale_after < now
+        if stale_after is None or stale_after >= now:
+            return False
+        heartbeat_at = parse_ts(claim_row["heartbeat_at"])
+        if heartbeat_at is None:
+            return True
+        claimed_at = parse_ts(claim_row["claimed_at"])
+        if claimed_at is not None and stale_after > claimed_at:
+            lease = (stale_after - claimed_at).total_seconds()
+        else:
+            lease = self._default_heartbeat_window * 3.0
+        return (now - heartbeat_at).total_seconds() >= lease
 
     async def _stamp_claim_recovered(
         self,
@@ -416,15 +464,15 @@ class GraphReconciler:
         placeholders = ",".join("?" for _ in IN_FLIGHT_STATUSES)
         rows = await (
             await db.execute(
-                "SELECT claim_id, stale_after, retry_count, metadata_json"
+                "SELECT claim_id, claimed_at, heartbeat_at, stale_after,"
+                " retry_count, metadata_json"
                 f" FROM task_claims WHERE status IN ({placeholders})"
                 " AND recovered_at IS NULL AND stale_after IS NOT NULL",
                 IN_FLIGHT_STATUSES,
             )
         ).fetchall()
         for row in rows:
-            stale_after = parse_ts(row["stale_after"])
-            if stale_after is None or stale_after >= now:
+            if not self._claim_is_stale(row, now):
                 continue
             claim_id = str(row["claim_id"])
             try:

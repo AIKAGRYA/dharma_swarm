@@ -74,6 +74,7 @@ def _insert_claim(
     status: str = "running",
     task_id: str = "task-1",
     acked_at: str | None = None,
+    claimed_at: str | None = None,
     heartbeat_at: str | None = None,
     stale_after: str | None = None,
     recovered_at: str | None = None,
@@ -88,7 +89,7 @@ def _insert_claim(
                 claim_id,
                 task_id,
                 status,
-                (NOW - timedelta(minutes=10)).isoformat(),
+                claimed_at or (NOW - timedelta(minutes=10)).isoformat(),
                 acked_at,
                 heartbeat_at,
                 stale_after,
@@ -357,9 +358,17 @@ async def test_quarantined_and_terminal_rows_skipped(runtime):
 class _StubBoard:
     def __init__(self) -> None:
         self.requeued: list[str] = []
+        self.completed: list[str] = []
+        self.failed: list[str] = []
 
     async def requeue(self, task_id: str, reason: str = "", metadata=None):
         self.requeued.append(task_id)
+
+    async def complete(self, task_id: str, result: str = "", metadata=None):
+        self.completed.append(task_id)
+
+    async def fail(self, task_id: str, error: str = "", metadata=None):
+        self.failed.append(task_id)
 
 
 async def test_requeued_run_requeues_task_on_board(runtime):
@@ -373,6 +382,56 @@ async def test_requeued_run_requeues_task_on_board(runtime):
 
     assert report.requeued_runs == ["run-board"]
     assert board.requeued == ["task-b"]
+
+
+async def test_terminal_reconciliations_settle_task_board(runtime):
+    board = _StubBoard()
+    _insert_run(
+        runtime,
+        "run-rc",
+        status="running",
+        claim_id="claim-rc",
+        task_id="task-rc",
+        receipt_json=json.dumps({"status": "ok"}),
+    )
+    _insert_claim(runtime, "claim-rc", status="running", task_id="task-rc")
+    _insert_run(
+        runtime, "run-qb", status="running", claim_id="claim-qb", task_id="task-qb"
+    )
+    _insert_claim(
+        runtime,
+        "claim-qb",
+        status="running",
+        task_id="task-qb",
+        acked_at=(NOW - timedelta(minutes=20)).isoformat(),
+        retry_count=3,
+    )
+
+    report = await GraphReconciler(runtime, task_board=board).reconcile(now=NOW)
+
+    assert report.completed_from_receipt == ["run-rc"]
+    assert report.quarantined_runs == ["run-qb"]
+    assert board.completed == ["task-rc"]
+    assert board.failed == ["task-qb"]
+
+
+async def test_heartbeated_claim_past_stale_after_not_stale(runtime):
+    _insert_run(runtime, "run-hb", status="running", claim_id="claim-hb")
+    _insert_claim(
+        runtime,
+        "claim-hb",
+        status="running",
+        acked_at=(NOW - timedelta(minutes=20)).isoformat(),
+        claimed_at=(NOW - timedelta(minutes=20)).isoformat(),
+        stale_after=(NOW - timedelta(minutes=5)).isoformat(),
+        heartbeat_at=(NOW - timedelta(seconds=30)).isoformat(),
+    )
+
+    report = await GraphReconciler(runtime).reconcile(now=NOW, stale_only=True)
+
+    assert report.total_reconciled == 0
+    assert _get_run(runtime, "run-hb")["status"] == "running"
+    assert _get_claim(runtime, "claim-hb")["recovered_at"] is None
 
 
 # ---------------------------------------------------------------------------
