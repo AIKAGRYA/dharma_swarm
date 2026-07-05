@@ -85,9 +85,11 @@ jobs:
       # PAT (contents+PR+actions write) used ONLY to dispatch the router
       # workflow. A run triggered by the built-in GITHUB_TOKEN cannot create
       # a new workflow run, so the router dispatch below silently no-ops and
-      # Mike's merge arm never fires. Falls back to GITHUB_TOKEN when unset
-      # (dispatch stays a no-op until the MIKE_PAT secret is added).
-      MIKE_PAT: ${{ secrets.MIKE_PAT }}
+      # Mike's merge arm never fires. Falls back to GITHUB_TOKEN when unset.
+      # Secret is named MERGEMASTERMIKE_PAT (not MIKE_PAT) in this repo --
+      # verified via `gh secret list`; a prior fix (#756) referenced the
+      # wrong name and shipped an inert no-op.
+      MIKE_PAT: ${{ secrets.MERGEMASTERMIKE_PAT }}
       GH_REPO: ${{ github.repository }}
       EVENT_NAME: ${{ github.event_name }}
       EVENT_PR: ${{ github.event.pull_request.number || github.event.inputs.pr || '' }}
