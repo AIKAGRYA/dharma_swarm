@@ -191,7 +191,9 @@ class MerkleLog:
         if self._corrupt or self.quarantined:
             raise ValueError("cannot append to corrupt Merkle log; repair or archive it first")
         if isinstance(data, Leaf):
-            payload_dict = data.model_dump()
+            # Hand-rolled projection, not `model_dump()`. Ensures the leaf
+            # hash covers exactly the bytes that were signed.
+            payload_dict = data.to_canonical_dict()
         else:
             payload_dict = dict(data)  # defensive copy
 

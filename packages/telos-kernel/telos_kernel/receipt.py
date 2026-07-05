@@ -32,7 +32,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 )
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from telos_kernel.canonical import canonicalize
+from telos_kernel.canonical import JSONValue, canonicalize
 
 SCHEMA_VERSION: Final[str] = "v3.0"
 
@@ -105,12 +105,43 @@ class Leaf(BaseModel):
         # Canonical form: 'YYYY-MM-DDTHH:MM:SSZ' or with fractional seconds
         return v
 
+    def to_canonical_dict(self) -> dict[str, JSONValue]:
+        """Hand-rolled, ordered projection to a JSONValue dict.
+
+        This deliberately does NOT go through Pydantic `model_dump()`.
+        Reasons:
+          1. Determinism — no dependency on Pydantic serialization
+             behavior across versions.
+          2. Hot-path latency — Tier A gates have a p95 <= 5 ms budget;
+             `model_dump()` walks the C descriptor for every field.
+          3. Verifiability — `titanium-verify` (packages/titanium-verify/)
+             can prove exhaustiveness of this projection; it cannot see
+             through Pydantic's descriptor.
+
+        A drift test (`tests/test_canonical_dict_matches_model_dump`)
+        keeps this in lockstep with the Pydantic model.
+        """
+        return {
+            "schema_version": self.schema_version,
+            "gate": self.gate,
+            "tier": self.tier.value,
+            "proposal_id": self.proposal_id,
+            "prev_merkle_root": self.prev_merkle_root,
+            "measure": _coerce_json(self.measure),
+            "threshold": _coerce_json(self.threshold),
+            "verdict": self.verdict.value,
+            "signature_status": self.signature_status.value,
+            "capability_signature": self.capability_signature,
+            "signer_key_id": self.signer_key_id,
+            "timestamp": self.timestamp,
+        }
+
     def signing_bytes(self) -> bytes:
         """JCS-canonical bytes of the payload with `capability_signature` blanked.
 
         This is what Ed25519 signs. Verifying re-computes this and compares.
         """
-        payload = self.model_dump()
+        payload = self.to_canonical_dict()
         payload["capability_signature"] = ""
         return canonicalize(payload)
 
@@ -143,6 +174,33 @@ class Leaf(BaseModel):
             return True
         except (InvalidSignature, ValueError):
             return False
+
+
+def _coerce_json(value: Any) -> JSONValue:
+    """Deep-coerce a nested dict/list to JSONValue, rejecting non-JCS types.
+
+    This is applied to `measure` and `threshold` (which are `dict[str, Any]`
+    at the Pydantic layer). Every leaf must already be a JSONValue; we do not
+    silently stringify — unknown types raise so callers see the problem
+    immediately.
+    """
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, (list, tuple)):
+        return [_coerce_json(v) for v in value]
+    if isinstance(value, dict):
+        out: dict[str, JSONValue] = {}
+        for k, v in value.items():
+            if not isinstance(k, str):
+                raise ValueError(
+                    f"canonical dict keys must be str, got {type(k).__name__!r}"
+                )
+            out[k] = _coerce_json(v)
+        return out
+    raise ValueError(
+        f"cannot coerce {type(value).__name__!r} to JSONValue "
+        f"(only None, bool, int, float, str, list, tuple, dict allowed)"
+    )
 
 
 def now_iso_utc() -> str:

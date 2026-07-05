@@ -20,7 +20,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from icontract import ensure, require
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from telos_kernel.canonical import canonicalize
+from telos_kernel.canonical import JSONValue, canonicalize
 
 MANIFEST_SCHEMA_VERSION: Final[str] = "v3.0"
 
@@ -98,9 +98,19 @@ class Manifest(BaseModel):
 
     # ---- Derived accessors ----
 
+    def to_canonical_dict(self) -> dict[str, JSONValue]:
+        """Hand-rolled canonical projection. See `Leaf.to_canonical_dict` for
+        why we do not use `model_dump()` on the signing/hashing path."""
+        return {
+            "schema_version": self.schema_version,
+            "version": self.version,
+            "invariants": [_invariant_to_dict(i) for i in self.invariants],
+            "signer_set": _signer_set_to_dict(self.signer_set),
+        }
+
     def content_hash(self) -> str:
         """SHA-256 of the JCS-canonical manifest bytes (excluding signatures)."""
-        payload = self.model_dump()
+        payload = self.to_canonical_dict()
         # Signatures live external to the manifest object; the hash covers
         # the whole schema-versioned document.
         return hashlib.sha256(canonicalize(payload)).hexdigest()
@@ -165,6 +175,49 @@ class Manifest(BaseModel):
             if valid >= k:
                 return True
         return False
+
+
+# ---- Canonical-projection helpers ------------------------------------------
+
+def _invariant_to_dict(i: InvariantSpec) -> dict[str, JSONValue]:
+    return {
+        "id": i.id,
+        "name": i.name,
+        "predicate": i.predicate,
+        "measure": i.measure,
+        "threshold": _coerce_json_manifest(i.threshold),
+        "receipt_type": i.receipt_type,
+        "falsification_test": i.falsification_test,
+        "tier": i.tier,
+        "citations": list(i.citations),
+        "enforcement_status": i.enforcement_status.value,
+    }
+
+
+def _signer_set_to_dict(v: dict[str, Any]) -> dict[str, JSONValue]:
+    return {
+        "k": int(v["k"]),
+        "n": int(v["n"]),
+        "signers": [
+            {
+                "key_id": s["key_id"],
+                "public_key_hex": s["public_key_hex"],
+                "role": s["role"],
+                "stub": bool(s.get("stub", s["public_key_hex"] == "STUB")),
+            }
+            for s in v["signers"]
+        ],
+    }
+
+
+def _coerce_json_manifest(value: Any) -> JSONValue:
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, (list, tuple)):
+        return [_coerce_json_manifest(x) for x in value]
+    if isinstance(value, dict):
+        return {str(k): _coerce_json_manifest(v) for k, v in value.items()}
+    raise ValueError(f"cannot coerce {type(value).__name__!r} to JSONValue")
 
 
 # ---- Loader ----------------------------------------------------------------

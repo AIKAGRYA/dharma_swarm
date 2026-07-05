@@ -55,6 +55,15 @@ class TestJcsBasics:
         with pytest.raises(ValueError):
             canonicalize(float("-inf"))
 
+    def test_float_ecmascript_thresholds(self):
+        assert canonicalize(1e-6) == b"0.000001"
+        assert canonicalize(-1e-6) == b"-0.000001"
+        assert canonicalize(1.234e-5) == b"0.00001234"
+        assert canonicalize(1e-7) == b"1e-7"
+        assert canonicalize(1e20) == b"100000000000000000000"
+        assert canonicalize(1e21) == b"1e+21"
+        assert canonicalize(1.23e21) == b"1.23e+21"
+
     def test_rejects_non_string_key(self):
         with pytest.raises(ValueError):
             canonicalize({1: "x"})

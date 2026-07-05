@@ -19,7 +19,17 @@ from __future__ import annotations
 
 import json
 import math
-from typing import Any, Final
+from typing import Any, Final, Union
+
+# Discriminated union of everything JCS accepts. Every value in a signed
+# payload must be a JSONValue; anything else raises before we reach the
+# encoder. This eliminates `Any` on the signing path and lets
+# `titanium-verify` (packages/titanium-verify/) reason about exhaustiveness
+# of the isinstance chain in `_encode`.
+JSONValue = Union[
+    None, bool, int, float, str,
+    list["JSONValue"], tuple["JSONValue", ...], dict[str, "JSONValue"],
+]
 
 MAX_DEPTH: Final[int] = 64
 """Maximum nesting depth. Signed payloads deeper than this are rejected;
@@ -107,16 +117,47 @@ def _encode_float(value: float, out: list[str]) -> None:
     if value.is_integer() and abs(value) < 1e21:
         out.append(str(int(value)))
         return
-    # Python's repr() produces the shortest round-trip form for floats
-    # (PEP 3101 / Gay's algorithm), which matches ECMAScript ToString
-    # for typical magnitudes. We normalize scientific notation to match
-    # ECMAScript's `e+NN` / `e-NN` form.
     s = repr(value)
+    abs_value = abs(value)
+    if 1e-6 <= abs_value < 1e21:
+        if "e" in s:
+            s = _expand_exponent_decimal(s)
+        out.append(s)
+        return
+    # Python's repr() produces the shortest round-trip form for floats
+    # (PEP 3101 / Gay's algorithm). Outside the decimal threshold range,
+    # normalize scientific notation to ECMAScript's `e+N` / `e-N` form.
     if "e" in s:
         mantissa, exp = s.split("e")
+        if "." in mantissa:
+            mantissa = mantissa.rstrip("0").rstrip(".")
         exp_int = int(exp)
         s = f"{mantissa}e{'+' if exp_int >= 0 else '-'}{abs(exp_int)}"
     out.append(s)
+
+
+def _expand_exponent_decimal(value: str) -> str:
+    sign = ""
+    if value.startswith("-"):
+        sign = "-"
+        value = value[1:]
+    mantissa, exponent = value.split("e")
+    exp = int(exponent)
+    if "." in mantissa:
+        int_part, frac_part = mantissa.split(".")
+    else:
+        int_part, frac_part = mantissa, ""
+    digits = int_part + frac_part
+    point = len(int_part) + exp
+    if point <= 0:
+        body = "0." + ("0" * abs(point)) + digits
+    elif point >= len(digits):
+        body = digits + ("0" * (point - len(digits)))
+    else:
+        body = digits[:point] + "." + digits[point:]
+    if "." in body:
+        body = body.rstrip("0").rstrip(".")
+    return sign + body
 
 
 def _encode_string(value: str, out: list[str]) -> None:
