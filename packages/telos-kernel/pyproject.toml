@@ -30,8 +30,8 @@ dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.21",
     "hypothesis>=6.100",
-    # Nagini and Crosshair are optional in Phase 0 (installed by CI); tests skip
-    # cleanly if unavailable so local dev remains ergonomic.
+    # Crosshair is installed by CI; tests skip cleanly if unavailable so local
+    # dev remains ergonomic.
     "crosshair-tool>=0.0.50",
 ]
 

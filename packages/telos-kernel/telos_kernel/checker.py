@@ -4,7 +4,7 @@ Phase 0: stub. Real verifier lands in Phase 6 (Fiat-Shamir Σ-protocol v1).
 Phase 8 research spike adds Nova/Sonobe folding IVC.
 
 This stub exists so the kernel `__init__.py` has a stable import surface and
-`test_nagini.py` has a target from day one.
+`titanium-verify` has a target from day one (see packages/titanium-verify/).
 """
 from __future__ import annotations
 
