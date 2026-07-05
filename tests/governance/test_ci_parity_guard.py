@@ -70,6 +70,11 @@ def test_help_available() -> None:
     assert "CI parity guard" in result.stdout
 
 
+def test_workflow_fetch_uses_admin_read_secret() -> None:
+    workflow = (WORKFLOWS / "ci-parity.yml").read_text(encoding="utf-8")
+    assert "secrets.CI_PARITY_ADMIN_READ_TOKEN || github.token" in workflow
+
+
 def test_aligned_state_is_green(tmp_path: Path) -> None:
     """The committed manifest matched to the real workflows and the actual
     required-context set is aligned -> exit 0."""
