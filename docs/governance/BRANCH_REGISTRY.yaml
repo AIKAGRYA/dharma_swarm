@@ -1,0 +1,26 @@
+# Branch registry — TTL-exempt lineages for scripts/governance/branch_janitor.py.
+#
+# Branches matching an entry here are NEVER touched by the janitor, regardless
+# of PR state, tip evidence, or idle time. Keep this list small; every entry
+# needs a single-line reason. Two entry kinds:
+#   - branch: exact ref name
+#   - pattern: fnmatch glob (e.g. titanium/*)
+#
+# Values must stay single-line scalars: the janitor falls back to a minimal
+# stdlib parser when PyYAML is unavailable (scripts/governance is stdlib-only).
+#
+# Seeded 2026-07-04 from the branch/sprawl dive (section 5.3): lineage and
+# active-stack branches that a TTL sweep must not judge.
+version: 1
+updated: "2026-07-04"
+exempt:
+  - branch: agent/magpie-seed
+    reason: "Live daemon lineage; operator primary checkout and dw-worktrees/mem branch off it (dive section 2)"
+  - branch: feat/rsi-lab
+    reason: "Active research lane, 58 ahead, live worktree ds_forge_spine_v0 (dive section 4 KEEP)"
+  - pattern: titanium/*
+    reason: "Titanium stack PRs 763-768; draft stack under active repair (dive section 3)"
+  - pattern: telos_titanium/*
+    reason: "Titanium research lane: PR 773 naga_ir plus dharma_lane_research feed (dive section 3)"
+  - pattern: weaver/*
+    reason: "Weaver PRs 769-770, active operator lane (dive section 3)"
