@@ -263,10 +263,16 @@ Add or wire these hooks incrementally:
 
 - `make wiki-gate`: run wiki live gate plus section retrieval smoke.
 - `make memory-metabolize`: run `dgc memory metabolize`.
+- `make wiki-orphan-status`: render total atoms, orphan count, semantic-density
+  coverage, missing source/status/PARA counts, and sample orphan slugs.
+- `make wiki-orphan-upgrade`: enrich orphan atoms with stronger YAML,
+  source-hardening status, cross-pollination targets, ideation seeds, and an
+  inbound MOC anchor; regenerate the wiki index; re-ingest concepts; run the
+  live vector gate.
 - `make brain-lint`: validate `BRAIN.md`, `docs/brain/**`, and wiki links.
 - `make agent-memory-contract`: validate closeout receipts for memory fields.
 - `make karpathy-wiki-ci`: aggregate wiki gate, brain lint, onboarding truth,
-  writeback schema, and metabolism smoke.
+  orphan absence, writeback schema, and metabolism smoke.
 
 CI policy:
 
@@ -288,6 +294,17 @@ Runtime policy:
 - Daily cron runs metabolism and writes a receipt.
 - Weekly audit checks stale pages, orphan pages, contradictions, dead ends, and
   group-memory drift.
+
+Orphan rule:
+
+- An atom with zero inbound backlinks is not culturally adopted, even if it is
+  beautifully written.
+- Orphan recovery is not cosmetic tagging. The recovery pass must create real
+  graph edges through MOC anchors and must attach source quality, review status,
+  cross-pollination targets, and ideation prompts.
+- `make karpathy-wiki-ci` treats orphan count as a hard local contract. Legacy
+  schema debt may remain visible, but newly isolated atoms should not silently
+  accumulate.
 
 ## Agent Seed Packet
 

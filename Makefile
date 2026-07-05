@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check bug-corral-scan name-drift-preflight semantic-commons-check semantic-commons-project agent-admit onboard-agent codex-composer-bootstrap codex-composer-once codex-composer-status codex-composer-start codex-composer-stop docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop tmux-bootstrap tmux-status tmux-substrate-contract memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight wiki-gate memory-metabolize brain-lint karpathy-wiki-ci operator-prod-smoke runtime-truth-ci runtime-truth-closeout runtime-truth-burn-in runtime-truth-burn-in-smoke runtime-truth-100-audit runtime-task-firebreak ds-goal-longrun-preflight-check governance-all agent-build-preflight agent-build-closeout cybernetics-codex-audit spine-check onboard offboard orient status go-fmt-check go-test go-vet go-ci xray compile test-smoke test-all dashboard-lint dashboard-build
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check bug-corral-scan name-drift-preflight semantic-commons-check semantic-commons-project agent-admit onboard-agent codex-composer-bootstrap codex-composer-once codex-composer-status codex-composer-start codex-composer-stop docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop tmux-bootstrap tmux-status tmux-substrate-contract memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight wiki-gate memory-metabolize wiki-orphan-status wiki-orphan-upgrade brain-lint karpathy-wiki-ci operator-prod-smoke runtime-truth-ci runtime-truth-closeout runtime-truth-burn-in runtime-truth-burn-in-smoke runtime-truth-100-audit runtime-task-firebreak ds-goal-longrun-preflight-check governance-all agent-build-preflight agent-build-closeout cybernetics-codex-audit spine-check onboard offboard orient status go-fmt-check go-test go-vet go-ci xray compile test-smoke test-all dashboard-lint dashboard-build
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently.
@@ -92,6 +92,8 @@ help:
 	@echo "  make memory-kernel-full-power-preflight Run M2-M5 governed live preflight"
 	@echo "  make wiki-gate Run the live wiki/vector retrieval gate"
 	@echo "  make memory-metabolize Run Memory Common ingest + gates + receipt"
+	@echo "  make wiki-orphan-status Render Karpathy wiki orphan/density health"
+	@echo "  make wiki-orphan-upgrade ARGS='--limit 200' Enrich orphan atoms and re-ingest wiki retrieval"
 	@echo "  make brain-lint Validate repo-local BRAIN.md seed files"
 	@echo "  make karpathy-wiki-ci Run local Karpathy wiki contract checks"
 	@echo "  make operator-prod-smoke Run fast read-only operator production smoke"
@@ -463,6 +465,15 @@ wiki-gate:
 memory-metabolize:
 	$(REPO_PYTHON) -m dharma_swarm.dgc_cli memory metabolize
 
+wiki-orphan-status:
+	$(PYTHON) scripts/wiki_orphan_upgrade.py --status $(ARGS)
+
+wiki-orphan-upgrade:
+	$(PYTHON) scripts/wiki_orphan_upgrade.py --apply $(ARGS)
+	$(PYTHON) /Users/dhyana/.dharma/scripts/regen_wiki_index.py
+	$(REPO_PYTHON) -c 'from dharma_swarm.wiki_vector_ingest import ingest_wiki_concepts; r=ingest_wiki_concepts(); print(r.to_json()["discovered_files"])'
+	$(REPO_PYTHON) scripts/wiki_vector_live_gate.py
+
 brain-lint:
 	@test -f BRAIN.md
 	@test -f docs/brain/index.md
@@ -471,6 +482,7 @@ brain-lint:
 	@grep -q "timeline" docs/brain/timeline.md
 
 karpathy-wiki-ci: brain-lint
+	$(PYTHON) scripts/wiki_orphan_upgrade.py --status --fail-on-orphans
 	$(VENV_PYTHON) -m pytest -q \
 		tests/test_agent_onboard.py \
 		tests/test_dgc_cli.py::test_dgc_cli_wiki_search_command \
@@ -541,6 +553,8 @@ spine-check:
 # session — humans and agents both.
 onboard:
 	$(PYTHON) scripts/governance/agent_onboard.py
+	@printf "\n== Wiki Knowledge Health ==\n"
+	@$(PYTHON) scripts/wiki_orphan_upgrade.py --status --max-print 8
 
 # Single-door offboarding: writes a receipt for the next agent/auditor after a
 # scoped work session. By default this writes under ~/.dharma/ops; pass
@@ -552,6 +566,8 @@ offboard:
 # broken register — one read-only view projected from the owners. Always exits 0.
 orient:
 	$(PYTHON) scripts/governance/orientation_graph.py
+	@printf "\n== Wiki Knowledge Health ==\n"
+	@$(PYTHON) scripts/wiki_orphan_upgrade.py --status --max-print 8
 
 # Quick cross-agent state snapshot: active track, open PRs, stale items,
 # broken register, hotlist. Any agent on any platform can run this.

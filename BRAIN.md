@@ -19,3 +19,5 @@ Rules:
 - Append events to `docs/brain/timeline.md`; do not rewrite history there.
 - If a decision changes, update compiled truth and add a timeline entry with
   source refs.
+- Keep wiki orphan health visible through `make onboard`, `make orient`,
+  `make wiki-orphan-status`, and `make karpathy-wiki-ci`.

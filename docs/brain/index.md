@@ -3,7 +3,7 @@
 brain_schema: project_brain.v0
 kind: compiled_truth
 priority: HIGH
-updated_at: 2026-07-05
+updated_at: 2026-07-06
 
 ## compiled_truth
 
@@ -24,6 +24,10 @@ updated_at: 2026-07-05
   Its current thesis is: sell verified evidence work first, use Obsidian as
   cockpit, broker MCP through NAGA effects, and feed RSI through staged
   experiment receipts rather than raw memory.
+- Wiki orphan recovery is now a first-class Karpathy-wiki maintenance gate.
+  `make wiki-orphan-status` renders graph health, `make wiki-orphan-upgrade`
+  enriches isolated atoms and creates inbound MOC anchors, and
+  `make karpathy-wiki-ci` fails when orphan atoms remain.
 
 ## open_contradictions
 
@@ -33,6 +37,9 @@ updated_at: 2026-07-05
   re-verified before claiming continuous operation.
 - Existing wiki volume is high, but orphan/stale concept health still needs a
   recurring audit before trusted synthesis claims are broad.
+- The recovered orphan set validates cleanly, but full-wiki validation still
+  contains legacy non-orphan schema debt. Treat zero orphans as graph health,
+  not total schema perfection.
 - NAGA-IR language-womb must prove it adds typechecker/evaluator semantics. If
   it only emits receipts after Python execution, it should fold back into
   governance.

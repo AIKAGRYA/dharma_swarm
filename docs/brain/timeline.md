@@ -16,3 +16,12 @@ This timeline is append-only. Add dated events when compiled truth changes.
   Obsidian MCP, NAGA authority gateway, Evidence Loom revenue wedge, and RSI
   memory loop:
   `docs/research/2026-07-05-karpathy-wiki-obsidian-mcp-rsi-money-engine.md`.
+
+## 2026-07-06
+
+- Added deterministic wiki orphan recovery to the high-priority Karpathy wiki
+  enforcement branch via `scripts/wiki_orphan_upgrade.py`.
+- Wired `make wiki-orphan-status` and `make wiki-orphan-upgrade`; `make onboard`
+  and `make orient` now render wiki graph health as part of agent entry.
+- Promoted orphan count to a hard local contract by making `make
+  karpathy-wiki-ci` fail when orphan atoms remain.
