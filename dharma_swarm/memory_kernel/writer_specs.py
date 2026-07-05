@@ -203,7 +203,7 @@ def default_writer_specs() -> tuple[MemoryWriterSpec, ...]:
         ),
         MemoryWriterSpec(
             "vector_store.tfidf_state",
-            "dharma_swarm.vector_store",
+            "dharma_swarm.embedders",
             "TFIDFEmbedder",
             ("home.vectors",),
             WriteMode.PROJECTION_WRITE,

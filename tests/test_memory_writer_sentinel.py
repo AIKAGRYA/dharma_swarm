@@ -229,6 +229,30 @@ def test_loop4_10_state_sentinel_write_has_reviewed_baseline() -> None:
     assert sentinel_write.write_decision["decision"] == "warn"
 
 
+def test_tfidf_embedder_move_keeps_registered_writer_spec() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+
+    observations = MemoryWriterSentinel(repo_root=repo_root).run()
+    by_id = {observation.spec.writer_id: observation for observation in observations}
+    tfidf_spec = by_id["vector_store.tfidf_state"].spec
+
+    assert tfidf_spec.owner_module == "dharma_swarm.embedders"
+    assert by_id["vector_store.tfidf_state"].status is WriterStatus.PRESENT
+
+    discoveries = MemoryWriterSentinel(repo_root=repo_root).discover_write_paths(
+        scan_roots=("dharma_swarm/embedders.py",),
+    )
+    tfidf_write = next(
+        discovery
+        for discovery in discoveries
+        if discovery.symbol == "TFIDFEmbedder._save_state"
+        and discovery.operation == "file_open_write"
+    )
+
+    assert tfidf_write.status is DiscoveredWriteStatus.REGISTERED
+    assert tfidf_write.matched_writer_ids == ("vector_store.tfidf_state",)
+
+
 def test_writer_sentinel_cli_ci_profile_runs_discovery_and_gates(capsys) -> None:
     repo_root = Path(__file__).resolve().parents[1]
 
