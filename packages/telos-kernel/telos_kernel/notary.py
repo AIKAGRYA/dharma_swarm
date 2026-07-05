@@ -1,11 +1,17 @@
-"""External notary anchoring for the Merkle root (§U5).
+"""External notary anchoring for the Merkle root (\u00a7U5) \u2014 core (pure).
 
-Phase 0 ships:
-  * `LocalFileAnchor` — append-only file bound to `git rev-parse HEAD`.
+The core exports:
+  * `AnchorReceipt` \u2014 frozen dataclass carrying (root_hash, anchor_ref,
+    anchored_at, scheme).
+  * `NotaryAnchor` \u2014 abstract base with a single `anchor(root_hash)` method.
+  * `LocalFileAnchor` \u2014 base class with pure `_build_receipt` logic and an
+    abstract `_git_head_result()` seam. The actual filesystem-append plus
+    the subprocess git-HEAD binding live in
+    `telos_kernel._io.notary_fs.GitBoundLocalFileAnchor`.
 
 Phase 1+ can drop in:
-  * `Rfc3161TimestampAnchor` — RFC 3161 timestamping via a public TSA.
-  * `OpenTimestampsAnchor` — Bitcoin-anchored via OpenTimestamps.
+  * `Rfc3161TimestampAnchor` \u2014 RFC 3161 timestamping via a public TSA.
+  * `OpenTimestampsAnchor` \u2014 Bitcoin-anchored via OpenTimestamps.
 
 References:
   * RFC 3161: https://datatracker.ietf.org/doc/html/rfc3161
@@ -16,10 +22,9 @@ from __future__ import annotations
 
 import abc
 import datetime as _dt
-import json
-import subprocess
 from dataclasses import dataclass
-from pathlib import Path
+
+from telos_kernel.result import ERR_GIT_UNAVAILABLE, Err, KernelError, Ok, Result
 
 
 @dataclass(frozen=True)
@@ -36,49 +41,50 @@ class NotaryAnchor(abc.ABC):
         raise NotImplementedError
 
 
-class LocalFileAnchor(NotaryAnchor):
-    """Append-only file anchor that binds each root to the current git HEAD.
+def _now_iso_utc() -> str:
+    return (
+        _dt.datetime.now(_dt.timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
 
-    This is intentionally weak — it defends against replay against an
-    honest observer, not against an attacker who controls the local disk.
-    Phase 1+ swaps in a real timestamping authority.
+
+class LocalFileAnchor(NotaryAnchor):
+    """Append-only anchor bound to a git HEAD.
+
+    The core class is pure by default: `_git_head_result()` returns
+    `Err(ERR_GIT_UNAVAILABLE)` unconditionally. The rim subclass
+    `telos_kernel._io.notary_fs.GitBoundLocalFileAnchor` overrides it
+    to actually invoke `git rev-parse HEAD`.
+
+    Similarly, `anchor()` here builds an in-memory receipt only. The rim
+    subclass extends it to append to the on-disk log.
     """
 
-    def __init__(self, path: str | Path = "~/.dharma/merkle_anchors.jsonl",
-                 git_repo: str | Path | None = None):
-        self.path = Path(path).expanduser()
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.git_repo = Path(git_repo).expanduser() if git_repo else None
+    def __init__(self, path=None, git_repo=None):
+        # `path` and `git_repo` are stored but not touched from core.
+        # The rim subclass uses them.
+        self.path = path
+        self.git_repo = git_repo
 
-    def _git_head(self) -> str:
-        try:
-            cmd = ["git", "rev-parse", "HEAD"]
-            cwd = str(self.git_repo) if self.git_repo else None
-            out = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=5, check=False, cwd=cwd
-            )
-            if out.returncode == 0:
-                return out.stdout.strip()
-        except FileNotFoundError:
-            return "no-git"
-        except subprocess.SubprocessError:
-            return "no-git"
-        return "no-git"
+    def _git_head_result(self) -> Result:
+        return Err(KernelError(
+            ERR_GIT_UNAVAILABLE,
+            "core LocalFileAnchor cannot invoke git; use GitBoundLocalFileAnchor "
+            "from telos_kernel._io.notary_fs instead",
+        ))
 
-    def anchor(self, root_hash: str) -> AnchorReceipt:
-        now = (
-            _dt.datetime.now(_dt.timezone.utc)
-            .replace(microsecond=0)
-            .isoformat()
-            .replace("+00:00", "Z")
-        )
-        head = self._git_head()
-        receipt = AnchorReceipt(
+    def _build_receipt(self, root_hash: str) -> AnchorReceipt:
+        head_r = self._git_head_result()
+        head = head_r.unwrap() if head_r.is_ok else "no-git"
+        return AnchorReceipt(
             root_hash=root_hash,
             anchor_ref=f"git:{head}",
-            anchored_at=now,
+            anchored_at=_now_iso_utc(),
             scheme="local-file+git",
         )
-        with open(self.path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(receipt.__dict__, sort_keys=True) + "\n")
-        return receipt
+
+    def anchor(self, root_hash: str) -> AnchorReceipt:
+        """Pure receipt-construction. Persistence lives in the rim subclass."""
+        return self._build_receipt(root_hash)
