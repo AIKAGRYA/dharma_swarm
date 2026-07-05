@@ -139,7 +139,13 @@ def run(argv: list[str] | None = None) -> int:
                         help="Passed through to `mutmut run --max-children`.")
     args = parser.parse_args(argv)
 
-    mutmut_cmd = [sys.executable, "-m", "mutmut"]
+    # Invoke mutmut through its cli() entry point, NOT `python -m mutmut`. Under
+    # `-m`, the module loads as `__main__`; the mutant trampoline then re-imports
+    # it as `mutmut.__main__`, re-running that module's top-level
+    # `set_start_method('fork')` and crashing every instrumented test with
+    # "context has already been set". Importing cli() loads the module once under
+    # its real name, so the trampoline's re-import is cached.
+    mutmut_cmd = [sys.executable, "-c", "from mutmut.__main__ import cli; cli()"]
     run_cmd = [*mutmut_cmd, "run"]
     if args.max_children is not None:
         run_cmd.extend(["--max-children", str(args.max_children)])

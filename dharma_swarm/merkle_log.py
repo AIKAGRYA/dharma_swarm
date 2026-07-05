@@ -39,6 +39,11 @@ class MerkleLog:
         self.log_file = Path(log_file).expanduser()
         self.log_file.parent.mkdir(parents=True, exist_ok=True)
         self.hashes: List[bytes] = []  # Chain of hashes
+        # True when the on-disk log is present but unreadable (truncated, corrupt
+        # JSON, bad hex, wrong shape, or a stored-count mismatch). An absent file
+        # is a valid empty log and does NOT set this flag. Certificate
+        # Transparency forbids silently reporting a corrupt log as clean-empty.
+        self._corrupt: bool = False
         self._load()
 
     def append(self, data: dict) -> str:
@@ -57,6 +62,9 @@ class MerkleLog:
         This creates a tamper-evident chain where modifying any entry
         breaks all subsequent hashes.
         """
+        if self._corrupt:
+            raise ValueError("cannot append to corrupt Merkle log; repair or archive it first")
+
         # Get previous hash (or genesis hash)
         prev_root = self.hashes[-1] if self.hashes else b'\x00' * 32
 
@@ -91,6 +99,12 @@ class MerkleLog:
         provides lightweight verification (chain exists and has correct structure).
         For full cryptographic verification, use verify_with_data().
         """
+        if self._corrupt:
+            # An on-disk log that was truncated or corrupted must NEVER report a
+            # clean bill of health. Certificate Transparency / Sigstore forbid
+            # silent truncation; the previous behavior (reset to [] then return
+            # (True, 0)) erased that guarantee. Fail closed at index 0.
+            return False, 0
         if not self.hashes:
             return True, 0  # Empty chain is valid
 
@@ -150,21 +164,47 @@ class MerkleLog:
         return len(self.hashes)
 
     def _load(self):
-        """Load hash chain from disk."""
-        if self.log_file.exists():
-            try:
-                with open(self.log_file) as f:
-                    data = json.load(f)
-                    # Convert hex strings back to bytes
-                    self.hashes = [bytes.fromhex(h) for h in data.get("hashes", [])]
-            except (json.JSONDecodeError, ValueError) as e:
-                # Corrupted file - start fresh
-                self.hashes = []
+        """Load hash chain from disk.
+
+        An absent file is a valid empty log. A file that is present but
+        truncated, non-JSON, malformed, carries non-32-byte hashes, or whose
+        stored count does not match the loaded hashes sets ``self._corrupt`` so
+        ``verify_chain`` fails closed instead of silently reporting clean-empty.
+        """
+        if not self.log_file.exists():
+            return
+        try:
+            raw = self.log_file.read_text()
+        except OSError:
+            self._corrupt = True
+            return
+        try:
+            data = json.loads(raw)
+        except (json.JSONDecodeError, ValueError):
+            self._corrupt = True
+            return
+        if not isinstance(data, dict) or not isinstance(data.get("hashes"), list):
+            self._corrupt = True
+            return
+        try:
+            hashes = [bytes.fromhex(h) for h in data["hashes"]]
+        except (ValueError, TypeError):
+            self._corrupt = True
+            return
+        if any(len(h) != 32 for h in hashes):
+            self._corrupt = True
+            return
+        stored_count = data.get("count")
+        if stored_count is not None and stored_count != len(hashes):
+            self._corrupt = True
+            return
+        self.hashes = hashes
 
     def _save(self):
         """Persist hash chain to disk."""
         data = {
             "hashes": [h.hex() for h in self.hashes],
+            "count": len(self.hashes),
             "version": 1,
             "algorithm": "sha256",
             "encoding": "utf-8"

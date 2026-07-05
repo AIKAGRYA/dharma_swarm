@@ -73,6 +73,19 @@ filterwarnings = [
 # The runner is the kernel's own fast test file, so mutants are scored against
 # meaningful assertions (a trivially-true test lets mutants survive -> low score
 # -> the gate blocks). Produce the report with `make mutation-test`.
-paths_to_mutate = "dharma_swarm/spine/receipt.py"
+# paths_to_mutate MUST be a TOML array: mutmut's pyproject reader iterates the
+# value directly, so a bare string is walked character by character and the "/"
+# character makes mutmut walk the whole filesystem root. A single-element array
+# is the one shape mutmut reads correctly here.
+paths_to_mutate = ["dharma_swarm/spine/receipt.py"]
 runner = "python -m pytest -x -q tests/test_claim_evidence_binding.py"
-tests_dir = "tests/"
+# tests_dir drives mutmut's test selection and must be a TOML array (same
+# character-iteration hazard as paths_to_mutate). Point it at the single fast
+# kernel test file so the mutant score is graded against meaningful assertions
+# and one run stays tractable.
+tests_dir = ["tests/test_claim_evidence_binding.py"]
+# mutmut runs the suite from inside the copied `mutants/` tree, so the rest of
+# the package and the governance scripts the runner imports (memory_kernel,
+# check_track_status) must be copied alongside the single mutated module. Only
+# receipt.py (paths_to_mutate) is instrumented; these are copied clean.
+also_copy = ["dharma_swarm", "scripts", "docs/governance"]
