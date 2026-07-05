@@ -271,12 +271,12 @@ append-style refreshes quadruplicated rows and broke `make docops-integrity`).
 | Total Python modules | **880** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **435 (49.4%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
 | Total Python LOC | **339,354** | wc -l across dharma_swarm Python modules |
-| Test files | **824** | find tests -name "*.py" -type f |
-| Test functions | **12,557 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test files | **825** | find tests -name "*.py" -type f |
+| Test functions | **12,587 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **12,674 (measured 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
 | Collection errors | **0 (measured 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
-| Markdown files | **1,314** | find . -name "*.md" -type f |
-| Markdown total lines | **280,913** | wc -l across all .md |
+| Markdown files | **1,313** | find . -name "*.md" -type f |
+| Markdown total lines | **281,377** | wc -l across all .md |
 | Bridge files | **26** | find dharma_swarm -name "*bridge*.py" -type f |
 | Adapter files | **26** | find dharma_swarm -type f | rg -i "adapter" |
 | Router files | **16** | find dharma_swarm -type f | rg -i "rout" |

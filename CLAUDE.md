@@ -260,7 +260,7 @@ For machine-readable status, run `python3 scripts/governance/check_track_status.
 - **LoopEngine** (`dharma_swarm/cascade.py`): F(S)=S universal convergence loop across 5 domains.
 - **DharmaKernel** (`dharma_swarm/dharma_kernel.py`): 25 immutable axioms (SHA-256 signed).
 - **MemoryKernel** (`dharma_swarm/memory_kernel/`): Canonical front door for agent memory context; legacy MemoryPlane, RuntimeState facts, MemoryPalace, MemoryLattice, vector, graph, log, and wiki stores are subordinate sources, adapters, projections, or promotion feeds.
-- **TelosGatekeeper** (`dharma_swarm/telos_gates.py`): 11 dharmic safety gates.
+- **TelosGatekeeper** (`dharma_swarm/telos_gates.py`): the dharmic safety gate battery (AHIMSA, SATYA, CONSENT, SVABHAAVA, ...). The gate count lives in the code, not here — this file has frozen wrong counts before; read `telos_gates.py` for the live battery.
 - **StigmergyStore** (`dharma_swarm/stigmergy.py`): Pheromone-trail coordination.
 - **CatalyticGraph** (`dharma_swarm/catalytic_graph.py`): Autocatalytic set detection (Tarjan SCC).
 - **StrangeLoop** (`dharma_swarm/strange_loop.py`): Organism self-modification engine.
@@ -277,7 +277,7 @@ For machine-readable status, run `python3 scripts/governance/check_track_status.
 3. **Skill generalization** — recombining capabilities beyond any single agent
 
 **Three necessary conditions** (all must hold, or transcendence fails):
-1. **Diversity of competence** — agents must have genuinely different capabilities, trained on different data, using different approaches. Same model prompted differently may NOT suffice. Different model families, different specializations, different error profiles. Measured via MAP-Elites behavioral diversity (`diversity_archive.py`).
+1. **Diversity of competence** — agents must have genuinely different capabilities, trained on different data, using different approaches. Same model prompted differently may NOT suffice. Different model families, different specializations, different error profiles. Measured via MAP-Elites behavioral diversity (`archive.py` `MAPElitesGrid`; `diversity_archive.py` is a deprecated shim).
 2. **Error decorrelation** — agent errors must be independent. If agents fail on the same inputs in the same way, aggregation provides no benefit. Correlated errors compound; decorrelated errors cancel. This is arithmetic: `E_ensemble = E_mean - E_diversity` (Krogh-Vedelsby). The diversity term directly subtracts from ensemble error.
 3. **Quality aggregation** — the mechanism that combines agent outputs must amplify agreement and suppress noise. Temperature concentration, weighted voting, Brier-scored selection, telos-gated filtering. Bad aggregation (simple averaging, loudest-voice-wins) kills the signal.
 
@@ -286,7 +286,7 @@ For machine-readable status, run `python3 scripts/governance/check_track_status.
 **What this means for every session**:
 - When adding agents: maximize behavioral diversity, not count. The 5th agent from a different model family adds more than the 50th agent from the same family.
 - When designing orchestration: route by specialty (skill selection), aggregate by quality weighting (skill denoising), recombine in cascade loops (skill generalization).
-- When evolving agents: DarwinEngine MUST preserve diversity. Pure fitness pressure → convergence → transcendence death. Use diversity-preserving selection (MAP-Elites in `diversity_archive.py`).
+- When evolving agents: DarwinEngine MUST preserve diversity. Pure fitness pressure → convergence → transcendence death. Use diversity-preserving selection (MAP-Elites in `archive.py`).
 - When measuring success: track the Krogh-Vedelsby diversity term, not just individual agent fitness. If diversity is falling, transcendence is dying regardless of individual performance.
 - When governing: telos gates and VSM channels are necessary but must be LIGHT. System 2 (damping) > System 3 (mandates). The governance cost of a gate is measured in diversity loss.
 
@@ -370,6 +370,17 @@ See [`docs/architecture/NAVIGATION.md`](docs/architecture/NAVIGATION.md) for the
 See [`docs/MEGAFILE_INDEX.md`](docs/MEGAFILE_INDEX.md) for the ten highest-system onboarding maps and their current status.
 See `README.md` for repo map and common commands.
 See `foundations/` for the 10-pillar intellectual genome.
+
+### Skills & Agent Role Registries (who reads which instruction files)
+
+Four separate registries; do not cross-pollinate formats:
+
+- `dharma_swarm/skills/*.skill.md` — **swarm subagent role definitions**, parsed by `dharma_swarm/skills.py` (`SkillRegistry`). Format contract: yaml-lite frontmatter ONLY (flat `key: value`, inline arrays `[a, b]`, one-level nesting for `context_weights`; block lists (`- item`) are silently dropped by the parser); first body block = description used for keyword matching; everything after = the agent's system prompt. Also discovered from `~/.dharma/skills/` and `.dharma/skills/`.
+- `.agents/skills/*/SKILL.md` — testing/verification playbooks for external coding agents (Devin etc.). Standard `name`/`description` frontmatter.
+- `.warp/skills/*/SKILL.md` — Warp/Oz operator skills (janitor, verifier, roast council). Each declares a hard authority boundary; never widen one to "get something done".
+- `dharma_swarm/chetana/claude_code_plugin/` — the chetana memory plugin (skill + slash commands + hooks).
+
+**Gotcha:** `.claude/*` is gitignored (only `.claude/hooks/` and `.claude/settings.json` are tracked), so personal `.claude/skills/` and `.claude/agents/` never reach remote/cloud sessions. Anything an agent must see in every checkout belongs in one of the tracked registries above, not in `.claude/`.
 
 ## CRITICAL: Read Before Any Code Changes
 

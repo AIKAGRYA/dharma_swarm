@@ -6,38 +6,27 @@ type: reference
 
 # Testing Dashboard + Runtime Inside-Out
 
-## Devin Secrets Needed
+**Purpose:** an end-to-end smoke that proves the FastAPI runtime boots, the Next.js dashboard renders live telemetry from it, and opportunity dispatch/refill writes durable sqlite state. "Inside-out" means: assert at the API first, then confirm the UI shows the same numbers — a pretty dashboard over a dead API is a FAIL.
 
-- None for local dev mode when `DASHBOARD_API_KEY` is unset; API middleware opens `/api/*` in dev mode.
-- `DASHBOARD_API_KEY` only if intentionally testing authenticated dashboard API access.
-- `DEVIN_NATS_URL`, `DEVIN_NATS_USER`, `DEVIN_NATS_PW` are only needed for live A2A/NATS substrate tests, not the local dashboard/opportunity smoke.
+## Environment
 
-## Setup
+No secrets needed in dev mode: when `DASHBOARD_API_KEY` is unset the API middleware opens `/api/*`. Set it only when intentionally testing Bearer auth. NATS credentials are only for live A2A substrate tests, never for this smoke.
 
-Use the repo venv when present from the repo or worktree under test:
+Run from the repo root of the checkout under test:
 
 ```bash
-cd /path/to/dharma-swarm
-PATH="$PWD/.venv/bin:$PATH" make onboard
-```
-
-If testing from a separate worktree, set `PYTHONPATH` to that worktree. Prefer its local `.venv`; only point `PATH` at a shared venv after verifying that shared venv belongs to the same repository and dependency set.
-
-```bash
-cd /path/to/dharma-swarm-worktree
+cd "$(git rev-parse --show-toplevel)"
 export PYTHONPATH="$PWD"
-export PATH="$PWD/.venv/bin:$PATH"
+export PATH="$PWD/.venv/bin:$PATH"    # prefer THIS checkout's venv; only borrow a shared
+                                      # venv after confirming it's the same repo + deps
+[ -d dashboard/node_modules ] || npm --prefix dashboard install --legacy-peer-deps
 ```
 
-If `dashboard/node_modules` is missing, install dashboard dependencies incrementally:
+## Procedure
 
-```bash
-npm --prefix dashboard install --legacy-peer-deps
-```
+### 1. Start the runtime with isolated state
 
-## Start Local Runtime
-
-Use an isolated state dir for repeatable sqlite assertions:
+Always use a throwaway state dir so sqlite assertions are repeatable and you never pollute `~/.dharma`:
 
 ```bash
 export DHARMA_STATE_DIR="$PWD/.e2e_state/inside-out-state"
@@ -45,89 +34,72 @@ export DHARMA_SWARM_INIT_TIMEOUT_SECONDS=3
 uvicorn api.main:app --host 127.0.0.1 --port 8420
 ```
 
-Expected startup:
+Expected startup: `Application startup complete`, plus `Dashboard API bearer auth is disabled...` when the key is unset. GnaniLodestone seeding warnings are warnings only — escalate them to failures only if an endpoint then errors.
 
-- `Application startup complete`
-- `Dashboard API bearer auth is disabled...` when `DASHBOARD_API_KEY` is unset
-- GnaniLodestone seeding warnings might appear; treat them as warnings unless API endpoints fail
-
-Start the dashboard:
+### 2. Start the dashboard
 
 ```bash
 npm --prefix dashboard run dev -- --hostname 127.0.0.1 --port 3420
 ```
 
-Open `http://127.0.0.1:3420/dashboard`. The dashboard uses relative `/api/...` calls; Next proxies these to FastAPI on `8420`. Keep `NEXT_PUBLIC_API_URL` unset unless intentionally bypassing the proxy.
+Open `http://127.0.0.1:3420/dashboard`. The dashboard makes relative `/api/...` calls that Next proxies to FastAPI on 8420 — keep `NEXT_PUBLIC_API_URL` unset unless you are deliberately bypassing the proxy.
 
-## Browser Assertions
+### 3. Browser assertions (record browser testing for UI runs)
 
-Record browser testing when using the dashboard UI.
+Pass criteria — all of:
+- Page shows `System Overview`; `Connecting to swarm...` disappears.
+- Metric cards render: `Agents`, `Tasks`, `Fitness`, `Health`.
+- Card values match `GET http://127.0.0.1:8420/api/overview`: `agent_count`, `task_count`, `mean_fitness` (3 decimals), `health_status`.
+- `health_status: "unknown"` is a warning, not a wiring failure, iff `/api/health` returns `status: "ok"` and no endpoint errored.
 
-Pass criteria:
-
-- The page shows `System Overview`.
-- Metric cards render with labels `Agents`, `Tasks`, `Fitness`, and `Health`.
-- `Connecting to swarm...` disappears.
-- Values shown in the cards match `GET http://127.0.0.1:8420/api/overview`:
-  - `agent_count`
-  - `task_count`
-  - `mean_fitness` formatted to three decimals
-  - `health_status`
-
-`health_status: "unknown"` is a warning, not a dashboard wiring failure, if `/api/health` returns `status: "ok"` and no endpoint error.
-
-## Opportunity Loop Checks
-
-Verify the stage list:
+### 4. Opportunity loop checks
 
 ```bash
 curl -s http://127.0.0.1:8420/api/opportunities/stages | python -m json.tool
 ```
+Expected stages, in order: `scope, validate, deep_research, capability, mvp, first_artifact`.
 
-Expected stage names:
-
-```text
-scope, validate, deep_research, capability, mvp, first_artifact
-```
-
-Dispatch an opportunity:
-
+Dispatch:
 ```bash
 curl -s -X POST http://127.0.0.1:8420/api/opportunities/dispatch \
   -H 'Content-Type: application/json' \
   -d '{"id":"inside-out-dispatch","title":"Inside-out dispatch","type":"external_revenue","estimated_value_usd":1000}' \
   | python -m json.tool
 ```
+Pass: exactly 6 results, every one `success: true` with non-empty `stage`, `task_id`, `claim_id`, `run_id`; and `$DHARMA_STATE_DIR/runtime.db` contains exactly 6 matching `task_claims` and 6 matching `delegation_runs` for the test opportunity id (inspect with Python's `sqlite3` module — the CLI may not be installed).
 
-Checks:
-
-- Exactly 6 results.
-- Every result has `success: true`.
-- Every result has non-empty `stage`, `task_id`, `claim_id`, and `run_id`.
-- `runtime.db` contains exactly 6 matching `task_claims` and 6 matching `delegation_runs` for the test opportunity ID.
-
-Refill an opportunity:
-
+Refill:
 ```bash
 curl -s -X POST http://127.0.0.1:8420/api/opportunities/refill \
   -H 'Content-Type: application/json' \
   -d '{"id":"inside-out-refill","title":"Inside-out refill","type":"external_revenue","estimated_value_usd":1000}' \
   | python -m json.tool
 ```
+Pass: `success: true`; exactly 6 stages; `total_provider_cost_usd` present and numeric; `total_net_value_usd` numeric and equal to `estimated_value_usd - total_provider_cost_usd`; `revenue_packet_path` non-empty, exists on disk, and contains the refill opportunity id.
 
-Checks:
-
-- `success: true`.
-- Exactly 6 stages.
-- `total_provider_cost_usd` is present and numeric.
-- `total_net_value_usd` is present, numeric, and equals `estimated_value_usd - total_provider_cost_usd` for the submitted opportunity.
-- `revenue_packet_path` is non-empty, exists on disk, and the file contains the refill opportunity ID.
-
-## Useful Diagnostics
+### 5. Diagnostics (context for the report, not pass/fail)
 
 ```bash
-PATH="$PWD/.venv/bin:$PATH" make status
-PATH="$PWD/.venv/bin:$PATH" make spine-check
+make status        # open PRs / broken-register items → report as warnings
+make spine-check   # should print "spine ownership clear"
 ```
 
-`make spine-check` should print `spine ownership clear`. `make status` may still show open PRs or broken-register items; report those as warnings rather than dashboard/runtime smoke failures unless they prevent startup or endpoint execution.
+## Output Format
+
+```
+DASHBOARD/RUNTIME SMOKE: PASS | FAIL
+- runtime boot:        <ok | failed: first error line>
+- dashboard render:    <ok | which card/value mismatched vs /api/overview>
+- stages endpoint:     <ok | got: ...>
+- dispatch:            <6/6 success, db rows 6+6 | what diverged>
+- refill:              <ok, packet at <path> | what diverged>
+- warnings:            <GnaniLodestone seeding, health_status unknown, make status items, ...>
+```
+
+## Do NOT
+
+- Do not run against `~/.dharma/state` — always an isolated `DHARMA_STATE_DIR`, and don't commit `.e2e_state/` (runtime receipts never enter git).
+- Do not call the UI "passing" without diffing its numbers against `/api/overview` — matching values are the test.
+- Do not set `NEXT_PUBLIC_API_URL` casually; it silently bypasses the proxy path you're supposed to be testing.
+- Do not promote startup warnings to failures unless an endpoint actually errors — and do not bury endpoint errors as "warnings" either.
+- Do not leave uvicorn/next dev servers running after the smoke; kill them and note it.
