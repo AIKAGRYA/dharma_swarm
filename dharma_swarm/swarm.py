@@ -691,6 +691,22 @@ class SwarmManager:
             )
             self._manifest = update_manifest(manifest_path=fallback_manifest_path)
 
+        # Boot reconcile of orphaned delegation_runs/task_claims from prior
+        # daemon incarnations (single-writer: SwarmManager owns this pass).
+        # Must run BEFORE the stale-task reaper: a crashed run with a persisted
+        # success receipt settles its board task COMPLETED here; if the reaper
+        # ran first it would board-FAIL the task and the receipt completion
+        # could no longer apply (FAILED -> COMPLETED is not a legal transition).
+        try:
+            boot_report = await self.reconcile_graph_runs()
+            if boot_report.total_reconciled or boot_report.recovered_claims:
+                logger.info(
+                    "Graph reconciler settled orphaned dispatch state at boot: %s",
+                    boot_report.summary(),
+                )
+        except Exception as exc:
+            logger.warning("Graph boot reconcile failed (non-fatal): %s", exc)
+
         # Reap stale running tasks from prior daemon incarnations.
         # When the daemon crashes, tasks it dispatched are left in RUNNING status
         # forever. No other daemon instance will ever settle them because
@@ -701,18 +717,6 @@ class SwarmManager:
                 logger.info("Reaped %d stale running tasks from prior daemon", reaped)
         except Exception as exc:
             logger.warning("Stale task reaper failed (non-fatal): %s", exc)
-
-        # Boot reconcile of orphaned delegation_runs/task_claims from prior
-        # daemon incarnations (single-writer: SwarmManager owns this pass).
-        try:
-            boot_report = await self.reconcile_graph_runs()
-            if boot_report.total_reconciled or boot_report.recovered_claims:
-                logger.info(
-                    "Graph reconciler settled orphaned dispatch state at boot: %s",
-                    boot_report.summary(),
-                )
-        except Exception as exc:
-            logger.warning("Graph boot reconcile failed (non-fatal): %s", exc)
 
         # Spawn default crew and seed tasks if this is a fresh start
         from dharma_swarm.startup_crew import (

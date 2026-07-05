@@ -483,3 +483,65 @@ def test_reconcile_report_summary_shape():
         "recovered_claims": 0,
         "errors": 0,
     }
+
+
+# ---------------------------------------------------------------------------
+# Boot ordering: reconciler must settle receipted runs BEFORE the stale reaper
+# ---------------------------------------------------------------------------
+
+
+def test_init_reconciles_before_stale_reaper_source_order():
+    import inspect
+
+    from dharma_swarm.swarm import SwarmManager
+
+    src = inspect.getsource(SwarmManager.init)
+    assert src.index("reconcile_graph_runs") < src.index(
+        "_reap_stale_running_tasks"
+    ), "boot reconcile must run before the stale-task reaper"
+
+
+async def test_boot_sequence_receipted_crash_task_ends_completed(
+    runtime, tmp_path: Path
+):
+    """Crash + stale RUNNING task + success receipt -> board ends COMPLETED.
+
+    Replays the SwarmManager.init() boot sequence (reconcile, then stale
+    reaper): the receipt settles the board task COMPLETED first, so the
+    reaper never board-FAILs it and runtime truth matches the board.
+    """
+    from dharma_swarm.models import TaskStatus
+    from dharma_swarm.swarm import SwarmManager
+    from dharma_swarm.task_board import TaskBoard
+
+    board = TaskBoard(tmp_path / "tasks.db")
+    await board.init_db()
+    task = await board.create("crashed task with persisted success receipt")
+    stale = datetime.now(timezone.utc) - timedelta(hours=7)
+    async with board._open() as db:
+        await db.execute(
+            "UPDATE tasks SET status = 'running', updated_at = ? WHERE id = ?",
+            (stale.isoformat(), task.id),
+        )
+        await db.commit()
+
+    _insert_run(
+        runtime,
+        "run-order",
+        status="running",
+        claim_id="claim-order",
+        task_id=task.id,
+        receipt_json=json.dumps({"status": "ok"}),
+    )
+    _insert_claim(runtime, "claim-order", status="running", task_id=task.id)
+
+    sm = SwarmManager(state_dir=tmp_path / ".dharma")
+    sm._task_board = board
+    sm._graph_reconciler = GraphReconciler(runtime, task_board=board)
+
+    await sm.reconcile_graph_runs()
+    await sm._reap_stale_running_tasks()
+
+    refreshed = await board.get(task.id)
+    assert refreshed is not None
+    assert refreshed.status == TaskStatus.COMPLETED
