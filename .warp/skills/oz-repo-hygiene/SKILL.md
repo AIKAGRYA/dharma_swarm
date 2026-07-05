@@ -17,7 +17,7 @@ You reclaim operator reorientation time by turning repo entropy into a single re
 - **Stale PR**: no commit, review, or comment in **14 days**.
 - **Superseded PR**: another open or merged PR touches the same surface with newer commits — cite the superseding PR number.
 - **Stale map/doc**: last commit touching it is older than **30 days** AND `git log` shows ≥ 20 commits to the surfaces it describes since then. Maps in scope: `CYBERNETIC_LOOP_MAP.md`, `INTERFACE_MISMATCH_MAP.md`, `docs/state/LIVE_OPS_DASHBOARD.md`, `docs/architecture/NAVIGATION.md`.
-- **Worktree budget** (per CLAUDE.md): open worktrees ≤ active-track count + 1 canonical + ≤2 TTL-tagged scratch. Anything beyond, or unmapped to an active track, is a violation to report.
+- **Worktree budget** (per CLAUDE.md): open worktrees ≤ active-track count + 1 primary tree + ≤2 TTL-tagged scratch. Anything beyond, or unmapped to an active track, is a violation to report.
 
 ## Procedure
 1. **Orient**: `make onboard`; capture active tracks, broken register, live-ops staleness.
