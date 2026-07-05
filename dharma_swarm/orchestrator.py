@@ -2524,55 +2524,45 @@ class Orchestrator:
             )
 
         captured["_task_obj"] = task
+        from dharma_swarm.graph.durable_invoker import (
+            persist_evidence_receipt,
+            wrap_invoker,
+        )
+
+        # Exactly-once dispatch (dharmagraph Phase 0b): memo-check + idempotency
+        # begin/complete around the provider call, on the existing runtime_state
+        # machinery — a replayed dispatch returns the prior receipt, zero
+        # provider calls. Fail-open passthrough when store/identity is missing.
+        _store = getattr(
+            getattr(self, "_runtime_lifecycle", None), "_runtime_state_store", lambda: None
+        )()
+        invoker = wrap_invoker(
+            _orch_invoker,
+            store=_store,
+            identity=ident,
+            side_effect_key=side_effect_key,
+            stale_after_seconds=max(60.0, timeout_seconds * 2),
+            result_provider=lambda: captured.get("result"),
+        )
         receipt = await invoke_agent(
             task={"id": td.task_id, "agent_id": td.agent_id},
             agent_id=td.agent_id,
             context_id=routing.context_id,
             routing=routing,
-            invoker=_orch_invoker,
+            invoker=invoker,
         )
         # Observable for the verifier + downstream truth packets (no new store).
         self._last_evidence_receipt = receipt
         td.metadata["evidence_receipt_id"] = str(receipt.receipt_id)
-        # Persist to delegation_runs.receipt_json — the operator-witnessable record
-        # (GATE 1 watches this column; orchestrator-surface witness — the A2A
-        # surface persists via RuntimeReceipt instead, see spine/persistence.py).
-        # CRITICAL: write to the SAME store record_delegation_run used (the
-        # configurable store db_path, not a hardcoded default) — writer and
-        # witnessed column must be the same file by construction. persist_receipt
-        # raises on a 0-row match so a missing row cannot masquerade as success.
-        # Fail-open: a persistence error must never break dispatch (receipt stays
-        # in memory; the gap shows up as a warning + non-incrementing witness).
-        try:
-            import aiosqlite
-
-            from dharma_swarm.spine.persistence import (
-                ensure_receipt_column,
-                persist_receipt,
-            )
-
-            _store = self._runtime_lifecycle._runtime_state_store()
-            _db_path = getattr(_store, "db_path", None)
-            if _db_path is None:
-                raise RuntimeError(
-                    "no runtime-state store available for receipt persistence"
-                )
-            # Explicit, SHORT lock budget: the interpreter default busy_timeout is
-            # 5000ms, which would stall this dispatch coroutine up to ~5s when a
-            # sync fleet writer holds the WAL write lock (empirically reproduced).
-            # 2s bounds the tail latency; a stuck writer fails open in bounded time.
-            async with aiosqlite.connect(_db_path, timeout=2.0) as _receipt_db:
-                await _receipt_db.execute("PRAGMA busy_timeout=2000")
-                await ensure_receipt_column(_receipt_db)
-                await persist_receipt(receipt, _receipt_db)
-        except Exception:
-            logger.warning(
-                "spine: EvidenceReceipt produced but NOT persisted (task_id=%s)",
-                td.task_id,
-                exc_info=True,
-            )
+        # Persist to delegation_runs.receipt_json — the operator-witnessable
+        # record (GATE 1 watches this column). Fail-open semantics, same-store
+        # discipline, and the SHORT lock budget were extracted verbatim to
+        # graph.durable_invoker.persist_evidence_receipt (module line budget).
+        await persist_evidence_receipt(receipt, _store, task_id=td.task_id)
         if "exc" in captured:
             raise captured["exc"]
+        if invoker.memo_hit:
+            return invoker.memo_result
         return captured["result"]
 
     @staticmethod

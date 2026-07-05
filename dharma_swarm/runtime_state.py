@@ -3630,6 +3630,59 @@ class RuntimeStateStore:
         )
         return record
 
+    async def try_reclaim_idempotent_side_effect(
+        self,
+        identity: ExecutionIdentity,
+        side_effect_key: str,
+        *,
+        expected_status: str,
+        expected_updated_at: datetime | None = None,
+    ) -> bool:
+        """Atomically re-claim a dead or failed side-effect record for retry.
+
+        Compare-and-swap: flips the record back to ``'started'`` (stamping
+        the reclaiming identity's run/trace ids) ONLY if it still holds
+        ``expected_status`` (and, when given, ``expected_updated_at`` — the
+        guard for taking over a stale ``'started'`` holder without racing a
+        live one). Exactly one of N concurrent claimants wins; losers get
+        ``False`` and must not execute the side effect.
+        """
+        identity.require_for_dispatch()
+        if not side_effect_key:
+            raise ValueError("side_effect_key is required")
+        await self.init_db()
+        now = _utc_now_iso()
+        sql = (
+            "UPDATE idempotency_records SET status = 'started', run_id = ?,"
+            " task_id = ?, trace_id = ?, correlation_id = ?, updated_at = ?"
+            " WHERE idempotency_key = ? AND side_effect_key = ? AND status = ?"
+        )
+        params: list[Any] = [
+            identity.run_id,
+            identity.task_id,
+            identity.trace_id,
+            identity.correlation_id,
+            now,
+            identity.idempotency_key,
+            side_effect_key,
+            expected_status,
+        ]
+        if expected_updated_at is not None:
+            sql += " AND updated_at = ?"
+            params.append(expected_updated_at.isoformat())
+        async with aiosqlite.connect(self.db_path) as db:
+            cur = await db.execute(sql, tuple(params))
+            await db.commit()
+            reclaimed = int(cur.rowcount or 0) == 1
+        if reclaimed:
+            await self.record_idempotency_consumed(
+                identity,
+                side_effect_key,
+                status="reclaimed",
+                payload={"expected_status": expected_status},
+            )
+        return reclaimed
+
     async def get_idempotency_record(
         self,
         idempotency_key: str,
