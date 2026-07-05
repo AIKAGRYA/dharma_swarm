@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import abc
 import hashlib
+import math
 import json
 from pathlib import Path
 from typing import Any, Final, List, Tuple
@@ -126,6 +127,23 @@ def _compute_leaf_hash(prev_hash: bytes, payload_bytes: bytes) -> bytes:
     return hashlib.sha256(prev_hash + payload_bytes).digest()
 
 
+def _is_jcs_value(value: Any) -> bool:
+    if value is None or isinstance(value, (str, bool, int)):
+        return True
+    if isinstance(value, float):
+        return math.isfinite(value)
+    if isinstance(value, (list, tuple)):
+        return all(_is_jcs_value(item) for item in value)
+    if isinstance(value, dict):
+        return all(isinstance(key, str) and _is_jcs_value(item)
+                   for key, item in value.items())
+    return False
+
+
+def _is_append_payload(value: Any) -> bool:
+    return isinstance(value, Leaf) or (isinstance(value, dict) and _is_jcs_value(value))
+
+
 class MerkleLog:
     """Append-only Merkle-chained log with signed Leaf payloads.
 
@@ -166,7 +184,7 @@ class MerkleLog:
 
     # ---- Append ----
 
-    @require(lambda data: isinstance(data, (dict, Leaf)))
+    @require(lambda data: _is_append_payload(data))
     @ensure(lambda result: isinstance(result, str) and len(result) == 64)
     def append(self, data: dict | Leaf) -> str:
         """Append a payload and return the new Merkle root (hex)."""

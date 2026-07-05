@@ -17,8 +17,8 @@ References:
 """
 from __future__ import annotations
 
+import json
 import math
-import re
 from typing import Any, Final
 
 MAX_DEPTH: Final[int] = 64
@@ -173,13 +173,6 @@ def _encode_object(value: dict, out: list[str], depth: int) -> None:
     out.append("}")
 
 
-# ---- Round-trip test hook ---------------------------------------------------
-
-_JCS_CANONICAL_RE: Final[re.Pattern] = re.compile(
-    r'^(-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]\d+)?|"(?:[^"\\]|\\.)*"|true|false|null|\[|\]|\{|\}|,|:)+$'
-)
-
-
 def is_probably_canonical(payload: bytes) -> bool:
     """Cheap structural sanity check. NOT a full JCS conformance test —
     that's what the round-trip property in Hypothesis tests provides."""
@@ -187,4 +180,11 @@ def is_probably_canonical(payload: bytes) -> bool:
         s = payload.decode("utf-8")
     except UnicodeDecodeError:
         return False
-    return bool(_JCS_CANONICAL_RE.match(s))
+    try:
+        parsed = json.loads(s)
+    except json.JSONDecodeError:
+        return False
+    try:
+        return canonicalize(parsed) == payload
+    except (RecursionError, TypeError, ValueError):
+        return False

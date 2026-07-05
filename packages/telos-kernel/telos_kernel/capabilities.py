@@ -63,9 +63,29 @@ class Macaroon:
     signature: str  # hex
 
 
+def _is_concrete_bytes(value: object, min_len: int = 0) -> bool:
+    return type(value) is bytes and len(value) >= min_len
+
+
+def _is_concrete_str(value: object) -> bool:
+    return type(value) is str
+
+
+def _is_hex_digest(value: object) -> bool:
+    if type(value) is not str or len(value) != 64:
+        return False
+    try:
+        bytes.fromhex(value)
+    except ValueError:
+        return False
+    return True
+
+
 # ---- Minting ---------------------------------------------------------------
 
-@require(lambda root_key: isinstance(root_key, bytes) and len(root_key) >= _MIN_KEY_BYTES)
+@require(lambda root_key: _is_concrete_bytes(root_key, _MIN_KEY_BYTES))
+@require(lambda identifier: _is_concrete_str(identifier))
+@require(lambda location: _is_concrete_str(location))
 def mint(root_key: bytes, identifier: str, location: str) -> Macaroon:
     """Mint a fresh unattenuated macaroon."""
     sig = hmac.new(root_key, identifier.encode("utf-8"), sha256).hexdigest()
@@ -75,6 +95,8 @@ def mint(root_key: bytes, identifier: str, location: str) -> Macaroon:
 # ---- Attenuation (monotone) ------------------------------------------------
 
 @require(lambda m: isinstance(m, Macaroon))
+@require(lambda m: _is_hex_digest(m.signature))
+@require(lambda predicate: _is_concrete_str(predicate))
 @ensure(lambda result, m: len(result.caveats) == len(m.caveats) + 1)
 def add_first_party_caveat(m: Macaroon, predicate: str) -> Macaroon:
     """Append a first-party caveat. Never widens authority."""
@@ -124,7 +146,7 @@ def _default_checker(predicate: str, context: dict) -> bool:
     return False
 
 
-@require(lambda root_key: isinstance(root_key, bytes) and len(root_key) >= _MIN_KEY_BYTES)
+@require(lambda root_key: _is_concrete_bytes(root_key, _MIN_KEY_BYTES))
 def verify(
     m: Macaroon,
     root_key: bytes,
@@ -138,7 +160,7 @@ def verify(
     """
     try:
         expected_sig = _recompute_signature(root_key, m)
-    except ValueError:
+    except (TypeError, ValueError):
         return False
     if not hmac.compare_digest(expected_sig, m.signature):
         return False

@@ -1,6 +1,6 @@
 # Titanium Telos Gates v3 — Repo Hardwiring Plan
 
-Companion to [`specs/TITANIUM_TELOS_GATES_SPEC_v3.md`](specs/TITANIUM_TELOS_GATES_SPEC_v3.md).
+Companion to [`specs/TITANIUM_TELOS_GATES_SPEC_v3.md`](../../specs/TITANIUM_TELOS_GATES_SPEC_v3.md).
 This document is the executable delivery plan: a concrete PR stack against
 [AmitabhainArunachala/dharma_swarm](https://github.com/AmitabhainArunachala/dharma_swarm), sized for one to two focused work-weeks per phase, each landing behind acceptance receipts and falsification tests.
 

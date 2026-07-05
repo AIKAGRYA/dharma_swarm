@@ -59,8 +59,10 @@ class LocalFileAnchor(NotaryAnchor):
             )
             if out.returncode == 0:
                 return out.stdout.strip()
-        except (FileNotFoundError, subprocess.SubprocessError):
-            pass
+        except FileNotFoundError:
+            return "no-git"
+        except subprocess.SubprocessError:
+            return "no-git"
         return "no-git"
 
     def anchor(self, root_hash: str) -> AnchorReceipt:

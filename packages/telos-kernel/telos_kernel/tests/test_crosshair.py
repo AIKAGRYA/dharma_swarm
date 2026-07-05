@@ -18,9 +18,9 @@ import pytest
 KERNEL_ROOT = Path(__file__).resolve().parents[1]
 
 TARGETS = [
-    "telos_kernel.canonical",
-    "telos_kernel.capabilities",
-    "telos_kernel.merkle_log",
+    "telos_kernel.capabilities.add_first_party_caveat",
+    "telos_kernel.checker.verify_certificate",
+    "telos_kernel.manifest.Manifest.verify_quorum",
 ]
 
 

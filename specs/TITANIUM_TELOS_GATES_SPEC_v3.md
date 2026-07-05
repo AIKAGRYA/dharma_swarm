@@ -2,7 +2,7 @@
 
 **Status:** Deep hardening draft. Supersedes v2 seed dated 2026-07-03 (extending PR [#761](https://github.com/AmitabhainArunachala/dharma_swarm/pull/761)).
 **Audience:** dharma_swarm kernel maintainers; Titanium invariant reviewers.
-**Companion:** [`../HARDWIRING_PLAN.md`](../HARDWIRING_PLAN.md) — the 8-phase PR stack that operationalizes this spec.
+**Companion:** [`../docs/plans/TITANIUM_TELOS_HARDWIRING_PLAN.md`](../docs/plans/TITANIUM_TELOS_HARDWIRING_PLAN.md) — the 8-phase PR stack that operationalizes this spec.
 **Guiding claim:** the v2 seed was a scaffold that named the right *shapes* (density matrices, sheaf H¹, contextual fraction, Merkle-chained kernel) but under-specified the *semantics*, the *verification tiers*, and the *anti-metaphor discipline* that prevents philosophy from becoming load-bearing. v3 replaces the surface-level "dharmic guidance stand" with a **layered, source-cited, measure-and-receipt substrate** that survives model-scale advances by binding invariants to computable objects (matrices, DAGs, string diagrams, path certificates) and never to metaphors.
 
 ---
@@ -39,7 +39,7 @@ The system's dharmic framing has been a source of both power (naming, motivation
 
 ## 2. Invariant substrate — U0 through U11
 
-Predicates, measures, thresholds, receipt types, and falsification tests for every U-invariant are declared in machine-readable form in [`../kernel/manifest.yaml`](../kernel/manifest.yaml) and reproduced narratively here. The Phase 0 PR lands the manifest and the U5 enforcement path; other invariants are `declared` until their phase per §8 of this document and [`../HARDWIRING_PLAN.md`](../HARDWIRING_PLAN.md).
+Predicates, measures, thresholds, receipt types, and falsification tests for every U-invariant are declared in machine-readable form in [`../kernel/manifest.yaml`](../kernel/manifest.yaml) and reproduced narratively here. The Phase 0 PR lands the manifest and the U5 enforcement path; other invariants are `declared` until their phase per §8 of this document and [`../docs/plans/TITANIUM_TELOS_HARDWIRING_PLAN.md`](../docs/plans/TITANIUM_TELOS_HARDWIRING_PLAN.md).
 
 Full invariant narrative text (U0–U11) is preserved verbatim in the source
 draft this document was distilled from. To avoid duplication drift between
@@ -96,7 +96,7 @@ timestamp: <utc iso8601 with trailing Z>
 
 ## 4. Repo hardwiring
 
-See [`../HARDWIRING_PLAN.md`](../HARDWIRING_PLAN.md) for the phase-by-phase file-level dispositions.
+See [`../docs/plans/TITANIUM_TELOS_HARDWIRING_PLAN.md`](../docs/plans/TITANIUM_TELOS_HARDWIRING_PLAN.md) for the phase-by-phase file-level dispositions.
 
 Phase 0 (this PR) lands:
 - `packages/telos-kernel/` with JCS canonicalization, signed Leaf schema, Merkle chain, K-of-N-capable manifest loader, macaroon-shaped capability tokens, notary anchor seam.
@@ -128,7 +128,7 @@ Sub-goals:
 
 ## 6. Phased delivery
 
-See [`../HARDWIRING_PLAN.md`](../HARDWIRING_PLAN.md). Summary:
+See [`../docs/plans/TITANIUM_TELOS_HARDWIRING_PLAN.md`](../docs/plans/TITANIUM_TELOS_HARDWIRING_PLAN.md). Summary:
 
 | Phase | Focus | Weeks | Blocking? |
 |---|---|---|---|
