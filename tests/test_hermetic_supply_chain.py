@@ -74,6 +74,36 @@ def test_dropping_a_required_owner_fails_check():
     assert not mod._is_covered("dharma_swarm/models.py", patterns)
 
 
+def test_package_style_importfrom_resolves_imported_submodule(tmp_path):
+    mod = _load_module()
+    pkg = tmp_path / "dharma_swarm"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("", encoding="utf-8")
+    (pkg / "hot_module.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (pkg / "importer.py").write_text("from dharma_swarm import hot_module\n", encoding="utf-8")
+
+    modmap = mod._module_map(pkg, tmp_path)
+    importers = mod._direct_importers(modmap, tmp_path)
+
+    assert importers["dharma_swarm.hot_module"] == {"dharma_swarm.importer"}
+
+
+def test_relative_importfrom_resolves_imported_submodule(tmp_path):
+    mod = _load_module()
+    pkg = tmp_path / "dharma_swarm"
+    child = pkg / "chetana"
+    child.mkdir(parents=True)
+    (pkg / "__init__.py").write_text("", encoding="utf-8")
+    (child / "__init__.py").write_text("", encoding="utf-8")
+    (child / "staging.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (child / "actor.py").write_text("from . import staging\n", encoding="utf-8")
+
+    modmap = mod._module_map(pkg, tmp_path)
+    importers = mod._direct_importers(modmap, tmp_path)
+
+    assert importers["dharma_swarm.chetana.staging"] == {"dharma_swarm.chetana.actor"}
+
+
 def test_blast_radius_is_monotone_under_measurement():
     # The six named modules must each measure above the threshold, i.e. the
     # routing really is earned by coupling mass, not a hardcoded name list.

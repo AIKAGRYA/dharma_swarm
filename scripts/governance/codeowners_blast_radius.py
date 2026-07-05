@@ -88,6 +88,36 @@ def _resolve(candidate: str, internal: set[str]) -> str | None:
     return None
 
 
+def _import_from_targets(node: ast.ImportFrom, importer_parts: tuple[str, ...]) -> list[str]:
+    """Return dotted module candidates for an ImportFrom node.
+
+    The alias-qualified candidate comes first so ``from dharma_swarm import
+    model_pool`` resolves to ``dharma_swarm.model_pool`` when that submodule
+    exists. If the alias is a class/symbol, longest-prefix resolution falls
+    back to the module named in ``from ...``.
+    """
+    if node.level:
+        base = list(importer_parts[:-1])
+        for _ in range(node.level - 1):
+            base = base[:-1]
+        if node.module:
+            base.extend(node.module.split("."))
+    else:
+        base = node.module.split(".") if node.module else []
+
+    base_name = ".".join(base)
+    targets: list[str] = []
+    for alias in node.names:
+        if alias.name == "*":
+            continue
+        target = ".".join([*base, alias.name])
+        if target:
+            targets.append(target)
+    if base_name:
+        targets.append(base_name)
+    return targets
+
+
 def _direct_importers(
     modmap: dict[str, Path], repo_root: Path
 ) -> dict[str, set[str]]:
@@ -103,14 +133,7 @@ def _direct_importers(
         for node in ast.walk(tree):
             targets: list[str] = []
             if isinstance(node, ast.ImportFrom):
-                if node.level:
-                    base = list(pkg_parts[:-1])
-                    for _ in range(node.level - 1):
-                        base = base[:-1]
-                    tail = node.module.split(".") if node.module else []
-                    targets.append(".".join(base + tail))
-                else:
-                    targets.append(node.module or "")
+                targets.extend(_import_from_targets(node, pkg_parts))
             elif isinstance(node, ast.Import):
                 targets.extend(a.name for a in node.names)
             for t in targets:
