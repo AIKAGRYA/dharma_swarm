@@ -221,6 +221,7 @@ class SwarmManager:
         self._daily_reset: datetime | None = None
         self._last_auto_rescue_scan: datetime | None = None
         self._graph_reconciler: GraphReconciler | None = None
+        self._last_boot_reconcile_error: str | None = None
         self._auto_rescue_scan_interval_seconds = _sm.auto_rescue_scan_interval_seconds
         self._auto_rescue_max_age = timedelta(hours=_sm.auto_rescue_max_age_hours)
         self._auto_rescue_max_attempts = _sm.auto_rescue_max_attempts
@@ -706,6 +707,7 @@ class SwarmManager:
                 )
         except Exception as exc:
             logger.warning("Graph boot reconcile failed (non-fatal): %s", exc)
+            self._last_boot_reconcile_error = f"{type(exc).__name__}: {exc}"
 
         # Reap stale running tasks from prior daemon incarnations.
         # When the daemon crashes, tasks it dispatched are left in RUNNING status
@@ -2310,6 +2312,7 @@ class SwarmManager:
             result["claims_heartbeaten"] = beaten
         except Exception as exc:
             logger.warning("Claim heartbeat failed (non-fatal): %s", exc)
+            result["claims_heartbeat_error"] = f"{type(exc).__name__}: {exc}"
 
         rescued: list[Task] = []
         now = datetime.now(timezone.utc)
@@ -2351,6 +2354,7 @@ class SwarmManager:
                 logger.warning("reconcile_graph_runs timed out after 10s")
             except Exception as exc:
                 logger.warning("Graph tick reconcile failed (non-fatal): %s", exc)
+                result["graph_reconcile_error"] = f"{type(exc).__name__}: {exc}"
 
         queue_snapshot: dict[str, int] = {}
         try:
