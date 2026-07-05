@@ -19,7 +19,17 @@ from __future__ import annotations
 
 import json
 import math
-from typing import Any, Final
+from typing import Any, Final, Union
+
+# Discriminated union of everything JCS accepts. Every value in a signed
+# payload must be a JSONValue; anything else raises before we reach the
+# encoder. This eliminates `Any` on the signing path and lets
+# `titanium-verify` (packages/titanium-verify/) reason about exhaustiveness
+# of the isinstance chain in `_encode`.
+JSONValue = Union[
+    None, bool, int, float, str,
+    list["JSONValue"], tuple["JSONValue", ...], dict[str, "JSONValue"],
+]
 
 MAX_DEPTH: Final[int] = 64
 """Maximum nesting depth. Signed payloads deeper than this are rejected;
