@@ -146,11 +146,7 @@ def cmd_invariants() -> None:
         graph = CatalyticGraph()
         if not graph.load():
             # No persisted graph — fall back to hardcoded seed
-            try:
-                from dharma_swarm.catalytic_graph import seed_ecosystem
-                seed_ecosystem(graph)
-            except ImportError:
-                pass
+            graph.seed_ecosystem()
         mat, nodes = graph.adjacency_matrix()
         total_nodes = graph.node_count
         ac_sets = graph.detect_autocatalytic_sets()
