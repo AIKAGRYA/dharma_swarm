@@ -202,8 +202,15 @@ def _promotion_verification_allows_live(
     packet: dict[str, Any] | None,
     *,
     trusted_judge_public_keys: Iterable[str | bytes] = (),
+    requested_source_files: Iterable[str] | None = None,
 ) -> bool:
-    """Return True only for a fail-closed Forge promotion verification packet."""
+    """Return True only for a fail-closed Forge promotion verification packet.
+
+    A packet is a capability scoped to the specific mutation it authorizes,
+    never a bearer token: it must name ``authorized_source_files``, and when
+    the caller supplies ``requested_source_files`` every requested path must
+    be covered by the packet's authorization.
+    """
     if not isinstance(packet, dict):
         return False
     if packet.get("schema") != "forge_v2.promotion_verification.v1":
@@ -226,8 +233,21 @@ def _promotion_verification_allows_live(
     if telos.get("decision") != "allow":
         return False
     signed_receipts = dict(packet.get("signed_receipts") or {})
-    if not signed_receipts or not all(value is True for value in signed_receipts.values()):
+    try:
+        from dharma_swarm.forge_v1.forge_v2.promote import REQUIRED_RECEIPTS_V0_ABSENT
+    except Exception:
         return False
+    if not all(signed_receipts.get(name) is True for name in REQUIRED_RECEIPTS_V0_ABSENT):
+        return False
+    authorized_source_files = {
+        str(entry).strip() for entry in (packet.get("authorized_source_files") or []) if str(entry).strip()
+    }
+    if not authorized_source_files:
+        return False
+    if requested_source_files is not None:
+        requested = {str(entry).strip() for entry in requested_source_files if str(entry).strip()}
+        if not requested or not requested.issubset(authorized_source_files):
+            return False
     try:
         from dharma_swarm.forge_v1.forge_v2.verify_promotion import (
             verify_promotion_verification_signature,
@@ -3346,6 +3366,9 @@ class DarwinEngine:
         if not shadow and not _promotion_verification_allows_live(
             promotion_verification,
             trusted_judge_public_keys=trusted_judge_public_keys,
+            requested_source_files=[
+                self._component_key_for_source_file(Path(sf)) for sf in source_files
+            ],
         ):
             reason = "live_apply_refused: forge_v2.verify_promotion packet required"
             logger.warning("Auto-evolve refused live mode: %s", reason)
@@ -3490,10 +3513,13 @@ class DarwinEngine:
         if not _promotion_verification_allows_live(
             promotion_verification,
             trusted_judge_public_keys=trusted_judge_public_keys,
+            requested_source_files=[proposal.component],
         ):
             logger.warning(
-                "Refusing to auto-commit proposal %s without signed promotion verification",
+                "Refusing to auto-commit proposal %s without signed promotion verification"
+                " bound to component %s",
                 proposal.id,
+                proposal.component,
             )
             return None
         if proposal.actual_fitness is None:

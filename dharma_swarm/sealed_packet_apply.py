@@ -30,14 +30,25 @@ _SEALED_PACKET_BLOCKED_PATHS: tuple[str, ...] = (
     "dharma_swarm/agent_runner.py",
     "dharma_swarm/dgc_cli.py",
     "dharma_swarm/dharma_kernel.py",
+    "dharma_swarm/diff_applier.py",
+    "dharma_swarm/dgm_loop.py",
+    "dharma_swarm/evolution.py",
+    "dharma_swarm/evolution_safety.py",
+    "dharma_swarm/evolution_safety_runtime.py",
     "dharma_swarm/frontier_council.py",
     "dharma_swarm/guardian_crew.py",
     "dharma_swarm/insight_brief.py",
     "dharma_swarm/models.py",
     "dharma_swarm/orchestrate_live.py",
     "dharma_swarm/orchestrator.py",
+    "dharma_swarm/sealed_packet_apply.py",
     "dharma_swarm/swarm.py",
     "dharma_swarm/telos_gates.py",
+    # A live packet must never be able to rewrite the door that admitted it.
+    "dharma_swarm/forge_v1/forge_v2/*",
+    "dharma_swarm/operator_core/governed_work_admission.py",
+    "dharma_swarm/telos_formal.py",
+    "scripts/governance/*",
 )
 
 
@@ -140,6 +151,20 @@ async def apply_sealed_packet(
                 "sealed packet diff failed conservative guards",
                 guard_failures,
             )
+        if not shadow:
+            authorized = {
+                str(entry).strip()
+                for entry in (dict(promotion_verification or {}).get("authorized_source_files") or [])
+                if str(entry).strip()
+            }
+            unauthorized = [path for path in files_changed if path not in authorized]
+            if unauthorized:
+                return await _refuse_sealed_packet(
+                    engine,
+                    result,
+                    "sealed packet diff touches files the promotion packet does not authorize",
+                    [f"path_not_authorized_by_promotion:{path}" for path in unauthorized],
+                )
     else:
         files_changed = []
         diff_lines = 0

@@ -80,7 +80,7 @@ def _fake_signed_receipts(public_key: str) -> list[dict]:
     return [
         {
             "name": name,
-            "payload": {"receipt": name},
+            "payload": {"receipt": name, "status": "pass"},
             "signature": {
                 "scheme": "ed25519",
                 "public_key": public_key,
@@ -89,6 +89,12 @@ def _fake_signed_receipts(public_key: str) -> list[dict]:
         }
         for name in promote.REQUIRED_RECEIPTS_V0_ABSENT
     ]
+
+
+def _verified_lease(_lease: dict) -> bool:
+    """Simulates real lease infrastructure (PR-001's loader returns None today).
+    Default behavior without this injection: operator_lease_unverified blocker."""
+    return True
 
 
 class _FakeEd25519Key:
@@ -193,6 +199,7 @@ def test_verify_promotion_trusts_receipts_only_from_configured_judge_key(monkeyp
         trusted_receipt_public_keys=[public_key],
         operator_lease={"lease_id": "op-1"},
         admission_fn=_allow_admission_fn,
+        lease_verifier_fn=_verified_lease,
     )
 
     assert verdict["decision"] == "allow"
@@ -216,6 +223,7 @@ def test_verify_promotion_missing_one_trusted_receipt_fails_closed(monkeypatch) 
         signed_receipts=receipts,
         trusted_receipt_public_keys=[public_key],
         operator_lease={"lease_id": "op-1"},
+        lease_verifier_fn=_verified_lease,
     )
 
     assert verdict["decision"] == "refused"
@@ -237,6 +245,7 @@ def test_verify_promotion_allows_backend_verified_trusted_receipt_bundle(monkeyp
         trusted_receipt_public_keys=[public_key],
         operator_lease={"lease_id": "op-1"},
         admission_fn=_allow_admission_fn,
+        lease_verifier_fn=_verified_lease,
     )
 
     assert verdict["decision"] == "allow"
@@ -270,3 +279,122 @@ def test_e2_green_pytest_red_holdout_is_refused() -> None:
     assert verdict["decision"] == "refused"
     assert verdict["live_apply_allowed"] is False
     assert "promotion_packet:stats_confirm_gate" in verdict["blockers"]
+
+
+def test_signed_receipt_payload_without_pass_status_refuses(monkeypatch) -> None:
+    """Signature validity proves authorship, not assent (review finding #5)."""
+    from dharma_swarm.forge_v1.forge_v2 import verify_promotion as verifier
+
+    monkeypatch.setattr(verifier, "verify_signed_receipt", lambda _receipt: True)
+    public_key = "01" * 32
+    receipts = _fake_signed_receipts(public_key)
+    del receipts[0]["payload"]["status"]  # signed, trusted, but payload never says pass
+
+    verdict = verify_promotion(
+        _receipt_ready_signal(),
+        signed_receipts=receipts,
+        trusted_receipt_public_keys=[public_key],
+        operator_lease={"lease_id": "op-1"},
+        admission_fn=_allow_admission_fn,
+        lease_verifier_fn=_verified_lease,
+    )
+
+    assert verdict["decision"] == "refused"
+    assert "invalid_receipt_payload:preregistration" in verdict["blockers"]
+    assert verdict["signed_receipts"]["preregistration"] is False
+
+
+def test_bare_lease_dict_is_not_a_verified_lease(monkeypatch) -> None:
+    """{"lease_id": "x"} must never satisfy the lease conjunct (finding #6)."""
+    from dharma_swarm.forge_v1.forge_v2 import verify_promotion as verifier
+
+    monkeypatch.setattr(verifier, "verify_signed_receipt", lambda _receipt: True)
+    public_key = "01" * 32
+
+    verdict = verify_promotion(
+        _receipt_ready_signal(),
+        signed_receipts=_fake_signed_receipts(public_key),
+        trusted_receipt_public_keys=[public_key],
+        operator_lease={"lease_id": "x"},
+        admission_fn=_allow_admission_fn,
+        # no lease_verifier_fn: default must refuse
+    )
+
+    assert verdict["decision"] == "refused"
+    assert "operator_lease_unverified" in verdict["blockers"]
+
+
+def _gate_ready_packet() -> dict:
+    return {
+        "schema": "forge_v2.promotion_verification.v1",
+        "decision": "allow",
+        "live_apply_allowed": True,
+        "operator_lease_present": True,
+        "blockers": [],
+        "promotion_packet": {"decision": "promotable_candidate"},
+        "governed_admission": {"decision": "allow"},
+        "telos": {"decision": "allow"},
+        "signed_receipts": {name: True for name in promote.REQUIRED_RECEIPTS_V0_ABSENT},
+        "authorized_source_files": ["dharma_swarm/agent_scaffolds/demo.py"],
+    }
+
+
+def test_evolution_gate_packet_is_scoped_not_bearer(monkeypatch) -> None:
+    """A packet authorizes ONE mutation, never all mutations (finding #2)."""
+    from dharma_swarm.forge_v1.forge_v2 import verify_promotion as verifier
+    from dharma_swarm.evolution import _promotion_verification_allows_live
+
+    monkeypatch.setattr(
+        verifier, "verify_promotion_verification_signature", lambda *_a, **_k: True
+    )
+
+    packet = _gate_ready_packet()
+    assert _promotion_verification_allows_live(
+        packet,
+        requested_source_files=["dharma_swarm/agent_scaffolds/demo.py"],
+    ) is True
+
+    # Unrequested file -> refuse: the packet's scope does not cover it.
+    assert _promotion_verification_allows_live(
+        packet,
+        requested_source_files=["dharma_swarm/agent_scaffolds/other.py"],
+    ) is False
+
+    # Packet with no authorization scope at all -> refuse outright.
+    unbound = dict(packet)
+    unbound.pop("authorized_source_files")
+    assert _promotion_verification_allows_live(
+        unbound,
+        requested_source_files=["dharma_swarm/agent_scaffolds/demo.py"],
+    ) is False
+    assert _promotion_verification_allows_live(unbound) is False
+
+
+def test_evolution_gate_requires_exact_receipt_names(monkeypatch) -> None:
+    """signed_receipts={"anything": true} must never pass (finding #7)."""
+    from dharma_swarm.forge_v1.forge_v2 import verify_promotion as verifier
+    from dharma_swarm.evolution import _promotion_verification_allows_live
+
+    monkeypatch.setattr(
+        verifier, "verify_promotion_verification_signature", lambda *_a, **_k: True
+    )
+
+    packet = _gate_ready_packet()
+    packet["signed_receipts"] = {"anything": True}
+    assert _promotion_verification_allows_live(
+        packet,
+        requested_source_files=["dharma_swarm/agent_scaffolds/demo.py"],
+    ) is False
+
+
+def test_nvidia_advisory_review_cannot_satisfy_packet_guard() -> None:
+    """The advisory NIM review must never stand in for the deterministic
+    packet guard (finding #3)."""
+    signal = _receipt_ready_signal()
+    review = signal.pop("packet_guard_review")
+    signal["nvidia_guard_review"] = review  # advisory only
+
+    packet = promote.evaluate_promotion(signal)
+
+    assert packet["decision"] == "refused"
+    assert "packet_guard_passed" in packet["failed_conjuncts"]

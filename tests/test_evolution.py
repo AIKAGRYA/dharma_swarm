@@ -32,7 +32,9 @@ class _ExplodingProvider:
         raise AssertionError("proposal generation should have been monkeypatched or refused")
 
 
-def _unsigned_allow_live_packet() -> dict:
+def _unsigned_allow_live_packet(
+    authorized: tuple[str, ...] = ("target.py",),
+) -> dict:
     from dharma_swarm.forge_v1.forge_v2.promote import REQUIRED_RECEIPTS_V0_ABSENT
 
     packet = {
@@ -44,14 +46,19 @@ def _unsigned_allow_live_packet() -> dict:
         "telos": {"decision": "allow"},
         "signed_receipts": {name: True for name in REQUIRED_RECEIPTS_V0_ABSENT},
         "operator_lease_present": True,
+        # The packet is a capability scoped to specific files, never a bearer
+        # token — the gate refuses packets without an authorization scope.
+        "authorized_source_files": list(authorized),
         "blockers": [],
     }
     packet["payload_sha256"] = canonical_sha256(packet)
     return packet
 
 
-def _signed_allow_live_packet() -> tuple[dict, list[str]]:
-    packet = _unsigned_allow_live_packet()
+def _signed_allow_live_packet(
+    authorized: tuple[str, ...] = ("target.py",),
+) -> tuple[dict, list[str]]:
+    packet = _unsigned_allow_live_packet(authorized)
     public_key = "01" * 32
     packet["verification_signature"] = {
         "scheme": "ed25519",
@@ -1558,7 +1565,9 @@ async def test_auto_evolve_routes_through_sandbox_cycle(engine_paths, tmp_path, 
     monkeypatch.setattr(eng, "run_cycle_with_sandbox", fake_run_cycle_with_sandbox)
 
     _trust_test_judge(monkeypatch)
-    packet, trusted_keys = _signed_allow_live_packet()
+    packet, trusted_keys = _signed_allow_live_packet(
+        authorized=("pkg_file.py", "misc_file.py"),
+    )
     result = await eng.auto_evolve(
         DummyProvider(),
         [source_a, source_b],
@@ -2199,7 +2208,9 @@ async def test_apply_sealed_packet_live_calls_apply_after_guards(
     monkeypatch.setattr(engine, "apply_diff_and_test", fake_apply)
 
     _trust_test_judge(monkeypatch)
-    packet, trusted_keys = _signed_allow_live_packet()
+    packet, trusted_keys = _signed_allow_live_packet(
+        authorized=("dharma_swarm/safe_leaf.py",),
+    )
     result = await engine.apply_sealed_packet(
         root,
         shadow=False,
@@ -2268,7 +2279,9 @@ async def test_apply_sealed_packet_blocked_path_refuses_before_apply(
     monkeypatch.setattr(engine, "apply_diff_and_test", fake_apply)
 
     _trust_test_judge(monkeypatch)
-    packet, trusted_keys = _signed_allow_live_packet()
+    packet, trusted_keys = _signed_allow_live_packet(
+        authorized=("dharma_swarm/dharma_kernel.py",),
+    )
     result = await engine.apply_sealed_packet(
         root,
         shadow=False,

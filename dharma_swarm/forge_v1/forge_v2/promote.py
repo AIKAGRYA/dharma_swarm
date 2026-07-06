@@ -89,9 +89,10 @@ def _packet_guard_review(signal: dict) -> dict:
     receipt battery.  The optional NVIDIA/NIM review is advisory; it is not used
     as a promotion oracle.
     """
+    # The advisory NVIDIA/NIM review must never satisfy this hard conjunct;
+    # only the deterministic packet guard keys are accepted.
     candidate = (
         signal.get("packet_guard_review")
-        or signal.get("nvidia_guard_review")
         or signal.get("forge_packet_guard")
         or {}
     )
