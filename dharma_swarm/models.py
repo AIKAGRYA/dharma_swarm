@@ -135,6 +135,7 @@ class ProviderType(str, Enum):
     CHUTES = "chutes"
     ZHIPU = "zhipu"
     KIMI_CODE = "kimi_code"
+    MOONSHOT = "moonshot"
 
 
 class AutonomyLevel(str, Enum):

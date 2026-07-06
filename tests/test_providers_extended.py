@@ -157,7 +157,7 @@ async def test_nvidia_nim_stream_not_implemented():
 
 def test_moonshot_defaults():
     p = MoonshotProvider(api_key="moon-key")
-    assert p.base_url == "https://api.moonshot.cn/v1"
+    assert p.base_url == "https://api.moonshot.ai/v1"
     assert p._api_key == "moon-key"
 
 

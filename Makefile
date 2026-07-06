@@ -521,7 +521,7 @@ staging-promote-dry:
 	$(PYTHON) scripts/consume_review_marks.py --auto-promote --dry-run
 
 provider-check:
-	$(PYTHON) scripts/check_provider_credits.py
+	bash scripts/refresh_provider_status.sh
 
 hermes-heartbeat:
 	$(PYTHON) scripts/hermes_heartbeat_poll.py

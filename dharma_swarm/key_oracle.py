@@ -190,6 +190,32 @@ def _load_status(home: Path | None = None) -> dict | None:
     return data
 
 
+def _rows_by_key(data: dict) -> dict[str, dict]:
+    """Return keys_status rows keyed by dkeys row name.
+
+    Historical fixtures used ``{"rows": {"openai": {...}}}``, while current
+    ``dkeys test`` writes ``{"rows": [{"name": "openai", ...}, ...]}``.
+    Accept both shapes so the oracle follows the live cache instead of silently
+    treating a fresh array-shaped file as unreadable.
+    """
+
+    rows = data.get("rows")
+    if isinstance(rows, dict):
+        return {str(key): row for key, row in rows.items() if isinstance(row, dict)}
+    if not isinstance(rows, list):
+        return {}
+
+    keyed: dict[str, dict] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        name = row.get("name") or row.get("provider") or row.get("id") or row.get("key")
+        if not name:
+            continue
+        keyed[str(name)] = row
+    return keyed
+
+
 def live_providers(
     ttl_s: float = DEFAULT_TTL_S,
     *,
@@ -212,8 +238,8 @@ def live_providers(
     if data is None:
         return None
 
-    rows = data.get("rows")
-    if not isinstance(rows, dict) or not rows:
+    rows = _rows_by_key(data)
+    if not rows:
         return None
 
     last_test = data.get("last_test_ts")

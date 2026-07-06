@@ -410,6 +410,7 @@ def test_create_default_router_contains_expected_provider_types():
         ProviderType.NVIDIA_NIM,
         ProviderType.OLLAMA,
         ProviderType.KIMI_CODE,
+        ProviderType.MOONSHOT,
         ProviderType.ZHIPU,
     }
     assert set(router._providers.keys()) == expected

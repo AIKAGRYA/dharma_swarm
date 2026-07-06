@@ -33,6 +33,7 @@ from dharma_swarm.api_keys import (
     GROQ_API_KEY_ENV,
     KIMI_API_KEY_ENV,
     MISTRAL_API_KEY_ENV,
+    MOONSHOT_API_KEY_ENV,
     NVIDIA_NIM_API_KEY_ENV,
     OLLAMA_API_KEY_ENV,
     OPENAI_API_KEY_ENV,
@@ -1910,7 +1911,7 @@ class ChutesProvider(LLMProvider):
 
 
 class KimiCodeProvider(LLMProvider):
-    """Kimi Code membership API, using its OpenAI-compatible chat endpoint."""
+    """Kimi API Platform coding lane, using its OpenAI-compatible chat endpoint."""
 
     capabilities = ProviderCapabilities(
         supports_streaming=True, supports_tools=True,
@@ -1925,8 +1926,12 @@ class KimiCodeProvider(LLMProvider):
         default_model: str | None = None,
         timeout: float = 300.0,
     ) -> None:
-        self._api_key = api_key or os.environ.get(KIMI_API_KEY_ENV)
-        self._base_url = (base_url or "https://api.kimi.com/coding/v1").rstrip("/")
+        self._api_key = (
+            api_key
+            or os.environ.get(KIMI_API_KEY_ENV)
+            or os.environ.get(MOONSHOT_API_KEY_ENV)
+        )
+        self._base_url = (base_url or "https://api.moonshot.ai/v1").rstrip("/")
         self._default_model = default_model or canonical_default_model(ProviderType.KIMI_CODE)
         self._timeout = float(timeout)
         self._client: Any = None
@@ -1935,7 +1940,7 @@ class KimiCodeProvider(LLMProvider):
         if self._client is not None:
             return self._client
         if not self._api_key:
-            raise RuntimeError(f"{KIMI_API_KEY_ENV} not set")
+            raise RuntimeError(f"{KIMI_API_KEY_ENV} or {MOONSHOT_API_KEY_ENV} not set")
         try:
             from openai import AsyncOpenAI
         except ImportError as exc:
@@ -1963,7 +1968,7 @@ class KimiCodeProvider(LLMProvider):
             model=request.model or self._default_model,
             messages=messages,
             max_tokens=request.max_tokens,
-            # Kimi Code rejects other temperature values on the coding model.
+            # Kimi K2 coding models require this fixed temperature.
             temperature=1,
         )
         if request.tools:
@@ -2280,6 +2285,12 @@ class ModelRouter:
                 f"Available: [{available}]"
             ) from None
 
+    def _provider_instance_available(self, provider_type: ProviderType) -> bool:
+        provider = self._providers.get(provider_type)
+        if provider is None:
+            return False
+        return bool(getattr(provider, "available", True))
+
     async def complete(
         self, provider_type: ProviderType, request: LLMRequest,
     ) -> LLMResponse:
@@ -2301,7 +2312,7 @@ class ModelRouter:
         available = [
             provider
             for provider in (available_provider_types or list(self._providers.keys()))
-            if provider in self._providers
+            if provider in self._providers and self._provider_instance_available(provider)
         ]
         return self._policy_router.route(
             route_request,
@@ -2386,7 +2397,12 @@ class ModelRouter:
         available = set(available_provider_types or self._providers.keys())
         chain: list[ProviderType] = []
         for provider in [decision.selected_provider, *decision.fallback_providers]:
-            if provider in available and provider in self._providers and provider not in chain:
+            if (
+                provider in available
+                and provider in self._providers
+                and self._provider_instance_available(provider)
+                and provider not in chain
+            ):
                 chain.append(provider)
         return self._prune_dead_key_providers(
             chain,
@@ -2973,7 +2989,11 @@ class ModelRouter:
         if not chain:
             # Routing filter found nothing — fall back to any registered provider
             fallback_set = set(available_provider_types or self._providers.keys())
-            chain = [p for p in self._providers if p in fallback_set]
+            chain = [
+                p
+                for p in self._providers
+                if p in fallback_set and self._provider_instance_available(p)
+            ]
         if not chain:
             raise RuntimeError("No available providers after routing filter")
         task_signature = build_task_signature(

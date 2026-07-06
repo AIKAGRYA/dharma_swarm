@@ -56,6 +56,7 @@ TIER_FREE: tuple[ProviderType, ...] = (
 
 TIER_CHEAP: tuple[ProviderType, ...] = (
     ProviderType.KIMI_CODE,      # Kimi Code membership API (stable kimi-for-coding)
+    ProviderType.MOONSHOT,       # Kimi Open Platform / Moonshot global API
     ProviderType.ZHIPU,          # glm-5.2 direct (z.ai/Zhipu first-party lane)
     ProviderType.GOOGLE_AI,      # gemini-2.5-pro (free tier, 1M ctx)
     ProviderType.CHUTES,         # DeepSeek-R1 (community)
@@ -101,6 +102,7 @@ PRIMARY_DRIVER_LANES: tuple[ProviderType, ...] = (
 
 DELEGATED_RESEARCH_PRIORITY: tuple[ProviderType, ...] = (
     ProviderType.KIMI_CODE,      # Kimi Code direct API
+    ProviderType.MOONSHOT,       # Kimi Open Platform direct API
     ProviderType.OPENROUTER,     # Kimi / GLM / Qwen router
     ProviderType.OLLAMA,         # GLM-5 / Kimi cloud
     ProviderType.NVIDIA_NIM,     # MiniMax / Nemotron frontier support
@@ -118,6 +120,7 @@ DELEGATED_RESEARCH_PRIORITY: tuple[ProviderType, ...] = (
 
 CHALLENGER_PRIORITY: tuple[ProviderType, ...] = (
     ProviderType.KIMI_CODE,
+    ProviderType.MOONSHOT,
     ProviderType.NVIDIA_NIM,
     ProviderType.OPENROUTER,
     ProviderType.OLLAMA,
@@ -127,6 +130,7 @@ CHALLENGER_PRIORITY: tuple[ProviderType, ...] = (
 
 DELEGATED_BUILDER_PRIORITY: tuple[ProviderType, ...] = (
     ProviderType.KIMI_CODE,
+    ProviderType.MOONSHOT,
     ProviderType.OPENROUTER,
     ProviderType.OPENROUTER_FREE,
     ProviderType.OLLAMA,
@@ -200,6 +204,7 @@ _LANE_ROLES: dict[ProviderType, LaneRole] = {
     ProviderType.ANTHROPIC: LaneRole.PRIMARY_DRIVER,
     ProviderType.OPENROUTER: LaneRole.RESEARCH_DELEGATE,
     ProviderType.KIMI_CODE: LaneRole.RESEARCH_DELEGATE,
+    ProviderType.MOONSHOT: LaneRole.RESEARCH_DELEGATE,
     ProviderType.OLLAMA: LaneRole.RESEARCH_DELEGATE,
     ProviderType.OPENROUTER_FREE: LaneRole.RESEARCH_DELEGATE,
     ProviderType.NVIDIA_NIM: LaneRole.CHALLENGER,
@@ -274,6 +279,7 @@ MODEL_INTELLIGENCE: dict[ProviderType, int] = {
     # Free / cheap frontier
     ProviderType.OLLAMA: 68,           # GLM-5 744B (cloud)
     ProviderType.KIMI_CODE: 68,        # Kimi Code stable lane (K2.x Code)
+    ProviderType.MOONSHOT: 68,         # Kimi K2.7 Code global API
     ProviderType.ZHIPU: 67,            # glm-5.2 direct (z.ai/Zhipu)
     ProviderType.GOOGLE_AI: 65,        # Gemini 2.5 Pro
     ProviderType.GROQ: 64,             # Kimi K2 1T MoE
