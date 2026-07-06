@@ -239,6 +239,8 @@ class DiffApplier:
             )
             try:
                 guard_writable_target(self.workspace)
+                for patch in patches:
+                    guard_writable_target(self.workspace / patch.target_path)
             except LiveMutationDenied as exc:
                 return ApplyResult(success=False, error=str(exc))
 
