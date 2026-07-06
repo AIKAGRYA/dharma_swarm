@@ -14,7 +14,7 @@ Doctrine (see docs/sarathi_apex_build/03_HOLON_SYSTEM_CODE_MAP.md):
 
 Subpackages:
   identity/        -> agent_registry, external_agent_registration, load_holon
-  runtime/         -> holon_bridge, holon_runtime, holon_persistence
+  runtime/         -> holon_bridge, holon_runtime, holon_persistence, runtime_provider
   kernel/          -> operator_core.living_agent_kernel
   authority/       -> operator_core.execution_lease, operator_core.reversibility_gate
   orchestration/   -> holon_orchestrate

@@ -69,6 +69,51 @@ def test_load_holon_strips_bom(tmp_path):
     assert h.system_prompt == "I am the agent."  # BOM stripped, no U+FEFF
 
 
+def test_load_holon_resolves_frontier_model_policy(tmp_path, monkeypatch):
+    from dharma_swarm.models import ProviderType
+    from dharma_swarm.runtime_provider import RuntimeProviderConfig
+
+    root = _make_agent(
+        tmp_path,
+        name="sarathi",
+        model="@frontier",
+        provider="google_ai",
+        active="I am Sarathi.",
+    )
+    identity_path = root / "sarathi" / "identity.json"
+    identity = json.loads(identity_path.read_text(encoding="utf-8"))
+    identity["model_policy"] = "resolve_top_available_at_wake"
+    identity["fallback_model"] = "gemini-2.5-flash"
+    identity_path.write_text(json.dumps(identity), encoding="utf-8")
+
+    def _fake_resolve_top_available_at_wake(**kwargs):
+        assert kwargs["fallback_provider"] == ProviderType.GOOGLE_AI
+        assert kwargs["fallback_model"] == "gemini-2.5-flash"
+        return RuntimeProviderConfig(
+            provider=ProviderType.OLLAMA,
+            default_model="glm-5:cloud",
+            available=True,
+            source="test",
+        )
+
+    monkeypatch.setattr(
+        "dharma_swarm.runtime_provider.resolve_top_available_at_wake",
+        _fake_resolve_top_available_at_wake,
+    )
+
+    h = load_holon("sarathi", agents_root=root)
+
+    assert h.provider_type == "ollama"
+    assert h.model == "glm-5:cloud"
+    assert h.identity["_runtime_model_resolution"] == {
+        "policy": "resolve_top_available_at_wake",
+        "provider": "ollama",
+        "model": "glm-5:cloud",
+        "available": True,
+        "source": "test",
+    }
+
+
 # --- Regression: provider_type must be a VALID ProviderType (the enum bug) ---
 
 def test_provider_type_is_valid_enum(tmp_path):

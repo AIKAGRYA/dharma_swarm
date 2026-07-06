@@ -21,6 +21,7 @@ from dharma_swarm.runtime_provider import (
     create_default_provider_map,
     create_runtime_provider,
     preferred_runtime_provider_configs,
+    resolve_top_available_at_wake,
     resolve_runtime_provider_config,
 )
 
@@ -417,6 +418,36 @@ def test_preferred_runtime_provider_configs_skips_unavailable(monkeypatch) -> No
     assert ProviderType.OLLAMA in providers
     assert ProviderType.OPENROUTER_FREE in providers
     assert ProviderType.OPENROUTER in providers
+
+
+def test_resolve_top_available_at_wake_picks_first_available_provider() -> None:
+    cfg = resolve_top_available_at_wake(
+        provider_order=(ProviderType.GROQ, ProviderType.GOOGLE_AI),
+        fallback_provider=ProviderType.GOOGLE_AI,
+        fallback_model="gemini-2.5-flash",
+        env={"GEMINI_API_KEY": "gemini-key"},
+    )
+
+    assert cfg.provider == ProviderType.GOOGLE_AI
+    assert cfg.default_model == DEFAULT_MODELS[ProviderType.GOOGLE_AI]
+    assert cfg.available is True
+
+
+def test_resolve_top_available_at_wake_logs_honest_fallback(caplog) -> None:
+    with caplog.at_level("WARNING"):
+        cfg = resolve_top_available_at_wake(
+            provider_order=(ProviderType.GROQ,),
+            fallback_provider=ProviderType.GOOGLE_AI,
+            fallback_model="gemini-2.5-flash",
+            env={},
+        )
+
+    assert cfg.provider == ProviderType.GOOGLE_AI
+    assert cfg.default_model == "gemini-2.5-flash"
+    assert cfg.available is False
+    assert cfg.metadata is not None
+    assert cfg.metadata["frontier_resolution"]["status"] == "fallback_unavailable"
+    assert any("No @frontier provider was available" in r.message for r in caplog.records)
 
 
 @pytest.mark.asyncio

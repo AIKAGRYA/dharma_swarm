@@ -11,22 +11,18 @@
 
 ## Next build steps (ordered)
 
-1. **Gate 2 — `@frontier` resolver.** Add `resolve_top_available_at_wake` support
-   to `load_holon`/provider path so `sarathi/identity.json`'s
-   `resolve_top_available_at_wake` policy is honored instead of a hard pin.
-   Owner: `holon_bridge.py` + `runtime_provider.py`. Additive; tested.
-2. **Gate 3 — Fugu provider.** Either add `sakana` as a declared external
+1. **Gate 3 — Fugu provider.** Either add `sakana` as a declared external
    provider or model Fugu as external-only so `dgc agent status` stops coercing
    to `claude_code`. Owner: `runtime_provider.py` / provider enum.
-3. **Gate 4 — Fable standing daemon.** Prove one unattended `fable_composer`
+2. **Gate 4 — Fable standing daemon.** Prove one unattended `fable_composer`
    semantic reply with a fresh heartbeat (lease-gated). Owner: wake shell + A2A.
-4. **`holon/` fork collapse (138 copies / ~3-4 distinct).** Follow
+3. **`holon/` fork collapse (138 copies / ~3-4 distinct).** Follow
    `12_LOAD_HOLON_COLLAPSE_PLAN.md`; make `sprawl_guard.py` reach exit 0.
    Owner: consolidation pass on a clean branch off origin/main.
-5. **Gate 5-6 — Sarathi runtime surfaces + gateway module.** Create runtime
+4. **Gate 5-6 — Sarathi runtime surfaces + gateway module.** Create runtime
    surfaces (with repo map entries) and `holon_system/sarathi/gateway.py`.
-6. **Gate 7-9 — pulse, brief, overnight durability.** Only then `wake_loop_active`.
-7. **Gate 10 — scoreboard.** Receipts-only Hermes-vs-Sarathi comparison.
+5. **Gate 7-9 — pulse, brief, overnight durability.** Only then `wake_loop_active`.
+6. **Gate 10 — scoreboard.** Receipts-only Hermes-vs-Sarathi comparison.
 
 ## Must NOT be touched (constraints)
 
@@ -46,6 +42,10 @@
 ## Known stale claims to correct when seen
 
 - "reversibility_gate.py is uncommitted" → committed in `f18fe8476`.
+- "`@frontier` / `resolve_top_available_at_wake` is unimplemented" → implemented
+  in `runtime_provider.resolve_top_available_at_wake()` and wired into
+  `holon_bridge.load_holon()`; on 2026-07-06 `load_holon("sarathi")` resolved to
+  `ollama/glm-5:cloud` on this machine.
 - "136 copies" of holon_bridge → current scan 138 copies / ~69 roots, only ~3-4
   distinct contents (mostly worktree mirrors).
 - "Sarathi has no code seam to the gate" → `holon_wake_cycle(planned_action=...)`

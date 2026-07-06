@@ -2,4 +2,4 @@
 
 from __future__ import annotations
 
-__all__ = ["bridge", "wake", "persistence"]
+__all__ = ["bridge", "wake", "persistence", "provider"]

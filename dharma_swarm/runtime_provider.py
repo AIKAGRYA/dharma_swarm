@@ -7,6 +7,7 @@ ModelRouter policy and provider implementations unchanged.
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import shutil
 from dataclasses import dataclass
@@ -50,6 +51,8 @@ from dharma_swarm.ollama_config import (
     resolve_ollama_model,
 )
 
+logger = logging.getLogger(__name__)
+
 OPENAI_BASE_URL = "https://api.openai.com/v1"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 NVIDIA_NIM_BASE_URL = "https://integrate.api.nvidia.com/v1"
@@ -65,6 +68,7 @@ CHUTES_BASE_URL = "https://api.chutes.ai/v1"
 from dharma_swarm.model_hierarchy import (
     CANONICAL_SEED_ORDER,
     default_model,
+    get_live_order,
 )
 
 # Default models — sourced from model_hierarchy.py (the single source of truth)
@@ -632,6 +636,81 @@ def preferred_runtime_provider_configs(
     return configs
 
 
+def resolve_top_available_at_wake(
+    *,
+    provider_order: tuple[ProviderType, ...] | None = None,
+    fallback_provider: ProviderType | None = None,
+    fallback_model: str | None = None,
+    working_dir: str | None = None,
+    timeout_seconds: int | None = None,
+    env: Mapping[str, str] | None = None,
+) -> RuntimeProviderConfig:
+    """Resolve the best currently available provider/model for model-agnostic wakes.
+
+    This is the code owner for the ``@frontier`` / ``resolve_top_available_at_wake``
+    policy used by Sarathi-style identities. It is deliberately a resolver over
+    the existing model hierarchy + runtime provider config path; it does not add
+    a second router or provider store.
+
+    ``available`` here means the provider has the local prerequisite that the
+    existing runtime resolver can check deterministically (key, configured base
+    URL, or local CLI binary). It does not make a network/model call. If no
+    candidate is available, the function returns an explicitly marked fallback
+    config when a fallback is supplied, and logs that the fallback is not live.
+    """
+
+    order = provider_order or tuple(get_live_order())
+    checked: list[str] = []
+    for provider in order:
+        cfg = resolve_runtime_provider_config(
+            provider,
+            working_dir=working_dir,
+            timeout_seconds=timeout_seconds,
+            env=env,
+        )
+        checked.append(f"{cfg.provider.value}:{cfg.default_model or ''}")
+        if cfg.available:
+            return cfg
+
+    if fallback_provider is not None:
+        fallback_cfg = resolve_runtime_provider_config(
+            fallback_provider,
+            model=fallback_model,
+            working_dir=working_dir,
+            timeout_seconds=timeout_seconds,
+            env=env,
+        )
+        metadata = dict(fallback_cfg.metadata or {})
+        metadata["frontier_resolution"] = {
+            "status": "fallback_unavailable",
+            "reason": "no candidate provider reported available",
+            "checked": checked,
+        }
+        logger.warning(
+            "No @frontier provider was available; falling back to %s/%s (available=%s)",
+            fallback_cfg.provider.value,
+            fallback_cfg.default_model,
+            fallback_cfg.available,
+        )
+        return RuntimeProviderConfig(
+            provider=fallback_cfg.provider,
+            api_key=fallback_cfg.api_key,
+            base_url=fallback_cfg.base_url,
+            default_model=fallback_cfg.default_model,
+            transport_mode=fallback_cfg.transport_mode,
+            working_dir=fallback_cfg.working_dir,
+            timeout_seconds=fallback_cfg.timeout_seconds,
+            binary_path=fallback_cfg.binary_path,
+            available=fallback_cfg.available,
+            source=fallback_cfg.source,
+            metadata=metadata,
+        )
+
+    raise RuntimeError(
+        "No @frontier provider available and no fallback_provider/fallback_model supplied"
+    )
+
+
 async def complete_via_preferred_runtime_providers(
     *,
     messages: list[dict[str, str]],
@@ -724,5 +803,6 @@ __all__ = [
     "create_default_provider_map",
     "create_runtime_provider",
     "preferred_runtime_provider_configs",
+    "resolve_top_available_at_wake",
     "resolve_runtime_provider_config",
 ]

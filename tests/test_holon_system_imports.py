@@ -52,6 +52,15 @@ def test_runtime_persistence_facade_reexports() -> None:
     assert persistence.resume_point is persist.resume_point
 
 
+def test_runtime_provider_facade_reexports_frontier_resolver() -> None:
+    import dharma_swarm.runtime_provider as rp
+    from dharma_swarm.holon_system.runtime import provider
+
+    assert provider.resolve_top_available_at_wake is rp.resolve_top_available_at_wake
+    assert provider.resolve_runtime_provider_config is rp.resolve_runtime_provider_config
+    assert provider.RuntimeProviderConfig is rp.RuntimeProviderConfig
+
+
 def test_kernel_facade_reexports_living_agent_kernel() -> None:
     import dharma_swarm.operator_core.living_agent_kernel as lak
     from dharma_swarm.holon_system.kernel import living
@@ -104,6 +113,7 @@ def test_all_subpackages_import_cleanly() -> None:
         "dharma_swarm.holon_system.runtime.bridge",
         "dharma_swarm.holon_system.runtime.wake",
         "dharma_swarm.holon_system.runtime.persistence",
+        "dharma_swarm.holon_system.runtime.provider",
         "dharma_swarm.holon_system.kernel",
         "dharma_swarm.holon_system.kernel.living",
         "dharma_swarm.holon_system.authority",
