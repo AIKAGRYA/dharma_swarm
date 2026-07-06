@@ -26,11 +26,21 @@ Done:
 
 ## Phase C — facade package + Sarathi source
 
-1. Build fresh thin facades under `dharma_swarm/holon_system/`.
-2. Add `tests/test_holon_system_imports.py` proving every facade path imports.
-3. Add `dharma_swarm/holon_system/sarathi/{gateway,pulse,roster,brief,scoreboard}.py`.
-4. Add only thin runtime wrappers/surfaces under `~/.dharma` after source code exists.
-5. Port bridge dialogue/LivingDock additions only as intentional patches with tests.
+Done:
+
+1. Built fresh thin facades under `dharma_swarm/holon_system/`.
+2. Added `tests/test_holon_system_imports.py` proving every facade path imports.
+3. Added `dharma_swarm/holon_system/sarathi/{gateway,pulse,roster,brief,scoreboard}.py`.
+4. Added thin runtime wrapper/surfaces under `~/.dharma` after source code existed.
+5. Ported bridge dialogue/LivingDock additions as an intentional patch with tests:
+   unsafe agentic providers are refused, safe overrides resolve through
+   `runtime_provider`, and LivingDock context is bounded/evidence-backed.
+
+Remaining beyond this collapse lane:
+
+1. Open/land PR review into `origin/main`.
+2. Run an actual unattended Sarathi proof before any `wake_loop_active=true` promotion.
+3. Operator-gated cleanup of stale sibling worktrees if desired.
 
 ## Operator-gated cleanup note
 

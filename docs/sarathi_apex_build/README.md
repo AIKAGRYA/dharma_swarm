@@ -33,7 +33,7 @@ Linked architecture maps that used to be orphaned:
 7. **What got deleted in Phase B?** The standalone `holon/` fork after the surviving fallback importer was migrated to `dharma_swarm.holon_runtime`.
 8. **What proves collapse?** `python3 scripts/governance/sprawl_guard.py` exits `0` on this clean branch; current proof is recorded in `06_PROOF_GATES.md`.
 9. **Where does mutable runtime state live?** `~/.dharma`; source code, tests, schemas, and docs live in git; Hermes Agent lives under `~/.hermes` as a side ecosystem.
-10. **What is the next exact step?** Phase C: build fresh `dharma_swarm/holon_system/` thin facades and import tests.
+10. **What is the next exact step?** Open/land PR review; do not promote `wake_loop_active=true` until a separate unattended proof exists.
 
 ## Non-negotiable truths
 

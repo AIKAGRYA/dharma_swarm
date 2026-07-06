@@ -12,7 +12,7 @@
 | 6 | Orphan maps are metabolized. | `AGENT_HOLON_CODE_MAP.md` and `HOLON_RUNTIME_FULL_ESTATE_MAP.md` are committed under `docs/architecture/` and linked from README. |
 | 7 | Duplicate holon fork removed after importer migration. | Done in Phase B: `scripts/verify_holon_harness_prod.py` now imports `dharma_swarm.holon_runtime`; `holon/` removed. |
 | 8 | `sprawl_guard.py` exits `0` on the clean branch. | Done in Phase B; output below. |
-| 9 | Sarathi facade/package/runtime wrapper exists without source-in-runtime. | Pending Phase C. |
+| 9 | Sarathi facade/package/runtime wrapper exists without source-in-runtime. | Done in Phase C: repo source under `dharma_swarm/holon_system/`; runtime wrapper is thin and imports repo code. |
 | 10 | Unattended proof exists before any `wake_loop_active=true` claim. | Pending; no alive claim made. |
 
 ## Verification already run in Phase A
@@ -53,4 +53,19 @@ EXIT=0
 
 $ .venv/bin/python -m pytest tests/test_holon*.py tests/test_reversibility_gate.py tests/test_codex_composer_wake_loop.py -q
 108 passed, 1 warning in 1.16s
+```
+
+## Phase C verification
+
+```text
+$ python3 scripts/governance/sprawl_guard.py
+RESULT: CLEAN — no sprawl findings.
+
+$ .venv/bin/python -m pytest tests/test_reversibility_gate.py tests/test_holon*.py tests/test_codex_composer_wake_loop.py tests/test_holon_system_imports.py -q
+116 passed, 1 warning in 1.12s
+
+$ DHARMA_SWARM_REPO=/Users/dhyana/ds_holon_collapse_20260707 ~/.dharma/agents/sarathi/gateway/sarathi_gateway.py
+schema_version=dharma.sarathi.gateway_snapshot.v1
+wake_loop_active=false
+alive_claim=false
 ```

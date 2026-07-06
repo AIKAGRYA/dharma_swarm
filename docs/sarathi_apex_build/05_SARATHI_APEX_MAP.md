@@ -23,14 +23,18 @@ dharma_swarm/holon_system/sarathi/
   scoreboard.py
 ```
 
+Status: **created on the clean branch** as source surfaces that return honest
+`wake_loop_active=false` / `alive_claim=false` snapshots.
+
 Runtime wrapper target:
 
 ```text
 ~/.dharma/agents/sarathi/gateway/sarathi_gateway.py
 ```
 
-The runtime wrapper should import repo-owned code; it should not become the
-source of truth.
+Status: **created as a thin runtime wrapper** importing
+`dharma_swarm.holon_system.sarathi.gateway`. It should not become the source of
+truth.
 
 ## Runtime surfaces still needed
 
@@ -44,7 +48,8 @@ source of truth.
 ```
 
 These are listed for Phase C/runtime integration; this Phase A docs commit does
-not create mutable runtime state.
+not claim mutable runtime liveness. The state/heartbeat files now exist with
+`status=scaffolded_not_alive`, `wake_loop_active=false`, and `alive_claim=false`.
 
 ## Admission boundary
 
