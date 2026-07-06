@@ -1,5 +1,13 @@
 # Installing master-prompt-forge
 
+**Doc role:** `reference` (per `docs/AGENTS.md` § Authority Model). This
+package is portable tooling for external distribution — it carries no
+operational authority over this repo, and none of its doctrine (hygiene
+rules, prompt contract, quality gate) governs this repo's own agents or
+docs. Once installed elsewhere, its instructions apply only within the
+Skill/plugin scope the installing user grants it — the same as any other
+Claude Skill.
+
 This directory holds the tracked, maintained copy of the `master-prompt-forge`
 Claude Skill. It lives here in git so it survives across checkouts; it is
 *not* auto-loaded into any Claude Code session by virtue of living in this
