@@ -117,6 +117,12 @@ def load_active_track(path: Path) -> dict[str, Any]:
     fall back to a minimal block parser.
     """
     text = path.read_text(encoding="utf-8")
+    return _parse_active_track_text(text)
+
+
+def _parse_active_track_text(text: str) -> dict[str, Any]:
+    """Parse ACTIVE_TRACK.yaml content from a string (same strategy as
+    load_active_track; used for base-ref blobs read via `git show`)."""
     try:
         import yaml  # type: ignore
         return yaml.safe_load(text)
@@ -1864,6 +1870,79 @@ def _load_prior_passed(findings: list[Finding]) -> dict[str, set[str]]:
     return out
 
 
+def _lifecycle_findings(base_p: dict[str, Any], head_p: dict[str, Any]) -> list[Finding]:
+    """Merge-time lifecycle invariants between a base and a head portfolio.
+
+    A snapshot validator cannot see transitions. These rules close the
+    track-resurrection class observed 2026-06-09..07-01 (a SHIPPED track
+    silently returned ACTIVE when stale PR #555 overwrote the file):
+      1. closed_tracks is append-only — an id closed on base must stay closed.
+      2. a base-closed id may not be active at head without `reopened_at`.
+      3. no id may be both active and closed at head without `reopened_at`.
+    """
+    findings: list[Finding] = []
+    base_closed = {ct.get("id") for ct in base_p.get("closed_tracks") or []
+                   if isinstance(ct, dict) and ct.get("id")}
+    head_closed = {ct.get("id") for ct in head_p.get("closed_tracks") or []
+                   if isinstance(ct, dict) and ct.get("id")}
+    head_active = {t.get("id"): t for t in head_p.get("active_tracks") or []
+                   if isinstance(t, dict) and t.get("id")}
+
+    for cid in sorted(base_closed):
+        if cid not in head_closed:
+            findings.append(Finding("ERROR", f"closed-track-removed:{cid}",
+                f"closed_tracks is append-only: '{cid}' is closed on the base ref "
+                "but missing here. Restore the entry — a stale-branch merge must "
+                "not erase closure history."))
+        entry = head_active.get(cid)
+        if entry is not None and _is_active(entry) and not entry.get("reopened_at"):
+            findings.append(Finding("ERROR", f"closed-track-resurrected:{cid}",
+                f"'{cid}' is closed on the base ref but ACTIVE here without "
+                "`reopened_at`. Deliberate reopen requires reopened_at + evidence; "
+                "otherwise this is a stale-branch overwrite."))
+
+    for tid, t in head_active.items():
+        if _is_active(t) and tid in head_closed and not t.get("reopened_at"):
+            findings.append(Finding("ERROR", f"active-closed-overlap:{tid}",
+                f"'{tid}' appears in both active_tracks and closed_tracks "
+                "without `reopened_at`."))
+    return findings
+
+
+def check_lifecycle_transition(head_p: dict[str, Any], findings: list[Finding],
+                               base_ref: str | None = None) -> None:
+    """Apply _lifecycle_findings against ACTIVE_TRACK.yaml at the merge base.
+
+    Base resolution: explicit --base, else origin/$GITHUB_BASE_REF (PR CI),
+    else origin/main. Skips with INFO — never blocks — when the ref or file
+    is unavailable (local clone without a remote, fresh history)."""
+    import os
+    ref = base_ref or (
+        f"origin/{os.environ['GITHUB_BASE_REF']}"
+        if os.environ.get("GITHUB_BASE_REF") else "origin/main")
+    try:
+        res = subprocess.run(
+            ["git", "show", f"{ref}:docs/governance/ACTIVE_TRACK.yaml"],
+            capture_output=True, text=True, timeout=30, cwd=str(REPO_ROOT))
+    except Exception as exc:
+        findings.append(Finding("INFO", "lifecycle-base-unavailable",
+            f"git show {ref} failed ({exc}); transition check skipped."))
+        return
+    if res.returncode != 0:
+        findings.append(Finding("INFO", "lifecycle-base-unavailable",
+            f"base ref {ref} has no readable ACTIVE_TRACK.yaml; "
+            "transition check skipped."))
+        return
+    try:
+        base_p = normalize_portfolio(_parse_active_track_text(res.stdout) or {})
+    except Exception as exc:
+        findings.append(Finding("WARN", "lifecycle-base-unparseable",
+            f"ACTIVE_TRACK.yaml at {ref} unparseable ({exc}); "
+            "transition check skipped."))
+        return
+    findings.extend(_lifecycle_findings(base_p, head_p))
+
+
 def run(args: argparse.Namespace) -> int:
     findings: list[Finding] = []
     if not ACTIVE_TRACK_PATH.exists():
@@ -1889,6 +1968,11 @@ def run(args: argparse.Namespace) -> int:
     # Portfolio-level graph invariants.
     validate_portfolio_graph(p, findings)
     detect_dependency_cycle(p["active_tracks"], findings)
+
+    # Merge-time lifecycle invariants (closes the C9 resurrection class):
+    # compare against the base ref so a stale-branch merge cannot silently
+    # un-close a track or erase closure history.
+    check_lifecycle_transition(p, findings, base_ref=getattr(args, "base", None))
 
     prior_passed = _load_prior_passed(findings)
     track_results: list[tuple[dict[str, Any], dict[str, Any]]] = []
@@ -2148,6 +2232,9 @@ def main() -> int:
                         help="Treat TTL staleness as a blocking ERROR (scheduled "
                              "freshness sweep). Off by default so an unrelated stale "
                              "track does not block per-PR merges.")
+    parser.add_argument("--base", default=None,
+                        help="Git ref to diff lifecycle transitions against "
+                             "(default: origin/$GITHUB_BASE_REF, else origin/main).")
     args = parser.parse_args()
     code = run(args)
     if args.warn_only:
