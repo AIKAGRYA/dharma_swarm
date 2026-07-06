@@ -101,7 +101,11 @@ def lease_path(root: str | Path, lease_id: str) -> Path:
     return Path(root).expanduser() / f"{safe_lease_id(lease_id)}.json"
 
 
-def default_lease_root(dharma_home: str | Path = "~/.dharma") -> Path:
+def default_lease_root(dharma_home: str | Path | None = None) -> Path:
+    if dharma_home is None:
+        from dharma_swarm.daemon_config import dharma_state_dir
+
+        return dharma_state_dir() / "a2a_bus" / "leases"
     return Path(dharma_home).expanduser() / "a2a_bus" / "leases"
 
 

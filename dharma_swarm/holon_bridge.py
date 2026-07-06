@@ -224,10 +224,8 @@ def get_holon_dialogue_provider(holon: RunningHolon, env: dict[str, str] | None 
                 f"dialogue provider {ptype.value} is not available"
             )
         provider = create_runtime_provider(config)
-        try:
+        if hasattr(provider, "__dict__"):
             setattr(provider, "holon_dialogue_provider_override", True)
-        except Exception:
-            pass
         return provider
 
     if holon.provider_type in UNSAFE_DIALOGUE_PROVIDER_TYPES:

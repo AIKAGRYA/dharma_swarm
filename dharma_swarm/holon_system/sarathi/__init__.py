@@ -1,7 +1,7 @@
 """Sarathi apex source package.
 
 These modules are honest source surfaces. They do not claim unattended liveness;
-runtime wrappers under ``~/.dharma`` should import from here.
+runtime-home wrappers should import from here.
 """
 
 from .brief import build_operator_brief

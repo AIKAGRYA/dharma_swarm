@@ -53,6 +53,16 @@
 /dharma_swarm/model_hierarchy.py       @AmitabhainArunachala
 /dharma_swarm/resilience.py             @AmitabhainArunachala
 /dharma_swarm/routing_memory.py         @AmitabhainArunachala
+/dharma_swarm/evolution_roster.py       @AmitabhainArunachala
+/dharma_swarm/model_pool.py             @AmitabhainArunachala
+/dharma_swarm/ollama_config.py          @AmitabhainArunachala
+/dharma_swarm/telemetry_plane.py        @AmitabhainArunachala
+/dharma_swarm/jikoku_samaya.py          @AmitabhainArunachala
+/dharma_swarm/jikoku_instrumentation.py @AmitabhainArunachala
+/dharma_swarm/router_retrospective.py   @AmitabhainArunachala
+/dharma_swarm/stigmergy.py              @AmitabhainArunachala
+/dharma_swarm/codex_cli.py              @AmitabhainArunachala
+/dharma_swarm/cost_tracker.py           @AmitabhainArunachala
 
 # Governance config — touch carefully
 /.github/                               @AmitabhainArunachala

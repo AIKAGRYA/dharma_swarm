@@ -272,7 +272,7 @@ These are immutable engineering laws for this repository. Violation = architectu
 The `dharma_swarm/` package currently has **389 files at its top level (58.7% of 663 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
 
 ### A2: NO DUPLICATE IMPLEMENTATIONS
-Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **26 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **21 adapter files across 8 locations** (V), and **14 router files** (V). Do not add more without deprecating an existing one.
+Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **29 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **26 adapter files across 8 locations** (V), and **17 router files** (V). Do not add more without deprecating an existing one.
 
 ### A3: NO UNDOCUMENTED SEAMS
 If your code creates a new interface between domains (a bridge, adapter, or protocol), you must update `NAVIGATION.md` with its purpose, entry point, and boundary constraints. Undocumented seams become invisible coupling.
@@ -316,18 +316,18 @@ append-style refreshes quadruplicated rows and broke `make docops-integrity`).
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **887** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **436 (49.2%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **343,077** | wc -l across dharma_swarm Python modules |
-| Test files | **841** | find tests -name "*.py" -type f |
-| Test functions | **12,710 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Total Python modules | **953** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **437 (45.9%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **349,793** | wc -l across dharma_swarm Python modules |
+| Test files | **856** | find tests -name "*.py" -type f |
+| Test functions | **12,842 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **12,674 (measured 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
 | Collection errors | **0 (measured 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
-| Markdown files | **1,324** | find . -name "*.md" -type f |
-| Markdown total lines | **282,623** | wc -l across all .md |
-| Bridge files | **26** | find dharma_swarm -name "*bridge*.py" -type f |
+| Markdown files | **1,345** | find . -name "*.md" -type f |
+| Markdown total lines | **284,527** | wc -l across all .md |
+| Bridge files | **29** | find dharma_swarm -name "*bridge*.py" -type f |
 | Adapter files | **26** | find dharma_swarm -type f | rg -i "adapter" |
-| Router files | **16** | find dharma_swarm -type f | rg -i "rout" |
+| Router files | **17** | find dharma_swarm -type f | rg -i "rout" |
 
 ## SYSTEM TOPOGRAPHY
 
@@ -411,7 +411,7 @@ append-style refreshes quadruplicated rows and broke `make docops-integrity`).
 
 ### Domain 6: Bridges (Integration Layer)
 
-**26 bridge files** (V), **11,910 total LOC**:
+**29 bridge files** (V), **13,299 total LOC**:
 
 | Bridge | Lines | Importers | Status |
 |--------|-------|-----------|--------|
@@ -607,13 +607,13 @@ This re-audit found errors in the earlier 5-model audit:
 | Error in prior audit | Corrected value |
 |---------------------|----------------|
 | "codex_overnight.py is 10K lines" | **1,008 lines** (V) |
-| "17 bridge files" / "19 bridge files" (self-contradicting) | **26 bridge files** (V) |
+| "17 bridge files" / "19 bridge files" (self-contradicting) | **29 bridge files** (V) |
 | "16 TUI test errors" | **16 total errors: 10 numpy, 2 textual, 1 typer, 1 pytest_asyncio, 1 yaml, 1 tui.app** -- only 3 are TUI-specific (V) |
 | "10 pillars" with "PILLAR_04 missing, PILLAR_11 present" | **10 pillar files exist** (PILLAR_01-03, 05-11; PILLAR_04 never created). Sparse numbering, not 11. (V) |
 | "router_v1.py is LEGACY" | **router_v1.py is ALIVE** -- actively used by providers.py for signal generation (V) |
 | "18 provider classes" (VIVEKA) | **19 classes** (including abstract LLMProvider base); **18 ProviderType enum values** (V) |
 | "engine/ is legacy duplicate of tui/engine/" | **Both are ALIVE** -- engine/ has 41 importers, tui/engine/ has 31 importers. Different purposes. (V) |
-| Bridge count of "30" (Phase 3A) | **26 actual bridge files** -- the "30" counted test files and non-bridge files with "bridge" in name (V) |
+| Bridge count of "30" (Phase 3A) | **29 actual bridge files** -- the "30" counted test files and non-bridge files with "bridge" in name (V) |
 
 ---
 
