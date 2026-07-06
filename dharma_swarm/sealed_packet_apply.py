@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from dharma_swarm.diff_applier import parse_unified_diff
+from dharma_swarm.promotion_gate import SEALED_PACKET_BLOCKED_PATHS as _SEALED_PACKET_BLOCKED_PATHS
 from dharma_swarm.evolution import (
     EvidenceTier,
     EvolutionStatus,
@@ -22,34 +23,6 @@ from dharma_swarm.evolution import (
     SealedPacketApplyResult,
 )
 from dharma_swarm.traces import TraceEntry
-
-
-_SEALED_PACKET_BLOCKED_PATHS: tuple[str, ...] = (
-    ".github/workflows/*",
-    ".pre-commit-config.yaml",
-    "dharma_swarm/agent_runner.py",
-    "dharma_swarm/dgc_cli.py",
-    "dharma_swarm/dharma_kernel.py",
-    "dharma_swarm/diff_applier.py",
-    "dharma_swarm/dgm_loop.py",
-    "dharma_swarm/evolution.py",
-    "dharma_swarm/evolution_safety.py",
-    "dharma_swarm/evolution_safety_runtime.py",
-    "dharma_swarm/frontier_council.py",
-    "dharma_swarm/guardian_crew.py",
-    "dharma_swarm/insight_brief.py",
-    "dharma_swarm/models.py",
-    "dharma_swarm/orchestrate_live.py",
-    "dharma_swarm/orchestrator.py",
-    "dharma_swarm/sealed_packet_apply.py",
-    "dharma_swarm/swarm.py",
-    "dharma_swarm/telos_gates.py",
-    # A live packet must never be able to rewrite the door that admitted it.
-    "dharma_swarm/forge_v1/forge_v2/*",
-    "dharma_swarm/operator_core/governed_work_admission.py",
-    "dharma_swarm/telos_formal.py",
-    "scripts/governance/*",
-)
 
 
 async def apply_sealed_packet(
@@ -68,7 +41,7 @@ async def apply_sealed_packet(
     root = Path(dryrun_root).expanduser().resolve()
     result = SealedPacketApplyResult(packet_root=str(root), shadow=shadow)
     if not shadow:
-        from dharma_swarm.evolution import _promotion_verification_allows_live
+        from dharma_swarm.promotion_gate import _promotion_verification_allows_live
 
         if not _promotion_verification_allows_live(
             promotion_verification,
