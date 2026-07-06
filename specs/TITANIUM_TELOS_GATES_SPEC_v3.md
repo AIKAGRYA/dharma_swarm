@@ -102,7 +102,7 @@ Phase 0 (this PR) lands:
 - `packages/telos-kernel/` with JCS canonicalization, signed Leaf schema, Merkle chain, K-of-N-capable manifest loader, macaroon-shaped capability tokens, notary anchor seam.
 - `kernel/manifest.yaml` declaring U0–U11 with thresholds and citations. `U5` marked `enforced`; all others `declared`.
 - `dharma_swarm/merkle_log.py` shim preserving the legacy API surface.
-- CI: import-boundary AST check, Nagini, Crosshair, TCB LOC ceiling, Hypothesis property tests, U5 falsification (leaf tamper).
+- CI: import-boundary AST check, titanium-verify purity/effect certification, Crosshair, TCB LOC ceiling, Hypothesis property tests, U5 falsification (leaf tamper).
 
 ---
 
@@ -112,7 +112,7 @@ Top claim: *"No self-modification can loosen a U-invariant without K2 quorum (U2
 
 Sub-goals:
 1. **G1** — Kernel TCB is small, contract-verified, import-boundary-enforced.
-   Evidence: `test_import_boundary.py` green; Nagini passes; TCB LOC < 5 000.
+   Evidence: `test_import_boundary.py` green; titanium-verify passes; TCB LOC < 5 000.
 2. **G2** — Every gate produces a signed Merkle leaf.
    Evidence: `receipt.py` covers all U0–U11; `verify_chain` on every boot.
 3. **G3** — Every U-invariant has a measure, threshold, and falsification test.

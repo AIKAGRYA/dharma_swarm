@@ -25,7 +25,7 @@ This document is the executable delivery plan: a concrete PR stack against
 - `packages/telos-kernel/telos_kernel/contracts/kernel_contracts.py`
 - `packages/telos-kernel/telos_kernel/tests/*`
 - `kernel/manifest.yaml` — U0–U11 declared with thresholds
-- `.github/workflows/kernel-nagini.yml`, `kernel-crosshair.yml`, `kernel-import-boundary.yml`
+- `.github/workflows/kernel-crosshair.yml`, `kernel-import-boundary.yml`, `kernel-titanium-verify.yml`
 
 **Files touched (backwards-compatible shim):**
 - `dharma_swarm/merkle_log.py` — becomes `from telos_kernel.merkle_log import *`
@@ -190,7 +190,7 @@ Preserves the v2 PR #761 §5 Deep Cut on device-independent certification via co
 ### Trust boundary discipline
 - No dynamic import, `eval`, `exec`, or monkey-patching inside `packages/telos-kernel/`.
 - Every kernel function has an `icontract` or `deal` pre/post-condition.
-- Nagini runs on the kernel core in CI (`kernel-nagini.yml`).
+- `titanium-verify` runs on the kernel core in CI (`kernel-titanium-verify.yml`).
 - Crosshair runs SMT counterexample search in CI (`kernel-crosshair.yml`).
 - Kernel TCB LOC target ≤ 5 000; enforced as CI check.
 

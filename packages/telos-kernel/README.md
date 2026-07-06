@@ -9,7 +9,7 @@ Companion package to [`../telos-gatekeeper/`](../telos-gatekeeper/). Where the g
 - **TCB LOC target:** ≤ 5 000 across `telos_kernel/*.py` (CI-enforced).
 - **Import allow-list:** stdlib + `pydantic`, `cryptography`, `pyyaml`, `icontract`. Later phases extend under quorum-signed manifest edits.
 - **Forbidden constructs:** `eval`, `exec`, `__import__`, dynamic module loading, monkey-patching entry points. AST-checked in CI.
-- **Every public function:** carries `icontract` pre/post-conditions. Nagini runs on the verifiable subset; Crosshair runs SMT counterexample search on the wider contract surface.
+- **Verifier gates:** `titanium-verify` blocks merge on kernel purity/effect certification. Crosshair runs SMT counterexample search on the wider contract surface, with runtime contracts kept where they are still useful.
 
 ## Phase 0 status
 

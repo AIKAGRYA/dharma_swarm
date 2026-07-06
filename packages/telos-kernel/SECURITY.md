@@ -13,11 +13,11 @@ The TCB is exactly the Python source under `packages/telos-kernel/telos_kernel/*
 
 ## 2. Verifier stack
 
-1. **Nagini** — sound static verifier for a subset of Python. Runs on `merkle_log.py`, `receipt.py`, `manifest.py`, and `checker.py` (stub in Phase 0). CI blocks on Nagini errors. Reference: [marcoeilers/nagini](https://github.com/marcoeilers/nagini).
-2. **Crosshair** — SMT-guided counterexample finder against `icontract` pre/post-conditions. Runs in CI on the full kernel surface. Reference: [pschanely/CrossHair](https://github.com/pschanely/CrossHair).
+1. **titanium-verify** — bespoke sound purity and effect verifier for the TCB dialect. Runs on every core module in `telos_kernel/` (excluding the `_io` rim). Uses least-fixpoint dataflow analysis (Kildall 1973) plus Z3 SMT validation. CI blocks merge on any refutation. See `packages/titanium-verify/README.md`. Replaces Nagini as of Phase 1: Nagini required a Viper/silicon/JVM stack, rejected the TCB dialect (Pydantic, dataclass methods, icontract), and returned unknown on most core functions. References: [Kildall 1973](https://dl.acm.org/doi/10.1145/512927.512945), [Z3](https://github.com/Z3Prover/z3).
+2. **Crosshair** — SMT-guided counterexample finder against `icontract` pre/post-conditions. Runs in CI on the full kernel surface. Complementary to titanium-verify (which proves purity/effects; Crosshair searches for value counterexamples). Reference: [pschanely/CrossHair](https://github.com/pschanely/CrossHair).
 3. **Hypothesis** — property-based tests on `MerkleLog.append/verify` round-trip, canonicalization round-trip, macaroon attenuation monotonicity, receipt sign/verify.
 
-Any verifier disagreement blocks merge. If Nagini rejects a construct required for correctness, we restructure the code, not the verifier.
+Any verifier disagreement blocks merge. If titanium-verify refuses a construct required for correctness, we restructure the code, not the verifier.
 
 ## 3. Cryptographic primitives
 
