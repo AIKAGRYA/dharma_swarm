@@ -13,6 +13,7 @@ FLEET_ROWS=(
   "hermes-m5|hermes_inbox|com.dharma.a2a-inbox-bridge.hermes-m5|"
   "codex_composer|codex_composer_inbox|com.dharma.a2a.codex-composer-inbox-bridge|com.dharma.a2a-inbox-bridge.codex-composer"
   "fable_composer|fable_composer_inbox|com.dharma.a2a-inbox-bridge.fable-composer|"
+  "fugu_ultra|fugu_ultra_inbox|com.dharma.a2a-inbox-bridge.fugu-ultra|"
   "opus_composer|opus_composer_inbox|com.dharma.a2a-inbox-bridge.opus-composer|"
   "devin-roaming-2987d222|devin_roaming_2987d222_inbox|com.dharma.a2a-inbox-bridge.devin-roaming-2987d222|"
   "perplexity-computer|perplexity_computer_inbox|com.dharma.a2a-inbox-bridge.perplexity-computer|"

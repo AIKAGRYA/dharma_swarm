@@ -180,8 +180,8 @@ def test_status_reports_mission_tasks_and_kernel_status(tmp_path, capsys):
 
     assert code == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["task_count"] == 1
-    assert payload["open_task_count"] == 1
+    assert payload["task_count"] == 2
+    assert payload["open_task_count"] == 2
     assert payload["latest_wake_status"] == []
 
 

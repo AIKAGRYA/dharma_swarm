@@ -46,6 +46,7 @@ def test_a2a_inbox_bridge_fleet_launchd_scripts_keep_five_plus_agents_live() -> 
         "hermes-m5",
         "codex_composer",
         "fable_composer",
+        "fugu_ultra",
         "opus_composer",
         "devin-roaming-2987d222",
         "perplexity-computer",
