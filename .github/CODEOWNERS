@@ -53,6 +53,9 @@
 /dharma_swarm/model_hierarchy.py       @AmitabhainArunachala
 /dharma_swarm/resilience.py             @AmitabhainArunachala
 /dharma_swarm/routing_memory.py         @AmitabhainArunachala
+/dharma_swarm/evolution_roster.py       @AmitabhainArunachala
+/dharma_swarm/model_pool.py             @AmitabhainArunachala
+/dharma_swarm/ollama_config.py          @AmitabhainArunachala
 
 # Governance config — touch carefully
 /.github/                               @AmitabhainArunachala
