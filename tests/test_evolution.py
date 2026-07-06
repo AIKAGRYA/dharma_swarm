@@ -17,12 +17,63 @@ from dharma_swarm.evolution import (
     Proposal,
     _paths_from_unified_diff,
 )
+from dharma_swarm.forge_v1.forge_v2.signals import canonical_sha256
 from dharma_swarm.landscape import BasinType, LandscapeProbe
 from dharma_swarm.meta_evolution import MetaParameters
 from dharma_swarm.experiment_log import ExperimentRecord
 from dharma_swarm.models import GateDecision, LLMResponse, SandboxResult
 from dharma_swarm.router_retrospective import RouteOutcomeRecord
 from dharma_swarm.ucb_selector import UCBConfig
+
+
+class _ExplodingProvider:
+    async def complete(self, request):
+        del request
+        raise AssertionError("proposal generation should have been monkeypatched or refused")
+
+
+def _unsigned_allow_live_packet() -> dict:
+    from dharma_swarm.forge_v1.forge_v2.promote import REQUIRED_RECEIPTS_V0_ABSENT
+
+    packet = {
+        "schema": "forge_v2.promotion_verification.v1",
+        "decision": "allow",
+        "live_apply_allowed": True,
+        "promotion_packet": {"decision": "promotable_candidate"},
+        "governed_admission": {"decision": "allow"},
+        "telos": {"decision": "allow"},
+        "signed_receipts": {name: True for name in REQUIRED_RECEIPTS_V0_ABSENT},
+        "operator_lease_present": True,
+        "blockers": [],
+    }
+    packet["payload_sha256"] = canonical_sha256(packet)
+    return packet
+
+
+def _signed_allow_live_packet() -> tuple[dict, list[str]]:
+    packet = _unsigned_allow_live_packet()
+    public_key = "01" * 32
+    packet["verification_signature"] = {
+        "scheme": "ed25519",
+        "key_id": "unit-judge",
+        "public_key": public_key,
+        "signature": "02" * 64,
+    }
+    return packet, [public_key]
+
+
+def _trust_test_judge(monkeypatch):
+    from dharma_swarm.forge_v1.forge_v2 import verify_promotion as promotion_verifier
+
+    def fake_signature_verifier(packet, *, trusted_public_keys=()):
+        signature = dict(packet.get("verification_signature", {}) or {})
+        return signature.get("public_key") in set(trusted_public_keys)
+
+    monkeypatch.setattr(
+        promotion_verifier,
+        "verify_promotion_verification_signature",
+        fake_signature_verifier,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1506,15 +1557,112 @@ async def test_auto_evolve_routes_through_sandbox_cycle(engine_paths, tmp_path, 
     monkeypatch.setattr(eng, "generate_proposal", fake_generate)
     monkeypatch.setattr(eng, "run_cycle_with_sandbox", fake_run_cycle_with_sandbox)
 
+    _trust_test_judge(monkeypatch)
+    packet, trusted_keys = _signed_allow_live_packet()
     result = await eng.auto_evolve(
         DummyProvider(),
         [source_a, source_b],
         test_command="echo 'global passed'",
         timeout=9.0,
+        shadow=False,
+        promotion_verification=packet,
+        trusted_judge_public_keys=trusted_keys,
     )
 
     assert result.proposals_submitted == 2
     assert result.proposals_archived == 2
+
+
+async def test_auto_evolve_live_mode_requires_verified_promotion_packet(engine, tmp_path, monkeypatch):
+    source = tmp_path / "target.py"
+    source.write_text("def f():\n    return 1\n", encoding="utf-8")
+
+    async def explode_generate(*_args, **_kwargs):
+        raise AssertionError("live refusal must happen before proposal generation")
+
+    monkeypatch.setattr(engine, "generate_proposal", explode_generate)
+
+    result = await engine.auto_evolve(
+        _ExplodingProvider(),
+        [source],
+        shadow=False,
+    )
+
+    assert result.proposals_submitted == 0
+    assert "verify_promotion packet required" in result.reflection
+
+
+async def test_auto_evolve_refuses_worker_authored_allow_packet(engine, tmp_path, monkeypatch):
+    source = tmp_path / "target.py"
+    source.write_text("def f():\n    return 1\n", encoding="utf-8")
+
+    async def explode_generate(*_args, **_kwargs):
+        raise AssertionError("self-authored allow packet must not reach proposal generation")
+
+    monkeypatch.setattr(engine, "generate_proposal", explode_generate)
+
+    result = await engine.auto_evolve(
+        _ExplodingProvider(),
+        [source],
+        shadow=False,
+        promotion_verification=_unsigned_allow_live_packet(),
+    )
+
+    assert result.proposals_submitted == 0
+    assert "verify_promotion packet required" in result.reflection
+
+
+async def test_auto_evolve_refuses_untrusted_judge_signature(engine, tmp_path, monkeypatch):
+    source = tmp_path / "target.py"
+    source.write_text("def f():\n    return 1\n", encoding="utf-8")
+
+    async def explode_generate(*_args, **_kwargs):
+        raise AssertionError("untrusted judge packet must not reach proposal generation")
+
+    monkeypatch.setattr(engine, "generate_proposal", explode_generate)
+    packet, _trusted_keys = _signed_allow_live_packet()
+
+    result = await engine.auto_evolve(
+        _ExplodingProvider(),
+        [source],
+        shadow=False,
+        promotion_verification=packet,
+        trusted_judge_public_keys=[],
+    )
+
+    assert result.proposals_submitted == 0
+    assert "verify_promotion packet required" in result.reflection
+
+
+async def test_commit_if_worthy_requires_signed_promotion_verdict(engine, tmp_path, monkeypatch):
+    proposal = Proposal(
+        component="target.py",
+        change_type="mutation",
+        description="direct commit bypass attempt",
+        diff=(
+            "diff --git a/target.py b/target.py\n"
+            "--- a/target.py\n"
+            "+++ b/target.py\n"
+            "@@\n"
+            "-old\n"
+            "+new\n"
+        ),
+        actual_fitness=FitnessScore(correctness=1.0, safety=1.0),
+    )
+
+    async def explode_subprocess(*_args, **_kwargs):
+        raise AssertionError("commit bypass must refuse before any git subprocess")
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", explode_subprocess)
+
+    result = await engine.commit_if_worthy(
+        proposal,
+        fitness_threshold=0.1,
+        workspace=tmp_path,
+        promotion_verification=_unsigned_allow_live_packet(),
+    )
+
+    assert result is None
 
 
 async def test_run_cycle_circuit_breaker_after_repeated_failures(engine):
@@ -2050,6 +2198,40 @@ async def test_apply_sealed_packet_live_calls_apply_after_guards(
 
     monkeypatch.setattr(engine, "apply_diff_and_test", fake_apply)
 
+    _trust_test_judge(monkeypatch)
+    packet, trusted_keys = _signed_allow_live_packet()
+    result = await engine.apply_sealed_packet(
+        root,
+        shadow=False,
+        workspace=workspace,
+        proof_timeout=5.0,
+        halt_path=tmp_path / "missing-halt",
+        promotion_verification=packet,
+        trusted_judge_public_keys=trusted_keys,
+    )
+
+    assert result.accepted is True
+    assert result.applied is True
+    assert result.archive_entry_id is not None
+    assert len(calls) == 1
+    assert calls[0][3] == workspace
+
+
+async def test_apply_sealed_packet_live_requires_verified_promotion_packet(
+    engine,
+    tmp_path,
+    monkeypatch,
+):
+    root = tmp_path / "dryrun"
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _write_sealed_packet(root, diff_text=_safe_diff())
+
+    async def fake_apply(*_args, **_kwargs):
+        raise AssertionError("live sealed packet must refuse before apply")
+
+    monkeypatch.setattr(engine, "apply_diff_and_test", fake_apply)
+
     result = await engine.apply_sealed_packet(
         root,
         shadow=False,
@@ -2058,11 +2240,10 @@ async def test_apply_sealed_packet_live_calls_apply_after_guards(
         halt_path=tmp_path / "missing-halt",
     )
 
-    assert result.accepted is True
-    assert result.applied is True
-    assert result.archive_entry_id is not None
-    assert len(calls) == 1
-    assert calls[0][3] == workspace
+    assert result.accepted is False
+    assert result.applied is False
+    assert result.refused_checks == ["promotion_verification"]
+    assert "verify_promotion" in result.reason
 
 
 async def test_apply_sealed_packet_blocked_path_refuses_before_apply(
@@ -2086,11 +2267,15 @@ async def test_apply_sealed_packet_blocked_path_refuses_before_apply(
 
     monkeypatch.setattr(engine, "apply_diff_and_test", fake_apply)
 
+    _trust_test_judge(monkeypatch)
+    packet, trusted_keys = _signed_allow_live_packet()
     result = await engine.apply_sealed_packet(
         root,
         shadow=False,
         proof_timeout=5.0,
         halt_path=tmp_path / "missing-halt",
+        promotion_verification=packet,
+        trusted_judge_public_keys=trusted_keys,
     )
 
     assert result.accepted is False

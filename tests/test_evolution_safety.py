@@ -170,9 +170,13 @@ def test_free_grind_shadow_forced_without_lease(monkeypatch):
 
 
 def test_free_grind_source_present_in_orchestrate_live():
+    # One-door (U1) tightened PR-001's posture: the grind lane no longer has a
+    # lease-conditional live path at all — auto_evolve is hardcoded shadow-only.
+    # Live apply exists only via forge_v2.verify_promotion sealed packets.
     src = Path(__file__).resolve().parents[1] / "dharma_swarm" / "orchestrate_live.py"
     text = src.read_text(encoding="utf-8")
-    assert "shadow=_grind_shadow" in text
+    assert "shadow=True,  # one-door" in text
+    assert "shadow=_grind_shadow" not in text  # the lease-conditional live call is gone
     assert "shadow=False,  # Real mode" not in text  # the old hardcoded live call is gone
 
 
