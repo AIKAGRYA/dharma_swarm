@@ -130,13 +130,38 @@ async def talk(
         reply = await _stream_request(provider, _request(model))
     except Exception as exc:  # noqa: BLE001
         if mode != "declared-first":
-            raise
-        print(f"\n[warn] declared route failed ({type(exc).__name__}: {exc}); falling back to free-first")
-        fallback_from = route_label
-        provider, pname, model = _resolve_free_provider()
-        route_label = f"{pname}/{model}"
-        print(f"{name} [fallback {route_label}]> ", end="", flush=True)
-        reply = await _stream_request(provider, _request(model))
+            # free-first: creation succeeding does not mean the account will
+            # serve (e.g. weekly 429) — walk the rest of the chain at stream level.
+            last_err = f"{pname}: {type(exc).__name__}: {exc}"
+            fallback_from = route_label
+            reply = None
+            failed = {pname}
+            for cfg in preferred_runtime_provider_configs():
+                if cfg.provider in _FREE_CHAIN_EXCLUDES or cfg.provider.value in failed:
+                    continue
+                if not cfg.default_model:
+                    continue
+                try:
+                    provider = create_runtime_provider(cfg)
+                    pname, model = cfg.provider.value, cfg.default_model
+                    route_label = f"{pname}/{model}"
+                    print(f"\n[warn] {last_err}; trying {route_label}")
+                    print(f"{name} [fallback {route_label}]> ", end="", flush=True)
+                    reply = await _stream_request(provider, _request(model))
+                    break
+                except Exception as exc2:  # noqa: BLE001
+                    failed.add(cfg.provider.value)
+                    last_err = f"{cfg.provider.value}: {type(exc2).__name__}: {exc2}"
+                    continue
+            if reply is None:
+                raise RuntimeError(f"all free providers failed (last: {last_err})") from exc
+        else:
+            print(f"\n[warn] declared route failed ({type(exc).__name__}: {exc}); falling back to free-first")
+            fallback_from = route_label
+            provider, pname, model = _resolve_free_provider()
+            route_label = f"{pname}/{model}"
+            print(f"{name} [fallback {route_label}]> ", end="", flush=True)
+            reply = await _stream_request(provider, _request(model))
     if mode == "declared-first" and fallback_from is None and _looks_like_provider_failure(reply):
         print("\n[warn] declared route returned provider/account failure; falling back to free-first")
         fallback_from = route_label

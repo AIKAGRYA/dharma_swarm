@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check bug-corral-scan name-drift-preflight semantic-commons-check semantic-commons-project agent-admit onboard-agent codex-composer-bootstrap codex-composer-once codex-composer-status codex-composer-start codex-composer-stop docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop tmux-bootstrap tmux-status tmux-substrate-contract memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke runtime-truth-ci runtime-truth-closeout runtime-truth-burn-in runtime-truth-burn-in-smoke runtime-truth-100-audit runtime-task-firebreak ds-goal-longrun-preflight-check governance-all agent-build-preflight agent-build-closeout cybernetics-codex-audit spine-check onboard offboard orient status go-fmt-check go-test go-vet go-ci xray compile test-smoke test-all dashboard-lint dashboard-build
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check bug-corral-scan name-drift-preflight semantic-commons-check semantic-commons-project agent-admit onboard-agent codex-composer-bootstrap codex-composer-once codex-composer-status codex-composer-start codex-composer-stop agent-wake-once agent-wake-status agent-wake-bootstrap agent-wake-start agent-wake-stop docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop tmux-bootstrap tmux-status tmux-substrate-contract memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke runtime-truth-ci runtime-truth-closeout runtime-truth-burn-in runtime-truth-burn-in-smoke runtime-truth-100-audit runtime-task-firebreak ds-goal-longrun-preflight-check governance-all agent-build-preflight agent-build-closeout cybernetics-codex-audit wiki-orphan-status wiki-orphan-upgrade spine-check onboard offboard orient status go-fmt-check go-test go-vet go-ci xray compile test-smoke test-all dashboard-lint dashboard-build
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently.
@@ -99,6 +99,8 @@ help:
 	@echo "  make runtime-task-firebreak ARGS='--json' Dry-run task backlog firebreak"
 	@echo "  make ds-goal-longrun-preflight-check Block unpinned repo-owned ds-goal longrun workflow commands"
 	@echo "  make cybernetics-codex-audit Render read-only cybernetic loop closure ledger"
+	@echo "  make wiki-orphan-status Render Karpathy wiki orphan/density health"
+	@echo "  make wiki-orphan-upgrade ARGS='--limit 200' Enrich orphan atoms and re-ingest wiki retrieval"
 	@echo "  make onboard      Render current operating reality (active track, live ops, broken register, axioms)"
 	@echo "  make offboard     Render end-of-session handoff receipt for the next agent/auditor"
 	@echo "  make orient       Render the whole organism at once (identity, organs, tracks, custody, liveness)"
@@ -315,9 +317,30 @@ agent-admit:
 
 onboard-agent:
 	@[ -n "$(AGENT_NAME)" ] || (printf "set AGENT_NAME=codex_composer\n"; exit 2)
-	@[ "$(AGENT_NAME)" = "codex_composer" ] || (printf "unsupported AGENT_NAME=%s; supported: codex_composer\n" "$(AGENT_NAME)"; exit 2)
+	@case "$(AGENT_NAME)" in \
+		codex_composer|fable_composer) : ;; \
+		*) printf "unsupported AGENT_NAME=%s; supported: codex_composer fable_composer\n" "$(AGENT_NAME)"; exit 2 ;; \
+	esac
 	$(PYTHON) scripts/governance/agent_admission.py
-	$(PYTHON) scripts/runtime/codex_composer_wake_loop.py once $${ARGS:-}
+	$(PYTHON) scripts/runtime/codex_composer_wake_loop.py --agent-uid $(AGENT_NAME) once $${ARGS:-}
+
+# Generic seat wake surface (default codex_composer; set AGENT_NAME=fable_composer etc.).
+# One governed loop serves every admitted seat via --agent-uid; no per-agent fork.
+AGENT_NAME ?= codex_composer
+agent-wake-once:
+	$(PYTHON) scripts/runtime/codex_composer_wake_loop.py --agent-uid $(AGENT_NAME) once $${ARGS:-}
+
+agent-wake-status:
+	$(PYTHON) scripts/runtime/codex_composer_wake_loop.py --agent-uid $(AGENT_NAME) status $${ARGS:-}
+
+agent-wake-bootstrap:
+	$(PYTHON) scripts/runtime/codex_composer_wake_loop.py --agent-uid $(AGENT_NAME) bootstrap $${ARGS:-}
+
+agent-wake-start:
+	$(PYTHON) scripts/runtime/codex_composer_wake_loop.py --agent-uid $(AGENT_NAME) start $${ARGS:-}
+
+agent-wake-stop:
+	$(PYTHON) scripts/runtime/codex_composer_wake_loop.py --agent-uid $(AGENT_NAME) stop $${ARGS:-}
 
 codex-composer-bootstrap:
 	$(PYTHON) scripts/runtime/codex_composer_wake_loop.py bootstrap $${ARGS:-}
@@ -507,6 +530,15 @@ agent-build-closeout:
 cybernetics-codex-audit:
 	$(REPO_PYTHON) scripts/governance/cybernetics_codex_audit.py
 
+wiki-orphan-status:
+	$(PYTHON) scripts/wiki_orphan_upgrade.py --status $(ARGS)
+
+wiki-orphan-upgrade:
+	$(PYTHON) scripts/wiki_orphan_upgrade.py --apply $(ARGS)
+	$(PYTHON) /Users/dhyana/.dharma/scripts/regen_wiki_index.py
+	$(REPO_PYTHON) -c 'from dharma_swarm.wiki_vector_ingest import ingest_wiki_concepts; r=ingest_wiki_concepts(); print(r.to_json()["discovered_files"])'
+	$(REPO_PYTHON) scripts/wiki_vector_live_gate.py
+
 spine-check:
 	$(PYTHON) -m scripts.uplift_guards.check_spine_ownership
 
@@ -516,6 +548,8 @@ spine-check:
 # session — humans and agents both.
 onboard:
 	$(PYTHON) scripts/governance/agent_onboard.py
+	@printf "\n== Wiki Knowledge Health ==\n"
+	@$(PYTHON) scripts/wiki_orphan_upgrade.py --status --max-print 8
 
 # Single-door offboarding: writes a receipt for the next agent/auditor after a
 # scoped work session. By default this writes under ~/.dharma/ops; pass
@@ -527,6 +561,8 @@ offboard:
 # broken register — one read-only view projected from the owners. Always exits 0.
 orient:
 	$(PYTHON) scripts/governance/orientation_graph.py
+	@printf "\n== Wiki Knowledge Health ==\n"
+	@$(PYTHON) scripts/wiki_orphan_upgrade.py --status --max-print 8
 
 # Quick cross-agent state snapshot: active track, open PRs, stale items,
 # broken register, hotlist. Any agent on any platform can run this.

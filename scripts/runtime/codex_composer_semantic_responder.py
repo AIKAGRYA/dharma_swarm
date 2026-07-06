@@ -67,6 +67,14 @@ RESPONDER_SERVICE_ID = "codex-composer-semantic-responder"
 RESPONDER_LAUNCHD_LABEL = "com.dharma.codex-composer-semantic-responder"
 NO_PENDING_DELIVERIES_STATUS = "NO_PENDING_DELIVERIES"
 DELIVERIES_LEASE_HELD_STATUS = "PENDING_DELIVERIES_LEASE_HELD"
+# A semantic drain succeeded (model-authored artifact exists) but the domain
+# reply publish did not complete. The delivery is intentionally NOT marked
+# processed so a later tick can retry publish, but the model is never re-run,
+# so an earlier semantic success cannot be overwritten by a later provider
+# failure. This closes the fugu-verify idempotency flag named in the Phase A
+# work items of A2A_MASTER_SPEC_v1.md.
+PENDING_PUBLISH_STATUS = "SEMANTIC_SUCCESS_PENDING_PUBLISH"
+PENDING_PUBLISH_DIRNAME = "pending_publish"
 A2A_INBOX_BRIDGE_SCHEMA_VERSION = "dharma.a2a.inbox_bridge_heartbeat.v1"
 A2A_BRIDGE_FRESH_AFTER_SECONDS = 3600
 A2A_BRIDGE_REACHABLE_STATUSES = {
@@ -241,6 +249,8 @@ def _responder_runtime_status(loop_status: str) -> str:
         return "baselined_existing_backlog"
     if should_mark_processed(loop_status):
         return "processed_delivery"
+    if loop_status == PENDING_PUBLISH_STATUS:
+        return "semantic_success_pending_publish"
     if loop_status == "SEMANTIC_DRAINED_SEND_RECEIPT_MISSING":
         return "degraded"
     return "error"
@@ -256,6 +266,8 @@ def _canonical_status_for_loop(loop_status: str) -> str:
         return "partial_operating_semantic_responder_waiting_on_delivery_lease"
     if runtime_status == "baselined_existing_backlog":
         return "partial_operating_semantic_responder_baselined_existing_backlog"
+    if runtime_status == "semantic_success_pending_publish":
+        return "partial_operating_semantic_responder_semantic_success_pending_publish"
     if runtime_status == "degraded":
         return "partial_operating_semantic_responder_degraded"
     return "partial_operating_semantic_responder_error"
@@ -666,6 +678,74 @@ DrainFunc = Callable[..., dict[str, Any]]
 PublishFunc = Callable[..., dict[str, Any]]
 
 
+def _pending_publish_path(state_dir: Path | str, delivery_id: str) -> Path:
+    root = Path(state_dir).expanduser().resolve() / PENDING_PUBLISH_DIRNAME
+    return root / f"{_safe_token(delivery_id)}.json"
+
+
+def load_pending_publish(state_dir: Path | str, delivery_id: str) -> dict[str, Any] | None:
+    """Return a saved semantic-success job whose publish has not completed.
+
+    The job pins the already-authored, model-backed domain reply artifact so a
+    retry publishes the same artifact instead of re-running the model critic.
+    A missing or unreadable job returns ``None`` (fall back to a fresh drain).
+    """
+
+    path = _pending_publish_path(state_dir, delivery_id)
+    if not path.exists():
+        return None
+    try:
+        job = _read_json(path)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return None
+    artifact_path = str(job.get("domain_reply_artifact_path") or "")
+    # Only honor the job if its pinned artifact still exists on disk; otherwise a
+    # fresh drain is safer than publishing a dangling reference.
+    if not artifact_path or not Path(artifact_path).expanduser().exists():
+        return None
+    if not bool(job.get("semantic_reply_claim")):
+        # A non-semantic (typed-failure) drain has nothing to protect from being
+        # re-run, so do not pin it.
+        return None
+    return job
+
+
+def save_pending_publish(
+    state_dir: Path | str,
+    delivery: "Delivery",
+    *,
+    drain_receipt: dict[str, Any],
+) -> Path:
+    """Persist a semantic-success drain so a later tick can retry publish only."""
+
+    path = _pending_publish_path(state_dir, delivery.delivery_id)
+    _write_json(
+        path,
+        {
+            "schema_version": SCHEMA_VERSION,
+            "timestamp": utc_now(),
+            "delivery_id": delivery.delivery_id,
+            "packet_id": delivery.packet_id,
+            "reply_subject": delivery.reply_subject,
+            "delivery_record_path": str(delivery.path),
+            "domain_reply_artifact_path": str(drain_receipt.get("domain_reply_artifact_path") or ""),
+            "semantic_receipt_path": str(drain_receipt.get("semantic_receipt_path") or ""),
+            "semantic_receipt_id": str(drain_receipt.get("semantic_receipt_id") or ""),
+            "semantic_reply_claim": bool(drain_receipt.get("semantic_reply_claim")),
+            "drain_receipt": drain_receipt,
+        },
+    )
+    return path
+
+
+def clear_pending_publish(state_dir: Path | str, delivery_id: str) -> None:
+    path = _pending_publish_path(state_dir, delivery_id)
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        pass
+
+
 def process_delivery(
     delivery: Delivery,
     *,
@@ -692,27 +772,39 @@ def process_delivery(
         packet_id=delivery.packet_id,
         reply_subject=delivery.reply_subject,
     )
+    # Idempotency guard (fugu-verify flag, Phase A work item in
+    # A2A_MASTER_SPEC_v1.md): if a prior tick already produced a model-authored
+    # semantic success whose publish did not complete, reuse the pinned artifact
+    # and retry publish only. The model critic is never re-run for that delivery,
+    # so a good semantic reply cannot be overwritten by a later provider failure.
+    pending_job = None if no_publish else load_pending_publish(state_dir, delivery.delivery_id)
     drain_receipt: dict[str, Any] | None = None
     publish_receipt: dict[str, Any] | None = None
     status = "FAILED"
     error = ""
+    reused_pending_publish = False
     try:
-        drain_receipt = drain_func(
-            delivery_record_path=delivery.path,
-            send_receipt_path=send_receipt_path,
-            outbox_root=outbox_root,
-            semantic_receipt_dir=semantic_receipt_dir,
-            artifact_receipt_dir=artifact_receipt_dir,
-            drain_receipt_dir=drain_receipt_dir,
-            agent_uid=agent_uid,
-            provider=provider,
-            model=model,
-        )
+        if pending_job is not None:
+            drain_receipt = dict(pending_job.get("drain_receipt") or {})
+            reused_pending_publish = True
+        else:
+            drain_receipt = drain_func(
+                delivery_record_path=delivery.path,
+                send_receipt_path=send_receipt_path,
+                outbox_root=outbox_root,
+                semantic_receipt_dir=semantic_receipt_dir,
+                artifact_receipt_dir=artifact_receipt_dir,
+                drain_receipt_dir=drain_receipt_dir,
+                agent_uid=agent_uid,
+                provider=provider,
+                model=model,
+            )
         status = "SEMANTIC_DRAINED_NO_PUBLISH" if no_publish else "SEMANTIC_DRAINED_SEND_RECEIPT_MISSING"
-        if not no_publish and send_receipt_path is not None:
+        artifact_path_str = str((drain_receipt or {}).get("domain_reply_artifact_path") or "")
+        if not no_publish and send_receipt_path is not None and artifact_path_str:
             publish_receipt = publish_func(
                 send_receipt_path=send_receipt_path,
-                reply_artifact_path=Path(str(drain_receipt["domain_reply_artifact_path"])),
+                reply_artifact_path=Path(artifact_path_str),
                 agent_uid=agent_uid,
                 outbox_root=outbox_root,
                 receipt_dir=domain_reply_receipt_dir,
@@ -724,6 +816,26 @@ def process_delivery(
     except Exception as exc:
         error = f"{type(exc).__name__}: {exc}"
         status = "SEMANTIC_RESPONDER_FAILED"
+
+    # Persist / clear the pending-publish pin. A semantic success whose publish
+    # did not complete is saved so the next tick retries publish with the same
+    # artifact; a completed publish clears the pin.
+    semantic_success = bool((drain_receipt or {}).get("semantic_reply_claim"))
+    publish_completed = status == "DOMAIN_REPLY_PUBLISHED"
+    semantic_success_pinned = False
+    if not no_publish and semantic_success and not publish_completed:
+        try:
+            save_pending_publish(state_dir, delivery, drain_receipt=drain_receipt or {})
+            semantic_success_pinned = True
+        except OSError:
+            semantic_success_pinned = False
+        # Only relabel when no publish was even attempted (send receipt or
+        # artifact missing); a real publish failure keeps its own status so it
+        # remains visible, while still not being marked processed (so it retries).
+        if publish_receipt is None:
+            status = PENDING_PUBLISH_STATUS
+    elif publish_completed:
+        clear_pending_publish(state_dir, delivery.delivery_id)
 
     receipt = {
         "schema_version": SCHEMA_VERSION,
@@ -739,6 +851,8 @@ def process_delivery(
         "domain_reply_publish_receipt": publish_receipt or {},
         "semantic_reply_claim": bool((drain_receipt or {}).get("semantic_reply_claim")),
         "domain_receipt_claim": bool((publish_receipt or {}).get("domain_receipt_claim")),
+        "reused_pending_publish": reused_pending_publish,
+        "semantic_success_pinned": semantic_success_pinned,
         "handler_ack_is_semantic_cognition": False,
         "authenticated_target_runtime_claim": False,
         "no_publish": no_publish,
@@ -753,6 +867,12 @@ def process_delivery(
         receipt["operator_contact_note"] = (
             "Semantic artifact was written, but no matching send receipt was found; "
             "domain reply publication requires packet_id and reply_subject causation from the send receipt."
+        )
+    if reused_pending_publish:
+        receipt["operator_contact_note"] = (
+            "Reused a pinned model-authored semantic success and retried publish only; "
+            "the model critic was not re-run, so a prior semantic reply cannot be "
+            "overwritten by a later provider failure."
         )
     write_responder_receipt(state_dir, receipt)
     return receipt
@@ -870,8 +990,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--artifact-receipt-dir", default=str(DEFAULT_ARTIFACT_RECEIPT_DIR))
     parser.add_argument("--drain-receipt-dir", default=str(DEFAULT_DRAIN_RECEIPT_DIR))
     parser.add_argument("--domain-reply-receipt-dir", default=str(DEFAULT_DOMAIN_REPLY_RECEIPT_DIR))
-    parser.add_argument("--provider", default="ollama")
-    parser.add_argument("--model", default="glm-5:cloud")
+    parser.add_argument("--provider", default=None, help="runtime provider; default resolves via runtime_provider")
+    parser.add_argument("--model", default=None, help="model id; default resolves via runtime_provider")
     parser.add_argument("--stream", default="DHARMA_FLEET")
     parser.add_argument("--limit", type=int, default=1)
     parser.add_argument("--interval-s", type=float, default=30.0)

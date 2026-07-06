@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""Governed manual wake loop for codex_composer.
+"""Governed manual wake loop for admitted agent seats (default codex_composer).
 
-This is a repo-owned control shell for the existing codex_composer identity. It
+This is a repo-owned control shell for an admitted agent identity. It
 does not grant source-write authority, approve work, install launchd/cron jobs,
 or treat a broker publish as live collaboration. The default ``once`` command
 rehydrates canonical context, runs a bounded read-only orientation pass, checks
 assigned work surfaces, and writes heartbeat/status/receipt artifacts.
+
+Agent identity is threaded through a :class:`WakeProfile` so that additional
+seats (e.g. ``fable_composer``) reuse this one governed loop instead of forking
+a near-duplicate god-file per agent. Select the seat with ``--agent-uid``.
 """
 
 from __future__ import annotations
@@ -20,7 +24,7 @@ import shutil
 import subprocess
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
@@ -32,15 +36,106 @@ if str(REPO_ROOT) not in sys.path:
 
 from dharma_swarm.model_hierarchy import default_model  # noqa: E402
 from dharma_swarm.models import ProviderType  # noqa: E402
+from dharma_swarm.operator_core.execution_lease import (  # noqa: E402
+    ExecutionLeaseError,
+    find_execution_lease_for_task,
+    load_execution_lease,
+    load_revoked_lease_ids,
+    validate_execution_lease,
+)
 
-AGENT_UID = "codex_composer"
-CALLSIGN = "codex_composer"
-DISPLAY_NAME = "Codex Composer"
-MODEL_IDENTITY = os.getenv("DGC_DIRECTOR_CODEX_MODEL", "").strip() or default_model(ProviderType.CODEX)
+DEFAULT_AGENT_UID = "codex_composer"
 AUTHORITY_MODE = "read_only_until_execution_lease"
 DEFAULT_DHARMA_HOME = Path("~/.dharma")
-DEFAULT_SESSION = "codex-composer-wake"
 DEFAULT_INTERVAL_S = 900.0
+
+
+@dataclass(frozen=True)
+class WakeProfile:
+    """Per-seat identity for the governed wake loop.
+
+    Threading identity through a profile lets a single governed loop serve every
+    admitted seat. Authority stays ``read_only_until_execution_lease`` for all
+    seats; a profile never widens authority.
+    """
+
+    agent_uid: str
+    callsign: str
+    display_name: str
+    model_identity: str
+    schema_prefix: str
+    session: str
+    extra_addresses: tuple[str, ...] = ()
+
+
+def _codex_model_identity() -> str:
+    return os.getenv("DGC_DIRECTOR_CODEX_MODEL", "").strip() or default_model(ProviderType.CODEX)
+
+
+def _claude_model_identity() -> str:
+    # Fable's Tier-2 mind is the Claude Max-plan claude_code route, not a metered
+    # API model. Fall back gracefully if the provider enum lacks CLAUDE_CODE.
+    override = os.getenv("DGC_DIRECTOR_FABLE_MODEL", "").strip()
+    if override:
+        return override
+    provider = getattr(ProviderType, "CLAUDE_CODE", None)
+    if provider is not None:
+        try:
+            return default_model(provider)
+        except Exception:  # noqa: BLE001 - defensive: never fail wake on model lookup
+            pass
+    return "claude-code"
+
+
+def _slug(agent_uid: str) -> str:
+    return agent_uid.replace("_", "-")
+
+
+# Registry of admitted seats. Adding a seat here (plus its canonical context
+# files on disk) is all that is required to reuse the governed loop — no fork.
+WAKE_PROFILES: dict[str, WakeProfile] = {
+    "codex_composer": WakeProfile(
+        agent_uid="codex_composer",
+        callsign="codex_composer",
+        display_name="Codex Composer",
+        model_identity=_codex_model_identity(),
+        schema_prefix="dharma.codex_composer",
+        session="codex-composer-wake",
+        extra_addresses=("codex", "codex-composer"),
+    ),
+    "fable_composer": WakeProfile(
+        agent_uid="fable_composer",
+        callsign="fable_composer",
+        display_name="Fable Composer",
+        model_identity=_claude_model_identity(),
+        schema_prefix="dharma.fable_composer",
+        session="fable-composer-wake",
+        extra_addresses=("fable", "fable-composer", "fable_5_cursor", "fable-5-cursor"),
+    ),
+}
+
+
+def resolve_profile(agent_uid: str | None) -> WakeProfile:
+    """Return the WakeProfile for an admitted seat.
+
+    Unknown but well-formed agent uids get a conservative generic profile so the
+    loop degrades safely instead of crashing; authority stays lease-gated.
+    """
+    uid = (agent_uid or DEFAULT_AGENT_UID).strip()
+    if not uid:
+        uid = DEFAULT_AGENT_UID
+    if uid in WAKE_PROFILES:
+        return WAKE_PROFILES[uid]
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", uid):
+        raise ValueError(f"invalid agent uid: {uid!r}")
+    return WakeProfile(
+        agent_uid=uid,
+        callsign=uid,
+        display_name=uid.replace("_", " ").title(),
+        model_identity=os.getenv("DGC_DIRECTOR_WAKE_MODEL", "").strip() or "unspecified",
+        schema_prefix=f"dharma.{uid}",
+        session=f"{_slug(uid)}-wake",
+    )
 
 OPEN_STATUSES = {"", "pending", "open", "ready", "new", "unread"}
 TERMINAL_STATUSES = {"completed", "failed", "blocked", "done", "closed", "cancelled"}
@@ -87,16 +182,30 @@ PROTECTED_TERMS = {
     "pr approval",
 }
 
-CANONICAL_CONTEXT = (
-    ("holon_context", "agents/codex_composer/HOLON_CONTEXT.md"),
-    ("identity", "agents/codex_composer/identity.json"),
-    ("a2a_card", "a2a/cards/codex_composer.json"),
-    ("agent_passport", "agent_passports/codex_composer.json"),
-    ("external_registration", "external_agents/codex_composer/registration.json"),
-    ("bridge_heartbeat", "a2a_bus/bridge_heartbeats/codex_composer.json"),
-    ("a2a_state", "a2a_bus/state/codex_composer.json"),
-    ("external_authority_passport", "external_agents/codex_composer/authority/passport.json"),
-)
+def canonical_context_layout(agent_uid: str) -> tuple[tuple[str, str], ...]:
+    """Canonical context file map for a seat, relative to the dharma home.
+
+    Fable's seat body keeps its cold-boot procedure at ``agents/<uid>/BOOT.md``
+    and its nest under ``external_agents/<uid>/nest``; codex uses
+    ``HOLON_CONTEXT.md``. Both optional names are listed so a seat surfaces
+    whichever it actually has instead of always reporting one as missing.
+    """
+    return (
+        ("holon_context", f"agents/{agent_uid}/HOLON_CONTEXT.md"),
+        ("boot", f"agents/{agent_uid}/BOOT.md"),
+        ("identity", f"agents/{agent_uid}/identity.json"),
+        ("a2a_card", f"a2a/cards/{agent_uid}.json"),
+        ("agent_passport", f"agent_passports/{agent_uid}.json"),
+        ("external_registration", f"external_agents/{agent_uid}/registration.json"),
+        ("bridge_heartbeat", f"a2a_bus/bridge_heartbeats/{agent_uid}.json"),
+        ("a2a_state", f"a2a_bus/state/{agent_uid}.json"),
+        ("external_authority_passport", f"external_agents/{agent_uid}/authority/passport.json"),
+    )
+
+
+# Context files that are optional (a seat may legitimately have only one of a
+# holon_context / boot pair). These are not counted as "missing" for status.
+OPTIONAL_CONTEXT_KEYS = {"holon_context", "boot", "external_registration", "external_authority_passport"}
 
 
 @dataclass(frozen=True)
@@ -126,7 +235,10 @@ class ComposerPaths:
     assigned_inbox: Path
     external_inbox: Path
     task_queue: Path
+    leases: Path
     future_orchestration: Path
+    agent_uid: str = DEFAULT_AGENT_UID
+    profile: WakeProfile = field(default_factory=lambda: WAKE_PROFILES[DEFAULT_AGENT_UID])
 
 
 Runner = Callable[[list[str], Path, float], CommandResult]
@@ -148,14 +260,18 @@ def composer_paths(
     dharma_home: str | Path = DEFAULT_DHARMA_HOME,
     *,
     repo_root: str | Path = REPO_ROOT,
+    agent_uid: str | None = None,
+    profile: WakeProfile | None = None,
 ) -> ComposerPaths:
+    resolved = profile or resolve_profile(agent_uid)
+    uid = resolved.agent_uid
     root = expand(dharma_home)
-    external = root / "external_agents" / AGENT_UID
+    external = root / "external_agents" / uid
     nest = external / "nest"
     return ComposerPaths(
         dharma_home=root,
         repo_root=expand(repo_root),
-        agent_home=root / "agents" / AGENT_UID,
+        agent_home=root / "agents" / uid,
         external_home=external,
         nest=nest,
         logs=external / "logs",
@@ -166,11 +282,14 @@ def composer_paths(
         status=nest / "status.json",
         heartbeat=nest / "heartbeat.json",
         latest_receipt=nest / "latest_receipt.json",
-        living_agent=root / "agents" / AGENT_UID / "living_agent.json",
-        assigned_inbox=root / "a2a_bus" / "inboxes" / AGENT_UID,
+        living_agent=root / "agents" / uid / "living_agent.json",
+        assigned_inbox=root / "a2a_bus" / "inboxes" / uid,
         external_inbox=external / "inbox",
         task_queue=root / "a2a_bus" / "tasks" / "queue.jsonl",
+        leases=root / "a2a_bus" / "leases",
         future_orchestration=nest / "future_orchestration.json",
+        agent_uid=uid,
+        profile=resolved,
     )
 
 
@@ -300,14 +419,15 @@ def safe_json_summary(payload: Any) -> dict[str, Any]:
 
 
 def canonical_context_paths(paths: ComposerPaths) -> dict[str, Path]:
-    return {name: paths.dharma_home / relative for name, relative in CANONICAL_CONTEXT}
+    layout = canonical_context_layout(paths.agent_uid)
+    return {name: paths.dharma_home / relative for name, relative in layout}
 
 
 def rehydrate_context(paths: ComposerPaths) -> dict[str, Any]:
     files: dict[str, Any] = {}
     missing: list[str] = []
     authority_facts: dict[str, Any] = {
-        "agent_uid": AGENT_UID,
+        "agent_uid": paths.agent_uid,
         "default_authority": AUTHORITY_MODE,
         "no_self_approval": True,
         "no_pr_approval": True,
@@ -317,7 +437,8 @@ def rehydrate_context(paths: ComposerPaths) -> dict[str, Any]:
     for name, path in canonical_context_paths(paths).items():
         entry: dict[str, Any] = {"path": str(path), "exists": path.exists()}
         if not path.exists():
-            missing.append(name)
+            if name not in OPTIONAL_CONTEXT_KEYS:
+                missing.append(name)
             files[name] = entry
             continue
         data = path.read_bytes()
@@ -356,7 +477,7 @@ def rehydrate_context(paths: ComposerPaths) -> dict[str, Any]:
         }
     )
     return {
-        "schema_version": "dharma.codex_composer.rehydrated_context.v1",
+        "schema_version": f"{paths.profile.schema_prefix}.rehydrated_context.v1",
         "generated_at": utc_now(),
         "files": files,
         "missing": missing,
@@ -436,7 +557,7 @@ def run_orientation_cycle(
             )
         receipts.append(command_receipt(result, command))
     return {
-        "schema_version": "dharma.codex_composer.orientation_cycle.v1",
+        "schema_version": f"{paths.profile.schema_prefix}.orientation_cycle.v1",
         "generated_at": utc_now(),
         "bounded": True,
         "read_only_intent": True,
@@ -453,8 +574,9 @@ def payload_digest(payload: Any) -> str:
     return sha256_text(json.dumps(payload, sort_keys=True, default=_json_default))
 
 
-def assigned_addresses(context: Mapping[str, Any]) -> set[str]:
-    addresses = {AGENT_UID, "codex", "codex-composer", "codex_composer"}
+def assigned_addresses(context: Mapping[str, Any], profile: WakeProfile | None = None) -> set[str]:
+    profile = profile or WAKE_PROFILES[DEFAULT_AGENT_UID]
+    addresses = {profile.agent_uid, profile.callsign, *profile.extra_addresses}
     card = context.get("files", {}).get("a2a_card", {}).get("summary", {})
     agent_name = card.get("agent") or card.get("agent_uid")
     if agent_name:
@@ -520,11 +642,11 @@ def collect_task_messages(paths: ComposerPaths, addresses: set[str]) -> list[dic
 
 
 def collect_assigned_work(paths: ComposerPaths, context: Mapping[str, Any]) -> dict[str, Any]:
-    addresses = assigned_addresses(context)
+    addresses = assigned_addresses(context, paths.profile)
     inbox = collect_inbox_messages(paths)
     tasks = collect_task_messages(paths, addresses)
     return {
-        "schema_version": "dharma.codex_composer.assigned_work.v1",
+        "schema_version": f"{paths.profile.schema_prefix}.assigned_work.v1",
         "checked_surfaces": [
             str(paths.assigned_inbox),
             str(paths.external_inbox),
@@ -540,19 +662,145 @@ def text_requires_execution_lease(text: str) -> bool:
     return any(term in lowered for term in WRITE_CAPABLE_TERMS | PROTECTED_TERMS)
 
 
-def payload_has_execution_lease(payload: Mapping[str, Any]) -> bool:
+def payload_field(payload: Mapping[str, Any], *keys: str) -> str:
+    """Return the first non-empty top-level or envelope field."""
+    for key in keys:
+        value = payload.get(key)
+        if value:
+            return str(value)
+    envelope = payload.get("envelope")
+    if isinstance(envelope, Mapping):
+        for key in keys:
+            value = envelope.get(key)
+            if value:
+                return str(value)
+    return ""
+
+
+def payload_task_id(payload: Mapping[str, Any], record: Mapping[str, Any]) -> str:
+    return (
+        payload_field(payload, "id", "task_id", "packet_id", "correlation_id")
+        or str(record.get("trigger_id") or "")
+    )
+
+
+def payload_correlation_id(payload: Mapping[str, Any]) -> str:
+    return payload_field(payload, "correlation_id", "packet_id")
+
+
+def payload_execution_lease_status(
+    payload: Mapping[str, Any],
+    *,
+    agent_uid: str = "",
+    task_id: str = "",
+    lease_root: Path | None = None,
+) -> dict[str, Any]:
     lease = payload.get("execution_lease") or payload.get("lease")
-    return isinstance(lease, dict) and bool(lease.get("approved") or lease.get("operator_approved") or lease.get("lease_id"))
+    loaded_from = "embedded"
+    if not isinstance(lease, dict):
+        lease_id = str(
+            payload_field(payload, "execution_lease_id", "lease_id")
+            or (lease if isinstance(lease, str) else "")
+            or ""
+        ).strip()
+        if not lease_id:
+            correlation_id = payload_correlation_id(payload)
+            if lease_root is not None:
+                match = find_execution_lease_for_task(
+                    lease_root,
+                    agent_uid=agent_uid,
+                    task_id=task_id,
+                    correlation_id=correlation_id,
+                )
+                if match is not None:
+                    path, lease, validation = match
+                    return {
+                        "present": True,
+                        "valid": True,
+                        "lease_id": validation.lease_id,
+                        "errors": [],
+                        "warnings": list(validation.warnings),
+                        "loaded_from": str(path),
+                        "matched_by": "task_or_correlation_id",
+                    }
+            return {
+                "present": False,
+                "valid": False,
+                "errors": ["missing execution lease"],
+                "warnings": [],
+                "task_id": task_id,
+                "correlation_id": correlation_id,
+            }
+        if lease_root is None:
+            return {
+                "present": True,
+                "valid": False,
+                "lease_id": lease_id,
+                "errors": ["lease_id present but no lease_root was available"],
+                "warnings": [],
+            }
+        try:
+            lease = load_execution_lease(lease_root, lease_id)
+            loaded_from = str(lease_root)
+        except (ExecutionLeaseError, OSError, json.JSONDecodeError) as exc:
+            return {
+                "present": True,
+                "valid": False,
+                "lease_id": lease_id,
+                "errors": [f"lease load failed: {type(exc).__name__}: {exc}"],
+                "warnings": [],
+            }
+
+    revoked = load_revoked_lease_ids(lease_root) if lease_root is not None else set()
+    validation = validate_execution_lease(
+        lease,
+        agent_uid=agent_uid,
+        task_id=task_id,
+        revoked_lease_ids=revoked,
+    )
+    return {
+        "present": True,
+        "valid": validation.valid,
+        "lease_id": validation.lease_id,
+        "errors": list(validation.errors),
+        "warnings": list(validation.warnings),
+        "loaded_from": loaded_from,
+    }
 
 
-def classify_record(record: Mapping[str, Any], original_payload: Any | None = None) -> dict[str, Any]:
+def payload_has_execution_lease(
+    payload: Mapping[str, Any],
+    *,
+    agent_uid: str = "",
+    task_id: str = "",
+    lease_root: Path | None = None,
+) -> bool:
+    return bool(
+        payload_execution_lease_status(
+            payload,
+            agent_uid=agent_uid,
+            task_id=task_id,
+            lease_root=lease_root,
+        )["valid"]
+    )
+
+
+def classify_record(
+    record: Mapping[str, Any],
+    original_payload: Any | None = None,
+    *,
+    agent_uid: str = "",
+    lease_root: Path | None = None,
+) -> dict[str, Any]:
     payload = original_payload if isinstance(original_payload, dict) else {}
     summary = str(record.get("summary") or "")
     text = summary
     if payload:
         text += " " + json.dumps(payload, sort_keys=True, default=_json_default)
     explicit_requires = bool(payload.get("requires_execution_lease") or payload.get("requires_approval"))
-    has_lease = payload_has_execution_lease(payload)
+    task_id = payload_task_id(payload, record)
+    lease_status = payload_execution_lease_status(payload, agent_uid=agent_uid, task_id=task_id, lease_root=lease_root)
+    has_lease = bool(lease_status["valid"])
     requires_lease = (explicit_requires or text_requires_execution_lease(text)) and not has_lease
     contact_evidence = str(payload.get("contact_evidence") or payload.get("ack_tier") or payload.get("evidence_tier") or "")
     publish_only = contact_evidence.upper() in {"PUBLISH_ACCEPTED", "NATS_CLI_JETSTREAM_PUB_ACK", "CORE_FLUSH_ONLY"}
@@ -564,6 +812,7 @@ def classify_record(record: Mapping[str, Any], original_payload: Any | None = No
         "summary": record["summary"],
         "requires_execution_lease": requires_lease,
         "has_execution_lease": has_lease,
+        "execution_lease": lease_status,
         "blocked": blocked,
         "block_reason": "execution_lease_required" if requires_lease else ("status_blocked" if blocked else ""),
         "publish_acceptance_only": publish_only,
@@ -586,12 +835,24 @@ def load_original_payload_for_record(record: Mapping[str, Any]) -> Any:
     return {}
 
 
-def classify_work(work: Mapping[str, Any]) -> dict[str, Any]:
+def classify_work(
+    work: Mapping[str, Any],
+    profile: WakeProfile | None = None,
+    lease_root: Path | None = None,
+) -> dict[str, Any]:
+    profile = profile or WAKE_PROFILES[DEFAULT_AGENT_UID]
     observed = list(work.get("observed_messages") or [])
     classifications: list[dict[str, Any]] = []
     for record in observed:
         payload = load_original_payload_for_record(record)
-        classifications.append(classify_record(record, payload))
+        classifications.append(
+            classify_record(
+                record,
+                payload,
+                agent_uid=profile.agent_uid,
+                lease_root=lease_root,
+            )
+        )
 
     requiring_lease = [item for item in classifications if item["requires_execution_lease"]]
     blocked = [item for item in classifications if item["blocked"]]
@@ -606,7 +867,7 @@ def classify_work(work: Mapping[str, Any]) -> dict[str, Any]:
     ]
     completed_read_only = [
         {
-            "analysis_id": "codex_composer_orientation_and_assigned_surface_triage",
+            "analysis_id": f"{profile.agent_uid}_orientation_and_assigned_surface_triage",
             "status": "completed",
             "observed_message_count": len(observed),
             "accepted_read_only_claim_count": len(accepted),
@@ -615,7 +876,7 @@ def classify_work(work: Mapping[str, Any]) -> dict[str, Any]:
         }
     ]
     return {
-        "schema_version": "dharma.codex_composer.work_classification.v1",
+        "schema_version": f"{profile.schema_prefix}.work_classification.v1",
         "observed_messages": classifications,
         "accepted_task_claims": accepted,
         "work_requiring_execution_lease": requiring_lease,
@@ -628,10 +889,13 @@ def classify_work(work: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def nest_readme() -> str:
-    return """# codex_composer Wake Nest
+def nest_readme(profile: WakeProfile | None = None) -> str:
+    profile = profile or WAKE_PROFILES[DEFAULT_AGENT_UID]
+    uid = profile.agent_uid
+    slug = _slug(uid)
+    return f"""# {uid} Wake Nest
 
-This is the durable local nest for the governed codex_composer wake loop.
+This is the durable local nest for the governed {uid} wake loop.
 
 The nest stores receipts, heartbeat, status, and future orchestration slots. It
 is not a new authority source. The canonical identity, card, passport, and A2A
@@ -648,10 +912,10 @@ Default authority:
 Primary commands:
 
 ```bash
-make codex-composer-once
-make codex-composer-status
-make codex-composer-start ARGS="--activation-lease <operator-approved-id>"
-make codex-composer-stop
+.venv/bin/python scripts/runtime/codex_composer_wake_loop.py --agent-uid {uid} once
+.venv/bin/python scripts/runtime/codex_composer_wake_loop.py --agent-uid {uid} status
+.venv/bin/python scripts/runtime/codex_composer_wake_loop.py --agent-uid {uid} start --activation-lease <operator-approved-id>
+.venv/bin/python scripts/runtime/codex_composer_wake_loop.py --agent-uid {uid} stop
 ```
 
 `once` is the safe default. `start` refuses to launch a repeated loop unless an
@@ -659,23 +923,17 @@ activation lease is supplied.
 """
 
 
-def commands_doc() -> str:
-    return """# codex_composer Wake Commands
+def commands_doc(profile: WakeProfile | None = None) -> str:
+    profile = profile or WAKE_PROFILES[DEFAULT_AGENT_UID]
+    uid = profile.agent_uid
+    base = f".venv/bin/python scripts/runtime/codex_composer_wake_loop.py --agent-uid {uid}"
+    return f"""# {uid} Wake Commands
 
 ```bash
-make codex-composer-once
-make codex-composer-status
-make codex-composer-start ARGS="--activation-lease <operator-approved-id> --interval-s 900"
-make codex-composer-stop
-```
-
-Equivalent direct commands:
-
-```bash
-.venv/bin/python scripts/runtime/codex_composer_wake_loop.py once
-.venv/bin/python scripts/runtime/codex_composer_wake_loop.py status
-.venv/bin/python scripts/runtime/codex_composer_wake_loop.py start --activation-lease <operator-approved-id>
-.venv/bin/python scripts/runtime/codex_composer_wake_loop.py stop
+{base} once
+{base} status
+{base} start --activation-lease <operator-approved-id> --interval-s 900
+{base} stop
 ```
 
 The repeated loop is intentionally manual and lease-gated. Do not install cron,
@@ -686,8 +944,8 @@ operator lease.
 
 def future_orchestration_manifest(paths: ComposerPaths) -> dict[str, Any]:
     return {
-        "schema_version": "dharma.codex_composer.future_orchestration.v1",
-        "agent_uid": AGENT_UID,
+        "schema_version": f"{paths.profile.schema_prefix}.future_orchestration.v1",
+        "agent_uid": paths.agent_uid,
         "generated_at": utc_now(),
         "living_dock_projection": str(paths.agent_home),
         "external_sandbox": str(paths.external_home),
@@ -699,11 +957,11 @@ def future_orchestration_manifest(paths: ComposerPaths) -> dict[str, Any]:
             "LandingDock",
             "FactoryDroid",
             "DroidFactory",
-            "codex_composer",
+            paths.agent_uid,
         ],
         "current_findings": {
             "repo_terms": "Holocron, Aerie, LandingDock, and FactoryDroid are Semantic Commons names, not live orchestration authority.",
-            "codex_composer_surfaces": "Existing identity, card, passport, external home, one-shot wake proof, and stale L4/tmux artifacts are present.",
+            f"{paths.agent_uid}_surfaces": "Existing identity, card, passport, external home, one-shot wake proof, and stale L4/tmux artifacts are present.",
         },
         "reserved_slots": {
             "holocron": str(paths.nest / "holocron"),
@@ -723,9 +981,9 @@ def future_orchestration_manifest(paths: ComposerPaths) -> dict[str, Any]:
 def build_status(paths: ComposerPaths) -> dict[str, Any]:
     latest = read_json(paths.latest_receipt, None)
     return {
-        "schema_version": "dharma.codex_composer.wake_status.v1",
+        "schema_version": f"{paths.profile.schema_prefix}.wake_status.v1",
         "generated_at": utc_now(),
-        "agent_uid": AGENT_UID,
+        "agent_uid": paths.agent_uid,
         "authority_mode": AUTHORITY_MODE,
         "repo_root": str(paths.repo_root),
         "nest": str(paths.nest),
@@ -758,8 +1016,8 @@ def bootstrap_nest(paths: ComposerPaths) -> dict[str, Any]:
         directory.mkdir(parents=True, exist_ok=True)
     paths.wake_receipts.touch(exist_ok=True)
     paths.action_log.touch(exist_ok=True)
-    write_text(paths.nest / "README.md", nest_readme())
-    write_text(paths.nest / "COMMANDS.md", commands_doc())
+    write_text(paths.nest / "README.md", nest_readme(paths.profile))
+    write_text(paths.nest / "COMMANDS.md", commands_doc(paths.profile))
     write_json(paths.future_orchestration, future_orchestration_manifest(paths))
     status = build_status(paths)
     write_json(paths.status, status)
@@ -771,11 +1029,11 @@ def record_action(paths: ComposerPaths, action: str, summary: str, *, outputs: M
         paths.action_log,
         {
             "schema_version": "dharma_external_agent_action_log.v1",
-            "event_id": f"{action}:{AGENT_UID}:{stamp()}",
+            "event_id": f"{action}:{paths.agent_uid}:{stamp()}",
             "timestamp": utc_now(),
-            "agent_uid": AGENT_UID,
-            "callsign": CALLSIGN,
-            "display_name": DISPLAY_NAME,
+            "agent_uid": paths.agent_uid,
+            "callsign": paths.profile.callsign,
+            "display_name": paths.profile.display_name,
             "authority": AUTHORITY_MODE,
             "action": action,
             "summary": summary,
@@ -791,8 +1049,8 @@ def write_cycle_artifacts(paths: ComposerPaths, receipt: Mapping[str, Any]) -> N
     write_json(receipt_path, receipt)
     write_json(paths.latest_receipt, {**receipt, "receipt_path": str(receipt_path)})
     heartbeat = {
-        "schema_version": "dharma.codex_composer.wake_heartbeat.v1",
-        "agent_uid": AGENT_UID,
+        "schema_version": f"{paths.profile.schema_prefix}.wake_heartbeat.v1",
+        "agent_uid": paths.agent_uid,
         "updated_at": receipt["completed_at"],
         "status": receipt["status"],
         "receipt_id": receipt_id,
@@ -824,7 +1082,7 @@ def run_once(
         skip_orientation_command=skip_orientation_command,
     )
     assigned = collect_assigned_work(paths, context)
-    work = classify_work(assigned)
+    work = classify_work(assigned, paths.profile, paths.leases)
     status = "completed_read_only_analysis"
     if context["missing"]:
         status = "completed_with_missing_context"
@@ -833,13 +1091,13 @@ def run_once(
     if work["work_requiring_execution_lease"]:
         status = "blocked_execution_lease_required"
     receipt = {
-        "schema_version": "dharma.codex_composer.wake_receipt.v1",
-        "receipt_id": f"codex-composer-wake-{stamp()}-{hashlib.sha256(started.encode()).hexdigest()[:8]}",
+        "schema_version": f"{paths.profile.schema_prefix}.wake_receipt.v1",
+        "receipt_id": f"{_slug(paths.agent_uid)}-wake-{stamp()}-{hashlib.sha256(started.encode()).hexdigest()[:8]}",
         "started_at": started,
         "completed_at": utc_now(),
-        "agent_uid": AGENT_UID,
-        "callsign": CALLSIGN,
-        "display_name": DISPLAY_NAME,
+        "agent_uid": paths.agent_uid,
+        "callsign": paths.profile.callsign,
+        "display_name": paths.profile.display_name,
         "authority_mode": AUTHORITY_MODE,
         "mode": mode,
         "status": status,
@@ -862,7 +1120,7 @@ def run_once(
     record_action(
         paths,
         "wake_once",
-        "Ran one governed codex_composer read-only wake cycle.",
+        f"Ran one governed {paths.agent_uid} read-only wake cycle.",
         outputs={"receipt_id": receipt["receipt_id"], "status": status},
         status="ok" if not status.startswith("blocked") else "blocked",
     )
@@ -872,9 +1130,10 @@ def run_once(
 def render_status_markdown(status: Mapping[str, Any]) -> str:
     latest = status.get("latest_receipt") or {}
     heartbeat = status.get("heartbeat") or {}
+    agent_uid = status.get("agent_uid", DEFAULT_AGENT_UID)
     return "\n".join(
         [
-            "# codex_composer Wake Status",
+            f"# {agent_uid} Wake Status",
             "",
             f"- Generated: `{status['generated_at']}`",
             f"- Agent: `{status['agent_uid']}`",
@@ -917,6 +1176,8 @@ def build_loop_command(args: argparse.Namespace, paths: ComposerPaths) -> list[s
         str(paths.dharma_home),
         "--repo-root",
         str(paths.repo_root),
+        "--agent-uid",
+        paths.agent_uid,
         "loop",
         "--interval-s",
         str(args.interval_s),
@@ -936,7 +1197,7 @@ def start_loop(args: argparse.Namespace, paths: ComposerPaths) -> dict[str, Any]
         result = {
             "ok": False,
             "status": "blocked_activation_lease_required",
-            "agent_uid": AGENT_UID,
+            "agent_uid": paths.agent_uid,
             "message": "start refused without --activation-lease",
             "wake_loop_active": False,
         }
@@ -953,7 +1214,7 @@ def start_loop(args: argparse.Namespace, paths: ComposerPaths) -> dict[str, Any]
         write_json(paths.status, {**build_status(paths), "last_start": result})
         return result
 
-    session = args.session
+    session = _session_for(args, paths)
     has_session = subprocess.run([tmux, "has-session", "-t", session], capture_output=True, text=True, check=False)
     if has_session.returncode != 0:
         created = subprocess.run([tmux, "new-session", "-d", "-s", session, "-n", "wake", "-c", str(paths.repo_root)], capture_output=True, text=True, check=False)
@@ -973,7 +1234,7 @@ def start_loop(args: argparse.Namespace, paths: ComposerPaths) -> dict[str, Any]
         "stdout": sent.stdout,
         "stderr": sent.stderr,
     }
-    record_action(paths, "start", "Started lease-backed codex_composer wake loop in tmux.", outputs=result, status="ok" if result["ok"] else "blocked")
+    record_action(paths, "start", f"Started lease-backed {paths.agent_uid} wake loop in tmux.", outputs=result, status="ok" if result["ok"] else "blocked")
     write_json(paths.status, {**build_status(paths), "last_start": result, "wake_loop_active": bool(result["ok"])})
     return result
 
@@ -997,7 +1258,7 @@ def stop_loop(session: str, paths: ComposerPaths) -> dict[str, Any]:
                 "stdout": stopped.stdout,
                 "stderr": stopped.stderr,
             }
-    record_action(paths, "stop", "Stopped or confirmed absent codex_composer wake loop.", outputs=result, status="ok" if result["ok"] else "blocked")
+    record_action(paths, "stop", f"Stopped or confirmed absent {paths.agent_uid} wake loop.", outputs=result, status="ok" if result["ok"] else "blocked")
     write_json(paths.status, {**build_status(paths), "last_stop": result, "wake_loop_active": False})
     return result
 
@@ -1005,7 +1266,16 @@ def stop_loop(session: str, paths: ComposerPaths) -> dict[str, Any]:
 def add_common(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--dharma-home", default=str(DEFAULT_DHARMA_HOME))
     parser.add_argument("--repo-root", default=str(REPO_ROOT))
-    parser.add_argument("--session", default=DEFAULT_SESSION)
+    parser.add_argument(
+        "--agent-uid",
+        default=DEFAULT_AGENT_UID,
+        help="admitted seat to wake (default: codex_composer)",
+    )
+    parser.add_argument(
+        "--session",
+        default="",
+        help="tmux session for the lease-backed loop (default: derived from the seat profile)",
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1046,7 +1316,15 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _paths_from_args(args: argparse.Namespace) -> ComposerPaths:
-    return composer_paths(args.dharma_home, repo_root=args.repo_root)
+    return composer_paths(
+        args.dharma_home,
+        repo_root=args.repo_root,
+        agent_uid=getattr(args, "agent_uid", DEFAULT_AGENT_UID),
+    )
+
+
+def _session_for(args: argparse.Namespace, paths: ComposerPaths) -> str:
+    return (getattr(args, "session", "") or "").strip() or paths.profile.session
 
 
 def cmd_bootstrap(args: argparse.Namespace) -> int:
@@ -1088,7 +1366,8 @@ def cmd_start(args: argparse.Namespace) -> int:
 
 
 def cmd_stop(args: argparse.Namespace) -> int:
-    result = stop_loop(args.session, _paths_from_args(args))
+    paths = _paths_from_args(args)
+    result = stop_loop(_session_for(args, paths), paths)
     print(json.dumps(result, indent=2, sort_keys=True, default=_json_default))
     return 0 if result.get("ok") else 2
 

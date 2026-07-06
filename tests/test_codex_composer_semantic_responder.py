@@ -9,6 +9,7 @@ from scripts.runtime.codex_composer_semantic_responder import (
     baseline_existing_deliveries,
     delivery_from_path,
     find_send_receipt,
+    load_pending_publish,
     pending_deliveries,
     run_once,
     should_mark_processed,
@@ -376,3 +377,164 @@ def test_run_once_does_not_mark_processed_when_drain_fails(tmp_path: Path) -> No
 
     assert receipts[0]["status"] == "SEMANTIC_RESPONDER_FAILED"
     assert not (tmp_path / "state" / "processed_deliveries.jsonl").exists()
+
+
+
+def _semantic_success_drain_writer(tmp_path: Path):
+    """Return a fake drain that writes a real model-authored artifact once.
+
+    The returned callable records how many times it was invoked so a test can
+    prove the model critic is not re-run once a semantic success is pinned.
+    """
+
+    outbox_root = tmp_path / "outboxes"
+    artifact = outbox_root / "codex_composer" / "packet-1-domain-reply.json"
+    calls = {"count": 0}
+
+    def fake_drain(**kwargs: Any) -> dict[str, Any]:
+        calls["count"] += 1
+        artifact.parent.mkdir(parents=True, exist_ok=True)
+        artifact.write_text(
+            json.dumps(
+                {
+                    "schema_version": "dharma.a2a.domain_reply_artifact.v1",
+                    "authored_by": "codex_composer",
+                    "agent_uid": "codex_composer",
+                    "packet_id": "packet-1",
+                    "reply_subject": "dharma.agent.codex_composer.inbox.reply.packet-1",
+                    "verdict": "revise",
+                    "summary": "Genuine model-authored semantic reply.",
+                    "semantic_reply_claim": True,
+                    "peer_model_processed_claim": True,
+                },
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
+        return {
+            "status": "SEMANTIC_INBOX_DRAINED",
+            "packet_id": "packet-1",
+            "reply_subject": "dharma.agent.codex_composer.inbox.reply.packet-1",
+            "domain_reply_artifact_path": str(artifact),
+            "semantic_receipt_path": str(tmp_path / "semantic_receipts" / "packet-1.json"),
+            "semantic_receipt_id": "sem-1",
+            "semantic_reply_claim": True,
+        }
+
+    return fake_drain, calls, artifact, outbox_root
+
+
+def _run_once_common(tmp_path: Path, *, drain_func, publish_func, outbox_root: Path):
+    return run_once(
+        inbox_dir=tmp_path / "inbox",
+        state_dir=tmp_path / "state",
+        send_receipt_root=tmp_path / "send_receipts",
+        outbox_root=outbox_root,
+        semantic_receipt_dir=tmp_path / "semantic_receipts",
+        artifact_receipt_dir=tmp_path / "artifact_receipts",
+        drain_receipt_dir=tmp_path / "drain_receipts",
+        domain_reply_receipt_dir=tmp_path / "domain_reply_receipts",
+        agent_uid="codex_composer",
+        provider="ollama",
+        model="glm-5:cloud",
+        no_publish=False,
+        stream="DHARMA_FLEET",
+        timeout_s=0.1,
+        flush_timeout_s=0.1,
+        limit=1,
+        lease_ttl_s=0,
+        canonical_state_path=_canonical_state_path(tmp_path),
+        drain_func=drain_func,
+        publish_func=publish_func,
+    )
+
+
+def test_semantic_success_is_pinned_and_publish_retried_not_remodelled(tmp_path: Path) -> None:
+    """A semantic success whose publish is blocked must not be overwritten.
+
+    Reproduces the fugu-verify idempotency flag: the model critic produced a
+    valid verdict=revise reply, but the domain-reply publish failed. A later
+    tick must retry publish using the pinned artifact and must NOT re-run the
+    model (which, in the incident, returned provider_unavailable and overwrote
+    the good reply).
+    """
+
+    _delivery_record(tmp_path)
+    _send_receipt(tmp_path)
+    fake_drain, calls, artifact, outbox_root = _semantic_success_drain_writer(tmp_path)
+
+    publish_attempts = {"count": 0}
+
+    def flaky_publish(**kwargs: Any) -> dict[str, Any]:
+        publish_attempts["count"] += 1
+        if publish_attempts["count"] == 1:
+            raise RuntimeError("provider_unavailable: NIM 503 ResourceExhausted")
+        return {
+            "status": "DOMAIN_REPLY_PUBLISHED",
+            "packet_id": "packet-1",
+            "domain_receipt_claim": True,
+            "semantic_reply_claim": True,
+            "receipt_path": str(tmp_path / "domain_publish_receipt.json"),
+        }
+
+    first = _run_once_common(tmp_path, drain_func=fake_drain, publish_func=flaky_publish, outbox_root=outbox_root)
+    # Semantic success + publish raised: honest label is pending-publish (the
+    # error is preserved on the receipt), never a flat failure that would strip
+    # the semantic-success qualifier.
+    assert first[0]["status"] == "SEMANTIC_SUCCESS_PENDING_PUBLISH"
+    assert "provider_unavailable" in first[0]["error"]
+    assert first[0]["semantic_success_pinned"] is True
+    assert first[0]["semantic_reply_claim"] is True
+    assert not (tmp_path / "state" / "processed_deliveries.jsonl").exists()
+    pinned = load_pending_publish(tmp_path / "state", first[0]["delivery_id"])
+    assert pinned is not None
+    good_artifact = json.loads(artifact.read_text(encoding="utf-8"))
+    assert good_artifact["verdict"] == "revise"
+    assert good_artifact["semantic_reply_claim"] is True
+
+    second = _run_once_common(tmp_path, drain_func=fake_drain, publish_func=flaky_publish, outbox_root=outbox_root)
+    assert second[0]["status"] == "DOMAIN_REPLY_PUBLISHED"
+    assert second[0]["reused_pending_publish"] is True
+    assert calls["count"] == 1
+    assert load_pending_publish(tmp_path / "state", second[0]["delivery_id"]) is None
+    processed = (tmp_path / "state" / "processed_deliveries.jsonl").read_text(encoding="utf-8")
+    assert "DOMAIN_REPLY_PUBLISHED" in processed
+    final_artifact = json.loads(artifact.read_text(encoding="utf-8"))
+    assert final_artifact["verdict"] == "revise"
+    assert final_artifact["semantic_reply_claim"] is True
+
+
+def test_pending_publish_missing_send_receipt_pins_then_publishes(tmp_path: Path) -> None:
+    """Semantic success with no send receipt yet must pin, then publish on retry.
+
+    This is the exact SEMANTIC_DRAINED_SEND_RECEIPT_MISSING path from the
+    incident: the good reply is pinned as SEMANTIC_SUCCESS_PENDING_PUBLISH and,
+    once the send receipt appears, publish happens without re-running the model.
+    """
+
+    _delivery_record(tmp_path)
+    fake_drain, calls, artifact, outbox_root = _semantic_success_drain_writer(tmp_path)
+
+    def ok_publish(**kwargs: Any) -> dict[str, Any]:
+        return {
+            "status": "DOMAIN_REPLY_PUBLISHED",
+            "packet_id": "packet-1",
+            "domain_receipt_claim": True,
+            "semantic_reply_claim": True,
+            "receipt_path": str(tmp_path / "domain_publish_receipt.json"),
+        }
+
+    # Tick 1: no send receipt on disk yet -> publish not attempted, success pinned.
+    first = _run_once_common(tmp_path, drain_func=fake_drain, publish_func=ok_publish, outbox_root=outbox_root)
+    assert first[0]["status"] == "SEMANTIC_SUCCESS_PENDING_PUBLISH"
+    assert first[0]["semantic_success_pinned"] is True
+    assert not (tmp_path / "state" / "processed_deliveries.jsonl").exists()
+
+    # Send receipt now arrives.
+    _send_receipt(tmp_path)
+
+    # Tick 2: publish using pinned artifact; model not re-run.
+    second = _run_once_common(tmp_path, drain_func=fake_drain, publish_func=ok_publish, outbox_root=outbox_root)
+    assert second[0]["status"] == "DOMAIN_REPLY_PUBLISHED"
+    assert second[0]["reused_pending_publish"] is True
+    assert calls["count"] == 1

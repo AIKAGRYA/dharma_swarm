@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Compatibility CLI for ds-goal missions backed by LivingAgentKernel wakes.
+"""Compatibility CLI for ds-goal missions backed by governed runtime receipts.
 
-This is intentionally a bounded bridge. It creates mission/task ledgers that
-can be projected into operator boards, enqueues ds_goal wakes, and runs a
-finite kernel control tick. It does not start a standing daemon or replace the
-existing LivingAgentKernel control loop.
+The CLI creates mission/task ledgers that can be projected into operator
+boards. The default run mode remains a bounded LivingAgentKernel compatibility
+tick. `run --dispatch-mode tmux` starts the real ds-goal supervisor loop, which
+leases tasks, writes scoped artifacts, runs verifiers, and records terminal
+closeback receipts.
 """
 
 from __future__ import annotations
@@ -32,6 +33,11 @@ from dharma_swarm.operator_core.living_agent_kernel_provider_worker import (  # 
     execute_provider_worker_cycle,
 )
 from dharma_swarm.operator_core.ds_goal_wrapper_contract import wrapper_longrun_preflight_gate  # noqa: E402
+from dharma_swarm.operator_core.ds_goal_supervisor import (  # noqa: E402
+    compile_mission_tasks,
+    start_tmux_supervisor,
+    supervisor_status_payload,
+)
 from dharma_swarm.operator_core.runtime_truth import runtime_db_path_from_env, stable_payload_hash, utc_now  # noqa: E402
 from dharma_swarm.board.adapters.ds_goal_adapter import load_ds_goal_cards  # noqa: E402
 from dharma_swarm.runtime_provider import RuntimeProviderConfig, resolve_runtime_provider_config  # noqa: E402
@@ -222,6 +228,7 @@ def build_parser() -> argparse.ArgumentParser:
     status.add_argument("--mission-id", required=True)
     status.add_argument("--latest-limit", type=int, default=20)
     status.add_argument("--board-cards", action="store_true", help="Include read-only BoardStore Card projection.")
+    status.add_argument("--tmux-session", default="")
 
     run = sub.add_parser("run", help="Run a bounded LivingAgentKernel tick for one ds-goal mission.")
     _common_options(run)
@@ -230,6 +237,9 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--lease-seconds", type=int, default=300)
     run.add_argument("--duration-hours", type=float, default=0.0)
     run.add_argument("--dispatch-mode", default="bounded-kernel-tick")
+    run.add_argument("--tmux-session", default="")
+    run.add_argument("--supervisor-interval-seconds", type=float, default=5.0)
+    run.add_argument("--max-tasks-per-cycle", type=int, default=1)
     run.add_argument("--dry-run", action="store_true")
     run.add_argument(
         "--live-provider",
@@ -276,28 +286,16 @@ def cmd_init(args: argparse.Namespace) -> int:
         mission = _read_mission(mission_dir)
 
     if not tasks_path.exists():
-        task_id = f"{mission_id}-t01"
-        task = {
-            "schema": "dharma.autonomy_task.v1",
-            "mission_id": mission_id,
-            "task_id": task_id,
-            "role": args.role,
-            "agent_uid": args.agent_uid,
-            "title": args.title or args.goal,
-            "status": "claimed",
-            "allowed_writes": list(args.allowed_write or []),
-            "verifier_command": args.verifier_command,
-            "lease": {
-                "claimed_by": args.agent_uid,
-                "claimed_at": utc_now(),
-                "expires_at": "",
-            },
-            "return_address": f"autonomy://{mission_id}/{task_id}",
-            "requested_tools": ["session_status"],
-            "tool_calls": [{"name": "session_status", "arguments": {}}],
-            "receipt_required": True,
-        }
-        _append_jsonl(tasks_path, task)
+        tasks = compile_mission_tasks(
+            mission=mission,
+            mission_dir=mission_dir,
+            role=args.role,
+            agent_uid=args.agent_uid,
+            allowed_writes=list(args.allowed_write or []),
+            verifier_command=args.verifier_command,
+        )
+        for task in tasks:
+            _append_jsonl(tasks_path, task)
 
     tasks = _jsonl_rows(tasks_path)
     receipt = _append_receipt(
@@ -347,6 +345,11 @@ def cmd_status(args: argparse.Namespace) -> int:
         "open_task_count": sum(1 for task in tasks if not task.get("kernel_result_ref")),
         "latest_wake_status": store.latest_wake_status(limit=args.latest_limit),
         "runtime_db": str(_runtime_db_path(args)),
+        "supervisor": supervisor_status_payload(
+            state_root=args.state_root,
+            mission_id=args.mission_id,
+            session_name=args.tmux_session,
+        ),
     }
     if args.board_cards:
         payload["board_cards"] = [
@@ -392,10 +395,11 @@ def _runtime_identity_for_ds_goal(
         idempotency_key=f"idem_ds_goal:{mission_id}:{task_id}",
         agent_id=agent_uid,
         session_id=f"ds_goal:{mission_id}",
-        message_id=wake_id,
+        message_id=f"ds_goal:{mission_id}:{task_id}",
         artifact_id=artifact_id,
         metadata={
             "mission_id": mission_id,
+            "wake_id": wake_id,
             "source": "scripts/runtime/autonomy_spine.py",
         },
     )
@@ -655,7 +659,7 @@ def _begin_runtime_truth_for_dispatch(
     mission_id = _validate_mission_id(str(args.mission_id))
     claim_id = _task_claim_id(mission_id, task_id)
     run_id = _runtime_run_id_for_ds_goal(mission_id, task_id)
-    artifact_id = f"artifact_ds_goal_{mission_id}_{task_id}_{wake_id}".replace("-", "_")[:128]
+    artifact_id = f"artifact_ds_goal_{mission_id}_{task_id}".replace("-", "_")[:128]
     side_effect_key = f"ds_goal.run:{mission_id}:{task_id}"
     identity = _runtime_identity_for_ds_goal(
         mission_id=mission_id,
@@ -1049,6 +1053,51 @@ def cmd_run(args: argparse.Namespace) -> int:
             as_json=args.json,
         )
         return 2
+
+    if str(args.dispatch_mode).strip().lower() == "tmux":
+        tmux_payload = start_tmux_supervisor(
+            repo_root=ROOT,
+            state_root=args.state_root,
+            mission_id=str(args.mission_id),
+            kernel_store=args.kernel_store,
+            runtime_db=_runtime_db_path(args),
+            duration_hours=float(args.duration_hours),
+            lease_seconds=int(args.lease_seconds),
+            interval_seconds=float(args.supervisor_interval_seconds),
+            max_tasks_per_cycle=int(args.max_tasks_per_cycle),
+            live_provider_requested=bool(args.live_provider),
+            provider=str(getattr(args, "provider", "") or ""),
+            model=str(getattr(args, "model", "") or ""),
+            session_name=str(args.tmux_session or ""),
+        )
+        receipt = _append_receipt(
+            mission_dir,
+            {
+                **receipt_base,
+                "status": str(tmux_payload.get("status") or "blocked"),
+                "dispatch_mode": "tmux",
+                "tmux_supervisor": tmux_payload,
+                "ds_goal_longrun_preflight": ds_goal_preflight,
+            },
+        )
+        _print(
+            {
+                "status": str(tmux_payload.get("status") or "blocked"),
+                "mission_id": args.mission_id,
+                "task_id": receipt_base["task_id"],
+                "mission_dir": str(mission_dir),
+                "receipt_hash": receipt["record_hash"],
+                "dispatch_mode": "tmux",
+                "tmux_supervisor": tmux_payload,
+                "supervisor": supervisor_status_payload(
+                    state_root=args.state_root,
+                    mission_id=str(args.mission_id),
+                    session_name=str(args.tmux_session or ""),
+                ),
+            },
+            as_json=args.json,
+        )
+        return 0 if str(tmux_payload.get("status") or "") in {"running", "completed"} else 2
 
     live_config: RuntimeProviderConfig | None = None
     live_worker_id = ""
