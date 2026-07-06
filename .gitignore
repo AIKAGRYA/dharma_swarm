@@ -123,6 +123,17 @@ reports/a2a/NATS_*_20260617.md
 reports/a2a/CODEX_HOLON_SEMANTIC_REPLY_P0_*.md
 reports/a2a/archive_20260617_canonicalized/
 reports/a2a/nats_connect_signoffs/
+reports/a2a/domain_reply_artifacts/
+reports/a2a/domain_reply_receipts/
+reports/a2a/launchd_plans/
+reports/a2a/nats_live_production_matrix/
+reports/a2a/phase_a/
+reports/a2a/reply_receipts/
+reports/a2a/semantic_inbox_drains/
+reports/agentops/decorrelated_review_council/
+reports/agentops/semantic_receipts/
+reports/agentops/work_packets/*/
+reports/sab_first_six_agent_flywheel/receipts/
 reports/model_pool/
 reports/model_routing/e2e/
 reports/sovereign_holons/verify_holon_harness_prod_*.json
