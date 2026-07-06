@@ -459,6 +459,19 @@ def strong_vendor_model_ids() -> tuple[str, ...]:
     return tuple(out)
 
 
+def forge_high_slot_model_ids() -> tuple[str, ...]:
+    ids = [default_for_provider(ProviderType.ZHIPU)]
+    for entry_id in ("kimi-k2.7-code", "deepseek-v4-pro", "minimax-m3", "qwen3-coder:480b-cloud", "kimi-for-coding"):
+        entry = get_entry(entry_id)
+        if entry is not None and not entry.below_floor:
+            ids.extend(route.model_id for route in entry.routes)
+    return tuple(dict.fromkeys(model_id for model_id in ids if model_id))
+
+def forge_default_high_slot_verifier_id() -> str:
+    entry = get_entry("kimi-k2.7-code")
+    return entry.routes[0].model_id if entry is not None and entry.routes else default_for_provider(ProviderType.KIMI_CODE)
+
+
 __all__ = [
     "Route",
     "ModelEntry",
@@ -477,6 +490,8 @@ __all__ = [
     "FORGE_NVIDIA_KIMI_MODEL_ID",
     "FORGE_NVIDIA_LLAMA_VERIFIER_MODEL_ID",
     "live_routes",
+    "forge_default_high_slot_verifier_id",
+    "forge_high_slot_model_ids",
     "best_live_route",
     "provider_model_ids",
     "ollama_cloud_model_ids",

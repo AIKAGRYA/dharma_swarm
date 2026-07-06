@@ -50,6 +50,7 @@
 /dharma_swarm/runtime_env_loader.py     @AmitabhainArunachala
 /dharma_swarm/tiny_router_shadow.py     @AmitabhainArunachala
 /dharma_swarm/model_defaults.py         @AmitabhainArunachala
+/dharma_swarm/model_hierarchy.py       @AmitabhainArunachala
 /dharma_swarm/resilience.py             @AmitabhainArunachala
 /dharma_swarm/routing_memory.py         @AmitabhainArunachala
 

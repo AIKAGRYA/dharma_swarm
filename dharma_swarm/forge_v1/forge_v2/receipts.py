@@ -61,6 +61,7 @@ class RunReceipt:
     budget_matched_proof: dict = field(default_factory=dict)
     closeout: str = ""
     next_experiment: str = ""
+    artifact_dir: str = ""
     ledger_row_ids: list = field(default_factory=list)
     attempts: list = field(default_factory=list)
 

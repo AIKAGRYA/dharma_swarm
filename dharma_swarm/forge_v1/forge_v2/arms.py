@@ -27,24 +27,28 @@ DEFAULT_WINDOW_CHARS = 11000
 
 
 def _is_free_route(slot) -> bool:
-    prov = getattr(slot.provider, "value", str(slot.provider))
+    provider = getattr(slot, "provider", "")
+    prov = getattr(provider, "value", str(provider))
     return prov in ("ollama", "openrouter_free") or str(slot.model_id).endswith((":cloud", ":free"))
 
 
-def _win(slot):
+def _win(slot, window_chars: int | None = None):
     # First-slice runs must fit the matched budget on large SWE-bench contexts.
-    # Use the same bounded window for all providers.
-    return DEFAULT_WINDOW_CHARS
+    # Use the same bounded window for all providers in a campaign.  Track A
+    # scaffold/genome evolution may mutate this context policy, but the override
+    # must be applied symmetrically to the class-null and tested arm so budget
+    # parity remains meaningful.
+    return int(DEFAULT_WINDOW_CHARS if window_chars is None else window_chars)
 
 
 def self_moa_arm(generator, inst, ctx, budget: Budget, *, k: int, per_call_tokens: int,
-                 timeout_s: int) -> dict:
+                 timeout_s: int, window_chars: int | None = None) -> dict:
     """Same model, k independent samples, then a SYNTHESIS pass selects/merges the
     best (NOT the Docker oracle). The headline null baseline."""
     candidates = []
     for i in range(k):
         rec = _propose_slot(generator, inst, ctx, max_tokens=per_call_tokens, timeout_s=timeout_s,
-                            window_chars=_win(generator))
+                            window_chars=_win(generator, window_chars))
         budget.charge("generation", rec["tokens"], is_free_route=_is_free_route(generator))
         if rec["patch"].strip():
             candidates.append(rec["patch"])
@@ -54,7 +58,7 @@ def self_moa_arm(generator, inst, ctx, budget: Budget, *, k: int, per_call_token
     if candidates and not budget.invalid:
         synth_instr = (SYNTH_TEMPLATE + "\n\n" + "\n\n--- candidate ---\n".join(c[:1500] for c in candidates[:4]))
         srec = _propose_slot(generator, inst, ctx, max_tokens=per_call_tokens, timeout_s=timeout_s,
-                            window_chars=_win(generator), extra_instruction=synth_instr)
+                            window_chars=_win(generator, window_chars), extra_instruction=synth_instr)
         budget.charge("selection", srec["tokens"], is_free_route=_is_free_route(generator))
         if srec["patch"].strip():
             final_patch = srec["patch"]
@@ -62,19 +66,59 @@ def self_moa_arm(generator, inst, ctx, budget: Budget, *, k: int, per_call_token
 
 
 def verify_chain_arm(generator, verifier, inst, ctx, budget: Budget, *, per_call_tokens: int,
-                     timeout_s: int) -> dict:
+                     timeout_s: int, window_chars: int | None = None) -> dict:
     """Generator (SAME model as self_moa) produces a patch; an independent
     CROSS-FAMILY verifier reviews/repairs it. One final patch, graded once."""
     grec = _propose_slot(generator, inst, ctx, max_tokens=per_call_tokens, timeout_s=timeout_s,
-                        window_chars=_win(generator))
+                        window_chars=_win(generator, window_chars))
     budget.charge("generation", grec["tokens"], is_free_route=_is_free_route(generator))
     final_patch = grec["patch"]
     if final_patch.strip() and not budget.invalid:
         vrec = _propose_slot(verifier, inst, ctx, max_tokens=per_call_tokens, timeout_s=timeout_s,
-                            window_chars=_win(verifier),
+                            window_chars=_win(verifier, window_chars),
                             extra_instruction=VERIFY_TEMPLATE + "\n\nProposed patch:\n" + final_patch[:2000])
         budget.charge("verification", vrec["tokens"], is_free_route=_is_free_route(verifier))
         if vrec["patch"].strip():
             final_patch = vrec["patch"]
     return {"arm": "verify_chain", "final_patch": final_patch, "generator": generator.model_id,
             "verifier": verifier.model_id}
+
+
+def mixed_moa_arm(generators, selector, inst, ctx, budget: Budget, *, per_call_tokens: int,
+                  timeout_s: int, window_chars: int | None = None) -> dict:
+    """Cross-model mixture-of-agents control.
+
+    Each callable generator gets one independent sample under the same total
+    budget broker; the selector then synthesizes one final patch. This is the
+    diversity hypothesis arm and is intentionally contrasted against self_moa,
+    not used as an oracle over Docker grades.
+    """
+    candidates = []
+    model_ids = []
+    for slot in generators:
+        rec = _propose_slot(slot, inst, ctx, max_tokens=per_call_tokens, timeout_s=timeout_s,
+                            window_chars=_win(slot, window_chars))
+        budget.charge("generation", rec["tokens"], is_free_route=_is_free_route(slot))
+        model_ids.append(slot.model_id)
+        if rec["patch"].strip():
+            candidates.append((slot.model_id, rec["patch"]))
+        if budget.invalid:
+            break
+
+    final_patch = candidates[0][1] if candidates else ""
+    if candidates and not budget.invalid:
+        synth_instr = (
+            SYNTH_TEMPLATE
+            + "\n\nCandidate patches from different model families follow. "
+              "Synthesize the SINGLE best minimal fix. Do not mention the candidates.\n\n"
+            + "\n\n--- candidate ---\n".join(
+                f"model: {model_id}\n{patch[:1500]}" for model_id, patch in candidates[:6]
+            )
+        )
+        srec = _propose_slot(selector, inst, ctx, max_tokens=per_call_tokens, timeout_s=timeout_s,
+                             window_chars=_win(selector, window_chars), extra_instruction=synth_instr)
+        budget.charge("selection", srec["tokens"], is_free_route=_is_free_route(selector))
+        if srec["patch"].strip():
+            final_patch = srec["patch"]
+    return {"arm": "mixed_moa", "final_patch": final_patch, "models": model_ids,
+            "selector": selector.model_id, "n_candidates": len(candidates)}

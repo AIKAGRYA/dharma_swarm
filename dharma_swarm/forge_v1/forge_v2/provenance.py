@@ -18,6 +18,24 @@ def split_explore_confirm(instance_ids: list[str], n_explore: int) -> tuple[list
 
 def contamination_state(instance: dict) -> dict:
     """Honest contamination assessment for a SWE-bench instance."""
+    sealed = instance.get("sealed_provenance")
+    if isinstance(sealed, dict) and sealed.get("contamination_state"):
+        return {
+            "state": str(sealed.get("contamination_state")),
+            "basis": sealed.get("basis", "sealed taskbed provenance"),
+            "created_at": str(sealed.get("evidence_timestamp") or instance.get("created_at") or ""),
+            "source": sealed.get("source", instance.get("source", "")),
+            "source_kind": sealed.get("source_kind", instance.get("source_kind", "")),
+            "task_sha256": sealed.get("task_sha256", ""),
+        }
+    if str(instance.get("source_kind") or "").startswith("post_cutoff_pr_suite"):
+        return {
+            "state": str(instance.get("contamination_state") or "fresh_heldout"),
+            "basis": "validated post-cutoff PR-suite taskbed row",
+            "created_at": str(instance.get("created_at") or instance.get("merged_at") or ""),
+            "source": str(instance.get("source") or "post_cutoff_pr_suite"),
+            "source_kind": str(instance.get("source_kind") or ""),
+        }
     created = instance.get("created_at", "") or instance.get("base_commit", "")[:0]
     return {
         "state": "possible_pretrain",
