@@ -69,18 +69,32 @@ Forge Lab governs the membrane, not the imagination:
 
 ## Current chassis slice
 
-The first chassis implementation is deliberately modest:
+The chassis now runs WILD-FIRST, per the v0.3 amendment:
 
 - safe scratch worktree lifecycle;
 - append-only candidate store;
 - novelty-weighted parent sampling;
-- pluggable mutation operators;
+- pluggable mutation operators with the frontier `llm_propose_genome` as the
+  primary EXPLORE operator (parametric demoted to one operator among several);
+- the LLM path is REACHABLE by the loop — a real frontier model (via the
+  `forge_v1.canonical` roster seam) receives the parent genome, failure
+  transcripts, and archive exemplars (mycelial soil), and proposes an arbitrary
+  new genome dict; malformed/exhausted proposals are stored as `blocked`
+  evidence, never faked and never silently dropped;
+- no-fake guarantee: when no frontier slot is dispatchable (or model calls are
+  off), the loop falls back to non-LLM operators and records why;
+- one shared token/$ `Budget` cap across the whole experiment;
 - EXPLORE experiment loop;
 - taskbed fast-lane seam;
 - honest closeout as `inconclusive_low_power`.
 
 It creates traffic through the evolutionary archive without pretending the
 system has proven lift.
+
+Verified live: a real `kimi-k2.7-code` call proposed a novel scaffold genome
+(`llm_localize_ranked_patches_verify` with fields parametric ops cannot invent),
+which was graded and archived with lineage; the run closed honestly at
+`inconclusive_low_power`, budget-capped.
 
 The next scientific milestone is not a paid bounty. It is an internal
 same-budget comparison:

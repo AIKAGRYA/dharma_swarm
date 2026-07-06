@@ -29,6 +29,16 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--max-usd", type=float, default=0.0)
     run.add_argument("--use-taskbed", action="store_true")
     run.add_argument("--keep-worktree", action="store_true")
+    # WILD EXPLORE knobs (off by default: deterministic, offline, no spend).
+    run.add_argument(
+        "--allow-model-calls",
+        action="store_true",
+        help="Enable the frontier genome proposer (real model calls; budget-capped).",
+    )
+    run.add_argument("--roster-n", type=int, default=8)
+    run.add_argument("--per-call-tokens", type=int, default=3500)
+    run.add_argument("--token-budget", type=int, default=120000)
+    run.add_argument("--proposer-timeout-s", type=int, default=60)
     return parser
 
 

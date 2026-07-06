@@ -14,8 +14,14 @@ from typing import Any
 from dharma_swarm.evolution_safety import evaluate_mutation, is_scratch_worktree
 from dharma_swarm.evolution_safety_runtime import RuntimeCodeIdentity, safety_summary
 from dharma_swarm.forge_lab.candidate_store import CandidateStore, safe_membrane
+from dharma_swarm.forge_lab._context import (
+    archive_context as _archive_context,
+    pick_second_parent as _pick_second_parent,
+    recent_failure_transcripts as _recent_failure_transcripts,
+)
 from dharma_swarm.forge_lab.freeform_explore import explore_law_summary
-from dharma_swarm.forge_lab.mutation import mutate_genome, seed_genome
+from dharma_swarm.forge_lab.mutation import default_operators, mutate_genome, seed_genome
+from dharma_swarm.forge_lab.providers import build_frontier_proposer
 from dharma_swarm.forge_lab.selection import draw_parents
 from dharma_swarm.forge_lab.worktree import (
     ScratchWorktree,
@@ -56,6 +62,13 @@ class ExperimentConfig:
     max_usd: float = 0.0
     keep_worktree: bool = False
     use_taskbed: bool = False
+    # WILD EXPLORE knobs. Model calls are OFF by default so tests/CI stay
+    # deterministic and offline; enable explicitly for a real wild run.
+    allow_model_calls: bool = False
+    roster_n: int = 8
+    per_call_tokens: int = 3500
+    token_budget: int = 120_000
+    proposer_timeout_s: int = 60
 
     @property
     def archive_dir(self) -> Path:
@@ -247,6 +260,16 @@ async def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
     generation_receipts: list[dict[str, Any]] = []
     try:
         manifest = _preflight(config, scratch)
+        proposer, proposer_report = build_frontier_proposer(
+            allow_model_calls=config.allow_model_calls,
+            strategy="explore",
+            roster_n=config.roster_n,
+            per_call_tokens=config.per_call_tokens,
+            timeout_s=config.proposer_timeout_s,
+            token_budget=config.token_budget,
+            max_usd=config.max_usd,
+        )
+        manifest["proposer"] = proposer_report
         _write_json(config.archive_dir / "run_manifest.json", manifest)
         allocation, task_rows = _allocate_task_rows(config)
         if allocation is not None:
@@ -282,7 +305,29 @@ async def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
             )
             generated: list[dict[str, Any]] = []
             for slot, draw in enumerate(draws):
-                mutation = mutate_genome(draw.parent.genome, rng=rng)
+                records_now = store.records()
+                failure_transcripts = _recent_failure_transcripts(records_now)
+                archive_context = _archive_context(records_now)
+                second = _pick_second_parent(records_now, draw.parent.candidate_id, rng)
+                operators = default_operators(
+                    proposer=proposer,
+                    second_parent=second.genome if second is not None else None,
+                )
+                # The frontier proposer reuses forge_v1.canonical._call, which
+                # uses asyncio.run() internally. run_experiment itself runs under
+                # asyncio.run(), so we must dispatch the (synchronous) mutation on
+                # a worker thread — otherwise every real proposer call raises
+                # "asyncio.run() cannot be called from a running event loop".
+                mutation = await asyncio.to_thread(
+                    mutate_genome,
+                    draw.parent.genome,
+                    rng=rng,
+                    operators=operators,
+                    proposer=proposer,
+                    second_parent=second.genome if second is not None else None,
+                    failure_transcripts=failure_transcripts,
+                    archive_context=archive_context,
+                )
                 generation = draw.parent.generation + 1
                 if mutation.blocked:
                     record = await store.append(
@@ -346,6 +391,14 @@ async def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
         await store.load()
         graded = store.graded_records()
         best = max(graded, key=lambda item: item.weighted_fitness) if graded else None
+        all_records = store.records()
+        operator_histogram: dict[str, int] = {}
+        for record in all_records:
+            operator_histogram[record.operator] = operator_histogram.get(record.operator, 0) + 1
+        proposer_calls = getattr(proposer, "calls", 0) if proposer is not None else 0
+        proposer_budget = (
+            proposer.budget.to_dict() if proposer is not None and hasattr(proposer, "budget") else {}
+        )
         closeout = {
             "schema": "forge_lab.closeout.v0",
             "experiment_id": config.experiment_id,
@@ -357,6 +410,10 @@ async def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
             "graded_count": len(graded),
             "best_candidate_id": best.candidate_id if best else "",
             "best_fitness": best.weighted_fitness if best else 0.0,
+            "operator_histogram": operator_histogram,
+            "proposer": proposer_report.get("proposer", "disabled"),
+            "proposer_calls": proposer_calls,
+            "proposer_budget": proposer_budget,
             "archive_dir": str(config.archive_dir),
             "created_at": _now_iso(),
         }
@@ -383,6 +440,11 @@ def config_from_args(args: argparse.Namespace) -> ExperimentConfig:
         max_usd=args.max_usd,
         keep_worktree=args.keep_worktree,
         use_taskbed=args.use_taskbed,
+        allow_model_calls=args.allow_model_calls,
+        roster_n=args.roster_n,
+        per_call_tokens=args.per_call_tokens,
+        token_budget=args.token_budget,
+        proposer_timeout_s=args.proposer_timeout_s,
     )
 
 

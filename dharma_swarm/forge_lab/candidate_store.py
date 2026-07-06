@@ -107,7 +107,12 @@ class CandidateStore:
         benchmark_receipt: dict[str, Any] | None = None,
     ) -> CandidateRecord:
         candidate_id, canonicalizer = candidate_id_for_genome(genome)
-        if candidate_id in self._records and state != "duplicate":
+        # Only GRADED children dedupe to ``duplicate`` — that is the sole case
+        # where the point is skipping an expensive regrade of a reached genome.
+        # A ``blocked``/``errored`` child that happens to collide (e.g. a
+        # malformed LLM proposal that fell back to the parent genome) must keep
+        # its OWN honest identity and blocker, never be relabeled ``duplicate``.
+        if candidate_id in self._records and state == "graded":
             return await self.append_duplicate(
                 candidate_id=candidate_id,
                 parent_id=parent_id,
@@ -117,6 +122,20 @@ class CandidateStore:
                 loop_iteration=loop_iteration,
                 genome=genome,
                 operator=operator,
+            )
+        if candidate_id in self._records and state != "duplicate":
+            # Non-graded collision: derive a distinct id from the attempt so the
+            # honest state/blocker survives instead of overwriting a prior row.
+            candidate_id, canonicalizer = candidate_id_for_genome(
+                {
+                    "collided_genome_id": candidate_id,
+                    "genome": genome,
+                    "state": state,
+                    "operator": operator,
+                    "blocker": notes,
+                    "generation": generation,
+                    "loop_iteration": loop_iteration,
+                }
             )
 
         record = CandidateRecord(

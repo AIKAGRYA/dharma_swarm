@@ -91,7 +91,17 @@ def llm_propose_genome(
         "failure_transcripts": failure_transcripts or [],
         "archive_context": archive_context or [],
     }
-    proposed = proposer(copy.deepcopy(parent), context)
+    try:
+        proposed = proposer(copy.deepcopy(parent), context)
+    except Exception as exc:  # noqa: BLE001 - malformed/exhausted is EVIDENCE, not a crash.
+        blocker = f"{type(exc).__name__}:{str(exc)[:200]}"
+        return MutationResult(
+            genome=dict(parent),
+            operator="llm_propose_genome",
+            blocked=True,
+            blocker=blocker,
+            raw_output=str(exc)[:4000],
+        )
     if not isinstance(proposed, dict):
         return MutationResult(
             genome={"raw_proposal": repr(proposed)},
@@ -154,3 +164,31 @@ def mutate_genome(
             blocker=f"unknown_operators:{','.join(sorted(unknown))}",
         )
     return registry[rng.choice(names)]()
+
+
+# WILD-first default operator ladder. The handoff mandate is explicit: the LLM
+# proposer is the primary EXPLORE operator, with parametric demoted to one
+# operator among several. ``default_operators`` therefore leads with
+# ``llm_propose_genome`` whenever a proposer is available, and only falls back to
+# the non-LLM operators when no frontier slot is dispatchable.
+WILD_OPERATORS: tuple[str, ...] = ("llm_propose_genome", "llm_crossover", "parametric")
+FALLBACK_OPERATORS: tuple[str, ...] = ("parametric",)
+
+
+def default_operators(
+    *,
+    proposer: LLMProposer | None,
+    second_parent: dict[str, Any] | None = None,
+) -> list[str]:
+    """Return the operator ladder for a child slot.
+
+    Wild-first when a live proposer exists; otherwise the honest non-LLM
+    fallback so an offline/CI run never fakes a frontier call.
+    """
+    if proposer is None:
+        return list(FALLBACK_OPERATORS)
+    ops = ["llm_propose_genome"]
+    if second_parent is not None:
+        ops.append("llm_crossover")
+    ops.append("parametric")
+    return ops
