@@ -318,7 +318,7 @@ append-style refreshes quadruplicated rows and broke `make docops-integrity`).
 |--------|-------|-------------|
 | Total Python modules | **953** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **437 (45.9%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **349,793** | wc -l across dharma_swarm Python modules |
+| Total Python LOC | **349,803** | wc -l across dharma_swarm Python modules |
 | Test files | **856** | find tests -name "*.py" -type f |
 | Test functions | **12,842 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **12,674 (measured 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |

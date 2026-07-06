@@ -112,6 +112,16 @@ def default_writer_specs() -> tuple[MemoryWriterSpec, ...]:
             "Provider-learning SQLite store is memory-like runtime telemetry, not semantic truth.",
         ),
         MemoryWriterSpec(
+            "execution_lease.write_lease_index",
+            "dharma_swarm.operator_core.execution_lease",
+            "write_execution_lease",
+            ("home.runtime_state",),
+            WriteMode.APPEND_ONLY,
+            WriterClassification.REVIEW_REQUIRED,
+            RiskLevel.MEDIUM,
+            "File-backed lease index is authority/runtime evidence, not semantic memory.",
+        ),
+        MemoryWriterSpec(
             "runtime_state.store",
             "dharma_swarm.runtime_state",
             "RuntimeStateStore",
