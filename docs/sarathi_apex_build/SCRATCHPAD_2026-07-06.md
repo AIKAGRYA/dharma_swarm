@@ -74,3 +74,41 @@ Verification after the code seam:
 - `.venv/bin/python -m pytest tests/test_reversibility_gate.py tests/test_holon_runtime.py tests/test_holon_runtime_integration.py tests/test_codex_composer_wake_loop.py tests/test_holon_bridge.py -q` -> `61 passed in 0.79s`.
 - `.venv/bin/python -m py_compile dharma_swarm/operator_core/reversibility_gate.py dharma_swarm/holon_runtime.py scripts/runtime/codex_composer_wake_loop.py scripts/governance/sprawl_guard.py` -> pass.
 - Broad `.venv/bin/python -m pytest -q` was attempted and stopped after 4:01 with `1 failed, 574 passed`; failure was `tests/test_active_track_governance.py::test_managed_blocks_in_sync` due generated active-track blocks out of sync in `CLAUDE.md`, `docs/governance/SOVEREIGN_MANIFEST.md`, and `docs/governance/BUILD_SESSION_ENTRYPOINT.md`. This appears unrelated to the Sarathi/holon files and was not auto-rewritten in this scoped commit.
+
+## Independent-verification pass (fable_composer role, 2026-07-06 continuation)
+
+Re-derived requirements from the checkpoint rather than trusting the summary.
+Verified Agent-2's Gate 2 + Gate 3 are REAL: 173 targeted tests pass;
+`load_holon("sarathi") -> ollama/glm-5:cloud` via `resolve_top_available_at_wake`;
+`load_holon("fugu_ultra") -> sakana/fugu-ultra`; `dgc agent status` no longer
+emits `defaulting to claude_code`. Commits `42215a90f` + `4cb1bdf9c` landed.
+
+Counting-discipline catch: a combined `... | tail; echo $PIPESTATUS` reported a
+FALSE `SPRAWL_EXIT=0` (zsh `pipestatus` vs bash `PIPESTATUS`). Re-ran the guard
+without a pipe -> TRUE exit is 1 (2 findings). This is the exact "neither agent
+counted" failure mode; always capture the process's own `$?`, never a piped one.
+
+### The operator's meta-question, now handled (the real gap)
+
+The operator asked: *"help me think of a way to make this much simpler so we
+never have such sprawl before... a harness to organize it going forward"* and
+*"I run make onboard / make orient before most builds and yet still this sprawl."*
+Neither Agent 2 nor the checkpoint addressed it. Root cause found:
+`scripts/governance/sprawl_guard.py` existed but was wired into NOTHING
+(no Makefile target, no pre-commit, no CI) — orientation described sprawl but
+nothing failed on it.
+
+Fix (smallest possible, no new machinery): wired the EXISTING guard into the
+moment the operator already performs.
+- `make onboard` / `make orient` now run it advisory-only (`-` prefix; prints,
+  never blocks; both still exit 0).
+- `make sprawl-guard` is the blocking gate (non-zero on any finding) for
+  pre-commit/CI.
+Verified: onboard/orient exit 0 and print findings; `make sprawl-guard` fails
+(Error 1) on today's `holon/` fork. Only scoped file changed: `Makefile`
+(+ docs 90 + this scratchpad).
+
+The generalization the operator wanted beyond holons: `SINGLETON_SYMBOLS` in
+`sprawl_guard.py` is a one-line-per-primitive declarative registry. "One home,
+declared once, boring gate fails on the duplicate" is the whole harness — it is
+not holon-specific; add a row for any surface that keeps scattering.

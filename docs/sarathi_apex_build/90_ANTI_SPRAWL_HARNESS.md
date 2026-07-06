@@ -134,3 +134,36 @@ keep `IMPLEMENTED = False` until proof gates 6-10 are met.
 .venv/bin/python -m pytest tests/test_holon_system_imports.py -q  # facades == canonical
 python3 scripts/governance/sprawl_guard.py                        # singleton/dup/copy-drift
 ```
+
+---
+
+## The guard now runs at the moment you already perform (added 2026-07-06)
+
+Root cause the operator named directly: *"I run `make onboard` / `make orient`
+before most builds and yet there is still this much sprawl."* The reason was
+mechanical, not motivational: **`sprawl_guard.py` existed but was wired into no
+Makefile target, no pre-commit hook, no CI.** Orientation *described* reality; it
+never *failed* when a duplicate primitive was created. Doc 90 called for wiring;
+it had not been done.
+
+Fix (the smallest possible; no new machinery, no "eighth version"):
+
+- `make onboard` and `make orient` now call the guard **advisory-only** (prefixed
+  with `-` so a finding prints but never blocks orientation — those targets still
+  exit 0). You now *see* the sprawl every single time you orient.
+- `make sprawl-guard` is the **blocking** gate: it exits non-zero on any finding.
+  This is the one target to add to pre-commit / CI so a build *fails* the moment
+  a declared singleton is duplicated.
+
+```bash
+make onboard        # orientation + advisory sprawl report (exit 0)
+make orient         # whole-system view + advisory sprawl report (exit 0)
+make sprawl-guard   # THE gate: non-zero exit on any A1/A2 finding
+```
+
+To extend coverage beyond holons, add one entry to `SINGLETON_SYMBOLS` (or
+`FORBIDDEN_IMPORTS` / `COPY_WATCHLIST`) in `scripts/governance/sprawl_guard.py`.
+That single registry is the generic anti-sprawl surface for the whole repo — it
+is not holon-specific. This is the harness the operator asked for: pick one home,
+declare the singleton once, and let a boring deterministic gate fail on the
+139th copy instead of a human noticing it three weeks later.

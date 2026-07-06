@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check bug-corral-scan name-drift-preflight semantic-commons-check semantic-commons-project agent-admit onboard-agent codex-composer-bootstrap codex-composer-once codex-composer-status codex-composer-start codex-composer-stop agent-wake-once agent-wake-status agent-wake-bootstrap agent-wake-start agent-wake-stop docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop tmux-bootstrap tmux-status tmux-substrate-contract memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke runtime-truth-ci runtime-truth-closeout runtime-truth-burn-in runtime-truth-burn-in-smoke runtime-truth-100-audit runtime-task-firebreak ds-goal-longrun-preflight-check governance-all agent-build-preflight agent-build-closeout cybernetics-codex-audit wiki-orphan-status wiki-orphan-upgrade spine-check onboard offboard orient status go-fmt-check go-test go-vet go-ci xray compile test-smoke test-all dashboard-lint dashboard-build
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check bug-corral-scan name-drift-preflight semantic-commons-check semantic-commons-project agent-admit onboard-agent codex-composer-bootstrap codex-composer-once codex-composer-status codex-composer-start codex-composer-stop agent-wake-once agent-wake-status agent-wake-bootstrap agent-wake-start agent-wake-stop docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop tmux-bootstrap tmux-status tmux-substrate-contract memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke runtime-truth-ci runtime-truth-closeout runtime-truth-burn-in runtime-truth-burn-in-smoke runtime-truth-100-audit runtime-task-firebreak ds-goal-longrun-preflight-check governance-all agent-build-preflight agent-build-closeout cybernetics-codex-audit wiki-orphan-status wiki-orphan-upgrade spine-check onboard offboard orient status sprawl-guard go-fmt-check go-test go-vet go-ci xray compile test-smoke test-all dashboard-lint dashboard-build
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently.
@@ -550,6 +550,8 @@ onboard:
 	$(PYTHON) scripts/governance/agent_onboard.py
 	@printf "\n== Wiki Knowledge Health ==\n"
 	@$(PYTHON) scripts/wiki_orphan_upgrade.py --status --max-print 8
+	@printf "\n== Sprawl Guard (A1/A2 singletons — advisory here; run 'make sprawl-guard' to gate) ==\n"
+	-@$(PYTHON) scripts/governance/sprawl_guard.py
 
 # Single-door offboarding: writes a receipt for the next agent/auditor after a
 # scoped work session. By default this writes under ~/.dharma/ops; pass
@@ -563,6 +565,15 @@ orient:
 	$(PYTHON) scripts/governance/orientation_graph.py
 	@printf "\n== Wiki Knowledge Health ==\n"
 	@$(PYTHON) scripts/wiki_orphan_upgrade.py --status --max-print 8
+	@printf "\n== Sprawl Guard (A1/A2 singletons — advisory here; run 'make sprawl-guard' to gate) ==\n"
+	-@$(PYTHON) scripts/governance/sprawl_guard.py
+
+# Deterministic, read-only A1/A2 duplicate-primitive gate. Non-zero exit on any
+# sprawl finding, so this is the target to put in pre-commit / CI. `onboard` and
+# `orient` call the guard advisory-only (never blocking orientation); THIS target
+# is the one that fails the build when a declared singleton is duplicated.
+sprawl-guard:
+	$(PYTHON) scripts/governance/sprawl_guard.py
 
 # Quick cross-agent state snapshot: active track, open PRs, stale items,
 # broken register, hotlist. Any agent on any platform can run this.
