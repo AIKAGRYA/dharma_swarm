@@ -13,14 +13,16 @@ Done:
 
 ## Phase B — collapse spine
 
-1. Delete the duplicate `holon/` fork in its own commit after migrating importers.
-2. Check known importers:
-   - `scripts/verify_holon_harness_prod.py`
-   - `tests/test_holon_truth_projection.py`
-3. Preserve genuinely useful fork tests or types by porting them to canonical
-   modules, not by keeping the fork.
-4. Run `python3 scripts/governance/sprawl_guard.py`; it must exit `0`.
-5. Run the scoped holon tests and update `06_PROOF_GATES.md` with command output.
+Done:
+
+1. Deleted the duplicate `holon/` fork.
+2. Migrated the surviving runtime importer in
+   `scripts/verify_holon_harness_prod.py` to canonical
+   `dharma_swarm.holon_runtime`.
+3. Confirmed no `tests/test_holon_truth_projection.py` exists on this clean
+   `origin/main` branch.
+4. Ran `python3 scripts/governance/sprawl_guard.py`; it exited `0`.
+5. Ran the scoped holon tests; `108 passed, 1 warning`.
 
 ## Phase C — facade package + Sarathi source
 

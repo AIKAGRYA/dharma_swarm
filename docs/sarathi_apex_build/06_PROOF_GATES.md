@@ -10,8 +10,8 @@
 | 4 | Code/runtime boundary is documented and runtime state is not committed. | Done in `02_CODEBASE_RUNTIME_BOUNDARY.md`; no runtime state added. |
 | 5 | Hermes-organ comparison distinguishes exists/partial/missing/scattered. | Done in `03_HOLON_SYSTEM_CODE_MAP.md`. |
 | 6 | Orphan maps are metabolized. | `AGENT_HOLON_CODE_MAP.md` and `HOLON_RUNTIME_FULL_ESTATE_MAP.md` are committed under `docs/architecture/` and linked from README. |
-| 7 | Duplicate holon fork removed after importer migration. | Pending Phase B. |
-| 8 | `sprawl_guard.py` exits `0` on the clean branch. | Pending Phase B; expected to fail until `holon/` is removed. |
+| 7 | Duplicate holon fork removed after importer migration. | Done in Phase B: `scripts/verify_holon_harness_prod.py` now imports `dharma_swarm.holon_runtime`; `holon/` removed. |
+| 8 | `sprawl_guard.py` exits `0` on the clean branch. | Done in Phase B; output below. |
 | 9 | Sarathi facade/package/runtime wrapper exists without source-in-runtime. | Pending Phase C. |
 | 10 | Unattended proof exists before any `wake_loop_active=true` claim. | Pending; no alive claim made. |
 
@@ -34,3 +34,23 @@ python3 scripts/governance/sprawl_guard.py
 ```
 
 exits `0` on `feat/holon-system-collapse-base`.
+
+## Phase B verification
+
+```text
+$ python3 scripts/governance/sprawl_guard.py; echo EXIT=$?
+[1] SINGLETON SYMBOLS
+  OK   def load_holon -> dharma_swarm/holon_bridge.py
+  OK   def holon_wake_cycle -> dharma_swarm/holon_runtime.py
+[2] FORBIDDEN IMPORTS
+  OK   no runtime import of holon.holon_bridge
+  OK   no runtime import of holon.holon_runtime
+[3] COPY DRIFT
+  holon_bridge.py: 1 tracked copies, 1 DISTINCT contents
+  holon_runtime.py: 1 tracked copies, 1 DISTINCT contents
+RESULT: CLEAN — no sprawl findings.
+EXIT=0
+
+$ .venv/bin/python -m pytest tests/test_holon*.py tests/test_reversibility_gate.py tests/test_codex_composer_wake_loop.py -q
+108 passed, 1 warning in 1.16s
+```

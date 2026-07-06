@@ -38,7 +38,7 @@ This front door connects four things that were previously easy to confuse:
 | Gate ported | `dharma_swarm/operator_core/reversibility_gate.py`; `tests/test_reversibility_gate.py`; `holon_runtime.py` accepts caller-supplied `planned_action`. | Done |
 | Wake profile has Sarathi | `scripts/runtime/codex_composer_wake_loop.py` registers `sarathi` as a `WakeProfile`. | Done |
 | Scoped gate tests | `.venv/bin/python -m pytest tests/test_reversibility_gate.py tests/test_holon_runtime.py tests/test_codex_composer_wake_loop.py -q` → `39 passed in 0.62s`. | Done |
-| Collapse spine | `holon/` fork still exists on the clean branch at this point. | Not done |
+| Collapse spine | `holon/` fork deleted after migrating `scripts/verify_holon_harness_prod.py` to canonical `dharma_swarm.holon_runtime`; sprawl guard exits `0`. | Done |
 | Facade package | `dharma_swarm/holon_system/` is not yet rebuilt fresh on this clean branch. | Not done |
 | Sarathi liveness | No unattended proof and no `wake_loop_active=true` claim. | Not alive |
 

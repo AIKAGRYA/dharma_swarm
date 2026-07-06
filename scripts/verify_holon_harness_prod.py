@@ -239,18 +239,13 @@ import asyncio
                 ], timeout=60)
                 if code3 == 0 and "EXPORTABLE_OK" in o3:
                     return True, f"venv+pip+run OK\n{o3}"
-        # Prefer the thin standalone export surface at holon/ (created for this mission to satisfy "like hermes" + --require-exportable).
-        # This tests the real export contract in docs/sovereign_holons/EXPORT.md.
+        # Use the canonical runtime path only. The former standalone holon/ fork
+        # redefined the runtime primitives and was collapsed by the Sarathi v1.1
+        # holon-system lane; exportability now means the repo package imports.
         try:
             import sys as _sys
-            from pathlib import Path as _Path
-            surface = _Path(str(REPO_ROOT)) / "holon"
-            if surface.exists() and (surface / "holon_runtime.py").exists():
-                _sys.path.insert(0, str(surface))
-                from holon import holon_wake_cycle as _holon_wake_cycle  # type: ignore
-            else:
-                _sys.path.insert(0, str(REPO_ROOT))
-                from dharma_swarm.holon_runtime import holon_wake_cycle as _holon_wake_cycle  # type: ignore
+            _sys.path.insert(0, str(REPO_ROOT))
+            from dharma_swarm.holon_runtime import holon_wake_cycle as _holon_wake_cycle  # type: ignore
             import asyncio as _asyncio
             async def _stub(t): return t, 'EXPORT_OK'
             _res = _asyncio.run(_holon_wake_cycle('export-test', _stub, spent_usd=0, cap_usd=1, persist=False))
