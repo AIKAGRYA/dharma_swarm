@@ -142,3 +142,25 @@ async def test_dgm_forge_genome_generation_defaults_to_subprocess_bridge(monkeyp
     assert result.forge_grade["runner_receipt"]["source"] == "subprocess_forge_runner"
     assert result.applied is False
     assert result.shadow_mode is True
+
+
+@pytest.mark.asyncio
+async def test_dgm_forge_genome_generation_fails_closed_until_forge_fitness_lands(monkeypatch) -> None:
+    class ExplodingEngine:
+        async def auto_evolve(self, **_kwargs):
+            raise AssertionError("Forge genome DGM path must not use local Darwin auto_evolve")
+
+    monkeypatch.setattr(dgm_loop_mod, "_forge_fitness_available", lambda: False)
+    loop = DGMLoop(engine=ExplodingEngine(), shadow_mode=True)
+
+    result = await loop.run_forge_genome_generation(
+        {"arm": "verify_chain"},
+        ["fresh-task-1"],
+        split="confirm",
+    )
+
+    assert result.error is not None
+    assert "Forge genome subprocess grader is unavailable" in result.error
+    assert dgm_loop_mod.FORGE_FITNESS_MODULE in result.error
+    assert result.applied is False
+    assert result.shadow_mode is True

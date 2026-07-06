@@ -59,6 +59,7 @@ Reference: Sakana AI Darwin Gödel Machine (ICLR 2026)
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import json
 import logging
 import os
@@ -72,6 +73,8 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 DEFAULT_FORGE_GRADE_SUBPROCESS_TIMEOUT_S = 1800.0
+FORGE_FITNESS_MODULE = "dharma_swarm.forge_v1.forge_v2.forge_fitness"
+FORGE_FITNESS_SUBPROCESS_RESULT_PREFIX = "FORGE_GENOME_FITNESS_JSON "
 
 
 def _jsonable_forge_genome(genome: dict[str, Any] | Any) -> dict[str, Any]:
@@ -97,13 +100,15 @@ def _forge_grade_subprocess_timeout() -> float:
         return DEFAULT_FORGE_GRADE_SUBPROCESS_TIMEOUT_S
 
 
-def _parse_forge_grade_subprocess_stdout(stdout: bytes) -> dict[str, Any]:
-    from dharma_swarm.forge_v1.forge_v2.forge_fitness import SUBPROCESS_RESULT_PREFIX
+def _forge_fitness_available() -> bool:
+    return importlib.util.find_spec(FORGE_FITNESS_MODULE) is not None
 
+
+def _parse_forge_grade_subprocess_stdout(stdout: bytes) -> dict[str, Any]:
     text = stdout.decode("utf-8", errors="replace")
     for line in reversed(text.splitlines()):
-        if line.startswith(SUBPROCESS_RESULT_PREFIX):
-            return json.loads(line[len(SUBPROCESS_RESULT_PREFIX):])
+        if line.startswith(FORGE_FITNESS_SUBPROCESS_RESULT_PREFIX):
+            return json.loads(line[len(FORGE_FITNESS_SUBPROCESS_RESULT_PREFIX):])
     raise RuntimeError("Forge grade subprocess did not emit a structured fitness result")
 
 
@@ -121,6 +126,11 @@ async def _grade_forge_genome_in_subprocess(
     thread spawned by it, has provider-specific failure modes.  A subprocess
     gives each grade a fresh interpreter, fresh event loop, and crash boundary.
     """
+    if not _forge_fitness_available():
+        raise RuntimeError(
+            "Forge genome subprocess grader is unavailable; U2 must land "
+            f"{FORGE_FITNESS_MODULE} before default DGM forge grading can run."
+        )
     payload = {
         "genome": _jsonable_forge_genome(genome),
         "instance_ids": list(instance_ids),
@@ -129,7 +139,7 @@ async def _grade_forge_genome_in_subprocess(
     proc = await asyncio.create_subprocess_exec(
         sys.executable,
         "-m",
-        "dharma_swarm.forge_v1.forge_v2.forge_fitness",
+        FORGE_FITNESS_MODULE,
         "--json-stdin",
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
