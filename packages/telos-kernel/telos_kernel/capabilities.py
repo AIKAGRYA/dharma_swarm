@@ -28,6 +28,16 @@ from typing import Callable, Final
 
 from icontract import ensure, require
 
+from telos_kernel.result import (
+    ERR_CAVEAT_FAILED,
+    ERR_INVALID_SIGNATURE,
+    ERR_MALFORMED_HEX,
+    Err,
+    KernelError,
+    Ok,
+    Result,
+)
+
 _SECRET_BYTES: Final[int] = 32
 _MIN_KEY_BYTES: Final[int] = 32
 
@@ -147,28 +157,47 @@ def _default_checker(predicate: str, context: dict) -> bool:
 
 
 @require(lambda root_key: _is_concrete_bytes(root_key, _MIN_KEY_BYTES))
+def verify_result(
+    m: Macaroon,
+    root_key: bytes,
+    context: dict,
+    checker: CaveatChecker | None = None,
+) -> Result:
+    """Structured-result verify. See `verify()` for the boolean shim.
+
+    Returns `Ok(True)` on full success, or `Err(KernelError)` naming the
+    specific failure mode. Never raises — capability checks fail closed.
+    """
+    try:
+        expected_sig = _recompute_signature(root_key, m)
+    except (TypeError, ValueError) as e:
+        return Err(KernelError(ERR_MALFORMED_HEX, str(e)))
+    if not hmac.compare_digest(expected_sig, m.signature):
+        return Err(KernelError(ERR_INVALID_SIGNATURE, "macaroon signature mismatch"))
+    ck = checker if checker is not None else _default_checker
+    for c in m.caveats:
+        if not ck(c.predicate, context):
+            return Err(KernelError(
+                ERR_CAVEAT_FAILED,
+                f"caveat rejected: {c.predicate!r}",
+                detail={"predicate": c.predicate},
+            ))
+    return Ok(True)
+
+
+@require(lambda root_key: _is_concrete_bytes(root_key, _MIN_KEY_BYTES))
 def verify(
     m: Macaroon,
     root_key: bytes,
     context: dict,
     checker: CaveatChecker | None = None,
 ) -> bool:
-    """Verify signature and all caveats against `context`.
+    """Boolean-shim over verify_result() for backwards compatibility.
 
-    Returns False on any failure (signature mismatch, caveat evaluation false,
-    unknown predicate). Never raises — capability checks fail closed.
+    New callers should prefer verify_result() so they can distinguish
+    signature failure from caveat failure. Returns False on any failure.
     """
-    try:
-        expected_sig = _recompute_signature(root_key, m)
-    except (TypeError, ValueError):
-        return False
-    if not hmac.compare_digest(expected_sig, m.signature):
-        return False
-    ck = checker if checker is not None else _default_checker
-    for c in m.caveats:
-        if not ck(c.predicate, context):
-            return False
-    return True
+    return verify_result(m, root_key, context, checker).is_ok
 
 
 # ---- Root-key management ---------------------------------------------------

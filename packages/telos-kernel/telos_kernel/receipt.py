@@ -33,6 +33,14 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from telos_kernel.canonical import JSONValue, canonicalize
+from telos_kernel.result import (
+    ERR_INVALID_SIGNATURE,
+    ERR_MALFORMED_HEX,
+    Err,
+    KernelError,
+    Ok,
+    Result,
+)
 
 SCHEMA_VERSION: Final[str] = "v3.0"
 
@@ -165,15 +173,36 @@ class Leaf(BaseModel):
         sig = sk.sign(with_key.signing_bytes()).hex()
         return with_key.model_copy(update={"capability_signature": sig})
 
-    def verify(self, pk: Ed25519PublicKey) -> bool:
-        """Verify the signature under the given public key."""
+    def verify_result(self, pk: Ed25519PublicKey) -> Result:
+        """Structured verify. Returns Ok(True) or Err(KernelError).
+
+        Never raises. Distinguishes signature-mismatch from malformed-hex
+        so callers can log the specific failure mode. `titanium-verify`
+        proves the fail-closed postcondition on this function.
+        """
         if self.signature_status == SignatureStatus.ABSENT:
-            return self.capability_signature == ""
+            if self.capability_signature == "":
+                return Ok(True)
+            return Err(KernelError(
+                ERR_INVALID_SIGNATURE,
+                "ABSENT leaf must have empty signature",
+            ))
         try:
-            pk.verify(bytes.fromhex(self.capability_signature), self.signing_bytes())
-            return True
-        except (InvalidSignature, ValueError):
-            return False
+            sig_bytes = bytes.fromhex(self.capability_signature)
+        except ValueError as e:
+            return Err(KernelError(ERR_MALFORMED_HEX, str(e)))
+        try:
+            pk.verify(sig_bytes, self.signing_bytes())
+            return Ok(True)
+        except InvalidSignature:
+            return Err(KernelError(
+                ERR_INVALID_SIGNATURE,
+                "Ed25519 verification failed",
+            ))
+
+    def verify(self, pk: Ed25519PublicKey) -> bool:
+        """Boolean shim over verify_result(). Prefer verify_result() in new code."""
+        return self.verify_result(pk).is_ok
 
 
 def _coerce_json(value: Any) -> JSONValue:

@@ -5,6 +5,7 @@ from telos_kernel import boot, verify_chain
 from telos_kernel.merkle_log import MemoryBackend, MerkleLog
 from telos_kernel.manifest import load_manifest
 from telos_kernel.notary import LocalFileAnchor
+from telos_kernel._io.notary_fs import GitBoundLocalFileAnchor
 
 
 class TestBoot:
@@ -47,10 +48,13 @@ class TestBoot:
         assert first_broken is None
 
     def test_boot_anchor_writes_receipt(self, tmp_path):
+        # Persistence lives in the rim: the core LocalFileAnchor is pure and
+        # only builds a receipt in memory. Callers that want on-disk state
+        # must import from telos_kernel._io.
         log = MerkleLog(backend=MemoryBackend())
         m = load_manifest()
         anchor_path = tmp_path / "anchors.jsonl"
-        anchor = LocalFileAnchor(path=anchor_path)
+        anchor = GitBoundLocalFileAnchor(path=anchor_path)
         boot(log, m, anchor=anchor)
         assert anchor_path.exists()
         content = anchor_path.read_text().strip()
@@ -60,3 +64,15 @@ class TestBoot:
         line = json.loads(content.splitlines()[0])
         assert line["root_hash"] == log.head_hash()
         assert line["scheme"] == "local-file+git"
+
+    def test_core_local_file_anchor_is_pure(self, tmp_path):
+        # Regression: the core LocalFileAnchor must NOT touch the filesystem.
+        # This is the whole reason the rim exists — verification-friendliness.
+        log = MerkleLog(backend=MemoryBackend())
+        m = load_manifest()
+        anchor_path = tmp_path / "pure.jsonl"
+        anchor = LocalFileAnchor(path=anchor_path)
+        leaf = boot(log, m, anchor=anchor)
+        assert leaf.gate == "boot"
+        # The pure anchor must not have written anything.
+        assert not anchor_path.exists()
