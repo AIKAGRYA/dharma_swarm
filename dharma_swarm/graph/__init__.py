@@ -17,6 +17,10 @@ from dharma_swarm.graph.durable_invoker import (
     wrap_invoker,
 )
 from dharma_swarm.graph.effects import EffectsProvider, LiveEffects, SimulatedEffects
+from dharma_swarm.graph.receipt_chain import (
+    append_dispatch_receipt_to_machine_chain,
+    dispatch_machine_receipt,
+)
 
 __all__ = [
     "DispatchCheckpoint",
@@ -27,6 +31,8 @@ __all__ = [
     "LiveEffects",
     "SimulatedEffects",
     "derive_graph_side_effect_key",
+    "append_dispatch_receipt_to_machine_chain",
+    "dispatch_machine_receipt",
     "persist_evidence_receipt",
     "receipt_from_dict",
     "wrap_invoker",

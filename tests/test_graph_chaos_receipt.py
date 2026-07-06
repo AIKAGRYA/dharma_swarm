@@ -174,6 +174,7 @@ async def _chaos_scenario(seed: int, db_path: Path) -> list[tuple]:
     """
     trace: list[tuple] = [("seed", seed)]
     store = RuntimeStateStore(db_path)
+    chain_path = db_path.with_name(f"{db_path.stem}-machine-chain.jsonl")
     store.init_db_sync()
     # Simulated clock starts at the wall-clock the store stamps rows with,
     # then jumps an hour: the dead holder's claim rows are stale by the
@@ -201,7 +202,12 @@ async def _chaos_scenario(seed: int, db_path: Path) -> list[tuple]:
     _insert_run(store, "run-torn", "task-torn", claim_id="claim-torn")
     _insert_claim(store, "claim-torn", "task-torn", acked=True)
     _, torn_receipt = await _dispatch(store, effects, torn_inner, "task-torn", "boot1")
-    assert await persist_evidence_receipt(torn_receipt, store, task_id="task-torn")
+    assert await persist_evidence_receipt(
+        torn_receipt,
+        store,
+        task_id="task-torn",
+        machine_receipt_path=chain_path,
+    )
 
     # V3 never-started: claimed but no ack/heartbeat before the crash.
     _insert_run(store, "run-ns", "task-ns", status="claimed", claim_id="claim-ns")
@@ -252,7 +258,12 @@ async def _chaos_scenario(seed: int, db_path: Path) -> list[tuple]:
     assert retry_receipt.status == "ok"
     assert dropoff_inner.calls == 1, "retry must execute the provider exactly once"
     _insert_run(store, "run-dropoff-2", "task-dropoff", claim_id="claim-dropoff-2")
-    assert await persist_evidence_receipt(retry_receipt, store, task_id="task-dropoff")
+    assert await persist_evidence_receipt(
+        retry_receipt,
+        store,
+        task_id="task-dropoff",
+        machine_receipt_path=chain_path,
+    )
     trace.append(("retry", "executed_once", dropoff_inner.calls))
 
     # ---- replays (memo across re-minted identity => ZERO double calls) -------
