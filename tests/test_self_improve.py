@@ -154,7 +154,32 @@ class TestSelfImprovementCycle:
 
     @pytest.mark.asyncio
     async def test_failed_tests_force_targeted_rollback(self, monkeypatch, tmp_path):
+        # PR-001: self_improve may only apply on the SANCTIONED path — a marked
+        # scratch worktree + explicit opt-in + valid live-mutation lease +
+        # runtime_state. This test re-homes the rollback-on-failure invariant
+        # onto that path (it used to run against the live ~/dharma_swarm checkout,
+        # which PR-001 now forbids). The pure DiffApplier rollback mechanism is
+        # additionally covered by test_diff_applier.py::test_apply_and_test_rollback_on_fail.
+        import json as _json
+        from dharma_swarm import evolution_safety as _esafe
+
         monkeypatch.setenv("DHARMA_SELF_IMPROVE", "1")
+        monkeypatch.setenv("DHARMA_ALLOW_LIVE_MUTATION", "1")
+        monkeypatch.setenv("DHARMA_EVOLUTION_WORKTREE_ROOT", str(tmp_path))
+        _scratch = tmp_path / "repo"
+        _scratch.mkdir()
+        (_scratch / _esafe.EVOLUTION_MARKER).write_text(_json.dumps({
+            "experiment_id": "si-rollback", "git_base_sha": "deadbeef",
+            "created_at": "2026-07-06T00:00:00Z", "archive_path": str(tmp_path / "arch"),
+        }), encoding="utf-8")
+        monkeypatch.setenv("DHARMA_EVOLUTION_WORKSPACE", str(_scratch))
+        monkeypatch.setattr(
+            "dharma_swarm.evolution_safety.load_live_mutation_lease",
+            lambda **_: _esafe.LiveMutationLease(
+                lease_id="L1", target_sha="abc", promotion_receipt="PR",
+                granted_by_human="operator", expires_at="2999-01-01T00:00:00Z",
+            ),
+        )
         monkeypatch.setattr("dharma_swarm.self_improve.CYCLE_DIR", tmp_path)
         monkeypatch.setattr(
             "dharma_swarm.self_improve._find_locally_modified_components",
@@ -197,6 +222,7 @@ class TestSelfImprovementCycle:
 
         with patch("dharma_swarm.self_improve.subprocess.run") as checkout_run:
             cycle = SelfImprovementCycle()
+            cycle._runtime_state = object()  # durable store present (sanctioned path)
             cycle._run_eval = AsyncMock(side_effect=eval_steps)
             cycle._run_review = lambda cid: [mock_proposal]
             cycle._run_tests = AsyncMock(return_value=False)

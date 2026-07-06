@@ -390,7 +390,10 @@ class TestCronIntegration:
         assert ok is True
         assert err is None
         assert "linter" in output
-        mock_cycle.assert_called_once_with(roles=["linter", "doc_patcher"], dry_run=False)
+        # PR-001 fail-closed: scheduled custodian runs are dry-run by default
+        # (no agent spawn, no commit, no merge) unless the full promotion
+        # infrastructure + explicit opt-in are present.
+        mock_cycle.assert_called_once_with(roles=["linter", "doc_patcher"], dry_run=True)
 
     @patch("dharma_swarm.custodians.run_custodian_cycle")
     def test_cron_run_fn_partial_failure(self, mock_cycle):
@@ -408,7 +411,8 @@ class TestCronIntegration:
             CustodianResult(role="test_gap_closer", success=True, model="m"),
         ]
         ok, output, err = custodians_run_fn({"prompt": "daily"})
-        mock_cycle.assert_called_once_with(roles=["test_gap_closer"], dry_run=False)
+        # PR-001 fail-closed: dry-run by default (see test_cron_run_fn_success).
+        mock_cycle.assert_called_once_with(roles=["test_gap_closer"], dry_run=True)
 
     @patch("dharma_swarm.custodians.run_custodian_cycle", side_effect=RuntimeError("boom"))
     def test_cron_run_fn_exception(self, mock_cycle):
