@@ -21,6 +21,11 @@ from dharma_swarm.graph.receipt_chain import (
     append_dispatch_receipt_to_machine_chain,
     dispatch_machine_receipt,
 )
+from dharma_swarm.graph.telos_bridge import (
+    GATE_GRAPH_RECEIPT_ANCHOR,
+    GraphTelosBridge,
+    GraphTelosBridgeResult,
+)
 
 __all__ = [
     "DispatchCheckpoint",
@@ -28,6 +33,9 @@ __all__ = [
     "DurableInvoker",
     "EffectsProvider",
     "GraphCheckpointStore",
+    "GraphTelosBridge",
+    "GraphTelosBridgeResult",
+    "GATE_GRAPH_RECEIPT_ANCHOR",
     "LiveEffects",
     "SimulatedEffects",
     "derive_graph_side_effect_key",

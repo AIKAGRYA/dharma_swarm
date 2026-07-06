@@ -77,6 +77,32 @@ async def test_diffapplier_refuses_protected_roots(tmp_path):
         assert "protected live checkout" in (res.error or "")
 
 
+@pytest.mark.asyncio
+async def test_diffapplier_refuses_protected_targets_below_safe_ancestor(tmp_path):
+    app = tmp_path / "app"
+    protected = app / "dharma_swarm"
+    (protected / "dharma_swarm").mkdir(parents=True)
+    (protected / "dharma_swarm" / "__init__.py").write_text("", encoding="utf-8")
+    (protected / ".git").mkdir()
+    target = protected / "foo.py"
+    target.write_text("old\n", encoding="utf-8")
+
+    diff = (
+        "--- a/dharma_swarm/foo.py\n"
+        "+++ b/dharma_swarm/foo.py\n"
+        "@@ -1,1 +1,1 @@\n"
+        "-old\n"
+        "+new\n"
+    )
+
+    applier = DiffApplier(workspace=app)
+    res = await applier.apply(diff)
+    assert res.success is False
+    assert "protected live checkout" in (res.error or "")
+    assert target.read_text(encoding="utf-8") == "old\n"
+    assert not target.with_suffix(target.suffix + ".bak").exists()
+
+
 def test_is_protected_live_root_detects_main_repo(tmp_path):
     # A dir that looks like the main repo (has .git + dharma_swarm/__init__.py)
     repo = tmp_path / "mainrepo"
