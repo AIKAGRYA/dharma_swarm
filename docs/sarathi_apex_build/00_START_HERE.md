@@ -12,11 +12,21 @@ Sarathi is the apex holon that USES persistent-agent lineage + living-agent kern
 
 ## Read order
 
-1. `00_START_HERE.md` — this file; the single front door for the Sarathi apex build.
-2. `11_PERSISTENT_AGENT_RELATION.md` — the layer map: Registry → PersistentAgent → LivingAgentKernel → Holon runtime → Sarathi apex.
-3. `12_LOAD_HOLON_COLLAPSE_PLAN.md` — the `load_holon` diff verdict and 136→1/138→1 consolidation plan.
-4. `90_ANTI_SPRAWL_HARNESS.md` — lightweight harness proposal so future builds do not scatter into new homes.
-5. `SCRATCHPAD_2026-07-06.md` — this session's verification scratchpad and uncertainties.
+**`README.md` is the front door.** The canonical numbered read order is:
+
+1. `00_START_HERE.md` — this file (orientation + locked sentence + "alive" definition).
+2. `01_CURRENT_STATE.md` — live snapshot (git, dgc, runtime counts, Sarathi surfaces).
+3. `02_CODEBASE_RUNTIME_BOUNDARY.md` — dharma_swarm/ vs ~/.dharma vs ~/.hermes, and the drift.
+4. `03_HOLON_SYSTEM_CODE_MAP.md` — Hermes-class organs -> our code (exists/partial/scattered/missing).
+5. `04_PERSISTENT_AGENT_RELATION.md` — the lineage ladder up to the apex.
+6. `05_SARATHI_APEX_MAP.md` — what Sarathi is + its target source package.
+7. `06_PROOF_GATES.md` — gate-ordered next work; what authorizes "alive".
+8. `07_BACKLOG.md` — safe-to-change, next steps, do-not-touch.
+9. `90_ANTI_SPRAWL_HARNESS.md` — the rules that stop the next map from scattering.
+
+Supporting/historical (linked from README, non-canonical): `11_PERSISTENT_AGENT_RELATION.md`
+(full file:line lineage), `12_LOAD_HOLON_COLLAPSE_PLAN.md`, `HOLON_SYSTEM_CODE_ORGANIZATION.md`,
+`91_SPRAWL_HARNESS_RUNBOOK.md`, `CURRENT_MAP_2026-07-06.md`, `SCRATCHPAD_2026-07-06.md`.
 
 ## Current proof status
 

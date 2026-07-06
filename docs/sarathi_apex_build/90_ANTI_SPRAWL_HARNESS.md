@@ -98,3 +98,39 @@ assertions:
 
 This is intentionally boring. Sprawl prevention should be boring: pick one home,
 fail on duplicates, make every exception named and temporary.
+
+---
+
+## Front-door + holon-system rules (added 2026-07-06, V1 organization pass)
+
+These make it impossible to quietly scatter the build again:
+
+1. **No new Sarathi/holon doc outside `docs/sarathi_apex_build/` unless linked
+   from `README.md`.** The README numbered read order (00-07, 90) is canonical.
+   A new doc must either take a number or be linked under "supporting/historical".
+2. **No new runtime script without a repo source owner.** Logic lives in
+   `dharma_swarm/holon_system/...`; `~/.dharma` gets a thin `import main` shim.
+3. **No new identity home.** Use `~/.dharma/agents/<uid>`. Do not add a fifth
+   home next to `agents` / `ginko/agents` / `docs/agents` / `external_agents`.
+4. **No new router / orchestrator / task store / A2A bus / receipt spine**
+   (constraint #9). New organ code is a facade/wrapper over the canonical owner
+   listed in `03_HOLON_SYSTEM_CODE_MAP.md`.
+5. **No "alive" claim without a receipt/heartbeat.** `service_alive`/`wake_loop_active`
+   are receipt-backed (proof gates 4/9), never identity-doc-backed.
+6. **Every new artifact is classified** as exactly one of: code, runtime, doc,
+   receipt, archive (see `02_CODEBASE_RUNTIME_BOUNDARY.md`).
+
+### The `holon_system` facade rule
+
+`dharma_swarm/holon_system/` is a navigation + compatibility layer. Its modules
+MUST re-export existing symbols by identity, never reimplement them.
+`tests/test_holon_system_imports.py` enforces this with `is`-identity asserts:
+if a facade drifts into a copy, the test fails. The `sarathi/` subpackage must
+keep `IMPLEMENTED = False` until proof gates 6-10 are met.
+
+### Executable enforcement
+
+```bash
+.venv/bin/python -m pytest tests/test_holon_system_imports.py -q  # facades == canonical
+python3 scripts/governance/sprawl_guard.py                        # singleton/dup/copy-drift
+```
