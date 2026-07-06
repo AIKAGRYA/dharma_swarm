@@ -21,6 +21,7 @@ SENSITIVE_FILES = (
     ROOT / "dharma_swarm" / "orchestrate_live.py",
     ROOT / "dharma_swarm" / "sealed_packet_apply.py",
     ROOT / "dharma_swarm" / "terminal_commands" / "evolution.py",
+    ROOT / "dharma_swarm" / "dgc_cli.py",
 )
 FALSE_KEYWORDS = {"shadow", "shadow_mode"}
 LIVE_APPLY_CALLS = {
@@ -51,6 +52,16 @@ def _call_name(node: ast.Call) -> str:
 
 def _is_false_constant(node: ast.AST) -> bool:
     return isinstance(node, ast.Constant) and node.value is False
+
+
+def _add_argument_flag_name(node: ast.Call) -> str:
+    """Return the normalized flag name for ``parser.add_argument("--shadow", ...)``."""
+    if not node.args:
+        return ""
+    first = node.args[0]
+    if isinstance(first, ast.Constant) and isinstance(first.value, str):
+        return first.value.lstrip("-").replace("-", "_")
+    return ""
 
 
 def check_file(path: Path) -> list[str]:
@@ -89,6 +100,16 @@ def check_file(path: Path) -> list[str]:
         if not isinstance(node, ast.Call):
             continue
         name = _call_name(node)
+        if name == "add_argument":
+            flag_name = _add_argument_flag_name(node)
+            if flag_name in FALSE_KEYWORDS:
+                for kw in node.keywords:
+                    if kw.arg == "default" and _is_false_constant(kw.value):
+                        findings.append(
+                            f"{rel}:{node.lineno}: unsafe CLI default "
+                            f'add_argument("--{flag_name}", default=False)'
+                        )
+            continue
         if name not in LIVE_APPLY_CALLS:
             continue
         if name == "commit_if_worthy":
