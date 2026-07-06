@@ -1915,8 +1915,20 @@ def check_lifecycle_transition(head_p: dict[str, Any], findings: list[Finding],
 
     Base resolution: explicit --base, else origin/$GITHUB_BASE_REF (PR CI),
     else origin/main. Skips with INFO — never blocks — when the ref or file
-    is unavailable (local clone without a remote, fresh history)."""
+    is unavailable (local clone without a remote, fresh history), or when
+    ACTIVE_TRACK_PATH points outside the repo (test fixtures validate
+    portfolio *snapshots*; a transition diff against the repo's base ref is
+    only meaningful for the repo's own tracked file)."""
     import os
+    canonical = REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml"
+    try:
+        is_repo_file = Path(ACTIVE_TRACK_PATH).resolve() == canonical.resolve()
+    except OSError:
+        is_repo_file = False
+    if not is_repo_file:
+        findings.append(Finding("INFO", "lifecycle-base-unavailable",
+            "validating an out-of-tree ACTIVE_TRACK file; transition check skipped."))
+        return
     ref = base_ref or (
         f"origin/{os.environ['GITHUB_BASE_REF']}"
         if os.environ.get("GITHUB_BASE_REF") else "origin/main")
