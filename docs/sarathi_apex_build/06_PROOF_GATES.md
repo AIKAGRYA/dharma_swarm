@@ -10,7 +10,7 @@ never narration.
 |---|---|---|---|
 | 1 | deterministic reversibility gate committed + tests pass | `reversibility_gate.py` tracked; `pytest tests/test_reversibility_gate.py` green | **DONE** (`f18fe8476`; 9 passed) |
 | 2 | `load_holon` supports `@frontier` / `resolve_top_available_at_wake` | a resolver test: `@frontier` picks top-available model or logs honest fallback | **DONE** — `resolve_top_available_at_wake()` routes through `model_hierarchy.get_live_order()` + `runtime_provider`; `load_holon("sarathi")` resolved to `ollama/glm-5:cloud` on 2026-07-06 |
-| 3 | Fugu provider drift resolved or modeled as external | `dgc agent status` emits no `sakana -> defaulting to claude_code` warning, OR `sakana` is a declared external provider | **OPEN** — warning still emitted |
+| 3 | Fugu provider drift resolved or modeled as external | `dgc agent status` emits no `sakana -> defaulting to claude_code` warning, OR `sakana` is a declared external provider | **DONE** — `ProviderType.SAKANA` exists as external-only; `dgc agent status --json` emits no `sakana -> defaulting to claude_code` warning |
 | 4 | Fable standing semantic daemon proven | a fresh `fable_composer` service heartbeat + a semantic reply receipt from an unattended run | **OPEN** — `service_alive=false`, `heartbeat_seen=false` |
 | 5 | Sarathi runtime surfaces created | `~/.dharma/a2a_bus/state/sarathi.json`, inbox dir, bridge heartbeat exist (as runtime, with repo map entries) | **OPEN** — all missing |
 | 6 | Sarathi gateway wraps `holon_wake_cycle` | `holon_system/sarathi/gateway.py` calls `holon_wake_cycle(planned_action=...)` behind the gate | **PARTIAL** — the `planned_action` seam exists in `holon_runtime`; the gateway module is not built |
@@ -43,8 +43,8 @@ h = load_holon("sarathi")
 print(h.provider_type, h.model, h.identity.get("_runtime_model_resolution"))
 PY
 
-# gate 3 (observe the warning presence)
-.venv/bin/python -m dharma_swarm.dgc_cli agent status --json 2>&1 | grep -i sakana || echo "no drift warning"
+# gate 3
+.venv/bin/python -m dharma_swarm.dgc_cli agent status --json 2>&1 | grep -i 'defaulting to claude_code' || echo "no drift warning"
 
 # gate 4 / 5 (liveness is receipts, not identity)
 .venv/bin/python -m dharma_swarm.dgc_cli agent status --json

@@ -20,7 +20,7 @@ Status legend: **EXISTS** (real, importable), **PARTIAL** (works but incomplete)
 | Hermes-class organ | Our canonical code | Facade | Status |
 |---|---|---|---|
 | identity / registry | `agent_registry.py` (`AgentRegistry`), `external_agent_registration.py`, `holon_bridge.load_holon` | `holon_system/identity` | EXISTS |
-| providers / model routing | `runtime_provider.py`, `model_hierarchy.py` (`resolve_top_available_at_wake` for `@frontier`) | `holon_system/runtime/provider.py` | EXISTS |
+| providers / model routing | `runtime_provider.py`, `model_hierarchy.py` (`resolve_top_available_at_wake` for `@frontier`; `sakana` external-only) | `holon_system/runtime/provider.py` | EXISTS |
 | persistent runtime | `persistent_agent.py` (`PersistentAgent`), `autonomous_agent.py` (`AutonomousAgent`) | — | EXISTS (ancestor lineage) |
 | living kernel | `operator_core/living_agent_kernel.py` (`LivingAgentKernel`) | `holon_system/kernel/living` | EXISTS |
 | governed runtime | `holon_runtime.py` (`holon_wake_cycle`, `run_holon_loop`), `holon_bridge.py`, `holon_persistence.py` | `holon_system/runtime/*` | EXISTS |

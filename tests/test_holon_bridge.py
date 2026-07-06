@@ -131,6 +131,24 @@ def test_unknown_provider_falls_back_to_valid_enum(tmp_path):
     ProviderType(h.provider_type)  # must not raise — falls back to claude_code
 
 
+def test_sakana_provider_is_valid_external_provider_not_claude_fallback(tmp_path, caplog):
+    from dharma_swarm.runtime_provider import ProviderType
+
+    root = _make_agent(
+        tmp_path,
+        name="fugu_ultra",
+        provider="sakana",
+        model="sakana/fugu-ultra",
+    )
+
+    with caplog.at_level("WARNING"):
+        h = load_holon("fugu_ultra", agents_root=root)
+
+    assert h.provider_type == "sakana"
+    assert ProviderType(h.provider_type) == ProviderType.SAKANA
+    assert not any("defaulting to claude_code" in r.message for r in caplog.records)
+
+
 # --- Integration: the real registered opus_composer (skips on machines without it) ---
 
 def test_load_holon_real_opus_composer():

@@ -133,4 +133,5 @@ def test_provider_type_has_claude_code():
     assert ProviderType.SAMBANOVA == "sambanova"
     assert ProviderType.MISTRAL == "mistral"
     assert ProviderType.CHUTES == "chutes"
-    assert len(ProviderType) >= 18
+    assert ProviderType.SAKANA == "sakana"
+    assert len(ProviderType) >= 19

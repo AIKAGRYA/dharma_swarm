@@ -11,18 +11,15 @@
 
 ## Next build steps (ordered)
 
-1. **Gate 3 — Fugu provider.** Either add `sakana` as a declared external
-   provider or model Fugu as external-only so `dgc agent status` stops coercing
-   to `claude_code`. Owner: `runtime_provider.py` / provider enum.
-2. **Gate 4 — Fable standing daemon.** Prove one unattended `fable_composer`
+1. **Gate 4 — Fable standing daemon.** Prove one unattended `fable_composer`
    semantic reply with a fresh heartbeat (lease-gated). Owner: wake shell + A2A.
-3. **`holon/` fork collapse (138 copies / ~3-4 distinct).** Follow
+2. **`holon/` fork collapse (138 copies / ~3-4 distinct).** Follow
    `12_LOAD_HOLON_COLLAPSE_PLAN.md`; make `sprawl_guard.py` reach exit 0.
    Owner: consolidation pass on a clean branch off origin/main.
-4. **Gate 5-6 — Sarathi runtime surfaces + gateway module.** Create runtime
+3. **Gate 5-6 — Sarathi runtime surfaces + gateway module.** Create runtime
    surfaces (with repo map entries) and `holon_system/sarathi/gateway.py`.
-5. **Gate 7-9 — pulse, brief, overnight durability.** Only then `wake_loop_active`.
-6. **Gate 10 — scoreboard.** Receipts-only Hermes-vs-Sarathi comparison.
+4. **Gate 7-9 — pulse, brief, overnight durability.** Only then `wake_loop_active`.
+5. **Gate 10 — scoreboard.** Receipts-only Hermes-vs-Sarathi comparison.
 
 ## Must NOT be touched (constraints)
 
@@ -46,6 +43,10 @@
   in `runtime_provider.resolve_top_available_at_wake()` and wired into
   `holon_bridge.load_holon()`; on 2026-07-06 `load_holon("sarathi")` resolved to
   `ollama/glm-5:cloud` on this machine.
+- "`sakana` defaults to `claude_code`" → corrected by modeling `sakana` as an
+  explicit external-only provider (`ProviderType.SAKANA`); this stops DGC from
+  silently reporting Fugu as a Claude route while still refusing fake local
+  Sakana provider instantiation.
 - "136 copies" of holon_bridge → current scan 138 copies / ~69 roots, only ~3-4
   distinct contents (mostly worktree mirrors).
 - "Sarathi has no code seam to the gate" → `holon_wake_cycle(planned_action=...)`

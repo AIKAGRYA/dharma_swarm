@@ -265,6 +265,10 @@ DEFAULT_MODELS: dict[ProviderType, str] = {
     ProviderType.ANTHROPIC: "claude-opus-4-6",
     ProviderType.CLAUDE_CODE: "claude-opus-4-6",
     ProviderType.CODEX: "gpt-5.4",
+    # External-only field-ops lane. The dharma_swarm runtime does not own a
+    # Sakana/Fugu adapter yet; keep the identity valid without pretending it is
+    # a local provider route.
+    ProviderType.SAKANA: "sakana/fugu-ultra",
 }
 
 

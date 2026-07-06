@@ -84,6 +84,7 @@ DEFAULT_NIM_MODEL = default_model(ProviderType.NVIDIA_NIM)
 DEFAULT_SAMBANOVA_MODEL = default_model(ProviderType.SAMBANOVA)
 DEFAULT_MISTRAL_MODEL = default_model(ProviderType.MISTRAL)
 DEFAULT_CHUTES_MODEL = default_model(ProviderType.CHUTES)
+DEFAULT_SAKANA_MODEL = default_model(ProviderType.SAKANA)
 DEFAULT_GOOGLE_AI_MODEL = default_model(ProviderType.GOOGLE_AI)
 DEFAULT_CODEX_MODEL = default_model(ProviderType.CODEX)
 DEFAULT_PROVIDER_TIMEOUT_SECONDS = 300
@@ -455,6 +456,23 @@ def resolve_runtime_provider_config(
             available=bool(token),
         )
 
+    if provider == ProviderType.SAKANA:
+        return RuntimeProviderConfig(
+            provider=provider,
+            default_model=model or DEFAULT_SAKANA_MODEL,
+            working_dir=cwd,
+            timeout_seconds=timeout,
+            available=False,
+            source="external_only",
+            metadata={
+                "external_only": True,
+                "reason": (
+                    "Sakana/Fugu runs through its own external responder or approved "
+                    "wrapper; dharma_swarm has no local Provider adapter yet."
+                ),
+            },
+        )
+
     raise ValueError(f"Unsupported runtime provider: {provider.value}")
 
 
@@ -582,6 +600,11 @@ def create_runtime_provider(config: RuntimeProviderConfig) -> Any:
     if config.provider == ProviderType.CHUTES:
         kwargs = _api_key_base_url_kwargs(config)
         return _attach_runtime_provider_metadata(ChutesProvider(**kwargs), config)
+    if config.provider == ProviderType.SAKANA:
+        raise ValueError(
+            "Sakana/Fugu is registered as an external-only provider; use the approved "
+            "Fugu responder/wrapper, not create_runtime_provider()"
+        )
     raise ValueError(f"Unsupported runtime provider: {config.provider.value}")
 
 
@@ -786,6 +809,7 @@ __all__ = [
     "DEFAULT_OPENROUTER_MODEL",
     "DEFAULT_PROVIDER_TIMEOUT_SECONDS",
     "DEFAULT_RUNTIME_PROVIDERS",
+    "DEFAULT_SAKANA_MODEL",
     "DEFAULT_SILICONFLOW_MODEL",
     "DEFAULT_TOGETHER_MODEL",
     "FIREWORKS_BASE_URL",

@@ -240,6 +240,29 @@ def test_resolve_runtime_provider_config_for_fireworks_uses_default_model(monkey
     assert cfg.default_model == DEFAULT_FIREWORKS_MODEL
 
 
+def test_resolve_runtime_provider_config_for_sakana_is_external_only() -> None:
+    cfg = resolve_runtime_provider_config(ProviderType.SAKANA, model="sakana/fugu-ultra")
+
+    assert cfg.provider == ProviderType.SAKANA
+    assert cfg.default_model == "sakana/fugu-ultra"
+    assert cfg.available is False
+    assert cfg.source == "external_only"
+    assert cfg.metadata is not None
+    assert cfg.metadata["external_only"] is True
+
+
+def test_create_runtime_provider_refuses_sakana_external_only() -> None:
+    with pytest.raises(ValueError, match="external-only provider"):
+        create_runtime_provider(
+            RuntimeProviderConfig(
+                provider=ProviderType.SAKANA,
+                default_model="sakana/fugu-ultra",
+                available=False,
+                source="external_only",
+            )
+        )
+
+
 @pytest.mark.parametrize(
     ("provider_type", "env", "expected_provider"),
     (

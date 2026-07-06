@@ -204,13 +204,13 @@ organs are missing or scattered.
 |---|---|---|
 | Product CLI | Partial | `dgc agent` exists, but no polished holon-system CLI spine. |
 | Gateway daemon | Partial/missing | A2A bridges and responders exist; Sarathi gateway missing. |
-| Provider abstraction | Yes | `runtime_provider.py`, `model_hierarchy.py`; `@frontier` integration now exists via `resolve_top_available_at_wake`. |
+| Provider abstraction | Yes | `runtime_provider.py`, `model_hierarchy.py`; `@frontier` integration now exists via `resolve_top_available_at_wake`; `sakana` is explicitly modeled as external-only. |
 | Persistent memory/runtime state | Yes/partial | Living kernel + memory systems exist, but maps are split. |
 | Cron/always-on scheduler | Yes/partial | Dharma cron + Hermes cron + launchd exist; no unified holon scheduler UI. |
 | Plugin/skill system | Exists elsewhere | Not integrated as holon-system product organ. |
 | A2A transport | Yes | `a2a_*` code exists; NATS/filesystem status can diverge. |
 | Semantic responders | Partial | Codex/Fugu templates exist; Fable not proven. |
-| Safety/permission | Partial | execution lease + reversibility gate exist; provider drift still exists. |
+| Safety/permission | Partial | execution lease + reversibility gate exist; Fugu provider drift is modeled as external-only. |
 | Web/TUI/operator app | Exists elsewhere | Not cleanly part of holon-system package. |
 | Packaging/install/update | Weak | No clear "install our holon system" product path like Hermes. |
 | Docs front door | Newly started | `docs/sarathi_apex_build/` is the current corrective front door. |
@@ -246,12 +246,11 @@ mess. Use a three-pass migration.
 
 ## 7. Immediate next build tasks
 
-1. Resolve Fugu provider drift (`sakana` as declared external provider or modeled external-only).
-2. Prove Fable standing daemon with a fresh unattended semantic reply.
-3. Collapse the tracked `holon/` fork until `sprawl_guard.py` exits 0.
-4. Create Sarathi runtime wrapper + surfaces.
-5. Run one Sarathi pulse over Hermes + Codex + Fugu/Fable state.
-6. Produce honest scoreboard: where Hermes still beats us, where Sarathi
+1. Prove Fable standing daemon with a fresh unattended semantic reply.
+2. Collapse the tracked `holon/` fork until `sprawl_guard.py` exits 0.
+3. Create Sarathi runtime wrapper + surfaces.
+4. Run one Sarathi pulse over Hermes + Codex + Fugu/Fable state.
+5. Produce honest scoreboard: where Hermes still beats us, where Sarathi
    design/runtime now beats Hermes.
 
 ## 8. Definition of "our own Hermes system"
