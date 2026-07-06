@@ -94,6 +94,7 @@ PROVIDER_API_KEY_ENV_KEYS: dict[str, str] = {
     "chutes": CHUTES_API_KEY_ENV,
     "zhipu": ZHIPU_API_KEY_ENV,
     "kimi_code": KIMI_API_KEY_ENV,
+    "moonshot": MOONSHOT_API_KEY_ENV,
 }
 
 CHAT_PROVIDER_API_KEY_ENV_KEYS: dict[str, str] = {
@@ -107,6 +108,7 @@ CHAT_PROVIDER_API_KEY_ENV_KEYS: dict[str, str] = {
     "nvidia_nim": NVIDIA_NIM_API_KEY_ENV,
     "zhipu": ZHIPU_API_KEY_ENV,
     "kimi_code": KIMI_API_KEY_ENV,
+    "moonshot": MOONSHOT_API_KEY_ENV,
 }
 
 PROVIDER_BASE_URL_ENV_KEYS: dict[str, str] = {
@@ -126,6 +128,7 @@ PROVIDER_BASE_URL_ENV_KEYS: dict[str, str] = {
     "chutes": CHUTES_BASE_URL_ENV,
     "zhipu": ZHIPU_BASE_URL_ENV,
     "kimi_code": KIMI_BASE_URL_ENV,
+    "moonshot": MOONSHOT_BASE_URL_ENV,
 }
 
 GINKO_API_KEY_ENV_VARS: dict[str, str] = {

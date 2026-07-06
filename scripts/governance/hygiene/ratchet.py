@@ -38,6 +38,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
@@ -139,6 +140,104 @@ def load_baselines(path: Path) -> dict[str, int]:
         if not isinstance(value, int) or isinstance(value, bool) or value < 0:
             raise BrokenCounter(f"baseline {name!r} must be a non-negative integer, got {value!r}")
     return dict(counters)
+
+
+def parse_baselines_text(text: str, *, source: str) -> dict[str, int]:
+    """Validate a baselines JSON blob (from any source) into a counters map.
+
+    Same schema/value rules as ``load_baselines`` but the payload comes from
+    a string rather than a working-tree file, and the counter-set is NOT
+    required to match the current ``COUNTERS`` — a historical (merge-base)
+    baseline may define a different counter set than today's code, and only
+    the counters that still exist are consulted by the caller.
+    """
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise BrokenCounter(f"{source} is not valid JSON: {exc}") from exc
+    if payload.get("schema_version") != BASELINE_SCHEMA_VERSION:
+        raise BrokenCounter(
+            f"{source} schema_version {payload.get('schema_version')!r} != "
+            f"{BASELINE_SCHEMA_VERSION!r}"
+        )
+    counters = payload.get("counters")
+    if not isinstance(counters, dict):
+        raise BrokenCounter(f"{source} 'counters' must be an object")
+    for name, value in counters.items():
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            raise BrokenCounter(
+                f"{source} counter {name!r} must be a non-negative integer, got {value!r}"
+            )
+    return dict(counters)
+
+
+def resolve_merge_base(repo_root: Path, ref: str) -> str:
+    """Return the merge-base SHA of ``ref`` and HEAD, or raise BrokenCounter.
+
+    Fail-closed: if the merge-base cannot be computed (not a git repo, ref
+    absent, shallow clone), the caller asked to grade against the immutable
+    fork point and we cannot honour that, so the gate must BLOCK rather than
+    silently fall back to the PR's own (editable) baseline.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), "merge-base", ref, "HEAD"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError as exc:
+        raise BrokenCounter(f"git merge-base {ref} HEAD could not run: {exc}") from exc
+    if result.returncode != 0:
+        raise BrokenCounter(
+            f"git merge-base {ref} HEAD failed (rc={result.returncode}): "
+            f"{result.stderr.strip()}. A merge-base baseline needs full history "
+            "(fetch-depth: 0) and a reachable base ref."
+        )
+    sha = result.stdout.strip()
+    if not sha:
+        raise BrokenCounter(f"git merge-base {ref} HEAD produced no commit")
+    return sha
+
+
+def load_baselines_at_ref(repo_root: Path, ref: str, path: Path) -> dict[str, int] | None:
+    """Read the baselines file as it existed at ``ref``.
+
+    Returns the parsed counters map, or None if the file did not exist at
+    that ref (the baseline was first introduced after the merge-base — every
+    counter is then new and has no immutable prior bar). A file that exists
+    but is malformed raises BrokenCounter: a corrupt historical baseline is a
+    broken gate, not an absent one.
+    """
+    result = subprocess.run(
+        ["git", "-C", str(repo_root), "show", f"{ref}:{path.as_posix()}"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return None
+    return parse_baselines_text(result.stdout, source=f"baselines at {ref}:{path.as_posix()}")
+
+
+def effective_baselines(
+    working: dict[str, int], merge_base: dict[str, int] | None
+) -> dict[str, int]:
+    """Grade against the merge-base bar for every counter that existed there.
+
+    For a counter present in the merge-base baseline, its immutable value is
+    used, so a PR editing the working-tree baselines file cannot loosen its
+    own bar. A counter absent from the merge-base (added in this PR) has no
+    prior bar and falls back to the working-tree value — a genuinely new
+    counter, not a raised ceiling.
+    """
+    if merge_base is None:
+        return dict(working)
+    effective = dict(working)
+    for name in working:
+        if name in merge_base:
+            effective[name] = merge_base[name]
+    return effective
 
 
 def read_tightened_on(path: Path) -> str | None:
@@ -268,6 +367,15 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="create the baselines file from current reality (refuses to overwrite)",
     )
+    parser.add_argument(
+        "--baseline-merge-base-of",
+        metavar="REF",
+        default=None,
+        help="grade counters against the baseline as it existed at the merge-base "
+        "of REF and HEAD, not the working tree. A PR cannot raise its own ceiling: "
+        "editing the baselines file in the same diff cannot loosen the gate. "
+        "Fail-closed (BROKEN) if the merge-base cannot be resolved.",
+    )
     parser.add_argument("--explain", metavar="COUNTER", help="show the evidence behind one counter")
     parser.add_argument("--list", action="store_true", help="list counters and definitions")
     parser.add_argument(
@@ -332,7 +440,14 @@ def main(argv: list[str] | None = None) -> int:
             return EXIT_GREEN
 
         baselines = load_baselines(baseline_path)
-        comparisons = compare_all(repo_root, baselines)
+        judged_baselines = baselines
+        if args.baseline_merge_base_of is not None:
+            merge_base_sha = resolve_merge_base(repo_root, args.baseline_merge_base_of)
+            merge_base_baselines = load_baselines_at_ref(
+                repo_root, merge_base_sha, BASELINE_PATH
+            )
+            judged_baselines = effective_baselines(baselines, merge_base_baselines)
+        comparisons = compare_all(repo_root, judged_baselines)
     except BrokenCounter as exc:
         print(f"ratchet: BROKEN — {exc}", file=sys.stderr)
         return EXIT_BROKEN

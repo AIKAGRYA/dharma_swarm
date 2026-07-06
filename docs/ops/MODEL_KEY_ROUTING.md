@@ -11,6 +11,8 @@ are background only.
 - Keys live in one place: `~/.dharma/agent_keys.env`.
 - Keys are managed by one tool: `dkeys`.
 - Code reads keys through one module: `dharma_swarm/api_keys.py`.
+- Shell and launchd entrypoints source one loader:
+  `scripts/load_runtime_env.sh`.
 - Model/provider resolution enters through one door:
   `dharma_swarm.runtime_provider.resolve_runtime_provider_config()` followed by
   `create_runtime_provider()`.
@@ -31,6 +33,16 @@ dkeys test
 dkeys add VAR=value
 dkeys find kimi
 ```
+
+For the scheduled/operator refresh path, use:
+
+```bash
+make provider-check
+```
+
+That runs `scripts/refresh_provider_status.sh`, which sources
+`scripts/load_runtime_env.sh`, runs `dkeys test` when available, and refreshes
+`~/.dharma/logs/provider_credits_latest.json`.
 
 Then route through code like:
 
@@ -88,6 +100,8 @@ Claude/OpenAI subscription lanes:
 - `dharma_swarm/key_oracle.py`: reads `dkeys test` status without key material.
 - `dharma_swarm/runtime_provider.py`: resolver and provider factory.
 - `dharma_swarm/providers.py`: concrete provider implementations.
+- `scripts/refresh_provider_status.sh`: one scheduled/manual refresh for
+  `keys_status.json` plus credit-health heuristics.
 
 ## Forge Benchmark Entry Points
 

@@ -66,7 +66,18 @@ Equivalent to `dgc up --background` with pre-flight checks (DB migrations, pre-c
 
 ### 3d. launchd (macOS persistent)
 
-Create `~/Library/LaunchAgents/com.dharma.swarm.plist`:
+Install the repo-managed plist:
+
+```bash
+make boot
+```
+
+The checked-in `com.dharma.swarm.plist` runs through
+`scripts/load_runtime_env.sh`; do not hand-edit a launchd plist that sources
+`.env` or `~/.dharma/agent_keys.env` directly. The source of truth for provider
+secrets is `~/.dharma/agent_keys.env` via `dkeys`.
+
+Rendered shape:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -76,8 +87,9 @@ Create `~/Library/LaunchAgents/com.dharma.swarm.plist`:
   <key>Label</key><string>com.dharma.swarm</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/local/bin/dgc</string>
-    <string>orchestrate-live</string>
+	    <string>/bin/bash</string>
+	    <string>-c</string>
+	    <string>cd /Users/dhyana/dharma_swarm &amp;&amp; source scripts/load_runtime_env.sh &amp;&amp; exec env TINY_ROUTER_BACKEND=heuristic dgc orchestrate-live</string>
   </array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
@@ -88,7 +100,7 @@ Create `~/Library/LaunchAgents/com.dharma.swarm.plist`:
 </plist>
 ```
 
-Load/unload:
+Manual load/unload:
 
 ```bash
 launchctl load ~/Library/LaunchAgents/com.dharma.swarm.plist

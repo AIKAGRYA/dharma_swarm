@@ -94,6 +94,7 @@ _PROVIDER_MAP = {
     "OPENAI": ProviderType.OPENAI,
     "OPENROUTER": ProviderType.OPENROUTER,
     "OPENROUTER_FREE": ProviderType.OPENROUTER_FREE,
+    "MOONSHOT": ProviderType.MOONSHOT,
     "LOCAL": ProviderType.LOCAL,
 }
 
@@ -111,6 +112,29 @@ def _has_ollama_key() -> bool:
     from dharma_swarm.api_keys import OLLAMA_API_KEY_ENV, env_has_value
 
     return env_has_value(OLLAMA_API_KEY_ENV)
+
+
+def _runtime_provider_available(provider: ProviderType) -> bool:
+    try:
+        from dharma_swarm.runtime_provider import resolve_runtime_provider_config
+
+        return bool(resolve_runtime_provider_config(provider).available)
+    except Exception as exc:
+        logger.debug("Provider availability check failed for %s: %s", provider.value, exc)
+        return False
+
+
+def _cybernetics_lane(pool_id: str) -> tuple[ProviderType, str]:
+    """Resolve a cybernetics seat lane without pinning to a dead provider."""
+    if _runtime_provider_available(ProviderType.OLLAMA):
+        return ProviderType.OLLAMA, _cloud_id(pool_id)
+    if _runtime_provider_available(ProviderType.KIMI_CODE):
+        return ProviderType.KIMI_CODE, DEFAULT_MODELS[ProviderType.KIMI_CODE]
+    if _runtime_provider_available(ProviderType.MOONSHOT):
+        return ProviderType.MOONSHOT, DEFAULT_MODELS[ProviderType.MOONSHOT]
+    if _has_openrouter_key():
+        return ProviderType.OPENROUTER_FREE, DEFAULT_MODELS[ProviderType.OPENROUTER_FREE]
+    return ProviderType.CLAUDE_CODE, "sonnet"
 
 
 def _resolve_default_crew() -> list[dict]:
@@ -177,56 +201,64 @@ def _resolve_default_crew() -> list[dict]:
 DEFAULT_CREW = _resolve_default_crew()
 
 
-CYBERNETICS_CREW = [
-    {
-        "name": "cyber-glm5",
-        "role": AgentRole.RESEARCHER,
-        "thread": "cybernetics",
-        "provider": ProviderType.OLLAMA,
-        "model": _cloud_id("glm-5"),
-        "system_prompt": (
-            "You are CYBER-GLM5, the Variety Cartographer of the Cybernetics Directive. "
-            "Map S2/S3/S4/S5 wiring, identify where governance variety is attenuated, "
-            "and keep your outputs evidence-dense and structurally useful."
-        ),
-    },
-    {
-        "name": "cyber-kimi25",
-        "role": AgentRole.CARTOGRAPHER,
-        "thread": "cybernetics",
-        "provider": ProviderType.OLLAMA,
-        "model": _cloud_id("kimi-k2.6"),  # K2.6 FLOOR (was sub-floor kimi-k2.5:cloud)
-        "system_prompt": (
-            "You are CYBER-KIMI25, the ecosystem mapper of the Cybernetics Directive. "
-            "Trace cross-file, cross-module, and cross-ledger connections; make the "
-            "control plane legible without inflating scope."
-        ),
-    },
-    {
-        "name": "cyber-codex",
-        "role": AgentRole.SURGEON,
-        "thread": "cybernetics",
-        "provider": ProviderType.OLLAMA,
-        "model": _cloud_id("qwen3-coder:480b-cloud"),
-        "system_prompt": (
-            "You are CYBER-CODEX, the execution and wiring seat of the Cybernetics Directive. "
-            "Prefer the smallest hot-path control improvement over broad subsystem invention. "
-            "Your job is to turn diagnosis into tested runtime change."
-        ),
-    },
-    {
-        "name": "cyber-opus",
-        "role": AgentRole.ARCHITECT,
-        "thread": "cybernetics",
-        "provider": ProviderType.OLLAMA,
-        "model": _cloud_id("deepseek-v3.2"),
-        "system_prompt": (
-            "You are CYBER-OPUS, the identity and architecture seat of the Cybernetics Directive. "
-            "Hold telos, constitutional coherence, and the bounded mission shape. "
-            "Prevent decorative management theater and keep the subsystem aligned."
-        ),
-    },
-]
+def _resolve_cybernetics_crew() -> list[dict]:
+    glm_provider, glm_model = _cybernetics_lane("glm-5")
+    kimi_provider, kimi_model = _cybernetics_lane("kimi-k2.6")
+    codex_provider, codex_model = _cybernetics_lane("qwen3-coder:480b-cloud")
+    opus_provider, opus_model = _cybernetics_lane("deepseek-v3.2")
+    return [
+        {
+            "name": "cyber-glm5",
+            "role": AgentRole.RESEARCHER,
+            "thread": "cybernetics",
+            "provider": glm_provider,
+            "model": glm_model,
+            "system_prompt": (
+                "You are CYBER-GLM5, the Variety Cartographer of the Cybernetics Directive. "
+                "Map S2/S3/S4/S5 wiring, identify where governance variety is attenuated, "
+                "and keep your outputs evidence-dense and structurally useful."
+            ),
+        },
+        {
+            "name": "cyber-kimi25",
+            "role": AgentRole.CARTOGRAPHER,
+            "thread": "cybernetics",
+            "provider": kimi_provider,
+            "model": kimi_model,
+            "system_prompt": (
+                "You are CYBER-KIMI25, the ecosystem mapper of the Cybernetics Directive. "
+                "Trace cross-file, cross-module, and cross-ledger connections; make the "
+                "control plane legible without inflating scope."
+            ),
+        },
+        {
+            "name": "cyber-codex",
+            "role": AgentRole.SURGEON,
+            "thread": "cybernetics",
+            "provider": codex_provider,
+            "model": codex_model,
+            "system_prompt": (
+                "You are CYBER-CODEX, the execution and wiring seat of the Cybernetics Directive. "
+                "Prefer the smallest hot-path control improvement over broad subsystem invention. "
+                "Your job is to turn diagnosis into tested runtime change."
+            ),
+        },
+        {
+            "name": "cyber-opus",
+            "role": AgentRole.ARCHITECT,
+            "thread": "cybernetics",
+            "provider": opus_provider,
+            "model": opus_model,
+            "system_prompt": (
+                "You are CYBER-OPUS, the identity and architecture seat of the Cybernetics Directive. "
+                "Hold telos, constitutional coherence, and the bounded mission shape. "
+                "Prevent decorative management theater and keep the subsystem aligned."
+            ),
+        },
+    ]
+
+
+CYBERNETICS_CREW = _resolve_cybernetics_crew()
 
 
 # Seed tasks — world-creating missions that produce external artifacts,

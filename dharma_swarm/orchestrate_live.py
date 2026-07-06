@@ -1353,24 +1353,40 @@ async def run_free_evolution_grind(shutdown_event: asyncio.Event) -> None:
             if cycle_count % 5 == 0 and hunger > 0.4:
                 try:
                     import os as _gos
-                    if _gos.environ.get("OPENROUTER_API_KEY"):
+                    from dharma_swarm import evolution_safety as _esafe
+
+                    # PR-001: free-grind may NEVER call auto_evolve(shadow=False)
+                    # by default. Live mutation requires an explicit opt-in AND a
+                    # valid live-mutation lease; absent either, force shadow.
+                    _budget_ok, _budget_reason = _esafe.model_spend_allowed()
+                    _live_lease = _esafe.load_live_mutation_lease()
+                    _grind_shadow = not (
+                        _esafe.allow_live_mutation_env() and _live_lease is not None
+                    )
+                    if _gos.environ.get("OPENROUTER_API_KEY") and _budget_ok:
                         from dharma_swarm.providers import OpenRouterProvider
                         _free_provider = OpenRouterProvider()
                         _llm_targets = _grng.sample(available_targets, min(2, len(available_targets)))
                         _llm_files = [_src_root / t for t in _llm_targets]
                         _model = _grng.choice(_FREE_CODING_MODELS)
-                        _log("grind", f"LLM evolve via {_model}: {_llm_targets}")
+                        _log(
+                            "grind",
+                            f"LLM evolve via {_model}: {_llm_targets} "
+                            f"(shadow={_grind_shadow})",
+                        )
                         llm_result = await engine.auto_evolve(
                             provider=_free_provider,
                             source_files=_llm_files,
                             model=_model,
-                            shadow=False,  # Real mode — apply diffs, run tests, roll back on failure
+                            shadow=_grind_shadow,  # fail-closed: True unless leased
                             timeout=30.0,
                             context=f"Grind cycle {cycle_count}, hunger={hunger:.2f}",
                         )
                         if llm_result.best_fitness > result.best_fitness:
                             result = llm_result  # Use the better result
                             _log("grind", f"LLM result: fitness={llm_result.best_fitness:.3f} (better)")
+                    elif _gos.environ.get("OPENROUTER_API_KEY") and not _budget_ok:
+                        _log("grind", f"LLM evolve skipped: no budget gate ({_budget_reason})")
                 except Exception as _llm_err:
                     _log("grind", f"LLM evolve error: {_llm_err}")
 
@@ -2127,11 +2143,30 @@ async def orchestrate(background: bool = False) -> None:
     from dharma_swarm.training_flywheel import run_training_flywheel_loop
     from dharma_swarm.self_improve import run_self_improvement_loop
 
-    # Auto-enable self-improvement when autonomy >= 1
-    _auto_level = int(os.environ.get("DGC_AUTONOMY_LEVEL", "1"))
-    if _auto_level >= 1 and not os.environ.get("DHARMA_SELF_IMPROVE"):
-        os.environ["DHARMA_SELF_IMPROVE"] = "1"
-        _log("orchestrator", "Auto-enabled DHARMA_SELF_IMPROVE (autonomy >= 1)")
+    # PR-001 fail-closed: self-improvement is NEVER auto-enabled by autonomy.
+    # It requires an explicit DHARMA_SELF_IMPROVE=1 opt-in AND, to mutate, a
+    # scratch worktree + live-mutation lease (see evolution_safety). Emit the
+    # startup safety summary so the daemon's true posture is on the record.
+    try:
+        from dharma_swarm import evolution_safety as _esafe
+        _summary = _esafe.safety_summary()
+        _log(
+            "orchestrator",
+            "SAFETY: mode=%s source_writable=%s shadow=%s autonomy=%s "
+            "self_improve=%s live_mutation_allowed=%s (%s) budget_gate=%s"
+            % (
+                _summary["code_identity"].get("mode"),
+                _summary["source_writable"],
+                _summary["evolution_shadow"],
+                _summary["autonomy_level"],
+                _summary["self_improve_enabled"],
+                _summary["live_mutation_allowed"],
+                _summary["live_mutation_denied_reason"] or "ok",
+                _summary["budget_gate_ok"],
+            ),
+        )
+    except Exception as _exc:  # safety logging must never block startup
+        _log("orchestrator", f"SAFETY summary unavailable: {_exc}")
 
     # Liveness watchdog — the #1 convergent finding from the 20-agent audit.
     # Detects "alive but not progressing" loops before they compound.

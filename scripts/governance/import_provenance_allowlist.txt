@@ -7,6 +7,7 @@ aiosqlite
 anthropic
 arch
 croniter
+cryptography
 fastapi
 fasttext
 gemma_scope_feature_install
@@ -14,8 +15,10 @@ hmmlearn
 httpx
 huggingface_hub
 hypothesis
+icontract
 lancedb
 langfuse
+langgraph
 mcp
 nats
 numpy
@@ -48,3 +51,4 @@ tree_sitter_typescript
 typer
 yaml
 yfinance
+z3

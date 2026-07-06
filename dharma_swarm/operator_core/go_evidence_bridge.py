@@ -12,6 +12,10 @@ from pathlib import Path
 from typing import Any
 
 from dharma_swarm.operator_core.closure_v0 import ClosureEvidenceReceipt, WorkPacket, record_evidence_receipt
+from dharma_swarm.operator_core.go_receipt_identity import (
+    GoReceiptIdentityError,
+    verify_identity_chain,
+)
 from dharma_swarm.operator_core.operating_facts import AgentOpsRunFact
 
 
@@ -40,6 +44,7 @@ class GoEvidenceReceipt:
             self.receipt_id,
             self.correlation_id,
             self.source,
+            self.source_url,
             self.observed_at,
             self.content_hash,
             self.event_uid,
@@ -52,6 +57,17 @@ class GoEvidenceReceipt:
             raise GoEvidenceBridgeError(f"unsupported Go evidence schema: {self.schema_version}")
         if self.status != "accepted":
             raise GoEvidenceBridgeError(f"Go receipt is not accepted: {self.status}")
+        try:
+            verify_identity_chain(
+                source=self.source,
+                source_url=self.source_url,
+                content_hash_value=self.content_hash,
+                correlation_id=self.correlation_id,
+                event_uid=self.event_uid,
+                receipt_id=self.receipt_id,
+            )
+        except GoReceiptIdentityError as exc:
+            raise GoEvidenceBridgeError(str(exc)) from exc
 
 
 def load_go_evidence_receipt(path: Path) -> GoEvidenceReceipt:

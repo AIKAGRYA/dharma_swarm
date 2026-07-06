@@ -124,7 +124,7 @@ closed_tracks: []
     prior = {"minimal-test-track": {"behavior_test"}}
     monkeypatch.setattr(cts, "ACTIVE_TRACK_PATH", track_file)
     monkeypatch.setattr(cts, "check_test_passes", _unverified)
-    monkeypatch.setattr(cts, "_load_prior_passed", lambda: prior)
+    monkeypatch.setattr(cts, "_load_prior_passed", lambda _findings: prior)
     monkeypatch.setattr(cts, "emit_reports", lambda *_a, **_k: None)
     args = argparse.Namespace(enforce_ttl=False)
     assert cts.run(args) == 0  # unverified must not block

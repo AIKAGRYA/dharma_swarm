@@ -39,6 +39,40 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
+      - name: Bind impact-checked attestation to the hot-path diff
+        id: attest
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          # Single hot-path oracle: the same list the warrant library enforces.
+          git diff --name-only "${BASE_SHA}...HEAD" | python3 -c '
+          import sys
+          from dharma_swarm.shakti_warrant import _HOT_PATHS
+          changed = {line.strip() for line in sys.stdin if line.strip()}
+          hot = sorted(changed & set(_HOT_PATHS))
+          sys.stdout.write("\n".join(hot) + ("\n" if hot else ""))
+          ' > hot_paths.txt
+          impact_checked=false
+          if [ ! -s hot_paths.txt ]; then
+            impact_checked=true   # no hot paths touched; nothing to attest
+          elif [[ "$PR_TITLE $PR_BODY" == *"[impact-checked]"* ]]; then
+            impact_checked=true
+            missing=""
+            while IFS= read -r path; do
+              [ -z "$path" ] && continue
+              case "$PR_BODY" in *"$path"*) ;; *) missing="${missing}${path} "; impact_checked=false ;; esac
+            done < hot_paths.txt
+            if [ "$impact_checked" = "false" ]; then
+              echo "::error::[impact-checked] claimed, but the PR body does not name these hot-path files: ${missing}. Enumerate each with one line of impact evidence (blast radius / tests run). A bare tag is not an attestation."
+            fi
+          else
+            echo "::error::Hot paths touched ($(paste -sd, - < hot_paths.txt)) without [impact-checked]."
+          fi
+          echo "impact_checked=${impact_checked}" >> "$GITHUB_OUTPUT"
+
       - name: Run Fourfold Shakti Warrant on PR diff
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
@@ -49,10 +83,7 @@ jobs:
             and verification
         run: |
           mkdir -p reports/governance
-          impact_checked=false
-          if [[ "$PR_TITLE" == *"[impact-checked]"* || "$PR_BODY" == *"[impact-checked]"* ]]; then
-            impact_checked=true
-          fi
+          impact_checked="${{ steps.attest.outputs.impact_checked }}"
           set +e
           python3 scripts/governance/check_shakti_warrant.py \
             --intent "$WARRANT_INTENT" \

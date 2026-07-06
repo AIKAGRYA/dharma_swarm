@@ -53,6 +53,7 @@ if TYPE_CHECKING:
     from dharma_swarm.dharma_kernel import KernelGuard
     from dharma_swarm.engine.event_memory import EventMemoryStore
     from dharma_swarm.evolution import DarwinEngine
+    from dharma_swarm.graph.reconciler import GraphReconciler, ReconcileReport
     from dharma_swarm.handoff import HandoffProtocol
     from dharma_swarm.intent_router import IntentRouter
     from dharma_swarm.memory import StrangeLoopMemory
@@ -219,6 +220,8 @@ class SwarmManager:
         self._daily_contributions: int = 0
         self._daily_reset: datetime | None = None
         self._last_auto_rescue_scan: datetime | None = None
+        self._graph_reconciler: GraphReconciler | None = None
+        self._last_boot_reconcile_error: str | None = None
         self._auto_rescue_scan_interval_seconds = _sm.auto_rescue_scan_interval_seconds
         self._auto_rescue_max_age = timedelta(hours=_sm.auto_rescue_max_age_hours)
         self._auto_rescue_max_attempts = _sm.auto_rescue_max_attempts
@@ -688,6 +691,23 @@ class SwarmManager:
                 fallback_manifest_path,
             )
             self._manifest = update_manifest(manifest_path=fallback_manifest_path)
+
+        # Boot reconcile of orphaned delegation_runs/task_claims from prior
+        # daemon incarnations (single-writer: SwarmManager owns this pass).
+        # Must run BEFORE the stale-task reaper: a crashed run with a persisted
+        # success receipt settles its board task COMPLETED here; if the reaper
+        # ran first it would board-FAIL the task and the receipt completion
+        # could no longer apply (FAILED -> COMPLETED is not a legal transition).
+        try:
+            boot_report = await self.reconcile_graph_runs()
+            if boot_report.total_reconciled or boot_report.recovered_claims:
+                logger.info(
+                    "Graph reconciler settled orphaned dispatch state at boot: %s",
+                    boot_report.summary(),
+                )
+        except Exception as exc:
+            logger.warning("Graph boot reconcile failed (non-fatal): %s", exc)
+            self._last_boot_reconcile_error = f"{type(exc).__name__}: {exc}"
 
         # Reap stale running tasks from prior daemon incarnations.
         # When the daemon crashes, tasks it dispatched are left in RUNNING status
@@ -1771,6 +1791,23 @@ class SwarmManager:
             return True
         return False
 
+    def _get_graph_reconciler(self) -> GraphReconciler:
+        from dharma_swarm.graph.reconciler import GraphReconciler
+        from dharma_swarm.runtime_state import RuntimeStateStore
+
+        if self._graph_reconciler is None:
+            runtime_state = RuntimeStateStore(
+                self.state_dir / "state" / "runtime.db"
+            )
+            self._graph_reconciler = GraphReconciler(
+                runtime_state, task_board=self._task_board
+            )
+        return self._graph_reconciler
+
+    async def reconcile_graph_runs(self, *, stale_only: bool = False) -> ReconcileReport:
+        """Requeue-or-quarantine orphaned dispatch state (graph reconciler)."""
+        return await self._get_graph_reconciler().reconcile(stale_only=stale_only)
+
     async def reap_orphaned_tasks(self, *, stale_minutes: int = 30) -> list[Task]:
         """Requeue ASSIGNED/RUNNING tasks whose agents no longer exist in the pool.
 
@@ -2268,6 +2305,15 @@ class SwarmManager:
             except Exception as me_exc:
                 logger.debug("Meta-evolution observation error: %s", me_exc)
 
+        # Heartbeat live claims every tick, before any staleness-gated
+        # reconcile: claim windows can be shorter than the rescue cadence.
+        try:
+            beaten = self._get_graph_reconciler().heartbeat_live_claims()
+            result["claims_heartbeaten"] = beaten
+        except Exception as exc:
+            logger.warning("Claim heartbeat failed (non-fatal): %s", exc)
+            result["claims_heartbeat_error"] = f"{type(exc).__name__}: {exc}"
+
         rescued: list[Task] = []
         now = datetime.now(timezone.utc)
         if (self._last_auto_rescue_scan is None
@@ -2296,6 +2342,19 @@ class SwarmManager:
                 logger.warning("reap_orphaned_tasks timed out after 10s")
             except Exception:
                 logger.debug("Orphan reaper error", exc_info=True)
+
+            # Graph reconciler: settle orphaned delegation_runs/task_claims
+            # (runs with rescue scan cadence; heartbeat already ran this tick).
+            try:
+                tick_report = await asyncio.wait_for(
+                    self.reconcile_graph_runs(stale_only=True), timeout=10.0
+                )
+                result["graph_reconciled"] = tick_report.total_reconciled
+            except asyncio.TimeoutError:
+                logger.warning("reconcile_graph_runs timed out after 10s")
+            except Exception as exc:
+                logger.warning("Graph tick reconcile failed (non-fatal): %s", exc)
+                result["graph_reconcile_error"] = f"{type(exc).__name__}: {exc}"
 
         queue_snapshot: dict[str, int] = {}
         try:

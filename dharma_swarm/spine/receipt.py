@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -263,6 +264,38 @@ class VerifiedMachineReceipt:
         return asdict(self)
 
 
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX host (Windows)
+    fcntl = None  # type: ignore[assignment]
+
+
+@contextmanager
+def _append_lock(target: Path):
+    """Serialize the read-tail -> link -> write critical section.
+
+    Without this the append was a lock-free read-modify-write: two concurrent
+    appenders both read the same tail digest ``D``, both link to it, and the
+    next read raises at the forked link -> the whole audit log is permanently
+    unreadable (one racing append bricks every future read). An advisory
+    ``flock`` on a sidecar lock file makes the section mutually exclusive.
+
+    LIMIT: ``flock`` is advisory and host-local. It protects the single-host
+    Mac-hub model (dozens of agents, one shared receipt path); it does NOT
+    protect multi-container or NFS writers. On non-POSIX hosts (no ``fcntl``)
+    this degrades to the previous lock-free behavior rather than failing."""
+    if fcntl is None:  # pragma: no cover - non-POSIX host
+        yield
+        return
+    lock_path = target.with_name(target.name + ".lock")
+    with lock_path.open("w") as lock_handle:
+        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
+
+
 def append_machine_receipt(
     receipt: "VerifiedMachineReceipt",
     *,
@@ -274,15 +307,19 @@ def append_machine_receipt(
     Append-only with a tamper guard: if any existing row digest or chain link does
     not verify, we refuse to extend a broken chain. Mirrors the immutable-append
     discipline of memory_kernel.promotion_gate without minting a second receipt
-    *system*."""
+    *system*.
+
+    The read-tail -> link -> write section runs under an advisory file lock so
+    concurrent appenders cannot fork the chain (see ``_append_lock``)."""
     target = (path or DEFAULT_MACHINE_RECEIPT_PATH).expanduser()
-    prev_digest = ""
-    if target.exists():
-        rows = _read_verified_machine_receipt_chain(target)
-        if rows:
-            prev_digest = str(rows[-1].get("digest", ""))
-    chained = receipt.with_chain(prev_digest)
     target.parent.mkdir(parents=True, exist_ok=True)
-    with target.open("a", encoding="utf-8") as handle:
-        handle.write(_canonical_json(chained.to_dict()) + "\n")
+    with _append_lock(target):
+        prev_digest = ""
+        if target.exists():
+            rows = _read_verified_machine_receipt_chain(target)
+            if rows:
+                prev_digest = str(rows[-1].get("digest", ""))
+        chained = receipt.with_chain(prev_digest)
+        with target.open("a", encoding="utf-8") as handle:
+            handle.write(_canonical_json(chained.to_dict()) + "\n")
     return chained

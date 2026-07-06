@@ -29,10 +29,7 @@ def test_shell_handler_runs_shlex_split_command_without_shell(tmp_path):
             {
                 "id": "provider-credit-check",
                 "handler": "shell",
-                "shell_command": (
-                    "python3 scripts/check_provider_credits.py --json "
-                    "--output ~/.dharma/logs/provider_credits_latest.json"
-                ),
+                "shell_command": "bash scripts/refresh_provider_status.sh",
                 "repo_root": str(tmp_path),
             }
         )
@@ -42,11 +39,8 @@ def test_shell_handler_runs_shlex_split_command_without_shell(tmp_path):
     assert len(calls) == 1
     args, kwargs = calls[0]
     assert args == [
-        "python3",
-        "scripts/check_provider_credits.py",
-        "--json",
-        "--output",
-        "~/.dharma/logs/provider_credits_latest.json",
+        "bash",
+        "scripts/refresh_provider_status.sh",
     ]
     assert kwargs["cwd"] == repo_root
     assert "shell" not in kwargs

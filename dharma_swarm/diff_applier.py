@@ -230,6 +230,20 @@ class DiffApplier:
         if not patches:
             return ApplyResult(success=True)
 
+        # PR-001 fail-closed backstop: never write into a protected live checkout.
+        # dry_run validates without writing, so it is exempt.
+        if not dry_run:
+            from dharma_swarm.evolution_safety import (
+                LiveMutationDenied,
+                guard_writable_target,
+            )
+            try:
+                guard_writable_target(self.workspace)
+                for patch in patches:
+                    guard_writable_target(self.workspace / patch.target_path)
+            except LiveMutationDenied as exc:
+                return ApplyResult(success=False, error=str(exc))
+
         effective_require = self._require_identity if require_identity is None else require_identity
         identity: ExecutionIdentity | None = None
         if not dry_run:

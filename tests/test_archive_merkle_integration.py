@@ -128,11 +128,12 @@ async def test_archive_detects_merkle_tampering():
         # If it only checks structure, we need to verify with data
         from dharma_swarm.merkle_log import MerkleLog
         merkle = MerkleLog(merkle_path)
-        valid, _ = merkle.verify_chain()
+        valid, first_broken = merkle.verify_chain()
 
-        # Chain structure is intact, but data verification would fail
-        # (This is a limitation of lightweight verification)
-        assert valid  # Structure still valid, need full data verification
+        # The hardened Merkle log verifies the stored payload chain and fails
+        # closed on tampered hashes.
+        assert not valid
+        assert first_broken == 0
 
 
 @pytest.mark.asyncio
