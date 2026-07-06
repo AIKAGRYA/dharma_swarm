@@ -9,6 +9,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.cron_algedonic_handlers import (
+    run_algedonic_triage,
+    run_provider_starvation_alert,
+)
 from dharma_swarm.cron_job_runtime import CronJobExecutionResult, CronJobRunStatus
 from dharma_swarm.daemon_config import dharma_state_dir
 from dharma_swarm.context import (
@@ -710,120 +714,6 @@ def _run_store_sync(job: dict[str, Any]) -> CronJobExecutionResult:
         )
 
 
-def _run_algedonic_triage(job: dict[str, Any]) -> CronJobExecutionResult:
-    """Drain algedonic pain signals into the triage cursor and alert flag."""
-
-    import subprocess
-    import sys
-
-    repo_root = Path(__file__).resolve().parent.parent
-    script = repo_root / "scripts" / "algedonic_triage.py"
-    if not script.exists():
-        error = f"missing script: {script}"
-        return CronJobExecutionResult(
-            status=CronJobRunStatus.FAILED,
-            output=error,
-            error=error,
-        )
-
-    env = os.environ.copy()
-    state_dir = str(job.get("state_dir") or "").strip()
-    if state_dir:
-        env["DHARMA_STATE_DIR"] = str(Path(state_dir).expanduser())
-
-    timeout = _as_int(job.get("timeout_sec"), 60)
-    try:
-        proc = subprocess.run(
-            [sys.executable, str(script)],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            cwd=str(repo_root),
-            env=env,
-        )
-    except subprocess.TimeoutExpired:
-        error = f"algedonic_triage timed out after {timeout}s"
-        return CronJobExecutionResult(
-            status=CronJobRunStatus.FAILED,
-            output="",
-            error=error,
-        )
-
-    output = (proc.stdout or "").strip()
-    err = (proc.stderr or "").strip()
-    if proc.returncode != 0:
-        return CronJobExecutionResult(
-            status=CronJobRunStatus.FAILED,
-            output=output or err or f"algedonic_triage exited {proc.returncode}",
-            error=err or output[:500],
-        )
-    return CronJobExecutionResult(
-        status=CronJobRunStatus.COMPLETED,
-        output=output or "algedonic_triage: no new signals",
-        error="",
-    )
-
-
-def _run_provider_starvation_alert(job: dict[str, Any]) -> CronJobExecutionResult:
-    """Emit algedonic P0 signal when provider-chain failures dominate."""
-
-    import subprocess
-    import sys
-
-    repo_root = Path(__file__).resolve().parent.parent
-    script = repo_root / "scripts" / "runtime" / "provider_starvation_alert.py"
-    if not script.exists():
-        error = f"missing script: {script}"
-        return CronJobExecutionResult(
-            status=CronJobRunStatus.FAILED,
-            output=error,
-            error=error,
-        )
-
-    args = [sys.executable, str(script)]
-    state_dir = str(job.get("state_dir") or "").strip()
-    if state_dir:
-        args.extend(["--state-dir", state_dir])
-    since_date = str(job.get("since_date") or "").strip()
-    if since_date:
-        args.extend(["--since-date", since_date])
-    if job.get("threshold") is not None:
-        args.extend(["--threshold", str(job.get("threshold"))])
-    if job.get("min_count") is not None:
-        args.extend(["--min-count", str(job.get("min_count"))])
-
-    timeout = _as_int(job.get("timeout_sec"), 30)
-    try:
-        proc = subprocess.run(
-            args,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            cwd=str(repo_root),
-        )
-    except subprocess.TimeoutExpired:
-        error = f"provider_starvation_alert timed out after {timeout}s"
-        return CronJobExecutionResult(
-            status=CronJobRunStatus.FAILED,
-            output="",
-            error=error,
-        )
-
-    output = (proc.stdout or "").strip()
-    err = (proc.stderr or "").strip()
-    if proc.returncode != 0:
-        return CronJobExecutionResult(
-            status=CronJobRunStatus.FAILED,
-            output=output or err or f"provider_starvation_alert exited {proc.returncode}",
-            error=err or output[:500],
-        )
-    return CronJobExecutionResult(
-        status=CronJobRunStatus.COMPLETED,
-        output=output or "provider_starvation_alert: no output",
-        error="",
-    )
-
-
 def _run_world_scout(job: dict[str, Any]) -> CronJobExecutionResult:
     """Run the external world radar and canonicalize promoted signals."""
 
@@ -980,7 +870,6 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         tcs_heartbeat   — local IdentityMonitor time-series sample
         world_scout     — external zeitgeist radar and scout cascade
         store_sync      — materialize ontology outcomes into runtime artifacts
-        memory_common_metabolism — ingest promoted memory and gate retrieval
         provider_starvation_alert — emit algedonic signal for provider-chain starvation
         algedonic_triage — drain pain-signal cursor and write P0 alert summary
     """
@@ -1033,12 +922,9 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
     if handler == "store_sync":
         return _run_store_sync(job)
     if handler == "provider_starvation_alert":
-        return _run_provider_starvation_alert(job)
+        return run_provider_starvation_alert(job)
     if handler == "algedonic_triage":
-        return _run_algedonic_triage(job)
-    if handler == "memory_common_metabolism":
-        from dharma_swarm.memory_common import memory_common_cron_run_fn
-        return _result_from_legacy(*memory_common_cron_run_fn(job))
+        return run_algedonic_triage(job)
     if handler == "shell":
         return _run_shell_command(job)
 
