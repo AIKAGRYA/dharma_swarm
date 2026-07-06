@@ -348,10 +348,15 @@ def _seed_fable_context(root: Path) -> None:
 def test_resolve_profile_selects_seat_and_is_lease_gated() -> None:
     codex = wake.resolve_profile("codex_composer")
     fable = wake.resolve_profile("fable_composer")
+    sarathi = wake.resolve_profile("sarathi")
     assert codex.agent_uid == "codex_composer"
     assert fable.agent_uid == "fable_composer"
+    assert sarathi.agent_uid == "sarathi"
     assert fable.session == "fable-composer-wake"
     assert fable.schema_prefix == "dharma.fable_composer"
+    assert sarathi.session == "sarathi-wake"
+    assert sarathi.schema_prefix == "dharma.sarathi"
+    assert sarathi.display_name == "Sarathi Apex"
     # Default (None/empty) resolves to codex for backward compatibility.
     assert wake.resolve_profile(None).agent_uid == "codex_composer"
     assert wake.resolve_profile("").agent_uid == "codex_composer"
@@ -422,3 +427,55 @@ def test_fable_once_blocks_write_capable_work_without_lease(tmp_path: Path) -> N
     assert receipt["status"] == "blocked_execution_lease_required"
     assert len(receipt["work"]["work_requiring_execution_lease"]) == 1
     assert receipt["safety"]["source_mutation_performed"] is False
+
+
+def _seed_sarathi_context(root: Path) -> None:
+    (root / "agents" / "sarathi").mkdir(parents=True, exist_ok=True)
+    (root / "agents" / "sarathi" / "BOOT.md").write_text(
+        "# SARATHI APEX COLD BOOT\nread_only_until_execution_lease\n",
+        encoding="utf-8",
+    )
+    _write_json(
+        root / "agents" / "sarathi" / "identity.json",
+        {
+            "agent_uid": "sarathi",
+            "model": "gemini-2.5-flash",
+            "provider": "google_ai",
+            "authority_mode": "read_only_until_execution_lease",
+            "wake_loop_active": False,
+        },
+    )
+    _write_json(root / "a2a" / "cards" / "sarathi.json", {"agent": "sarathi"})
+    _write_json(
+        root / "agent_passports" / "sarathi.json",
+        {"agent_uid": "sarathi", "authority_mode": "read_only_until_execution_lease"},
+    )
+    _write_json(
+        root / "a2a_bus" / "bridge_heartbeats" / "sarathi.json",
+        {"agent_uid": "sarathi", "status": "IDLE"},
+    )
+    _write_json(
+        root / "a2a_bus" / "state" / "sarathi.json",
+        {"agent": "sarathi", "wake_loop_active": False},
+    )
+
+
+def test_sarathi_once_uses_registered_profile_without_forking_wake_loop(tmp_path: Path) -> None:
+    state = tmp_path / ".dharma"
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _seed_sarathi_context(state)
+    paths = wake.composer_paths(state, repo_root=repo, agent_uid="sarathi")
+
+    receipt = wake.run_once(paths, runner=_runner)
+
+    assert receipt["status"] == "completed_read_only_analysis"
+    assert receipt["context"]["missing"] == []
+    assert receipt["agent_uid"] == "sarathi"
+    assert receipt["schema_version"] == "dharma.sarathi.wake_receipt.v1"
+    assert receipt["receipt_id"].startswith("sarathi-wake-")
+    assert receipt["safety"]["source_mutation_performed"] is False
+    heartbeat = json.loads(paths.heartbeat.read_text())
+    assert heartbeat["agent_uid"] == "sarathi"
+    assert heartbeat["schema_version"] == "dharma.sarathi.wake_heartbeat.v1"
+    assert (paths.nest / "README.md").read_text().startswith("# sarathi Wake Nest")

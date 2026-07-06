@@ -87,6 +87,16 @@ def _claude_model_identity() -> str:
     return "claude-code"
 
 
+def _sarathi_model_identity() -> str:
+    override = os.getenv("DGC_DIRECTOR_SARATHI_MODEL", "").strip()
+    if override:
+        return override
+    try:
+        return default_model(ProviderType.GOOGLE_AI)
+    except Exception:  # noqa: BLE001 - defensive: never fail wake on model lookup
+        return "gemini-2.5-flash"
+
+
 def _slug(agent_uid: str) -> str:
     return agent_uid.replace("_", "-")
 
@@ -111,6 +121,15 @@ WAKE_PROFILES: dict[str, WakeProfile] = {
         schema_prefix="dharma.fable_composer",
         session="fable-composer-wake",
         extra_addresses=("fable", "fable-composer", "fable_5_cursor", "fable-5-cursor"),
+    ),
+    "sarathi": WakeProfile(
+        agent_uid="sarathi",
+        callsign="sarathi",
+        display_name="Sarathi Apex",
+        model_identity=_sarathi_model_identity(),
+        schema_prefix="dharma.sarathi",
+        session="sarathi-wake",
+        extra_addresses=("sarathi-apex", "apex-holon", "chief-of-staff"),
     ),
 }
 

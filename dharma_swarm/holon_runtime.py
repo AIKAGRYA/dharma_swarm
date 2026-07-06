@@ -30,6 +30,7 @@ from dharma_swarm import (
     holon_persistence,
 )
 from dharma_swarm.holon_budget_guard import CostLimitExceeded
+from dharma_swarm.operator_core.reversibility_gate import classify_action
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,8 @@ async def holon_wake_cycle(
     agents_root: Path | None = None,
     persist: bool = True,
     memory_kernel: Any | None = None,  # MemoryKernel facade for SOTA context-bridging (optional, project-only)
+    planned_action: str | None = None,
+    operator_reachable: bool = False,
 ) -> dict[str, Any]:
     """Run ONE governed wake cycle. Govern first, animate second, then persist.
 
@@ -65,6 +68,10 @@ async def holon_wake_cycle(
     ``status`` is one of ``halted:kill`` / ``halted:budget`` / ``halted:error`` / ``ran``.
     Only completed (``ran``) cycles are persisted — they are the replayable work units; a kill
     or budget halt did no work and is terminal, so it is returned but not stored.
+
+    If ``planned_action`` is supplied, the Sarathi reversibility gate runs BEFORE
+    the injected runner. Only ``reversible_safe`` actions may execute unattended;
+    anything lease-gated / irreversible / operator-only halts before work.
 
     Context-bridging overbuild (2026-06-09): if memory_kernel is supplied, pull a budgeted
     context pack from the canonical MemoryKernel (trust-tagged, redacted, admissible atoms)
@@ -83,6 +90,32 @@ async def holon_wake_cycle(
     except CostLimitExceeded as exc:
         logger.info("[holon %s] wake cycle halted: budget ($%.4f >= $%.4f)", name, exc.spent, exc.cap)
         return {"status": "halted:budget", "spent_usd": exc.spent, "cap_usd": exc.cap}
+
+    # (2.5) Sarathi reversibility gate — only when the caller supplies a concrete
+    # planned action. This avoids theater: the gate classifies the actual intended
+    # action, not the holon's name string. It runs before the injected runner so a
+    # blocked action does no work and emits an auditable decision.
+    gate_decision: dict[str, object] | None = None
+    if planned_action is not None:
+        decision = classify_action(
+            planned_action,
+            operator_reachable=operator_reachable,
+        )
+        gate_decision = decision.to_dict()
+        if not decision.may_execute_unattended:
+            result = {
+                "status": "halted:reversibility_gate",
+                "planned_action": planned_action,
+                "reversibility_gate": gate_decision,
+            }
+            if persist:
+                _persist(name, result, agents_root)
+            logger.info(
+                "[holon %s] wake cycle halted by reversibility gate: %s",
+                name,
+                decision.action_class.value,
+            )
+            return result
 
     # (3) Work — INJECTED runner does one unit. FAULT-TOLERANT: a runner exception is governed
     # into a halt, never an uncaught crash that bypasses the loop's control.
@@ -140,6 +173,9 @@ async def holon_wake_cycle(
 
     # (5) Result + (6) persist the completed cycle so a restart resumes at cycle N+1.
     result: dict[str, Any] = {"status": "ran", "task": task, "reply": reply}
+    if planned_action is not None:
+        result["planned_action"] = planned_action
+        result["reversibility_gate"] = gate_decision
     if context_injected:
         result["context_injected"] = True
     if signal is not None:
@@ -198,6 +234,8 @@ async def run_holon_loop(
     agents_root: Path | None = None,
     persist: bool = True,
     memory_kernel: Any | None = None,  # passed through to each wake cycle for context-bridging
+    planned_action: str | None = None,
+    operator_reachable: bool = False,
 ) -> list[dict[str, Any]]:
     """Drive ``holon_wake_cycle`` up to ``max_cycles`` times, honoring kill/budget BETWEEN cycles.
 
@@ -227,6 +265,8 @@ async def run_holon_loop(
             agents_root=agents_root,
             persist=persist,
             memory_kernel=memory_kernel,
+            planned_action=planned_action,
+            operator_reachable=operator_reachable,
         )
         # p3: real pass^k streak + GDS/meltdown classification computed over consecutive clean runs.
         # Values attached to each cycle's result dict (persisted via holon_persistence cycle records).
