@@ -34,6 +34,7 @@ from typing import Any
 import aiosqlite
 
 from dharma_swarm.loop_closure_quarantine import QUARANTINE_COLUMNS, parse_ts
+from dharma_swarm.graph.reconcile_board import settle_task_board
 from dharma_swarm.runtime_state import RuntimeStateStore
 
 __all__ = ["GraphReconciler", "ReconcileReport"]
@@ -172,7 +173,13 @@ class GraphReconciler:
             await self._recover_stale_claims(db, now, report)
             await db.commit()
 
-        await self._requeue_tasks(report, now)
+        await settle_task_board(
+            runtime_state=self._runtime_state,
+            task_board=self._task_board,
+            report=report,
+            now=now,
+            logger=logger,
+        )
         if report.total_reconciled or report.recovered_claims or report.errors:
             logger.info("reconciler: pass complete %s", report.summary())
         if report.quarantined_runs:
@@ -337,64 +344,6 @@ class GraphReconciler:
                 str(row["run_id"]),
             ),
         )
-
-    async def _requeue_tasks(self, report: ReconcileReport, now: datetime) -> None:
-        """Settle reconciled runs' underlying tasks on the task board.
-
-        Requeued runs go back to PENDING; receipt-completed and quarantined
-        runs settle their board rows terminally so stale/orphan reapers do
-        not re-dispatch work the reconciler already decided.
-        """
-        if self._task_board is None:
-            return
-        settled = (
-            [(run_id, "requeue") for run_id in report.requeued_runs]
-            + [(run_id, "receipt") for run_id in report.completed_from_receipt]
-            + [(run_id, "quarantine") for run_id in report.quarantined_runs]
-        )
-        for run_id, action in settled:
-            run = await self._runtime_state.get_delegation_run(run_id)
-            if run is None or not run.task_id:
-                continue
-            try:
-                if action == "requeue":
-                    await self._task_board.requeue(
-                        run.task_id,
-                        reason=f"Graph reconciler: orphaned run {run_id[:12]} requeued",
-                        metadata={"reconciled_at": now.isoformat()},
-                    )
-                elif action == "receipt" and run.status == "completed":
-                    await self._task_board.complete(
-                        run.task_id,
-                        result=f"Graph reconciler: run {run_id[:12]} completed from receipt",
-                        metadata={"reconciled_at": now.isoformat()},
-                    )
-                else:
-                    await self._task_board.fail(
-                        run.task_id,
-                        error=(
-                            f"Graph reconciler: run {run_id[:12]} "
-                            + (
-                                "quarantined (retry-exhausted)"
-                                if action == "quarantine"
-                                else "failed per receipt"
-                            )
-                        ),
-                        metadata={"reconciled_at": now.isoformat()},
-                    )
-            except KeyError:
-                logger.warning(
-                    "reconciler: task %s for run %s not on board", run.task_id, run_id
-                )
-            except Exception as exc:
-                logger.error(
-                    "reconciler: task board settle (%s) failed for %s: %s",
-                    action,
-                    run.task_id,
-                    exc,
-                    exc_info=True,
-                )
-                report.errors.append(f"task:{run.task_id}:{type(exc).__name__}")
 
     # -- claims ---------------------------------------------------------------
 
