@@ -239,8 +239,8 @@ not justified until the daemon + oracle CI both run green on the first.
 
 - [code] Phase 0a (Devin lane): delete workflow_graph.py + test; absorb durable_execution.py atomic checkpoint/restore + _record_runtime_receipt hook into dharma_swarm/graph/checkpoint.py, then delete. Brief: docs/plans/handoffs/DHARMAGRAPH_HANDOFF_DEVIN.md
 - [code] (blocker) Phase 0b reconciler (Devin lane): generalize operator_bridge.recover_stale_tasks pattern to delegation_runs; boot scan owned by SwarmManager.init + tick beside reap_orphaned_tasks; write recovered_at; heartbeat cadence; quarantine per loop_closure_quarantine convention. Chaos receipt (kill -9 -> reconcile -> zero double-execution) is the phase gate.
-- [code] (blocker) Phase 0b durable_invoker (Claude lane): new module dharma_swarm/graph/durable_invoker.py wrapping _orch_invoker (orchestrator.py:2471-2524) with idempotency begin/complete around runner.run_task + receipt memo-check. orchestrator.py is at module-budget ceiling — wrapper is a NEW module.
-- [code] (blocker) Phase 1 (Claude lane): differential oracle — [test-oracle] extra installing langgraph 1.2.4, dual-run diff harness over parity scenarios, CI job advisory then blocking. Net-new work (the parity harness is a self-graded clone). Gates all Phase 2/3 merges.
+- [code] DONE 2026-07-05 (56743da, PR #799): Phase 0b durable_invoker (Claude lane) — dharma_swarm/graph/durable_invoker.py wraps _orch_invoker with memo-check + begin/complete idempotency on the existing runtime_state machinery. Review-hardened: deterministic claim key (all identities race on ONE PK row), CAS re-claim for stale/failed/declined takeover (runtime_state.try_reclaim_idempotent_side_effect, exactly one of N concurrent claimants executes), type-exact JSON result memo (unmemoizable results decline replay and re-execute — never truncated/null). orchestrator.py seam SHRANK the file 3220 -> 3210. Joint chaos receipt with the #798 reconciler landed as tests/test_graph_chaos_receipt.py (criterion phase0b_chaos_receipt): kill -9 sim -> boot reconcile -> requeue/quarantine per failure_code vocabulary -> retry executes exactly once -> replay memoizes across re-minted identity -> receipts intact; seeded-deterministic via graph/effects.
+- [code] DONE 2026-07-05 (b58cd31, PR #800): Phase 1 (Claude lane) — differential oracle: [test-oracle] extra pins langgraph==1.2.4 (oracle only, never core dep), 13 scenarios dual-run through the dharma clone AND real langgraph with semantic diff + JSON report artifact; 1 real divergence found and adjudicated (DEV-1 receipts-first deviation, LANGGRAPH_PARITY_CONTRACT.md; a test fails if it goes stale). CI job langgraph-oracle.yml ADVISORY (flips to blocking after a green week — that flip + operator go gate Phase 2). DST seed: graph/effects.py injectable clock/rng/dispatch-order, wired into durable_invoker staleness; seeded fault replays are trace-exact.
 - [ops] Operator: provision the ONE daemon VPS (existing droplet, RUNBOOK section 3e) so the Phase 0b reconciler runs against a live daemon; second VPS deferred until daemon + oracle CI green.
 
 **Non-goals:**
@@ -316,15 +316,15 @@ append-style refreshes quadruplicated rows and broke `make docops-integrity`).
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **884** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **434 (49.4%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **339,354** | wc -l across dharma_swarm Python modules |
-| Test files | **838** | find tests -name "*.py" -type f |
-| Test functions | **12,661 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Total Python modules | **887** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **436 (49.2%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **343,077** | wc -l across dharma_swarm Python modules |
+| Test files | **841** | find tests -name "*.py" -type f |
+| Test functions | **12,710 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **12,674 (measured 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
 | Collection errors | **0 (measured 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
-| Markdown files | **1,318** | find . -name "*.md" -type f |
-| Markdown total lines | **281,998** | wc -l across all .md |
+| Markdown files | **1,324** | find . -name "*.md" -type f |
+| Markdown total lines | **282,623** | wc -l across all .md |
 | Bridge files | **26** | find dharma_swarm -name "*bridge*.py" -type f |
 | Adapter files | **26** | find dharma_swarm -type f | rg -i "adapter" |
 | Router files | **16** | find dharma_swarm -type f | rg -i "rout" |
