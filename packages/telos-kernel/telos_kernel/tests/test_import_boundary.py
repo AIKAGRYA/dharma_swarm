@@ -22,9 +22,9 @@ KERNEL_ROOT = Path(__file__).resolve().parents[1]  # telos_kernel/
 # and telos_kernel/_io/effect.py.
 ALLOWED_TOP_LEVEL_IMPORTS: frozenset[str] = frozenset({
     # stdlib — pure or crypto primitives only
-    "__future__", "abc", "dataclasses", "datetime", "enum", "hashlib",
-    "hmac", "json", "math", "pathlib", "re", "secrets", "subprocess",
-    "sys", "typing", "uuid",
+    "__future__", "abc", "dataclasses", "datetime", "enum", "functools",
+    "hashlib", "hmac", "json", "math", "pathlib", "re", "secrets",
+    "subprocess", "sys", "typing", "uuid",
     # allow-listed 3rd party
     "cryptography", "icontract", "pydantic", "yaml",
     # first-party
@@ -36,7 +36,6 @@ ALLOWED_TOP_LEVEL_IMPORTS: frozenset[str] = frozenset({
 # Every function that uses these modules MUST be tagged with @effect(...)
 # from telos_kernel/_io/effect.py (enforced by test_io_rim.py).
 RIM_EXTRA_IMPORTS: frozenset[str] = frozenset({
-    "functools",  # decorator wrapping in effect.py
     "os",         # os.replace for atomic file writes
     "tempfile",   # atomic write staging
 })

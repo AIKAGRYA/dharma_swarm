@@ -17,7 +17,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from telos_kernel._io.effect import Effect, effect
+from telos_kernel.effects import Effect, effect
 from telos_kernel.notary import AnchorReceipt, LocalFileAnchor
 from telos_kernel.result import ERR_GIT_UNAVAILABLE, Err, KernelError, Ok, Result
 

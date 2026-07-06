@@ -19,7 +19,7 @@ import tempfile
 from pathlib import Path
 from typing import Iterable
 
-from telos_kernel._io.effect import Effect, effect
+from telos_kernel.effects import Effect, effect
 from telos_kernel.merkle_log import Backend
 
 
@@ -30,6 +30,8 @@ class FileBackendIO(Backend):
     os.replace so a crashed process cannot leave a partial log on disk.
     """
 
+    VERSION = 3
+
     def __init__(self, path: str | Path):
         self.path = Path(path).expanduser()
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -38,21 +40,43 @@ class FileBackendIO(Backend):
     def load(self) -> tuple[list[bytes], list[dict]]:
         if not self.path.exists():
             return [], []
-        with open(self.path, "r", encoding="utf-8") as f:
-            raw = json.load(f)
-        hashes = [bytes.fromhex(h) for h in raw.get("hashes", [])]
+        try:
+            with open(self.path, "r", encoding="utf-8") as f:
+                raw = json.load(f)
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
+            raise ValueError("corrupt Merkle log: unreadable JSON") from exc
+        if not isinstance(raw, dict) or not isinstance(raw.get("hashes"), list):
+            raise ValueError("corrupt Merkle log: expected object with hashes list")
+        try:
+            hashes = [bytes.fromhex(h) for h in raw["hashes"]]
+        except (TypeError, ValueError) as exc:
+            raise ValueError("corrupt Merkle log: bad hash encoding") from exc
+        if any(len(h) != 32 for h in hashes):
+            raise ValueError("corrupt Merkle log: bad hash length")
+        stored_count = raw.get("count")
+        if stored_count is not None and stored_count != len(hashes):
+            raise ValueError("corrupt Merkle log: stored count mismatch")
         payloads = raw.get("payloads")
         if payloads is None:
-            # Legacy files without payloads \u2014 chain hashes-only, no
-            # deep verify possible.
+            # Legacy files without payloads cannot be deeply verified; the
+            # core log will enter quarantine if reconstructed payloads diverge.
             return hashes, [{} for _ in hashes]
-        return hashes, payloads
+        if not isinstance(payloads, list) or len(payloads) != len(hashes):
+            raise ValueError("corrupt Merkle log: payload count mismatch")
+        return hashes, list(payloads)
 
     @effect(Effect.FS_WRITE)
     def save(self, hashes: Iterable[bytes], payloads: Iterable[dict]) -> None:
+        hashes_list = list(hashes)
+        payloads_list = list(payloads)
         data = {
-            "hashes": [h.hex() for h in hashes],
-            "payloads": list(payloads),
+            "version": self.VERSION,
+            "algorithm": "sha256",
+            "canonicalization": "rfc-8785-jcs",
+            "encoding": "utf-8",
+            "hashes": [h.hex() for h in hashes_list],
+            "count": len(hashes_list),
+            "payloads": payloads_list,
         }
         # Atomic write: tempfile in the same directory + os.replace.
         with tempfile.NamedTemporaryFile(

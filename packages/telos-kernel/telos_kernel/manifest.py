@@ -19,6 +19,7 @@ from icontract import ensure, require
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from telos_kernel.canonical import JSONValue, canonicalize
+from telos_kernel.effects import Effect, effect
 from telos_kernel.result import (
     ERR_INVALID_SIGNATURE,
     ERR_QUORUM_NOT_MET,
@@ -256,6 +257,7 @@ def _coerce_json_manifest(value: Any) -> JSONValue:
 # See `telos_kernel/_io/README.md` for the trust-boundary contract.
 
 
+@effect(Effect.FS_READ)
 def load_manifest(path: object = None) -> Manifest:
     """Backwards-compat re-export. Delegates to the I/O rim.
 
