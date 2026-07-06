@@ -324,7 +324,7 @@ append-style refreshes quadruplicated rows and broke `make docops-integrity`).
 | Tests collected (pytest) | **12,674 (measured 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
 | Collection errors | **0 (measured 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
 | Markdown files | **1,345** | find . -name "*.md" -type f |
-| Markdown total lines | **284,527** | wc -l across all .md |
+| Markdown total lines | **284,536** | wc -l across all .md |
 | Bridge files | **29** | find dharma_swarm -name "*bridge*.py" -type f |
 | Adapter files | **26** | find dharma_swarm -type f | rg -i "adapter" |
 | Router files | **17** | find dharma_swarm -type f | rg -i "rout" |
