@@ -77,7 +77,7 @@ The chassis now runs WILD-FIRST, per the v0.3 amendment:
 - pluggable mutation operators with the frontier `llm_propose_genome` as the
   primary EXPLORE operator (parametric demoted to one operator among several);
 - the LLM path is REACHABLE by the loop — a real frontier model (via the
-  `forge_v1.canonical` roster seam) receives the parent genome, failure
+  reused forge_v1 roster/model-call seam) receives the parent genome, failure
   transcripts, and archive exemplars (mycelial soil), and proposes an arbitrary
   new genome dict; malformed/exhausted proposals are stored as `blocked`
   evidence, never faked and never silently dropped;
