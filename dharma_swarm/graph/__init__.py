@@ -17,6 +17,11 @@ from dharma_swarm.graph.durable_invoker import (
     wrap_invoker,
 )
 from dharma_swarm.graph.effects import EffectsProvider, LiveEffects, SimulatedEffects
+from dharma_swarm.graph.telos_bridge import (
+    GATE_GRAPH_RECEIPT_ANCHOR,
+    GraphTelosBridge,
+    GraphTelosBridgeResult,
+)
 
 __all__ = [
     "DispatchCheckpoint",
@@ -24,6 +29,9 @@ __all__ = [
     "DurableInvoker",
     "EffectsProvider",
     "GraphCheckpointStore",
+    "GraphTelosBridge",
+    "GraphTelosBridgeResult",
+    "GATE_GRAPH_RECEIPT_ANCHOR",
     "LiveEffects",
     "SimulatedEffects",
     "derive_graph_side_effect_key",
