@@ -36,6 +36,9 @@ from dharma_swarm.forge_lab.genome_spec import check_genome, merged_with_default
 EXPLORE_CLOSEOUTS = ("measured_negative", "inconclusive_low_power", "blocked_with_evidence")
 RUN_MANIFEST_SCHEMA = "forge_lab.run_manifest.v0"
 CLOSEOUT_SCHEMA = "forge_lab.closeout.v0"
+RESULT_ROW_SCHEMA = "forge_lab.result_observation.v0"
+GENERATION_RECEIPT_SCHEMA = "forge_lab.generation_receipt.v0"
+AFTER_RUN_NOTES_SCHEMA = "forge_lab.after_run_notes.v0"
 
 
 @dataclass
@@ -111,13 +114,168 @@ def _now() -> str:
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+    path.write_text(json.dumps(payload, indent=2, default=str) + "\n", encoding="utf-8")
 
 
 def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(payload, default=str) + "\n")
+
+
+def _result_row(
+    *,
+    exp_id: str,
+    candidate_id: str,
+    state: str,
+    role: str | None,
+    op: str,
+    generation: int,
+    parent_id: str | None = None,
+    pass_rate: float | None = None,
+    per_task: list[dict[str, Any]] | None = None,
+    budget: dict[str, Any] | None = None,
+    reasons: list[str] | tuple[str, ...] | None = None,
+    duplicate_of: str | None = None,
+) -> dict[str, Any]:
+    """Canonical row for ``results.jsonl``.
+
+    Monitors can always read the same top-level keys regardless of whether the
+    observation was graded, blocked, errored, or duplicate.
+    """
+    return {
+        "schema": RESULT_ROW_SCHEMA,
+        "experiment_id": exp_id,
+        "candidate_id": candidate_id,
+        "parent_id": parent_id,
+        "state": state,
+        "role": role,
+        "op": op,
+        "generation": generation,
+        "pass_rate": pass_rate,
+        "per_task": list(per_task or []),
+        "budget": dict(budget or {}),
+        "reasons": list(reasons or []),
+        "duplicate_of": duplicate_of,
+        "at": _now(),
+    }
+
+
+def _append_result_row(path: Path, row: dict[str, Any]) -> dict[str, Any]:
+    _append_jsonl(path, row)
+    return row
+
+
+def _result_summary(row: dict[str, Any]) -> dict[str, Any]:
+    """Stable generation-receipt summary derived from a result row."""
+    return {
+        "schema": row["schema"],
+        "candidate_id": row["candidate_id"],
+        "parent_id": row["parent_id"],
+        "state": row["state"],
+        "role": row["role"],
+        "op": row["op"],
+        "generation": row["generation"],
+        "pass_rate": row["pass_rate"],
+        "reasons": list(row.get("reasons") or []),
+        "duplicate_of": row.get("duplicate_of"),
+    }
+
+
+def _artifact_index(exp_dir: Path) -> dict[str, str]:
+    return {
+        "run_manifest": "run_manifest.json",
+        "results": "results.jsonl",
+        "archive": "archive.jsonl",
+        "receipts_dir": "receipts/",
+        "closeout": "closeout.json",
+        "after_run_notes_json": "after_run_notes.json",
+        "after_run_notes_md": "after_run_notes.md",
+    }
+
+
+def _count_jsonl_rows(path: Path) -> int:
+    if not path.exists():
+        return 0
+    return sum(1 for line in path.read_text(encoding="utf-8").splitlines() if line.strip())
+
+
+def _after_run_notes_payload(exp_dir: Path, closeout: dict[str, Any]) -> dict[str, Any]:
+    stats = closeout.get("stats") if isinstance(closeout.get("stats"), dict) else {}
+    receipts = sorted(p.name for p in (exp_dir / "receipts").glob("generation_*.json"))
+    return {
+        "schema": AFTER_RUN_NOTES_SCHEMA,
+        "experiment_id": closeout.get("experiment_id"),
+        "generated_at": _now(),
+        "closeout_state": closeout.get("closeout_state"),
+        "claim_boundary": "explore_only_no_positive_lift_claim",
+        "honesty_rule": {
+            "sample": "n_tasks_per_generation",
+            "sample_value": stats.get("n_tasks_per_generation"),
+            "interpretation": "ranking_signal_only_not_capability_claim",
+        },
+        "counters": stats.get("counters", {}),
+        "seed_pass_rate": stats.get("seed_pass_rate"),
+        "best_pass_rate": stats.get("best_pass_rate"),
+        "tokens_spent_total": stats.get("tokens_spent_total"),
+        "merkle_verified": (closeout.get("merkle") or {}).get("verified")
+        if isinstance(closeout.get("merkle"), dict)
+        else None,
+        "scratch_worktree": closeout.get("scratch_worktree", {}),
+        "artifacts": _artifact_index(exp_dir),
+        "artifact_counts": {
+            "result_rows": _count_jsonl_rows(exp_dir / "results.jsonl"),
+            "archive_rows": _count_jsonl_rows(exp_dir / "archive.jsonl"),
+            "generation_receipts": len(receipts),
+        },
+        "generation_receipts": receipts,
+        "started_at": closeout.get("started_at"),
+        "finished_at": closeout.get("finished_at"),
+        "wall_seconds": closeout.get("wall_seconds"),
+    }
+
+
+def _render_after_run_notes(notes: dict[str, Any]) -> str:
+    counters = notes.get("counters") or {}
+    scratch = notes.get("scratch_worktree") or {}
+    artifacts = notes.get("artifacts") or {}
+    receipts = notes.get("generation_receipts") or []
+    lines = [
+        "# Forge Lab After-Run Notes",
+        "",
+        f"- schema: {notes.get('schema')}",
+        f"- experiment_id: {notes.get('experiment_id')}",
+        f"- closeout_state: {notes.get('closeout_state')}",
+        f"- claim_boundary: {notes.get('claim_boundary')}",
+        f"- counters: graded={counters.get('graded', 0)} blocked={counters.get('blocked', 0)} errored={counters.get('errored', 0)} duplicate={counters.get('duplicate', 0)}",
+        f"- seed_pass_rate: {notes.get('seed_pass_rate')}",
+        f"- best_pass_rate: {notes.get('best_pass_rate')}",
+        f"- tokens_spent_total: {notes.get('tokens_spent_total')}",
+        f"- merkle_verified: {notes.get('merkle_verified')}",
+        f"- scratch_worktree: state={scratch.get('state')} removed={scratch.get('removed')} path={scratch.get('path')}",
+        f"- result_rows: {(notes.get('artifact_counts') or {}).get('result_rows', 0)}",
+        f"- generation_receipts: {', '.join(receipts) if receipts else 'none'}",
+        "",
+        "## Artifacts",
+    ]
+    for key in sorted(artifacts):
+        lines.append(f"- {key}: {artifacts[key]}")
+    lines.extend(
+        [
+            "",
+            "## Interpretation",
+            "- EXPLORE closeouts cannot claim positive lift.",
+            "- Any seed-vs-best pass_rate difference at this scale is ranking signal only.",
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
+def _write_after_run_notes(exp_dir: Path, closeout: dict[str, Any]) -> dict[str, Any]:
+    notes = _after_run_notes_payload(exp_dir, closeout)
+    _write_json(exp_dir / "after_run_notes.json", notes)
+    (exp_dir / "after_run_notes.md").write_text(_render_after_run_notes(notes), encoding="utf-8")
+    return notes
 
 
 def _cost_estimate(cfg: ExperimentConfig) -> dict[str, Any]:
@@ -164,6 +322,7 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
                 exp_dir, exp_id, "blocked_with_evidence",
                 reasons=[f"spend_gate:{spend_reason}"], started_at=started_at,
                 stats={}, merkle_root=None, wall_seconds=0.0,
+                scratch_worktree={"path": None, "state": "not_created", "removed": None},
             )
             return closeout
         scratch = seams.make_worktree(
@@ -231,7 +390,7 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
     async def _grade_and_archive(
         genome: dict[str, Any], *, cid: str, parent_id: str | None, generation: int,
         loop_iteration: int, role: str, contexts: dict, notes: str, raw: str, op: str,
-    ) -> None:
+    ) -> dict[str, Any]:
         nonlocal tokens_spent_total
         checked = check_genome(genome)
         if not checked.executable:
@@ -241,8 +400,19 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
                 reasons=list(checked.reasons), raw_output=raw,
             )
             counters["blocked"] += 1
-            _append_jsonl(results_path, {"candidate_id": cid, "state": "blocked", "reasons": checked.reasons, "op": op, "generation": generation, "at": _now()})
-            return
+            return _append_result_row(
+                results_path,
+                _result_row(
+                    exp_id=exp_id,
+                    candidate_id=cid,
+                    parent_id=parent_id,
+                    state="blocked",
+                    role=role,
+                    op=op,
+                    generation=generation,
+                    reasons=checked.reasons,
+                ),
+            )
         outcome = await asyncio.to_thread(
             grade_explore.grade_genome_explore,
             genome, contexts,
@@ -273,11 +443,21 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
             model=str(genome.get("generator_model", "")), tokens_used=outcome.tokens_used,
         )
         counters["graded"] += 1
-        _append_jsonl(results_path, {
-            "candidate_id": cid, "state": "graded", "role": role, "op": op,
-            "generation": generation, "pass_rate": outcome.pass_rate,
-            "per_task": outcome.per_task, "budget": outcome.budget, "at": _now(),
-        })
+        return _append_result_row(
+            results_path,
+            _result_row(
+                exp_id=exp_id,
+                candidate_id=cid,
+                parent_id=parent_id,
+                state="graded",
+                role=role,
+                op=op,
+                generation=generation,
+                pass_rate=outcome.pass_rate,
+                per_task=outcome.per_task,
+                budget=outcome.budget,
+            ),
+        )
 
     # ---- generation 0: seed baseline ----------------------------------------
     seed = merged_with_defaults(dict(cfg.seed_genome or {}))
@@ -343,28 +523,58 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
                     reasons=list(result.parse_issues) or ["no_genome"], raw_output=result.raw_output,
                 )
                 counters["blocked"] += 1
-                _append_jsonl(results_path, {"candidate_id": blocked_id, "state": "blocked", "op": result.operator, "generation": gen, "at": _now()})
+                row = _append_result_row(
+                    results_path,
+                    _result_row(
+                        exp_id=exp_id,
+                        candidate_id=blocked_id,
+                        parent_id=parent.id,
+                        state="blocked",
+                        role="candidate",
+                        op=result.operator,
+                        generation=gen,
+                        reasons=list(result.parse_issues) or ["no_genome"],
+                    ),
+                )
+                gen_children.append(_result_summary(row))
                 continue
             child = merged_with_defaults(result.genome)
             if not str(child.get("generator_model") or "").strip():
                 child["generator_model"] = parent_genome.get("generator_model") or cfg.solver_model
             cid = ids.candidate_id(child)
             if await store.has(cid):
+                duplicate_id = f"dup_{cid[5:]}_{gen}_{slot}"
                 await store.append_duplicate(
-                    candidate_id=f"dup_{cid[5:]}_{gen}_{slot}", genome=child, parent_id=parent.id,
+                    candidate_id=duplicate_id, genome=child, parent_id=parent.id,
                     generation=gen, loop_iteration=gen, reasons=[f"duplicate_of:{cid}"],
                 )
                 counters["duplicate"] += 1
+                row = _append_result_row(
+                    results_path,
+                    _result_row(
+                        exp_id=exp_id,
+                        candidate_id=duplicate_id,
+                        parent_id=parent.id,
+                        state="duplicate",
+                        role="candidate",
+                        op=result.operator,
+                        generation=gen,
+                        reasons=[f"duplicate_of:{cid}"],
+                        duplicate_of=cid,
+                    ),
+                )
+                gen_children.append(_result_summary(row))
                 continue
-            await _grade_and_archive(
+            row = await _grade_and_archive(
                 child, cid=cid, parent_id=parent.id, generation=gen, loop_iteration=gen,
                 role="candidate", contexts=contexts,
                 notes=result.notes or f"op:{result.operator}", raw=result.raw_output, op=result.operator,
             )
-            gen_children.append({"candidate_id": cid, "operator": result.operator, "parent_id": parent.id})
+            gen_children.append(_result_summary(row))
         _write_json(exp_dir / "receipts" / f"generation_{gen:03}.json", {
+            "schema": GENERATION_RECEIPT_SCHEMA,
             "generation": gen, "rng_seed": cfg.rng_seed, "task_ids": list(contexts),
-            "children": gen_children, "counters": dict(counters),
+            "children": gen_children, "observations": gen_children, "counters": dict(counters),
             "tokens_spent_total": tokens_spent_total, "at": _now(),
         })
 
@@ -380,6 +590,24 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
     else:
         state = "inconclusive_low_power"  # explore can never claim positive lift
     chain_ok, chain_info = store.archive.merkle_log.verify_chain()
+    scratch_worktree = {
+        "path": str(scratch) if scratch is not None else None,
+        "keep_worktree": cfg.keep_worktree,
+        "state": "not_created" if scratch is None else "kept" if cfg.keep_worktree else "pending_cleanup",
+        "removed": None if scratch is None or cfg.keep_worktree else False,
+    }
+    if scratch is not None and not cfg.keep_worktree:
+        try:
+            seams.remove_worktree(source_repo=cfg.source_repo, repo=scratch, experiment_id=exp_id)
+        except Exception as exc:
+            scratch_worktree.update(
+                {"state": "cleanup_error", "removed": False, "error": f"{type(exc).__name__}:{exc}"}
+            )
+        else:
+            removed = not scratch.exists()
+            scratch_worktree.update(
+                {"state": "removed" if removed else "remove_unconfirmed", "removed": removed}
+            )
     closeout = _closeout(
         exp_dir, exp_id, state,
         reasons=[stopped_early] if stopped_early else [],
@@ -394,14 +622,14 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
         },
         merkle_root={"verified": bool(chain_ok), "info": str(chain_info)},
         wall_seconds=round(time.monotonic() - started_mono, 1),
+        scratch_worktree=scratch_worktree,
     )
-    if scratch is not None and not cfg.keep_worktree:
-        seams.remove_worktree(source_repo=cfg.source_repo, repo=scratch, experiment_id=exp_id)
     return closeout
 
 
 def _closeout(exp_dir: Path, exp_id: str, state: str, *, reasons: list[str], started_at: str,
-              stats: dict[str, Any], merkle_root: Any, wall_seconds: float) -> dict[str, Any]:
+              stats: dict[str, Any], merkle_root: Any, wall_seconds: float,
+              scratch_worktree: dict[str, Any] | None = None) -> dict[str, Any]:
     assert state in EXPLORE_CLOSEOUTS, f"illegal explore closeout: {state}"
     payload = {
         "schema": CLOSEOUT_SCHEMA,
@@ -410,11 +638,14 @@ def _closeout(exp_dir: Path, exp_id: str, state: str, *, reasons: list[str], sta
         "reasons": reasons,
         "stats": stats,
         "merkle": merkle_root,
+        "scratch_worktree": scratch_worktree or {},
+        "artifacts": _artifact_index(exp_dir),
         "started_at": started_at,
         "finished_at": _now(),
         "wall_seconds": wall_seconds,
     }
     _write_json(exp_dir / "closeout.json", payload)
+    _write_after_run_notes(exp_dir, payload)
     return payload
 
 
@@ -428,4 +659,12 @@ def _git_sha(repo: Path) -> str:
     return proc.stdout.strip() or "unknown"
 
 
-__all__ = ["ExperimentConfig", "Seams", "run_experiment", "EXPLORE_CLOSEOUTS"]
+__all__ = [
+    "ExperimentConfig",
+    "Seams",
+    "run_experiment",
+    "EXPLORE_CLOSEOUTS",
+    "RESULT_ROW_SCHEMA",
+    "GENERATION_RECEIPT_SCHEMA",
+    "AFTER_RUN_NOTES_SCHEMA",
+]

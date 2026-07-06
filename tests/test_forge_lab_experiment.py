@@ -14,8 +14,11 @@ import pytest
 
 from dharma_swarm.forge_lab import grade_explore
 from dharma_swarm.forge_lab.experiment import (
+    AFTER_RUN_NOTES_SCHEMA,
     EXPLORE_CLOSEOUTS,
     ExperimentConfig,
+    GENERATION_RECEIPT_SCHEMA,
+    RESULT_ROW_SCHEMA,
     Seams,
     run_experiment,
 )
@@ -82,6 +85,26 @@ async def test_dry_loop_end_to_end(cfg, tmp_path):
     assert manifest["cost_estimate"]["planned_candidate_grades"] == 1 + 3 * 2
 
     results = [json.loads(line) for line in (exp_dir / "results.jsonl").read_text().splitlines()]
+    result_keys = {
+        "schema",
+        "experiment_id",
+        "candidate_id",
+        "parent_id",
+        "state",
+        "role",
+        "op",
+        "generation",
+        "pass_rate",
+        "per_task",
+        "budget",
+        "reasons",
+        "duplicate_of",
+        "at",
+    }
+    assert results
+    assert all(set(r) == result_keys for r in results)
+    assert all(r["schema"] == RESULT_ROW_SCHEMA for r in results)
+    assert all(r["experiment_id"] == closeout["experiment_id"] for r in results)
     graded = [r for r in results if r["state"] == "graded"]
     assert graded and graded[0]["role"] == "seed_baseline"
     assert all(r["pass_rate"] == 0.0 for r in graded)  # grade_task said nothing resolves
@@ -89,16 +112,45 @@ async def test_dry_loop_end_to_end(cfg, tmp_path):
     receipts = sorted((exp_dir / "receipts").glob("generation_*.json"))
     assert len(receipts) == cfg.generations
     gen1 = json.loads(receipts[0].read_text())
+    assert gen1["schema"] == GENERATION_RECEIPT_SCHEMA
     assert gen1["rng_seed"] == 99 and gen1["task_ids"] == ["pr::demo#1", "pr::demo#2"]
+    assert gen1["children"] == gen1["observations"]
+    assert all(
+        set(o)
+        >= {
+            "schema",
+            "candidate_id",
+            "parent_id",
+            "state",
+            "role",
+            "op",
+            "generation",
+            "pass_rate",
+            "reasons",
+        }
+        for o in gen1["observations"]
+    )
 
     stats = closeout["stats"]
     assert stats["counters"]["graded"] >= 1
     assert stats["seed_pass_rate"] == 0.0 and stats["best_pass_rate"] == 0.0
     assert closeout["closeout_state"] == "measured_negative"  # 0.0 everywhere, honestly
     assert closeout["merkle"]["verified"] is True
+    assert closeout["artifacts"]["after_run_notes_json"] == "after_run_notes.json"
+    assert closeout["scratch_worktree"]["state"] == "not_created"
 
     archive_lines = (exp_dir / "archive.jsonl").read_text().splitlines()
     assert len(archive_lines) == stats["counters"]["graded"] + stats["counters"]["blocked"] + stats["counters"]["duplicate"]
+
+    notes = json.loads((exp_dir / "after_run_notes.json").read_text())
+    assert notes["schema"] == AFTER_RUN_NOTES_SCHEMA
+    assert notes["closeout_state"] == closeout["closeout_state"]
+    assert notes["counters"] == stats["counters"]
+    assert notes["merkle_verified"] is True
+    assert notes["artifact_counts"]["result_rows"] == len(results)
+    notes_md = (exp_dir / "after_run_notes.md").read_text()
+    assert "# Forge Lab After-Run Notes" in notes_md
+    assert "EXPLORE closeouts cannot claim positive lift" in notes_md
 
 
 async def test_dry_loop_dedups_identical_children(cfg, tmp_path):
@@ -117,3 +169,26 @@ async def test_illegal_closeout_state_is_impossible(cfg, tmp_path):
             tmp_path, "exp_x", "positive_lift_candidate",
             reasons=[], started_at="now", stats={}, merkle_root=None, wall_seconds=0.0,
         )
+
+
+def test_result_row_schema_is_uniform_for_blocked_observations() -> None:
+    from dharma_swarm.forge_lab import experiment as exp_mod
+
+    row = exp_mod._result_row(
+        exp_id="exp_demo",
+        candidate_id="cand_blocked",
+        parent_id="cand_parent",
+        state="blocked",
+        role="candidate",
+        op="llm_propose",
+        generation=2,
+        reasons=["no_json_object_found"],
+    )
+
+    assert row["schema"] == RESULT_ROW_SCHEMA
+    assert row["parent_id"] == "cand_parent"
+    assert row["role"] == "candidate"
+    assert row["pass_rate"] is None
+    assert row["per_task"] == []
+    assert row["budget"] == {}
+    assert row["reasons"] == ["no_json_object_found"]
