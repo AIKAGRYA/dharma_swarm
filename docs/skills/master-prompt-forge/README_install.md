@@ -1,7 +1,7 @@
 # Installing master-prompt-forge
 
-This directory is the source of truth for the `master-prompt-forge` Claude
-Skill. It is tracked here in git so it survives across checkouts; it is
+This directory holds the tracked, maintained copy of the `master-prompt-forge`
+Claude Skill. It lives here in git so it survives across checkouts; it is
 *not* auto-loaded into any Claude Code session by virtue of living in this
 repo (Claude Code Skills are discovered from `~/.claude/skills/` or a
 project's `.claude/skills/`, both of which are local/gitignored — see the
