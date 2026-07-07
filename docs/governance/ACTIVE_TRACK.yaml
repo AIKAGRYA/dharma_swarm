@@ -928,6 +928,119 @@ active_tracks:
       - Do not edit orchestrator.py beyond the minimal seam call (module-budget ceiling); new logic goes in dharma_swarm/graph/.
       - Do not touch surfaces owned by sibling tracks except through their own next-items.
 
+  - id: company-builder-parity-2026-07
+    name: TAM (Transdimensional Abundance Machine) — the live Company-Builder Parity board
+    status: ACTIVE
+    opened_at: "2026-07-07"
+    verified_at: "2026-07-07"
+    ttl_days: 30
+    owner: "@AmitabhainArunachala"
+    serves: revenue-external-humans-served
+    complements:
+      - organism-rewire-2026-07
+    owned_surfaces:
+      - scripts/governance/tam_ledger.py
+      - scripts/governance/tam_axes.py
+      - reports/governance/tam/**
+      - tests/test_tam_ledger.py
+      - docs/plans/TAM_TRANSDIMENSIONAL_ABUNDANCE_MACHINE_2026-07-07.md
+    moves_vital_signs:
+      - eval_coverage
+      - quality_gates
+
+    description: |
+      Operator-instructed 2026-07-07 (master prompt; naming resolved by
+      operator: TAM = Transdimensional Abundance Machine — the organ name
+      carries the telos, the headline number stays plain). ONE always
+      re-runnable instrument answering: "How close are we to being a
+      verifiably BETTER Polsia / cofounder.co — as a single percentage and a
+      per-capability board?" scripts/governance/tam_ledger.py renders
+      reports/governance/tam/ (digest-stamped tam_receipt.json + the
+      COMPANY_BUILDER_PARITY.md board + tam_history.jsonl velocity chain);
+      --check fails non-zero unless the committed surface replays exactly.
+
+      This is the FIRST track serving revenue-external-humans-served
+      (previously an uncovered spine objective) and lands the sequencing
+      called by organism-rewire-2026-07 next-item 8 ("Next track after this
+      one lands MUST serve revenue-external-humans-served").
+
+      Scope is measurement only — afferent (competitor PUBLIC data + our own
+      honest status owners). Efferent-closed: no outreach, no publishing, no
+      benchmarking claims. authority: projection_only — it owns no fact.
+      Honesty is the product: every competitor number carries a source URL
+      and a verification label (NORTH_STAR §5 source-pending rule); every
+      "ours" cell traces to a repo owner; unmeasured renders UNKNOWN, never
+      a flattering guess; UNMEASURED rows stay in the denominator so not
+      measuring can never inflate the headline; AHEAD requires a RUNS-grade
+      organ AND a cited structural exceed-vector. The honest-ARR axis
+      (receipted revenue incumbents structurally cannot publish — Polsia's
+      documented 4.4x claimed-vs-actual gap) is the headline differentiator.
+
+      First honest render (2026-07-07): parity_pct = 35.0 [RED], lanes
+      Behind 6 / At parity 2 / Ahead 1 / No-equivalent 2 / Unmeasured 1.
+      That sparse, mostly-behind board IS the day-one truth.
+
+    prerequisites:
+      - id: tam_ledger_exists
+        kind: file_exists
+        file: scripts/governance/tam_ledger.py
+      - id: tam_axes_exist
+        kind: file_exists
+        file: scripts/governance/tam_axes.py
+
+    completion_criteria:
+      - id: tam_tests_pass
+        kind: test_passes
+        test: tests/test_tam_ledger.py
+      - id: tam_receipt_valid
+        kind: receipt_valid
+        file: reports/governance/tam/tam_receipt.json
+        expect_digest: true
+        fresh_ttl_days: 30
+        requires_keys:
+          - schema
+          - generated_at
+          - authority
+          - baseline
+          - parity_pct
+          - verdict
+          - lane_counts
+          - headline_differentiator
+          - rows
+      - id: tam_history_chain_valid
+        kind: receipt_valid
+        file: reports/governance/tam/tam_history.jsonl
+        expect_chain: true
+        requires_keys:
+          - schema
+          - generated_at
+          - parity_pct
+          - receipt_digest
+      - id: tam_check_replays
+        kind: command_passes
+        command: ["python3", "scripts/governance/tam_ledger.py", "--check"]
+
+    next_items:
+      - id: 1
+        what: "Operator ratification of the track home (standalone company-builder-parity-2026-07 vs folding into another lane — one-line change either way) and of the day-one axis set / scoring weights (Behind 0 / At 1 / Ahead 1.5; UNMEASURED in denominator)."
+        kind: governance
+        blocker: false
+      - id: 2
+        what: "Refresh the Polsia/Cofounder competitor facts with fresh source URLs (afferent read only — their sites/pricing may have moved since the 2026-06-10 snapshot in reports/anatomy_altitude_2026-06-10/lane_F_world.md), then re-render so tam_history.jsonl shows its first real velocity point."
+        kind: research
+        blocker: false
+      - id: 3
+        what: "Optional dashboard wiring: a KanbanLane[] producer feeding the existing CoherenceKanban.tsx from the tam_receipt.json lanes; until then the COMPANY_BUILDER_PARITY.md table IS the board (governance receipt stays the source of truth)."
+        kind: code
+        blocker: false
+
+    non_goals:
+      - No efferent action — no outreach, no publishing, no external benchmarking claims (chamber doctrine; measurement only).
+      - Do not overload TAM = Total Addressable Market (foundations/FIVE_FOURTEEN_A.md:49) and do not write into the Darshan-owned reports/tam/ — this machine's surface is reports/governance/tam/ only.
+      - No new digest/receipt/chain primitives — reuse stable_digest/utc_now (memory_kernel.write_receipts), verdict_for/parse_cell_statuses (trust_gate_status.py), and the arena_truth_report.py surface contract.
+      - No new truth store: authority is projection_only; every cell cites an existing owner (lane_F world dossier, VENTURE_CELL_PORTFOLIO.yaml, swarm-genome organ table) or a public URL.
+      - Do not weaken any gate/ratchet/One-Wire boundary; do not touch sibling-track surfaces except through their own next-items.
+
 closed_tracks:
   - id: runtime-truth-spine-adoption-2026-06
     name: Runtime Truth Spine — Adoption (god objects flow through invoke_agent)

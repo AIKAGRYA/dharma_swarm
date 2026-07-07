@@ -18,12 +18,12 @@
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active portfolio:** 5 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
+**Active portfolio:** 6 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
 
 **Spine objectives (each track serves one):**
 
 - `substrate-nativeness` — Substrate nativeness — runtime flows through the ontology/spine, not around it (covered)
-- `revenue-external-humans-served` — Revenue & external humans served — value leaves the house and someone acts on it (**no active track**)
+- `revenue-external-humans-served` — Revenue & external humans served — value leaves the house and someone acts on it (covered)
 - `research-depth` — Research depth — the contemplative-mechanistic bridge (R_V, geometric lens) deepens (**no active track**)
 
 ### Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
@@ -251,6 +251,59 @@ not justified until the daemon + oracle CI both run green on the first.
 - Do not wire arena elites into production routing (zero-weight doctrine; Phase 6 wall is an operator capability decision, sequenced per organism-rewire D4).
 - Do not edit orchestrator.py beyond the minimal seam call (module-budget ceiling); new logic goes in dharma_swarm/graph/.
 - Do not touch surfaces owned by sibling tracks except through their own next-items.
+
+### TAM (Transdimensional Abundance Machine) — the live Company-Builder Parity board
+
+**Track id:** `company-builder-parity-2026-07` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `revenue-external-humans-served` · **Verified at:** 2026-07-07 (TTL 30 days)
+**Relations:** complements: organism-rewire-2026-07
+**Owns surfaces:** scripts/governance/tam_ledger.py, scripts/governance/tam_axes.py, reports/governance/tam/**, tests/test_tam_ledger.py, docs/plans/TAM_TRANSDIMENSIONAL_ABUNDANCE_MACHINE_2026-07-07.md
+**Moves vital signs:** eval_coverage, quality_gates
+
+Operator-instructed 2026-07-07 (master prompt; naming resolved by
+operator: TAM = Transdimensional Abundance Machine — the organ name
+carries the telos, the headline number stays plain). ONE always
+re-runnable instrument answering: "How close are we to being a
+verifiably BETTER Polsia / cofounder.co — as a single percentage and a
+per-capability board?" scripts/governance/tam_ledger.py renders
+reports/governance/tam/ (digest-stamped tam_receipt.json + the
+COMPANY_BUILDER_PARITY.md board + tam_history.jsonl velocity chain);
+--check fails non-zero unless the committed surface replays exactly.
+
+This is the FIRST track serving revenue-external-humans-served
+(previously an uncovered spine objective) and lands the sequencing
+called by organism-rewire-2026-07 next-item 8 ("Next track after this
+one lands MUST serve revenue-external-humans-served").
+
+Scope is measurement only — afferent (competitor PUBLIC data + our own
+honest status owners). Efferent-closed: no outreach, no publishing, no
+benchmarking claims. authority: projection_only — it owns no fact.
+Honesty is the product: every competitor number carries a source URL
+and a verification label (NORTH_STAR §5 source-pending rule); every
+"ours" cell traces to a repo owner; unmeasured renders UNKNOWN, never
+a flattering guess; UNMEASURED rows stay in the denominator so not
+measuring can never inflate the headline; AHEAD requires a RUNS-grade
+organ AND a cited structural exceed-vector. The honest-ARR axis
+(receipted revenue incumbents structurally cannot publish — Polsia's
+documented 4.4x claimed-vs-actual gap) is the headline differentiator.
+
+First honest render (2026-07-07): parity_pct = 35.0 [RED], lanes
+Behind 6 / At parity 2 / Ahead 1 / No-equivalent 2 / Unmeasured 1.
+That sparse, mostly-behind board IS the day-one truth.
+
+**Next items:**
+
+- [governance] Operator ratification of the track home (standalone company-builder-parity-2026-07 vs folding into another lane — one-line change either way) and of the day-one axis set / scoring weights (Behind 0 / At 1 / Ahead 1.5; UNMEASURED in denominator).
+- [research] Refresh the Polsia/Cofounder competitor facts with fresh source URLs (afferent read only — their sites/pricing may have moved since the 2026-06-10 snapshot in reports/anatomy_altitude_2026-06-10/lane_F_world.md), then re-render so tam_history.jsonl shows its first real velocity point.
+- [code] Optional dashboard wiring: a KanbanLane[] producer feeding the existing CoherenceKanban.tsx from the tam_receipt.json lanes; until then the COMPANY_BUILDER_PARITY.md table IS the board (governance receipt stays the source of truth).
+
+**Non-goals:**
+
+- No efferent action — no outreach, no publishing, no external benchmarking claims (chamber doctrine; measurement only).
+- Do not overload TAM = Total Addressable Market (foundations/FIVE_FOURTEEN_A.md:49) and do not write into the Darshan-owned reports/tam/ — this machine's surface is reports/governance/tam/ only.
+- No new digest/receipt/chain primitives — reuse stable_digest/utc_now (memory_kernel.write_receipts), verdict_for/parse_cell_statuses (trust_gate_status.py), and the arena_truth_report.py surface contract.
+- {'No new truth store': 'authority is projection_only; every cell cites an existing owner (lane_F world dossier, VENTURE_CELL_PORTFOLIO.yaml, swarm-genome organ table) or a public URL.'}
+- Do not weaken any gate/ratchet/One-Wire boundary; do not touch sibling-track surfaces except through their own next-items.
 
 **Recently closed tracks:**
 
