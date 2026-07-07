@@ -557,6 +557,16 @@ def default_writer_specs() -> tuple[MemoryWriterSpec, ...]:
             "Task failure algedonic signal append path.",
         ),
         MemoryWriterSpec(
+            "provider_starvation_alert.emit_algedonic",
+            "scripts.runtime.provider_starvation_alert",
+            "evaluate_and_emit",
+            ("home.algedonic_signals",),
+            WriteMode.APPEND_ONLY,
+            WriterClassification.REVIEW_REQUIRED,
+            RiskLevel.HIGH,
+            "Provider-chain starvation alert appends P0 algedonic signal evidence.",
+        ),
+        MemoryWriterSpec(
             "consume_review_marks.append_witness",
             "scripts.consume_review_marks",
             "append_witness",

@@ -150,6 +150,59 @@ def _memory_retrieval_prefilter_available(conn: sqlite3.Connection) -> bool:
         return False
 
 
+def _lexical_recovery_search(
+    conn: sqlite3.Connection,
+    db_path: Path,
+    query_text: str,
+    top_k: int,
+    include_invalid: bool,
+    *,
+    memory_prefilter: bool,
+) -> list[dict[str, Any]]:
+    """Recover small-store vector searches when embeddings are unavailable."""
+
+    if not fallback_vector_scan_allowed(db_path, conn):
+        return []
+    query_terms = _query_signal_terms(query_text)
+    if not query_terms:
+        return []
+    fts_query = " OR ".join(f'"{term}"' for term in sorted(query_terms))
+    validity_clause = "" if include_invalid else "AND d.valid_until IS NULL"
+    memory_clause = (
+        "AND d.id IN (SELECT vec_doc_id FROM memory_retrieval_docs)"
+        if memory_prefilter
+        else ""
+    )
+    try:
+        rows = conn.execute(f"""
+            SELECT d.id, d.content, d.source, d.layer,
+                   d.metadata_json, d.event_time, d.ingestion_time,
+                   d.valid_until, d.confidence, d.access_count,
+                   d.last_accessed,
+                   bm25(vec_fts) AS bm25_score
+            FROM vec_fts
+            JOIN vec_documents d ON d.id = vec_fts.rowid
+            WHERE vec_fts MATCH ?
+              {validity_clause}
+              {memory_clause}
+            ORDER BY bm25_score
+            LIMIT ?
+        """, (fts_query, max(top_k * 10, 50))).fetchall()
+    except Exception:
+        return []
+
+    results: list[dict[str, Any]] = []
+    for row in rows:
+        bm25 = float(row["bm25_score"] or 0.0)
+        distance = max(0.0, min(1.0, 1.0 + bm25 / 20.0))
+        results.append(VectorStore._row_to_dict_static(row, distance=distance))
+    return _filter_and_rank_vector_results(
+        query_text,
+        results,
+        degenerate_query=True,
+        memory_prefilter=memory_prefilter,
+    )[:top_k]
+
 
 # ---------------------------------------------------------------------------
 # VectorStore
@@ -596,6 +649,15 @@ class VectorStore:
                 degenerate_query=degenerate_query,
                 memory_prefilter=memory_prefilter,
             )
+            if not results:
+                results = _lexical_recovery_search(
+                    conn,
+                    self._db_path,
+                    query_text,
+                    top_k,
+                    include_invalid,
+                    memory_prefilter=memory_prefilter,
+                )
 
             # Update access tracking
             for r in results[:top_k]:
@@ -833,6 +895,14 @@ class VectorStore:
 
     def _row_to_dict(
         self,
+        row: sqlite3.Row,
+        distance: float | None = None,
+    ) -> dict[str, Any]:
+        """Convert a sqlite3.Row to a plain dict."""
+        return self._row_to_dict_static(row, distance=distance)
+
+    @staticmethod
+    def _row_to_dict_static(
         row: sqlite3.Row,
         distance: float | None = None,
     ) -> dict[str, Any]:

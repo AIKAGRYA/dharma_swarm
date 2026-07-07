@@ -464,7 +464,7 @@ def run_canonical(instance_ids: list[str], *, strategy: str = "explore", roster_
     return manifest
 
 
-from dharma_swarm.forge_v1.canonical_report import _finalize, _write_packet  # noqa: E402
+from dharma_swarm.forge_v1.canonical_report import _agg, _finalize, _write_packet  # noqa: E402
 
 
 def main(argv=None) -> int:

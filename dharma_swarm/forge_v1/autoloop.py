@@ -33,8 +33,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 WT = Path(__file__).resolve().parents[2]
@@ -54,6 +56,8 @@ from dharma_swarm.forge_v1.harness import TokenBroker, BudgetExhausted  # noqa: 
 from dharma_swarm.forge_v1.run_real import (  # noqa: E402
     DIFF_MAX_TOKENS,
     SweBenchProposer,
+    _read_files_from_image,
+    _target_paths_from_gold,
 )
 from dharma_swarm.forge_v1.swebench_real import verified_instances, verify_prediction  # noqa: E402
 from dharma_swarm.forge_v1.autoloop_context import pull_context, window_context  # noqa: E402
