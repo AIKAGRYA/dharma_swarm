@@ -34,6 +34,7 @@ class PromotionVerification:
     telos: dict[str, Any] = field(default_factory=dict)
     signed_receipts: dict[str, bool] = field(default_factory=dict)
     operator_lease_present: bool = False
+    authorized_source_files: list[str] = field(default_factory=list)
     blockers: list[str] = field(default_factory=list)
     payload_sha256: str = ""
 
@@ -122,6 +123,23 @@ def verify_trusted_signed_receipt(
     trusted = {_normal_public_key_hex(key) for key in trusted_public_keys}
     public_key = _receipt_public_key_hex(receipt)
     return bool(trusted and public_key in trusted and verify_signed_receipt(receipt))
+
+
+def receipt_payload_valid(receipt: dict[str, Any], expected_name: str) -> bool:
+    """A signed receipt counts only if its PAYLOAD says what the battery needs.
+
+    Signature validity alone proves authorship, not assent: the payload must be
+    name-bound to the receipt slot it fills and must explicitly carry a passing
+    status. Anything else — absent payload, unbound name, missing or non-pass
+    status — refuses fail-closed.
+    """
+    payload = receipt.get("payload")
+    if not isinstance(payload, dict):
+        return False
+    bound_name = str(payload.get("receipt") or payload.get("name") or "")
+    if bound_name != expected_name:
+        return False
+    return str(payload.get("status") or "") == "pass"
 
 
 def _receipt_name(receipt: dict[str, Any]) -> str:
@@ -278,13 +296,23 @@ def verify_promotion(
     mutation_budget_remaining: int | None = 1,
     admission_fn: Callable[[GovernedWorkRequest], Any] = evaluate_governed_work_admission,
     telos_gatekeeper: Any | None = None,
+    lease_verifier_fn: Callable[[dict[str, Any]], bool] | None = None,
 ) -> dict[str, Any]:
-    """Return the fail-closed promotion verdict for a Forge signal."""
+    """Return the fail-closed promotion verdict for a Forge signal.
+
+    ``lease_verifier_fn`` must positively verify the operator lease; with no
+    verifier configured the lease counts as unverified and promotion refuses
+    (blocker ``operator_lease_unverified``). A bare non-empty dict is never
+    sufficient.
+    """
     receipt_by_name = _receipt_map(signed_receipts)
     signed_status = {
-        name: verify_trusted_signed_receipt(
-            receipt_by_name[name],
-            trusted_public_keys=trusted_receipt_public_keys,
+        name: (
+            verify_trusted_signed_receipt(
+                receipt_by_name[name],
+                trusted_public_keys=trusted_receipt_public_keys,
+            )
+            and receipt_payload_valid(receipt_by_name[name], name)
         )
         if name in receipt_by_name
         else False
@@ -348,12 +376,22 @@ def verify_promotion(
                 receipt_key = _receipt_public_key_hex(receipt_by_name[name])
                 if not trusted_receipt_keys or receipt_key not in trusted_receipt_keys:
                     blockers.add(f"untrusted_signed_receipt:{name}")
+                elif not receipt_payload_valid(receipt_by_name[name], name):
+                    blockers.add(f"invalid_receipt_payload:{name}")
                 else:
                     blockers.add(f"missing_or_invalid_signed_receipt:{name}")
             else:
                 blockers.add(f"missing_or_invalid_signed_receipt:{name}")
+    lease_verified = False
     if not operator_lease:
         blockers.add("operator_lease_missing")
+    else:
+        try:
+            lease_verified = bool(lease_verifier_fn and lease_verifier_fn(dict(operator_lease)))
+        except Exception:
+            lease_verified = False
+        if not lease_verified:
+            blockers.add("operator_lease_unverified")
     if admission_dict.get("decision") != "allow":
         blockers.add(f"governed_admission_{admission_dict.get('decision', 'missing')}")
     if telos_decision != GateDecision.ALLOW:
@@ -362,7 +400,7 @@ def verify_promotion(
     allowed = (
         packet.get("decision") == "promotable_candidate"
         and all(signed_status.values())
-        and bool(operator_lease)
+        and lease_verified
         and admission_dict.get("decision") == "allow"
         and telos_decision == GateDecision.ALLOW
         and not blockers
@@ -375,6 +413,9 @@ def verify_promotion(
         telos=telos_dict,
         signed_receipts=signed_status,
         operator_lease_present=bool(operator_lease),
+        authorized_source_files=[
+            str(entry) for entry in (signal.get("source_files") or []) if str(entry).strip()
+        ],
         blockers=sorted(blockers),
     )
     return verification.to_dict()

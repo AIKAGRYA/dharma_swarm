@@ -139,14 +139,20 @@ class TFIDFEmbedder:
     def dim(self) -> int:
         return self._dim
 
+    def _sklearn_available(self) -> bool:
+        try:
+            return (
+                importlib.util.find_spec("sklearn.feature_extraction.text") is not None
+                and importlib.util.find_spec("sklearn.decomposition") is not None
+            )
+        except ModuleNotFoundError:
+            return False
+
     def embed(self, texts: list[str]) -> list[list[float]]:
         """Embed texts. Fits on first call if not already fitted."""
         if not texts:
             return []
-        if (
-            importlib.util.find_spec("sklearn.feature_extraction.text") is None
-            or importlib.util.find_spec("sklearn.decomposition") is None
-        ):
+        if not self._sklearn_available():
             logger.debug("scikit-learn not available")
             return [[0.0] * self._dim for _ in texts]
 
@@ -218,15 +224,19 @@ class TFIDFEmbedder:
         if len(self._corpus) > 10000:
             self._corpus = self._corpus[-10000:]
         self._fit(self._corpus)
+        if not self._fitted:
+            self._save_state()
 
     def fit_replace(self, texts: list[str]) -> None:
         """Replace the persisted corpus and refit from trusted document text."""
-        self._corpus = []
+        self._corpus = list(dict.fromkeys(texts[-10000:]))
         self._corpus_hash = ""
         self._fitted = False
         self._vectorizer = None
         self._svd = None
-        self._fit(texts[-10000:])
+        self._fit(self._corpus)
+        if not self._fitted:
+            self._save_state()
 
     def _fit(self, texts: list[str]) -> None:
         """Fit TF-IDF + SVD on provided texts."""

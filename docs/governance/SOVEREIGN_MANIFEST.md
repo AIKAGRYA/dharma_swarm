@@ -18,13 +18,13 @@
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active portfolio:** 6 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
+**Active portfolio:** 7 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
 
 **Spine objectives (each track serves one):**
 
 - `substrate-nativeness` — Substrate nativeness — runtime flows through the ontology/spine, not around it (covered)
 - `revenue-external-humans-served` — Revenue & external humans served — value leaves the house and someone acts on it (covered)
-- `research-depth` — Research depth — the contemplative-mechanistic bridge (R_V, geometric lens) deepens (**no active track**)
+- `research-depth` — Research depth — the contemplative-mechanistic bridge (R_V, geometric lens) deepens (covered)
 
 ### Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
 
@@ -238,7 +238,7 @@ not justified until the daemon + oracle CI both run green on the first.
 **Next items:**
 
 - [code] Phase 0a (Devin lane): delete workflow_graph.py + test; absorb durable_execution.py atomic checkpoint/restore + _record_runtime_receipt hook into dharma_swarm/graph/checkpoint.py, then delete. Brief: docs/plans/handoffs/DHARMAGRAPH_HANDOFF_DEVIN.md
-- [code] (blocker) Phase 0b reconciler (Devin lane): generalize operator_bridge.recover_stale_tasks pattern to delegation_runs; boot scan owned by SwarmManager.init + tick beside reap_orphaned_tasks; write recovered_at; heartbeat cadence; quarantine per loop_closure_quarantine convention. Chaos receipt (kill -9 -> reconcile -> zero double-execution) is the phase gate.
+- [code] DONE 2026-07-06 (PR #798, merged): Phase 0b reconciler (Devin lane) generalized operator_bridge.recover_stale_tasks pattern to delegation_runs; boot scan owned by SwarmManager.init + tick beside reap_orphaned_tasks; recovered_at/heartbeat/quarantine semantics landed. Chaos receipt gate satisfied by tests/test_graph_chaos_receipt.py.
 - [code] DONE 2026-07-05 (56743da, PR #799): Phase 0b durable_invoker (Claude lane) — dharma_swarm/graph/durable_invoker.py wraps _orch_invoker with memo-check + begin/complete idempotency on the existing runtime_state machinery. Review-hardened: deterministic claim key (all identities race on ONE PK row), CAS re-claim for stale/failed/declined takeover (runtime_state.try_reclaim_idempotent_side_effect, exactly one of N concurrent claimants executes), type-exact JSON result memo (unmemoizable results decline replay and re-execute — never truncated/null). orchestrator.py seam SHRANK the file 3220 -> 3210. Joint chaos receipt with the #798 reconciler landed as tests/test_graph_chaos_receipt.py (criterion phase0b_chaos_receipt): kill -9 sim -> boot reconcile -> requeue/quarantine per failure_code vocabulary -> retry executes exactly once -> replay memoizes across re-minted identity -> receipts intact; seeded-deterministic via graph/effects.
 - [code] DONE 2026-07-05 (b58cd31, PR #800): Phase 1 (Claude lane) — differential oracle: [test-oracle] extra pins langgraph==1.2.4 (oracle only, never core dep), 13 scenarios dual-run through the dharma clone AND real langgraph with semantic diff + JSON report artifact; 1 real divergence found and adjudicated (DEV-1 receipts-first deviation, LANGGRAPH_PARITY_CONTRACT.md; a test fails if it goes stale). CI job langgraph-oracle.yml ADVISORY (flips to blocking after a green week — that flip + operator go gate Phase 2). DST seed: graph/effects.py injectable clock/rng/dispatch-order, wired into durable_invoker staleness; seeded fault replays are trace-exact.
 - [ops] Operator: provision the ONE daemon VPS (existing droplet, RUNBOOK section 3e) so the Phase 0b reconciler runs against a live daemon; second VPS deferred until daemon + oracle CI green.
@@ -252,15 +252,58 @@ not justified until the daemon + oracle CI both run green on the first.
 - Do not edit orchestrator.py beyond the minimal seam call (module-budget ceiling); new logic goes in dharma_swarm/graph/.
 - Do not touch surfaces owned by sibling tracks except through their own next-items.
 
+### Hyperbolic Time Chamber — afferent ingest, gym battery, Frontier Ledger
+
+**Track id:** `hyperbolic-time-chamber-2026-07` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `research-depth` · **Verified at:** 2026-07-07 (TTL 21 days)
+**Relations:** complements: organism-rewire-2026-07, orchestration-arena-v1-2026-06, loop-closure-2026-06
+**Owns surfaces:** docs/vision_maps/MASTER_2026-07-07_hyperbolic_time_chamber.md, docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md, docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md, docs/plans/INWARD_ASCENT_PHASE0_DOSSIER_2026-07-07.md, scripts/governance/inward_ascent_baseline.py, scripts/governance/frontier_ledger.py, scripts/governance/transcendence_ledger.py, dharma_swarm/chamber/**, tests/test_chamber_traces.py, tests/test_chamber_gym_git_history.py, tests/test_chamber_daily_delta.py, tests/test_chamber_predictions.py, tests/test_chamber_sandbox.py, tests/test_chamber_ledger_history.py, tests/test_transcendence_ledger.py, reports/governance/inward_ascent/**, reports/governance/chamber/**
+**Moves vital signs:** eval_coverage, quality_gates
+
+Operator-ratified chamber doctrine (vision map 2026-07-07) + elevation
+spec (SEAL v2): seal the efferent edge, open the afferent edge wide,
+evolve at machine speed against imported and time-lagged reality
+(class-2 signal only) until the trust gate opens on measured numbers.
+Phase 0 shipped the dossier + baseline scoreboard + Frontier Ledger
+(PR #830). Phase 1 Slice A (ratified via plan approval 2026-07-07)
+hardwires ONE environment fully alive: G1 git-history gym with the E5
+chamber_gym_trace.v1 mandate, E1 transcendence decomposition
+(Krogh-Vedelsby from trace rows — verified unowned gap, chamber
+surfaces only), E4 causal daily delta chain, E3 micro-prediction lane
+on the existing ginko_brier API, E6 velocity columns on the ledger.
+All 12 disciplines + substrate ruling enforced.
+
+**Next items:**
+
+- [code] DONE 2026-07-07 (Phase 1 Slice A): dharma_swarm/chamber/ package — traces.py (chamber_gym_trace.v1, E5 mandate), gym_git_history.py (G1 taskpack + deterministic scorer + git-archive leak guard + fixture/live solver seam), chain.py + daily_delta.py (E4 causal chain, expect_chain-verified), predictions.py (E3 emitter/resolver, oracle rule + incident log), ledger_rows.py + ledger_history.py; transcendence_ledger.py (E1, --check replays); frontier_ledger velocity history (E6, door-drift guard per Codex review). 37 chamber tests green. End-to-end drive on REAL repo history (control arms: landed-replay vs null): 2 tasks scored in leak-free sandboxes, committed trace corpus + transcendence receipt (realized E_div=0.25, lift_vs_best=0.0; null-control exposed 1 non-discriminative task — the instrument catching a degenerate task on day one), first causal daily-delta heartbeat, zeitgeist needs_host receipt (egress 403 here). Follow-up folded into item 4: task-discriminativeness filter (drop tasks the null control passes).
+- [ops] Live solver seats for G1 (needs provider keys on the running host via key_oracle.dispatchable_now) + first real evolution iteration under compute-ROI declaration. Operator: keys/compute (decision queue items 3/5). BLOCKED ON item 6: the scorer runs untrusted evolved diffs; the Python guards (chamber/sandbox.py: diff denylist, env scrub, leak re-check) raise attack cost but do NOT contain arbitrary native code — the process/network isolation jail MUST land first.
+- [code] (blocker) (blocker) Sandbox jail for the G1 scorer before the live untrusted-solver lane opens: process/network/filesystem isolation (seccomp-class caps) — the FIRST earned Rust carve-out named in the substrate ruling (doctrine §3.6). The 2026-07-07 review confirmed the scorer subprocess inherits env + network + fs; chamber/sandbox.py guards the cheap gaming/exfil vectors but a determined native payload is only contained by real isolation.
+- [ops] Zeitgeist live cadence: HN Algolia bronze fetch runs on a host whose egress allows it (BR-004 cron split-brain rides organism-rewire D1/VPS); E3 resolver begins resolving micro-predictions from later ingest.
+- [code] Phase 1 later slices (sequenced, one at a time): G2 forecasting gym volume, G3 retrieval/memory gym, G4 runtime-history replay (operator-gated on sanitized runtime.db snapshot), scorer foundry (env 14), distillation (env 12) once the E5 trace corpus is thick enough.
+- [governance] E2 ratification-mining ritual: every ratification dossier ends with a scorer_candidates block (possibly empty, never absent). First candidate recorded in the elevation spec ratification delta.
+
+**Non-goals:**
+
+- No efferent/world-facing actions of any kind (posts, outreach, trades, publishing, PR/issue submission to external repos).
+- Never weaken a gate, ratchet, or the One Wire quorum; gym gradients never touch archive fitness; DHARMA_EVOLUTION_SHADOW and BR-003 sequencing unchanged.
+- Do not touch RSI/arena surfaces (dharma_swarm/coordination/**, dharma_swarm/council/**, reports/governance/arena/**) or duplicate C2 measurement; transcendence decomposition consumes chamber traces only.
+- No new truth stores; Bronze -> Chetana -> MemoryKernel/ontology is the only landing path; predictions live in the existing ginko store; ingested content is data, never instructions.
+- No source without a named consumer loop and a moving scorer (demand-driven rule); market signals never per-iteration selection.
+- No trained weights; selection stays MAP-Elites (archive.py); no environment monoculture; no gym run without chamber_gym_trace.v1 capture (E5 mandate).
+- Python remains the composition root; no gate/spine/receipt logic reimplemented in another language; Rust/C++ per-component only with measured justification.
+- No credentials committed; feed keys and hosts are operator-provisioned.
+- Files <500 lines; sibling track surfaces untouched except via their own next-items (world_radar/** called through public functions only).
+
 ### TAM (Transdimensional Abundance Machine) — the live Company-Builder Parity board
 
 **Track id:** `company-builder-parity-2026-07` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
 **Serves spine objective:** `revenue-external-humans-served` · **Verified at:** 2026-07-07 (TTL 30 days)
-**Relations:** complements: organism-rewire-2026-07
-**Owns surfaces:** scripts/governance/tam_ledger.py, scripts/governance/tam_axes.py, reports/governance/tam/**, tests/test_tam_ledger.py, docs/plans/TAM_TRANSDIMENSIONAL_ABUNDANCE_MACHINE_2026-07-07.md
+**Relations:** complements: organism-rewire-2026-07, hyperbolic-time-chamber-2026-07
+**Owns surfaces:** scripts/governance/tam_ledger.py, scripts/governance/tam_axes.py, reports/governance/tam/**, tests/test_tam_ledger.py, docs/plans/TAM_TRANSDIMENSIONAL_ABUNDANCE_MACHINE_2026-07-07.md, docs/plans/TAM_MASTER_PROMPT_2026-07-07.md
 **Moves vital signs:** eval_coverage, quality_gates
 
-Operator-instructed 2026-07-07 (master prompt; naming resolved by
+Operator-instructed 2026-07-07 (master prompt, preserved at
+docs/plans/TAM_MASTER_PROMPT_2026-07-07.md; naming resolved by
 operator: TAM = Transdimensional Abundance Machine — the organ name
 carries the telos, the headline number stays plain). ONE always
 re-runnable instrument answering: "How close are we to being a
@@ -273,7 +316,10 @@ COMPANY_BUILDER_PARITY.md board + tam_history.jsonl velocity chain);
 This is the FIRST track serving revenue-external-humans-served
 (previously an uncovered spine objective) and lands the sequencing
 called by organism-rewire-2026-07 next-item 8 ("Next track after this
-one lands MUST serve revenue-external-humans-served").
+one lands MUST serve revenue-external-humans-served"). Built as an
+arena_truth_report.py sibling (the chamber Frontier Ledger landed on
+main via PR #830 only mid-build-session; consolidation onto the
+chamber ledger helpers is queued, not assumed).
 
 Scope is measurement only — afferent (competitor PUBLIC data + our own
 honest status owners). Efferent-closed: no outreach, no publishing, no
@@ -284,8 +330,8 @@ and a verification label (NORTH_STAR §5 source-pending rule); every
 a flattering guess; UNMEASURED rows stay in the denominator so not
 measuring can never inflate the headline; AHEAD requires a RUNS-grade
 organ AND a cited structural exceed-vector. The honest-ARR axis
-(receipted revenue incumbents structurally cannot publish — Polsia's
-documented 4.4x claimed-vs-actual gap) is the headline differentiator.
+(receipted revenue no incumbent publishes third-party-verifiably) is
+the headline differentiator.
 
 First honest render (2026-07-07): parity_pct = 35.0 [RED], lanes
 Behind 6 / At parity 2 / Ahead 1 / No-equivalent 2 / Unmeasured 1.
@@ -294,7 +340,8 @@ That sparse, mostly-behind board IS the day-one truth.
 **Next items:**
 
 - [governance] Operator ratification of the track home (standalone company-builder-parity-2026-07 vs folding into another lane — one-line change either way) and of the day-one axis set / scoring weights (Behind 0 / At 1 / Ahead 1.5; UNMEASURED in denominator).
-- [research] Refresh the Polsia/Cofounder competitor facts with fresh source URLs (afferent read only — their sites/pricing may have moved since the 2026-06-10 snapshot in reports/anatomy_altitude_2026-06-10/lane_F_world.md), then re-render so tam_history.jsonl shows its first real velocity point.
+- [research] Refresh the Polsia/Cofounder competitor facts with fresh source URLs (afferent read only). IN FLIGHT 2026-07-07: deep blueprint/genealogy research is running; its adversarial verifier has already REFUTED the zilla.so 4.4x claimed-vs-actual ARR-gap framing (temporal apples-to-oranges: the $689K run-rate predates the $3M+ claims by 2-3 weeks of documented hypergrowth; zilla.so is an anonymous SEO-blog source). Update tam_axes.py rows honest_arr + distribution_arr from the verified dossier, then re-render so tam_history.jsonl shows its first real velocity point.
+- [code] Consolidation audit vs the chamber Frontier Ledger (PR #830 landed scripts/governance/frontier_ledger.py + dharma_swarm/chamber/ledger_rows.py/ledger_history.py mid-session, after this instrument was built on the arena_truth_report.py contract): if the chamber ledger_history/comparator helpers are importable without touching chamber-owned surfaces, absorb them and delete the local equivalents; else record why two siblings stay.
 - [code] Optional dashboard wiring: a KanbanLane[] producer feeding the existing CoherenceKanban.tsx from the tam_receipt.json lanes; until then the COMPANY_BUILDER_PARITY.md table IS the board (governance receipt stays the source of truth).
 
 **Non-goals:**
@@ -325,7 +372,7 @@ These are immutable engineering laws for this repository. Violation = architectu
 The `dharma_swarm/` package currently has **389 files at its top level (58.7% of 663 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
 
 ### A2: NO DUPLICATE IMPLEMENTATIONS
-Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **26 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **21 adapter files across 8 locations** (V), and **14 router files** (V). Do not add more without deprecating an existing one.
+Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **27 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **21 adapter files across 8 locations** (V), and **14 router files** (V). Do not add more without deprecating an existing one.
 
 ### A3: NO UNDOCUMENTED SEAMS
 If your code creates a new interface between domains (a bridge, adapter, or protocol), you must update `NAVIGATION.md` with its purpose, entry point, and boundary constraints. Undocumented seams become invisible coupling.
@@ -369,16 +416,59 @@ append-style refreshes quadruplicated rows and broke `make docops-integrity`).
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
+| Total Python modules | **840** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **420 (52.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **326,297** | wc -l across dharma_swarm Python modules |
+| Test files | **782** | find tests -name "*.py" -type f |
+| Test functions | **12,198 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test files | **782** | find tests -name "*.py" -type f |
+| Test functions | **12,198 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
+| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
+| Markdown files | **1171** | find . -name "*.md" -type f |
+| Markdown total lines | **260,083** | wc -l across all .md |
+| Markdown files | **1171** | find . -name "*.md" -type f |
+| Markdown total lines | **260,083** | wc -l across all .md |
+| Test files | **777** | find tests -name "*.py" -type f |
+| Test functions | **12,164 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test files | **777** | find tests -name "*.py" -type f |
+| Test functions | **12,164 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
+| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
+| Markdown files | **1238** | find . -name "*.md" -type f |
+| Markdown total lines | **270,022** | wc -l across all .md |
+| Markdown files | **1238** | find . -name "*.md" -type f |
+| Markdown total lines | **270,022** | wc -l across all .md |
+| Total Python modules | **807** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **420 (53.1%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **319,298** | wc -l across dharma_swarm Python modules |
+| Test files | **777** | find tests -name "*.py" -type f |
+| Test functions | **12,164 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test files | **777** | find tests -name "*.py" -type f |
+| Test functions | **12,164 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
+| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
+| Markdown files | **1238** | find . -name "*.md" -type f |
+| Markdown total lines | **270,022** | wc -l across all .md |
+| Markdown files | **1238** | find . -name "*.md" -type f |
+| Markdown total lines | **270,022** | wc -l across all .md |
+| Total Python modules | **880** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **435 (49.4%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **339,354** | wc -l across dharma_swarm Python modules |
+| Test files | **824** | find tests -name "*.py" -type f |
+| Test functions | **12,557 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Total Python modules | **887** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **436 (49.2%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python modules | **908** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **437 (49.2%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
 | Total Python LOC | **343,077** | wc -l across dharma_swarm Python modules |
-| Test files | **841** | find tests -name "*.py" -type f |
-| Test functions | **12,710 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test files | **853** | find tests -name "*.py" -type f |
+| Test functions | **12,809 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **12,674 (measured 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
 | Collection errors | **0 (measured 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
-| Markdown files | **1,324** | find . -name "*.md" -type f |
-| Markdown total lines | **282,623** | wc -l across all .md |
-| Bridge files | **26** | find dharma_swarm -name "*bridge*.py" -type f |
+| Markdown files | **1,334** | find . -name "*.md" -type f |
+| Markdown total lines | **284,003** | wc -l across all .md |
+| Bridge files | **27** | find dharma_swarm -name "*bridge*.py" -type f |
 | Adapter files | **26** | find dharma_swarm -type f | rg -i "adapter" |
 | Router files | **16** | find dharma_swarm -type f | rg -i "rout" |
 
@@ -464,7 +554,7 @@ append-style refreshes quadruplicated rows and broke `make docops-integrity`).
 
 ### Domain 6: Bridges (Integration Layer)
 
-**26 bridge files** (V), **11,910 total LOC**:
+**27 bridge files** (V), **11,910 total LOC**:
 
 | Bridge | Lines | Importers | Status |
 |--------|-------|-----------|--------|
@@ -660,13 +750,13 @@ This re-audit found errors in the earlier 5-model audit:
 | Error in prior audit | Corrected value |
 |---------------------|----------------|
 | "codex_overnight.py is 10K lines" | **1,008 lines** (V) |
-| "17 bridge files" / "19 bridge files" (self-contradicting) | **26 bridge files** (V) |
+| "17 bridge files" / "19 bridge files" (self-contradicting) | **27 bridge files** (V) |
 | "16 TUI test errors" | **16 total errors: 10 numpy, 2 textual, 1 typer, 1 pytest_asyncio, 1 yaml, 1 tui.app** -- only 3 are TUI-specific (V) |
 | "10 pillars" with "PILLAR_04 missing, PILLAR_11 present" | **10 pillar files exist** (PILLAR_01-03, 05-11; PILLAR_04 never created). Sparse numbering, not 11. (V) |
 | "router_v1.py is LEGACY" | **router_v1.py is ALIVE** -- actively used by providers.py for signal generation (V) |
 | "18 provider classes" (VIVEKA) | **19 classes** (including abstract LLMProvider base); **18 ProviderType enum values** (V) |
 | "engine/ is legacy duplicate of tui/engine/" | **Both are ALIVE** -- engine/ has 41 importers, tui/engine/ has 31 importers. Different purposes. (V) |
-| Bridge count of "30" (Phase 3A) | **26 actual bridge files** -- the "30" counted test files and non-bridge files with "bridge" in name (V) |
+| Bridge count of "30" (Phase 3A) | **27 actual bridge files** -- the "30" counted test files and non-bridge files with "bridge" in name (V) |
 
 ---
 

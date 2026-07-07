@@ -1,0 +1,45 @@
+{
+  "authority": "projection_only",
+  "capability_claim": "NONE \u2014 internal-gym decomposition under the corpus's recorded aggregation rule; never a benchmark or C2 claim (RSI lab owns C2).",
+  "corpus_path": "reports/governance/chamber/trace_corpus.jsonl",
+  "corpus_rows": 2,
+  "corpus_sha256": "113d6489e1f66a7ca92545ad780011daf5e481c1d2e30ccf7f97080e5249b86d",
+  "decomposition": [
+    {
+      "all_seats_wrong_tasks": 0,
+      "disagreement_rate": 1.0,
+      "e_best_seat": 0.0,
+      "e_diversity_realized": 0.5,
+      "e_ensemble": 0.0,
+      "e_mean": 0.5,
+      "env_id": "g1_git_history",
+      "error_correlation": {
+        "mean_offdiag": null,
+        "pairs": {
+          "seat_landed_replay|seat_null": null
+        },
+        "undefined_pairs": 1
+      },
+      "lift_vs_best_seat": 0.0,
+      "n_tasks": 2,
+      "seat_error_rates": {
+        "seat_landed_replay": 0.0,
+        "seat_null": 1.0
+      },
+      "seats": [
+        "seat_landed_replay",
+        "seat_null"
+      ],
+      "selection_aggregation": true,
+      "taskpack_sha": "28a47b9f92a3e7e064bdb4d309af9271227830396e6dabe413c33f30903cf984"
+    }
+  ],
+  "digest": "0263d3dc9b2440a444c25364b720dbaadaf80832c10513070e34abe78a8ceded",
+  "fact_owner": "docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md \u00a7E1",
+  "generated_at": "2026-07-07T10:16:37Z",
+  "schema": "dharma_swarm.transcendence_decomposition.v1",
+  "summary": {
+    "any_positive_lift_vs_best_seat": false,
+    "taskpacks": 1
+  }
+}

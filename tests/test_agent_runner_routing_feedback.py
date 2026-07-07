@@ -81,9 +81,9 @@ async def test_run_task_uses_routed_provider_and_records_feedback(fast_gate) -> 
 
     assert result.startswith("Implemented fix")
     route_request, _, allowlist = provider.calls[0]
-    assert allowlist == [ProviderType.OPENAI]
+    assert allowlist is None
     assert route_request.context["preferred_provider"] == "openai"
-    assert route_request.context["preserve_requested_model"] is True
+    assert route_request.context["preserve_requested_model"] is False
     feedback = provider.feedback[0]
     assert feedback["success"] is True
     assert feedback["model"] == "gpt-4.1"
@@ -162,7 +162,7 @@ async def test_run_task_resolves_model_catalog_selector_into_routing_metadata(
 
 
 @pytest.mark.asyncio
-async def test_global_routed_execution_flag_does_not_override_pinned_agent_lane(
+async def test_explicit_routing_disable_keeps_pinned_agent_lane(
     fast_gate,
     monkeypatch,
 ) -> None:
@@ -174,6 +174,7 @@ async def test_global_routed_execution_flag_does_not_override_pinned_agent_lane(
             role=AgentRole.RESEARCHER,
             provider=ProviderType.OLLAMA,
             model="glm-5:cloud",
+            metadata={"allow_provider_routing": False},
         ),
         provider=provider,
     )
@@ -191,6 +192,34 @@ async def test_global_routed_execution_flag_does_not_override_pinned_agent_lane(
     assert allowlist == [ProviderType.OLLAMA]
     assert route_request.context["preferred_provider"] == "ollama"
     assert route_request.context["preserve_requested_model"] is True
+
+
+@pytest.mark.asyncio
+async def test_default_ollama_agent_uses_full_router_chain(fast_gate) -> None:
+    provider = _RoutedProvider(content="Fallback-capable response.")
+    runner = AgentRunner(
+        AgentConfig(
+            name="cyber-glm5",
+            role=AgentRole.RESEARCHER,
+            provider=ProviderType.OLLAMA,
+            model="glm-5:cloud",
+        ),
+        provider=provider,
+    )
+    await runner.start()
+
+    await runner.run_task(
+        Task(
+            id="task-default-route",
+            title="Investigate live provider routing",
+            description="Prove the daemon can use fallback providers when Ollama is rate-limited.",
+        )
+    )
+
+    route_request, _, allowlist = provider.calls[0]
+    assert allowlist is None
+    assert route_request.context["preferred_provider"] == "ollama"
+    assert route_request.context["preserve_requested_model"] is False
 
 
 @pytest.mark.asyncio

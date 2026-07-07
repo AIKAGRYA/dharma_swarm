@@ -109,18 +109,34 @@ not in Ahead.
 - History chain rows follow the `check_track_status` chain convention
   (digest over all fields except `digest`; `prev_digest` links; empty genesis).
 
-**Deviation from the build prompt, flagged honestly:** the prompt named
-`scripts/governance/frontier_ledger.py`, `dharma_swarm/chamber/ledger_rows.py`,
-`dharma_swarm/chamber/ledger_history.py`, and a `hyperbolic-time-chamber-2026-07`
-track as the instrument/modules to clone. **None of these exist anywhere in
-this repository's history** (verified 2026-07-07: no file, no branch, no
-commit matches). The closest shipped instrument implementing the exact same
-contract is `arena_truth_report.py`, so TAM was built as its sibling; the
-row/comparator and history-chain semantics the prompt described were
-implemented fresh inside `tam_ledger.py` against the existing house
-conventions. The track therefore `complements: organism-rewire-2026-07`
-(whose next-item 8 explicitly demanded the next track serve
-`revenue-external-humans-served`) instead of the nonexistent chamber track.
+**Deviation from the build prompt, flagged honestly (updated at merge):**
+the prompt named `scripts/governance/frontier_ledger.py`,
+`dharma_swarm/chamber/ledger_rows.py` / `ledger_history.py`, and the
+`hyperbolic-time-chamber-2026-07` track as the instrument/modules to clone.
+At build time none of these existed on the main this branch was cut from —
+**they landed on main mid-session via PR #830** (merged after this branch's
+base commit `d0a2c5d`). TAM was therefore built as a sibling of the shipped
+instrument implementing the identical contract, `arena_truth_report.py`,
+with the row/comparator and history-chain semantics implemented against the
+same house conventions the chamber ledger uses (`stable_digest` seal,
+`check_track_status` chain format). Reconciled at merge: the track now
+`complements` both `organism-rewire-2026-07` (whose next-item 8 demanded
+this spine objective be served next) and `hyperbolic-time-chamber-2026-07`;
+a consolidation audit onto the chamber ledger helpers is track next-item 3.
+The operator's forged master prompt (which PR #830 committed at this file's
+path) is preserved verbatim at `docs/plans/TAM_MASTER_PROMPT_2026-07-07.md`.
+
+**Competitor-fact correction in flight (2026-07-07):** the deep
+blueprint/genealogy research pass adversarially REFUTED the zilla.so "4.4×
+claimed-vs-actual ARR gap" framing this dossier and `tam_axes.py` cite: the
+$689K run-rate (Mixergy, recorded ~Feb 2026) predates the $3M+ claims by
+2–3 weeks of independently documented hypergrowth (True Ventures 2026-03-23
+"tripled to $3M ARR"; agent-wars 2026-03-14 "$3.5M"), the contemporaneous
+gap was ~1.45× at most, and zilla.so is an anonymous SEO-style review blog,
+not third-party reporting. The structural honest-ARR thesis (no incumbent
+publishes third-party-verifiable revenue) stands, but the 4.4×-gap wedge
+must not be repeated as fact. Axis rows `honest_arr` and `distribution_arr`
+get corrected from the verified dossier in track next-item 2.
 
 ## Operator decision queue
 

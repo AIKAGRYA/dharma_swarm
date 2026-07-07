@@ -22,6 +22,7 @@ SENSITIVE_FILES = (
     ROOT / "dharma_swarm" / "sealed_packet_apply.py",
     ROOT / "dharma_swarm" / "terminal_commands" / "evolution.py",
     ROOT / "dharma_swarm" / "dgc_cli.py",
+    ROOT / "dharma_swarm" / "promotion_gate.py",
 )
 FALSE_KEYWORDS = {"shadow", "shadow_mode"}
 LIVE_APPLY_CALLS = {
