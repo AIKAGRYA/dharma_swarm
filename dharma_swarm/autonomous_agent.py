@@ -957,8 +957,14 @@ class AutonomousAgent:
                 gate = check_action(action=action_desc, content=str(inputs))
                 if gate.decision == GateDecision.BLOCK:
                     return f"GATE BLOCKED: {gate.reason}"
-            except Exception:
-                pass  # gate failure should not prevent tool execution
+            except Exception as exc:
+                # Fail CLOSED (operator directive 2026-07-07): a crashed gate
+                # must not silently authorize a side-effect tool.
+                logger.error(
+                    "telos gate unavailable for %s; refusing side-effect tool: %s",
+                    name, exc)
+                return (f"GATE UNAVAILABLE: refusing side-effect tool '{name}' — "
+                        f"telos gate raised {exc.__class__.__name__}: {exc}")
 
         handler = {
             "read_file": self._tool_read_file,

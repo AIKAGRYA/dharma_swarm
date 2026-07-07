@@ -370,6 +370,22 @@ def render_parallel_work_lanes() -> dict[str, Any]:
     snap = _work_lane_snapshot()
     worktrees = snap.get("worktrees") or []
     print(f"  Worktrees: {len(worktrees)}  ·  Local branches: {snap.get('local_branch_count', 0)}")
+    try:
+        # Budget rule (CLAUDE.md): active tracks + 1 canonical + 2 scratch.
+        # Rendered here so the violation is impossible to not-see at session
+        # start; disposal remains an operator decision.
+        import importlib.util as _ilu
+        _spec = _ilu.spec_from_file_location(
+            "check_worktree_budget", Path(__file__).with_name("check_worktree_budget.py"))
+        _wb = _ilu.module_from_spec(_spec)
+        _spec.loader.exec_module(_wb)
+        _v = _wb.evaluate_for_repo(REPO_ROOT)
+        _state = f"OVER by {_v['over_by']}" if _v["over_budget"] else "OK"
+        print(f"  Worktree budget: {_v['count']}/{_v['budget']} ({_state})"
+              f"  ·  {_v['unmapped_count']} unmapped to any active track"
+              "  ·  detail: python3 scripts/governance/check_worktree_budget.py")
+    except Exception as _exc:  # a hygiene renderer must never break onboarding
+        print(f"  Worktree budget: check unavailable ({_exc})")
     here = str(REPO_ROOT)
     for w in worktrees[:12]:
         marker = "▶" if str(w.get("path")) == here else " "

@@ -362,6 +362,30 @@ class TestToolDispatch:
         result = await agent._execute_tool("nonexistent_tool", {})
         assert "Unknown tool" in result
 
+    @pytest.mark.asyncio
+    async def test_gate_crash_fails_closed(self, monkeypatch, tmp_path):
+        # A crashed telos gate must refuse the side-effect tool, not wave it
+        # through (the pre-2026-07-07 behavior was `except Exception: pass`).
+        def boom(**kwargs):
+            raise RuntimeError("gate down")
+
+        monkeypatch.setattr("dharma_swarm.telos_gates.check_action", boom)
+        ident = AgentIdentity(
+            name="t", role="r", system_prompt="s",
+            allowed_tools=["bash", "read_file"],
+            working_directory=str(tmp_path),
+        )
+        agent = AutonomousAgent(ident)
+        result = await agent._execute_tool("bash", {"command": "echo hi"})
+        assert "GATE UNAVAILABLE" in result
+        assert "hi" not in result.splitlines()[-1]  # command did not run
+
+        # Non-side-effect tools are unaffected by a downed gate.
+        probe = tmp_path / "probe.txt"
+        probe.write_text("ok")
+        result2 = await agent._execute_tool("read_file", {"path": str(probe)})
+        assert "GATE UNAVAILABLE" not in result2
+
 
 # ---------------------------------------------------------------------------
 # Message format conversion
