@@ -98,3 +98,10 @@ def test_from_agent_identity_uses_agent_uid_over_display_name():
     assert card.name == "devin"
     assert card.agent_uid == "devin-roaming-2987d222"
     assert _a2a_inbox_interface(card)["subject"] == "dharma.agent.devin-roaming-2987d222.inbox"
+
+
+def test_codex_rsi_lab_manager_aliases_resolve_to_stable_uid():
+    assert resolve_agent_uid("codex-rsi-lab-manager") == "codex_rsi_lab_manager"
+    assert resolve_agent_uid("codex-rsi-lab") == "codex_rsi_lab_manager"
+    assert resolve_agent_uid("rsi-lab-manager") == "codex_rsi_lab_manager"
+    assert a2a_inbox_subject("rsi-lab-manager") == "dharma.agent.codex_rsi_lab_manager.inbox"

@@ -48,6 +48,11 @@ AGENT_UID_ALIASES = {
     "fable-claude-code": "fable_claude_code",
     "fable-composer": "fable_composer",
     "perplexity": "perplexity-computer",
+    "codex-rsi-lab-manager": "codex_rsi_lab_manager",
+    "codex-rsi-lab": "codex_rsi_lab_manager",
+    "codex-rsi": "codex_rsi_lab_manager",
+    "rsi-lab-manager": "codex_rsi_lab_manager",
+    "rsi_lab_manager": "codex_rsi_lab_manager",
 }
 
 
