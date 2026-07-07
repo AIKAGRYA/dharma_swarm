@@ -490,6 +490,30 @@ def write_required_artifacts(
     return {"status": "completed", "artifact_refs": refs}
 
 
+def _record_verifier_command_receipt(*, command: str, workspace_root: Path) -> None:
+    """Append an audit-trail receipt before executing a shell verifier command.
+
+    run_verifier_command executes an operator-supplied shell string with
+    shell=True; this leaves a forensic trail (who/what ran, when, where) so an
+    unexpected or injected command is at least detectable after the fact, even
+    though it does not sanitize or restrict the command itself.
+    """
+    try:
+        receipts_dir = Path.home() / ".dharma" / "witness"
+        receipts_dir.mkdir(parents=True, exist_ok=True)
+        receipt = {
+            "schema_version": "dharma.ds_goal_verifier_command_receipt.v1",
+            "command": command,
+            "workspace_root": str(workspace_root),
+            "pid": os.getpid(),
+            "recorded_at": utc_now(),
+        }
+        with (receipts_dir / "verifier_command_receipts.jsonl").open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(receipt, sort_keys=True) + "\n")
+    except OSError:
+        pass
+
+
 def run_verifier_command(
     verifier_command: str,
     *,
@@ -508,6 +532,7 @@ def run_verifier_command(
             "reason": "verifier_command_missing",
         }
     workspace_root.mkdir(parents=True, exist_ok=True)
+    _record_verifier_command_receipt(command=command, workspace_root=workspace_root)
     try:
         completed = subprocess.run(
             command,

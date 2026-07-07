@@ -3,8 +3,8 @@ title: Production Deployment Guide
 path: docs/architecture/PRODUCTION_DEPLOYMENT_GUIDE.md
 slug: production-deployment-guide
 doc_type: documentation
-status: active
-summary: 'Version : 1.0 Date : 2026-03-09 Target : Enterprise deployment of dharma swarm with full Unassailable System guarantees'
+status: draft
+summary: 'Version : 1.0 Date : 2026-03-09 Target : Enterprise deployment of dharma swarm; Phase 4-6 (monitoring, scale testing, RBAC/SSO) below are unbuilt — see status note'
 source:
   provenance: repo_local
   kind: documentation
@@ -98,8 +98,15 @@ curation:
 # Production Deployment Guide
 
 **Version**: 1.0
-**Date**: 2026-03-09
-**Target**: Enterprise deployment of dharma_swarm with full Unassailable System guarantees
+**Date**: 2026-03-09 (status note added 2026-07-08)
+**Target**: Enterprise deployment of dharma_swarm
+
+> **Status: draft, not achieved.** Phase 4-6 below (monitoring/alerting,
+> load testing, multi-tenancy/RBAC/SSO) are unbuilt checklists, not shipped
+> capabilities. Per `docs/REPO_ONTOLOGY_AND_HYGIENE_MASTER_SPEC_2026-04-01.md`,
+> "complete"/"unassailable"/victory language should not determine placement
+> or authority — treat this doc as a deployment checklist to work through,
+> not a production-readiness claim.
 
 ---
 
@@ -827,4 +834,6 @@ FAILED test_fitness_always_bounded - Fitness score 1.2 > 1.0
 
 ---
 
-**JSCA!** — dharma_swarm is production-ready with Unassailable guarantees.
+**JSCA!** — this checklist is the target, not a claim: dharma_swarm reaches
+production-ready when Phase 1-3 above are verified green *and* Phase 4-6 are
+checked off, not before.

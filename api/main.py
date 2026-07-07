@@ -18,7 +18,7 @@ from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -194,6 +194,35 @@ async def lifespan(app: FastAPI):
 def _get_api_key() -> str | None:
     """Read DASHBOARD_API_KEY from environment (per-request, supports rotation)."""
     return os.environ.get(DASHBOARD_API_KEY_ENV)
+
+
+_dev_mode_warned = False
+
+
+def require_api_key(request: Request) -> None:
+    """Route-level auth dependency for mutating endpoints (defense-in-depth).
+
+    Enforces the same check as BearerAuthMiddleware directly on the route,
+    so a mutating endpoint stays protected even if the middleware is ever
+    removed, reordered, or misconfigured. Preserves the existing dev-mode
+    behavior (open when no key is configured) but makes that state loud
+    instead of silent.
+    """
+    global _dev_mode_warned
+    api_key = _get_api_key()
+    if api_key is None:
+        if not _dev_mode_warned:
+            logger.warning(
+                "%s is not set — mutating API routes are running with NO authentication "
+                "(dev mode). Set %s to require a bearer token.",
+                DASHBOARD_API_KEY_ENV, DASHBOARD_API_KEY_ENV,
+            )
+            _dev_mode_warned = True
+        return
+    auth_header = request.headers.get("authorization", "")
+    token = auth_header[7:] if auth_header.startswith("Bearer ") else ""
+    if not token or not hmac.compare_digest(token, api_key):
+        raise HTTPException(status_code=401, detail=_AUTH_FAILURE_RESPONSE["detail"])
 
 
 # Routes that never require authentication (method, path).

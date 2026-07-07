@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from api.main import require_api_key
 from api.models import ApiResponse, CreateTaskRequest, EvolveRequest, TraceOut
 
 router = APIRouter(prefix="/api", tags=["commands"])
@@ -14,7 +15,7 @@ def _get_swarm():
     return get_swarm()
 
 
-@router.post("/commands/evolve")
+@router.post("/commands/evolve", dependencies=[Depends(require_api_key)])
 async def trigger_evolve(req: EvolveRequest) -> ApiResponse:
     swarm = _get_swarm()
     try:
@@ -24,7 +25,7 @@ async def trigger_evolve(req: EvolveRequest) -> ApiResponse:
         return ApiResponse(status="error", error=str(e))
 
 
-@router.post("/commands/task")
+@router.post("/commands/task", dependencies=[Depends(require_api_key)])
 async def create_task(req: CreateTaskRequest) -> ApiResponse:
     swarm = _get_swarm()
     try:
@@ -98,7 +99,7 @@ async def recent_traces(limit: int = 30) -> ApiResponse:
         return ApiResponse(data=[], error=str(e))
 
 
-@router.post("/commands/dispatch")
+@router.post("/commands/dispatch", dependencies=[Depends(require_api_key)])
 async def dispatch_tasks() -> ApiResponse:
     """Trigger task dispatch cycle."""
     swarm = _get_swarm()
