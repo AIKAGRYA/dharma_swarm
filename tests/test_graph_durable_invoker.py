@@ -517,16 +517,26 @@ def test_receipt_round_trips_through_dict():
     assert rebuilt.attributes["side_effect_key"] == KEY
 
 
-async def test_persist_evidence_receipt_fail_open_and_success(store, caplog):
+async def test_persist_evidence_receipt_fail_open_and_success(store, caplog, tmp_path):
     import logging
 
     receipt = EvidenceReceipt(task_id=TASK_ID, agent_id=AGENT_ID, status="ok")
+    failed_chain = tmp_path / "failed-chain.jsonl"
     # No delegation_runs row yet: persist_receipt raises on 0-row match; the
     # helper fails open with a loud warning, never breaking dispatch.
     await store.init_db()
     with caplog.at_level(logging.WARNING):
-        assert await persist_evidence_receipt(receipt, store, task_id=TASK_ID) is False
+        assert (
+            await persist_evidence_receipt(
+                receipt,
+                store,
+                task_id=TASK_ID,
+                machine_receipt_path=failed_chain,
+            )
+            is False
+        )
     assert any("NOT persisted" in rec.message for rec in caplog.records)
+    assert failed_chain.exists()
 
     with sqlite3.connect(store.db_path) as db:
         db.execute(
@@ -535,12 +545,22 @@ async def test_persist_evidence_receipt_fail_open_and_success(store, caplog):
             (TASK_ID, AGENT_ID),
         )
         db.commit()
-    assert await persist_evidence_receipt(receipt, store, task_id=TASK_ID) is True
+    success_chain = tmp_path / "success-chain.jsonl"
+    assert (
+        await persist_evidence_receipt(
+            receipt,
+            store,
+            task_id=TASK_ID,
+            machine_receipt_path=success_chain,
+        )
+        is True
+    )
     with sqlite3.connect(store.db_path) as db:
         row = db.execute(
             "SELECT receipt_json FROM delegation_runs WHERE task_id = ?", (TASK_ID,)
         ).fetchone()
     assert row is not None and json.loads(row[0])["receipt_id"] == str(receipt.receipt_id)
+    assert success_chain.exists()
 
 
 def test_a2a_spine_adapter_untouched():

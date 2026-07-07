@@ -6,6 +6,25 @@ Do not hand-edit the generated block.
 <!-- DOCOPS:START metric=repo_inventory -->
 | Metric | Value |
 |---|---:|
+| Dharma Python modules | 840 |
+| Top-level Dharma Python modules | 420 |
+| Dharma Python LOC | 331,030 |
+| Test files | 782 |
+| Test function occurrences | 12,198 |
+| Markdown files | 1,171 |
+| Markdown total lines | 260,083 |
+| Dharma Python LOC | 326,297 |
+| Test files | 777 |
+| Test function occurrences | 12,164 |
+| Markdown files | 1,238 |
+| Markdown total lines | 270,022 |
+| Dharma Python modules | 880 |
+| Top-level Dharma Python modules | 435 |
+| Dharma Python LOC | 341,149 |
+| Test files | 824 |
+| Test function occurrences | 12,557 |
+| Markdown files | 1,314 |
+| Markdown total lines | 280,913 |
 | Dharma Python modules | 887 |
 | Top-level Dharma Python modules | 436 |
 | Dharma Python LOC | 343,077 |
@@ -14,8 +33,16 @@ Do not hand-edit the generated block.
 | Markdown files | 1,324 |
 | Markdown total lines | 282,623 |
 | Bridge files | 26 |
+| Dharma Python modules | 908 |
+| Top-level Dharma Python modules | 437 |
+| Dharma Python LOC | 348,593 |
+| Test files | 853 |
+| Test function occurrences | 12,809 |
+| Markdown files | 1,334 |
+| Markdown total lines | 284,003 |
+| Bridge files | 27 |
 | Adapter files | 26 |
 | Orchestrator files | 6 |
 | Router files | 16 |
-| Authority candidate docs | 593 |
+| Authority candidate docs | 595 |
 <!-- DOCOPS:END -->

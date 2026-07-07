@@ -9,6 +9,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.cron_algedonic_handlers import (
+    run_algedonic_triage,
+    run_provider_starvation_alert,
+)
 from dharma_swarm.cron_job_runtime import CronJobExecutionResult, CronJobRunStatus
 from dharma_swarm.daemon_config import dharma_state_dir
 from dharma_swarm.context import (
@@ -866,6 +870,8 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         tcs_heartbeat   — local IdentityMonitor time-series sample
         world_scout     — external zeitgeist radar and scout cascade
         store_sync      — materialize ontology outcomes into runtime artifacts
+        provider_starvation_alert — emit algedonic signal for provider-chain starvation
+        algedonic_triage — drain pain-signal cursor and write P0 alert summary
     """
     handler = str(job.get("handler", "headless_prompt")).strip() or "headless_prompt"
 
@@ -915,6 +921,10 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         return run_signal_deep_sweep_job(job)
     if handler == "store_sync":
         return _run_store_sync(job)
+    if handler == "provider_starvation_alert":
+        return run_provider_starvation_alert(job)
+    if handler == "algedonic_triage":
+        return run_algedonic_triage(job)
     if handler == "shell":
         return _run_shell_command(job)
 
