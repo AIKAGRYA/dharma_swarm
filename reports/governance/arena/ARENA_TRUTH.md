@@ -1,6 +1,6 @@
 # Arena Truth — governance report surface (read-only)
 
-**Schema:** `arena_truth_report.v1` · **Generated:** 2026-07-03T08:00:18Z
+**Schema:** `arena_truth_report.v1` · **Generated:** 2026-07-05T17:28:54Z
 **Replay:** `python3 scripts/governance/arena_truth_report.py --check`
 
 > **NO CAPABILITY CLAIM.** none — hermetic fixture harness only. The fixture pool is CONSTRUCTED so that specialist routing beats best-single (Krogh-Vedelsby by design), so the lift shown is a control-machinery existence proof on the frozen synthetic taskpack, NOT a production capability claim (track non-goal 1) and NOT commensurable with trust-gate C2 (which reads only live benchmark runs). Live-lane runs must carry the same best-single + budget-parity + significance controls before any claim.
@@ -21,6 +21,7 @@
 - task_manifest_hash: `76f69c2f2994dbe5…`
 - scorer_hash: `5c5e5be906ed2e85…`
 - candidate_genome_id: `genome-6f74d65b34c0424e`
+- measurement_mode: `hermetic_fixture`
 - **closeout_state: `positive_lift_candidate`**
 - council_verdict: `corroborated`
 
@@ -30,6 +31,7 @@
 | --- | ----- | ------------- | ------------- |
 | candidate | 1.0000 | 2400 | True |
 | best_single_full_budget | 0.3750 | 2400 | True |
+| best_single_parity_budget | 0.3750 | 2400 | True |
 | same_budget_self_moa | 0.3750 | 2400 | True |
 | random_or_static_ensemble | 0.3750 | 7200 | False |
 
@@ -37,8 +39,15 @@
 
 - best_single_full_budget score: 0.3750
 - candidate score: 1.0000
-- observed_lift: 0.6250  (p=0.0000, significant=True, n=24)
+- observed_lift: 0.6250  ci95=[0.4167, 0.7917]  (p=0.0000, significant=True, n=24)
 - budget_ref: 2400  ·  candidate_within_parity: True
+
+## Budget-parity control (strongest seat at the swarm's call budget)
+
+- control_model: `beta-code`  ·  parity_verified: **True** (fails closed on mismatch)
+- calls: control=24 candidate=24 (match=True, per_call_cap=None)
+- best_single_parity_budget score: 0.3750
+- observed_lift: 0.6250  ci95=[0.4167, 0.7917]  (p=0.0000, significant=True, n=24)
 
 ## Dharma Power Index
 
