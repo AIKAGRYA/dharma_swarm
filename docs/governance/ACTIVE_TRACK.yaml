@@ -953,6 +953,8 @@ active_tracks:
       - tests/test_chamber_gym_git_history.py
       - tests/test_chamber_daily_delta.py
       - tests/test_chamber_predictions.py
+      - tests/test_chamber_sandbox.py
+      - tests/test_chamber_ledger_history.py
       - tests/test_transcendence_ledger.py
       - reports/governance/inward_ascent/**
       - reports/governance/chamber/**
@@ -1063,9 +1065,13 @@ active_tracks:
         kind: code
         blocker: false
       - id: 2
-        what: "Live solver seats for G1 (needs provider keys on the running host via key_oracle.dispatchable_now) + first real evolution iteration under compute-ROI declaration. Operator: keys/compute (decision queue items 3/5)."
+        what: "Live solver seats for G1 (needs provider keys on the running host via key_oracle.dispatchable_now) + first real evolution iteration under compute-ROI declaration. Operator: keys/compute (decision queue items 3/5). BLOCKED ON item 6: the scorer runs untrusted evolved diffs; the Python guards (chamber/sandbox.py: diff denylist, env scrub, leak re-check) raise attack cost but do NOT contain arbitrary native code — the process/network isolation jail MUST land first."
         kind: ops
         blocker: false
+      - id: 6
+        what: "(blocker) Sandbox jail for the G1 scorer before the live untrusted-solver lane opens: process/network/filesystem isolation (seccomp-class caps) — the FIRST earned Rust carve-out named in the substrate ruling (doctrine §3.6). The 2026-07-07 review confirmed the scorer subprocess inherits env + network + fs; chamber/sandbox.py guards the cheap gaming/exfil vectors but a determined native payload is only contained by real isolation."
+        kind: code
+        blocker: true
       - id: 3
         what: "Zeitgeist live cadence: HN Algolia bronze fetch runs on a host whose egress allows it (BR-004 cron split-brain rides organism-rewire D1/VPS); E3 resolver begins resolving micro-predictions from later ingest."
         kind: ops

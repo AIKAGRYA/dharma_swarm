@@ -28,15 +28,30 @@ __all__ = [
 ]
 
 
+def _series_value(vals: dict[str, Any]) -> float | None:
+    """The trackable number for a capability: its delta-to-field when
+    commensurable, else our own measured value. Without the ``ours`` fallback
+    velocity is dead by construction — only one row is ever commensurable and
+    its value is None, so no capability would ever accumulate two points
+    (review R1-3)."""
+    for key in ("delta", "ours"):
+        v = vals.get(key)
+        if isinstance(v, (int, float)):
+            return float(v)
+    return None
+
+
 def history_values(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    """Extract per-capability numeric series from history rows."""
+    """Extract per-capability numeric series (time-sorted) from history rows."""
     series: dict[str, list[tuple[str, float]]] = {}
     for row in rows:
         at = str(row.get("generated_at", ""))
         for cap, vals in row.get("capabilities", {}).items():
-            delta = vals.get("delta")
-            if isinstance(delta, (int, float)):
-                series.setdefault(cap, []).append((at, float(delta)))
+            v = _series_value(vals)
+            if v is not None:
+                series.setdefault(cap, []).append((at, v))
+    for points in series.values():  # by time, not insertion order (R1-5)
+        points.sort(key=lambda p: p[0])
     return series
 
 
@@ -69,7 +84,7 @@ def compute_velocity(prior_rows: list[dict[str, Any]],
         if len(points) < 2:
             per_cap[cap] = {
                 "status": "UNVALUED",
-                "requires": ">=2 renders with a numeric delta for this "
+                "requires": ">=2 renders with a numeric value for this "
                             "capability",
                 "points": len(points),
             }
@@ -84,6 +99,10 @@ def compute_velocity(prior_rows: list[dict[str, Any]],
             "closing": (rate < 0 if rate is not None else None),
             "points": len(points),
         }
+        if rate is None:  # equal or non-increasing timestamps between renders
+            per_cap[cap]["requires"] = ("two renders at least one clock-second "
+                                        "apart (identical timestamps cannot "
+                                        "define a rate)")
         valued += rate is not None
     return {
         "renders_in_history": len(rows),

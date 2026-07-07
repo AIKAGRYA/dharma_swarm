@@ -16,6 +16,8 @@ import pytest
 from dharma_swarm.chamber.gym_git_history import (
     LeakError,
     Taskpack,
+    _is_test_file,
+    _parse_pytest_summary,
     assert_leak_free,
     build_taskpack,
     export_sandbox,
@@ -169,3 +171,64 @@ def test_run_gym_end_to_end_writes_traces_and_receipt(fixture_repo, tmp_path):
 def test_live_solver_reports_honest_status():
     available, reason = live_solver_status()
     assert available is False and reason  # never silently green in Slice A
+
+
+# --- review-round regression tests ---
+
+def test_both_pytest_filename_conventions_are_ground_truth():
+    # R1-6: pytest's default python_files is test_*.py AND *_test.py.
+    assert _is_test_file("test_add.py")
+    assert _is_test_file("foo_test.py")
+    assert _is_test_file("pkg/bar_test.py")
+    assert not _is_test_file("helper.py")
+    assert not _is_test_file("testing.py")
+
+
+@pytest.mark.parametrize("summary,expected", [
+    ("1 passed in 0.1s", (1, 0, False)),
+    ("1 failed, 2 passed in 0.3s", (2, 1, False)),
+    ("3 passed, 1 xfailed in 0.2s", (3, 0, False)),  # xfailed != failed
+    ("2 errors in 0.1s", (0, 0, True)),
+    ("1 error in 0.1s", (0, 0, True)),
+])
+def test_parse_pytest_summary_reads_only_the_tally(summary, expected):
+    assert _parse_pytest_summary(f"collecting...\n{summary}") == expected
+
+
+def test_parse_summary_ignores_poisoned_test_output():
+    # R1-4: a test body printing "5 passed" must not poison the count.
+    stdout = 'print output: "5 passed"\n1 failed, 1 passed in 0.2s'
+    assert _parse_pytest_summary(stdout) == (1, 1, False)
+
+
+def test_candidate_conftest_injection_is_blocked_end_to_end(fixture_repo, tmp_path):
+    # R2-1 (the critical exploit): a diff adding a root conftest that
+    # neutralizes every test must NOT score an unfixed bug as correct.
+    pack = build_taskpack(fixture_repo, _head(fixture_repo), holdout_fraction=0)
+    task = pack.tasks[0]
+    attack = ("diff --git a/conftest.py b/conftest.py\n"
+              "new file mode 100644\nindex 0000000..1111111\n"
+              "--- /dev/null\n+++ b/conftest.py\n@@ -0,0 +1,2 @@\n"
+              "+def pytest_pyfunc_call(pyfuncitem):\n+    return True\n")
+    res = score_candidate(fixture_repo, task, attack, tmp_path / "atk")
+    assert not res.correct
+    assert "policy" in res.detail
+
+
+def test_renamed_or_deleted_landed_test_does_not_crash_taskpack(fixture_repo):
+    # R1-7: a merge that renames a landed test away must not enter the pack
+    # with a path absent at merge (which would crash the scorer's git show).
+    def g(*a, inp=None):
+        return _git(fixture_repo, *a, inp=inp)
+    g("checkout", "-q", "-b", "rename-test")
+    # rename an existing landed test file
+    g("mv", "test_add.py", "test_add_renamed.py")
+    g("commit", "-q", "-am", "rename test")
+    g("checkout", "-q", "main")
+    g("merge", "-q", "--no-ff", "-m", "PR-3: rename", "rename-test")
+    pack = build_taskpack(fixture_repo, _head(fixture_repo), holdout_fraction=0)
+    for t in pack.tasks:  # every listed test file exists at its merge
+        for rel in t.test_files:
+            r = subprocess.run(["git", "-C", str(fixture_repo), "cat-file",
+                                "-e", f"{t.merge_sha}:{rel}"], capture_output=True)
+            assert r.returncode == 0

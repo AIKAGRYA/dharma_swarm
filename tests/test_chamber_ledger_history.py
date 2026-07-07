@@ -45,3 +45,38 @@ def test_velocity_none_delta_never_fabricates():
                          "2026-07-08T00:00:00Z")
     assert v["capabilities"]["cap"]["status"] == "UNVALUED"
     assert v["capabilities"]["cap"]["points"] == 0
+
+
+def test_velocity_values_from_ours_when_delta_is_none():
+    # R1-3: velocity was dead because only `delta` (always None) was read.
+    # A capability whose measured `ours` changes must now produce a rate.
+    prior = [{"generated_at": "2026-07-07T00:00:00Z",
+              "capabilities": {"ingest": {"delta": None, "ours": 0.0}}}]
+    v = compute_velocity(prior, {"ingest": {"delta": None, "ours": 4.0}},
+                         "2026-07-09T00:00:00Z")
+    cap = v["capabilities"]["ingest"]
+    assert cap["status"] == "VALUED"
+    assert cap["d_delta_dt_per_day"] == 2.0  # (4-0)/2 days
+    assert v["valued"] == 1
+
+
+def test_velocity_equal_timestamps_unvalued_with_reason():
+    # R1-5: identical second-granularity timestamps cannot define a rate.
+    prior = [{"generated_at": "2026-07-07T00:00:00Z",
+              "capabilities": {"cap": {"delta": None, "ours": 1.0}}}]
+    v = compute_velocity(prior, {"cap": {"delta": None, "ours": 2.0}},
+                         "2026-07-07T00:00:00Z")
+    cap = v["capabilities"]["cap"]
+    assert cap["status"] == "UNVALUED"
+    assert "clock-second" in cap["requires"]
+
+
+def test_velocity_series_sorted_by_time_not_insertion():
+    # R1-5: out-of-order history rows must be time-sorted before differencing.
+    from dharma_swarm.chamber.ledger_history import history_values
+    rows = [
+        {"generated_at": "2026-07-09T00:00:00Z", "capabilities": {"c": {"ours": 3.0}}},
+        {"generated_at": "2026-07-07T00:00:00Z", "capabilities": {"c": {"ours": 1.0}}},
+    ]
+    series = history_values(rows)
+    assert [v for _, v in series["c"]] == [1.0, 3.0]  # time order

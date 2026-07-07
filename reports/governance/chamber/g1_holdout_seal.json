@@ -1,9 +1,11 @@
 {
-  "digest": "5dfca25ae095261bb78e4ac8d269e7fbf9deb7635bc46b644e8829b1f44266c8",
+  "digest": "f4fcc18aee970eb9ed845954ddc07ff6b9b922bb52fb3a543236c8c0be05ddce",
   "held_out_ids": [
-    "g1-c4af75162daf",
-    "g1-f84f40344cbd"
+    "g1-665c90c35c29",
+    "g1-6c8abd25f974",
+    "g1-b490fe1a1513",
+    "g1-c4af75162daf"
   ],
   "schema": "chamber_g1_holdout_seal.v1",
-  "taskpack_sha": "1adef54fa3107258e215e718fdb9e9c3a19d107e34c0afa621cbd970dadc88a5"
+  "taskpack_sha": "28a47b9f92a3e7e064bdb4d309af9271227830396e6dabe413c33f30903cf984"
 }

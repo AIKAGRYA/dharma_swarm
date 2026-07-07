@@ -65,7 +65,13 @@ def emit_micro_prediction(*, question: str, probability: float, resolve_by: str,
 
 
 def _agent_id(receipt: dict[str, Any]) -> str:
-    return str(receipt.get("prov", {}).get("agent", {}).get("id", ""))
+    """Defensive against present-but-null / non-dict nesting: a malformed
+    bronze dict must produce a finding, never an AttributeError (which would
+    bypass the incident log and fail OPEN — review R1-1/R3-N1)."""
+    prov = receipt.get("prov") or {}
+    agent = prov.get("agent") if isinstance(prov, dict) else None
+    agent = agent or {}
+    return str(agent.get("id", "")) if isinstance(agent, dict) else ""
 
 
 def _evidence_findings(evidence: list[dict[str, Any]]) -> list[str]:
@@ -74,6 +80,9 @@ def _evidence_findings(evidence: list[dict[str, Any]]) -> list[str]:
         findings.append(f"corroboration k={len(evidence)} < required {REQUIRED_K}")
     urls: set[str] = set()
     for i, receipt in enumerate(evidence):
+        if not isinstance(receipt, dict):
+            findings.append(f"evidence {i}: not a receipt object (untrusted shape)")
+            continue
         agent = _agent_id(receipt)
         if not agent:
             findings.append(f"evidence {i}: no prov.agent.id (untraceable)")
@@ -81,8 +90,12 @@ def _evidence_findings(evidence: list[dict[str, Any]]) -> list[str]:
             findings.append(
                 f"evidence {i}: prov.agent.id {agent!r} is not a fetcher "
                 "organ — self-authored resolution is the mirror")
-        urls.update(receipt.get("corroboration", {})
-                    .get("independent_source_urls", []))
+        corr = receipt.get("corroboration") or {}
+        src = corr.get("independent_source_urls") if isinstance(corr, dict) else None
+        if isinstance(src, str):  # a bare string would be iterated char-by-char
+            findings.append(f"evidence {i}: independent_source_urls must be a list")
+        elif isinstance(src, list):
+            urls.update(str(u) for u in src)
     if len(evidence) >= REQUIRED_K and len(urls) < REQUIRED_K:
         findings.append(
             f"only {len(urls)} independent source url(s) across evidence — "

@@ -79,6 +79,30 @@ def test_tampered_chain_refuses_append_and_read(tmp_path):
         _append(path, date="2026-07-08")
 
 
+def test_concurrent_appends_do_not_fork_the_chain(tmp_path):
+    # R1-2/R4: parallel writers must serialize; the chain stays readable.
+    import concurrent.futures as cf
+    from dharma_swarm.chamber.chain import append_chained, read_chain
+    path = tmp_path / "concurrent.jsonl"
+
+    def worker(i):
+        return append_chained(path, {"schema": "t.v1", "i": i})
+
+    with cf.ThreadPoolExecutor(max_workers=8) as ex:
+        list(ex.map(worker, range(40)))
+    rows = read_chain(path)  # raises BrokenChainError if the chain forked
+    assert len(rows) == 40
+    assert {r["i"] for r in rows} == set(range(40))
+
+
+def test_non_dict_chain_row_is_rejected(tmp_path):
+    from dharma_swarm.chamber.chain import BrokenChainError, read_chain
+    path = tmp_path / "bad.jsonl"
+    path.write_text("123\n", encoding="utf-8")
+    with pytest.raises(BrokenChainError, match="not a JSON object"):
+        read_chain(path)
+
+
 def test_checker_compatible_expect_chain(tmp_path, monkeypatch):
     """The chain must pass the REAL governance checker's expect_chain mode."""
     import importlib.util

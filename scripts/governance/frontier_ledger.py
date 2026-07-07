@@ -249,6 +249,21 @@ def write_surface(out_dir: Path) -> dict[str, Any]:
     return receipt
 
 
+def _transcendence_check() -> list[str]:
+    """Replay the transcendence receipt via its own instrument. Imported by
+    file path (scripts/governance is not a package); any import/execution
+    failure is itself a finding, never a silent pass."""
+    import importlib.util
+    path = REPO_ROOT / "scripts/governance/transcendence_ledger.py"
+    try:
+        spec = importlib.util.spec_from_file_location("transcendence_ledger", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod.check(mod.RECEIPT_PATH)
+    except Exception as exc:  # noqa: BLE001 — surfaced as a finding, not swallowed
+        return [f"could not replay transcendence instrument: {type(exc).__name__}: {exc}"]
+
+
 def _door_drift(committed: dict[str, Any]) -> list[str]:
     """Codex review (PR #830): --check must not bless a stale door. Re-run
     the trust gate and compare stable verdicts + gate_open + measured lift."""
@@ -301,6 +316,14 @@ def check(out_dir: Path) -> list[str]:
         if pinned.get("sha256") != sha256_file(path):
             findings.append(f"{key} input drifted since render — rerun "
                             "scripts/governance/frontier_ledger.py")
+
+    # A file-sha pin only proves the transcendence receipt is unchanged — not
+    # that it honestly replays from its corpus. Chain the anchor: run the
+    # transcendence instrument's own --check so a stale/fabricated receipt
+    # fails frontier --check too (review R2-4), not just its own gate.
+    if TRANSCENDENCE_PATH.exists():
+        findings.extend(f"transcendence receipt: {f}"
+                        for f in _transcendence_check())
 
     if not md_path.exists():
         findings.append(f"markdown surface missing: {md_path}")

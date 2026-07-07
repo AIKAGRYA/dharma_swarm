@@ -94,17 +94,36 @@ def decompose(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         errors: dict[str, list[int]] = {s: [] for s in seats}
         answers: dict[str, list[str]] = {s: [] for s in seats}
         ens_errors: list[int] = []
+        # Selection-aggregation sanity: under a rule that PICKS one seat's
+        # answer (oracle_argmax), the ensemble can only be correct on a task
+        # if some seat is. A corpus with the ensemble correct while every seat
+        # is wrong is fabricated — void it rather than emit fake transcendence
+        # (review R2-3). Enforced only for rules that declare selection.
+        rules = {str(r.get("attributes", {}).get("aggregation_rule", "")) for r in grp}
+        selection = all(rule.startswith("oracle_argmax") for rule in rules) and rules
+        all_wrong_tasks = 0
         for r in grp:
             by_seat = {a["seat_id"]: a for a in r["answers"]}
+            any_seat_correct = False
             for s in seats:
                 a = by_seat.get(s)
                 if a is None or a.get("correct") is None:
                     raise ValueError(
                         f"task {r['task_id']}: seat {s} lacks a correctness "
                         "label — decomposition refuses partial data")
-                errors[s].append(0 if a["correct"] else 1)
+                is_correct = bool(a["correct"])
+                errors[s].append(0 if is_correct else 1)
                 answers[s].append(str(a["answer"]))
-            ens_errors.append(0 if r["correct"] else 1)
+                any_seat_correct = any_seat_correct or is_correct
+            ens_correct = bool(r["correct"])
+            ens_errors.append(0 if ens_correct else 1)
+            if not any_seat_correct:
+                all_wrong_tasks += 1
+                if selection and ens_correct:
+                    raise ValueError(
+                        f"task {r['task_id']}: ensemble correct but every seat "
+                        "wrong under a selection rule — impossible, corpus "
+                        "labels are fabricated (E1 sanity invariant)")
         n = len(grp)
         seat_rates = {s: round(sum(errors[s]) / n, 6) for s in seats}
         e_mean = round(sum(seat_rates.values()) / len(seats), 6)
@@ -142,6 +161,8 @@ def decompose(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "mean_offdiag": round(sum(defined) / len(defined), 6) if defined else None,
                 "undefined_pairs": sum(1 for v in pairs.values() if v is None),
             },
+            "selection_aggregation": bool(selection),
+            "all_seats_wrong_tasks": all_wrong_tasks,
         })
     return blocks
 
@@ -199,7 +220,10 @@ def check(out_path: Path) -> list[str]:
     if not corpus_path.exists():
         findings.append(f"pinned corpus missing: {corpus_path}")
         return findings
-    fresh = build_receipt(corpus_path)
+    try:
+        fresh = build_receipt(corpus_path)
+    except ValueError as exc:  # fabricated labels / bad corpus (E1 invariant)
+        return findings + [f"corpus fails decomposition: {exc}"]
     for key, value in fresh.items():
         if committed.get(key) != value:
             findings.append(f"field {key!r} does not replay from the pinned "

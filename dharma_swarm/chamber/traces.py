@@ -112,6 +112,8 @@ def read_corpus(path: Path) -> list[dict[str, Any]]:
         if not line.strip():
             continue
         row = json.loads(line)
+        if not isinstance(row, dict):
+            raise ValueError(f"trace corpus {path} row {i}: not a JSON object")
         if not verify_row_digest(row):
             raise ValueError(f"trace corpus {path} row {i}: digest mismatch")
         rows.append(row)

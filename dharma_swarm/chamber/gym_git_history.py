@@ -25,12 +25,21 @@ from __future__ import annotations
 import hashlib
 import json
 import random
+import re
 import shutil
 import subprocess
+import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Protocol
 
+from dharma_swarm.chamber.sandbox import (
+    DiffPolicyError,
+    assert_within,
+    diff_policy_reason,
+    find_symlinks,
+    scrubbed_env,
+)
 from dharma_swarm.chamber.traces import (
     GymTraceRow,
     SeatAnswer,
@@ -61,8 +70,23 @@ def scorer_hash() -> str:
 
 
 def _is_test_file(path: str) -> bool:
+    """pytest's default python_files is BOTH ``test_*.py`` and ``*_test.py`` —
+    matching only the former silently drops half the possible ground-truth
+    tests, letting an incomplete candidate score correct (review R1-6)."""
     name = path.rsplit("/", 1)[-1]
-    return name.startswith("test_") and name.endswith(".py")
+    return name.endswith(".py") and (name.startswith("test_")
+                                     or name.endswith("_test.py"))
+
+
+def _exists_at(repo_root: Path, sha: str, rel: str) -> bool:
+    """Does blob ``rel`` exist at commit ``sha``? A landed test that was
+    RENAMED or DELETED by the merge appears in --name-only but is absent at
+    merge_sha; scoring it would crash the whole run (review R1-7)."""
+    proc = subprocess.run(
+        ["git", "-C", str(repo_root), "cat-file", "-e", f"{sha}:{rel}"],
+        capture_output=True, timeout=30,
+    )
+    return proc.returncode == 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,7 +134,11 @@ def build_taskpack(repo_root: Path, snapshot_sha: str, *, limit: int | None = No
             continue
         merge_sha, base_sha, merged_at = parts[0], parts[1], parts[-1]
         changed = _git(repo_root, "diff", "--name-only", base_sha, merge_sha)
-        test_files = tuple(sorted(p for p in changed.splitlines() if _is_test_file(p)))
+        # Only tests that still EXIST at the merge (drop renamed-away/deleted
+        # paths that would crash the scorer's `git show merge:path`).
+        test_files = tuple(sorted(
+            p for p in changed.splitlines()
+            if _is_test_file(p) and _exists_at(repo_root, merge_sha, p)))
         if not test_files:
             continue
         prompt = _git(repo_root, "log", "-1", "--format=%B", merge_sha).strip()
@@ -207,42 +235,77 @@ def score_candidate(repo_root: Path, task: Task, candidate_diff: str,
     files at the merge sha -> pytest pass-rate. The landed source diff (the
     answer key) is never materialized."""
     scoring_dir = export_sandbox(repo_root, task.base_sha, workdir / "scoring")
+    env = scrubbed_env(scoring_dir)
     try:
         if candidate_diff.strip():
+            reason = diff_policy_reason(candidate_diff)
+            if reason:
+                return ScoreResult(0, 0, True, f"diff policy: {reason}")
             apply = subprocess.run(
                 ["git", "apply", "--whitespace=nowarn", "-"],
                 input=candidate_diff, text=True, capture_output=True,
-                cwd=scoring_dir, timeout=60,
+                cwd=scoring_dir, timeout=60, env=env,
             )
             if apply.returncode != 0:
                 return ScoreResult(0, 0, True,
                                    f"diff does not apply: {apply.stderr.strip()[:300]}")
+            # Defense in depth: a diff that slipped a symlink past the policy
+            # (or an in-tree symlink) must void the task before any write.
+            leaks = find_symlinks(scoring_dir)
+            if leaks:
+                return ScoreResult(0, 0, True,
+                                   f"diff introduced symlink(s): {leaks[0]} — VOID")
         for rel in task.test_files:
+            if not _exists_at(repo_root, task.merge_sha, rel):
+                return ScoreResult(0, 0, True,
+                                   f"landed test {rel} absent at merge — task VOID")
             blob = _git(repo_root, "show", f"{task.merge_sha}:{rel}")
             target = scoring_dir / rel
+            assert_within(scoring_dir, target.parent)
             target.parent.mkdir(parents=True, exist_ok=True)
+            assert_within(scoring_dir, target)
             target.write_text(blob, encoding="utf-8")
         proc = subprocess.run(
             ["python3", "-m", "pytest", *task.test_files, "-q", "--no-header",
              "-p", "no:cacheprovider"],
             capture_output=True, text=True, cwd=scoring_dir, timeout=timeout,
+            env=env,
         )
+        passed, failed, errored = _parse_pytest_summary(proc.stdout)
         tail = (proc.stdout + proc.stderr)[-400:]
-        passed = _count(proc.stdout, "passed")
-        failed = _count(proc.stdout, "failed") + _count(proc.stdout, "error")
-        if passed == 0 and failed == 0:
+        if errored or (passed == 0 and failed == 0):
             return ScoreResult(0, 0, True, f"no tests collected/ran: {tail}")
         return ScoreResult(passed, failed, False, tail)
+    except DiffPolicyError as exc:
+        return ScoreResult(0, 0, True, f"sandbox policy: {exc}")
     except subprocess.TimeoutExpired:
         return ScoreResult(0, 0, True, "scorer timeout")
     finally:
         shutil.rmtree(scoring_dir, ignore_errors=True)
 
 
-def _count(stdout: str, word: str) -> int:
-    import re
-    m = re.search(rf"(\d+) {word}", stdout)
-    return int(m.group(1)) if m else 0
+_SUMMARY_RE = re.compile(r"(\d+) (passed|failed|error|errors|xfailed|xpassed)\b")
+
+
+def _parse_pytest_summary(stdout: str) -> tuple[int, int, bool]:
+    """Parse (passed, failed, errored) from pytest's SUMMARY line only.
+
+    pytest prints the tally on the last non-empty output line (e.g.
+    ``1 failed, 2 passed in 0.3s``). Scanning all of stdout would let a test
+    body that prints ``5 passed`` poison the count (review R1-4), so we read
+    only the summary line and word-boundary-match to avoid xfailed/xpassed
+    bleeding into failed/passed."""
+    lines = [ln for ln in stdout.splitlines() if ln.strip()]
+    if not lines:
+        return 0, 0, False
+    summary = lines[-1]
+    counts: dict[str, int] = {}
+    for n, word in _SUMMARY_RE.findall(summary):
+        counts[word] = counts.get(word, 0) + int(n)
+    passed = counts.get("passed", 0)
+    failed = counts.get("failed", 0)
+    errored = counts.get("error", 0) + counts.get("errors", 0) > 0
+    return passed, failed, errored
 
 
 class Solver(Protocol):
@@ -283,9 +346,12 @@ def run_gym(repo_root: Path, pack: Taskpack, solver: Solver, seats: list[str],
     wanted = set(task_ids) if task_ids else None
     rows: list[dict[str, Any]] = []
     per_task: dict[str, bool] = {}
+    task_seconds: dict[str, float] = {}
+    scored_iterations = 0
     for task in pack.train_tasks():
         if wanted is not None and task.task_id not in wanted:
             continue
+        task_start = time.perf_counter()
         sandbox = export_sandbox(repo_root, task.base_sha,
                                  out_dir / "sandbox" / task.task_id)
         payload = {"task_id": task.task_id, "prompt": task.prompt,
@@ -305,10 +371,12 @@ def run_gym(repo_root: Path, pack: Taskpack, solver: Solver, seats: list[str],
                     provider=str(result.get("provider", "")),
                     correct=score.correct,
                 ))
+                scored_iterations += 1
                 if score.pass_rate > best[0]:
                     best = (score.pass_rate, diff, score.correct)
         finally:
             shutil.rmtree(sandbox, ignore_errors=True)
+        task_seconds[task.task_id] = round(time.perf_counter() - task_start, 3)
         per_task[task.task_id] = best[2]
         rows.append(GymTraceRow(
             env_id=ENV_ID, task_id=task.task_id, taskpack_sha=pack_sha,
@@ -332,6 +400,23 @@ def run_gym(repo_root: Path, pack: Taskpack, solver: Solver, seats: list[str],
         "trace_corpus": {"file": corpus_path.name, "rows": len(rows),
                          "sha256": corpus_sha},
         "live_solver": dict(zip(("available", "reason"), live_solver_status())),
+        # Compute-ROI declaration (discipline 9): cost-per-scored-iteration
+        # measured before any live iteration may claim compliance. Wall-time
+        # is host-variable (excluded from the deterministic trace corpus, only
+        # in this receipt); token/USD are 0 for fixture/control solvers and
+        # populated once the live solver lane (track item 2) runs.
+        "compute_roi": {
+            "scored_iterations": scored_iterations,
+            "wall_seconds_total": round(sum(task_seconds.values()), 3),
+            "wall_seconds_per_task": task_seconds,
+            "wall_seconds_per_scored_iteration": (
+                round(sum(task_seconds.values()) / scored_iterations, 3)
+                if scored_iterations else None),
+            "tokens_total": 0,
+            "usd_total": 0.0,
+            "note": "fixture/control solver — zero inference cost; live seats "
+                    "populate tokens/usd via the ONE model door.",
+        },
         "capability_claim": "NONE — internal gym numbers under a train-signal "
                             "aggregation rule; never a benchmark claim.",
     }

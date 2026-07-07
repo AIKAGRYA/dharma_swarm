@@ -105,3 +105,24 @@ def test_duplicate_source_urls_do_not_count_as_independent(tmp_path):
             [_bronze(url="https://same.example"), _bronze(url="https://same.example")],
             incident_path=tmp_path / "i.jsonl",
         )
+
+
+@pytest.mark.parametrize("evidence", [
+    [{"prov": None}, {"prov": None}],                       # present-but-null
+    ["not-a-dict", "also-not"],                             # non-dict element
+    [{"prov": {"agent": {"id": "x"}}, "corroboration": None},
+     {"prov": {"agent": {"id": "y"}}, "corroboration": None}],
+    [{"prov": {"agent": {"id": "dharma_swarm.world_radar"}},
+      "corroboration": {"independent_source_urls": "not-a-list"}},
+     {"prov": {"agent": {"id": "dharma_swarm.world_radar"}},
+      "corroboration": {"independent_source_urls": "x"}}],
+])
+def test_malformed_evidence_fails_closed_not_crash(tmp_path, evidence):
+    # R1-1/R3-N1: malformed bronze must raise OracleRuleViolation (with an
+    # incident), never a bare AttributeError that fails open.
+    pred = _emit()
+    with pytest.raises(OracleRuleViolation):
+        resolve_with_bronze(pred.id, 1.0, evidence,
+                            incident_path=tmp_path / "i.jsonl")
+    assert (tmp_path / "i.jsonl").exists()
+    assert len(gb.get_pending_predictions()) == 1  # unresolved

@@ -103,6 +103,32 @@ def test_receipt_writes_seals_and_check_replays(tmp_path, monkeypatch):
     assert findings and any("digest mismatch" in f for f in findings)
 
 
+def test_fabricated_all_seats_wrong_ensemble_right_is_refused(tmp_path):
+    # R2-3: under selection aggregation the ensemble cannot be correct while
+    # every seat is wrong. A corpus claiming so is fabricated -> ValueError.
+    rows = []
+    for t in ("t1", "t2"):
+        rows.append(GymTraceRow(
+            env_id="g1_git_history", task_id=t, taskpack_sha="p" * 64,
+            scorer_hash="s" * 64, seed=1,
+            answers=(SeatAnswer(seat_id="A", answer="w", correct=False),
+                     SeatAnswer(seat_id="B", answer="w", correct=False)),
+            aggregated_answer="winner", correct=True,  # impossible under selection
+            attributes={"aggregation_rule": "oracle_argmax_v0 (train-signal)"},
+        ).to_dict())
+    path = tmp_path / "fabricated.jsonl"
+    write_corpus(rows, path)
+    with pytest.raises(ValueError, match="fabricated"):
+        tl.build_receipt(path)
+
+
+def test_selection_metadata_recorded(tmp_path):
+    receipt = tl.build_receipt(_corpus(tmp_path))
+    block = receipt["decomposition"][0]
+    assert "selection_aggregation" in block
+    assert "all_seats_wrong_tasks" in block
+
+
 def test_check_detects_stale_receipt_after_corpus_change(tmp_path, monkeypatch):
     corpus = _corpus(tmp_path)
     out = tmp_path / "r.json"
