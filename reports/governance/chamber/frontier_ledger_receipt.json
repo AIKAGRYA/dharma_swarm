@@ -1,0 +1,246 @@
+{
+  "authority": "projection_only",
+  "capability_claim": "NONE. Every number here is either an internal instrument reading or a receipted external publication; nothing is a production capability claim (chamber doctrine, arena non-goal 1).",
+  "chamber_drift": {
+    "alert_rule": "gym trend rising while reality-graded trend is flat or falling over a 14-day window \u21d2 CHAMBER DRIFT alert on this page (we are overfitting the chamber; the mirror is reassembling)",
+    "gym_score_trend": null,
+    "reality_graded_trend": null,
+    "requires": "\u22652 gym receipts on one environment AND \u22651 reality-graded receipt (envs G2/G10 class) in the same window",
+    "status": "UNVALUED"
+  },
+  "digest": "bd8b12512f67bd761633dceb56bd46071ebb774cc9baa39f9f20f1e0858d6e39",
+  "door": {
+    "conditions": [
+      {
+        "id": "C1",
+        "score": 0.675,
+        "verdict": "AMBER"
+      },
+      {
+        "id": "C2",
+        "score": 0.05,
+        "verdict": "RED"
+      },
+      {
+        "id": "C3",
+        "score": 0.3,
+        "verdict": "RED"
+      },
+      {
+        "id": "C4",
+        "score": 0.307,
+        "verdict": "RED"
+      },
+      {
+        "id": "C5",
+        "score": 0.2,
+        "verdict": "RED"
+      }
+    ],
+    "gate_open": false,
+    "next_review": "PENDING_OPERATOR (decision queue item 6)",
+    "review_cadence_days": 30
+  },
+  "fact_owner": "docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md \u00a7(c)",
+  "generated_at": "2026-07-07T06:07:37Z",
+  "inputs": {
+    "baseline_receipt": {
+      "path": "reports/governance/inward_ascent/baseline_receipt.json",
+      "present": true,
+      "sha256": "946afc02649fc51c04f7c8fcd60649ee2ef5896d1789edf3e526ced8f70e4550"
+    },
+    "trust_gate": {
+      "available": true,
+      "conditions": [
+        {
+          "id": "C1",
+          "score": 0.675,
+          "verdict": "AMBER"
+        },
+        {
+          "id": "C2",
+          "score": 0.05,
+          "verdict": "RED"
+        },
+        {
+          "id": "C3",
+          "score": 0.3,
+          "verdict": "RED"
+        },
+        {
+          "id": "C4",
+          "score": 0.307,
+          "verdict": "RED"
+        },
+        {
+          "id": "C5",
+          "score": 0.2,
+          "verdict": "RED"
+        }
+      ],
+      "gate_open": false,
+      "owner": "docs/vision_maps/NORTH_STAR.md \u00a78"
+    }
+  },
+  "rows": [
+    {
+      "capability": "coding_benchmark_self_improvement",
+      "commensurable": true,
+      "delta": null,
+      "field": {
+        "receipt": "https://arxiv.org/abs/2505.22954",
+        "unit": "% SWE-bench-verified (DGM final, self-improved 20->50)",
+        "value": 50.0
+      },
+      "note": "The literal trust-gate C2 bar. Ours stays UNKNOWN until a real public-benchmark run under budget-parity controls exists.",
+      "ours": {
+        "measured": false,
+        "receipt": "never run \u2014 env 15 is operator-gated compute (decision queue)",
+        "unit": "% SWE-bench-verified",
+        "value": null
+      }
+    },
+    {
+      "capability": "swarm_lift_vs_best_single",
+      "commensurable": false,
+      "delta": null,
+      "field": {
+        "receipt": "UNKNOWN_PENDING_INGEST \u2014 the ingest lane supplies field numbers (F5)",
+        "unit": null,
+        "value": null
+      },
+      "note": "Internal measurement owned by the RSI/arena lab; NOT benchmark-commensurable (trust_gate_status admissibility rule). Negative = the transcendence conditions currently fail in wiring.",
+      "ours": {
+        "measured": true,
+        "receipt": "reports/anatomy_altitude_2026-06-10/lane_E_organism_vision.md",
+        "unit": "lift vs own best seat",
+        "value": -0.1
+      }
+    },
+    {
+      "capability": "ingest_metabolism",
+      "commensurable": false,
+      "delta": null,
+      "field": {
+        "receipt": "UNKNOWN_PENDING_INGEST \u2014 the ingest lane supplies field numbers (F5)",
+        "unit": null,
+        "value": null
+      },
+      "note": "Bronze receipts landed under corroboration. Field column is N/A by construction (internal capacity surface).",
+      "ours": {
+        "measured": true,
+        "receipt": "reports/governance/inward_ascent/baseline_receipt.json",
+        "unit": "receipts",
+        "value": 0
+      }
+    },
+    {
+      "capability": "forecast_brier",
+      "commensurable": false,
+      "delta": null,
+      "field": {
+        "receipt": "UNKNOWN_PENDING_INGEST \u2014 the ingest lane supplies field numbers (F5)",
+        "unit": null,
+        "value": null
+      },
+      "note": "Time-lagged reality grading (gym G2); resolution from ingest ONLY (oracle rule, discipline 10). Ratchets DOWN.",
+      "ours": {
+        "measured": false,
+        "receipt": "reports/governance/inward_ascent/baseline_receipt.json",
+        "unit": "brier",
+        "value": null
+      }
+    },
+    {
+      "capability": "memory_hit_rate",
+      "commensurable": false,
+      "delta": null,
+      "field": {
+        "receipt": "UNKNOWN_PENDING_INGEST \u2014 the ingest lane supplies field numbers (F5)",
+        "unit": null,
+        "value": null
+      },
+      "note": "G3 arm-A held-out accuracy \u2014 the first measured C5 instrument.",
+      "ours": {
+        "measured": false,
+        "receipt": "reports/governance/inward_ascent/baseline_receipt.json",
+        "unit": "fraction",
+        "value": null
+      }
+    },
+    {
+      "capability": "gate_catch_rate",
+      "commensurable": false,
+      "delta": null,
+      "field": {
+        "receipt": "UNKNOWN_PENDING_INGEST \u2014 the ingest lane supplies field numbers (F5)",
+        "unit": null,
+        "value": null
+      },
+      "note": "Deferred with the gate gym until the attack corpus is IMPORTED (class-2), never self-generated.",
+      "ours": {
+        "measured": false,
+        "receipt": "reports/governance/inward_ascent/baseline_receipt.json",
+        "unit": "fraction",
+        "value": null
+      }
+    },
+    {
+      "capability": "ontology_coverage",
+      "commensurable": false,
+      "delta": null,
+      "field": {
+        "receipt": "UNKNOWN_PENDING_INGEST \u2014 the ingest lane supplies field numbers (F5)",
+        "unit": null,
+        "value": null
+      },
+      "note": "ontology.db lives on the daemon host (BR-007); daemon-host baseline run is in the decision queue.",
+      "ours": {
+        "measured": false,
+        "receipt": "reports/governance/inward_ascent/baseline_receipt.json",
+        "unit": "entities",
+        "value": null
+      }
+    },
+    {
+      "capability": "routing_regret",
+      "commensurable": false,
+      "delta": null,
+      "field": {
+        "receipt": "UNKNOWN_PENDING_INGEST \u2014 the ingest lane supplies field numbers (F5)",
+        "unit": null,
+        "value": null
+      },
+      "note": "G4 off-policy regret vs ~2k real delegation_runs; operator-gated on a sanitized runtime.db snapshot. Ratchets DOWN.",
+      "ours": {
+        "measured": false,
+        "receipt": "reports/governance/inward_ascent/baseline_receipt.json",
+        "unit": "regret",
+        "value": null
+      }
+    },
+    {
+      "capability": "distilled_seat_cost_per_iteration",
+      "commensurable": false,
+      "delta": null,
+      "field": {
+        "receipt": "UNKNOWN_PENDING_INGEST \u2014 the ingest lane supplies field numbers (F5)",
+        "unit": null,
+        "value": null
+      },
+      "note": "The compute-ROI denominator (discipline 9). Every environment must declare cost-per-scored-iteration before its first evolution run; this row aggregates them.",
+      "ours": {
+        "measured": false,
+        "receipt": "env 12 (trace distillation) not built \u2014 no cost ledger yet",
+        "unit": "USD / scored iteration",
+        "value": null
+      }
+    }
+  ],
+  "schema": "dharma_swarm.frontier_ledger.v1",
+  "summary": {
+    "measured": 2,
+    "rows": 9,
+    "unknown": 7
+  }
+}
