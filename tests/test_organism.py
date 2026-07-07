@@ -102,7 +102,7 @@ class TestOrganismBoot:
 # ---------------------------------------------------------------------------
 
 class TestSamvaraActivation:
-    @pytest.mark.xfail(reason="Tests old instant-HOLD policy; replaced by consecutive-hold policy in e5f4e46")
+    @pytest.mark.xfail(reason="Tests old instant-HOLD policy; replaced by consecutive-hold policy in 8a4d9626 (CONSECUTIVE_HOLDS_BEFORE_EMERGENCY=3, organism.py:1056); real coverage: tests/test_samvara.py, tests/test_organism.py:84-97")
     def test_samvara_activates_after_threshold(self, state_dir: Path):
         """After enough consecutive HOLDs, samvara_mode activates."""
         org = OrganismRuntime(state_dir)
@@ -121,7 +121,7 @@ class TestSamvaraActivation:
 # ---------------------------------------------------------------------------
 
 class TestAltitudeEscalation:
-    @pytest.mark.xfail(reason="Tests old instant-HOLD policy; replaced by consecutive-hold policy in e5f4e46")
+    @pytest.mark.xfail(reason="Tests old instant-HOLD policy; replaced by consecutive-hold policy in 8a4d9626 (CONSECUTIVE_HOLDS_BEFORE_EMERGENCY=3, organism.py:1056); real coverage: tests/test_samvara.py, tests/test_organism.py:84-97")
     def test_powers_escalate(self, state_dir: Path):
         """Consecutive HOLDs escalate through the four powers."""
         org = OrganismRuntime(state_dir)
@@ -175,7 +175,7 @@ class TestProceedReset:
         # If still HOLD (possible with test timing), at least verify it ran
         assert result.cycle == 1
 
-    @pytest.mark.xfail(reason="Tests old instant-HOLD policy; replaced by consecutive-hold policy in e5f4e46")
+    @pytest.mark.xfail(reason="Tests old instant-HOLD policy; replaced by consecutive-hold policy in 8a4d9626 (CONSECUTIVE_HOLDS_BEFORE_EMERGENCY=3, organism.py:1056); real coverage: tests/test_samvara.py, tests/test_organism.py:84-97")
     def test_proceed_after_hold_resets_samvara(self, state_dir: Path):
         """If coherence rises after HOLDs, samvara deactivates."""
         # Start with empty state → HOLDs
@@ -196,7 +196,7 @@ class TestProceedReset:
 # ---------------------------------------------------------------------------
 
 class TestAlgedonicChannel:
-    @pytest.mark.xfail(reason="Tests old instant-HOLD policy; replaced by consecutive-hold policy in e5f4e46")
+    @pytest.mark.xfail(reason="Tests old instant-HOLD policy; replaced by consecutive-hold policy in 8a4d9626 (CONSECUTIVE_HOLDS_BEFORE_EMERGENCY=3, organism.py:1056); real coverage: tests/test_samvara.py, tests/test_organism.py:84-97")
     def test_telos_drift_fires(self, state_dir: Path):
         """Low blended coherence fires telos_drift signal."""
         signals_received: list[AlgedonicSignal] = []
@@ -220,7 +220,7 @@ class TestAlgedonicChannel:
             omega_signals = [s for s in signals_received if s.kind == "omega_divergence"]
             assert len(omega_signals) > 0
 
-    @pytest.mark.xfail(reason="Tests old instant-HOLD policy; replaced by consecutive-hold policy in e5f4e46")
+    @pytest.mark.xfail(reason="Tests old instant-HOLD policy; replaced by consecutive-hold policy in 8a4d9626 (CONSECUTIVE_HOLDS_BEFORE_EMERGENCY=3, organism.py:1056); real coverage: tests/test_samvara.py, tests/test_organism.py:84-97")
     def test_callbacks_fire(self, state_dir: Path):
         """Both on_algedonic and on_gnani callbacks fire."""
         verdicts: list[GnaniVerdict] = []
@@ -243,7 +243,7 @@ class TestAlgedonicChannel:
 # ---------------------------------------------------------------------------
 
 class TestOrganismProcessesItself:
-    @pytest.mark.xfail(reason="Tests old instant-HOLD policy; replaced by consecutive-hold policy in e5f4e46")
+    @pytest.mark.xfail(reason="Tests old instant-HOLD policy; replaced by consecutive-hold policy in 8a4d9626 (CONSECUTIVE_HOLDS_BEFORE_EMERGENCY=3, organism.py:1056); real coverage: tests/test_samvara.py, tests/test_organism.py:84-97")
     def test_15_heartbeats_with_escalation(self, state_dir: Path):
         """15 consecutive heartbeats on empty state.
 
