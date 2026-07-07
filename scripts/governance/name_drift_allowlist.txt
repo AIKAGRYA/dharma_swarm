@@ -15,7 +15,6 @@ dharma_swarm/terminal_adapters/claude.py::missing-module::`from dharma_swarm.ter
 dharma_swarm/terminal_adapters/claude.py::missing-module::`from dharma_swarm.terminal_engine.event_types import ...` -> module not found on disk
 dharma_swarm/terminal_adapters/claude.py::missing-module::`from dharma_swarm.terminal_engine.events import ...` -> module not found on disk
 dharma_swarm/terminal_adapters/claude.py::missing-module::`from dharma_swarm.terminal_engine.stream_parser import ...` -> module not found on disk
-dharma_swarm/terminal_commands/diagnostics.py::missing-name::`from dharma_swarm.catalytic_graph import seed_ecosystem` -> name not defined in module
 dharma_swarm/terminal_commands/meta.py::missing-module::`from dharma_swarm.cross_pollination import ...` -> module not found on disk
 scripts/launch_singularity_research.py::missing-name::`from dharma_swarm.models import Agent` -> name not defined in module
 scripts/psmv_deep_read.py::missing-module::`from dharma_swarm.protocols.recursive_reading import ...` -> module not found on disk
