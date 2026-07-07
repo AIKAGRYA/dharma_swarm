@@ -1,6 +1,6 @@
 # THE HYPERBOLIC TIME CHAMBER — Inward Ascent Doctrine, Audit Record & Campaign Seal
 
-**Role:** reference (vision/doctrine synthesis). Operator-authored via full-day dialogue, 2026-07-07.
+**Role:** canonical (vision/doctrine synthesis) — operator-ratified 2026-07-07, by explicit declaration in the sealing dialogue. Operator-authored via full-day dialogue, 2026-07-07.
 **Authority:** subordinate to [`NORTH_STAR.md`](NORTH_STAR.md) and `docs/governance/SOVEREIGN_MANIFEST.md` §Telos Hierarchy. This file owns no rules and no state; it braids with `docs/plans/FABLE5_CAMPAIGN_ROADMAP_2026-07-03.md`, `docs/plans/ORGANISM_REWIRE_DOCTRINE_2026-07-02.md`, and `CYBERNETIC_LOOP_MAP.md`.
 **Source of words:** the operator (John / Dhyana), dialogue of 2026-07-07, with a same-session zero-trust audit (three decorrelated verification agents + live command runs). Nothing below is agent-invented doctrine; every audit claim carries a file:line or command receipt from that session.
 **Rule:** if this file disagrees with `make onboard`, `docs/governance/ACTIVE_TRACK.yaml`, or any receipt, trust those. This file is the *why and the shape*; the owners hold the truth.
@@ -234,7 +234,7 @@ ungameability, iteration cost):
 | 15 | **Public coding benchmarks** | SWE-bench-verified / Polyglot | Published harness | The DGM path and the literal C2 bar; needs compute + strict held-out discipline |
 
 **Excluded here by boundary:** the hermetic arena / RSI lab (Mac + maharaja
-VPS) — sibling program, disjoint surfaces, shared receipt format (§3.6).
+VPS) — sibling program, disjoint surfaces, shared receipt format (§3.7).
 
 ### 3.3 The Flywheel
 
@@ -263,7 +263,34 @@ hit-rate, gate catch-rate, routing regret vs. history, self-model accuracy,
 forecast Brier, distilled-seat cost-per-iteration. Digest-stamped receipts
 (F2's hole is not recreated — `expect_digest` on everything new).
 
-### 3.6 Boundary with the RSI Lab (sibling program)
+### 3.6 Implementation substrate — the polyglot shell doctrine (operator ruling, 2026-07-07)
+
+The chamber is a **shell plus trainees**, and the metaphor is the
+architecture: the shell provides the gravity and time-dilation (sandboxing,
+resource caps, deterministic replay, receipt hashing, high-iteration
+scheduling); the trainees inside do the growing. Rulings:
+
+- **The environment protocol is language-agnostic by construction.** An
+  environment is a process that speaks JSONL receipts across a narrow
+  boundary — the pattern the Go organs already prove (`go_invoke.py`:
+  toolchain-checked invocation, structured errors, never an exception into
+  the caller). Environments may therefore be Python, Go, Rust, or C++
+  interchangeably from day one.
+- **Python stays the composition root.** Telos gates, the spine, Chetana,
+  and receipt ownership remain Python-owned; no gate or truth-store logic
+  is ever reimplemented in another language (that would be a second owner).
+- **Rust/C++ is earned, not defaulted.** The chamber's bottleneck is LLM
+  inference and scorer quality, not CPU; every added language is a
+  toolchain, CI lane, and context tax on a one-man operation. A Rust shell
+  component is justified where it genuinely pays: (a) the **sandbox jail**
+  for executing untrusted evolved code (process isolation, seccomp-class
+  caps — safety-critical), (b) **hot scoring kernels** once a specific
+  environment measures as iteration-bound rather than inference-bound
+  (e.g., replaying millions of runtime-history rows), (c) digest/Merkle
+  receipt chains at volume. No big-bang rewrite; carve per component with
+  the same narrow-boundary contract as the Go organs.
+
+### 3.7 Boundary with the RSI Lab (sibling program)
 
 The RSI/arena lab on the Mac + maharaja VPS owns swarm-lift (C2) measurement
 and the hermetic arena surfaces (`dharma_swarm/coordination/**`,
@@ -424,6 +451,11 @@ preserving selection (archive.py MAP-Elites); expect_digest on ALL new
 receipts + prose criteria become executable; compute-ROI ledger per
 environment; the oracle rule (resolution never from the predictor);
 chamber-drift metric on the ledger; the daily delta receipt as heartbeat.
+Plus the substrate ruling (doctrine §3.6): the environment protocol is a
+language-agnostic process+JSONL contract from day one; Python remains the
+composition root (gates/spine/receipts never reimplemented elsewhere);
+Rust/C++ components are earned per-component (sandbox jail, measured
+iteration-bound scoring kernels), never a default rewrite.
 Plus repo law: gates/ratchets never weakened; no new truth stores; sibling
 track surfaces untouched; new work = new ACTIVE_TRACK.yaml track (serves:
 substrate-nativeness or research-depth) with rigorous criteria; files
