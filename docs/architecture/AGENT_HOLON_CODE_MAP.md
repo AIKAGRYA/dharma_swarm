@@ -17,6 +17,14 @@ It is a map, not a runtime rewrite. Do not collapse these modules into one
 file, do not move runtime state, and do not create a new agent system to solve
 navigation drift.
 
+**Scope note**: this map covers the sovereign-holon talk/run/health call
+chains only. For model routing, A2A transport/spine, API/gateway routers,
+CLI/wrapper inventory, identity/state-home census, worktree drift across the
+full dharma_swarm-family clone set, and the parallel `~/.hermes` ecosystem
+(including its live self-mod loop and cross-system bridge), see the
+companion document
+[`HOLON_RUNTIME_FULL_ESTATE_MAP.md`](HOLON_RUNTIME_FULL_ESTATE_MAP.md).
+
 ## Snapshot Evidence
 
 This map was produced from the current worktree and live-state projections after

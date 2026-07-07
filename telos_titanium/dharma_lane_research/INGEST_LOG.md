@@ -1,0 +1,12 @@
+# Dharma Lane Research Ingest Log
+
+This log records externally generated research artifacts saved into this lane. It is descriptive only and does not promote artifacts to canon.
+
+| Saved At | Artifact | Source | Notes |
+|---|---|---|---|
+| 2026-07-04 JST | [pass_1_paramanu_scale_substrate_perplexity_20260704.md](pass_1_paramanu_scale_substrate_perplexity_20260704.md) | User-provided paste from Perplexity Computer / Claude Sonnet 4.6 backing | Pass 1 substrate ontology paper; saved as raw research artifact. NOTE: answers the substrate-ontology prompt (§3.1–3.8), not the Universal Coding Language prompt. |
+| 2026-07-04 JST | [universal_coding_language_genesis_CLAUDE_FABLE5_20260704.md](universal_coding_language_genesis_CLAUDE_FABLE5_20260704.md) | Claude Fable 5 session (6 stance drafts + 3 external model lanes + 18-claim adversarial refutation; workflow wf_ac2345f8-ca8) | Same-prompt parallel arrival to the codex response. Drafting/synthesis lanes blind to other arrivals; refutation-coverage outage disclosed in header; bootstrap receipt hashes independently re-verified twice. |
+| 2026-07-04 JST | [CONVERGENCE_APPENDIX_FABLE5_x_CODEX_20260704.md](CONVERGENCE_APPENDIX_FABLE5_x_CODEX_20260704.md) | Claude Fable 5 session orchestrator, post-freeze | Post-hoc §5 comparison: 7 parallel-arrival clusters, 8 decidable disagreement forks with cheapest settling tests, complementary blind spots, Perplexity cross-prompt intersections. |
+| 2026-07-04 JST | [PROMPT_universal_coding_language_genesis_20260704.md](PROMPT_universal_coding_language_genesis_20260704.md) | Operator prompt, saved by Claude Fable 5 for provenance | The clean full prompt both same-prompt arrivals answered. |
+| 2026-07-04 JST | [universal_coding_language_genesis_20260704.md](universal_coding_language_genesis_20260704.md) | codex (six delegated agents) | The codex same-prompt parallel arrival, 91/100 self-confidence; was in the lane before the Fable run began. |
+| 2026-07-04/05 JST | [ucl_genesis_receipt_bc5ae73f.json](ucl_genesis_receipt_bc5ae73f.json) + [ucl_kernel_rules_receipt_a3081988.json](ucl_kernel_rules_receipt_a3081988.json) | Claude Fable 5 session | UCL program 0 (genesis constant, 2,036 B) and program 1 (kernel admission rules, chained via prev_receipt_hash); derivations verified at mint and re-verified by the gate. Watched daily by `com.dharma.ucl-nurture` (report: `~/.dharma/ucl/LATEST.md`). |
