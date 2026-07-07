@@ -267,6 +267,7 @@ class GateCheckResult(BaseModel):
     reason: str
     gate: str = ""
     gate_results: dict[str, tuple[GateResult, str]] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
     timestamp: datetime = Field(default_factory=_utc_now)
 
 

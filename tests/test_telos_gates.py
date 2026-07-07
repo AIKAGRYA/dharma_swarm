@@ -1,5 +1,6 @@
 """Tests for dharma_swarm.telos_gates."""
 
+import json
 import pytest
 from unittest.mock import patch
 
@@ -374,7 +375,9 @@ class TestGatePressureFeedback:
         assert gk._apply_gate_pressure("internal") == "internal"
 
     def test_expired_pressure_returns_current_mode(self, tmp_path):
-        import json, time
+        import json
+        import time
+
         pressure_file = tmp_path / "gate_pressure.json"
         pressure_file.write_text(json.dumps({
             "trust_mode_override": "external_strict",
@@ -387,7 +390,9 @@ class TestGatePressureFeedback:
         assert gk._apply_gate_pressure("internal") == "internal"
 
     def test_active_pressure_overrides_trust_mode(self, tmp_path):
-        import json, time
+        import json
+        import time
+
         pressure_file = tmp_path / "gate_pressure.json"
         pressure_file.write_text(json.dumps({
             "trust_mode_override": "external_strict",
@@ -400,7 +405,9 @@ class TestGatePressureFeedback:
         assert gk._apply_gate_pressure("internal") == "external_strict"
 
     def test_same_mode_no_change(self, tmp_path):
-        import json, time
+        import json
+        import time
+
         pressure_file = tmp_path / "gate_pressure.json"
         pressure_file.write_text(json.dumps({
             "trust_mode_override": "internal",
@@ -648,3 +655,25 @@ class TestCustomGateEvaluation:
         assert len(TelosGatekeeper.CORE_GATES) == 11
         assert "AHIMSA" in TelosGatekeeper.CORE_GATES
         assert "STEELMAN" in TelosGatekeeper.CORE_GATES
+
+
+def test_check_action_formal_receipt_metadata_preserves_legacy_decision():
+    legacy = check_action("echo hello world", emit_formal=False)
+    enriched = check_action("echo hello world", emit_formal=True)
+
+    assert enriched.decision == legacy.decision
+    assert enriched.reason == legacy.reason
+    assert enriched.gate == legacy.gate
+    assert enriched.gate_results == legacy.gate_results
+    assert enriched.metadata["formal_telos"]["status"] == "ok"
+    assert enriched.metadata["formal_telos"]["mode"] == "observe_only"
+    assert len(enriched.metadata["formal_telos"]["receipt_sha256"]) == 64
+
+
+def test_check_action_formal_receipt_payload_has_no_nan():
+    enriched = check_action("echo hello world", emit_formal=True)
+
+    payload = enriched.metadata["formal_telos"]["canonical_payload"]
+    rendered = json.dumps(payload, allow_nan=False)
+
+    assert "NaN" not in rendered

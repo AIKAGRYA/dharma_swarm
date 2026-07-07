@@ -12,7 +12,7 @@ match threat variety without code changes.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import json
 import logging
 import os
@@ -34,6 +34,11 @@ from dharma_swarm.telos_payload_classifier import (
     PAYLOAD_HARM_TARGET_BLOCK,
     canonical_payload_harm_action,
 )
+from dharma_swarm.telos_reroute import (
+    ReflectiveGateOutcome,
+    ReflectiveRerouteNodeState,
+    run_reflective_reroute,
+)
 
 __all__ = [
     "DEFAULT_GATEKEEPER",
@@ -47,6 +52,7 @@ __all__ = [
     "PAYLOAD_HARM_GATEKEEPER_ALIASES",
     "PAYLOAD_HARM_TARGET_BLOCK",
     "ReflectiveGateOutcome",
+    "ReflectiveRerouteNodeState",
     "TelosGatekeeper",
     "WITNESS_DIR",
     "canonical_payload_harm_action",
@@ -222,16 +228,6 @@ class GateRegistry:
             for p in proposals:
                 f.write(json.dumps(p.to_dict()) + "\n")
         tmp.replace(self._proposals_file)
-
-
-@dataclass
-class ReflectiveGateOutcome:
-    """Result bundle for reflective reroute gate checks."""
-
-    result: GateCheckResult
-    attempts: int = 0
-    reflection: str = ""
-    suggestions: list[str] = field(default_factory=list)
 
 
 class TelosGatekeeper:
@@ -806,17 +802,46 @@ class TelosGatekeeper:
 DEFAULT_GATEKEEPER = TelosGatekeeper()
 
 
-def check_action(action: str, content: str = "") -> GateCheckResult:
+def check_action(
+    action: str,
+    content: str = "",
+    *,
+    emit_formal: bool | None = None,
+    formal_context: Any | None = None,
+    receipt_log: Any | None = None,
+) -> GateCheckResult:
     """Module-level shortcut using the default gatekeeper.
 
     Args:
         action: The action description to evaluate.
         content: Optional body content being written.
+        emit_formal: Attach observe-only formal/Titanium receipt metadata.
+        formal_context: Optional structured context for formal gates.
+        receipt_log: Optional injected Titanium Merkle log authority.
 
     Returns:
         GateCheckResult with decision and per-gate details.
     """
     result = DEFAULT_GATEKEEPER.check(action=action, content=content)
+    if emit_formal is None:
+        emit_formal = os.getenv("DHARMA_TELOS_FORMAL_RECEIPTS", "1").lower() not in {
+            "0",
+            "false",
+            "no",
+        }
+    if emit_formal:
+        from dharma_swarm.telos_receipts import (
+            enrich_gate_result_with_formal_receipts,
+        )
+
+        result = enrich_gate_result_with_formal_receipts(
+            result,
+            action=action,
+            content=content,
+            formal_context=formal_context,
+            receipt_log=receipt_log,
+        )
+
     # Feed result into VSM S3 pattern aggregator (closes the severed wire)
     try:
         from dharma_swarm.organism import get_organism
@@ -856,116 +881,16 @@ def check_with_reflective_reroute(
     This preserves hard safety blocks (AHIMSA/SATYA/CONSENT), while converting
     mandatory think-point witness blocks into a structured reflective reroute.
     """
-    attempts = 0
-    max_attempts = max(0, int(max_reroutes))
-    phase_key = (think_phase or "").strip().lower()
-    req_refs = requirement_refs or []
-    suggestions: list[str] = []
-    current_reflection = (reflection or "").strip()
-
-    while True:
-        result = DEFAULT_GATEKEEPER.check(
-            action=action,
-            content=content,
-            tool_name=tool_name,
-            trust_mode=trust_mode,
-            think_phase=think_phase,
-            reflection=current_reflection,
-        )
-
-        witness_result = result.gate_results.get("WITNESS")
-        mandatory_witness_block = (
-            result.decision == GateDecision.BLOCK
-            and witness_result is not None
-            and witness_result[0] == GateResult.FAIL
-            and phase_key in TelosGatekeeper.MANDATORY_THINK_PHASES
-        )
-        if not mandatory_witness_block:
-            return ReflectiveGateOutcome(
-                result=result,
-                attempts=attempts,
-                reflection=current_reflection,
-                suggestions=suggestions,
-            )
-
-        if attempts >= max_attempts:
-            return ReflectiveGateOutcome(
-                result=result,
-                attempts=attempts,
-                reflection=current_reflection,
-                suggestions=suggestions,
-            )
-
-        attempts += 1
-        suggestions = _reflective_lenses(spec_ref=spec_ref, requirement_refs=req_refs)
-        scaffold = _build_reflection_scaffold(
-            attempt=attempts,
-            max_attempts=max_attempts,
-            reason=result.reason,
-            phase=phase_key or "unknown",
-            action=action,
-            spec_ref=spec_ref,
-            requirement_refs=req_refs,
-        )
-        current_reflection = (
-            f"{current_reflection}\n\n{scaffold}".strip()
-            if current_reflection
-            else scaffold
-        )
-
-
-def _reflective_lenses(
-    *,
-    spec_ref: str | None = None,
-    requirement_refs: list[str] | None = None,
-) -> list[str]:
-    requirements = ", ".join(requirement_refs or []) or "none"
-    trace = spec_ref or "unlinked"
-    return [
-        (
-            "Risk lens: What could break, who/what could be harmed, and what "
-            "smallest reversible step reduces blast radius?"
-        ),
-        (
-            "Counterfactual lens: If this fails, what early signal will detect "
-            "it and what rollback is immediate?"
-        ),
-        (
-            "Plurality lens: What are two alternative strategies and why is this "
-            "one preferred now?"
-        ),
-        (
-            "Evidence lens: Which concrete spec/requirement does this satisfy "
-            f"(spec={trace}, reqs={requirements})?"
-        ),
-        (
-            "Integrity lens: Which assumption is uncertain and how will it be "
-            "validated before completion?"
-        ),
-    ]
-
-
-def _build_reflection_scaffold(
-    *,
-    attempt: int,
-    max_attempts: int,
-    reason: str,
-    phase: str,
-    action: str,
-    spec_ref: str | None = None,
-    requirement_refs: list[str] | None = None,
-) -> str:
-    requirements = ", ".join(requirement_refs or []) or "none"
-    trace = spec_ref or "unlinked"
-    return (
-        f"Reflective reroute attempt {attempt}/{max_attempts}. "
-        f"Phase: {phase}. Trigger: {reason}\n"
-        f"Action intent: {action}\n"
-        f"Spec trace: {trace}\n"
-        f"Requirement refs: {requirements}\n"
-        "RISK: Bound to smallest reversible step.\n"
-        "ROLLBACK: State exact undo path before continuing.\n"
-        "ALTERNATIVES: Name two alternatives and why deferred.\n"
-        "EVIDENCE: Define pass/fail signal for this step.\n"
-        "UNCERTAINTY: Name one unknown + check."
+    return run_reflective_reroute(
+        DEFAULT_GATEKEEPER,
+        TelosGatekeeper.MANDATORY_THINK_PHASES,
+        action=action,
+        content=content,
+        tool_name=tool_name,
+        trust_mode=trust_mode,
+        think_phase=think_phase,
+        reflection=reflection,
+        max_reroutes=max_reroutes,
+        spec_ref=spec_ref,
+        requirement_refs=requirement_refs,
     )
