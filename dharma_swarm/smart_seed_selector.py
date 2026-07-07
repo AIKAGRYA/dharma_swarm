@@ -116,14 +116,15 @@ class SmartSeedSelector:
             from dharma_swarm.stigmergy import StigmergyStore
 
             store = StigmergyStore(
-                marks_file=self._state_dir / "stigmergy" / "marks.jsonl",
+                base_path=self._state_dir / "stigmergy",
             )
             hot = await store.high_salience(threshold=0.7, limit=5)
             for mark in hot:
                 if hasattr(mark, "observation") and mark.observation:
                     terms.append(mark.observation[:100])
         except Exception:
-            logger.debug("Stigmergy term extraction failed", exc_info=True)
+            # warning, not debug: this swallow hid a severed wire (NEW-16)
+            logger.warning("Stigmergy term extraction failed", exc_info=True)
 
         # Try to read recent director visions for continuity
         try:

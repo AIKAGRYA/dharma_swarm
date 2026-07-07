@@ -262,3 +262,44 @@ class TestReadRandomSeedsSupplement:
             results = await selector.select(count=3)
             paths = [path for _, path, _ in results]
             assert paths.count("shared/path.md") == 1
+
+
+class TestStigmergyWire:
+    """Regression for NEW-16: the StigmergyStore constructor mismatch.
+
+    _extract_context_terms called StigmergyStore(marks_file=...) — a kwarg the
+    constructor never accepted — and the bare `except Exception` swallowed the
+    TypeError, so stigmergy marks silently never reached director seed
+    selection. These tests fail on the old call and pin the repaired wire.
+    """
+
+    @pytest.mark.asyncio
+    async def test_high_salience_mark_reaches_context_terms(self, tmp_path):
+        import json
+
+        marks_dir = tmp_path / "stigmergy"
+        marks_dir.mkdir(parents=True)
+        from dharma_swarm.stigmergy import StigmergicMark
+
+        mark = StigmergicMark(
+            agent="wire_regression",
+            file_path="some/file.py",
+            action="direct",
+            observation="DIRECTION[wire-regression]: unique-sentinel-observation",
+            salience=0.95,
+            channel="strategy",
+        )
+        (marks_dir / "marks.jsonl").write_text(
+            json.dumps(mark.model_dump(mode="json")) + "\n"
+        )
+
+        selector = SmartSeedSelector(state_dir=tmp_path)
+        context = await selector._extract_context_terms()
+        assert "unique-sentinel-observation" in context
+
+    @pytest.mark.asyncio
+    async def test_missing_stigmergy_state_still_falls_back_gracefully(self, tmp_path):
+        selector = SmartSeedSelector(state_dir=tmp_path / "does-not-exist")
+        context = await selector._extract_context_terms()
+        assert isinstance(context, str)
+        assert context  # default high-value terms fallback
