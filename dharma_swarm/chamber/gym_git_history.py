@@ -185,8 +185,15 @@ def export_sandbox(repo_root: Path, base_sha: str, dest: Path) -> Path:
 
     ``git archive`` reads objects from repo_root but the export carries no
     repository, so the landed fix and all future history are unreachable
-    from inside the sandbox by construction."""
-    dest.mkdir(parents=True, exist_ok=True)
+    from inside the sandbox by construction.
+
+    The sandbox is always a CLEAN tree of exactly ``base_sha``: any existing
+    ``dest`` (e.g. from an interrupted retry on a deterministic path) is
+    removed first, so stale non-``.git`` files can never contaminate solver
+    visibility or the scorer (review: Greptile PR #830)."""
+    if dest.exists():
+        shutil.rmtree(dest)
+    dest.mkdir(parents=True)
     archive = subprocess.run(
         ["git", "-C", str(repo_root), "archive", base_sha],
         capture_output=True, timeout=300,

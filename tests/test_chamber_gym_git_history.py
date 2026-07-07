@@ -115,6 +115,19 @@ def test_sandbox_has_no_git_and_leak_guard_trips(fixture_repo, tmp_path):
         assert_leak_free(sandbox)
 
 
+def test_export_sandbox_clears_stale_files_on_retry(fixture_repo, tmp_path):
+    # Greptile PR #830: a retry on a deterministic path must not inherit
+    # stale files that were not present at base_sha.
+    pack = build_taskpack(fixture_repo, _head(fixture_repo), holdout_fraction=0)
+    dest = tmp_path / "sandbox"
+    export_sandbox(fixture_repo, pack.tasks[0].base_sha, dest)
+    stale = dest / "STALE_INTERRUPTED_RUN.py"
+    stale.write_text("raise SystemExit('contamination')\n", encoding="utf-8")
+    export_sandbox(fixture_repo, pack.tasks[0].base_sha, dest)  # retry
+    assert not stale.exists()  # clean tree of exactly base_sha
+    assert (dest / "mymod.py").exists()
+
+
 def test_cheating_solver_finds_no_history_in_sandbox(fixture_repo, tmp_path):
     """Adversary check: a solver that greps git history for the landed fix
     gets nothing — the sandbox carries no objects at all."""
