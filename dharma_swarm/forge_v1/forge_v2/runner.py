@@ -31,180 +31,162 @@ from dharma_swarm.api_keys import bootstrap_runtime_env  # noqa: E402
 bootstrap_runtime_env()
 
 from dharma_swarm.daemon_config import dharma_state_dir  # noqa: E402
-from dharma_swarm.forge_v1.autoloop import grade, pull_context, _safe  # noqa: E402
-from dharma_swarm.forge_v1.canonical import _call, _provider_for_slot, pool_slots, KIMI_TEMP1  # noqa: E402
-from dharma_swarm.model_pool import FORGE_NVIDIA_KIMI_MODEL_ID  # noqa: E402
-
-from .arms import GEN_TEMPLATE, SYNTH_TEMPLATE, VERIFY_TEMPLATE, self_moa_arm, verify_chain_arm
-from .budget import Budget
-from .critic import _family, refute_pass
-from .provenance import contamination_state, split_explore_confirm
-from .receipts import AttemptReceipt, Ledger, RunReceipt, scaffold_parity_hash
-from .stats import paired_bootstrap_ci, positive_claim_gate, replicate_variance
+from dharma_swarm.forge_v1.autoloop import grade, pull_context  # noqa: E402
+from .arms import (  # noqa: E402
+    DEFAULT_WINDOW_CHARS,
+    GEN_TEMPLATE,
+    SYNTH_TEMPLATE,
+    VERIFY_TEMPLATE,
+    mixed_moa_arm,
+    self_moa_arm,
+    verify_chain_arm,
+)
+from .budget import Budget  # noqa: E402
+from .critic import _family, refute_pass  # noqa: E402
+from .pr_suite_grader import (  # noqa: E402
+    grade_pr_suite_prediction,
+    is_pr_suite_task,
+    is_pr_suite_task_id,
+    load_pr_suite_context,
+)
+from .provenance import aggregate_contamination_states, contamination_state, split_explore_confirm  # noqa: E402
+from .receipts import AttemptReceipt, Ledger, RunReceipt, scaffold_parity_hash  # noqa: E402
+from .stats import paired_bootstrap_ci, positive_claim_gate, replicate_variance  # noqa: E402
 
 RUN_ROOT = dharma_state_dir() / "forge_v1" / "forge_v2"
-_TIER = {"frontier": 0, "strong": 1, "fast": 2, "free": 3, "local": 4}
+from .runner_slots import (  # noqa: E402
+    DEFAULT_FORGE_GENERATOR_MODEL,
+    DEFAULT_FORGE_VERIFIER_MODEL,
+    FORGE_HIGH_SLOT_MIN_RELEASE_DATE,
+    _callable_roster,
+    _pick_generator_verifier,
+    _pick_mix_slots,
+    _resolve_high_slot_pair,
+)
+
+def _pull_task_context(instance_id: str):
+    if is_pr_suite_task_id(instance_id):
+        return load_pr_suite_context(instance_id)
+    return pull_context(instance_id)
 
 
-class _SimpleSlot:
-    """Minimal ModelSlot stand-in so a pinned model id (reproducible first slice)
-    can be used directly, without depending on a stochastic pool draw."""
-
-    def __init__(self, model_id, provider, tier="strong"):
-        self.model_id = model_id
-        self.provider = provider
-        self.tier = tier
-
-
-def _slot_for_id(model_id: str):
-    """Resolve a pinned model id to a (model_id, provider) slot via the model pool,
-    selecting the route that matches the id (hierarchy-true)."""
-    from dharma_swarm.model_pool import entry_for_model_id
-
-    entry = entry_for_model_id(model_id)
-    if entry is None or not entry.routes:
-        return None
-    route = next((r for r in entry.routes if r.model_id == model_id), entry.routes[0])
-    return _SimpleSlot(route.model_id, route.provider, getattr(entry, "tier", "strong"))
-
-
-def _probe(slot, timeout_s=40) -> bool:
-    try:
-        prov, wire = _provider_for_slot(slot, timeout_s=timeout_s)
-        temp = 1.0 if slot.model_id in KIMI_TEMP1 else 0.2
-        text, _, _ = _call(prov, wire, "Reply with the single word OK.", max_tokens=16,
-                           temperature=temp, timeout_s=timeout_s)
-        return bool((text or "").strip())
-    except Exception:
-        return False
-
-
-def _callable_roster(n: int, strategy: str, timeout_s: int = 40) -> tuple[list, list]:
-    """pool_slots -> probe reachable. Returns (callable_slots, probe_rows)."""
-    slots = pool_slots(n=n, strategy=strategy)
-    seen, uniq = set(), []
-    for s in slots:
-        if s.model_id in seen:
-            continue
-        seen.add(s.model_id)
-        uniq.append(s)
-    callable_slots, rows = [], []
-    for s in uniq:
-        try:
-            prov, wire = _provider_for_slot(s, timeout_s=timeout_s)
-            temp = 1.0 if s.model_id in KIMI_TEMP1 else 0.2
-            text, _, _ = _call(prov, wire, "Reply with the single word OK.",
-                               max_tokens=16, temperature=temp, timeout_s=timeout_s)
-            ok = bool((text or "").strip())
-            rows.append({"model_id": s.model_id, "provider": s.provider.value, "callable": ok})
-            if ok:
-                callable_slots.append(s)
-        except Exception as e:
-            rows.append({"model_id": s.model_id, "provider": s.provider.value, "callable": False,
-                         "error": f"{type(e).__name__}"})
-    return callable_slots, rows
-
-
-def _pick_generator_verifier(callable_slots, gen_id=None, ver_id=None):
-    if not callable_slots:
-        return None, None
-    by_id = {s.model_id: s for s in callable_slots}
-    if gen_id and gen_id in by_id:
-        gen = by_id[gen_id]
-    else:
-        gen = min(callable_slots, key=lambda s: _TIER.get(getattr(s.tier, "value", str(s.tier)), 9))
-    gfam = _family(gen.model_id)
-    if ver_id and ver_id in by_id:
-        ver = by_id[ver_id]
-    else:
-        ver = next((s for s in callable_slots if _family(s.model_id) != gfam), None)
-    if ver is not None and _family(ver.model_id) == gfam:
-        ver = None
-    return gen, ver
+def _grade_task(inst: dict, patch: str, *, timeout: int) -> tuple[bool, float, str | None]:
+    if is_pr_suite_task(inst):
+        result = grade_pr_suite_prediction(inst, patch, timeout=timeout)
+        if result.error:
+            return bool(result.resolved), result.seconds, f"{result.error}; receipt={result.receipt_path}"
+        return bool(result.resolved), result.seconds, f"receipt={result.receipt_path}"
+    return grade(inst, patch, timeout=timeout)
 
 
 def run(instance_ids, *, n_explore, replicates, budget_cap, budget_usd, per_call_tokens, k_self_moa,
-        grade_timeout, timeout_s, strategy, roster_n, gen_id, ver_id, label):
+        grade_timeout, timeout_s, strategy, roster_n, gen_id, ver_id, label,
+        arm="verify_chain", mix_ids: list[str] | None = None, window_chars: int | None = None):
     out = RUN_ROOT / f"{label}_{int(time.time())}"
     out.mkdir(parents=True, exist_ok=True)
     ledger = Ledger(out / "ledger.jsonl")
     parity = scaffold_parity_hash(GEN_TEMPLATE, SYNTH_TEMPLATE, VERIFY_TEMPLATE)
+    context_window_chars = int(DEFAULT_WINDOW_CHARS if window_chars is None else window_chars)
+    if context_window_chars <= 0:
+        raise ValueError("window_chars must be positive")
 
-    # Reproducible fast path: both generator+verifier pinned -> resolve+probe them
-    # directly (skip the slow stochastic census). Else census the pool and pick.
-    if gen_id and ver_id:
-        gen, ver = _slot_for_id(gen_id), _slot_for_id(ver_id)
-        probe_rows = []
-        for tag, s in (("generator", gen), ("verifier", ver)):
-            ok = s is not None and _probe(s)
-            probe_rows.append({"role": tag, "model_id": getattr(s, "model_id", gen_id if tag == "generator" else ver_id),
-                               "callable": ok})
-            if not ok:
-                print(f"[forge_v2] pinned {tag} {gen_id if tag=='generator' else ver_id} not callable", flush=True)
-        if gen is None or ver is None or not all(r["callable"] for r in probe_rows):
-            gen = gen if (gen and probe_rows[0]["callable"]) else None
-            ver = ver if (ver and probe_rows[1]["callable"]) else None
-        if gen is not None and ver is not None and _family(gen.model_id) == _family(ver.model_id):
-            probe_rows.append({"role": "pair", "model_id": f"{gen.model_id}+{ver.model_id}",
-                               "callable": False, "error": "same_family"})
-            ver = None
-        callable_slots = [s for s in (gen, ver) if s is not None]
+    if arm not in {"verify_chain", "mixed_moa"}:
+        raise ValueError(f"unknown Forge v2 arm: {arm}")
+
+    # Reproducible fast path: walk the explicit recent-frontier ladder instead
+    # of drawing a stochastic roster or silently downgrading to old workhorse
+    # lanes. The old stochastic census is opt-in for experiments only.
+    if gen_id or ver_id or os.environ.get("FORGE_ALLOW_STOCHASTIC_HIGH_SLOT") != "1":
+        gen, ver, callable_slots, probe_rows = _resolve_high_slot_pair(
+            gen_id,
+            ver_id,
+            timeout_s=timeout_s,
+        )
+        if gen_id and (gen is None or gen.model_id != gen_id):
+            print(f"[forge_v2] generator {gen_id} not callable; trying recent-frontier fallback", flush=True)
+        if ver_id and (ver is None or ver.model_id != ver_id):
+            print(f"[forge_v2] verifier {ver_id} not callable; trying recent-frontier fallback", flush=True)
     else:
         print(f"[forge_v2] roster census (strategy={strategy}, n={roster_n}) ...", flush=True)
         callable_slots, probe_rows = _callable_roster(roster_n, strategy)
         gen, ver = _pick_generator_verifier(callable_slots, gen_id, ver_id)
-    if gen is None or ver is None:
+    mix_slots: list = []
+    if arm == "mixed_moa" and gen is not None:
+        mix_slots, mix_probe_rows = _pick_mix_slots(callable_slots, gen, mix_ids=mix_ids, timeout_s=timeout_s)
+        probe_rows.extend(mix_probe_rows)
+        if len({_family(s.model_id) for s in mix_slots}) < 2:
+            mix_slots = []
+
+    needs_verifier = arm == "verify_chain"
+    if gen is None or (needs_verifier and ver is None) or (arm == "mixed_moa" and not mix_slots):
         rr = RunReceipt(mission_class="verifier_role", timestamp=int(time.time()),
                         closeout="blocked_with_evidence",
-                        next_experiment="no callable cross-family generator+verifier pair from pool this draw; "
-                                        "pin --generator/--verifier to known-callable ids")
+                        arm=arm, class_null="self_moa", artifact_dir=str(out),
+                        next_experiment="no callable cross-family model set inside the Forge "
+                                        f"recent-frontier floor (min_release_date={FORGE_HIGH_SLOT_MIN_RELEASE_DATE}); "
+                                        "restore a high-slot provider key or pin an explicit allowed route")
         (out / "decision_record.json").write_text(json.dumps(asdict(rr), indent=2, default=str))
-        print("[forge_v2] BLOCKED: no callable cross-family pair.", flush=True)
+        print("[forge_v2] BLOCKED: no callable cross-family model set.", flush=True)
         return asdict(rr)
-    selection_reasons = (f"generator={gen.model_id} (strongest callable tier "
-                         f"{getattr(gen.tier,'value',gen.tier)}); verifier={ver.model_id} "
-                         f"(callable, family {_family(ver.model_id)} != generator family {_family(gen.model_id)}); "
-                         f"callable_roster={[s.model_id for s in callable_slots]}")
-    print(f"[forge_v2] generator={gen.model_id}  verifier={ver.model_id}", flush=True)
+    if arm == "verify_chain":
+        selection_reasons = (f"arm=verify_chain; generator={gen.model_id} (strongest callable tier "
+                             f"{getattr(gen.tier,'value',gen.tier)}); verifier={ver.model_id} "
+                             f"(callable, family {_family(ver.model_id)} != generator family {_family(gen.model_id)}); "
+                             f"context_window_chars={context_window_chars}; "
+                             f"callable_roster={[s.model_id for s in callable_slots]}")
+        print(f"[forge_v2] arm=verify_chain generator={gen.model_id}  verifier={ver.model_id}", flush=True)
+    else:
+        selection_reasons = (f"arm=mixed_moa; selector={gen.model_id}; mix_models="
+                             f"{[s.model_id for s in mix_slots]} (cross-family diversity control); "
+                             f"context_window_chars={context_window_chars}; "
+                             f"callable_roster={[s.model_id for s in callable_slots]}")
+        print(f"[forge_v2] arm=mixed_moa selector={gen.model_id}  models={[s.model_id for s in mix_slots]}", flush=True)
 
     explore, confirm = split_explore_confirm(instance_ids, n_explore)
     split_of = {**{i: "explore" for i in explore}, **{i: "confirm" for i in confirm}}
 
     attempts = []
     diffs = []                 # (verify_chain.resolved - self_moa.resolved) per (task,replicate)
-    split_diffs = {"explore": [], "confirm": []}
+    diffs_by_split = {"explore": [], "confirm": []}
     sm_rates, vc_rates = [], []
     any_invalid = False
-    contamination = {}
+    contamination_by_task = {}
 
     for iid in instance_ids:
         print(f"\n[forge_v2] instance {iid} (split={split_of[iid]})", flush=True)
-        inst, ctx = pull_context(iid)
+        inst, ctx = _pull_task_context(iid)
         contamination = contamination_state(inst)
+        contamination_by_task[iid] = contamination
         for r in range(replicates):
             # --- self_moa (class_null) ---
             b_sm = Budget(cap_tokens=budget_cap, cap_usd=budget_usd)
             t0 = time.time()
             sm = self_moa_arm(gen, inst, ctx, b_sm, k=k_self_moa, per_call_tokens=per_call_tokens,
-                              timeout_s=timeout_s)
+                              timeout_s=timeout_s, window_chars=context_window_chars)
             b_sm.wall_seconds = time.time() - t0
             sm_resolved, sm_secs, sm_err = (False, 0.0, None)
             if sm["final_patch"].strip() and not b_sm.invalid:
-                sm_resolved, sm_secs, sm_err = grade(inst, sm["final_patch"], timeout=grade_timeout)
-            # --- verify_chain ---
-            b_vc = Budget(cap_tokens=budget_cap, cap_usd=budget_usd)
+                sm_resolved, sm_secs, sm_err = _grade_task(inst, sm["final_patch"], timeout=grade_timeout)
+            # --- tested arm ---
+            b_arm = Budget(cap_tokens=budget_cap, cap_usd=budget_usd)
             t0 = time.time()
-            vc = verify_chain_arm(gen, ver, inst, ctx, b_vc, per_call_tokens=per_call_tokens,
-                                  timeout_s=timeout_s)
-            b_vc.wall_seconds = time.time() - t0
-            vc_resolved, vc_secs, vc_err = (False, 0.0, None)
-            if vc["final_patch"].strip() and not b_vc.invalid:
-                vc_resolved, vc_secs, vc_err = grade(inst, vc["final_patch"], timeout=grade_timeout)
+            if arm == "verify_chain":
+                arm_result = verify_chain_arm(gen, ver, inst, ctx, b_arm, per_call_tokens=per_call_tokens,
+                                              timeout_s=timeout_s, window_chars=context_window_chars)
+                arm_verifier = ver.model_id
+            else:
+                arm_result = mixed_moa_arm(mix_slots, gen, inst, ctx, b_arm, per_call_tokens=per_call_tokens,
+                                           timeout_s=timeout_s, window_chars=context_window_chars)
+                arm_verifier = None
+            b_arm.wall_seconds = time.time() - t0
+            arm_resolved, arm_secs, arm_err = (False, 0.0, None)
+            if arm_result["final_patch"].strip() and not b_arm.invalid:
+                arm_resolved, arm_secs, arm_err = _grade_task(inst, arm_result["final_patch"], timeout=grade_timeout)
 
-            any_invalid = any_invalid or b_sm.invalid or b_vc.invalid
+            any_invalid = any_invalid or b_sm.invalid or b_arm.invalid
             for arm_name, slot_v, fp, res, secs, err, bud in [
                 ("self_moa", None, sm["final_patch"], sm_resolved, sm_secs, sm_err, b_sm),
-                ("verify_chain", ver.model_id, vc["final_patch"], vc_resolved, vc_secs, vc_err, b_vc),
+                (arm, arm_verifier, arm_result["final_patch"], arm_resolved, arm_secs, arm_err, b_arm),
             ]:
                 rec = AttemptReceipt(
                     task_id=iid, mission_class="verifier_role", split=split_of[iid], arm=arm_name,
@@ -218,32 +200,35 @@ def run(instance_ids, *, n_explore, replicates, budget_cap, budget_usd, per_call
                 d = asdict(rec)
                 d["_row_id"] = rid
                 attempts.append(d)
-            diff = (1.0 if vc_resolved else 0.0) - (1.0 if sm_resolved else 0.0)
+            diff = (1.0 if arm_resolved else 0.0) - (1.0 if sm_resolved else 0.0)
             diffs.append(diff)
-            split_diffs[split_of[iid]].append(diff)
+            diffs_by_split[split_of[iid]].append(diff)
             sm_rates.append(1.0 if sm_resolved else 0.0)
-            vc_rates.append(1.0 if vc_resolved else 0.0)
+            vc_rates.append(1.0 if arm_resolved else 0.0)
             print(f"   rep {r}: self_moa={'PASS' if sm_resolved else 'fail'} "
-                  f"verify_chain={'PASS' if vc_resolved else 'fail'} "
-                  f"(sm_tok={b_sm.spent} vc_tok={b_vc.spent})", flush=True)
+                  f"{arm}={'PASS' if arm_resolved else 'fail'} "
+                  f"(sm_tok={b_sm.spent} arm_tok={b_arm.spent})", flush=True)
 
     ci = paired_bootstrap_ci(diffs)
-    split_contrasts = {name: paired_bootstrap_ci(values) for name, values in split_diffs.items()}
+    split_contrasts = {name: paired_bootstrap_ci(vals) for name, vals in diffs_by_split.items()}
     var = {"self_moa": replicate_variance(sm_rates), "verify_chain": replicate_variance(vc_rates)}
+    run_contamination = aggregate_contamination_states(contamination_by_task)
 
     # critic gate only on a POSITIVE interpretation
     critic = {"ran": False}
     positive_interpretation = positive_claim_gate(ci, split_contrasts)
     if positive_interpretation:
-        claim = (f"verify_chain beats its class_null self_moa on verifier_role "
+        claim = (f"{arm} beats its class_null self_moa on verifier_role "
                  f"(paired lift mean={ci['mean']}, CI lower={ci['lower']}, n={ci['n']})")
-        critic = {"ran": True, **refute_pass(claim, {"ci": ci, "split_contrasts": split_contrasts,
-                                                      "variance": var, "n_pairs": ci["n"],
-                                                      "contamination": contamination}, generator_family=_family(gen.model_id))}
+        critic = {"ran": True, **refute_pass(claim, {"ci": ci, "variance": var, "n_pairs": ci["n"],
+                                                      "contamination": run_contamination},
+                                          generator_family=_family(gen.model_id))}
 
     # closeout
     if any_invalid:
         closeout = "invalid_budget"
+    elif run_contamination.get("state") == "contaminated_quarantine":
+        closeout = "contaminated_quarantine"
     elif positive_interpretation and not critic.get("refuted_majority", True):
         closeout = "positive_lift_candidate"
     elif ci["upper"] < 0:
@@ -257,10 +242,10 @@ def run(instance_ids, *, n_explore, replicates, budget_cap, budget_usd, per_call
 
     if closeout == "positive_lift_candidate":
         nxt = ("CONFIRM the EXPLORE pocket on >=20 POST-CUTOFF held-out instances (contamination control), "
-               "then ablate: does the verifier need a DIFFERENT family than the generator? swap verifier family.")
+               "then ablate the winning arm's key variable under the same budget.")
     elif closeout == "measured_negative":
-        nxt = ("null (self_moa) survived. Reallocate: run verify_chain ONLY on tasks where self_moa<1.0 (hard "
-               "tasks where a verifier can add signal); add the mixed_moa arm; raise N for power.")
+        nxt = (f"null (self_moa) survived against {arm}. Reallocate: run this arm ONLY on tasks where "
+               "self_moa<1.0; rotate in mixed_moa if not tested; raise N for power.")
     elif closeout == "invalid_budget":
         nxt = "raise budget cap or lower per_call_tokens/k so both arms fit; re-run (this run is disqualified)."
     else:
@@ -268,15 +253,18 @@ def run(instance_ids, *, n_explore, replicates, budget_cap, budget_usd, per_call
                f"replicates until CI excludes 0, or accept measured_negative if mean stays <=0.")
 
     rr = RunReceipt(
-        mission_class="verifier_role", arm="verify_chain", class_null="self_moa",
+        mission_class="verifier_role", arm=arm, class_null="self_moa",
         timestamp=int(time.time()), n_pairs=ci["n"], comparisons_count=1,
         contrast_vs_class_null=ci, split_contrasts=split_contrasts,
         replicate_variance=var, critic_verdict=critic,
-        contamination_state=contamination,
+        contamination_state=run_contamination,
         budget_matched_proof={"cap_tokens": budget_cap, "cap_usd": budget_usd, "any_invalid": any_invalid,
+                              "window_chars": context_window_chars,
                               "self_moa_pass_rate": round(sum(sm_rates) / len(sm_rates), 3) if sm_rates else 0.0,
-                              "verify_chain_pass_rate": round(sum(vc_rates) / len(vc_rates), 3) if vc_rates else 0.0},
+                              f"{arm}_pass_rate": round(sum(vc_rates) / len(vc_rates), 3) if vc_rates else 0.0,
+                              "arm_pass_rate": round(sum(vc_rates) / len(vc_rates), 3) if vc_rates else 0.0},
         closeout=closeout, next_experiment=nxt, attempts=attempts,
+        artifact_dir=str(out),
     )
     run_row = ledger.append(rr)
     rr.ledger_row_ids = [run_row]
@@ -284,12 +272,12 @@ def run(instance_ids, *, n_explore, replicates, budget_cap, budget_usd, per_call
     (out / "roster_probe.json").write_text(json.dumps(probe_rows, indent=2))
 
     print(f"\n{'='*64}\n[forge_v2] DECISION RECORD", flush=True)
-    print(f"  mission_class : verifier_role   generator={gen.model_id}  verifier={ver.model_id}", flush=True)
+    print(f"  mission_class : verifier_role   arm={arm}  generator={gen.model_id}", flush=True)
     print(f"  pairs={ci['n']}  self_moa={rr.budget_matched_proof['self_moa_pass_rate']}  "
-          f"verify_chain={rr.budget_matched_proof['verify_chain_pass_rate']}", flush=True)
-    print(f"  lift (verify_chain - self_moa): mean={ci['mean']}  CI=[{ci['lower']},{ci['upper']}]  p<=0={ci['p_le_0']}", flush=True)
+          f"{arm}={rr.budget_matched_proof['arm_pass_rate']}", flush=True)
+    print(f"  lift ({arm} - self_moa): mean={ci['mean']}  CI=[{ci['lower']},{ci['upper']}]  p<=0={ci['p_le_0']}", flush=True)
     print(f"  critic: {critic.get('n_refuted','-')}/{critic.get('n_critics','-')} refuted" if critic.get("ran") else "  critic: not run (no positive)", flush=True)
-    print(f"  contamination: {contamination.get('state')}", flush=True)
+    print(f"  contamination: {run_contamination.get('state')}", flush=True)
     print(f"  >>> CLOSEOUT: {closeout}", flush=True)
     print(f"  next_experiment: {nxt}", flush=True)
     print(f"  -> {out}/decision_record.json", flush=True)
@@ -309,16 +297,25 @@ def main(argv=None) -> int:
     ap.add_argument("--timeout-s", type=int, default=240)
     ap.add_argument("--strategy", default="explore")
     ap.add_argument("--roster-n", type=int, default=14)
-    ap.add_argument("--generator", default="glm-5.2", help="pin generator model id (reproducible)")
-    ap.add_argument("--verifier", default=FORGE_NVIDIA_KIMI_MODEL_ID, help="pin verifier model id (cross-family)")
+    ap.add_argument("--generator", default=DEFAULT_FORGE_GENERATOR_MODEL, help="pin generator model id (reproducible)")
+    ap.add_argument("--verifier", default=DEFAULT_FORGE_VERIFIER_MODEL, help="pin verifier model id (cross-family)")
+    ap.add_argument("--arm", default="verify_chain", choices=["verify_chain", "mixed_moa"])
+    ap.add_argument("--mix-models", default="", help="comma-separated pinned model ids for mixed_moa")
+    ap.add_argument(
+        "--window-chars",
+        type=int,
+        default=DEFAULT_WINDOW_CHARS,
+        help="Track A context-window genome field, applied symmetrically to all arms",
+    )
     ap.add_argument("--label", default="verifier_role")
     a = ap.parse_args(argv)
     ids = [x.strip() for x in a.instances.split(",") if x.strip()]
+    mix_ids = [x.strip() for x in a.mix_models.split(",") if x.strip()]
     run(ids, n_explore=a.n_explore, replicates=a.replicates, budget_cap=a.budget,
         budget_usd=a.budget_usd,
         per_call_tokens=a.per_call_tokens, k_self_moa=a.k_self_moa, grade_timeout=a.grade_timeout,
         timeout_s=a.timeout_s, strategy=a.strategy, roster_n=a.roster_n, gen_id=a.generator,
-        ver_id=a.verifier, label=a.label)
+        ver_id=a.verifier, label=a.label, arm=a.arm, mix_ids=mix_ids, window_chars=a.window_chars)
     return 0
 
 

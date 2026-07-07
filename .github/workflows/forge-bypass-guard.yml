@@ -1,0 +1,36 @@
+name: forge-bypass-guard
+
+on:
+  pull_request:
+    branches: [main, "promote/**", "governance/**"]
+  merge_group:
+
+concurrency:
+  group: forge-bypass-guard-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  check-bypass:
+    name: dharma forge bypass guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+
+      - name: Run forge bypass guard
+        # Same check the pre-commit hook runs (dharma-forge-bypass), independently
+        # enforced here so a local --no-verify commit can't skip it. The guard
+        # scans the RSI-sensitive live-apply surface for shadow=False / shadow_mode=False
+        # bypasses and env-unlock regressions; it is not diff-scoped, so it always
+        # checks the full sensitive surface at HEAD.
+        run: python3 scripts/governance/check_forge_bypass.py
