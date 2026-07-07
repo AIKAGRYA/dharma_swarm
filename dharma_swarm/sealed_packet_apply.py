@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from dharma_swarm.diff_applier import parse_unified_diff
+from dharma_swarm.promotion_gate import SEALED_PACKET_BLOCKED_PATHS as _SEALED_PACKET_BLOCKED_PATHS
 from dharma_swarm.evolution import (
     EvidenceTier,
     EvolutionStatus,
@@ -22,23 +23,6 @@ from dharma_swarm.evolution import (
     SealedPacketApplyResult,
 )
 from dharma_swarm.traces import TraceEntry
-
-
-_SEALED_PACKET_BLOCKED_PATHS: tuple[str, ...] = (
-    ".github/workflows/*",
-    ".pre-commit-config.yaml",
-    "dharma_swarm/agent_runner.py",
-    "dharma_swarm/dgc_cli.py",
-    "dharma_swarm/dharma_kernel.py",
-    "dharma_swarm/frontier_council.py",
-    "dharma_swarm/guardian_crew.py",
-    "dharma_swarm/insight_brief.py",
-    "dharma_swarm/models.py",
-    "dharma_swarm/orchestrate_live.py",
-    "dharma_swarm/orchestrator.py",
-    "dharma_swarm/swarm.py",
-    "dharma_swarm/telos_gates.py",
-)
 
 
 async def apply_sealed_packet(
@@ -57,7 +41,7 @@ async def apply_sealed_packet(
     root = Path(dryrun_root).expanduser().resolve()
     result = SealedPacketApplyResult(packet_root=str(root), shadow=shadow)
     if not shadow:
-        from dharma_swarm.evolution import _promotion_verification_allows_live
+        from dharma_swarm.promotion_gate import _promotion_verification_allows_live
 
         if not _promotion_verification_allows_live(
             promotion_verification,
@@ -140,6 +124,20 @@ async def apply_sealed_packet(
                 "sealed packet diff failed conservative guards",
                 guard_failures,
             )
+        if not shadow:
+            authorized = {
+                str(entry).strip()
+                for entry in (dict(promotion_verification or {}).get("authorized_source_files") or [])
+                if str(entry).strip()
+            }
+            unauthorized = [path for path in files_changed if path not in authorized]
+            if unauthorized:
+                return await _refuse_sealed_packet(
+                    engine,
+                    result,
+                    "sealed packet diff touches files the promotion packet does not authorize",
+                    [f"path_not_authorized_by_promotion:{path}" for path in unauthorized],
+                )
     else:
         files_changed = []
         diff_lines = 0
