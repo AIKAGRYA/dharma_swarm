@@ -95,6 +95,7 @@ def god_objects(root: Path) -> SignalResult:
         scope=f"{root}/ ({len(sizes):,} source files [{', '.join(langs)}], deps excluded)",
         pressure=min(1.0, len(big) / 8),
         instrument="line-count (language-agnostic)",
+        count=len(big),
         detail=[f"{n:>6}  {f.relative_to(root)}" for n, f in big[:8]],
     )
 
@@ -129,6 +130,7 @@ def complexity(root: Path) -> SignalResult:
                 scope=f"{len(rows):,} functions in {root}/",
                 pressure=min(1.0, len(over) / 100),
                 instrument=f"radon {_radon_version(radon)}",
+                count=len(over),
                 detail=[f"cc={c:>4}  {name}  @ {loc}" for c, loc, name in rows[:10]],
             )
     # radon absent: an AST branch-count proxy disagrees with radon (it cannot see
@@ -145,6 +147,7 @@ def complexity(root: Path) -> SignalResult:
         scope=f"{len(counts):,} functions in {root}/",
         pressure=min(1.0, len(over) / 100),
         instrument="AST branch-count proxy (radon ABSENT)",
+        count=len(over),
         detail=[f"~{c:>4}  {name}  @ {loc}" for c, loc, name in counts[:10]],
     )
 
@@ -197,6 +200,7 @@ def wildcard_imports(root: Path) -> SignalResult:
         scope=f"{root}/ (.py, deps excluded)",
         pressure=min(1.0, len(hits) / 20),
         instrument="AST",
+        count=len(hits),
         detail=hits[:10],
     )
 
@@ -242,6 +246,7 @@ def silent_swallows(root: Path) -> SignalResult:
         scope=f"{root}/",
         pressure=min(1.0, silent / 300),
         instrument="AST (ExceptHandler with sole Pass)",
+        count=silent,
         detail=locs[:8],
     )
 
@@ -263,6 +268,7 @@ def broad_catches(root: Path) -> SignalResult:
         scope=f"{root}/",
         pressure=min(1.0, broad / 3000),
         instrument="AST (ExceptHandler type in {Exception,BaseException,None})",
+        count=broad,
         detail=locs[:8],
     )
 
@@ -318,6 +324,7 @@ def coupling(root: Path) -> SignalResult:
         scope=f"intra-{pkg} import edges (static)",
         pressure=min(1.0, (top_in[0][1] if top_in else 0) / 150),
         instrument="AST import graph",
+        count=max_in,
         detail=[f"fan-in {c:>4}  {m}" for m, c in fan_in.most_common(6)],
     )
 
@@ -348,6 +355,7 @@ def dead_code(root: Path) -> SignalResult:
             scope=f"{root}/",
             pressure=min(1.0, n / 200),
             instrument="vulture",
+            count=n,
             detail=out.splitlines()[:8],
         )
     return SignalResult(
@@ -384,6 +392,7 @@ def churn(root: Path, days: int = 90) -> SignalResult:
         scope=f"whole repo, last {days}d",
         pressure=min(1.0, rate / 0.1),
         instrument="git log",
+        count=len(reverts),
         detail=[ln.split('\t', 1)[-1][:80] for ln in reverts[:6]],
     )
 
@@ -544,6 +553,7 @@ def cycles(root: Path) -> SignalResult:
         scope=f"intra-{root.name} import graph ({len(alle)} modules with edges)",
         pressure=min(1.0, n_load / 2 + n_all / 20),
         instrument="AST import graph + Tarjan SCC",
+        count=n_all,
         detail=detail,
     )
 
@@ -615,6 +625,7 @@ def duplication(root: Path) -> SignalResult:
         scope=f"{root}/ ({total_funcs:,} functions)",
         pressure=min(1.0, cloned_funcs / 150),
         instrument="AST function-body hashing (Type-1)",
+        count=cloned_funcs,
         detail=detail,
     )
 
@@ -677,6 +688,7 @@ def phantom_deps(root: Path) -> SignalResult:
             scope=f"{root}/ top-level imports not in stdlib/installed/first-party",
             pressure=0.0,   # an unconfirmed candidate must not drive the composite
             instrument="local resolution only (PyPI NOT queried)",
+            count=n,
             detail=[f"{name}  \u2190 {unresolved[name][0]}" for name in names[:10]],
         )
     # Online: PyPI is the ground truth for existence. A name that 404s (after
@@ -695,6 +707,7 @@ def phantom_deps(root: Path) -> SignalResult:
         scope=f"{root}/ unresolved imports cross-checked against PyPI",
         pressure=min(1.0, np / 5),
         instrument="PyPI existence check (live)",
+        count=np,
         detail=([f"PHANTOM: {p}  \u2190 {unresolved[p][0]}" for p in phantom]
                 or [f"all {len(real)} unresolved names exist on PyPI (uninstalled optional deps)"]),
     )
@@ -777,6 +790,7 @@ def change_coupling(root: Path, window: int = 400, min_support: int = 8) -> Sign
         scope=f"last {len(commits)} non-merge commits",
         pressure=min(1.0, n / 20),
         instrument="git co-change association rules",
+        count=n,
         detail=[f"{conf:4.0%} ({c}x)  {Path(a).name}  \u2194  {Path(b).name}" for conf, c, a, b in coupled[:8]],
     )
 
@@ -819,5 +833,6 @@ def narrative_comments(root: Path) -> SignalResult:
         scope=f"{root}/ comment lines",
         pressure=min(1.0, ratio / 0.2),
         instrument="comment-restatement regex (PROXY)",
+        count=restate,
         detail=locs,
     )
