@@ -8,13 +8,13 @@
     "requires": "\u22652 gym receipts on one environment AND \u22651 reality-graded receipt (envs G2/G10 class) in the same window",
     "status": "UNVALUED"
   },
-  "digest": "121d9c1d0bebfd7cdaf07235e14a49ce94f86bb4b90e904cd9313ac01cceb3d1",
+  "digest": "2f3c76abe740bb056294d79818ca1dcf0f289071798c93dcd692dcaa4cfb375b",
   "door": {
     "conditions": [
       {
         "id": "C1",
-        "score": 0.725,
-        "verdict": "AMBER"
+        "score": 0.25,
+        "verdict": "RED"
       },
       {
         "id": "C2",
@@ -42,20 +42,25 @@
     "review_cadence_days": 30
   },
   "fact_owner": "docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md \u00a7(c)",
-  "generated_at": "2026-07-07T06:12:13Z",
+  "generated_at": "2026-07-07T09:21:34Z",
   "inputs": {
     "baseline_receipt": {
       "path": "reports/governance/inward_ascent/baseline_receipt.json",
       "present": true,
       "sha256": "946afc02649fc51c04f7c8fcd60649ee2ef5896d1789edf3e526ced8f70e4550"
     },
+    "transcendence_receipt": {
+      "path": "reports/governance/chamber/transcendence_receipt.json",
+      "present": true,
+      "sha256": "3eab7a899623aa2a036c2bedb4046fb3509c6318a125a3dd37d7d5048f50d6d7"
+    },
     "trust_gate": {
       "available": true,
       "conditions": [
         {
           "id": "C1",
-          "score": 0.725,
-          "verdict": "AMBER"
+          "score": 0.25,
+          "verdict": "RED"
         },
         {
           "id": "C2",
@@ -132,6 +137,23 @@
         "receipt": "reports/governance/inward_ascent/baseline_receipt.json",
         "unit": "receipts",
         "value": 0
+      }
+    },
+    {
+      "capability": "ingest_quality",
+      "commensurable": false,
+      "delta": null,
+      "field": {
+        "receipt": "UNKNOWN_PENDING_INGEST \u2014 the ingest lane supplies field numbers (F5)",
+        "unit": null,
+        "value": null
+      },
+      "note": "Fraction of bronze receipts reaching corroboration k>=2; undefined until receipts land.",
+      "ours": {
+        "measured": false,
+        "receipt": "reports/governance/inward_ascent/baseline_receipt.json",
+        "unit": "fraction",
+        "value": null
       }
     },
     {
@@ -220,6 +242,40 @@
       }
     },
     {
+      "capability": "self_model_accuracy",
+      "commensurable": false,
+      "delta": null,
+      "field": {
+        "receipt": "UNKNOWN_PENDING_INGEST \u2014 the ingest lane supplies field numbers (F5)",
+        "unit": null,
+        "value": null
+      },
+      "note": "Does the organism know itself (env 7) \u2014 folds into G1 as a secondary scorer arm.",
+      "ours": {
+        "measured": false,
+        "receipt": "reports/governance/inward_ascent/baseline_receipt.json",
+        "unit": "fraction",
+        "value": null
+      }
+    },
+    {
+      "capability": "git_history_gym_substrate",
+      "commensurable": false,
+      "delta": null,
+      "field": {
+        "receipt": "UNKNOWN_PENDING_INGEST \u2014 the ingest lane supplies field numbers (F5)",
+        "unit": null,
+        "value": null
+      },
+      "note": "G1's raw substrate (commits/landed merges at the baseline's pinned snapshot sha).",
+      "ours": {
+        "measured": true,
+        "receipt": "reports/governance/inward_ascent/baseline_receipt.json",
+        "unit": "commits",
+        "value": 1331
+      }
+    },
+    {
       "capability": "distilled_seat_cost_per_iteration",
       "commensurable": false,
       "delta": null,
@@ -235,12 +291,104 @@
         "unit": "USD / scored iteration",
         "value": null
       }
+    },
+    {
+      "capability": "transcendence_decomposition",
+      "commensurable": false,
+      "delta": null,
+      "field": {
+        "receipt": "UNKNOWN_PENDING_INGEST \u2014 the ingest lane supplies field numbers (F5)",
+        "unit": null,
+        "value": null
+      },
+      "note": "E1: realized Krogh-Vedelsby lift vs best single seat on the latest gym trace corpus (internal-gym number under a train-signal aggregation rule \u2014 never a C2 claim).",
+      "ours": {
+        "measured": true,
+        "receipt": "reports/governance/chamber/transcendence_receipt.json",
+        "unit": "lift vs best seat (internal gym)",
+        "value": 0.0
+      }
     }
   ],
   "schema": "dharma_swarm.frontier_ledger.v1",
   "summary": {
-    "measured": 2,
-    "rows": 9,
-    "unknown": 7
+    "measured": 4,
+    "rows": 13,
+    "unknown": 9
+  },
+  "velocity": {
+    "capabilities": {
+      "coding_benchmark_self_improvement": {
+        "points": 0,
+        "requires": ">=2 renders with a numeric delta for this capability",
+        "status": "UNVALUED"
+      },
+      "distilled_seat_cost_per_iteration": {
+        "points": 0,
+        "requires": ">=2 renders with a numeric delta for this capability",
+        "status": "UNVALUED"
+      },
+      "forecast_brier": {
+        "points": 0,
+        "requires": ">=2 renders with a numeric delta for this capability",
+        "status": "UNVALUED"
+      },
+      "gate_catch_rate": {
+        "points": 0,
+        "requires": ">=2 renders with a numeric delta for this capability",
+        "status": "UNVALUED"
+      },
+      "git_history_gym_substrate": {
+        "points": 0,
+        "requires": ">=2 renders with a numeric delta for this capability",
+        "status": "UNVALUED"
+      },
+      "ingest_metabolism": {
+        "points": 0,
+        "requires": ">=2 renders with a numeric delta for this capability",
+        "status": "UNVALUED"
+      },
+      "ingest_quality": {
+        "points": 0,
+        "requires": ">=2 renders with a numeric delta for this capability",
+        "status": "UNVALUED"
+      },
+      "memory_hit_rate": {
+        "points": 0,
+        "requires": ">=2 renders with a numeric delta for this capability",
+        "status": "UNVALUED"
+      },
+      "ontology_coverage": {
+        "points": 0,
+        "requires": ">=2 renders with a numeric delta for this capability",
+        "status": "UNVALUED"
+      },
+      "routing_regret": {
+        "points": 0,
+        "requires": ">=2 renders with a numeric delta for this capability",
+        "status": "UNVALUED"
+      },
+      "self_model_accuracy": {
+        "points": 0,
+        "requires": ">=2 renders with a numeric delta for this capability",
+        "status": "UNVALUED"
+      },
+      "swarm_lift_vs_best_single": {
+        "points": 0,
+        "requires": ">=2 renders with a numeric delta for this capability",
+        "status": "UNVALUED"
+      },
+      "transcendence_decomposition": {
+        "points": 0,
+        "requires": ">=2 renders with a numeric delta for this capability",
+        "status": "UNVALUED"
+      }
+    },
+    "loop_latency": {
+      "requires": "gym iteration receipts with timestamps AND field publication cadence from ingest (code-world lane)",
+      "status": "UNVALUED"
+    },
+    "renders_in_history": 2,
+    "valued": 0
   }
 }

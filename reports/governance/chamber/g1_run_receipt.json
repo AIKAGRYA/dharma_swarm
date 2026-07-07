@@ -1,0 +1,29 @@
+{
+  "aggregation_rule": "oracle_argmax_v0 (train-signal only, not a capability rule)",
+  "capability_claim": "NONE \u2014 internal gym numbers under a train-signal aggregation rule; never a benchmark claim.",
+  "digest": "7d5ceb04c180fef4af510583ad459055e5742d280196348e7b93d5eebfc33872",
+  "env_id": "g1_git_history",
+  "live_solver": {
+    "available": false,
+    "reason": "keys dispatchable but live solver lane lands with track next-item 2"
+  },
+  "per_task": {
+    "g1-efe5a10f7b8c": true,
+    "g1-f3a14b468a63": true
+  },
+  "schema": "chamber_gym_run.v1",
+  "scorer_hash": "2ed914437442f90765c4b9f930d698d4fcb465b85892428b943efe933207d909",
+  "seats": [
+    "seat_landed_replay",
+    "seat_null"
+  ],
+  "seed": 7,
+  "taskpack_sha": "1adef54fa3107258e215e718fdb9e9c3a19d107e34c0afa621cbd970dadc88a5",
+  "tasks_correct": 2,
+  "tasks_run": 2,
+  "trace_corpus": {
+    "file": "trace_corpus.jsonl",
+    "rows": 2,
+    "sha256": "6dde8998b209ea083e0dffc555bb8b9cac7bdc1d193e05c8af2953d6f7de843f"
+  }
+}

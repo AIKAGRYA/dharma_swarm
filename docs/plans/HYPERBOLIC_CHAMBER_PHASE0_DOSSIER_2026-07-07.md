@@ -389,7 +389,7 @@ doctrine's name).
           - inputs
       - id: frontier_ledger_replays
         kind: command_passes
-        command: python3 scripts/governance/frontier_ledger.py --check
+        command: ["python3", "scripts/governance/frontier_ledger.py", "--check"]
     non_goals:
       - No efferent/world-facing actions of any kind (posts, outreach, trades, publishing, PR/issue submission to external repos).
       - Never weaken a gate, ratchet, or the One Wire quorum; gym gradients never touch archive fitness; DHARMA_EVOLUTION_SHADOW and BR-003 sequencing unchanged.

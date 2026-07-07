@@ -3,65 +3,68 @@
 
 Fact-owner: docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md §(c) and
 docs/vision_maps/MASTER_2026-07-07_hyperbolic_time_chamber.md §3.4. This script
-owns NO fact. It projects, per capability: our measured number (from existing
-receipt owners — the inward-ascent baseline receipt and the trust-gate
-scoreboard) against the field's published number (receipted comparators from
-NORTH_STAR §10; anything without a receipt URL renders UNKNOWN, never a guess),
-plus the door panel (trust gate C1–C5) and the chamber-drift slot.
+owns NO fact. Row construction lives in dharma_swarm/chamber/ledger_rows.py;
+velocity (E6) lives in dharma_swarm/chamber/ledger_history.py. Every render
+appends one row to a digest-chained history so d(delta)/dt is tamper-evident.
 
-Doctrine (same honesty contract as trust_gate_status.py and
-inward_ascent_baseline.py): a capability that cannot be measured on this host
-is UNKNOWN, never silently green; a field number without a receipt URL is
-UNKNOWN_PENDING_INGEST, never remembered prose. The C2 commensurability rule
-stands: internal lift numbers are never presented as benchmark-commensurable.
+Honesty contract (same as trust_gate_status.py / inward_ascent_baseline.py):
+UNKNOWN is rendered, never guessed; field numbers require receipt URLs; the
+C2 commensurability rule stands.
 
 Outputs (the committed surface):
   - reports/governance/chamber/frontier_ledger_receipt.json  (digest-stamped)
   - reports/governance/chamber/FRONTIER_LEDGER.md            (the one page)
+  - reports/governance/chamber/ledger_history.jsonl          (E6 chain)
 
-Replay contract (``--check``): the markdown page must re-render byte-for-byte
-as a pure function of the committed receipt; the receipt's tamper seal
-(`digest`, checker-compatible with check_track_status.py::_recompute_digest)
-must recompute; and the pinned sha256 of the baseline-receipt input must still
-match the committed baseline receipt (staleness is a failure, not a footnote).
+Replay contract (``--check``): tamper seal recomputes; pinned inputs
+(baseline + transcendence receipts) unchanged; the page re-renders
+byte-for-byte from the receipt; the history chain is intact with its tip
+referencing this receipt; the velocity block replays from the chain; and the
+DOOR has not drifted at verdict level (trust gate re-run live — C1 is
+excluded from drift comparison because it measures working-tree cleanliness,
+which is volatile by design; C2–C5 verdicts and gate_open must match).
 A re-RENDER (no flag) refreshes from the live owners; --check never writes.
-
-Exit code: 0 on render; --check exits 1 on any finding.
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
-import re
-import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from dharma_swarm.chamber.chain import BrokenChainError  # noqa: E402
+from dharma_swarm.chamber.ledger_history import (  # noqa: E402
+    append_history,
+    compute_velocity,
+    read_chain,
+)
+from dharma_swarm.chamber.ledger_rows import (  # noqa: E402
+    BASELINE_PATH,
+    TRANSCENDENCE_PATH,
+    build_rows,
+    capability_summary,
+    load_baseline,
+    sha256_file,
+    swarm_lift,
+    trust_gate_payload,
+    trust_gate_snapshot,
+)
+
 OUT_DIR = REPO_ROOT / "reports/governance/chamber"
 RECEIPT_NAME = "frontier_ledger_receipt.json"
 MARKDOWN_NAME = "FRONTIER_LEDGER.md"
-BASELINE_PATH = REPO_ROOT / "reports/governance/inward_ascent/baseline_receipt.json"
-TRUST_GATE_SCRIPT = REPO_ROOT / "scripts/governance/trust_gate_status.py"
+HISTORY_NAME = "ledger_history.jsonl"
 SCHEMA = "dharma_swarm.frontier_ledger.v1"
-
-# Volatile fields excluded from --check field-replay comparison (the tamper
-# seal `digest` still covers them, mirroring check_track_status conventions).
-_VOLATILE_KEYS = ("generated_at", "host", "digest")
-
-# Field comparators: ONLY entries with a receipt URL may carry a number.
-# NORTH_STAR §10 is the source; refreshing these is the ingest lane's job
-# (chamber doctrine F5: the ledger exists to replace hand-curated memory).
-FIELD_COMPARATORS: dict[str, dict[str, Any]] = {
-    "coding_benchmark_self_improvement": {
-        "value": 50.0,
-        "unit": "% SWE-bench-verified (DGM final, self-improved 20->50)",
-        "receipt": "https://arxiv.org/abs/2505.22954",
-    },
-}
+# C1 measures runtime-tree cleanliness — volatile across hosts/renders by
+# design; door drift compares the stable, repo-content-derived conditions.
+DRIFT_STABLE_CONDITIONS = ("C2", "C3", "C4", "C5")
 
 
 def _canonical_json(payload: object) -> str:
@@ -74,153 +77,6 @@ def stable_digest(payload: object) -> str:
 
 def _utc_now() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def sha256_file(path: Path) -> str | None:
-    if not path.exists():
-        return None
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def load_baseline() -> tuple[dict[str, Any] | None, str | None]:
-    """The committed inward-ascent baseline receipt is the 'ours' owner for
-    every ratchet surface it measures. Absent -> every surface UNKNOWN."""
-    digest = sha256_file(BASELINE_PATH)
-    if digest is None:
-        return None, None
-    try:
-        return json.loads(BASELINE_PATH.read_text(encoding="utf-8")), digest
-    except (OSError, json.JSONDecodeError):
-        return None, digest
-
-
-def _trust_gate_payload() -> dict[str, Any] | None:
-    """Run the trust-gate owner script ONCE. Any failure -> None, and the
-    callers render an UNKNOWN door / lift, never a fabricated one."""
-    try:
-        proc = subprocess.run(
-            [sys.executable, str(TRUST_GATE_SCRIPT), "--json-only"],
-            capture_output=True, text=True, timeout=180, cwd=REPO_ROOT,
-        )
-        return json.loads(proc.stdout)
-    except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
-        return None
-
-
-def trust_gate_snapshot(payload: dict[str, Any] | None) -> dict[str, Any]:
-    """Reduce the trust-gate payload to the door panel."""
-    if payload is None:
-        return {"available": False, "gate_open": None, "conditions": []}
-    conditions = [
-        {"id": c.get("id"), "score": c.get("score"), "verdict": c.get("verdict")}
-        for c in payload.get("conditions", [])
-    ]
-    return {
-        "available": True,
-        "gate_open": bool(payload.get("gate_open", False)),
-        "owner": str(payload.get("fact_owner", "docs/vision_maps/NORTH_STAR.md §8")),
-        "conditions": conditions,
-    }
-
-
-def _swarm_lift(payload: dict[str, Any] | None) -> tuple[float | None, str]:
-    """C2's evidence names the last real lift measurement and its receipt.
-    Parsed, not remembered; unparseable -> UNKNOWN with the gap named."""
-    if payload is None:
-        return None, "trust-gate owner unavailable on this host"
-    for cond in payload.get("conditions", []):
-        if cond.get("id") != "C2":
-            continue
-        for line in cond.get("evidence", []):
-            m = re.search(r"latest measured lift = (-?\d+(?:\.\d+)?)\s*\((\S+?)\)", line)
-            if m:
-                return float(m.group(1)), m.group(2)
-    return None, "no measured-lift line in C2 evidence"
-
-
-def _baseline_surface(baseline: dict[str, Any] | None, sid: str) -> dict[str, Any]:
-    for s in (baseline or {}).get("surfaces", []):
-        if s.get("id") == sid:
-            return {"value": s.get("value"), "unit": s.get("unit"),
-                    "measured": bool(s.get("measured")),
-                    "receipt": "reports/governance/inward_ascent/baseline_receipt.json"}
-    return {"value": None, "unit": None, "measured": False,
-            "receipt": "reports/governance/inward_ascent/baseline_receipt.json (surface absent)"}
-
-
-def _field_for(capability: str) -> dict[str, Any]:
-    row = FIELD_COMPARATORS.get(capability)
-    if row is None:
-        return {"value": None, "unit": None,
-                "receipt": "UNKNOWN_PENDING_INGEST — the ingest lane supplies field numbers (F5)"}
-    return dict(row)
-
-
-def build_rows(baseline: dict[str, Any] | None,
-               trust_payload: dict[str, Any] | None) -> list[dict[str, Any]]:
-    lift, lift_receipt = _swarm_lift(trust_payload)
-    rows: list[dict[str, Any]] = []
-
-    def add(capability: str, ours: dict[str, Any], *, commensurable: bool,
-            note: str) -> None:
-        field = _field_for(capability)
-        delta = None
-        if commensurable and isinstance(ours.get("value"), (int, float)) \
-                and isinstance(field.get("value"), (int, float)):
-            delta = round(float(ours["value"]) - float(field["value"]), 6)
-        rows.append({"capability": capability, "ours": ours, "field": field,
-                     "delta": delta, "commensurable": commensurable, "note": note})
-
-    add("coding_benchmark_self_improvement",
-        {"value": None, "unit": "% SWE-bench-verified", "measured": False,
-         "receipt": "never run — env 15 is operator-gated compute (decision queue)"},
-        commensurable=True,
-        note="The literal trust-gate C2 bar. Ours stays UNKNOWN until a real "
-             "public-benchmark run under budget-parity controls exists.")
-    add("swarm_lift_vs_best_single",
-        {"value": lift, "unit": "lift vs own best seat", "measured": lift is not None,
-         "receipt": lift_receipt},
-        commensurable=False,
-        note="Internal measurement owned by the RSI/arena lab; NOT "
-             "benchmark-commensurable (trust_gate_status admissibility rule). "
-             "Negative = the transcendence conditions currently fail in wiring.")
-    add("ingest_metabolism",
-        _baseline_surface(baseline, "ingest_volume"),
-        commensurable=False,
-        note="Bronze receipts landed under corroboration. Field column is N/A "
-             "by construction (internal capacity surface).")
-    add("forecast_brier",
-        _baseline_surface(baseline, "forecast_brier"),
-        commensurable=False,
-        note="Time-lagged reality grading (gym G2); resolution from ingest "
-             "ONLY (oracle rule, discipline 10). Ratchets DOWN.")
-    add("memory_hit_rate",
-        _baseline_surface(baseline, "memory_hit_rate"),
-        commensurable=False,
-        note="G3 arm-A held-out accuracy — the first measured C5 instrument.")
-    add("gate_catch_rate",
-        _baseline_surface(baseline, "gate_catch_rate"),
-        commensurable=False,
-        note="Deferred with the gate gym until the attack corpus is IMPORTED "
-             "(class-2), never self-generated.")
-    add("ontology_coverage",
-        _baseline_surface(baseline, "ontology_coverage"),
-        commensurable=False,
-        note="ontology.db lives on the daemon host (BR-007); daemon-host "
-             "baseline run is in the decision queue.")
-    add("routing_regret",
-        _baseline_surface(baseline, "routing_regret"),
-        commensurable=False,
-        note="G4 off-policy regret vs ~2k real delegation_runs; operator-gated "
-             "on a sanitized runtime.db snapshot. Ratchets DOWN.")
-    add("distilled_seat_cost_per_iteration",
-        {"value": None, "unit": "USD / scored iteration", "measured": False,
-         "receipt": "env 12 (trace distillation) not built — no cost ledger yet"},
-        commensurable=False,
-        note="The compute-ROI denominator (discipline 9). Every environment "
-             "must declare cost-per-scored-iteration before its first "
-             "evolution run; this row aggregates them.")
-    return rows
 
 
 def build_drift() -> dict[str, Any]:
@@ -240,12 +96,14 @@ def build_drift() -> dict[str, Any]:
     }
 
 
-def build_receipt_core() -> dict[str, Any]:
+def build_receipt_core(generated_at: str, history_path: Path) -> dict[str, Any]:
     baseline, baseline_sha = load_baseline()
-    trust_payload = _trust_gate_payload()
-    trust = trust_gate_snapshot(trust_payload)
-    rows = build_rows(baseline, trust_payload)
+    payload = trust_gate_payload()
+    trust = trust_gate_snapshot(payload)
+    rows = build_rows(baseline, payload)
     measured = sum(1 for r in rows if r["ours"].get("measured"))
+    velocity = compute_velocity(read_chain(history_path),
+                                capability_summary(rows), generated_at)
     return {
         "schema": SCHEMA,
         "fact_owner": "docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md §(c)",
@@ -260,9 +118,15 @@ def build_receipt_core() -> dict[str, Any]:
                 "sha256": baseline_sha,
                 "present": baseline is not None,
             },
+            "transcendence_receipt": {
+                "path": "reports/governance/chamber/transcendence_receipt.json",
+                "sha256": sha256_file(TRANSCENDENCE_PATH),
+                "present": TRANSCENDENCE_PATH.exists(),
+            },
             "trust_gate": trust,
         },
         "rows": rows,
+        "velocity": velocity,
         "door": {
             "gate_open": trust.get("gate_open"),
             "conditions": trust.get("conditions", []),
@@ -323,9 +187,33 @@ def render_markdown(receipt: dict[str, Any]) -> str:
             f"| {_fmt(field.get('value'), field.get('unit'))} "
             f"| {_fmt(r['delta'])} | {'yes' if r['commensurable'] else 'no'} "
             f"| {ours.get('receipt')} · {field.get('receipt')} |")
+    velocity = receipt.get("velocity", {})
+    vcaps = velocity.get("capabilities", {})
+    valued = [(c, v) for c, v in sorted(vcaps.items()) if v.get("status") == "VALUED"]
     lines += [
         "",
         "Notes per row live in the receipt (`rows[].note`).",
+        "",
+        f"## Velocity (E6) — d(delta)/dt · renders in history: "
+        f"{velocity.get('renders_in_history', 0)} · valued: "
+        f"{velocity.get('valued', 0)}/{len(vcaps)}",
+        "",
+    ]
+    if valued:
+        lines += ["| Capability | d(delta)/dt per day | Closing? | Window |",
+                  "|---|---|---|---|"]
+        lines += [f"| {c} | {v['d_delta_dt_per_day']} | "
+                  f"{'yes' if v['closing'] else 'NO'} | {v['window'][0]} → "
+                  f"{v['window'][1]} |" for c, v in valued]
+    else:
+        lines.append("All capabilities UNVALUED (requires ≥2 renders with a "
+                     "numeric delta). The history chain has begun; velocity "
+                     "values itself from the second render onward.")
+    lines += [
+        "",
+        f"- loop latency vs field cadence: "
+        f"{velocity.get('loop_latency', {}).get('status', 'UNVALUED')} — "
+        f"{velocity.get('loop_latency', {}).get('requires', '')}",
         "",
         f"## Chamber drift (discipline 11) — status: {drift['status']}",
         "",
@@ -346,21 +234,53 @@ def render_markdown(receipt: dict[str, Any]) -> str:
 
 
 def write_surface(out_dir: Path) -> dict[str, Any]:
-    receipt = build_receipt_core()
-    receipt["generated_at"] = _utc_now()
+    generated_at = _utc_now()
+    receipt = build_receipt_core(generated_at, out_dir / HISTORY_NAME)
+    receipt["generated_at"] = generated_at
     receipt["digest"] = stable_digest(
         {k: v for k, v in receipt.items() if k != "digest"})
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / RECEIPT_NAME).write_text(
         json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     (out_dir / MARKDOWN_NAME).write_text(render_markdown(receipt), encoding="utf-8")
+    append_history(out_dir / HISTORY_NAME, generated_at=generated_at,
+                   receipt_digest=receipt["digest"],
+                   capabilities=capability_summary(receipt["rows"]))
     return receipt
 
 
-def check(out_dir: Path) -> list[str]:
-    """Verify the committed surface: seal intact, inputs still pinned, page a
-    pure render of the receipt. Empty list == verified."""
+def _door_drift(committed: dict[str, Any]) -> list[str]:
+    """Codex review (PR #830): --check must not bless a stale door. Re-run
+    the trust gate and compare stable verdicts + gate_open + measured lift."""
+    payload = trust_gate_payload()
+    fresh = trust_gate_snapshot(payload)
+    if not fresh.get("available"):
+        return ["trust gate unmeasurable on this host — door drift UNKNOWN "
+                "(not blessing staleness silently)"]
     findings: list[str] = []
+    door = committed.get("door", {})
+    fresh_v = {c["id"]: c["verdict"] for c in fresh["conditions"]
+               if c["id"] in DRIFT_STABLE_CONDITIONS}
+    committed_v = {c.get("id"): c.get("verdict")
+                   for c in door.get("conditions", [])
+                   if c.get("id") in DRIFT_STABLE_CONDITIONS}
+    if fresh.get("gate_open") != door.get("gate_open") or fresh_v != committed_v:
+        findings.append(f"trust-gate door drifted since render (now {fresh_v}, "
+                        f"gate_open={fresh.get('gate_open')}) — rerun "
+                        "scripts/governance/frontier_ledger.py")
+    lift, _ = swarm_lift(payload)
+    committed_lift = next(
+        (r["ours"].get("value") for r in committed.get("rows", [])
+         if r.get("capability") == "swarm_lift_vs_best_single"), None)
+    if lift != committed_lift:
+        findings.append("measured swarm lift drifted since render — rerun "
+                        "scripts/governance/frontier_ledger.py")
+    return findings
+
+
+def check(out_dir: Path) -> list[str]:
+    """Verify the committed surface: seal intact, inputs pinned, page a pure
+    render, history chain + velocity replay, door not stale."""
     receipt_path = out_dir / RECEIPT_NAME
     md_path = out_dir / MARKDOWN_NAME
     if not receipt_path.exists():
@@ -370,23 +290,46 @@ def check(out_dir: Path) -> list[str]:
     except json.JSONDecodeError:
         return [f"receipt is not valid JSON: {receipt_path}"]
 
+    findings: list[str] = []
     stored = str(committed.get("digest", ""))
     if stored != stable_digest({k: v for k, v in committed.items() if k != "digest"}):
         findings.append("receipt digest mismatch (tampered or hand-edited)")
 
-    pinned = committed.get("inputs", {}).get("baseline_receipt", {})
-    live_sha = sha256_file(BASELINE_PATH)
-    if pinned.get("sha256") != live_sha:
-        findings.append(
-            "baseline-receipt input drifted since render "
-            f"(pinned {str(pinned.get('sha256'))[:16]}… vs live "
-            f"{str(live_sha)[:16]}…) — rerun scripts/governance/frontier_ledger.py")
+    for key, path in (("baseline_receipt", BASELINE_PATH),
+                      ("transcendence_receipt", TRANSCENDENCE_PATH)):
+        pinned = committed.get("inputs", {}).get(key, {})
+        if pinned.get("sha256") != sha256_file(path):
+            findings.append(f"{key} input drifted since render — rerun "
+                            "scripts/governance/frontier_ledger.py")
 
     if not md_path.exists():
         findings.append(f"markdown surface missing: {md_path}")
     elif md_path.read_text(encoding="utf-8") != render_markdown(committed):
         findings.append("FRONTIER_LEDGER.md is not a pure render of the "
                         "committed receipt (hand-edited or stale)")
+
+    # E6: history chain intact, tip matches this receipt, velocity replays.
+    try:
+        history = read_chain(out_dir / HISTORY_NAME)
+    except BrokenChainError as exc:
+        return findings + [f"ledger history chain broken: {exc}"]
+    if not history:
+        return findings + [f"ledger history missing/empty: {out_dir / HISTORY_NAME}"]
+    tip = history[-1]
+    if tip.get("receipt_digest") != committed.get("digest"):
+        findings.append("history tip does not reference the committed receipt "
+                        "(receipt and history must be re-rendered together)")
+        return findings
+    summary = capability_summary(committed.get("rows", []))
+    if tip.get("capabilities") != summary:
+        findings.append("history tip capabilities do not match the receipt rows")
+    replayed = compute_velocity(history[:-1], summary,
+                                str(committed.get("generated_at", "")))
+    if committed.get("velocity") != replayed:
+        findings.append("velocity block does not replay from the committed "
+                        "history chain")
+
+    findings.extend(_door_drift(committed))
     return findings
 
 
@@ -405,14 +348,15 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  - {f}")
             return 1
         print("frontier_ledger --check: OK — seal intact, inputs pinned, "
-              "page renders purely from the receipt.")
+              "page renders purely, history+velocity replay, door fresh.")
         return 0
 
     receipt = write_surface(args.out)
     s = receipt["summary"]
     print(f"frontier_ledger: wrote {args.out / RECEIPT_NAME}")
     print(f"  rows={s['rows']} measured={s['measured']} unknown={s['unknown']} "
-          f"gate_open={receipt['door']['gate_open']}")
+          f"gate_open={receipt['door']['gate_open']} "
+          f"velocity_valued={receipt['velocity']['valued']}")
     print(f"  digest={receipt['digest'][:16]}…")
     return 0
 
