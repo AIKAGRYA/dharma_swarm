@@ -66,6 +66,7 @@ class SignalResult:
     pressure: float = 0.0          # 0..1 normalized; only meaningful within a scope
     detail: list[str] = field(default_factory=list)
     instrument: str = ""           # what actually produced the number this run
+    count: int | None = None       # raw finding count (machine-comparable; None when UNASSESSED)
 
     def as_dict(self) -> dict:
         return {
@@ -77,6 +78,7 @@ class SignalResult:
             "scope": self.scope,
             "pressure": round(self.pressure, 3),
             "instrument": self.instrument,
+            "count": self.count,
             "detail": self.detail,
         }
 
