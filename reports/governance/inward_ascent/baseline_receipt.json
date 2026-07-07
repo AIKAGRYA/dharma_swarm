@@ -1,8 +1,8 @@
 {
-  "content_digest": "cf23e3ee0289dfdf4bad34a5a550a0d6b5b3c466524e1320c791618d4875bf5c",
-  "digest": "9a57be3ad5c3b63f5e3106628568dd49c35a9d51b52d0ffd8ea9ef5d831543ea",
+  "content_digest": "e313628e407385b72c88572b2308f87b7c411677005940ff92295c15b84a01e3",
+  "digest": "43021d4ad12026cdd8ea439bdeed7f38b2cc0a4d0c1d28f69c652165f07cb57a",
   "doctrine": "read model projects truth from owners; unmeasured = UNKNOWN, never green",
-  "generated_at": "2026-07-07T04:37:35Z",
+  "generated_at": "2026-07-07T05:09:35Z",
   "host": "devin-box",
   "schema_version": "dharma_swarm.inward_ascent_baseline.v1",
   "state_dir": "/home/ubuntu/.dharma",
@@ -108,19 +108,20 @@
     },
     {
       "detail": {
-        "commits": 1330,
+        "commits": 1331,
         "merges": 273,
-        "shallow": "false"
+        "shallow": "false",
+        "snapshot_sha": "de92625f23b3a9a8495cc014cb01e7016db8c1ba"
       },
       "id": "git_history_gym",
       "label": "git-history gym substrate (commits/merges)",
       "measured": true,
       "note": "non-shallow=True; landed merges = real solved tasks",
-      "owner": "git log (this worktree)",
+      "owner": "git log de92625f23b3a9a8495cc014cb01e7016db8c1ba (frozen snapshot)",
       "ratchet_direction": "up",
-      "ten_x_target": 13300.0,
+      "ten_x_target": 13310.0,
       "unit": "commits",
-      "value": 1330
+      "value": 1331
     }
   ]
 }

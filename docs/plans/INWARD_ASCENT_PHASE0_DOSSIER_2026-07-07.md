@@ -83,7 +83,7 @@ rejected by construction.
 ### Picked (3 buildable now + 1 operator-gated)
 
 **G1 — git-history repo gym** (candidate #2). Substrate verified on this
-host: non-shallow clone, 1330 commits, 273 landed merges (real solved tasks
+host: non-shallow clone, 1331 commits, 273 landed merges (real solved tasks
 with real landed tests as ground truth).
 - *Task:* given the repo state at merge-base of a past landed PR plus its
   issue/PR description, produce a diff; scorer checks out the PR's landed
@@ -200,7 +200,8 @@ drift (replay identity). Re-run: `python3
 scripts/governance/inward_ascent_baseline.py`.
 
 Baseline as measured on this host, 2026-07-07 (content_digest
-`cf23e3ee0289dfdf…`):
+`e313628e407385b7…`; git substrate frozen at the snapshot sha recorded in
+the receipt, so committing the receipt never shifts the measurement):
 
 | Surface | Baseline | 10x means | Measured by |
 |---|---|---|---|
@@ -212,7 +213,7 @@ Baseline as measured on this host, 2026-07-07 (content_digest
 | routing_regret | UNKNOWN — `runtime.db` ABSENT this host | G4 regret vs. history, ratchet DOWN | G4 scorer (operator-gated) |
 | self_model_accuracy | UNKNOWN — no harness | folded into G1 arm 2 | G1 secondary scorer |
 | forecast_brier | UNKNOWN — zero resolved predictions (`compute_brier_score()` → None, run this session) | resolved-prediction Brier, ratchet DOWN | G2 scorer |
-| git_history_gym substrate | **1330** commits / 273 merges, non-shallow | G1 taskpack size + held-out pass-rate | git log (this worktree) |
+| git_history_gym substrate | **1331** commits / 273 merges, non-shallow | G1 taskpack size + held-out pass-rate | git log at the pinned snapshot sha (frozen) |
 
 **Honesty note:** 2/9 surfaces measured, 7/9 UNKNOWN. That IS the baseline.
 "10x" on a surface becomes claimable only after its first measured non-UNKNOWN

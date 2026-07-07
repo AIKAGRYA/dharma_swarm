@@ -303,23 +303,40 @@ def _git_count(args: list[str]) -> int | None:
     return len([ln for ln in out.splitlines() if ln.strip()])
 
 
-def probe_git_history_gym() -> Surface:
-    """Real substrate for the git-history repo gym: this repo's own past."""
+def _git_head_sha() -> str | None:
+    try:
+        return subprocess.check_output(
+            ["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"],
+            text=True, stderr=subprocess.DEVNULL, timeout=30).strip()
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
+        return None
+
+
+def probe_git_history_gym(pin_sha: str | None = None) -> Surface:
+    """Real substrate for the git-history repo gym: this repo's own past.
+
+    The substrate is a FROZEN snapshot: counts are taken at a pinned commit
+    sha (recorded in the receipt), so committing the receipt itself never
+    shifts the measurement and ``--check`` replays against the same snapshot.
+    """
     shallow = subprocess.run(
         ["git", "-C", str(REPO_ROOT), "rev-parse", "--is-shallow-repository"],
         capture_output=True, text=True, timeout=30).stdout.strip()
-    commits = _git_count(["log", "--oneline"])
-    merges = _git_count(["log", "--oneline", "--merges"])
+    snapshot_sha = pin_sha or _git_head_sha()
+    log_ref = [snapshot_sha] if snapshot_sha else []
+    commits = _git_count(["log", "--oneline", *log_ref]) if snapshot_sha else None
+    merges = _git_count(["log", "--oneline", "--merges", *log_ref]) if snapshot_sha else None
     return Surface(
         id="git_history_gym", label="git-history gym substrate (commits/merges)",
         value=commits, unit="commits", measured=commits is not None,
-        owner="git log (this worktree)",
+        owner=f"git log {snapshot_sha or '(unresolved HEAD)'} (frozen snapshot)",
         note=f"non-shallow={shallow == 'false'}; landed merges = real solved tasks",
-        detail={"commits": commits, "merges": merges, "shallow": shallow},
+        detail={"commits": commits, "merges": merges, "shallow": shallow,
+                "snapshot_sha": snapshot_sha},
     )
 
 
-def collect(state: Path) -> list[Surface]:
+def collect(state: Path, git_pin_sha: str | None = None) -> list[Surface]:
     return [
         probe_ingest_volume(state),
         probe_ingest_quality(state),
@@ -329,7 +346,7 @@ def collect(state: Path) -> list[Surface]:
         probe_routing_regret(state),
         probe_self_model_accuracy(),
         probe_forecast_brier(state),
-        probe_git_history_gym(),
+        probe_git_history_gym(git_pin_sha),
     ]
 
 
@@ -360,6 +377,20 @@ def build_receipt(surfaces: list[Surface], state: Path) -> dict[str, object]:
     # digest = checker-compatible tamper seal over EVERYTHING except `digest`.
     body["digest"] = stable_digest({k: v for k, v in body.items() if k != "digest"})
     return body
+
+
+def _committed_git_pin(committed: dict[str, object]) -> str | None:
+    """Pull the frozen git snapshot sha out of a committed receipt."""
+    surfaces = committed.get("surfaces")
+    if not isinstance(surfaces, list):
+        return None
+    for s in surfaces:
+        if isinstance(s, dict) and s.get("id") == "git_history_gym":
+            detail = s.get("detail")
+            if isinstance(detail, dict):
+                sha = detail.get("snapshot_sha")
+                return str(sha) if sha else None
+    return None
 
 
 def _print_table(receipt: dict[str, object]) -> None:
@@ -398,14 +429,15 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     state = _state_dir()
-    surfaces = collect(state)
-    receipt = build_receipt(surfaces, state)
 
     if args.check:
         if not RECEIPT_PATH.is_file():
             print(f"--check: no committed receipt at {RECEIPT_PATH}")
             return 3
         committed = json.loads(RECEIPT_PATH.read_text(encoding="utf-8"))
+        pin_sha = _committed_git_pin(committed)
+        surfaces = collect(state, git_pin_sha=pin_sha)
+        receipt = build_receipt(surfaces, state)
         stored_seal = str(committed.get("digest", ""))
         reseal = stable_digest({k: v for k, v in committed.items() if k != "digest"})
         if stored_seal != reseal:
@@ -419,6 +451,9 @@ def main(argv: list[str] | None = None) -> int:
             return 3
         print(f"--check: seal intact and content replays ({stored_content[:16]}…)")
         return 0
+
+    surfaces = collect(state)
+    receipt = build_receipt(surfaces, state)
 
     if not args.no_write:
         RECEIPT_DIR.mkdir(parents=True, exist_ok=True)
