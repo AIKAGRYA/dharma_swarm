@@ -299,7 +299,7 @@ All 12 disciplines + substrate ruling enforced.
 **Track id:** `company-builder-parity-2026-07` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
 **Serves spine objective:** `revenue-external-humans-served` · **Verified at:** 2026-07-07 (TTL 30 days)
 **Relations:** complements: organism-rewire-2026-07, hyperbolic-time-chamber-2026-07
-**Owns surfaces:** scripts/governance/tam_ledger.py, scripts/governance/tam_axes.py, reports/governance/tam/**, tests/test_tam_ledger.py, docs/plans/TAM_TRANSDIMENSIONAL_ABUNDANCE_MACHINE_2026-07-07.md, docs/plans/TAM_MASTER_PROMPT_2026-07-07.md
+**Owns surfaces:** scripts/governance/tam_ledger.py, scripts/governance/tam_axes.py, reports/governance/tam/**, tests/test_tam_ledger.py, docs/plans/TAM_TRANSDIMENSIONAL_ABUNDANCE_MACHINE_2026-07-07.md, docs/plans/TAM_MASTER_PROMPT_2026-07-07.md, docs/research/POLSIA_COFOUNDER_BLUEPRINT_GENEALOGY_2026-07-07.md
 **Moves vital signs:** eval_coverage, quality_gates
 
 Operator-instructed 2026-07-07 (master prompt, preserved at
@@ -340,7 +340,7 @@ That sparse, mostly-behind board IS the day-one truth.
 **Next items:**
 
 - [governance] Operator ratification of the track home (standalone company-builder-parity-2026-07 vs folding into another lane — one-line change either way) and of the day-one axis set / scoring weights (Behind 0 / At 1 / Ahead 1.5; UNMEASURED in denominator).
-- [research] Refresh the Polsia/Cofounder competitor facts with fresh source URLs (afferent read only). IN FLIGHT 2026-07-07: deep blueprint/genealogy research is running; its adversarial verifier has already REFUTED the zilla.so 4.4x claimed-vs-actual ARR-gap framing (temporal apples-to-oranges: the $689K run-rate predates the $3M+ claims by 2-3 weeks of documented hypergrowth; zilla.so is an anonymous SEO-blog source). Update tam_axes.py rows honest_arr + distribution_arr from the verified dossier, then re-render so tam_history.jsonl shows its first real velocity point.
+- [research] DONE 2026-07-07: competitor facts refreshed from the adversarially-verified blueprint/genealogy dossier (docs/research/POLSIA_COFOUNDER_BLUEPRINT_GENEALOGY_2026-07-07.md — 100-agent deep research, 20 confirmed / 5 refuted claims). The zilla.so 4.4x ARR-gap framing was REFUTED and retired from all axis rows (replaced by 36kr's ~2.2x headline-vs-recurring decomposition + no-independent-audit finding); Polsia's engine is now citable via its own GitHub dump (Claude-CLI subprocesses on Celery Beat — commodity assembly, production parity unproven), flipping internal_architecture from UNMEASURED to measured. Second render: parity 35.0 -> 45.0 [AMBER], first velocity point on tam_history.jsonl (+10.0 pts — measurement improvement, not capability growth; annotated on the row).
 - [code] Consolidation audit vs the chamber Frontier Ledger (PR #830 landed scripts/governance/frontier_ledger.py + dharma_swarm/chamber/ledger_rows.py/ledger_history.py mid-session, after this instrument was built on the arena_truth_report.py contract): if the chamber ledger_history/comparator helpers are importable without touching chamber-owned surfaces, absorb them and delete the local equivalents; else record why two siblings stay.
 - [code] Optional dashboard wiring: a KanbanLane[] producer feeding the existing CoherenceKanban.tsx from the tam_receipt.json lanes; until then the COMPANY_BUILDER_PARITY.md table IS the board (governance receipt stays the source of truth).
 

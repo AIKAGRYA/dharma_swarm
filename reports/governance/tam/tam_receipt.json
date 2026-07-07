@@ -1,16 +1,16 @@
 {
   "authority": "projection_only",
-  "baseline": "Polsia (polsia.com) + Cofounder (cofounder.co) \u2014 public data snapshot 2026-06-10, reports/anatomy_altitude_2026-06-10/lane_F_world.md; refresh of competitor facts is an open next-item, not silently assumed current",
-  "digest": "ffa7e2279a6c177bd883e4b479e1d4ea6a882da1f05614b0421b4c46bb79af8d",
+  "baseline": "Polsia (polsia.com) + Cofounder (cofounder.co) \u2014 2026-06-10 world triangulation (reports/anatomy_altitude_2026-06-10/lane_F_world.md) refreshed 2026-07-07 by the adversarially-verified blueprint/genealogy dossier (docs/research/POLSIA_COFOUNDER_BLUEPRINT_GENEALOGY_2026-07-07.md; 20 confirmed / 5 refuted claims \u2014 incl. the retired 4.4x ARR-gap framing)",
+  "digest": "38645a80984c4e882269e24f39131d40358b1a74d435e1d815c5f3281d29c6cc",
   "efferent_action": "none \u2014 afferent measurement only (no outreach, no publishing, no benchmark claims)",
-  "generated_at": "2026-07-07T11:41:33Z",
+  "generated_at": "2026-07-07T14:18:22Z",
   "headline_differentiator": "honest_arr",
   "lane_counts": {
     "AHEAD": 1,
-    "AT_PARITY": 2,
+    "AT_PARITY": 3,
     "BEHIND": 6,
     "NO_EQUIVALENT": 2,
-    "UNMEASURED": 1
+    "UNMEASURED": 0
   },
   "machine": "Transdimensional Abundance Machine (TAM)",
   "metric": "Company-Builder Parity %",
@@ -20,7 +20,7 @@
   },
   "parity_math": {
     "denominator": 10,
-    "numerator": 3.5,
+    "numerator": 4.5,
     "scoring": {
       "AHEAD": 1.5,
       "AT_PARITY": 1.0,
@@ -29,7 +29,7 @@
       "UNMEASURED": "0.0 and counted in the denominator (cannot inflate)"
     }
   },
-  "parity_pct": 35.0,
+  "parity_pct": 45.0,
   "portfolio_live_read": {
     "active_class": [
       "darshan-publication",
@@ -41,10 +41,11 @@
     {
       "bucket": "BEHIND",
       "capability": "Org-shaped multi-agent orchestration (departments, roster, routing)",
-      "comp_claim": "departmentalized agents (Engineering/Sales/Marketing/...) with managers and shared context",
+      "comp_claim": "departmentalized agents (Engineering/Sales/Marketing/...) with managers and shared context ('superoptimizer' doctrine; engine internals UNKNOWN). Polsia's verified equivalent is shallower: scheduled Claude-CLI subprocesses, orchestrator itself just one scheduled agent (docs/research/POLSIA_COFOUNDER_BLUEPRINT_GENEALOGY_2026-07-07.md \u00a72)",
       "comp_name": "Cofounder",
       "comp_sources": [
-        "https://cofounder.co"
+        "https://cofounder.co",
+        "https://github.com/PolsiaAI/Polsia"
       ],
       "comp_status": "CLAIMED",
       "comp_verification": "vendor-claim",
@@ -161,12 +162,12 @@
     {
       "bucket": "BEHIND",
       "capability": "Distribution, paying customers, ARR",
-      "comp_claim": "~$10M ARR claimed 5 months post-launch, 7,600 customers, 85% month-2 retention \u2014 unverified, and a 4.4x claimed-vs-actual gap is documented (claimed $3M+ vs $689K run-rate)",
+      "comp_claim": "~$10M 'ARR' claimed around the $30M raise at $250M (round itself verified). 36kr decomposition: ~$4.6M true subscription ARR (~7,600 x $49/mo) + ~$2M one-time task packages + ~$2M pass-through ad spend counted as revenue (~2.2x headline-vs-recurring); best-case customer company ~$50/mo gross MRR; all figures founder-dominated, no independent audit. (Prior 4.4x-gap framing REFUTED 2026-07-07 \u2014 see docs/research/POLSIA_COFOUNDER_BLUEPRINT_GENEALOGY_2026-07-07.md \u00a75)",
       "comp_name": "Polsia",
       "comp_sources": [
-        "https://en.ain.ua/2026/05/25/ai-startup-polsia-with-no-employees-raised-30m-in-funding/",
-        "https://aiweekly.co/alerts/polsia-solo-founder-raises-30m-at-250m-valuation",
-        "https://zilla.so/blog/polsia-review"
+        "https://eu.36kr.com/en/p/3825813697565316",
+        "https://gtmnow.com/gtm-192-inside-the-company-that-raised-30m-at-a-250m-valuation-with-0-employees-ben-cera-polsia/",
+        "https://en.ain.ua/2026/05/25/ai-startup-polsia-with-no-employees-raised-30m-in-funding/"
       ],
       "comp_status": "CLAIMED",
       "comp_verification": "source-pending",
@@ -197,10 +198,11 @@
     {
       "bucket": "NO_EQUIVALENT",
       "capability": "Verifiable (receipted) revenue \u2014 'honest ARR' a third party can check",
-      "comp_claim": "no incumbent publishes third-party-verifiable revenue; Polsia's documented 4.4x claimed-vs-actual ARR gap shows why they cannot",
+      "comp_claim": "no incumbent publishes third-party-verifiable revenue \u2014 confirmed 2026-07-07: Polsia's figures are founder-dominated and decomposition-disputed (36kr: ~$10M claimed vs ~$4.6M true subscription ARR), Cofounder publishes none; no audit of any incumbent figure exists (docs/research/POLSIA_COFOUNDER_BLUEPRINT_GENEALOGY_2026-07-07.md \u00a74-5)",
       "comp_name": "Polsia + Cofounder",
       "comp_sources": [
-        "https://zilla.so/blog/polsia-review"
+        "https://eu.36kr.com/en/p/3825813697565316",
+        "https://github.com/PolsiaAI/Polsia"
       ],
       "comp_status": "ABSENT",
       "comp_verification": "third-party-report",
@@ -230,21 +232,24 @@
       "structural_exceed_cite": ""
     },
     {
-      "bucket": "UNMEASURED",
-      "capability": "Competitor internal architecture quality / production reliability",
-      "comp_claim": "SPECULATIVE \u2014 neither publishes architecture (reports/anatomy_altitude_2026-06-10/lane_F_world.md:18,204); no citable claim exists, so this row is UNMEASURED, not guessed",
+      "bucket": "AT_PARITY",
+      "capability": "Substrate architecture depth (orchestration engine, durability, memory)",
+      "comp_claim": "Polsia (repo self-description, one-shot 2-commit dump, core app/ package missing, production parity unproven): nine agents shelling out to Claude Code CLI on Celery Beat schedules over Next.js/FastAPI/PostgreSQL/Redis/ChromaDB \u2014 commodity assembly, no framework or Temporal-class durability. Cofounder: 'superoptimizer' departments + MemGPT-lineage 3-tier memory (vendor doctrine; engine internals UNKNOWN). docs/research/POLSIA_COFOUNDER_BLUEPRINT_GENEALOGY_2026-07-07.md \u00a72-4",
       "comp_name": "Polsia + Cofounder",
-      "comp_sources": [],
-      "comp_status": "UNKNOWN",
-      "comp_verification": "unverifiable",
+      "comp_sources": [
+        "https://github.com/PolsiaAI/Polsia",
+        "https://www.generalintelligencecompany.com/writing/introducing-cofounder-our-state-of-the-art-memory-system-in-an-agent"
+      ],
+      "comp_status": "CLAIMED",
+      "comp_verification": "vendor-claim",
       "key": "internal_architecture",
-      "ours_note": "",
-      "ours_owner": "repo-inspectable: 770+ modules (python3 xray.py), test suite, docs/architecture/NAVIGATION.md",
+      "ours_note": "was UNMEASURED until 2026-07-07: Polsia's own GitHub dump made the competitor cell citable (measurement improved, not us)",
+      "ours_owner": "repo-inspectable: 770+ modules (python3 xray.py), spine receipts, crash-resume graph engine lane (dharmagraph track), docs/architecture/NAVIGATION.md",
       "ours_status": "RUNS",
-      "score": 0.0,
+      "score": 1.0,
       "structural_exceed_cite": ""
     }
   ],
   "schema": "tam_ledger.v1",
-  "verdict": "RED"
+  "verdict": "AMBER"
 }

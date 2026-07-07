@@ -14,10 +14,14 @@ from __future__ import annotations
 from typing import Any
 
 BASELINE = (
-    "Polsia (polsia.com) + Cofounder (cofounder.co) — public data snapshot "
-    "2026-06-10, reports/anatomy_altitude_2026-06-10/lane_F_world.md; refresh "
-    "of competitor facts is an open next-item, not silently assumed current"
+    "Polsia (polsia.com) + Cofounder (cofounder.co) — 2026-06-10 world "
+    "triangulation (reports/anatomy_altitude_2026-06-10/lane_F_world.md) "
+    "refreshed 2026-07-07 by the adversarially-verified blueprint/genealogy "
+    "dossier (docs/research/POLSIA_COFOUNDER_BLUEPRINT_GENEALOGY_2026-07-07.md; "
+    "20 confirmed / 5 refuted claims — incl. the retired 4.4x ARR-gap framing)"
 )
+
+_DOSSIER = "docs/research/POLSIA_COFOUNDER_BLUEPRINT_GENEALOGY_2026-07-07.md"
 
 _LANE_F = "reports/anatomy_altitude_2026-06-10/lane_F_world.md"
 _COFOUNDER = ("https://cofounder.co",)
@@ -48,9 +52,13 @@ def axes() -> list[dict[str, Any]]:
                        "persistence on the daemon host is still operator-pending "
                        "(organism-rewire-2026-07 D1)",
              comp_name="Cofounder", comp="CLAIMED",
-             comp_claim="departmentalized agents (Engineering/Sales/Marketing/...) "
-                        "with managers and shared context",
-             sources=_COFOUNDER, verification="vendor-claim"),
+             comp_claim="departmentalized agents (Engineering/Sales/Marketing/...) with "
+                        "managers and shared context ('superoptimizer' doctrine; engine "
+                        "internals UNKNOWN). Polsia's verified equivalent is shallower: "
+                        "scheduled Claude-CLI subprocesses, orchestrator itself just one "
+                        f"scheduled agent ({_DOSSIER} §2)",
+             sources=_COFOUNDER + ("https://github.com/PolsiaAI/Polsia",),
+             verification="vendor-claim"),
         _row("hitl_approval",
              "Exception-based human-in-the-loop approval of dangerous actions",
              ours="RUNS",
@@ -105,12 +113,17 @@ def axes() -> list[dict[str, Any]]:
              ours_owner=f"$0 revenue across every economic surface — {_LANE_F}:199 "
                         "(clean negative #1); docs/governance/VENTURE_CELL_PORTFOLIO.yaml revenue_usd: 0",
              comp_name="Polsia", comp="CLAIMED",
-             comp_claim="~$10M ARR claimed 5 months post-launch, 7,600 customers, 85% "
-                        "month-2 retention — unverified, and a 4.4x claimed-vs-actual "
-                        "gap is documented (claimed $3M+ vs $689K run-rate)",
-             sources=("https://en.ain.ua/2026/05/25/ai-startup-polsia-with-no-employees-raised-30m-in-funding/",
-                      "https://aiweekly.co/alerts/polsia-solo-founder-raises-30m-at-250m-valuation",
-                      "https://zilla.so/blog/polsia-review"),
+             comp_claim="~$10M 'ARR' claimed around the $30M raise at $250M (round "
+                        "itself verified). 36kr decomposition: ~$4.6M true "
+                        "subscription ARR (~7,600 x $49/mo) + ~$2M one-time task "
+                        "packages + ~$2M pass-through ad spend counted as revenue "
+                        "(~2.2x headline-vs-recurring); best-case customer company "
+                        "~$50/mo gross MRR; all figures founder-dominated, no "
+                        "independent audit. (Prior 4.4x-gap framing REFUTED "
+                        f"2026-07-07 — see {_DOSSIER} §5)",
+             sources=("https://eu.36kr.com/en/p/3825813697565316",
+                      "https://gtmnow.com/gtm-192-inside-the-company-that-raised-30m-at-a-250m-valuation-with-0-employees-ben-cera-polsia/",
+                      "https://en.ain.ua/2026/05/25/ai-startup-polsia-with-no-employees-raised-30m-in-funding/"),
              verification="source-pending"),
         _row("e2e_company",
              "End-to-end company operation by agents (research -> code -> ads -> support -> sales)",
@@ -130,10 +143,13 @@ def axes() -> list[dict[str, Any]]:
                        "publish receipted revenue without exposing their claims gap; "
                        "unrealized until real dollars flow through the receipt spine",
              comp_name="Polsia + Cofounder", comp="ABSENT",
-             comp_claim="no incumbent publishes third-party-verifiable revenue; "
-                        "Polsia's documented 4.4x claimed-vs-actual ARR gap shows why "
-                        "they cannot",
-             sources=("https://zilla.so/blog/polsia-review",),
+             comp_claim="no incumbent publishes third-party-verifiable revenue — "
+                        "confirmed 2026-07-07: Polsia's figures are founder-dominated "
+                        "and decomposition-disputed (36kr: ~$10M claimed vs ~$4.6M "
+                        "true subscription ARR), Cofounder publishes none; no audit "
+                        f"of any incumbent figure exists ({_DOSSIER} §4-5)",
+             sources=("https://eu.36kr.com/en/p/3825813697565316",
+                      "https://github.com/PolsiaAI/Polsia"),
              verification="third-party-report"),
         _row("self_evolution",
              "Governed self-evolution of the operating substrate (DGM-class)",
@@ -146,12 +162,22 @@ def axes() -> list[dict[str, Any]]:
                         f"substrate under governance (public surfaces checked 2026-06-10, {_LANE_F})",
              sources=_COFOUNDER + _POLSIA, verification="vendor-claim"),
         _row("internal_architecture",
-             "Competitor internal architecture quality / production reliability",
+             "Substrate architecture depth (orchestration engine, durability, memory)",
              ours="RUNS",
-             ours_owner="repo-inspectable: 770+ modules (python3 xray.py), test suite, "
+             ours_owner="repo-inspectable: 770+ modules (python3 xray.py), spine "
+                        "receipts, crash-resume graph engine lane (dharmagraph track), "
                         "docs/architecture/NAVIGATION.md",
-             comp_name="Polsia + Cofounder", comp="UNKNOWN",
-             comp_claim=f"SPECULATIVE — neither publishes architecture ({_LANE_F}:18,204); "
-                        "no citable claim exists, so this row is UNMEASURED, not guessed",
-             sources=(), verification="unverifiable"),
+             ours_note="was UNMEASURED until 2026-07-07: Polsia's own GitHub dump made "
+                       "the competitor cell citable (measurement improved, not us)",
+             comp_name="Polsia + Cofounder", comp="CLAIMED",
+             comp_claim="Polsia (repo self-description, one-shot 2-commit dump, core "
+                        "app/ package missing, production parity unproven): nine agents "
+                        "shelling out to Claude Code CLI on Celery Beat schedules over "
+                        "Next.js/FastAPI/PostgreSQL/Redis/ChromaDB — commodity assembly, "
+                        "no framework or Temporal-class durability. Cofounder: "
+                        "'superoptimizer' departments + MemGPT-lineage 3-tier memory "
+                        f"(vendor doctrine; engine internals UNKNOWN). {_DOSSIER} §2-4",
+             sources=("https://github.com/PolsiaAI/Polsia",
+                      "https://www.generalintelligencecompany.com/writing/introducing-cofounder-our-state-of-the-art-memory-system-in-an-agent"),
+             verification="vendor-claim"),
     ]
