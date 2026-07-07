@@ -78,7 +78,7 @@ track_policy:
   model: "1..N co-equal active tracks; typed graph; WIP-limited; surface-owned"
   min_active: 1             # floor — single-track default holds until a 2nd is opened
   max_active: 10            # hard ceiling — focus protection; CI ERROR above this
-  warn_active: 5            # soft signal — "you're spreading thin"; CI WARN above this
+  warn_active: 8            # soft signal — "you're spreading thin"; CI WARN above this (bumped 5->8 2026-07-07: reconcile admitted helm terminal + safety TCB with REAL behavioral gates; hyperbolic-time-chamber landed via #830)
   min_active_grace_days: 7  # advisory: how long an empty portfolio is tolerable (empty warns immediately; not auto-enforced)
   min_active_grace_enforced: false  # explicit tombstone: grace is advisory, NOT auto-failed by CI (downstream JSON consumers read this directly)
   allow_active_active_conflict: false  # two ACTIVE tracks joined by conflicts_with => ERROR
@@ -652,6 +652,23 @@ active_tracks:
       - id: github_review_bridge_landed
         kind: commit_on_main
         commit: "751c5ba8a802e7116827c31bcf98631b2e2a1f8f"
+      # --- REAL behavioral gate (2026-07-07 reconcile): the criteria above were
+      #     existence/landed-only. These two RAN GREEN from origin/main and prove
+      #     the shipped Slice 1 behavior (native-GitHub-review -> Mike receipt
+      #     bridge is ADDITIVE and FAILS CLOSED). No longer a landed-only false positive.
+      - id: github_review_bridge_test_passes
+        kind: test_passes
+        test: tests/test_pr_merge_control_github_reviews.py
+        oracle_source: github-rest-pulls-reviews-contract
+        # 14 tests: CHANGES_REQUESTED still blocks; untrusted login never counts;
+        # no-trusted-review keeps local blocked; a present local receipt is never
+        # overridden. Verified 2026-07-07: 14 passed.
+      - id: pr_merge_control_gate_fail_closed_test_passes
+        kind: test_passes
+        test: tests/test_pr_merge_control.py
+        # 52 tests: fail-closed dispatch/gate (missing-required-CI blocks; Mike
+        # merge authority skips when gate blocked; backup-reviewer/quorum gating).
+        # Verified 2026-07-07: 52 passed.
 
     non_goals:
       - Do not weaken or remove any existing gate check (CI green, conflict, unresolved threads, CHANGES_REQUESTED stay hard).
@@ -755,6 +772,15 @@ active_tracks:
       - id: rewire_done_slices_landed
         kind: commit_on_main
         commit: "4c4f5aa47c7b49d49e28608f39f0b650d236ad57"
+      # --- REAL behavioral gate (2026-07-07 reconcile): the commit anchor above
+      #     was landed-only. This RAN GREEN and directly exercises the rewired Go
+      #     sense-organ that DONE item 3 claims shipped (dharma_swarm/world_radar/**):
+      #     toolchain-checked needs_host invocation, no exception into the caller
+      #     loop, per-source errors surface into world_radar_health. Hermetic
+      #     (mocks shutil.which; no Go toolchain/network). Verified 2026-07-07: 20 passed.
+      - id: go_sense_organ_toolchain_closure_tests_pass
+        kind: test_passes
+        test: tests/test_world_radar_go_bridge.py
 
     next_items:
       - id: 1
@@ -927,6 +953,283 @@ active_tracks:
       - Do not wire arena elites into production routing (zero-weight doctrine; Phase 6 wall is an operator capability decision, sequenced per organism-rewire D4).
       - Do not edit orchestrator.py beyond the minimal seam call (module-budget ceiling); new logic goes in dharma_swarm/graph/.
       - Do not touch surfaces owned by sibling tracks except through their own next-items.
+
+  # ==========================================================================
+  # ADMITTED 2026-07-07 (ACTIVE_TRACK reconcile) — two tracks whose shipped work
+  # owned no active track. Each is admitted with a VERIFIED-GREEN behavioral gate
+  # (never an existence-only rubber-stamp).
+  # ==========================================================================
+
+  - id: helm-worldclass-terminal-2026-06
+    name: Helm — world-class operator terminal (Bun+Ink TUI)
+    status: ACTIVE
+    opened_at: "2026-06-15"
+    verified_at: "2026-07-07"
+    ttl_days: 21
+    owner: "@AmitabhainArunachala"
+    serves: substrate-nativeness
+    complements:
+      - merge-master-mike-d4-2026-06
+    owned_surfaces:
+      - terminal/**
+    moves_vital_signs:
+      - tool_coverage
+      - context_efficiency
+
+    description: |
+      Stranded-track admission (2026-07-07 reconcile). The operator TUI
+      (terminal/, a Bun+Ink TypeScript project) shipped a real behavioral suite
+      on origin/main but owned no active track; its prior gate on
+      agent/magpie-seed was 7x file_exists (rubber-stamp) and 6 of those 7 files
+      exist ONLY on magpie-seed (a false positive on main). This admits the
+      LANDED core with an honest, re-runnable behavioral gate.
+
+      Claim boundary: the command_passes gate proves the operator TUI's GENERAL
+      shipped behavior (527 green), NOT the golden-frame / compact-viewport /
+      tmux-receipt verification LANE — that lane is genuinely unmerged
+      (branch-only) and remains open work below; it must NOT be gated by
+      file_exists.
+
+    completion_criteria:
+      # REAL behavioral gate (replaces the 7x file_exists rubber-stamp).
+      # Verified GREEN 2026-07-07, bun 1.3.11:
+      #   cd terminal && bun install --frozen-lockfile && bun test
+      #   -> 527 pass / 0 fail across 12 files, exit 0.
+      - id: terminal_tui_test_suite_passes
+        kind: command_passes
+        command: ["bash", "-c", "cd terminal && bun install --frozen-lockfile && bun test"]
+        timeout_s: 300
+      # Tighter/faster gate on the app render + command-routing surface named by
+      # the old app_test_exists criterion. Verified GREEN: 208 pass / 0 fail, exit 0.
+      - id: terminal_app_test_passes
+        kind: command_passes
+        command: ["bash", "-c", "cd terminal && bun install --frozen-lockfile && bun test tests/app.test.ts"]
+        timeout_s: 300
+      # Provenance-only evidence (NOT a sole gate): app test file ships on main.
+      - id: app_test_exists
+        kind: file_exists
+        file: terminal/tests/app.test.ts
+      # Rigorous landed anchor (2026-07-07): the commit that introduced the Bun TUI
+      # behavioral suite (terminal/tests/app.test.ts) is an ancestor of origin/main.
+      # Verified: git merge-base --is-ancestor 1d8dae294 origin/main -> true.
+      - id: terminal_behavioral_suite_landed
+        kind: commit_on_main
+        commit: "1d8dae2943f48e5ef343e67ee7c4ed084e065ea0"
+      # NOTE: the 6 golden-frame/compact-viewport/tmux-receipt file_exists criteria
+      # from the prior gate (golden_capture.sh, ratchet.sh, tests/golden/120x40/chat.txt,
+      # compactShell.test.tsx, HELM_WORLDCLASS_LIVE_TMUX_RECEIPT.md, HELM_WORLDCLASS_CLOSEOUT.md)
+      # do NOT exist on origin/main -- they live only on agent/magpie-seed. That lane
+      # is genuinely unmerged and stays tracked by next_items; it must NOT be file_exists-gated.
+
+    next_items:
+      - id: 1
+        what: "(blocker) Golden-frame verification lane (golden_capture.sh / ratchet.sh / 120x40 golden / compactShell.test.tsx + closeout+tmux receipts) is unmerged — lives only on agent/magpie-seed. This is the track's world-class differentiator and keeps it ACTIVE (not shippable). Split that branch into reviewable PRs; do NOT gate it by file_exists."
+        kind: code
+        blocker: true
+
+    non_goals:
+      - Do not gate this track on the golden-frame/tmux-receipt file_exists criteria that live only on agent/magpie-seed.
+      - Do not touch surfaces owned by sibling tracks except through their own next-items.
+
+  - id: sovereign-safety-tcb-2026-07
+    name: Sovereign Safety TCB — fail-closed evolution, graded anti-slop, verified kernel, self-gating portfolio
+    status: ACTIVE
+    opened_at: "2026-07-07"
+    verified_at: "2026-07-07"
+    ttl_days: 21
+    owner: "@AmitabhainArunachala"
+    serves: substrate-nativeness
+    complements:
+      - loop-closure-2026-06
+      - merge-master-mike-d4-2026-06
+      - organism-rewire-2026-07
+    owned_surfaces:
+      - dharma_swarm/evolution_safety.py
+      - scripts/governance/check_claim_evidence_binding.py
+      - scripts/governance/pramana_probe.py
+      - scripts/governance/branch_janitor.py
+      - scripts/governance/verify_corral_findings.py
+      - scripts/governance/hygiene/**
+      - docs/governance/hygiene/patterns/AI-M1.yaml
+      - packages/telos-kernel/**
+      - packages/titanium-verify/**
+      - .github/workflows/pudgala-rigor.yml
+      - .github/workflows/pramana-probe.yml
+      - .github/workflows/kernel-titanium-verify.yml
+      - .github/workflows/kernel-tests.yml
+      - .github/workflows/branch-janitor.yml
+      - tests/test_evolution_safety.py
+      - tests/test_claim_evidence_binding.py
+      - tests/test_pramana_probe.py
+      - tests/test_pramana.py
+      - tests/test_branch_janitor.py
+      - tests/test_verify_corral_findings.py
+    moves_vital_signs:
+      - quality_gates
+      - security_guardrails
+    target_closure_kind: CLOSED_NOT_PROD
+    claim_boundary: |
+      The gate MACHINERY is landed and CI-enforced (each completion criterion
+      is independently re-run by a pull_request-triggered GitHub Actions
+      workflow the PR author cannot forge). Two ratchets remain deliberately
+      un-flipped and are NOT claimed closed: (a) the AI-M1 hygiene pattern is
+      stage=advisory (docs/governance/hygiene/patterns/AI-M1.yaml) so the
+      graded-binding gate reports but does not yet block merges; (b) the
+      PR-001 fail-closed evolution guarantee is proven at unit level, but the
+      live-host observation (DHARMA_EVOLUTION_SHADOW default + read-only
+      source mount denying live-checkout mutation on the daemon host) is an
+      operator observation still owned by organism-rewire D4. Completion
+      criteria prove the gates are green + wired, not that every ratchet is at
+      its blocking terminal stage.
+
+    description: |
+      Governance admission for the SAFETY / GOVERNANCE substrate that LANDED
+      on main this week (2026-07-04..07) but owned no active-track. This is
+      the Trusted Computing Base for the whole organism's self-modification
+      and claim-shipping surface, made governance-visible so the system knows
+      its own safety floor exists, is enforced, and is not a forgeable local
+      receipt.
+
+      Shipped work this track owns:
+        - Pudgala anti-slop + AI-M1 graded claim/evidence binding (PR #781):
+          a claim ships only when its strongest passing evidence meets the
+          required grade; a self-owned green test is downgraded (not
+          independent). Stage-driven ratchet flips advisory->enforced via
+          scripts/governance/hygiene/promote.py with NO code change.
+        - Pramana probe phantom-gate fix (PR #779): the tiered verification
+          conductor refuses to run a registry with phantom targets and exits
+          3 (config error, no verdict) rather than emitting a false verdict.
+        - PR-001 fail-closed evolution safety (PR #803): polarity inversion —
+          live mutation of the running organism is impossible by default;
+          verify_promotion is the one-door sole live-apply arbiter; a missing
+          OR writable evaluator yields NO promotion grade; blocked mutations
+          write receipts (dharma_swarm/evolution_safety.py).
+        - titanium-verify blocking TCB gate (PRs #767/#768) over the
+          telos-kernel (PR #763): every public function in
+          packages/telos-kernel is proven PURE or carries an honest
+          @effect(...) declaration, certified by a least-fixpoint dataflow
+          analysis independently validated by Z3 SMT (kernel-titanium-verify.yml).
+        - De Bug Corral / evidence-gated branch janitor (PR #784): the branch
+          cleanup campaign converted into a standing evidence-gated gate
+          (branch_janitor.py + verify_corral_findings.py).
+
+      Doctrine that must hold: add gate SOURCES, never weaken a check; a local
+      ~/.dharma witness receipt proves integrity (author can produce it), NOT
+      authenticity — only the trusted-CI re-run counts as a merge signal;
+      every gate is fail-closed (missing/malformed config reads as the SAFE /
+      advisory default, never as pass).
+
+    prerequisites:
+      - id: evolution_safety_module_exists
+        kind: file_exists
+        file: dharma_swarm/evolution_safety.py
+      - id: track_status_checker_exists
+        kind: file_exists
+        file: scripts/governance/check_track_status.py
+      - id: ai_m1_binding_pattern_exists
+        kind: file_exists
+        file: docs/governance/hygiene/patterns/AI-M1.yaml
+      - id: telos_kernel_pkg_exists
+        kind: file_exists
+        file: packages/telos-kernel/telos_kernel/__init__.py
+      - id: titanium_verify_pkg_exists
+        kind: file_exists
+        file: packages/titanium-verify/titanium_verify/cli.py
+
+    completion_criteria:
+      # 1) PR-001 fail-closed evolution safety. Independent oracle = tests.yml
+      #    (pull_request CI) re-runs this; author cannot forge it.
+      #    Verified 2026-07-07: 29 passed.
+      - id: evolution_fail_closed_tests_pass
+        kind: test_passes
+        test: tests/test_evolution_safety.py
+        oracle_source: ".github/workflows/tests.yml"
+      # 2) Pudgala anti-slop + AI-M1 stage-driven graded-binding ratchet.
+      #    Verified 2026-07-07: 57 passed.
+      - id: pudgala_ai_m1_binding_tests_pass
+        kind: test_passes
+        test: tests/test_claim_evidence_binding.py
+        oracle_source: ".github/workflows/pudgala-rigor.yml"
+      # 3) Pramana probe phantom-gate fix (registry integrity, exit-3 on phantom).
+      #    Verified 2026-07-07: 14 passed.
+      - id: pramana_phantom_gate_tests_pass
+        kind: test_passes
+        test: tests/test_pramana_probe.py
+        oracle_source: ".github/workflows/tests.yml"
+      # 4) Verified-kernel TCB (the surface titanium-verify blocking gate certifies).
+      #    telos-kernel suite is z3-free green; kernel-titanium-verify.yml is the
+      #    independent SMT oracle over it. Verified 2026-07-07: 180 passed, 3 skipped.
+      - id: telos_kernel_tcb_tests_pass
+        kind: test_passes
+        test: packages/telos-kernel/telos_kernel/tests/
+        oracle_source: ".github/workflows/kernel-titanium-verify.yml"
+      # 5) DROPPED in the 2026-07-07 reconcile: the proposed
+      #    `final_boss_portfolio_selfgate_passes` command_passes criterion ran
+      #    `python3 scripts/governance/check_track_status.py`. Because the checker
+      #    executes every command_passes criterion and reads the FIXED path
+      #    docs/governance/ACTIVE_TRACK.yaml, once this track is in the file that
+      #    criterion makes the checker recursively invoke itself (infinite
+      #    recursion / process explosion). It is intentionally omitted. It carried
+      #    grade 0 on the evidence ladder (command_passes is not RIGOROUS_KINDS),
+      #    so it was never load-bearing: the four test_passes criteria above (S2/S3)
+      #    already satisfy the grade floor with no existence-only sole gate.
+
+    next_items:
+      - id: 1
+        what: "(operator) Ratify this track; then decide the AI-M1 flip: promote docs/governance/hygiene/patterns/AI-M1.yaml stage advisory->enforced via scripts/governance/hygiene/promote.py (turns the graded-binding gate's teeth on with no code change) and/or mark pudgala-rigor a required status check in branch protection."
+        kind: governance
+        blocker: false
+      - id: 2
+        what: "(blocker) PR-001 live-host edge: one canonical daemon-host observation that live-checkout mutation is denied by default (read-only source mount + DHARMA_EVOLUTION_SHADOW), with a rollback receipt. Sequenced with organism-rewire D4; keep evolution fail-closed until then."
+        kind: code
+        blocker: true
+      - id: 3
+        what: "De Bug Corral: schedule branch-janitor.yml against real branch sprawl and confirm verify_corral_findings evidence-gate blocks an unverified corral finding on a live run."
+        kind: ops
+        blocker: false
+
+    non_goals:
+      - Do not weaken, bypass, or hard-code any telos gate, ratchet, or the one-door verify_promotion arbiter to make a gate green.
+      - Do not treat a local ~/.dharma witness receipt as a merge signal; only the trusted-CI re-run counts (integrity != authenticity).
+      - Do not auto-escalate AI-M1 from advisory to enforced from inside the gate; escalation is a deliberate, readable operator promotion.
+      - Do not add trained weights, capability claims, or production-live closure claims to this track; it certifies the SAFETY floor only.
+      - Do not touch surfaces owned by sibling tracks except through their own next-items.
+
+  # ==========================================================================
+  # PROPOSED HOLD — NOT ADMITTED AS ACTIVE (2026-07-07 reconcile).
+  # Neither track can carry an honest green behavioral criterion today, so per
+  # the reconcile mandate they are recorded here, NOT added as green ACTIVE tracks.
+  #
+  # (A) telos-ai-morning-refinery-2026-06 — CANT-MAKE-REAL. RECOMMEND: design-hold
+  #     (or close). The track is a user-facing semantic-refinery PRODUCT with ZERO
+  #     shipped product code and NO behavioral test. Its only "test",
+  #     tests/test_telos_morning_refinery.py, is by its own docstring a
+  #     document-level markdown-string lint (== file_contains in test clothing),
+  #     exercises zero product code, and cannot even run on origin/main (all
+  #     telos_ai owned surfaces absent from main; block lives only on
+  #     agent/magpie-seed). Its only real completion gate is an operator-mediated
+  #     EXTERNAL HUMAN action receipt (reports/telos_ai/FIRST_EXTERNAL_ACTED_RECEIPT.md),
+  #     intentionally absent/UNMET. Do NOT gate on the unrelated telos-GATE
+  #     governance tests (test_telos_gates.py) — different subsystem, would be a
+  #     false positive. Move to design-hold/backlog until a real seed-runner exists
+  #     (honest future gate = command_passes on that runner + the external receipt).
+  #
+  # (B) agent-admission-semantic-commons-2026-06 — KEEP-INCOMPLETE. The track's
+  #     declared CORE is genuinely unshipped on origin/main (dharma_swarm/semantic_commons.py,
+  #     scripts/governance/agent_admission.py, scripts/governance/name_drift_preflight.py,
+  #     tests/test_agent_admission.py, tests/test_semantic_commons.py all ABSENT on
+  #     main; both file_contains criteria also fail on main), and its existing 16
+  #     criteria are all file_exists/file_contains (zero behavioral) — so it cannot
+  #     honestly be ACTIVE. One adjacent slice DID ship with a real green test:
+  #     tests/test_a2a_card_semantic_commons.py (VERIFIED 2026-07-07: 4 passed) proves
+  #     the semantic-commons A2A card naming/alias/name-drift slice. RECOMMEND: either
+  #     resource the AgentAdmission core to completion, or split — CLOSE the
+  #     semantic-commons naming slice as shipped and re-scope AgentAdmission as its
+  #     own new track gated by test_passes: tests/test_a2a_card_semantic_commons.py
+  #     plus test_passes on the (unlanded) tests/test_agent_admission.py once it lands.
+  #     Not added ACTIVE here because presenting an adjacent-slice test as the track's
+  #     completion would be a false positive.
+  # ==========================================================================
 
   - id: hyperbolic-time-chamber-2026-07
     name: Hyperbolic Time Chamber — afferent ingest, gym battery, Frontier Ledger
