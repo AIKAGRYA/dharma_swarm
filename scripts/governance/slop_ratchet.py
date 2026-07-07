@@ -133,7 +133,12 @@ def evaluate(current: dict[str, Any], baseline: dict[str, Any]) -> dict[str, Any
             msg = (f"{label}: {b['grade']}/{b['count']} -> {c['grade']}/{c['count']}"
                    f"  ({c['measured']})")
             if worse_grade or worse_count:
-                if name in TIME_WINDOWED or c["confidence"] == "LOW":
+                # Advisory, never blocking: time-windowed axes, LOW-confidence
+                # proxies (on either side), and confidence flips — a count from
+                # a proxy and a count from the real instrument are incomparable.
+                if (name in TIME_WINDOWED
+                        or c["confidence"] == "LOW" or b["confidence"] == "LOW"
+                        or c["confidence"] != b["confidence"]):
                     advisory.append(msg)
                 else:
                     regressions.append(msg)

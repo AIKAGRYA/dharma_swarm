@@ -60,6 +60,23 @@ def test_low_confidence_regression_is_advisory():
     assert v["advisory"]
 
 
+def test_low_confidence_baseline_regression_is_advisory():
+    # proxy baseline vs real instrument now present: incomparable counts
+    base = _scoped({"Complexity inflation": _sig("AMBER", "LOW", 253)})
+    cur = _scoped({"Complexity inflation": _sig("RED", "HIGH", 300)})
+    v = slop_ratchet.evaluate(cur, base)
+    assert v["passed"]
+    assert v["advisory"]
+
+
+def test_confidence_flip_regression_is_advisory():
+    base = _scoped({"Dead code": _sig("AMBER", "MEDIUM", 50)})
+    cur = _scoped({"Dead code": _sig("RED", "HIGH", 80)})
+    v = slop_ratchet.evaluate(cur, base)
+    assert v["passed"]
+    assert v["advisory"]
+
+
 def test_time_windowed_regression_is_advisory():
     base = _scoped({"Churn/revert": _sig("GREEN", "HIGH", 2)})
     cur = _scoped({"Churn/revert": _sig("RED", "HIGH", 60)})
