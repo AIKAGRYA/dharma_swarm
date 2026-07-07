@@ -1,0 +1,256 @@
+{
+  "generated_at": "2026-07-07T06:24:28+00:00",
+  "probe": "docs/stop-the-slop/probe (13 signals)",
+  "scopes": {
+    "dharma_swarm": {
+      "composite": "ELEVATED",
+      "signals": {
+        "God objects": {
+          "grade": "RED",
+          "confidence": "HIGH",
+          "count": 8,
+          "measured": "8 files \u22653000 ln (max 5,255)"
+        },
+        "Complexity inflation": {
+          "grade": "AMBER",
+          "confidence": "LOW",
+          "count": 253,
+          "measured": "~253 fns branch-count>20 (PROXY; worst ~111 tick)"
+        },
+        "Import cycles": {
+          "grade": "RED",
+          "confidence": "HIGH",
+          "count": 17,
+          "measured": "1 load-time cyclic SCC(s); 17 total cyclic SCC(s); largest load-time = 2 modules"
+        },
+        "Wildcard imports": {
+          "grade": "GREEN",
+          "confidence": "HIGH",
+          "count": 0,
+          "measured": "0"
+        },
+        "Silent swallows": {
+          "grade": "RED",
+          "confidence": "HIGH",
+          "count": 337,
+          "measured": "337 (except\u2026: pass)"
+        },
+        "Broad catches": {
+          "grade": "AMBER",
+          "confidence": "HIGH",
+          "count": 1942,
+          "measured": "1942 (except Exception/bare)"
+        },
+        "Coupling": {
+          "grade": "AMBER",
+          "confidence": "MEDIUM",
+          "count": 200,
+          "measured": "max fan-in 200 (models); max fan-out 57 (swarm)"
+        },
+        "Dead code": {
+          "grade": "\u2014",
+          "confidence": "UNASSESSED",
+          "count": null,
+          "measured": "UNASSESSED (vulture absent)"
+        },
+        "Duplication": {
+          "grade": "AMBER",
+          "confidence": "MEDIUM",
+          "count": 112,
+          "measured": "75 clone clusters; 112 cloned fns (1.0% of 11,466)"
+        },
+        "Churn/revert": {
+          "grade": "GREEN",
+          "confidence": "HIGH",
+          "count": 5,
+          "measured": "5/1095 commits are reverts (0.5%) in 90d"
+        },
+        "Phantom deps": {
+          "grade": "AMBER",
+          "confidence": "LOW",
+          "count": 23,
+          "measured": "23 unresolved imports (NOT phantom-confirmed \u2014 run --online)"
+        },
+        "Change coupling": {
+          "grade": "GREEN",
+          "confidence": "HIGH",
+          "count": 0,
+          "measured": "0 file-pairs co-change \u22658x at \u226560% confidence"
+        },
+        "Narrative comments": {
+          "grade": "AMBER",
+          "confidence": "LOW",
+          "count": 85,
+          "measured": "~85 restate-the-code comments (0.8% of 10177)"
+        }
+      }
+    },
+    "api": {
+      "composite": "MODERATE",
+      "signals": {
+        "God objects": {
+          "grade": "GREEN",
+          "confidence": "HIGH",
+          "count": 0,
+          "measured": "0 files \u22653000 ln"
+        },
+        "Complexity inflation": {
+          "grade": "AMBER",
+          "confidence": "LOW",
+          "count": 7,
+          "measured": "~7 fns branch-count>20 (PROXY; worst ~26 _agentic_stream)"
+        },
+        "Import cycles": {
+          "grade": "AMBER",
+          "confidence": "HIGH",
+          "count": 1,
+          "measured": "0 load-time cyclic SCC(s); 1 total cyclic SCC(s)"
+        },
+        "Wildcard imports": {
+          "grade": "GREEN",
+          "confidence": "HIGH",
+          "count": 0,
+          "measured": "0"
+        },
+        "Silent swallows": {
+          "grade": "AMBER",
+          "confidence": "HIGH",
+          "count": 7,
+          "measured": "7 (except\u2026: pass)"
+        },
+        "Broad catches": {
+          "grade": "AMBER",
+          "confidence": "HIGH",
+          "count": 111,
+          "measured": "111 (except Exception/bare)"
+        },
+        "Coupling": {
+          "grade": "AMBER",
+          "confidence": "MEDIUM",
+          "count": 13,
+          "measured": "max fan-in 13 (models); max fan-out 22 (main)"
+        },
+        "Dead code": {
+          "grade": "\u2014",
+          "confidence": "UNASSESSED",
+          "count": null,
+          "measured": "UNASSESSED (vulture absent)"
+        },
+        "Duplication": {
+          "grade": "GREEN",
+          "confidence": "MEDIUM",
+          "count": 0,
+          "measured": "0 clone clusters; 0 cloned fns (0.0% of 312)"
+        },
+        "Churn/revert": {
+          "grade": "GREEN",
+          "confidence": "HIGH",
+          "count": 5,
+          "measured": "5/1095 commits are reverts (0.5%) in 90d"
+        },
+        "Phantom deps": {
+          "grade": "AMBER",
+          "confidence": "LOW",
+          "count": 1,
+          "measured": "1 unresolved imports (NOT phantom-confirmed \u2014 run --online)"
+        },
+        "Change coupling": {
+          "grade": "GREEN",
+          "confidence": "HIGH",
+          "count": 0,
+          "measured": "0 file-pairs co-change \u22658x at \u226560% confidence"
+        },
+        "Narrative comments": {
+          "grade": "GREEN",
+          "confidence": "LOW",
+          "count": 2,
+          "measured": "~2 restate-the-code comments (1.6% of 125)"
+        }
+      }
+    },
+    "scripts": {
+      "composite": "MODERATE",
+      "signals": {
+        "God objects": {
+          "grade": "AMBER",
+          "confidence": "HIGH",
+          "count": 1,
+          "measured": "1 files \u22653000 ln (max 3,285)"
+        },
+        "Complexity inflation": {
+          "grade": "AMBER",
+          "confidence": "LOW",
+          "count": 84,
+          "measured": "~84 fns branch-count>20 (PROXY; worst ~139 _print_text)"
+        },
+        "Import cycles": {
+          "grade": "GREEN",
+          "confidence": "HIGH",
+          "count": 0,
+          "measured": "0 load-time cyclic SCC(s); 0 total cyclic SCC(s)"
+        },
+        "Wildcard imports": {
+          "grade": "GREEN",
+          "confidence": "HIGH",
+          "count": 0,
+          "measured": "0"
+        },
+        "Silent swallows": {
+          "grade": "AMBER",
+          "confidence": "HIGH",
+          "count": 59,
+          "measured": "59 (except\u2026: pass)"
+        },
+        "Broad catches": {
+          "grade": "AMBER",
+          "confidence": "HIGH",
+          "count": 286,
+          "measured": "286 (except Exception/bare)"
+        },
+        "Coupling": {
+          "grade": "AMBER",
+          "confidence": "MEDIUM",
+          "count": 9,
+          "measured": "max fan-in 9 (pr_merge_control); max fan-out 3 (run_pre_commit)"
+        },
+        "Dead code": {
+          "grade": "\u2014",
+          "confidence": "UNASSESSED",
+          "count": null,
+          "measured": "UNASSESSED (vulture absent)"
+        },
+        "Duplication": {
+          "grade": "AMBER",
+          "confidence": "MEDIUM",
+          "count": 66,
+          "measured": "55 clone clusters; 66 cloned fns (2.4% of 2,780)"
+        },
+        "Churn/revert": {
+          "grade": "GREEN",
+          "confidence": "HIGH",
+          "count": 5,
+          "measured": "5/1095 commits are reverts (0.5%) in 90d"
+        },
+        "Phantom deps": {
+          "grade": "AMBER",
+          "confidence": "LOW",
+          "count": 4,
+          "measured": "4 unresolved imports (NOT phantom-confirmed \u2014 run --online)"
+        },
+        "Change coupling": {
+          "grade": "GREEN",
+          "confidence": "HIGH",
+          "count": 0,
+          "measured": "0 file-pairs co-change \u22658x at \u226560% confidence"
+        },
+        "Narrative comments": {
+          "grade": "GREEN",
+          "confidence": "LOW",
+          "count": 24,
+          "measured": "~24 restate-the-code comments (1.1% of 2192)"
+        }
+      }
+    }
+  },
+  "digest": "a698e61e7d4b30120a25040d08dd48e2dff1c1adc8309ff91fbaab02bbd983c7"
+}
