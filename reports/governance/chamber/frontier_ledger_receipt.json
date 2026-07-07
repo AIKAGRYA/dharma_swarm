@@ -8,12 +8,12 @@
     "requires": "\u22652 gym receipts on one environment AND \u22651 reality-graded receipt (envs G2/G10 class) in the same window",
     "status": "UNVALUED"
   },
-  "digest": "bd8b12512f67bd761633dceb56bd46071ebb774cc9baa39f9f20f1e0858d6e39",
+  "digest": "121d9c1d0bebfd7cdaf07235e14a49ce94f86bb4b90e904cd9313ac01cceb3d1",
   "door": {
     "conditions": [
       {
         "id": "C1",
-        "score": 0.675,
+        "score": 0.725,
         "verdict": "AMBER"
       },
       {
@@ -42,7 +42,7 @@
     "review_cadence_days": 30
   },
   "fact_owner": "docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md \u00a7(c)",
-  "generated_at": "2026-07-07T06:07:37Z",
+  "generated_at": "2026-07-07T06:12:13Z",
   "inputs": {
     "baseline_receipt": {
       "path": "reports/governance/inward_ascent/baseline_receipt.json",
@@ -54,7 +54,7 @@
       "conditions": [
         {
           "id": "C1",
-          "score": 0.675,
+          "score": 0.725,
           "verdict": "AMBER"
         },
         {

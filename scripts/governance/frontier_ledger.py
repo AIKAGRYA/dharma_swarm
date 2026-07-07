@@ -94,16 +94,22 @@ def load_baseline() -> tuple[dict[str, Any] | None, str | None]:
         return None, digest
 
 
-def trust_gate_snapshot() -> dict[str, Any]:
-    """Run the trust-gate owner script and reduce to the door panel. Any
-    failure renders an UNKNOWN door, never a fabricated one."""
+def _trust_gate_payload() -> dict[str, Any] | None:
+    """Run the trust-gate owner script ONCE. Any failure -> None, and the
+    callers render an UNKNOWN door / lift, never a fabricated one."""
     try:
         proc = subprocess.run(
             [sys.executable, str(TRUST_GATE_SCRIPT), "--json-only"],
             capture_output=True, text=True, timeout=180, cwd=REPO_ROOT,
         )
-        payload = json.loads(proc.stdout)
+        return json.loads(proc.stdout)
     except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
+        return None
+
+
+def trust_gate_snapshot(payload: dict[str, Any] | None) -> dict[str, Any]:
+    """Reduce the trust-gate payload to the door panel."""
+    if payload is None:
         return {"available": False, "gate_open": None, "conditions": []}
     conditions = [
         {"id": c.get("id"), "score": c.get("score"), "verdict": c.get("verdict")}
@@ -117,25 +123,19 @@ def trust_gate_snapshot() -> dict[str, Any]:
     }
 
 
-def _swarm_lift_from_trust(trust: dict[str, Any]) -> tuple[float | None, str]:
+def _swarm_lift(payload: dict[str, Any] | None) -> tuple[float | None, str]:
     """C2's evidence names the last real lift measurement and its receipt.
-    Parsed, not remembered; unparseable -> UNKNOWN."""
-    try:
-        proc = subprocess.run(
-            [sys.executable, str(TRUST_GATE_SCRIPT), "--json-only"],
-            capture_output=True, text=True, timeout=180, cwd=REPO_ROOT,
-        )
-        payload = json.loads(proc.stdout)
-        for cond in payload.get("conditions", []):
-            if cond.get("id") != "C2":
-                continue
-            for line in cond.get("evidence", []):
-                m = re.search(r"latest measured lift = (-?\d+(?:\.\d+)?)\s*\((\S+?)\)", line)
-                if m:
-                    return float(m.group(1)), m.group(2)
-    except (OSError, subprocess.SubprocessError, json.JSONDecodeError, ValueError):
-        pass
-    return None, "unparsed"
+    Parsed, not remembered; unparseable -> UNKNOWN with the gap named."""
+    if payload is None:
+        return None, "trust-gate owner unavailable on this host"
+    for cond in payload.get("conditions", []):
+        if cond.get("id") != "C2":
+            continue
+        for line in cond.get("evidence", []):
+            m = re.search(r"latest measured lift = (-?\d+(?:\.\d+)?)\s*\((\S+?)\)", line)
+            if m:
+                return float(m.group(1)), m.group(2)
+    return None, "no measured-lift line in C2 evidence"
 
 
 def _baseline_surface(baseline: dict[str, Any] | None, sid: str) -> dict[str, Any]:
@@ -157,8 +157,8 @@ def _field_for(capability: str) -> dict[str, Any]:
 
 
 def build_rows(baseline: dict[str, Any] | None,
-               trust: dict[str, Any]) -> list[dict[str, Any]]:
-    lift, lift_receipt = _swarm_lift_from_trust(trust)
+               trust_payload: dict[str, Any] | None) -> list[dict[str, Any]]:
+    lift, lift_receipt = _swarm_lift(trust_payload)
     rows: list[dict[str, Any]] = []
 
     def add(capability: str, ours: dict[str, Any], *, commensurable: bool,
@@ -242,8 +242,9 @@ def build_drift() -> dict[str, Any]:
 
 def build_receipt_core() -> dict[str, Any]:
     baseline, baseline_sha = load_baseline()
-    trust = trust_gate_snapshot()
-    rows = build_rows(baseline, trust)
+    trust_payload = _trust_gate_payload()
+    trust = trust_gate_snapshot(trust_payload)
+    rows = build_rows(baseline, trust_payload)
     measured = sum(1 for r in rows if r["ours"].get("measured"))
     return {
         "schema": SCHEMA,

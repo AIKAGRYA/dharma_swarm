@@ -1,6 +1,6 @@
 # FRONTIER LEDGER — the chamber's one page (read-only projection)
 
-**Schema:** `dharma_swarm.frontier_ledger.v1` · **Generated:** 2026-07-07T06:07:37Z
+**Schema:** `dharma_swarm.frontier_ledger.v1` · **Generated:** 2026-07-07T06:12:13Z
 **Replay:** `python3 scripts/governance/frontier_ledger.py --check` · **Refresh:** `python3 scripts/governance/frontier_ledger.py`
 
 > **NO CAPABILITY CLAIM.** NONE. Every number here is either an internal instrument reading or a receipted external publication; nothing is a production capability claim (chamber doctrine, arena non-goal 1).
@@ -9,7 +9,7 @@
 
 | Cond | Verdict | Score |
 |---|---|---|
-| C1 | AMBER | 0.675 |
+| C1 | AMBER | 0.725 |
 | C2 | RED | 0.05 |
 | C3 | RED | 0.3 |
 | C4 | RED | 0.307 |
