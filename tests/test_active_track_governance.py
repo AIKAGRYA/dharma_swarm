@@ -12,6 +12,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ACTIVE_TRACK = REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml"
 EVIDENCE = REPO_ROOT / "reports/governance/active_track_evidence.json"
@@ -60,6 +62,7 @@ def test_active_track_loads() -> None:
                 f"{t.get('id')} serves '{t.get('serves')}' not in spine objectives {sorted(spine_ids)}"
 
 
+@pytest.mark.timeout(75)
 def test_check_track_status_runs() -> None:
     """The checker runs to completion and writes evidence JSON."""
     result = _run(CHECK_SCRIPT, "--warn-only")
@@ -90,6 +93,7 @@ def test_managed_files_have_markers() -> None:
             f"{path} missing ACTIVE_TRACK end marker"
 
 
+@pytest.mark.timeout(75)
 def test_onboard_command_succeeds() -> None:
     """agent_onboard.py runs end-to-end and prints the active track section."""
     result = _run(ONBOARD_SCRIPT)
@@ -138,6 +142,7 @@ def test_underclaim_detector_flags_shipped_but_open_items() -> None:
     assert ucs[0]["blocker"] is True
 
 
+@pytest.mark.timeout(75)
 def test_underclaims_surface_in_evidence_payload() -> None:
     """Every track payload carries the underclaims field, and any underclaim in
     the payload also surfaces as a WARN line in the checker output — the ledger
