@@ -1,32 +1,36 @@
-"""Sarathi apex holon package — SPECIFIED, NOT YET IMPLEMENTED.
+"""Sarathi apex holon source package.
 
-Sarathi is the apex continuity holon that sits ON TOP of the holon_system organs
-above (identity + runtime + kernel + authority + orchestration + transport +
-responders + gateway + observability). It is NOT a parallel build.
+The apex continuity holon — chief-of-staff seat that holds the whole
+fleet/life map, runs ONLY reversible-safe loops unattended, and surfaces
+one highest-leverage lane to the operator.
 
-Planned modules (see docs/sarathi_apex_build/05_SARATHI_APEX_MAP.md):
-  gateway.py    -> read fleet state, reversibility-classify, select ONE lane, emit brief
-  pulse.py      -> single governed wake tick wrapping holon_runtime.holon_wake_cycle
-  roster.py     -> sub-holon roster (codex/fable/fugu/hermes) load + status
-  brief.py      -> operator-facing daily brief generation
-  scoreboard.py -> where Hermes still wins vs where Sarathi now wins (receipts only)
+Modules:
+    roster  — load + status of sub-holons and Hermes organ (read-only)
+    gateway — reversibility gate evaluation + optional execution
+    pulse   — one governed tick: read → gate → brief → receipt
+    brief   — operator-facing daily brief generation
 
-Deliberately EMPTY of implementation: creating stub gateway/pulse/roster/brief/
-scoreboard modules now would be theater (an "apex" that does nothing). Per the
-anti-sprawl harness, these are specified in the doc and built only behind proof
-gates 6-10 (docs/sarathi_apex_build/06_PROOF_GATES.md). The eventual runtime
-wrapper `~/.dharma/agents/sarathi/gateway/sarathi_gateway.py` must be a thin
-shim: `from dharma_swarm.holon_system.sarathi.gateway import main`.
+Safety invariant: the gate takes NO model input by construction. Whether
+an action may run unattended is decided by CODE (reversibility_gate.py),
+never by the resolved model's judgment.
 
-Current honest status: Sarathi = identity + committed reversibility gate + a
-reusable wake-shell profile + read-only proof receipts. Body NOT breathing;
-wake_loop_active is false.
+Status: gates 5-8 source modules built. Gate 9 (overnight durability)
+remains OPEN — wake_loop_active stays False until proven.
 """
 
-from __future__ import annotations
+from dharma_swarm.holon_system.sarathi.brief import generate_brief
+from dharma_swarm.holon_system.sarathi.gateway import evaluate, gate_and_execute
+from dharma_swarm.holon_system.sarathi.pulse import run_pulse
+from dharma_swarm.holon_system.sarathi.roster import fleet_summary, load_roster, load_seat
 
-# Intentionally no exports until the modules are implemented behind proof gates.
-IMPLEMENTED = False
-PLANNED_MODULES = ("gateway", "pulse", "roster", "brief", "scoreboard")
+IMPLEMENTED = True  # gates 5-8 built; gate 9 (durability) still open
 
-__all__ = ["IMPLEMENTED", "PLANNED_MODULES"]
+__all__ = [
+    "evaluate",
+    "fleet_summary",
+    "gate_and_execute",
+    "generate_brief",
+    "load_roster",
+    "load_seat",
+    "run_pulse",
+]
