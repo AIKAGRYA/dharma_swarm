@@ -24,16 +24,18 @@
 ```text
 dharma_swarm/holon_system/sarathi/
   __init__.py    # IMPLEMENTED = False (present now; honest placeholder)
-  gateway.py     # read fleet state -> reversibility-classify -> ONE lane -> emit brief/receipt
+  gateway.py     # read-only readiness snapshot + pullable operator brief (present now)
   pulse.py       # one governed tick wrapping holon_runtime.holon_wake_cycle(planned_action=...)
   roster.py      # load + status of sub-holons (codex/fable/fugu) + hermes organ
   brief.py       # operator-facing daily brief generation
   scoreboard.py  # where Hermes still wins vs where Sarathi now wins (receipts only)
 ```
 
-Only `__init__.py` exists today, deliberately empty of behavior. Shipping stub
-gateway/pulse/roster/brief/scoreboard modules now would be an "apex that does
-nothing" — theater. They are built one proof gate at a time.
+`gateway.py` now exists as a deliberately read-only remote-readiness primitive:
+it can render a snapshot and write a finite operator brief into the Sarathi
+runtime outbox. It does **not** run the apex decision loop, select/act on a lane,
+send a phone message, approve work, or claim liveness. The remaining
+gateway/pulse/roster/brief/scoreboard behavior is built one proof gate at a time.
 
 ## The runtime wrapper rule
 

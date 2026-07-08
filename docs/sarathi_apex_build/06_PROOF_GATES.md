@@ -12,10 +12,10 @@ never narration.
 | 2 | `load_holon` supports `@frontier` / `resolve_top_available_at_wake` | a resolver test: `@frontier` picks top-available model or logs honest fallback | **DONE** — `resolve_top_available_at_wake()` routes through `model_hierarchy.get_live_order()` + `runtime_provider`; `load_holon("sarathi")` resolved to `ollama/glm-5:cloud` on 2026-07-06 |
 | 3 | Fugu provider drift resolved or modeled as external | `dgc agent status` emits no `sakana -> defaulting to claude_code` warning, OR `sakana` is a declared external provider | **DONE** — `ProviderType.SAKANA` exists as external-only; `dgc agent status --json` emits no `sakana -> defaulting to claude_code` warning |
 | 4 | Fable standing semantic daemon proven | a fresh `fable_composer` service heartbeat + a semantic reply receipt from an unattended run | **OPEN** — `service_alive=false`, `heartbeat_seen=false` |
-| 5 | Sarathi runtime surfaces created | `~/.dharma/a2a_bus/state/sarathi.json`, inbox dir, bridge heartbeat exist (as runtime, with repo map entries) | **OPEN** — all missing |
-| 6 | Sarathi gateway wraps `holon_wake_cycle` | `holon_system/sarathi/gateway.py` calls `holon_wake_cycle(planned_action=...)` behind the gate | **PARTIAL** — the `planned_action` seam exists in `holon_runtime`; the gateway module is not built |
+| 5 | Sarathi runtime surfaces created | `~/.dharma/a2a_bus/state/sarathi.json`, inbox dir, bridge heartbeat exist (as runtime, with repo map entries) | **PARTIAL** — state/inbox/bridge/wrapper/roster/contract exist; `service_heartbeats.jsonl` missing |
+| 6 | Sarathi gateway wraps `holon_wake_cycle` | `holon_system/sarathi/gateway.py` calls `holon_wake_cycle(planned_action=...)` behind the gate | **PARTIAL** — `gateway.py` exists as read-only snapshot/outbox brief; no apex loop wrapping `holon_wake_cycle` yet |
 | 7 | Sarathi pulse reads Hermes + Codex + Fable/Fugu state | a `pulse.py` run produces a state bundle citing each seat's live liveness | **OPEN** |
-| 8 | operator brief produced | a `brief.py` run writes a dated operator brief receipt | **OPEN** |
+| 8 | operator brief produced | a `brief.py` run writes a dated operator brief receipt | **PARTIAL** — a readiness brief can be written to Sarathi outbox; no daily apex operator brief yet |
 | 9 | overnight durability proof | one unattended lease-gated run leaves wake receipts across N hours; only then may `wake_loop_active` flip true | **OPEN** — do NOT flip before this |
 | 10 | scoreboard: where Hermes wins vs where Sarathi wins | `scoreboard.py` emits a receipts-only comparison; no "we beat Hermes" claim without it | **OPEN** |
 
