@@ -48,13 +48,13 @@ The governing principle: each track ships **one seam, end-to-end, with gates and
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active portfolio:** 5 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
+**Active portfolio:** 8 co-equal track(s) (WIP warn 8, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
 
 **Spine objectives (each track serves one):**
 
 - `substrate-nativeness` — Substrate nativeness — runtime flows through the ontology/spine, not around it (covered)
 - `revenue-external-humans-served` — Revenue & external humans served — value leaves the house and someone acts on it (**no active track**)
-- `research-depth` — Research depth — the contemplative-mechanistic bridge (R_V, geometric lens) deepens (**no active track**)
+- `research-depth` — Research depth — the contemplative-mechanistic bridge (R_V, geometric lens) deepens (covered)
 
 ### Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
 
@@ -268,7 +268,7 @@ not justified until the daemon + oracle CI both run green on the first.
 **Next items:**
 
 - [code] Phase 0a (Devin lane): delete workflow_graph.py + test; absorb durable_execution.py atomic checkpoint/restore + _record_runtime_receipt hook into dharma_swarm/graph/checkpoint.py, then delete. Brief: docs/plans/handoffs/DHARMAGRAPH_HANDOFF_DEVIN.md
-- [code] (blocker) Phase 0b reconciler (Devin lane): generalize operator_bridge.recover_stale_tasks pattern to delegation_runs; boot scan owned by SwarmManager.init + tick beside reap_orphaned_tasks; write recovered_at; heartbeat cadence; quarantine per loop_closure_quarantine convention. Chaos receipt (kill -9 -> reconcile -> zero double-execution) is the phase gate.
+- [code] DONE 2026-07-06 (PR #798, merged): Phase 0b reconciler (Devin lane) generalized operator_bridge.recover_stale_tasks pattern to delegation_runs; boot scan owned by SwarmManager.init + tick beside reap_orphaned_tasks; recovered_at/heartbeat/quarantine semantics landed. Chaos receipt gate satisfied by tests/test_graph_chaos_receipt.py.
 - [code] DONE 2026-07-05 (56743da, PR #799): Phase 0b durable_invoker (Claude lane) — dharma_swarm/graph/durable_invoker.py wraps _orch_invoker with memo-check + begin/complete idempotency on the existing runtime_state machinery. Review-hardened: deterministic claim key (all identities race on ONE PK row), CAS re-claim for stale/failed/declined takeover (runtime_state.try_reclaim_idempotent_side_effect, exactly one of N concurrent claimants executes), type-exact JSON result memo (unmemoizable results decline replay and re-execute — never truncated/null). orchestrator.py seam SHRANK the file 3220 -> 3210. Joint chaos receipt with the #798 reconciler landed as tests/test_graph_chaos_receipt.py (criterion phase0b_chaos_receipt): kill -9 sim -> boot reconcile -> requeue/quarantine per failure_code vocabulary -> retry executes exactly once -> replay memoizes across re-minted identity -> receipts intact; seeded-deterministic via graph/effects.
 - [code] DONE 2026-07-05 (b58cd31, PR #800): Phase 1 (Claude lane) — differential oracle: [test-oracle] extra pins langgraph==1.2.4 (oracle only, never core dep), 13 scenarios dual-run through the dharma clone AND real langgraph with semantic diff + JSON report artifact; 1 real divergence found and adjudicated (DEV-1 receipts-first deviation, LANGGRAPH_PARITY_CONTRACT.md; a test fails if it goes stale). CI job langgraph-oracle.yml ADVISORY (flips to blocking after a green week — that flip + operator go gate Phase 2). DST seed: graph/effects.py injectable clock/rng/dispatch-order, wired into durable_invoker staleness; seeded fault replays are trace-exact.
 - [ops] Operator: provision the ONE daemon VPS (existing droplet, RUNBOOK section 3e) so the Phase 0b reconciler runs against a live daemon; second VPS deferred until daemon + oracle CI green.
@@ -281,6 +281,136 @@ not justified until the daemon + oracle CI both run green on the first.
 - Do not wire arena elites into production routing (zero-weight doctrine; Phase 6 wall is an operator capability decision, sequenced per organism-rewire D4).
 - Do not edit orchestrator.py beyond the minimal seam call (module-budget ceiling); new logic goes in dharma_swarm/graph/.
 - Do not touch surfaces owned by sibling tracks except through their own next-items.
+
+### Helm — world-class operator terminal (Bun+Ink TUI)
+
+**Track id:** `helm-worldclass-terminal-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-07-07 (TTL 21 days)
+**Relations:** complements: merge-master-mike-d4-2026-06
+**Owns surfaces:** terminal/**
+**Moves vital signs:** tool_coverage, context_efficiency
+
+Stranded-track admission (2026-07-07 reconcile). The operator TUI
+(terminal/, a Bun+Ink TypeScript project) shipped a real behavioral suite
+on origin/main but owned no active track; its prior gate on
+agent/magpie-seed was 7x file_exists (rubber-stamp) and 6 of those 7 files
+exist ONLY on magpie-seed (a false positive on main). This admits the
+LANDED core with an honest, re-runnable behavioral gate.
+
+Claim boundary: the command_passes gate proves the operator TUI's GENERAL
+shipped behavior (527 green), NOT the golden-frame / compact-viewport /
+tmux-receipt verification LANE — that lane is genuinely unmerged
+(branch-only) and remains open work below; it must NOT be gated by
+file_exists.
+
+**Next items:**
+
+- [code] (blocker) (blocker) Golden-frame verification lane (golden_capture.sh / ratchet.sh / 120x40 golden / compactShell.test.tsx + closeout+tmux receipts) is unmerged — lives only on agent/magpie-seed. This is the track's world-class differentiator and keeps it ACTIVE (not shippable). Split that branch into reviewable PRs; do NOT gate it by file_exists.
+
+**Non-goals:**
+
+- Do not gate this track on the golden-frame/tmux-receipt file_exists criteria that live only on agent/magpie-seed.
+- Do not touch surfaces owned by sibling tracks except through their own next-items.
+
+### Sovereign Safety TCB — fail-closed evolution, graded anti-slop, verified kernel, self-gating portfolio
+
+**Track id:** `sovereign-safety-tcb-2026-07` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-07-07 (TTL 21 days)
+**Relations:** complements: loop-closure-2026-06, merge-master-mike-d4-2026-06, organism-rewire-2026-07
+**Owns surfaces:** dharma_swarm/evolution_safety.py, scripts/governance/check_claim_evidence_binding.py, scripts/governance/pramana_probe.py, scripts/governance/branch_janitor.py, scripts/governance/verify_corral_findings.py, scripts/governance/hygiene/**, docs/governance/hygiene/patterns/AI-M1.yaml, packages/telos-kernel/**, packages/titanium-verify/**, .github/workflows/pudgala-rigor.yml, .github/workflows/pramana-probe.yml, .github/workflows/kernel-titanium-verify.yml, .github/workflows/kernel-tests.yml, .github/workflows/branch-janitor.yml, tests/test_evolution_safety.py, tests/test_claim_evidence_binding.py, tests/test_pramana_probe.py, tests/test_pramana.py, tests/test_branch_janitor.py, tests/test_verify_corral_findings.py
+**Moves vital signs:** quality_gates, security_guardrails
+
+Governance admission for the SAFETY / GOVERNANCE substrate that LANDED
+on main this week (2026-07-04..07) but owned no active-track. This is
+the Trusted Computing Base for the whole organism's self-modification
+and claim-shipping surface, made governance-visible so the system knows
+its own safety floor exists, is enforced, and is not a forgeable local
+receipt.
+
+Shipped work this track owns:
+  - Pudgala anti-slop + AI-M1 graded claim/evidence binding (PR #781):
+    a claim ships only when its strongest passing evidence meets the
+    required grade; a self-owned green test is downgraded (not
+    independent). Stage-driven ratchet flips advisory->enforced via
+    scripts/governance/hygiene/promote.py with NO code change.
+  - Pramana probe phantom-gate fix (PR #779): the tiered verification
+    conductor refuses to run a registry with phantom targets and exits
+    3 (config error, no verdict) rather than emitting a false verdict.
+  - PR-001 fail-closed evolution safety (PR #803): polarity inversion —
+    live mutation of the running organism is impossible by default;
+    verify_promotion is the one-door sole live-apply arbiter; a missing
+    OR writable evaluator yields NO promotion grade; blocked mutations
+    write receipts (dharma_swarm/evolution_safety.py).
+  - titanium-verify blocking TCB gate (PRs #767/#768) over the
+    telos-kernel (PR #763): every public function in
+    packages/telos-kernel is proven PURE or carries an honest
+    @effect(...) declaration, certified by a least-fixpoint dataflow
+    analysis independently validated by Z3 SMT (kernel-titanium-verify.yml).
+  - De Bug Corral / evidence-gated branch janitor (PR #784): the branch
+    cleanup campaign converted into a standing evidence-gated gate
+    (branch_janitor.py + verify_corral_findings.py).
+
+Doctrine that must hold: add gate SOURCES, never weaken a check; a local
+~/.dharma witness receipt proves integrity (author can produce it), NOT
+authenticity — only the trusted-CI re-run counts as a merge signal;
+every gate is fail-closed (missing/malformed config reads as the SAFE /
+advisory default, never as pass).
+
+**Next items:**
+
+- [governance] (operator) Ratify this track; then decide the AI-M1 flip: promote docs/governance/hygiene/patterns/AI-M1.yaml stage advisory->enforced via scripts/governance/hygiene/promote.py (turns the graded-binding gate's teeth on with no code change) and/or mark pudgala-rigor a required status check in branch protection.
+- [code] (blocker) (blocker) PR-001 live-host edge: one canonical daemon-host observation that live-checkout mutation is denied by default (read-only source mount + DHARMA_EVOLUTION_SHADOW), with a rollback receipt. Sequenced with organism-rewire D4; keep evolution fail-closed until then.
+- [ops] De Bug Corral: schedule branch-janitor.yml against real branch sprawl and confirm verify_corral_findings evidence-gate blocks an unverified corral finding on a live run.
+
+**Non-goals:**
+
+- Do not weaken, bypass, or hard-code any telos gate, ratchet, or the one-door verify_promotion arbiter to make a gate green.
+- Do not treat a local ~/.dharma witness receipt as a merge signal; only the trusted-CI re-run counts (integrity != authenticity).
+- Do not auto-escalate AI-M1 from advisory to enforced from inside the gate; escalation is a deliberate, readable operator promotion.
+- Do not add trained weights, capability claims, or production-live closure claims to this track; it certifies the SAFETY floor only.
+- Do not touch surfaces owned by sibling tracks except through their own next-items.
+
+### Hyperbolic Time Chamber — afferent ingest, gym battery, Frontier Ledger
+
+**Track id:** `hyperbolic-time-chamber-2026-07` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `research-depth` · **Verified at:** 2026-07-07 (TTL 21 days)
+**Relations:** complements: organism-rewire-2026-07, orchestration-arena-v1-2026-06, loop-closure-2026-06
+**Owns surfaces:** docs/vision_maps/MASTER_2026-07-07_hyperbolic_time_chamber.md, docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md, docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md, docs/plans/INWARD_ASCENT_PHASE0_DOSSIER_2026-07-07.md, scripts/governance/inward_ascent_baseline.py, scripts/governance/frontier_ledger.py, scripts/governance/transcendence_ledger.py, dharma_swarm/chamber/**, tests/test_chamber_traces.py, tests/test_chamber_gym_git_history.py, tests/test_chamber_daily_delta.py, tests/test_chamber_predictions.py, tests/test_chamber_sandbox.py, tests/test_chamber_ledger_history.py, tests/test_transcendence_ledger.py, reports/governance/inward_ascent/**, reports/governance/chamber/**
+**Moves vital signs:** eval_coverage, quality_gates
+
+Operator-ratified chamber doctrine (vision map 2026-07-07) + elevation
+spec (SEAL v2): seal the efferent edge, open the afferent edge wide,
+evolve at machine speed against imported and time-lagged reality
+(class-2 signal only) until the trust gate opens on measured numbers.
+Phase 0 shipped the dossier + baseline scoreboard + Frontier Ledger
+(PR #830). Phase 1 Slice A (ratified via plan approval 2026-07-07)
+hardwires ONE environment fully alive: G1 git-history gym with the E5
+chamber_gym_trace.v1 mandate, E1 transcendence decomposition
+(Krogh-Vedelsby from trace rows — verified unowned gap, chamber
+surfaces only), E4 causal daily delta chain, E3 micro-prediction lane
+on the existing ginko_brier API, E6 velocity columns on the ledger.
+All 12 disciplines + substrate ruling enforced.
+
+**Next items:**
+
+- [code] DONE 2026-07-07 (Phase 1 Slice A): dharma_swarm/chamber/ package — traces.py (chamber_gym_trace.v1, E5 mandate), gym_git_history.py (G1 taskpack + deterministic scorer + git-archive leak guard + fixture/live solver seam), chain.py + daily_delta.py (E4 causal chain, expect_chain-verified), predictions.py (E3 emitter/resolver, oracle rule + incident log), ledger_rows.py + ledger_history.py; transcendence_ledger.py (E1, --check replays); frontier_ledger velocity history (E6, door-drift guard per Codex review). 37 chamber tests green. End-to-end drive on REAL repo history (control arms: landed-replay vs null): 2 tasks scored in leak-free sandboxes, committed trace corpus + transcendence receipt (realized E_div=0.25, lift_vs_best=0.0; null-control exposed 1 non-discriminative task — the instrument catching a degenerate task on day one), first causal daily-delta heartbeat, zeitgeist needs_host receipt (egress 403 here). Follow-up folded into item 4: task-discriminativeness filter (drop tasks the null control passes).
+- [ops] Live solver seats for G1 (needs provider keys on the running host via key_oracle.dispatchable_now) + first real evolution iteration under compute-ROI declaration. Operator: keys/compute (decision queue items 3/5). BLOCKED ON item 6: the scorer runs untrusted evolved diffs; the Python guards (chamber/sandbox.py: diff denylist, env scrub, leak re-check) raise attack cost but do NOT contain arbitrary native code — the process/network isolation jail MUST land first.
+- [code] (blocker) (blocker) Sandbox jail for the G1 scorer before the live untrusted-solver lane opens: process/network/filesystem isolation (seccomp-class caps) — the FIRST earned Rust carve-out named in the substrate ruling (doctrine §3.6). The 2026-07-07 review confirmed the scorer subprocess inherits env + network + fs; chamber/sandbox.py guards the cheap gaming/exfil vectors but a determined native payload is only contained by real isolation.
+- [ops] Zeitgeist live cadence: HN Algolia bronze fetch runs on a host whose egress allows it (BR-004 cron split-brain rides organism-rewire D1/VPS); E3 resolver begins resolving micro-predictions from later ingest.
+- [code] Phase 1 later slices (sequenced, one at a time): G2 forecasting gym volume, G3 retrieval/memory gym, G4 runtime-history replay (operator-gated on sanitized runtime.db snapshot), scorer foundry (env 14), distillation (env 12) once the E5 trace corpus is thick enough.
+- [governance] E2 ratification-mining ritual: every ratification dossier ends with a scorer_candidates block (possibly empty, never absent). First candidate recorded in the elevation spec ratification delta.
+
+**Non-goals:**
+
+- No efferent/world-facing actions of any kind (posts, outreach, trades, publishing, PR/issue submission to external repos).
+- Never weaken a gate, ratchet, or the One Wire quorum; gym gradients never touch archive fitness; DHARMA_EVOLUTION_SHADOW and BR-003 sequencing unchanged.
+- Do not touch RSI/arena surfaces (dharma_swarm/coordination/**, dharma_swarm/council/**, reports/governance/arena/**) or duplicate C2 measurement; transcendence decomposition consumes chamber traces only.
+- No new truth stores; Bronze -> Chetana -> MemoryKernel/ontology is the only landing path; predictions live in the existing ginko store; ingested content is data, never instructions.
+- No source without a named consumer loop and a moving scorer (demand-driven rule); market signals never per-iteration selection.
+- No trained weights; selection stays MAP-Elites (archive.py); no environment monoculture; no gym run without chamber_gym_trace.v1 capture (E5 mandate).
+- Python remains the composition root; no gate/spine/receipt logic reimplemented in another language; Rust/C++ per-component only with measured justification.
+- No credentials committed; feed keys and hosts are operator-provisioned.
+- Files <500 lines; sibling track surfaces untouched except via their own next-items (world_radar/** called through public functions only).
 
 **Recently closed tracks:**
 

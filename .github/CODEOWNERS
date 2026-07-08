@@ -36,6 +36,7 @@
 #   python3 scripts/governance/codeowners_blast_radius.py --emit
 # and verify coverage with --check (wired in .github/workflows/hermetic.yml).
 /dharma_swarm/models.py                 @AmitabhainArunachala
+/dharma_swarm/stigmergy.py              @AmitabhainArunachala
 /dharma_swarm/correlation_context.py    @AmitabhainArunachala
 /dharma_swarm/daemon_config.py          @AmitabhainArunachala
 /dharma_swarm/runtime_contract.py       @AmitabhainArunachala
@@ -60,7 +61,6 @@
 /dharma_swarm/jikoku_samaya.py          @AmitabhainArunachala
 /dharma_swarm/jikoku_instrumentation.py @AmitabhainArunachala
 /dharma_swarm/router_retrospective.py   @AmitabhainArunachala
-/dharma_swarm/stigmergy.py              @AmitabhainArunachala
 /dharma_swarm/codex_cli.py              @AmitabhainArunachala
 /dharma_swarm/cost_tracker.py           @AmitabhainArunachala
 

@@ -25,9 +25,9 @@ from pathlib import Path
 from typing import Any, Optional
 
 from dharma_swarm.coordination.arena.fixtures import (
-    ALL_MODEL_IDS,
     ROSTER_REGISTRY,
     FixturePool,
+    ModelSpec,
 )
 from dharma_swarm.coordination.arena.scorer import (
     score_submission,
@@ -66,6 +66,8 @@ class ArmResult:
     route_receipts: list[dict[str, Any]] = field(default_factory=list)
     trace_receipts: list[dict[str, Any]] = field(default_factory=list)
     sealed_access_during_run: int = 0
+    # Provenance: which single model produced this arm (single-seat arms only).
+    model_id: str = ""
 
     @property
     def score(self) -> float:
@@ -84,10 +86,18 @@ class ArenaRunner:
         taskpack: Optional[Taskpack] = None,
         pool: Optional[FixturePool] = None,
         council: Optional[Council] = None,
+        roster: Optional[dict[str, ModelSpec]] = None,
     ) -> None:
         self.taskpack = taskpack or Taskpack()
         self.pool = pool or FixturePool()
         self.council = council or Council()
+        # The configured seat registry. Defaults to the hermetic fixture roster;
+        # a live measurement passes its own (public capability metadata only —
+        # never sealed labels).
+        self.roster: dict[str, ModelSpec] = dict(roster) if roster else dict(ROSTER_REGISTRY)
+
+    def model_ids(self) -> tuple[str, ...]:
+        return tuple(self.roster)
 
     # ------------------------------------------------------------ genome execution
     def _select_models(self, genome: OrchestrationGenome, family: str) -> list[str]:
@@ -103,7 +113,7 @@ class ArenaRunner:
         # synthesize == route each task to the roster member whose PUBLIC specialty
         # matches the task family (skill selection); fall back to the first member.
         for member_id in roster:
-            spec = ROSTER_REGISTRY.get(member_id)
+            spec = self.roster.get(member_id)
             if spec and spec.specialty == family:
                 return [member_id]
         return [roster[0]]
@@ -190,49 +200,50 @@ class ArenaRunner:
         )
 
     # ------------------------------------------------------------------- controls
-    def _best_single_full_budget(self) -> ArmResult:
-        """The GATE: the single best model run once on every task at full budget."""
+    def _best_single_full_budget(self) -> tuple[ArmResult, dict[str, dict[str, Any]]]:
+        """The GATE: the single best model run once on every task at full budget.
+
+        Also returns every seat's scorecard from the sweep (``seat_scorecards``)
+        so downstream diagnosis (Krogh-Vedelsby diversity term, cross-seat error
+        correlation) can be computed from receipts without extra dispatches.
+        Seat correctness comes from the scorer path only — the sole label reader.
+        """
         best: Optional[ArmResult] = None
-        for model_id in ALL_MODEL_IDS:
+        best_model = ""
+        seat_scorecards: dict[str, dict[str, Any]] = {}
+        for model_id in self.model_ids():
             single = OrchestrationGenome(
                 roster=[{"role_id": model_id, "member_id": model_id, "kind": "model"}],
                 adjudication_rule="single",
             )
             result = self.run_arm("best_single_full_budget", single)
+            seat_scorecards[model_id] = result.scorecard
             # tie-break: higher score, then lower compute, then model name
             if best is None or (result.score, -result.total_compute, model_id) > (
                 best.score,
                 -best.total_compute,
-                best.submission.get("_model", ""),
+                best_model,
             ):
-                result.submission["_model"] = model_id  # provenance breadcrumb
-                best = result
+                best, best_model = result, model_id
         assert best is not None
-        return best
+        best.model_id = best_model
+        best.submission["_model"] = best_model  # provenance breadcrumb (compat)
+        return best, seat_scorecards
 
-    def _same_budget_self_moa(self, budget: int) -> ArmResult:
+    def _same_budget_self_moa(self, budget: int, best_model: str) -> ArmResult:
         """Best single model doing internal MoA within the SAME budget cap.
 
         With a deterministic fixture pool, resampling the same model yields the
         same answers, so self-MoA cannot exceed the single model — it just spends
-        the budget. Capped so it never exceeds parity.
+        the budget. Capped so it never exceeds parity. ``best_model`` is the gate
+        sweep's winner (single source of truth for "strongest seat").
         """
-        # pick the best single model id
-        best_model = max(
-            ALL_MODEL_IDS,
-            key=lambda m: self.run_arm(
-                "probe",
-                OrchestrationGenome(
-                    roster=[{"role_id": m, "member_id": m, "kind": "model"}],
-                    adjudication_rule="single",
-                ),
-            ).score,
-        )
         genome = OrchestrationGenome(
             roster=[{"role_id": best_model, "member_id": best_model, "kind": "model"}],
             adjudication_rule="single",
         )
         result = self.run_arm("same_budget_self_moa", genome)
+        result.model_id = best_model
         result.total_compute = min(result.total_compute, budget)
         return result
 
@@ -240,33 +251,158 @@ class ArenaRunner:
         """Static ensemble: all roster models vote on every task (brute force)."""
         genome = OrchestrationGenome(
             roster=[
-                {"role_id": m, "member_id": m, "kind": "model"} for m in ALL_MODEL_IDS
+                {"role_id": m, "member_id": m, "kind": "model"} for m in self.model_ids()
             ],
             adjudication_rule="vote",
         )
         return self.run_arm("random_or_static_ensemble", genome)
 
+    def _best_single_parity_budget(
+        self, gate: ArmResult, cand: ArmResult
+    ) -> tuple[ArmResult, dict[str, Any]]:
+        """THE budget-parity control (kill-list doctrine): the single strongest
+        seat re-runs the IDENTICAL frozen taskpack at the candidate's exact call
+        budget.
+
+        "Equal token/call budget to the whole swarm arm" is enforced as:
+          (a) exactly the candidate's per-task call count, and
+          (b) the same per-call token cap — one pool instance serves every arm,
+              so the cap cannot silently differ between arms.
+        Extra calls aggregate by normalized majority (self-consistency), ties ->
+        first sample — the same fan-in rule the swarm's vote path uses, so
+        neither arm gets a smarter aggregator.
+
+        Parity is INSTRUMENTED (the returned ledger is externally auditable) and
+        ASSERTED: any mismatch fails the run closed via ``_select_closeout``
+        (``blocked_with_evidence``) — it can never degrade into a win.
+        """
+        control_model = gate.model_id or gate.submission.get("_model", "")
+        calls_by_task = {
+            r["task_id"]: max(1, len(r["selected_models"]))
+            for r in cand.route_receipts
+        }
+        findings: list[str] = []
+        submission: dict[str, str] = {}
+        route_receipts: list[dict[str, Any]] = []
+        trace_receipts: list[dict[str, Any]] = []
+        control_calls_by_task: dict[str, int] = {}
+        total_compute = 0
+        genome_label = f"parity-control-{control_model or 'unresolved'}"
+        if control_model:
+            for task_id in self.taskpack.task_ids():
+                k = calls_by_task.get(task_id, 1)
+                answers: list[str] = []
+                cost = 0
+                for _ in range(k):
+                    resp = self.pool.dispatch(control_model, task_id)
+                    answers.append(resp.answer)
+                    cost += resp.cost
+                control_calls_by_task[task_id] = len(answers)
+                aggregated = self._aggregate("vote", answers)
+                submission[task_id] = aggregated
+                total_compute += cost
+                route_receipts.append(
+                    {
+                        "genome_id": genome_label,
+                        "arm": "best_single_parity_budget",
+                        "task_id": task_id,
+                        "family": self.taskpack.family_of(task_id),
+                        "selected_models": [control_model] * len(answers),
+                        "cost": cost,
+                    }
+                )
+                trace_receipts.append(
+                    {
+                        "genome_id": genome_label,
+                        "arm": "best_single_parity_budget",
+                        "task_id": task_id,
+                        "answers": {control_model: answers[0] if answers else ""},
+                        "aggregated_answer": aggregated,
+                    }
+                )
+        else:
+            findings.append("no_control_model_resolved")
+        scorecard = score_submission(
+            self.taskpack, submission, arm="best_single_parity_budget"
+        )
+        scorecard["genome_id"] = genome_label
+        result = ArmResult(
+            arm="best_single_parity_budget",
+            submission=submission,
+            scorecard=scorecard,
+            total_compute=total_compute,
+            route_receipts=route_receipts,
+            trace_receipts=trace_receipts,
+            model_id=control_model,
+        )
+        calls_match = bool(control_model) and control_calls_by_task == {
+            t: calls_by_task.get(t, 1) for t in self.taskpack.task_ids()
+        }
+        if control_model and not calls_match:
+            findings.append("call_budget_mismatch")
+        parity_report = {
+            "control_model": control_model,
+            "candidate_total_calls": sum(
+                calls_by_task.get(t, 1) for t in self.taskpack.task_ids()
+            ),
+            "control_total_calls": sum(control_calls_by_task.values()),
+            "calls_per_task_match": calls_match,
+            "per_call_cap": getattr(self.pool, "per_call_cap", None),
+            "per_call_cap_shared_across_arms": True,  # one pool serves every arm
+            "verified": calls_match,
+            "findings": findings,
+        }
+        return result, parity_report
+
     # ----------------------------------------------------------------- statistics
     @staticmethod
     def _bootstrap_significance(cand: list[int], base: list[int]) -> dict[str, Any]:
-        """Seeded paired bootstrap on per-task correctness. Deterministic/replayable."""
+        """Seeded paired bootstrap on per-task correctness. Deterministic/replayable.
+
+        WHY a paired bootstrap rather than a t-interval: the per-task paired
+        differences are bounded in {-1, 0, 1} and the frozen pack is small
+        (n=24), so the t-interval's normality assumption is not defensible;
+        the percentile bootstrap is distribution-free, needs no dependency, and
+        is exactly replayable with the seeded RNG (§6 replay invariant). The
+        p-value and the 95% CI are computed from the SAME resample stream so a
+        replayed run can never disagree with itself.
+
+        The scorecard/report layer must always render ``ci95_lift`` alongside
+        ``observed_lift`` — a point estimate alone is forbidden.
+        """
         n = len(cand)
         diffs = [c - b for c, b in zip(cand, base)]
         observed = sum(diffs) / n if n else 0.0
         if n == 0:
-            return {"observed_lift": 0.0, "p_value": 1.0, "significant": False, "n": 0}
+            return {
+                "observed_lift": 0.0,
+                "p_value": 1.0,
+                "significant": False,
+                "n": 0,
+                "ci95_lift": [0.0, 0.0],
+                "method": "paired_seeded_bootstrap_percentile",
+                "iterations": 0,
+            }
         rng = random.Random(_BOOTSTRAP_SEED)
+        means: list[float] = []
         worse_or_equal = 0
         for _ in range(_BOOTSTRAP_ITERS):
             resampled = sum(diffs[rng.randrange(n)] for _ in range(n)) / n
+            means.append(resampled)
             if resampled <= 0:
                 worse_or_equal += 1
         p_value = worse_or_equal / _BOOTSTRAP_ITERS
+        means.sort()
+        lo = means[int(0.025 * (_BOOTSTRAP_ITERS - 1))]
+        hi = means[int(0.975 * (_BOOTSTRAP_ITERS - 1))]
         return {
             "observed_lift": observed,
             "p_value": p_value,
             "significant": observed > 0 and p_value < _SIGNIFICANCE_P,
             "n": n,
+            "ci95_lift": [lo, hi],
+            "method": "paired_seeded_bootstrap_percentile",
+            "iterations": _BOOTSTRAP_ITERS,
         }
 
     # ---------------------------------------------------------------------- run
@@ -278,17 +414,21 @@ class ArenaRunner:
         task_ids = self.taskpack.task_ids()
 
         # --- Controls (gate first; it sets the parity budget).
-        gate = self._best_single_full_budget()
+        gate, seat_scorecards = self._best_single_full_budget()
         budget_ref = gate.total_compute
-        self_moa = self._same_budget_self_moa(budget_ref)
+        self_moa = self._same_budget_self_moa(budget_ref, gate.model_id)
         ensemble = self._random_or_static_ensemble()
         # --- Candidate.
         cand = self.run_arm("candidate", candidate)
+        # --- Budget-parity control: strongest seat at the candidate's exact
+        #     call budget (the honest "equal spend" baseline; kill-list doctrine).
+        parity_control, parity_report = self._best_single_parity_budget(gate, cand)
 
         # --- Budget parity, logged for candidate AND every control (spec §6.3).
         arms = {
             "candidate": cand,
             "best_single_full_budget": gate,
+            "best_single_parity_budget": parity_control,
             "same_budget_self_moa": self_moa,
             "random_or_static_ensemble": ensemble,
         }
@@ -300,12 +440,31 @@ class ArenaRunner:
             }
             for name, r in arms.items()
         }
+        # Externally auditable spend ledger (tokens/compute + calls per arm):
+        # parity must be checkable from receipts, not merely enforced in-process.
+        parity_ledger = {
+            name: {
+                "total_compute": r.total_compute,
+                "total_calls": len(
+                    [c for rr in r.route_receipts for c in rr["selected_models"]]
+                ),
+                "per_call_cap": getattr(self.pool, "per_call_cap", None),
+            }
+            for name, r in arms.items()
+        }
 
-        # --- Significance of candidate vs the gate.
+        # --- Significance of candidate vs the gate AND vs the parity control.
+        #     Both are paired per-task comparisons with a seeded bootstrap CI;
+        #     no "win" exists below significance on BOTH baselines.
         sig = self._bootstrap_significance(
             cand.correctness_vector(task_ids), gate.correctness_vector(task_ids)
         )
+        sig_parity = self._bootstrap_significance(
+            cand.correctness_vector(task_ids),
+            parity_control.correctness_vector(task_ids),
+        )
         within_parity = budget_parity["candidate"]["within_parity"]
+        parity_verified = bool(parity_report["verified"])
         contaminated = cand.sealed_access_during_run > 0
 
         # --- Council verifies the trace + the "beat controls" promotion claim.
@@ -313,7 +472,10 @@ class ArenaRunner:
             "claim": "beat_best_single_full_budget",
             "candidate_score": cand.score,
             "baseline_score": gate.score,
-            "budget_parity_logged": within_parity,
+            "parity_baseline_score": parity_control.score,
+            # Logged parity now also requires the instrumented control-arm
+            # assertion — a broken parity instrument refutes the claim.
+            "budget_parity_logged": within_parity and parity_verified,
         }
         contamination_findings: tuple[str, ...] = ()
         if contaminated:
@@ -334,8 +496,11 @@ class ArenaRunner:
         closeout = self._select_closeout(
             cand=cand,
             gate=gate,
+            parity_control=parity_control,
             within_parity=within_parity,
+            parity_verified=parity_verified,
             sig=sig,
+            sig_parity=sig_parity,
             contaminated=contaminated,
             council_verdict=council_receipt.verdict,
         )
@@ -354,7 +519,15 @@ class ArenaRunner:
             "arm_scores": {name: r.score for name, r in arms.items()},
             "budget_parity": budget_parity,
             "budget_ref": budget_ref,
+            "parity_control": parity_report,
+            "parity_ledger": parity_ledger,
             "significance": sig,
+            "significance_vs_parity_control": sig_parity,
+            "seat_scorecards": seat_scorecards,
+            "roster": {
+                m: {"specialty": spec.specialty} for m, spec in self.roster.items()
+            },
+            "measurement_mode": getattr(self.pool, "mode", "hermetic_fixture"),
             "contaminated": contaminated,
             "council_verdict": council_receipt.verdict,
             "closeout_state": closeout,
@@ -373,8 +546,11 @@ class ArenaRunner:
         *,
         cand: ArmResult,
         gate: ArmResult,
+        parity_control: ArmResult,
         within_parity: bool,
+        parity_verified: bool,
         sig: dict[str, Any],
+        sig_parity: dict[str, Any],
         contaminated: bool,
         council_verdict: str,
     ) -> str:
@@ -382,14 +558,23 @@ class ArenaRunner:
             return "contaminated_quarantine"
         if not cand.submission or not self.taskpack.task_ids():
             return "blocked_with_evidence"
+        if not parity_verified:
+            # FAIL CLOSED (kill-list doctrine): if the budget-parity instrument
+            # itself broke, no comparison is trustworthy — the run is blocked
+            # with evidence; it can never degrade into a win OR an honest loss.
+            return "blocked_with_evidence"
         lift = cand.score - gate.score
-        if lift <= 0:
+        lift_vs_parity = cand.score - parity_control.score
+        if lift <= 0 or lift_vs_parity <= 0:
+            # The swarm must beat the strongest seat under BOTH budget framings
+            # (seat at its own budget AND seat at the swarm's budget).
             return "measured_negative"
         # lift > 0 from here
         if not within_parity:
             # Beating best-single by spending more is theater (spec §3) — not a pass.
             return "measured_negative"
-        if not sig["significant"]:
+        if not (sig["significant"] and sig_parity["significant"]):
+            # No "win" classification below significance — on either baseline.
             return "inconclusive_low_power"
         # The Council must affirmatively CORROBORATE the trace + "beat controls"
         # claim before a positive promotion. A refuted/insufficient verdict (e.g.
@@ -438,6 +623,17 @@ class ArenaRunner:
                 "candidate": cand.scorecard,
                 "scorecard_hash": scorecard_hash(cand.scorecard),
                 "arms": {name: r.scorecard for name, r in arms.items()},
+                # A lift point estimate is FORBIDDEN without its interval: the
+                # scorecard always carries the paired-bootstrap significance
+                # (observed lift + ci95 + p) for both baselines.
+                "significance": {
+                    "vs_best_single_full_budget": run["significance"],
+                    "vs_best_single_parity_budget": run[
+                        "significance_vs_parity_control"
+                    ],
+                },
+                "parity_control": run["parity_control"],
+                "parity_ledger": run["parity_ledger"],
             },
         )
         _write_jsonl(
@@ -453,6 +649,16 @@ class ArenaRunner:
         _write_text(out / "decision_packet.md", render_decision_packet(run, power))
 
 
+def _sig_line(sig: dict[str, Any]) -> str:
+    """Render a lift WITH its interval — a point estimate alone is forbidden."""
+    ci = sig.get("ci95_lift", [0.0, 0.0])
+    return (
+        f"observed_lift: {sig['observed_lift']:.4f}  "
+        f"ci95=[{ci[0]:.4f}, {ci[1]:.4f}]  "
+        f"(p={sig['p_value']:.4f}, significant={sig['significant']}, n={sig['n']})"
+    )
+
+
 def render_decision_packet(run: dict[str, Any], power: dict[str, Any]) -> str:
     bp = run["budget_parity"]
     lines = [
@@ -462,6 +668,7 @@ def render_decision_packet(run: dict[str, Any], power: dict[str, Any]) -> str:
         f"- task_manifest_hash: `{run['task_manifest_hash'][:16]}…`",
         f"- scorer_hash: `{run['scorer_hash'][:16]}…`",
         f"- candidate_genome_id: `{run['candidate_genome_id']}`",
+        f"- measurement_mode: `{run.get('measurement_mode', 'hermetic_fixture')}`",
         f"- **closeout_state: `{run['closeout_state']}`**",
         f"- council_verdict: `{run['council_verdict']}`",
         "",
@@ -482,10 +689,27 @@ def render_decision_packet(run: dict[str, Any], power: dict[str, Any]) -> str:
         "",
         f"- best_single_full_budget score: {run['arm_scores']['best_single_full_budget']:.4f}",
         f"- candidate score: {run['arm_scores']['candidate']:.4f}",
-        f"- observed_lift: {sig['observed_lift']:.4f}  (p={sig['p_value']:.4f}, "
-        f"significant={sig['significant']}, n={sig['n']})",
+        f"- {_sig_line(sig)}",
         f"- budget_ref: {run['budget_ref']}  ·  candidate_within_parity: "
         f"{bp['candidate']['within_parity']}",
+    ]
+    pc = run.get("parity_control")
+    sig_pc = run.get("significance_vs_parity_control")
+    if pc is not None and sig_pc is not None:
+        lines += [
+            "",
+            "## Budget-parity control (strongest seat at the swarm's call budget)",
+            "",
+            f"- control_model: `{pc['control_model']}`  ·  parity_verified: "
+            f"**{pc['verified']}** (fails closed on mismatch)",
+            f"- calls: control={pc['control_total_calls']} "
+            f"candidate={pc['candidate_total_calls']} "
+            f"(match={pc['calls_per_task_match']}, per_call_cap={pc['per_call_cap']})",
+            f"- best_single_parity_budget score: "
+            f"{run['arm_scores']['best_single_parity_budget']:.4f}",
+            f"- {_sig_line(sig_pc)}",
+        ]
+    lines += [
         "",
         "## Dharma Power Index",
         "",

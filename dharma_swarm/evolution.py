@@ -198,62 +198,9 @@ def _paths_from_unified_diff(diff_text: str) -> list[str]:
     return paths
 
 
-def _promotion_verification_allows_live(
-    packet: dict[str, Any] | None,
-    *,
-    trusted_judge_public_keys: Iterable[str | bytes] = (),
-) -> bool:
-    """Return True only for a fail-closed Forge promotion verification packet."""
-    if not isinstance(packet, dict):
-        return False
-    if packet.get("schema") != "forge_v2.promotion_verification.v1":
-        return False
-    if packet.get("decision") != "allow":
-        return False
-    if packet.get("live_apply_allowed") is not True:
-        return False
-    if packet.get("operator_lease_present") is not True:
-        return False
-    if packet.get("blockers"):
-        return False
-    promotion_packet = dict(packet.get("promotion_packet") or {})
-    if promotion_packet.get("decision") != "promotable_candidate":
-        return False
-    admission = dict(packet.get("governed_admission") or {})
-    if admission.get("decision") != "allow":
-        return False
-    telos = dict(packet.get("telos") or {})
-    if telos.get("decision") != "allow":
-        return False
-    signed_receipts = dict(packet.get("signed_receipts") or {})
-    if not signed_receipts or not all(value is True for value in signed_receipts.values()):
-        return False
-    try:
-        from dharma_swarm.forge_v1.forge_v2.verify_promotion import (
-            verify_promotion_verification_signature,
-        )
-
-        if not verify_promotion_verification_signature(
-            packet,
-            trusted_public_keys=trusted_judge_public_keys,
-        ):
-            return False
-    except Exception:
-        return False
-    if packet.get("payload_sha256"):
-        try:
-            from dharma_swarm.forge_v1.forge_v2.signals import canonical_sha256
-
-            body = {
-                k: v
-                for k, v in packet.items()
-                if k not in {"payload_sha256", "verification_signature"}
-            }
-            if canonical_sha256(body) != packet["payload_sha256"]:
-                return False
-        except Exception:
-            return False
-    return True
+from dharma_swarm.promotion_gate import (  # noqa: E402  (one-door gate lives in its own module)
+    _promotion_verification_allows_live,
+)
 
 
 class CycleResult(BaseModel):
@@ -3346,6 +3293,9 @@ class DarwinEngine:
         if not shadow and not _promotion_verification_allows_live(
             promotion_verification,
             trusted_judge_public_keys=trusted_judge_public_keys,
+            requested_source_files=[
+                self._component_key_for_source_file(Path(sf)) for sf in source_files
+            ],
         ):
             reason = "live_apply_refused: forge_v2.verify_promotion packet required"
             logger.warning("Auto-evolve refused live mode: %s", reason)
@@ -3490,10 +3440,13 @@ class DarwinEngine:
         if not _promotion_verification_allows_live(
             promotion_verification,
             trusted_judge_public_keys=trusted_judge_public_keys,
+            requested_source_files=[proposal.component],
         ):
             logger.warning(
-                "Refusing to auto-commit proposal %s without signed promotion verification",
+                "Refusing to auto-commit proposal %s without signed promotion verification"
+                " bound to component %s",
                 proposal.id,
+                proposal.component,
             )
             return None
         if proposal.actual_fitness is None:

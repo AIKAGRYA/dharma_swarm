@@ -335,6 +335,15 @@ def default_gates(target: str = "dharma_swarm/") -> list[GateSpec]:
         GateSpec("verify-corral", AGAMA, "medium",
                  ["python3", "scripts/governance/verify_corral_findings.py"],
                  requires=("scripts/governance/verify_corral_findings.py",)),
+        # deep — anumana (inference from measured signs): the Stop-the-Slop
+        # probe (docs/stop-the-slop/probe, 13 instrument-routed signals) as a
+        # delta-ratchet against the committed baseline. New regressions fail;
+        # pre-existing findings and LOW/UNASSESSED axes stay advisory.
+        GateSpec("slop-ratchet", ANUMANA, "deep",
+                 ["python3", "scripts/governance/slop_ratchet.py"],
+                 requires=("scripts/governance/slop_ratchet.py",
+                           "docs/stop-the-slop/probe/probe.py",
+                           "docs/governance/hygiene/slop_index_baseline.json")),
         # deep — arthapatti (what MUST hold): the computable invariants plus
         # the NATS substrate contract — both real on main, both fast (<1s).
         # BLOCKING: a failure here cannot be outweighed by any amount of green.

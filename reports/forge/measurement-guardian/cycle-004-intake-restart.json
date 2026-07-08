@@ -1,0 +1,459 @@
+{
+  "schema_version": "forge_measurement_guardian_intake_restart.v1",
+  "cycle": 4,
+  "recorded_at": "2026-07-03T22:45:00+08:00",
+  "observed_at_utc": "2026-07-03T14:45:00Z",
+  "actor": "forge_measurement_guardian",
+  "verifier_agent": "receipt-lane (warp_fable_weaver orchestration seat, verifier role only; no fitness authority claimed)",
+  "mission": "cycle-4 intake restart: live re-validation of the three confirmed acted receipts after a 32-day guardian gap, honest N/M recount, enumeration of unverified on-disk and live candidates, and drift audit of the evidence chain",
+  "guardian_gap": {
+    "previous_cycle_recorded_at": "2026-06-01T22:45:00+08:00",
+    "this_cycle_recorded_at": "2026-07-03T22:45:00+08:00",
+    "gap_days": 32,
+    "builder_lane_cycles_observed_during_gap": "forge_external_beast state dir advanced to cycle-081 without any guardian countersign cycle"
+  },
+  "source_manifest": {
+    "path": "reports/forge/external-beast/cycle-020-receipt-candidate-manifest.json",
+    "sha256_sealed_in_cycles_001_003": "9bcb3bd635a59a5960bf1a7f24e70c8d4b73820a860bf3762397f001d41175d7",
+    "found_on_disk": false,
+    "search_scope": "origin/main worktree (/Users/dhyana/ds-wt-receipt-lane), stale checkout (/Users/dhyana/dharma_swarm), ~/.dharma recursive find",
+    "drift_note": "The source manifest for cycles 001-003 is missing from every searched location. Its content is unrecoverable locally; only its sha256 survives inside the sealed guardian artifacts. Recorded as drift evidence."
+  },
+  "prior_guardian_artifacts": [
+    {
+      "path": "/Users/dhyana/.dharma/forge_measurement_guardian/cycle-001-external-receipt-verification.json",
+      "sha256": "00f62faba685b1d4246eb6d9675707a6baa7b2ee696bf9f2d0df669dd3be07ce",
+      "matches_seal_in_cycle_002": true
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_measurement_guardian/cycle-002-receipt-drift-seal.json",
+      "sha256": "c3f845cf344be811797bde5993296f5cae528cae8dd63da71a6d1c57789289f7",
+      "matches_seal_in_cycle_003": true
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_measurement_guardian/cycle-003-fitness-quorum-guard.json",
+      "sha256": "05036769ac6c72db2196198e20e5a01e0c34099c5b7736179b808ab5f14fac5e",
+      "matches_seal": "no prior seal exists for cycle-003 itself; hash recorded here as the first seal"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_measurement_guardian/2026-06-01-dharma-reward-forge-first-external-receipt.md",
+      "sha256": "acf39d2effec5bb7f882a066de9d57915b955af85cc9484af95914b6a7fcffbf",
+      "matches_seal_in_cycles_002_003": true
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_measurement_guardian/cycle-001/abduznik-instrumation-98/verifier_artifact.json",
+      "sha256": "1d09cc1be520210640b11c8e2e7a372cf03fd7afe4285b31d9935b5901b4081f",
+      "matches_seal_in_cycle_002": true
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_measurement_guardian/cycle-001/yasuno-5555-guild-7/verifier_artifact.json",
+      "sha256": "454e167c781dcffbe69f1c52e2f76cdfdcb26be7bd323f8c06118e243cc34712",
+      "matches_seal_in_cycle_002": true
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_measurement_guardian/cycle-001/leticiv-intigriti-asset-copier-6/verifier_artifact.json",
+      "sha256": "70b1c45db4f780a6b053ef579b07cd360e77ab52f8f2022738dc72d2e2e860ca",
+      "matches_seal_in_cycle_002": true
+    }
+  ],
+  "authority_result": {
+    "external_confirmed_receipts_revalidated": true,
+    "confirmed_receipt_count": 3,
+    "quality_stratified_receipt_count": 3,
+    "domains": [
+      "external_code_contribution"
+    ],
+    "domain_count": 1,
+    "eligible_to_set_archive_fitness": false,
+    "archive_fitness_changed": false,
+    "fitness_authority_granted": false,
+    "reason_fitness_blocked": "Cycle 4 revalidates the three already-confirmed acted receipts (no live drift) and restarts intake after a 32-day guardian gap. The Forge Council threshold remains unmet: N=3 confirmed receipts where N>=5 is required, and M=1 domain where M>=3 is required. Four additional live-verified external merges were enumerated as candidates but are NOT counted as confirmed because their local evidence chain (candidate manifest + readiness packet hashes) does not exist on disk; admitting them requires either chain repair or an explicit Forge Council schema decision, which is outside this verifier's authority. Even if all four were admitted, N=7 would satisfy N>=5 but M would remain 1 of 3 required domains: domain diversity, not receipt count, is the binding constraint on the One Wire quorum."
+  },
+  "threshold_guard": {
+    "required_confirmed_receipts": 5,
+    "observed_confirmed_receipts": 3,
+    "required_distinct_domains": 3,
+    "observed_distinct_domains": 1,
+    "observed_domains": [
+      "external_code_contribution"
+    ],
+    "v1_external_threshold_ready": false,
+    "archive_fitness_authority": "none_from_this_status_artifact",
+    "external_beast_fitness_authority_granted": 0,
+    "external_beast_external_confirmed_authority_granted": 0,
+    "projection_if_all_enumerated_candidates_were_admitted": {
+      "projected_confirmed_receipts": 7,
+      "projected_distinct_domains": 1,
+      "projected_v1_external_threshold_ready": false,
+      "note": "projection only; no candidate is admitted by this artifact"
+    }
+  },
+  "direct_candidates": [
+    {
+      "candidate": "abduznik/instrumation#98",
+      "verdict": "confirmed_external_acted_receipt_revalidated",
+      "drift_from_cycle_003": false,
+      "live_pr": {
+        "state": "MERGED",
+        "author": "AmitabhainArunachala",
+        "merged_by": "abduznik",
+        "merged_at": "2026-06-01T12:50:58Z",
+        "merge_commit_sha": "6ef7f4c9cbdbb96d3c0df57261635ce489cf0c11",
+        "head_sha": "5294c451499f4b8e37ee8d401039891dcd01c0d5",
+        "body_has_ai_operator_disclosure": true
+      },
+      "matches_cycle_003_seal": true,
+      "live_probe_artifact": {
+        "path": "/Users/dhyana/.dharma/forge_measurement_guardian/cycle-004/live/abduznik-instrumation-98.json",
+        "sha256": "8d79ece2da29f78f48baa0eb2f08662c3381b2857f201cdb1d2100f7d51cb707"
+      }
+    },
+    {
+      "candidate": "Yasuno-5555/Guild#7",
+      "verdict": "confirmed_external_acted_receipt_revalidated",
+      "drift_from_cycle_003": false,
+      "live_pr": {
+        "state": "MERGED",
+        "author": "AmitabhainArunachala",
+        "merged_by": "Yasuno-5555",
+        "merged_at": "2026-06-01T12:56:20Z",
+        "merge_commit_sha": "c809f0377fb9fd4bfa7f4b0e5aa8082fd4759361",
+        "head_sha": "1444b1538c2fd6cf640734a3f3faa7a9f2b1a348",
+        "body_has_ai_operator_disclosure": true
+      },
+      "matches_cycle_003_seal": true,
+      "live_probe_artifact": {
+        "path": "/Users/dhyana/.dharma/forge_measurement_guardian/cycle-004/live/yasuno-guild-7.json",
+        "sha256": "324c06c330a8524434bac23a114d75f72fd296c3b342a30ae2a7b64114600767"
+      }
+    },
+    {
+      "candidate": "leticiv/intigriti-asset-copier#6",
+      "verdict": "confirmed_external_acted_receipt_revalidated",
+      "drift_from_cycle_003": false,
+      "live_pr": {
+        "state": "MERGED",
+        "author": "AmitabhainArunachala",
+        "merged_by": "leticiv",
+        "merged_at": "2026-06-01T13:01:29Z",
+        "merge_commit_sha": "fd60a48582cde487fd10e3c00b30d2e5336e90ae",
+        "head_sha": "dbf9fbb579d45cb3f9e4fa31f6d0bd5b73393a4b",
+        "body_has_ai_operator_disclosure": true
+      },
+      "matches_cycle_003_seal": true,
+      "live_probe_artifact": {
+        "path": "/Users/dhyana/.dharma/forge_measurement_guardian/cycle-004/live/leticiv-iac-6.json",
+        "sha256": "f6c44bf925422120eb8b314695e958d3aaa119eafde5a0c43a5fef0f3d585917"
+      }
+    }
+  ],
+  "new_candidate_receipts_enumerated_not_admitted": [
+    {
+      "candidate": "Abhigyan-Shekhar/Waggle-mcp#222",
+      "verdict": "live_verified_merge_pending_evidence_chain",
+      "discovered_via": "builder-lane state dir (~/.dharma/forge_external_beast/cycle-053..074 waggle-mcp-222 artifacts) and live merged-PR sweep",
+      "live_pr": {
+        "state": "MERGED",
+        "author": "AmitabhainArunachala",
+        "merged_by": "ard12",
+        "merged_at": "2026-06-01T23:50:35Z",
+        "merge_commit_sha": "ec5a4e06fb83f064155344eebc87ab44346ea84b",
+        "head_sha": "a8f29700856368ef0c319037dfef41ed5552dad8",
+        "body_has_ai_operator_disclosure": true,
+        "title": "test: cover relationship normalization aliases"
+      },
+      "repository": {
+        "name_with_owner": "Abhigyan-Shekhar/Waggle-mcp",
+        "owner": "Abhigyan-Shekhar",
+        "is_private": false,
+        "is_fork": false,
+        "is_archived": false,
+        "default_branch": "main",
+        "not_dharma_swarm_controlled": true
+      },
+      "linked_issue": {
+        "number": 219,
+        "state": "closed",
+        "state_reason": "completed",
+        "closed_at": "2026-06-01T23:50:36Z"
+      },
+      "merge_commit": {
+        "exists": true,
+        "author_login": "ard12",
+        "committer_login": "web-flow"
+      },
+      "comments_review": "2 comments: coderabbitai[bot] auto-review and an operator follow-up describing review-feedback scope reduction; no payment request, bounty claim, or forbidden authority claim",
+      "checks_passing": [
+        "repository_not_dharma_swarm_controlled",
+        "pr_author_is_operator",
+        "pr_is_merged",
+        "merger_external_distinct_from_author",
+        "merger_not_swarm_agent_by_local_registry_scan",
+        "merge_commit_sha_exists",
+        "linked_issue_closed_or_equivalent_action",
+        "transparent_ai_operator_disclosure_present",
+        "no_payment_request_bounty_claim_or_broad_dharma_claim"
+      ],
+      "checks_failing_or_unavailable": [
+        "readiness_packet_hash_matches_manifest: UNAVAILABLE - no candidate manifest or readiness packet exists on disk for this candidate"
+      ],
+      "domain_classification": {
+        "honest_domain": "external_code_contribution",
+        "builder_lane_claimed_domain": "code_bounty",
+        "builder_claim_rejected_reason": "no payment, bounty payout, or bounty-program evidence exists; the PR is a test-coverage code contribution"
+      },
+      "builder_lane_boundary_note": "builder artifact cycle-074-waggle-mcp-222-receipt-reverification.json records guard.external_confirmed=true; the builder lane cannot self-confirm receipts, and this artifact does not accept that claim",
+      "live_probe_artifacts": [
+        {
+          "path": "/Users/dhyana/.dharma/forge_measurement_guardian/cycle-004/live/waggle-mcp-222.json",
+          "sha256": "baab4cc4dc972f76a39a6e786d3a7ef90c80c3144e3814e7ce3c45dd8ea8527b"
+        },
+        {
+          "path": "/Users/dhyana/.dharma/forge_measurement_guardian/cycle-004/live/waggle-repo.json",
+          "sha256": "48610069ffff8046de9c10b4bebdff84abb60abb5a7e188c85aa9aa16d82493d"
+        },
+        {
+          "path": "/Users/dhyana/.dharma/forge_measurement_guardian/cycle-004/live/waggle-merge-commit.json",
+          "sha256": "27c070a007e6b34681d8d79c7ee1f96ed14536d259f0aa0d28a45247d31f4f0d"
+        },
+        {
+          "path": "/Users/dhyana/.dharma/forge_measurement_guardian/cycle-004/live/waggle-issue-219.json",
+          "sha256": "7da878a3c7ea817df04169ff43d752f73efabf1811bb7663d079f94873fa9f26"
+        }
+      ]
+    },
+    {
+      "candidate": "stellarkit-lab-devtools/stellarkit-api#223",
+      "verdict": "live_verified_merge_pending_evidence_chain",
+      "discovered_via": "live merged-PR sweep; a target clone exists at ~/.dharma/forge_external_beast/target-clones/stellarkit-api but no readiness packet or manifest",
+      "live_pr": {
+        "state": "MERGED",
+        "author": "AmitabhainArunachala",
+        "merged_by": "Sulex45",
+        "merged_at": "2026-06-02T09:14:35Z",
+        "merge_commit_sha": "50beacefd9d51f486453e9cab15cf8e94ad6f8a0",
+        "body_has_ai_operator_disclosure": true
+      },
+      "repository": {
+        "name_with_owner": "stellarkit-lab-devtools/stellarkit-api",
+        "owner": "stellarkit-lab-devtools",
+        "is_private": false,
+        "is_fork": false,
+        "is_archived": false,
+        "not_dharma_swarm_controlled": true
+      },
+      "linked_issue": {
+        "number": 220,
+        "state": "closed",
+        "state_reason": "completed",
+        "closed_at": "2026-06-02T09:14:37Z"
+      },
+      "comments_review": "no PR comments; no forbidden claims",
+      "checks_failing_or_unavailable": [
+        "readiness_packet_hash_matches_manifest: UNAVAILABLE - no candidate manifest or readiness packet exists on disk for this candidate"
+      ],
+      "domain_classification": {
+        "honest_domain": "external_code_contribution"
+      },
+      "live_probe_artifacts": [
+        {
+          "path": "/Users/dhyana/.dharma/forge_measurement_guardian/cycle-004/live/stellarkit-lab-devtools-stellarkit-api-223.json",
+          "sha256": "2e6484b33ec2405f685f39c5ccde5f0cd2a3f2fd7d30b5b02fa43770bdbc1136"
+        },
+        {
+          "path": "/Users/dhyana/.dharma/forge_measurement_guardian/cycle-004/live/stellarkit-lab-devtools-stellarkit-api-repo.json",
+          "sha256": "96bbee6f44825f69455d69a0107d0d8fbf2d443a38d31903bd9c4a095b741365"
+        },
+        {
+          "path": "/Users/dhyana/.dharma/forge_measurement_guardian/cycle-004/live/stellarkit-issue-220.json",
+          "sha256": "ae9f20040de50e5ec58c212a1cc3e1fc79602af7b8a9c636d505ba129a1bda3b"
+        }
+      ]
+    },
+    {
+      "candidate": "ferro-labs/ferrolabs-python-sdk#23",
+      "verdict": "live_verified_merge_pending_evidence_chain",
+      "discovered_via": "live merged-PR sweep; no local builder artifacts exist for this candidate",
+      "live_pr": {
+        "state": "MERGED",
+        "author": "AmitabhainArunachala",
+        "merged_by": "MitulShah1",
+        "merged_at": "2026-06-02T13:12:28Z",
+        "merge_commit_sha": "2b06d70de4a6e511ff48d01bee82c4f5fe741195",
+        "body_has_ai_operator_disclosure": true
+      },
+      "repository": {
+        "name_with_owner": "ferro-labs/ferrolabs-python-sdk",
+        "owner": "ferro-labs",
+        "is_private": false,
+        "is_fork": false,
+        "is_archived": false,
+        "not_dharma_swarm_controlled": true
+      },
+      "linked_issue": {
+        "number": null,
+        "note": "no closing issue reference; maintainer engagement evidenced by post-merge thank-you comment from MitulShah1"
+      },
+      "comments_review": "1 comment: maintainer thank-you requesting a repo star; no payment request or forbidden claim by the operator side",
+      "checks_failing_or_unavailable": [
+        "readiness_packet_hash_matches_manifest: UNAVAILABLE - no candidate manifest or readiness packet exists on disk for this candidate",
+        "linked_issue_closed_or_equivalent_action: PARTIAL - no linked issue; maintainer merge + thank-you comment is the acted evidence"
+      ],
+      "domain_classification": {
+        "honest_domain": "external_code_contribution"
+      },
+      "live_probe_artifacts": [
+        {
+          "path": "/Users/dhyana/.dharma/forge_measurement_guardian/cycle-004/live/ferro-labs-ferrolabs-python-sdk-23.json",
+          "sha256": "dfe9d4dcc8dcd41fa01f0de917525cc1919be551d3d5b95bde3fafb1fbc74fed"
+        },
+        {
+          "path": "/Users/dhyana/.dharma/forge_measurement_guardian/cycle-004/live/ferro-labs-ferrolabs-python-sdk-repo.json",
+          "sha256": "4d34b4fee8550e585144501f5e91c78caa908f179486e21c915b6387015a4b2c"
+        }
+      ]
+    },
+    {
+      "candidate": "siddhant-rajhans/cortexlab#76",
+      "verdict": "live_verified_merge_pending_evidence_chain",
+      "discovered_via": "live merged-PR sweep; no local builder artifacts exist for this candidate",
+      "live_pr": {
+        "state": "MERGED",
+        "author": "AmitabhainArunachala",
+        "merged_by": "siddhant-rajhans",
+        "merged_at": "2026-06-15T05:17:37Z",
+        "merge_commit_sha": "1a7fa833695e73b072fe91efa1db3c9aaf62f473",
+        "body_has_ai_operator_disclosure": true
+      },
+      "repository": {
+        "name_with_owner": "siddhant-rajhans/cortexlab",
+        "owner": "siddhant-rajhans",
+        "is_private": false,
+        "is_fork": false,
+        "is_archived": false,
+        "not_dharma_swarm_controlled": true
+      },
+      "linked_issue": {
+        "number": 75,
+        "state": "closed",
+        "state_reason": "completed",
+        "closed_at": "2026-06-15T05:17:38Z"
+      },
+      "comments_review": "no PR comments; no forbidden claims",
+      "checks_failing_or_unavailable": [
+        "readiness_packet_hash_matches_manifest: UNAVAILABLE - no candidate manifest or readiness packet exists on disk for this candidate"
+      ],
+      "domain_classification": {
+        "honest_domain": "external_code_contribution"
+      },
+      "live_probe_artifacts": [
+        {
+          "path": "/Users/dhyana/.dharma/forge_measurement_guardian/cycle-004/live/siddhant-rajhans-cortexlab-76.json",
+          "sha256": "43601525c29baf617465230163d854529fbc692afb8215f8b49386b6d69de44b"
+        },
+        {
+          "path": "/Users/dhyana/.dharma/forge_measurement_guardian/cycle-004/live/siddhant-rajhans-cortexlab-repo.json",
+          "sha256": "9f05a472fa4c55a49f2d2fb86a29fdf921d311484978e4a11f37cc3fb16550eb"
+        },
+        {
+          "path": "/Users/dhyana/.dharma/forge_measurement_guardian/cycle-004/live/cortexlab-issue-75.json",
+          "sha256": "4c769f7430fee90512b2bd2317817fc31c2cb2960509ef60de81837f71b38223"
+        }
+      ]
+    }
+  ],
+  "author_merge_crosscheck": {
+    "command": "gh search prs --author AmitabhainArunachala --merged --merged-at <window> --json repository,number,url --limit 100 (date-sliced 2026-06-01..2026-06-07, 2026-06-08..2026-06-20, 2026-06-21..2026-07-03 because the single-window query truncated at 100 results)",
+    "external_direct_matches": [
+      "abduznik/instrumation#98",
+      "Yasuno-5555/Guild#7",
+      "leticiv/intigriti-asset-copier#6",
+      "Abhigyan-Shekhar/Waggle-mcp#222",
+      "stellarkit-lab-devtools/stellarkit-api#223",
+      "ferro-labs/ferrolabs-python-sdk#23",
+      "siddhant-rajhans/cortexlab#76"
+    ],
+    "operator_owned_matches_excluded": [
+      "AmitabhainArunachala/dharma_swarm#* (bulk)",
+      "AmitabhainArunachala/dharmic-agora#1",
+      "AmitabhainArunachala/dharmic-agora#2",
+      "AmitabhainArunachala/dharmic-agora#3"
+    ],
+    "new_external_matches_since_cycle_003": [
+      "Abhigyan-Shekhar/Waggle-mcp#222",
+      "stellarkit-lab-devtools/stellarkit-api#223",
+      "ferro-labs/ferrolabs-python-sdk#23",
+      "siddhant-rajhans/cortexlab#76"
+    ],
+    "sweep_artifact": {
+      "path": "/Users/dhyana/.dharma/forge_measurement_guardian/cycle-004/live/merged-sweep.json",
+      "sha256": "540877587e965e31479a4345672650ab174f481f31149b022984f2ac499a5890",
+      "note": "single-window sweep artifact retained even though truncated; date-sliced queries provided the complete external set"
+    }
+  },
+  "drift_evidence": [
+    {
+      "finding": "source_manifest_missing",
+      "detail": "reports/forge/external-beast/cycle-020-receipt-candidate-manifest.json (sha256 9bcb3bd6...) is not on origin/main, not in the stale checkout, and not anywhere under ~/.dharma. The candidate-manifest half of the cycle-001..003 evidence chain is unrecoverable locally."
+    },
+    {
+      "finding": "repo_side_guardian_artifacts_never_landed_on_main",
+      "detail": "reports/forge/measurement-guardian/** (cycle-001..003 reports, verifier artifacts, status smokes), reports/forge/external-beast/** (readiness packets), and reports/witness/2026-06-01-dharma-reward-forge-first-external-receipt.md do not exist on origin/main. git log --all shows only reports/forge/FORGE_CANONICAL_INDEX.md in a rescue snapshot (260a11539) on non-main branches. State-dir copies in ~/.dharma/forge_measurement_guardian/ hash-match the seals recorded in cycles 002/003, so the artifact content survives; the repo-side chain does not. This cycle-004 commit restores a repo-side guardian surface."
+    },
+    {
+      "finding": "guardian_intake_stalled_32_days",
+      "detail": "No guardian cycle ran between 2026-06-01 (cycle-003) and 2026-07-03 (this cycle). During the gap the builder lane advanced to cycle-081 and four external merges accumulated with no verifier countersign."
+    },
+    {
+      "finding": "builder_lane_self_confirmation_boundary_violation_risk",
+      "detail": "~/.dharma/forge_external_beast/cycle-074-waggle-mcp-222-receipt-reverification.json records guard.external_confirmed=true and a fitness block for an unverified candidate. Confirmation authority belongs to the guardian lane; this artifact does not accept the builder claim and re-derives all checks independently."
+    },
+    {
+      "finding": "registry_scan_surface_reduced",
+      "detail": "reports/agent_registry_atlas (a cycle-001..003 registry-scan surface) does not exist on origin/main; the scan was run over the existing surfaces (examples/agents, docs/agents, dharma_swarm) with no counterparty matches (rg exit 1)."
+    }
+  ],
+  "crosschecks": {
+    "github_cli_live": {
+      "commands": [
+        "gh auth status",
+        "gh pr view <7 candidate PRs> --json number,state,author,mergedAt,mergedBy,mergeCommit,headRefOid,body,url,isCrossRepository,closingIssuesReferences",
+        "gh repo view <4 new candidate repos> --json nameWithOwner,owner,isFork,isArchived,isPrivate",
+        "gh api repos/Abhigyan-Shekhar/Waggle-mcp/commits/ec5a4e06fb83f064155344eebc87ab44346ea84b",
+        "gh api repos/<repo>/issues/<n> for linked issues 219, 220, 75",
+        "gh api repos/<repo>/issues/<pr>/comments for all 4 new candidates",
+        "gh search prs --author AmitabhainArunachala --merged --merged-at <3 date slices> --limit 100"
+      ],
+      "exit_status": "passed"
+    },
+    "local_manifest_and_prior_artifact_hashes": {
+      "command": "shasum -a 256 over state-dir cycle-001/002/003 artifacts, witness, and cycle-001 verifier artifacts",
+      "hashes_match_prior_seals": true
+    },
+    "swarm_agent_registry_scan": {
+      "command": "rg -n '\\b(abduznik|Yasuno-5555|leticiv|ard12|Abhigyan-Shekhar|Sulex45|MitulShah1|ferro-labs|siddhant-rajhans)\\b' examples/agents docs/agents dharma_swarm -S",
+      "exit_code": 1,
+      "matches_found": false,
+      "note": "reports/agent_registry_atlas absent on main; scan run over existing surfaces"
+    },
+    "github_connector_live": {
+      "commands": [],
+      "exit_status": "unavailable",
+      "note": "GitHub MCP connector not available in this session; gh CLI was the sole live probe (single-source, flagged honestly)"
+    }
+  },
+  "guardrails": {
+    "public_github_actions_taken_by_guardian": false,
+    "money_spent": false,
+    "payment_requested": false,
+    "bounty_claimed": false,
+    "broad_dharma_swarm_performance_claim_published": false,
+    "protected_dharma_swarm_branch_pushed_or_merged": false,
+    "commit_push_merge_or_pr_action_in_dharma_swarm": true,
+    "commit_push_note": "receipt-lane commits this artifact's repo-side copy to lane branch weaver/one-wire-quorum and opens a DRAFT PR only, per the operator-approved Metabolic Loop Ignition plan; no push to main, operator merges",
+    "nonzero_archive_fitness_set": false,
+    "v2_or_higher_autonomy_escalated": false
+  },
+  "summary_verdict": "intake_restarted_confirmed_receipts_revalidated_fitness_blocked",
+  "summary": "Cycle 4 restarts guardian intake after a 32-day gap. The three confirmed acted receipts show zero live drift and remain the only confirmed receipts: N=3 of 5, M=1 of 3 (external_code_contribution). Four additional operator-authored external PRs merged by distinct external maintainers with intact AI-operator disclosure were live-verified and enumerated as candidates (Waggle-mcp#222, stellarkit-api#223, ferrolabs-python-sdk#23, cortexlab#76) but are not admitted because the local candidate-manifest/readiness evidence chain is missing - itself recorded as drift alongside the missing cycle-020 manifest and the never-committed repo-side guardian artifacts. Even full candidate admission would leave M=1: domain diversity is the binding quorum constraint, and non-code-contribution domains (e.g. a paid engagement receipt via the One Wire) are what actually move it. Archive fitness remains blocked; no authority is claimed."
+}

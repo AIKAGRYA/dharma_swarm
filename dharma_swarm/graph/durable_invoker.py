@@ -51,7 +51,9 @@ import dataclasses
 import hashlib
 import json
 import logging
+import sqlite3
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Callable, Optional
 from uuid import UUID
 
@@ -174,9 +176,13 @@ def receipt_from_dict(payload: dict[str, Any]) -> EvidenceReceipt:
 
 
 async def persist_evidence_receipt(
-    receipt: EvidenceReceipt, store: Any, *, task_id: str
+    receipt: EvidenceReceipt,
+    store: Any,
+    *,
+    task_id: str,
+    machine_receipt_path: Path | None = None,
 ) -> bool:
-    """Persist a receipt to ``delegation_runs.receipt_json``, fail-open.
+    """Persist a dispatch receipt projection and chain anchor, fail-open.
 
     Extracted verbatim from ``orchestrator._run_task_via_spine`` (module at
     its line-budget ceiling): writes to the SAME store the delegation-run
@@ -187,6 +193,7 @@ async def persist_evidence_receipt(
     persistence error must never break dispatch (the receipt stays in
     memory; the gap shows up as a warning + non-incrementing witness).
     """
+    projection_ok = False
     try:
         import aiosqlite
 
@@ -202,11 +209,72 @@ async def persist_evidence_receipt(
             await db.execute("PRAGMA busy_timeout=2000")
             await ensure_receipt_column(db)
             await persist_receipt(receipt, db)
-        return True
-    except Exception:
+        projection_ok = True
+    except (
+        ModuleNotFoundError,
+        OSError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+        sqlite3.Error,
+    ):
         logger.warning(
             "spine: EvidenceReceipt produced but NOT persisted (task_id=%s)",
             task_id,
+            exc_info=True,
+        )
+        projection_ok = False
+    chain_ok = _append_dispatch_receipt_to_machine_chain(
+        receipt,
+        path=_machine_receipt_path_for_store(store, machine_receipt_path),
+    )
+    return projection_ok and chain_ok
+
+
+def _machine_receipt_path_for_store(
+    store: Any,
+    override: Path | None,
+) -> Path | None:
+    """Keep pytest stores from writing to the operator's real witness path."""
+    if override is not None:
+        return override
+    db_path = getattr(store, "db_path", None)
+    if db_path is None:
+        return None
+    path = Path(db_path).expanduser()
+    from dharma_swarm.spine.receipt import DEFAULT_MACHINE_RECEIPT_PATH
+
+    dharma_root = DEFAULT_MACHINE_RECEIPT_PATH.expanduser().parent.parent
+    try:
+        path.relative_to(dharma_root)
+        return None
+    except ValueError:
+        return path.with_name("claim_evidence_receipts.jsonl")
+
+
+def _append_dispatch_receipt_to_machine_chain(
+    receipt: EvidenceReceipt,
+    *,
+    path: Path | None = None,
+) -> bool:
+    """Append dispatch evidence to the existing machine chain, fail-open."""
+    try:
+        from dharma_swarm.graph.receipt_chain import (
+            append_dispatch_receipt_to_machine_chain,
+        )
+
+        side_effect_key = str(receipt.attributes.get("side_effect_key", "") or "")
+        append_dispatch_receipt_to_machine_chain(
+            receipt,
+            path=path,
+            side_effect_key=side_effect_key,
+        )
+        return True
+    except (OSError, RuntimeError, TypeError, ValueError):
+        logger.warning(
+            "spine: EvidenceReceipt produced but NOT hash-chained"
+            " (receipt_id=%s)",
+            receipt.receipt_id,
             exc_info=True,
         )
         return False

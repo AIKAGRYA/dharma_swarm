@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import time
 from dataclasses import dataclass
 
 from dharma_swarm.forge_v1.providers import PoolCompletion
@@ -187,6 +188,7 @@ class _DiffCompletion(PoolCompletion):
         self.last_rounds: int = 0
 
     def complete(self, prompt: str):
+        import asyncio
 
         from dharma_swarm.models import LLMRequest
         from dharma_swarm.forge_v1.providers import _usage_tokens

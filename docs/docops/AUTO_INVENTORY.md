@@ -18,4 +18,16 @@ Do not hand-edit the generated block.
 | Orchestrator files | 6 |
 | Router files | 17 |
 | Authority candidate docs | 602 |
+| Dharma Python modules | 932 |
+| Top-level Dharma Python modules | 439 |
+| Dharma Python LOC | 352,645 |
+| Test files | 869 |
+| Test function occurrences | 12,947 |
+| Markdown files | 1,345 |
+| Markdown total lines | 286,618 |
+| Bridge files | 27 |
+| Adapter files | 26 |
+| Orchestrator files | 6 |
+| Router files | 16 |
+| Authority candidate docs | 600 |
 <!-- DOCOPS:END -->

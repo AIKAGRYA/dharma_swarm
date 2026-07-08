@@ -42,7 +42,20 @@ def _isolate_tui_state(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="TUI dispatch refactor pending — submit no longer reaches runner")
+@pytest.mark.xfail(
+    reason=(
+        "Stale fixture, not a dispatch bug: _dispatch_prompt DOES reach the "
+        "runner (verified 2026-07-07). This test's autouse _isolate_tui_state "
+        "fixture persists preferred_model='gpt-5.4', but the current "
+        "MODEL_TARGETS codex floor lane is 'gpt-5.5' (model roster moved on); "
+        "target_for_route('codex', 'gpt-5.4') returns None so "
+        "_load_model_policy() silently no-ops and the persisted route never "
+        "takes effect, leaving status_bar.model at the compiled-in default "
+        "'claude:claude-opus-4.8' instead of 'codex:gpt-5.4'. Needs the "
+        "fixture's pinned model id updated to track the live roster (or the "
+        "roster pinned in a per-test policy file), not a credential-gate stub."
+    )
+)
 async def test_tui_submit_dispatches_to_persisted_codex_route() -> None:
     app = DGCApp()
     app._restore_last_session_context = lambda **_: None
@@ -75,11 +88,13 @@ async def test_tui_submit_dispatches_to_persisted_codex_route() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="TUI dispatch refactor pending — submit no longer reaches runner")
 async def test_tui_renders_provider_events_after_submit() -> None:
     app = DGCApp()
     app._restore_last_session_context = lambda **_: None
     app._run_status_on_startup = lambda: None
+    # Credential/routing gate: force it to always pass so submit deterministically
+    # reaches the runner regardless of whether claude/codex CLIs are on PATH.
+    app._provider_ready = lambda provider_id: True
 
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -256,11 +271,13 @@ async def test_tui_mouse_scroll_over_prompt_routes_to_transcript() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="TUI dispatch refactor pending — submit no longer reaches runner")
 async def test_tui_codex_progress_notes_do_not_count_as_turns() -> None:
     app = DGCApp()
     app._restore_last_session_context = lambda **_: None
     app._run_status_on_startup = lambda: None
+    # Credential/routing gate: force it to always pass so submit deterministically
+    # reaches the runner regardless of whether claude/codex CLIs are on PATH.
+    app._provider_ready = lambda provider_id: True
 
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -353,11 +370,13 @@ async def test_tui_codex_progress_notes_do_not_count_as_turns() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="TUI dispatch refactor pending — submit no longer reaches runner")
 async def test_tui_status_bar_tracks_activity_tools_and_usage() -> None:
     app = DGCApp()
     app._restore_last_session_context = lambda **_: None
     app._run_status_on_startup = lambda: None
+    # Credential/routing gate: force it to always pass so submit deterministically
+    # reaches the runner regardless of whether claude/codex CLIs are on PATH.
+    app._provider_ready = lambda provider_id: True
 
     async with app.run_test() as pilot:
         await pilot.pause()

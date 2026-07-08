@@ -125,7 +125,6 @@ class _DummyStore:
         self._transcript.append(event)
 
 
-@pytest.mark.xfail(reason="TUI dispatch refactor pending — submit no longer reaches runner")
 def test_send_to_claude_plan_mode_uses_strict_prompt_and_default_permissions(
     monkeypatch,
 ) -> None:
@@ -136,6 +135,13 @@ def test_send_to_claude_plan_mode_uses_strict_prompt_and_default_permissions(
 
     monkeypatch.setattr(app, "_ensure_local_session_id", lambda: "sid-plan")
     monkeypatch.setattr(app, "_get_state_context", lambda: "cached context")
+    # Credential/routing gate: deterministically simulate a host with no
+    # claude/codex CLI credentials (the real CI/sandboxed condition), so the
+    # default-provider fallback to the free ollama floor lane below is exercised
+    # regardless of what happens to be on this machine's PATH.
+    monkeypatch.setattr(
+        app, "_provider_ready", lambda provider_id: provider_id not in ("claude", "codex")
+    )
 
     app._send_to_claude("design a plan")
 
@@ -173,7 +179,6 @@ def test_get_state_context_includes_latent_gold(monkeypatch, tmp_path) -> None:
     assert "latent branch" in out
 
 
-@pytest.mark.xfail(reason="TUI dispatch refactor pending — submit no longer reaches runner")
 def test_send_to_claude_normal_mode_keeps_bypass_permissions(monkeypatch) -> None:
     app = DGCApp()
     runner = _DummyRunner()
@@ -182,6 +187,9 @@ def test_send_to_claude_normal_mode_keeps_bypass_permissions(monkeypatch) -> Non
 
     monkeypatch.setattr(app, "_ensure_local_session_id", lambda: "sid-normal")
     monkeypatch.setattr(app, "_get_state_context", lambda: "")
+    # Credential/routing gate: force it to always pass so submit deterministically
+    # reaches the runner regardless of whether claude/codex CLIs are on PATH.
+    monkeypatch.setattr(app, "_provider_ready", lambda provider_id: True)
 
     app._send_to_claude("hello")
 
@@ -201,7 +209,6 @@ def test_mode_cycle_synchronizes_command_handler() -> None:
     assert app._commands.mode == "P"
 
 
-@pytest.mark.xfail(reason="TUI dispatch refactor pending — submit no longer reaches runner")
 def test_send_to_claude_recovers_stale_lock_after_session_end(monkeypatch) -> None:
     app = DGCApp()
     runner = _DummyRunner()
@@ -213,6 +220,9 @@ def test_send_to_claude_recovers_stale_lock_after_session_end(monkeypatch) -> No
     monkeypatch.setattr(app, "_get_main_screen", lambda: main)
     monkeypatch.setattr(app, "_ensure_local_session_id", lambda: "sid-stale")
     monkeypatch.setattr(app, "_get_state_context", lambda: "")
+    # Credential/routing gate: force it to always pass so submit deterministically
+    # reaches the runner regardless of whether claude/codex CLIs are on PATH.
+    monkeypatch.setattr(app, "_provider_ready", lambda provider_id: True)
 
     app._send_to_claude("resume please")
 
@@ -242,7 +252,6 @@ def test_send_to_claude_blocks_when_actively_running(monkeypatch) -> None:
     assert any("already running" in line for line in main.stream_output.errors)
 
 
-@pytest.mark.xfail(reason="TUI dispatch refactor pending — submit no longer reaches runner")
 def test_send_to_claude_recovers_running_lock_from_completed_session_meta(monkeypatch) -> None:
     app = DGCApp()
     runner = _DummyRunner()
@@ -255,6 +264,9 @@ def test_send_to_claude_recovers_running_lock_from_completed_session_meta(monkey
     main = _DummyMain(running=True)
     monkeypatch.setattr(app, "_get_main_screen", lambda: main)
     monkeypatch.setattr(app, "_get_state_context", lambda: "")
+    # Credential/routing gate: force it to always pass so submit deterministically
+    # reaches the runner regardless of whether claude/codex CLIs are on PATH.
+    monkeypatch.setattr(app, "_provider_ready", lambda provider_id: True)
 
     app._send_to_claude("resume after stale completion")
 
