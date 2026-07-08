@@ -14,6 +14,7 @@ on:
       - "dharma_swarm/graph/**"
       - "dharma_swarm/langgraph_parity/**"
       - "tests/test_langgraph_differential_oracle.py"
+      - "tests/test_graph_neutral_langgraph_oracle.py"
       - "tests/test_graph_effects.py"
       - "tests/oracle_support/**"
       - ".github/workflows/langgraph-oracle.yml"
@@ -62,6 +63,7 @@ jobs:
           DHARMA_ORACLE_REPORT_PATH: ${{ runner.temp }}/oracle/langgraph_oracle_report.json
         run: |
           python -m pytest tests/test_langgraph_differential_oracle.py \
+            tests/test_graph_neutral_langgraph_oracle.py \
             tests/test_graph_effects.py \
             -q --tb=short --timeout=120 \
             --junitxml=oracle.xml
