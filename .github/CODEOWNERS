@@ -63,6 +63,20 @@
 /dharma_swarm/router_retrospective.py   @AmitabhainArunachala
 /dharma_swarm/codex_cli.py              @AmitabhainArunachala
 /dharma_swarm/cost_tracker.py           @AmitabhainArunachala
+/dharma_swarm/decision_router.py        @AmitabhainArunachala
+/dharma_swarm/key_oracle.py             @AmitabhainArunachala
+/dharma_swarm/spine/tollbooth.py        @AmitabhainArunachala
+/dharma_swarm/__init__.py               @AmitabhainArunachala
+/dharma_swarm/base_provider.py          @AmitabhainArunachala
+/dharma_swarm/metrics.py                @AmitabhainArunachala
+/dharma_swarm/moonshot_provider.py      @AmitabhainArunachala
+/dharma_swarm/provider_policy.py        @AmitabhainArunachala
+/dharma_swarm/router_v1.py              @AmitabhainArunachala
+/dharma_swarm/runtime_provider.py       @AmitabhainArunachala
+/dharma_swarm/semantic_gravity.py       @AmitabhainArunachala
+/dharma_swarm/smart_router.py           @AmitabhainArunachala
+/dharma_swarm/swarm_router.py           @AmitabhainArunachala
+/dharma_swarm/telemetry_optimizer.py    @AmitabhainArunachala
 
 # Governance config — touch carefully
 /.github/                               @AmitabhainArunachala
