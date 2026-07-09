@@ -63,7 +63,7 @@
     - dharma_swarm/agent_runner.py
     - dharma_swarm/orchestrator.py
     - dharma_swarm/swarm.py
-    - dharma_swarm/runtime_state.py
+    - dharma_swarm/runtime_state/store.py
     - dharma_swarm/a2a/a2a_bridge.py
     - tests/test_spine_adoption_*.py
     - scripts/uplift_guards/check_spine_ownership.py

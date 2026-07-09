@@ -62,7 +62,7 @@ SURFACE_RULES: tuple[SurfaceRule, ...] = (
         surface_id="runtime_state_ledger",
         label="RuntimeStateStore durable ledger",
         category="ledger",
-        path_patterns=("dharma_swarm/runtime_state.py",),
+        path_patterns=("dharma_swarm/runtime_state/store.py",),
         joined=(
             p("store_class", r"\bclass RuntimeStateStore\b", "RuntimeStateStore type exists"),
             p("identity_table", r"execution_identities", "execution identity table is declared"),

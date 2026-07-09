@@ -43,7 +43,7 @@
 /dharma_swarm/engine/knowledge_store.py @AmitabhainArunachala
 /dharma_swarm/engine/event_memory.py    @AmitabhainArunachala
 /dharma_swarm/spine/identity.py         @AmitabhainArunachala
-/dharma_swarm/runtime_state.py          @AmitabhainArunachala
+/dharma_swarm/runtime_state/            @AmitabhainArunachala
 /dharma_swarm/execution_profile.py      @AmitabhainArunachala
 /dharma_swarm/merkle_log.py             @AmitabhainArunachala
 /dharma_swarm/archive.py                @AmitabhainArunachala

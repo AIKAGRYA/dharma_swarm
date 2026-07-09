@@ -59,8 +59,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_PATH = Path("ACTIVE_SURFACE_MANIFEST.yaml")
 REPORT_SCHEMA_VERSION = "assurance_boundary_report.v1"
 
-BOUNDARY_PACKAGES = ("dharma_swarm/spine", "dharma_swarm/memory_kernel", "dharma_swarm/a2a")
-BOUNDARY_MODULES = ("dharma_swarm/runtime_state.py", "dharma_swarm/runtime_provider.py")
+BOUNDARY_PACKAGES = ("dharma_swarm/spine", "dharma_swarm/memory_kernel", "dharma_swarm/a2a", "dharma_swarm/runtime_state")
+BOUNDARY_MODULES = ("dharma_swarm/runtime_provider.py",)
 # The one sanctioned door for provider SDKs; everything else in the
 # boundary must reach providers through it.
 PROVIDER_DOOR = "dharma_swarm/runtime_provider.py"
