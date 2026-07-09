@@ -17,12 +17,15 @@ Correlation spine convention (declared, not yet enforced via lint):
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import json
+import os
 import tempfile
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Iterator, Literal
 
 from dharma_swarm.daemon_config import dharma_state_dir
 from dharma_swarm.operator_core.return_address import build_return_address
@@ -213,6 +216,32 @@ def _write_queue_entries(path: Path, entries: list[tuple[str | None, dict[str, A
     tmp.replace(path)
 
 
+@contextmanager
+def _queue_lock(path: Path) -> Iterator[None]:
+    """Serialize read-modify-write on the queue via an exclusive advisory lock.
+
+    Two concurrent workers must not both claim (or both close) the same task.
+    ``claim_task``/``close_task`` do read -> mutate -> write, and the writer
+    replaces the queue file by atomic rename (swapping the inode), so a lock
+    taken on the queue file itself would not exclude a claimant that opened it
+    after the rename. We therefore lock a stable sidecar file that is never
+    renamed, so every contender contends on the same inode. ``flock`` is
+    per-open-file-description, so independent ``os.open`` calls exclude one
+    another even within a single process (thread-vs-thread), which is exactly
+    the double-claim case this guards.
+    """
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = path.with_name(path.name + ".lock")
+    fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+
+
 def _find_task(
     entries: list[tuple[str | None, dict[str, Any] | None]],
     task_id: str,
@@ -383,25 +412,26 @@ def claim_task(
     """Claim an open task idempotently and mirror it into the agent inbox."""
 
     path = queue_path(state_root)
-    entries = _read_queue_entries(path)
-    task = _find_task(entries, task_id)
-    current_status = _status(task)
-    claimed_by = str(task.get("claimed_by") or "")
-    if current_status in CLOSED_STATUSES:
-        raise A2ATaskLifecycleError(f"cannot claim closed task {task_id} with status {current_status}")
-    if claimed_by and claimed_by != agent_uid:
-        raise A2ATaskLifecycleError(f"task {task_id} is already claimed by {claimed_by}")
+    with _queue_lock(path):
+        entries = _read_queue_entries(path)
+        task = _find_task(entries, task_id)
+        current_status = _status(task)
+        claimed_by = str(task.get("claimed_by") or "")
+        if current_status in CLOSED_STATUSES:
+            raise A2ATaskLifecycleError(f"cannot claim closed task {task_id} with status {current_status}")
+        if claimed_by and claimed_by != agent_uid:
+            raise A2ATaskLifecycleError(f"task {task_id} is already claimed by {claimed_by}")
 
-    ts = now or iso_now()
-    task["status"] = "claimed"
-    task["claimed_by"] = agent_uid
-    task["claimed_at"] = task.get("claimed_at") or ts
-    task["claimed_via"] = task.get("claimed_via") or claimed_via
-    task["return_address"] = task.get("return_address") or make_return_address(
-        agent_uid=agent_uid,
-        resume_ref=f"a2a_task:{task_id}",
-    )
-    _write_queue_entries(path, entries)
+        ts = now or iso_now()
+        task["status"] = "claimed"
+        task["claimed_by"] = agent_uid
+        task["claimed_at"] = task.get("claimed_at") or ts
+        task["claimed_via"] = task.get("claimed_via") or claimed_via
+        task["return_address"] = task.get("return_address") or make_return_address(
+            agent_uid=agent_uid,
+            resume_ref=f"a2a_task:{task_id}",
+        )
+        _write_queue_entries(path, entries)
     inbox_path = _mirror_claimed_task(task, agent_uid, state_root, ts)
     result = dict(task)
     result["inbox_path"] = str(inbox_path)
@@ -435,50 +465,51 @@ def close_task(
         raise A2ATaskLifecycleError("; ".join(validation["errors"]))
 
     path = queue_path(state_root)
-    entries = _read_queue_entries(path)
-    task = _find_task(entries, task_id)
-    current_status = _status(task)
-    if current_status in CLOSED_STATUSES:
-        raise A2ATaskLifecycleError(f"cannot close terminal task {task_id} with status {current_status}")
-    claimed_by = str(task.get("claimed_by") or "")
-    supervisor_block = (
-        bool(claimed_by)
-        and claimed_by != agent_uid
-        and allow_supervisor_block
-        and status == "blocked"
-    )
-    if claimed_by and claimed_by != agent_uid and not supervisor_block:
-        raise A2ATaskLifecycleError(f"task {task_id} is claimed by {claimed_by}, not {agent_uid}")
-    if supervisor_block:
-        if not receipt.get("authority"):
-            raise A2ATaskLifecycleError("supervisor block requires receipt.authority")
-        if not isinstance(receipt.get("evidence"), dict) or not receipt.get("evidence"):
-            raise A2ATaskLifecycleError("supervisor block requires receipt.evidence")
-
-    ts = now or iso_now()
-    task["status"] = status
-    task["closed_at"] = ts
-    task["closed_by"] = agent_uid
-    task["closed_via"] = closed_via
-    task["receipt_id"] = receipt.get("receipt_id")
-    task["receipt"] = receipt
-    task["receipt_validation"] = validation
-    if status == "completed":
-        task["completed"] = ts
-        task["completed_at"] = ts
-        task["completed_by"] = agent_uid
-    elif status == "failed":
-        task["failed_at"] = ts
-        task["failed_by"] = agent_uid
-        task["failure_reason"] = receipt.get("failure_reason")
-    elif status == "blocked":
-        task["blocked_at"] = ts
-        task["blocked_by"] = agent_uid
-        task["failure_reason"] = receipt.get("failure_reason")
+    with _queue_lock(path):
+        entries = _read_queue_entries(path)
+        task = _find_task(entries, task_id)
+        current_status = _status(task)
+        if current_status in CLOSED_STATUSES:
+            raise A2ATaskLifecycleError(f"cannot close terminal task {task_id} with status {current_status}")
+        claimed_by = str(task.get("claimed_by") or "")
+        supervisor_block = (
+            bool(claimed_by)
+            and claimed_by != agent_uid
+            and allow_supervisor_block
+            and status == "blocked"
+        )
+        if claimed_by and claimed_by != agent_uid and not supervisor_block:
+            raise A2ATaskLifecycleError(f"task {task_id} is claimed by {claimed_by}, not {agent_uid}")
         if supervisor_block:
-            task["supervisor_blocked_claimed_by"] = claimed_by
-            task["supervisor_blocked_by"] = agent_uid
-    _write_queue_entries(path, entries)
+            if not receipt.get("authority"):
+                raise A2ATaskLifecycleError("supervisor block requires receipt.authority")
+            if not isinstance(receipt.get("evidence"), dict) or not receipt.get("evidence"):
+                raise A2ATaskLifecycleError("supervisor block requires receipt.evidence")
+
+        ts = now or iso_now()
+        task["status"] = status
+        task["closed_at"] = ts
+        task["closed_by"] = agent_uid
+        task["closed_via"] = closed_via
+        task["receipt_id"] = receipt.get("receipt_id")
+        task["receipt"] = receipt
+        task["receipt_validation"] = validation
+        if status == "completed":
+            task["completed"] = ts
+            task["completed_at"] = ts
+            task["completed_by"] = agent_uid
+        elif status == "failed":
+            task["failed_at"] = ts
+            task["failed_by"] = agent_uid
+            task["failure_reason"] = receipt.get("failure_reason")
+        elif status == "blocked":
+            task["blocked_at"] = ts
+            task["blocked_by"] = agent_uid
+            task["failure_reason"] = receipt.get("failure_reason")
+            if supervisor_block:
+                task["supervisor_blocked_claimed_by"] = claimed_by
+                task["supervisor_blocked_by"] = agent_uid
+        _write_queue_entries(path, entries)
     mirrored = _mirror_receipt(task, receipt, agent_uid, state_root)
     result = dict(task)
     result["receipt_mirrors"] = mirrored
