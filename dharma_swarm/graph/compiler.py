@@ -26,11 +26,15 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable
 
-from dharma_swarm.graph.channels import Channel
+from typing import Mapping, Sequence
+
+from dharma_swarm.graph.channels import BarrierChannel, Channel, TopicChannel
+from dharma_swarm.graph.routing import BranchSpec, PathCallable, join_channel
 from dharma_swarm.graph.scheduler import CompiledGraph
 from dharma_swarm.graph.types import (
     END,
     START,
+    TASKS_CHANNEL,
     EdgeSpec,
     NodeCallable,
     NodeSpec,
@@ -108,14 +112,48 @@ class GraphBuilder:
         self.graph_id = graph_id
         self._nodes: list[NodeSpec] = []
         self._edges: list[EdgeSpec] = []
+        self._join_edges: list[tuple[tuple[str, ...], str]] = []
+        self._branches: list[BranchSpec] = []
         self._channels: list[tuple[str, Callable[[], Channel[Any]]]] = []
 
     def add_node(self, node_id: str, fn: NodeCallable) -> GraphBuilder:
         self._nodes.append(NodeSpec(node_id=node_id, fn=fn))
         return self
 
-    def add_edge(self, source: str, target: str) -> GraphBuilder:
-        self._edges.append(EdgeSpec(source=source, target=target))
+    def add_edge(self, source: str | Sequence[str], target: str) -> GraphBuilder:
+        """Static edge. A list/tuple source declares an ALL-OF barrier join:
+        the target fires only after every listed source has committed."""
+        if isinstance(source, str):
+            self._edges.append(EdgeSpec(source=source, target=target))
+        else:
+            self._join_edges.append((tuple(source), target))
+        return self
+
+    def add_conditional_edges(
+        self,
+        source: str,
+        path: PathCallable,
+        path_map: Mapping[str, str] | Sequence[str] | None = None,
+    ) -> GraphBuilder:
+        """Conditional routing: after ``source`` commits, ``path`` picks targets.
+
+        ``path_map`` is REQUIRED (dict key->node, or list of node names which
+        maps each name to itself). Passing None raises — this engine does not
+        infer destinations from type hints (recorded deviation, fail closed).
+        """
+        if path_map is None:
+            raise GraphCompileError(
+                f"add_conditional_edges({source!r}, ...) requires an explicit "
+                "path_map (dict or list); destination inference from return "
+                "type hints is not supported (fail closed)",
+                graph_id=self.graph_id,
+            )
+        mapping: dict[str, str]
+        if isinstance(path_map, Mapping):
+            mapping = dict(path_map)
+        else:
+            mapping = {name: name for name in path_map}
+        self._branches.append(BranchSpec(source=source, path=path, path_map=mapping))
         return self
 
     def add_channel(
@@ -124,7 +162,9 @@ class GraphBuilder:
         self._channels.append((name, factory))
         return self
 
-    def compile(self, *, allow_orphans: bool = False) -> CompiledGraph:
+    def compile(
+        self, *, allow_orphans: bool = False, allow_cycles: bool = False
+    ) -> CompiledGraph:
         graph_id = self.graph_id
 
         declared: dict[str, Callable[[], Channel[Any]]] = {}
@@ -202,13 +242,85 @@ class GraphBuilder:
             seen_edges.add(key)
             edges.append(edge)
 
-        if not any(edge.source == START for edge in edges):
+        joins: list[tuple[tuple[str, ...], str]] = []
+        for sources_tuple, target in self._join_edges:
+            if len(sources_tuple) < 2:
+                raise GraphCompileError(
+                    f"list-form add_edge({list(sources_tuple)!r}, {target!r}) "
+                    "needs at least two sources; use a plain edge for one",
+                    graph_id=graph_id,
+                )
+            if target in (START, END):
+                raise GraphCompileError(
+                    f"barrier join target must be a node, not {target!r}",
+                    graph_id=graph_id,
+                )
+            for endpoint in (*sources_tuple, target):
+                if endpoint not in nodes:
+                    raise UnknownEdgeEndpointError(
+                        f"join edge {list(sources_tuple)!r} -> {target!r} "
+                        f"references unknown node {endpoint!r}",
+                        graph_id=graph_id,
+                        source="+".join(sources_tuple),
+                        target=target,
+                        endpoint=endpoint,
+                    )
+            if len(set(sources_tuple)) != len(sources_tuple):
+                raise GraphCompileError(
+                    f"join edge {list(sources_tuple)!r} -> {target!r} repeats "
+                    "a source",
+                    graph_id=graph_id,
+                )
+            joins.append((tuple(sorted(sources_tuple)), target))
+
+        branches: dict[str, BranchSpec] = {}
+        for spec in self._branches:
+            if spec.source != START and spec.source not in nodes:
+                raise UnknownEdgeEndpointError(
+                    f"conditional edge source {spec.source!r} is not a node",
+                    graph_id=graph_id,
+                    source=spec.source,
+                    target="",
+                    endpoint=spec.source,
+                )
+            if spec.source in branches:
+                raise GraphCompileError(
+                    f"node {spec.source!r} already has a conditional edge; one "
+                    "branch per source in this slice",
+                    graph_id=graph_id,
+                )
+            for key, dest in spec.path_map.items():
+                if dest != END and dest not in nodes:
+                    raise UnknownEdgeEndpointError(
+                        f"conditional edge on {spec.source!r} maps {key!r} to "
+                        f"unknown node {dest!r}",
+                        graph_id=graph_id,
+                        source=spec.source,
+                        target=dest,
+                        endpoint=dest,
+                    )
+            branches[spec.source] = spec
+
+        if not any(edge.source == START for edge in edges) and START not in branches:
             raise GraphCompileError(
                 f"graph {graph_id!r} has no entry edge from START",
                 graph_id=graph_id,
             )
 
-        canonical_order = self._topological_order(nodes, edges, graph_id)
+        dependency_edges = list(edges)
+        for sources_tuple, target in joins:
+            dependency_edges.extend(
+                EdgeSpec(source=s, target=target) for s in sources_tuple
+            )
+        for source, spec in branches.items():
+            dependency_edges.extend(
+                EdgeSpec(source=source, target=dest)
+                for dest in spec.destinations()
+                if dest != END
+            )
+        canonical_order = self._topological_order(
+            nodes, dependency_edges, graph_id, allow_cycles=allow_cycles
+        )
 
         in_sources: dict[str, list[str]] = {}
         for edge in edges:
@@ -218,10 +330,10 @@ class GraphBuilder:
             sources = in_sources[target]
             if len(sources) > 1:
                 raise FanInNotSupportedError(
-                    f"node {target!r} has {len(sources)} incoming edges from "
-                    f"{sorted(sources)}: ordinary fan-in joins require barrier "
-                    "channels and are not yet supported in this slice (fan-in "
-                    "to END is allowed)",
+                    f"node {target!r} has {len(sources)} plain incoming edges "
+                    f"from {sorted(sources)}: declare an all-of join with "
+                    f"add_edge({sorted(sources)!r}, {target!r}) instead "
+                    "(fan-in to END is allowed)",
                     graph_id=graph_id,
                     target=target,
                     sources=tuple(sorted(sources)),
@@ -229,12 +341,15 @@ class GraphBuilder:
 
         reachable: set[str] = set()
         frontier = [START]
-        successors: dict[str, list[str]] = {}
-        for edge in edges:
-            successors.setdefault(edge.source, []).append(edge.target)
+        walk: dict[str, list[str]] = {}
+        for edge in dependency_edges:
+            walk.setdefault(edge.source, []).append(edge.target)
+        for source, spec in branches.items():
+            if END in spec.path_map.values():
+                walk.setdefault(source, []).append(END)
         while frontier:
             current = frontier.pop()
-            for target in successors.get(current, ()):
+            for target in walk.get(current, ()):
                 if target not in reachable:
                     reachable.add(target)
                     if target != END:
@@ -248,11 +363,34 @@ class GraphBuilder:
                 graph_id=graph_id,
                 node_ids=orphans,
             )
-        if END not in reachable:
+        if END not in reachable and not allow_cycles:
             raise GraphCompileError(
                 f"END is not reachable from START in graph {graph_id!r}",
                 graph_id=graph_id,
             )
+        # Under allow_cycles, a graph may terminate only by exhausting the
+        # superstep_cap (langgraph recursion_limit parity); END need not be
+        # reachable — the iteration budget is the guaranteed terminator.
+
+        successors: dict[str, list[str]] = {}
+        for edge in edges:
+            successors.setdefault(edge.source, []).append(edge.target)
+
+        factories: dict[str, Callable[[], Channel[Any]]] = dict(declared)
+        factories[TASKS_CHANNEL] = TopicChannel
+        triggers: dict[str, list[str]] = {
+            node_id: [trigger_channel(node_id)] for node_id in nodes
+        }
+        join_writes: dict[str, list[tuple[str, str]]] = {}
+        for sources_tuple, target in joins:
+            name = join_channel(sources_tuple, target)
+            members = frozenset(sources_tuple)
+            factories[name] = (
+                lambda m=members: BarrierChannel(m)  # bind per join
+            )
+            triggers[target].append(name)
+            for source in sources_tuple:
+                join_writes.setdefault(source, []).append((name, source))
 
         return CompiledGraph(
             graph_id=graph_id,
@@ -263,15 +401,25 @@ class GraphBuilder:
                 for source, targets in successors.items()
             },
             triggers={
-                node_id: (trigger_channel(node_id),) for node_id in nodes
+                node_id: tuple(chans) for node_id, chans in triggers.items()
             },
-            channel_factories=dict(declared),
+            channel_factories=factories,
             allow_orphans=allow_orphans,
+            allow_cycles=allow_cycles,
+            branches=dict(branches),
+            join_writes={
+                source: tuple(sorted(writes))
+                for source, writes in join_writes.items()
+            },
         )
 
     @staticmethod
     def _topological_order(
-        nodes: dict[str, NodeSpec], edges: list[EdgeSpec], graph_id: str
+        nodes: dict[str, NodeSpec],
+        edges: list[EdgeSpec],
+        graph_id: str,
+        *,
+        allow_cycles: bool = False,
     ) -> tuple[str, ...]:
         in_degree = {node_id: 0 for node_id in nodes}
         internal_successors: dict[str, list[str]] = {}
@@ -293,10 +441,16 @@ class GraphBuilder:
 
         if len(order) != len(nodes):
             leftovers = tuple(sorted(set(nodes) - set(order)))
+            if allow_cycles:
+                # Cyclic: the ready predicate (channel version > versions_seen)
+                # re-fires nodes on its own; canonical scan order falls back to
+                # deterministic node-id sort. Termination is the superstep_cap
+                # iteration budget, required by invoke() under a cyclic graph.
+                return tuple(sorted(nodes))
             raise GraphCycleError(
-                f"cycle detected among nodes {list(leftovers)}: cycles are not "
-                "yet supported in this slice (acyclic-only scheduler; the "
-                "unlock is telos-gated iteration budgets, not a rewrite)",
+                f"cycle detected among nodes {list(leftovers)}: cycles need "
+                "compile(allow_cycles=True) + an explicit superstep_cap "
+                "(the unlock is telos-gated iteration budgets, not a rewrite)",
                 graph_id=graph_id,
                 node_ids=leftovers,
             )

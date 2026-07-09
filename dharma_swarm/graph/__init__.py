@@ -13,13 +13,22 @@ from __future__ import annotations
 
 from dharma_swarm.graph.channels import (
     AppendChannel,
+    BarrierChannel,
+    BarrierMemberError,
     ChannelWriteConflictError,
     LastValueChannel,
+    TopicChannel,
     TriggerChannel,
     UnknownChannelError,
 )
 from dharma_swarm.graph.checkpoint import DispatchCheckpoint, GraphCheckpointStore
 from dharma_swarm.graph.compiler import GraphBuilder, GraphCompileError
+from dharma_swarm.graph.routing import (
+    BranchDestinationError,
+    Command,
+    Send,
+    SendTargetError,
+)
 from dharma_swarm.graph.scheduler import (
     CompiledGraph,
     GraphRuntimeError,
@@ -28,7 +37,13 @@ from dharma_swarm.graph.scheduler import (
     NodeResultError,
     SuperstepLimitError,
 )
-from dharma_swarm.graph.types import END, START, GraphRunEvent, GraphRunResult
+from dharma_swarm.graph.types import (
+    END,
+    START,
+    GraphRunEvent,
+    GraphRunResult,
+    RunCheckpoint,
+)
 from dharma_swarm.graph.durable_invoker import (
     DuplicateDispatchInFlight,
     DurableInvoker,
@@ -50,7 +65,11 @@ from dharma_swarm.graph.telos_bridge import (
 
 __all__ = [
     "AppendChannel",
+    "BarrierChannel",
+    "BarrierMemberError",
+    "BranchDestinationError",
     "ChannelWriteConflictError",
+    "Command",
     "CompiledGraph",
     "DispatchCheckpoint",
     "DuplicateDispatchInFlight",
@@ -62,6 +81,7 @@ __all__ = [
     "GraphCompileError",
     "GraphRunEvent",
     "GraphRunResult",
+    "RunCheckpoint",
     "GraphRuntimeError",
     "GraphTelosBridge",
     "GraphTelosBridgeResult",
@@ -71,9 +91,12 @@ __all__ = [
     "MalformedDispatchOrderError",
     "NodeExecutionError",
     "NodeResultError",
+    "Send",
+    "SendTargetError",
     "SimulatedEffects",
     "START",
     "SuperstepLimitError",
+    "TopicChannel",
     "TriggerChannel",
     "UnknownChannelError",
     "derive_graph_side_effect_key",

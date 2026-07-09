@@ -17,15 +17,18 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Generic, Sequence, TypeVar
+from typing import Any, Generic, Mapping, Sequence, TypeVar
 
 __all__ = [
     "AppendChannel",
+    "BarrierChannel",
+    "BarrierMemberError",
     "Channel",
     "ChannelWrite",
     "ChannelWriteConflictError",
     "EmptyChannelError",
     "LastValueChannel",
+    "TopicChannel",
     "TriggerChannel",
     "UnknownChannelError",
 ]
@@ -37,11 +40,18 @@ V = TypeVar("V")
 
 @dataclass(frozen=True)
 class ChannelWrite:
-    """One node's proposed write to one named channel."""
+    """One task's proposed write to one named channel.
+
+    ``task_seq`` distinguishes multiple tasks of one node in one superstep
+    (0 = trigger-driven PULL task, Slice A behavior; 1..N = Send-driven PUSH
+    tasks). It is part of the canonical commit sort key so same-node task
+    writes never tie — final state stays execution-order-invariant.
+    """
 
     node_id: str
     channel: str
     value: Any
+    task_seq: int = 0
 
 
 class EmptyChannelError(LookupError):
@@ -109,6 +119,16 @@ class Channel(ABC, Generic[V]):
     def is_empty(self) -> bool:
         return self.version == 0
 
+    def checkpoint(self) -> dict[str, Any]:
+        """JSON-serializable STATE of this channel (not ``get()`` — that raises
+        when empty and hides barrier/topic internals). Round-trips through
+        :meth:`restore`. Subclasses add their own payload under ``data``."""
+        return {"version": self.version}
+
+    def restore(self, snapshot: Mapping[str, Any]) -> None:
+        """Rebuild channel state from a :meth:`checkpoint` payload."""
+        self.version = int(snapshot["version"])
+
 
 class LastValueChannel(Channel[Any]):
     """Default channel: at most ONE write per superstep (LastValue parity).
@@ -139,6 +159,13 @@ class LastValueChannel(Channel[Any]):
         if self.is_empty:
             raise EmptyChannelError(self.name or "<unbound>")
         return self._value
+
+    def checkpoint(self) -> dict[str, Any]:
+        return {"version": self.version, "value": self._value}
+
+    def restore(self, snapshot: Mapping[str, Any]) -> None:
+        super().restore(snapshot)
+        self._value = snapshot.get("value")
 
 
 class AppendChannel(Channel[list[Any]]):
@@ -172,13 +199,19 @@ class AppendChannel(Channel[list[Any]]):
             raise EmptyChannelError(self.name or "<unbound>")
         return list(self._items)
 
+    def checkpoint(self) -> dict[str, Any]:
+        return {"version": self.version, "items": list(self._items)}
+
+    def restore(self, snapshot: Mapping[str, Any]) -> None:
+        super().restore(snapshot)
+        self._items = list(snapshot.get("items", []))
+
 
 class TriggerChannel(Channel[bool]):
     """Scheduler-owned barrier channel (``__trigger__:*``): payload-free.
 
-    Any number of same-superstep writes is one activation. The designed
-    upgrade path for Send-style fanout is a payload-carrying Topic variant
-    of this class — :class:`ChannelWrite` already carries a value.
+    Any number of same-superstep writes is one activation. Send-style
+    fanout payloads ride :class:`TopicChannel` instead.
     """
 
     def validate(self, writes: Sequence[ChannelWrite], superstep: int) -> None:
@@ -194,3 +227,120 @@ class TriggerChannel(Channel[bool]):
         if self.is_empty:
             raise EmptyChannelError(self.name or "<unbound>")
         return True
+
+
+class BarrierMemberError(RuntimeError):
+    """A barrier channel received a write from a node outside its member set.
+
+    langgraph parity: ``NamedBarrierValue.update`` raises ``InvalidUpdateError``
+    for a value not in ``names`` (fail closed on stray writers).
+    """
+
+    def __init__(self, channel: str, superstep: int, writer: str, names: frozenset[str]) -> None:
+        self.channel = channel
+        self.superstep = superstep
+        self.writer = writer
+        self.names = names
+        super().__init__(
+            f"barrier channel {channel!r} received a write of {writer!r} in "
+            f"superstep {superstep}, which is not in its member set "
+            f"{sorted(names)} (fail closed)"
+        )
+
+
+class BarrierChannel(Channel[bool]):
+    """All-of join channel (langgraph ``NamedBarrierValue`` parity).
+
+    Each member source commits its OWN node name as the write value. The
+    version advances ONLY when every member has been seen (then the seen-set
+    resets — the barrier re-arms, matching langgraph ``consume()``). A commit
+    group containing only already-seen members does not bump the version.
+
+    Recorded deviation: langgraph bumps the join channel's version on every
+    new member; advance-at-completion is scheduling-equivalent for our ready
+    predicate (which has no ``is_available``) but differs in version-space.
+    """
+
+    def __init__(self, names: frozenset[str]) -> None:
+        super().__init__()
+        self.names = frozenset(names)
+        self._seen: set[str] = set()
+
+    def validate(self, writes: Sequence[ChannelWrite], superstep: int) -> None:
+        for write in writes:
+            if write.value not in self.names:
+                raise BarrierMemberError(
+                    write.channel, superstep, str(write.value), self.names
+                )
+
+    def commit(self, writes: Sequence[ChannelWrite], superstep: int) -> bool:
+        if not writes:
+            return False
+        for write in writes:
+            self._seen.add(write.value)
+        if self._seen == self.names:
+            self._seen = set()
+            self.version += 1
+            return True
+        return False
+
+    @property
+    def seen(self) -> frozenset[str]:
+        return frozenset(self._seen)
+
+    def get(self) -> bool:
+        if self.is_empty:
+            raise EmptyChannelError(self.name or "<unbound>")
+        return True
+
+    def checkpoint(self) -> dict[str, Any]:
+        return {"version": self.version, "seen": sorted(self._seen)}
+
+    def restore(self, snapshot: Mapping[str, Any]) -> None:
+        super().restore(snapshot)
+        self._seen = set(snapshot.get("seen", []))
+
+
+class TopicChannel(Channel[list[Any]]):
+    """Accumulating pub-sub channel (langgraph ``Topic`` parity, non-persistent).
+
+    Backs the scheduler-owned ``__tasks__`` channel carrying Send packets:
+    list values extend, scalars append; the version bumps once per non-empty
+    commit; :meth:`drain` returns-and-clears (the scheduler drains at task
+    preparation, so pending Sends live exactly one barrier).
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._items: list[Any] = []
+
+    def validate(self, writes: Sequence[ChannelWrite], superstep: int) -> None:
+        return None
+
+    def commit(self, writes: Sequence[ChannelWrite], superstep: int) -> bool:
+        if not writes:
+            return False
+        for write in writes:
+            if isinstance(write.value, list):
+                self._items.extend(write.value)
+            else:
+                self._items.append(write.value)
+        self.version += 1
+        return True
+
+    def drain(self) -> list[Any]:
+        items = self._items
+        self._items = []
+        return items
+
+    def get(self) -> list[Any]:
+        if self.is_empty:
+            raise EmptyChannelError(self.name or "<unbound>")
+        return list(self._items)
+
+    def checkpoint(self) -> dict[str, Any]:
+        return {"version": self.version, "items": list(self._items)}
+
+    def restore(self, snapshot: Mapping[str, Any]) -> None:
+        super().restore(snapshot)
+        self._items = list(snapshot.get("items", []))

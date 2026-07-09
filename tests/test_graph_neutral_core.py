@@ -216,7 +216,7 @@ def test_compile_cycle_rejected():
         .add_edge("a", "b")
         .add_edge("b", "a")
     )
-    with pytest.raises(GraphCycleError, match="not yet supported") as exc_info:
+    with pytest.raises(GraphCycleError, match="allow_cycles=True") as exc_info:
         builder.compile()
     assert exc_info.value.node_ids == ("a", "b")
 
