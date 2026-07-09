@@ -1,39 +1,30 @@
-"""Acyclic BSP superstep scheduler over versioned channels (Candidate Slice A).
+"""BSP superstep scheduler over versioned channels (Candidate Slices A–C).
 
-State-integrated runtime: execution is DRIVEN by channel versions, not by a
-static loop over nodes. A node is ready iff one of its trigger channels has
-a version greater than what that node has seen (``versions_seen``); the run
-halts when nothing advances. Removing the compiler's acyclic guard (and
-giving ``superstep_cap`` a telos-gated budget) is the designed path to legal
-cycles — the ready predicate already re-fires nodes on version advance, so
-that unlock is a scheduling-predicate change, not a rewrite.
+State-integrated runtime: execution is DRIVEN by channel versions. A node is
+ready iff a trigger channel's version exceeds what it has seen
+(``versions_seen``); the run halts when nothing advances. Cycles are legal
+under ``compile(allow_cycles=True)`` + an explicit ``superstep_cap`` — the
+ready predicate re-fires nodes on its own, so the unlock is a scheduling
+change, not a rewrite.
 
-Superstep protocol (all-or-nothing): every ready node executes against a
-deep-copied snapshot of committed state; its return value is a write
-PROPOSAL; proposals buffer and commit only at the barrier, in canonical
-``(channel, node_id)`` order, behind GraphState's validate-all-then-commit
-two-phase apply. Final state is therefore execution-order-invariant while
-execution order itself is ``effects.dispatch_order``-driven and
+Superstep protocol (all-or-nothing): PULL (trigger) and PUSH (Send) tasks
+run against deep-copied inputs; returns are write PROPOSALS buffered and
+committed only at the barrier, in canonical ``(channel, node_id, task_seq)``
+order behind GraphState's validate-all-then-commit apply. Final state is
+execution-order-invariant; execution order is ``effects.dispatch_order``,
 seed-deterministic under ``SimulatedEffects``.
 
-Effect-call budget (part of the replay contract): exactly one
-``effects.dispatch_order`` call per non-empty superstep — over the full
-task-identity list ``(node_id, task_seq)``, PULL and PUSH together — and
-none on halt; one ``effects.random()`` draw ONLY when minting a default
-``graph_run_id``; the scheduler never calls ``effects.now()`` (events carry
-no timestamps — the checkpoint sink stamps its own wall clock, which stays
-out of digests). Branch paths and Command handling are pure: they never
-touch effects.
+Effect-call budget (replay contract): exactly one ``dispatch_order`` call
+per non-empty superstep over the full task-identity list, none on halt; one
+``random()`` draw only to mint a default ``graph_run_id``; never ``now()``.
+Branch paths and Command handling are pure.
 
 Failure doctrine: fail closed by RAISING typed errors — a failed superstep
-commits nothing, checkpoints nothing, and returns no result. Named seams
-for later phases (not built here): ``_writes_from_result`` (Command),
-``_trigger_writes`` (conditional edges / Send), ``superstep_cap`` (cycle
-iteration budget), :class:`TriggerChannel` -> Topic (fanout payloads).
+commits nothing, checkpoints nothing, returns no result. ``resume_from`` /
+``on_checkpoint`` add crash-resume and fork; the resume integrity contract
+is digest equality at the join point, never event-stream identity.
 
-claim_mode: candidate / test_only. Not wired into production dispatch; node
-callables are pure/internal state transforms — side effects are not proven
-safe here (no durable invoker, no receipts, no telos anchoring).
+claim_mode: candidate / test_only. Not wired into production dispatch.
 """
 
 from __future__ import annotations
@@ -65,8 +56,9 @@ from dharma_swarm.graph.routing import (
     BranchSpec,
     Command,
     Send,
-    SendTargetError,
     evaluate_branch,
+    interpret_result,
+    send_write,
 )
 from dharma_swarm.graph.state import GraphState
 from dharma_swarm.graph.types import (
@@ -77,6 +69,7 @@ from dharma_swarm.graph.types import (
     GraphRunEvent,
     GraphRunResult,
     NodeSpec,
+    RunCheckpoint,
     trigger_channel,
 )
 
@@ -127,6 +120,7 @@ class CompiledGraph:
     triggers: Mapping[str, tuple[str, ...]]
     channel_factories: Mapping[str, Callable[[], Channel[Any]]]
     allow_orphans: bool = False
+    allow_cycles: bool = False
     branches: Mapping[str, BranchSpec] = field(default_factory=dict)
     join_writes: Mapping[str, tuple[tuple[str, str], ...]] = field(
         default_factory=dict
@@ -140,6 +134,8 @@ class CompiledGraph:
         checkpoint_store: CheckpointSink | None = None,
         graph_run_id: str | None = None,
         superstep_cap: int | None = None,
+        resume_from: RunCheckpoint | None = None,
+        on_checkpoint: Callable[[RunCheckpoint], None] | None = None,
     ) -> GraphRunResult:
         """Run the graph from START to quiescence and return the committed result.
 
@@ -147,11 +143,18 @@ class CompiledGraph:
         ``checkpoint_store``'s ``run_id`` is adopted; else one id is minted
         from ``effects.random()`` (never uuid4 — same seed, same id, so
         seeded traces replay byte-identically).
+
+        ``resume_from`` rebuilds channel state + versions_seen from a
+        :class:`RunCheckpoint` and continues from ``superstep + 1`` (fork = a
+        checkpoint copied under a new run id). ``on_checkpoint`` receives a
+        RunCheckpoint after every committed superstep (0 included).
         """
         active_effects: EffectsProvider = (
             effects if effects is not None else LiveEffects()
         )
         run_id = graph_run_id
+        if run_id is None and resume_from is not None:
+            run_id = resume_from.graph_run_id
         if run_id is None and checkpoint_store is not None:
             run_id = checkpoint_store.run_id
         if run_id is None:
@@ -161,38 +164,73 @@ class CompiledGraph:
                 f"checkpoint_store.run_id {checkpoint_store.run_id!r} does not "
                 f"match graph_run_id {run_id!r}; refusing to run (fail closed)"
             )
+        if self.allow_cycles and superstep_cap is None:
+            raise ValueError(
+                "a cyclic graph (allow_cycles=True) requires an explicit "
+                "superstep_cap — the iteration budget IS the termination "
+                "guarantee (fail closed)"
+            )
         cap = superstep_cap if superstep_cap is not None else len(self.nodes) + 2
 
         state = GraphState(self.channel_factories)
         versions_seen: dict[str, dict[str, int]] = {n: {} for n in self.nodes}
         events: list[GraphRunEvent] = []
 
-        seed_input = self._validated_seed(input, run_id)
-        seed_writes = [
-            ChannelWrite(START, name, value)
-            for name, value in sorted(seed_input.items())
-        ]
-        routing_writes = self._trigger_writes(START)
-        if START in self.branches:
-            state.apply_writes(seed_writes, 0)
-            view = state.snapshot()
-            routing_writes.extend(
-                self._branch_writes(START, 0, view, run_id, 0)
+        def _emit_checkpoint(step: int, current_digest: str) -> None:
+            if on_checkpoint is None:
+                return
+            on_checkpoint(
+                RunCheckpoint(
+                    graph_run_id=run_id,
+                    graph_id=self.graph_id,
+                    superstep=step,
+                    state_digest=current_digest,
+                    channels=state.checkpoint_channels(),
+                    versions_seen={n: dict(v) for n, v in versions_seen.items()},
+                )
             )
-            state.apply_writes(routing_writes, 0)
-        else:
-            state.apply_writes(seed_writes + routing_writes, 0)
-        digest = state.digest()
-        events.append(
-            GraphRunEvent(run_id, self.graph_id, START, 0, "ok", digest)
-        )
-        if checkpoint_store is not None:
-            checkpoint_store.checkpoint(
-                superstep=0, node_id=START, state_ref=digest
-            )
-        committed = 0
 
-        superstep = 0
+        if resume_from is not None:
+            state.restore_channels(resume_from.channels)
+            versions_seen = {
+                n: dict(resume_from.versions_seen.get(n, {})) for n in self.nodes
+            }
+            digest = state.digest()
+            if digest != resume_from.state_digest:
+                raise ValueError(
+                    f"resume integrity check failed: rebuilt digest {digest} != "
+                    f"checkpoint state_ref {resume_from.state_digest} (fail closed)"
+                )
+            committed = resume_from.superstep
+            superstep = resume_from.superstep
+        else:
+            seed_input = self._validated_seed(input, run_id)
+            seed_writes = [
+                ChannelWrite(START, name, value)
+                for name, value in sorted(seed_input.items())
+            ]
+            routing_writes = self._trigger_writes(START)
+            if START in self.branches:
+                state.apply_writes(seed_writes, 0)
+                view = state.snapshot()
+                routing_writes.extend(
+                    self._branch_writes(START, 0, view, run_id, 0)
+                )
+                state.apply_writes(routing_writes, 0)
+            else:
+                state.apply_writes(seed_writes + routing_writes, 0)
+            digest = state.digest()
+            events.append(
+                GraphRunEvent(run_id, self.graph_id, START, 0, "ok", digest)
+            )
+            if checkpoint_store is not None:
+                checkpoint_store.checkpoint(
+                    superstep=0, node_id=START, state_ref=digest
+                )
+            committed = 0
+            superstep = 0
+            _emit_checkpoint(0, digest)
+
         while True:
             superstep += 1
             start_versions = state.versions
@@ -268,6 +306,7 @@ class CompiledGraph:
                     state_ref=digest,
                 )
             committed = superstep
+            _emit_checkpoint(superstep, digest)
 
         return GraphRunResult(
             graph_run_id=run_id,
@@ -357,67 +396,14 @@ class CompiledGraph:
         superstep: int,
         task_seq: int,
     ) -> list[ChannelWrite]:
-        if result is None:
-            return []
-        if isinstance(result, Command):
-            writes: list[ChannelWrite] = []
-            if result.update is not None:
-                writes.extend(
-                    self._mapping_writes(
-                        node_id, result.update, run_id, superstep, task_seq
-                    )
-                )
-            for target in result.goto_items():
-                if isinstance(target, Send):
-                    writes.append(self._send_write(node_id, target, task_seq))
-                elif target == END:
-                    continue  # langgraph parity: goto=END silently skipped
-                elif target in self.nodes:
-                    writes.append(
-                        ChannelWrite(
-                            node_id, trigger_channel(target), True, task_seq
-                        )
-                    )
-                else:
-                    raise SendTargetError(
-                        str(target),
-                        f"Command.goto from {node_id!r} references unknown "
-                        f"node {target!r} (fail closed; langgraph WARN-drops)",
-                    )
-            return writes
-        if not isinstance(result, Mapping):
-            raise NodeResultError(
-                f"node {node_id!r} returned {type(result).__name__!r} in "
-                f"superstep {superstep}; nodes must return a Mapping of "
-                "channel writes, a Command, or None (fail closed)",
-                graph_run_id=run_id,
-                superstep=superstep,
-                node_id=node_id,
-            )
-        return self._mapping_writes(node_id, result, run_id, superstep, task_seq)
-
-    def _mapping_writes(
-        self,
-        node_id: str,
-        mapping: Mapping[str, Any],
-        run_id: str,
-        superstep: int,
-        task_seq: int,
-    ) -> list[ChannelWrite]:
-        writes: list[ChannelWrite] = []
-        for key in mapping:
-            if not isinstance(key, str):
-                raise NodeResultError(
-                    f"node {node_id!r} returned non-string channel key "
-                    f"{key!r} in superstep {superstep}",
-                    graph_run_id=run_id,
-                    superstep=superstep,
-                    node_id=node_id,
-                )
-            if key.startswith(RESERVED_PREFIX):
-                raise UnknownChannelError(key, node_id=node_id, reason="reserved")
-            writes.append(ChannelWrite(node_id, key, mapping[key], task_seq))
-        return writes
+        return interpret_result(
+            node_id,
+            result,
+            run_id=run_id,
+            superstep=superstep,
+            task_seq=task_seq,
+            known_nodes=self.nodes,
+        )
 
     def _trigger_writes(self, node_id: str, task_seq: int = 0) -> list[ChannelWrite]:
         """Static routing: plain-edge triggers + this node's barrier-join writes."""
@@ -445,7 +431,9 @@ class CompiledGraph:
         writes: list[ChannelWrite] = []
         for destination in evaluate_branch(spec, view):
             if isinstance(destination, Send):
-                writes.append(self._send_write(node_id, destination, task_seq))
+                writes.append(
+                    send_write(node_id, destination, task_seq, self.nodes)
+                )
             elif destination == END:
                 continue
             else:
@@ -455,18 +443,6 @@ class CompiledGraph:
                     )
                 )
         return writes
-
-    def _send_write(
-        self, origin: str, send: Send, task_seq: int
-    ) -> ChannelWrite:
-        if send.node not in self.nodes:
-            raise SendTargetError(
-                send.node,
-                f"Send from {origin!r} targets unknown node {send.node!r} "
-                "(fail closed; langgraph WARN-drops)",
-            )
-        packet = Send(send.node, copy.deepcopy(send.arg))
-        return ChannelWrite(origin, TASKS_CHANNEL, packet, task_seq)
 
     def _validated_dispatch_order(
         self,

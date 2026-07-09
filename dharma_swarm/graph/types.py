@@ -26,6 +26,7 @@ __all__ = [
     "NodeCallable",
     "NodeSpec",
     "RESERVED_PREFIX",
+    "RunCheckpoint",
     "RunStatus",
     "START",
     "TASKS_CHANNEL",
@@ -104,3 +105,35 @@ class GraphRunResult:
     state_digest: str
     supersteps: int
     events: tuple[GraphRunEvent, ...]
+
+
+@dataclass(frozen=True)
+class RunCheckpoint:
+    """A resumable snapshot of a run at one committed superstep.
+
+    JSON-serializable (channel payloads + versions_seen), so the same object
+    resumes in-process or after a persist/reload. Resume rebuilds the exact
+    channel state and continues from ``superstep + 1``; the integrity contract
+    is digest equality — ``state_digest`` must equal the rebuilt state's digest
+    — never event-stream identity (the effects call-cursor is positional and
+    a resumed run mints a fresh cursor).
+    """
+
+    graph_run_id: str
+    graph_id: str
+    superstep: int
+    state_digest: str
+    channels: Mapping[str, Mapping[str, Any]]
+    versions_seen: Mapping[str, Mapping[str, int]]
+
+    def fork(self, new_run_id: str) -> RunCheckpoint:
+        """A copy under a NEW run id — the only safe fork (in-place fork would
+        interleave divergent histories in one checkpoint log)."""
+        return RunCheckpoint(
+            graph_run_id=new_run_id,
+            graph_id=self.graph_id,
+            superstep=self.superstep,
+            state_digest=self.state_digest,
+            channels=self.channels,
+            versions_seen=self.versions_seen,
+        )

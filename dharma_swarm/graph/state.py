@@ -23,7 +23,8 @@ from dharma_swarm.graph.channels import (
     TriggerChannel,
     UnknownChannelError,
 )
-from dharma_swarm.graph.types import RESERVED_PREFIX, TRIGGER_PREFIX
+from dharma_swarm.graph.routing import Send
+from dharma_swarm.graph.types import RESERVED_PREFIX, TASKS_CHANNEL, TRIGGER_PREFIX
 
 __all__ = ["GraphState", "state_digest"]
 
@@ -142,6 +143,27 @@ class GraphState:
 
     def digest(self) -> str:
         return state_digest(self.snapshot())
+
+    def checkpoint_channels(self) -> dict[str, dict[str, Any]]:
+        """Per-channel STATE for resume/fork (Send packets serialized)."""
+        out: dict[str, dict[str, Any]] = {}
+        for name, channel in self._channels.items():
+            snap = channel.checkpoint()
+            if name == TASKS_CHANNEL and "items" in snap:
+                snap = {**snap, "items": [s.to_dict() for s in snap["items"]]}
+            out[name] = snap
+        return out
+
+    def restore_channels(self, snapshots: Mapping[str, Mapping[str, Any]]) -> None:
+        """Rebuild every channel from :meth:`checkpoint_channels` output."""
+        for name, snap in snapshots.items():
+            channel = self.channel(name)
+            if name == TASKS_CHANNEL and "items" in snap:
+                snap = {
+                    **snap,
+                    "items": [Send.from_dict(d) for d in snap["items"]],
+                }
+            channel.restore(snap)
 
     def own_writes_view(
         self, writes: Sequence[ChannelWrite], superstep: int

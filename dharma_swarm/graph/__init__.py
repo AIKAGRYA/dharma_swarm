@@ -37,7 +37,13 @@ from dharma_swarm.graph.scheduler import (
     NodeResultError,
     SuperstepLimitError,
 )
-from dharma_swarm.graph.types import END, START, GraphRunEvent, GraphRunResult
+from dharma_swarm.graph.types import (
+    END,
+    START,
+    GraphRunEvent,
+    GraphRunResult,
+    RunCheckpoint,
+)
 from dharma_swarm.graph.durable_invoker import (
     DuplicateDispatchInFlight,
     DurableInvoker,
@@ -75,6 +81,7 @@ __all__ = [
     "GraphCompileError",
     "GraphRunEvent",
     "GraphRunResult",
+    "RunCheckpoint",
     "GraphRuntimeError",
     "GraphTelosBridge",
     "GraphTelosBridgeResult",

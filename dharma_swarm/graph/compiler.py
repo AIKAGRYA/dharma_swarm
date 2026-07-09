@@ -162,7 +162,9 @@ class GraphBuilder:
         self._channels.append((name, factory))
         return self
 
-    def compile(self, *, allow_orphans: bool = False) -> CompiledGraph:
+    def compile(
+        self, *, allow_orphans: bool = False, allow_cycles: bool = False
+    ) -> CompiledGraph:
         graph_id = self.graph_id
 
         declared: dict[str, Callable[[], Channel[Any]]] = {}
@@ -317,7 +319,7 @@ class GraphBuilder:
                 if dest != END
             )
         canonical_order = self._topological_order(
-            nodes, dependency_edges, graph_id
+            nodes, dependency_edges, graph_id, allow_cycles=allow_cycles
         )
 
         in_sources: dict[str, list[str]] = {}
@@ -361,11 +363,14 @@ class GraphBuilder:
                 graph_id=graph_id,
                 node_ids=orphans,
             )
-        if END not in reachable:
+        if END not in reachable and not allow_cycles:
             raise GraphCompileError(
                 f"END is not reachable from START in graph {graph_id!r}",
                 graph_id=graph_id,
             )
+        # Under allow_cycles, a graph may terminate only by exhausting the
+        # superstep_cap (langgraph recursion_limit parity); END need not be
+        # reachable — the iteration budget is the guaranteed terminator.
 
         successors: dict[str, list[str]] = {}
         for edge in edges:
@@ -400,6 +405,7 @@ class GraphBuilder:
             },
             channel_factories=factories,
             allow_orphans=allow_orphans,
+            allow_cycles=allow_cycles,
             branches=dict(branches),
             join_writes={
                 source: tuple(sorted(writes))
@@ -409,7 +415,11 @@ class GraphBuilder:
 
     @staticmethod
     def _topological_order(
-        nodes: dict[str, NodeSpec], edges: list[EdgeSpec], graph_id: str
+        nodes: dict[str, NodeSpec],
+        edges: list[EdgeSpec],
+        graph_id: str,
+        *,
+        allow_cycles: bool = False,
     ) -> tuple[str, ...]:
         in_degree = {node_id: 0 for node_id in nodes}
         internal_successors: dict[str, list[str]] = {}
@@ -431,10 +441,16 @@ class GraphBuilder:
 
         if len(order) != len(nodes):
             leftovers = tuple(sorted(set(nodes) - set(order)))
+            if allow_cycles:
+                # Cyclic: the ready predicate (channel version > versions_seen)
+                # re-fires nodes on its own; canonical scan order falls back to
+                # deterministic node-id sort. Termination is the superstep_cap
+                # iteration budget, required by invoke() under a cyclic graph.
+                return tuple(sorted(nodes))
             raise GraphCycleError(
-                f"cycle detected among nodes {list(leftovers)}: cycles are not "
-                "yet supported in this slice (acyclic-only scheduler; the "
-                "unlock is telos-gated iteration budgets, not a rewrite)",
+                f"cycle detected among nodes {list(leftovers)}: cycles need "
+                "compile(allow_cycles=True) + an explicit superstep_cap "
+                "(the unlock is telos-gated iteration budgets, not a rewrite)",
                 graph_id=graph_id,
                 node_ids=leftovers,
             )

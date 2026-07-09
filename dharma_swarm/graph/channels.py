@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Generic, Sequence, TypeVar
+from typing import Any, Generic, Mapping, Sequence, TypeVar
 
 __all__ = [
     "AppendChannel",
@@ -119,6 +119,16 @@ class Channel(ABC, Generic[V]):
     def is_empty(self) -> bool:
         return self.version == 0
 
+    def checkpoint(self) -> dict[str, Any]:
+        """JSON-serializable STATE of this channel (not ``get()`` — that raises
+        when empty and hides barrier/topic internals). Round-trips through
+        :meth:`restore`. Subclasses add their own payload under ``data``."""
+        return {"version": self.version}
+
+    def restore(self, snapshot: Mapping[str, Any]) -> None:
+        """Rebuild channel state from a :meth:`checkpoint` payload."""
+        self.version = int(snapshot["version"])
+
 
 class LastValueChannel(Channel[Any]):
     """Default channel: at most ONE write per superstep (LastValue parity).
@@ -149,6 +159,13 @@ class LastValueChannel(Channel[Any]):
         if self.is_empty:
             raise EmptyChannelError(self.name or "<unbound>")
         return self._value
+
+    def checkpoint(self) -> dict[str, Any]:
+        return {"version": self.version, "value": self._value}
+
+    def restore(self, snapshot: Mapping[str, Any]) -> None:
+        super().restore(snapshot)
+        self._value = snapshot.get("value")
 
 
 class AppendChannel(Channel[list[Any]]):
@@ -181,6 +198,13 @@ class AppendChannel(Channel[list[Any]]):
         if self.is_empty:
             raise EmptyChannelError(self.name or "<unbound>")
         return list(self._items)
+
+    def checkpoint(self) -> dict[str, Any]:
+        return {"version": self.version, "items": list(self._items)}
+
+    def restore(self, snapshot: Mapping[str, Any]) -> None:
+        super().restore(snapshot)
+        self._items = list(snapshot.get("items", []))
 
 
 class TriggerChannel(Channel[bool]):
@@ -269,6 +293,13 @@ class BarrierChannel(Channel[bool]):
             raise EmptyChannelError(self.name or "<unbound>")
         return True
 
+    def checkpoint(self) -> dict[str, Any]:
+        return {"version": self.version, "seen": sorted(self._seen)}
+
+    def restore(self, snapshot: Mapping[str, Any]) -> None:
+        super().restore(snapshot)
+        self._seen = set(snapshot.get("seen", []))
+
 
 class TopicChannel(Channel[list[Any]]):
     """Accumulating pub-sub channel (langgraph ``Topic`` parity, non-persistent).
@@ -306,3 +337,10 @@ class TopicChannel(Channel[list[Any]]):
         if self.is_empty:
             raise EmptyChannelError(self.name or "<unbound>")
         return list(self._items)
+
+    def checkpoint(self) -> dict[str, Any]:
+        return {"version": self.version, "items": list(self._items)}
+
+    def restore(self, snapshot: Mapping[str, Any]) -> None:
+        super().restore(snapshot)
+        self._items = list(snapshot.get("items", []))

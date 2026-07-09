@@ -26,7 +26,15 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Callable, Mapping, Sequence
 
-from dharma_swarm.graph.types import END, START
+from dharma_swarm.graph.channels import ChannelWrite, UnknownChannelError
+from dharma_swarm.graph.errors import NodeResultError
+from dharma_swarm.graph.types import (
+    END,
+    RESERVED_PREFIX,
+    START,
+    TASKS_CHANNEL,
+    trigger_channel,
+)
 
 __all__ = [
     "BranchDestinationError",
@@ -35,6 +43,7 @@ __all__ = [
     "Send",
     "SendTargetError",
     "evaluate_branch",
+    "interpret_result",
     "join_channel",
 ]
 
@@ -73,6 +82,13 @@ class Send:
     node: str
     arg: Any
 
+    def to_dict(self) -> dict[str, Any]:
+        return {"node": self.node, "arg": self.arg}
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> Send:
+        return cls(node=str(data["node"]), arg=data.get("arg"))
+
 
 @dataclass(frozen=True)
 class Command:
@@ -109,6 +125,99 @@ class BranchSpec:
 def join_channel(sources: Sequence[str], target: str) -> str:
     """Reserved name for the all-of join channel of a list-form edge."""
     return f"__join__:{'+'.join(sorted(sources))}:{target}"
+
+
+def send_write(
+    origin: str, send: Send, task_seq: int, known_nodes: Mapping[str, Any]
+) -> ChannelWrite:
+    """A Send packet as a write to the task channel (arg deep-copied at store)."""
+    import copy
+
+    if send.node not in known_nodes:
+        raise SendTargetError(
+            send.node,
+            f"Send from {origin!r} targets unknown node {send.node!r} "
+            "(fail closed; langgraph WARN-drops)",
+        )
+    return ChannelWrite(
+        origin, TASKS_CHANNEL, Send(send.node, copy.deepcopy(send.arg)), task_seq
+    )
+
+
+def interpret_result(
+    node_id: str,
+    result: Mapping[str, Any] | Command | None,
+    *,
+    run_id: str,
+    superstep: int,
+    task_seq: int,
+    known_nodes: Mapping[str, Any],
+) -> list[ChannelWrite]:
+    """Turn a node return (Mapping / Command / None) into channel writes.
+
+    Command.goto is ADDITIVE to static routing (langgraph parity); goto=END is
+    silently skipped; reserved/non-string keys and unknown goto targets fail
+    closed.
+    """
+    if result is None:
+        return []
+    writes: list[ChannelWrite] = []
+    if isinstance(result, Command):
+        if result.update is not None:
+            writes.extend(
+                _mapping_writes(
+                    node_id, result.update, run_id, superstep, task_seq
+                )
+            )
+        for target in result.goto_items():
+            if isinstance(target, Send):
+                writes.append(send_write(node_id, target, task_seq, known_nodes))
+            elif target == END:
+                continue
+            elif target in known_nodes:
+                writes.append(
+                    ChannelWrite(node_id, trigger_channel(target), True, task_seq)
+                )
+            else:
+                raise SendTargetError(
+                    str(target),
+                    f"Command.goto from {node_id!r} references unknown node "
+                    f"{target!r} (fail closed; langgraph WARN-drops)",
+                )
+        return writes
+    if not isinstance(result, Mapping):
+        raise NodeResultError(
+            f"node {node_id!r} returned {type(result).__name__!r} in superstep "
+            f"{superstep}; nodes must return a Mapping, a Command, or None "
+            "(fail closed)",
+            graph_run_id=run_id,
+            superstep=superstep,
+            node_id=node_id,
+        )
+    return _mapping_writes(node_id, result, run_id, superstep, task_seq)
+
+
+def _mapping_writes(
+    node_id: str,
+    mapping: Mapping[str, Any],
+    run_id: str,
+    superstep: int,
+    task_seq: int,
+) -> list[ChannelWrite]:
+    writes: list[ChannelWrite] = []
+    for key in mapping:
+        if not isinstance(key, str):
+            raise NodeResultError(
+                f"node {node_id!r} returned non-string channel key {key!r} in "
+                f"superstep {superstep}",
+                graph_run_id=run_id,
+                superstep=superstep,
+                node_id=node_id,
+            )
+        if key.startswith(RESERVED_PREFIX):
+            raise UnknownChannelError(key, node_id=node_id, reason="reserved")
+        writes.append(ChannelWrite(node_id, key, mapping[key], task_seq))
+    return writes
 
 
 def evaluate_branch(

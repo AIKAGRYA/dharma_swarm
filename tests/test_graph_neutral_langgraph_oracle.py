@@ -368,3 +368,74 @@ async def test_command_update_and_goto_parity():
     dharma = await compiled.invoke(input={"mark": []}, effects=SimulatedEffects(42))
     assert dharma.state["x"] == lg_final["x"] == 5
     assert dharma.state["mark"] == lg_final["mark"] == ["b"]
+
+
+# ---------------------------------------------------------------------------
+# Slice C differential: cyclic recursion-limit parity
+# ---------------------------------------------------------------------------
+
+from langgraph.errors import GraphRecursionError  # noqa: E402
+
+from dharma_swarm.graph.scheduler import SuperstepLimitError  # noqa: E402
+
+
+class _LoopState(TypedDict, total=False):
+    count: int
+
+
+async def test_recursion_limit_both_engines_cap_cyclic_runs():
+    """Both engines cap an unbounded cycle; both raise their limit error."""
+
+    def lg_inc(state):
+        return {"count": state.get("count", 0) + 1}
+
+    graph = StateGraph(_LoopState)
+    graph.add_node("a", lg_inc)
+    graph.add_edge(LG_START, "a")
+    graph.add_conditional_edges("a", lambda state: "a", {"a": "a"})
+    app = graph.compile()
+    with pytest.raises(GraphRecursionError):
+        app.invoke({"count": 0}, {"recursion_limit": 5})
+
+    def inc(state):
+        return {"count": state.get("count", 0) + 1}
+
+    compiled = (
+        GraphBuilder("loop")
+        .add_channel("count", LastValueChannel)
+        .add_node("a", inc)
+        .add_edge(START, "a")
+        .add_conditional_edges("a", lambda view: "a", {"a": "a"})
+        .compile(allow_cycles=True)
+    )
+    with pytest.raises(SuperstepLimitError):
+        await compiled.invoke(effects=SimulatedEffects(42), superstep_cap=5)
+
+
+async def test_bounded_cycle_reaches_condition_no_error():
+    """A cycle that self-terminates before the cap completes on both engines."""
+
+    def lg_inc(state):
+        return {"count": state.get("count", 0) + 1}
+
+    graph = StateGraph(_LoopState)
+    graph.add_node("a", lg_inc)
+    graph.add_edge(LG_START, "a")
+    graph.add_conditional_edges(
+        "a", lambda s: END if s["count"] >= 3 else "a", {"a": "a", END: END}
+    )
+    lg_final = graph.compile().invoke({"count": 0}, {"recursion_limit": 25})
+
+    def route(view):
+        return "stop" if view.get("count", 0) >= 3 else "loop"
+
+    compiled = (
+        GraphBuilder("bounded")
+        .add_channel("count", LastValueChannel)
+        .add_node("a", lambda s: {"count": s.get("count", 0) + 1})
+        .add_edge(START, "a")
+        .add_conditional_edges("a", route, {"loop": "a", "stop": END})
+        .compile(allow_cycles=True)
+    )
+    dharma = await compiled.invoke(effects=SimulatedEffects(42), superstep_cap=25)
+    assert dharma.state["count"] == lg_final["count"] == 3
