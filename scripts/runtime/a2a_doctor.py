@@ -57,7 +57,7 @@ _PROBE_SUBJECT_BY_LANE = {
     "hermes": "dharma.a2a.hermes",
     "hermes-m5": "dharma.a2a.hermes",
     "perplexity": "dharma.a2a.perplexity",
-    "perplexity-computer": "dharma.a2a.perplexity",
+    "perplexity-computer": "dharma.a2a.perplexity-computer",
     "fleet": "dharma.a2a.fleet",
     "fable_5_cursor": "dharma.a2a.fable_5_cursor",
     "fable_composer": "dharma.a2a.fable_composer",
