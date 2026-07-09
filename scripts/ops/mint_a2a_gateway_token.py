@@ -7,7 +7,15 @@ to the gateway's token file. Plaintext is never stored.
 
 Usage (on the gateway host):
     python3 scripts/ops/mint_a2a_gateway_token.py <agent_uid>
+    python3 scripts/ops/mint_a2a_gateway_token.py <agent_uid> --callsign <cs>
     python3 scripts/ops/mint_a2a_gateway_token.py <agent_uid> --revoke   # remove all tokens for uid
+
+--callsign records the LEGACY fleet callsign when it differs from the uid
+(e.g. uid devin-roaming-2987d222, callsign devin) so the gateway drains the
+dharma.a2a.<callsign> subject the live fleet actually sends to.
+
+The running gateway re-reads this file on mtime change, so mint/revoke take
+effect without a restart.
 """
 from __future__ import annotations
 
@@ -50,10 +58,22 @@ def main(argv: list[str]) -> int:
         print(f"revoked {before - len(data['tokens'])} token(s) for {uid}")
         return 0
 
+    callsign = ""
+    if "--callsign" in argv[1:]:
+        try:
+            callsign = argv[argv.index("--callsign") + 1]
+        except IndexError:
+            print("[error] --callsign requires a value", file=sys.stderr)
+            return 2
+        if not _UID_RE.match(callsign):
+            print(f"[error] invalid callsign: {callsign!r}", file=sys.stderr)
+            return 2
+
     token = secrets.token_urlsafe(32)
-    data["tokens"].append(
-        {"token_sha256": hashlib.sha256(token.encode()).hexdigest(), "agent_uid": uid}
-    )
+    row = {"token_sha256": hashlib.sha256(token.encode()).hexdigest(), "agent_uid": uid}
+    if callsign:
+        row["legacy_callsign"] = callsign
+    data["tokens"].append(row)
     path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     os.chmod(path, 0o600)
     print(f"# token for {uid} — shown ONCE, hash stored in {path}")

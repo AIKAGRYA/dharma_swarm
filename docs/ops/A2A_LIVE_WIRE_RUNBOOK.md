@@ -51,8 +51,12 @@ The repo-agnostic HTTPS door (`scripts/runtime/a2a_gateway_server.py` +
 # On the droplet, in the dharma_swarm checkout:
 pip install fastapi uvicorn nats-py
 python3 scripts/ops/mint_a2a_gateway_token.py fable_claude_code   # repeat per agent:
-#   devin-roaming-2987d222, perplexity-computer, codex, rushabdev, hermes
+python3 scripts/ops/mint_a2a_gateway_token.py devin-roaming-2987d222 --callsign devin
+#   also: perplexity-computer, codex, rushabdev, hermes
+# --callsign records the legacy fleet subject when it differs from the uid, so
+# the gateway drains dharma.a2a.<callsign> (where the fleet actually sends).
 # Each prints the plaintext token ONCE — deliver to that agent's operator channel.
+# Mint/revoke take effect on the RUNNING gateway (token file is mtime-watched).
 
 NATS_URL=nats://127.0.0.1:4222 NATS_USER=a2a_gateway NATS_PASSWORD='<pw>' \
   uvicorn scripts.runtime.a2a_gateway_server:app --host 0.0.0.0 --port 8422

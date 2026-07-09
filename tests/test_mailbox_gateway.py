@@ -26,8 +26,13 @@ class _FakeMsg:
     subject: str
     data: bytes
     acked: bool = False
+    _broker: object = None
 
     async def ack(self) -> None:
+        broker = self._broker
+        if broker is not None and getattr(broker, "close_count", 0) > 0:
+            broker.acks_after_close += 1
+            raise RuntimeError("ack over closed connection")
         self.acked = True
 
 
@@ -37,6 +42,8 @@ class _FakeBroker:
     inbox_messages: list[_FakeMsg] = field(default_factory=list)
     fetch_calls: list[tuple[str, str, int]] = field(default_factory=list)
     fail_publish: bool = False
+    close_count: int = 0
+    acks_after_close: int = 0
 
     async def publish(self, subject: str, payload: bytes) -> _Ack:
         if self.fail_publish:
@@ -46,7 +53,12 @@ class _FakeBroker:
 
     async def fetch_inbox(self, subject: str, durable: str, batch: int) -> list[_FakeMsg]:
         self.fetch_calls.append((subject, durable, batch))
+        for msg in self.inbox_messages:
+            msg._broker = self  # so acks can detect a premature close
         return self.inbox_messages
+
+    async def close(self) -> None:
+        self.close_count += 1
 
 
 def _sha(token: str) -> str:
@@ -61,7 +73,11 @@ def gateway(tmp_path):
             {
                 "tokens": [
                     {"token_sha256": _sha(TOKEN_ALPHA), "agent_uid": "alpha_agent"},
-                    {"token_sha256": _sha(TOKEN_BRAVO), "agent_uid": "bravo-agent"},
+                    {
+                        "token_sha256": _sha(TOKEN_BRAVO),
+                        "agent_uid": "bravo-agent",
+                        "legacy_callsign": "bravo",
+                    },
                 ]
             }
         )
@@ -201,6 +217,54 @@ def test_inbox_batch_is_clamped(gateway):
     client, broker, _ = gateway
     client.get("/a2a/mailbox/inbox?batch=9999", headers=_auth(TOKEN_ALPHA))
     assert broker.fetch_calls[-1][2] == 25
+
+
+def test_inbox_a2a_route_drains_legacy_callsign_subject(gateway):
+    # uid bravo-agent, callsign bravo: the live fleet sends to dharma.a2a.bravo,
+    # so that is what the a2a route must drain; durables stay keyed by the uid.
+    client, broker, _ = gateway
+    resp = client.get("/a2a/mailbox/inbox", headers=_auth(TOKEN_BRAVO))
+    assert resp.status_code == 200
+    assert broker.fetch_calls == [("dharma.a2a.bravo", "gw_bravo_agent_a2a", 10)]
+    who = client.get("/a2a/mailbox/whoami", headers=_auth(TOKEN_BRAVO)).json()
+    assert "dharma.a2a.bravo" in who["own_subjects"]
+    assert who["legacy_callsign"] == "bravo"
+
+
+def test_broker_stays_open_for_acks_then_closes(gateway):
+    client, broker, _ = gateway
+    broker.inbox_messages = [_FakeMsg("dharma.a2a.alpha_agent", b"{}")]
+    resp = client.get("/a2a/mailbox/inbox", headers=_auth(TOKEN_ALPHA))
+    assert resp.status_code == 200
+    assert broker.acks_after_close == 0          # no ack raced a closed connection
+    assert broker.inbox_messages[0].acked
+    assert broker.close_count == 1               # and the broker WAS closed afterwards
+    client.post("/a2a/mailbox/send", headers=_auth(TOKEN_ALPHA), json={"to": "bravo-agent", "body": "x"})
+    assert broker.close_count == 2
+
+
+def test_token_revocation_applies_without_restart(gateway):
+    import os
+
+    client, _, tmp = gateway
+    assert client.get("/a2a/mailbox/whoami", headers=_auth(TOKEN_ALPHA)).status_code == 200
+    tokens = tmp / "agent_tokens.json"
+    tokens.write_text(json.dumps({"tokens": [{"token_sha256": _sha(TOKEN_BRAVO), "agent_uid": "bravo-agent"}]}))
+    os.utime(tokens, ns=(1, 1))  # force a distinct mtime regardless of fs resolution
+    assert client.get("/a2a/mailbox/whoami", headers=_auth(TOKEN_ALPHA)).status_code == 401
+    assert client.get("/a2a/mailbox/whoami", headers=_auth(TOKEN_BRAVO)).status_code == 200
+
+
+def test_oversized_body_rejected_before_parse(gateway):
+    client, broker, _ = gateway
+    huge = b'{"to": "bravo-agent", "body": "' + b"x" * (70 * 1024) + b'"}'
+    resp = client.post(
+        "/a2a/mailbox/send",
+        headers={**_auth(TOKEN_ALPHA), "Content-Type": "application/json"},
+        content=huge,
+    )
+    assert resp.status_code == 413
+    assert broker.published == []
 
 
 def test_receipts_never_contain_tokens(gateway):
