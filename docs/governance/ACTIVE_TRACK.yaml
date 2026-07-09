@@ -1520,7 +1520,7 @@ active_tracks:
       - No efferent action — no outreach, no publishing, no external benchmarking claims (chamber doctrine; measurement only).
       - Do not overload TAM = Total Addressable Market (foundations/FIVE_FOURTEEN_A.md:49) and do not write into the Darshan-owned reports/tam/ — this machine's surface is reports/governance/tam/ only.
       - No new digest/receipt/chain primitives — reuse stable_digest/utc_now (memory_kernel.write_receipts), verdict_for/parse_cell_statuses (trust_gate_status.py), and the arena_truth_report.py surface contract.
-      - No new truth store: authority is projection_only; every cell cites an existing owner (lane_F world dossier, VENTURE_CELL_PORTFOLIO.yaml, swarm-genome organ table) or a public URL.
+      - "No new truth store: authority is projection_only; every cell cites an existing owner (lane_F world dossier, VENTURE_CELL_PORTFOLIO.yaml, swarm-genome organ table) or a public URL."
       - Do not weaken any gate/ratchet/One-Wire boundary; do not touch sibling-track surfaces except through their own next-items.
 
 closed_tracks:
