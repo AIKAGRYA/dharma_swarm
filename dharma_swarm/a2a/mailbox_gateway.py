@@ -237,7 +237,9 @@ async def inbox(request: Request, batch: int = 10, route: str = "a2a") -> JSONRe
     uid = _authenticate(request)
     batch = max(1, min(int(batch), _MAX_BATCH))
     subject = _subject_for_peer(uid, route)  # own subject only — uid comes from the token
-    durable = f"gw_{uid}".replace("-", "_")
+    # A durable is bound to its filter subject, so each route needs its own
+    # durable — one shared name would stick to whichever subject came first.
+    durable = f"gw_{uid}_{route}".replace("-", "_")
 
     broker = await _broker()
     try:

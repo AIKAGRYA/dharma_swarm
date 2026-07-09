@@ -179,10 +179,22 @@ def test_inbox_drains_only_own_subject_and_acks(gateway):
     data = resp.json()
     # subject derived from the TOKEN identity — there is no way to name a peer's inbox
     assert data["subject"] == "dharma.a2a.alpha_agent"
-    assert broker.fetch_calls == [("dharma.a2a.alpha_agent", "gw_alpha_agent", 5)]
+    assert broker.fetch_calls == [("dharma.a2a.alpha_agent", "gw_alpha_agent_a2a", 5)]
     assert data["messages"][0]["payload"] == {"hello": 1}
     assert data["messages"][1]["payload"] == {"raw": "not-json"}
     assert all(msg.acked for msg in broker.inbox_messages)
+
+
+def test_inbox_routes_use_distinct_durables(gateway):
+    # A JetStream durable is bound to its filter subject; the two routes must
+    # never share a durable name or the second route sticks to the first subject.
+    client, broker, _ = gateway
+    client.get("/a2a/mailbox/inbox?route=a2a", headers=_auth(TOKEN_ALPHA))
+    client.get("/a2a/mailbox/inbox?route=agent-inbox", headers=_auth(TOKEN_ALPHA))
+    (sub_a, dur_a, _), (sub_b, dur_b, _) = broker.fetch_calls
+    assert sub_a == "dharma.a2a.alpha_agent" and sub_b == "dharma.agent.alpha_agent.inbox"
+    assert dur_a != dur_b
+    assert dur_a == "gw_alpha_agent_a2a" and dur_b == "gw_alpha_agent_agent_inbox"
 
 
 def test_inbox_batch_is_clamped(gateway):
