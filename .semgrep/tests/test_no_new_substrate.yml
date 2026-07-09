@@ -1,0 +1,34 @@
+rules:
+  - id: dharma.no-new-substrate
+    message: test fixture (mirror of real rule)
+    severity: WARNING
+    languages: [python]
+    patterns:
+      - pattern-either:
+          - pattern: |
+              class $NAME:
+                  ...
+                  $X = sqlite3.connect(...)
+                  ...
+          - pattern: |
+              class $NAME:
+                  ...
+                  $X = aiosqlite.connect(...)
+                  ...
+          - pattern: |
+              class $NAME:
+                  ...
+                  def $M(...):
+                      ...
+                      self.$X = sqlite3.connect(...)
+                      ...
+          - pattern: |
+              class $NAME:
+                  ...
+                  def $M(...):
+                      ...
+                      self.$X = aiosqlite.connect(...)
+                      ...
+      - metavariable-regex:
+          metavariable: $NAME
+          regex: '.*(Store|Ledger|Registry|Substrate)$'
