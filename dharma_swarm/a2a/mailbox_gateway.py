@@ -72,6 +72,8 @@ _tokens_path: Path | None = None
 _receipts_path: Path | None = None
 # token_sha256 -> agent_uid
 _token_index: dict[str, str] = {}
+# receipt appends that failed since process start (surfaced for ops visibility)
+_receipt_write_failures = 0
 
 
 def _state_dir() -> Path:
@@ -162,7 +164,9 @@ def _record_receipt(kind: str, payload: dict[str, Any]) -> None:
         with path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps({"kind": kind, "at": _utc_now(), **payload}) + "\n")
     except (OSError, TypeError, ValueError) as exc:  # receipts must not break delivery
-        logger.warning("gateway receipt write failed: %s", exc)
+        global _receipt_write_failures  # noqa: PLW0603
+        _receipt_write_failures += 1
+        logger.warning("gateway receipt write failed (%d total): %s", _receipt_write_failures, exc)
 
 
 async def _broker() -> MailboxBrokerLike:
