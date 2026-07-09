@@ -1824,16 +1824,19 @@ async def run_conductor_loop(shutdown_event: asyncio.Event) -> None:
     Each conductor has its own wake interval and restart logic.
     If one crashes, the other keeps running.
     """
+    from dharma_swarm.api_keys import bootstrap_runtime_env
     from dharma_swarm.persistent_agent import PersistentAgent
-    from dharma_swarm.conductors import CONDUCTOR_CONFIGS
+    from dharma_swarm.conductors import CONDUCTOR_CONFIGS, materialize_conductor_config
     from dharma_swarm.providers import create_default_router
 
+    bootstrap_runtime_env()
     conductor_router = create_default_router()
 
     _log("conductors", f"Initializing {len(CONDUCTOR_CONFIGS)} conductors...")
 
     conductors: list[PersistentAgent] = []
-    for cfg in CONDUCTOR_CONFIGS:
+    for template in CONDUCTOR_CONFIGS:
+        cfg = materialize_conductor_config(template)
         agent = PersistentAgent(
             name=cfg["name"],
             role=cfg["role"],

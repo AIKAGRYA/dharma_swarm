@@ -9,6 +9,8 @@ Both compose PersistentAgent which composes AutonomousAgent.
 
 from __future__ import annotations
 
+from copy import deepcopy
+
 from dharma_swarm.api_keys import ANTHROPIC_API_KEY_ENV, env_has_value
 from dharma_swarm.daemon_config import V7_BASE_RULES
 from dharma_swarm.model_hierarchy import default_model as canonical_default_model
@@ -20,6 +22,21 @@ def _resolve_conductor_provider() -> ProviderType:
     if env_has_value(ANTHROPIC_API_KEY_ENV):
         return ProviderType.ANTHROPIC
     return ProviderType.CLAUDE_CODE
+
+
+def materialize_conductor_config(template: dict[str, object]) -> dict[str, object]:
+    """Resolve provider/model at instantiation time after runtime env bootstrap."""
+    cfg = deepcopy(template)
+    provider = _resolve_conductor_provider()
+    cfg["provider_type"] = provider
+    cfg["provider_fallbacks"] = [ProviderType.CLAUDE_CODE]
+    if cfg["name"] == "conductor_codex":
+        cfg["model"] = canonical_default_model(ProviderType.CLAUDE_CODE)
+    elif provider == ProviderType.ANTHROPIC:
+        cfg["model"] = canonical_default_model(ProviderType.ANTHROPIC)
+    else:
+        cfg["model"] = canonical_default_model(ProviderType.CLAUDE_CODE)
+    return cfg
 
 
 _CONDUCTOR_CLAUDE_PROMPT = V7_BASE_RULES + """
@@ -71,7 +88,7 @@ Your job is to keep the system healthy and catch problems early.
 CONDUCTOR_CLAUDE_CONFIG = {
     "name": "conductor_claude",
     "role": AgentRole.CONDUCTOR,
-    "provider_type": _resolve_conductor_provider(),
+    "provider_type": ProviderType.CLAUDE_CODE,
     "model": canonical_default_model(ProviderType.ANTHROPIC),
     "wake_interval_seconds": 3600.0,
     "system_prompt": _CONDUCTOR_CLAUDE_PROMPT,
@@ -81,7 +98,7 @@ CONDUCTOR_CLAUDE_CONFIG = {
 CONDUCTOR_CODEX_CONFIG = {
     "name": "conductor_codex",
     "role": AgentRole.CONDUCTOR,
-    "provider_type": _resolve_conductor_provider(),
+    "provider_type": ProviderType.CLAUDE_CODE,
     "model": canonical_default_model(ProviderType.CLAUDE_CODE),
     "wake_interval_seconds": 1800.0,
     "system_prompt": _CONDUCTOR_CODEX_PROMPT,
