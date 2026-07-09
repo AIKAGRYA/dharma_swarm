@@ -1,12 +1,14 @@
 # Adversarial Due-Diligence Audit — Integrated Master Prompt (2026-07-09)
 
-**Provenance.** This document integrates three inputs into one canonical audit prompt:
+**Doc role (per `docs/AGENTS.md`):** `working_plan` — a bounded handoff instrument, not repo-level authority. It replaces no existing repo doc: it is the first landing of two operator-authored prompt drafts that previously existed only in chat (an original 6-step version and an expanded v2), which it supersedes. It is subordinate to `CLAUDE.md` and the canonical doc stack; any audit produced from it is a dated `report` artifact, and nothing in this file overrides the repo's own governance owners.
+
+**Provenance.** This document integrates three inputs into one audit prompt (the single current source for this instrument):
 
 1. The original operator audit prompt ("Adversarial Due-Diligence Audit Prompt", ~270k-line framing, 6-step method).
 2. The expanded v2 prompt ("Adversarial Due-Diligence Audit Prompt for `dharma_swarm`", 9-step method, systems-programming checks, enterprise maturity scorecard, machine-readable YAML appendix). v2 is a strict superset of v1; every v1 requirement (access statement first, claims-vs-reality ledger, smell hunt, delete-the-logic test-quality standard, no-averaging severity weighting, citation-or-silence rule) is preserved inside the v2 structure below.
 3. A session-verified repo snapshot from 2026-07-09 (Appendix A) plus four additional falsifiable hypotheses (#10–#13) derived from live observations that neither prompt contained.
 
-**How to use.** Hand everything from "## THE PROMPT" through the end of the YAML template to an auditing agent verbatim, on a fresh clone, with no other repo context. Appendix A is included as dated prior evidence the auditor must re-verify, never trust.
+**How to use.** Hand everything from "## THE PROMPT" through the end of this document — including Appendix A — to an auditing agent verbatim, on a fresh clone, with no other repo context. Appendix A is included as dated prior evidence the auditor must re-verify, never trust.
 
 **Status of this file.** It is a prompt + dated snapshot, not a report. It asserts no facts about current system state; every claim in Appendix A carries its observation date and decays from there.
 
@@ -95,7 +97,7 @@ Proof requires at least one of:
 
 1. a reachable execution path from a real entry point;
 2. a test that asserts meaningful behavior and would fail if the implementation were removed, inverted, or bypassed;
-3. a command you personally ran and can quote;
+3. a command you personally ran and can quote, provided the command exercises behavior or replays an independent verifier — merely printing the contents of a generated report or doc (`cat`/`rg` over prose) does not upgrade that content beyond documentation-only evidence;
 4. a live runtime artifact whose producer path is also verified;
 5. a CI workflow whose actual execution result is available and linked to the current commit.
 
@@ -128,6 +130,7 @@ Distinguish explicitly between:
 If the repository is available as a full clone, run at minimum:
 
 ```bash
+make onboard   # the repo's required front door; treat its rendered prose as claims to verify, but run it first
 git rev-parse HEAD
 git branch --show-current
 git status --short
