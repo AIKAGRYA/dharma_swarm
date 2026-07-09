@@ -78,7 +78,10 @@ def validate(data: dict, *, repo_root: Path = REPO_ROOT) -> list[str]:
         return errors + ["agents must be a non-empty list"]
 
     seen_uids: set[str] = set()
-    for agent in agents:
+    for index, agent in enumerate(agents):
+        if not isinstance(agent, dict):
+            errors.append(f"agents[{index}]: entry is not a mapping ({type(agent).__name__})")
+            continue
         uid = str(agent.get("agent_uid", "<missing uid>"))
         if uid in seen_uids:
             errors.append(f"{uid}: duplicate agent_uid")

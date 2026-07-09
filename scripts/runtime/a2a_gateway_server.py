@@ -59,12 +59,17 @@ class _LiveBroker:
             await self._nc.close()
 
     async def fetch_inbox(self, subject: str, durable: str, batch: int) -> list[Any]:
+        import asyncio
+
         js = await self._js()
         try:
             sub = await js.pull_subscribe(subject, durable=durable, stream=STREAM_NAME)
             try:
                 return list(await sub.fetch(batch, timeout=3.0))
-            except Exception:  # noqa: BLE001 — empty inbox raises TimeoutError
+            except asyncio.TimeoutError:
+                # nats-py signals an empty pull with TimeoutError; anything
+                # else (permission violation, wrong stream, durable conflict)
+                # must propagate so the HTTP layer returns an honest 502.
                 return []
         finally:
             await self._nc.close()

@@ -61,6 +61,13 @@ def test_validation_rejects_literal_secret_values():
     assert any("possible secret value" in error for error in errors)
 
 
+def test_validation_handles_non_mapping_agent_entry_cleanly():
+    data = copy.deepcopy(load_registry())
+    data["agents"].append("stray string entry")
+    errors = validate(data)  # must not raise
+    assert any("not a mapping" in error for error in errors)
+
+
 def test_validation_rejects_unknown_lane_and_missing_fields():
     data = copy.deepcopy(load_registry())
     data["agents"][0]["primary_lane"] = "carrier_pigeon"
