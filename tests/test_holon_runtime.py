@@ -85,6 +85,63 @@ async def test_zero_cap_is_unbounded(tmp_path):
     assert runner.calls == ["h"]
 
 
+# --- single cycle: Sarathi reversibility gate -------------------------------------------
+
+async def test_reversibility_gate_allows_planned_reversible_action_before_work(tmp_path):
+    runner = make_runner(task="read the status file", reply="status observed")
+
+    result = await holon_runtime.holon_wake_cycle(
+        "sarathi",
+        runner,
+        spent_usd=0.0,
+        cap_usd=10.0,
+        agents_root=tmp_path,
+        planned_action="read the status file",
+    )
+
+    assert result["status"] == "ran"
+    assert runner.calls == ["sarathi"]
+    assert result["planned_action"] == "read the status file"
+    assert result["reversibility_gate"]["may_execute_unattended"] is True
+    assert result["reversibility_gate"]["action_class"] == "reversible_safe"
+
+
+async def test_reversibility_gate_blocks_irreversible_action_before_work(tmp_path):
+    runner = make_exploding_runner()  # must not be invoked once the gate halts
+
+    result = await holon_runtime.holon_wake_cycle(
+        "sarathi",
+        runner,
+        spent_usd=0.0,
+        cap_usd=10.0,
+        agents_root=tmp_path,
+        planned_action="git push origin main",
+    )
+
+    assert result["status"] == "halted:reversibility_gate"
+    assert result["planned_action"] == "git push origin main"
+    assert result["reversibility_gate"]["may_execute_unattended"] is False
+    assert result["reversibility_gate"]["action_class"] == "operator_only"
+    assert result["reversibility_gate"]["never_auto_hit"] == "git push"
+
+
+async def test_loop_passes_planned_action_to_reversibility_gate(tmp_path):
+    runner = make_exploding_runner()
+
+    results = await holon_runtime.run_holon_loop(
+        "sarathi",
+        runner,
+        max_cycles=3,
+        spent_usd=0.0,
+        cap_usd=10.0,
+        agents_root=tmp_path,
+        planned_action="send email to the operator",
+    )
+
+    assert [r["status"] for r in results] == ["halted:reversibility_gate"]
+    assert results[0]["reversibility_gate"]["never_auto_hit"] == "send email"
+
+
 # --- single cycle: normal run + compass --------------------------------------------------
 
 async def test_normal_cycle_runs_and_logs_compass(tmp_path):

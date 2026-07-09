@@ -1,4 +1,10 @@
-# Sovereign Holon Harness — Export & Standalone Use
+# Sovereign Holon Harness — Export Notes (superseded standalone fork)
+
+> 2026-07-07 update: the former repo-local `holon/` standalone fork was
+> collapsed by the Sarathi v1.1 holon-system lane. Canonical runtime imports are
+> now `dharma_swarm.holon_bridge` and `dharma_swarm.holon_runtime`. This document
+> remains as historical export-design context only; do not recreate a second
+> `holon/` package inside this repo.
 
 **Goal:** The core harness (governed runnable shell + verification + context-bridging) must be usable as a clean, minimal, standalone package or Git subtree exactly like hermes-m5, without pulling the entire dharma_swarm.
 
@@ -20,10 +26,10 @@ python -m venv .venv
 source .venv/bin/activate
 pip install pydantic aiosqlite
 
-# Then:
-from holon.holon_runtime import holon_wake_cycle, run_holon_loop
-from holon.memory_kernel import MemoryKernel
-from holon.runtime_provider import resolve_runtime_provider_config, create_runtime_provider
+# Then, from this repo's canonical package:
+from dharma_swarm.holon_runtime import holon_wake_cycle, run_holon_loop
+from dharma_swarm.memory_kernel import MemoryKernel
+from dharma_swarm.runtime_provider import resolve_runtime_provider_config, create_runtime_provider
 
 # Your runner (the "hands")
 async def my_runner(task: str) -> tuple[str, str]:
@@ -48,8 +54,8 @@ python3 scripts/verify_holon_harness_prod.py --mode prod --require-live-smoke --
 
 ## Packaging (for real distribution)
 
-- A thin `pyproject.toml` or `setup.py` at the export root that declares only the minimal deps + the holon + memory_kernel subpackages.
-- `holon/__init__.py` re-exports the public surface.
+- A thin `pyproject.toml` or `setup.py` at the export root that declares only the minimal deps + the canonical `dharma_swarm` holon and memory-kernel subpackages.
+- Do not add an in-repo `holon/__init__.py` fork; use packaging metadata or an out-of-repo distribution surface if a standalone name is needed.
 - README in the exported tree points back to the full sovereign_holons docs for governance, telos, etc., but the runtime itself is self-contained.
 
 ## Non-goals for the export
