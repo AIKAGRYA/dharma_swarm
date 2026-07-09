@@ -57,6 +57,10 @@ _PROBE_SUBJECT_BY_LANE = {
     "hermes": "dharma.a2a.hermes",
     "hermes-m5": "dharma.a2a.hermes",
     "perplexity": "dharma.a2a.perplexity",
+    # perplexity-computer's canonical subject (dharma.a2a.perplexity-computer)
+    # is reserved-but-NOT-live until the FFR-D1 ACL rework provisions it
+    # (FLEET_FIELD_REGISTRY.yaml); the doctor probes the live field, so it
+    # targets the historical live lane until then. Flip after FFR-D1 applies.
     "perplexity-computer": "dharma.a2a.perplexity",
     "fleet": "dharma.a2a.fleet",
     "fable_5_cursor": "dharma.a2a.fable_5_cursor",
@@ -127,6 +131,24 @@ def _probe_targets(reg: dict[str, Any]) -> list[dict[str, str]]:
     ]
 
 
+def _require_ws_transport_deps(url: str) -> None:
+    """Fail honestly (not with nats-py traceback spew) when the hub URL is a
+    websocket endpoint but aiohttp — required by nats-py's ws/wss transport
+    and, like nats-py itself, deliberately not a declared repo dependency —
+    is not installed. find_spec keeps this probe out of the import-provenance
+    ratchet."""
+    if not url.startswith(("ws://", "wss://")):
+        return
+    import importlib.util
+
+    if importlib.util.find_spec("aiohttp") is None:
+        raise RuntimeError(
+            f"hub URL {url} is a websocket endpoint but aiohttp is not "
+            "installed — nats-py needs it for ws/wss transports. "
+            "Install with: pip install aiohttp"
+        )
+
+
 async def _probe_outbound_reachability(
     reg: dict[str, Any],
     live_subjects: list[str] | set[str] | tuple[str, ...],
@@ -136,6 +158,7 @@ async def _probe_outbound_reachability(
     import nats
 
     url, user, pw = _creds()
+    _require_ws_transport_deps(url)
     live_subject_set = {str(subject) for subject in live_subjects if str(subject)}
     probe_from = str(reg.get("callsign") or reg.get("agent_uid") or "devin")
     probes: list[dict[str, Any]] = []
@@ -249,6 +272,7 @@ async def _gather(scan: int) -> dict[str, Any]:
     import nats
 
     url, user, pw = _creds()
+    _require_ws_transport_deps(url)
     out: dict[str, Any] = {"hub": {"url": url, "user": user, "stream": STREAM}}
 
     nc = await nats.connect(

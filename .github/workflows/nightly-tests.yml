@@ -109,7 +109,7 @@ jobs:
           # failing the step: this job is advisory, and a red test (e.g. the
           # known council event-loop bug) must not hide the coverage numbers.
           set +e
-          python -m pytest tests/test_a2a*.py -q --tb=line --timeout=120 \
+          python -m pytest tests/test_a2a*.py tests/test_nats_*.py -q --tb=line --timeout=120 \
             --cov=dharma_swarm.a2a --cov-branch \
             --cov-report=json:cov_a2a.json --cov-report=term
           echo "a2a $?" >> cov_exit_codes.txt
