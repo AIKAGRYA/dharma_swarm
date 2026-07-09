@@ -68,6 +68,37 @@ def _log_auth_mode() -> None:
         logger.info("Bearer token auth enabled for /api/* routes.")
 
 
+def _dashboard_auth_required() -> bool:
+    """True when the operator has demanded fail-closed dashboard auth.
+
+    Any exposed / production deployment should set DHARMA_REQUIRE_DASHBOARD_AUTH=1
+    so a keyless (open-to-all) boot is impossible. Unset (default) preserves the
+    dev-mode-open convenience for local use.
+    """
+    return os.environ.get("DHARMA_REQUIRE_DASHBOARD_AUTH", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def _enforce_dashboard_auth_policy() -> None:
+    """Fail closed: refuse to start open when auth is explicitly required.
+
+    Without this, an unset DASHBOARD_API_KEY silently opens every /api route
+    (BearerAuthMiddleware dev-mode branch). On a reachable host that is a
+    remote-code-execution surface, so a production posture must refuse the
+    boot rather than only log a warning.
+    """
+    if _dashboard_auth_required() and _get_api_key() is None:
+        raise RuntimeError(
+            "DHARMA_REQUIRE_DASHBOARD_AUTH is set but no dashboard API key is "
+            f"configured ({DASHBOARD_API_KEY_ENV}). Refusing to boot with all "
+            "/api routes open. Configure the key, or unset the requirement for dev."
+        )
+
+
 def get_swarm():
     """Get or create SwarmManager singleton.
 
@@ -129,6 +160,7 @@ def get_monitor():
 async def lifespan(app: FastAPI):
     """Initialize subsystems on startup, cleanup on shutdown."""
     logger.info("DHARMA COMMAND API starting...")
+    _enforce_dashboard_auth_policy()
     operator_pid = os.getpid()
     _publish_operator_pid(operator_pid)
 

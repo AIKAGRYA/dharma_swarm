@@ -4,6 +4,8 @@ import builtins
 import importlib
 import sys
 
+import pytest
+
 
 class TestOrganismCompositionRoot:
     """DHARMA_ORGANISM_ROOT gates the Organism composition root in get_swarm().
@@ -115,3 +117,45 @@ def test_api_main_imports_without_api_keys(monkeypatch) -> None:
     module = importlib.import_module("api.main")
 
     assert module.app.title == "DHARMA COMMAND"
+
+
+class TestDashboardAuthPolicy:
+    """DHARMA_REQUIRE_DASHBOARD_AUTH makes a keyless (open-to-all) boot fail closed.
+
+    Default (flag unset) preserves dev-mode-open; the guard only bites when the
+    operator has explicitly demanded auth on an exposed deployment.
+    """
+
+    def _api_main(self):
+        import api.main as api_main
+
+        return api_main
+
+    def test_dev_mode_open_preserved_when_flag_unset(self, monkeypatch) -> None:
+        api_main = self._api_main()
+        monkeypatch.delenv("DHARMA_REQUIRE_DASHBOARD_AUTH", raising=False)
+        monkeypatch.delenv(api_main.DASHBOARD_API_KEY_ENV, raising=False)
+        # Local dev with no key still boots open — no exception.
+        api_main._enforce_dashboard_auth_policy()
+
+    def test_required_without_key_refuses_boot(self, monkeypatch) -> None:
+        api_main = self._api_main()
+        monkeypatch.setenv("DHARMA_REQUIRE_DASHBOARD_AUTH", "1")
+        monkeypatch.delenv(api_main.DASHBOARD_API_KEY_ENV, raising=False)
+        with pytest.raises(RuntimeError, match="Refusing to boot"):
+            api_main._enforce_dashboard_auth_policy()
+
+    def test_required_with_key_boots(self, monkeypatch) -> None:
+        api_main = self._api_main()
+        monkeypatch.setenv("DHARMA_REQUIRE_DASHBOARD_AUTH", "true")
+        monkeypatch.setenv(api_main.DASHBOARD_API_KEY_ENV, "s3cret-token")
+        api_main._enforce_dashboard_auth_policy()  # must not raise
+
+    def test_flag_truthiness(self, monkeypatch) -> None:
+        api_main = self._api_main()
+        for val in ("1", "true", "YES", "On"):
+            monkeypatch.setenv("DHARMA_REQUIRE_DASHBOARD_AUTH", val)
+            assert api_main._dashboard_auth_required() is True
+        for val in ("0", "", "false", "no", "garbage"):
+            monkeypatch.setenv("DHARMA_REQUIRE_DASHBOARD_AUTH", val)
+            assert api_main._dashboard_auth_required() is False
