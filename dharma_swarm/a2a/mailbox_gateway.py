@@ -161,7 +161,7 @@ def _record_receipt(kind: str, payload: dict[str, Any]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps({"kind": kind, "at": _utc_now(), **payload}) + "\n")
-    except Exception as exc:  # noqa: BLE001 — receipts must not break delivery
+    except (OSError, TypeError, ValueError) as exc:  # receipts must not break delivery
         logger.warning("gateway receipt write failed: %s", exc)
 
 
