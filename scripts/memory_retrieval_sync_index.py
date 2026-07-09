@@ -14,6 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from dharma_swarm.daemon_config import dharma_state_dir
 from dharma_swarm.vector_store import VectorStore
 
 
@@ -238,7 +239,7 @@ def _install_triggers(conn) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--state-dir", type=Path, default=Path.home() / ".dharma")
+    parser.add_argument("--state-dir", type=Path, default=dharma_state_dir())
     parser.add_argument("--dim", type=int, default=128)
     parser.add_argument("--recent-row-window", type=int, default=1_000_000)
     parser.add_argument("--full-scan", action="store_true")

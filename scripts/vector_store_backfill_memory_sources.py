@@ -16,12 +16,14 @@ import os
 import re
 import sqlite3
 import struct
+import sys
 import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+from dharma_swarm.daemon_config import dharma_state_dir
 from dharma_swarm.vector_store import VectorStore
 
 
@@ -495,8 +497,12 @@ def _read_state(path: Path) -> dict[str, str]:
         payload = json.loads(path.read_text(encoding="utf-8"))
         if isinstance(payload, dict):
             return {str(key): str(value) for key, value in payload.items()}
-    except (OSError, json.JSONDecodeError):
-        pass
+    except (OSError, json.JSONDecodeError) as exc:
+        print(
+            f"  Resume state {path} unreadable ({type(exc).__name__}); starting fresh.",
+            file=sys.stderr,
+        )
+        return {}
     return {}
 
 
@@ -515,7 +521,7 @@ def _elapsed_ms(start: float) -> float:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--state-dir", type=Path, default=Path.home() / ".dharma")
+    parser.add_argument("--state-dir", type=Path, default=dharma_state_dir())
     parser.add_argument(
         "--memory-jsonl",
         action="append",

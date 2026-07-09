@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import staging as staging_mod
+from ..daemon_config import dharma_state_dir
 from .cross_update import cross_update_trusted
 from .governance import gate_check_atom
 from .provenance import (
@@ -212,4 +213,4 @@ def _wiki_vector_state_dir_for_trusted_path(path: Path) -> Path:
     try:
         return path.parent.parent.parent
     except IndexError:
-        return Path.home() / ".dharma"
+        return dharma_state_dir()

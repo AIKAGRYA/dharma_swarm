@@ -22,6 +22,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from dharma_swarm.daemon_config import dharma_state_dir
 from dharma_swarm.vector_store import TFIDFEmbedder, VectorStore, _fts_match_query
 
 
@@ -45,7 +46,7 @@ class ReembedReceipt:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--state-dir", default=str(Path.home() / ".dharma"))
+    parser.add_argument("--state-dir", default=str(dharma_state_dir()))
     parser.add_argument("--query", action="append", default=[])
     parser.add_argument("--limit-per-query", type=int, default=100)
     parser.add_argument("--memory-retrieval-docs", action="store_true")

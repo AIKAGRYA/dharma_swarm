@@ -77,6 +77,9 @@
 /dharma_swarm/smart_router.py           @AmitabhainArunachala
 /dharma_swarm/swarm_router.py           @AmitabhainArunachala
 /dharma_swarm/telemetry_optimizer.py    @AmitabhainArunachala
+/dharma_swarm/embedders.py              @AmitabhainArunachala
+/dharma_swarm/vector_fallback_guard.py  @AmitabhainArunachala
+/dharma_swarm/vector_store.py           @AmitabhainArunachala
 
 # Governance config — touch carefully
 /.github/                               @AmitabhainArunachala
