@@ -54,6 +54,11 @@ GRANDFATHERED: dict[str, int] = {
     "dharma_swarm/operator_core/control_surface_memory.py": 1240,
     "dharma_swarm/operator_core/living_agent_kernel.py": 2921,
     "dharma_swarm/operator_core/runtime_truth.py": 1008,
+    # 2026-07-09: item 6a mechanical decomposition of the former
+    # dharma_swarm/runtime_state.py (4111 lines) into a runtime_state/ package.
+    # store.py is a verbatim extraction of the RuntimeStateStore class; the
+    # class split is deferred to item 6b (decomposition tracking follow-up).
+    "dharma_swarm/runtime_state/store.py": 2996,
 }
 
 LINE_BUDGET = 1000  # New modules: hard limit.
