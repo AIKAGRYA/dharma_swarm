@@ -2,10 +2,11 @@
 
 - Probe: fleet field probe 2026-07-09 (see `inter_agent/fleet/2026-07-09-field-probe-synthesis.md`)
 - Relay: operator hand-carried from Telegram. The agent reported committing repo copies
-  locally on its VPS as commit `750b360f` — that commit was NEVER PUSHED to origin
-  (verified 2026-07-09: no origin branch contains it), so this relayed copy is the
-  durable receipt. The stranded-receipt problem is itself recorded as a blocker in
-  `docs/ops/FLEET_FIELD_REGISTRY.yaml`.
+  locally on its VPS as commit `750b360f` — at relay time that commit was not on origin
+  (verified 2026-07-09: no origin branch contained it), so this relayed copy became the
+  durable receipt. UPDATE 2026-07-09T~06Z: the commit was subsequently pushed as branch
+  `rushabdev/a2a-field-probe-2026-07-09` — the seat CAN push; delivery was delayed, not
+  impossible. The registry blocker is downgraded accordingly.
 - The agent also published a live copy to `dharma.a2a.hermes` (seq 8118691, packet
   probe-reply-rushabdev-2e191323) after a direct publish to
   `dharma.a2a.fable_claude_code` was BLOCKED by a hub permission violation

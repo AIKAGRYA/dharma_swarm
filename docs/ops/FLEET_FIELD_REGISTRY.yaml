@@ -116,7 +116,9 @@ agents:
     blockers:
       - shares dharma.a2a.hermes with AGNI Hermes (FFR-D2 collision)
       - hub ACL blocked publish to dharma.a2a.fable_claude_code (verified live; FFR-D1)
-      - local git commits (e.g. its probe-reply commit) are not pushed — receipts strand on the VPS
+      - git-seat pushes are DELAYED, not absent — its probe-reply commit 750b360f stranded
+        locally at probe time, then landed as branch rushabdev/a2a-field-probe-2026-07-09
+        (~3h later); treat the seat's git lane as slow-but-working
     probe_receipt: inter_agent/fable_claude_code/inbound/2026-07-09-rushabdev-probe-reply.md
 
   - agent_uid: devin-roaming-2987d222
