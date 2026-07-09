@@ -23,7 +23,7 @@ from dharma_swarm.graph.channels import (
     TriggerChannel,
     UnknownChannelError,
 )
-from dharma_swarm.graph.types import TRIGGER_PREFIX
+from dharma_swarm.graph.types import RESERVED_PREFIX, TRIGGER_PREFIX
 
 __all__ = ["GraphState", "state_digest"]
 
@@ -51,8 +51,10 @@ class GraphState:
 
     Explicit channels only: every user channel is declared at compile time;
     a write (node output or input seed) to an undeclared name raises
-    :class:`UnknownChannelError`. Trigger channels (``__trigger__:*``) are
-    scheduler-owned and auto-registered on first use.
+    :class:`UnknownChannelError`. Reserved ``__`` channels are runtime-owned:
+    ``__trigger__:*`` auto-registers lazily; every other reserved channel
+    (``__join__:*``, ``__tasks__``) must be compiler-declared — never created
+    on demand, so a stray write cannot mint scheduler state.
     """
 
     def __init__(
@@ -72,6 +74,11 @@ class GraphState:
                 existing.name = name
                 self._channels[name] = existing
             return existing
+        if name.startswith(RESERVED_PREFIX):
+            try:
+                return self._channels[name]
+            except KeyError:
+                raise UnknownChannelError(name, reason="reserved") from None
         try:
             return self._channels[name]
         except KeyError:
@@ -96,7 +103,7 @@ class GraphState:
             channel = self.channel(name)
             group = groups[name]
             channel.validate(group, superstep)
-            if not name.startswith(TRIGGER_PREFIX):
+            if not name.startswith(RESERVED_PREFIX):
                 for write in group:
                     try:
                         _canonical_json(write.value)
@@ -120,17 +127,40 @@ class GraphState:
         return {name: ch.version for name, ch in self._channels.items()}
 
     def snapshot(self) -> dict[str, Any]:
-        """Deep-copied view of committed USER state (triggers excluded).
+        """Deep-copied view of committed USER state (reserved ``__`` excluded).
 
         Deep copy is the snapshot-isolation guarantee: a node mutating its
         input (or a value it previously returned) never touches committed
-        state.
+        state. Every runtime-owned ``__`` channel (triggers, joins, tasks)
+        stays out of user snapshots and digests.
         """
         return {
             name: copy.deepcopy(channel.get())
             for name, channel in sorted(self._channels.items())
-            if not name.startswith(TRIGGER_PREFIX) and not channel.is_empty
+            if not name.startswith(RESERVED_PREFIX) and not channel.is_empty
         }
 
     def digest(self) -> str:
         return state_digest(self.snapshot())
+
+    def own_writes_view(
+        self, writes: Sequence[ChannelWrite], superstep: int
+    ) -> dict[str, Any]:
+        """Snapshot + ONE task's pending writes, reducer-correct (branch view).
+
+        langgraph parity: a branch path sees the source node's own pending
+        writes but not other same-superstep tasks' writes. Writes apply to
+        deep-copied channel objects so reducers show old+new, never new-only;
+        committed state is untouched.
+        """
+        view = self.snapshot()
+        groups: dict[str, list[ChannelWrite]] = {}
+        for write in writes:
+            if not write.channel.startswith(RESERVED_PREFIX):
+                groups.setdefault(write.channel, []).append(write)
+        for name, group in groups.items():
+            channel_copy = copy.deepcopy(self.channel(name))
+            channel_copy.validate(group, superstep)
+            channel_copy.commit(group, superstep)
+            view[name] = copy.deepcopy(channel_copy.get())
+        return view

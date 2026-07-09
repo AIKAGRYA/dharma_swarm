@@ -25,15 +25,19 @@ __all__ = [
     "GraphRunResult",
     "NodeCallable",
     "NodeSpec",
+    "RESERVED_PREFIX",
     "RunStatus",
     "START",
+    "TASKS_CHANNEL",
     "TRIGGER_PREFIX",
     "trigger_channel",
 ]
 
 START: Final[str] = "__start__"
 END: Final[str] = "__end__"
+RESERVED_PREFIX: Final[str] = "__"
 TRIGGER_PREFIX: Final[str] = "__trigger__:"
+TASKS_CHANNEL: Final[str] = "__tasks__"
 
 NodeResult = Mapping[str, Any] | None
 NodeCallable = Callable[[Mapping[str, Any]], "NodeResult | Awaitable[NodeResult]"]
@@ -72,6 +76,12 @@ class GraphRunEvent:
     in ``durable_invoker`` so later durable wiring needs no renaming.
     ``state_digest`` is the digest of the state committed at this superstep's
     barrier (all events of one superstep share it).
+
+    ``task_index`` distinguishes multiple tasks of ONE node in one superstep
+    (Send fan-out): 0 = the ordinary trigger-driven (PULL) task — identical to
+    Slice A events — and 1..N = Send-driven (PUSH) tasks in canonical drain
+    order. Future durable wiring appends ``:{task_index}`` to the idempotency
+    key input only when > 0, preserving every existing key byte-identically.
     """
 
     graph_run_id: str
@@ -80,6 +90,7 @@ class GraphRunEvent:
     superstep: int
     status: EventStatus
     state_digest: str
+    task_index: int = 0
 
 
 @dataclass(frozen=True)
