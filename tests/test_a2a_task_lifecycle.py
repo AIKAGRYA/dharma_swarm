@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+import threading
+import time
 from pathlib import Path
 
 import pytest
 
+import dharma_swarm.operator_core.a2a_task_lifecycle as lifecycle
 from dharma_swarm.operator_core.a2a_task_lifecycle import (
     A2ATaskLifecycleError,
     block_task,
@@ -291,6 +294,64 @@ def test_terminal_task_cannot_be_reclosed(tmp_path: Path) -> None:
 
     assert read_queue(tmp_path)[0]["status"] == "completed"
     assert "receipt" not in read_queue(tmp_path)[0]
+
+
+def test_concurrent_claims_of_same_task_admit_exactly_one(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Two workers racing to claim the same task: exactly one wins, the other
+    must see it already claimed. Without the exclusive file lock around the
+    read-modify-write span both readers see ``pending`` and both write a claim
+    (last-write-wins), so this asserts the lock is real, not that a mock ran.
+    """
+
+    _write_queue(
+        tmp_path,
+        [{"id": "t1", "from": "opus", "to": "any", "status": "pending", "body": "race me"}],
+    )
+
+    # Widen the read-modify-write window so the second claimant is guaranteed to
+    # arrive while the first is mid-transaction. With the lock the second thread
+    # blocks at lock acquisition (before its read); without it, both read the
+    # stale "pending" row and double-claim.
+    real_read = lifecycle._read_queue_entries
+
+    def slow_read(path: Path):
+        entries = real_read(path)
+        time.sleep(0.3)
+        return entries
+
+    monkeypatch.setattr(lifecycle, "_read_queue_entries", slow_read)
+
+    results: dict[str, object] = {}
+    barrier = threading.Barrier(2)
+
+    def worker(agent_uid: str) -> None:
+        barrier.wait()
+        try:
+            claimed = claim_task("t1", agent_uid=agent_uid, state_root=tmp_path)
+            results[agent_uid] = ("ok", claimed["claimed_by"])
+        except A2ATaskLifecycleError as exc:  # noqa: PERF203 - test path
+            results[agent_uid] = ("rejected", str(exc))
+
+    threads = [threading.Thread(target=worker, args=(uid,)) for uid in ("agent-a", "agent-b")]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=10)
+
+    outcomes = sorted(kind for kind, _ in results.values())
+    assert outcomes == ["ok", "rejected"], f"expected exactly one winner, got {results}"
+
+    winners = [uid for uid, (kind, _) in results.items() if kind == "ok"]
+    assert len(winners) == 1
+    winner = winners[0]
+
+    (_, reject_msg) = next(v for v in results.values() if v[0] == "rejected")
+    assert "already claimed" in reject_msg
+
+    rows = read_queue(tmp_path)
+    assert len(rows) == 1
+    assert rows[0]["status"] == "claimed"
+    assert rows[0]["claimed_by"] == winner
 
 
 def test_validate_task_receipt_checks_content_hash(tmp_path: Path) -> None:
