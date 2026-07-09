@@ -1,7 +1,15 @@
 # A2A/NATS Central Index
 
-Date: 2026-07-02
-Status: central integration map for the A2A/NATS lane
+Date: 2026-07-02 (routing role superseded 2026-07-09)
+Status: historical integration map for the A2A/NATS lane
+
+> **2026-07-09:** For connect-time routing truth (who is live, on which
+> broker, which subjects, which credential env vars), read
+> `docs/ops/FLEET_FIELD_REGISTRY.yaml` first
+> (`python3 scripts/runtime/fleet_field_registry.py`) — it is refreshed by
+> probe receipts, per registry decision FFR-D3. The worktree/PR pointers
+> below are operator-machine-local and historical; they are not reachable
+> from a clean checkout.
 
 ## One Place
 

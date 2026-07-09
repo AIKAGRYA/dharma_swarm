@@ -127,6 +127,22 @@ def _probe_targets(reg: dict[str, Any]) -> list[dict[str, str]]:
     ]
 
 
+def _require_ws_transport_deps(url: str) -> None:
+    """Fail honestly (not with nats-py traceback spew) when the hub URL is a
+    websocket endpoint but aiohttp — required by nats-py's ws/wss transport —
+    is not installed."""
+    if not url.startswith(("ws://", "wss://")):
+        return
+    try:
+        import aiohttp  # noqa: F401
+    except ImportError as exc:
+        raise RuntimeError(
+            f"hub URL {url} is a websocket endpoint but aiohttp is not "
+            "installed — nats-py needs it for ws/wss transports. "
+            "Install with: pip install aiohttp"
+        ) from exc
+
+
 async def _probe_outbound_reachability(
     reg: dict[str, Any],
     live_subjects: list[str] | set[str] | tuple[str, ...],
@@ -136,6 +152,7 @@ async def _probe_outbound_reachability(
     import nats
 
     url, user, pw = _creds()
+    _require_ws_transport_deps(url)
     live_subject_set = {str(subject) for subject in live_subjects if str(subject)}
     probe_from = str(reg.get("callsign") or reg.get("agent_uid") or "devin")
     probes: list[dict[str, Any]] = []
@@ -249,6 +266,7 @@ async def _gather(scan: int) -> dict[str, Any]:
     import nats
 
     url, user, pw = _creds()
+    _require_ws_transport_deps(url)
     out: dict[str, Any] = {"hub": {"url": url, "user": user, "stream": STREAM}}
 
     nc = await nats.connect(

@@ -19,6 +19,7 @@ REGISTERED_AGENT_UIDS = [
     "hermes-m5",
     "devin-roaming-2987d222",
     "fable_5_cursor",
+    "perplexity-computer",
 ]
 
 _ALIASES = {
