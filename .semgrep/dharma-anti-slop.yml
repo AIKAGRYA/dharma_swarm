@@ -43,6 +43,11 @@ rules:
   # New persistent stores (Store/Ledger/Registry classes that open
   # their own SQLite or append their own JSONL) should be wrapped by
   # RuntimeStateStore, not created as new substrates.
+  # ARMED to ERROR 2026-07-09 (ANTI_SLOP_RULES.md Rule 2: "extend to ERROR
+  # after observing for a few PRs"). The 3 pre-existing legitimate
+  # substrates are grandfathered via a `canonical-store` role declaration
+  # in each file header + the allowlist below; any NEW
+  # Store/Ledger/Registry/Substrate class now fails the strict gate.
   # ===========================================================================
   - id: dharma.no-new-substrate
     message: |
@@ -60,11 +65,20 @@ rules:
             add an entry to ACTIVE_SURFACE_MANIFEST.yaml
             correlation_spine.layers, then add the class name to this
             rule's allowlist with the role and PR link as justification.
-    severity: WARNING
+    severity: ERROR
     languages: [python]
     paths:
       exclude:
         - "dharma_swarm/runtime_state.py"
+        # Grandfathered pre-existing canonical substrates (armed 2026-07-09).
+        # Each declares closure-layer role `canonical-store` in its file
+        # header per ANTI_SLOP_RULES.md Rule 2 and owns the source of truth
+        # for its layer. Listed here so promotion to ERROR does not retro-
+        # actively fail landed code; the rule still fires ERROR on any NEW
+        # Store/Ledger/Registry/Substrate that is not on this allowlist.
+        - "dharma_swarm/bridge_registry.py"    # canonical-store: cross-graph bridge edges
+        - "dharma_swarm/graph_store.py"        # canonical-store: four-graph storage layer
+        - "dharma_swarm/knowledge_units.py"    # canonical-store: PlugMem knowledge units
     patterns:
       - pattern-either:
           # Class-body bare-name assignment: `conn = sqlite3.connect(...)`.
@@ -137,12 +151,11 @@ rules:
       providers_extended.py factory. This duplicates connection handling,
       bypasses retry/budget controls, and confuses provider-routing.
       Move the SDK import into providers.py and call through the factory.
-      Known offender at the time this rule was added:
-        dharma_swarm/autonomous_agent.py:468 (fix in a separate PR
-        before this rule is promoted to ERROR).
-    # WARNING until autonomous_agent.py:468 is refactored.
-    # TODO(governance): promote to ERROR once that fix lands.
-    severity: WARNING
+      The prior offender (autonomous_agent.py:468) was refactored; a repo-
+      wide scan now finds zero provider SDK imports outside the factory.
+    # ARMED to ERROR 2026-07-09: verified 0 offenders across dharma_swarm/
+    # (the autonomous_agent.py:468 fix landed). Strict gate now enforces it.
+    severity: ERROR
     languages: [python]
     paths:
       exclude:

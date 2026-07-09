@@ -12,6 +12,12 @@ Environment variables:
   KNOWLEDGE_MAX_TOKENS — max tokens for knowledge block (default: 500)
 """
 
+# dharma.no-new-substrate closure-layer role: canonical-store
+# (ANTI_SLOP_RULES.md Rule 2). KnowledgeStore owns the source of truth for the
+# structured-knowledge layer (Proposition/Prescription atoms); it is a
+# subordinate source under MemoryKernel but the canonical store for its own
+# layer. Allowlisted in .semgrep/dharma-anti-slop.yml.
+
 from __future__ import annotations
 
 import json
