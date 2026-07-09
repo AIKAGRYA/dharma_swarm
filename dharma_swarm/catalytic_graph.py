@@ -15,6 +15,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.atomic_io import write_json_atomic
 from dharma_swarm.models import CatalyticEdge, _utc_now
 
 logger = logging.getLogger(__name__)
@@ -334,9 +335,7 @@ class CatalyticGraph:
             "edges": [e.model_dump(mode="json") for e in self._edges],
             "saved_at": _utc_now().isoformat(),
         }
-        self._persist_path.write_text(
-            json.dumps(data, indent=2, default=str)
-        )
+        write_json_atomic(self._persist_path, data, indent=2, default=str)
 
     def load(self) -> bool:
         """Load graph from disk, replacing in-memory state.
