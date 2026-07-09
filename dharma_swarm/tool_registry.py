@@ -19,6 +19,7 @@ Import chain (circular-import safe):
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 from typing import Any, Callable, Optional
@@ -28,6 +29,16 @@ from dharma_swarm.spine.adapters import identity_from_carrier
 from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
 
 logger = logging.getLogger(__name__)
+
+
+def _tool_operation_hash(name: str, args: dict) -> str:
+    payload = json.dumps(
+        {"tool_name": name, "args": args},
+        default=str,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 class ToolEntry:
@@ -179,6 +190,11 @@ class ToolRegistry:
         metadata = kwargs.pop("metadata", None)
         identity: ExecutionIdentity | None = None
         side_effect_key = f"tool_registry.dispatch:{name}"
+        effect_metadata = {
+            "tool_name": name,
+            "operation_hash": _tool_operation_hash(name, args),
+        }
+        idempotency_started = False
         try:
             identity = self._resolve_identity(
                 name,
@@ -196,11 +212,17 @@ class ToolRegistry:
                     source="tool_registry.dispatch",
                     metadata={"tool_name": name},
                 )
-                runtime_state.record_side_effect_intent_sync(
+                idempotency_started = runtime_state.try_begin_idempotent_side_effect_sync(
                     identity,
                     side_effect_key,
-                    payload={"tool_name": name},
+                    metadata=effect_metadata,
                 )
+                if not idempotency_started:
+                    return json.dumps({
+                        "duplicate": True,
+                        "tool_name": name,
+                        "side_effect_key": side_effect_key,
+                    })
             if entry.is_async:
                 loop: asyncio.AbstractEventLoop | None = None
                 try:
@@ -217,21 +239,21 @@ class ToolRegistry:
             else:
                 result = entry.handler(args, **kwargs)
             if identity is not None and runtime_state is not None:
-                runtime_state.record_side_effect_complete_sync(
+                runtime_state.complete_idempotent_side_effect_sync(
                     identity,
                     side_effect_key,
                     result_receipt_id=f"tool:{name}",
-                    payload={"tool_name": name},
+                    metadata=effect_metadata,
                 )
             return result
         except Exception as e:
-            if identity is not None and runtime_state is not None:
+            if identity is not None and runtime_state is not None and idempotency_started:
                 try:
-                    runtime_state.record_side_effect_complete_sync(
+                    runtime_state.complete_idempotent_side_effect_sync(
                         identity,
                         side_effect_key,
                         status="failed",
-                        payload={"tool_name": name, "error": type(e).__name__},
+                        metadata={**effect_metadata, "error": type(e).__name__},
                     )
                 except Exception:
                     logger.exception("Tool %s failed to record runtime failure receipt", name)
