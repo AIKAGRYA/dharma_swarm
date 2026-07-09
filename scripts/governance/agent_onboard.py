@@ -316,6 +316,7 @@ def render_repo_state(*, fast: bool = False) -> dict[str, Any]:
     elif dirty_count == 0:
         print("Next command : make agent-build-preflight # before editing")
     print("If unsure    : rerun make onboard (or --fast); it repeats the next command")
+    print("New identity : joining the A2A fleet as a persistent agent? -> make agent-onboard")
     return {
         "worktree": str(REPO_ROOT),
         "branch": branch,
