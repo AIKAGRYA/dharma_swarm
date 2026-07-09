@@ -57,7 +57,11 @@ _PROBE_SUBJECT_BY_LANE = {
     "hermes": "dharma.a2a.hermes",
     "hermes-m5": "dharma.a2a.hermes",
     "perplexity": "dharma.a2a.perplexity",
-    "perplexity-computer": "dharma.a2a.perplexity-computer",
+    # perplexity-computer's canonical subject (dharma.a2a.perplexity-computer)
+    # is reserved-but-NOT-live until the FFR-D1 ACL rework provisions it
+    # (FLEET_FIELD_REGISTRY.yaml); the doctor probes the live field, so it
+    # targets the historical live lane until then. Flip after FFR-D1 applies.
+    "perplexity-computer": "dharma.a2a.perplexity",
     "fleet": "dharma.a2a.fleet",
     "fable_5_cursor": "dharma.a2a.fable_5_cursor",
     "fable_composer": "dharma.a2a.fable_composer",
