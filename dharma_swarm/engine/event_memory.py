@@ -178,6 +178,12 @@ def ensure_memory_plane_schema_sync(db: Any) -> None:
 
 async def ensure_memory_plane_schema_async(db: aiosqlite.Connection) -> None:
     """Create the full phase-1 memory-plane schema with an async SQLite connection."""
+    # Concurrency hygiene applied on every connection path: WAL lets readers
+    # proceed while a writer holds the DB (the default DELETE journal takes a
+    # whole-database write lock and starves readers on the multi-GB store);
+    # busy_timeout avoids an immediate 'database is locked' under contention.
+    await db.execute("PRAGMA journal_mode=WAL")
+    await db.execute("PRAGMA busy_timeout=5000")
     for ddl in (
         _EVENT_LOG_DDL,
         _SOURCE_DOCUMENTS_DDL,

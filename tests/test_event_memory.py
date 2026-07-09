@@ -16,6 +16,18 @@ async def store(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_memory_plane_uses_wal_journal(store: EventMemoryStore) -> None:
+    """WAL prevents the whole-DB write lock that starved readers on the
+    default DELETE journal (memory_plane.db reader-starvation fix)."""
+    import aiosqlite
+
+    async with aiosqlite.connect(store.db_path) as db:
+        cur = await db.execute("PRAGMA journal_mode")
+        mode = (await cur.fetchone())[0]
+    assert str(mode).lower() == "wal"
+
+
+@pytest.mark.asyncio
 async def test_ingest_valid_runtime_envelope(store: EventMemoryStore) -> None:
     event = RuntimeEnvelope.create(
         event_type=RuntimeEventType.ACTION_EVENT,
