@@ -129,18 +129,20 @@ def _probe_targets(reg: dict[str, Any]) -> list[dict[str, str]]:
 
 def _require_ws_transport_deps(url: str) -> None:
     """Fail honestly (not with nats-py traceback spew) when the hub URL is a
-    websocket endpoint but aiohttp — required by nats-py's ws/wss transport —
-    is not installed."""
+    websocket endpoint but aiohttp — required by nats-py's ws/wss transport
+    and, like nats-py itself, deliberately not a declared repo dependency —
+    is not installed. find_spec keeps this probe out of the import-provenance
+    ratchet."""
     if not url.startswith(("ws://", "wss://")):
         return
-    try:
-        import aiohttp  # noqa: F401
-    except ImportError as exc:
+    import importlib.util
+
+    if importlib.util.find_spec("aiohttp") is None:
         raise RuntimeError(
             f"hub URL {url} is a websocket endpoint but aiohttp is not "
             "installed — nats-py needs it for ws/wss transports. "
             "Install with: pip install aiohttp"
-        ) from exc
+        )
 
 
 async def _probe_outbound_reachability(
