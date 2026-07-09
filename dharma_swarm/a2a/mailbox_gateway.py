@@ -33,6 +33,8 @@ from typing import Any, Awaitable, Callable, Protocol
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 
+from dharma_swarm.daemon_config import dharma_state_dir
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["a2a-mailbox-gateway"])
@@ -73,7 +75,10 @@ _token_index: dict[str, str] = {}
 
 
 def _state_dir() -> Path:
-    return Path(os.environ.get("DHARMA_A2A_GATEWAY_DIR", "~/.dharma/a2a_gateway")).expanduser()
+    override = os.environ.get("DHARMA_A2A_GATEWAY_DIR")
+    if override:
+        return Path(override).expanduser()
+    return dharma_state_dir() / "a2a_gateway"
 
 
 def init_mailbox_gateway(
@@ -89,7 +94,7 @@ def init_mailbox_gateway(
     _receipts_path = receipts_path or _state_dir() / "receipts.jsonl"
     reload_tokens()
     logger.info(
-        "mailbox gateway initialized: %d agent token(s) from %s",
+        "mailbox gateway initialized: %d registered agent identity(ies), index at %s",
         len(_token_index),
         _tokens_path,
     )
@@ -110,7 +115,7 @@ def reload_tokens() -> None:
                 if len(digest) == 64 and _SUBJECT_TOKEN_RE.match(uid):
                     index[digest] = uid
         except Exception as exc:  # noqa: BLE001 — fail closed, never crash the app
-            logger.warning("token file %s unreadable (%s); rejecting all requests", path, exc)
+            logger.warning("identity index %s unreadable (%s); rejecting all requests", path, exc)
             index = {}
     _token_index = index
 
@@ -240,7 +245,8 @@ async def inbox(request: Request, batch: int = 10, route: str = "a2a") -> JSONRe
     for msg in pulled:
         try:
             decoded: Any = json.loads(msg.data.decode("utf-8"))
-        except Exception:  # noqa: BLE001 — non-JSON traffic is surfaced, not dropped
+        except Exception as exc:  # noqa: BLE001 — non-JSON traffic is surfaced, not dropped
+            logger.debug("non-JSON message on %s surfaced raw: %s", msg.subject, exc)
             decoded = {"raw": msg.data.decode("utf-8", errors="replace")}
         messages.append({"subject": msg.subject, "payload": decoded})
         await msg.ack()
