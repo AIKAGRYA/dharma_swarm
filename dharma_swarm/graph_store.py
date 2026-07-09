@@ -17,6 +17,11 @@ table-name prefixes to avoid ATTACH complexity.
 See ``FOUR_GRAPH_ARCHITECTURE.md`` §II, §III, §VI for the full specification.
 """
 
+# dharma.no-new-substrate closure-layer role: canonical-store
+# (ANTI_SLOP_RULES.md Rule 2). SQLiteGraphStore owns the source of truth for
+# the Four-Graph storage layer (Code/Semantic/Runtime/Telos + Bridge); other
+# layers read through it. Allowlisted in .semgrep/dharma-anti-slop.yml.
+
 from __future__ import annotations
 
 import json
