@@ -1,293 +1,154 @@
-# TAM — Transdimensional Abundance Machine: forged master prompt (2026-07-07)
+# TAM — Transdimensional Abundance Machine (2026-07-07)
 
-**Role:** agent-forged master prompt, ratification-PENDING. Produced at the
-operator's request ("use the master-prompt-forge skill for this and feed it
-back to me") to turn the operator's TAM seed into an execution-ready prompt
-for a future build session. **These are NOT operator words** except the name
-**TAM = Transdimensional Abundance Machine** (operator-supplied, 2026-07-07);
-the metric design and wiring are agent-proposed and become doctrine only on
-operator ratification.
-**Authority:** subordinate to `docs/vision_maps/NORTH_STAR.md` (§5, §7, §8,
-§11) and the honesty rule that competitor figures are source-pending until
-receipted. This file owns no rules and no state until ratified.
-**Method:** forged via the in-repo `master-prompt-forge` skill
-(`docs/skills/master-prompt-forge/`) — repo-agent template + verbatim
-workspace-hygiene block + quality-gate self-check. The skill is not installed
-into `.claude/skills/` (so not invokable as a session Skill); its documented
-contract was applied directly.
-**Rule:** if this file disagrees with `make onboard`, `ACTIVE_TRACK.yaml`, or
-any receipt, trust those.
+**Track:** `company-builder-parity-2026-07` (serves `revenue-external-humans-served`)
+**Instrument:** `scripts/governance/tam_ledger.py` (+ data owner `scripts/governance/tam_axes.py`)
+**Surface:** `reports/governance/tam/` — `tam_receipt.json` (digest-stamped), `COMPANY_BUILDER_PARITY.md` (the board), `tam_history.jsonl` (velocity chain)
+**Replay:** `python3 scripts/governance/tam_ledger.py --check` (byte-for-byte or non-zero exit)
 
----
+## The machine's name and telos
 
-## What TAM is, in one breath
+**TAM = Transdimensional Abundance Machine** (operator-resolved 2026-07-07):
+the organ that measures abundance across every dimension the organism serves
+against the strongest external company-builders. The soul lives in the name;
+the clarity lives in the number — its single headline output is deliberately
+plain: the **Company-Builder Parity %**.
 
-The **Transdimensional Abundance Machine** is a live instrument — the same
-shape as the Frontier Ledger and the DharmaGraph↔LangGraph differential
-oracle — that answers one plain question continuously: **"How close are we to
-being a verifiably BETTER Polsia / cofounder.co?"** Soul in the name; clarity
-in the number. Its single legible output is the **Company-Builder Parity %**,
-on a repo-wide capability board, with a history chain that shows whether the
-gap is closing over time. It weaves into what we already built with zero new
-mechanism — it clones `frontier_ledger.py`, reuses the row/velocity model,
-and reads existing honest-status owners for its axes.
+## The metric, plainly
 
-**The wedge (already documented, 2026-06 world-scan):** Polsia's own
-claimed-vs-actual ARR gap is ~4.4× (`reports/anatomy_altitude_2026-06-10/
-lane_F_world.md:35`). The autonomous-revenue category has no evidence layer.
-A telos-gated engine that publishes third-party-verifiable receipted revenue
-("honest ARR") exceeds on an axis incumbents structurally cannot follow —
-because publishing real receipts would expose their gap. That is the headline
-differentiator row on the board.
+> **Company-Builder Parity %** — 0% = far below the Polsia/Cofounder
+> capability baseline; 100% = at parity on everything they do; >100% = we
+> exceed on axes they cannot match.
 
-**Naming ledger (resolved):** TAM = Transdimensional Abundance Machine (the
-organ). The existing *Total Addressable Market* usage in
-`foundations/FIVE_FOURTEEN_A.md:49` is untouched; the Darshan work-packet dir
-`reports/tam/` is untouched. The machine writes to `reports/governance/tam/`.
+Per-capability scoring: **Behind = 0 · At parity = 1 · Ahead = 1.5**, over
+the denominator of all comparable + unmeasured rows. Lane rules (pure
+function `parity_bucket`, ordering is load-bearing):
 
----
+1. Competitor cell uncited or UNKNOWN → **Unmeasured** (never a guess).
+2. Our cell without a repo owner → **Unmeasured**.
+3. Competitor ABSENT (cited clean negative) → **No competitor equivalent**
+   (excluded from the denominator; watched as the exceed-vector lane).
+4. Ours RUNS + cited structural exceed-vector → **Ahead**.
+5. Ours RUNS → **At parity**. Anything less → **Behind**.
 
-## THE FORGED MASTER PROMPT (copy-paste block)
+### Anti-gaming (the adversary check, encoded as tests)
 
-```markdown
-# MASTER PROMPT — TAM (Transdimensional Abundance Machine): the live "Company-Builder Parity" metric + board
+Question asked before committing: *can parity_pct be made to look higher than
+honest?* Vectors found and closed:
 
-## Role & target agent
-Claude (fresh repo session, full tool access) on
-AmitabhainArunachala/dharma_swarm. Operator = John / Dhyana holds all
-ratification authority. Run `make onboard` FIRST and trust it over this
-prompt. This is a governance-instrument build in the same idiom as the
-Frontier Ledger you already shipped — reuse, do not reinvent.
+- **Mark Unmeasured rows as Ahead** — impossible: uncited competitor cells
+  bucket to UNMEASURED before AHEAD is ever considered (rule ordering), and
+  UNMEASURED scores 0 **while staying in the denominator**, so not measuring
+  always drags the number down (`test_unmeasured_rows_stay_in_denominator_and_cannot_inflate`).
+- **Narrate an exceed-vector on a dormant organ** — `validate_row` raises
+  ValueError unless ours is RUNS *and* the exceed citation exists
+  (`test_ahead_must_be_earned_not_narrated`).
+- **Shrink the denominator by declaring competitor ABSENT** — ABSENT requires
+  a cited clean negative or `validate_row` raises
+  (`test_uncited_competitor_absent_cannot_shrink_denominator`).
+- **Hand-edit the receipt/board** — digest seal + `--check` pure-render
+  comparison catch both (`test_write_then_check_roundtrip_and_tamper_detection`,
+  `test_markdown_is_a_pure_render`).
 
-## Goal
-Build the **Transdimensional Abundance Machine (TAM)** — ONE
-plain-language, always-re-runnable instrument that answers, on a repo-wide
-board: **"How close are we to being a verifiably BETTER Polsia /
-cofounder.co — as a single percentage and a per-capability Kanban?"** The
-machine's name carries the telos (abundance across every dimension the
-organism serves); its single legible output is deliberately plain — the
-**Company-Builder Parity %**. Snapshot research already exists (2026-06
-world-scan); turn it into a LIVE, digest-stamped, `--check`-replayable
-instrument that weaves into the existing Frontier Ledger, and whose history
-chain shows whether the gap is CLOSING over time. Phase 0 ships the
-instrument + first honest render + a track proposal; no world-facing action.
+## First honest render (2026-07-07)
 
-## Inferred assumptions (correct any that are wrong)
-- **Naming — RESOLVED by operator (2026-07-07): TAM = Transdimensional
-  Abundance Machine** (the instrument/organ name). Its single headline
-  output stays the plain **Company-Builder Parity %** (`parity_pct`) — soul
-  in the name, clarity in the number. Do NOT overload the existing
-  *Total Addressable Market* usage (`foundations/FIVE_FOURTEEN_A.md:49`);
-  do NOT write into the Darshan-owned `reports/tam/` — the machine's
-  surface is `reports/governance/tam/`.
-- **Scope:** measurement only — afferent (read competitor PUBLIC data +
-  our own honest status). Efferent-closed: no outreach, no publishing, no
-  benchmarking claims. Consistent with chamber doctrine.
-- **Home:** a NEW active track `company-builder-parity-2026-07` serving
-  the uncovered spine objective `revenue-external-humans-served`,
-  complementing `hyperbolic-time-chamber-2026-07`. If the operator prefers
-  folding it into the chamber track, that's a one-line change — flag it,
-  don't assume irreversibly.
-- **Clarity over math:** the operator explicitly does NOT want fancy
-  mathematical names. The headline is a percentage a non-engineer
-  understands. Internal rigor (digests, replay) stays under the hood.
+**parity_pct = 35.0 [RED]** · Behind 6 · At parity 2 · Ahead 1 ·
+No-equivalent 2 · Unmeasured 1. Sparse and mostly Behind — that IS the
+day-one truth. Velocity is unmeasured until a second render populates
+`tam_history.jsonl` (the chain is digest-linked; the governance checker
+verifies it with `expect_chain`).
 
-## Context the executing agent needs (verify every file:line before trusting)
-- **The instrument to CLONE:** `scripts/governance/frontier_ledger.py` —
-  reuse its `stable_digest`, `write_surface` (receipt.json + .md +
-  history.jsonl triad), `check()` replay contract (seal recomputes, pinned
-  input shas, markdown is a pure render, history chain intact + tip
-  references receipt), and `render_markdown`. Build
-  `scripts/governance/tam_ledger.py` as its sibling writing
-  `reports/governance/tam/` (NOT `reports/tam/`, which is Darshan-owned).
-- **Row / comparator model to REUSE:** `dharma_swarm/chamber/ledger_rows.py`
-  — mirror `FIELD_COMPARATORS` (capability -> {value, unit, receipt};
-  "only entries with a citation carry a number"), the
-  `add(capability, ours, *, commensurable, note)` engine, and
-  `capability_summary(rows)`. Here the "field" column is a NAMED COMPETITOR
-  capability (Polsia / Cofounder), each cell citing a source URL or repo
-  receipt — the commensurability rule (`score_c2` /
-  `trust_gate_status.py`) applies: an unmeasured/uncited competitor cell
-  renders UNKNOWN, never a guess.
-- **Velocity (gap-closing over time):** `dharma_swarm/chamber/ledger_history.py`
-  `append_history` / `compute_velocity` / `read_chain` — reuse verbatim so
-  the board shows d(parity)/dt (are we catching up?).
-- **Tri-color verdict + portfolio reader:** `scripts/governance/trust_gate_status.py`
-  `verdict_for` (GREEN>=0.8 / AMBER>=0.4 / RED), `parse_cell_statuses`
-  (reads `VENTURE_CELL_PORTFOLIO.yaml`). Reuse; do not re-implement.
-- **CI digest gate:** `scripts/governance/check_track_status.py`
-  `check_receipt_valid(..., expect_digest=True)`. Wire the track criterion
-  by copying the shape of `arena_truth_receipt_valid` in `ACTIVE_TRACK.yaml`.
-- **Capability axes (the rows) come from existing honest-status owners —
-  read, don't duplicate:** `docs/governance/VENTURE_CELL_PORTFOLIO.yaml`
-  (`cells[]` incl. `external_operator: cofounder.co ... supersedes Polsia`,
-  line 82), `reports/swarm_genome/<latest>/SYNTHESIS.md` §Organ-Health
-  table (Working/Semi-working/Aspirational vocabulary), NORTH_STAR §7 organ
-  table, `ACTIVE_TRACK.yaml` `vital_signs.dimensions`.
-- **The competitor facts (source-pending — carry that label):**
-  `reports/anatomy_altitude_2026-06-10/lane_F_world.md` (Polsia :30-45,
-  Cofounder :11-28) and `docs/research/AI_COMPANY_OPERATOR_GROUNDING_PACK_2026-06-12.md`
-  (the exceed-vectors). Polsia's **4.4× claimed-vs-actual ARR gap
-  (`:35`)** is the load-bearing wedge: the honest-ARR axis is where we
-  structurally exceed — incumbents can't publish receipted revenue without
-  exposing the gap. NORTH_STAR §5 flags these figures source-pending;
-  preserve that honesty (cite URLs, mark unverified).
-- **The Kanban render already exists and is generic:**
-  `dashboard/src/components/operator-coherence/CoherenceKanban.tsx` renders
-  any `KanbanLane[]` (`dashboard/src/lib/operatorCoherence.ts`). A repo-wide
-  capability board = lanes as parity buckets ("Behind" / "At parity" /
-  "Ahead" / "No competitor equivalent" / "Unmeasured"), cards = capabilities.
-  The governance receipt (`reports/governance/tam/`) is the SOURCE OF TRUTH;
-  the dashboard optionally reads its JSON. The one-page markdown table IS
-  the board if no UI wiring is done in Phase 0.
+## Axis list and sourcing
 
-<workspace-hygiene>
-## Workspace hygiene (read this before touching anything)
+Competitor snapshot: 2026-06-10 world triangulation
+(`reports/anatomy_altitude_2026-06-10/lane_F_world.md`); every competitor
+cell carries a URL + verification label (`vendor-claim` /
+`third-party-report` / `source-pending` / `unverifiable`) per the
+NORTH_STAR §5 source-pending rule. Refreshing these facts is track
+next-item 2, never silently assumed current.
 
-Before making any change, gather the following — read-only, no writes:
+| Axis | Ours (owner) | Competitor (source) | Lane |
+|---|---|---|---|
+| Org-shaped orchestration | WIRED_BUT_DORMANT — orchestrator + spine (lane_F:21) | Cofounder CLAIMED (cofounder.co) | Behind |
+| HITL approval | RUNS — telos_gates + gate PEP (lane_F:22) | Cofounder CLAIMED (cofounder.co) | At parity |
+| Typed witnessed gates | RUNS — GateRegistry + witness (lane_F:28) | Cofounder CLAIMED (cofounder.co) | **Ahead** (exceed cite lane_F:28) |
+| Customer-facing execution | ABSENT (lane_F:25 clean negative) | Cofounder CLAIMED (cofounder.co) | Behind |
+| GTM milestone scaffold | ABSENT (lane_F:26) | Cofounder CLAIMED (cofounder.co) | Behind |
+| Extensibility (MCP/skills) | RUNS — SkillRegistry + registries | Cofounder CLAIMED (cofounder.co) | At parity |
+| Pricing + billing | ABSENT (lane_F:42) | Polsia SHIPPED ($49/mo + 20%, polsia.com) | Behind |
+| Distribution / ARR | ABSENT — $0 (lane_F:199; portfolio revenue_usd 0) | Polsia CLAIMED ~$10M ARR, **source-pending** (ain.ua, aiweekly, zilla.so) | Behind |
+| E2E company operation | ASPIRATION — portfolio live-read | Polsia CLAIMED 9 agents E2E (polsia.com) | Behind |
+| **Honest (receipted) ARR** ⭐ | WIRED_BUT_DORMANT — EvidenceReceipt, $0 to date (lane_F:28,44) | Polsia+Cofounder ABSENT — 4.4x claims gap (zilla.so, third-party) | No equivalent |
+| Governed self-evolution | WIRED_BUT_DORMANT — genome table "overclaim risk" | Polsia+Cofounder ABSENT (public surfaces, lane_F) | No equivalent |
+| Competitor internals | RUNS (repo-inspectable) | UNKNOWN — SPECULATIVE (lane_F:18,204), no citation | Unmeasured |
 
-- Repo root (`git rev-parse --show-toplevel`), current branch, and
-  upstream tracking branch.
-- `git worktree list` — is this checkout one of several worktrees on the
-  same repo? Note any siblings.
-- Dirty state: `git status --short` — count of modified/untracked files.
-  If this count is large (dozens to hundreds), treat the tree as **user
-  property to preserve**, not clutter to clean — see "Dirty-Worktree
-  Quarantine Mode" below.
-- Lockfiles present (`package-lock.json`, `pnpm-lock.yaml`, `poetry.lock`,
-  `Cargo.lock`, `go.sum`, etc.) and which dependency manager they imply.
-- Generated / vendor / cache directories (`node_modules/`, `dist/`,
-  `build/`, `.venv/`, `__pycache__/`, `target/`, `.next/`) — do not
-  descend into these for edits; do not "clean" them unless asked.
-- The project's actual test/lint/build commands (check `Makefile`,
-  `package.json` scripts, `pyproject.toml`, CI config) rather than
-  assuming a generic `npm test` / `pytest` invocation.
+**The headline differentiator is `honest_arr`**: Polsia's documented 4.4×
+claimed-vs-actual ARR gap (claimed $3M+ vs $689K run-rate,
+zilla.so/blog/polsia-review) is the load-bearing wedge — incumbents cannot
+publish receipted revenue without exposing the gap; our receipt spine can,
+the moment real dollars flow through it. Honestly graded WIRED_BUT_DORMANT
+($0 receipted revenue to date), so it sits in the exceed-vector watch lane,
+not in Ahead.
 
-**Forbidden by default** (only do these if the user explicitly asked for
-this exact operation, and even then, confirm current state and flag the
-risk first):
+## Naming resolution (collision map)
 
-- `git reset --hard`, `git clean -f` / `-fdx`, `git checkout -- .`
-- Force-push, rewriting published history, `--no-verify` / skipping hooks
-- Mass reformatting or repo-wide auto-fix passes
-- Dependency upgrades/downgrades not directly requested
-- Deleting or moving files outside the stated scope of the task
-- Mixing new agent-driven work into an already-chaotic worktree without
-  the user's explicit go-ahead
+- **TAM (this machine)** = Transdimensional Abundance Machine — instrument
+  name only; headline stays "Company-Builder Parity %".
+- **TAM = Total Addressable Market** (`foundations/FIVE_FOURTEEN_A.md:49`) —
+  untouched, not overloaded.
+- **`reports/tam/`** — Darshan-owned; untouched. This machine writes only
+  `reports/governance/tam/`.
 
-## Dirty-Worktree Quarantine Mode
+## Reuse map (no new primitives)
 
-Trigger this posture whenever the workspace has a large number of
-pre-existing uncommitted or unfamiliar changes that are **not** part of
-the current task:
+- `stable_digest` / `utc_now` — `dharma_swarm/memory_kernel/write_receipts.py`
+  (same seal convention `check_track_status.check_receipt_valid` recomputes).
+- `verdict_for` (GREEN≥0.8 / AMBER≥0.4 / RED) and `parse_cell_statuses`
+  (portfolio live-read) — imported from `scripts/governance/trust_gate_status.py`.
+- Surface contract (receipt + pure-render markdown + `--check` replay,
+  volatile-keys convention) — cloned from `scripts/governance/arena_truth_report.py`.
+- History chain rows follow the `check_track_status` chain convention
+  (digest over all fields except `digest`; `prev_digest` links; empty genesis).
 
-1. Do not touch, stash, or discard the existing changes. Inventory them
-   (file count, rough categories, whether they look intentional or
-   stale) and report the inventory before doing anything else.
-2. Do the new work in a clean sibling worktree or fresh clone instead of
-   inside the contaminated tree:
-   `git worktree add -b <new-branch> <new-path> <commit-ish>`
-   creates an isolated working tree and branch from a chosen commit
-   without disturbing the original.
-3. If the user wants the dirty tree cleaned up, that is a separate,
-   explicit task — never bundle it into an unrelated feature/fix prompt.
-4. If unsure whether uncommitted work is intentional, ask before treating
-   it as disposable. It is not.
-</workspace-hygiene>
+**Deviation from the build prompt, flagged honestly (updated at merge):**
+the prompt named `scripts/governance/frontier_ledger.py`,
+`dharma_swarm/chamber/ledger_rows.py` / `ledger_history.py`, and the
+`hyperbolic-time-chamber-2026-07` track as the instrument/modules to clone.
+At build time none of these existed on the main this branch was cut from —
+**they landed on main mid-session via PR #830** (merged after this branch's
+base commit `d0a2c5d`). TAM was therefore built as a sibling of the shipped
+instrument implementing the identical contract, `arena_truth_report.py`,
+with the row/comparator and history-chain semantics implemented against the
+same house conventions the chamber ledger uses (`stable_digest` seal,
+`check_track_status` chain format). Reconciled at merge: the track now
+`complements` both `organism-rewire-2026-07` (whose next-item 8 demanded
+this spine objective be served next) and `hyperbolic-time-chamber-2026-07`;
+a consolidation audit onto the chamber ledger helpers is track next-item 3.
+The operator's forged master prompt (which PR #830 committed at this file's
+path) is preserved verbatim at `docs/plans/TAM_MASTER_PROMPT_2026-07-07.md`.
 
-## Constraints & non-goals
-- Reuse the frontier-ledger mechanism; write NO new digest/receipt/chain
-  primitives (import them). New logic is only the TAM row-set + the
-  competitor comparator map.
-- No new truth store; read existing owners (portfolio, genome, NORTH_STAR,
-  active-track). The instrument is `authority: projection_only` — it owns
-  no fact, exactly like `frontier_ledger.py` and `trust_gate_status.py`.
-- Honesty is the product: every competitor number carries a source URL and
-  a source-pending/verified label (NORTH_STAR §5 rule); every "ours" cell
-  traces to a repo owner; unmeasured = UNKNOWN, never a flattering guess.
-  The whole point vs Polsia is that our number is checkable.
-- No efferent action (no outreach, publishing, benchmarking claims, PR to
-  external repos). No gate/ratchet/One-Wire weakening. Files < 500 lines.
-- Do NOT overload "TAM = Total Addressable Market"; do NOT write into
-  `reports/tam/` (Darshan-owned) — use `reports/governance/tam/`.
-- Do NOT touch sibling-track surfaces (`dharma_swarm/coordination/**`,
-  `council/**`, arena reports) except through their own next-items.
+**Competitor-fact correction in flight (2026-07-07):** the deep
+blueprint/genealogy research pass adversarially REFUTED the zilla.so "4.4×
+claimed-vs-actual ARR gap" framing this dossier and `tam_axes.py` cite: the
+$689K run-rate (Mixergy, recorded ~Feb 2026) predates the $3M+ claims by
+2–3 weeks of independently documented hypergrowth (True Ventures 2026-03-23
+"tripled to $3M ARR"; agent-wars 2026-03-14 "$3.5M"), the contemporaneous
+gap was ~1.45× at most, and zilla.so is an anonymous SEO-style review blog,
+not third-party reporting. The structural honest-ARR thesis (no incumbent
+publishes third-party-verifiable revenue) stands, but the 4.4×-gap wedge
+must not be repeated as fact. Axis rows `honest_arr` and `distribution_arr`
+get corrected from the verified dossier in track next-item 2.
 
-## Deliverables
-1. `scripts/governance/tam_ledger.py` — a frontier-ledger sibling:
-   renders `reports/governance/tam/{tam_receipt.json (digest-stamped),
-   COMPANY_BUILDER_PARITY.md (the board), tam_history.jsonl (velocity
-   chain)}`; `--check` replays byte-for-byte or fails non-zero.
-2. **The metric, plainly:** one headline `parity_pct` (0% = far below the
-   Polsia/Cofounder capability baseline; 100% = at parity on everything
-   they do; >100% = we exceed on axes they can't match — honest-ARR
-   receipts, telos gates, fractal survival pressure). Plus a per-capability
-   table: each row = a capability, columns = OURS status | COMPETITOR
-   (Polsia/Cofounder) | parity bucket (Behind/At/Ahead/No-equivalent/
-   Unmeasured) | source citations. The honest-ARR row is explicitly the
-   headline differentiator.
-3. First **honest render** committed (expect it to be sparse and mostly
-   "Behind"/"Unmeasured" — that IS the day-one truth, like the Frontier
-   Ledger's 4/13-measured first render; do not inflate it).
-4. Draft `ACTIVE_TRACK.yaml` entry `company-builder-parity-2026-07`
-   (serves `revenue-external-humans-served`) with a `tam_receipt_valid`
-   (`expect_digest: true`) completion criterion + a `tam_ledger.py --check`
-   `command_passes` criterion; run `render_active_track_includes.py`.
-5. A short dossier `docs/plans/TAM_TRANSDIMENSIONAL_ABUNDANCE_MACHINE_<date>.md`:
-   the machine's name + telos (Transdimensional Abundance Machine), the
-   plain metric definition (Company-Builder Parity %), the axis list +
-   where each "ours"/"competitor" value is sourced, the resolved naming
-   (TAM = the organ; parity % = the number; the FIVE_FOURTEEN_A market-TAM
-   and Darshan reports/tam/ left untouched), and the operator decision queue.
-6. (Optional, only if time) wire a `KanbanLane[]` producer feeding the
-   existing `CoherenceKanban.tsx` — else the markdown table is the board and
-   this is a next-item.
+## Operator decision queue
 
-## Evidence / verification discipline
-- Every claim = a command run this session or a file:line read this
-  session. Committed receipts are claims until replayed.
-- Run and show: `python3 scripts/governance/tam_ledger.py` then
-  `python3 scripts/governance/tam_ledger.py --check` (OK); the governance
-  checker `check_receipt_valid(..., expect_digest=True)` passes on the
-  receipt; `python3 -m pytest tests/test_tam_ledger.py -q` green (add
-  tests mirroring the frontier-ledger tests: seal, replay, UNKNOWN honesty,
-  velocity, competitor-cell-requires-citation).
-- Every competitor number shows its source URL; every "ours" cell shows
-  its repo owner; anything unverifiable renders UNKNOWN with the gap named.
-- `check_track_status.py` reads the new track as rigorous (>=1
-  receipt_valid/command_passes/test_passes criterion, no open blocker);
-  hygiene delta-ratchet REGRESSIONS(0); boundary audit clean.
-
-## Subagent / swarm strategy (proportionate)
-Mostly single-pass (it's a clone of an existing instrument). Optionally one
-research subagent to REFRESH the Polsia/Cofounder public capability facts
-(their sites/pricing may have moved since 2026-06) with fresh source URLs
-before the first render — afferent read only. One adversary check: can the
-parity_pct be gamed to look higher than honest (e.g. by marking
-Unmeasured rows as Ahead)? If so, fix before committing.
-
-## Done when
-- `tam_ledger.py` runs and `--check` replays green; the receipt passes the
-  real governance checker with `expect_digest`.
-- The board renders one clear headline `parity_pct` + a per-capability
-  table with source citations and honest UNKNOWNs.
-- The draft track entry + dossier exist; `render_active_track_includes.py
-  --check` is clean; the naming decision and operator decision queue are
-  explicit.
-- Nothing efferent happened; no sibling surface touched; files < 500 lines;
-  and a second render would populate velocity (gap-closing over time).
-```
-
----
-
-## Operator decision queue (for when this prompt is fed to a build session)
-1. **Ratify** the metric design (Company-Builder Parity %) and the machine
-   name TAM = Transdimensional Abundance Machine (done — naming resolved).
-2. **Track placement:** new `company-builder-parity-2026-07` serving
-   `revenue-external-humans-served` (recommended — finally covers the gap),
-   OR fold into `hyperbolic-time-chamber-2026-07`.
-3. **Competitor refresh:** approve the one afferent research subagent to
-   re-pull Polsia/Cofounder public facts with fresh source URLs before the
-   first render (their sites may have moved since 2026-06).
-4. **Board surface:** markdown table only for Phase 0 (recommended), or wire
-   `CoherenceKanban.tsx` now.
+1. **Track home** — keep standalone `company-builder-parity-2026-07` (as
+   landed) or fold into another lane; one-line YAML move either way.
+2. **WIP** — the portfolio now has 6 ACTIVE tracks (warn threshold 5, max
+   10). Checker warns; ratify the sixth or close/merge one.
+3. **Axis set + weights** — ratify the day-one 12 axes and the
+   Behind 0 / At 1 / Ahead 1.5 scoring (in particular whether Ahead's 1.5
+   premium is wanted in the headline).
+4. **Refresh cadence** — competitor facts are a 2026-06-10 snapshot;
+   `fresh_ttl_days: 30` on the receipt forces a monthly re-render. Approve
+   the afferent research refresh (track next-item 2).
+5. **Dashboard wiring** — optional `KanbanLane[]` producer feeding
+   `CoherenceKanban.tsx` (next-item 3); until then the `.md` table IS the board.

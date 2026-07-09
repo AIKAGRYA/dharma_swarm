@@ -18,12 +18,12 @@
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active portfolio:** 8 co-equal track(s) (WIP warn 8, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
+**Active portfolio:** 9 co-equal track(s) (WIP warn 8, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
 
 **Spine objectives (each track serves one):**
 
 - `substrate-nativeness` — Substrate nativeness — runtime flows through the ontology/spine, not around it (covered)
-- `revenue-external-humans-served` — Revenue & external humans served — value leaves the house and someone acts on it (**no active track**)
+- `revenue-external-humans-served` — Revenue & external humans served — value leaves the house and someone acts on it (covered)
 - `research-depth` — Research depth — the contemplative-mechanistic bridge (R_V, geometric lens) deepens (covered)
 
 ### Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
@@ -381,6 +381,64 @@ All 12 disciplines + substrate ruling enforced.
 - Python remains the composition root; no gate/spine/receipt logic reimplemented in another language; Rust/C++ per-component only with measured justification.
 - No credentials committed; feed keys and hosts are operator-provisioned.
 - Files <500 lines; sibling track surfaces untouched except via their own next-items (world_radar/** called through public functions only).
+
+### TAM (Transdimensional Abundance Machine) — the live Company-Builder Parity board
+
+**Track id:** `company-builder-parity-2026-07` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `revenue-external-humans-served` · **Verified at:** 2026-07-07 (TTL 30 days)
+**Relations:** complements: organism-rewire-2026-07, hyperbolic-time-chamber-2026-07
+**Owns surfaces:** scripts/governance/tam_ledger.py, scripts/governance/tam_axes.py, reports/governance/tam/**, tests/test_tam_ledger.py, docs/plans/TAM_TRANSDIMENSIONAL_ABUNDANCE_MACHINE_2026-07-07.md, docs/plans/TAM_MASTER_PROMPT_2026-07-07.md, docs/research/POLSIA_COFOUNDER_BLUEPRINT_GENEALOGY_2026-07-07.md
+**Moves vital signs:** eval_coverage, quality_gates
+
+Operator-instructed 2026-07-07 (master prompt, preserved at
+docs/plans/TAM_MASTER_PROMPT_2026-07-07.md; naming resolved by
+operator: TAM = Transdimensional Abundance Machine — the organ name
+carries the telos, the headline number stays plain). ONE always
+re-runnable instrument answering: "How close are we to being a
+verifiably BETTER Polsia / cofounder.co — as a single percentage and a
+per-capability board?" scripts/governance/tam_ledger.py renders
+reports/governance/tam/ (digest-stamped tam_receipt.json + the
+COMPANY_BUILDER_PARITY.md board + tam_history.jsonl velocity chain);
+--check fails non-zero unless the committed surface replays exactly.
+
+This is the FIRST track serving revenue-external-humans-served
+(previously an uncovered spine objective) and lands the sequencing
+called by organism-rewire-2026-07 next-item 8 ("Next track after this
+one lands MUST serve revenue-external-humans-served"). Built as an
+arena_truth_report.py sibling (the chamber Frontier Ledger landed on
+main via PR #830 only mid-build-session; consolidation onto the
+chamber ledger helpers is queued, not assumed).
+
+Scope is measurement only — afferent (competitor PUBLIC data + our own
+honest status owners). Efferent-closed: no outreach, no publishing, no
+benchmarking claims. authority: projection_only — it owns no fact.
+Honesty is the product: every competitor number carries a source URL
+and a verification label (NORTH_STAR §5 source-pending rule); every
+"ours" cell traces to a repo owner; unmeasured renders UNKNOWN, never
+a flattering guess; UNMEASURED rows stay in the denominator so not
+measuring can never inflate the headline; AHEAD requires a RUNS-grade
+organ AND a cited structural exceed-vector. The honest-ARR axis
+(receipted revenue no incumbent publishes third-party-verifiably) is
+the headline differentiator.
+
+First honest render (2026-07-07): parity_pct = 35.0 [RED], lanes
+Behind 6 / At parity 2 / Ahead 1 / No-equivalent 2 / Unmeasured 1.
+That sparse, mostly-behind board IS the day-one truth.
+
+**Next items:**
+
+- [governance] Operator ratification of the track home (standalone company-builder-parity-2026-07 vs folding into another lane — one-line change either way) and of the day-one axis set / scoring weights (Behind 0 / At 1 / Ahead 1.5; UNMEASURED in denominator).
+- [research] DONE 2026-07-07: competitor facts refreshed from the adversarially-verified blueprint/genealogy dossier (docs/research/POLSIA_COFOUNDER_BLUEPRINT_GENEALOGY_2026-07-07.md — 100-agent deep research, 20 confirmed / 5 refuted claims). The zilla.so 4.4x ARR-gap framing was REFUTED and retired from all axis rows (replaced by 36kr's ~2.2x headline-vs-recurring decomposition + no-independent-audit finding); Polsia's engine is now citable via its own GitHub dump (Claude-CLI subprocesses on Celery Beat — commodity assembly, production parity unproven), flipping internal_architecture from UNMEASURED to measured. Second render: parity 35.0 -> 45.0 [AMBER], first velocity point on tam_history.jsonl (+10.0 pts — measurement improvement, not capability growth; annotated on the row).
+- [code] Consolidation audit vs the chamber Frontier Ledger (PR #830 landed scripts/governance/frontier_ledger.py + dharma_swarm/chamber/ledger_rows.py/ledger_history.py mid-session, after this instrument was built on the arena_truth_report.py contract): if the chamber ledger_history/comparator helpers are importable without touching chamber-owned surfaces, absorb them and delete the local equivalents; else record why two siblings stay.
+- [code] Optional dashboard wiring: a KanbanLane[] producer feeding the existing CoherenceKanban.tsx from the tam_receipt.json lanes; until then the COMPANY_BUILDER_PARITY.md table IS the board (governance receipt stays the source of truth).
+
+**Non-goals:**
+
+- No efferent action — no outreach, no publishing, no external benchmarking claims (chamber doctrine; measurement only).
+- Do not overload TAM = Total Addressable Market (foundations/FIVE_FOURTEEN_A.md:49) and do not write into the Darshan-owned reports/tam/ — this machine's surface is reports/governance/tam/ only.
+- No new digest/receipt/chain primitives — reuse stable_digest/utc_now (memory_kernel.write_receipts), verdict_for/parse_cell_statuses (trust_gate_status.py), and the arena_truth_report.py surface contract.
+- {'No new truth store': 'authority is projection_only; every cell cites an existing owner (lane_F world dossier, VENTURE_CELL_PORTFOLIO.yaml, swarm-genome organ table) or a public URL.'}
+- Do not weaken any gate/ratchet/One-Wire boundary; do not touch sibling-track surfaces except through their own next-items.
 
 **Recently closed tracks:**
 
