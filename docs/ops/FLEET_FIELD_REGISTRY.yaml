@@ -195,7 +195,10 @@ agents:
 
 # Known identities NOT probed on 2026-07-09 — do not treat as live without a receipt.
 unprobed_identities:
-  - {agent_uid: merge_master_mike, registered_card: examples/agents/merge_master_mike.registration.json}
+  - {agent_uid: merge_master_mike, registered_card: examples/agents/merge_master_mike.registration.json,
+     note: 'live wire VERIFIED 2026-07-09: @mike mention on PR #842 fired codex-mention-router
+       (run 28993046529-era, ack + deterministic gate packet posted by github-actions) — a cloud
+       session CAN summon Mike by PR comment; still unprobed for NATS/git-seat lanes'}
   - {agent_uid: fable_5_cursor, registered_card: examples/agents/fable_5_cursor.registration.json}
   - {agent_uid: fable_composer, registered_card: examples/agents/fable_composer.registration.json, note: card path unverified; git seat inter_agent/fable_composer/ exists}
   - {agent_uid: qwen_code, registered_card: examples/agents/qwen_code.registration.json}
