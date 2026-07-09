@@ -24,6 +24,34 @@ def isolate_cron_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(cron_scheduler, "LOCK_FILE", cron_dir / ".tick.lock")
 
 
+class TestCorruptJobsRecovery:
+    """A corrupt jobs file must be quarantined, never silently emptied —
+    otherwise the next atomic save_jobs() permanently destroys every job.
+    """
+
+    def test_corrupt_file_is_quarantined_not_destroyed(self):
+        cron_scheduler._ensure_dirs()
+        corrupt = '{"jobs": [{"id": "keep-me"},,, BROKEN'
+        cron_scheduler.JOBS_FILE.write_text(corrupt, encoding="utf-8")
+
+        # Recovers gracefully instead of crashing the scheduler...
+        assert cron_scheduler.load_jobs() == []
+        # ...the original bytes are preserved under a .corrupt-* name...
+        assert not cron_scheduler.JOBS_FILE.exists()
+        quarantined = list(cron_scheduler.CRON_DIR.glob("jobs.json.corrupt-*"))
+        assert len(quarantined) == 1
+        assert quarantined[0].read_text(encoding="utf-8") == corrupt
+
+        # ...and they survive a later save (the data-loss bug this fixes).
+        cron_scheduler.save_jobs([{"id": "new-job"}])
+        assert quarantined[0].read_text(encoding="utf-8") == corrupt
+        assert cron_scheduler.load_jobs() == [{"id": "new-job"}]
+
+    def test_valid_file_still_loads(self):
+        cron_scheduler.save_jobs([{"id": "a"}, {"id": "b"}])
+        assert cron_scheduler.load_jobs() == [{"id": "a"}, {"id": "b"}]
+
+
 class TestParseDuration:
     """Tests for parse_duration()."""
 

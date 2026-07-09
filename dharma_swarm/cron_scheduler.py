@@ -179,16 +179,45 @@ def compute_next_run(
 # ── Job CRUD ─────────────────────────────────────────────────────────
 
 def load_jobs() -> list[dict[str, Any]]:
-    """Load all jobs from storage."""
+    """Load all jobs from storage.
+
+    On a corrupt jobs file, quarantine it (preserving the bytes) rather than
+    silently returning []: because save_jobs() overwrites atomically, an empty
+    return would let the next save permanently destroy every recoverable job.
+    An unreadable (non-corrupt) file fails closed for the same reason.
+    """
     _ensure_dirs()
     if not JOBS_FILE.exists():
         return []
     try:
         with open(JOBS_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-            return data.get("jobs", [])
-    except (json.JSONDecodeError, IOError):
+    except json.JSONDecodeError as exc:
+        quarantine = JOBS_FILE.with_name(
+            f"{JOBS_FILE.name}.corrupt-{_utc_now().strftime('%Y%m%dT%H%M%SZ')}"
+        )
+        try:
+            os.replace(JOBS_FILE, quarantine)
+        except OSError as move_exc:
+            logger.error(
+                "cron jobs file corrupt (%s) AND quarantine failed (%s); refusing "
+                "to return empty so a later save cannot overwrite recoverable data.",
+                exc, move_exc,
+            )
+            raise
+        logger.error(
+            "cron jobs file was corrupt (%s); quarantined to %s. Scheduler starts "
+            "with no jobs — recover from the quarantine file.",
+            exc, quarantine,
+        )
         return []
+    except OSError as exc:
+        logger.error(
+            "cron jobs file unreadable (%s); refusing to return empty so a later "
+            "save cannot overwrite a file that may be readable again.", exc,
+        )
+        raise
+    return data.get("jobs", [])
 
 
 def save_jobs(jobs: list[dict[str, Any]]) -> None:
