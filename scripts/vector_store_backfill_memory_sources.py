@@ -72,6 +72,7 @@ class MemorySourceBackfillReceipt:
     candidate_rows: int
     selected_rows: int
     inserted_rows: int
+    invalidated_rows: int
     skipped_rows: int
     dry_run: bool
     elapsed_ms: float
@@ -259,6 +260,7 @@ def backfill_memory_sources(
             candidate_rows=len(docs),
             selected_rows=len(pending),
             inserted_rows=0,
+            invalidated_rows=0,
             skipped_rows=skipped,
             dry_run=dry_run,
             elapsed_ms=_elapsed_ms(started),
@@ -276,7 +278,7 @@ def backfill_memory_sources(
         warnings.append(f"embedding_failed:{type(exc).__name__}")
         embeddings = [[0.0] * dim for _ in pending]
 
-    inserted_ids = _insert_documents(store, pending, embeddings, dim=dim)
+    inserted_ids, invalidated_rows = _insert_documents(store, pending, embeddings, dim=dim)
     for doc in pending[: len(inserted_ids)]:
         state[doc.uid] = doc.digest
     _write_state(state_path, state)
@@ -289,6 +291,7 @@ def backfill_memory_sources(
         candidate_rows=len(docs),
         selected_rows=len(pending),
         inserted_rows=len(inserted_ids),
+        invalidated_rows=invalidated_rows,
         skipped_rows=skipped,
         dry_run=False,
         elapsed_ms=_elapsed_ms(started),
@@ -364,10 +367,11 @@ def _insert_documents(
     embeddings: list[list[float]],
     *,
     dim: int,
-) -> list[int]:
+) -> tuple[list[int], int]:
     conn = store._connect()
     now_iso = datetime.now(timezone.utc).isoformat()
     inserted_ids: list[int] = []
+    invalidated_rows = 0
     try:
         has_vec0 = store._has_vec0(conn)
         if not has_vec0:
@@ -381,6 +385,7 @@ def _insert_documents(
             )
 
         for doc, embedding in zip(docs, embeddings, strict=False):
+            invalidated_rows += _invalidate_active_source_rows(conn, doc, now_iso)
             cursor = conn.execute(
                 """
                 INSERT INTO vec_documents
@@ -413,12 +418,48 @@ def _insert_documents(
             inserted_ids.append(doc_id)
 
         conn.commit()
-        return inserted_ids
+        return inserted_ids, invalidated_rows
     except sqlite3.Error:
         conn.rollback()
         raise
     finally:
         conn.close()
+
+
+def _invalidate_active_source_rows(
+    conn: sqlite3.Connection,
+    doc: SourceDocument,
+    now_iso: str,
+) -> int:
+    """Expire prior active rows for the same stable source identity."""
+
+    patch = json.dumps(
+        {
+            "invalidated_at": now_iso,
+            "invalidated_by": "vector_store_backfill_memory_sources",
+            "invalidated_reason": "source_uid_replaced",
+            "replacement_source_digest": doc.digest,
+        },
+        sort_keys=True,
+    )
+    cursor = conn.execute(
+        """
+        UPDATE vec_documents
+        SET valid_until = ?,
+            metadata_json = json_patch(
+                CASE
+                    WHEN json_valid(metadata_json) THEN metadata_json
+                    ELSE '{}'
+                END,
+                ?
+            )
+        WHERE valid_until IS NULL
+          AND json_valid(metadata_json)
+          AND json_extract(metadata_json, '$.source_uid') = ?
+        """,
+        (now_iso, patch, doc.uid),
+    )
+    return max(0, int(cursor.rowcount or 0))
 
 
 def _source_doc(source_key: str, source: str, content: str, layer: str, metadata: dict[str, Any]) -> SourceDocument:
@@ -593,6 +634,7 @@ def main(argv: list[str] | None = None) -> int:
         print(
             "memory source backfill: "
             f"selected={receipt.selected_rows} inserted={receipt.inserted_rows} "
+            f"invalidated={receipt.invalidated_rows} "
             f"skipped={receipt.skipped_rows} elapsed_ms={receipt.elapsed_ms}"
         )
     return 0
