@@ -26,6 +26,7 @@ from dharma_swarm.context import (
     read_agni_state,
     read_agent_notes,
     read_engineering,
+    read_governed_retrieval_context,
     read_latent_gold_overview,
     read_manifest,
     read_memory_context,
@@ -516,6 +517,58 @@ def test_read_memory_context_can_skip_semantic_query(tmp_path):
 
     assert "[index]" in result
     assert "Recent memory snapshot" in result
+
+
+def test_read_governed_retrieval_context_reads_vector_wiki_lane(tmp_path):
+    from dharma_swarm.vector_store import VectorStore
+
+    store = VectorStore(state_dir=tmp_path, dim=32)
+    store.upsert(
+        "Orchestrator async task routing engine",
+        source="text_file:concepts-orchestrator",
+        layer="source_file",
+        metadata={"source_file": "concepts/orchestrator.md"},
+    )
+
+    result = read_governed_retrieval_context(
+        state_dir=tmp_path,
+        query="orchestrator async task routing engine",
+        limit=2,
+    )
+
+    assert "# Governed Retrieval Context" in result
+    assert "concepts-orchestrator" in result
+
+
+def test_read_memory_context_prefers_governed_retrieval_for_queries(tmp_path):
+    from dharma_swarm.vector_store import VectorStore
+
+    db_dir = tmp_path / "db"
+    db_dir.mkdir()
+    db_path = db_dir / "memory.db"
+    conn = sqlite3.connect(str(db_path))
+    conn.execute("CREATE TABLE memories (content TEXT, layer TEXT, timestamp TEXT)")
+    conn.execute(
+        "INSERT INTO memories VALUES (?, ?, ?)",
+        ("Legacy only fallback", "witness", "2026-01-01T00:00:00"),
+    )
+    conn.commit()
+    conn.close()
+    store = VectorStore(state_dir=tmp_path, dim=32)
+    store.upsert(
+        "Live wiki concept: Orchestrator async task routing engine",
+        source="text_file:concepts-orchestrator",
+        layer="source_file",
+    )
+
+    result = read_memory_context(
+        state_dir=tmp_path,
+        query="orchestrator async task routing engine",
+    )
+
+    assert "# Governed Retrieval Context" in result
+    assert "concepts-orchestrator" in result
+    assert "Legacy only fallback" not in result
 
 
 def test_read_recent_memories_with_data(tmp_path):

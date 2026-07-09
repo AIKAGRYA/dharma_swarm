@@ -222,6 +222,16 @@ def default_writer_specs() -> tuple[MemoryWriterSpec, ...]:
             "TF-IDF model state is retrieval projection sidecar state.",
         ),
         MemoryWriterSpec(
+            "vector_store_backfill_memory_sources.state",
+            "scripts/vector_store_backfill_memory_sources.py",
+            "_write_state",
+            ("home.vectors",),
+            WriteMode.PROJECTION_WRITE,
+            WriterClassification.REVIEW_REQUIRED,
+            RiskLevel.MEDIUM,
+            "Backfill resume state is vector projection sidecar state, not canon.",
+        ),
+        MemoryWriterSpec(
             "agent_memory_manager.store",
             "dharma_swarm.agent_memory_manager",
             "AgentMemoryManager",

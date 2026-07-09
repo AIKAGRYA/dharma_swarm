@@ -19,10 +19,12 @@ Every promote call:
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import staging as staging_mod
+from ..daemon_config import dharma_state_dir
 from .cross_update import cross_update_trusted
 from .governance import gate_check_atom
 from .provenance import (
@@ -143,6 +145,24 @@ def promote(
     except Exception as e:
         notes.append(f"cross-update failed: {type(e).__name__}: {e}")
 
+    if _wiki_vector_auto_ingest_enabled():
+        try:
+            from dharma_swarm.wiki_vector_ingest import ingest_wiki_concepts
+
+            receipt = ingest_wiki_concepts(
+                state_dir=_wiki_vector_state_dir_for_trusted_path(trusted_path),
+                wiki_concepts_dir=trusted_path.parent,
+            )
+            notes.append(
+                "wiki-vector ingest: "
+                f"discovered={receipt.discovered_files}, "
+                f"inserted={receipt.backfill.get('inserted_rows')}, "
+                f"indexed={receipt.sync_index.get('indexed_rows')}, "
+                f"reembedded={receipt.reembed.get('upserted_rows')}"
+            )
+        except Exception as e:
+            notes.append(f"wiki-vector ingest failed: {type(e).__name__}: {e}")
+
     result = PromoteResult(
         staged_path=staged_path,
         trusted_path=trusted_path,
@@ -179,3 +199,18 @@ def _require_staged_path(path: Path) -> None:
             f"refusing to promote path outside chetana staging root: {path} "
             f"(staging root: {staging_root})"
         ) from exc
+
+
+def _wiki_vector_auto_ingest_enabled() -> bool:
+    value = os.environ.get("DHARMA_WIKI_VECTOR_AUTO_INGEST", "1").strip().lower()
+    return value not in {"0", "false", "no", "off"}
+
+
+def _wiki_vector_state_dir_for_trusted_path(path: Path) -> Path:
+    for parent in (path, *path.parents):
+        if parent.name == ".dharma":
+            return parent
+    try:
+        return path.parent.parent.parent
+    except IndexError:
+        return dharma_state_dir()

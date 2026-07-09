@@ -234,6 +234,46 @@ class MemoryKernel:
             budget=resolved_budget,
         )
 
+    def query(
+        self,
+        text: str,
+        *,
+        top_k: int = 10,
+        include_content: bool = True,
+        min_score: float = 0.01,
+    ):
+        """Query the governed wiki/vector retrieval door for ranked context."""
+
+        from dharma_swarm.memory_retrieval import GovernedRetrievalEngine, RetrievalQuery
+
+        state_dir = self.config.census.home / ".dharma"
+        engine = GovernedRetrievalEngine(state_dir=state_dir, memory_kernel=self)
+        return engine.retrieve(
+            RetrievalQuery(
+                text=text,
+                top_k=max(1, top_k),
+                include_content=include_content,
+                min_score=min_score,
+            )
+        )
+
+    def search(
+        self,
+        text: str,
+        *,
+        top_k: int = 10,
+        include_content: bool = True,
+        min_score: float = 0.01,
+    ):
+        """Alias for query() for callers that expect a search-shaped API."""
+
+        return self.query(
+            text,
+            top_k=top_k,
+            include_content=include_content,
+            min_score=min_score,
+        )
+
     def adapter_readiness_report(
         self,
         *,
