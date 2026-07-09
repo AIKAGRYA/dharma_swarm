@@ -126,6 +126,36 @@ class TestVectorStoreUpsert:
         doc_id = store.upsert("The organism is healthy", source="heartbeat")
         assert doc_id > 0
 
+    def test_upsert_dedupes_identical_content(self, tmp_path):
+        """Re-ingesting the same (content, source, layer) must not duplicate —
+        this is the fix for the unbounded row growth that reached 56GB."""
+        from dharma_swarm.vector_store import VectorStore
+        store = VectorStore(state_dir=tmp_path, dim=32)
+        id1 = store.upsert("The organism is healthy", source="heartbeat")
+        id2 = store.upsert("The organism is healthy", source="heartbeat")
+        id3 = store.upsert("The organism is healthy", source="heartbeat")
+        assert id1 == id2 == id3
+        conn = store._connect()
+        try:
+            n = conn.execute(
+                "SELECT COUNT(*) FROM vec_documents WHERE content = ?",
+                ("The organism is healthy",),
+            ).fetchone()[0]
+            access = conn.execute(
+                "SELECT access_count FROM vec_documents WHERE id = ?", (id1,)
+            ).fetchone()[0]
+        finally:
+            conn.close()
+        assert n == 1  # three inserts before the fix, one row after
+        assert access == 2  # two re-ingests bumped access, none re-inserted
+
+    def test_upsert_distinct_source_stays_separate(self, tmp_path):
+        from dharma_swarm.vector_store import VectorStore
+        store = VectorStore(state_dir=tmp_path, dim=32)
+        a = store.upsert("shared text", source="alpha")
+        b = store.upsert("shared text", source="beta")
+        assert a != b  # same content, different source → distinct documents
+
     def test_upsert_empty_content_returns_negative(self, tmp_path):
         from dharma_swarm.vector_store import VectorStore
         store = VectorStore(state_dir=tmp_path, dim=32)

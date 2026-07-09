@@ -17,6 +17,7 @@ Protocol: Embedder interface allows drop-in replacement with sentence-transforme
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import re
@@ -283,17 +284,20 @@ class VectorStore:
                 conn.enable_load_extension(False)
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA synchronous=NORMAL")
+            conn.execute("PRAGMA busy_timeout=5000")
             return conn
         except ImportError:
             # sqlite_vec not installed — fall back to plain sqlite
             conn = sqlite3.connect(str(self._db_path), timeout=10)
             conn.row_factory = sqlite3.Row
             conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=5000")
             return conn
         except Exception as exc:
             logger.debug("VectorStore _connect error: %s", exc)
             conn = sqlite3.connect(str(self._db_path), timeout=10)
             conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA busy_timeout=5000")
             return conn
 
     def _init_db(self) -> None:
@@ -312,8 +316,20 @@ class VectorStore:
                     valid_until TEXT,
                     confidence REAL DEFAULT 1.0,
                     access_count INTEGER DEFAULT 0,
-                    last_accessed TEXT
+                    last_accessed TEXT,
+                    content_hash TEXT
                 )
+            """)
+            # Migration for pre-existing DBs: add content_hash if missing.
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(vec_documents)")}
+            if "content_hash" not in cols:
+                conn.execute("ALTER TABLE vec_documents ADD COLUMN content_hash TEXT")
+            # Non-unique index (safe even with existing duplicates) makes the
+            # upsert dedup lookup fast; a UNIQUE constraint would fail on the
+            # already-duplicated 56GB store, so dedup is enforced in upsert().
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_vec_documents_dedup
+                ON vec_documents(content_hash, source, layer)
             """)
             # FTS5 table for lexical search
             conn.execute("""
@@ -391,6 +407,26 @@ class VectorStore:
             now_iso = _utc_now_iso()
             event_iso = event_time.isoformat() if event_time else now_iso
             meta_json = json.dumps(metadata or {})
+            content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+            # Idempotent by (content, source, layer): re-ingesting an existing
+            # document bumps its access count instead of inserting a duplicate.
+            # This is the fix for the unbounded duplicate-row growth that drove
+            # vectors.db to 56GB — upsert() previously did a plain INSERT.
+            existing = conn.execute(
+                "SELECT id FROM vec_documents "
+                "WHERE content_hash = ? AND source = ? AND layer = ? LIMIT 1",
+                (content_hash, source, layer),
+            ).fetchone()
+            if existing is not None:
+                doc_id = existing[0]
+                conn.execute(
+                    "UPDATE vec_documents SET access_count = access_count + 1, "
+                    "last_accessed = ? WHERE id = ?",
+                    (now_iso, doc_id),
+                )
+                conn.commit()
+                return doc_id
 
             # Fit embedder on new content (incremental vocabulary expansion)
             try:
@@ -400,9 +436,9 @@ class VectorStore:
 
             cursor = conn.execute("""
                 INSERT INTO vec_documents
-                    (content, source, layer, metadata_json, event_time, ingestion_time, confidence)
-                VALUES (?, ?, ?, ?, ?, ?, 1.0)
-            """, (content, source, layer, meta_json, event_iso, now_iso))
+                    (content, source, layer, metadata_json, event_time, ingestion_time, confidence, content_hash)
+                VALUES (?, ?, ?, ?, ?, ?, 1.0, ?)
+            """, (content, source, layer, meta_json, event_iso, now_iso, content_hash))
             doc_id = cursor.lastrowid
 
             # Store vector embedding
