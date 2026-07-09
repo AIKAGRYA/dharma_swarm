@@ -1,0 +1,56 @@
+name: governance-aggregator
+
+# Deadlock-safe teeth for the path-filtered doctrine gates.
+#
+# Every other gate (semgrep, module-budget, quality-ratchet, fourfold-warrant,
+# titanium-verify, TCB import boundary, ...) is path-filtered: it does not run
+# on a PR that touches none of its paths. Branch protection therefore cannot
+# mark those gates "required" without deadlocking unrelated PRs (a required
+# check that never runs never turns green).
+#
+# This workflow has NO path filter, so it ALWAYS runs and always reports a
+# status. Make THIS check the single required status. It reads the check-runs
+# recorded for the PR head SHA and fails only when an allowlisted gate actually
+# concluded failure. Gates that did not run are not failures (anti-deadlock).
+
+on:
+  pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+  checks: read
+  pull-requests: read
+
+concurrency:
+  group: governance-aggregator-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  aggregate:
+    name: Governance aggregate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+
+      - name: Self-test the classifier (no network)
+        run: python3 scripts/governance/aggregate_gate_verdicts.py --self-test
+
+      - name: Aggregate governance gate verdicts
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          python3 scripts/governance/aggregate_gate_verdicts.py \
+            --repo "${{ github.repository }}" \
+            --sha "$HEAD_SHA" \
+            --wait-seconds 1200 \
+            --poll-interval 20
