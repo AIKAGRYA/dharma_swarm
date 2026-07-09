@@ -213,5 +213,9 @@ deferred_fixes:
   - shared NATS connection factory lives in scripts/runtime/pr_merge_control.py — moving it into
     dharma_swarm/a2a/ touches a merge-master-mike-d4-2026-06 owned surface; do via that track's next-items
   - Hermes bridge session resume (--continue <session_id>) so fleet exchanges accumulate context
-  - reachable hub entrypoint for Devin VM + Perplexity sandbox (WSS bridge/tunnel), or accept
-    git seat as their canonical lane
+  - >-
+    reachable hub entrypoint for Devin VM + Perplexity sandbox — CODE SHIPPED 2026-07-09
+    (dharma_swarm/a2a/mailbox_gateway.py + scripts/runtime/a2a_gateway_server.py +
+    scripts/ops/mint_a2a_gateway_token.py; per-agent bearer tokens, publish-to-peer,
+    own-inbox drain). REMAINING — operator deploys it on the droplet + issues tokens;
+    docs/ops/A2A_LIVE_WIRE_RUNBOOK.md steps 2-3
