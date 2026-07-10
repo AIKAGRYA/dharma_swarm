@@ -51,8 +51,8 @@ Baseline commit before this plan branch: `212df1a8c22bd2bbf731dd2308472fb9e2a2f5
 | Python test files | 884 | same DocOps command |
 | Python LOC | 358,267 | same DocOps command |
 | Collected pytest tests | 13,394 | `.venv/bin/python -m pytest --collect-only -q` |
-| Markdown files | 1,389 | DocOps inventory |
-| Markdown lines | 290,498 | DocOps inventory |
+| Markdown files | 1,388 | base-SHA DocOps inventory (head minus this new file) |
+| Markdown lines | 290,297 | base-SHA DocOps inventory (head minus the initial 201-line plan) |
 | Modules above 500 lines | 207 at audit commit | `python3 scripts/governance/hygiene/ratchet.py --explain modules_over_500_lines` |
 | Silent exception swallows | 243 at audit commit | `python3 scripts/governance/hygiene/ratchet.py --explain silent_exception_swallows` |
 | Active tracks | 9 | `make onboard` |
@@ -74,11 +74,19 @@ Baseline command failures re-verified during the adversarial audit:
 
 Every work packet must close, narrow, or explicitly defer at least one finding.
 
+Severity rubric:
+
+- **5 — Critical:** remotely exploitable, corrupts canonical state, or can duplicate irreversible external effects.
+- **4 — High:** defeats a required verification/control or makes production truth materially unreliable.
+- **3 — Medium:** blocks clean-clone reproducibility, maintainability, or a declared operational lane.
+- **2 — Low:** bounded defect with a working fallback and limited blast radius.
+- **1 — Cosmetic:** presentation or local ergonomics only; never sufficient to justify a hardening packet alone.
+
 | ID | Severity | Finding | Evidence owner | Reproduction / proof |
 |---|---:|---|---|---|
 | TIT-001 | 4 | `verifier-selfcheck` claims all gates are functional without executing behavioral gates | `Makefile:verifier-selfcheck` | compare target body with `make test-fast` result |
 | TIT-002 | 4 | fast suite deterministically times out only in suite context | `Makefile:test-fast`, `tests/test_build_engine.py` | `make test-fast`; then run the failing test alone |
-| TIT-003 | 3 | Go capability is inferred from executable presence, not required version | `tools/*/go.mod`, `tests/test_github_ingestor_runner.py` | Go 1.22 host with modules declaring 1.26 |
+| TIT-003 | 3 | Go capability is inferred from executable presence, not required version | `tools/*/go.mod`, `tests/test_go_evidence_ingestor_bridge.py`, `tests/test_github_ingestor_runner.py`, sibling Go bridges | Go 1.22 host with modules declaring 1.26 |
 | TIT-004 | 4 | missing Semgrep can exit zero in a required-looking local target | `scripts/governance/run_semgrep_with_ca.sh` | remove Semgrep from `PATH` and run strict target |
 | TIT-005 | 4 | uplift subprocess can block indefinitely on inherited stdin | `scripts/uplift_guards/shakti_warrant_guard.py` | run `make uplift-guards` with open non-TTY stdin |
 | TIT-006 | 4 | duplicate top-level JSON key silently drops pytest/gitleaks classifications | `docs/governance/CI_TRUTH_CONTRACT.json` | `json.load` and inspect advisory IDs |
@@ -86,46 +94,104 @@ Every work packet must close, narrow, or explicitly defer at least one finding.
 | TIT-008 | 4 | strict DocOps is red while PR count drift is advisory and the rolling repair PR can lose checks | DocOps scripts/workflows | `make docops-integrity`; inspect latest reconcile PR head checks |
 | TIT-009 | 3 | hermetic governance depends on live NATS freshness | `Makefile:nats-substrate-contract` | run on a clean clone without daemon state |
 | TIT-010 | 5 | production-shaped API opens mutations when no key is configured; GraphQL/WS bypass bearer scope | `api/main.py`, `Dockerfile` | protected/unprotected TestClient matrix |
-| TIT-011 | 5 | durable invoker is effective-once in bounded cases, not strict exactly-once for external effects | `graph/durable_invoker.py` | crash after provider success before DB completion |
-| TIT-012 | 4 | task, runtime, ontology, memory, and JSONL state have split authority | `swarm.py`, `runtime_state.py`, mismatch map | crash/consistency matrix |
+| TIT-011 | 5 | durable invoker is effective-once in bounded cases, not strict exactly-once for external effects | `dharma_swarm/graph/durable_invoker.py` | crash after provider success before DB completion |
+| TIT-012 | 4 | task, runtime, ontology, memory, and JSONL state have split authority | `dharma_swarm/swarm.py`, `dharma_swarm/runtime_state.py`, mismatch map | crash/consistency matrix |
 | TIT-013 | 4 | critical behavior remains concentrated in god modules and silent catches | hygiene ratchet | module/silent-swallow counters |
 | TIT-014 | 4 | untrusted proof/scorer paths still execute shell/native code without a complete jail | `sealed_packet_apply.py`, chamber sandbox | adversarial escape suite |
 | TIT-015 | 3 | terminal behavior is not continuously verified in current CI and Bun is absent on clean agents | `terminal/`, active-track criterion | Bun clean-clone test |
 
 ## Governance and ownership
 
-The campaign does not own every file it needs to harden. Work packets remain subordinate to current active-track owners:
+The campaign does not currently own implementation surfaces. Current active ownership is narrower than the first revision of this specification implied:
 
-| Surface | Existing owner |
+| Active track | Surfaces relevant here that it actually owns |
 |---|---|
-| CI Truth, automerge, Mike | `merge-master-mike-d4-2026-06` |
-| Evolution safety and governance hygiene | `sovereign-safety-tcb-2026-07` |
-| Durable invoker, reconciler, runtime graph | `dharmagraph-engine-2026-07` |
-| Go sense organs and compose daemon | `organism-rewire-2026-07` |
-| Terminal | `helm-worldclass-terminal-2026-06` |
-| Loop closure and NATS live evidence | `loop-closure-2026-06` |
+| `merge-master-mike-d4-2026-06` | `pr_merge_control.py`, Mike daemon, automerge/router/backlog workflows, GitHub-review bridge test |
+| `sovereign-safety-tcb-2026-07` | evolution safety, claim/evidence and pramana scripts, hygiene package/pattern, telos/titanium packages, named TCB workflows/tests |
+| `dharmagraph-engine-2026-07` | graph package, workflow/topology/checkpoint, narrow swarm/orchestrator seams, `pyproject.toml` test-oracle extra only, named graph tests/workflow |
+| `organism-rewire-2026-07` | Go tools, world radar, organism surfaces, `docker-compose.yml`, `Dockerfile.swarm` |
+| `helm-worldclass-terminal-2026-06` | `terminal/**` |
+| `loop-closure-2026-06` | `reports/loop_closure/**` and `CYBERNETIC_LOOP_MAP.md` only |
 
-Before implementation:
+The following Phase 0 surfaces have no declared owner broad enough for this campaign: `Makefile`, `Dockerfile`, hermetic/parity workflows, CI Truth/parity files, DocOps scripts/workflows/generated blocks, and uplift/scan wrappers.
 
-1. Close or move the already-shippable TAM track according to its owner.
-2. Ratify this campaign as a sequencing layer over existing owners, not as a competing surface owner.
-3. Run collision preflight for every BR-id cited by an implementation PR.
-4. Do not modify files from two owner tracks in one PR unless both owners and the exact cross-track seam are declared.
+### WP-00 — Governance admission
+
+**Required before any implementation packet**
+
+1. Move the shippable `company-builder-parity-2026-07` track according to portfolio policy.
+2. Add an operator-ratified `repository-titanium-hardening-2026-07` track for the currently unowned Phase 0 surfaces only.
+3. Keep every already-owned surface with its current owner; the new track must not claim Go, terminal, graph, organism, or Mike-owned files.
+4. Add explicit `complements` relations to the owner tracks above.
+5. Add Phase 0 acceptance criteria that execute behavioral commands, not file-existence checks.
+6. Run `render_active_track_includes.py --check` and the track-status checker before merging admission.
+
+Proposed new-track ownership:
+
+- `Makefile`
+- `Dockerfile`
+- `.github/workflows/hermetic.yml`
+- `.github/workflows/tests.yml`
+- `.github/workflows/ci-parity.yml`
+- `.github/workflows/docops.yml`
+- `.github/workflows/docops-reconcile-main.yml`
+- `.github/workflows/pr-dedupe.yml`
+- `.github/workflows/bot-pr-limit.yml`
+- `docs/governance/CI_TRUTH_CONTRACT.json`
+- `scripts/governance/ci_parity_manifest.json`
+- `scripts/governance/check_ci_parity.py`
+- `scripts/runtime/ci_truth.py`
+- `scripts/governance/run_semgrep_with_ca.sh`
+- `scripts/uplift_guards/shakti_warrant_guard.py`
+- `scripts/uplift_guards/run_pre_commit.py`
+- `scripts/governance/check_shakti_warrant.py`
+- `scripts/governance/check_nats_substrate_contract.py`
+- `scripts/governance/check_nats_live_production_evidence.py`
+- `scripts/governance/run_nats_live_production_matrix.py`
+- `.github/workflows/a2a-agni-live-contact.yml`
+- `scripts/docops/**`
+- `dharma_swarm/build_engine.py` (TIT-002 only)
+- `dharma_swarm/autonomous_agent.py` (TIT-002 leaked-process investigation only)
+- `docs/docops/AUTO_INVENTORY.md`
+- count-managed blocks in `docs/governance/SOVEREIGN_MANIFEST.md`
+- Phase 0 contract tests introduced by this specification
+
+Extend `organism-rewire-2026-07` ownership, with operator ratification, to the Go-trigger seam it already governs:
+
+- `scripts/runtime/github_ingestor_runner.py`
+- `tests/test_github_ingestor_runner.py`
+- `tests/test_go_evidence_ingestor_bridge.py`
+- `tests/test_go_github_ingestor_bridge.py`
+- `tests/test_go_world_signal_bridge.py`
+- `tests/test_go_receipt_identity_verify.py`
+- `tests/test_go_adapter_contracts.py`
+
+Implementation PR rules:
+
+- Run collision preflight for every BR-id cited.
+- One PR may touch only one active owner's surfaces.
+- A cross-owner dependency is represented by stacked PR ordering, not mixed ownership in one diff.
+- Expanding an allowed-file list requires an approved specification amendment before editing.
 
 ## Campaign dependency graph
 
 ```mermaid
 flowchart TD
-  A[WP-0A Hermetic bootstrap] --> B[WP-0B Verifier truth]
-  A --> C[WP-0C Tool and subprocess fail-closed]
+  P[WP-00 Governance admission] --> A[WP-0A Hermetic bootstrap]
+  A --> B[WP-0B Verifier truth]
+  A --> C1[WP-0C1 Scanner/subprocess fail-closed]
+  A --> C2[WP-0C2 Go capability]
   B --> D[WP-0D Fast-suite determinism]
-  C --> E[WP-0E Hermetic/live split]
-  A --> F[WP-0F CI authority]
-  F --> G[WP-0G DocOps convergence]
+  C1 --> E[WP-0E Hermetic/live split]
+  A --> F1[WP-0F1 CI Truth/parity]
+  F1 --> F2[WP-0F2 Mike/automerge]
+  A --> G[WP-0G DocOps convergence]
   A --> H[WP-0H Polyglot verification]
+  C1 --> H
+  C2 --> H
   D --> Z[Phase 0 exit]
   E --> Z
-  F --> Z
+  F2 --> Z
   G --> Z
   H --> Z
 ```
@@ -226,62 +292,71 @@ Repository CI must not depend on a live daemon receipt.
 
 ## Phase 0 work packets
 
-### WP-0A — Hermetic bootstrap
+### WP-0A — Hermetic Python bootstrap
 
-**Findings:** TIT-003, TIT-004, TIT-015
-**Owner lanes:** sovereign safety, organism rewire, Helm
-**Depends on:** none
+**Findings:** TIT-004
+**Owner:** proposed `repository-titanium-hardening-2026-07`
+**Depends on:** WP-00
 
 **Allowed files**
 
 - `Makefile`
-- `pyproject.toml`
-- `uv.lock`
 - `.github/workflows/hermetic.yml`
 - `Dockerfile`
-- `Dockerfile.swarm`
-- `dashboard/package.json`
-- `dashboard/package-lock.json`
-- `terminal/package.json`
-- `terminal/bun.lock`
-- bootstrap-contract tests only
+- `tests/test_bootstrap_contract.py` (new)
+
+`pyproject.toml` and `uv.lock` are read-only inputs in this packet. Any discovered dependency-manifest defect requires a separate DharmaGraph-owned packet because that track owns the shared `pyproject.toml` test-oracle seam.
 
 **Required implementation**
 
-1. Define one clean-clone bootstrap contract using the pinned `uv` version already owned by `.github/workflows/hermetic.yml`.
+1. Add `UV_VERSION ?= 0.11.2` and a `bootstrap` target that installs that exact version through the current Python, resolves its user-base executable path, then runs `uv lock --check` and `uv sync --frozen --extra dev`.
 2. Make `uv lock --check` and `uv sync --frozen --extra dev` the Python dependency path used by verification.
-3. Remove `Dockerfile.swarm` dependency-install suppression; a failed install must fail the image build.
-4. Declare the required Go and Bun versions from their existing manifests and verify them before tests.
-5. Keep dashboard installation aligned with its committed lockfile and existing CI flags.
+3. Make `install` delegate to the same frozen path rather than unpinned `pip install -e ".[dev]"`.
+4. Make repository commands resolve `.venv/bin/python` and `.venv/bin/ruff` explicitly after bootstrap.
+5. Align `Dockerfile` with the locked Python closure or label it as a separate non-hermetic legacy lane; it may not claim hermeticity while using live resolution.
 6. Do not download unpinned executable scripts during a required verification lane.
+
+The Make target must implement the equivalent of:
+
+```bash
+python3 -m pip install --user "uv==0.11.2"
+UV_BIN="$(python3 -m site --user-base)/bin/uv"
+"$UV_BIN" lock --check
+"$UV_BIN" sync --frozen --extra dev
+```
+
+If the repository later supplies uv in the base environment, the same target may reuse it only after confirming the exact version.
 
 **Tests**
 
 - Add a bootstrap contract test that reads the real Makefile/workflow and proves:
+  - the exact pinned uv version is installed or found;
   - `uv.lock` is checked before sync;
   - the frozen lock is used;
-  - Docker dependency failure is not swallowed;
-  - Go and Bun requirements have one declared source each.
-- The test must fail if `|| true` is reintroduced on the swarm dependency install.
+  - verification resolves tools inside `.venv`; and
+  - Docker dependency failure is not swallowed.
+- The test must fail if bootstrap returns to unpinned editable installation or bypasses lock drift.
 
 **Verification**
 
 ```bash
-uv lock --check
-uv sync --frozen --extra dev
+make bootstrap
 .venv/bin/python -m pytest --collect-only -q
+make install
 make lint-blockers
 ```
 
+The clean-container test starts with Python and pip but no uv, user-site packages, repository venv, or author state.
+
 **Expected negative controls**
 
-- Modified `pyproject.toml` without lock refresh → `uv lock --check` fails.
-- Missing required tool → bootstrap exits nonzero with an install instruction.
+- Modified `pyproject.toml` without lock refresh → bootstrap fails at `uv lock --check`.
+- Pinned uv installation/invocation failure → bootstrap exits nonzero with an actionable message.
 - Dependency resolution failure during Docker build → image build fails.
 
 **Rollback**
 
-Revert only bootstrap, workflow, and Docker installation changes. No state migration is permitted in this packet.
+Revert only `Makefile`, `hermetic.yml`, `Dockerfile`, and the bootstrap contract test. No state migration is permitted in this packet.
 
 **Exit**
 
@@ -292,14 +367,13 @@ Revert only bootstrap, workflow, and Docker installation changes. No state migra
 ### WP-0B — Verifier truth
 
 **Findings:** TIT-001
-**Owner lane:** sovereign safety
+**Owner:** proposed `repository-titanium-hardening-2026-07`
 **Depends on:** WP-0A
 
 **Allowed files**
 
 - `Makefile`
-- tests dedicated to verifier behavior
-- existing preflight documentation if its command contract changes
+- `tests/test_verifier_selfcheck_contract.py` (new)
 
 **Required implementation**
 
@@ -329,46 +403,44 @@ Removing the behavioral command or replacing its failure with `|| true` must fai
 
 **Rollback**
 
-Restore the previous target but also restore its narrower pre-change banner; never restore the overbroad claim independently.
+Revert the complete packet, which reopens TIT-001 and blocks Phase 0. Never restore the overbroad banner without the behavioral command it names.
 
 **Exit**
 
 Success output and executed evidence are equivalent.
 
-### WP-0C — Required tools and subprocesses fail closed
+### WP-0C1 — Required scanners and governance subprocesses fail closed
 
-**Findings:** TIT-003, TIT-004, TIT-005
-**Owner lanes:** sovereign safety, organism rewire
+**Findings:** TIT-004, TIT-005
+**Owner:** proposed `repository-titanium-hardening-2026-07`
 **Depends on:** WP-0A
 
 **Allowed files**
 
+- `Makefile`
 - `scripts/governance/run_semgrep_with_ca.sh`
 - `scripts/uplift_guards/shakti_warrant_guard.py`
 - `scripts/uplift_guards/run_pre_commit.py`
 - `scripts/governance/check_shakti_warrant.py`
-- `dharma_swarm/world_radar/go_invoke.py`
-- `scripts/runtime/github_ingestor_runner.py`
-- related tests
-- relevant Makefile targets
+- `tests/test_semgrep_wrapper.py` (new)
+- `tests/test_uplift_guard_subprocess.py` (new)
 
 **Required implementation**
 
-1. Required Semgrep mode exits nonzero when Semgrep is absent. Baseline-capture mode may remain nonblocking only when its output says `SKIPPED`.
-2. Gitleaks absence fails with an actionable message before command execution.
-3. Every governance subprocess receives closed stdin unless input is explicitly part of its contract.
-4. Every governance subprocess has a wall-clock timeout and converts timeout into a nonzero, named failure.
-5. Go capability checks compare the installed version with the module `go` directive.
-6. The GitHub ingestor reports `NEEDS_HOST` when Go exists but is too old; it must not move the queued envelope to `failed/`.
-7. Reuse the existing Go invocation owner; do not create a second toolchain registry.
+1. Make `make semgrep` a strict required scan. Move the current warn-only behavior to an explicitly named advisory/baseline target.
+2. Close the existing real Semgrep findings rather than baseline them into the required scan.
+3. Required Semgrep mode exits nonzero when Semgrep is absent.
+4. Gitleaks absence fails with an actionable message before command execution.
+5. Every governance subprocess receives closed stdin unless input is explicitly part of its contract.
+6. Every governance subprocess has a wall-clock timeout and converts timeout into a nonzero, named failure.
 
 **Tests**
 
 - Strict Semgrep with a stripped `PATH` exits nonzero.
-- Advisory baseline mode returns a structured skip, not an implied pass.
-- A child process that waits on stdin is terminated within the test timeout.
-- Fake Go 1.22 against a `go 1.26` module returns `NEEDS_HOST`.
-- A queued GitHub envelope remains pending on an incapable host.
+- A deliberately violating fixture makes the strict scan fail.
+- Advisory baseline mode emits `SKIPPED`/findings and never appears in `governance-all`.
+- A child process that waits on stdin is terminated within its test timeout.
+- A passing child still returns its real output and exit code.
 
 **Verification**
 
@@ -376,41 +448,101 @@ Success output and executed evidence are equivalent.
 make semgrep
 make gitleaks
 make uplift-guards
-make go-ci
-python3 -m pytest -q \
-  tests/test_github_ingestor_runner.py \
-  tests/test_world_radar_go_bridge.py
+python3 -m pytest -q tests/test_semgrep_wrapper.py tests/test_uplift_guard_subprocess.py
 ```
 
-**Expected negative controls**
+**Negative controls**
 
 - `PATH` without Semgrep/gitleaks → named nonzero failure.
-- Open stdin with no bytes → no hang.
-- Go below module requirement → `NEEDS_HOST`, no payload loss.
+- Injected Semgrep violation → nonzero failure.
+- Open stdin with no bytes → bounded completion, not hang.
 
 **Rollback**
 
-Revert per tool. Never restore an indefinite timeout or a green missing-tool result.
+Revert scanner and subprocess changes together with their tests. Reverting reopens TIT-004/TIT-005 and blocks Phase 0; an indefinite timeout or green missing-tool result may not be restored selectively.
+
+**Exit**
+
+Required scanners are strict and present; uplift guards finish within their declared budget in TTY and non-TTY environments.
+
+### WP-0C2 — Version-aware Go capability
+
+**Findings:** TIT-003
+**Owner:** `organism-rewire-2026-07` after WP-00 ownership extension
+**Depends on:** WP-0A
+
+**Allowed files**
+
+- `dharma_swarm/world_radar/go_invoke.py`
+- `Dockerfile.swarm`
+- `scripts/runtime/github_ingestor_runner.py`
+- `tests/test_github_ingestor_runner.py`
+- `tests/test_go_evidence_ingestor_bridge.py`
+- `tests/test_go_github_ingestor_bridge.py`
+- `tests/test_go_world_signal_bridge.py`
+- `tests/test_go_receipt_identity_verify.py`
+- `tests/test_go_adapter_contracts.py`
+- `tests/test_world_radar_go_bridge.py`
+- `tests/test_hermetic_supply_chain.py`
+
+**Required implementation**
+
+1. Promote the existing version-aware check in `tests/test_go_adapter_contracts.py` into the single production helper owned by `world_radar/go_invoke.py`.
+2. Compare installed Go with the exact module `go` directive before selecting `go run`.
+3. Route every listed test and `github_ingestor_runner.py` through that helper.
+4. When no compatible binary/toolchain exists, return or skip with explicit `NEEDS_HOST`; do not attempt execution and do not move queued payloads to `failed/`.
+5. Remove `Dockerfile.swarm` dependency-install suppression so an invalid Python environment cannot boot the Go-integrated daemon.
+
+**Tests**
+
+- Fake Go 1.22 against `go 1.26` → incapable.
+- Fake Go 1.26.x → capable.
+- Prebuilt executable binary works without Go.
+- Malformed `go version` and unreadable `go.mod` fail closed.
+- Every affected bridge test uses the shared helper; direct `shutil.which("go")` capability gates are absent.
+
+**Verification**
+
+```bash
+make go-ci
+python3 -m pytest -q \
+  tests/test_github_ingestor_runner.py \
+  tests/test_go_evidence_ingestor_bridge.py \
+  tests/test_go_github_ingestor_bridge.py \
+  tests/test_go_world_signal_bridge.py \
+  tests/test_go_receipt_identity_verify.py \
+  tests/test_go_adapter_contracts.py \
+  tests/test_world_radar_go_bridge.py
+```
+
+**Rollback**
+
+Revert the shared helper and all consumers atomically. Partial rollback would recreate split capability answers.
+
+**Exit**
+
+One version-aware helper determines Go capability for all Go bridges and tests.
 
 ### WP-0D — Fast-suite determinism
 
 **Findings:** TIT-002
-**Owner lanes:** sovereign safety; runtime owner only if production code is proven causal
+**Owner:** proposed `repository-titanium-hardening-2026-07`
 **Depends on:** WP-0A, WP-0B
 
 **Observed symptom**
 
 `make test-fast` repeatedly stopped after 1,666 passes while setting up `TestDryRun.test_dry_run_no_files_changed`. The same test passed alone in under one second. This proves suite-order, leaked-resource, or global-state coupling; it does not prove `build_engine.py` itself is defective.
 
-**Initial allowed files**
+**Allowed files**
 
 - `tests/test_build_engine.py`
 - `tests/test_autonomous_agent.py`
-- shared test fixtures that are demonstrated to leak resources
-- `Makefile:test-fast`
-- `pyproject.toml` pytest configuration
+- `tests/test_fast_suite_isolation.py` (new)
+- `dharma_swarm/build_engine.py`
+- `dharma_swarm/autonomous_agent.py`
+- `Makefile`
 
-Production files enter scope only after a minimized reproducer demonstrates causality.
+Production files may change only after the minimized reproducer proves their causality. If another file owns the leak, stop and amend this specification before editing it.
 
 **Investigation protocol**
 
@@ -451,8 +583,8 @@ Revert the isolated leak fix. If production behavior changed, restore it and kee
 ### WP-0E — Hermetic/live verification split
 
 **Findings:** TIT-009
-**Owner lanes:** loop closure, organism rewire
-**Depends on:** WP-0C
+**Owner:** proposed `repository-titanium-hardening-2026-07`
+**Depends on:** WP-0C1
 
 **Allowed files**
 
@@ -461,7 +593,11 @@ Revert the isolated leak fix. If production behavior changed, restore it and kee
 - `scripts/governance/check_nats_live_production_evidence.py`
 - `scripts/governance/run_nats_live_production_matrix.py`
 - `.github/workflows/a2a-agni-live-contact.yml`
-- NATS contract/live-evidence tests
+- `tests/test_nats_substrate_contract.py`
+- `tests/test_nats_live_contact.py`
+- `tests/test_nats_transport.py`
+- `tests/test_nats_verification_split.py` (new)
+- `tests/test_nats_live_production_evidence.py` (new)
 
 **Required implementation**
 
@@ -497,10 +633,14 @@ The third command is expected to report `NEEDS_HOST` away from the daemon host; 
 
 Restore target wiring only. Do not copy a live receipt into the repository to make a clean clone green.
 
-### WP-0F — One CI authority
+**Exit**
+
+`make governance-all` and `make nats-substrate-contract` are hermetic; the live command distinguishes `NEEDS_HOST`, stale failure, and fresh live evidence without feeding a PR merge decision.
+
+### WP-0F1 — CI Truth and parity authority
 
 **Findings:** TIT-006, TIT-007
-**Owner lane:** merge-master-mike
+**Owner:** proposed `repository-titanium-hardening-2026-07`
 **Depends on:** WP-0A
 
 **Allowed files**
@@ -508,19 +648,17 @@ Restore target wiring only. Do not copy a live receipt into the repository to ma
 - `docs/governance/CI_TRUTH_CONTRACT.json`
 - `scripts/governance/ci_parity_manifest.json`
 - `scripts/runtime/ci_truth.py`
-- `scripts/runtime/pr_merge_control.py`
 - `scripts/governance/check_ci_parity.py`
 - `.github/workflows/ci-parity.yml`
-- `.github/workflows/automerge.yml`
-- `.github/workflows/codex-mention-router.yml`
-- CI Truth, parity, and merge-control tests
-- `Makefile` only for correcting referenced local commands
+- `Makefile`
+- `tests/test_ci_truth.py`
+- `tests/governance/test_ci_parity_guard.py`
 
 **Required policy**
 
-The committed parity manifest is the sole expected-context list. Live branch protection remains the enforcement owner and must be compared against it with Administration-read access.
+The committed parity manifest is the sole expected-context list. Live branch protection remains the enforcement owner and is compared against that manifest with Administration-read access.
 
-The initial desired required set is:
+The proposed required set is:
 
 - `pytest (3.11)`
 - `pytest (3.12)`
@@ -529,52 +667,101 @@ The initial desired required set is:
 - `Coherence Delta PR body`
 - `Quality ratchet - repo-wide fitness function`
 
-Changing this set is an operator decision and must update branch protection and all consumers in one reviewed change.
+The operator approves or replaces this set before implementation. A change updates branch protection and all consumers in one ordered rollout.
 
 **Required implementation**
 
 1. Merge duplicate `advisory` arrays and reject future duplicate JSON keys.
 2. Make CI Truth consume or validate against the parity manifest.
-3. Make automerge load the required set rather than carry a private string.
-4. Make missing required checks blockers in manual Mike and workflow-dispatch paths.
-5. Keep stale-head trusted reviews invalid.
-6. Replace phantom local commands, including `make frontend-check`, with real targets or correct commands.
-7. Preserve the narrow `bot-pr` reviewer waiver; it must not waive required checks, conflicts, changed-requested, or blocking threads.
+3. Replace phantom local commands with real Make targets or correct commands.
+4. Make live parity mandatory for WP-0F1 closure; structural-only parity remains visibly incomplete.
 
 **Tests**
 
 - Committed contract contains pytest and gitleaks after JSON parsing.
-- A duplicate top-level key raises a configuration error.
+- A duplicate top-level key raises configuration error.
 - Manifest and CI Truth required names are identical.
-- Missing required check blocks Mike.
-- Required check failure blocks Mike.
-- Stale reviewer commit does not satisfy quorum.
-- Bot PR waiver does not waive any required CI context.
+- Every CI Truth local command resolves to a real command surface.
+- Missing live protection data cannot produce a full-parity verdict.
 
 **Verification**
 
 ```bash
-python3 -m pytest -q \
-  tests/test_ci_truth.py \
-  tests/governance/test_ci_parity_guard.py \
-  tests/test_pr_merge_control.py \
-  tests/test_pr_merge_control_github_reviews.py
+python3 -m pytest -q tests/test_ci_truth.py tests/governance/test_ci_parity_guard.py
 python3 scripts/governance/check_ci_parity.py --live
 ```
 
 **Operator prerequisite**
 
-Provision read access for live branch-protection parity and apply the approved required set. Without it, structural parity may pass but WP-0F cannot close.
+Provision Administration-read access and approve the required set. Without both, WP-0F1 remains open.
+
+**Rollout and rollback order**
+
+Rollout:
+
+1. Ensure every desired context is produced on PRs and merge groups.
+2. Merge contract/manifest validation.
+3. Update branch protection last.
+
+Rollback:
+
+1. Restore the prior branch-protection context set first to avoid deadlock.
+2. Revert contract/manifest code second.
+3. Re-run live parity before accepting another merge.
+
+**Exit**
+
+Committed expected contexts, CI Truth, producing workflows, and live branch protection agree exactly.
+
+### WP-0F2 — Mike and automerge consume CI authority
+
+**Findings:** TIT-007
+**Owner:** `merge-master-mike-d4-2026-06`
+**Depends on:** WP-0F1
+
+**Allowed files**
+
+- `scripts/runtime/pr_merge_control.py`
+- `.github/workflows/automerge.yml`
+- `.github/workflows/codex-mention-router.yml`
+- `tests/test_pr_merge_control.py`
+- `tests/test_pr_merge_control_github_reviews.py`
+
+**Required implementation**
+
+1. Make automerge load or verify the required set from the canonical manifest rather than carry a private list.
+2. Make absent required checks blockers in manual Mike and workflow-dispatch paths.
+3. Keep stale-head trusted reviews invalid.
+4. Preserve the narrow `bot-pr` reviewer waiver; it cannot waive CI, conflicts, changes-requested, or blocking threads.
+5. Encode the operator-approved human-review policy without giving Mike approval authority.
+
+**Tests**
+
+- Missing required check blocks Mike.
+- Failed, pending, cancelled, and action-required checks block.
+- Stale reviewer commit does not satisfy quorum.
+- Bot PR waiver does not waive any required context.
+- Manual workflow dispatch and automerge event paths produce the same gate verdict.
+
+**Verification**
+
+```bash
+python3 -m pytest -q tests/test_pr_merge_control.py tests/test_pr_merge_control_github_reviews.py
+```
 
 **Rollback**
 
-Revert all consumers together. Partial rollback that recreates divergent required sets is forbidden.
+Revert Mike consumers only after WP-0F1's required set remains valid. Do not reintroduce a private context list.
+
+**Exit**
+
+Every Mike/automerge entry path consumes the same required-check truth and fails closed on absence.
 
 ### WP-0G — Strict DocOps convergence
 
 **Findings:** TIT-008
-**Owner:** DocOps workflow/script surfaces
-**Depends on:** WP-0A; may proceed in parallel with WP-0D through WP-0F
+**Owner:** proposed `repository-titanium-hardening-2026-07`
+**Depends on:** WP-0A; may proceed in parallel with WP-0D through WP-0F1
 
 **Allowed files**
 
@@ -584,8 +771,10 @@ Revert all consumers together. Partial rollback that recreates divergent require
 - `.github/workflows/pr-dedupe.yml`
 - `.github/workflows/bot-pr-limit.yml`
 - `docs/docops/AUTO_INVENTORY.md`
-- count-managed portions of `docs/governance/SOVEREIGN_MANIFEST.md`
-- DocOps tests
+- `docs/governance/SOVEREIGN_MANIFEST.md` (managed count blocks only)
+- `tests/test_docops_integrity.py`
+- `tests/test_docops_reconcile_workflow.py` (new)
+- `tests/test_pr_dedupe_workflow.py` (new)
 
 **Required implementation**
 
@@ -622,29 +811,32 @@ Confirm the existing `DOCOPS_RECONCILE_TOKEN`/GitHub App path or authorize the n
 
 Revert workflow mechanics and regenerated managed blocks together. Never hand-edit generated counts.
 
-### WP-0H — Polyglot verification parity
+**Exit**
+
+Strict DocOps passes on merged `main`; a reconcile update reaches main or a checked PR head, and snapshot dedupe is bounded by behavior tests.
+
+### WP-0H — Polyglot CI orchestration
 
 **Findings:** TIT-003, TIT-015
-**Owner lanes:** organism rewire, Helm, dashboard owners
-**Depends on:** WP-0A, WP-0C
+**Owner:** proposed `repository-titanium-hardening-2026-07`
+**Depends on:** WP-0A, WP-0C1, WP-0C2
 
 **Allowed files**
 
-- Go module manifests only if version normalization is required
 - `.github/workflows/tests.yml`
 - `Makefile`
-- `dashboard/package.json`, lockfile only when required
-- `terminal/package.json`, Bun lockfile only when required
-- existing Go, dashboard, and terminal tests
+- `tests/test_polyglot_ci_contract.py` (new)
+
+Go module manifests, dashboard manifests/lockfile, and terminal manifests/lockfile are read-only version authorities in this packet. A defect in one requires a separate PR under that language surface owner.
 
 **Required implementation**
 
-- Align all Go CI jobs to one patch-level policy compatible with module directives.
+- Align all Go CI jobs to one patch-level policy compatible with the read-only module directives.
 - Add a real `frontend-check` target matching dashboard CI.
 - Add a real `terminal-check` target using the pinned Bun lockfile.
 - Run terminal behavioral tests in CI; file existence is not sufficient.
 - Make local commands and workflow commands byte-for-byte comparable where practical.
-- Do not regenerate lockfiles unless a declared dependency change requires it.
+- Add contract tests that compare Make commands, workflow commands, and manifest-declared tool versions.
 
 **Verification**
 
@@ -673,7 +865,11 @@ bun --cwd terminal test
 
 **Rollback**
 
-Revert each language lane independently. Do not weaken another language's gate to compensate.
+Revert the CI orchestration and Make targets together. Language manifests remain unchanged.
+
+**Exit**
+
+Go, dashboard, and terminal run on their declared toolchains in the required CI workflow, and the same commands are available locally.
 
 ## Phase 0 exit gate
 
@@ -681,6 +877,7 @@ All commands below must complete from a fresh clone:
 
 ```bash
 make verifier-selfcheck
+make test-fast
 make test-fast
 make test
 make lint-blockers
@@ -702,7 +899,7 @@ The exit gate permits no unexplained skips, stale evidence, missing tools, dirty
 
 Phase 0 closes only when:
 
-1. every WP-0A through WP-0H acceptance criterion passes on merged `main`;
+1. WP-00 and every WP-0A through WP-0H subpacket acceptance criterion pass on merged `main`;
 2. `make agent-build-closeout` is green;
 3. live-only checks report either a fresh live verdict on their owner host or explicit `NEEDS_HOST` elsewhere;
 4. live branch protection matches the committed required-context manifest;
@@ -715,15 +912,18 @@ Phase 0 closes only when:
 
 | Order | Packet | May run in parallel with | Merge blocker |
 |---:|---|---|---|
-| 1 | WP-0A bootstrap | none | clean-clone bootstrap |
-| 2 | WP-0B verifier truth | WP-0C | honest success claim |
-| 3 | WP-0C tools/subprocesses | WP-0B | no required false-green/hang |
-| 4 | WP-0D fast suite | WP-0E, WP-0F, WP-0G | two deterministic passes |
-| 5 | WP-0E live/hermetic split | WP-0D, WP-0F, WP-0G | governance-all hermetic |
-| 6 | WP-0F CI authority | WP-0D, WP-0E, WP-0G | operator live-parity decision |
-| 7 | WP-0G DocOps | WP-0D through WP-0F | strict main green |
-| 8 | WP-0H polyglot | after WP-0A/WP-0C | all language lanes green |
-| 9 | Integrated exit | none | all prior packets merged |
+| 1 | WP-00 admission | none | owners and WIP ratified |
+| 2 | WP-0A bootstrap | none | clean-clone bootstrap |
+| 3 | WP-0B verifier truth | WP-0C1, WP-0C2 | honest success claim |
+| 4 | WP-0C1 scanner/subprocess | WP-0B, WP-0C2 | no required false-green/hang |
+| 5 | WP-0C2 Go capability | WP-0B, WP-0C1 | one version-aware answer |
+| 6 | WP-0D fast suite | WP-0E, WP-0F1, WP-0G | two deterministic passes |
+| 7 | WP-0E live/hermetic split | WP-0D, WP-0F1, WP-0G | governance-all hermetic |
+| 8 | WP-0F1 CI authority | WP-0D, WP-0E, WP-0G | operator live-parity decision |
+| 9 | WP-0F2 Mike consumers | WP-0G | all merge paths consume SSOT |
+| 10 | WP-0G DocOps | WP-0D through WP-0F1 | strict main green |
+| 11 | WP-0H polyglot | after WP-0A/WP-0C1/WP-0C2 | all language lanes green |
+| 12 | Integrated exit | none | all prior packets merged |
 
 ## Deferred phase specifications
 
@@ -766,7 +966,7 @@ No externally reachable mutation is fail-open.
 
 **Findings:** TIT-011
 **Entry:** Phase 1 closed
-**Primary surfaces:** `dharma_swarm/graph/durable_invoker.py`, `graph/reconciler.py`, `runtime_lifecycle.py`, provider invocation seams, `orchestrator.py` seam only
+**Primary surfaces:** `dharma_swarm/graph/durable_invoker.py`, `dharma_swarm/graph/reconciler.py`, `dharma_swarm/runtime_lifecycle.py`, provider invocation seams, `dharma_swarm/orchestrator.py` seam only
 
 **Required outcomes**
 
@@ -811,7 +1011,7 @@ A second daemon cannot own the same runtime DB, and no test claims more than its
 
 **Findings:** TIT-012
 **Entry:** Phase 2 ownership lease and crash semantics merged
-**Primary surfaces:** `runtime_state.py`, `task_board.py`, ontology owner, graph checkpoint owner, migrations, Litestream config
+**Primary surfaces:** `dharma_swarm/runtime_state.py`, `dharma_swarm/task_board.py`, ontology owner, `dharma_swarm/graph/checkpoint.py`, migrations, Litestream config
 
 **Required outcomes**
 
@@ -871,14 +1071,14 @@ No production claim depends only on documentation, file existence, or a test-onl
 
 **Priority order**
 
-1. `runtime_state.py`
-2. `orchestrator.py`
-3. `swarm.py`
-4. `agent_runner.py`
-5. `providers.py`
-6. `evolution.py`
-7. `telos_substrate.py`
-8. `thinkodynamic_director.py`
+1. `dharma_swarm/runtime_state.py`
+2. `dharma_swarm/orchestrator.py`
+3. `dharma_swarm/swarm.py`
+4. `dharma_swarm/agent_runner.py`
+5. `dharma_swarm/providers.py`
+6. `dharma_swarm/evolution.py`
+7. `dharma_swarm/telos_substrate.py`
+8. `dharma_swarm/thinkodynamic_director.py`
 
 Ordering may change only with a fresh centrality/blast-radius measurement.
 
@@ -954,17 +1154,17 @@ An independent clean-room contributor follows the published path, submits a boun
 
 ## Metrics and ratchets
 
-| Metric | Baseline | Direction | Phase 0 rule | Campaign target |
-|---|---:|---|---|---|
-| Required commands with false-green behavior | at least 3 | down | zero | zero |
-| `make test-fast` consecutive passes | 0/2 | up | 2/2 | stable |
-| Required-check SSOTs | 3+ | down | 1 expected manifest + live enforcement owner | 1 |
-| Strict DocOps findings | nonzero | down | zero | zero |
-| Critical unauthenticated mutation routes | nonzero | down | inventory only | zero in Phase 1 |
-| Modules >500 lines | 207 at audit commit | down | no increase | strict decrease |
-| Largest module | 5,255 lines at audit commit | down | no increase | <1,000 for critical modules |
-| Silent exception swallows | 243 at audit commit | down | no increase | zero on critical paths |
-| Spine bypass sites | 0 | hold | zero | zero |
+| Metric | Baseline | Phase 0 / campaign target | Executable oracle |
+|---|---:|---|---|
+| Required false-green behaviors | at least 3 | zero | verifier, scanner, CI Truth, and live/hermetic negative-control tests |
+| `make test-fast` consecutive passes | 0/2 | 2/2, then stable | two literal sequential `make test-fast` invocations |
+| Required-check expected lists | 3+ | one manifest | `tests/governance/test_ci_parity_guard.py` + live parity |
+| Strict DocOps findings | nonzero | zero | `make docops-integrity` |
+| Critical unauthenticated mutation routes | nonzero | inventory in Phase 0; zero in Phase 1 | full API auth route matrix |
+| Modules >500 lines | 207 at audit commit | no increase, then strict decrease | hygiene ratchet counter |
+| Largest module | 5,255 lines at audit commit | no increase; <1,000 for critical modules | largest-module ratchet |
+| Silent exception swallows | 243 at audit commit | no increase; zero on critical paths | silent-swallow ratchet + critical-path allowlist |
+| Spine bypass sites | 0 | hold at zero | `spine_bypass_report.py` |
 
 Ratchet baselines may tighten after an improvement. They may not be raised in the same PR that introduces a regression.
 
@@ -985,16 +1185,17 @@ These are external prerequisites, not tasks an implementation agent may silently
 
 1. Move the shippable `company-builder-parity-2026-07` track according to portfolio policy.
 2. Ratify this specification as a sequencing layer over existing owners.
-3. Approve the six-context required-check set in WP-0F or provide a replacement set with rationale.
+3. Approve the six-context required-check set in WP-0F1 or provide a replacement set with rationale.
 4. Provision Administration-read access for live branch-protection parity.
 5. Confirm the DocOps reconcile credential or approve normal reviewed-PR delivery only.
 6. Define the minimum human-approval rule for human-authored and bot-authored PRs.
+7. Verify the actual deployment exposure of the FastAPI web service. Until Phase 1 closes, if it is reachable beyond loopback/private ingress, set `DASHBOARD_API_KEY` and unpublish, firewall, or stop the service. This is interim containment, not a claim that the service is currently public.
 
 An unavailable operator prerequisite blocks only its dependent packet. It does not justify weakening or fabricating the evidence.
 
-## Frozen work
+## Proposed portfolio freeze
 
-Until Phase 0 closes:
+This freeze becomes binding only when the operator records it in the canonical portfolio/track owner. Until Phase 0 closes, the proposed freeze is:
 
 - no new product features;
 - no new governance frameworks;
