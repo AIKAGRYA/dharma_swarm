@@ -86,7 +86,7 @@ The omitted v0 fields (`intent`, `commit`, and `approval`) remain mandatory.
 Angle-bracket values above are illustrative and must be replaced. Session Entry
 validation additionally requires:
 
-- an external packet path and exact canonical packet digest;
+- an external packet path and exact packet `stable_digest` after omitting only `session_entry.packet_digest`;
 - at least one gate, with `work_packet` bound to the packet id and every
   declared tool version freshly probed for exact equality;
 - no angle-bracket placeholder anywhere in the submitted packet;

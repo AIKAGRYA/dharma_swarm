@@ -15,7 +15,6 @@ from .models import (AUTHORITY_PRECEDENCE, SESSION_ENTRY_SCHEMA_V1, AgentOpsErro
                      ApprovalPolicy, CollisionRecord, CommitPolicy, ConfigError,
                      GateSpec, SessionEntry, WorkPacket)
 
-
 DEFAULT_GATE_TIMEOUT_SECONDS = 900
 DEFAULT_MAX_OUTPUT_CHARS = 30_000
 CANONICAL_FIRST_READ: tuple[tuple[str, str], ...] = (
@@ -53,7 +52,8 @@ def canonical_first_read_manifest(repo_root: Path) -> list[dict[str, str]]:
     return manifest
 
 
-canonical_packet_json, current_utc_time = canonical_json, utc_now
+canonical_packet_json = canonical_json
+current_utc_time = utc_now
 
 
 def _git_admin_dirs(repo_root: Path) -> set[Path]:
