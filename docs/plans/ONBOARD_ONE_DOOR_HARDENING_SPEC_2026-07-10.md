@@ -800,6 +800,14 @@ explicitly. No dependency on D2.
   admission is packet-scoped). [AMENDED 2026-07-10: added after a WP-O1
   implementation agent correctly stopped on the exhaustive-envelope conflict.]
 - `.github/workflows/structure.yml` — only exact `AGENTS.md` Rule 8 allowlist
+- `dharma_swarm/operator_core/__init__.py` — shared, non-owned surface admitted
+  for exactly one behavior change: convert eager submodule imports to
+  lazy/guarded so that importing `operator_core.onboarding` (and collecting
+  its tests) succeeds on a host WITHOUT optional TUI dependencies
+  (`textual`). No public name may be removed; no other module may be pulled
+  in. Proven by new behavior O1-B14. [AMENDED 2026-07-10 #3: independent
+  review of the first WP-O1 PR reproduced a collection failure on a
+  textual-free host — the gate battery could not even import.]
 - `docs/governance/ANTI_SLOP_RULES.md` — mirror that one allowlist fact
 - `docs/governance/AGENTOPS.md` — external-report and entry-packet contract
 - `scripts/docops/check_docops_integrity.py`
@@ -849,6 +857,7 @@ Return the startup readback printed by onboarding before editing.
 | O1-B11 | Collision proof detects exact, containment, glob-intersection, and actual-file overlap instead of trusting warning-only portfolio output | `test_session_entry_collision_adversarial_matrix` |
 | O1-B12 | Only versioned `extensions` are accepted outside core; extension data cannot affect verdict or stable digest | `test_receipt_extensions_are_versioned_and_nonadmission` |
 | O1-B13 | Root pointer bytes equal the canonical block exactly; `.gitignore` drops only the `/AGENTS.md` line and every other ignore rule is byte-unchanged | `test_agents_pointer_bytes_canonical_and_gitignore_carveout_scoped` |
+| O1-B14 | `operator_core.onboarding` imports and its test module collects with optional TUI deps absent (block `textual` via a meta-path finder in-process, then import) | `test_onboarding_imports_without_optional_tui_deps` |
 
 **Verification / expected exit:**
 
