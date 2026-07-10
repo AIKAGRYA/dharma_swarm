@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
+import subprocess
 import sys
+from collections import Counter
 from pathlib import Path
 
 
@@ -12,6 +15,45 @@ docops = importlib.util.module_from_spec(spec)
 assert spec and spec.loader
 sys.modules["check_docops_integrity"] = docops
 spec.loader.exec_module(docops)
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+WP_O1_PACKET = (
+    REPO_ROOT
+    / "reports"
+    / "agentops"
+    / "work_packets"
+    / "onboard-one-door-WP-O1.json"
+)
+CANONICAL_AGENTS_POINTER = (
+    b"# Agent entrypoint\n"
+    b"\n"
+    b"Run `make onboard` before non-trivial work.\n"
+    b"The canonical behavioral contract is `CLAUDE.md`; this file must never duplicate it.\n"
+    b"Return the startup readback printed by onboarding before editing.\n"
+)
+
+
+def wp_o1_base_ref() -> str:
+    packet = json.loads(WP_O1_PACKET.read_text(encoding="utf-8"))
+    return str(packet["base_ref"])
+
+
+def git_show_bytes(ref: str, path: str) -> bytes:
+    result = subprocess.run(
+        ["git", "show", f"{ref}:{path}"],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+    )
+    return result.stdout
+
+
+def rule8_allowlist(workflow: bytes) -> list[str]:
+    text = workflow.decode("utf-8")
+    match = re.search(r"(?ms)^\s*allow=\(\n(?P<body>.*?)^\s*\)\s*$", text)
+    assert match is not None, "Rule 8 allow=(...) block is missing"
+    return re.findall(r'^\s*"([^"]+)"\s*$', match.group("body"), flags=re.MULTILINE)
 
 
 def write(path: Path, text: str) -> None:
@@ -300,3 +342,80 @@ def test_duplicate_asserted_token_is_flagged(tmp_path: Path) -> None:
     )
     dupes = [f for f in findings if f.check == "assertion-duplicate"]
     assert len(dupes) == 1 and dupes[0].severity == "WARN"
+
+
+def test_registered_canon_missing_fails(tmp_path: Path) -> None:
+    """O1-B5: registration must not make an absent canonical file look valid."""
+    config_path = base_config(tmp_path)
+    config = load_config(config_path)
+    config["canonical_guard"]["managed_include"] = ["AGENTS.md"]
+    config["canonical_guard"]["registered"] = ["AGENTS.md"]
+    save_config(config_path, config)
+
+    findings, _metrics = docops.run_checks(
+        tmp_path,
+        config_path,
+        None,
+        docops.parse_iso_date("2026-05-05"),
+        False,
+    )
+
+    assert any(
+        finding.severity == "FAIL"
+        and "AGENTS.md" in finding.message
+        and "missing" in finding.message.lower()
+        for finding in findings
+    )
+
+
+def test_agents_pointer_rejects_contract_duplication(tmp_path: Path) -> None:
+    """O1-B5: the root pointer cannot grow a second copy of CLAUDE's contract."""
+    duplicated_contract = "Never weaken a gate merely to make verification green.\n"
+    write(tmp_path / "CLAUDE.md", "# Behavioral contract\n\n" + duplicated_contract)
+    (tmp_path / "AGENTS.md").write_bytes(
+        CANONICAL_AGENTS_POINTER + b"\n" + duplicated_contract.encode("utf-8")
+    )
+    config_path = base_config(tmp_path)
+    config = load_config(config_path)
+    config["canonical_guard"]["managed_include"] = ["AGENTS.md", "CLAUDE.md"]
+    config["canonical_guard"]["registered"] = ["AGENTS.md", "CLAUDE.md"]
+    save_config(config_path, config)
+
+    findings, _metrics = docops.run_checks(
+        tmp_path,
+        config_path,
+        None,
+        docops.parse_iso_date("2026-05-05"),
+        False,
+    )
+
+    assert any(
+        finding.severity == "FAIL" and "AGENTS.md" in finding.message
+        for finding in findings
+    )
+
+
+def test_rule8_agents_exception_is_exact() -> None:
+    """O1-B6: Rule 8 admits AGENTS.md alone and still blocks another root doc."""
+    base_ref = wp_o1_base_ref()
+    baseline = rule8_allowlist(git_show_bytes(base_ref, ".github/workflows/structure.yml"))
+    current = rule8_allowlist((REPO_ROOT / ".github" / "workflows" / "structure.yml").read_bytes())
+
+    assert Counter(current) - Counter(baseline) == Counter({"AGENTS.md": 1})
+    assert Counter(baseline) - Counter(current) == Counter()
+    assert len(current) == len(baseline) + 1
+
+    candidate_root_docs = ["AGENTS.md", "UNREGISTERED_ROOT_DOC.md"]
+    violations = [path for path in candidate_root_docs if path not in current]
+    assert violations == ["UNREGISTERED_ROOT_DOC.md"]
+
+
+def test_agents_pointer_bytes_canonical_and_gitignore_carveout_scoped() -> None:
+    """O1-B13: pointer bytes are pinned and the ignore carve-out is one deletion."""
+    assert (REPO_ROOT / "AGENTS.md").read_bytes() == CANONICAL_AGENTS_POINTER
+
+    baseline = git_show_bytes(wp_o1_base_ref(), ".gitignore")
+    removed_rule = b"/AGENTS.md\n"
+    assert baseline.count(removed_rule) == 1
+    expected = baseline.replace(removed_rule, b"", 1)
+    assert (REPO_ROOT / ".gitignore").read_bytes() == expected

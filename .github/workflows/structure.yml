@@ -37,6 +37,7 @@ jobs:
           allow=(
             "README.md"
             "CLAUDE.md"
+            "AGENTS.md"
             "DEVIN.md"
             "CHANGELOG.md"
             "LICENSE.md"

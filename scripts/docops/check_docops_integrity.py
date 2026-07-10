@@ -22,6 +22,13 @@ from typing import Any, Iterable
 
 
 DEFAULT_CONFIG = Path("docs/docops/assertions.yaml")
+CANONICAL_ROOT_AGENTS_BYTES = (
+    b"# Agent entrypoint\n"
+    b"\n"
+    b"Run `make onboard` before non-trivial work.\n"
+    b"The canonical behavioral contract is `CLAUDE.md`; this file must never duplicate it.\n"
+    b"Return the startup readback printed by onboarding before editing.\n"
+)
 IGNORE_DIR_NAMES = {
     ".git",
     ".claude",
@@ -367,6 +374,43 @@ def check_canonical_guard(
     ignore_patterns = guard.get("ignore", [])
     patterns = guard.get("managed_include", [])
     files = {repo_relative(path, repo_root): path for path in iter_files(repo_root, patterns)}
+    findings: list[Finding] = []
+
+    for rel in sorted(registered):
+        path = repo_root / rel
+        if not path.is_file():
+            findings.append(
+                Finding(
+                    "FAIL",
+                    "canonical",
+                    f"registered canonical file is missing: {rel}",
+                )
+            )
+
+    agents_path = repo_root / "AGENTS.md"
+    if "AGENTS.md" in registered and agents_path.is_file():
+        try:
+            agents_bytes = agents_path.read_bytes()
+        except OSError as exc:
+            findings.append(
+                Finding(
+                    "FAIL",
+                    "canonical",
+                    f"registered canonical file is unreadable: AGENTS.md ({exc})",
+                )
+            )
+        else:
+            if agents_bytes != CANONICAL_ROOT_AGENTS_BYTES:
+                findings.append(
+                    Finding(
+                        "FAIL",
+                        "canonical",
+                        (
+                            "AGENTS.md must be the byte-exact root pointer; it may not "
+                            "duplicate or extend the behavioral contract in CLAUDE.md"
+                        ),
+                    )
+                )
 
     changed_doc_statuses: dict[str, str] = {}
     if changed_files:
@@ -382,7 +426,6 @@ def check_canonical_guard(
                     files[rel] = path
                     changed_doc_statuses[rel] = status
 
-    findings: list[Finding] = []
     for rel, path in sorted(files.items()):
         if any(fnmatch.fnmatch(rel, pattern) for pattern in ignore_patterns):
             continue
