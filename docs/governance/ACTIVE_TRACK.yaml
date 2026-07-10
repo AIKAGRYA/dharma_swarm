@@ -1621,7 +1621,7 @@ active_tracks:
         kind: governance
         blocker: true
       - id: D3
-        what: "D3 PENDING — inventory and upgrade, or explicitly disconfirm, every off-repo reader of ~/.dharma/ops/onboard_receipt.json before the WP-O3 v2 writer flip (spec §9.3; in-repo audit found zero production readers, the fleet-readable claim is unverified)"
+        what: "D3 PENDING — operator answered 'no idea' 2026-07-10, so this resolves by evidence, not recall: on EACH fleet host (Mac daemon, VPS, any Warp/Oz seat) run the reader sweep and record the output — (1) grep -rn onboard_receipt ~/.dharma /etc/cron* /etc/systemd/system ~/Library/LaunchAgents ~/bin 2>/dev/null | grep -v ops/onboard_receipt.json$ ; (2) crontab -l 2>/dev/null | grep -i onboard ; (3) command -v lsof >/dev/null && lsof ~/.dharma/ops/onboard_receipt.json 2>/dev/null. All three empty on every host = D3 disconfirmed (record host list + date here, flip blocker false). Any hit = that reader gets a v1+v2 dual-read upgrade before the WP-O3 writer flip (spec §9.3)."
         kind: governance
         blocker: true
       - id: 1
