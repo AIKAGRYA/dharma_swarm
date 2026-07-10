@@ -1625,7 +1625,7 @@ active_tracks:
         kind: governance
         blocker: true
       - id: 1
-        what: "WP-O1 — contract module, versioned receipt loader, portable Session Entry Packet, root AGENTS.md custody repair incl. .gitignore carve-out (spec §6 WP-O1: allowed files, failing-first tests O1-B1..B12, expected exits)"
+        what: "WP-O1 — contract module, versioned receipt loader, portable Session Entry Packet, root AGENTS.md custody repair incl. .gitignore carve-out (spec §6 WP-O1: allowed files, failing-first tests O1-B1..B13, expected exits). AMENDED 2026-07-10 after a WP-O1 agent correctly stopped on the envelope conflict: .gitignore is admitted to the WP-O1 packet as a packet-scoped shared-surface exception (single edit: drop the /AGENTS.md ignore line) WITHOUT owned_surfaces claim, and the root pointer bytes are now pinned in the spec (O1-B13 asserts byte equality)."
         kind: code
         blocker: false
     non_goals:

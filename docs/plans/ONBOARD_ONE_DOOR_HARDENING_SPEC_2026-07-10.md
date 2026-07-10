@@ -776,6 +776,12 @@ explicitly. No dependency on D2.
 **Allowed files:**
 
 - `AGENTS.md`
+- `.gitignore` — shared, non-owned surface admitted for exactly one edit:
+  delete the root `/AGENTS.md` ignore line (`.gitignore:99` at the amendment
+  SHA). No other ignore rule may change; the track does NOT take
+  `owned_surfaces` ownership of this file (other lanes edit it routinely —
+  admission is packet-scoped). [AMENDED 2026-07-10: added after a WP-O1
+  implementation agent correctly stopped on the exhaustive-envelope conflict.]
 - `.github/workflows/structure.yml` — only exact `AGENTS.md` Rule 8 allowlist
 - `docs/governance/ANTI_SLOP_RULES.md` — mirror that one allowlist fact
 - `docs/governance/AGENTOPS.md` — external-report and entry-packet contract
@@ -797,6 +803,18 @@ and obtain an operator-approved packet/ownership amendment; do not widen WP-O1
 in flight. The CI/DocOps files above are a named custody repair, not an
 implicit authority expansion.
 
+**Canonical root pointer content** — byte-exact, LF line endings, exactly one
+trailing newline; O1-B13 asserts byte equality [AMENDED 2026-07-10: the
+original text required the pointer without pinning its bytes]:
+
+~~~markdown
+# Agent entrypoint
+
+Run `make onboard` before non-trivial work.
+The canonical behavioral contract is `CLAUDE.md`; this file must never duplicate it.
+Return the startup readback printed by onboarding before editing.
+~~~
+
 **Behavior → named test map:**
 
 | ID | Behavior | Failing-first test / structural contract |
@@ -813,6 +831,7 @@ implicit authority expansion.
 | O1-B10 | AgentOps reports require an explicit external root and attempt no source/`.git` write, including ignored or identical files | `test_external_report_root_is_mandatory_and_read_only` |
 | O1-B11 | Collision proof detects exact, containment, glob-intersection, and actual-file overlap instead of trusting warning-only portfolio output | `test_session_entry_collision_adversarial_matrix` |
 | O1-B12 | Only versioned `extensions` are accepted outside core; extension data cannot affect verdict or stable digest | `test_receipt_extensions_are_versioned_and_nonadmission` |
+| O1-B13 | Root pointer bytes equal the canonical block exactly; `.gitignore` drops only the `/AGENTS.md` line and every other ignore rule is byte-unchanged | `test_agents_pointer_bytes_canonical_and_gitignore_carveout_scoped` |
 
 **Verification / expected exit:**
 
