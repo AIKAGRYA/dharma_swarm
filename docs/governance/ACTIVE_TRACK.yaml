@@ -1582,8 +1582,9 @@ active_tracks:
       with default-deny scope enforcement, AGENTS.md custody repair
       (registered canon, absent on disk, gitignored), compact 40-70-line
       render, and warm<1s/cold<5s targets. Work proceeds only through the
-      spec's admitted packets WP-O1..WP-O6; the spec (§6-§13) is the detail
-      authority — this entry is the admission record, not a second spec.
+      spec's admitted sequence WP-O1, WP-O1R-B0, WP-O1R, and WP-O2..WP-O6;
+      the spec (§6-§13) is the detail authority — this entry is the admission
+      record, not a second spec.
       Titanium vNext (PR #854 plan) baseline capture and WP-00 stay blocked
       until this track's implementation, merge-blocking CI admission (C1),
       and independent clean-room proof have merged.
@@ -1599,6 +1600,12 @@ active_tracks:
       - id: wp_o1_contract_entry_packet_custody
         kind: command_passes
         command: ["python3", "-m", "pytest", "tests/test_onboarding_contract.py", "tests/test_agent_work_packet.py", "tests/test_docops_integrity.py", "-q"]
+      - id: wp_o1r_exact_identifier_bridge
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/test_agent_work_packet.py", "-q", "-k", "session_entry_accepts_exact_wp_o1r_identity_only"]
+      - id: wp_o1r_interpreter_routed_live_guard
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/test_agent_work_packet.py", "-q", "-k", "gate_command_normalization_rejects_live_targets_without_blocking_safe_commands"]
       - id: wp_o2_single_parser_six_consumers
         kind: command_passes
         command: ["python3", "-m", "pytest", "tests/test_onboarding_broken_register.py", "tests/test_agent_onboard.py", "tests/test_orientation_graph.py", "tests/test_trust_gate_status.py", "tests/test_repo_status.py", "tests/test_control_surface.py", "tests/test_operator_coherence_cockpit.py", "-q"]
@@ -1626,6 +1633,14 @@ active_tracks:
         blocker: true
       - id: 1
         what: "WP-O1 — contract module, versioned receipt loader, portable Session Entry Packet, root AGENTS.md custody repair incl. .gitignore carve-out (spec §6 WP-O1: allowed files, failing-first tests O1-B1..B13, expected exits). AMENDED 2026-07-10 after a WP-O1 agent correctly stopped on the envelope conflict: .gitignore is admitted to the WP-O1 packet as a packet-scoped shared-surface exception (single edit: drop the /AGENTS.md ignore line) WITHOUT owned_surfaces claim, and the root pointer bytes are now pinned in the spec (O1-B13 asserts byte equality)."
+        kind: code
+        blocker: false
+      - id: 1R-B0
+        what: "WP-O1R-B0 — one-time, separately reviewed exact-identifier bootstrap admitted by spec §6 WP-O1R: contract.py plus its existing AgentOps test file only; accept literal WP-O1R without arbitrary suffixes, then merge before creating or validating the real WP-O1R packet. No live-command implementation or later-WP edit in this bootstrap."
+        kind: code
+        blocker: false
+      - id: 1R
+        what: "WP-O1R — after the separately merged exact-identifier bootstrap, remediate the Session Entry interpreter/path-routed live-command bypass in contract.py under the exact §6 WP-O1R envelope; external/tracked filename, packet id, and work_packet identity are all onboard-one-door-WP-O1R / WP-O1R as specified. Must merge before WP-O2; WP-O2 and later packets remain untouched."
         kind: code
         blocker: false
     non_goals:
