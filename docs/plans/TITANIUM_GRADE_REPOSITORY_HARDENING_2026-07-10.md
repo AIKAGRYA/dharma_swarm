@@ -1,6 +1,8 @@
-# Titanium-Grade Repository Hardening Plan
+# Titanium-Grade Repository Hardening — Execution Specification
 
 **Doc role (per `docs/AGENTS.md`):** `working_plan` — a bounded internal-hardening campaign, not repo-level authority. It creates no new runtime substrate or governance owner and remains subordinate to `CLAUDE.md`, `docs/governance/ACTIVE_TRACK.yaml`, and the canonical document stack.
+
+**Status:** revised execution specification, awaiting operator approval. This document sequences work; each implementation PR still requires its current active-track owner and normal merge gates.
 
 ## Main purpose
 
@@ -13,6 +15,135 @@
 The repository itself is the product until an independent engineer can clone, understand, test, deploy, and trust it without access to the author's machine.
 
 GitHub stars are not an engineering acceptance criterion. Public reproducibility, secure defaults, explicit ownership, recoverable state, and trustworthy verification are.
+
+## Specification contract
+
+This is the execution specification for a sustained internal-hardening campaign. It is written for autonomous coding agents, reviewers, and the operator.
+
+It does not authorize a single unbounded rewrite. Every implementation change must ship as a reviewable work packet with:
+
+- one declared surface owner;
+- an explicit list of files allowed to change;
+- an explicit list of adjacent surfaces that must not change;
+- a failing behavioral test before production code changes;
+- a rollback that restores the prior behavior without state surgery;
+- a reproduction command and expected exit status;
+- a finding ID from the registry below; and
+- a PR body that states which claim becomes more truthful.
+
+The campaign composes existing owners and gates. It must not create a new truth store, receipt format, policy engine, test framework, or catch-all god module.
+
+### Claim boundary
+
+- `PASS` means the exact stated command completed with exit code zero on the stated commit and environment.
+- `NEEDS_HOST` means a live-only verifier could not run on the current host; it is neither pass nor failure.
+- `HARNESS_PROVEN` means a bounded fixture or replay passed.
+- `CLOSED_LIVE` requires a declared live owner surface and fresh production evidence.
+- Missing tools, missing dependencies, missing receipts, skipped required tests, and malformed configuration never mean `PASS`.
+
+## Verified baseline
+
+Baseline commit before this plan branch: `212df1a8c22bd2bbf731dd2308472fb9e2a2f549`.
+
+| Measure | Baseline | Reproduction |
+|---|---:|---|
+| Python modules under `dharma_swarm/` | 995 | `python3 scripts/docops/check_docops_integrity.py` |
+| Python test files | 884 | same DocOps command |
+| Python LOC | 358,267 | same DocOps command |
+| Collected pytest tests | 13,394 | `.venv/bin/python -m pytest --collect-only -q` |
+| Markdown files | 1,389 | DocOps inventory |
+| Markdown lines | 290,498 | DocOps inventory |
+| Modules above 500 lines | 207 at audit commit | `python3 scripts/governance/hygiene/ratchet.py --explain modules_over_500_lines` |
+| Silent exception swallows | 243 at audit commit | `python3 scripts/governance/hygiene/ratchet.py --explain silent_exception_swallows` |
+| Active tracks | 9 | `make onboard` |
+| Shippable active tracks | 1 (`company-builder-parity-2026-07`) | `make onboard` |
+
+Baseline command failures re-verified during the adversarial audit:
+
+| Finding | Observed failure |
+|---|---|
+| `make test-fast` | stopped after 1,666 passes at `tests/test_build_engine.py::TestDryRun::test_dry_run_no_files_changed` setup timeout; the test passed alone |
+| `make test` | stopped after 5,661 passes when Go 1.22 was treated as capable of running modules requiring Go 1.26 |
+| `make governance-all` | missing Semgrep skipped green; missing gitleaks stopped the bundle |
+| `make go-ci` | Go 1.26 toolchain unavailable on the audit host |
+| `make docops-integrity` | strict main count duplication and generated-content drift |
+| `make nats-substrate-contract` | live NATS evidence was more than eight days stale |
+| `make uplift-guards` | child process waited on inherited stdin until terminated; rerun with closed stdin passed |
+
+## Finding registry
+
+Every work packet must close, narrow, or explicitly defer at least one finding.
+
+| ID | Severity | Finding | Evidence owner | Reproduction / proof |
+|---|---:|---|---|---|
+| TIT-001 | 4 | `verifier-selfcheck` claims all gates are functional without executing behavioral gates | `Makefile:verifier-selfcheck` | compare target body with `make test-fast` result |
+| TIT-002 | 4 | fast suite deterministically times out only in suite context | `Makefile:test-fast`, `tests/test_build_engine.py` | `make test-fast`; then run the failing test alone |
+| TIT-003 | 3 | Go capability is inferred from executable presence, not required version | `tools/*/go.mod`, `tests/test_github_ingestor_runner.py` | Go 1.22 host with modules declaring 1.26 |
+| TIT-004 | 4 | missing Semgrep can exit zero in a required-looking local target | `scripts/governance/run_semgrep_with_ca.sh` | remove Semgrep from `PATH` and run strict target |
+| TIT-005 | 4 | uplift subprocess can block indefinitely on inherited stdin | `scripts/uplift_guards/shakti_warrant_guard.py` | run `make uplift-guards` with open non-TTY stdin |
+| TIT-006 | 4 | duplicate top-level JSON key silently drops pytest/gitleaks classifications | `docs/governance/CI_TRUTH_CONTRACT.json` | `json.load` and inspect advisory IDs |
+| TIT-007 | 4 | CI Truth, parity manifest, automerge, and branch protection do not share one required set | three CI owner surfaces | `check_ci_parity.py --live` plus manifest diff |
+| TIT-008 | 4 | strict DocOps is red while PR count drift is advisory and the rolling repair PR can lose checks | DocOps scripts/workflows | `make docops-integrity`; inspect latest reconcile PR head checks |
+| TIT-009 | 3 | hermetic governance depends on live NATS freshness | `Makefile:nats-substrate-contract` | run on a clean clone without daemon state |
+| TIT-010 | 5 | production-shaped API opens mutations when no key is configured; GraphQL/WS bypass bearer scope | `api/main.py`, `Dockerfile` | protected/unprotected TestClient matrix |
+| TIT-011 | 5 | durable invoker is effective-once in bounded cases, not strict exactly-once for external effects | `graph/durable_invoker.py` | crash after provider success before DB completion |
+| TIT-012 | 4 | task, runtime, ontology, memory, and JSONL state have split authority | `swarm.py`, `runtime_state.py`, mismatch map | crash/consistency matrix |
+| TIT-013 | 4 | critical behavior remains concentrated in god modules and silent catches | hygiene ratchet | module/silent-swallow counters |
+| TIT-014 | 4 | untrusted proof/scorer paths still execute shell/native code without a complete jail | `sealed_packet_apply.py`, chamber sandbox | adversarial escape suite |
+| TIT-015 | 3 | terminal behavior is not continuously verified in current CI and Bun is absent on clean agents | `terminal/`, active-track criterion | Bun clean-clone test |
+
+## Governance and ownership
+
+The campaign does not own every file it needs to harden. Work packets remain subordinate to current active-track owners:
+
+| Surface | Existing owner |
+|---|---|
+| CI Truth, automerge, Mike | `merge-master-mike-d4-2026-06` |
+| Evolution safety and governance hygiene | `sovereign-safety-tcb-2026-07` |
+| Durable invoker, reconciler, runtime graph | `dharmagraph-engine-2026-07` |
+| Go sense organs and compose daemon | `organism-rewire-2026-07` |
+| Terminal | `helm-worldclass-terminal-2026-06` |
+| Loop closure and NATS live evidence | `loop-closure-2026-06` |
+
+Before implementation:
+
+1. Close or move the already-shippable TAM track according to its owner.
+2. Ratify this campaign as a sequencing layer over existing owners, not as a competing surface owner.
+3. Run collision preflight for every BR-id cited by an implementation PR.
+4. Do not modify files from two owner tracks in one PR unless both owners and the exact cross-track seam are declared.
+
+## Campaign dependency graph
+
+```mermaid
+flowchart TD
+  A[WP-0A Hermetic bootstrap] --> B[WP-0B Verifier truth]
+  A --> C[WP-0C Tool and subprocess fail-closed]
+  B --> D[WP-0D Fast-suite determinism]
+  C --> E[WP-0E Hermetic/live split]
+  A --> F[WP-0F CI authority]
+  F --> G[WP-0G DocOps convergence]
+  A --> H[WP-0H Polyglot verification]
+  D --> Z[Phase 0 exit]
+  E --> Z
+  F --> Z
+  G --> Z
+  H --> Z
+```
+
+## Autonomous execution protocol
+
+For every work packet:
+
+1. Run `make onboard` and record branch, SHA, dirty state, and active owner.
+2. Read the touched module, its tests, and the relevant mismatch-map entry.
+3. Write one failing regression test that kills the observed failure mode.
+4. Run only that test and capture the expected failure.
+5. Implement the smallest change that makes the test pass.
+6. Run the work-packet verification commands.
+7. Run `make agent-build-closeout`.
+8. Review `git diff --check`, changed-file scope, generated files, and secrets.
+9. Commit one logical change, push, and open/update a draft PR.
+10. Do not start a dependent packet until its prerequisite PR is green or the operator explicitly authorizes stacked work.
 
 ## Titanium-grade standard
 
@@ -93,6 +224,457 @@ Repository CI must not depend on a live daemon receipt.
 - Stop snapshot PR accumulation.
 - Require generated counts to be reproducible, current, and independently checked.
 
+## Phase 0 work packets
+
+### WP-0A — Hermetic bootstrap
+
+**Findings:** TIT-003, TIT-004, TIT-015  
+**Owner lanes:** sovereign safety, organism rewire, Helm  
+**Depends on:** none
+
+**Allowed files**
+
+- `Makefile`
+- `pyproject.toml`
+- `uv.lock`
+- `.github/workflows/hermetic.yml`
+- `Dockerfile`
+- `Dockerfile.swarm`
+- `dashboard/package.json`
+- `dashboard/package-lock.json`
+- `terminal/package.json`
+- `terminal/bun.lock`
+- bootstrap-contract tests only
+
+**Required implementation**
+
+1. Define one clean-clone bootstrap contract using the pinned `uv` version already owned by `.github/workflows/hermetic.yml`.
+2. Make `uv lock --check` and `uv sync --frozen --extra dev` the Python dependency path used by verification.
+3. Remove `Dockerfile.swarm` dependency-install suppression; a failed install must fail the image build.
+4. Declare the required Go and Bun versions from their existing manifests and verify them before tests.
+5. Keep dashboard installation aligned with its committed lockfile and existing CI flags.
+6. Do not download unpinned executable scripts during a required verification lane.
+
+**Tests**
+
+- Add a bootstrap contract test that reads the real Makefile/workflow and proves:
+  - `uv.lock` is checked before sync;
+  - the frozen lock is used;
+  - Docker dependency failure is not swallowed;
+  - Go and Bun requirements have one declared source each.
+- The test must fail if `|| true` is reintroduced on the swarm dependency install.
+
+**Verification**
+
+```bash
+uv lock --check
+uv sync --frozen --extra dev
+.venv/bin/python -m pytest --collect-only -q
+make lint-blockers
+```
+
+**Expected negative controls**
+
+- Modified `pyproject.toml` without lock refresh → `uv lock --check` fails.
+- Missing required tool → bootstrap exits nonzero with an install instruction.
+- Dependency resolution failure during Docker build → image build fails.
+
+**Rollback**
+
+Revert only bootstrap, workflow, and Docker installation changes. No state migration is permitted in this packet.
+
+**Exit**
+
+- A fresh Linux clone reaches a working `.venv` through one documented command.
+- Repeating the command is idempotent.
+- No user-site package or shell profile is required.
+
+### WP-0B — Verifier truth
+
+**Findings:** TIT-001  
+**Owner lane:** sovereign safety  
+**Depends on:** WP-0A
+
+**Allowed files**
+
+- `Makefile`
+- tests dedicated to verifier behavior
+- existing preflight documentation if its command contract changes
+
+**Required implementation**
+
+Choose and encode one honest contract:
+
+- Preferred: `verifier-selfcheck` runs a bounded behavioral sentinel in addition to syntax, F821, collection, and onboarding.
+- Acceptable: narrow the target and banner to state exactly what it verifies, while `agent-build-preflight` separately runs the behavioral sentinel.
+
+It must never print `ALL GATES FUNCTIONAL` unless all gates named by that phrase were executed.
+
+**Tests**
+
+- Add a meta-test that substitutes a failing behavioral sentinel and asserts `verifier-selfcheck` exits nonzero.
+- Add a positive control proving a passing sentinel produces the narrowed success banner.
+- Assert the target uses repository `.venv` Python after bootstrap.
+
+**Verification**
+
+```bash
+make verifier-selfcheck
+make agent-build-preflight
+```
+
+**Mutation check**
+
+Removing the behavioral command or replacing its failure with `|| true` must fail the meta-test.
+
+**Rollback**
+
+Restore the previous target but also restore its narrower pre-change banner; never restore the overbroad claim independently.
+
+**Exit**
+
+Success output and executed evidence are equivalent.
+
+### WP-0C — Required tools and subprocesses fail closed
+
+**Findings:** TIT-003, TIT-004, TIT-005  
+**Owner lanes:** sovereign safety, organism rewire  
+**Depends on:** WP-0A
+
+**Allowed files**
+
+- `scripts/governance/run_semgrep_with_ca.sh`
+- `scripts/uplift_guards/shakti_warrant_guard.py`
+- `scripts/uplift_guards/run_pre_commit.py`
+- `scripts/governance/check_shakti_warrant.py`
+- `dharma_swarm/world_radar/go_invoke.py`
+- `scripts/runtime/github_ingestor_runner.py`
+- related tests
+- relevant Makefile targets
+
+**Required implementation**
+
+1. Required Semgrep mode exits nonzero when Semgrep is absent. Baseline-capture mode may remain nonblocking only when its output says `SKIPPED`.
+2. Gitleaks absence fails with an actionable message before command execution.
+3. Every governance subprocess receives closed stdin unless input is explicitly part of its contract.
+4. Every governance subprocess has a wall-clock timeout and converts timeout into a nonzero, named failure.
+5. Go capability checks compare the installed version with the module `go` directive.
+6. The GitHub ingestor reports `NEEDS_HOST` when Go exists but is too old; it must not move the queued envelope to `failed/`.
+7. Reuse the existing Go invocation owner; do not create a second toolchain registry.
+
+**Tests**
+
+- Strict Semgrep with a stripped `PATH` exits nonzero.
+- Advisory baseline mode returns a structured skip, not an implied pass.
+- A child process that waits on stdin is terminated within the test timeout.
+- Fake Go 1.22 against a `go 1.26` module returns `NEEDS_HOST`.
+- A queued GitHub envelope remains pending on an incapable host.
+
+**Verification**
+
+```bash
+make semgrep
+make gitleaks
+make uplift-guards
+make go-ci
+python3 -m pytest -q \
+  tests/test_github_ingestor_runner.py \
+  tests/test_world_radar_go_bridge.py
+```
+
+**Expected negative controls**
+
+- `PATH` without Semgrep/gitleaks → named nonzero failure.
+- Open stdin with no bytes → no hang.
+- Go below module requirement → `NEEDS_HOST`, no payload loss.
+
+**Rollback**
+
+Revert per tool. Never restore an indefinite timeout or a green missing-tool result.
+
+### WP-0D — Fast-suite determinism
+
+**Findings:** TIT-002  
+**Owner lanes:** sovereign safety; runtime owner only if production code is proven causal  
+**Depends on:** WP-0A, WP-0B
+
+**Observed symptom**
+
+`make test-fast` repeatedly stopped after 1,666 passes while setting up `TestDryRun.test_dry_run_no_files_changed`. The same test passed alone in under one second. This proves suite-order, leaked-resource, or global-state coupling; it does not prove `build_engine.py` itself is defective.
+
+**Initial allowed files**
+
+- `tests/test_build_engine.py`
+- `tests/test_autonomous_agent.py`
+- shared test fixtures that are demonstrated to leak resources
+- `Makefile:test-fast`
+- `pyproject.toml` pytest configuration
+
+Production files enter scope only after a minimized reproducer demonstrates causality.
+
+**Investigation protocol**
+
+1. Reproduce the failure twice from a clean `.pytest_cache`.
+2. Run the failing test alone.
+3. Bisect the preceding collected test modules until the smallest order-dependent prefix is known.
+4. Measure child processes, open file descriptors, event loops, temporary git hooks, and environment mutations before and after the minimal prefix.
+5. Write a regression test that reproduces the leaked state without relying on wall-clock luck.
+6. Fix the owner of the leak.
+
+**Forbidden fixes**
+
+- Raising the global fast timeout without root-cause evidence.
+- Marking the failing test slow merely because it appears late in the suite.
+- Adding retries.
+- Reordering tests to hide shared state.
+
+**Verification**
+
+```bash
+make test-fast
+make test-fast
+make test
+```
+
+Two consecutive fast runs are required to reject one-off luck.
+
+**Rollback**
+
+Revert the isolated leak fix. If production behavior changed, restore it and keep the regression test failing until a safer fix is designed.
+
+**Exit**
+
+- Two clean consecutive fast-suite passes.
+- No new unraisable subprocess/event-loop warning.
+- The isolated test remains fast.
+
+### WP-0E — Hermetic/live verification split
+
+**Findings:** TIT-009  
+**Owner lanes:** loop closure, organism rewire  
+**Depends on:** WP-0C
+
+**Allowed files**
+
+- `Makefile`
+- `scripts/governance/check_nats_substrate_contract.py`
+- `scripts/governance/check_nats_live_production_evidence.py`
+- `scripts/governance/run_nats_live_production_matrix.py`
+- `.github/workflows/a2a-agni-live-contact.yml`
+- NATS contract/live-evidence tests
+
+**Required implementation**
+
+| Lane | May read host state? | Missing host result | Merge authority |
+|---|---:|---|---|
+| Hermetic substrate contract | No | Test failure only for repo defect | Required-capable |
+| Live NATS evidence | Yes | `NEEDS_HOST` on non-daemon host | Never a PR merge requirement |
+| Daemon-host scheduled closure | Yes | Failure/stale is red on that host | Operational signal |
+
+- `governance-all` composes only the hermetic NATS contract.
+- Existing live matrix/evidence paths retain their current state owner.
+- Stale evidence is still failure on a declared live host.
+- `NEEDS_HOST` cannot be converted into `PASS` in a report.
+
+**Tests**
+
+- Inspect the real Make dependency graph and assert no live-evidence script is reachable from hermetic `governance-all`.
+- Missing live artifact on a non-live fixture host yields `NEEDS_HOST`.
+- Stale artifact under declared live mode yields failure.
+- Fresh structurally valid artifact yields the current live verdict.
+
+**Verification**
+
+```bash
+make governance-all
+make nats-substrate-contract
+make nats-live-production-matrix
+```
+
+The third command is expected to report `NEEDS_HOST` away from the daemon host; that is an honest non-closure.
+
+**Rollback**
+
+Restore target wiring only. Do not copy a live receipt into the repository to make a clean clone green.
+
+### WP-0F — One CI authority
+
+**Findings:** TIT-006, TIT-007  
+**Owner lane:** merge-master-mike  
+**Depends on:** WP-0A
+
+**Allowed files**
+
+- `docs/governance/CI_TRUTH_CONTRACT.json`
+- `scripts/governance/ci_parity_manifest.json`
+- `scripts/runtime/ci_truth.py`
+- `scripts/runtime/pr_merge_control.py`
+- `scripts/governance/check_ci_parity.py`
+- `.github/workflows/ci-parity.yml`
+- `.github/workflows/automerge.yml`
+- `.github/workflows/codex-mention-router.yml`
+- CI Truth, parity, and merge-control tests
+- `Makefile` only for correcting referenced local commands
+
+**Required policy**
+
+The committed parity manifest is the sole expected-context list. Live branch protection remains the enforcement owner and must be compared against it with Administration-read access.
+
+The initial desired required set is:
+
+- `pytest (3.11)`
+- `pytest (3.12)`
+- `gitleaks`
+- `DocOps integrity gate`
+- `Coherence Delta PR body`
+- `Quality ratchet - repo-wide fitness function`
+
+Changing this set is an operator decision and must update branch protection and all consumers in one reviewed change.
+
+**Required implementation**
+
+1. Merge duplicate `advisory` arrays and reject future duplicate JSON keys.
+2. Make CI Truth consume or validate against the parity manifest.
+3. Make automerge load the required set rather than carry a private string.
+4. Make missing required checks blockers in manual Mike and workflow-dispatch paths.
+5. Keep stale-head trusted reviews invalid.
+6. Replace phantom local commands, including `make frontend-check`, with real targets or correct commands.
+7. Preserve the narrow `bot-pr` reviewer waiver; it must not waive required checks, conflicts, changed-requested, or blocking threads.
+
+**Tests**
+
+- Committed contract contains pytest and gitleaks after JSON parsing.
+- A duplicate top-level key raises a configuration error.
+- Manifest and CI Truth required names are identical.
+- Missing required check blocks Mike.
+- Required check failure blocks Mike.
+- Stale reviewer commit does not satisfy quorum.
+- Bot PR waiver does not waive any required CI context.
+
+**Verification**
+
+```bash
+python3 -m pytest -q \
+  tests/test_ci_truth.py \
+  tests/governance/test_ci_parity_guard.py \
+  tests/test_pr_merge_control.py \
+  tests/test_pr_merge_control_github_reviews.py
+python3 scripts/governance/check_ci_parity.py --live
+```
+
+**Operator prerequisite**
+
+Provision read access for live branch-protection parity and apply the approved required set. Without it, structural parity may pass but WP-0F cannot close.
+
+**Rollback**
+
+Revert all consumers together. Partial rollback that recreates divergent required sets is forbidden.
+
+### WP-0G — Strict DocOps convergence
+
+**Findings:** TIT-008  
+**Owner:** DocOps workflow/script surfaces  
+**Depends on:** WP-0A; may proceed in parallel with WP-0D through WP-0F
+
+**Allowed files**
+
+- `scripts/docops/check_docops_integrity.py`
+- `.github/workflows/docops.yml`
+- `.github/workflows/docops-reconcile-main.yml`
+- `.github/workflows/pr-dedupe.yml`
+- `.github/workflows/bot-pr-limit.yml`
+- `docs/docops/AUTO_INVENTORY.md`
+- count-managed portions of `docs/governance/SOVEREIGN_MANIFEST.md`
+- DocOps tests
+
+**Required implementation**
+
+1. Regenerate current count-managed surfaces deterministically.
+2. Make strict mode green on the exact merged tree.
+3. Preserve advisory count behavior on ordinary feature PRs only if post-merge reconciliation is guaranteed.
+4. Ensure a force-update of the rolling reconcile branch triggers fresh checks on the new head.
+5. Ensure success means the update reached main or an actionable PR with checks—not merely that a branch was pushed.
+6. Close or update stale snapshot PRs using existing dedupe/limit owners.
+7. Keep hand-authored doctrine outside generated count blocks.
+
+**Tests**
+
+- Writer is idempotent: two writes produce byte-identical managed blocks.
+- Strict check fails after a tracked count changes.
+- Strict check passes after regeneration.
+- Reconcile workflow tests assert the updated head receives a check-triggering event.
+- Dedupe tests cover timestamped spine snapshots lacking an automation marker.
+
+**Verification**
+
+```bash
+make docops-integrity
+make docops-report
+python3 scripts/docops/check_docops_integrity.py
+git diff --check
+```
+
+**Operator prerequisite**
+
+Confirm the existing `DOCOPS_RECONCILE_TOKEN`/GitHub App path or authorize the normal reviewed-PR fallback. No credential is committed.
+
+**Rollback**
+
+Revert workflow mechanics and regenerated managed blocks together. Never hand-edit generated counts.
+
+### WP-0H — Polyglot verification parity
+
+**Findings:** TIT-003, TIT-015  
+**Owner lanes:** organism rewire, Helm, dashboard owners  
+**Depends on:** WP-0A, WP-0C
+
+**Allowed files**
+
+- Go module manifests only if version normalization is required
+- `.github/workflows/tests.yml`
+- `Makefile`
+- `dashboard/package.json`, lockfile only when required
+- `terminal/package.json`, Bun lockfile only when required
+- existing Go, dashboard, and terminal tests
+
+**Required implementation**
+
+- Align all Go CI jobs to one patch-level policy compatible with module directives.
+- Add a real `frontend-check` target matching dashboard CI.
+- Add a real `terminal-check` target using the pinned Bun lockfile.
+- Run terminal behavioral tests in CI; file existence is not sufficient.
+- Make local commands and workflow commands byte-for-byte comparable where practical.
+- Do not regenerate lockfiles unless a declared dependency change requires it.
+
+**Verification**
+
+```bash
+make go-ci
+make frontend-check
+make terminal-check
+```
+
+Expanded commands:
+
+```bash
+npm --prefix dashboard ci --legacy-peer-deps
+npm --prefix dashboard run lint -- --quiet
+npm --prefix dashboard run build
+bun --cwd terminal install --frozen-lockfile
+bun --cwd terminal test
+```
+
+**Negative controls**
+
+- Wrong Go version fails before compilation.
+- Modified dashboard lockfile fails `npm ci`.
+- Modified Bun lockfile fails frozen install.
+- Removed terminal behavior causes CI failure.
+
+**Rollback**
+
+Revert each language lane independently. Do not weaken another language's gate to compensate.
+
 ## Phase 0 exit gate
 
 All commands below must complete from a fresh clone:
@@ -106,7 +688,7 @@ make governance-all
 make go-ci
 make docops-report
 python3 scripts/governance/check_track_status.py
-npm --prefix dashboard ci
+npm --prefix dashboard ci --legacy-peer-deps
 npm --prefix dashboard run lint
 npm --prefix dashboard run build
 bun --cwd terminal install --frozen-lockfile
@@ -116,63 +698,299 @@ git status --short
 
 The exit gate permits no unexplained skips, stale evidence, missing tools, dirty files, or success claims broader than the commands actually prove.
 
-## Subsequent priorities
+`git status --short` must be empty after removing only documented disposable build caches. Runtime receipts, generated status reports, dependency trees, and tool caches must already be ignored or written outside the repository.
+
+Phase 0 closes only when:
+
+1. every WP-0A through WP-0H acceptance criterion passes on merged `main`;
+2. `make agent-build-closeout` is green;
+3. live-only checks report either a fresh live verdict on their owner host or explicit `NEEDS_HOST` elsewhere;
+4. live branch protection matches the committed required-context manifest;
+5. strict DocOps is green on `main`;
+6. two consecutive `make test-fast` runs pass;
+7. the standard Python suite, Go modules, dashboard, and terminal all pass on their pinned toolchains; and
+8. `make onboard` makes no shippability claim from missing or unexecuted evidence.
+
+### Phase 0 PR stack
+
+| Order | Packet | May run in parallel with | Merge blocker |
+|---:|---|---|---|
+| 1 | WP-0A bootstrap | none | clean-clone bootstrap |
+| 2 | WP-0B verifier truth | WP-0C | honest success claim |
+| 3 | WP-0C tools/subprocesses | WP-0B | no required false-green/hang |
+| 4 | WP-0D fast suite | WP-0E, WP-0F, WP-0G | two deterministic passes |
+| 5 | WP-0E live/hermetic split | WP-0D, WP-0F, WP-0G | governance-all hermetic |
+| 6 | WP-0F CI authority | WP-0D, WP-0E, WP-0G | operator live-parity decision |
+| 7 | WP-0G DocOps | WP-0D through WP-0F | strict main green |
+| 8 | WP-0H polyglot | after WP-0A/WP-0C | all language lanes green |
+| 9 | Integrated exit | none | all prior packets merged |
+
+## Deferred phase specifications
+
+No deferred phase may begin before the Phase 0 exit gate passes on merged `main`. Each phase must be decomposed into work packets using the Phase 0 template before implementation.
 
 ### Phase 1 — Security boundaries
 
-- Require authentication for REST, GraphQL, WebSockets, and webhooks.
-- Require TLS for publicly bound services.
-- Add boundary validation, bounded inputs, and rate limiting.
-- Remove arbitrary shell execution from untrusted proof and scorer paths.
-- Route every source mutation path through the one-door promotion authority.
+**Findings:** TIT-010, TIT-014  
+**Entry:** Phase 0 closed; API and deployment tests reproducible  
+**Primary surfaces:** `api/main.py`, API routers, dashboard transport, webhook verifier, sandbox/proof execution, `Dockerfile`, `docker-compose.yml`
+
+**Required outcomes**
+
+- Production mode refuses startup when authentication material is absent.
+- REST, GraphQL, WebSockets, A2A, webhooks, and health surfaces have an explicit auth classification.
+- The shipped dashboard can authenticate without exposing long-lived secrets to browser storage.
+- Public bindings require a documented TLS/reverse-proxy boundary.
+- Mutating endpoints have bounded Pydantic inputs and rate/resource limits.
+- Untrusted proof, diff, test, and scorer execution uses argv allowlists and process/network/filesystem isolation.
+- Every source mutation reaches `verify_promotion` and the protected-root backstop.
+
+**Behavioral tests**
+
+- Full route matrix: no key, invalid key, valid key, public route, WebSocket, GraphQL, webhook.
+- Production-start negative test with missing key.
+- Path traversal, oversized payload, repeated request, invalid amount, and malformed signature tests.
+- Sandbox escape, credential exfiltration, shell metacharacter, symlink, and network tests.
+- Mutation-path census test asserting no direct writable live-root path.
+
+**Exit**
+
+```bash
+python3 -m pytest -q tests/test_api_auth.py tests/test_verify_api.py tests/test_evolution_safety.py
+make semgrep-strict
+```
+
+No externally reachable mutation is fail-open.
 
 ### Phase 2 — Runtime correctness
 
-- Replace the strict `exactly-once` claim with precise side-effect semantics.
-- Add provider-backed idempotency or transactional outbox boundaries where possible.
-- Introduce daemon ownership fencing.
-- Add crash injection at each dispatch and receipt window.
-- Define backpressure, retry budgets, quarantine, and terminal failure behavior.
+**Findings:** TIT-011  
+**Entry:** Phase 1 closed  
+**Primary surfaces:** `dharma_swarm/graph/durable_invoker.py`, `graph/reconciler.py`, `runtime_lifecycle.py`, provider invocation seams, `orchestrator.py` seam only
+
+**Required outcomes**
+
+- Replace universal `exactly-once` language with a table of side-effect classes:
+  - memoized local computation;
+  - provider generation;
+  - idempotent external action;
+  - non-idempotent external action;
+  - human-confirmed action.
+- Propagate provider idempotency keys where supported.
+- Use intent/outcome records to quarantine unknown completion rather than blindly repeat non-idempotent actions.
+- Add a durable daemon ownership lease and reject a second writer.
+- Define bounded queue size, admission, backpressure, retry budget, and terminal quarantine.
+- Receipt persistence failure becomes observable state, not a debug-only warning.
+
+**Chaos matrix**
+
+Kill the process:
+
+1. before claim;
+2. after claim and before provider call;
+3. during provider call;
+4. after provider success and before receipt;
+5. after receipt and before task completion;
+6. during idempotency completion; and
+7. during task-board settlement.
+
+For each window, specify whether the result is retry, memo, quarantine, or manual decision.
+
+**Exit**
+
+```bash
+python3 -m pytest -q \
+  tests/test_graph_durable_invoker.py \
+  tests/test_graph_reconciler.py \
+  tests/test_graph_chaos_receipt.py
+```
+
+A second daemon cannot own the same runtime DB, and no test claims more than its fault model proves.
 
 ### Phase 3 — State integrity
 
-- Declare canonical ownership for tasks, claims, runs, ontology, memory, and receipts.
-- Replace inline best-effort schema edits with versioned migrations.
-- Make cross-store transitions explicit and consistency-checked.
-- Test backup and restoration onto an empty host.
-- Eliminate hidden local-state prerequisites.
+**Findings:** TIT-012  
+**Entry:** Phase 2 ownership lease and crash semantics merged  
+**Primary surfaces:** `runtime_state.py`, `task_board.py`, ontology owner, graph checkpoint owner, migrations, Litestream config
+
+**Required outcomes**
+
+- Publish a state-authority table identifying canonical, derived, cache, mirror, and host-local stores.
+- Define transaction boundaries between task status, claim, delegation run, receipt, artifact, and topology state.
+- Replace inline catch-all `ALTER TABLE` logic with ordered, idempotent, versioned migrations.
+- Detect schema version mismatches before accepting work.
+- Reconcile `tasks.db` and `runtime.db` through an explicit invariant with no silent impossible transitions.
+- Decide the canonical ontology path and migrate or merge divergent copies safely.
+- Back up every canonical store or explicitly reconstruct it from an owned source.
+- Restore onto an empty host and compare semantic state, not merely file hashes.
+
+**Tests**
+
+- Upgrade from every supported schema version.
+- Interrupted migration and retry.
+- Corrupt/partial DB refusal.
+- Task/runtime invariant mutation tests.
+- Litestream restore into empty volume.
+- Restore followed by daemon boot/reconcile with no duplicate external effect.
+
+**Exit**
+
+One documented restore command recreates a bootable, semantically consistent organism from owned backups.
 
 ### Phase 4 — Wiring truth
 
-- Classify every claimed component by reachable production entrypoint.
-- Remove dead or duplicate implementations.
-- Mark optional and experimental paths explicitly.
-- Convert live wiring claims into behavioral acceptance tests.
-- Close interface mismatches rather than guarding permanent split-brain behavior.
+**Findings:** TIT-012 plus every `PARTIAL`, `DORMANT`, and unresolved mismatch found by the audit  
+**Entry:** canonical state ownership published  
+**Primary surfaces:** `INTERFACE_MISMATCH_MAP.md`, active surface manifest, entrypoints, `spine_bypass_report.py`, xray inventory
+
+**Required outcomes**
+
+- Build an executable entrypoint-to-side-effect inventory for CLI, API, daemon, cron, workflow, dashboard, terminal, and Go tools.
+- Every named component is classified `LIVE`, `PARTIAL`, `DORMANT`, or removed.
+- Every `LIVE` classification has an entrypoint-reachable behavioral test.
+- Every `DORMANT` component has an explicit owner and activation condition or is deleted.
+- Delete duplicate adapters, routers, executors, receipt types, and state owners after proving callers migrated.
+- Resolve mismatch-map entries; a permanent guard is not resolution when two owners still diverge.
+- Hold runtime spine bypass at zero and reject new unclassified dispatch paths.
+
+**Exit**
+
+```bash
+python3 scripts/repo_xray.py --format json
+python3 scripts/governance/spine_bypass_report.py
+make assurance-boundary
+```
+
+No production claim depends only on documentation, file existence, or a test-only import.
 
 ### Phase 5 — Maintainability
 
-- Decompose the highest-centrality god modules first.
-- Eliminate silent exception swallowing from critical paths.
-- Introduce strict typing incrementally at public and stateful boundaries.
-- Replace private cross-module coupling with narrow typed interfaces.
-- Keep refactoring behavior-preserving and mutation-tested.
+**Findings:** TIT-013  
+**Entry:** wiring inventory stable enough to preserve behavior during decomposition  
+**Primary surfaces:** highest-centrality modules from xray, module-budget and hygiene ratchets
+
+**Priority order**
+
+1. `runtime_state.py`
+2. `orchestrator.py`
+3. `swarm.py`
+4. `agent_runner.py`
+5. `providers.py`
+6. `evolution.py`
+7. `telos_substrate.py`
+8. `thinkodynamic_director.py`
+
+Ordering may change only with a fresh centrality/blast-radius measurement.
+
+**Required outcomes**
+
+- Each extraction has one responsibility and typed interface.
+- No behavior change and no new compatibility layer without a removal date.
+- Critical-path `except Exception: pass` reaches zero.
+- Every swallowed noncritical failure increments an observable counter or writes to its existing owner.
+- Public APIs receive complete annotations and boundary validation.
+- Circular imports and private cross-module method calls are ratcheted downward.
+- Existing oversized files may not grow; each touched giant must shrink.
+
+**Verification**
+
+```bash
+python3 scripts/governance/hygiene/ratchet.py --explain modules_over_500_lines
+python3 scripts/governance/hygiene/ratchet.py --explain silent_exception_swallows
+make module-budget
+make lint-blockers
+```
+
+**Exit**
+
+- No critical production module exceeds 1,000 lines.
+- No critical path silently swallows an exception.
+- The over-500 and largest-module ratchets have strictly improved from baseline.
 
 ### Phase 6 — Test quality
 
-- Expand mutation testing across the trusted computing base.
-- Add concurrency, crash, migration, restore, and deployment tests.
-- Replace import-only and file-existence criteria with behavior-sensitive checks.
-- Generate and verify API contracts across backend, dashboard, and terminal clients.
-- Measure test effectiveness, not only test count.
+**Entry:** critical interfaces decomposed and stable  
+**Primary surfaces:** mutation runner, assurance boundary, test hygiene, integration/chaos suites
 
-### Phase 7 — Open-source readiness
+**Required outcomes**
 
-- Provide a reproducible quickstart.
-- Publish stable architectural boundaries and public APIs.
-- Add a security policy, release process, dependency update policy, and SBOM.
-- Ensure examples and deployment instructions work from clean environments.
-- Make contributor workflows independent of private operator state.
+- Grade tests by mutation sensitivity, not count.
+- Expand mutation testing from receipt core to auth, idempotency, migration, gate, and state invariants.
+- Replace import-only, truthiness-only, file-existence-only, and no-throw closure criteria.
+- Maintain separate unit, integration, chaos, deployment, and live-host suites.
+- Eliminate order dependence and shared global/environment leakage.
+- Generate backend API contracts and verify dashboard/terminal consumers against them.
+- Record duration and flake rate; quarantine requires an owner and expiry.
+
+**Exit**
+
+```bash
+make mutation-test
+make test-hygiene
+make assurance-boundary
+make test
+```
+
+The trusted computing base meets its declared mutation threshold, and no required test is quarantined without an owner and expiry.
+
+### Phase 7 — Open-source engineering readiness
+
+**Entry:** Phases 0 through 6 green  
+**Scope:** engineering usability only; no marketing or capability inflation
+
+**Required outcomes**
+
+- A new contributor succeeds from clone to verified change without private state.
+- Stable public APIs and package boundaries are documented from code.
+- Security reporting, dependency updates, release signing, SBOM, provenance, and supported-version policies exist.
+- Docker images are reproducible, scanned, minimally privileged, and tagged by immutable digest.
+- Examples are executable tests.
+- The quickstart reaches a safe local demo without API keys.
+- Contributor documentation translates project vocabulary into standard engineering terms.
+
+**Exit**
+
+An independent clean-room contributor follows the published path, submits a bounded change, and reproduces the same verification results as CI.
+
+## Metrics and ratchets
+
+| Metric | Baseline | Direction | Phase 0 rule | Campaign target |
+|---|---:|---|---|---|
+| Required commands with false-green behavior | at least 3 | down | zero | zero |
+| `make test-fast` consecutive passes | 0/2 | up | 2/2 | stable |
+| Required-check SSOTs | 3+ | down | 1 expected manifest + live enforcement owner | 1 |
+| Strict DocOps findings | nonzero | down | zero | zero |
+| Critical unauthenticated mutation routes | nonzero | down | inventory only | zero in Phase 1 |
+| Modules >500 lines | 207 at audit commit | down | no increase | strict decrease |
+| Largest module | 5,255 lines at audit commit | down | no increase | <1,000 for critical modules |
+| Silent exception swallows | 243 at audit commit | down | no increase | zero on critical paths |
+| Spine bypass sites | 0 | hold | zero | zero |
+
+Ratchet baselines may tighten after an improvement. They may not be raised in the same PR that introduces a regression.
+
+## Failure and rollback rules
+
+- A red gate is investigated; it is not made advisory in the same change.
+- A timeout is a failure with a captured process tree and last progress point.
+- A flaky test is a product defect until a deterministic environmental cause is proven.
+- A migration PR includes forward, retry, and restore tests; destructive rollback is forbidden.
+- Generated files are changed only by their existing generator.
+- Security fixes default closed; compatibility escape hatches require explicit local-only naming, logging, and removal criteria.
+- If a work packet expands beyond its allowed files, stop and amend the design before editing.
+- If a sibling track changes the same surface, rebase and re-run the packet's negative controls before continuing.
+
+## Operator decision queue
+
+These are external prerequisites, not tasks an implementation agent may silently decide:
+
+1. Move the shippable `company-builder-parity-2026-07` track according to portfolio policy.
+2. Ratify this specification as a sequencing layer over existing owners.
+3. Approve the six-context required-check set in WP-0F or provide a replacement set with rationale.
+4. Provision Administration-read access for live branch-protection parity.
+5. Confirm the DocOps reconcile credential or approve normal reviewed-PR delivery only.
+6. Define the minimum human-approval rule for human-authored and bot-authored PRs.
+
+An unavailable operator prerequisite blocks only its dependent packet. It does not justify weakening or fabricating the evidence.
 
 ## Frozen work
 
