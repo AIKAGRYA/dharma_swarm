@@ -760,6 +760,23 @@ WP explicitly admits one, forbid `docs/plans/TITANIUM_TELOS_HARDWIRING_PLAN.md`,
 `reports/governance/**`, and `docs/state/**`. Exact resolved arrays, not brace
 notation or prose wildcards, go into the packet.
 
+**Mechanical count-refresh admission (every WP):** strict
+`make docops-integrity` recomputes module/test/markdown metrics that any
+implementation diff necessarily moves
+(`docs/docops/assertions.yaml:7-46`;
+`scripts/docops/check_docops_integrity.py:184-200,648-675`). Every WP envelope
+therefore admits, as its final pre-commit step only, the mechanical outputs of
+`python3 scripts/docops/check_docops_integrity.py --write-manifest-counts
+--write-auto-sections`: the managed count rows in
+`docs/governance/SOVEREIGN_MANIFEST.md` and the generated sections of
+`docs/docops/AUTO_INVENTORY.md`. This admission covers ONLY tool-generated
+replace-in-place refreshes — no prose edit, no assertion redesign, no new or
+weakened assertion, no other change to either file. Any hand edit to those
+files remains forbidden and fails review. [AMENDED 2026-07-10: second
+deterministic envelope conflict, reported by the WP-O1 implementation lane
+before merge — without this clause no packet can both stay in-scope and make
+the strict DocOps gate exit 0.]
+
 ### WP-O1 — Contract, receipt loader, entry packet, and custody repair (L)
 
 **Closes:** §1.3 finding 5, the in-repository reader portion of finding 6, and
