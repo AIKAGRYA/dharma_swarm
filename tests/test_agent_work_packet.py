@@ -467,6 +467,44 @@ def test_session_entry_truth_fields_are_cross_bound(tmp_path: Path) -> None:
         agentops.parse_work_packet(seal_packet(empty_gates))
 
 
+def test_session_entry_accepts_exact_wp_o1r_identity_only(tmp_path: Path) -> None:
+    repo = init_session_repo(tmp_path)
+    base = session_packet(repo)
+
+    exact = copy.deepcopy(base)
+    exact["id"] = "onboard-one-door-WP-O1R"
+    entry = exact["session_entry"]
+    assert isinstance(entry, dict)
+    entry["work_packet"] = "WP-O1R"
+    reseal_packet(exact)
+    parsed = agentops.parse_work_packet(exact)
+    assert parsed.session_entry.work_packet == "WP-O1R"
+
+    ten = copy.deepcopy(base)
+    ten["id"] = "onboard-one-door-WP-O10"
+    ten_entry = ten["session_entry"]
+    assert isinstance(ten_entry, dict)
+    ten_entry["work_packet"] = "WP-O10"
+    reseal_packet(ten)
+    assert agentops.parse_work_packet(ten).session_entry.work_packet == "WP-O10"
+
+    invalid = [
+        ("WP-O2R", "onboard-one-door-WP-O2R"),
+        ("WP-O1RR", "onboard-one-door-WP-O1RR"),
+        ("WP-O1R2", "onboard-one-door-WP-O1R2"),
+        ("WP-O1r", "onboard-one-door-WP-O1r"),
+    ]
+    for bad_work, bad_id in invalid:
+        broken = copy.deepcopy(base)
+        broken["id"] = bad_id
+        broken_entry = broken["session_entry"]
+        assert isinstance(broken_entry, dict)
+        broken_entry["work_packet"] = bad_work
+        reseal_packet(broken)
+        with pytest.raises(agentops.AgentOpsError, match="work_packet.*packet id"):
+            agentops.parse_work_packet(broken)
+
+
 def test_external_entry_packet_bootstrap_and_digest_binding(tmp_path: Path) -> None:
     repo = init_session_repo(tmp_path)
     payload = seal_packet(session_packet(repo))

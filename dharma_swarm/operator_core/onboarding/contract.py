@@ -284,7 +284,7 @@ def _parse_session_entry(
     if not all(isinstance(item, str) and item for item in closest):
         raise AgentOpsError("closest_existing_implementation entries must be strings")
     work_packet = _required_text(raw, "work_packet")
-    if not re.fullmatch(r"WP-O[1-9][0-9]*", work_packet) or not re.search(
+    if not re.fullmatch(r"WP-O[1-9][0-9]*|WP-O1R", work_packet) or not re.search(
         rf"(?:^|-){re.escape(work_packet)}(?:-|$)", packet_id
     ):
         raise AgentOpsError("session_entry.work_packet does not match packet id")
