@@ -1,6 +1,6 @@
 {
   "id": "onboard-one-door-WP-O1",
-  "base_ref": "7f551aee6a8ffc0654105aa0e20a89b1f0752f2b",
+  "base_ref": "a2298f77880c409511290820840ef147e83e86eb",
   "branch": "codex/onboard-wp-o1-20260710",
   "worktree": ".",
   "intent": "Implement only WP-O1: typed onboarding contracts, dual-version receipt loader while the writer remains v1, portable Session Entry Packet enforcement, and exact root AGENTS.md custody repair.",
@@ -8,6 +8,7 @@
     "AGENTS.md",
     ".gitignore",
     ".github/workflows/structure.yml",
+    "dharma_swarm/operator_core/__init__.py",
     "docs/governance/ANTI_SLOP_RULES.md",
     "docs/governance/AGENTOPS.md",
     "scripts/docops/check_docops_integrity.py",
@@ -167,7 +168,7 @@
     },
     {
       "name": "docops-changed",
-      "command": "python3 scripts/docops/check_docops_integrity.py --changed-from 7f551aee6a8ffc0654105aa0e20a89b1f0752f2b",
+      "command": "python3 scripts/docops/check_docops_integrity.py --changed-from a2298f77880c409511290820840ef147e83e86eb",
       "expected_exit": 0,
       "env": {
         "PYTHONPATH": ".venv/lib/python3.12/site-packages:."
@@ -251,7 +252,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "7f551aee6a8ffc0654105aa0e20a89b1f0752f2b",
+      "checked_at_sha": "a2298f77880c409511290820840ef147e83e86eb",
       "details": []
     },
     "interface_mismatches": [],
@@ -265,6 +266,6 @@
       "PR #860 ratifies the final tool-generated DocOps count refresh for SOVEREIGN_MANIFEST.md and AUTO_INVENTORY.md; no hand edit, assertion change, or prose-policy weakening is admitted."
     ],
     "rollback": "Revert the WP-O1 implementation commit; keep the v1 writer and remove no receipt history because WP-O1 creates none.",
-    "packet_digest": "e5cf1ee4ae3ab357f1f309a5469997906056fe690db2feb2d5f15f58c1b53978"
+    "packet_digest": "eb214b8b21c8c9ed805d4e88d2854205072cb106b2dad0b2d21939f38b47d064"
   }
 }

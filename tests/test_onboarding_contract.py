@@ -4,6 +4,8 @@ import ast
 import copy
 import json
 import re
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Callable
 
@@ -32,6 +34,54 @@ CANONICAL_FIRST_READ = (
     ("file", "docs/governance/ACTIVE_TRACK.yaml"),
     ("file", "docs/governance/ANTI_SLOP_RULES.md"),
 )
+
+
+def test_onboarding_imports_without_optional_tui_deps() -> None:
+    probe = """
+import importlib.abc
+import importlib
+import sys
+
+sys.dont_write_bytecode = True
+
+class BlockTextual(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname == "textual" or fullname.startswith("textual."):
+            raise ModuleNotFoundError(
+                "blocked optional dependency: textual", name=fullname
+            )
+        return None
+
+sys.meta_path.insert(0, BlockTextual())
+operator_core = importlib.import_module("dharma_swarm.operator_core")
+assert set(operator_core.__all__) == set(operator_core._EXPORT_MODULES)
+lazy_modules = {
+    f"{operator_core.__name__}.{module_name}"
+    for module_name in operator_core._EXPORT_MODULES.values()
+}
+assert lazy_modules.isdisjoint(sys.modules)
+importlib.import_module("dharma_swarm.operator_core.onboarding")
+assert lazy_modules.isdisjoint(sys.modules)
+
+import pytest
+raise SystemExit(
+    pytest.main([
+        "--collect-only",
+        "-q",
+        "-p",
+        "no:cacheprovider",
+        "tests/test_onboarding_contract.py",
+    ])
+)
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", probe],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def _write(path: Path, text: str) -> None:
