@@ -10,107 +10,63 @@ local commit candidate. It never merges or pushes.
 from __future__ import annotations
 
 import argparse
-import fnmatch
 import json
 import os
-import shlex
+import platform
+import re
+import shutil
 import subprocess
 import sys
+import sysconfig
+import tempfile
 import time
-from dataclasses import dataclass
+import types
+from dataclasses import replace
 from datetime import datetime, timezone
-from pathlib import Path, PurePosixPath
-from typing import Any
+from pathlib import Path
+from typing import Any, Callable
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+sys.dont_write_bytecode = True
+
+# The parent package eagerly imports the optional Textual UI.  AgentOps needs
+# only the dependency-light onboarding contract, so give importlib a namespace
+# parent instead of executing that unrelated initializer on minimal hosts.
+_bootstrapped_operator_core = "dharma_swarm.operator_core" not in sys.modules
+_operator_core_stub: types.ModuleType | None = None
+if _bootstrapped_operator_core:
+    _operator_core_stub = types.ModuleType("dharma_swarm.operator_core")
+    _operator_core_stub.__path__ = [str(REPO_ROOT / "dharma_swarm/operator_core")]
+    sys.modules[_operator_core_stub.__name__] = _operator_core_stub
+
+from dharma_swarm.operator_core.onboarding.models import (  # noqa: E402, F401
+    AgentOpsError,
+    ApprovalPolicy,
+    CommitPolicy,
+    GateSpec,
+    ScopeState,
+    WorkPacket,
+)
+from dharma_swarm.operator_core.onboarding.contract import (  # noqa: E402, F401
+    detect_surface_collisions,
+    matching_patterns,
+    packet_digest,
+    parse_gate,
+    parse_work_packet,
+    path_matches_pattern,
+    resolve_external_dir,
+)
+
+if _bootstrapped_operator_core:
+    sys.modules.pop("dharma_swarm.operator_core", None)
+    root_package = sys.modules.get("dharma_swarm")
+    if getattr(root_package, "operator_core", None) is _operator_core_stub:
+        delattr(root_package, "operator_core")
 
 REPORT_ROOT = Path("reports") / "agentops"
-DEFAULT_GATE_TIMEOUT_SECONDS = 900
-DEFAULT_MAX_OUTPUT_CHARS = 30_000
-
-BANNED_GATE_GIT_SUBCOMMANDS = {
-    "am",
-    "cherry-pick",
-    "clean",
-    "commit",
-    "merge",
-    "pull",
-    "push",
-    "rebase",
-    "reset",
-    "restore",
-    "revert",
-    "stash",
-}
-BANNED_SHELL_TOKENS = {"&&", "||", ";", "|", ">", ">>", "<", "<<"}
-BANNED_SHELL_EXECUTABLES = {
-    "bash",
-    "cmd",
-    "cmd.exe",
-    "fish",
-    "powershell",
-    "pwsh",
-    "sh",
-    "zsh",
-}
-BANNED_LIVE_COMMAND_TOKENS = {
-    "orchestrate-live",
-    "live_swarm",
-    "autonomy-daemon",
-    "autonomous-daemon",
-}
-
-
-class AgentOpsError(Exception):
-    """Raised when a packet or repo state fails closed."""
-
-
-@dataclass(frozen=True)
-class GateSpec:
-    name: str
-    command: str
-    argv: list[str]
-    env: dict[str, str]
-    timeout_seconds: int = DEFAULT_GATE_TIMEOUT_SECONDS
-    max_output_chars: int = DEFAULT_MAX_OUTPUT_CHARS
-
-
-@dataclass(frozen=True)
-class CommitPolicy:
-    allowed: bool
-    message: str
-
-
-@dataclass(frozen=True)
-class ApprovalPolicy:
-    before_commit: bool
-    before_merge: bool
-
-
-@dataclass(frozen=True)
-class WorkPacket:
-    id: str
-    base_ref: str
-    branch: str
-    worktree: Path
-    intent: str
-    allowed_files: list[str]
-    forbidden_files: list[str]
-    gates: list[GateSpec]
-    commit: CommitPolicy
-    approval: ApprovalPolicy
-
-
-@dataclass(frozen=True)
-class ScopeState:
-    tracked_changed_files: list[str]
-    staged_files: list[str]
-    untracked_files: list[str]
-    changed_files: list[str]
-    violations: list[dict[str, Any]]
-
-    @property
-    def passed(self) -> bool:
-        return not self.violations
+_TRUSTED_HOST_PATH = "/usr/sbin:/usr/bin:/sbin:/bin"
 
 
 def run_command(
@@ -119,17 +75,12 @@ def run_command(
     cwd: Path,
     env: dict[str, str] | None = None,
     timeout_seconds: int | None = None,
+    preexec_fn: Callable[[], None] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        argv,
-        cwd=cwd,
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=timeout_seconds,
-        check=False,
+        argv, cwd=cwd, env=env, capture_output=True, text=True,
+        timeout=timeout_seconds, check=False, preexec_fn=preexec_fn,
     )
-
 
 def run_git(args: list[str], *, cwd: Path, check: bool = True) -> subprocess.CompletedProcess[str]:
     result = run_command(["git", *args], cwd=cwd)
@@ -138,11 +89,8 @@ def run_git(args: list[str], *, cwd: Path, check: bool = True) -> subprocess.Com
         raise AgentOpsError(f"git {' '.join(args)} failed: {detail}")
     return result
 
-
 def repo_root_from(path: Path) -> Path:
-    result = run_git(["rev-parse", "--show-toplevel"], cwd=path)
-    return Path(result.stdout.strip()).resolve()
-
+    return Path(run_git(["rev-parse", "--show-toplevel"], cwd=path).stdout.strip()).resolve()
 
 def require_repo_root(path: Path) -> Path:
     root = repo_root_from(path)
@@ -151,130 +99,51 @@ def require_repo_root(path: Path) -> Path:
     return root
 
 
-def safe_packet_id(raw: Any) -> str:
-    if not isinstance(raw, str) or not raw.strip():
-        raise AgentOpsError("id must be a non-empty string")
-    packet_id = raw.strip()
-    allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.:-")
-    if any(char not in allowed for char in packet_id):
-        raise AgentOpsError("id may contain only letters, numbers, '_', '.', ':', and '-'")
-    return packet_id
-
-
-def require_string(data: dict[str, Any], field: str) -> str:
-    value = data.get(field)
-    if not isinstance(value, str) or not value.strip():
-        raise AgentOpsError(f"{field} is required and must be a non-empty string")
-    return value.strip()
-
-
-def require_bool(data: dict[str, Any], field: str) -> bool:
-    value = data.get(field)
-    if not isinstance(value, bool):
-        raise AgentOpsError(f"{field} is required and must be a boolean")
-    return value
-
-
-def normalize_repo_pattern(value: Any, *, field: str) -> str:
-    if not isinstance(value, str) or not value.strip():
-        raise AgentOpsError(f"{field} entries must be non-empty strings")
-    candidate = value.strip().replace("\\", "/")
-    if candidate.startswith("/"):
-        raise AgentOpsError(f"{field} entries must be repo-relative: {value}")
-    posix = PurePosixPath(candidate)
-    if any(part == ".." for part in posix.parts):
-        raise AgentOpsError(f"{field} entries must not traverse upward: {value}")
-    if posix.as_posix() in {"", "."}:
-        raise AgentOpsError(f"{field} entries must name a file, directory, or glob")
-    return posix.as_posix()
-
-
-def require_pattern_list(data: dict[str, Any], field: str, *, non_empty: bool) -> list[str]:
-    value = data.get(field)
-    if not isinstance(value, list):
-        raise AgentOpsError(f"{field} is required and must be a list")
-    patterns = [normalize_repo_pattern(item, field=field) for item in value]
-    if non_empty and not patterns:
-        raise AgentOpsError(f"{field} must contain at least one entry")
-    return patterns
-
-
-def path_matches_pattern(path: str, pattern: str) -> bool:
-    normalized = path.replace("\\", "/")
-    normalized_pattern = pattern.replace("\\", "/")
-    if fnmatch.fnmatchcase(normalized, normalized_pattern):
-        return True
-    if normalized_pattern.endswith("/"):
-        return normalized.startswith(normalized_pattern)
-    return fnmatch.fnmatchcase(normalized, f"{normalized_pattern}/**")
-
-
-def matching_patterns(path: str, patterns: list[str]) -> list[str]:
-    return [pattern for pattern in patterns if path_matches_pattern(path, pattern)]
-
-
-def parse_gate_command(command: str) -> list[str]:
+def _is_within(path: Path, root: Path) -> bool:
     try:
-        argv = shlex.split(command)
-    except ValueError as exc:
-        raise AgentOpsError(f"invalid gate command {command!r}: {exc}") from exc
-    if not argv:
-        raise AgentOpsError("gate command must not be empty")
-    if any(token in BANNED_SHELL_TOKENS for token in argv):
-        raise AgentOpsError(f"gate command uses unsupported shell control token: {command}")
-    executable = Path(argv[0]).name.lower()
-    if executable in BANNED_SHELL_EXECUTABLES:
-        raise AgentOpsError(f"gate command may not invoke a shell executable: {command}")
-    lowered = [Path(part).name.lower() if index == 0 else part.lower() for index, part in enumerate(argv)]
-    if lowered[0] == "git" and len(lowered) > 1 and lowered[1] in BANNED_GATE_GIT_SUBCOMMANDS:
-        raise AgentOpsError(f"gate command is not allowed to run git {lowered[1]}")
-    if any(token in BANNED_LIVE_COMMAND_TOKENS for token in lowered):
-        raise AgentOpsError(f"gate command appears to invoke live swarm/autonomy: {command}")
-    return argv
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
 
 
-def parse_gate(raw: Any, index: int) -> GateSpec:
-    if isinstance(raw, str):
-        command = raw.strip()
-        name = f"gate-{index + 1}"
-        env: dict[str, str] = {}
-        timeout = DEFAULT_GATE_TIMEOUT_SECONDS
-        max_output = DEFAULT_MAX_OUTPUT_CHARS
-    elif isinstance(raw, dict):
-        command_value = raw.get("command")
-        if not isinstance(command_value, str) or not command_value.strip():
-            raise AgentOpsError(f"gates[{index}].command is required and must be a string")
-        command = command_value.strip()
-        name_value = raw.get("name", f"gate-{index + 1}")
-        if not isinstance(name_value, str) or not name_value.strip():
-            raise AgentOpsError(f"gates[{index}].name must be a non-empty string")
-        name = name_value.strip()
-        env_value = raw.get("env", {})
-        if not isinstance(env_value, dict) or not all(
-            isinstance(key, str) and isinstance(value, str)
-            for key, value in env_value.items()
-        ):
-            raise AgentOpsError(f"gates[{index}].env must be an object of string values")
-        env = dict(env_value)
-        timeout = raw.get("timeout_seconds", DEFAULT_GATE_TIMEOUT_SECONDS)
-        if not isinstance(timeout, int) or timeout <= 0:
-            raise AgentOpsError(f"gates[{index}].timeout_seconds must be a positive integer")
-        max_output = raw.get("max_output_chars", DEFAULT_MAX_OUTPUT_CHARS)
-        if not isinstance(max_output, int) or max_output <= 0:
-            raise AgentOpsError(f"gates[{index}].max_output_chars must be a positive integer")
-    else:
-        raise AgentOpsError(f"gates[{index}] must be a command string or object")
+def _git_admin_roots(repo_root: Path) -> set[Path]:
+    roots = {(repo_root / ".git").resolve(strict=False)}
+    for flag in ("--git-dir", "--git-common-dir"):
+        raw = run_git(["rev-parse", flag], cwd=repo_root).stdout.strip()
+        candidate = Path(raw).expanduser()
+        if not candidate.is_absolute():
+            candidate = repo_root / candidate
+        roots.add(candidate.resolve(strict=False))
+    return roots
 
-    argv = parse_gate_command(command)
-    return GateSpec(
-        name=name,
-        command=command,
-        argv=argv,
-        env=env,
-        timeout_seconds=timeout,
-        max_output_chars=max_output,
-    )
 
+def _validate_external_packet_path(repo_root: Path, packet_path: Path) -> None:
+    raw = packet_path.expanduser()
+    lexical = raw if raw.is_absolute() else Path(os.path.abspath(raw))
+    resolved = raw.resolve(strict=False)
+    for boundary in {repo_root.resolve(), *_git_admin_roots(repo_root)}:
+        boundary = boundary.resolve(strict=False)
+        if _is_within(lexical, boundary) or _is_within(resolved, boundary):
+            raise AgentOpsError(
+                f"Session Entry Packet must be external to source and Git state: {packet_path}"
+            )
+
+
+def _probe_tool_version(name: str, repo_root: Path) -> str:
+    if name == "python":
+        return platform.python_version()
+    commands = {"git": ["git", "--version"], "make": ["make", "--version"]}
+    if name not in commands:
+        raise AgentOpsError(f"session_entry declares unsupported tool: {name}")
+    result = run_command(commands[name], cwd=repo_root)
+    if result.returncode != 0:
+        raise AgentOpsError(f"could not probe declared tool {name}")
+    first_line = result.stdout.splitlines()[0] if result.stdout.splitlines() else ""
+    match = re.search(r"\b(\d+(?:\.\d+)+)\b", first_line)
+    if match is None:
+        raise AgentOpsError(f"could not parse {name} version from {first_line!r}")
+    return match.group(1)
 
 def load_raw_packet(path: Path) -> dict[str, Any]:
     text = path.read_text(encoding="utf-8")
@@ -293,59 +162,12 @@ def load_raw_packet(path: Path) -> dict[str, Any]:
         raise AgentOpsError("work packet root must be an object")
     return data
 
-
-def parse_work_packet(data: dict[str, Any]) -> WorkPacket:
-    packet_id = safe_packet_id(data.get("id"))
-    base_ref = require_string(data, "base_ref")
-    branch = require_string(data, "branch")
-    worktree_raw = require_string(data, "worktree")
-    intent = require_string(data, "intent")
-    allowed_files = require_pattern_list(data, "allowed_files", non_empty=True)
-    forbidden_files = require_pattern_list(data, "forbidden_files", non_empty=False)
-
-    gates_raw = data.get("gates")
-    if not isinstance(gates_raw, list):
-        raise AgentOpsError("gates is required and must be a list")
-    gates = [parse_gate(raw_gate, index) for index, raw_gate in enumerate(gates_raw)]
-
-    commit_raw = data.get("commit")
-    if not isinstance(commit_raw, dict):
-        raise AgentOpsError("commit is required and must be an object")
-    commit = CommitPolicy(
-        allowed=require_bool(commit_raw, "allowed"),
-        message=require_string(commit_raw, "message"),
-    )
-
-    approval_raw = data.get("approval")
-    if not isinstance(approval_raw, dict):
-        raise AgentOpsError("approval is required and must be an object")
-    approval = ApprovalPolicy(
-        before_commit=require_bool(approval_raw, "before_commit"),
-        before_merge=require_bool(approval_raw, "before_merge"),
-    )
-
-    return WorkPacket(
-        id=packet_id,
-        base_ref=base_ref,
-        branch=branch,
-        worktree=Path(worktree_raw).expanduser().resolve(),
-        intent=intent,
-        allowed_files=allowed_files,
-        forbidden_files=forbidden_files,
-        gates=gates,
-        commit=commit,
-        approval=approval,
-    )
-
-
 def load_work_packet(path: Path) -> WorkPacket:
     return parse_work_packet(load_raw_packet(path))
-
 
 def git_lines(repo_root: Path, args: list[str]) -> list[str]:
     output = run_git(args, cwd=repo_root).stdout
     return [line.strip().replace("\\", "/") for line in output.splitlines() if line.strip()]
-
 
 def git_status(repo_root: Path) -> str:
     return run_git(["status", "--short"], cwd=repo_root).stdout
@@ -361,21 +183,9 @@ def inspect_scope(repo_root: Path, packet: WorkPacket) -> ScopeState:
         forbidden = matching_patterns(path, packet.forbidden_files)
         allowed = matching_patterns(path, packet.allowed_files)
         if forbidden:
-            violations.append(
-                {
-                    "path": path,
-                    "reason": "forbidden",
-                    "patterns": forbidden,
-                }
-            )
+            violations.append({"path": path, "reason": "forbidden", "patterns": forbidden})
         elif not allowed:
-            violations.append(
-                {
-                    "path": path,
-                    "reason": "outside_allowed_scope",
-                    "patterns": [],
-                }
-            )
+            violations.append({"path": path, "reason": "outside_allowed_scope", "patterns": []})
     return ScopeState(
         tracked_changed_files=tracked,
         staged_files=staged,
@@ -403,31 +213,128 @@ def verify_base_is_ancestor(repo_root: Path, base_hash: str) -> None:
         raise AgentOpsError(f"target worktree HEAD does not contain base_ref {base_hash}")
 
 
+def _packet_target(source_root: Path, packet: WorkPacket) -> Path:
+    if packet.session_entry is not None:
+        if packet.worktree != Path("."):
+            raise AgentOpsError('session_entry packets require portable worktree "."')
+        return source_root
+    return packet.worktree.expanduser().resolve()
+
+
 def prepare_worktree(source_root: Path, packet: WorkPacket) -> Path:
     base_hash = resolve_base_ref(source_root, packet.base_ref)
-    if packet.worktree.exists():
-        target_root = repo_root_from(packet.worktree)
-        if target_root != packet.worktree:
-            raise AgentOpsError(f"worktree path is not a repo root: {packet.worktree}")
+    worktree = _packet_target(source_root, packet)
+    if worktree.exists():
+        target_root = repo_root_from(worktree)
+        if target_root != worktree:
+            raise AgentOpsError(f"worktree path is not a repo root: {worktree}")
         actual_branch = branch_for(target_root)
         if actual_branch != packet.branch:
             raise AgentOpsError(f"worktree branch expected {packet.branch}, got {actual_branch}")
         verify_base_is_ancestor(target_root, base_hash)
         return target_root
 
-    packet.worktree.parent.mkdir(parents=True, exist_ok=True)
+    worktree.parent.mkdir(parents=True, exist_ok=True)
     result = run_git(
-        ["worktree", "add", "-b", packet.branch, str(packet.worktree), packet.base_ref],
+        ["worktree", "add", "-b", packet.branch, str(worktree), packet.base_ref],
         cwd=source_root,
         check=False,
     )
     if result.returncode != 0:
         detail = (result.stderr or result.stdout).strip()
-        raise AgentOpsError(f"could not create worktree {packet.worktree}: {detail}")
-    target_root = repo_root_from(packet.worktree)
+        raise AgentOpsError(f"could not create worktree {worktree}: {detail}")
+    target_root = repo_root_from(worktree)
     if branch_for(target_root) != packet.branch:
         raise AgentOpsError(f"created worktree is not on expected branch {packet.branch}")
     return target_root
+
+
+def _active_tracks(repo_root: Path) -> list[dict[str, Any]]:
+    path = repo_root / "docs/governance/ACTIVE_TRACK.yaml"
+    try:
+        text = path.read_text(encoding="utf-8")
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            import yaml  # type: ignore[import-not-found]
+
+            data = yaml.safe_load(text)
+    except (OSError, ValueError) as exc:
+        raise AgentOpsError(f"cannot read active-track owner config: {exc}") from exc
+    rows = data.get("active_tracks") if isinstance(data, dict) else None
+    if not isinstance(rows, list):
+        raise AgentOpsError("ACTIVE_TRACK.yaml active_tracks must be a list")
+    return [row for row in rows if isinstance(row, dict)]
+
+
+def _validate_session_envelope(
+    repo_root: Path,
+    packet_path: Path,
+    packet: WorkPacket,
+    *,
+    inspect: bool,
+    require_tracked_copy: bool,
+) -> None:
+    entry = packet.session_entry
+    if entry is None:
+        return
+    _validate_external_packet_path(repo_root, packet_path)
+    base_hash = resolve_base_ref(repo_root, packet.base_ref)
+    if packet.base_ref != base_hash:
+        raise AgentOpsError("session_entry base_ref must be the exact 40-character HEAD SHA")
+    if entry.collision.checked_at_sha != base_hash:
+        raise AgentOpsError("session_entry.collision.checked_at_sha must equal base_ref")
+    for tool, declared in sorted(entry.tool_versions.items()):
+        actual = _probe_tool_version(tool, repo_root)
+        if declared != actual:
+            raise AgentOpsError(
+                f"session_entry tool version mismatch for {tool}: "
+                f"declared {declared}, actual {actual}"
+            )
+    selected = next((row for row in _active_tracks(repo_root) if row.get("id") == entry.active_track), None)
+    if selected is None or selected.get("status") != "ACTIVE":
+        raise AgentOpsError(f"session_entry active_track is not ACTIVE: {entry.active_track}")
+    if selected.get("owner") != entry.owner:
+        raise AgentOpsError("session_entry owner does not match ACTIVE_TRACK.yaml")
+    siblings = {
+        str(row.get("id")): [str(value) for value in row.get("owned_surfaces") or []]
+        for row in _active_tracks(repo_root)
+        if row.get("id") != entry.active_track
+    }
+    missing = sorted({p for patterns in siblings.values() for p in patterns} - set(packet.forbidden_files))
+    if missing:
+        raise AgentOpsError(f"forbidden_files omit sibling owned surfaces: {missing}")
+    actual = sorted(set(git_lines(repo_root, ["ls-files"]) + inspect_scope(repo_root, packet).changed_files))
+    collisions = detect_surface_collisions(
+        allowed_patterns=packet.allowed_files,
+        sibling_patterns=siblings,
+        actual_paths=actual,
+    )
+    if collisions:
+        raise AgentOpsError(f"session_entry ownership collision: {collisions}")
+    if entry.collision.status != "clear" or entry.collision.details:
+        raise AgentOpsError("session_entry collision declaration disagrees with recomputation")
+    tracked = repo_root / "reports/agentops/work_packets" / f"{packet.id}.json"
+    if tracked.exists() and tracked.read_bytes() != packet_path.read_bytes():
+        raise AgentOpsError("tracked copy must be byte-identical to external Session Entry Packet")
+    if require_tracked_copy and not tracked.exists():
+        raise AgentOpsError(f"tracked copy is missing: {tracked.relative_to(repo_root)}")
+    if require_tracked_copy:
+        relative = tracked.relative_to(repo_root).as_posix()
+        indexed = run_git(
+            ["ls-files", "--error-unmatch", "--", relative],
+            cwd=repo_root,
+            check=False,
+        )
+        if indexed.returncode != 0:
+            raise AgentOpsError(f"tracked copy is not in the Git index: {relative}")
+    if inspect:
+        if head_for(repo_root) != base_hash:
+            raise AgentOpsError("inspect requires exact HEAD == packet.base_ref")
+        if branch_for(repo_root) != packet.branch:
+            raise AgentOpsError("inspect branch does not match packet.branch")
+        if git_status(repo_root):
+            raise AgentOpsError("inspect requires an exact clean HEAD")
 
 
 def trim_output(output: str, max_chars: int) -> str:
@@ -437,16 +344,283 @@ def trim_output(output: str, max_chars: int) -> str:
     return f"{output[:max_chars]}\n...[truncated {omitted} chars]"
 
 
-def run_gate(repo_root: Path, gate: GateSpec) -> dict[str, Any]:
+def _jail_path(jail: Path, absolute: Path) -> Path:
+    return jail / absolute.as_posix().lstrip("/")
+
+
+def _copy_file_into_jail(source: Path, jail: Path, lexical: Path | None = None) -> None:
+    target = _jail_path(jail, lexical or source)
+    if target.exists():
+        return
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source.resolve(), target)
+
+
+def _copy_elf_dependencies(source: Path, jail: Path) -> None:
+    result = run_command(["ldd", str(source.resolve())], cwd=source.parent)
+    if result.returncode != 0:
+        return
+    for line in result.stdout.splitlines():
+        match = re.search(r"(?:=>\s+)?(/[^\s()]+)", line)
+        if match:
+            dependency = Path(match.group(1))
+            if dependency.is_file():
+                _copy_file_into_jail(dependency, jail)
+
+
+def _copy_executable_into_jail(command: str, jail: Path) -> None:
+    lexical = Path(command).expanduser()
+    if not lexical.is_absolute():
+        resolved = shutil.which(command)
+        if resolved is None:
+            raise AgentOpsError(f"negative-control executable is unavailable: {command}")
+        lexical = Path(resolved)
+    if not lexical.exists():
+        raise AgentOpsError(f"negative-control executable is unavailable: {command}")
+    _copy_file_into_jail(lexical.resolve(), jail, lexical)
+    _copy_elf_dependencies(lexical.resolve(), jail)
+
+
+def _copy_python_runtime(jail: Path) -> None:
+    executable = Path(sys.executable)
+    _copy_executable_into_jail(str(executable), jail)
+    stdlib = Path(sysconfig.get_path("stdlib")).resolve()
+    target = _jail_path(jail, stdlib)
+    shutil.copytree(
+        stdlib,
+        target,
+        symlinks=False,
+        dirs_exist_ok=True,
+        ignore=shutil.ignore_patterns("site-packages", "__pycache__", "*.pyc"),
+    )
+    for extension in stdlib.rglob("*.so"):
+        _copy_elf_dependencies(extension, jail)
+
+
+def _copy_pythonpath_entry(
+    raw: str, *, repo_root: Path, fixture: Path, jail: Path,
+    index: int, jailed: bool,
+) -> str:
+    if raw in {"", "."}:
+        return "/fixture" if jailed else str(fixture)
+    candidate = Path(raw).expanduser()
+    if candidate.is_absolute():
+        source = candidate.resolve(strict=False)
+    else:
+        copied = (fixture / candidate).resolve(strict=False)
+        if copied.exists():
+            relative = copied.relative_to(fixture.resolve()).as_posix()
+            return f"/fixture/{relative}" if jailed else str(copied)
+        choices = (Path.cwd() / candidate, REPO_ROOT / candidate, repo_root / candidate)
+        source = next(
+            (choice.resolve(strict=False) for choice in choices if choice.exists()),
+            (repo_root / candidate).resolve(strict=False),
+        )
+    if os.environ.get("DHARMA_AGENTOPS_JAILED") == "1" and source == Path("/fixture"):
+        return "/fixture"
+    if source == repo_root.resolve():
+        return "/fixture" if jailed else str(fixture)
+    if _is_within(source, repo_root.resolve()):
+        copied = fixture / source.relative_to(repo_root.resolve())
+        if copied.exists():
+            relative = copied.relative_to(fixture.resolve()).as_posix()
+            return f"/fixture/{relative}" if jailed else str(copied)
+    if not source.exists():
+        return f"/missing/{index}" if jailed else str(fixture / ".missing" / str(index))
+    if not jailed:
+        return str(source)
+    target = jail / "deps" / str(index)
+    if source.is_dir():
+        shutil.copytree(source, target, symlinks=False, dirs_exist_ok=True)
+        if os.environ.get("DHARMA_AGENTOPS_JAILED") != "1":
+            for pattern in ("pydantic_core/*.so", "yaml/*.so"):
+                for extension in source.glob(pattern):
+                    _copy_elf_dependencies(extension, jail)
+    else:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+        if source.suffix == ".so":
+            _copy_elf_dependencies(source, jail)
+    return f"/deps/{index}"
+
+
+def _negative_environment(
+    repo_root: Path, fixture: Path, jail: Path, declared: dict[str, str], *,
+    jailed: bool,
+) -> dict[str, str]:
+    safe = {
+        key: value
+        for key, value in os.environ.items()
+        if key in {"LANG", "LC_ALL", "PATH", "PATHEXT", "SYSTEMROOT", "TZ", "WINDIR"}
+    }
+    home, tmp, pycache = fixture / ".home", fixture / ".tmp", fixture / ".pycache"
+    for path in (home, tmp, pycache):
+        path.mkdir(parents=True, exist_ok=True)
+    def inside(path: Path) -> str:
+        relative = path.relative_to(fixture).as_posix()
+        return f"/fixture/{relative}" if jailed else str(path)
+    safe.update({
+        "HOME": inside(home),
+        "TMPDIR": inside(tmp),
+        "PWD": "/fixture" if jailed else str(fixture),
+        "OLDPWD": "/fixture" if jailed else str(fixture),
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPYCACHEPREFIX": inside(pycache),
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "GIT_CONFIG_NOSYSTEM": "1",
+    })
+    if jailed:
+        safe["DHARMA_AGENTOPS_JAILED"] = "1"
+    pythonpath = declared.get("PYTHONPATH", os.environ.get("PYTHONPATH", ""))
+    entries = [
+        _copy_pythonpath_entry(
+            item, repo_root=repo_root, fixture=fixture, jail=jail,
+            index=index, jailed=jailed,
+        )
+        for index, item in enumerate(pythonpath.split(os.pathsep))
+    ]
+    safe["PYTHONPATH"] = os.pathsep.join(entries)
+    for key, value in declared.items():
+        if not key or "=" in key or "\x00" in key or "\x00" in value:
+            raise AgentOpsError(
+                "negative-control env keys must be non-empty names without '=' or NUL"
+            )
+        upper = key.upper()
+        if upper == "PYTHONPATH":
+            continue
+        if upper in {
+            "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
+            "GIT_ALTERNATE_OBJECT_DIRECTORIES", "HOME", "OLDPWD", "PWD", "TMPDIR",
+            "VIRTUAL_ENV", "PYTHONPYCACHEPREFIX",
+        }:
+            raise AgentOpsError(f"negative-control env may not override {key}")
+        if str(repo_root.resolve()) in value:
+            raise AgentOpsError(f"negative-control env {key} points into source")
+        safe[key] = value
+    return safe
+
+
+def _environment_argv(env: dict[str, str]) -> list[str]:
+    assignments: list[str] = []
+    for key, value in sorted(env.items()):
+        if not key or "=" in key or "\x00" in key or "\x00" in value:
+            raise AgentOpsError("negative-control environment cannot be encoded safely")
+        assignments.append(f"{key}={value}")
+    return assignments
+
+
+def _negative_confinement(
+    jail: Path, fixture: Path
+) -> tuple[Callable[[], None] | None, list[str], bool, bool]:
+    if sys.platform == "darwin" and shutil.which("sandbox-exec"):
+        escaped = str(fixture.resolve()).replace("\\", "\\\\").replace('"', '\\"')
+        profile = (
+            '(version 1) (deny file-write*) '
+            f'(allow file-write* (subpath "{escaped}") (literal "/dev/null"))'
+        )
+        return None, ["sandbox-exec", "-p", profile, "--"], False, False
+    if sys.platform != "linux":
+        raise AgentOpsError("negative-control write confinement is unavailable")
+    if os.geteuid() == 0:
+        def enter_jail() -> None:
+            os.chroot(jail)
+            os.chdir("/fixture")
+            os.umask(0o077)
+        return enter_jail, [], True, False
+    unshare = shutil.which("unshare", path=_TRUSTED_HOST_PATH)
+    chroot = shutil.which("chroot", path=_TRUSTED_HOST_PATH)
+    if unshare and chroot:
+        probe = run_command([unshare, "--user", "--map-root-user", "true"], cwd=fixture)
+        if probe.returncode == 0:
+            prefix = [
+                unshare, "--user", "--map-root-user", "--", chroot, str(jail),
+                "/bin/sh", "-c", 'cd /fixture && exec "$@"', "agentops",
+            ]
+            return None, prefix, True, False
+    sudo = shutil.which("sudo", path=_TRUSTED_HOST_PATH)
+    env_executable = shutil.which("env", path=_TRUSTED_HOST_PATH)
+    uid, gid = os.getuid(), os.getgid()
+    if sudo and chroot and env_executable and uid > 0 and gid > 0:
+        trusted_host_env = {"PATH": _TRUSTED_HOST_PATH}
+        probe = run_command(
+            [sudo, "-n", "--", chroot, "--version"],
+            cwd=fixture,
+            env=trusted_host_env,
+        )
+        if probe.returncode == 0:
+            prefix = [
+                sudo,
+                "-n",
+                "--",
+                chroot,
+                f"--userspec={uid}:{gid}",
+                f"--groups={gid}",
+                str(jail),
+                env_executable,
+                "-i",
+                "--",
+            ]
+            return None, prefix, True, True
+    raise AgentOpsError(
+        "negative controls require root chroot, unprivileged user namespaces, "
+        "passwordless sudo chroot with a uid/gid drop, or macOS sandbox-exec; "
+        "confinement is unavailable"
+    )
+
+
+def _prepare_jail(jail: Path, gate: GateSpec) -> None:
+    if os.environ.get("DHARMA_AGENTOPS_JAILED") == "1":
+        for root in (Path("/lib"), Path("/lib64"), Path("/usr/lib")):
+            if root.exists():
+                shutil.copytree(
+                    root, _jail_path(jail, root), symlinks=False, dirs_exist_ok=True
+                )
+    _copy_python_runtime(jail)
+    executables = {gate.argv[0], "python3", "git", "ldd", "/bin/bash", "/bin/sh"}
+    trusted_env = shutil.which("env", path=_TRUSTED_HOST_PATH)
+    if trusted_env:
+        executables.add(trusted_env)
+    for executable in executables:
+        _copy_executable_into_jail(executable, jail)
+    dev = jail / "dev"
+    dev.mkdir(parents=True, exist_ok=True)
+    (dev / "null").touch()
+    inherited_entropy = Path("/dev/urandom")
+    entropy = (
+        inherited_entropy.read_bytes()
+        if os.environ.get("DHARMA_AGENTOPS_JAILED") == "1"
+        and inherited_entropy.is_file()
+        else os.urandom(1024 * 1024)
+    )
+    (dev / "urandom").write_bytes(entropy)
+    (dev / "random").write_bytes(entropy)
+
+
+def _reject_fixture_symlink_escapes(fixture: Path) -> None:
+    root = fixture.resolve()
+    for path in fixture.rglob("*"):
+        if path.is_symlink() and not _is_within(path.resolve(strict=False), root):
+            raise AgentOpsError(f"negative-control fixture symlink escapes isolation: {path}")
+
+
+def run_gate(
+    repo_root: Path,
+    gate: GateSpec,
+    *,
+    base_env: dict[str, str] | None = None,
+    preexec_fn: Callable[[], None] | None = None,
+    argv_prefix: list[str] | None = None,
+) -> dict[str, Any]:
     started = time.monotonic()
-    env = os.environ.copy()
+    env = os.environ.copy() if base_env is None else dict(base_env)
     env.update(gate.env)
     try:
         result = run_command(
-            gate.argv,
+            [*(argv_prefix or []), *gate.argv],
             cwd=repo_root,
             env=env,
             timeout_seconds=gate.timeout_seconds,
+            preexec_fn=preexec_fn,
         )
         exit_code = result.returncode
         combined_output = result.stdout
@@ -463,12 +637,82 @@ def run_gate(repo_root: Path, gate: GateSpec) -> dict[str, Any]:
     return {
         "name": gate.name,
         "command": gate.command,
+        "expected_exit": gate.expected_exit,
         "exit_code": exit_code,
-        "passed": exit_code == 0,
+        "passed": not timed_out and exit_code == gate.expected_exit,
         "timed_out": timed_out,
         "duration_seconds": round(time.monotonic() - started, 3),
         "output": trim_output(combined_output, gate.max_output_chars),
     }
+
+
+def run_negative_control(repo_root: Path, gate: GateSpec) -> dict[str, Any]:
+    ignored_names = {".git", ".venv", "node_modules", "__pycache__", ".pytest_cache"}
+    ignored = shutil.ignore_patterns(*ignored_names)
+    candidate = next(
+        (os.environ[name] for name in ("TMPDIR", "TEMP", "TMP") if os.environ.get(name)),
+        "/tmp" if os.name == "posix" else str(Path.cwd()),
+    )
+    temp_root = resolve_external_dir(
+        candidate, repo_root=repo_root, field="negative-control temp root"
+    )
+    if not temp_root.is_dir():
+        raise AgentOpsError(f"negative-control temp root is not a directory: {temp_root}")
+    with tempfile.TemporaryDirectory(
+        prefix="dharma-agentops-negative-", dir=temp_root
+    ) as raw:
+        jail = Path(raw) / "jail"
+        fixture = jail / "fixture"
+        fixture.parent.mkdir(parents=True)
+        source_git = repo_root / ".git"
+        if source_git.is_dir():
+            fixture.mkdir()
+            shutil.copytree(source_git, fixture / ".git", symlinks=False)
+        else:
+            clone = run_command(
+                ["git", "clone", "--no-checkout", "--no-hardlinks",
+                 str(repo_root), str(fixture)], cwd=repo_root,
+            )
+            if clone.returncode != 0:
+                detail = (clone.stderr or clone.stdout).strip()
+                raise AgentOpsError(
+                    f"could not isolate negative-control git metadata: {detail}"
+                )
+        for source in repo_root.iterdir():
+            if source.name in ignored_names:
+                continue
+            target = fixture / source.name
+            if source.is_dir():
+                shutil.copytree(source, target, ignore=ignored, symlinks=True, dirs_exist_ok=True)
+            else:
+                shutil.copy2(source, target, follow_symlinks=False)
+        _reject_fixture_symlink_escapes(fixture)
+        preexec_fn, argv_prefix, jailed, env_via_argv = _negative_confinement(
+            jail, fixture
+        )
+        control_env = _negative_environment(
+            repo_root, fixture, jail, gate.env, jailed=jailed
+        )
+        if jailed:
+            _prepare_jail(jail, gate)
+        host_env = control_env
+        if env_via_argv:
+            argv_prefix = [
+                *argv_prefix,
+                *_environment_argv(control_env),
+                "/bin/sh",
+                "-c",
+                'cd /fixture && exec "$@"',
+                "agentops",
+            ]
+            host_env = {"PATH": _TRUSTED_HOST_PATH}
+        return run_gate(
+            fixture,
+            replace(gate, env={}),
+            base_env=host_env,
+            preexec_fn=preexec_fn,
+            argv_prefix=argv_prefix,
+        )
 
 
 def timestamp_slug(now: datetime | None = None) -> str:
@@ -479,6 +723,27 @@ def timestamp_slug(now: datetime | None = None) -> str:
 def report_paths(repo_root: Path, job_id: str, timestamp: str) -> tuple[Path, Path]:
     report_dir = repo_root / REPORT_ROOT / job_id / timestamp
     return report_dir / "report.json", report_dir / "report.md"
+
+
+def _validate_report_destination(
+    report_root: Path, report_path: Path, source_root: Path
+) -> None:
+    root = report_root.resolve()
+    lexical = Path(os.path.abspath(report_path))
+    resolved = report_path.resolve(strict=False)
+    if not _is_within(lexical, root) or not _is_within(resolved, root):
+        raise AgentOpsError(f"report destination escapes external report_root: {report_path}")
+    relative_parent = lexical.parent.relative_to(root)
+    cursor = root
+    for part in relative_parent.parts:
+        cursor = cursor / part
+        if cursor.is_symlink():
+            raise AgentOpsError(f"report destination contains a symlink: {cursor}")
+    resolve_external_dir(
+        report_path.parent,
+        repo_root=source_root,
+        field="report destination",
+    )
 
 
 def scope_to_dict(scope: ScopeState) -> dict[str, Any]:
@@ -492,9 +757,21 @@ def scope_to_dict(scope: ScopeState) -> dict[str, Any]:
     }
 
 
-def write_report(repo_root: Path, report: dict[str, Any], timestamp: str) -> tuple[Path, Path]:
+def write_report(
+    repo_root: Path,
+    report: dict[str, Any],
+    timestamp: str,
+    *,
+    source_root: Path | None = None,
+) -> tuple[Path, Path]:
     json_path, md_path = report_paths(repo_root, report["job_id"], timestamp)
+    if source_root is not None:
+        _validate_report_destination(repo_root, json_path, source_root)
+        _validate_report_destination(repo_root, md_path, source_root)
     json_path.parent.mkdir(parents=True, exist_ok=True)
+    if source_root is not None:
+        _validate_report_destination(repo_root, json_path, source_root)
+        _validate_report_destination(repo_root, md_path, source_root)
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(render_markdown_report(report), encoding="utf-8")
     return json_path, md_path
@@ -509,38 +786,22 @@ def render_markdown_report(report: dict[str, Any]) -> str:
         f"- Branch: `{report['branch']}`",
         f"- Worktree: `{report['worktree']}`",
         f"- Commit hash: `{report.get('commit_hash') or ''}`",
-        f"- Approval before commit: `{report['approval']['before_commit']}`",
-        f"- Approval before merge: `{report['approval']['before_merge']}`",
-        "",
-        "## Intent",
-        "",
-        report["intent"],
-        "",
-        "## Scope",
-        "",
+        "", "## Intent", "", report["intent"], "", "## Scope", "",
         f"- Scope passed: `{report['scope']['passed']}`",
         f"- Changed files: `{len(report['scope']['changed_files'])}`",
         f"- Violations: `{len(report['scope']['violations'])}`",
-        "",
-        "## Gates",
-        "",
-        "| Gate | Exit | Result |",
-        "|---|---:|---|",
+        "", "## Gates", "", "| Gate | Expected | Actual | Result |", "|---|---:|---:|---|",
     ]
     for gate in report["gates"]:
         result = "PASS" if gate["passed"] else "FAIL"
-        lines.append(f"| {gate['name']} | {gate['exit_code']} | {result} |")
-    lines.extend(
-        [
-            "",
-            "## Final Git Status",
-            "",
-            "```",
-            report.get("final_git_status", "").rstrip(),
-            "```",
-            "",
-        ]
-    )
+        lines.append(f"| {gate['name']} | {gate['expected_exit']} | {gate['exit_code']} | {result} |")
+    lines.extend(["", "## Negative Controls", "", "| Control | Expected | Actual | Result |",
+                  "|---|---:|---:|---|"])
+    for control in report.get("negative_controls", []):
+        result = "PASS" if control["passed"] else "FAIL"
+        lines.append(f"| {control['name']} | {control['expected_exit']} | {control['exit_code']} | {result} |")
+    lines.extend(["", "## Final Git Status", "", "```",
+                  report.get("final_git_status", "").rstrip(), "```", ""])
     return "\n".join(lines)
 
 
@@ -551,6 +812,8 @@ def should_commit(report: dict[str, Any], packet: WorkPacket, final_scope: Scope
         return False, "human approval required before commit"
     if not all(gate["passed"] for gate in report["gates"]):
         return False, "one or more gates failed"
+    if not all(control["passed"] for control in report["negative_controls"]):
+        return False, "one or more negative controls failed"
     if not final_scope.passed:
         return False, "scope gate failed"
     if not final_scope.changed_files:
@@ -568,33 +831,21 @@ def create_commit(repo_root: Path, files: list[str], message: str) -> str:
 
 
 def base_report(packet: WorkPacket, target_root: Path, *, dry_run: bool) -> dict[str, Any]:
+    empty_scope = {
+        "tracked_changed_files": [], "staged_files": [], "untracked_files": [],
+        "changed_files": [], "violations": [], "passed": True,
+    }
     return {
-        "job_id": packet.id,
-        "base_ref": packet.base_ref,
-        "branch": packet.branch,
-        "worktree": str(packet.worktree),
-        "intent": packet.intent,
-        "allowed_files": packet.allowed_files,
-        "forbidden_files": packet.forbidden_files,
-        "approval": {
-            "before_commit": packet.approval.before_commit,
-            "before_merge": packet.approval.before_merge,
-        },
+        "job_id": packet.id, "base_ref": packet.base_ref, "branch": packet.branch,
+        "worktree": str(packet.worktree), "intent": packet.intent,
+        "allowed_files": packet.allowed_files, "forbidden_files": packet.forbidden_files,
+        "approval": {"before_commit": packet.approval.before_commit,
+                     "before_merge": packet.approval.before_merge},
         "dry_run": dry_run,
         "target_head": head_for(target_root) if target_root.exists() else None,
-        "scope": {
-            "tracked_changed_files": [],
-            "staged_files": [],
-            "untracked_files": [],
-            "changed_files": [],
-            "violations": [],
-            "passed": True,
-        },
-        "gates": [],
-        "commit_hash": None,
-        "commit_decision": "not evaluated",
-        "final_git_status": "",
-        "status": "pending",
+        "scope": empty_scope, "gates": [], "negative_controls": [],
+        "commit_hash": None, "commit_decision": "not evaluated",
+        "final_git_status": "", "status": "pending",
     }
 
 
@@ -604,11 +855,25 @@ def execute_packet(
     source_root: Path | None = None,
     dry_run: bool = False,
     allow_existing_changes: bool = False,
+    report_root: Path | None = None,
 ) -> tuple[int, dict[str, Any] | None]:
-    source = source_root.resolve() if source_root else require_repo_root(Path.cwd())
+    source = require_repo_root((source_root or Path.cwd()).resolve())
     packet = load_work_packet(packet_path)
+    if packet.session_entry is not None and packet_path.suffix.lower() != ".json":
+        raise AgentOpsError("Session Entry Packet must use JSON")
+    external_reports = (
+        resolve_external_dir(report_root, repo_root=source)
+        if report_root is not None
+        else None
+    )
+    if packet.session_entry is not None and not dry_run and external_reports is None:
+        raise AgentOpsError("session_entry execution requires an explicit external report_root")
 
     if dry_run:
+        _validate_session_envelope(
+            source, packet_path, packet, inspect=True, require_tracked_copy=False
+        )
+        target = _packet_target(source, packet)
         summary = {
             "job_id": packet.id,
             "base_ref": packet.base_ref,
@@ -624,28 +889,38 @@ def execute_packet(
                 "before_merge": packet.approval.before_merge,
             },
             "dry_run": True,
-            "would_create_worktree": not packet.worktree.exists(),
+            "would_create_worktree": not target.exists(),
             "would_run_gates": False,
             "would_commit": False,
         }
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 0, None
 
+    _validate_session_envelope(
+        source, packet_path, packet, inspect=False, require_tracked_copy=True
+    )
     target_root = prepare_worktree(source, packet)
+    output_root = external_reports or target_root  # legacy v0 compatibility only
+    report_source = source if packet.session_entry is not None else None
     timestamp = timestamp_slug()
     report = base_report(packet, target_root, dry_run=False)
+    if report_source is not None:
+        for destination in report_paths(output_root, packet.id, timestamp):
+            _validate_report_destination(output_root, destination, report_source)
     initial_scope = inspect_scope(target_root, packet)
     if initial_scope.changed_files and not allow_existing_changes:
         report["scope"] = scope_to_dict(initial_scope)
         report["final_git_status"] = git_status(target_root)
         report["status"] = "failed"
         report["commit_decision"] = "target worktree dirty before gates; rerun with --allow-existing-changes after human review"
-        write_report(target_root, report, timestamp)
+        write_report(output_root, report, timestamp, source_root=report_source)
         return 1, report
 
     for gate in packet.gates:
         gate_result = run_gate(target_root, gate)
         report["gates"].append(gate_result)
+    for control in packet.negative_controls:
+        report["negative_controls"].append(run_negative_control(target_root, control))
 
     final_scope = inspect_scope(target_root, packet)
     report["scope"] = scope_to_dict(final_scope)
@@ -657,9 +932,11 @@ def execute_packet(
         report["scope"] = scope_to_dict(final_scope)
 
     report["final_git_status"] = git_status(target_root)
-    gates_passed = all(gate["passed"] for gate in report["gates"])
-    report["status"] = "passed" if gates_passed and final_scope.passed else "failed"
-    write_report(target_root, report, timestamp)
+    checks_passed = all(
+        row["passed"] for key in ("gates", "negative_controls") for row in report[key]
+    )
+    report["status"] = "passed" if checks_passed and final_scope.passed else "failed"
+    write_report(output_root, report, timestamp, source_root=report_source)
     return (0 if report["status"] == "passed" else 1), report
 
 
@@ -677,6 +954,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Allow an already-dirty target worktree after explicit human review; scope still fails closed",
     )
+    parser.add_argument(
+        "--report-root",
+        type=Path,
+        help="Explicit external root for reports; required for Session Entry execution",
+    )
     return parser
 
 
@@ -688,6 +970,7 @@ def main(argv: list[str] | None = None) -> int:
             args.packet,
             dry_run=args.dry_run,
             allow_existing_changes=args.allow_existing_changes,
+            report_root=args.report_root,
         )
     except AgentOpsError as exc:
         print(f"AgentOps error: {exc}", file=sys.stderr)
