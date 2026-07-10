@@ -73,7 +73,7 @@ def _git_admin_dirs(repo_root: Path) -> set[Path]:
             raw = Path(common_file.read_text(encoding="utf-8").strip())
             roots.add((raw if raw.is_absolute() else git_dir / raw).resolve(strict=False))
     except (OSError, IndexError):
-        pass
+        return roots
     return roots
 
 def resolve_external_dir(
