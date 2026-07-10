@@ -32,27 +32,33 @@ SRC = ["dharma_swarm", "scripts"]
 PKG = "dharma_swarm"
 
 
-def _run(cmd: list[str], timeout: int = 600) -> tuple[int, str]:
+def _run(cmd: list[str], timeout: int = 600) -> tuple[int, str, str]:
+    """Return (exit, stdout, stderr). NEVER concatenate the streams before
+    parsing: a stderr warning would corrupt JSON output (real CI failure,
+    2026-07-10 — ruff emitted a warning locally absent, JSON became
+    unparseable)."""
     try:
         proc = subprocess.run(
             cmd, cwd=REPO_ROOT, capture_output=True, text=True, timeout=timeout
         )
-        return proc.returncode, proc.stdout + proc.stderr
+        return proc.returncode, proc.stdout, proc.stderr
     except FileNotFoundError:
-        return 127, f"tool not found: {cmd[0]} (run: make substrate-tools)"
+        return 127, "", f"tool not found: {cmd[0]} (run: make substrate-tools)"
     except subprocess.TimeoutExpired:
-        return 124, f"timeout: {' '.join(cmd)}"
+        return 124, "", f"timeout: {' '.join(cmd)}"
 
 
 def audit_ruff(detail: list[str]) -> dict[str, int]:
-    code, out = _run(["ruff", "check", *SRC, "--output-format", "json"])
+    code, out, err = _run(["ruff", "check", *SRC, "--output-format", "json"])
     if code == 127:
-        detail.append(out)
+        detail.append(err)
         return {"ruff_unavailable": 1}
     try:
         findings = json.loads(out)
     except json.JSONDecodeError:
-        detail.append(f"ruff: unparseable output (exit {code})\n{out[:2000]}")
+        detail.append(
+            f"ruff: unparseable stdout (exit {code})\nstdout: {out[:1000]}\nstderr: {err[:1000]}"
+        )
         return {"ruff_unparseable": 1}
     detail.append(f"== ruff ({len(findings)} findings)")
     detail.extend(
@@ -63,9 +69,9 @@ def audit_ruff(detail: list[str]) -> dict[str, int]:
 
 
 def audit_vulture(detail: list[str]) -> dict[str, int]:
-    code, out = _run(["vulture", PKG, "--min-confidence", "90"])
+    code, out, err = _run(["vulture", PKG, "--min-confidence", "90"])
     if code == 127:
-        detail.append(out)
+        detail.append(err)
         return {"vulture_unavailable": 1}
     lines = [ln for ln in out.splitlines() if ": unused" in ln]
     detail.append(f"== vulture min-confidence 90 ({len(lines)} findings)")
@@ -74,9 +80,9 @@ def audit_vulture(detail: list[str]) -> dict[str, int]:
 
 
 def audit_radon(detail: list[str]) -> dict[str, int]:
-    code, out = _run(["radon", "cc", PKG, "-s", "-n", "E"])
+    code, out, err = _run(["radon", "cc", PKG, "-s", "-n", "E"])
     if code == 127:
-        detail.append(out)
+        detail.append(err)
         return {"radon_unavailable": 1}
     blocks = [ln for ln in out.splitlines() if " - E (" in ln or " - F (" in ln]
     f_blocks = [ln for ln in blocks if " - F (" in ln]
@@ -86,14 +92,14 @@ def audit_radon(detail: list[str]) -> dict[str, int]:
 
 
 def audit_bandit(detail: list[str]) -> dict[str, int]:
-    code, out = _run(["bandit", "-r", PKG, "-q", "-f", "json"])
+    code, out, err = _run(["bandit", "-r", PKG, "-q", "-f", "json"])
     if code == 127:
-        detail.append(out)
+        detail.append(err)
         return {"bandit_unavailable": 1}
     try:
         data = json.loads(out[out.index("{"):])
     except (ValueError, json.JSONDecodeError):
-        detail.append(f"bandit: unparseable output (exit {code})")
+        detail.append(f"bandit: unparseable stdout (exit {code}); stderr: {err[:500]}")
         return {"bandit_unparseable": 1}
     results = data.get("results", [])
     high = [r for r in results if r.get("issue_severity") == "HIGH"]

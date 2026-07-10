@@ -440,8 +440,9 @@ agent-build-preflight: verifier-selfcheck onboard hygiene-check
 
 agent-build-closeout:
 	$(PYTHON) scripts/governance/hygiene/scan.py --output /tmp/dharma-hygiene-audit.txt
+	-$(PYTHON) scripts/governance/substrate_audit.py
 	$(MAKE) governance-all
-	@printf "\nAgent build closeout complete. Hygiene audit receipt: /tmp/dharma-hygiene-audit.txt\n"
+	@printf "\nAgent build closeout complete. Hygiene audit receipt: /tmp/dharma-hygiene-audit.txt · Substrate audit: /tmp/dharma-substrate-audit.txt\n"
 
 spine-check:
 	$(PYTHON) -m scripts.uplift_guards.check_spine_ownership
