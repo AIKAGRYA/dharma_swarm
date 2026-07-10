@@ -294,6 +294,21 @@ slop-ratchet:
 slop-baseline:
 	$(PYTHON) scripts/governance/slop_ratchet.py --write-baseline
 
+# Substrate audit: ruff + vulture + radon + bandit + grimp behind one door,
+# delta-ratcheted against reports/governance/substrate_baseline.json.
+# Advisory by default; substrate-audit-strict exits 1 on any count regression.
+substrate-tools:
+	$(PYTHON) -m pip install --quiet "vulture>=2.14" "radon>=6" "grimp>=3.9" "bandit>=1.8" "import-linter>=2.3" "pip-audit>=2.7"
+
+substrate-audit:
+	$(PYTHON) scripts/governance/substrate_audit.py
+
+substrate-audit-strict:
+	$(PYTHON) scripts/governance/substrate_audit.py --strict
+
+substrate-baseline:
+	$(PYTHON) scripts/governance/substrate_audit.py --write-baseline
+
 verify-corral:
 	$(PYTHON) scripts/governance/verify_corral_findings.py
 
