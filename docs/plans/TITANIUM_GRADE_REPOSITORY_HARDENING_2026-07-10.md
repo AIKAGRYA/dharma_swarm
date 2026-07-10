@@ -1,8 +1,18 @@
-# Titanium-Grade Repository Hardening — Execution Specification
+# Titanium-Grade Repository Hardening — Integrated Execution Specification vNext
 
 **Doc role (per `docs/AGENTS.md`):** `working_plan` — a bounded internal-hardening campaign, not repo-level authority. It creates no new runtime substrate or governance owner and remains subordinate to `CLAUDE.md`, `docs/governance/ACTIVE_TRACK.yaml`, and the canonical document stack.
 
-**Status:** revised execution specification, awaiting operator approval. This document sequences work; each implementation PR still requires its current active-track owner and normal merge gates.
+**Status:** operator-approved for repository placement. This document sequences work; implementation begins only through WP-00 governance admission, and each implementation PR still requires its current active-track owner and normal merge gates.
+
+## Agent entrypoint
+
+New agents start here:
+
+1. Run `make onboard`.
+2. Read this document's claim boundary, ownership rules, dependency graph, and Phase 0 exit gate.
+3. Begin with WP-00; do not skip directly to an implementation packet.
+4. Work one finding, one owner, and one bounded PR at a time.
+5. Do not begin feature work, broad refactors, or live self-evolution before the independent Phase 0 clean-room proof passes on merged `main`.
 
 ## Main purpose
 
@@ -25,7 +35,7 @@ It does not authorize a single unbounded rewrite. Every implementation change mu
 - one declared surface owner;
 - an explicit list of files allowed to change;
 - an explicit list of adjacent surfaces that must not change;
-- a failing behavioral test before production code changes;
+- a failing behavioral or structural contract test before production/configuration changes;
 - a rollback that restores the prior behavior without state surgery;
 - a reproduction command and expected exit status;
 - a finding ID from the registry below; and
@@ -36,14 +46,38 @@ The campaign composes existing owners and gates. It must not create a new truth 
 ### Claim boundary
 
 - `PASS` means the exact stated command completed with exit code zero on the stated commit and environment.
+- `FAIL` means the command executed and found a defect, stale evidence, malformed configuration, or unmet required condition.
 - `NEEDS_HOST` means a live-only verifier could not run on the current host; it is neither pass nor failure.
+- `BLOCKED_OPERATOR` means a required operator decision, credential, platform, or external setting prevents closure; it is not a pass.
 - `HARNESS_PROVEN` means a bounded fixture or replay passed.
+- `CLOSED_NOT_PROD` means repository behavior is verified without claiming production operation.
 - `CLOSED_LIVE` requires a declared live owner surface and fresh production evidence.
 - Missing tools, missing dependencies, missing receipts, skipped required tests, and malformed configuration never mean `PASS`.
 
-## Verified baseline
+## Audit baseline and dynamic campaign baseline
 
-Baseline commit before this plan branch: `212df1a8c22bd2bbf731dd2308472fb9e2a2f549`.
+Audit baseline before this plan branch: `212df1a8c22bd2bbf731dd2308472fb9e2a2f549`.
+
+The campaign baseline is not permanently pinned to this audit SHA. WP-00 must capture current clean `origin/main` immediately before implementation begins:
+
+```bash
+git fetch origin
+git checkout main
+git pull --ff-only
+git status --short
+git rev-parse --is-shallow-repository
+git rev-parse HEAD
+```
+
+Required result:
+
+- the worktree is clean;
+- the clone is non-shallow;
+- local `main` equals `origin/main`;
+- the exact SHA and UTC timestamp are recorded; and
+- the baseline commands below are rerun rather than copied from this plan.
+
+The resulting baseline packet records tool versions, repository measurements, command exit codes, GitHub required-context visibility, live-host availability, and final worktree status. It is a CI/PR artifact, not a new committed truth store.
 
 | Measure | Baseline | Reproduction |
 |---|---:|---|
@@ -120,11 +154,12 @@ The following Phase 0 surfaces have no declared owner broad enough for this camp
 **Required before any implementation packet**
 
 1. Move the shippable `company-builder-parity-2026-07` track according to portfolio policy.
-2. Add an operator-ratified `repository-titanium-hardening-2026-07` track for the currently unowned Phase 0 surfaces only.
-3. Keep every already-owned surface with its current owner; the new track must not claim Go, terminal, graph, organism, or Mike-owned files.
-4. Add explicit `complements` relations to the owner tracks above.
-5. Add Phase 0 acceptance criteria that execute behavioral commands, not file-existence checks.
-6. Run `render_active_track_includes.py --check` and the track-status checker before merging admission.
+2. Capture the dynamic campaign baseline from clean current `origin/main`.
+3. Add an operator-ratified `repository-titanium-hardening-2026-07` track for the currently unowned Phase 0 surfaces only.
+4. Keep every already-owned surface with its current owner; the new track must not claim Go, terminal, graph, organism, or Mike-owned files.
+5. Add explicit `complements` relations to the owner tracks above.
+6. Add Phase 0 acceptance criteria that execute behavioral commands, not file-existence checks.
+7. Run `render_active_track_includes.py --check` and the track-status checker before merging admission.
 
 Proposed new-track ownership:
 
@@ -154,6 +189,7 @@ Proposed new-track ownership:
 - `dharma_swarm/autonomous_agent.py` (TIT-002 leaked-process investigation only)
 - `docs/docops/AUTO_INVENTORY.md`
 - count-managed blocks in `docs/governance/SOVEREIGN_MANIFEST.md`
+- `api/main.py` and existing API-auth tests for the narrow WP-0S fail-closed containment packet only
 - Phase 0 contract tests introduced by this specification
 
 Extend `organism-rewire-2026-07` ownership, with operator ratification, to the Go-trigger seam it already governs:
@@ -178,8 +214,12 @@ Implementation PR rules:
 ```mermaid
 flowchart TD
   P[WP-00 Governance admission] --> A[WP-0A Hermetic bootstrap]
+  P --> O[Immediate operational ingress containment]
+  A --> S[WP-0S Minimum fail-closed ingress]
+  O --> S
   A --> B[WP-0B Verifier truth]
-  A --> C1[WP-0C1 Scanner/subprocess fail-closed]
+  A --> C1R[WP-0C1R Semgrep adjudication]
+  C1R --> C1[WP-0C1 Scanner/subprocess fail-closed]
   A --> C2[WP-0C2 Go capability]
   B --> D[WP-0D Fast-suite determinism]
   C1 --> E[WP-0E Hermetic/live split]
@@ -189,11 +229,13 @@ flowchart TD
   A --> H[WP-0H Polyglot verification]
   C1 --> H
   C2 --> H
-  D --> Z[Phase 0 exit]
-  E --> Z
-  F2 --> Z
-  G --> Z
-  H --> Z
+  S --> I[WP-0I Independent clean-room proof]
+  D --> I
+  E --> I
+  F2 --> I
+  G --> I
+  H --> I
+  I --> Z[Phase 0 exit]
 ```
 
 ## Autonomous execution protocol
@@ -202,7 +244,7 @@ For every work packet:
 
 1. Run `make onboard` and record branch, SHA, dirty state, and active owner.
 2. Read the touched module, its tests, and the relevant mismatch-map entry.
-3. Write one failing regression test that kills the observed failure mode.
+3. Write one failing behavioral or structural contract test that kills the observed failure mode.
 4. Run only that test and capture the expected failure.
 5. Implement the smallest change that makes the test pass.
 6. Run the work-packet verification commands.
@@ -228,6 +270,23 @@ The repository must be:
 - modular enough for independent contributors; and
 - honest about `LIVE`, `PARTIAL`, and experimental surfaces.
 
+## Exact toolchain contract
+
+WP-00 records current manifest authorities and WP-0A validates the following proposed clean-room versions:
+
+- Python 3.12.13 primary;
+- Python 3.11.15 compatibility;
+- uv 0.11.2;
+- Go 1.26.3;
+- Node 22.23.1;
+- Bun 1.1.38;
+- Semgrep 1.168.0; and
+- gitleaks 8.30.1.
+
+Primary clean-room environment: Linux x86_64.
+
+Each version must exist, support the target platform, and be compatible with repository manifests before it becomes the packet's ratified pin. If a proposed version is invalid or conflicts with an owned manifest, the owner amends this table through a reviewed packet with evidence; agents do not silently substitute `latest`, an unbounded range, or an author-machine version.
+
 ## Best next long-running goal
 
 ### Make `main` truthfully green from a clean clone
@@ -248,6 +307,17 @@ Until these are corrected, later green results remain provisional.
 ## Phase 0 — Verification truth
 
 Phase 0 should land as several reviewable PRs under existing surface owners. It must not become one giant hardening PR or a new catch-all framework.
+
+Phase 0 also owns minimum fail-closed ingress because a repository cannot be called truthfully green while a production-shaped service opens mutation paths when authentication is absent. Full boundary hardening remains Phase 1; Phase 0 establishes the non-negotiable safety floor.
+
+Before code changes, the operator records one deployment status for the FastAPI service:
+
+- `CONTAINED` — public exposure removed or service stopped;
+- `PRIVATE_ONLY` — bounded to loopback/private authenticated ingress;
+- `NOT_DEPLOYED` — no reachable deployment exists; or
+- `BLOCKED_OPERATOR` — exposure cannot yet be established.
+
+If public or ambiguous exposure exists, containment happens immediately rather than waiting for the packet stack.
 
 ### 0.1 Hermetic bootstrap
 
@@ -290,7 +360,74 @@ Repository CI must not depend on a live daemon receipt.
 - Stop snapshot PR accumulation.
 - Require generated counts to be reproducible, current, and independently checked.
 
+### 0.6 Prove the result independently
+
+- A second agent or engineer starts from a fresh clone and receives only this specification.
+- The reviewer captures the current `main` SHA and toolchain versions, runs the complete Phase 0 exit gate, and verifies the final worktree is clean.
+- The author does not repair the reviewer's environment interactively or reinterpret failures as passes.
+- Any unavailable live prerequisite is reported with the exact `NEEDS_HOST` or `BLOCKED_OPERATOR` reason.
+- Phase 0 does not close until the independent result is green.
+
 ## Phase 0 work packets
+
+### WP-0S — Minimum fail-closed ingress
+
+**Findings:** TIT-010
+**Owner:** proposed `repository-titanium-hardening-2026-07` for the narrow API containment seam; operator owns deployment containment
+**Depends on:** WP-00, WP-0A
+
+**Allowed files**
+
+- `api/main.py`
+- existing API authentication/configuration module used directly by `api/main.py`, if one exists
+- `tests/test_api_auth.py`
+- `tests/test_verify_api.py`
+- one new focused API ingress contract test if the existing tests cannot express the matrix
+
+Deployment files already owned by another track are read-only in this packet. Any required deployment-manifest change is a separate stacked PR under that owner.
+
+**Required implementation**
+
+1. Define explicit local-development and production-shaped modes; ambiguous mode selects the safer behavior.
+2. Refuse production-shaped startup when required authentication material is absent.
+3. Classify REST, GraphQL, WebSocket, webhook, A2A, and health/readiness ingress as public, authenticated-read, authenticated-mutate, or disabled.
+4. Apply one fail-closed authorization decision across every enabled mutation transport.
+5. Keep any local-only unauthenticated escape hatch explicit, loopback-bound, logged, tested, and excluded from production-shaped startup.
+6. Do not claim full security-boundary closure; this packet establishes only the minimum default-deny floor.
+
+**Behavioral tests**
+
+- Production-shaped mode with no key or equivalent credential fails startup.
+- Invalid credentials fail across every enabled protected ingress class.
+- Valid credentials reach only their declared scope.
+- GraphQL and WebSocket mutation paths cannot bypass the REST bearer decision.
+- Webhook signatures fail closed when verification material is absent or malformed.
+- Public health/readiness endpoints expose no mutation or secret-bearing payload.
+- Local-development bypass, if retained, is rejected on non-loopback binding.
+
+**Verification**
+
+```bash
+.venv/bin/python -m pytest -q tests/test_api_auth.py tests/test_verify_api.py
+```
+
+The packet adds any new focused contract test to this command.
+
+**Negative controls**
+
+- Remove the credential requirement in production-shaped mode → the startup-negative test fails.
+- Remove authorization from GraphQL or WebSocket mutation ingress → the route matrix fails.
+- Treat missing webhook verification material as success → the webhook negative test fails.
+
+**Rollback**
+
+Revert the complete code-and-test packet. If rollback would re-open a reachable deployment, keep the service contained until a corrected packet lands.
+
+**Exit**
+
+- Default production-shaped startup and all enabled mutation ingress fail closed.
+- Deployment status is recorded as `CONTAINED`, `PRIVATE_ONLY`, or `NOT_DEPLOYED`; `BLOCKED_OPERATOR` prevents Phase 0 closure.
+- The result is `CLOSED_NOT_PROD` unless fresh deployment evidence proves `CLOSED_LIVE`.
 
 ### WP-0A — Hermetic Python bootstrap
 
@@ -409,11 +546,57 @@ Revert the complete packet, which reopens TIT-001 and blocks Phase 0. Never rest
 
 Success output and executed evidence are equivalent.
 
+### WP-0C1R — Semgrep finding adjudication
+
+**Findings:** TIT-004
+**Owner:** proposed `repository-titanium-hardening-2026-07`
+**Depends on:** WP-0A
+
+**Allowed files**
+
+- source files containing findings confirmed on the dynamic baseline, grouped into owner-safe PRs
+- the narrow tests that prove each confirmed behavior
+- existing Semgrep rule/config files only when a false positive is demonstrated with a focused rule test
+
+The scanner wrapper, required/advisory target behavior, and governance orchestration are read-only in this packet; WP-0C1 owns them.
+
+**Required implementation**
+
+1. Run the pinned Semgrep version against the exact dynamic baseline and record the complete finding set.
+2. Adjudicate every finding as:
+   - fixed with a regression test;
+   - false positive with a narrow rule/config proof; or
+   - `BLOCKED_OPERATOR`/owner-deferred with a finding ID, owner, and reason that prevents Phase 0 closure.
+3. Split fixes by active owner and blast radius; do not mix unrelated findings into a scanner-cleanup omnibus.
+4. Do not add broad ignores, global exclusions, or a new baseline merely to make the result green.
+
+**Verification**
+
+```bash
+make semgrep-strict
+```
+
+Each owner-safe PR also runs its focused regression tests.
+
+**Negative controls**
+
+- Restore any fixed pattern → strict Semgrep or its focused regression test fails.
+- Broaden an ignore beyond the demonstrated false positive → the rule/config test fails.
+- Leave an unadjudicated finding → the packet remains incomplete.
+
+**Rollback**
+
+Revert only the affected owner-safe fix and its focused tests. Reopening a finding blocks WP-0C1 and Phase 0.
+
+**Exit**
+
+The dynamic-baseline finding set is fully adjudicated and strict Semgrep is clean before scanner absence/failure semantics become required.
+
 ### WP-0C1 — Required scanners and governance subprocesses fail closed
 
 **Findings:** TIT-004, TIT-005
 **Owner:** proposed `repository-titanium-hardening-2026-07`
-**Depends on:** WP-0A
+**Depends on:** WP-0A, WP-0C1R
 
 **Allowed files**
 
@@ -428,7 +611,7 @@ Success output and executed evidence are equivalent.
 **Required implementation**
 
 1. Make `make semgrep` a strict required scan. Move the current warn-only behavior to an explicitly named advisory/baseline target.
-2. Close the existing real Semgrep findings rather than baseline them into the required scan.
+2. Preserve WP-0C1R's clean result rather than baselining real findings into the required scan.
 3. Required Semgrep mode exits nonzero when Semgrep is absent.
 4. Gitleaks absence fails with an actionable message before command execution.
 5. Every governance subprocess receives closed stdin unless input is explicitly part of its contract.
@@ -834,7 +1017,7 @@ Go module manifests, dashboard manifests/lockfile, and terminal manifests/lockfi
 - Align all Go CI jobs to one patch-level policy compatible with the read-only module directives.
 - Add a real `frontend-check` target matching dashboard CI.
 - Add a real `terminal-check` target using the pinned Bun lockfile.
-- Run terminal behavioral tests in CI; file existence is not sufficient.
+- Run terminal typechecking and behavioral tests in CI; file existence is not sufficient.
 - Make local commands and workflow commands byte-for-byte comparable where practical.
 - Add contract tests that compare Make commands, workflow commands, and manifest-declared tool versions.
 
@@ -853,6 +1036,7 @@ npm --prefix dashboard ci --legacy-peer-deps
 npm --prefix dashboard run lint -- --quiet
 npm --prefix dashboard run build
 bun --cwd terminal install --frozen-lockfile
+bun --cwd terminal run typecheck
 bun --cwd terminal test
 ```
 
@@ -871,11 +1055,42 @@ Revert the CI orchestration and Make targets together. Language manifests remain
 
 Go, dashboard, and terminal run on their declared toolchains in the required CI workflow, and the same commands are available locally.
 
+### WP-0I — Independent clean-room proof
+
+**Findings:** TIT-001 through TIT-010, TIT-015
+**Owner:** independent reviewer or agent; the implementation author may not serve as the sole reviewer
+**Depends on:** WP-0S and every WP-0A through WP-0H packet merged to `main`
+
+**Allowed changes**
+
+None by default. This packet evaluates merged `main` from a fresh clone. Any defect found returns to a bounded finding-owned implementation packet; the clean-room reviewer does not hot-patch the proof environment.
+
+**Required procedure**
+
+1. Create a fresh non-shallow clone with no reused repository virtualenv, dependency tree, generated report, tool cache, or author-local runtime receipt.
+2. Record the exact `origin/main` SHA, UTC timestamp, operating system, architecture, and toolchain versions.
+3. Follow only the repository instructions and this specification.
+4. Run the complete Phase 0 exit command exactly as written.
+5. Verify local commands and required CI contexts represent the same contract.
+6. Confirm the final worktree is clean.
+7. Report every unavailable live prerequisite as `NEEDS_HOST` or `BLOCKED_OPERATOR`; do not import copied live artifacts.
+
+**Failure rule**
+
+Any required command failure, unexplained skip, missing tool, dirty worktree, author intervention, stale artifact, or mismatch between local and CI authority reopens the owning packet. A retry is allowed only after a corrective PR merges to `main` and the proof restarts from a new clean clone.
+
+**Exit**
+
+- An independent reviewer completes the entire procedure without implementation-author intervention.
+- The reviewed SHA is merged `origin/main`, not a local candidate branch.
+- The proof record distinguishes `PASS`, `NEEDS_HOST`, `BLOCKED_OPERATOR`, `CLOSED_NOT_PROD`, and `CLOSED_LIVE` without promotion by interpretation.
+
 ## Phase 0 exit gate
 
 All commands below must complete from a fresh clone:
 
 ```bash
+make bootstrap
 make verifier-selfcheck
 make test-fast
 make test-fast
@@ -883,12 +1098,15 @@ make test
 make lint-blockers
 make governance-all
 make go-ci
-make docops-report
+make docops-integrity
+make frontend-check
+make terminal-check
 python3 scripts/governance/check_track_status.py
 npm --prefix dashboard ci --legacy-peer-deps
 npm --prefix dashboard run lint
 npm --prefix dashboard run build
 bun --cwd terminal install --frozen-lockfile
+bun --cwd terminal run typecheck
 bun --cwd terminal test
 git status --short
 ```
@@ -899,31 +1117,36 @@ The exit gate permits no unexplained skips, stale evidence, missing tools, dirty
 
 Phase 0 closes only when:
 
-1. WP-00 and every WP-0A through WP-0H subpacket acceptance criterion pass on merged `main`;
+1. WP-00, WP-0S, and every WP-0A through WP-0I subpacket acceptance criterion pass on merged `main`;
 2. `make agent-build-closeout` is green;
 3. live-only checks report either a fresh live verdict on their owner host or explicit `NEEDS_HOST` elsewhere;
 4. live branch protection matches the committed required-context manifest;
 5. strict DocOps is green on `main`;
 6. two consecutive `make test-fast` runs pass;
 7. the standard Python suite, Go modules, dashboard, and terminal all pass on their pinned toolchains; and
-8. `make onboard` makes no shippability claim from missing or unexecuted evidence.
+8. `make onboard` makes no shippability claim from missing or unexecuted evidence;
+9. production-shaped startup and every enabled mutation ingress fail closed; and
+10. an independent fresh-clone reviewer completes the full exit command without author intervention.
 
 ### Phase 0 PR stack
 
 | Order | Packet | May run in parallel with | Merge blocker |
 |---:|---|---|---|
 | 1 | WP-00 admission | none | owners and WIP ratified |
-| 2 | WP-0A bootstrap | none | clean-clone bootstrap |
-| 3 | WP-0B verifier truth | WP-0C1, WP-0C2 | honest success claim |
-| 4 | WP-0C1 scanner/subprocess | WP-0B, WP-0C2 | no required false-green/hang |
-| 5 | WP-0C2 Go capability | WP-0B, WP-0C1 | one version-aware answer |
-| 6 | WP-0D fast suite | WP-0E, WP-0F1, WP-0G | two deterministic passes |
-| 7 | WP-0E live/hermetic split | WP-0D, WP-0F1, WP-0G | governance-all hermetic |
-| 8 | WP-0F1 CI authority | WP-0D, WP-0E, WP-0G | operator live-parity decision |
-| 9 | WP-0F2 Mike consumers | WP-0G | all merge paths consume SSOT |
-| 10 | WP-0G DocOps | WP-0D through WP-0F1 | strict main green |
-| 11 | WP-0H polyglot | after WP-0A/WP-0C1/WP-0C2 | all language lanes green |
-| 12 | Integrated exit | none | all prior packets merged |
+| 2 | Immediate ingress containment | WP-0A | deployment status is not ambiguous/public |
+| 3 | WP-0A bootstrap | containment | clean-clone bootstrap |
+| 4 | WP-0S minimum ingress | WP-0B, WP-0C1, WP-0C2 | production-shaped ingress fails closed |
+| 5 | WP-0B verifier truth | WP-0S, WP-0C1, WP-0C2 | honest success claim |
+| 6 | WP-0C1R Semgrep adjudication | WP-0S, WP-0B, WP-0C2 | all findings owner-adjudicated |
+| 7 | WP-0C1 scanner/subprocess | WP-0S, WP-0B, WP-0C2 | no required false-green/hang |
+| 8 | WP-0C2 Go capability | WP-0S, WP-0B, WP-0C1R | one version-aware answer |
+| 9 | WP-0D fast suite | WP-0E, WP-0F1, WP-0G | two deterministic passes |
+| 10 | WP-0E live/hermetic split | WP-0D, WP-0F1, WP-0G | governance-all hermetic |
+| 11 | WP-0F1 CI authority | WP-0D, WP-0E, WP-0G | operator live-parity decision |
+| 12 | WP-0F2 Mike consumers | WP-0G | all merge paths consume SSOT |
+| 13 | WP-0G DocOps | WP-0D through WP-0F1 | strict main green |
+| 14 | WP-0H polyglot | after WP-0A/WP-0C1/WP-0C2 | all language lanes green |
+| 15 | WP-0I clean-room proof | none | independent full exit on merged `main` |
 
 ## Deferred phase specifications
 
@@ -932,12 +1155,12 @@ No deferred phase may begin before the Phase 0 exit gate passes on merged `main`
 ### Phase 1 — Security boundaries
 
 **Findings:** TIT-010, TIT-014
-**Entry:** Phase 0 closed; API and deployment tests reproducible
+**Entry:** Phase 0 closed; minimum fail-closed ingress is merged; API and deployment tests are reproducible
 **Primary surfaces:** `api/main.py`, API routers, dashboard transport, webhook verifier, sandbox/proof execution, `Dockerfile`, `docker-compose.yml`
 
 **Required outcomes**
 
-- Production mode refuses startup when authentication material is absent.
+- Preserve and deepen the Phase 0 production-start fail-closed invariant.
 - REST, GraphQL, WebSockets, A2A, webhooks, and health surfaces have an explicit auth classification.
 - The shipped dashboard can authenticate without exposing long-lived secrets to browser storage.
 - Public bindings require a documented TLS/reverse-proxy boundary.
@@ -1160,7 +1383,8 @@ An independent clean-room contributor follows the published path, submits a boun
 | `make test-fast` consecutive passes | 0/2 | 2/2, then stable | two literal sequential `make test-fast` invocations |
 | Required-check expected lists | 3+ | one manifest | `tests/governance/test_ci_parity_guard.py` + live parity |
 | Strict DocOps findings | nonzero | zero | `make docops-integrity` |
-| Critical unauthenticated mutation routes | nonzero | inventory in Phase 0; zero in Phase 1 | full API auth route matrix |
+| Critical unauthenticated mutation routes | nonzero | zero for production-shaped ingress in Phase 0; full boundary hardening in Phase 1 | full API auth route matrix |
+| Independent clean-room result | none | one complete pass on merged `main` | WP-0I fresh-clone record |
 | Modules >500 lines | 207 at audit commit | no increase, then strict decrease | hygiene ratchet counter |
 | Largest module | 5,255 lines at audit commit | no increase; <1,000 for critical modules | largest-module ratchet |
 | Silent exception swallows | 243 at audit commit | no increase; zero on critical paths | silent-swallow ratchet + critical-path allowlist |
@@ -1176,6 +1400,9 @@ Ratchet baselines may tighten after an improvement. They may not be raised in th
 - A migration PR includes forward, retry, and restore tests; destructive rollback is forbidden.
 - Generated files are changed only by their existing generator.
 - Security fixes default closed; compatibility escape hatches require explicit local-only naming, logging, and removal criteria.
+- A missing tool, skipped required test, stale receipt, or malformed configuration cannot be represented as a pass.
+- A failed live check cannot be replaced with copied repository evidence.
+- An unavailable operator prerequisite is `BLOCKED_OPERATOR`, not permission to weaken proof.
 - If a work packet expands beyond its allowed files, stop and amend the design before editing.
 - If a sibling track changes the same surface, rebase and re-run the packet's negative controls before continuing.
 
@@ -1189,7 +1416,8 @@ These are external prerequisites, not tasks an implementation agent may silently
 4. Provision Administration-read access for live branch-protection parity.
 5. Confirm the DocOps reconcile credential or approve normal reviewed-PR delivery only.
 6. Define the minimum human-approval rule for human-authored and bot-authored PRs.
-7. Verify the actual deployment exposure of the FastAPI web service. Until Phase 1 closes, if it is reachable beyond loopback/private ingress, set `DASHBOARD_API_KEY` and unpublish, firewall, or stop the service. This is interim containment, not a claim that the service is currently public.
+7. Verify the actual deployment exposure of the FastAPI web service before WP-0S. If it is reachable beyond loopback/private authenticated ingress, set the required authentication material and unpublish, firewall, or stop the service until WP-0S closes.
+8. Nominate the independent WP-0I reviewer or agent after every implementation packet is merged.
 
 An unavailable operator prerequisite blocks only its dependent packet. It does not justify weakening or fabricating the evidence.
 
