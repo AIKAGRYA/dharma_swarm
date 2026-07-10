@@ -286,6 +286,7 @@ assurance-boundary:
 docops-integrity:
 	$(PYTHON) scripts/docops/check_docops_integrity.py
 	$(PYTHON) scripts/governance/hygiene/check_hygiene_integrity.py
+	$(PYTHON) scripts/governance/render_active_track_includes.py --check
 
 slop-ratchet:
 	$(PYTHON) scripts/governance/slop_ratchet.py

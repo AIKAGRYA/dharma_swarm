@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "verified_at": "2026-06-27",
+  "verified_at": "2026-07-10",
   "ttl_days": 14,
   "assertions": [
     {
@@ -121,7 +121,8 @@
       "*reports/governance/track_portfolio.json",
       "*reports/governance/trust_gate_status.json",
       "foo.py",
-      "test_foo.py"
+      "test_foo.py",
+      "/AGENTS.md"
     ]
   },
   "canonical_guard": {
@@ -180,6 +181,8 @@
         "docs/governance/REALITY_DEBT_LEDGER.md",
         "docs/governance/RUNTIME_TRUTH_COMMAND_CUTOVER.md",
         "docs/governance/COHERENCE_DELTA.md",
+        "docs/governance/CONTEXT_SUITE_MAP.md",
+        "docs/governance/CONTEXT_SUITE_LINE_LEDGER.md",
         "docs/ops/PR_REVIEW_CONTROL.md",
         "docs/governance/INTEGRATION_LANDING_ORDER.md",
         "docs/governance/KAIZENOPS.md",

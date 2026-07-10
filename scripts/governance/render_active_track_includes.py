@@ -47,48 +47,26 @@ MANAGED_FILES = [
 
 
 def _render_one_track(t: dict, lines: list) -> None:
-    """Render a single track's block into `lines` (used per active track)."""
-    lines.append(f"### {t.get('name', '(unnamed)')}")
-    lines.append("")
-    lines.append(f"**Track id:** `{t.get('id', '(none)')}` · "
-                 f"**Status:** {t.get('status', 'UNKNOWN')} · "
-                 f"**Owner:** {t.get('owner', '(unset)')}")
-    lines.append(f"**Serves spine objective:** `{t.get('serves', '(none)')}` · "
-                 f"**Verified at:** {t.get('verified_at', '(unset)')} "
-                 f"(TTL {t.get('ttl_days', 14)} days)")
-    edges = []
-    for kind in ("complements", "depends_on", "conflicts_with"):
-        vals = t.get(kind) or []
-        if vals:
-            edges.append(f"{kind}: {', '.join(str(v) for v in vals)}")
-    if edges:
-        lines.append(f"**Relations:** {' · '.join(edges)}")
+    """Render a single track's compact digest into `lines`.
+
+    Deliberately NOT the full track body: descriptions, next-items, and
+    non-goals live in ACTIVE_TRACK.yaml and are rendered live by
+    `make onboard`. The 2026-07 four-agent onboarding probe showed that a
+    full prose copy becomes a leak channel — agents answer portfolio
+    questions from the copy while claiming to answer from the gate, which
+    masks gate failure. The digest keeps only what an agent needs before
+    its first edit: identity, freshness, and surface-ownership boundaries.
+    """
+    blockers = sum(1 for it in (t.get("next_items") or []) if it.get("blocker"))
+    lines.append(
+        f"- **`{t.get('id', '(none)')}`** — {t.get('name', '(unnamed)')} "
+        f"({t.get('status', 'UNKNOWN')}, serves `{t.get('serves', '(none)')}`, "
+        f"verified {t.get('verified_at', '(unset)')}, "
+        f"open blocker items: {blockers})"
+    )
     owned = t.get("owned_surfaces") or []
     if owned:
-        lines.append(f"**Owns surfaces:** {', '.join(str(s) for s in owned)}")
-    moves = t.get("moves_vital_signs") or []
-    if moves:
-        lines.append(f"**Moves vital signs:** {', '.join(str(s) for s in moves)}")
-    lines.append("")
-    desc = (t.get("description") or "").strip()
-    if desc:
-        lines.extend(desc.splitlines())
-        lines.append("")
-    next_items = t.get("next_items") or []
-    if next_items:
-        lines.append("**Next items:**")
-        lines.append("")
-        for item in next_items:
-            tag = " (blocker)" if item.get("blocker") else ""
-            lines.append(f"- [{item.get('kind', '?')}]{tag} {str(item.get('what', '')).strip()}")
-        lines.append("")
-    non_goals = t.get("non_goals") or []
-    if non_goals:
-        lines.append("**Non-goals:**")
-        lines.append("")
-        for ng in non_goals:
-            lines.append(f"- {str(ng).strip()}")
-        lines.append("")
+        lines.append(f"  - owns: {', '.join(str(s) for s in owned)}")
 
 
 def render_block(track: dict) -> str:
@@ -96,6 +74,9 @@ def render_block(track: dict) -> str:
 
     Works for both schemas: normalize_portfolio adapts v1 (singular
     active_track) into a one-track portfolio, so this renders either.
+
+    The stamp's "newest verified_at" is derived from the YAML (never from
+    the wall clock) so --check replays byte-for-byte in CI.
     """
     p = normalize_portfolio(track)
     tracks = p["active_tracks"]
@@ -104,28 +85,41 @@ def render_block(track: dict) -> str:
     spine = p["spine_objectives"]
     closed = p["closed_tracks"]
 
+    verified = sorted(str(t["verified_at"]) for t in tracks if t.get("verified_at"))
+    as_of = verified[-1] if verified else "(unset)"
+
     lines = [
         START,
         "",
-        "<!-- This block is generated from docs/governance/ACTIVE_TRACK.yaml.",
-        "     Do not hand-edit. Run scripts/governance/render_active_track_includes.py",
-        "     after updating the YAML. -->",
+        "<!-- GENERATED — do not hand-edit.",
+        "     source-of-truth: docs/governance/ACTIVE_TRACK.yaml",
+        "     render: python3 scripts/governance/render_active_track_includes.py",
+        "     check:  python3 scripts/governance/render_active_track_includes.py --check",
+        "     checked by: .github/workflows/active-track.yml, make docops-integrity,",
+        "                 tests/test_active_track_governance.py",
+        f"     newest track verified_at in source: {as_of} -->",
         "",
-        f"**Active portfolio:** {len(active)} co-equal track(s) "
-        f"(WIP warn {policy.get('warn_active')}, max {policy.get('max_active')}). "
-        "A new project is a new track here, not a violation — "
-        f"model: {policy.get('model')}.",
+        f"**Active portfolio — declared intent only:** {len(active)} co-equal "
+        f"track(s) (WIP warn {policy.get('warn_active')}, max "
+        f"{policy.get('max_active')}; model: {policy.get('model')}). "
+        "This stamped digest carries track identity and surface ownership, "
+        "NOT live status and NOT full track detail (descriptions, next-items, "
+        "non-goals stay in the YAML). Live state comes only from "
+        "`make onboard`; if its ACTIVE PORTFOLIO section is empty or warns, "
+        "run `python3 scripts/governance/check_track_status.py` — never "
+        "answer portfolio questions from this block or any other .md copy.",
         "",
     ]
 
     if spine:
         served = {t.get("serves") for t in active}
-        lines.append("**Spine objectives (each track serves one):**")
-        lines.append("")
-        for o in spine:
-            oid = o.get("id")
-            mark = "covered" if oid in served else "**no active track**"
-            lines.append(f"- `{oid}` — {o.get('name', '')} ({mark})")
+        gaps = [str(o.get("id")) for o in spine if o.get("id") not in served]
+        objectives = ", ".join(f"`{o.get('id')}`" for o in spine)
+        coverage = (
+            f" — NO ACTIVE TRACK serves: {', '.join(gaps)}" if gaps
+            else " (each covered by at least one active track)"
+        )
+        lines.append(f"**Spine objectives:** {objectives}{coverage}")
         lines.append("")
 
     if not tracks:
@@ -133,15 +127,21 @@ def render_block(track: dict) -> str:
         lines.append("")
     for t in tracks:
         _render_one_track(t, lines)
+    if tracks:
+        lines.append("")
+        lines.append(
+            "Before editing any file, check it against the `owns:` globs "
+            "above — a surface owned by a track you are not serving is "
+            "off-limits except through that track's own next-items. Full "
+            "track detail: `docs/governance/ACTIVE_TRACK.yaml`."
+        )
+        lines.append("")
 
     if closed:
-        lines.append("**Recently closed tracks:**")
-        lines.append("")
-        for ct in closed[:3]:  # newest three; closed_tracks is newest-first
-            lines.append(
-                f"- `{ct.get('id')}` — {ct.get('name')} "
-                f"({ct.get('status')}, closed {ct.get('closed_at')})"
-            )
+        lines.append("**Recently closed tracks:** " + " · ".join(
+            f"`{ct.get('id')}` ({ct.get('status')}, closed {ct.get('closed_at')})"
+            for ct in closed[:3]  # newest three; closed_tracks is newest-first
+        ))
         lines.append("")
 
     lines.append("For machine-readable status, run "

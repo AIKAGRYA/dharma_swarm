@@ -1,24 +1,14 @@
 # Documentation Agent Instructions
 
-This file governs AI agents working in the prose layer: `docs/`, `reports/`, `specs/`, `foundations/`, `lodestones/`, and root Markdown.
+**Scope:** AI agents (any brand) working in the prose layer — `docs/`,
+`reports/`, `specs/`, `foundations/`, `lodestones/`, root Markdown. Repo-wide
+behaviour, the onboarding gate, and its trust boundaries are
+owned by `CLAUDE.md`; this file adds only prose-layer rules. Root `/AGENTS.md` is
+gitignored and never reaches a fresh clone — this is the tracked file.
 
-## Before Anything Else — the single remembered gate
-
-`make onboard` is the only command you need to remember. Run it before
-touching any doc:
-
-```bash
-make onboard
-```
-
-It shows the active track, live ops, open broken-register items, tooling
-hints, and the doc-ownership map. If any prose in this file or any other
-doc disagrees with that output, trust the onboarding output and update the
-stale prose.
-
-For memory/context work, Memory Kernel is the canonical front door. Older
-memory surfaces remain subordinate evidence, projection, adapter, backend, or
-promotion-feed layers unless the Memory Kernel production bar says otherwise.
+Run `make onboard` before touching any doc; if prose anywhere disagrees with
+its output, trust the output and fix the prose. Memory/context work goes
+through MemoryKernel — see `CLAUDE.md` §Key Abstractions.
 
 ## Authority Model
 
