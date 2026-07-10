@@ -119,6 +119,7 @@ append-style refreshes quadruplicated rows and broke `make docops-integrity`).
 | Markdown files | **1,392** | git ls-files \| rg '\.md$' \| wc -l (excl. AGENTS.md, reports/docops) |
 | Markdown total lines | **292,345** | wc -l across all tracked .md |
 | Test functions | **13,182 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test functions | **13,183 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **12,885 (measured 2026-07-10, cloud checkout)** | python3 -m pytest tests/ --collect-only -q |
 | Collection errors | **35 (measured 2026-07-10, cloud checkout — env-dependent optional extras; 0 on the operator host 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
 | Markdown files | **1,392** | git ls-files \| rg '\.md$' \| wc -l (excl. AGENTS.md, reports/docops) |

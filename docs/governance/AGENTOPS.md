@@ -133,11 +133,11 @@ requires that tracked-path copy to exist and be byte-identical. Committed-range
 scope enforcement is not claimed here; WP-O4 adds it to the existing matcher.
 
 Negative controls run one at a time in disposable clones. Linux uses a chroot
-jail (directly as root or through an unprivileged user namespace); macOS uses
-`sandbox-exec`. Runtime and dependency files placed in a jail are byte copies,
-never hard links. A host without a real write-confinement mechanism fails
-closed. Source-pointing symlinks and environment routes are rejected, while
-mutations inside the disposable fixture remain available to the control.
+jail directly as root, through an unprivileged user namespace, or through
+passwordless `sudo` with an immediate UID/GID drop. macOS uses `sandbox-exec`.
+Runtime and dependency files placed in a jail are byte copies, never hard
+links. A host without a real write-confinement mechanism fails closed. Source
+symlinks and environment routes are rejected; fixture mutations remain usable.
 
 ## Reports
 

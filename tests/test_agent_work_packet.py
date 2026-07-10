@@ -369,6 +369,7 @@ def test_gate_commands_may_not_hide_mutation_inside_shell() -> None:
         "bash -lc 'git merge main'",
         "env sh -c 'git push origin HEAD'",
         "env git push origin HEAD",
+        "sudo -n git push origin HEAD",
     ):
         try:
             agentops.parse_gate({"name": "blocked-shell", "command": command}, 0)
@@ -717,6 +718,82 @@ def test_negative_control_temp_root_must_be_external(
     assert tree_snapshot(repo) == before
 
 
+def test_nonroot_linux_uses_passwordless_sudo_chroot_with_uid_drop(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    jail = tmp_path / "jail"
+    fixture = jail / "fixture"
+    fixture.mkdir(parents=True)
+    paths = {
+        "unshare": "/usr/bin/unshare",
+        "chroot": "/usr/sbin/chroot",
+        "sudo": "/usr/bin/sudo",
+        "env": "/usr/bin/env",
+    }
+    probes: list[list[str]] = []
+    which_calls: list[tuple[str, str | None]] = []
+
+    monkeypatch.setattr(agentops.sys, "platform", "linux")
+    monkeypatch.setattr(agentops.os, "geteuid", lambda: 1001)
+    monkeypatch.setattr(agentops.os, "getuid", lambda: 1001)
+    monkeypatch.setattr(agentops.os, "getgid", lambda: 1002)
+    def trusted_which(name: str, *, path: str | None = None) -> str | None:
+        which_calls.append((name, path))
+        if path != agentops._TRUSTED_HOST_PATH:
+            return f"/tmp/attacker/{name}"
+        return paths.get(name)
+
+    monkeypatch.setattr(agentops.shutil, "which", trusted_which)
+
+    def probe(
+        argv: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        probes.append(argv)
+        return subprocess.CompletedProcess(
+            argv, 0 if argv[0] == paths["sudo"] else 1, "", ""
+        )
+
+    monkeypatch.setattr(agentops, "run_command", probe)
+    preexec_fn, prefix, jailed, env_via_argv = agentops._negative_confinement(
+        jail, fixture
+    )
+
+    assert preexec_fn is None
+    assert jailed is True
+    assert env_via_argv is True
+    assert probes == [
+        [paths["unshare"], "--user", "--map-root-user", "true"],
+        [paths["sudo"], "-n", "--", paths["chroot"], "--version"],
+    ]
+    assert which_calls == [
+        ("unshare", agentops._TRUSTED_HOST_PATH),
+        ("chroot", agentops._TRUSTED_HOST_PATH),
+        ("sudo", agentops._TRUSTED_HOST_PATH),
+        ("env", agentops._TRUSTED_HOST_PATH),
+    ]
+    assert prefix == [
+        paths["sudo"],
+        "-n",
+        "--",
+        paths["chroot"],
+        "--userspec=1001:1002",
+        "--groups=1002",
+        str(jail),
+        paths["env"],
+        "-i",
+        "--",
+    ]
+    assert "-E" not in prefix
+
+    monkeypatch.setattr(
+        agentops,
+        "run_command",
+        lambda argv, **_kwargs: subprocess.CompletedProcess(argv, 1, "", "denied"),
+    )
+    with pytest.raises(agentops.AgentOpsError, match="confinement is unavailable"):
+        agentops._negative_confinement(jail, fixture)
+
+
 def test_external_report_root_is_mandatory_and_read_only(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -754,7 +831,9 @@ def test_external_report_root_is_mandatory_and_read_only(
     assert tree_snapshot(repo) == before
 
 
-def test_external_report_root_rejects_nested_symlink_into_source(tmp_path: Path) -> None:
+def test_external_report_root_rejects_nested_symlink_into_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     repo = init_session_repo(tmp_path)
     payload = seal_packet(session_packet(repo))
     external = write_external_packet(tmp_path, payload)
@@ -766,6 +845,12 @@ def test_external_report_root_rejects_nested_symlink_into_source(tmp_path: Path)
     report_root = tmp_path / "nested-report-root"
     report_root.mkdir()
     (report_root / "reports").symlink_to(repo, target_is_directory=True)
+
+    def must_not_run(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("report destination must be rejected before execution")
+
+    monkeypatch.setattr(agentops, "run_gate", must_not_run)
+    monkeypatch.setattr(agentops, "run_negative_control", must_not_run)
 
     with pytest.raises(agentops.AgentOpsError, match="report destination"):
         agentops.execute_packet(

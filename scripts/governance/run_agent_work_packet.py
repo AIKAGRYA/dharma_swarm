@@ -66,6 +66,7 @@ if _bootstrapped_operator_core:
         delattr(root_package, "operator_core")
 
 REPORT_ROOT = Path("reports") / "agentops"
+_TRUSTED_HOST_PATH = "/usr/sbin:/usr/bin:/sbin:/bin"
 
 
 def run_command(
@@ -480,6 +481,10 @@ def _negative_environment(
     ]
     safe["PYTHONPATH"] = os.pathsep.join(entries)
     for key, value in declared.items():
+        if not key or "=" in key or "\x00" in key or "\x00" in value:
+            raise AgentOpsError(
+                "negative-control env keys must be non-empty names without '=' or NUL"
+            )
         upper = key.upper()
         if upper == "PYTHONPATH":
             continue
@@ -495,16 +500,25 @@ def _negative_environment(
     return safe
 
 
+def _environment_argv(env: dict[str, str]) -> list[str]:
+    assignments: list[str] = []
+    for key, value in sorted(env.items()):
+        if not key or "=" in key or "\x00" in key or "\x00" in value:
+            raise AgentOpsError("negative-control environment cannot be encoded safely")
+        assignments.append(f"{key}={value}")
+    return assignments
+
+
 def _negative_confinement(
     jail: Path, fixture: Path
-) -> tuple[Callable[[], None] | None, list[str], bool]:
+) -> tuple[Callable[[], None] | None, list[str], bool, bool]:
     if sys.platform == "darwin" and shutil.which("sandbox-exec"):
         escaped = str(fixture.resolve()).replace("\\", "\\\\").replace('"', '\\"')
         profile = (
             '(version 1) (deny file-write*) '
             f'(allow file-write* (subpath "{escaped}") (literal "/dev/null"))'
         )
-        return None, ["sandbox-exec", "-p", profile, "--"], False
+        return None, ["sandbox-exec", "-p", profile, "--"], False, False
     if sys.platform != "linux":
         raise AgentOpsError("negative-control write confinement is unavailable")
     if os.geteuid() == 0:
@@ -512,8 +526,9 @@ def _negative_confinement(
             os.chroot(jail)
             os.chdir("/fixture")
             os.umask(0o077)
-        return enter_jail, [], True
-    unshare, chroot = shutil.which("unshare"), shutil.which("chroot")
+        return enter_jail, [], True, False
+    unshare = shutil.which("unshare", path=_TRUSTED_HOST_PATH)
+    chroot = shutil.which("chroot", path=_TRUSTED_HOST_PATH)
     if unshare and chroot:
         probe = run_command([unshare, "--user", "--map-root-user", "true"], cwd=fixture)
         if probe.returncode == 0:
@@ -521,10 +536,35 @@ def _negative_confinement(
                 unshare, "--user", "--map-root-user", "--", chroot, str(jail),
                 "/bin/sh", "-c", 'cd /fixture && exec "$@"', "agentops",
             ]
-            return None, prefix, True
+            return None, prefix, True, False
+    sudo = shutil.which("sudo", path=_TRUSTED_HOST_PATH)
+    env_executable = shutil.which("env", path=_TRUSTED_HOST_PATH)
+    uid, gid = os.getuid(), os.getgid()
+    if sudo and chroot and env_executable and uid > 0 and gid > 0:
+        trusted_host_env = {"PATH": _TRUSTED_HOST_PATH}
+        probe = run_command(
+            [sudo, "-n", "--", chroot, "--version"],
+            cwd=fixture,
+            env=trusted_host_env,
+        )
+        if probe.returncode == 0:
+            prefix = [
+                sudo,
+                "-n",
+                "--",
+                chroot,
+                f"--userspec={uid}:{gid}",
+                f"--groups={gid}",
+                str(jail),
+                env_executable,
+                "-i",
+                "--",
+            ]
+            return None, prefix, True, True
     raise AgentOpsError(
         "negative controls require root chroot, unprivileged user namespaces, "
-        "or macOS sandbox-exec; confinement is unavailable"
+        "passwordless sudo chroot with a uid/gid drop, or macOS sandbox-exec; "
+        "confinement is unavailable"
     )
 
 
@@ -536,9 +576,11 @@ def _prepare_jail(jail: Path, gate: GateSpec) -> None:
                     root, _jail_path(jail, root), symlinks=False, dirs_exist_ok=True
                 )
     _copy_python_runtime(jail)
-    for executable in {
-        gate.argv[0], "python3", "git", "ldd", "/bin/bash", "/bin/sh",
-    }:
+    executables = {gate.argv[0], "python3", "git", "ldd", "/bin/bash", "/bin/sh"}
+    trusted_env = shutil.which("env", path=_TRUSTED_HOST_PATH)
+    if trusted_env:
+        executables.add(trusted_env)
+    for executable in executables:
         _copy_executable_into_jail(executable, jail)
     dev = jail / "dev"
     dev.mkdir(parents=True, exist_ok=True)
@@ -645,16 +687,29 @@ def run_negative_control(repo_root: Path, gate: GateSpec) -> dict[str, Any]:
             else:
                 shutil.copy2(source, target, follow_symlinks=False)
         _reject_fixture_symlink_escapes(fixture)
-        preexec_fn, argv_prefix, jailed = _negative_confinement(jail, fixture)
-        env = _negative_environment(
+        preexec_fn, argv_prefix, jailed, env_via_argv = _negative_confinement(
+            jail, fixture
+        )
+        control_env = _negative_environment(
             repo_root, fixture, jail, gate.env, jailed=jailed
         )
         if jailed:
             _prepare_jail(jail, gate)
+        host_env = control_env
+        if env_via_argv:
+            argv_prefix = [
+                *argv_prefix,
+                *_environment_argv(control_env),
+                "/bin/sh",
+                "-c",
+                'cd /fixture && exec "$@"',
+                "agentops",
+            ]
+            host_env = {"PATH": _TRUSTED_HOST_PATH}
         return run_gate(
             fixture,
             replace(gate, env={}),
-            base_env=env,
+            base_env=host_env,
             preexec_fn=preexec_fn,
             argv_prefix=argv_prefix,
         )
@@ -849,6 +904,9 @@ def execute_packet(
     report_source = source if packet.session_entry is not None else None
     timestamp = timestamp_slug()
     report = base_report(packet, target_root, dry_run=False)
+    if report_source is not None:
+        for destination in report_paths(output_root, packet.id, timestamp):
+            _validate_report_destination(output_root, destination, report_source)
     initial_scope = inspect_scope(target_root, packet)
     if initial_scope.changed_files and not allow_existing_changes:
         report["scope"] = scope_to_dict(initial_scope)
