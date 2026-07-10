@@ -20,6 +20,7 @@ REGISTERED_AGENT_UIDS = [
     "devin-roaming-2987d222",
     "fable_5_cursor",
     "perplexity-computer",
+    "kestrel",
 ]
 
 _ALIASES = {
