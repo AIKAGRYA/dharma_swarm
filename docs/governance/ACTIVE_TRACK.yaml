@@ -1523,6 +1523,118 @@ active_tracks:
       - "No new truth store: authority is projection_only; every cell cites an existing owner (lane_F world dossier, VENTURE_CELL_PORTFOLIO.yaml, swarm-genome organ table) or a public URL."
       - Do not weaken any gate/ratchet/One-Wire boundary; do not touch sibling-track surfaces except through their own next-items.
 
+  - id: onboard-one-door-2026-07
+    name: One-door onboarding — strict, fast, deterministic session admission
+    status: ACTIVE
+    opened_at: "2026-07-10"
+    verified_at: "2026-07-10"
+    ttl_days: 30
+    owner: "@AmitabhainArunachala"
+    serves: substrate-nativeness
+    complements:
+      - sovereign-safety-tcb-2026-07
+      - merge-master-mike-d4-2026-06
+    owned_surfaces:
+      - AGENTS.md
+      - Makefile
+      - .github/workflows/structure.yml
+      - .github/workflows/active-track.yml
+      - docs/governance/ANTI_SLOP_RULES.md
+      - docs/governance/AGENTOPS.md
+      - docs/governance/BUILD_SESSION_ENTRYPOINT.md
+      - scripts/docops/check_docops_integrity.py
+      - scripts/governance/agent_onboard.py
+      - scripts/governance/orientation_graph.py
+      - scripts/governance/trust_gate_status.py
+      - scripts/governance/repo_status.py
+      - scripts/governance/run_agent_work_packet.py
+      - dharma_swarm/operator_core/onboarding/**
+      - dharma_swarm/operator_core/control_surface.py
+      - dharma_swarm/operator_core/control_surface_models.py
+      - dharma_swarm/operator_core/operator_coherence/git_governance.py
+      - tests/test_agent_onboard.py
+      - tests/test_orientation_graph.py
+      - tests/test_trust_gate_status.py
+      - tests/test_repo_status.py
+      - tests/test_control_surface.py
+      - tests/test_operator_coherence_cockpit.py
+      - tests/test_agent_work_packet.py
+      - tests/test_docops_integrity.py
+      - tests/test_make_onboarding_contract.py
+      - tests/test_onboarding_*.py
+      - tests/properties/test_onboarding_readiness_properties.py
+      - reports/agentops/work_packets/onboard-one-door-WP-O*.json
+    moves_vital_signs:
+      - quality_gates
+      - context_efficiency
+    description: >
+      Operator decision D1 resolved 2026-07-10: standalone track (the tenth,
+      at the max_active hard ceiling — an explicit WIP decision, not automatic
+      admission). Executes docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md
+      (merged PR #855: measured rewrite + adversarial refinement): make onboard
+      becomes the sole strict session-admission door — typed verdicts and exit
+      codes (0 READY / 1 BLOCKED / 2 usage / 3 CONFIG_ERROR / 4 NEEDS_HOST /
+      5 TOOLCHAIN_MISSING), receipt v2 with versioned loader, receipt-backed
+      warm cache with stored input-manifest invalidation, previous-run delta,
+      one canonical broken-register parser absorbing all six divergent
+      consumers (the bold **FIXED** misparse is LIVE: 17 open-like rendered vs
+      9 canonical), typed needs_host gap codes, mandatory Session Entry Packet
+      with default-deny scope enforcement, AGENTS.md custody repair
+      (registered canon, absent on disk, gitignored), compact 40-70-line
+      render, and warm<1s/cold<5s targets. Work proceeds only through the
+      spec's admitted packets WP-O1..WP-O6; the spec (§6-§13) is the detail
+      authority — this entry is the admission record, not a second spec.
+      Titanium vNext (PR #854 plan) baseline capture and WP-00 stay blocked
+      until this track's implementation, merge-blocking CI admission (C1),
+      and independent clean-room proof have merged.
+    prerequisites:
+      - id: onboard_spec_on_main
+        kind: file_exists
+        file: docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md
+      - id: onboard_spec_admission_gate_declared
+        kind: file_contains
+        file: docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md
+        pattern: "D1 in §9 must be resolved"
+    completion_criteria:
+      - id: wp_o1_contract_entry_packet_custody
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/test_onboarding_contract.py", "tests/test_agent_work_packet.py", "tests/test_docops_integrity.py", "-q"]
+      - id: wp_o2_single_parser_six_consumers
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/test_onboarding_broken_register.py", "tests/test_agent_onboard.py", "tests/test_orientation_graph.py", "tests/test_trust_gate_status.py", "tests/test_repo_status.py", "tests/test_control_surface.py", "tests/test_operator_coherence_cockpit.py", "-q"]
+      - id: wp_o3_cli_readiness_cache_delta
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/test_onboarding_cli.py", "tests/test_onboarding_readiness.py", "tests/test_onboarding_cache.py", "tests/test_agent_onboard.py", "-q"]
+      - id: wp_o4_make_agentops_ci_parity
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/test_make_onboarding_contract.py", "tests/test_onboarding_ci_contract.py", "tests/test_agent_work_packet.py", "tests/test_orientation_graph.py", "-q"]
+      - id: wp_o6_readiness_property_battery
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/properties/test_onboarding_readiness_properties.py", "-q"]
+    next_items:
+      - id: D2
+        what: "D2 PENDING — operator ratification of strict-by-default after WP-O4/C1 (exact record format in spec §9.2; the implementation author cannot mint it; WP-O5 preflight verifies the record is a merged ancestor)"
+        kind: governance
+        blocker: true
+      - id: C1
+        what: "C1 PENDING — merge-authority owner (merge-master-mike-d4-2026-06 lane) registers the shared onboarding admission context as required + parity-manifest + automerge-required in its own coordinated change (spec §9.4); WP-O5 and the terminal clean-room proof block until merged"
+        kind: governance
+        blocker: true
+      - id: D3
+        what: "D3 PENDING — inventory and upgrade, or explicitly disconfirm, every off-repo reader of ~/.dharma/ops/onboard_receipt.json before the WP-O3 v2 writer flip (spec §9.3; in-repo audit found zero production readers, the fleet-readable claim is unverified)"
+        kind: governance
+        blocker: true
+      - id: 1
+        what: "WP-O1 — contract module, versioned receipt loader, portable Session Entry Packet, root AGENTS.md custody repair incl. .gitignore carve-out (spec §6 WP-O1: allowed files, failing-first tests O1-B1..B12, expected exits)"
+        kind: code
+        blocker: false
+    non_goals:
+      - No gate weakening, no new truth store, receipt store, digest primitive, or parser family — reuse stable_digest/utc_now (memory_kernel.write_receipts), the ledger --check replay contract, and the needs_host vocabulary chain (spec §2.4, §3.1).
+      - No Titanium, production, CLOSED_LIVE, merge-authority, or branch-protection work under this track (C1 belongs to its owners).
+      - No strict-default promotion without the merged operator-authored D2 record (spec §9.2).
+      - No active sibling-track surface edit; pyproject.toml stays forbidden until M6-1 resolves with the DharmaGraph owner (spec §9.6).
+      - No performance target met by removing or deferring a required validation (spec WP-O6 kill criterion).
+
 closed_tracks:
   - id: runtime-truth-spine-adoption-2026-06
     name: Runtime Truth Spine — Adoption (god objects flow through invoke_agent)
