@@ -228,8 +228,8 @@ Repository CI must not depend on a live daemon receipt.
 
 ### WP-0A — Hermetic bootstrap
 
-**Findings:** TIT-003, TIT-004, TIT-015  
-**Owner lanes:** sovereign safety, organism rewire, Helm  
+**Findings:** TIT-003, TIT-004, TIT-015
+**Owner lanes:** sovereign safety, organism rewire, Helm
 **Depends on:** none
 
 **Allowed files**
@@ -291,8 +291,8 @@ Revert only bootstrap, workflow, and Docker installation changes. No state migra
 
 ### WP-0B — Verifier truth
 
-**Findings:** TIT-001  
-**Owner lane:** sovereign safety  
+**Findings:** TIT-001
+**Owner lane:** sovereign safety
 **Depends on:** WP-0A
 
 **Allowed files**
@@ -337,8 +337,8 @@ Success output and executed evidence are equivalent.
 
 ### WP-0C — Required tools and subprocesses fail closed
 
-**Findings:** TIT-003, TIT-004, TIT-005  
-**Owner lanes:** sovereign safety, organism rewire  
+**Findings:** TIT-003, TIT-004, TIT-005
+**Owner lanes:** sovereign safety, organism rewire
 **Depends on:** WP-0A
 
 **Allowed files**
@@ -394,8 +394,8 @@ Revert per tool. Never restore an indefinite timeout or a green missing-tool res
 
 ### WP-0D — Fast-suite determinism
 
-**Findings:** TIT-002  
-**Owner lanes:** sovereign safety; runtime owner only if production code is proven causal  
+**Findings:** TIT-002
+**Owner lanes:** sovereign safety; runtime owner only if production code is proven causal
 **Depends on:** WP-0A, WP-0B
 
 **Observed symptom**
@@ -450,8 +450,8 @@ Revert the isolated leak fix. If production behavior changed, restore it and kee
 
 ### WP-0E — Hermetic/live verification split
 
-**Findings:** TIT-009  
-**Owner lanes:** loop closure, organism rewire  
+**Findings:** TIT-009
+**Owner lanes:** loop closure, organism rewire
 **Depends on:** WP-0C
 
 **Allowed files**
@@ -499,8 +499,8 @@ Restore target wiring only. Do not copy a live receipt into the repository to ma
 
 ### WP-0F — One CI authority
 
-**Findings:** TIT-006, TIT-007  
-**Owner lane:** merge-master-mike  
+**Findings:** TIT-006, TIT-007
+**Owner lane:** merge-master-mike
 **Depends on:** WP-0A
 
 **Allowed files**
@@ -572,8 +572,8 @@ Revert all consumers together. Partial rollback that recreates divergent require
 
 ### WP-0G — Strict DocOps convergence
 
-**Findings:** TIT-008  
-**Owner:** DocOps workflow/script surfaces  
+**Findings:** TIT-008
+**Owner:** DocOps workflow/script surfaces
 **Depends on:** WP-0A; may proceed in parallel with WP-0D through WP-0F
 
 **Allowed files**
@@ -624,8 +624,8 @@ Revert workflow mechanics and regenerated managed blocks together. Never hand-ed
 
 ### WP-0H — Polyglot verification parity
 
-**Findings:** TIT-003, TIT-015  
-**Owner lanes:** organism rewire, Helm, dashboard owners  
+**Findings:** TIT-003, TIT-015
+**Owner lanes:** organism rewire, Helm, dashboard owners
 **Depends on:** WP-0A, WP-0C
 
 **Allowed files**
@@ -731,8 +731,8 @@ No deferred phase may begin before the Phase 0 exit gate passes on merged `main`
 
 ### Phase 1 — Security boundaries
 
-**Findings:** TIT-010, TIT-014  
-**Entry:** Phase 0 closed; API and deployment tests reproducible  
+**Findings:** TIT-010, TIT-014
+**Entry:** Phase 0 closed; API and deployment tests reproducible
 **Primary surfaces:** `api/main.py`, API routers, dashboard transport, webhook verifier, sandbox/proof execution, `Dockerfile`, `docker-compose.yml`
 
 **Required outcomes**
@@ -764,8 +764,8 @@ No externally reachable mutation is fail-open.
 
 ### Phase 2 — Runtime correctness
 
-**Findings:** TIT-011  
-**Entry:** Phase 1 closed  
+**Findings:** TIT-011
+**Entry:** Phase 1 closed
 **Primary surfaces:** `dharma_swarm/graph/durable_invoker.py`, `graph/reconciler.py`, `runtime_lifecycle.py`, provider invocation seams, `orchestrator.py` seam only
 
 **Required outcomes**
@@ -809,8 +809,8 @@ A second daemon cannot own the same runtime DB, and no test claims more than its
 
 ### Phase 3 — State integrity
 
-**Findings:** TIT-012  
-**Entry:** Phase 2 ownership lease and crash semantics merged  
+**Findings:** TIT-012
+**Entry:** Phase 2 ownership lease and crash semantics merged
 **Primary surfaces:** `runtime_state.py`, `task_board.py`, ontology owner, graph checkpoint owner, migrations, Litestream config
 
 **Required outcomes**
@@ -839,8 +839,8 @@ One documented restore command recreates a bootable, semantically consistent org
 
 ### Phase 4 — Wiring truth
 
-**Findings:** TIT-012 plus every `PARTIAL`, `DORMANT`, and unresolved mismatch found by the audit  
-**Entry:** canonical state ownership published  
+**Findings:** TIT-012 plus every `PARTIAL`, `DORMANT`, and unresolved mismatch found by the audit
+**Entry:** canonical state ownership published
 **Primary surfaces:** `INTERFACE_MISMATCH_MAP.md`, active surface manifest, entrypoints, `spine_bypass_report.py`, xray inventory
 
 **Required outcomes**
@@ -865,8 +865,8 @@ No production claim depends only on documentation, file existence, or a test-onl
 
 ### Phase 5 — Maintainability
 
-**Findings:** TIT-013  
-**Entry:** wiring inventory stable enough to preserve behavior during decomposition  
+**Findings:** TIT-013
+**Entry:** wiring inventory stable enough to preserve behavior during decomposition
 **Primary surfaces:** highest-centrality modules from xray, module-budget and hygiene ratchets
 
 **Priority order**
@@ -909,7 +909,7 @@ make lint-blockers
 
 ### Phase 6 — Test quality
 
-**Entry:** critical interfaces decomposed and stable  
+**Entry:** critical interfaces decomposed and stable
 **Primary surfaces:** mutation runner, assurance boundary, test hygiene, integration/chaos suites
 
 **Required outcomes**
@@ -935,7 +935,7 @@ The trusted computing base meets its declared mutation threshold, and no require
 
 ### Phase 7 — Open-source engineering readiness
 
-**Entry:** Phases 0 through 6 green  
+**Entry:** Phases 0 through 6 green
 **Scope:** engineering usability only; no marketing or capability inflation
 
 **Required outcomes**
