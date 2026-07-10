@@ -1,0 +1,19 @@
+{
+  "counts": {
+    "bandit_high": 5,
+    "bandit_medium": 104,
+    "grimp_mutual_pairs": 22,
+    "radon_grade_e_plus": 90,
+    "radon_grade_f": 42,
+    "ruff_total": 490,
+    "vulture_dead_90": 29
+  },
+  "schema": "dharma_swarm.substrate_baseline.v1",
+  "tools": [
+    "ruff",
+    "vulture",
+    "radon",
+    "bandit",
+    "grimp"
+  ]
+}

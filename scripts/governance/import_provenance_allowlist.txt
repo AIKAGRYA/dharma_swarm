@@ -11,6 +11,7 @@ cryptography
 fastapi
 fasttext
 gemma_scope_feature_install
+grimp
 hmmlearn
 httpx
 huggingface_hub
