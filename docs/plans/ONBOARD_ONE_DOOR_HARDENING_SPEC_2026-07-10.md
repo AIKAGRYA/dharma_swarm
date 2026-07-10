@@ -32,7 +32,8 @@ production or `CLOSED_LIVE` claims.
 ## §0 Admission and use of this specification
 
 1. D1 in §9 must be resolved through a governance-only admission PR before
-   any WP-O1..O6 implementation edit. Track admission is not a one-line act:
+   any WP-O1, WP-O1R-B0, WP-O1R, or WP-O2..O6 implementation edit. Track
+   admission is not a one-line act:
    changing `ACTIVE_TRACK.yaml` requires regenerated managed blocks in
    `CLAUDE.md`, `SOVEREIGN_MANIFEST.md`, and
    `BUILD_SESSION_ENTRYPOINT.md`
@@ -592,6 +593,11 @@ exactly one packet at:
 reports/agentops/work_packets/onboard-one-door-WP-O<N>.json
 ```
 
+The post-WP-O1 security remediation admitted below uses the exact tracked path
+`reports/agentops/work_packets/onboard-one-door-WP-O1R.json`. `WP-O1R` is a
+distinct, literal packet identity; its one-time exact-identifier bootstrap and
+normal pre-edit validation sequence are pinned in §6 WP-O1R.
+
 This reuses the existing tracked AgentOps packet surface; it is not a new
 receipt store. Before any code edit, however, the complete packet lives outside
 the worktree under an external `DHARMA_OPS_DIR`. It is validated against a
@@ -675,7 +681,8 @@ Negative controls may never mutate the admitted source checkout.
   edit is authorized yet.
 - WP-O1 makes the extension, expected exits, negative controls, canonical
   digest, portable worktree binding, and external report root
-  machine-validating. From WP-O2 onward any mismatch is fail-closed.
+  machine-validating. From WP-O1R onward any mismatch is fail-closed, after the
+  exact-identifier bootstrap exception admitted in §6 WP-O1R has merged.
 - Preflight reads the external packet, requires a clean worktree and exact
   `HEAD == packet.base_ref`, writes its report outside the worktree, and returns
   0 before any code edit. The agent then copies the exact packet bytes to the
@@ -886,14 +893,256 @@ track content repair, no general DocOps cleanup, no second packet parser.
 canonical guard semantics, stop and return to the operator; do not create the
 pointer.
 
+### WP-O1R — Session Entry live-command bypass remediation (S)
+
+**Closes:** the post-merge Session Entry command-validation defect at
+`dharma_swarm/operator_core/onboarding/contract.py:169-185`. At baseline
+`94a3877c7799bbde7f0ac9adff060ee1f449683f`, only `argv[0]` receives basename
+normalization while later tokens are compared whole
+(`dharma_swarm/operator_core/onboarding/contract.py:178-184`). A read-only
+`parse_gate` probe must record all three commands below as accepted before the
+failing-first test is added:
+
+```text
+python3 scripts/runtime/live_swarm.py
+python3 ./scripts/runtime/live_swarm.py
+python3 -m dharma_swarm.live_swarm
+```
+
+Run the exact probe from a supported repository Python environment:
+
+```bash
+export DHARMA_PYTHON="${DHARMA_PYTHON:-.venv/bin/python}"
+test -x "$DHARMA_PYTHON"
+"$DHARMA_PYTHON" -B -c 'import json, subprocess; from dharma_swarm.operator_core.onboarding.contract import parse_gate; commands=["python3 scripts/runtime/live_swarm.py", "python3 ./scripts/runtime/live_swarm.py", "python3 -m dharma_swarm.live_swarm"]; payload={"baseline_sha": subprocess.run(["git", "rev-parse", "HEAD"], check=True, capture_output=True, text=True).stdout.strip(), "results": [{"command": command, "accepted_argv": parse_gate({"name": "baseline-probe", "command": command}, index).argv} for index, command in enumerate(commands)]}; print(json.dumps(payload, indent=2))'
+# expected at 94a3877c7799bbde7f0ac9adff060ee1f449683f: exit 0;
+# all three results contain accepted_argv
+```
+
+The probe records exact command, baseline SHA, parsed `argv`, output, and
+process exit. Acceptance of all three with exit 0 is the defect witness; it is
+not a passing security result.
+
+**Owner:** D1-admitted track owner.
+
+**Prerequisites / merge dependency:** this admission amendment and the
+WP-O1R-B0 exact-identifier bootstrap below merged; merge commit
+`94a3877c7799bbde7f0ac9adff060ee1f449683f` remains an ancestor; a fresh clean
+post-bootstrap baseline and sibling collision matrix are recorded; the
+complete external WP-O1R Session Entry Packet validates before any
+live-command implementation edit. Prove the ancestry with
+`git merge-base --is-ancestor 94a3877c7799bbde7f0ac9adff060ee1f449683f HEAD`
+(expected exit 0). WP-O1R must merge before WP-O2 begins.
+
+**Packet identity:** the operator-required canonical external filename and the
+machine-enforced tracked filename are `onboard-one-door-WP-O1R.json`. The
+runner derives the required tracked path from `packet.id` and requires indexed
+byte equality
+(`scripts/governance/run_agent_work_packet.py:317-330`), so the packet must use
+the following injective identity:
+
+```json
+{
+  "id": "onboard-one-door-WP-O1R",
+  "session_entry": {"work_packet": "WP-O1R"}
+}
+```
+
+The current evaluator admits only numeric `WP-O<N>` values
+(`dharma_swarm/operator_core/onboarding/contract.py:286-290`), so exact
+pre-edit validation is impossible at baseline
+`94a3877c7799bbde7f0ac9adff060ee1f449683f`. Neither the
+filename nor an alias may mint authority: the merged spec/track admission owns
+the envelope, and the evaluator must check the same literal identity in the
+external packet content, tracked path, and report. The external source
+basename is a procedural requirement; the runner machine-checks its `.json`
+suffix and content, not that basename
+(`scripts/governance/run_agent_work_packet.py:861-878`).
+
+**WP-O1R-B0 exact-identifier bootstrap (separate prerequisite PR):** merge of
+this governance amendment explicitly ratifies one narrow exception to §4's
+pre-edit packet rule. It waives only external/tracked packet presence and
+prevalidation for B0; exact clean base, tool versions, track/owner, fresh
+sibling collision analysis, default-deny complete-diff scope, and
+failing-first evidence remain mandatory. The D1-admitted track owner starts B0
+at the exact clean admission-merge SHA, records that SHA and the empty
+`git status --porcelain=v1`, and may edit only:
+
+- `dharma_swarm/operator_core/onboarding/contract.py`
+- `tests/test_agent_work_packet.py`
+
+Only the mechanically required §6 count-refresh outputs may join those two
+files. B0's sole behavior change is to accept exact `WP-O1R` as a
+`session_entry.work_packet` value while preserving `WP-O1` and `WP-O10`, the
+packet-id token check, and rejection of `WP-O2R`, `WP-O1RR`, `WP-O1R2`,
+`WP-O1r`, and every other suffix. Its sole named test is
+`test_session_entry_accepts_exact_wp_o1r_identity_only`.
+
+Before the first B0 edit, run and record:
+
+```bash
+export DHARMA_PYTHON="${DHARMA_PYTHON:-.venv/bin/python}"
+test -x "$DHARMA_PYTHON"
+export ADMISSION_MERGE_SHA="<merged 40-hex admission SHA>"
+export BASELINE_SHA="$(git rev-parse HEAD)"
+test -z "$(git status --porcelain=v1)"
+test "$BASELINE_SHA" = "$ADMISSION_MERGE_SHA"
+"$DHARMA_PYTHON" --version
+git --version
+make --version
+"$DHARMA_PYTHON" -c 'from pathlib import Path; import yaml; from dharma_swarm.operator_core.onboarding.contract import detect_surface_collisions; data=yaml.safe_load(Path("docs/governance/ACTIVE_TRACK.yaml").read_text()); track=next(item for item in data["active_tracks"] if item["id"] == "onboard-one-door-2026-07"); assert track["status"] == "ACTIVE" and track["owner"] == "@AmitabhainArunachala"; allowed=["dharma_swarm/operator_core/onboarding/contract.py", "tests/test_agent_work_packet.py", "docs/governance/SOVEREIGN_MANIFEST.md", "docs/docops/AUTO_INVENTORY.md"]; siblings={item["id"]: item.get("owned_surfaces", []) for item in data["active_tracks"] if item["id"] != track["id"]}; collisions=detect_surface_collisions(allowed, siblings, allowed); assert not collisions, collisions; print("WP-O1R-B0 track/owner/collision: clear")'
+# expected: every command exits 0; replace the descriptive SHA before running
+```
+
+After adding only that test and before changing the grammar, run the node below
+and require a nonzero exit; record exact command, baseline SHA, output, and
+exit. Then implement the exact identity bridge and require every remaining
+command to exit 0:
+
+```bash
+export DHARMA_PYTHON="${DHARMA_PYTHON:-.venv/bin/python}"
+test -x "$DHARMA_PYTHON"
+"$DHARMA_PYTHON" -m pytest \
+  tests/test_agent_work_packet.py::test_session_entry_accepts_exact_wp_o1r_identity_only -q
+# failing-first expected: nonzero before the grammar edit; 0 afterward
+"$DHARMA_PYTHON" -m pytest tests/test_agent_work_packet.py -q
+"$DHARMA_PYTHON" -m ruff check \
+  dharma_swarm/operator_core/onboarding/contract.py \
+  tests/test_agent_work_packet.py
+make docops-integrity
+"$DHARMA_PYTHON" scripts/governance/render_active_track_includes.py --check
+"$DHARMA_PYTHON" scripts/governance/check_track_status.py
+"$DHARMA_PYTHON" scripts/governance/check_name_drift.py
+git diff --check
+set -o pipefail
+{
+  git diff --name-only "$BASELINE_SHA"...HEAD
+  git diff --name-only
+  git diff --cached --name-only
+  git ls-files --others --exclude-standard
+} | sort -u | while IFS= read -r path; do
+  case "$path" in
+    ""|dharma_swarm/operator_core/onboarding/contract.py|tests/test_agent_work_packet.py|docs/governance/SOVEREIGN_MANIFEST.md|docs/docops/AUTO_INVENTORY.md) ;;
+    *) echo "WP-O1R-B0 forbidden path: $path" >&2; exit 1 ;;
+  esac
+done
+# passing expected: only admitted code/test and mechanical count outputs;
+# any other committed, unstaged, staged, or untracked path exits 1
+```
+
+No packet, command normalization, runner, DocOps assertion, or later-WP change
+is allowed. The B0 PR body plus its failing-first/passing CI logs and merge
+commit are the evidence artifact; no new receipt path is created. Rollback is
+one B0 revert before any WP-O1R packet is admitted. The first merged B0 consumes
+this exception permanently. The later WP-O1R packet/PR records that merge SHA,
+proves it is an ancestor, starts from a new clean baseline, and follows normal
+§4 packet validation with no exception.
+
+**Allowed files:**
+
+- `dharma_swarm/operator_core/onboarding/contract.py`
+- `tests/test_agent_work_packet.py`
+- `reports/agentops/work_packets/onboard-one-door-WP-O1R.json`
+
+The §6 mechanical count-refresh admission remains available only if these
+edits move generated DocOps metrics. No other source, test, packet, or owner
+surface is admitted.
+
+**Behavior → named test map:**
+
+| ID | Behavior | Failing-first test / structural contract |
+|---|---|---|
+| O1R-B0 | Exact `WP-O1R` identity is accepted without widening the numeric packet grammar to arbitrary suffixes | `test_session_entry_accepts_exact_wp_o1r_identity_only` |
+| O1R-B1 | Every command token is checked case-insensitively through raw executable, separator-canonical, normalized path basename, basename stem, and dotted-module leaf forms; parsed `argv` is not rewritten | `test_gate_command_normalization_rejects_live_targets_without_blocking_safe_commands` |
+| O1R-B2 | Direct, relative, absolute, `.py`, interpreter-routed, and `python -m` forms reaching the existing live/autonomy vocabulary (`dharma_swarm/operator_core/onboarding/contract.py:35-36`) are rejected, including common Python executable variants and underscore spellings of hyphenated targets | `test_gate_command_normalization_rejects_live_targets_without_blocking_safe_commands` |
+| O1R-B3 | Safe pytest, governance, DocOps, and ordinary non-live Python commands remain accepted with exact parsed `argv` | `test_gate_command_normalization_rejects_live_targets_without_blocking_safe_commands` |
+
+Use one named command matrix test so the bypass rows make that test fail on the
+clean baseline; direct-denial and safe-command rows are regression controls,
+not failing-first assertions. Collect every result before the final assertion
+so the baseline output witnesses the complete bypass set. The minimum rejection
+matrix is:
+
+```text
+live_swarm
+./live_swarm
+scripts/runtime/live_swarm.py
+./scripts/runtime/live_swarm.py
+/absolute/path/to/live_swarm.py
+python3 scripts/runtime/live_swarm.py
+python3 ./scripts/runtime/live_swarm.py
+python3 -m dharma_swarm.live_swarm
+python3 -m Dharma_Swarm.LIVE_SWARM
+python dharma_swarm/orchestrate_live.py
+python3.13 -m dharma_swarm.orchestrate_live
+.venv/bin/python scripts/runtime/autonomy-daemon.py
+/usr/bin/python3 -m dharma_swarm.autonomy_daemon
+python.exe scripts/runtime/autonomous-daemon.py
+python.exe "C:\scripts\runtime\live_swarm.py"
+py -3 -m dharma_swarm.autonomous_daemon
+```
+
+The minimum acceptance controls are:
+
+```text
+python3 -m pytest tests/test_agent_work_packet.py -q
+python3 scripts/governance/check_track_status.py
+make docops-integrity
+python3 scripts/governance/check_name_drift.py
+python3 scripts/governance/repo_status.py
+python3 -c "print('ordinary non-live Python')"
+python3 scripts/runtime/live_swarm_report.py
+python3 -m dharma_swarm.live_swarm_report
+```
+
+**Verification / expected exit:**
+
+```bash
+python3 -m pytest tests/test_onboarding_contract.py tests/test_agent_work_packet.py -q
+python3 -m pytest tests/test_onboarding_contract.py tests/test_agent_work_packet.py \
+  tests/test_docops_integrity.py -q
+python3 -m pytest tests/test_agent_onboard.py -q
+make docops-integrity
+python3 scripts/governance/render_active_track_includes.py --check
+python3 scripts/governance/check_track_status.py
+python3 scripts/governance/check_name_drift.py
+python3 -m ruff check dharma_swarm/operator_core/onboarding/contract.py \
+  tests/test_onboarding_contract.py tests/test_agent_work_packet.py
+git diff --check
+# expected: every command exits 0
+```
+
+Run the external byte-identical Session Entry Packet and require every declared
+gate and negative control to pass. The report records the before/after command
+matrix, packet digest, and gate/control totals outside the source tree.
+
+**Rollback:** revert WP-O1R, then revert WP-O1R-B0 only after no WP-O1R packet
+or report remains in use. The original WP-O1 contract and packet remain merged;
+no receipt schema, runner, or later packet change is coupled to this
+remediation.
+
+**Evidence artifact:** the checked-in byte-identical WP-O1R packet plus its
+external AgentOps report and exact failing-first/before-after command matrix;
+no new receipt path.
+
+**Forbidden/non-goals:** no WP-O2 or later packet edit; no new parser, policy
+engine, denylist family, receipt, network call, or source-tree write; no shell,
+Git, mutation, path, jail, or negative-control weakening; no ban on ordinary
+safe Python or pytest commands.
+
+**Kill criterion:** any required implementation file outside the allowed list,
+or any inability to validate the exact external injectively identified packet
+at the clean post-bootstrap baseline, stops WP-O1R and requires another merged
+admission amendment. Do not widen the packet in flight.
+
 ### WP-O2 — One broken-register parser and shared static orientation (M)
 
 **Closes:** §1.3 finding 1 and the eight live orientation false positives.
 
 **Owner:** D1-admitted track owner.
 
-**Prerequisites / merge dependency:** WP-O1 merged; re-run ownership collision
-at WP-O2 baseline.
+**Prerequisites / merge dependency:** WP-O1, WP-O1R-B0, and WP-O1R merged;
+re-run ownership collision at WP-O2 baseline.
 
 **Allowed files:**
 
@@ -1251,9 +1500,9 @@ and blocks completion; it is not “fixed” by making a mandatory probe optiona
 
 ### 6.1 Dependency graph, critical path, and parallel work
 
-**Critical path:** D1 → WP-O1 → WP-O2 → D3 → WP-O3 → A3 → WP-O4 →
-C1+D2 → WP-O5 → M6-1 → WP-O6 → independent proof. A1+A2+A4 are external
-adapter prerequisites that must join before the independent proof.
+**Critical path:** D1 → WP-O1 → WP-O1R-B0 → WP-O1R → WP-O2 → D3 → WP-O3 →
+A3 → WP-O4 → C1+D2 → WP-O5 → M6-1 → WP-O6 → independent proof. A1+A2+A4 are
+external adapter prerequisites that must join before the independent proof.
 
 Parser fixtures can be prepared in parallel with WP-O1 after the shared model
 interface is frozen. The named performance and clean-room test harnesses may be
@@ -1543,8 +1792,9 @@ rows/counts agree, all Behavior IDs map to named tests, and D1/D2 remain open.
 ## §13 Terminal independent clean-room proof and Titanium handoff
 
 This is the final campaign gate, not an implementation-author rerun. It starts
-only after WP-O1..O5 and D1/D2/D3, C1, A1/A2/A3/A4, and M6-1 have merged and the
-WP-O6/final candidate is complete at one remotely fetchable integration SHA.
+only after WP-O1, WP-O1R-B0, WP-O1R, WP-O2..O5, D1/D2/D3, C1,
+A1/A2/A3/A4, and M6-1 have merged and the WP-O6/final candidate is complete at
+one remotely fetchable integration SHA.
 The verifier has not authored the implementation and receives no
 implementation-author assistance after the run starts. The passing artifact is
 attached to that final PR/merge-group candidate; the proof and WP-O6 then merge
