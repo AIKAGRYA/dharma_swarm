@@ -121,7 +121,8 @@
       "*reports/governance/track_portfolio.json",
       "*reports/governance/trust_gate_status.json",
       "foo.py",
-      "test_foo.py"
+      "test_foo.py",
+      "/AGENTS.md"
     ]
   },
   "canonical_guard": {

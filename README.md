@@ -79,7 +79,7 @@ make onboard
 | Live runtime / merge state | [`docs/state/LIVE_OPS_DASHBOARD.md`](docs/state/LIVE_OPS_DASHBOARD.md) |
 | Declared surfaces / routers / nav | [`ACTIVE_SURFACE_MANIFEST.yaml`](ACTIVE_SURFACE_MANIFEST.yaml) |
 | Known broken / stale surfaces | [`docs/state/BROKEN_REGISTER.md`](docs/state/BROKEN_REGISTER.md) |
-| Behavioural contract | [`CLAUDE.md`](CLAUDE.md), [`AGENTS.md`](AGENTS.md), [`docs/AGENTS.md`](docs/AGENTS.md) |
+| Behavioural contract | [`CLAUDE.md`](CLAUDE.md) (repo-wide), [`docs/AGENTS.md`](docs/AGENTS.md) (prose layer; root `AGENTS.md` is gitignored/local-only) |
 | Architecture / doctrine | [`docs/governance/SOVEREIGN_MANIFEST.md`](docs/governance/SOVEREIGN_MANIFEST.md), [`docs/doctrine/`](docs/doctrine/) |
 | Doc ownership map | [`docs/governance/CANONICAL_DOC_STACK.md`](docs/governance/CANONICAL_DOC_STACK.md) |
 | Anti-slop rules | [`docs/governance/ANTI_SLOP_RULES.md`](docs/governance/ANTI_SLOP_RULES.md) |
