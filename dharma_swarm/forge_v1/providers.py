@@ -59,6 +59,14 @@ def _provider_for_model(model_id: str):
         provider_type = ProviderType.ANTHROPIC
     elif mid.startswith("gemini"):
         provider_type = ProviderType.GOOGLE_AI
+    elif mid.startswith("moonshot:"):
+        # RSI-LAB travel route: force the Moonshot OpenAI-compatible lane
+        # (api.moonshot.ai) with the accessible id after the prefix, e.g.
+        # "moonshot:kimi-k2.7-code". The default kimi-* ids route to Ollama
+        # Cloud / kimi-for-coding which are not reachable/entitled here.
+        provider_type = ProviderType.MOONSHOT
+        model_id = model_id.split(":", 1)[1]
+        mid = model_id.lower()
     elif mid in {"kimi-for-coding", "kimi-code"} or mid.startswith("kimi_code/") or mid.startswith("kimi-code/"):
         provider_type = ProviderType.KIMI_CODE
     elif mid.startswith("glm-5.2") or mid.startswith("zai/") or mid.startswith("z-ai/"):
