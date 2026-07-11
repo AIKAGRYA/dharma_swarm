@@ -1609,6 +1609,12 @@ active_tracks:
       - id: wp_o1r_git_global_alias_guard
         kind: command_passes
         command: ["python3", "-m", "pytest", "tests/test_agent_work_packet.py", "-q", "-k", "gate_rejects_git_global_options_and_aliases"]
+      - id: wp_o1r_private_subordinate_lexical_helper
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/test_agent_work_packet.py", "-q", "-k", "wp_o1r_lexical_helper_remains_private_and_subordinate"]
+      - id: wp_o1r_direct_git_inherited_env_guard
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/test_agent_work_packet.py", "-q", "-k", "direct_git_gate_strips_inherited_git_environment"]
       - id: wp_o2_single_parser_six_consumers
         kind: command_passes
         command: ["python3", "-m", "pytest", "tests/test_onboarding_broken_register.py", "tests/test_agent_onboard.py", "tests/test_orientation_graph.py", "tests/test_trust_gate_status.py", "tests/test_repo_status.py", "tests/test_control_surface.py", "tests/test_operator_coherence_cockpit.py", "-q"]
@@ -1646,7 +1652,7 @@ active_tracks:
         kind: code
         blocker: false
       - id: 1R
-        what: "WP-O1R — after the separately merged exact-identifier bootstrap, remediate both admitted Session Entry direct-command lexical P1s in contract.py under the exact §6 WP-O1R envelope: interpreter/path-routed live targets plus direct Git global-option/config/alias/env/direct-executable/argument-shape bypasses. Preserve only the exact admitted read-only Git command shapes. This is not the WP-O4 positive command-family allowlist or an arbitrary-command sandbox. External/tracked filename, packet id, and work_packet identity are all onboard-one-door-WP-O1R / WP-O1R as specified. Must merge before WP-O2; WP-O2 and later packets remain untouched."
+        what: "WP-O1R — after the separately merged exact-identifier bootstrap and module-budget/environment admission amendment, remediate both admitted Session Entry direct-command lexical P1s through contract.py plus exactly one private subordinate _command_lexical.py helper, and close inherited GIT_* execution control in run_agent_work_packet.py, under the exact §6 WP-O1R envelope: interpreter/path-routed live targets plus direct Git global-option/config/alias/env/direct-executable/argument-shape bypasses. The dependency is one-way: the stdlib-only helper returns lexical values/booleans and only mechanically evaluates exact shapes using grammar constants passed by contract.py; it defines no allowlist of its own. contract.py retains _parse_command, grammar ownership, final admission decisions/AgentOpsError, the direct-Git environment builder, and sole parser/public policy ownership. The runner calls that builder before normal execution and before negative-control env -i argv encoding, strips inherited GIT_* controls case-insensitively, then sets exactly GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM=1, and GIT_OPTIONAL_LOCKS=0. The helper is not exported and may not become a second direct-command lexical engine or owner. Extraction is mandatory so contract.py and the helper stay <=500 lines and modules_over_500_lines stays <=207. Preserve only the exact admitted read-only Git command shapes. This closes admitted direct-Git children, not trusted-host runner-internal Git calls or O4/O6 PATH/syscall/network boundaries. External/tracked filename, packet id, and work_packet identity are all onboard-one-door-WP-O1R / WP-O1R as specified. Must merge before WP-O2; WP-O2 and later packets remain untouched."
         kind: code
         blocker: false
     non_goals:
