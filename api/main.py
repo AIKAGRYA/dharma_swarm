@@ -107,6 +107,16 @@ def get_organism():
     return _state.get("organism")
 
 
+def get_boardstore_outbox():
+    """Return the app-scoped TaskBoard → BoardStore shadow outbox, if ready."""
+    return _state.get("boardstore_outbox")
+
+
+def get_agent_directory():
+    """Return the app-scoped stable-UID AgentDirectory, if ready."""
+    return _state.get("agent_directory")
+
+
 def get_trace_store():
     """Get or create TraceStore singleton."""
     if "traces" not in _state:
@@ -121,6 +131,73 @@ def get_monitor():
         from dharma_swarm.monitor import SystemMonitor
         _state["monitor"] = SystemMonitor(trace_store=get_trace_store())
     return _state["monitor"]
+
+
+def _initialize_node_gateway() -> None:
+    """Compose the mounted A2A gateway from the existing server/card types."""
+    from dharma_swarm.a2a.a2a_server import A2AServer
+    from dharma_swarm.a2a.agent_card import AgentCard, CardRegistry
+    from dharma_swarm.a2a.node_gateway import init_gateway
+
+    node_id = os.getenv("DHARMA_NODE_ID", "dharma-hub")
+    server = A2AServer()
+    registry = CardRegistry()
+    node_card = AgentCard(
+        name=node_id,
+        agent_uid=node_id,
+        description="Dharma Swarm A2A HTTP gateway",
+        endpoint=os.getenv("DHARMA_A2A_PUBLIC_ENDPOINT", "local://"),
+        role="orchestrator",
+        status="idle",
+    )
+    registry.register(node_card)
+    init_gateway(
+        server=server,
+        registry=registry,
+        node_card=node_card,
+        node_id=node_id,
+    )
+    _state["a2a_server"] = server
+    _state["card_registry"] = registry
+    _state["node_card"] = node_card
+
+
+def _initialize_boardstore_shadow(swarm: Any) -> None:
+    """Compose one app-scoped shadow projector over the canonical TaskBoard."""
+    from dharma_swarm.board.adapters.taskboard_adapter import TaskBoardAdapter
+    from dharma_swarm.board.event_log import BoardEventLog
+    from dharma_swarm.board.facade import BoardStoreFacade
+    from dharma_swarm.board.task_command_outbox import TaskCommandOutbox
+
+    task_board = getattr(swarm, "_task_board", None)
+    if task_board is None:
+        raise RuntimeError("canonical TaskBoard is not initialized")
+    event_log = BoardEventLog(path=dharma_state_dir() / "board" / "event_log.sqlite3")
+    facade = BoardStoreFacade(event_log=event_log)
+    adapter = TaskBoardAdapter(task_board, event_log)
+    outbox = TaskCommandOutbox(facade=facade, adapter=adapter)
+    _state["boardstore_facade"] = facade
+    _state["boardstore_outbox"] = outbox
+
+
+def _initialize_agent_directory(swarm: Any) -> None:
+    """Compose the credential-safe directory from existing control-plane stores."""
+    from api.routers.fleet import _get_registry
+    from dharma_swarm.a2a.agent_card import CardRegistry
+    from dharma_swarm.a2a.agent_directory import AgentDirectory
+
+    card_registry = _state.get("card_registry")
+    if card_registry is None:
+        card_registry = CardRegistry()
+        _state["card_registry"] = card_registry
+    node_registry = _get_registry()
+    _state["node_registry"] = node_registry
+    _state["agent_directory"] = AgentDirectory(
+        card_registry=card_registry,
+        node_registry=node_registry,
+        dharma_home=dharma_state_dir("DHARMA_HOME"),
+        telemetry_store=getattr(swarm, "_telemetry", None),
+    )
 
 
 # ── Lifespan ──────────────────────────────────────────────────────
@@ -166,6 +243,26 @@ async def lifespan(app: FastAPI):
         _state.pop("swarm_init_task", None)
     except Exception as e:
         logger.warning("Swarm init partial: %s", e)
+
+    try:
+        _initialize_boardstore_shadow(swarm)
+    except Exception as exc:
+        _state["boardstore_shadow_error"] = type(exc).__name__
+        logger.warning("BoardStore shadow init failed; TaskBoard remains canonical: %s", exc)
+
+    try:
+        _initialize_node_gateway()
+    except Exception as exc:
+        from dharma_swarm.a2a.node_gateway import mark_gateway_degraded
+
+        mark_gateway_degraded(type(exc).__name__)
+        logger.warning("Node gateway init failed; health remains degraded: %s", exc)
+
+    try:
+        _initialize_agent_directory(swarm)
+    except Exception as exc:
+        _state["agent_directory_error"] = type(exc).__name__
+        logger.warning("AgentDirectory init failed; existing registries remain active: %s", exc)
 
     _log_auth_mode()
     logger.info("DHARMA COMMAND API ready on port 8420")

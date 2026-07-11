@@ -10,7 +10,7 @@
 # Your workflow: Declare → Observe → Reconcile → Dispatch → Verify.
 
 schema_version: 2
-last_updated: "2026-05-20"
+last_updated: "2026-07-11"
 
 state_dir:
   canonical: "~/.dharma"
@@ -482,11 +482,11 @@ agents:
   - id: boardstore_facade
     label: "BoardStore Facade"
     module: dharma_swarm/board/facade.py
-    status: live
+    status: shadow
     health_check_ids: [module_file_exists, test_file_exists]
     wired_to: [tasks, lineage, audit]
     priority: p0
-    next_action: "Adapt TaskBoard behind facade in a later BoardStore adapter track"
+    next_action: "Shadow projection active: BoardStore facade wraps existing TaskBoard without replacing canonical path"
 
   - id: sakshi_provenance
     label: "Sakshi Provenance Log"
