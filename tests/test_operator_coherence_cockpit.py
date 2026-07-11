@@ -59,6 +59,7 @@ closed_tracks: []
         repo / "docs/state/BROKEN_REGISTER.md",
         """
 # Broken Register
+## OPEN ITEMS (1 open/partial)
 ### BR-001 — open real defect
 - **status:** OPEN — still broken
 
@@ -110,6 +111,7 @@ closed_tracks: []
     assert [card["title"] for card in payload["cards"] if card["kind"] == "broken_register"] == [
         "BR-001 — open real defect"
     ]
+    assert payload["track_portfolio"]["broken_register"]["open_like_count"] == 1
     assert payload["readiness"]["score"] >= 0
 
     # Branch census enumerates ALL local branches, not just checked-out ones.

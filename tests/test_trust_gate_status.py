@@ -45,6 +45,7 @@ def fake_repo(tmp_path: Path) -> Path:
     )
     (tmp_path / "docs/state").mkdir(parents=True)
     (tmp_path / "docs/state/BROKEN_REGISTER.md").write_text(
+        "## OPEN ITEMS (1 open/partial)\n"
         "### BR-001 — thing one\n**status:** OPEN\n\n"
         "### BR-002 — thing two\n**status:** FIXED\n\n"
         "### BR-003 — thing three\n**status:** FIXED\n",
@@ -163,6 +164,22 @@ def test_c5_unwired_is_red_zero(fake_repo: Path) -> None:
 def test_parse_broken_counts(fake_repo: Path) -> None:
     counts = tgs.parse_broken_counts(fake_repo / "docs/state/BROKEN_REGISTER.md")
     assert counts == (3, 1, 2)
+
+
+def test_c4_unknown_lifecycle_cannot_inflate_closed_ratio(fake_repo: Path) -> None:
+    register = fake_repo / "docs/state/BROKEN_REGISTER.md"
+    register.write_text(
+        "## OPEN ITEMS (1 open/partial)\n"
+        "### BR-001 — open\n**status:** OPEN\n\n"
+        "### BR-002 — malformed\n**status:** DEGRADED\n\n"
+        "### BR-003 — fixed\n**status:** FIXED\n",
+        encoding="utf-8",
+    )
+
+    result = tgs.score_c4(fake_repo, [])
+
+    assert any("total=3 open-like=1 closed-like=1" in item for item in result.evidence)
+    assert result.score == 0.667
 
 
 def test_scoreboard_json_schema(fake_repo: Path) -> None:

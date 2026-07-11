@@ -6,6 +6,10 @@ import re
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.operator_core.onboarding.broken_register import (
+    parse_broken_register,
+)
+
 from .base import (
     ProbeContext,
     _age_hours_from_iso,
@@ -16,7 +20,6 @@ from .base import (
     _rel,
     _run,
     _safe_json,
-    _safe_read_text,
     _safe_yaml,
     _utc_now,
 )
@@ -253,34 +256,23 @@ def _probe_governance(ctx: ProbeContext) -> dict[str, Any]:
             )
 
     broken_entries: list[dict[str, Any]] = []
-    broken_text = _safe_read_text(broken_path)
-    broken_lines = broken_text.splitlines()
-    heading_indices = [
-        (idx, line.strip())
-        for idx, line in enumerate(broken_lines, start=1)
-        if re.match(r"^###\s+BR-\d+", line.strip())
-    ]
-    for h_pos, (line_no, heading) in enumerate(heading_indices):
-        next_line = heading_indices[h_pos + 1][0] if h_pos + 1 < len(heading_indices) else len(broken_lines) + 1
-        block = "\n".join(broken_lines[line_no - 1 : next_line - 1])
-        status_match = re.search(r"^\s*-\s+\*\*status:\*\*\s*(.+)$", block, re.I | re.M)
-        status_text = status_match.group(1).strip() if status_match else ""
-        if re.match(r"^\**\s*(FIXED|CLOSED)\b", status_text, re.I):
-            continue
-        is_closed = re.search(r"\b(FIXED|CLOSED)\b", status_text, re.I)
-        is_open_like = (not status_text) or re.search(r"\b(OPEN|PARTIAL|INVESTIGATING|WORKAROUND|BLOCKER|DEGRADED|STALE)\b", status_text, re.I)
-        if is_closed and not re.search(r"\b(OPEN|PARTIAL|WORKAROUND|INVESTIGATING)\b", status_text, re.I):
-            continue
-        if not is_open_like:
-            continue
-        entry = {"line": line_no, "text": heading[:240], "status": status_text[:240]}
-        broken_entries.append(entry)
+    broken_result = parse_broken_register(broken_path)
+    for broken in broken_result.open_entries:
+        status_text = broken.raw_status or broken.status
+        block = f"{broken.heading}\n{broken.body}"
+        broken_entries.append(
+            {
+                "line": broken.line,
+                "text": f"### {broken.heading}"[:240],
+                "status": status_text[:240],
+            }
+        )
         if len(broken_entries) <= 25:
             ctx.cards.append(
                 _card(
                     kind="broken_register",
-                    card_id=f"broken:{line_no}",
-                    title=heading.replace("### ", "", 1)[:140],
+                    card_id=f"broken:{broken.line}",
+                    title=broken.heading[:140],
                     status="open",
                     lane="Needs Repair",
                     risk="known_breakage",
@@ -290,7 +282,7 @@ def _probe_governance(ctx: ProbeContext) -> dict[str, Any]:
                         _evidence(
                             "docs/state/BROKEN_REGISTER.md",
                             path="docs/state/BROKEN_REGISTER.md",
-                            detail=f"line {line_no}: {heading[:180]} | status: {status_text[:160]}",
+                            detail=f"line {broken.line}: {broken.heading[:180]} | status: {status_text[:160]}",
                             status="open",
                             age_hours=_file_age_hours(broken_path),
                         )
