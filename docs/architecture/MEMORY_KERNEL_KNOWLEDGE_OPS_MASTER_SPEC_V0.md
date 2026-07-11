@@ -722,6 +722,7 @@ itself authority. EMIR uses capability-scoped constructors:
 | `verify_execution` | `Event<ProcedureOutcome>` + `Derivation<ExecutionVerification>` | sandbox receipt + named verifier | cannot rewrite procedure history |
 | `evaluate_support` | `Derivation<SupportAssessment>` | authorized evaluator + policy + proof bundle | modality invariant |
 | `assess_contradiction` | `Derivation<ContradictionAssessment>` | comparator/policy + both verified locators + verifier | cannot mutate members or emit generic `incompatible` |
+| `resolve_contradiction` | `Decision<ContradictionResolution>` | scoped resolution grant + target assessments/assertions/evidence | counterevidence alone cannot mark a conflict resolved |
 | `synthesize` | `Derivation<Synthesis>` | authorized compiler + atomic output/source map + omission log | cannot become independent source evidence |
 | `compile_context` | `Derivation<ContextCompilation>` when retained | authenticated effective query contract + selected authorized candidates | cannot grant tool/action authority |
 | `record_feedback` | `Event<Feedback>` | declared durable-use purpose + source task/outcome | raw telemetry cannot self-promote |
@@ -924,6 +925,7 @@ INSERT INTO constructor_emission_rules VALUES
   ('verify_execution','Derivation','ExecutionVerification','genesis-v1'),
   ('evaluate_support','Derivation','SupportAssessment','genesis-v1'),
   ('assess_contradiction','Derivation','ContradictionAssessment','genesis-v1'),
+  ('resolve_contradiction','Decision','ContradictionResolution','genesis-v1'),
   ('synthesize','Derivation','Synthesis','genesis-v1'),
   ('compile_context','Derivation','ContextCompilation','genesis-v1'),
   ('record_feedback','Event','Feedback','genesis-v1'),
@@ -1573,7 +1575,8 @@ offline operation, and one local writer dominate, SQLite may remain authority.
 Experiment 13 uses one frozen corpus/proposal trace and the same fault schedule
 for every candidate. Its scorecard records:
 
-- pass/fail of C01–C11 and identical authorized current/as-of results;
+- pass/fail of C01–C09, C11, and C16, with identical authorized current/as-of
+  results;
 - p50/p95/p99 commit/read latency, lock wait, throughput, aborts, database/WAL
   growth, backup size, and CPU/RAM/disk at baseline and `2 ×` peak;
 - crash points, corruption detection, achieved RPO/RTO, stale-primary fencing,
@@ -2482,8 +2485,10 @@ Algorithm:
    direction when present, relation, comparator, and evaluation-policy versions.
 7. Current contradiction views fold assessments by policy/basis; neither side is
    deleted. A support assessment may return `contested` under its named policy.
-   A resolution is a separate scoped decision or evidence-backed assertion with
-   provenance and never mutates the assessment.
+   Counterevidence may be a new evidence-backed assertion, but resolution is
+   always a separate scoped `Decision<ContradictionResolution>` that references
+   the assertions/assessments/evidence and never mutates them. Current folds
+   therefore consume only immutable assessments plus typed resolution decisions.
 
 Minimum truth-table fixtures include: mutually exclusive values over the same
 interval (incompatible); the same values in different jurisdictions (scope
@@ -3368,8 +3373,11 @@ part of production operation, not an afterthought.
    it write-only.
 6. Add versioned migrations/user-version ledgers to principal SQLite stores and
    instantiate the §9.4 surface migration ledger.
-7. Implement raw-byte capture for World Radar through the shared vault contract,
-   or remove the archive capability claim until it exists.
+7. Implement raw-byte capture for World Radar through the shared vault contract.
+   Until it exists, disable that ingestion path for durable/evidence-bearing
+   observations (or quarantine them explicitly as non-evidentiary ephemeral
+   telemetry); removing the archive capability claim alone does not close source
+   loss.
 
 These are implementation prerequisites, not part of this no-code report.
 
