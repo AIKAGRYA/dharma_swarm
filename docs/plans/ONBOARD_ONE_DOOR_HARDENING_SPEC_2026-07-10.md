@@ -893,9 +893,9 @@ track content repair, no general DocOps cleanup, no second packet parser.
 canonical guard semantics, stop and return to the operator; do not create the
 pointer.
 
-### WP-O1R — Session Entry live-command bypass remediation (S)
+### WP-O1R — Session Entry direct-command lexical remediation (S)
 
-**Closes:** the post-merge Session Entry command-validation defect at
+**Closes:** two post-merge Session Entry direct-command lexical defects at
 `dharma_swarm/operator_core/onboarding/contract.py:169-185`. At baseline
 `94a3877c7799bbde7f0ac9adff060ee1f449683f`, only `argv[0]` receives basename
 normalization while later tokens are compared whole
@@ -923,14 +923,47 @@ The probe records exact command, baseline SHA, parsed `argv`, output, and
 process exit. Acceptance of all three with exit 0 is the defect witness; it is
 not a passing security result.
 
+The same parser also checks only `argv[1]` for a banned Git subcommand. The
+[post-merge review](https://github.com/AmitabhainArunachala/dharma_swarm/pull/861#discussion_r3558920481)
+is confirmed and promoted from P2 to P1: global-option forms and aliases cross
+the documented direct-Git lexical guard. Before the WP-O1R test is added, a
+read-only `parse_gate` probe must record each command below as accepted:
+
+```text
+git -C . push origin HEAD
+git -c core.sshCommand=/bin/false push origin HEAD
+git --git-dir=.git push origin HEAD
+git -c alias.x=push x origin HEAD
+git -c "alias.x=!printf ALIAS_EXECUTED" x
+```
+
+The last form can cause Git to invoke a shell alias even though AgentOps later
+uses `subprocess.run(..., shell=False)`. The implementation proof must not
+execute that alias; parsing acceptance is the failing-first witness. The same
+boundary also rejects packet-supplied environment for Git gates, direct
+`git-*` plumbing executables, side-effectful or helper-routing flags, every Git
+global option before a subcommand, and every non-allowlisted subcommand/alias.
+Only the exact read-only command/argument shapes in O1R-B5 remain admitted.
+The inherited operator environment is a trusted host prerequisite, not packet
+input; B0 remains exact-identity-only and may not absorb this change.
+
+This packet does **not** claim that arbitrary admitted commands are confined.
+At this boundary `python -c` can spawn Git, and alternate clients such as
+`gh`, `ssh`, or `curl` remain syntactically admissible. Session Entry packets
+are therefore trusted declarative code, not an arbitrary-command sandbox.
+WP-O4-B11 owns the mandatory fail-closed positive command-family allowlist;
+its Active Track criterion must pass before the track can ship. Even that
+allowlist does not prove trusted pytest or repository scripts are free of I/O:
+WP-O6 syscall/no-network evidence remains the terminal oracle.
+
 **Owner:** D1-admitted track owner.
 
 **Prerequisites / merge dependency:** this admission amendment and the
 WP-O1R-B0 exact-identifier bootstrap below merged; merge commit
 `94a3877c7799bbde7f0ac9adff060ee1f449683f` remains an ancestor; a fresh clean
 post-bootstrap baseline and sibling collision matrix are recorded; the
-complete external WP-O1R Session Entry Packet validates before any
-live-command implementation edit. Prove the ancestry with
+complete external WP-O1R Session Entry Packet validates before any direct-
+command lexical implementation edit. Prove the ancestry with
 `git merge-base --is-ancestor 94a3877c7799bbde7f0ac9adff060ee1f449683f HEAD`
 (expected exit 0). WP-O1R must merge before WP-O2 begins.
 
@@ -1056,6 +1089,8 @@ surface is admitted.
 | O1R-B1 | Every command token is checked case-insensitively through raw executable, separator-canonical, normalized path basename, basename stem, and dotted-module leaf forms; parsed `argv` is not rewritten | `test_gate_command_normalization_rejects_live_targets_without_blocking_safe_commands` |
 | O1R-B2 | Direct, relative, absolute, `.py`, interpreter-routed, and `python -m` forms reaching the existing live/autonomy vocabulary (`dharma_swarm/operator_core/onboarding/contract.py:35-36`) are rejected, including common Python executable variants and underscore spellings of hyphenated targets | `test_gate_command_normalization_rejects_live_targets_without_blocking_safe_commands` |
 | O1R-B3 | Safe pytest, governance, DocOps, and ordinary non-live Python commands remain accepted with exact parsed `argv` | `test_gate_command_normalization_rejects_live_targets_without_blocking_safe_commands` |
+| O1R-B4 | Direct Git lexical routes using global options, packet-supplied environment, configuration injection, alternate repository roots, executable/helper routing, direct `git-*` plumbing executables, side-effectful flags, unknown subcommands, or aliases fail at parse time, including `alias.*=!shell` forms | `test_gate_rejects_git_global_options_and_aliases` |
+| O1R-B5 | Only the exact read-only Git command/argument shapes listed below for `status`, `diff --check`, `rev-parse`, `merge-base --is-ancestor`, and `ls-files` remain accepted without argv rewriting; every other Git subcommand, option, argument shape, and non-empty gate `env` remains fail-closed | `test_gate_rejects_git_global_options_and_aliases` |
 
 Use one named command matrix test so the bypass rows make that test fail on the
 clean baseline; direct-denial and safe-command rows are regression controls,
@@ -1082,6 +1117,88 @@ python.exe "C:\scripts\runtime\live_swarm.py"
 py -3 -m dharma_swarm.autonomous_daemon
 ```
 
+The Git rejection matrix is:
+
+```text
+git -C . status --short
+git -c core.sshCommand=/bin/false status --short
+git --git-dir=.git status --short
+git --git-dir .git status --short
+git --work-tree=. status --short
+git --work-tree . status --short
+git --exec-path=/tmp status --short
+git --config-env=core.sshCommand=GIT_SSH_COMMAND status --short
+git --no-pager status --short
+git -c alias.x=push x origin HEAD
+git -c "alias.x=!printf ALIAS_EXECUTED" x
+git x
+git fetch origin main
+git push origin HEAD
+git merge main
+git diff --output=/tmp/agentops-write
+git diff --output /tmp/agentops-write
+git diff --ext-diff HEAD
+git diff --textconv HEAD
+git-push origin HEAD
+/usr/local/libexec/git-core/git-push origin HEAD
+git-send-pack origin HEAD
+git-http-push origin HEAD
+"C:\\Program Files\\Git\\mingw64\\libexec\\git-core\\git-push.exe" origin HEAD
+git.exe push origin HEAD
+```
+
+The named test also parameterizes every existing banned mutating subcommand
+(`am`, `cherry-pick`, `clean`, `commit`, `merge`, `pull`, `push`, `rebase`,
+`reset`, `restore`, `revert`, and `stash`) and proves representative
+non-allowlisted subcommands such as `branch`, `config`, `fetch`, `remote`, and
+`show` fail closed. The direct-executable rows are checked through raw,
+separator-canonical, basename, and basename-stem forms on POSIX and Windows.
+
+For object-form gates, each non-empty Git `env` is rejected before execution,
+including the following witnesses:
+
+```json
+{"command":"git status --short","env":{"PATH":"/tmp/fake-git"}}
+{"command":"git diff --check","env":{"GIT_EXTERNAL_DIFF":"/tmp/helper"}}
+{"command":"git diff --check","env":{"GIT_CONFIG_COUNT":"1","GIT_CONFIG_KEY_0":"diff.external","GIT_CONFIG_VALUE_0":"/tmp/helper"}}
+```
+
+The Git acceptance controls, and the complete allowed grammar, are:
+
+```text
+git status --short
+git status --short --branch
+git status --porcelain=v2 --branch
+git diff --check
+git diff --check HEAD
+git diff --check origin/main...HEAD
+git diff --check -- docs/governance/AGENTOPS.md
+git rev-parse HEAD
+git rev-parse --verify HEAD
+git rev-parse --show-toplevel
+git rev-parse --abbrev-ref HEAD
+git merge-base --is-ancestor HEAD HEAD
+git ls-files --others --exclude-standard
+/usr/bin/git status --short
+"C:\\Program Files\\Git\\cmd\\git.exe" status --short
+```
+
+For `status`, only `--short` or `--porcelain[=v1|v2]`, optionally combined
+with `--branch`, is allowed. For `diff`, `--check` is mandatory; following
+non-option revision/range operands and repo-relative path operands, with an
+optional literal `--` separator, are allowed, while every other option is
+rejected. `rev-parse` accepts only the four exact shapes above. `merge-base`
+accepts only `--is-ancestor` plus two non-option revision operands. `ls-files`
+accepts only `--others --exclude-standard`, optionally followed by literal
+`--` and repo-relative path operands. Operands that are absolute, traverse
+upward, contain control characters, or begin with `-` fail closed. No generic
+"read-only subcommand" allowance exists beyond this grammar.
+
+The test collects all parse results before asserting, verifies exact accepted
+`argv` and empty accepted Git `env`, and proves no rejected command reaches
+subprocess execution. It must not add a second Git policy owner, rewrite argv,
+or permit a global option because its current fixture appears harmless.
+
 The minimum acceptance controls are:
 
 ```text
@@ -1094,6 +1211,11 @@ python3 -c "print('ordinary non-live Python')"
 python3 scripts/runtime/live_swarm_report.py
 python3 -m dharma_swarm.live_swarm_report
 ```
+
+The ordinary `python3 -c` row is an O1R-only regression control proving that
+live-token normalization does not become an unbounded interpreter ban. O4-B11
+deliberately inverts that row at the packet execution-admission boundary;
+it is not a terminally accepted command family.
 
 **Verification / expected exit:**
 
@@ -1318,6 +1440,7 @@ claim merge authority; C1 must separately promote that context before WP-O5.
 | O4-B8 | Make forwards documented `ARGS`; unknown flags preserve exit 2 | `test_make_forwards_onboard_args_and_usage_exit` |
 | O4-B9 | Preflight/closeout write only to the external root; syscall guard plus ordinary/ignored status prove no source write attempt | `test_make_admission_reports_are_external_and_read_only` |
 | O4-B10 | PR CI checks out the declared head; merge-group packets are each bound or the group blocks | `test_ci_pr_head_and_merge_group_packet_binding` |
+| O4-B11 | Positive gates use one fail-closed command-family allowlist before execution: exact O1R Git grammar and explicitly enumerated pytest/Ruff/read-only governance/DocOps/Make forms pass; inline interpreters, alternate mutation/network clients, shell-capable wrappers, and unknown executables fail | `test_positive_gate_command_family_allowlist_rejects_transitive_routes` |
 
 CI packet discovery is conditional and fail-closed. A PR with no change in the
 onboarding track's owned surfaces runs the shared baseline evaluator but needs
@@ -1327,6 +1450,31 @@ tree, and pass the event base/head explicitly. A merge group evaluates every
 changed onboarding packet in stable order, rejects overlaps, and binds each
 declared base to the group diff; if the workflow cannot establish that mapping,
 it returns `CONFIG_ERROR` rather than skipping or weakening the check.
+
+O4-B11 is the owner of positive-gate execution admission; O1R remains the
+owner of direct token normalization and direct Git grammar. The allowlist is
+one authoritative table, not scattered executable checks. It rejects at least
+`python -c`, `python -`, `node -e`, `ruby -e`, `perl -e`, `gh`, `ssh`, `scp`,
+`curl`, `wget`, every shell-capable wrapper, and every unknown executable. Its
+acceptance matrix is limited to the exact O1R Git grammar plus explicitly
+enumerated `python -m pytest`, `python -m ruff check`, read-only repository
+governance/DocOps scripts, and Make targets required by admitted packets.
+Packet-supplied environment is empty by default; any allowed key/value shape
+is enumerated and path-confined rather than passed through generically.
+Extending the table requires a governance-reviewed admission change.
+
+This is command-family confinement, not semantic proof about trusted code:
+pytest and an allowlisted repository script can themselves perform I/O. The
+test proves the five direct witnesses below are rejected before subprocess
+execution, while WP-O6's syscall/no-network proof remains the terminal oracle:
+
+```text
+python3 -c "import subprocess; subprocess.run(['git','push','origin','HEAD'])"
+python3 -c "import os; os.system('git push origin HEAD')"
+gh pr merge 1
+ssh host git-receive-pack repo
+curl -X POST https://api.github.invalid/merges
+```
 
 **Verification / expected exit:**
 

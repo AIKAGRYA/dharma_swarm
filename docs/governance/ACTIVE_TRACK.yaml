@@ -1606,6 +1606,9 @@ active_tracks:
       - id: wp_o1r_interpreter_routed_live_guard
         kind: command_passes
         command: ["python3", "-m", "pytest", "tests/test_agent_work_packet.py", "-q", "-k", "gate_command_normalization_rejects_live_targets_without_blocking_safe_commands"]
+      - id: wp_o1r_git_global_alias_guard
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/test_agent_work_packet.py", "-q", "-k", "gate_rejects_git_global_options_and_aliases"]
       - id: wp_o2_single_parser_six_consumers
         kind: command_passes
         command: ["python3", "-m", "pytest", "tests/test_onboarding_broken_register.py", "tests/test_agent_onboard.py", "tests/test_orientation_graph.py", "tests/test_trust_gate_status.py", "tests/test_repo_status.py", "tests/test_control_surface.py", "tests/test_operator_coherence_cockpit.py", "-q"]
@@ -1615,6 +1618,9 @@ active_tracks:
       - id: wp_o4_make_agentops_ci_parity
         kind: command_passes
         command: ["python3", "-m", "pytest", "tests/test_make_onboarding_contract.py", "tests/test_onboarding_ci_contract.py", "tests/test_agent_work_packet.py", "tests/test_orientation_graph.py", "-q"]
+      - id: wp_o4_positive_gate_command_allowlist
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/test_agent_work_packet.py", "-q", "-k", "positive_gate_command_family_allowlist_rejects_transitive_routes"]
       - id: wp_o6_readiness_property_battery
         kind: command_passes
         command: ["python3", "-m", "pytest", "tests/properties/test_onboarding_readiness_properties.py", "-q"]
@@ -1640,7 +1646,7 @@ active_tracks:
         kind: code
         blocker: false
       - id: 1R
-        what: "WP-O1R — after the separately merged exact-identifier bootstrap, remediate the Session Entry interpreter/path-routed live-command bypass in contract.py under the exact §6 WP-O1R envelope; external/tracked filename, packet id, and work_packet identity are all onboard-one-door-WP-O1R / WP-O1R as specified. Must merge before WP-O2; WP-O2 and later packets remain untouched."
+        what: "WP-O1R — after the separately merged exact-identifier bootstrap, remediate both admitted Session Entry direct-command lexical P1s in contract.py under the exact §6 WP-O1R envelope: interpreter/path-routed live targets plus direct Git global-option/config/alias/env/direct-executable/argument-shape bypasses. Preserve only the exact admitted read-only Git command shapes. This is not the WP-O4 positive command-family allowlist or an arbitrary-command sandbox. External/tracked filename, packet id, and work_packet identity are all onboard-one-door-WP-O1R / WP-O1R as specified. Must merge before WP-O2; WP-O2 and later packets remain untouched."
         kind: code
         blocker: false
     non_goals:
