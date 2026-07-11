@@ -759,7 +759,7 @@ def test_wp_o1r_lexical_helper_remains_private_and_subordinate() -> None:
     assert sorted(onboarding.glob("*lexical*.py")) == [helper]
     helper_source = helper.read_text(encoding="utf-8")
     helper_tree = ast.parse(helper_source)
-    allowed_imports = {"__future__", "pathlib", "re", "shlex", "typing"}
+    allowed_imports = {"__future__", "pathlib", "re", "shlex", "typing", "unicodedata"}
     imported: set[str] = set()
     for node in helper_tree.body:
         if isinstance(node, ast.Import):
