@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import subprocess
+import sys
 from pathlib import Path
 
 from dharma_swarm.operator_core.onboarding.broken_register import (
@@ -179,8 +181,30 @@ def test_all_six_consumers_share_canonical_parser() -> None:
     )
     for relative in consumers:
         source = (REPO_ROOT / relative).read_text(encoding="utf-8")
-        assert "onboarding.broken_register import" in source, relative
+        assert (
+            "onboarding.broken_register import" in source
+            or "onboarding/broken_register.py" in source
+        ), relative
         assert "parse_broken_register(" in source, relative
+
+
+def test_agent_onboard_remains_importable_before_dependency_bootstrap() -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-I",
+            "-S",
+            str(REPO_ROOT / "scripts/governance/agent_onboard.py"),
+            "--help",
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "--fast" in result.stdout
 
 
 def test_header_count_drift_is_reported() -> None:

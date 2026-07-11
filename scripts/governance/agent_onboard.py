@@ -52,9 +52,20 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # (Previously a hidden insert inside render_manifest_health was load-bearing.)
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
-from dharma_swarm.operator_core.onboarding.broken_register import (  # noqa: E402
-    parse_broken_register,
-)
+
+
+def _load_broken_register_parser():
+    path = REPO_ROOT / "dharma_swarm/operator_core/onboarding/broken_register.py"
+    spec = importlib.util.spec_from_file_location("_dharma_broken_register_onboard", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load canonical broken-register parser: {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module.parse_broken_register
+
+
+parse_broken_register = _load_broken_register_parser()
 
 EVIDENCE_JSON = REPO_ROOT / "reports/governance/active_track_evidence.json"
 ACTIVE_TRACK = REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml"
