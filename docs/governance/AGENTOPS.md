@@ -40,9 +40,16 @@ Required fields:
 }
 ```
 
-`gates[].command` is parsed with `shlex` and executed without a shell. Shell
-control tokens are rejected. Gate commands cannot run merge, push, or other
-mutating git integration operations.
+`gates[].command` is parsed with `shlex` and executed without an implicit
+shell. This is syntactic admission, not an arbitrary-command sandbox or proof
+of transitive behavior. Session Entry packets are trusted declarative code:
+shell-control tokens and known direct shell/wrapper or mutating-Git forms are
+rejected, but an admitted interpreter or alternate client can still perform
+process, network, or filesystem I/O. The active onboarding hardening track
+owns the direct Git lexical closure in WP-O1R, the positive command-family
+allowlist in WP-O4, and terminal syscall/no-network evidence in WP-O6. Until
+those packets land, never treat gate parsing alone as proof that a command
+cannot indirectly merge, push, or invoke a shell.
 
 Legacy gates may omit `expected_exit`, which adapts to `0`. A declared
 `expected_exit` is graded against the actual process exit and both values are
