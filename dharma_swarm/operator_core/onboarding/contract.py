@@ -5,12 +5,12 @@ from __future__ import annotations
 import copy
 import os
 import re
-import shlex
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Mapping
 
 from dharma_swarm.memory_kernel.write_receipts import canonical_json, stable_digest, utc_now
 
+from . import _command_lexical as _lexical
 from .models import (AUTHORITY_PRECEDENCE, SESSION_ENTRY_SCHEMA_V1, AgentOpsError,
                      ApprovalPolicy, CollisionRecord, CommitPolicy, ConfigError,
                      GateSpec, SessionEntry, WorkPacket)
@@ -19,22 +19,26 @@ DEFAULT_GATE_TIMEOUT_SECONDS = 900
 DEFAULT_MAX_OUTPUT_CHARS = 30_000
 CANONICAL_FIRST_READ: tuple[tuple[str, str], ...] = (
     ("command", "make onboard"), ("file", "CLAUDE.md"), ("file", "docs/governance/SWARM_GENOME.md"),
-    ("file", "docs/governance/ACTIVE_TRACK.yaml"),
-    ("file", "docs/governance/ANTI_SLOP_RULES.md"))
+    ("file", "docs/governance/ACTIVE_TRACK.yaml"), ("file", "docs/governance/ANTI_SLOP_RULES.md"))
 _HEX_40 = re.compile(r"^[0-9a-f]{40}$")
 _HEX_64 = re.compile(r"^[0-9a-f]{64}$")
 _PLACEHOLDER = re.compile(r"<[^>\r\n]+>")
 _GLOB_MAGIC = re.compile(r"[*?[]")
-_BANNED_GATE_GIT_SUBCOMMANDS = {"am", "cherry-pick", "clean", "commit", "merge",
-                                "pull", "push", "rebase", "reset", "restore",
-                                "revert", "stash"}
 _BANNED_SHELL_TOKENS = {"&&", "||", ";", "|", ">", ">>", "<", "<<"}
-_BANNED_SHELL_EXECUTABLES = {"bash", "cmd", "cmd.exe", "env", "fish", "nice",
-                             "nohup", "powershell", "pwsh", "sh", "sudo",
-                             "timeout", "xargs", "zsh"}
-_BANNED_LIVE_COMMAND_TOKENS = {"orchestrate-live", "live_swarm",
+_BANNED_SHELL_EXECUTABLES = {"bash", "cmd", "cmd.exe", "env", "fish", "nice", "nohup",
+                             "powershell", "pwsh", "sh", "sudo", "timeout", "xargs", "zsh"}
+_BANNED_LIVE_COMMAND_TOKENS = {"orchestrate-live", "live-swarm",
                                "autonomy-daemon", "autonomous-daemon"}
-
+_GIT_EXECUTABLE = "git"
+_ALLOWED_GIT_STATUS_FORMATS = {"--short", "--porcelain", "--porcelain=v1", "--porcelain=v2"}
+_GIT_STATUS_BRANCH = "--branch"
+_GIT_DIFF_CHECK = "--check"
+_GIT_SEPARATOR = "--"
+_ALLOWED_GIT_REV_PARSE_ARGS = {
+    ("HEAD",), ("--verify", "HEAD"), ("--show-toplevel",), ("--abbrev-ref", "HEAD"),
+}
+_GIT_MERGE_BASE_ANCESTOR = "--is-ancestor"
+_GIT_LS_FILES_PREFIX = ("--others", "--exclude-standard")
 
 def canonical_first_read_manifest(repo_root: Path) -> list[dict[str, str]]:
     """Return the canonical ordered max-five with deterministic content hashes."""
@@ -51,10 +55,8 @@ def canonical_first_read_manifest(repo_root: Path) -> list[dict[str, str]]:
         manifest.append({"kind": kind, "source": source, "sha256": stable_digest(content)})
     return manifest
 
-
 canonical_packet_json = canonical_json
 current_utc_time = utc_now
-
 
 def _git_admin_dirs(repo_root: Path) -> set[Path]:
     marker = repo_root / ".git"
@@ -77,10 +79,7 @@ def _git_admin_dirs(repo_root: Path) -> set[Path]:
     return roots
 
 def resolve_external_dir(
-    candidate: Path | str,
-    *,
-    repo_root: Path,
-    field: str = "external directory",
+    candidate: Path | str, *, repo_root: Path, field: str = "external directory",
 ) -> Path:
     """Resolve an output root and fail closed if it touches source or git state."""
     root = repo_root.expanduser().resolve()
@@ -161,29 +160,47 @@ def path_matches_pattern(path: str, pattern: str) -> bool:
         return normalized.startswith(normalized_pattern + "/")
     return False
 
-
 def matching_patterns(path: str, patterns: Iterable[str]) -> list[str]:
     return [pattern for pattern in patterns if path_matches_pattern(path, pattern)]
 
+def _validate_git_gate(argv: list[str], env: Mapping[str, str], command: str) -> None:
+    identity = _lexical.git_executable_identity(argv[0], _GIT_EXECUTABLE)
+    if identity is None:
+        return
+    if identity != _GIT_EXECUTABLE:
+        raise AgentOpsError(f"gate command is not allowed to invoke direct {identity}: {command}")
+    if env:
+        raise AgentOpsError(f"gate command is not allowed to supply env to Git: {command}")
+    if len(argv) < 2:
+        raise AgentOpsError(f"gate command is not allowed by direct Git grammar: {command}")
+    subcommand, args = argv[1], argv[2:]
+    valid = (
+        _lexical.valid_git_status(args, _ALLOWED_GIT_STATUS_FORMATS, _GIT_STATUS_BRANCH)
+        if subcommand == "status"
+        else _lexical.valid_git_diff(args, _GIT_DIFF_CHECK, _GIT_SEPARATOR) if subcommand == "diff"
+        else _lexical.valid_git_rev_parse(args, _ALLOWED_GIT_REV_PARSE_ARGS) if subcommand == "rev-parse"
+        else _lexical.valid_git_merge_base(args, _GIT_MERGE_BASE_ANCESTOR) if subcommand == "merge-base"
+        else _lexical.valid_git_ls_files(args, _GIT_LS_FILES_PREFIX, _GIT_SEPARATOR)
+        if subcommand == "ls-files" else False
+    )
+    if not valid:
+        raise AgentOpsError(f"gate command is not allowed by direct Git grammar: {command}")
 
-def _parse_command(command: str) -> list[str]:
+def _parse_command(command: str, *, env: Mapping[str, str] | None = None) -> list[str]:
     try:
-        argv = shlex.split(command)
+        argv = _lexical.split_command(command)
     except ValueError as exc:
         raise AgentOpsError(f"invalid gate command {command!r}: {exc}") from exc
     if not argv:
         raise AgentOpsError("gate command must not be empty")
     if any(token in _BANNED_SHELL_TOKENS for token in argv):
         raise AgentOpsError(f"gate command uses unsupported shell control token: {command}")
-    lowered = [Path(token).name.lower() if not i else token.lower() for i, token in enumerate(argv)]
-    if lowered[0] in _BANNED_SHELL_EXECUTABLES:
+    if _lexical.command_token_forms(argv[0]) & _BANNED_SHELL_EXECUTABLES:
         raise AgentOpsError(f"gate command may not invoke a shell/wrapper executable: {command}")
-    if lowered[0] == "git" and len(lowered) > 1 and lowered[1] in _BANNED_GATE_GIT_SUBCOMMANDS:
-        raise AgentOpsError(f"gate command is not allowed to run git {lowered[1]}")
-    if any(token in _BANNED_LIVE_COMMAND_TOKENS for token in lowered):
+    if any(_lexical.command_token_forms(token) & _BANNED_LIVE_COMMAND_TOKENS for token in argv):
         raise AgentOpsError(f"gate command appears to invoke live swarm/autonomy: {command}")
+    _validate_git_gate(argv, env or {}, command)
     return argv
-
 
 def parse_gate(raw: Any, index: int, *, require_expected_exit: bool = False) -> GateSpec:
     if isinstance(raw, str):
@@ -216,8 +233,19 @@ def parse_gate(raw: Any, index: int, *, require_expected_exit: bool = False) -> 
             raise AgentOpsError(f"commands[{index}].{label} must be a positive integer")
     if isinstance(expected_exit, bool) or not isinstance(expected_exit, int) or not 0 <= expected_exit <= 255:
         raise AgentOpsError(f"commands[{index}].expected_exit must be an integer from 0 to 255")
-    return GateSpec(name, command, _parse_command(command), env, expected_exit, timeout, max_output)
+    argv = _parse_command(command, env=env)
+    return GateSpec(name, command, argv, env, expected_exit, timeout, max_output)
 
+def build_gate_environment(gate: GateSpec, inherited: Mapping[str, str]) -> dict[str, str]:
+    environment = dict(inherited)
+    environment.update(gate.env)
+    if _lexical.git_executable_identity(gate.argv[0], _GIT_EXECUTABLE) == _GIT_EXECUTABLE:
+        environment = {key: value for key, value in environment.items()
+                       if not key.casefold().startswith("git_")}
+        environment["GIT_CONFIG_GLOBAL"] = os.devnull
+        environment["GIT_CONFIG_NOSYSTEM"] = "1"
+        environment["GIT_OPTIONAL_LOCKS"] = "0"
+    return environment
 
 def _required_text(data: Mapping[str, Any], field: str, *, prefix: str = "") -> str:
     value = data.get(field)
@@ -225,13 +253,11 @@ def _required_text(data: Mapping[str, Any], field: str, *, prefix: str = "") -> 
         raise AgentOpsError(f"{prefix}{field} is required and must be a non-empty string")
     return value.strip()
 
-
 def _required_bool(data: Mapping[str, Any], field: str) -> bool:
     value = data.get(field)
     if not isinstance(value, bool):
         raise AgentOpsError(f"{field} is required and must be a boolean")
     return value
-
 
 def _pattern_list(data: Mapping[str, Any], field: str, *, non_empty: bool) -> list[str]:
     value = data.get(field)
@@ -242,7 +268,6 @@ def _pattern_list(data: Mapping[str, Any], field: str, *, non_empty: bool) -> li
         raise AgentOpsError(f"{field} must contain at least one entry")
     return result
 
-
 def _list_field(data: Mapping[str, Any], field: str, *, non_empty: bool = False) -> list[Any]:
     value = data.get(field)
     if not isinstance(value, list) or (non_empty and not value):
@@ -250,10 +275,7 @@ def _list_field(data: Mapping[str, Any], field: str, *, non_empty: bool = False)
         raise AgentOpsError(f"{field} is required and must be a {qualifier}list")
     return list(value)
 
-
-def _parse_session_entry(
-    raw: Any, payload: Mapping[str, Any], packet_id: str
-) -> SessionEntry:
+def _parse_session_entry(raw: Any, payload: Mapping[str, Any], packet_id: str) -> SessionEntry:
     if not isinstance(raw, dict):
         raise AgentOpsError("session_entry is required and must be an object")
     schema = _required_text(raw, "schema")
@@ -289,8 +311,7 @@ def _parse_session_entry(
     ):
         raise AgentOpsError("session_entry.work_packet does not match packet id")
     return SessionEntry(
-        schema=schema,
-        tool_versions=dict(tools),
+        schema=schema, tool_versions=dict(tools),
         authority_precedence=[str(item) for item in precedence],
         work_packet=work_packet,
         active_track=_required_text(raw, "active_track"),
@@ -302,7 +323,6 @@ def _parse_session_entry(
         rollback=_required_text(raw, "rollback"),
         packet_digest=digest,
     )
-
 
 def parse_work_packet(data: Mapping[str, Any]) -> WorkPacket:
     packet_id = _required_text(data, "id")
@@ -322,27 +342,19 @@ def parse_work_packet(data: Mapping[str, Any]) -> WorkPacket:
         raise AgentOpsError("negative_controls is required and must be a non-empty list")
     if not isinstance(controls_raw, list):
         raise AgentOpsError("negative_controls must be a list")
-    controls = [
-        parse_gate(item, index, require_expected_exit=True)
-        for index, item in enumerate(controls_raw)
-    ]
+    controls = [parse_gate(item, index, require_expected_exit=True)
+                for index, item in enumerate(controls_raw)]
     commit_raw, approval_raw = data.get("commit"), data.get("approval")
     if not isinstance(commit_raw, dict):
         raise AgentOpsError("commit is required and must be an object")
     if not isinstance(approval_raw, dict):
         raise AgentOpsError("approval is required and must be an object")
-    commit = CommitPolicy(
-        _required_bool(commit_raw, "allowed"), _required_text(commit_raw, "message")
-    )
-    approval = ApprovalPolicy(
-        _required_bool(approval_raw, "before_commit"),
-        _required_bool(approval_raw, "before_merge"),
-    )
+    commit = CommitPolicy(_required_bool(commit_raw, "allowed"),
+                          _required_text(commit_raw, "message"))
+    approval = ApprovalPolicy(_required_bool(approval_raw, "before_commit"),
+                              _required_bool(approval_raw, "before_merge"))
     payload = dict(data)
-    session = (
-        _parse_session_entry(session_raw, payload, packet_id)
-        if session_raw is not None else None
-    )
+    session = _parse_session_entry(session_raw, payload, packet_id) if session_raw is not None else None
     return WorkPacket(
         id=packet_id,
         base_ref=_required_text(data, "base_ref"),
@@ -351,14 +363,10 @@ def parse_work_packet(data: Mapping[str, Any]) -> WorkPacket:
         intent=_required_text(data, "intent"),
         allowed_files=_pattern_list(data, "allowed_files", non_empty=True),
         forbidden_files=_pattern_list(data, "forbidden_files", non_empty=False),
-        gates=gates,
-        commit=commit,
-        approval=approval,
-        negative_controls=controls,
-        session_entry=session,
+        gates=gates, commit=commit, approval=approval,
+        negative_controls=controls, session_entry=session,
         raw_payload=copy.deepcopy(payload),
     )
-
 
 def _contains_pattern(container: str, contained: str) -> bool:
     if container == contained:
@@ -371,19 +379,16 @@ def _contains_pattern(container: str, contained: str) -> bool:
     literal_head = re.split(r"[*?[]", contained, maxsplit=1)[0]
     return literal_head.startswith(prefix + "/")
 
-
 def _segment_tokens(pattern: str) -> list[str]:
     tokens = re.findall(r"\[[^]]*\]|\*|\?|.", pattern)
     return [token for index, token in enumerate(tokens)
             if token != "*" or not index or tokens[index - 1] != "*"]
-
 
 def _token_accepts(token: str, char: str) -> bool:
     if token in {"*", "?"}:
         return char != "/"
     return (_glob_regex(token).fullmatch(char) is not None
             if token.startswith("[") else token == char)
-
 
 def _segment_witness(left: str, right: str) -> str | None:
     lt, rt = _segment_tokens(left), _segment_tokens(right)
@@ -410,7 +415,6 @@ def _segment_witness(left: str, right: str) -> str | None:
                               ri if rt[ri] == "*" else ri + 1, text + char))
                 break
     return None
-
 
 def _glob_witness(left: str, right: str) -> str | None:
     ls, rs = left.strip("/").split("/"), right.strip("/").split("/")
@@ -449,7 +453,6 @@ def _glob_witness(left: str, right: str) -> str | None:
             queue.append((*next_state, parts + (segment,)))
     return None
 
-
 def _glob_intersection_witness(left: str, right: str) -> str | None:
     lefts = (left, f"{left}/**") if not _GLOB_MAGIC.search(left) else (left,)
     rights = (right, f"{right}/**") if not _GLOB_MAGIC.search(right) else (right,)
@@ -460,10 +463,8 @@ def _glob_intersection_witness(left: str, right: str) -> str | None:
                 return witness
     return None
 
-
 def detect_surface_collisions(
-    allowed_patterns: Iterable[str],
-    sibling_patterns: Mapping[str, Iterable[str]],
+    allowed_patterns: Iterable[str], sibling_patterns: Mapping[str, Iterable[str]],
     actual_paths: Iterable[str],
 ) -> list[dict[str, str]]:
     """Return deterministic exact/containment/glob/actual overlap evidence."""
@@ -494,6 +495,5 @@ def detect_surface_collisions(
                 for path in actual:
                     if path_matches_pattern(path, ours) and path_matches_pattern(path, theirs):
                         add("actual_file_overlap", ours, track, theirs, path)
-    return sorted(rows, key=lambda row: (
-        row["kind"], row["sibling_track"], row["allowed_pattern"],
-        row["sibling_pattern"], row.get("path", "")))
+    return sorted(rows, key=lambda row: (row["kind"], row["sibling_track"],
+        row["allowed_pattern"], row["sibling_pattern"], row.get("path", "")))

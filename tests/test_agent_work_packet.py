@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import copy
 import hashlib
 import importlib.util
@@ -377,6 +378,543 @@ def test_gate_commands_may_not_hide_mutation_inside_shell() -> None:
             assert "shell/wrapper executable" in str(exc)
         else:  # pragma: no cover
             raise AssertionError(f"expected {command} to be rejected")
+
+
+def test_gate_command_normalization_rejects_live_targets_without_blocking_safe_commands(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def must_not_execute(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("command normalization must not execute a gate")
+
+    monkeypatch.setattr(agentops, "run_command", must_not_execute)
+    rejected = (
+        "live_swarm",
+        "live-swarm",
+        "orchestrate-live",
+        "autonomy-daemon",
+        "autonomous-daemon",
+        "./live_swarm",
+        "scripts/runtime/live_swarm.py",
+        "./scripts/runtime/live_swarm.py",
+        "/absolute/path/to/live_swarm.py",
+        "python3 scripts/runtime/live_swarm.py",
+        "python3 ./scripts/runtime/live_swarm.py",
+        "python3 -m dharma_swarm.live_swarm",
+        "python3 -m Dharma_Swarm.LIVE_SWARM",
+        "python dharma_swarm/orchestrate_live.py",
+        "python3.13 -m dharma_swarm.orchestrate_live",
+        ".venv/bin/python scripts/runtime/autonomy-daemon.py",
+        "/usr/bin/python3 -m dharma_swarm.autonomy_daemon",
+        "python.exe scripts/runtime/autonomous-daemon.py",
+        'python.exe "C:\\scripts\\runtime\\live_swarm.py"',
+        'python.exe "C:\\scripts\\runtime\\live_swarm.py."',
+        'python.exe "C:\\scripts\\runtime\\live_swarm.py "',
+        'python.exe "C:\\scripts\\runtime\\live_swarm.py.::$DATA"',
+        "python.exe C:live_swarm.py",
+        "python.exe C:orchestrate_live.py",
+        "C:live_swarm.exe",
+        "py -3 -m dharma_swarm.autonomous_daemon",
+    )
+    accepted = (
+        (
+            "python3 -m pytest tests/test_agent_work_packet.py -q",
+            ["python3", "-m", "pytest", "tests/test_agent_work_packet.py", "-q"],
+        ),
+        (
+            "python3 scripts/governance/check_track_status.py",
+            ["python3", "scripts/governance/check_track_status.py"],
+        ),
+        ("make docops-integrity", ["make", "docops-integrity"]),
+        (
+            "python3 scripts/governance/check_name_drift.py",
+            ["python3", "scripts/governance/check_name_drift.py"],
+        ),
+        (
+            "python3 scripts/governance/repo_status.py",
+            ["python3", "scripts/governance/repo_status.py"],
+        ),
+        (
+            'python3 -c "print(\'ordinary non-live Python\')"',
+            ["python3", "-c", "print('ordinary non-live Python')"],
+        ),
+        (
+            "python3 scripts/runtime/live_swarm_report.py",
+            ["python3", "scripts/runtime/live_swarm_report.py"],
+        ),
+        (
+            "python3 -m dharma_swarm.live_swarm_report",
+            ["python3", "-m", "dharma_swarm.live_swarm_report"],
+        ),
+    )
+    rejected_results: list[tuple[str, list[str] | None, str | None]] = []
+    accepted_results: list[tuple[str, list[str] | None, list[str]]] = []
+    for index, command in enumerate(rejected):
+        try:
+            gate = agentops.parse_gate({"name": f"live-rejected-{index}", "command": command}, index)
+        except agentops.AgentOpsError as exc:
+            rejected_results.append((command, None, str(exc)))
+        else:
+            rejected_results.append((command, gate.argv, None))
+    for index, (command, expected_argv) in enumerate(accepted):
+        try:
+            gate = agentops.parse_gate({"name": f"live-accepted-{index}", "command": command}, index)
+        except agentops.AgentOpsError:
+            accepted_results.append((command, None, expected_argv))
+        else:
+            accepted_results.append((command, gate.argv, expected_argv))
+
+    assert all(
+        error and "live swarm/autonomy" in error
+        for _, _, error in rejected_results
+    ), rejected_results
+    assert all(actual == expected for _, actual, expected in accepted_results), accepted_results
+
+
+def test_gate_rejects_git_global_options_and_aliases(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def must_not_execute(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("direct Git lexical validation must not execute a gate")
+
+    monkeypatch.setattr(agentops, "run_command", must_not_execute)
+    rejected_commands = [
+        "git -C . status --short",
+        "git -c core.sshCommand=/bin/false status --short",
+        "git --git-dir=.git status --short",
+        "git --git-dir .git status --short",
+        "git --work-tree=. status --short",
+        "git --work-tree . status --short",
+        "git --exec-path=/tmp status --short",
+        "git --config-env=core.sshCommand=GIT_SSH_COMMAND status --short",
+        "git --no-pager status --short",
+        "git -c alias.x=push x origin HEAD",
+        'git -c "alias.x=!printf ALIAS_EXECUTED" x',
+        "git x",
+        "git fetch origin main",
+        "git push origin HEAD",
+        "git merge main",
+        "git diff --output=/tmp/agentops-write",
+        "git diff --output /tmp/agentops-write",
+        "git diff --ext-diff HEAD",
+        "git diff --textconv HEAD",
+        "git-push origin HEAD",
+        "/usr/local/libexec/git-core/git-push origin HEAD",
+        "git-send-pack origin HEAD",
+        "git-http-push origin HEAD",
+        "git-push.git status --short",
+        "/tmp/git-push.git status --short",
+        "git-push.exe.git status --short",
+        "git_push.git status --short",
+        "GIT-PUSH.GIT status --short",
+        "git-push.git. status --short",
+        "git-push.git::$DATA status --short",
+        '"C:\\Program Files\\Git\\mingw64\\libexec\\git-core\\git-push.exe" origin HEAD',
+        '"C:\\Program Files\\Git\\cmd\\git.exe." push origin HEAD',
+        '"C:\\Program Files\\Git\\cmd\\git.exe " push origin HEAD',
+        '"C:\\Program Files\\Git\\cmd\\git.exe.::$DATA" push origin HEAD',
+        "C:git.exe push origin HEAD",
+        "C:git-push.exe origin HEAD",
+        "git.exe push origin HEAD",
+        "git status --branch",
+        "git status --porcelain=v3",
+        "git status --short --branch HEAD",
+        "git diff HEAD --check",
+        "git diff --check --",
+        "git diff --check /absolute/path",
+        "git diff --check C:outside",
+        "git diff --check ../outside",
+        'git diff --check "foo\\.. \\outside"',
+        'git diff --check "foo\\.. .\\outside"',
+        'git diff --check "foo\\... \\outside"',
+        'git diff --check "foo\\.. ..\\outside"',
+        'git diff --check "bad\npath"',
+        "git diff --check -- ':(literal)../outside'",
+        "git diff --check -- ':!../outside'",
+        "git diff --check -- ':(glob)../*'",
+        "git diff --check -- ':(literal)/etc/passwd'",
+        "git diff --check ':(literal)../outside'",
+        "git diff --check ':!../outside'",
+        "git diff --check ':(glob)../*'",
+        "git diff --check ':0:../outside'",
+        "git diff --check ':../outside'",
+        "git diff --check 'HEAD:../outside'",
+        "git diff --check 'HEAD:/outside'",
+        "git diff --check 'HEAD@{10:00}:../outside'",
+        "git diff --check 'HEAD@{2026-07-10T10:00:00}:../outside'",
+        "git diff --check 'HEAD^{/foo:bar}:../outside'",
+        "git diff --check 'HEAD^{/../}:../outside'",
+        "git diff --check 'HEAD@{2026/../10}:../outside'",
+        "git diff --check '..::$DATA'",
+        "git diff --check -- '..::$DATA'",
+        "git diff --check -- '..:secret:$DATA'",
+        "git diff --check -- '..::$INDEX_ALLOCATION'",
+        "git diff --check -- '.. .::$DATA'",
+        "git diff --check -- '...::$DATA'",
+        'git diff --check -- "foo\\..::$DATA"',
+        "git rev-parse --verify origin/main",
+        "git merge-base --is-ancestor HEAD",
+        "git merge-base --is-ancestor --fork-point HEAD HEAD",
+        "git merge-base --is-ancestor 'HEAD:../outside' HEAD",
+        "git merge-base --is-ancestor 'HEAD@{10:00}:../outside' HEAD",
+        "git merge-base --is-ancestor 'HEAD^{/../}:../outside' HEAD",
+        "git ls-files --others",
+        "git ls-files --others --exclude-standard docs",
+        "git ls-files --others --exclude-standard -- C:outside",
+        "git ls-files --others --exclude-standard -- ../outside",
+        'git ls-files --others --exclude-standard -- "foo\\.. \\outside"',
+        'git ls-files --others --exclude-standard -- "foo\\.. .\\outside"',
+        'git ls-files --others --exclude-standard -- "foo\\... \\outside"',
+        'git ls-files --others --exclude-standard -- "foo\\.. ..\\outside"',
+        'git ls-files --others --exclude-standard -- "bad\tpath"',
+        "git ls-files --others --exclude-standard -- ':(literal)../outside'",
+        "git ls-files --others --exclude-standard -- ':!../outside'",
+        "git ls-files --others --exclude-standard -- ':(glob)../*'",
+        "git ls-files --others --exclude-standard -- ':(literal)/etc/passwd'",
+        "git ls-files --others --exclude-standard -- '..::$DATA'",
+        "git ls-files --others --exclude-standard -- '..:secret:$DATA'",
+        "git ls-files --others --exclude-standard -- '..::$INDEX_ALLOCATION'",
+        "git ls-files --others --exclude-standard -- '.. .::$DATA'",
+        "git ls-files --others --exclude-standard -- '...::$DATA'",
+        'git ls-files --others --exclude-standard -- "foo\\..::$DATA"',
+    ]
+    mutating_subcommands = (
+        "am",
+        "cherry-pick",
+        "clean",
+        "commit",
+        "merge",
+        "pull",
+        "push",
+        "rebase",
+        "reset",
+        "restore",
+        "revert",
+        "stash",
+    )
+    rejected_commands.extend(f"git {subcommand}" for subcommand in mutating_subcommands)
+    rejected_commands.extend(f"git {subcommand}" for subcommand in ("branch", "config", "fetch", "remote", "show"))
+    rejected_env = (
+        {"command": "git status --short", "env": {"PATH": "/tmp/fake-git"}},
+        {"command": "git diff --check", "env": {"GIT_EXTERNAL_DIFF": "/tmp/helper"}},
+        {
+            "command": "git diff --check",
+            "env": {
+                "GIT_CONFIG_COUNT": "1",
+                "GIT_CONFIG_KEY_0": "diff.external",
+                "GIT_CONFIG_VALUE_0": "/tmp/helper",
+            },
+        },
+    )
+    accepted = (
+        ("git status --short", ["git", "status", "--short"]),
+        ("git status --short --branch", ["git", "status", "--short", "--branch"]),
+        ("git status --porcelain=v2 --branch", ["git", "status", "--porcelain=v2", "--branch"]),
+        ("git diff --check", ["git", "diff", "--check"]),
+        ("git diff --check HEAD", ["git", "diff", "--check", "HEAD"]),
+        (
+            "git diff --check origin/main...HEAD",
+            ["git", "diff", "--check", "origin/main...HEAD"],
+        ),
+        ("git diff --check ':/Merge'", ["git", "diff", "--check", ":/Merge"]),
+        ("git diff --check ':/../'", ["git", "diff", "--check", ":/../"]),
+        (
+            "git diff --check 'HEAD:docs/file'",
+            ["git", "diff", "--check", "HEAD:docs/file"],
+        ),
+        ("git diff --check ':0:docs/file'", ["git", "diff", "--check", ":0:docs/file"]),
+        ("git diff --check 'HEAD:'", ["git", "diff", "--check", "HEAD:"]),
+        (
+            "git diff --check 'HEAD@{10:00}'",
+            ["git", "diff", "--check", "HEAD@{10:00}"],
+        ),
+        ("git diff --check 'topic{draft'", ["git", "diff", "--check", "topic{draft"]),
+        (
+            "git diff --check 'HEAD^{/foo:bar}'",
+            ["git", "diff", "--check", "HEAD^{/foo:bar}"],
+        ),
+        (
+            "git diff --check 'HEAD^{/feature:../path}'",
+            ["git", "diff", "--check", "HEAD^{/feature:../path}"],
+        ),
+        (
+            "git diff --check 'HEAD@{2026/../10}'",
+            ["git", "diff", "--check", "HEAD@{2026/../10}"],
+        ),
+        (
+            "git diff --check 'HEAD@{10:00}:docs/file'",
+            ["git", "diff", "--check", "HEAD@{10:00}:docs/file"],
+        ),
+        (
+            "git diff --check -- docs/governance/AGENTOPS.md",
+            ["git", "diff", "--check", "--", "docs/governance/AGENTOPS.md"],
+        ),
+        ("git rev-parse HEAD", ["git", "rev-parse", "HEAD"]),
+        ("git rev-parse --verify HEAD", ["git", "rev-parse", "--verify", "HEAD"]),
+        ("git rev-parse --show-toplevel", ["git", "rev-parse", "--show-toplevel"]),
+        (
+            "git rev-parse --abbrev-ref HEAD",
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+        ),
+        (
+            "git merge-base --is-ancestor HEAD HEAD",
+            ["git", "merge-base", "--is-ancestor", "HEAD", "HEAD"],
+        ),
+        (
+            "git ls-files --others --exclude-standard",
+            ["git", "ls-files", "--others", "--exclude-standard"],
+        ),
+        ("/usr/bin/git status --short", ["/usr/bin/git", "status", "--short"]),
+        (
+            '"C:\\Program Files\\Git\\cmd\\git.exe" status --short',
+            ["C:\\Program Files\\Git\\cmd\\git.exe", "status", "--short"],
+        ),
+    )
+    rejected_results: list[
+        tuple[str, list[str] | None, dict[str, str] | None, str | None]
+    ] = []
+    for index, command in enumerate(rejected_commands):
+        try:
+            gate = agentops.parse_gate({"name": f"git-rejected-{index}", "command": command}, index)
+        except agentops.AgentOpsError as exc:
+            rejected_results.append((command, None, None, str(exc)))
+        else:
+            rejected_results.append((command, gate.argv, gate.env, None))
+    for index, raw in enumerate(rejected_env, start=len(rejected_commands)):
+        try:
+            gate = agentops.parse_gate({"name": f"git-env-rejected-{index}", **raw}, index)
+        except agentops.AgentOpsError as exc:
+            rejected_results.append((str(raw), None, None, str(exc)))
+        else:
+            rejected_results.append((str(raw), gate.argv, gate.env, None))
+    accepted_results: list[tuple[str, list[str] | None, dict[str, str] | None, list[str]]] = []
+    for index, (command, expected_argv) in enumerate(accepted):
+        try:
+            gate = agentops.parse_gate({"name": f"git-accepted-{index}", "command": command}, index)
+        except agentops.AgentOpsError:
+            accepted_results.append((command, None, None, expected_argv))
+        else:
+            accepted_results.append((command, gate.argv, gate.env, expected_argv))
+
+    assert all(
+        error and "not allowed" in error
+        for _, _, _, error in rejected_results
+    ), rejected_results
+    assert all(
+        actual == expected and env == {}
+        for _, actual, env, expected in accepted_results
+    ), accepted_results
+
+
+def test_wp_o1r_lexical_helper_remains_private_and_subordinate() -> None:
+    onboarding = REPO_ROOT / "dharma_swarm/operator_core/onboarding"
+    helper = onboarding / "_command_lexical.py"
+    contract = onboarding / "contract.py"
+    runner = REPO_ROOT / "scripts/governance/run_agent_work_packet.py"
+
+    assert sorted(onboarding.glob("*lexical*.py")) == [helper]
+    helper_source = helper.read_text(encoding="utf-8")
+    helper_tree = ast.parse(helper_source)
+    allowed_imports = {"__future__", "pathlib", "re", "shlex", "typing"}
+    imported: set[str] = set()
+    for node in helper_tree.body:
+        if isinstance(node, ast.Import):
+            imported.update(alias.name.split(".", 1)[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            assert node.level == 0
+            imported.add((node.module or "").split(".", 1)[0])
+    assert imported <= allowed_imports
+    assert not any(isinstance(node, (ast.ClassDef, ast.Raise)) for node in ast.walk(helper_tree))
+    assert not any(isinstance(node, (ast.Assign, ast.AnnAssign)) for node in helper_tree.body)
+    assert not {
+        "AgentOpsError", "GateSpec", "SessionEntry", "WorkPacket", "parse_gate", "subprocess",
+    } & {node.id for node in ast.walk(helper_tree) if isinstance(node, ast.Name)}
+    functions = [node for node in helper_tree.body if isinstance(node, ast.FunctionDef)]
+    assert functions and all(node.returns is not None for node in functions)
+
+    init_source = (onboarding / "__init__.py").read_text(encoding="utf-8")
+    assert "_command_lexical" not in init_source
+    production_consumers = sorted(
+        path.relative_to(REPO_ROOT).as_posix()
+        for path in REPO_ROOT.rglob("*.py")
+        if path not in {helper, contract}
+        and "tests" not in path.relative_to(REPO_ROOT).parts
+        and b"_command_lexical" in path.read_bytes()
+    )
+    assert production_consumers == []
+    contract_source = contract.read_text(encoding="utf-8")
+    contract_tree = ast.parse(contract_source)
+    contract_symbols = {
+        node.name for node in contract_tree.body if isinstance(node, ast.FunctionDef)
+    }
+    assert {
+        "_parse_command", "_validate_git_gate", "build_gate_environment", "parse_gate",
+    } <= contract_symbols
+    grammar_constants = {
+        "_GIT_EXECUTABLE", "_ALLOWED_GIT_STATUS_FORMATS", "_GIT_STATUS_BRANCH",
+        "_GIT_DIFF_CHECK", "_GIT_SEPARATOR", "_ALLOWED_GIT_REV_PARSE_ARGS",
+        "_GIT_MERGE_BASE_ANCESTOR", "_GIT_LS_FILES_PREFIX",
+    }
+    assigned = {
+        target.id
+        for node in contract_tree.body
+        if isinstance(node, (ast.Assign, ast.AnnAssign))
+        for target in (node.targets if isinstance(node, ast.Assign) else [node.target])
+        if isinstance(target, ast.Name)
+    }
+    assert grammar_constants <= assigned
+    assert "AgentOpsError" in contract_source
+    assert "_command_lexical" in contract_source
+    runner_source = runner.read_text(encoding="utf-8")
+    assert "build_gate_environment" in runner_source
+    assert "_command_lexical" not in runner_source
+    assert "git_executable_identity" not in runner_source
+    assert len(contract_source.splitlines()) <= 500
+    assert len(helper_source.splitlines()) <= 500
+
+
+def test_direct_git_gate_strips_inherited_git_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    captured: list[dict[str, object]] = []
+
+    def capture_run(
+        argv: list[str], *, cwd: Path, env: dict[str, str] | None = None,
+        timeout_seconds: int | None = None, preexec_fn: object = None,
+    ) -> subprocess.CompletedProcess[str]:
+        captured.append({"argv": list(argv), "cwd": cwd, "env": dict(env or {})})
+        return subprocess.CompletedProcess(argv, 0, "ok\n", "")
+
+    monkeypatch.setattr(agentops, "run_command", capture_run)
+    poisoned = {
+        "gIt_DiR": "/poison/repository",
+        "Git_Work_Tree": "/poison/worktree",
+        "GIT_INDEX_FILE": "/poison/index",
+        "git_object_directory": "/poison/objects",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES": "/poison/alternate",
+        "GIT_CONFIG_GLOBAL": "/poison/global-config",
+        "git_config_system": "/poison/system-config",
+        "GIT_CONFIG_COUNT": "1",
+        "Git_Config_Key_0": "core.fsmonitor",
+        "GIT_CONFIG_VALUE_0": "/poison/helper",
+        "GIT_EXTERNAL_DIFF": "/poison/diff-helper",
+        "Git_SSH_Command": "/poison/ssh-helper",
+        "GIT_TRACE": "/poison/trace",
+        "git_trace2_event": "/poison/trace2",
+        "GIT_REDIRECT_STDERR": "/poison/redirect",
+        "Git_Optional_Locks": "1",
+        "HOME": "/trusted/home",
+        "XDG_CONFIG_HOME": "/trusted/xdg",
+        "PATH": "/trusted/bin",
+        "KEEP_ME": "yes",
+        "GITHUB_ACTIONS": "true",
+    }
+    original = dict(poisoned)
+    safe_git = {
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_OPTIONAL_LOCKS": "0",
+    }
+    commands = (
+        "git status --short",
+        "/usr/bin/git status --short",
+        '"C:\\Program Files\\Git\\cmd\\git.exe" status --short',
+    )
+    for index, command in enumerate(commands):
+        gate = agentops.parse_gate({"name": f"git-env-{index}", "command": command}, index)
+        agentops.run_gate(repo, gate, base_env=poisoned)
+        child = captured.pop()
+        assert child["argv"] == gate.argv
+        assert child["cwd"] == repo
+        child_env = child["env"]
+        assert isinstance(child_env, dict)
+        assert {
+            key: value for key, value in child_env.items()
+            if key.casefold().startswith("git_")
+        } == safe_git
+        for key in ("HOME", "XDG_CONFIG_HOME", "PATH", "KEEP_ME", "GITHUB_ACTIONS"):
+            assert child_env[key] == poisoned[key]
+        assert poisoned == original
+
+    non_git = agentops.parse_gate(
+        {
+            "name": "non-git-env",
+            "command": "python3 -c pass",
+            "env": {"CUSTOM": "packet", "GIT_TRACE": "packet-trace"},
+        },
+        0,
+    )
+    non_git_base = {"HOME": "/home", "Git_Dir": "inherited", "CUSTOM": "base"}
+    agentops.run_gate(repo, non_git, base_env=non_git_base)
+    expected_non_git = dict(non_git_base)
+    expected_non_git.update(non_git.env)
+    assert captured.pop()["env"] == expected_non_git
+
+    for command in ("evil.git status --short", "tool.GIT status --short"):
+        dotted_non_git = agentops.parse_gate(
+            {"name": "dotted-non-git", "command": command}, 0,
+        )
+        agentops.run_gate(repo, dotted_non_git, base_env=poisoned)
+        assert captured.pop()["env"] == poisoned
+    assert poisoned == original
+
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / ".git").mkdir()
+    (source / "README.md").write_text("fixture\n", encoding="utf-8")
+    external_tmp = tmp_path / "external-tmp"
+    external_tmp.mkdir()
+    monkeypatch.setenv("TMPDIR", str(external_tmp))
+    monkeypatch.setattr(
+        agentops, "_negative_confinement",
+        lambda _jail, _fixture: (None, ["/usr/bin/env", "-i", "--"], False, True),
+    )
+    monkeypatch.setattr(
+        agentops, "_negative_environment",
+        lambda *_args, **_kwargs: dict(poisoned),
+    )
+    negative_gate = agentops.parse_gate(
+        {"name": "negative-git-env", "command": "git status --short"}, 0,
+    )
+    agentops.run_negative_control(source, negative_gate)
+    negative_child = captured.pop()
+    negative_argv = negative_child["argv"]
+    assert isinstance(negative_argv, list)
+    shell_index = negative_argv.index("/bin/sh")
+    encoded = [token for token in negative_argv[:shell_index] if "=" in token]
+    encoded_git = {
+        token.split("=", 1)[0]: token.split("=", 1)[1]
+        for token in encoded
+        if token.split("=", 1)[0].casefold().startswith("git_")
+    }
+    assert encoded_git == safe_git
+    assert poisoned == original
+
+    remapped = {"PYTHONPATH": "/fixture", "KEEP_ME": "yes"}
+    monkeypatch.setattr(
+        agentops, "_negative_environment",
+        lambda *_args, **_kwargs: dict(remapped),
+    )
+    non_git_negative = agentops.parse_gate(
+        {
+            "name": "negative-non-git-env",
+            "command": "python3 -c pass",
+            "env": {"PYTHONPATH": "/source/must-not-return"},
+        },
+        0,
+    )
+    agentops.run_negative_control(source, non_git_negative)
+    non_git_argv = captured.pop()["argv"]
+    assert isinstance(non_git_argv, list)
+    shell_index = non_git_argv.index("/bin/sh")
+    encoded_non_git = {
+        token.split("=", 1)[0]: token.split("=", 1)[1]
+        for token in non_git_argv[:shell_index]
+        if "=" in token
+    }
+    assert encoded_non_git["PYTHONPATH"] == "/fixture"
+    assert encoded_non_git["KEEP_ME"] == "yes"
 
 
 def test_session_entry_rejects_each_missing_required_field(tmp_path: Path) -> None:
