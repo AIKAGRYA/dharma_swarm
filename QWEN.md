@@ -10,9 +10,9 @@ Claude, or Codex. Identify reviews with the actual model/lane you run under.
 
 ## Session Entry
 
-Run `make onboard` before non-trivial work. Its Session Entry packet is the
-one door into a build session and projects current facts from source owners.
-Those owner files, not this adapter, govern:
+Run `make onboard` before non-trivial work for orientation. Implementation requires an external
+Session Entry packet validated by the current owner-defined gate; onboarding without a packet
+is not admission. The validated packet and source owner files, not this adapter, govern:
 
 - repository root, branch, baseline, and dirty state;
 - active track, admitted surfaces, and forbidden surfaces;
