@@ -146,12 +146,13 @@ def test_underclaim_detector_flags_shipped_but_open_items() -> None:
     assert ucs[0]["blocker"] is True
 
 
-@pytest.mark.timeout(75)
+@pytest.mark.timeout(270)
 def test_underclaims_surface_in_evidence_payload() -> None:
     """Every track payload carries the underclaims field, and any underclaim in
     the payload also surfaces as a WARN line in the checker output — the ledger
     can fall behind reality, but never silently."""
-    result = _run(CHECK_SCRIPT)
+    # Same portfolio-scaled budget as test_check_track_status_runs above.
+    result = _run(CHECK_SCRIPT, timeout=240)
     payload = json.loads(EVIDENCE.read_text(encoding="utf-8"))
     out = result.stdout + result.stderr
     for tr in payload.get("active_tracks", []):
