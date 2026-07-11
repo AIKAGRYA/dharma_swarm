@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import shlex
+import unicodedata
 from pathlib import PurePosixPath
 from typing import Collection
 
@@ -25,7 +26,6 @@ def _win32_path_canonical(value: str) -> str:
     return drive + "/".join(components)
 
 def command_token_forms(token: str) -> set[str]:
-    """Return the lexical identities used by direct-command guards."""
     raw = token.casefold()
     separator_canonical = raw.replace("\\", "/")
     win32_canonical = _win32_path_canonical(raw)
@@ -44,8 +44,7 @@ def command_token_forms(token: str) -> set[str]:
     return {form.replace("_", "-") for form in forms if form}
 
 def _git_executable_forms(token: str) -> tuple[str, str]:
-    """Return raw and Win32-canonical executable basenames."""
-    raw = token.casefold().replace("\\", "/")
+    raw = token.lower().replace("\\", "/")
     canonical = _win32_path_canonical(raw)
     forms = [
         (leaf[2:] if leaf == value and re.match(r"^[a-zA-Z]:", leaf) else leaf).replace("_", "-")
@@ -55,9 +54,11 @@ def _git_executable_forms(token: str) -> tuple[str, str]:
     return forms[0], forms[1]
 
 def git_executable_identity(token: str, git_executable: str) -> str | None:
-    """Identify direct Git and git-* executables across POSIX/Windows paths."""
     raw, canonical = _git_executable_forms(token)
     allowed = (git_executable, f"{git_executable}.exe")
+    path = token.lower().replace("\\", "/")
+    compatibility = _git_executable_forms(unicodedata.normalize("NFKC", token))
+    trusted = path in allowed or path == "/usr/bin/git" or re.fullmatch(r"c:/program files/git/cmd/git\.exe", path) is not None
     prefixes = (f"{git_executable}-", f"{git_executable}.")
     embedded = raw[2:] if re.match(r"^[a-zA-Z]:", raw) else ""
     embedded_canonical = _win32_path_canonical(embedded)
@@ -66,12 +67,11 @@ def git_executable_identity(token: str, git_executable: str) -> str | None:
         (form for form in (raw, canonical, embedded, embedded_canonical) if form.startswith(prefixes) and form != allowed[1]),
         None,
     )
-    if alias or direct:
+    if alias or direct or (not path.isascii() and any(form in allowed or form.startswith(prefixes) and form != allowed[1] for form in compatibility)):
         return raw
-    return git_executable if canonical in allowed else None
+    return git_executable if canonical in allowed and trusted else path if canonical in allowed else None
 
 def _safe_git_operand(value: str) -> bool:
-    """Return whether a revision/path operand is lexically repo-relative."""
     if not value or value.startswith("-"):
         return False
     if any(ord(char) < 32 or ord(char) == 127 for char in value):
