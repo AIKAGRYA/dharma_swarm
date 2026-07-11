@@ -1,18 +1,21 @@
 from __future__ import annotations
 
+import importlib.util
 import subprocess
 import sys
 from pathlib import Path
 
-from dharma_swarm.operator_core.onboarding.broken_register import (
-    find_broken_register_references,
-    parse_broken_register,
-    parse_broken_register_text,
-    validate_broken_register_references,
-)
-
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
+PARSER_PATH = REPO_ROOT / "dharma_swarm/operator_core/onboarding/broken_register.py"
+_SPEC = importlib.util.spec_from_file_location("_wp_o2_broken_register", PARSER_PATH)
+assert _SPEC is not None and _SPEC.loader is not None
+_PARSER = importlib.util.module_from_spec(_SPEC)
+sys.modules[_SPEC.name] = _PARSER
+_SPEC.loader.exec_module(_PARSER)
+find_broken_register_references = _PARSER.find_broken_register_references
+parse_broken_register = _PARSER.parse_broken_register
+parse_broken_register_text = _PARSER.parse_broken_register_text
+validate_broken_register_references = _PARSER.validate_broken_register_references
 
 LEGACY_CONSUMER_MATRIX = {
     "agent_onboard": (27, 9, 8),
@@ -318,3 +321,16 @@ def test_drift_triage_br_ids_resolve() -> None:
     assert len(orphan) == 1
     assert orphan[0].code == "orphan_reference"
     assert orphan[0].br_id == "BR-999"
+
+
+if __name__ == "__main__":
+    control = sys.argv[1:]
+    if control == ["--negative-malformed"]:
+        test_incidental_status_words_do_not_classify()
+        test_duplicate_current_status_is_diagnostic()
+        test_header_count_drift_is_reported()
+        test_section_and_heading_prose_boundaries()
+    elif control == ["--negative-orphan"]:
+        test_drift_triage_br_ids_resolve()
+    else:
+        raise SystemExit(2)
