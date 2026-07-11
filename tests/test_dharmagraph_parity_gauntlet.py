@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 
 import pytest
@@ -174,6 +175,10 @@ def test_matrix_leads_with_number_and_named_gap() -> None:
     assert matrix == cli.render_matrix(json.loads(json.dumps(receipt, sort_keys=True)))
 
 
+@pytest.mark.skipif(
+    importlib.util.find_spec("langgraph") is None,
+    reason="test-oracle extra not installed; the oracle CI lane runs this",
+)
 def test_full_harness_covers_every_frozen_row_and_broken_control() -> None:
     rubric = _rubric()
 
