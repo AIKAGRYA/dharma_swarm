@@ -1188,6 +1188,26 @@ active_tracks:
         what: "parity-gap-pb01-prebuilt-tools: PB01 Prebuilt agent and tool execution, validation, injection, parallel calls, errors, and Command updates — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
         kind: code
         blocker: false
+      # Harness-hardening cards from the 2026-07-12 decorrelated review council
+      # (14 findings, all adversarially confirmed, 0 refuted). Cards 46-48 change
+      # probe semantics, so per the frozen-rubric law they are re-run work, never
+      # silent edits: expect the headline number to DROP when 46 lands.
+      - id: 46
+        what: "Harness hardening (council P1): execute-or-zero surface probes. Import/getattr-only facets currently award partial credit — an importable-but-broken engine floors at 14.50/100 (executed counterfactual; LG10/LG14/LG18 alone carry a 9.0-point surface floor). Every facet must earn credit from executed two-arm behavior or score 0; the broken-engine counterfactual must score 0.00 and should land as a permanent second control. Requires builder re-emit + independent judge re-sign; headline expected to drop."
+        kind: code
+        blocker: false
+      - id: 47
+        what: "Harness hardening (council P2): APP01-APP04 grade dharma_swarm.langgraph_parity (the clone), not dharma_swarm/graph — 5.0 of the 31.00 points survive engine deletion (executed counterfactual). Either route the application scenarios through the DharmaGraph engine or rescope the APP rows via an operator-ratified V3 exclusion citing the row ids. Never close these cards with clone-side work."
+        kind: code
+        blocker: false
+      - id: 48
+        what: "Harness hardening (council P2): real harness-integrity controls. COMPLETE01 is a hardcoded literal (expected_observation_present=True asserted, never observed) and CTRL01 only proves dict inequality on one workload output — neither detects the surface/app/perf fail-open paths; PERF01 has two unconditionally-pass facets. Replace COMPLETE01 with an executed enumeration of installed-langgraph surface vs matrix rows; extend the control family to cover each fail-open path class."
+        kind: code
+        blocker: false
+      - id: 49
+        what: "Cross-lane coordination (council P1, onboard-one-door surfaces): parity_gauntlet_check_passes fake-fails on any checkout without the repo venv (run_python_with_repo_env.sh falls back to bare python3 = macOS 3.9; active-track CI installs only pyyaml so the published generated/status baseline will record the criterion FAILED — split-brain vs full-venv machines). Fix belongs in check_track_status.check_command_passes (export DHARMA_PYTHON=sys.executable; wrapper already honors it) and/or the active-track.yml env — coordinate with the onboard-one-door lane; do not edit their surfaces from this lane."
+        kind: code
+        blocker: false
 
     non_goals:
       - Do not adopt langgraph as the runtime engine; it is reference semantics and a differential-test oracle only.
