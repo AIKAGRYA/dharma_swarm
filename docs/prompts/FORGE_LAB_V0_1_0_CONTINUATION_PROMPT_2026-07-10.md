@@ -289,4 +289,3 @@ Do not stop at a plan when implementation is authorized and feasible. Do not
 start a live compute campaign merely because implementation tests pass.
 
 ---
-
