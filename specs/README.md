@@ -84,7 +84,7 @@ Current high-signal specs in this directory:
 - [ONTOLOGY_PHASE2_SQLITE_UNIFICATION_SPEC_2026-03-19.md](/Users/dhyana/dharma_swarm/specs/ONTOLOGY_PHASE2_SQLITE_UNIFICATION_SPEC_2026-03-19.md): active ontology runtime spec
 - [ONTOLOGY_PHASE2_SQLITE_UNIFICATION_TODO_2026-03-19.md](/Users/dhyana/dharma_swarm/specs/ONTOLOGY_PHASE2_SQLITE_UNIFICATION_TODO_2026-03-19.md): execution companion checklist for that ontology pass
 - [STIGMERGY_11_LAYER_SPEC_2026-03-23.md](/Users/dhyana/dharma_swarm/specs/STIGMERGY_11_LAYER_SPEC_2026-03-23.md): structured subsystem spec
-- [FORGE_LAB_V0_1_0_SPEC.md](FORGE_LAB_V0_1_0_SPEC.md): operator-ratified target contract for the dedicated Meghadharma open-compute DGM lab
+- [FORGE_LAB_V0_1_0_SPEC.md](FORGE_LAB_V0_1_0_SPEC.md): operator-ratified target protocol for dedicated Meghadharma open-compute agent evolution; DGM implementation and evidence remain gated
 
 ## Version And Companion Precedence
 
