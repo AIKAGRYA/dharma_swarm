@@ -2,16 +2,24 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter
 
 from api.models import ApiResponse, CreateTaskRequest, EvolveRequest, TraceOut
 
 router = APIRouter(prefix="/api", tags=["commands"])
+logger = logging.getLogger(__name__)
 
 
 def _get_swarm():
     from api.main import get_swarm
     return get_swarm()
+
+
+def _get_boardstore_outbox():
+    from api.main import get_boardstore_outbox
+    return get_boardstore_outbox()
 
 
 @router.post("/commands/evolve")
@@ -43,6 +51,16 @@ async def create_task(req: CreateTaskRequest) -> ApiResponse:
             priority=priority,
             metadata=meta,
         )
+        outbox = _get_boardstore_outbox()
+        if outbox is not None:
+            try:
+                await outbox.publish(task.id, operation="create")
+            except Exception as exc:
+                logger.warning(
+                    "BoardStore create shadow failed after canonical task %s (%s)",
+                    task.id,
+                    type(exc).__name__,
+                )
         return ApiResponse(data={
             "id": task.id,
             "title": task.title,
