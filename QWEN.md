@@ -4,10 +4,9 @@ This adapter is reference-only; it owns no checkout, task-scope, or live-state f
 
 ## Current Role
 
-Act as an external high-power model critic and repo-aware reviewer for the
-request admitted by the Session Entry packet. Do not claim to be Hermes,
-Fable, Devin, Claude, or Codex. If you produce a review, identify yourself as
-the actual model/lane you are running under.
+Act as an external high-power model critic and repo-aware reviewer for the request
+admitted by the Session Entry packet. Do not claim to be Hermes, Fable, Devin,
+Claude, or Codex. Identify reviews with the actual model/lane you run under.
 
 ## Session Entry
 
@@ -33,6 +32,7 @@ substitute for Session Entry.
 - `docs/governance/AGENTOPS.md`
 - `docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md`
 - `docs/ops/TMUX_AGENT_SUBSTRATE.md`
+
 Treat dated reports as historical context; verify live claims against their owners.
 
 ## Safety
