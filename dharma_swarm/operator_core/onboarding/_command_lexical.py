@@ -58,7 +58,7 @@ def _git_executable_forms(token: str) -> set[str]:
         if re.match(r"^[a-zA-Z]:", basename)
     )
     forms = {raw, separator_canonical, win32_canonical, *basenames}
-    forms.update(PurePosixPath(basename).stem for basename in basenames)
+    forms.update(basename[:-4] for basename in basenames if basename.endswith(".exe"))
     return {form.replace("_", "-") for form in forms if form}
 
 def git_executable_identity(token: str, git_executable: str) -> str | None:
@@ -66,8 +66,8 @@ def git_executable_identity(token: str, git_executable: str) -> str | None:
     forms = _git_executable_forms(token)
     if git_executable in forms:
         return git_executable
-    prefix = f"{git_executable}-"
-    direct = sorted(form for form in forms if form.startswith(prefix))
+    prefixes = (f"{git_executable}-", f"{git_executable}.")
+    direct = sorted(form for form in forms if form.startswith(prefixes))
     return direct[0] if direct else None
 
 def _safe_git_operand(value: str) -> bool:
