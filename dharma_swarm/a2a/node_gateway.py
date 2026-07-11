@@ -20,23 +20,6 @@ NOT cover the full A2A 1.0 transport surface.  Specifically:
     - gRPC / NATS transport bindings (Tier 2)
     - OAuth2 / mTLS / JWS enforcement (Tier 2)
 
-Spec-standard endpoints (A2A 1.0):
-  - GET  /.well-known/agent-card.json  — Agent card discovery
-  - POST /tasks                         — submit a task
-  - GET  /tasks/{task_id}               — poll task status + result
-  - POST /tasks/{task_id}:cancel        — cancel a running task
-  - POST /tasks/{task_id}:reject        — reject a task (A2A 1.0)
-  - GET  /tasks/{task_id}:stream        — SSE streaming (A2A 1.0)
-  - GET  /health                        — heartbeat / node status
-  - GET  /skills                        — list skills (A2A 1.0 name)
-
-Legacy endpoints (backward compat):
-  - POST /a2a/tasks
-  - GET  /a2a/tasks/{task_id}
-  - POST /a2a/tasks/{task_id}/cancel
-  - GET  /a2a/health
-  - GET  /a2a/capabilities
-
 Four-question discipline (Contemplative Spine §11):
   1. Which loop?  Central metabolic: opportunity → dispatch → outcome → feedback
   2. Which membrane?  Network boundary between Dharma hub and remote nodes
@@ -360,8 +343,7 @@ async def submit_task_v1(request: Request) -> JSONResponse:
     )
 
 
-# Colon-action routes MUST be registered before the generic /tasks/{task_id}
-# so FastAPI's route matching doesn't greedily capture the suffix.
+# Register colon-action routes before generic /tasks/{task_id} to avoid suffix capture.
 
 
 @router.post("/tasks/{task_id}:cancel", dependencies=[Depends(_verify_api_key)])
