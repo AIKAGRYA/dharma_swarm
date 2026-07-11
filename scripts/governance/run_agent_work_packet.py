@@ -50,6 +50,7 @@ from dharma_swarm.operator_core.onboarding.models import (  # noqa: E402, F401
     WorkPacket,
 )
 from dharma_swarm.operator_core.onboarding.contract import (  # noqa: E402, F401
+    build_gate_environment,
     detect_surface_collisions,
     matching_patterns,
     packet_digest,
@@ -612,8 +613,8 @@ def run_gate(
     argv_prefix: list[str] | None = None,
 ) -> dict[str, Any]:
     started = time.monotonic()
-    env = os.environ.copy() if base_env is None else dict(base_env)
-    env.update(gate.env)
+    inherited = os.environ if base_env is None else base_env
+    env = build_gate_environment(gate, inherited)
     try:
         result = run_command(
             [*(argv_prefix or []), *gate.argv],
@@ -697,6 +698,7 @@ def run_negative_control(repo_root: Path, gate: GateSpec) -> dict[str, Any]:
             _prepare_jail(jail, gate)
         host_env = control_env
         if env_via_argv:
+            control_env = build_gate_environment(replace(gate, env={}), control_env)
             argv_prefix = [
                 *argv_prefix,
                 *_environment_argv(control_env),
