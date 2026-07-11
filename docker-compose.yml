@@ -81,7 +81,7 @@ services:
       dockerfile: Dockerfile.swarm
     container_name: dharma-swarm
     ports:
-      - "7433:7433"   # health API: curl http://localhost:7433/health
+      - "127.0.0.1:7433:7433"   # health API (loopback-only: world bind reopened MeghaDharma exposure on clean redeploys; 2026-07-09 forensics)
     volumes:
       - dharma-state:/root/.dharma
       - ./dharma_swarm:/app/dharma_swarm:ro  # source is READ-ONLY (never mutable)
