@@ -4,7 +4,10 @@ import pytest
 
 from dharma_swarm.memory_kernel.write_receipts import stable_digest
 from scripts.governance import dharmagraph_parity_gauntlet as cli
-from tests.oracle_support.dharmagraph_gauntlet import run_capability_probes
+from tests.oracle_support.dharmagraph_gauntlet import (
+    langgraph_public_surface_manifest,
+    run_capability_probes,
+)
 
 
 def _rubric() -> dict:
@@ -35,6 +38,14 @@ def test_frozen_rubric_is_complete_weighted_and_void_old_scores() -> None:
     assert (
         "typed_v2_invoke" in next(row for row in rows if row["id"] == "LG12")["facets"]
     )
+
+
+def test_public_surface_manifest_normalizes_process_addresses() -> None:
+    first = langgraph_public_surface_manifest()
+    second = langgraph_public_surface_manifest()
+
+    assert first == second
+    assert not any("0x" in entry and "0xADDR" not in entry for entry in first)
 
 
 def test_capability_points_are_derived_from_facet_statuses() -> None:

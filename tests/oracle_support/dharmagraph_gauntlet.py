@@ -21,6 +21,7 @@ import json
 import operator
 import platform
 import random
+import re
 import statistics
 import subprocess
 import sys
@@ -167,7 +168,11 @@ def langgraph_public_surface_manifest() -> list[str]:
                 "langgraph"
             ):
                 try:
-                    signature = str(inspect.signature(value))
+                    signature = re.sub(
+                        r"0x[0-9a-fA-F]+",
+                        "0xADDR",
+                        str(inspect.signature(value)),
+                    )
                 except (TypeError, ValueError):
                     signature = "<no-signature>"
             entries.append(f"{module_name}:{name}:{kind}:{signature}")
