@@ -267,12 +267,28 @@ def classify_context_tier(token_estimate: int) -> str:
     return "SHORT"
 
 
+def _message_content_text(content: object) -> str:
+    """Extract classifier text from plain or structured chat content."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, (list, tuple)):
+        parts = [_message_content_text(part) for part in content]
+        return "\n".join(part for part in parts if part)
+    if isinstance(content, dict):
+        for key in ("text", "content"):
+            if key in content:
+                return _message_content_text(content[key])
+        return ""
+    text = getattr(content, "text", None)
+    return text if isinstance(text, str) else ""
+
+
 def build_routing_signals(request: LLMRequest) -> RoutingSignals:
     chunks: list[str] = []
     if request.system:
         chunks.append(request.system)
     chunks.extend(
-        msg.get("content", "")
+        _message_content_text(msg.get("content", ""))
         for msg in request.messages
         if msg.get("role") in {"user", "assistant"}
     )

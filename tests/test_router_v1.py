@@ -36,6 +36,44 @@ def test_build_routing_signals_reasoning_tier() -> None:
     assert signals.reasoning_markers >= 2
 
 
+def test_build_routing_signals_supports_structured_react_messages() -> None:
+    request = LLMRequest(
+        model="x",
+        system="system",
+        messages=[
+            {"role": "user", "content": "Inspect the conductor failure."},
+            {
+                "role": "assistant",
+                "content": [
+                    {"type": "text", "text": "Analyze the failure step by step."},
+                    {
+                        "type": "tool_use",
+                        "id": "tool-1",
+                        "name": "read_file",
+                        "input": {"path": "/tmp/runtime.json"},
+                    },
+                ],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": "tool-1",
+                        "content": "The runtime contains failure evidence.",
+                    }
+                ],
+            },
+        ],
+    )
+
+    signals = build_routing_signals(request)
+
+    assert signals.complexity_tier == "REASONING"
+    assert signals.reasoning_markers >= 2
+    assert signals.token_estimate > 0
+
+
 def test_enrich_route_request_promotes_quality_for_japanese() -> None:
     route = ProviderRouteRequest(
         action_name="jp_reasoning",
