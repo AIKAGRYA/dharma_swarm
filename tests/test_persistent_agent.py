@@ -202,10 +202,9 @@ class TestMemoryConsolidationReceipts:
             "dharma_swarm.memory_kernel.write_receipts.append_write_receipts",
             side_effect=OSError("ledger unavailable"),
         ):
-            result = await agent._cron_consolidate_memory()
+            with pytest.raises(RuntimeError, match="memory reorg failed"):
+                await agent._cron_consolidate_memory()
 
-        assert result == "error: ledger unavailable"
-        assert "receipt=" not in result
         assert not (state_dir / "holon_reorg" / "receipt_failure.jsonl").exists()
 
 

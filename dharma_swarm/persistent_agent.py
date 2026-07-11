@@ -288,7 +288,7 @@ class PersistentAgent:
                 return f"demoted={demoted} (no mk)"
             return "nothing_to_demote (no mk)"
         except Exception as exc:
-            return f"error: {exc}"
+            raise RuntimeError(f"memory reorg failed: {exc}") from exc
 
     async def _cron_scan_stigmergy(self) -> str:
         """Scan for high-salience marks that might need attention."""
