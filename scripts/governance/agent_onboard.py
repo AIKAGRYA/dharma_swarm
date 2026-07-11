@@ -52,6 +52,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # (Previously a hidden insert inside render_manifest_health was load-bearing.)
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
+from dharma_swarm.operator_core.onboarding.broken_register import (  # noqa: E402
+    parse_broken_register,
+)
+
 EVIDENCE_JSON = REPO_ROOT / "reports/governance/active_track_evidence.json"
 ACTIVE_TRACK = REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml"
 LIVE_OPS = REPO_ROOT / "docs/state/LIVE_OPS_DASHBOARD.md"
@@ -783,34 +787,23 @@ def render_manifest_health() -> None:
 
 def _parse_broken_register() -> dict[str, Any]:
     """Return summary counts and top open BR items."""
-    if not BROKEN_REGISTER.exists():
+    result = parse_broken_register(BROKEN_REGISTER)
+    if not result.present:
         return {"present": False}
-    text = BROKEN_REGISTER.read_text(encoding="utf-8", errors="replace")
-
-    # Split by H3 BR headings, then look at each block's status line.
-    blocks = re.split(r"(?m)^### (BR-\d+[^\n]*)\n", text)
-    # blocks = [pre, heading1, body1, heading2, body2, ...]
-    items = []
-    for i in range(1, len(blocks), 2):
-        heading = blocks[i].strip()
-        body = blocks[i + 1] if i + 1 < len(blocks) else ""
-        status_match = re.search(r"\*\*status:\*\*\s*([^\n]+)", body, re.IGNORECASE)
-        status = status_match.group(1).strip() if status_match else ""
-        # First UPPERCASE word of status (OPEN, PARTIAL, FIXED, CLOSED, ...).
-        # Strip leading bold markers / punctuation.
-        cleaned = re.sub(r"^[\W_]+", "", status)
-        word_match = re.match(r"[A-Z_]+", cleaned)
-        status_word = word_match.group(0) if word_match else "UNKNOWN"
-        items.append({"heading": heading, "status_word": status_word, "status": status})
-
-    open_like = [it for it in items if it["status_word"] in {"OPEN", "PARTIAL", "INVESTIGATING", "WORKAROUND"}]
-    closed_like = [it for it in items if it["status_word"] in {"FIXED", "CLOSED"}]
+    top_open = [
+        {
+            "heading": entry.heading,
+            "status_word": entry.status,
+            "status": entry.raw_status,
+        }
+        for entry in result.open_entries[:3]
+    ]
     return {
         "present": True,
-        "total": len(items),
-        "open_count": len(open_like),
-        "closed_count": len(closed_like),
-        "top_open": open_like[:3],
+        "total": result.total,
+        "open_count": result.open_count,
+        "closed_count": result.closed_count,
+        "top_open": top_open,
     }
 
 

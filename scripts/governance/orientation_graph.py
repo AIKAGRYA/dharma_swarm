@@ -35,7 +35,6 @@ import argparse
 import hashlib
 import importlib.util
 import json
-import re
 import subprocess
 import sys
 import time
@@ -49,6 +48,9 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from dharma_swarm.a2a.agent_presence import list_agent_presence  # noqa: E402
+from dharma_swarm.operator_core.onboarding.broken_register import (  # noqa: E402
+    parse_broken_register,
+)
 
 ORGANISM_DOC = REPO_ROOT / "foundations/THE_ORGANISM.md"
 NORTH_STAR_DOC = REPO_ROOT / "docs/vision_maps/NORTH_STAR.md"
@@ -636,30 +638,12 @@ def build_liveness() -> Liveness:
     )
 
 
-_BR_HEAD = re.compile(r"^###\s+(?P<id>BR-\d+)\s*[—-]\s*(?P<title>.+)$")
-_BR_STATUS = re.compile(r"^-\s*\*\*status:\*\*\s*(?P<status>[A-Z]+)")
-
-
 def build_broken() -> list[BrokenItem]:
-    items: list[BrokenItem] = []
-    if not BROKEN_REGISTER.exists():
-        return items
-    current: BrokenItem | None = None
-    for line in BROKEN_REGISTER.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if stripped.startswith("## CLOSED"):
-            break
-        head = _BR_HEAD.match(stripped)
-        if head:
-            current = BrokenItem(
-                id=head.group("id"), status="OPEN", title=head.group("title").strip()
-            )
-            items.append(current)
-            continue
-        status = _BR_STATUS.match(stripped)
-        if status and current is not None:
-            current.status = status.group("status")
-    return [i for i in items if i.status not in {"FIXED", "CLOSED"}]
+    result = parse_broken_register(BROKEN_REGISTER)
+    return [
+        BrokenItem(id=entry.id, status=entry.status, title=entry.title)
+        for entry in result.open_entries
+    ]
 
 
 def _runtime_db_path() -> Any:

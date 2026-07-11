@@ -110,6 +110,7 @@ closed_tracks: []
     assert [card["title"] for card in payload["cards"] if card["kind"] == "broken_register"] == [
         "BR-001 — open real defect"
     ]
+    assert payload["track_portfolio"]["broken_register"]["open_like_count"] == 1
     assert payload["readiness"]["score"] >= 0
 
     # Branch census enumerates ALL local branches, not just checked-out ones.

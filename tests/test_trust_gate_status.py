@@ -165,6 +165,21 @@ def test_parse_broken_counts(fake_repo: Path) -> None:
     assert counts == (3, 1, 2)
 
 
+def test_c4_unknown_lifecycle_cannot_inflate_closed_ratio(fake_repo: Path) -> None:
+    register = fake_repo / "docs/state/BROKEN_REGISTER.md"
+    register.write_text(
+        "### BR-001 — open\n**status:** OPEN\n\n"
+        "### BR-002 — malformed\n**status:** DEGRADED\n\n"
+        "### BR-003 — fixed\n**status:** FIXED\n",
+        encoding="utf-8",
+    )
+
+    result = tgs.score_c4(fake_repo, [])
+
+    assert any("total=3 open-like=1 closed-like=1" in item for item in result.evidence)
+    assert result.score == 0.667
+
+
 def test_scoreboard_json_schema(fake_repo: Path) -> None:
     payload = tgs.build_scoreboard(fake_repo, runtime_tree=None, branches=[])
     assert payload["schema"] == "dharma_swarm.trust_gate_status.v1"

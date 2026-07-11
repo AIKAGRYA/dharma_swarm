@@ -33,6 +33,12 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+from dharma_swarm.operator_core.onboarding.broken_register import (  # noqa: E402
+    parse_broken_register,
+)
+
 REPORTS_DIR = REPO_ROOT / "reports/governance"
 NORTH_STAR_REL = "docs/vision_maps/NORTH_STAR.md"
 SCHEMA = "dharma_swarm.trust_gate_status.v1"
@@ -238,31 +244,12 @@ def score_c3(repo_root: Path) -> ConditionResult:
     return _result("C3", evidence, score, str(portfolio.relative_to(repo_root)))
 
 
-_BR_HEADING_RE = re.compile(r"(?m)^### (BR-\d+[^\n]*)\n")
-_BR_STATUS_RE = re.compile(r"\*\*status:\*\*\s*([^\n]+)", re.IGNORECASE)
-_OPEN_WORDS = {"OPEN", "PARTIAL", "INVESTIGATING", "WORKAROUND"}
-_CLOSED_WORDS = {"FIXED", "CLOSED"}
-
-
 def parse_broken_counts(register_path: Path) -> tuple[int, int, int] | None:
     """(total, open_like, closed_like) — same parse as agent_onboard.py."""
-    if not register_path.exists():
+    result = parse_broken_register(register_path)
+    if not result.present:
         return None
-    text = register_path.read_text(encoding="utf-8", errors="replace")
-    blocks = _BR_HEADING_RE.split(text)
-    total = open_like = closed_like = 0
-    for i in range(1, len(blocks), 2):
-        body = blocks[i + 1] if i + 1 < len(blocks) else ""
-        sm = _BR_STATUS_RE.search(body)
-        cleaned = re.sub(r"^[\W_]+", "", sm.group(1).strip()) if sm else ""
-        wm = re.match(r"[A-Z_]+", cleaned)
-        word = wm.group(0) if wm else "UNKNOWN"
-        total += 1
-        if word in _OPEN_WORDS:
-            open_like += 1
-        elif word in _CLOSED_WORDS:
-            closed_like += 1
-    return total, open_like, closed_like
+    return result.total, result.open_count, result.closed_count
 
 
 def list_remote_heads(repo_root: Path) -> list[str] | None:
@@ -290,7 +277,7 @@ def score_c4(repo_root: Path, branches: list[str] | None) -> ConditionResult:
     else:
         total, open_like, closed_like = counts
         evidence.append(f"BROKEN_REGISTER: total={total} open-like={open_like} closed-like={closed_like}")
-        denom = open_like + closed_like
+        denom = total
         br_component = 1.0 if denom == 0 else closed_like / denom
 
     if branches is None:

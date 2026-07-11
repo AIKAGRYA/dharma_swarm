@@ -164,6 +164,9 @@ class ControlSurfaceRow:
     declared_state: str = ""
     desired_state: str = ""
     observed_state: str = ""
+    lifecycle_status: str = ""
+    lifecycle_is_open_like: bool = False
+    lifecycle_is_closed_like: bool = False
     coherence_state: str = "unknown"
     priority: str = "unknown"
     owner_module: str = ""
@@ -255,7 +258,7 @@ def _needs_human_decision(row: ControlSurfaceRow) -> bool:
         return True
     if row.authority_role == "incubating" and row.desired_state == "live":
         return True
-    if row.kind == "broken_register" and "OPEN" in row.declared_state.upper():
+    if row.kind == "broken_register" and row.lifecycle_status == "OPEN":
         return True
     if "go_world_receipt_rejections" in row.gap_codes:
         return True
@@ -295,7 +298,7 @@ def _build_human_decision_context(row: ControlSurfaceRow) -> HumanDecisionContex
     elif row.authority_role == "incubating" and row.desired_state == "live":
         why_now = "Incubating surface declared as desired=live"
         recommended_action = f"Implement or promote {row.label}"
-    elif row.kind == "broken_register" and "OPEN" in row.declared_state.upper():
+    elif row.kind == "broken_register" and row.lifecycle_status == "OPEN":
         why_now = f"Open broken register entry: {row.label}"
         recommended_action = f"Fix root cause and close {row.id.replace('br.', 'BR-').replace('_', '-')}"
     elif row.kind == "recursive_discovery" and "human_promotion_required" in row.gap_codes:
