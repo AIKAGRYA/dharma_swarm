@@ -345,44 +345,7 @@ class MemoryPalace:
                 logger.debug("VectorStore recall failed (non-fatal): %s", exc)
 
         # Phase 2b: GraphNexus query — cross-graph concept hits
-        graph_results: list[PalaceResult] = []
-        if self._graph_nexus is not None:
-            try:
-                nexus_result = await self._graph_nexus.query_about(query.text)
-                for hit in getattr(nexus_result, "semantic_hits", []):
-                    relevance = getattr(hit, "relevance", 0.5)
-                    name = getattr(hit, "name", "")
-                    node_type = getattr(hit, "node_type", "")
-                    meta = getattr(hit, "metadata", {})
-                    if isinstance(meta, dict):
-                        meta = dict(meta)
-                    else:
-                        meta = {}
-                    # Boost by graph centrality heuristic
-                    centrality_bonus = min(0.2, len(getattr(hit, "metadata", {}).get("edges", [])) * 0.02)
-                    graph_results.append(PalaceResult(
-                        content=f"[{node_type}] {name}: {meta.get('description', '')}".strip()[:2000],
-                        source=f"graph:{getattr(hit, 'graph', 'nexus')}",
-                        score=relevance + centrality_bonus,
-                        layer="semantic_graph",
-                        metadata={**meta, "graph_origin": getattr(hit, "graph", "")},
-                    ))
-                # Also include temporal and telos hits at lower priority
-                for hit_list in (
-                    getattr(nexus_result, "temporal_hits", []),
-                    getattr(nexus_result, "telos_hits", []),
-                ):
-                    for hit in hit_list[:2]:
-                        name = getattr(hit, "name", "")
-                        graph_results.append(PalaceResult(
-                            content=f"[{getattr(hit, 'node_type', '')}] {name}".strip()[:2000],
-                            source=f"graph:{getattr(hit, 'graph', 'nexus')}",
-                            score=getattr(hit, "relevance", 0.3) * 0.7,
-                            layer="semantic_graph",
-                            metadata={"graph_origin": getattr(hit, "graph", "")},
-                        ))
-            except Exception as exc:
-                logger.debug("GraphNexus recall failed (non-fatal): %s", exc)
+        graph_results = await self._search_graph(query.text, limit=query.max_results * 2)
 
         # Merge: start with lattice results, augment with vector scores
         results = list(lattice_results)
@@ -613,61 +576,47 @@ class MemoryPalace:
         scored.sort(key=lambda x: x[0], reverse=True)
         return [r for _, r in scored]
 
-    def _search_graph(self, query_text: str, limit: int = 5) -> list[PalaceResult]:
-        """Search the GraphStore semantic graph for concept matches.
+    async def _search_graph(self, query_text: str, limit: int = 5) -> list[PalaceResult]:
+        """Search graph projections through the configured GraphNexus adapter."""
+        if self._graph_nexus is None:
+            return []
 
-        Scores hits by: FTS5 relevance + edge count (centrality) + bridge
-        count (cross-graph connections).  Returns PalaceResult items.
-        """
-        if self._graph_store is None:
+        try:
+            nexus_result = await self._graph_nexus.query_about(query_text)
+        except Exception as exc:
+            logger.debug("GraphNexus recall failed (non-fatal): %s", exc)
             return []
 
         results: list[PalaceResult] = []
-        try:
-            nodes = self._graph_store.search_nodes("semantic", query_text, limit=limit)
-        except Exception:
-            return []
-
-        for node in nodes[:limit]:
-            node_id = node.get("id", "")
-            name = node.get("name", "")
-            data = node.get("data", {})
-            definition = ""
-            if isinstance(data, dict):
-                definition = data.get("definition", "")
-
-            content = f"[Concept] {name}"
-            if definition:
-                content += f": {definition[:300]}"
-
-            # Score components
-            try:
-                edge_count = len(self._graph_store.get_edges("semantic", node_id))
-            except Exception:
-                edge_count = 0
-
-            try:
-                bridge_count = len(self._graph_store.get_bridges(
-                    target_graph="semantic", target_id=node_id
-                ))
-            except Exception:
-                bridge_count = 0
-
-            # Composite score: base relevance + centrality bonus + bridge bonus
-            score = 0.5 + min(edge_count * 0.05, 0.3) + min(bridge_count * 0.03, 0.2)
-
+        for hit in getattr(nexus_result, "semantic_hits", [])[:limit]:
+            relevance = getattr(hit, "relevance", 0.5)
+            name = getattr(hit, "name", "")
+            node_type = getattr(hit, "node_type", "")
+            raw_meta = getattr(hit, "metadata", {})
+            meta = dict(raw_meta) if isinstance(raw_meta, dict) else {}
+            centrality_bonus = min(0.2, len(meta.get("edges", [])) * 0.02)
             results.append(PalaceResult(
-                content=content[:2000],
-                source=f"graph:semantic:{node_id}",
-                score=round(score, 4),
-                layer="semantic",
-                metadata={
-                    "node_id": node_id,
-                    "edge_count": edge_count,
-                    "bridge_count": bridge_count,
-                    "origin": "graph_nexus",
-                },
+                content=f"[{node_type}] {name}: {meta.get('description', '')}".strip()[:2000],
+                source=f"graph:{getattr(hit, 'graph', 'nexus')}",
+                score=relevance + centrality_bonus,
+                layer="semantic_graph",
+                metadata={**meta, "graph_origin": getattr(hit, "graph", "")},
             ))
+
+        # Temporal and telos graph projections stay lower priority.
+        for hit_list in (
+            getattr(nexus_result, "temporal_hits", []),
+            getattr(nexus_result, "telos_hits", []),
+        ):
+            for hit in hit_list[:2]:
+                name = getattr(hit, "name", "")
+                results.append(PalaceResult(
+                    content=f"[{getattr(hit, 'node_type', '')}] {name}".strip()[:2000],
+                    source=f"graph:{getattr(hit, 'graph', 'nexus')}",
+                    score=getattr(hit, "relevance", 0.3) * 0.7,
+                    layer="semantic_graph",
+                    metadata={"graph_origin": getattr(hit, "graph", "")},
+                ))
 
         return results
 

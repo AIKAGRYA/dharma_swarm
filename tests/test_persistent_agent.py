@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import asyncio
+import json
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -134,6 +135,78 @@ class TestAcceptTask:
         assert not agent._task_queue.empty()
         task = agent._task_queue.get_nowait()
         assert task == "Check daemon health"
+
+
+class TestMemoryConsolidationReceipts:
+    @pytest.mark.asyncio
+    async def test_governed_receipt_is_appended_before_success_is_reported(self, tmp_path):
+        from dharma_swarm.memory_kernel import (
+            DEFAULT_WRITE_RECEIPT_PATH,
+            MemoryKernelWritePolicyOutcome,
+            load_write_receipts,
+        )
+
+        repo_root = tmp_path / "repo"
+        memory_kernel = SimpleNamespace(
+            config=SimpleNamespace(census=SimpleNamespace(repo_root=repo_root)),
+            iter_episodes=MagicMock(return_value=[SimpleNamespace(id="memory_atom:episode-1")]),
+        )
+        state_dir = tmp_path / "state"
+        agent = PersistentAgent(
+            name="receipt_test",
+            role=AgentRole.CONDUCTOR,
+            provider_type=ProviderType.ANTHROPIC,
+            model="test-model",
+            state_dir=state_dir,
+            memory_kernel=memory_kernel,
+        )
+
+        result = await agent._cron_consolidate_memory()
+
+        receipt_path = repo_root / DEFAULT_WRITE_RECEIPT_PATH
+        receipts, immutable = load_write_receipts(receipt_path)
+        assert immutable is True
+        assert len(receipts) == 1
+        receipt = receipts[0]
+        policy = receipt["policy_decision"]
+        request = receipt["request"]
+        assert isinstance(policy, dict)
+        assert isinstance(request, dict)
+        assert policy["outcome"] == MemoryKernelWritePolicyOutcome.ALLOW
+        assert request["proposed_operation"] == "append_proposal"
+        assert request["target_surface"] == "memory_kernel.write_receipts"
+        assert f"receipt={receipt_path}" in result
+
+        reorg_path = state_dir / "holon_reorg" / "receipt_test.jsonl"
+        reorg_rows = [json.loads(line) for line in reorg_path.read_text().splitlines()]
+        assert reorg_rows[-1]["write_receipt_id"] == receipt["receipt_id"]
+
+    @pytest.mark.asyncio
+    async def test_receipt_append_failure_does_not_claim_or_write_local_reorg(self, tmp_path):
+        repo_root = tmp_path / "repo"
+        memory_kernel = SimpleNamespace(
+            config=SimpleNamespace(census=SimpleNamespace(repo_root=repo_root)),
+            iter_episodes=MagicMock(return_value=[SimpleNamespace(id="memory_atom:episode-1")]),
+        )
+        state_dir = tmp_path / "state"
+        agent = PersistentAgent(
+            name="receipt_failure",
+            role=AgentRole.CONDUCTOR,
+            provider_type=ProviderType.ANTHROPIC,
+            model="test-model",
+            state_dir=state_dir,
+            memory_kernel=memory_kernel,
+        )
+
+        with patch(
+            "dharma_swarm.memory_kernel.write_receipts.append_write_receipts",
+            side_effect=OSError("ledger unavailable"),
+        ):
+            result = await agent._cron_consolidate_memory()
+
+        assert result == "error: ledger unavailable"
+        assert "receipt=" not in result
+        assert not (state_dir / "holon_reorg" / "receipt_failure.jsonl").exists()
 
 
 class TestGateCheck:
