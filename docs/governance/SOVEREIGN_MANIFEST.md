@@ -57,6 +57,63 @@ For machine-readable status, run `python3 scripts/governance/check_track_status.
 
 ---
 
+## Telos Hierarchy
+
+This section is the registry-named owner of the highest invariant in the repository: **what the whole system is for, and how its objectives rank.** Per `docs/governance/CANONICAL_DOC_STACK.md`, this manifest owns axioms and invariants; the telos hierarchy is the invariant that every other doc's "why" is subordinate to. Downstream docs (`docs/vision_maps/NORTH_STAR.md`, `docs/doctrine/OPERATIONAL_DOCTRINE.md`, `docs/doctrine/LIVE_ROADMAP.md`, `docs/loomwork/**`, `docs/research/verified_nature_house/**`, `docs/MEGAFILE_INDEX.md`) carry the *why* and compressed pointers; when any of them disagrees with this section on the hierarchy, **this section wins.**
+
+**Provenance:** this section was first landed 2026-05-08 (commit `7ecf285`, logged in `docs/governance/REPO_GOVERNANCE_AUDIT.md` §"2026-05-08 — Telos Hierarchy Correction", entries C1–C10). That commit's branch never merged to `main`, so the manifest lost the section it is registry-named to own while ~30 downstream docs kept deferring to it — a dangling top authority. The text below restores the section from its own authoritative downstream descriptions: the audit's C1–C10 resolutions and the compressed hierarchy carried in `docs/doctrine/OPERATIONAL_DOCTRINE.md:9-24`. No new doctrine is introduced here; this is a recovery of the ratified invariant into the file that owns it.
+
+### The hierarchy
+
+```
+Jagat Kalyan (JK) — highest telos: welfare / salvation of the world on every level
+│                    (mental, spiritual, ecological, economic, focus, health,
+│                     people finding their highest calling, harmonizing AI,
+│                     human spirit, and nature — JK at full resolution)
+│
+├── DOMAINS — what we work on
+│   ├── Silicon Is Sand (SIS) — the material-body domain objective
+│   │   ├── GAIA / Reciprocity — accounting kernel under SIS
+│   │   └── Loomwork — evidence-weaving / media organ under SIS
+│   └── Attention Emancipation (AE) — separate JK-level domain, UNRESOLVED / not yet typed
+│
+└── METABOLISM — how we sustain the work
+    └── Shakti Ginko — wealth-metabolism organ under JK directly
+
+Dharma Swarm = the self-evolving VSM/cybernetic organism (S1–S5 + Kaizen + DGM)
+               that enacts all of the above. It is the body, not a layer of the telos.
+```
+
+### Layer definitions
+
+- **Jagat Kalyan (JK)** — the highest telos: universal welfare, the salvation of the world on every level. Everything below is a means to JK; nothing outranks it. Stated at full resolution in `docs/vision_maps/NORTH_STAR.md:12-16`.
+
+- **Dharma Swarm (the organism)** — the self-evolving VSM/cybernetic organism that *enacts* the hierarchy. It has S1–S5 anatomy (operations, coordination, control, intelligence, identity) plus Kaizen and DGM (Darwin–Gödel Machine) learning loops (`docs/doctrine/OPERATIONAL_DOCTRINE.md:30`). It is the body serving JK — **not** itself a domain or objective within the telos. Recursion, self-narration, and "papers about our own architecture" are the named anti-pattern (the Mirror Experiment / world-zero), not a telos (`docs/doctrine/OPERATIONAL_DOCTRINE.md:43`).
+
+- **Silicon Is Sand (SIS)** — a JK-level **domain objective**: material-body recognition covering the full material cost of compute — **energy, water, chips, minerals, fabs, labor, land, emissions, e-waste** (audit C3). SIS is the parent objective layer between JK and its accounting/media organs; it is not merely an adjective.
+
+- **GAIA / Reciprocity** — the **accounting kernel under SIS** (the welfare-ton ecological-restoration / carbon-attribution loop). GAIA is **not** a peer-level "deployment platform / operating system" alongside JK; it is a kernel *under* SIS that pays the material debt SIS names (audit C2, C10).
+
+- **Loomwork** — the **evidence-weaving / media organ under SIS**: ecological/material pattern surfacing (casefiles, alerts, maps, briefs, action intelligence for journalists, NGOs, regulators, citizens). Loomwork is a **domain organ under SIS**, **not** a peer of Shakti Ginko (audit C4). Current build status is DESIGN_ONLY (`docs/vision_maps/NORTH_STAR.md` §7). Note the owner boundary: **noosphere propagation is assigned to Darshan / SAB** (`docs/vision_maps/NORTH_STAR.md` §6), not to Loomwork.
+
+- **Attention Emancipation (AE)** — a **separate JK-level domain**, marked **UNRESOLVED / not yet typed** (audit C6). Anti-collapse guard: **AE is not SIS, not productivity tooling, and not generic focus work.** It is named here so it is not silently folded into another domain, but it carries no typed structure yet.
+
+- **Shakti Ginko** — the **wealth-metabolism organ under JK directly**, at peer *priority* to SIS but in a categorically distinct *position* (metabolism vs. domain) (audit C7). Function: **wealth-generation by all means possible**, in service of funding every other domain. Discipline: **trustee, not possessor** — internal trustee discipline is gate-enforced (`shakti.py` quadrature); outward function is unconstrained. Source authority: Sri Aurobindo, *The Mother*, Ch. IV.
+
+### Conditions of consistency (binding on downstream docs)
+
+1. **JK is the ceiling.** No doc may position any domain, organ, or the organism itself as peer to or above Jagat Kalyan.
+2. **SIS is a domain; Shakti Ginko is metabolism.** They may share priority but are never the same category. Do not collapse metabolism into domain or vice versa.
+3. **Loomwork is a child of SIS**, not a peer of Shakti Ginko. Any doc framing them as peers is superseded by this section.
+4. **GAIA is an accounting kernel under SIS**, not a peer-platform of JK.
+5. **AE stays separate and unresolved** until explicitly typed; it must not be collapsed into SIS, productivity tooling, or generic focus work.
+6. **Runtime scoring** (e.g. Loomwork's CompassRoom / `compass.py`) should score candidates against **SIS-fitness primarily, with JK as the ultimate telos** — not JK-fitness directly (audit C5, tracked as drift).
+7. **The organism is the body, not the telos.** Self-referential work that no external human transacts through is the named anti-pattern, not an objective.
+
+Operational grounding: `dharma_swarm/ontology.py:1-30` declares "Palantir built this pattern for supply chains and kill chains. We take the engineering and reforge it for Jagat Kalyan." This hierarchy is the constitutional statement of that reforging.
+
+---
+
 ## GLOBAL AXIOMS
 
 These are immutable engineering laws for this repository. Violation = architectural regression.
@@ -109,15 +166,16 @@ append-style refreshes quadruplicated rows and broke `make docops-integrity`).
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **999** | git ls-files dharma_swarm \| rg '\.py$' \| wc -l |
+| Total Python modules | **1001** | git ls-files dharma_swarm \| rg '\.py$' \| wc -l |
 | Top-level (flat) modules | **443 (44.5%)** | git ls-files dharma_swarm \| rg '^dharma_swarm/[^/]+\.py$' \| wc -l |
-| Total Python LOC | **358,267** | wc -l across dharma_swarm Python modules |
-| Test files | **887** | git ls-files tests \| rg '\.py$' \| wc -l |
-| Test functions | **13,188 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Total Python LOC | **359,619** | wc -l across dharma_swarm Python modules |
+| Test files | **890** | git ls-files tests \| rg '\.py$' \| wc -l |
+| Test functions | **13,216 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **12,885 (measured 2026-07-10, cloud checkout)** | python3 -m pytest tests/ --collect-only -q |
 | Collection errors | **35 (measured 2026-07-10, cloud checkout — env-dependent optional extras; 0 on the operator host 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
 | Markdown files | **1,398** | git ls-files \| rg '\.md$' \| wc -l (excl. AGENTS.md, reports/docops) |
 | Markdown total lines | **293,621** | wc -l across all tracked .md |
+| Markdown total lines | **293,978** | wc -l across all tracked .md |
 | Bridge files | **29** | find dharma_swarm -name "*bridge*.py" -type f |
 | Adapter files | **26** | find dharma_swarm -type f \| rg -i "adapter" |
 | Router files | **19** | find dharma_swarm -type f \| rg -i "rout" |

@@ -35,6 +35,12 @@ def _get_trace_store():
     return get_trace_store()
 
 
+def _get_agent_directory():
+    from api.main import get_agent_directory
+
+    return get_agent_directory()
+
+
 def _get_agent_registry():
     from dharma_swarm.agent_registry import get_registry
 
@@ -303,6 +309,19 @@ async def list_agents() -> ApiResponse:
         return ApiResponse(data=[_agent_to_out(a) for a in agents])
     except Exception as e:
         return ApiResponse(data=[], error=str(e))
+
+
+@router.get("/agents/directory")
+async def list_agent_directory() -> ApiResponse:
+    """Return the stable-UID, credential-safe control-plane directory."""
+    directory = _get_agent_directory()
+    if directory is None:
+        return ApiResponse(status="error", data=[], error="AgentDirectory not initialized")
+    try:
+        entries = await directory.list_entries()
+        return ApiResponse(data=[entry.to_dict() for entry in entries])
+    except Exception as exc:
+        return ApiResponse(status="error", data=[], error=str(exc))
 
 
 @router.get("/agents/{agent_id}")

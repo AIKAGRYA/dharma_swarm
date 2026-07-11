@@ -20,23 +20,6 @@ NOT cover the full A2A 1.0 transport surface.  Specifically:
     - gRPC / NATS transport bindings (Tier 2)
     - OAuth2 / mTLS / JWS enforcement (Tier 2)
 
-Spec-standard endpoints (A2A 1.0):
-  - GET  /.well-known/agent-card.json  — Agent card discovery
-  - POST /tasks                         — submit a task
-  - GET  /tasks/{task_id}               — poll task status + result
-  - POST /tasks/{task_id}:cancel        — cancel a running task
-  - POST /tasks/{task_id}:reject        — reject a task (A2A 1.0)
-  - GET  /tasks/{task_id}:stream        — SSE streaming (A2A 1.0)
-  - GET  /health                        — heartbeat / node status
-  - GET  /skills                        — list skills (A2A 1.0 name)
-
-Legacy endpoints (backward compat):
-  - POST /a2a/tasks
-  - GET  /a2a/tasks/{task_id}
-  - POST /a2a/tasks/{task_id}/cancel
-  - GET  /a2a/health
-  - GET  /a2a/capabilities
-
 Four-question discipline (Contemplative Spine §11):
   1. Which loop?  Central metabolic: opportunity → dispatch → outcome → feedback
   2. Which membrane?  Network boundary between Dharma hub and remote nodes
@@ -93,6 +76,18 @@ _node_card: AgentCard | None = None
 _allowed_keys: set[str] = set()
 _node_id: str = "unknown"
 _started_at: str = ""
+_initialization_error: str = ""
+
+
+def mark_gateway_degraded(error_type: str) -> None:
+    """Record a safe startup failure class without exposing exception details."""
+    global _server, _registry, _node_card, _node_id, _started_at, _initialization_error  # noqa: PLW0603
+    _server = None
+    _registry = None
+    _node_card = None
+    _node_id = "unknown"
+    _started_at = ""
+    _initialization_error = str(error_type or "GatewayInitializationError")
 
 
 def init_gateway(
@@ -112,13 +107,18 @@ def init_gateway(
         node_card: This node's AgentCard (served at /.well-known/).
         node_id: Unique identifier for this node in the fleet.
     """
-    global _server, _registry, _node_card, _node_id, _started_at  # noqa: PLW0603
+    global _server, _registry, _node_card, _node_id, _started_at, _initialization_error  # noqa: PLW0603
+    try:
+        _load_allowed_keys()
+    except Exception as exc:
+        mark_gateway_degraded(type(exc).__name__)
+        raise
     _server = server
     _registry = registry
     _node_card = node_card
     _node_id = node_id
     _started_at = datetime.now(timezone.utc).isoformat()
-    _load_allowed_keys()
+    _initialization_error = ""
     logger.info("Node gateway initialized: node_id=%s", node_id)
 
 
@@ -250,6 +250,10 @@ def _parse_task_from_body(body: dict[str, Any]) -> A2ATask:
 
 def _health_payload() -> dict[str, Any]:
     """Build health check response payload."""
+    initialized = _server is not None and _registry is not None and _node_card is not None
+    health_status = (
+        "online" if initialized else ("degraded" if _initialization_error else "uninitialized")
+    )
     task_counts: dict[str, int] = {}
     if _server is not None:
         for status in A2ATaskStatus:
@@ -263,7 +267,9 @@ def _health_payload() -> dict[str, Any]:
 
     return {
         "node_id": _node_id,
-        "status": "online",
+        "status": health_status,
+        "initialized": initialized,
+        "initialization_error": _initialization_error,
         "started_at": _started_at,
         "checked_at": _utc_now(),
         "task_counts": task_counts,
@@ -337,8 +343,7 @@ async def submit_task_v1(request: Request) -> JSONResponse:
     )
 
 
-# Colon-action routes MUST be registered before the generic /tasks/{task_id}
-# so FastAPI's route matching doesn't greedily capture the suffix.
+# Register colon-action routes before generic /tasks/{task_id} to avoid suffix capture.
 
 
 @router.post("/tasks/{task_id}:cancel", dependencies=[Depends(_verify_api_key)])
@@ -417,7 +422,8 @@ async def get_task_v1(task_id: str) -> JSONResponse:
 @router.get("/health")
 async def health_check_v1() -> JSONResponse:
     """Heartbeat (A2A 1.0 spec path)."""
-    return JSONResponse(content=_health_payload())
+    payload = _health_payload()
+    return JSONResponse(content=payload, status_code=200 if payload["initialized"] else 503)
 
 
 @router.get("/skills", dependencies=[Depends(_verify_api_key)])
@@ -482,7 +488,8 @@ async def cancel_task_legacy(task_id: str) -> JSONResponse:
 @router.get("/a2a/health")
 async def health_check_legacy() -> JSONResponse:
     """Heartbeat (legacy path)."""
-    return JSONResponse(content=_health_payload())
+    payload = _health_payload()
+    return JSONResponse(content=payload, status_code=200 if payload["initialized"] else 503)
 
 
 @router.get("/a2a/capabilities", dependencies=[Depends(_verify_api_key)])

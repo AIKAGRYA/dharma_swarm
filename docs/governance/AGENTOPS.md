@@ -40,9 +40,34 @@ Required fields:
 }
 ```
 
-`gates[].command` is parsed with `shlex` and executed without a shell. Shell
-control tokens are rejected. Gate commands cannot run merge, push, or other
-mutating git integration operations.
+`gates[].command` is parsed with `shlex` and executed without an implicit
+shell. This is syntactic admission, not an arbitrary-command sandbox or proof
+of transitive behavior. Session Entry packets are trusted declarative code:
+shell-control tokens and known direct shell/wrapper or mutating-Git forms are
+rejected, but an admitted interpreter or alternate client can still perform
+process, network, or filesystem I/O. The active onboarding hardening track
+owns the direct Git lexical closure in WP-O1R, the positive command-family
+allowlist in WP-O4, and terminal syscall/no-network evidence in WP-O6. Until
+those packets land, never treat gate parsing alone as proof that a command
+cannot indirectly merge, push, or invoke a shell.
+WP-O1R may place only its private lexical mechanics in
+`dharma_swarm/operator_core/onboarding/_command_lexical.py` to preserve the
+500-line module budget. The dependency is one-way: the stdlib-only helper
+splits and classifies command/Git lexemes and mechanically evaluates the
+exact shapes whose constants and ownership remain in `contract.py`; it returns
+values or booleans only and defines no allowlist constant of its own.
+`contract.py` passes its grammar constants into the inspection call and
+retains `_parse_command`, grammar ownership, every final admission decision,
+and every `AgentOpsError`. The
+helper is not exported, accepts no packet, executes no command, raises no
+admission exception, and does not create a second WP-O1R direct-command policy
+engine or owner. Before an admitted direct Git gate executes,
+`run_agent_work_packet.py` must use the contract-owned environment builder to
+remove inherited `GIT_*` process controls case-insensitively and then set only
+`GIT_CONFIG_GLOBAL=os.devnull`, `GIT_CONFIG_NOSYSTEM=1`, and
+`GIT_OPTIONAL_LOCKS=0`. The runner also applies that builder before a
+negative-control environment is encoded into `env -i` argv; packet-supplied
+environment remains fail-closed.
 
 Legacy gates may omit `expected_exit`, which adapts to `0`. A declared
 `expected_exit` is graded against the actual process exit and both values are

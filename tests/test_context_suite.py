@@ -108,6 +108,11 @@ def test_docs_agents_md_is_scoped_and_defers() -> None:
     # The gate's trust boundary is owned by CLAUDE.md; this file must not
     # grow its own copy of the onboarding section again.
     assert "single remembered gate" not in text
+    assert "read-only projection" in text
+    assert "owner files win" in text
+    assert "trust the output and fix the prose" not in text
+    assert "Root `/AGENTS.md`" in text
+    assert "tracked minimal entrypoint" in text
 
 
 def test_suite_evidence_docs_exist() -> None:

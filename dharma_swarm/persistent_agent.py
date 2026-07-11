@@ -223,7 +223,18 @@ class PersistentAgent:
             if getattr(self, "_memory_kernel", None):
                 mk = self._memory_kernel
                 eps = list(mk.iter_episodes(limit_per_surface=12))
+                if not eps:
+                    return "nothing_to_reorganize (mk)"
+
                 from dharma_swarm.memory_kernel import writers as mk_writers
+                from dharma_swarm.memory_kernel.write_receipts import (
+                    DEFAULT_WRITE_RECEIPT_PATH,
+                    MemoryKernelWritePolicyOutcome,
+                    MemoryKernelWriteReceiptInput,
+                    append_write_receipts,
+                    governed_write_receipt,
+                )
+
                 specs = mk_writers.default_writer_specs() if hasattr(mk_writers, "default_writer_specs") else []
                 facts = min(3, len(eps))
                 edges = 1 if len(eps) > 4 else 0
@@ -237,35 +248,36 @@ class PersistentAgent:
                     "writer_specs": len(specs),
                     "bi_temporal": True,
                 }
+
+                request = MemoryKernelWriteReceiptInput(
+                    source_atom_ids=tuple(getattr(e, "id", str(i)) for i, e in enumerate(eps[:6])),
+                    proposed_operation="append_proposal",
+                    target_surface="memory_kernel.write_receipts",
+                    reason="sleep-time reorg (raw EPISODE -> FACT/EDGE for long-horizon context bridging)",
+                    reviewer_state="auto_scheduled_cron",
+                )
+                receipt = governed_write_receipt(request)
+                if receipt.policy_decision.outcome != MemoryKernelWritePolicyOutcome.ALLOW:
+                    reasons = ",".join(receipt.policy_decision.reasons)
+                    raise RuntimeError(f"memory reorg receipt denied: {reasons}")
+
+                repo_root = Path(mk.config.census.repo_root)
+                write_receipt_path = repo_root / DEFAULT_WRITE_RECEIPT_PATH
+                append_write_receipts(write_receipt_path, (receipt,))
+
+                # The local reorg file is a projection only. Do not create or
+                # report it until the governed receipt ledger append succeeds.
                 reorg_dir = self.state_dir / "holon_reorg"
                 reorg_dir.mkdir(parents=True, exist_ok=True)
-                rp = reorg_dir / f"{self.name}.jsonl"
-                import json
-                with open(rp, "a", encoding="utf-8") as f:
+                reorg_path = reorg_dir / f"{self.name}.jsonl"
+                with open(reorg_path, "a", encoding="utf-8") as f:
                     f.write(json.dumps(reorg) + "\n")
-                # p4: governed proposal via write_receipts (existing surface, no new authority).
-                reorg_receipt_path = None
-                try:
-                    from dharma_swarm.memory_kernel.write_receipts import governed_write_receipt, MemoryKernelWriteReceiptInput
-                    req = MemoryKernelWriteReceiptInput(
-                        source_atom_ids=tuple(getattr(e, "id", str(i)) for i, e in enumerate(eps[:6])),
-                        proposed_operation="promote_high_salience_episodes_to_fact_edge",
-                        target_surface="home.memory_kernel.promoted",
-                        reason="sleep-time reorg (raw EPISODE -> FACT/EDGE for long-horizon context bridging)",
-                        reviewer_state="auto_scheduled_cron",
-                    )
-                    rec = governed_write_receipt(req)
-                    reorg_receipt_path = str(rp)
-                    # also append the reorg summary as a sidecar artifact for external re-read
-                    with open(rp, "a", encoding="utf-8") as f:
-                        f.write(json.dumps({"write_receipt_id": getattr(rec, "receipt_id", None)}) + "\n")
-                except Exception:
-                    pass
+                    f.write(json.dumps({"write_receipt_id": receipt.receipt_id}) + "\n")
 
-                result = f"reorg: raw={len(eps)} facts={facts} edges={edges} artifact={rp.name}"
-                if reorg_receipt_path:
-                    result += f" receipt={reorg_receipt_path}"
-                return result
+                return (
+                    f"reorg: raw={len(eps)} facts={facts} edges={edges} "
+                    f"artifact={reorg_path.name} receipt={write_receipt_path}"
+                )
             # legacy simple path (no mk)
             bank = self._agent.memory
             await bank.load()
@@ -276,7 +288,7 @@ class PersistentAgent:
                 return f"demoted={demoted} (no mk)"
             return "nothing_to_demote (no mk)"
         except Exception as exc:
-            return f"error: {exc}"
+            raise RuntimeError(f"memory reorg failed: {exc}") from exc
 
     async def _cron_scan_stigmergy(self) -> str:
         """Scan for high-salience marks that might need attention."""
