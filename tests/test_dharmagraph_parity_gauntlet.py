@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from dharma_swarm.memory_kernel.write_receipts import stable_digest
@@ -146,7 +148,11 @@ def test_matrix_leads_with_number_and_named_gap() -> None:
                     "schema": {
                         "status": "pass",
                         "evidence": [{"id": "probe-schema", "kind": "probe"}],
-                    }
+                    },
+                    "alpha": {
+                        "status": "missing",
+                        "evidence": [{"id": "probe-alpha", "kind": "probe"}],
+                    },
                 },
                 "caveats": ["partial"],
             }
@@ -165,6 +171,7 @@ def test_matrix_leads_with_number_and_named_gap() -> None:
     assert matrix.startswith("# DharmaGraph x LangGraph parity: 12.00/100")
     assert "parity-gap-lg01-schemas" in matrix
     assert "NOT_FINISHED" in matrix
+    assert matrix == cli.render_matrix(json.loads(json.dumps(receipt, sort_keys=True)))
 
 
 def test_full_harness_covers_every_frozen_row_and_broken_control() -> None:

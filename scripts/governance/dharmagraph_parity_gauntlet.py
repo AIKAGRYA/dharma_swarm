@@ -883,7 +883,7 @@ def _build_receipt(
 
 def _evidence_pointer(row: Mapping[str, Any]) -> str:
     pointers: list[str] = []
-    for facet_id, cell in row.get("facets", {}).items():
+    for facet_id, cell in sorted(row.get("facets", {}).items()):
         for evidence in cell.get("evidence", []):
             if isinstance(evidence, Mapping):
                 evidence_id = (
