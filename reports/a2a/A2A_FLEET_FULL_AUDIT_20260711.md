@@ -142,6 +142,101 @@ Focused current-main tests passed when the declared async plugins were supplied:
 226 passed, 1 skipped in 6.19s
 ```
 
+## Independent audit addendum
+
+Three parallel independent audits completed after the first report draft. They confirm the overall 40/100 verdict and add the following implementation-level defects.
+
+### CRITICAL: source message is ACKed before semantic completion
+
+The live `hermes_remote_a2a_bridge.py` currently:
+
+1. writes the inbox file;
+2. publishes `HANDLER_ACKED`;
+3. broker-ACKs the source message;
+4. only then starts Hermes/model semantic work.
+
+Evidence: live bridge lines `329-344`, with semantic execution beginning at `362-363` in the deployed copy.
+
+A crash between broker ACK and semantic invocation loses the semantic job permanently. `MaxDeliver=5` cannot help because the source message is already ACKed. This is a stronger defect than simple reply timeout.
+
+**Required correction:** durably commit a semantic-job/inbox row and transactional outbox before broker ACK. Resume unfinished semantic jobs after restart. Emit `HANDLER_ACKED` only for the delivery step and a separate semantic/domain receipt after model completion.
+
+### HIGH: reply retention exists, but no operational reply-recovery loop is running
+
+- Operators such as the SAB flywheel subscribe ephemerally and exit after roughly 90 seconds.
+- The bridge publishes replies through core `nc.publish()+flush()`, not `js.publish()`, so the publisher does not receive JetStream stream/sequence evidence.
+- No durable reply-capture daemon was found running.
+- Repo `a2a_reply_capture.py` defaults to localhost and `DHARMA_FLEET`, not the actual AGNI `DHARMA_A2A` field.
+- Several base agent subjects still lack equivalent reply/ACK wildcard coverage.
+
+A late response may exist on the broker yet remain invisible to the operation that requested it.
+
+### HIGH: poison-message, retry, deduplication, and DLQ behavior violate the target contract
+
+- invalid JSON is ACKed and discarded;
+- live publishes do not consistently set `Nats-Msg-Id`;
+- duplicate packet IDs can overwrite one inbox artifact;
+- semantic failures happen after source ACK and are not retried;
+- max-deliver exhaustion does not emit a typed DLQ event.
+
+The live bridge needs an inbox/outbox transaction, packet/event-ID uniqueness, deterministic duplicate receipts, bounded retry, and typed dead-letter publication.
+
+### HIGH: the advertised A2A power tool can prove transport while missing semantics
+
+The deployed `a2a_power_tool.py` emits `type: "a2a_message"` without `semantic_required`. The bridge's semantic matcher does not treat that as semantic by default. Its announce target `"*"` also has no matching wildcard behavior in `Bridge.is_target()`, and wildcard listeners do not consistently filter packet IDs.
+
+Therefore `probe`/`announce` can report ACK activity without proving their advertised semantic or fleet-wide behavior.
+
+### HIGH: BoardStore is declared live but production commands bypass it
+
+Current repo evidence shows:
+
+- `ACTIVE_SURFACE_MANIFEST.yaml` declares BoardStore live;
+- `BoardStoreFacade(...)` and `TaskBoardAdapter(...)` production construction was not found outside tests/examples;
+- `/api/commands/tasks` routes still call `get_swarm()` / `SwarmManager` directly;
+- A2A appears on the control surface only through local receipt-file projections.
+
+BoardStore is therefore not currently the shared command/task SSOT. It should be marked `shadow` until all command mutations pass through one app-scoped facade/outbox.
+
+### HIGH: mounted node gateway is uninitialized and reports false health
+
+`api/main.py` mounts the node gateway router, but no production `init_gateway(...)` call was found. Card/task/skill routes can return 503 while `_health_payload()` still reports `online`.
+
+Health must expose `uninitialized/degraded` until the gateway shares the canonical `AgentDirectory`, runtime store, and transport.
+
+### HIGH: agent identity and dispatch are split across incompatible registries
+
+Cards, `NodeRegistry`, `CardRegistry`, telemetry registration, onboarding receipts, and the fleet field registry are not one UID-keyed aggregate. Remote HTTP dispatch can bypass NATS, board events, execution identity, and the runtime receipt spine; it may treat `submitted`/`working` as success.
+
+Create one `AgentDirectory` aggregate keyed by stable UID. Cards, registry YAML, telemetry, and node files become projections. Credentials remain secret references, never serialized key values.
+
+### HIGH: registry/presence status is not a liveness projection
+
+Independent timestamps showed registry and holon records many hours stale while bridge heartbeat and semantic receipts were fresh. The system needs separate fields and TTLs for:
+
+- configured/registered;
+- `last_heartbeat`;
+- `last_transport_seen`;
+- `last_handler_ack`;
+- `last_semantic_seen`;
+- `last_domain_receipt`.
+
+No single `active` boolean should collapse these evidence tiers.
+
+### MEDIUM: memory authority and receipt paths remain fragmented
+
+Independent repo inspection found:
+
+- 83 configured memory surfaces, only 3 existing in the dry-run census;
+- `MemoryPalace._search_graph` accesses `_graph_store`, but initialization sets `_graph_nexus`, producing a verified `AttributeError`;
+- persistent-agent memory reorganization creates a `MemoryKernelWriteReceipt` but does not append it to the governed receipt ledger before reporting the local reorganization file.
+
+MemoryKernel should be the only production read/write facade. Vector, graph, lattice, and legacy stores should be adapters/projections with content-addressed IDs. Governed writes must fail unless the canonical receipt append succeeds.
+
+### MEDIUM: mobile gateway resource margin is unsafe
+
+The persistent Telegram gateway was observed near its configured pressure limit: roughly 799 MB RSS against `MemoryHigh=800M`, with swap already in use. The board/control plane should be a separate supervised service with bounded resources; a Telegram OOM or restart must not drop canonical command state.
+
 ## Root architectural defects
 
 ### P0-1: Shared subject identity collision
