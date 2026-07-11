@@ -12,7 +12,8 @@ import asyncio
 import importlib.util
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -344,3 +345,27 @@ class TestPalaceQueryConfig:
     def test_custom_weights(self):
         q = PalaceQuery(text="test", weight_semantic=0.8, weight_lexical=0.2)
         assert q.weight_semantic == 0.8
+
+
+def test_search_graph_uses_configured_graph_nexus():
+    nexus = SimpleNamespace(
+        query_about=AsyncMock(return_value=SimpleNamespace(
+            semantic_hits=[SimpleNamespace(
+                relevance=0.8,
+                name="autopoiesis",
+                node_type="concept",
+                metadata={"description": "self-producing system", "edges": ["e1"]},
+                graph="semantic",
+            )],
+            temporal_hits=[],
+            telos_hits=[],
+        ))
+    )
+    palace = MemoryPalace(graph_nexus=nexus)
+
+    results = _run(palace._search_graph("autopoiesis", limit=3))
+
+    nexus.query_about.assert_awaited_once_with("autopoiesis")
+    assert [result.content for result in results] == [
+        "[concept] autopoiesis: self-producing system"
+    ]
