@@ -905,8 +905,12 @@ def render_matrix(receipt: Mapping[str, Any]) -> str:
         "",
         f"**Verdict: {receipt['verdict']}. Closeout blocked: {str(receipt['closeout_blocked']).lower()}.**",
         "",
-        f"Target: LangGraph `{receipt['environment']['langgraph_version']}` at tag SHA `{receipt['shas']['langgraph_git_sha']}`. ",
-        f"Rubric commit: `{receipt['rubric']['rubric_commit_sha']}`. Dharma SHA: `{receipt['shas']['dharma_git_sha']}`.",
+        (
+            f"Target: LangGraph `{receipt['environment']['langgraph_version']}` "
+            f"at tag SHA `{receipt['shas']['langgraph_git_sha']}`. Rubric commit: "
+            f"`{receipt['rubric']['rubric_commit_sha']}`. Dharma SHA: "
+            f"`{receipt['shas']['dharma_git_sha']}`."
+        ),
         "",
         "## Gaps",
         "",
