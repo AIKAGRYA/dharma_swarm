@@ -1,0 +1,52 @@
+# Idea-Spark & Magpie track block — DRAFT, not active
+#
+# Source: claude-code, 2026-07-11, from the estate 20-theme funnel + per-track
+# deep review (docs/governance/ESTATE_THEMES_TRACK_LINKAGE_2026-07-11.md).
+# This is a QUEUE proposal only — it does not gate CI and is not load-bearing
+# until an operator promotes it into ACTIVE_TRACK.yaml. The active portfolio is
+# currently FULL (max_active: 10); this waits for a slot or runs as a declared
+# parallel_lane first.
+#
+# WHY A TRACK, NARROWLY: most of theme 13 is already resolved on origin/main —
+# the Go/NATS "GO_IDEA_SPARK_INGEST_SPINE" shipped via PR #474 (2026-06-06, a
+# same-named-but-unrelated system) and brief-to-spec-seam is content-identical
+# on main. The ONE unresolved asset is dharma_swarm/idea_spark/ — a 13-module
+# Python package (~10 tests, a doc, 27 commits PR0..PR16) pushed to
+# origin/feat/operator-idea-spark-ingest but NEVER merged, with three
+# 2026-06-27 validation findings (F1 triage miscalibration, F2 thin commons,
+# F3 triage-advisory-not-gate) still open. No track owns the rebase-or-retire
+# decision, and THE MAGPIE idea-miner has gone quiet with no written
+# continue/retire call. This track exists to force that reconciliation, not to
+# build something new.
+
+proposed_track:
+  id: idea-spark-magpie-reconcile-2026-07
+  name: Idea-Spark & Magpie — reconcile the unmerged ingest spine
+  serves: substrate-nativeness
+  status: PROPOSED
+  owner: operator            # promotion is operator-only
+  proposed_by: claude-code
+  proposed_at: 2026-07-11
+  ttl_days: 30
+  intent: >
+    Resolve the last un-adopted idea-ingest asset (origin/feat/operator-idea-spark-ingest,
+    27 commits) with an honest rebase-and-PR vs harvest-and-drop decision, and record an
+    explicit continue-or-retire disposition for THE MAGPIE — so this theme stops sitting
+    half-built.
+  completion_criteria:
+    - id: reconciliation_triage_exists
+      kind: file_exists
+      file: reports/governance/idea_spark_magpie_reconciliation_triage.md
+      pattern: null   # honest read: rebasable? conflict surface? F1-F3 still open? rebase-and-PR vs harvest-and-drop
+    - id: idea_spark_package_on_main
+      kind: file_exists
+      file: dharma_swarm/idea_spark/__init__.py    # only if triage says rebase
+    - id: idea_spark_e2e_test_on_main
+      kind: file_exists
+      file: tests/test_operator_idea_spark_ingest_e2e.py
+    - id: live_ingest_doc_on_main
+      kind: file_exists
+      file: docs/ops/OPERATOR_IDEA_SPARK_LIVE_INGEST.md
+    - id: magpie_disposition_recorded
+      kind: file_exists
+      file: docs/agents/magpie/DISPOSITION_2026-07.md    # explicit continue-or-retire, written down

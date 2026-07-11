@@ -1,0 +1,54 @@
+# Ontology & Language Research track block — DRAFT, not active
+#
+# Source: claude-code, 2026-07-11, from the estate 20-theme funnel + per-track
+# deep review (docs/governance/ESTATE_THEMES_TRACK_LINKAGE_2026-07-11.md).
+# QUEUE proposal only — not load-bearing until an operator promotes it.
+#
+# WHY THIS SERVES research-depth (which has only ONE active track today,
+# hyperbolic-time-chamber): the substrate is already merged and adopted on
+# origin/main — core-four ontology (dharma_swarm/ontology.py + 5 modules, API
+# router, dashboard hook) is live, not orphaned. What is NOT closed:
+#   - ADR-008 (api_name grammar) header still reads "Status: PROPOSED (awaiting
+#     operator ratification)" — 5+ weeks stale (since 2026-06-01), no owner.
+#   - NAGA-IR spec triple + UCL kernel_p0 work lives on branches
+#     (naga-ir-elevate-20260704, telos_titanium/ucl_kernel_p0,
+#     telos_titanium/naga_ir_language_womb_seed) and origin/telos_titanium/
+#     dharma_lane_research — with ZERO adoption citations (0 callers outside
+#     specs/, per memory). This track owns closing the ratification + first-
+#     adopter loop and reconciling the research lanes, NOT open-ended research.
+
+proposed_track:
+  id: ontology-language-research-2026-07
+  name: Ontology & Language Research — ratify + first-adopter + lane reconcile
+  serves: research-depth
+  status: PROPOSED
+  owner: operator
+  proposed_by: claude-code
+  proposed_at: 2026-07-11
+  ttl_days: 30
+  intent: >
+    Close the open ontology/language-research loops that no active track owns: ratify
+    ADR-008, land the NAGA-IR spec + UCL kernel_p0 on main with a first real adopter
+    (kill the 0-adoption-citations gap), and reconcile the scattered research lanes into
+    origin/telos_titanium/dharma_lane_research (or explicitly retire them).
+  completion_criteria:
+    - id: adr008_ratified
+      kind: file_contains
+      file: docs/architecture/ADRs/ADR-008-ontology-api-name-grammar.md
+      pattern: "Status:** RATIFIED"
+    - id: naga_ir_spec_on_main
+      kind: file_exists
+      file: specs/naga_ir/core.md
+    - id: ucl_kernel_p0_on_main
+      kind: file_exists
+      file: packages/telos-kernel/ucl_0/receipt/identity.py
+    - id: naga_ir_first_adopter_exists
+      kind: file_contains
+      file: reports/governance/naga_ir_adoption_evidence.md
+      pattern: "callers_outside_specs: 1"
+    - id: ucl_kernel_tests_green_on_main
+      kind: file_exists
+      file: packages/telos-kernel/ucl_0/tests/test_receipt_p0.py
+    - id: research_lanes_reconciled
+      kind: file_exists
+      file: reports/governance/ontology_language_research_lane_reconcile.md   # naga-ir-elevate + ucl_kernel_p0 merged-or-retired vs dharma_lane_research
