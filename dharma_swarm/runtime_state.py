@@ -13,7 +13,7 @@ import json
 import re
 import sqlite3
 from dataclasses import dataclass, field, replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -320,6 +320,18 @@ def _utc_now() -> datetime:
 
 def _utc_now_iso() -> str:
     return _utc_now().isoformat()
+
+
+def _next_idempotency_token(
+    observed: datetime | None, floor: datetime | None = None,
+) -> str:
+    candidates = [_utc_now()]
+    if observed is not None:
+        observed = observed.replace(tzinfo=observed.tzinfo or timezone.utc)
+        candidates.append(observed + timedelta(microseconds=1))
+    if floor is not None:
+        candidates.append(floor.replace(tzinfo=floor.tzinfo or timezone.utc))
+    return max(candidates).isoformat()
 
 
 def _new_id(prefix: str) -> str:
@@ -3272,8 +3284,8 @@ class RuntimeStateStore:
         existing: IdempotencyRecord,
         *,
         metadata: dict[str, Any] | None = None,
-    ) -> IdempotencyRecord:
-        now = _utc_now_iso()
+    ) -> bool:
+        now = _next_idempotency_token(existing.updated_at)
         merged_metadata = _merge_idempotency_metadata(
             existing,
             {
@@ -3283,30 +3295,29 @@ class RuntimeStateStore:
             },
         )
         async with aiosqlite.connect(self.db_path) as db:
-            await db.execute(
+            cur = await db.execute(
                 "UPDATE idempotency_records SET status = 'stale',"
                 " metadata_json = ?, updated_at = ?"
-                " WHERE idempotency_key = ? AND side_effect_key = ?",
+                " WHERE idempotency_key = ? AND side_effect_key = ?"
+                " AND status = 'started' AND updated_at = ?",
                 (
                     _json_dump(merged_metadata),
                     now,
                     existing.idempotency_key,
                     existing.side_effect_key,
+                    existing.updated_at.isoformat(),
                 ),
             )
             await db.commit()
-        record = await self.get_idempotency_record(existing.idempotency_key, existing.side_effect_key)
-        if record is None:
-            raise KeyError(f"idempotency record {existing.idempotency_key}:{existing.side_effect_key} not found")
-        return record
+        return int(cur.rowcount or 0) == 1
 
     def _mark_idempotency_record_stale_sync(
         self,
         existing: IdempotencyRecord,
         *,
         metadata: dict[str, Any] | None = None,
-    ) -> IdempotencyRecord:
-        now = _utc_now_iso()
+    ) -> bool:
+        now = _next_idempotency_token(existing.updated_at)
         merged_metadata = _merge_idempotency_metadata(
             existing,
             {
@@ -3317,22 +3328,21 @@ class RuntimeStateStore:
         )
         with sqlite3.connect(self.db_path) as db:
             _apply_connection_pragmas_sync(db)
-            db.execute(
+            cur = db.execute(
                 "UPDATE idempotency_records SET status = 'stale',"
                 " metadata_json = ?, updated_at = ?"
-                " WHERE idempotency_key = ? AND side_effect_key = ?",
+                " WHERE idempotency_key = ? AND side_effect_key = ?"
+                " AND status = 'started' AND updated_at = ?",
                 (
                     _json_dump(merged_metadata),
                     now,
                     existing.idempotency_key,
                     existing.side_effect_key,
+                    existing.updated_at.isoformat(),
                 ),
             )
             db.commit()
-        record = self.get_idempotency_record_sync(existing.idempotency_key, existing.side_effect_key)
-        if record is None:
-            raise KeyError(f"idempotency record {existing.idempotency_key}:{existing.side_effect_key} not found")
-        return record
+        return int(cur.rowcount or 0) == 1
 
     async def _handle_existing_idempotency_record(
         self,
@@ -3364,17 +3374,18 @@ class RuntimeStateStore:
             and stale_after_seconds is not None
             and (_utc_now() - existing.updated_at).total_seconds() >= stale_after_seconds
         ):
-            await self._mark_idempotency_record_stale(existing, metadata=metadata)
-            await self.record_idempotency_consumed(
-                identity,
-                existing.side_effect_key,
-                status="stale",
-                payload={
-                    **dict(metadata or {}),
-                    "stale_after_seconds": stale_after_seconds,
-                },
-            )
-            return
+            marked = await self._mark_idempotency_record_stale(existing, metadata=metadata)
+            if marked:
+                await self.record_idempotency_consumed(
+                    identity,
+                    existing.side_effect_key,
+                    status="stale",
+                    payload={
+                        **dict(metadata or {}),
+                        "stale_after_seconds": stale_after_seconds,
+                    },
+                )
+                return
         await self.record_idempotency_consumed(
             identity,
             existing.side_effect_key,
@@ -3412,17 +3423,18 @@ class RuntimeStateStore:
             and stale_after_seconds is not None
             and (_utc_now() - existing.updated_at).total_seconds() >= stale_after_seconds
         ):
-            self._mark_idempotency_record_stale_sync(existing, metadata=metadata)
-            self.record_idempotency_consumed_sync(
-                identity,
-                existing.side_effect_key,
-                status="stale",
-                payload={
-                    **dict(metadata or {}),
-                    "stale_after_seconds": stale_after_seconds,
-                },
-            )
-            return
+            marked = self._mark_idempotency_record_stale_sync(existing, metadata=metadata)
+            if marked:
+                self.record_idempotency_consumed_sync(
+                    identity,
+                    existing.side_effect_key,
+                    status="stale",
+                    payload={
+                        **dict(metadata or {}),
+                        "stale_after_seconds": stale_after_seconds,
+                    },
+                )
+                return
         self.record_idempotency_consumed_sync(
             identity,
             existing.side_effect_key,
@@ -3430,19 +3442,20 @@ class RuntimeStateStore:
             payload=metadata,
         )
 
-    async def try_begin_idempotent_side_effect(
+    async def try_begin_idempotent_side_effect_with_token(
         self,
         identity: ExecutionIdentity,
         side_effect_key: str,
         *,
         metadata: dict[str, Any] | None = None,
         stale_after_seconds: float | None = None,
-    ) -> bool:
+        ownership_time: datetime | None = None,
+    ) -> datetime | None:
         identity.require_for_dispatch()
         if not side_effect_key:
             raise ValueError("side_effect_key is required")
         await self.init_db()
-        now = _utc_now_iso()
+        now = _next_idempotency_token(None, ownership_time)
         async with aiosqlite.connect(self.db_path) as db:
             cur = await db.execute(
                 "INSERT OR IGNORE INTO idempotency_records (idempotency_key,"
@@ -3473,20 +3486,30 @@ class RuntimeStateStore:
                 metadata=metadata,
                 stale_after_seconds=stale_after_seconds,
             )
-            return False
+            return None
         await self.record_idempotency_consumed(
             identity,
             side_effect_key,
             status="accepted",
             payload=metadata,
         )
-        if inserted:
-            await self.record_side_effect_intent(
-                identity,
-                side_effect_key,
-                payload=metadata,
-            )
-        return inserted
+        await self.record_side_effect_intent(identity, side_effect_key, payload=metadata)
+        return datetime.fromisoformat(now)
+
+    async def try_begin_idempotent_side_effect(
+        self,
+        identity: ExecutionIdentity,
+        side_effect_key: str,
+        *,
+        metadata: dict[str, Any] | None = None,
+        stale_after_seconds: float | None = None,
+    ) -> bool:
+        """Preserve the public boolean begin API."""
+        token = await self.try_begin_idempotent_side_effect_with_token(
+            identity, side_effect_key, metadata=metadata,
+            stale_after_seconds=stale_after_seconds,
+        )
+        return token is not None
 
     def try_begin_idempotent_side_effect_sync(
         self,
@@ -3555,29 +3578,30 @@ class RuntimeStateStore:
         status: str = "completed",
         result_receipt_id: str = "",
         metadata: dict[str, Any] | None = None,
+        expected_updated_at: datetime | None = None,
     ) -> IdempotencyRecord:
         identity.require_for_dispatch()
         await self.init_db()
-        now = _utc_now_iso()
         existing = await self.get_idempotency_record(identity.idempotency_key, side_effect_key)
         if existing is None:
             raise KeyError(f"idempotency record {identity.idempotency_key}:{side_effect_key} not found")
+        now = _next_idempotency_token(expected_updated_at or existing.updated_at)
         merged_metadata = _merge_idempotency_metadata(existing, metadata)
         async with aiosqlite.connect(self.db_path) as db:
-            await db.execute(
+            sql = (
                 "UPDATE idempotency_records SET status = ?, result_receipt_id = ?,"
                 " metadata_json = ?, updated_at = ?"
-                " WHERE idempotency_key = ? AND side_effect_key = ?",
-                (
-                    status,
-                    result_receipt_id,
-                    _json_dump(merged_metadata),
-                    now,
-                    identity.idempotency_key,
-                    side_effect_key,
-                ),
+                " WHERE idempotency_key = ? AND side_effect_key = ?"
             )
+            params: list[Any] = [status, result_receipt_id, _json_dump(merged_metadata), now,
+                                 identity.idempotency_key, side_effect_key]
+            if expected_updated_at is not None:
+                sql += " AND status = 'started' AND updated_at = ?"
+                params.append(expected_updated_at.isoformat())
+            cur = await db.execute(sql, tuple(params))
             await db.commit()
+        if expected_updated_at is not None and int(cur.rowcount or 0) != 1:
+            raise RuntimeError(f"idempotency lease lost for {identity.idempotency_key}:{side_effect_key}")
         record = await self.get_idempotency_record(identity.idempotency_key, side_effect_key)
         await self.record_side_effect_complete(
             identity,
@@ -3596,30 +3620,31 @@ class RuntimeStateStore:
         status: str = "completed",
         result_receipt_id: str = "",
         metadata: dict[str, Any] | None = None,
+        expected_updated_at: datetime | None = None,
     ) -> IdempotencyRecord:
         identity.require_for_dispatch()
         self.init_db_sync()
-        now = _utc_now_iso()
         existing = self.get_idempotency_record_sync(identity.idempotency_key, side_effect_key)
         if existing is None:
             raise KeyError(f"idempotency record {identity.idempotency_key}:{side_effect_key} not found")
+        now = _next_idempotency_token(expected_updated_at or existing.updated_at)
         merged_metadata = _merge_idempotency_metadata(existing, metadata)
         with sqlite3.connect(self.db_path) as db:
             _apply_connection_pragmas_sync(db)
-            db.execute(
+            sql = (
                 "UPDATE idempotency_records SET status = ?, result_receipt_id = ?,"
                 " metadata_json = ?, updated_at = ?"
-                " WHERE idempotency_key = ? AND side_effect_key = ?",
-                (
-                    status,
-                    result_receipt_id,
-                    _json_dump(merged_metadata),
-                    now,
-                    identity.idempotency_key,
-                    side_effect_key,
-                ),
+                " WHERE idempotency_key = ? AND side_effect_key = ?"
             )
+            params: list[Any] = [status, result_receipt_id, _json_dump(merged_metadata), now,
+                                 identity.idempotency_key, side_effect_key]
+            if expected_updated_at is not None:
+                sql += " AND status = 'started' AND updated_at = ?"
+                params.append(expected_updated_at.isoformat())
+            cur = db.execute(sql, tuple(params))
             db.commit()
+        if expected_updated_at is not None and int(cur.rowcount or 0) != 1:
+            raise RuntimeError(f"idempotency lease lost for {identity.idempotency_key}:{side_effect_key}")
         record = self.get_idempotency_record_sync(identity.idempotency_key, side_effect_key)
         self.record_side_effect_complete_sync(
             identity,
@@ -3630,28 +3655,20 @@ class RuntimeStateStore:
         )
         return record
 
-    async def try_reclaim_idempotent_side_effect(
+    async def try_reclaim_idempotent_side_effect_with_token(
         self,
         identity: ExecutionIdentity,
         side_effect_key: str,
         *,
         expected_status: str,
         expected_updated_at: datetime | None = None,
-    ) -> bool:
-        """Atomically re-claim a dead or failed side-effect record for retry.
-
-        Compare-and-swap: flips the record back to ``'started'`` (stamping
-        the reclaiming identity's run/trace ids) ONLY if it still holds
-        ``expected_status`` (and, when given, ``expected_updated_at`` — the
-        guard for taking over a stale ``'started'`` holder without racing a
-        live one). Exactly one of N concurrent claimants wins; losers get
-        ``False`` and must not execute the side effect.
-        """
+        ownership_time: datetime | None = None,
+    ) -> datetime | None:
         identity.require_for_dispatch()
         if not side_effect_key:
             raise ValueError("side_effect_key is required")
         await self.init_db()
-        now = _utc_now_iso()
+        now = _next_idempotency_token(expected_updated_at, ownership_time)
         sql = (
             "UPDATE idempotency_records SET status = 'started', run_id = ?,"
             " task_id = ?, trace_id = ?, correlation_id = ?, updated_at = ?"
@@ -3679,9 +3696,25 @@ class RuntimeStateStore:
                 identity,
                 side_effect_key,
                 status="reclaimed",
-                payload={"expected_status": expected_status},
+                payload={"expected_status": expected_status,
+                         "ownership_token": now},
             )
-        return reclaimed
+        return datetime.fromisoformat(now) if reclaimed else None
+
+    async def try_reclaim_idempotent_side_effect(
+        self,
+        identity: ExecutionIdentity,
+        side_effect_key: str,
+        *,
+        expected_status: str,
+        expected_updated_at: datetime | None = None,
+    ) -> bool:
+        """Preserve the public boolean reclaim API."""
+        token = await self.try_reclaim_idempotent_side_effect_with_token(
+            identity, side_effect_key, expected_status=expected_status,
+            expected_updated_at=expected_updated_at,
+        )
+        return token is not None
 
     async def get_idempotency_record(
         self,

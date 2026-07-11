@@ -90,6 +90,17 @@ async def _invoke(invoker):
     )
 
 
+async def _wait_for_claim_losers(tasks, inners) -> None:
+    """Keep the winner blocked until every overlapping contender settles."""
+    for _ in range(200):
+        if sum(inner.calls for inner in inners) == 1 and sum(
+            task.done() for task in tasks
+        ) == len(tasks) - 1:
+            return
+        await asyncio.sleep(0.01)
+    raise AssertionError("concurrent claim losers did not settle behind the live lease")
+
+
 @pytest.fixture
 def store(tmp_path: Path) -> RuntimeStateStore:
     return RuntimeStateStore(tmp_path / "runtime.db")
@@ -308,6 +319,8 @@ async def test_concurrent_stale_takeover_reclaims_atomically(store):
             (KEY,),
         )
         db.commit()
+    stale_snapshot = await store.get_idempotency_record(CLAIM_KEY, KEY)
+    assert stale_snapshot is not None
 
     gate = asyncio.Event()
     inners = [StubInner(gate=gate) for _ in range(3)]
@@ -317,15 +330,19 @@ async def test_concurrent_stale_takeover_reclaims_atomically(store):
             store=store,
             identity=_identity(f"w{i}"),
             side_effect_key=KEY,
-            stale_after_seconds=1.0,
+            stale_after_seconds=60.0,
         )
         for i, inner in enumerate(inners)
     ]
     tasks = [asyncio.create_task(_invoke(inv)) for inv in invokers]
-    for _ in range(100):
-        await asyncio.sleep(0.01)
-        if sum(inner.calls for inner in inners) >= 1:
-            break
+    await _wait_for_claim_losers(tasks, inners)
+    assert not await store._mark_idempotency_record_stale(stale_snapshot)
+    with pytest.raises(RuntimeError, match="lease lost"):
+        await store.complete_idempotent_side_effect(
+            _claim(identity),
+            KEY,
+            expected_updated_at=stale_snapshot.updated_at,
+        )
     gate.set()
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -340,6 +357,7 @@ async def test_concurrent_stale_takeover_reclaims_atomically(store):
     assert len(receipts) == 1 and len(losers) == 2
     record = await store.get_idempotency_record(CLAIM_KEY, KEY)
     assert record is not None and record.status == "completed"
+    assert record.updated_at > stale_snapshot.updated_at
 
 
 async def test_concurrent_cross_identity_double_begin_loses_one(store):
@@ -393,13 +411,21 @@ async def test_oversized_result_declines_memo_and_reexecutes(store):
         store=store,
         identity=_identity(),
         side_effect_key=KEY,
-        result_provider=lambda: huge,
+        result_provider=lambda: "RECOVERED",
     )
     receipt = await _invoke(replay)
     assert replay.memo_hit is False, "unmemoizable result must decline replay"
     assert replay.memo_result_omitted == "exceeds_result_cap"
     assert replay_inner.calls == 1, "provider re-executes for the real result"
     assert receipt.status == "ok"
+
+    memo_inner = StubInner()
+    memo = wrap_invoker(
+        memo_inner, store=store, identity=_identity("memo"), side_effect_key=KEY
+    )
+    await _invoke(memo)
+    assert memo_inner.calls == 0, "replacement result must memoize normally"
+    assert memo.memo_hit is True and memo.memo_result == "RECOVERED"
 
 
 async def test_concurrent_declined_memo_replays_reclaim_atomically(store):
@@ -415,6 +441,8 @@ async def test_concurrent_declined_memo_replays_reclaim_atomically(store):
         result_provider=lambda: huge,
     )
     await _invoke(first)
+    completed_snapshot = await store.get_idempotency_record(CLAIM_KEY, KEY)
+    assert completed_snapshot is not None and completed_snapshot.status == "completed"
 
     gate = asyncio.Event()
     inners = [StubInner(gate=gate) for _ in range(3)]
@@ -429,10 +457,7 @@ async def test_concurrent_declined_memo_replays_reclaim_atomically(store):
         for i, inner in enumerate(inners)
     ]
     tasks = [asyncio.create_task(_invoke(inv)) for inv in invokers]
-    for _ in range(100):
-        await asyncio.sleep(0.01)
-        if sum(inner.calls for inner in inners) >= 1:
-            break
+    await _wait_for_claim_losers(tasks, inners)
     gate.set()
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -447,6 +472,16 @@ async def test_concurrent_declined_memo_replays_reclaim_atomically(store):
         "declined memo re-execution must be exactly-once"
     )
     assert len(receipts) == 1 and len(losers) == 2
+    completed_after = await store.get_idempotency_record(CLAIM_KEY, KEY)
+    assert completed_after is not None
+    assert completed_after.updated_at > completed_snapshot.updated_at
+    stale_reclaim = await store.try_reclaim_idempotent_side_effect(
+        _claim(_identity("late")),
+        KEY,
+        expected_status="completed",
+        expected_updated_at=completed_snapshot.updated_at,
+    )
+    assert stale_reclaim is False, "an old completed token must not survive ABA"
 
 
 async def test_fallback_receipt_requires_matching_side_effect_key(store):

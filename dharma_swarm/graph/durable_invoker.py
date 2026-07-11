@@ -1,49 +1,7 @@
 # spine: memoizes EvidenceReceipt by idempotency key (owner: runtime_state) — no new store
-"""Durable invoker — exactly-once dispatch for the spine's ``invoke_agent`` path.
-
-Phase 0b of the DharmaGraph campaign (dharmagraph-engine-2026-07; spec
-§3 Phase 0b in docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md).
-
-``wrap_invoker`` returns an ``AgentInvoker``-compatible wrapper that applies
-the EXISTING idempotency machinery (``runtime_state.try_begin_idempotent_
-side_effect`` / ``complete_idempotent_side_effect``) around the provider
-call, and checks for a prior completion BEFORE executing. This upgrades the
-write-only audit trail (idempotency_records + delegation_runs.receipt_json)
-into effectively-once execution:
-
-- **One claim row per side effect** — every dispatcher claims under a
-  DETERMINISTIC idempotency key (``claim_idempotency_key(side_effect_key)``)
-  while keeping its own run/task/trace identity in the record fields for
-  audit. A crash-requeued task with a re-minted ExecutionIdentity and a
-  concurrent duplicate with a different identity both race on the SAME
-  (idempotency_key, side_effect_key) primary-key row, so the store's atomic
-  ``INSERT OR IGNORE`` resolves all overlaps and memo lookups are PK gets.
-- **Memo hit** — the claim row is ``completed``: the prior
-  ``EvidenceReceipt`` is returned WITHOUT calling the provider, with the
-  memoized result decoded type-exact from JSON. A result that could NOT be
-  memoized (non-JSON-serializable or over the cap) DECLINES the replay and
-  re-executes the provider instead — never a truncated, stringified, or
-  null result on a completed task (see ``memo_result_omitted``).
-- **Duplicate in flight** — a fresh ``started`` record exists: the loser
-  raises ``DuplicateDispatchInFlight`` instead of double-calling the
-  provider. A stale ``started`` record (older than ``stale_after_seconds``,
-  i.e. the prior holder is presumed dead) is taken over and re-executed.
-- **Failure is retryable** — an inner exception or a non-``ok`` receipt
-  completes the record as ``failed`` (never falsely ``completed``), so the
-  next retry re-executes.
-
-No new idempotency plumbing and no new truth store: every read and write in
-this module lands on tables owned by ``runtime_state`` (idempotency_records,
-runtime_receipts) or the spine's ``delegation_runs.receipt_json`` column.
-
-Forward-compat (Phase 3): ``derive_graph_side_effect_key`` produces the
-graph-run key form ``sha256(run_id:superstep:node_id:retry_count)``; today's
-flat ``invoke_agent:{task_id}:{agent_id}`` key remains valid for the flat
-dispatch path.
-
-Explicitly out of scope: ``a2a/spine_adapter.py`` — its ``_a2a_invoker`` has
-its own idempotency path and is not touched.
-"""
+"""Fenced, effectively-once ``invoke_agent`` wrapper for DharmaGraph Phase 0b.
+Memoizable completions replay; other claims use strictly increasing ownership
+tokens and CAS reclaim without touching A2A's independent path."""
 
 from __future__ import annotations
 
@@ -427,8 +385,8 @@ class DurableInvoker:
             hasattr(self._store, attr)
             for attr in (
                 "init_db",
-                "try_begin_idempotent_side_effect",
-                "try_reclaim_idempotent_side_effect",
+                "try_begin_idempotent_side_effect_with_token",
+                "try_reclaim_idempotent_side_effect_with_token",
                 "complete_idempotent_side_effect",
                 "get_idempotency_record",
             )
@@ -470,6 +428,7 @@ class DurableInvoker:
         claim = identity.with_updates(
             idempotency_key=claim_idempotency_key(self._side_effect_key)
         )
+        claim_token: datetime | None = None
 
         # 1) Memo check: a completed claim row replays the prior receipt.
         memo = await self._check_memo(task_id, claim)
@@ -482,11 +441,12 @@ class DurableInvoker:
         #    never silently.
         begin_metadata = {_META_OPERATION_HASH: operation_hash, "task_id": task_id}
         try:
-            inserted = await self._store.try_begin_idempotent_side_effect(
+            claim_token = await self._store.try_begin_idempotent_side_effect_with_token(
                 claim,
                 self._side_effect_key,
                 metadata=begin_metadata,
                 stale_after_seconds=self._stale_after_seconds,
+                ownership_time=self._effects.now(),
             )
         except Exception:
             logger.warning(
@@ -498,7 +458,7 @@ class DurableInvoker:
             return await self._inner(
                 task=task, agent_id=agent_id, context_id=context_id, routing=routing
             )
-        if not inserted:
+        if claim_token is None:
             try:
                 record = await self._store.get_idempotency_record(
                     claim.idempotency_key, self._side_effect_key
@@ -520,7 +480,9 @@ class DurableInvoker:
                 # unrecoverable) — loudly logged by _check_memo. The
                 # re-execution must still be exactly-once: CAS-reclaim the
                 # completed row; concurrent decliners lose cleanly.
-                await self._reclaim_or_lose(claim, expected_status="completed")
+                claim_token = await self._reclaim_or_lose(
+                    claim, expected_status="completed", record=record
+                )
             elif status == "started" and not self._started_record_is_stale(record):
                 # The store already stale-marks dead holders on its own
                 # (wall) clock; the wrapper re-checks with ITS clock so a
@@ -534,7 +496,7 @@ class DurableInvoker:
                 # N concurrent recovery workers all reach this branch; the
                 # CAS re-claim lets exactly one flip the row back to
                 # 'started' — losers refuse to double-call the provider.
-                await self._reclaim_or_lose(
+                claim_token = await self._reclaim_or_lose(
                     claim, expected_status=status, record=record
                 )
             # record fetch failed (None): fail-open, execute below (logged).
@@ -551,6 +513,7 @@ class DurableInvoker:
                 status="failed",
                 result_receipt_id="",
                 metadata={_META_OPERATION_HASH: operation_hash},
+                claim_token=claim_token,
             )
             raise
 
@@ -559,6 +522,7 @@ class DurableInvoker:
         complete_metadata: dict[str, Any] = {
             _META_OPERATION_HASH: operation_hash,
             _META_RECEIPT: receipt.to_dict(),
+            _META_RESULT_JSON: None, _META_RESULT_OMITTED: None,
         }
         if receipt.status == "ok" and self._result_provider is not None:
             try:
@@ -572,6 +536,7 @@ class DurableInvoker:
             status="completed" if receipt.status == "ok" else "failed",
             result_receipt_id=str(receipt.receipt_id),
             metadata=complete_metadata,
+            claim_token=claim_token,
         )
         return receipt
 
@@ -581,25 +546,17 @@ class DurableInvoker:
         *,
         expected_status: str,
         record: Any = None,
-    ) -> None:
-        """Atomically re-claim the row before re-executing, or lose cleanly.
-
-        CAS via ``runtime_state.try_reclaim_idempotent_side_effect``: exactly
-        one of N concurrent claimants flips the row back to ``'started'``;
-        everyone else raises ``DuplicateDispatchInFlight`` instead of
-        double-calling the provider. The ``updated_at`` guard applies only to
-        stale-``started`` takeover, where a live holder must never be raced.
-        """
+    ) -> datetime:
+        """CAS-reclaim an observed token or refuse stale/ABA execution."""
+        if record is None or not isinstance(getattr(record, "updated_at", None), datetime):
+            raise DuplicateDispatchInFlight(self._side_effect_key)
         try:
-            reclaimed = await self._store.try_reclaim_idempotent_side_effect(
+            token = await self._store.try_reclaim_idempotent_side_effect_with_token(
                 claim,
                 self._side_effect_key,
                 expected_status=expected_status,
-                expected_updated_at=(
-                    getattr(record, "updated_at", None)
-                    if expected_status == "started"
-                    else None
-                ),
+                expected_updated_at=record.updated_at,
+                ownership_time=self._effects.now(),
             )
         except Exception:
             logger.warning(
@@ -608,9 +565,10 @@ class DurableInvoker:
                 self._side_effect_key,
                 exc_info=True,
             )
-            reclaimed = False
-        if not reclaimed:
+            token = None
+        if token is None:
             raise DuplicateDispatchInFlight(self._side_effect_key)
+        return token
 
     async def _check_memo(
         self,
@@ -679,7 +637,15 @@ class DurableInvoker:
         status: str,
         result_receipt_id: str,
         metadata: dict[str, Any],
+        claim_token: datetime | None,
     ) -> None:
+        if claim_token is None:
+            self.audit_failures += 1
+            logger.warning(
+                "durable_invoker: refusing unfenced completion for %s",
+                self._side_effect_key,
+            )
+            return
         try:
             await self._store.complete_idempotent_side_effect(
                 identity,
@@ -687,6 +653,7 @@ class DurableInvoker:
                 status=status,
                 result_receipt_id=result_receipt_id,
                 metadata=metadata,
+                expected_updated_at=claim_token,
             )
         except Exception:
             # Fail-open on the audit write, but loudly: a missing completion
