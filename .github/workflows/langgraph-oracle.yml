@@ -4,9 +4,10 @@ name: langgraph-oracle
 # Runs the parity scenario inventory through BOTH engines — the dharma
 # langgraph_parity clone AND real langgraph 1.2.4 (test-oracle extra) —
 # and diffs semantic outcomes, uploading the machine-readable diff report
-# as an artifact. ADVISORY first (continue-on-error) per the phase plan;
-# flips to blocking once it has been green for a week. langgraph is a test
-# oracle only and never enters core dependencies (track non-goal).
+# as an artifact. The rubric-frozen gauntlet is blocking for evidence
+# integrity, while a sub-100 grade remains an explicit governance blocker
+# rather than a CI failure. langgraph is a test oracle only and never enters
+# core dependencies (track non-goal).
 
 on:
   pull_request:
@@ -15,10 +16,16 @@ on:
       - "dharma_swarm/langgraph_parity/**"
       - "tests/test_langgraph_differential_oracle.py"
       - "tests/test_graph_neutral_langgraph_oracle.py"
+      - "tests/test_dharmagraph_parity_gauntlet.py"
       - "tests/test_graph_effects.py"
       - "tests/oracle_support/**"
+      - "scripts/governance/dharmagraph_parity_gauntlet.py"
+      - "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+      - "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json"
+      - "reports/governance/dharmagraph_parity/**"
       - ".github/workflows/langgraph-oracle.yml"
       - "pyproject.toml"
+      - "uv.lock"
   schedule:
     - cron: "0 20 * * *" # nightly, after the 19:30 full-suite lane
   workflow_dispatch:
@@ -34,10 +41,6 @@ jobs:
   differential-oracle:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Advisory phase: findings surface in the report artifact and the job
-    # summary without blocking merges. Remove this line to flip to blocking
-    # (Phase 1 plan: after one green week).
-    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -64,16 +67,20 @@ jobs:
         run: |
           python -m pytest tests/test_langgraph_differential_oracle.py \
             tests/test_graph_neutral_langgraph_oracle.py \
+            tests/test_dharmagraph_parity_gauntlet.py \
             tests/test_graph_effects.py \
             -q --tb=short --timeout=120 \
             --junitxml=oracle.xml
+
+      - name: Replay rubric-frozen parity gauntlet
+        run: python scripts/governance/dharmagraph_parity_gauntlet.py --check
 
       - name: Summarize diff report
         if: always()
         env:
           DHARMA_ORACLE_REPORT_PATH: ${{ runner.temp }}/oracle/langgraph_oracle_report.json
         run: |
-          python3 - <<'EOF'
+          python - <<'EOF'
           import json, os
           from pathlib import Path
 
@@ -109,4 +116,5 @@ jobs:
           name: langgraph-oracle-report
           path: |
             ${{ runner.temp }}/oracle/langgraph_oracle_report.json
+            reports/governance/dharmagraph_parity/**
             oracle.xml
