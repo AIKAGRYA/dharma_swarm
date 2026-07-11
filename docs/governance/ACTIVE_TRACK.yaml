@@ -909,6 +909,12 @@ active_tracks:
       - docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md
       - docs/plans/handoffs/DHARMAGRAPH_HANDOFF_DEVIN.md
       - docs/plans/handoffs/DHARMAGRAPH_HANDOFF_CLAUDE.md
+      - scripts/governance/dharmagraph_parity_gauntlet.py
+      - tests/oracle_support/dharmagraph_gauntlet.py
+      - tests/test_dharmagraph_parity_gauntlet.py
+      - docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json
+      - docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json
+      - reports/governance/dharmagraph_parity/**
     moves_vital_signs:
       - quality_gates
       - eval_coverage
@@ -970,6 +976,36 @@ active_tracks:
         kind: file_contains
         file: docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md
         pattern: "Kill criterion"
+      # Parity gauntlet (2026-07-12): rubric frozen BEFORE results (V1 66214c5c7,
+      # completeness-corrected V2 7b8662ed5); builder + independent judge both
+      # graded 31.00/100 (MATCH), receipts digest-sealed. These criteria verify
+      # the EVIDENCE is intact and replayable — the 100/100 bar itself lives in
+      # the blocker next-item below, which keeps closeout blocked under the bar.
+      - id: parity_builder_receipt_valid
+        kind: receipt_valid
+        file: reports/governance/dharmagraph_parity/builder_receipt.json
+        expect_digest: true
+        requires_keys:
+          - score
+          - verdict
+          - gaps
+          - capabilities
+          - rubric
+          - shas
+          - environment
+          - stable_digest
+      - id: parity_judge_receipt_valid
+        kind: receipt_valid
+        file: reports/governance/dharmagraph_parity/judge_receipt.json
+        expect_digest: true
+        requires_keys:
+          - score
+          - judge
+          - stable_digest
+      - id: parity_gauntlet_check_passes
+        kind: command_passes
+        command: ["bash", "scripts/governance/run_python_with_repo_env.sh", "scripts/governance/dharmagraph_parity_gauntlet.py", "--check"]
+        timeout_s: 120
 
     next_items:
       - id: 1
@@ -991,6 +1027,166 @@ active_tracks:
       - id: 5
         what: "Operator: provision the ONE daemon VPS (existing droplet, RUNBOOK section 3e) so the Phase 0b reconciler runs against a live daemon; second VPS deferred until daemon + oracle CI green."
         kind: ops
+        blocker: false
+      - id: 6
+        what: "BLOCKER: parity gauntlet judge-signed at 100/100 (or operator-ratified non-goal set) — closeout blocked below the bar. Judge-signed grade 2026-07-12: 31.00/100 (builder and judge receipts reconcile MATCH; digest-sealed under reports/governance/dharmagraph_parity/; replay: scripts/governance/run_python_with_repo_env.sh scripts/governance/dharmagraph_parity_gauntlet.py --check). Rubric frozen before results (V2 at 7b8662ed5); all pre-2026-07-11 parity scores are VOID (self-graded, real langgraph never installed — see rubric preamble). Full evidence per cell: reports/governance/dharmagraph_parity/PARITY_MATRIX.md. The gap cards below (ids 7-45) are the complete work list; N/A requires operator ratification, self-declared rationales score 0."
+        kind: code
+        blocker: true
+      - id: 7
+        what: "parity-gap-lg01-schemas: LG01 State, input, output, and context schemas with partial updates — 1/2 points at weight 4. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 8
+        what: "parity-gap-lg02-node-policies: LG02 Node registration metadata, schemas, destinations, and default policies — 0/2 points at weight 2. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 9
+        what: "parity-gap-lg03-defer: LG03 Deferred and finalization nodes — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 10
+        what: "parity-gap-lg04-topology: LG04 Static topology, sequence, entry/finish, and ALL barrier edges — 1/2 points at weight 2. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 11
+        what: "parity-gap-lg06-supersteps: LG06 Bulk-synchronous parallel supersteps and step atomicity — 1/2 points at weight 2. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 12
+        what: "parity-gap-lg07-send: LG07 Dynamic Send fan-out and map-reduce — 1/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 13
+        what: "parity-gap-lg08-command: LG08 Command update, multi-target goto, parent routing, and resume — 1/2 points at weight 2. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 14
+        what: "parity-gap-lg09-cycles: LG09 Cycles, recursion caps, and managed remaining-step state — 1/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 15
+        what: "parity-gap-lg10-reducers: LG10 Reducer and channel semantics with concurrent-write conflicts — 1/2 points at weight 4. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 16
+        what: "parity-gap-lg11-messages: LG11 Message accumulation, replacement, removal, and formatting — 0/2 points at weight 2. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 17
+        what: "parity-gap-lg12-invocation: LG12 Compilation and sync/async single-run interfaces — 1/2 points at weight 4. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 18
+        what: "parity-gap-lg13-batch: LG13 Batch, as-completed, and max-concurrency interfaces — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 19
+        what: "parity-gap-lg14-checkpoint-protocol: LG14 Checkpoint schema, saver protocol, pending writes, lineage, and serializer — 1/2 points at weight 4. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 20
+        what: "parity-gap-lg15-thread-resume: LG15 Thread-scoped continuity and resume — 0/2 points at weight 9. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 21
+        what: "parity-gap-lg16-history: LG16 State inspection, history, and replay — 1/2 points at weight 2. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 22
+        what: "parity-gap-lg17-fork-time-travel: LG17 Manual state update, bulk update, fork, and time travel — 1/2 points at weight 8. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 23
+        what: "parity-gap-lg18-process-restart: LG18 Durability ordering and process-restart recovery — 1/2 points at weight 10. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 24
+        what: "parity-gap-lg19-static-interrupts: LG19 Static interrupt-before and interrupt-after — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 25
+        what: "parity-gap-lg20-dynamic-interrupt: LG20 Dynamic HITL interrupt and resume — 0/2 points at weight 2. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 26
+        what: "parity-gap-lg21-streaming: LG21 Seven standard stream modes, multi-mode, typed v2, and subgraph namespaces — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 27
+        what: "parity-gap-lg22-stream-v3: LG22 Experimental event stream v3 and transformer projections — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 28
+        what: "parity-gap-lg23-subgraphs: LG23 Nested graphs, parent commands, inheritance, nested state, and streaming — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 29
+        what: "parity-gap-lg24-retry: LG24 Retry selection, backoff, jitter, attempts, and write clearing — 0/2 points at weight 4. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 30
+        what: "parity-gap-lg25-timeout: LG25 Hard/idle timeout, heartbeat, and retry interaction — 0/2 points at weight 2. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 31
+        what: "parity-gap-lg26-errors: LG26 Error propagation, sibling cancellation, handlers, and atomic writes — 1/2 points at weight 4. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 32
+        what: "parity-gap-lg27-store: LG27 Long-term Store CRUD, namespaces, filters, paging, async, and batch — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 33
+        what: "parity-gap-lg28-store-vector: LG28 Store semantic/vector indexing and TTL — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 34
+        what: "parity-gap-lg29-cache: LG29 Node/task result caching and TTL/backend protocol — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 35
+        what: "parity-gap-lg30-config-context: LG30 Config, context, runtime injection, and propagation — 0/2 points at weight 4. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 36
+        what: "parity-gap-lg31-callbacks: LG31 Graph lifecycle callbacks and interrupt/resume events — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 37
+        what: "parity-gap-lg32-functional-api: LG32 Functional task/entrypoint API — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 38
+        what: "parity-gap-lg33-pregel: LG33 Low-level Pregel and channel composition API — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 39
+        what: "parity-gap-lg34-introspection: LG34 Topology introspection and schema export — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 40
+        what: "parity-gap-lg35-drain: LG35 Cooperative drain with checkpointed continuation — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 41
+        what: "parity-gap-app01-handoff: APP01 Active-agent state and handoff ownership through DharmaGraph integration — 1/2 points at weight 4. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 42
+        what: "parity-gap-app02-supervisor: APP02 Supervisor final authority through DharmaGraph integration — 1/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 43
+        what: "parity-gap-app03-history: APP03 Message history filtering and output modes through DharmaGraph integration — 1/2 points at weight 2. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 44
+        what: "parity-gap-app04-isolation: APP04 Tool/domain/memory isolation and subagents-as-tools through DharmaGraph integration — 1/2 points at weight 3. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 45
+        what: "parity-gap-pb01-prebuilt-tools: PB01 Prebuilt agent and tool execution, validation, injection, parallel calls, errors, and Command updates — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
         blocker: false
 
     non_goals:
