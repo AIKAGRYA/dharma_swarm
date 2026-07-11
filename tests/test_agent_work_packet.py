@@ -510,6 +510,7 @@ def test_gate_rejects_git_global_options_and_aliases(
         "/tmp/git status --short",
         "/usr/local/bin/git status --short",
         '"\\\\server\\share\\git.exe" status --short',
+        '"D:\\Program Files\\Git\\cmd\\git.exe" status --short',
         "git-push.git status --short",
         "/tmp/git-push.git status --short",
         "git-push.exe.git status --short",
