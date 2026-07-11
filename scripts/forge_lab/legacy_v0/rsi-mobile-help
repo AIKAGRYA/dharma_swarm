@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+cat <<HELP
+=== RSI LAB — MOBILE COMMANDS (MeghaDharma) ===
+Live model on this VPS: Kimi K2.7 Code via api.moonshot.ai (the ONE live key).
+All runs are shadow/EXPLORE only — closeouts are inconclusive_low_power by design.
+
+  rsi-status              health, tasks, tmux sessions, latest closeouts
+  rsi-keys-refresh        refresh the Kimi liveness receipt (auto via cron every 10m)
+  rsi-run smoke           quick real run: 2 gen x1 child x3 tasks
+  rsi-run calibration     travel run: 10 gen x1 child x5 tasks   <-- recommended
+  rsi-run n20             bigger: 20 gen x1 child x5 tasks
+  rsi-loop calibration 3  run calibration 3x back-to-back in one tmux session
+  rsi-loop calibration forever   nonstop until you stop it
+  rsi-tail [SESSION]      show latest/specific run log (note: CLI buffers; see below)
+  rsi-progress [SESSION]  live per-candidate results from the archive (better than tail)
+  rsi-attach SESSION      attach the tmux session
+  rsi-stop SESSION        Ctrl-C the named session (no raw PID kill)
+  rsi-update-main         pull latest GitHub main + re-apply substrate fixes
+  rsi-fix-substrate       (re)stage keys, liveness receipt, origin/main ref, routing
+
+TIP: model output is buffered, so 'rsi-tail' may look stuck. Use 'rsi-progress'
+     or check grade receipts to see real progress.
+Budgets are sized for Kimi (~8-30k tokens/task). Monitor spend with rsi-status.
+HELP

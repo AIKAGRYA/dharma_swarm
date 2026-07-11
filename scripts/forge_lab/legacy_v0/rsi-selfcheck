@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+echo "=== FRESH LOGIN SHELL command resolution ==="
+for c in rsi-status rsi-run rsi-loop rsi-progress rsi-stop rsi-keys-refresh rsi-update-main rsi-fix-substrate rsi-mobile-help; do
+  p=$(command -v "$c" || echo MISSING)
+  echo "  $c -> $p"
+done
+echo
+echo "=== dispatchable + receipt age ==="
+set -a; . /root/rsi-lab/current-main/secrets/keys.env; set +a
+HOME=/root/rsi-lab/current-main/state PYTHONPATH=/root/rsi-lab/current-main/repo:/root/rsi-lab/current-main/pydeps \
+  /root/rsi-lab/current-main/.venv/bin/python3 -c 'from dharma_swarm.key_oracle import dispatchable_now; print("  dispatchable=", sorted(dispatchable_now()))'
+age=$(( $(date +%s) - $(stat -c %Y /root/rsi-lab/current-main/state/.dharma/keys_status.json) ))
+echo "  keys_status.json age(s)=$age (TTL 900)"
+echo
+echo "=== active runs ==="
+tmux ls 2>/dev/null | grep rsi- || echo "  none (idle, ready)"
+echo
+df -h / | tail -1
