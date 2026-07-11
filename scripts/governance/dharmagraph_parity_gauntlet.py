@@ -502,8 +502,24 @@ def _validate_rubric(rubric: Mapping[str, Any]) -> list[dict[str, Any]]:
     return normalized
 
 
+def _ratified_exclusion_ids(exclusions: Any) -> frozenset[str]:
+    ids: set[str] = set()
+    for entry in exclusions or []:
+        if isinstance(entry, str) and entry.strip():
+            ids.add(entry.strip())
+        elif isinstance(entry, Mapping):
+            for key in ("capability_id", "row_id", "id"):
+                value = entry.get(key)
+                if isinstance(value, str) and value.strip():
+                    ids.add(value.strip())
+    return frozenset(ids)
+
+
 def _normalize_capability(
-    row: Mapping[str, Any], observation: Mapping[str, Any]
+    row: Mapping[str, Any],
+    observation: Mapping[str, Any],
+    *,
+    ratified_ids: frozenset[str] = frozenset(),
 ) -> dict[str, Any]:
     row_id = str(row["id"])
     points = observation.get("points")
@@ -513,6 +529,15 @@ def _normalize_capability(
         citation = observation.get("operator_ratified_non_goal")
         if not isinstance(citation, str) or not citation.strip():
             points = 0
+        elif row_id not in ratified_ids:
+            # na_rule (frozen, V1:48): N/A only via a frozen operator-ratified
+            # exclusion citing the exact row id. Free-text rationale from the
+            # builder or judge is exactly the self-declaration the rule voids.
+            raise GauntletError(
+                f"probe {row_id} claims N/A without a frozen operator-ratified "
+                "exclusion citing this row id (na_rule: self-declared "
+                "rationales score 0)"
+            )
     expected_facets = {str(item) for item in row["facets"]}
     facets = observation.get("facets")
     if not isinstance(facets, Mapping):
@@ -695,8 +720,12 @@ def _build_receipt(
             f"probe/rubric row mismatch: missing={sorted(expected_ids - observed_ids)} "
             f"extra={sorted(observed_ids - expected_ids)}"
         )
+    ratified_ids = _ratified_exclusion_ids(rubric.get("operator_ratified_exclusions"))
     capabilities = [
-        _normalize_capability(row, observations[str(row["id"])]) for row in rows
+        _normalize_capability(
+            row, observations[str(row["id"])], ratified_ids=ratified_ids
+        )
+        for row in rows
     ]
     control = raw.get("control")
     if not isinstance(control, Mapping):
@@ -1010,7 +1039,51 @@ def emit(args: argparse.Namespace) -> int:
             sort_keys=True,
         )
     )
+    if args.role == "judge" and receipt["judge"]["reconciliation"] != "MATCH":
+        # The receipt is still written — a discrepancy is itself a reportable
+        # finding — but the exit code must make it mechanically ungreen.
+        return 1
     return 0
+
+
+def _presentation_findings(stored: Mapping[str, Any]) -> list[str]:
+    """The human-facing grade fields are derived, not sealed — re-derive them
+    from the sealed core so a receipt whose presentation was edited after
+    sealing (verdict, display, gap list, closeout flag) cannot replay PASS."""
+    core = stored.get("stable_core", {})
+    findings: list[str] = []
+    sealed_score = str(core.get("score", ""))
+    if stored.get("score", {}).get("earned") != sealed_score:
+        findings.append("presented earned score diverges from sealed core")
+    if stored.get("score", {}).get("display") != f"{sealed_score}/100":
+        findings.append("presented score display diverges from sealed core")
+    expected_verdict = "FINISHED" if sealed_score == "100.00" else "NOT_FINISHED"
+    if stored.get("verdict") != expected_verdict:
+        findings.append("presented verdict diverges from sealed core")
+    if bool(stored.get("closeout_blocked")) != bool(core.get("closeout_blocked")):
+        findings.append("presented closeout_blocked diverges from sealed core")
+    presented_gaps = [gap.get("capability_id") for gap in stored.get("gaps", [])]
+    if presented_gaps != list(core.get("gap_ids", [])):
+        findings.append("presented gap list diverges from sealed core")
+    return findings
+
+
+def _judge_findings(stored: Mapping[str, Any], judge: Mapping[str, Any]) -> list[str]:
+    findings: list[str] = []
+    try:
+        _validate_receipt_digest(judge)
+    except GauntletError:
+        return ["judge receipt digest invalid"]
+    judge_block = judge.get("judge", {})
+    if judge_block.get("builder_receipt_digest") != stored.get("digest"):
+        findings.append("judge receipt does not bind the stored builder receipt")
+    if judge.get("stable_digest") != stored.get("stable_digest"):
+        findings.append("judge stable digest diverges from builder")
+    if judge_block.get("reconciliation") != "MATCH":
+        findings.append("judge reconciliation is not MATCH")
+    if judge.get("score", {}).get("earned") != stored.get("score", {}).get("earned"):
+        findings.append("judge score diverges from builder")
+    return findings
 
 
 def check(args: argparse.Namespace) -> int:
@@ -1026,6 +1099,9 @@ def check(args: argparse.Namespace) -> int:
         latest_drift=False,
     )
     findings: list[str] = []
+    findings.extend(_presentation_findings(stored))
+    if JUDGE_RECEIPT.exists():
+        findings.extend(_judge_findings(stored, _load_json(JUDGE_RECEIPT)))
     if replay["stable_digest"] != stored["stable_digest"]:
         findings.append("stable semantic digest changed")
     if replay["score"]["earned"] != stored["score"]["earned"]:
