@@ -1,0 +1,300 @@
+# SIS (Silicon Is Sand) — Material Body Track
+# PROPOSED — NOT YET PROMOTED TO ACTIVE
+#
+# Status: DRAFT (ready to promote)
+# Source: 24-agent Web5/Planetary Commons research synthesis, 2026-07-11
+#         MASTER_SYNTHESIS.md + canon_sis-gaia.md + SYNADIA_CAR_BRIDGE_SPEC.md
+#
+# WHY THIS IS DRAFT AND NOT PROMOTED:
+#   Portfolio is at 11/11 active tracks (verified max_active cap).
+#   This track cannot be promoted until the operator:
+#     (a) closes or supersedes one existing track, OR
+#     (b) explicitly raises max_active above 11 in ACTIVE_TRACK.yaml.
+#
+# OPERATOR DECISION GATES (from MASTER_SYNTHESIS.md §8):
+#   - D2: kill-condition-1 (08-07) armed or retired? The SIS first-cash
+#     criterion below IS the same act as satisfying kill-condition-1's
+#     MOU/customer gate. Arming this track arms a rescue plan for D2.
+#   - D3: open the receipt-signing/commons work track — this IS that track.
+#   - D5: language discipline enforced — external face is "GPAI-compliant
+#     compute obligation receipt", not "Web5 / material burden / SIS".
+#   - D6: Commons needs a seat in the telos hierarchy (SOVEREIGN_MANIFEST
+#     amendment). SIS already has a seat; the planetary-commons spine
+#     objective below is conditional on that amendment.
+#
+# SERVES:
+#   Primary: revenue-external-humans-served (GPAI commercial wedge —
+#     first paying subscriber for an agent-audit attestation receipt)
+#   Secondary: substrate-nativeness (GAIA kernel → CAR envelope → DS_CAR)
+#   Future: planetary-commons (pending D6 SOVEREIGN_MANIFEST amendment)
+#
+# The revenue objective is the right fit because:
+#   - GPAI enforcement 2026-08-02 creates a dated demand for compute-
+#     obligation documentation that nothing in the stack currently produces
+#   - $500–5,000 agent-audit attestation (operator verifier + named human
+#     reviewer countersigns a deployer's receipt stream) is the boutique
+#     attestation wedge from MASTER_SYNTHESIS.md §7 — this is the revenue
+#     mechanism that needs no external constituency and is available today
+#   - Month-6 stop-rule: ≥1 external countersigned receipt + ≥1 paying
+#     subscriber. This is the same gate as kill-condition-1 rescue.
+
+- id: sis-material-body-2026-07
+  name: SIS Material Body — Causal Action Receipt S3 + GAIA challenge fix + Synadia bridge seed
+  status: ACTIVE
+  opened_at: "2026-07-11"
+  verified_at: "2026-07-11"
+  ttl_days: 45
+  owner: "@AmitabhainArunachala"
+  serves: revenue-external-humans-served
+  complements:
+    - runtime-truth-nats-2026-06
+  depends_on: []
+  owned_surfaces:
+    - docs/governance/SYNADIA_CAR_BRIDGE_SPEC.md
+    - dharma_swarm/gaia/car_envelope.py
+    - dharma_swarm/gaia/sis_burden.py
+    - dharma_swarm/gaia/challenge_state_machine.py
+    - tests/test_gaia_platform.py          # owns the fix for the challenge test
+    - tests/test_sis_car_envelope.py
+    - tests/test_car_challenge_state_machine.py
+    - configs/nats/car_bridge.conf         # leaf node bridge config (not live until D1 lifted)
+    - reports/receipts/sis_receipt_zero.json
+    - reports/receipts/sis_receipt_zero_anchor.sha256
+  moves_vital_signs:
+    - revenue-external-humans-served
+    - quality_gates
+
+  description: |
+    SIS (Silicon Is Sand) is the JK-level telos child that parents GAIA and Loomwork.
+    It enters the 2026 agentic protocol landscape through CAR S3 (material burden) —
+    the only regulation-shaped material-burden hook in the entire stack:
+    EU GPAI Model Documentation Form compute/energy fields (enforcement 2026-08-02).
+
+    This track has three concrete jobs:
+
+    1. FIX THE FAILING TEST.
+       `test_submit_claim_challenge_refreshes_canonical_reciprocity_summary` in
+       tests/test_gaia_platform.py is red. The challenge/reversal path (CAR S8)
+       is the load-bearing trust mechanism of the entire doctrine. It has never had
+       a surface (the challenge desk or public claim explorer per canon_sis-gaia.md
+       ECO:133). Fixing this test IS implementing the CAR challenge state machine
+       for the SIS domain. This is blocker #1 — nothing gets anchored publicly
+       until the challenge path is provably correct.
+
+    2. PRODUCE RECEIPT ZERO FOR SIS.
+       A `dharma.car.{car_id}.s3.burden` message carrying dharma_swarm's own compute
+       obligation (the Confess+Sign-forward motion from MASTER_SYNTHESIS.md §5).
+       This is simultaneously:
+         - The dharmic founder-bound-first principle ("the founder is bound first")
+         - The grant exhibit for Longview/SFF/LTFF ("demonstrated on the applicant's
+           own agent estate")
+         - The R_V arXiv companion move (mechanistic evidence of self-observation)
+         - Kill-condition-1 rescue path (if accompanied by one paying subscriber)
+       Format: the GAIA GaiaPilotMeasurementContract fields mapped to the CAR S3
+       envelope schema defined in SYNADIA_CAR_BRIDGE_SPEC.md §SIS Integration.
+
+    3. SEED THE SYNADIA BRIDGE (config artifact, not live connection).
+       Add `configs/nats/car_bridge.conf` (the leaf node bridge config from
+       SYNADIA_CAR_BRIDGE_SPEC.md §Leaf Node Bridge). The config is the seeding
+       artifact. Live NGS connection requires operator Synadia Cloud account creation
+       (which does not violate the D1 HOLD — account creation is not external outreach)
+       and the DPIA/privacy pass before any public NGS log entry.
+
+    The GAIA kernel (23/24 tests green, 6 modules on disk) is the strongest existing
+    CAR prototype in the estate. This track's narrow job is to close the gap:
+    CAR envelope v0.1 wrapping GAIA's S3 fields + S8 challenge state machine fix.
+    It does NOT rewrite GAIA, does NOT add new oracle integrations, does NOT build
+    the full commons governance layer. Those are Round 2 items.
+
+  prerequisites:
+    - id: synadia_car_bridge_spec_exists
+      kind: file_exists
+      file: docs/governance/SYNADIA_CAR_BRIDGE_SPEC.md
+    - id: gaia_platform_exists
+      kind: file_exists
+      file: dharma_swarm/gaia_platform.py
+    - id: gaia_tests_exist
+      kind: file_exists
+      file: tests/test_gaia_platform.py
+    - id: nats_substrate_spec_exists
+      kind: file_exists
+      file: docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
+
+  completion_criteria:
+    # Gate 1 — The red test turns green (load-bearing)
+    - id: gaia_challenge_test_passes
+      kind: command_passes
+      command: ["./.venv/bin/python", "-m", "pytest",
+                "tests/test_gaia_platform.py::test_submit_claim_challenge_refreshes_canonical_reciprocity_summary",
+                "-q"]
+      timeout_s: 120
+      description: >
+        The single failing test on the challenge path must be green before any
+        global anchoring is attempted. This is the load-bearing trust mechanism.
+
+    # Gate 2 — Full GAIA test suite stays green (non-regression)
+    - id: gaia_full_suite_green
+      kind: command_passes
+      command: ["./.venv/bin/python", "-m", "pytest", "tests/test_gaia_platform.py", "-q"]
+      timeout_s: 300
+      description: All 24 GAIA tests pass (currently 23/24).
+
+    # Gate 3 — CAR envelope module exists
+    - id: car_envelope_module_exists
+      kind: file_exists
+      file: dharma_swarm/gaia/car_envelope.py
+      description: >
+        The CAR S3 material burden envelope adapter — maps GaiaPilotMeasurementContract
+        fields to the dharma.car.s3.burden.v1 schema.
+
+    # Gate 4 — CAR envelope tests pass
+    - id: car_envelope_tests_pass
+      kind: command_passes
+      command: ["./.venv/bin/python", "-m", "pytest", "tests/test_sis_car_envelope.py", "-q"]
+      timeout_s: 120
+
+    # Gate 5 — Receipt Zero for SIS exists and is committed
+    - id: sis_receipt_zero_exists
+      kind: file_exists
+      file: reports/receipts/sis_receipt_zero.json
+      description: >
+        The first S3 material burden receipt for dharma_swarm itself. This is the
+        Confess+Sign-forward motion — the founder bound first. The receipt must be
+        non-empty, carry a valid car_id, and have a challenge_contact field.
+
+    - id: sis_receipt_zero_anchor_committed
+      kind: file_exists
+      file: reports/receipts/sis_receipt_zero_anchor.sha256
+      description: >
+        SHA-256 of the Receipt Zero JSON, committed to the repo as a tamper-evident
+        anchor. A committed hash is the minimum viable non-backdatability proof before
+        NGS anchoring is live.
+
+    # Gate 6 — Synadia bridge config seeded (not live, just the artifact)
+    - id: synadia_bridge_config_exists
+      kind: file_exists
+      file: configs/nats/car_bridge.conf
+      description: >
+        Leaf node bridge config per SYNADIA_CAR_BRIDGE_SPEC.md §Leaf Node Bridge.
+        The config's existence is the seeding artifact. Live connection is gated on
+        D1 HOLD lift + DPIA, which are operator decisions, not code decisions.
+
+    # Gate 7 — NATS_SUBSTRATE_MASTER_SPEC.md references DS_CAR
+    - id: nats_spec_references_ds_car
+      kind: file_contains
+      file: docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
+      pattern: "DS_CAR"
+      description: The substrate spec declares DS_CAR as a known stream.
+
+    # Month-6 stop-rule (the hardest gate — evidence of external traction)
+    # Not a CI-enforced gate; operator-reviewed at Month 6 (approx 2026-12)
+    # - id: month_6_stop_rule
+    #   kind: external_evidence
+    #   description: >
+    #     ≥1 external countersigned receipt + ≥1 paying subscriber for the boutique
+    #     attestation service ($500–5,000 agent-audit receipts). No reinterpretation
+    #     of "paying subscriber" as a grant. If this is not met by 2026-12, stop
+    #     and re-diagnose.
+
+  non_goals:
+    # From MASTER_SYNTHESIS.md — these are correct bounds for this track
+    - Do not build a carbon marketplace or generalized credit issuance engine.
+    - Do not rewrite gaia_platform.py or any existing GAIA module beyond the
+      minimum needed to fix the challenge test. The 5,569-line gaia_platform.py
+      is a governance concern for a separate track.
+    - Do not connect live oracle integrations (satellite, IoT, human auditor, community).
+      The 3-of-5 oracle quorum is a protocol over oracle types that exists in Python.
+      Live integrations are Round 2.
+    - Do not build the Challenge Desk UI or public claim explorer in this track.
+      The S8 challenge state machine fix is code-level; the UI is separate scope.
+    - Do not create a global price of nature or transferable offset tokens.
+      MDEs (Material Debit Entries) are non-transferable, demurrage-bearing (+2%/quarter).
+    - Do not introduce Redis, PostgreSQL, or gRPC. NATS/JetStream is the substrate.
+    - Do not touch SOVEREIGN_MANIFEST.md (D6 is an operator-level amendment,
+      not a code change in this track).
+    - Do not claim "GAIA is integrated with the CAR" until Receipt Zero is committed.
+    - Do not claim the Commons is operational until Month-6 stop-rule is met.
+    - Do not activate the NGS leaf bridge before the DPIA pass and D1 HOLD review.
+
+  next_items:
+    - id: 1
+      what: >
+        Fix `test_submit_claim_challenge_refreshes_canonical_reciprocity_summary`.
+        Read the test and the challenge path in gaia_platform.py. The fix is likely
+        a missing canonical_reciprocity_summary refresh in the challenge submission
+        handler. Do not modify any other behavior — surgical fix only. Run the full
+        suite after to confirm 24/24 pass.
+      kind: code
+      blocker: true
+
+    - id: 2
+      what: >
+        Create `dharma_swarm/gaia/car_envelope.py` — CAR S3 material burden envelope
+        adapter. Maps GaiaPilotMeasurementContract.total_obligation_usd,
+        measurement_mode, methodology_ref, challenge_contact, consent_status to the
+        `dharma.car.s3.burden.v1` schema from SYNADIA_CAR_BRIDGE_SPEC.md. Include
+        the conservation_laws block (no_creation_ex_nihilo, no_double_counting,
+        temporal_coherence). Write tests in tests/test_sis_car_envelope.py.
+      kind: code
+      blocker: true
+
+    - id: 3
+      what: >
+        Produce Receipt Zero for SIS. Use the CAR envelope adapter to emit the first
+        S3 burden receipt for dharma_swarm's own compute footprint. The measurement
+        can be approximate (honest measurement_mode = "estimated" is better than
+        false precision). Commit to reports/receipts/sis_receipt_zero.json and
+        reports/receipts/sis_receipt_zero_anchor.sha256. This is the
+        Confess+Sign-forward motion from Round 1 §5 ruling.
+      kind: code
+      blocker: true
+
+    - id: 4
+      what: >
+        Create `configs/nats/car_bridge.conf` from the template in
+        SYNADIA_CAR_BRIDGE_SPEC.md §Leaf Node Bridge. Use credential path placeholder
+        (`/path/to/synadia-leaf-car-commons.creds` — not the real path, which is
+        operator-secret). Add to .gitignore: `configs/nats/*.creds`. This is a
+        seeding artifact; the file should exist even if no NGS account is created yet.
+      kind: code
+      blocker: false
+
+    - id: 5
+      what: >
+        Update NATS_SUBSTRATE_MASTER_SPEC.md §JetStream Stream Topology to add DS_CAR
+        and DS_CAR_CHALLENGE rows with a reference to SYNADIA_CAR_BRIDGE_SPEC.md.
+        Additive only — do not modify existing DS_* rows.
+      kind: docs
+      blocker: false
+
+    - id: 6
+      what: >
+        Operator decision: create a Synadia Cloud account (cloud.synadia.com — free
+        personal tier) for the CAR commons leaf account. This is not external outreach
+        (D1 HOLD does not cover account creation on a managed service). Create one
+        NGS account for the commons layer, download leaf credentials, store at
+        ~/.nats/synadia-leaf-car-commons.creds, test leaf node bridge config.
+      kind: operator_action
+      blocker: false
+
+  capacity_reality_gate: >
+    From MASTER_SYNTHESIS.md §4: "the gap between narrated capacity and receipted
+    capacity is the program's #1 internal risk — write it into any new track as an
+    executable gate, or it will be narrated past like its predecessors."
+    This track's capacity-reality gate: receipt_zero_committed (Gate 5 above) must
+    pass before any external communication about SIS, the CAR, or the Commons. No
+    narration of the Commons as operational until Month-6 stop-rule evidence exists.
+
+  kill_conditions:
+    - >
+      If Gate 1 (challenge test) reveals the gaia_platform.py challenge path is
+      architecturally broken (not just a missing line), escalate to operator before
+      attempting a rewrite. Scope is surgical fix; a rewrite is a new track.
+    - >
+      If Receipt Zero cannot be produced because no compute measurement mechanism
+      exists, use the operator's own session compute as the measurement (estimate
+      via model API cost data). Honest approximation > no receipt.
+    - >
+      Month-6 stop-rule (approx 2026-12): ≥1 external countersigned receipt +
+      ≥1 paying subscriber. If not met, stop and re-diagnose. The boutique
+      attestation wedge ($500–5,000 per agent-audit) is the revenue mechanism.
