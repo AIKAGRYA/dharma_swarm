@@ -3,12 +3,12 @@
 **Scope:** AI agents (any brand) working in the prose layer — `docs/`,
 `reports/`, `specs/`, `foundations/`, `lodestones/`, root Markdown. Repo-wide
 behaviour, the onboarding gate, and its trust boundaries are
-owned by `CLAUDE.md`; this file adds only prose-layer rules. Root `/AGENTS.md` is
-gitignored and never reaches a fresh clone — this is the tracked file.
+owned by `CLAUDE.md`; this file adds only prose-layer rules. Root `/AGENTS.md`
+is the tracked minimal entrypoint; this file owns the prose-layer instructions.
 
-Run `make onboard` before touching any doc; if prose anywhere disagrees with
-its output, trust the output and fix the prose. Memory/context work goes
-through MemoryKernel — see `CLAUDE.md` §Key Abstractions.
+Run `make onboard` before touching any doc. Its output is a read-only projection over fact owners, never a replacement:
+on conflict, owner files win and the projection/generator must be repaired. Do not rewrite an owner to match generated output.
+Memory/context work goes through MemoryKernel — see `CLAUDE.md` §Key Abstractions.
 
 ## Authority Model
 
