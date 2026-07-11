@@ -20,14 +20,14 @@
      check:  python3 scripts/governance/render_active_track_includes.py --check
      checked by: .github/workflows/active-track.yml, make docops-integrity,
                  tests/test_active_track_governance.py
-     newest track verified_at in source: 2026-07-10 -->
+     newest track verified_at in source: 2026-07-11 -->
 
 **Active portfolio — declared intent only:** 10 co-equal track(s) (WIP warn 8, max 10; model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned). This stamped digest carries track identity and surface ownership, NOT live status and NOT full track detail (descriptions, next-items, non-goals stay in the YAML). Live state comes only from `make onboard`; if its ACTIVE PORTFOLIO section is empty or warns, run `python3 scripts/governance/check_track_status.py` — never answer portfolio questions from this block or any other .md copy.
 
 **Spine objectives:** `substrate-nativeness`, `revenue-external-humans-served`, `research-depth` (each covered by at least one active track)
 
-- **`loop-closure-2026-06`** — Cybernetic Loop Closure — wire all 13 loops with receipted closure checks (ACTIVE, serves `substrate-nativeness`, verified 2026-07-01, open blocker items: 2)
-  - owns: reports/loop_closure/**, CYBERNETIC_LOOP_MAP.md
+- **`loop-closure-2026-06`** — Cybernetic Loop Closure — wire all 13 loops with receipted closure checks (ACTIVE, serves `substrate-nativeness`, verified 2026-07-11, open blocker items: 3)
+  - owns: reports/loop_closure/**, CYBERNETIC_LOOP_MAP.md, docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md, scripts/governance/loop1_consumption_check.py, tests/test_loop_supervisor_tristate.py, tests/test_loop1_consumption.py, tests/test_loop1_consumption_check.py
 - **`orchestration-arena-v1-2026-06`** — Orchestration Arena v1 — frozen hermetic fitness + zero-weight orchestrator + DPI (ACTIVE, serves `substrate-nativeness`, verified 2026-06-23, open blocker items: 1)
   - owns: dharma_swarm/coordination/**, dharma_swarm/council/**, scripts/governance/arena_truth_report.py, reports/governance/arena/**, tests/test_arena_v1.py, tests/test_dpi.py, tests/test_orchestration_genome.py, tests/test_orchestrator_v1.py, tests/test_council_profiles.py, tests/test_coordination_closure_checks.py, tests/test_arena_truth_report.py
 - **`merge-master-mike-d4-2026-06`** — Merge Master Mike — D4 persistent always-on merge agent (ACTIVE, serves `substrate-nativeness`, verified 2026-06-24, open blocker items: 2)
@@ -173,8 +173,8 @@ append-style refreshes quadruplicated rows and broke `make docops-integrity`).
 | Test functions | **13,216 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **12,885 (measured 2026-07-10, cloud checkout)** | python3 -m pytest tests/ --collect-only -q |
 | Collection errors | **35 (measured 2026-07-10, cloud checkout — env-dependent optional extras; 0 on the operator host 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
-| Markdown files | **1,398** | git ls-files \| rg '\.md$' \| wc -l (excl. AGENTS.md, reports/docops) |
-| Markdown total lines | **293,978** | wc -l across all tracked .md |
+| Markdown files | **1,399** | git ls-files \| rg '\.md$' \| wc -l (excl. AGENTS.md, reports/docops) |
+| Markdown total lines | **294,542** | wc -l across all tracked .md |
 | Bridge files | **29** | find dharma_swarm -name "*bridge*.py" -type f |
 | Adapter files | **26** | find dharma_swarm -type f \| rg -i "adapter" |
 | Router files | **19** | find dharma_swarm -type f \| rg -i "rout" |
