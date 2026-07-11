@@ -29,10 +29,10 @@ MANAGED_FILES = [
 ]
 
 
-def _run(script: Path, *args: str) -> subprocess.CompletedProcess:
+def _run(script: Path, *args: str, timeout: int = 60) -> subprocess.CompletedProcess:
     return subprocess.run(
         [sys.executable, str(script), *args],
-        cwd=REPO_ROOT, capture_output=True, text=True, timeout=60,
+        cwd=REPO_ROOT, capture_output=True, text=True, timeout=timeout,
     )
 
 
@@ -62,10 +62,14 @@ def test_active_track_loads() -> None:
                 f"{t.get('id')} serves '{t.get('serves')}' not in spine objectives {sorted(spine_ids)}"
 
 
-@pytest.mark.timeout(75)
+@pytest.mark.timeout(270)
 def test_check_track_status_runs() -> None:
     """The checker runs to completion and writes evidence JSON."""
-    result = _run(CHECK_SCRIPT, "--warn-only")
+    # The checker executes every track's command_passes criteria, so its
+    # wall-clock grows with the admitted portfolio: ~50s on a warm fast host
+    # at 10 tracks (2026-07-11), slower on shared CI runners. The budget must
+    # bound "hung", not "busy" — a tight bound here blocks unrelated PRs.
+    result = _run(CHECK_SCRIPT, "--warn-only", timeout=240)
     assert result.returncode == 0, result.stderr
     assert EVIDENCE.exists(), "evidence JSON must be written"
     payload = json.loads(EVIDENCE.read_text())
@@ -142,12 +146,13 @@ def test_underclaim_detector_flags_shipped_but_open_items() -> None:
     assert ucs[0]["blocker"] is True
 
 
-@pytest.mark.timeout(75)
+@pytest.mark.timeout(270)
 def test_underclaims_surface_in_evidence_payload() -> None:
     """Every track payload carries the underclaims field, and any underclaim in
     the payload also surfaces as a WARN line in the checker output — the ledger
     can fall behind reality, but never silently."""
-    result = _run(CHECK_SCRIPT)
+    # Same portfolio-scaled budget as test_check_track_status_runs above.
+    result = _run(CHECK_SCRIPT, timeout=240)
     payload = json.loads(EVIDENCE.read_text(encoding="utf-8"))
     out = result.stdout + result.stderr
     for tr in payload.get("active_tracks", []):
