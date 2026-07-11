@@ -716,7 +716,8 @@ and operator read models:
 dharma_swarm/operator_core/onboarding/
 ├── __init__.py
 ├── models.py          # packet/check/condition/version models
-├── contract.py        # owner manifest, packet validation, content hashes
+├── contract.py        # sole public packet/gate policy owner
+├── _command_lexical.py  # private WP-O1R lexical mechanics; no public owner
 ├── broken_register.py # the one canonical lifecycle parser
 ├── evidence.py        # repo/portfolio/tool/host collection; no policy
 ├── receipt.py         # v1/v2 loader, cache manifest, lock, delta, atomic write
@@ -729,6 +730,18 @@ This avoids making runtime `dharma_swarm` modules import from `scripts/`.
 `agent_onboard.py` and `orientation_graph.py` become compatibility shims.
 Modules stay below 500 lines; responsibilities may be combined only if the
 separability tests remain direct and no file approaches the budget.
+`_command_lexical.py` is the one narrow exception that permits `contract.py`
+to delegate private lexical mechanics without transferring policy ownership.
+The dependency is one-way from `contract.py` to the stdlib-only helper. Its
+surface is limited to pure command splitting, token forms, direct-Git
+inspection, private Win32/path/revision normalization, and exact Git-shape
+predicates that mechanically evaluate constants owned by `contract.py`. It
+defines no allowlist constant of its own; `contract.py` supplies those values
+to the inspection call. It raises no AgentOps/admission exception and makes no
+final admission decision.
+It is not exported from the package and is not a second parser or policy
+surface; every behavioral admission consumer and test continues through
+`contract.parse_gate`.
 
 Canonical broken-register semantics:
 
@@ -958,8 +971,56 @@ WP-O6 syscall/no-network evidence remains the terminal oracle.
 
 **Owner:** D1-admitted track owner.
 
-**Prerequisites / merge dependency:** this admission amendment and the
-WP-O1R-B0 exact-identifier bootstrap below merged; merge commit
+**Mandatory module-budget extraction (amended 2026-07-11):** at
+`d3e084c66a262a26779971b25729151c4c9a0ae7`, `contract.py` is exactly 499
+physical lines. Keeping the admitted O1R lexical closure in that file would
+make it another module above 500 lines and raise the one-way
+`modules_over_500_lines` counter above its 207 bound. WP-O1R therefore must
+create exactly one subordinate internal module,
+`dharma_swarm/operator_core/onboarding/_command_lexical.py`, and extract the
+stdlib-only mechanics into it: `split_command`, token-form and direct-Git
+inspection helpers, private Win32/path/revision normalizers, and exact
+Git-shape predicates that mechanically evaluate grammar constants owned by
+`contract.py` and supplied to the inspection call. The helper defines no
+allowlist constant of its own. Those symbols return lexical values or booleans only.
+`contract.py` retains `_parse_command`, shell/live policy, grammar constants
+and ownership, environment/identity/grammar orchestration, every final
+admission decision, every `AgentOpsError`, and sole parser/public policy
+ownership. The helper has no packet/schema/scope
+ownership, admission exception, subprocess execution, standalone admission
+entrypoint, package export, reverse import, or independent consumer. All
+behavioral admission calls continue through `contract.parse_gate`.
+`contract.py` and the helper must each remain at or below 500 physical lines,
+and WP-O1R must leave `modules_over_500_lines` at or below 207. A second helper,
+parser, policy engine, or owner for direct-command lexical admission is not
+admitted.
+
+**Inherited direct-Git environment closure (amended 2026-07-11):** the
+reviewed pre-amendment implementation rejected only packet-supplied `env`,
+while `run_gate()` copied the AgentOps process environment. An inherited
+`GIT_DIR`, `GIT_WORK_TREE`, index/object override, or config-injection variable
+could therefore redirect an otherwise admitted read-only Git gate away from
+the packet worktree. WP-O1R must add one contract-owned execution-environment
+builder and wire only `scripts/governance/run_agent_work_packet.py` to use it.
+For a direct Git gate, the builder removes every inherited key whose name
+case-insensitively starts with `GIT_` before execution and sets exactly
+`GIT_CONFIG_GLOBAL=os.devnull`, `GIT_CONFIG_NOSYSTEM=1`, and
+`GIT_OPTIONAL_LOCKS=0`. `os.devnull` is required for POSIX/macOS and Windows
+portability. The global-config override prevents `$HOME/.gitconfig` and
+`$XDG_CONFIG_HOME/git/config` from supplying executable config such as
+`core.fsmonitor`; optional-lock suppression prevents `git status` from
+refreshing the index as a side effect. The existing parse-time rejection of
+every non-empty packet `env` remains. The runner does not re-identify Git,
+import the lexical helper, or acquire admission policy: it consumes the
+contract-owned builder immediately before normal child execution and before a
+negative-control `control_env` is encoded into `env -i` argv. Non-Git gate
+environment behavior is unchanged. This closes the admitted direct-Git child,
+not trusted-host runner-internal `run_git()` calls before packet parsing; O4/O6
+retain PATH/interpreter and terminal syscall/network proof.
+
+**Prerequisites / merge dependency:** the direct-command admission amendment,
+this module-budget extraction amendment, and the WP-O1R-B0 exact-identifier
+bootstrap below merged; merge commit
 `94a3877c7799bbde7f0ac9adff060ee1f449683f` remains an ancestor; a fresh clean
 post-bootstrap baseline and sibling collision matrix are recorded; the
 complete external WP-O1R Session Entry Packet validates before any direct-
@@ -992,14 +1053,14 @@ basename is a procedural requirement; the runner machine-checks its `.json`
 suffix and content, not that basename
 (`scripts/governance/run_agent_work_packet.py:861-878`).
 
-**WP-O1R-B0 exact-identifier bootstrap (separate prerequisite PR):** merge of
-this governance amendment explicitly ratifies one narrow exception to §4's
-pre-edit packet rule. It waives only external/tracked packet presence and
-prevalidation for B0; exact clean base, tool versions, track/owner, fresh
-sibling collision analysis, default-deny complete-diff scope, and
-failing-first evidence remain mandatory. The D1-admitted track owner starts B0
-at the exact clean admission-merge SHA, records that SHA and the empty
-`git status --porcelain=v1`, and may edit only:
+**WP-O1R-B0 exact-identifier bootstrap (separate prerequisite PR):** the
+previously merged direct-command admission amendment explicitly ratified one
+narrow exception to §4's pre-edit packet rule. It waived only external/tracked
+packet presence and prevalidation for B0; exact clean base, tool versions,
+track/owner, fresh sibling collision analysis, default-deny complete-diff
+scope, and failing-first evidence remained mandatory. Under that exception,
+the D1-admitted track owner starts B0 at the exact clean admission-merge SHA,
+records that SHA and the empty `git status --porcelain=v1`, and may edit only:
 
 - `dharma_swarm/operator_core/onboarding/contract.py`
 - `tests/test_agent_work_packet.py`
@@ -1074,12 +1135,36 @@ proves it is an ancestor, starts from a new clean baseline, and follows normal
 **Allowed files:**
 
 - `dharma_swarm/operator_core/onboarding/contract.py`
+- `dharma_swarm/operator_core/onboarding/_command_lexical.py`
+- `scripts/governance/run_agent_work_packet.py`
 - `tests/test_agent_work_packet.py`
 - `reports/agentops/work_packets/onboard-one-door-WP-O1R.json`
 
-The §6 mechanical count-refresh admission remains available only if these
-edits move generated DocOps metrics. No other source, test, packet, or owner
-surface is admitted.
+Creating the helper necessarily moves DocOps module/LOC metrics, so the
+materialized external and byte-identical tracked packet must use this exact
+`allowed_files` array (no directory glob or alias):
+
+```json
+[
+  "dharma_swarm/operator_core/onboarding/contract.py",
+  "dharma_swarm/operator_core/onboarding/_command_lexical.py",
+  "scripts/governance/run_agent_work_packet.py",
+  "tests/test_agent_work_packet.py",
+  "reports/agentops/work_packets/onboard-one-door-WP-O1R.json",
+  "docs/governance/SOVEREIGN_MANIFEST.md",
+  "docs/docops/AUTO_INVENTORY.md"
+]
+```
+
+The last two paths retain only the §6 mechanical count-refresh authority.
+`dharma_swarm/operator_core/onboarding/__init__.py` remains unedited and may
+not re-export the helper. Any pre-amendment packet that omits the helper or
+runner or binds the old base/digest is invalid; regenerate the external packet
+at the clean post-amendment baseline, validate it, then copy its bytes
+unchanged to the tracked path. Its Ruff gate names both onboarding source
+modules plus the runner, and its blocking quality-ratchet gate substitutes the
+packet's exact `base_ref` for `$BASELINE_SHA` in the verification command
+below. No other source, test, packet, or owner surface is admitted.
 
 **Behavior → named test map:**
 
@@ -1087,10 +1172,29 @@ surface is admitted.
 |---|---|---|
 | O1R-B0 | Exact `WP-O1R` identity is accepted without widening the numeric packet grammar to arbitrary suffixes | `test_session_entry_accepts_exact_wp_o1r_identity_only` |
 | O1R-B1 | Every command token is checked case-insensitively through raw executable, separator-canonical, normalized path basename, basename stem, and dotted-module leaf forms; parsed `argv` is not rewritten | `test_gate_command_normalization_rejects_live_targets_without_blocking_safe_commands` |
-| O1R-B2 | Direct, relative, absolute, `.py`, interpreter-routed, and `python -m` forms reaching the existing live/autonomy vocabulary (`dharma_swarm/operator_core/onboarding/contract.py:35-36`) are rejected, including common Python executable variants and underscore spellings of hyphenated targets | `test_gate_command_normalization_rejects_live_targets_without_blocking_safe_commands` |
+| O1R-B2 | Direct, relative, absolute, `.py`, interpreter-routed, and `python -m` forms reaching `contract.py`'s existing `_BANNED_LIVE_COMMAND_TOKENS` owner vocabulary are rejected, including common Python executable variants and underscore spellings of hyphenated targets | `test_gate_command_normalization_rejects_live_targets_without_blocking_safe_commands` |
 | O1R-B3 | Safe pytest, governance, DocOps, and ordinary non-live Python commands remain accepted with exact parsed `argv` | `test_gate_command_normalization_rejects_live_targets_without_blocking_safe_commands` |
 | O1R-B4 | Direct Git lexical routes using global options, packet-supplied environment, configuration injection, alternate repository roots, executable/helper routing, direct `git-*` plumbing executables, side-effectful flags, unknown subcommands, or aliases fail at parse time, including `alias.*=!shell` forms | `test_gate_rejects_git_global_options_and_aliases` |
 | O1R-B5 | Only the exact read-only Git command/argument shapes listed below for `status`, `diff --check`, `rev-parse`, `merge-base --is-ancestor`, and `ls-files` remain accepted without argv rewriting; every other Git subcommand, option, argument shape, and non-empty gate `env` remains fail-closed | `test_gate_rejects_git_global_options_and_aliases` |
+| O1R-B6 | Exactly one stdlib-only subordinate helper returns lexical values/booleans and mechanically evaluates only exact shapes using grammar constants passed by `contract.py`, with no helper-owned allowlist, in a one-way `contract.py` → helper dependency; `_parse_command`, grammar ownership, final admission decisions, and all `AgentOpsError` raising remain in `contract.py`, both files stay ≤500 lines, and `modules_over_500_lines` stays ≤207 | `test_wp_o1r_lexical_helper_remains_private_and_subordinate` plus physical-line checks and the blocking quality ratchet |
+| O1R-B7 | Before a direct Git gate executes, the contract-owned environment builder case-insensitively removes all inherited `GIT_*` keys; sets only `GIT_CONFIG_GLOBAL=os.devnull`, `GIT_CONFIG_NOSYSTEM=1`, and `GIT_OPTIONAL_LOCKS=0`; preserves unrelated inherited variables; and leaves non-Git gate behavior unchanged. The runner consumes this builder without importing the helper or duplicating Git identity policy, including before negative-control `env -i` argv encoding | `test_direct_git_gate_strips_inherited_git_environment` |
+
+O1R-B6 is a structural boundary test, not a helper behavior test. It inspects
+AST/source to prove the helper is stdlib-only, imports no AgentOps model/error,
+defines no allowlist constant, raises no admission exception, is absent from
+package exports, and has no
+production consumer except `contract.py`; it also proves `contract.py` retains
+`_parse_command`, the exact grammar constants, and the admission/error symbols,
+and that no second lexical helper/engine was added. The test must not import or
+call helper behavior directly. B1–B5 remain the behavioral parse-entrypoint
+proof; B7 exercises the public runner boundary and captures the exact child
+environment without executing Git. B7 poisons mixed-case repository, config,
+helper, trace, redirect, and optional-lock variables; asserts that the only
+remaining case-insensitive `GIT_*` keys are the exact safe triple; preserves
+HOME/XDG/PATH and unrelated keys without mutating the input mapping; proves
+argv/cwd unchanged; covers bare, absolute POSIX, and quoted Windows `git.exe`
+forms; locks non-Git environment behavior; and proves the negative-control
+`env -i` assignment vector carries the same sanitized triple.
 
 Use one named command matrix test so the bypass rows make that test fail on the
 clean baseline; direct-denial and safe-command rows are regression controls,
@@ -1223,13 +1327,23 @@ it is not a terminally accepted command family.
 python3 -m pytest tests/test_onboarding_contract.py tests/test_agent_work_packet.py -q
 python3 -m pytest tests/test_onboarding_contract.py tests/test_agent_work_packet.py \
   tests/test_docops_integrity.py -q
+python3 -m pytest \
+  tests/test_agent_work_packet.py::test_wp_o1r_lexical_helper_remains_private_and_subordinate -q
+python3 -m pytest \
+  tests/test_agent_work_packet.py::test_direct_git_gate_strips_inherited_git_environment -q
 python3 -m pytest tests/test_agent_onboard.py -q
 make docops-integrity
 python3 scripts/governance/render_active_track_includes.py --check
 python3 scripts/governance/check_track_status.py
 python3 scripts/governance/check_name_drift.py
 python3 -m ruff check dharma_swarm/operator_core/onboarding/contract.py \
+  dharma_swarm/operator_core/onboarding/_command_lexical.py \
+  scripts/governance/run_agent_work_packet.py \
   tests/test_onboarding_contract.py tests/test_agent_work_packet.py
+test "$(wc -l < dharma_swarm/operator_core/onboarding/contract.py)" -le 500
+test "$(wc -l < dharma_swarm/operator_core/onboarding/_command_lexical.py)" -le 500
+python3 scripts/governance/hygiene/ratchet.py --max-baseline-age-days 45 \
+  --baseline-merge-base-of "$BASELINE_SHA"
 git diff --check
 # expected: every command exits 0
 ```
@@ -1247,14 +1361,27 @@ remediation.
 external AgentOps report and exact failing-first/before-after command matrix;
 no new receipt path.
 
-**Forbidden/non-goals:** no WP-O2 or later packet edit; no new parser, policy
-engine, denylist family, receipt, network call, or source-tree write; no shell,
-Git, mutation, path, jail, or negative-control weakening; no ban on ordinary
-safe Python or pytest commands.
+**Forbidden/non-goals:** no WP-O2 or later packet edit; no new direct-command
+parser, policy engine, denylist family, or command owner beyond the one private
+subordinate lexical helper admitted above; no helper export or direct consumer
+other than `contract.py`; no runner import of the helper, Git re-identification,
+or admission decision; no reverse import, helper-side admission exception or
+final decision, receipt, network call, or source-tree write; no shell, Git,
+mutation, path, jail, or negative-control weakening; no ban on ordinary safe
+Python or pytest commands.
 
 **Kill criterion:** any required implementation file outside the allowed list,
+any second direct-command lexical policy/helper owner, any public export of
+`_command_lexical.py`, any helper import of AgentOps models/errors or helper-
+side admission exception/final decision, any runner-side Git identity or
+admission logic, any inherited case-insensitive `GIT_*` key reaching an
+executed direct Git gate outside the builder's exact safe triple
+(`GIT_CONFIG_GLOBAL=os.devnull`, `GIT_CONFIG_NOSYSTEM=1`, and
+`GIT_OPTIONAL_LOCKS=0`), any unsanitized negative-control `env -i` assignment,
+any `contract.py` or helper line count above 500, any
+`modules_over_500_lines` reading above 207,
 or any inability to validate the exact external injectively identified packet
-at the clean post-bootstrap baseline, stops WP-O1R and requires another merged
+at the clean post-bootstrap baseline stops WP-O1R and requires another merged
 admission amendment. Do not widen the packet in flight.
 
 ### WP-O2 — One broken-register parser and shared static orientation (M)
