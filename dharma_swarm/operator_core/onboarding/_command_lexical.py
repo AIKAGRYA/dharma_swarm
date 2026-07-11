@@ -44,7 +44,6 @@ def command_token_forms(token: str) -> set[str]:
     return {form.replace("_", "-") for form in forms if form}
 
 def _git_executable_forms(token: str) -> tuple[str, str]:
-    """Return raw and Win32-canonical executable basenames."""
     raw = token.casefold().replace("\\", "/")
     canonical = _win32_path_canonical(raw)
     forms = [
@@ -55,9 +54,11 @@ def _git_executable_forms(token: str) -> tuple[str, str]:
     return forms[0], forms[1]
 
 def git_executable_identity(token: str, git_executable: str) -> str | None:
-    """Identify direct Git and git-* executables across POSIX/Windows paths."""
+    """Identify trusted direct Git; flag other Git-shaped executable paths."""
     raw, canonical = _git_executable_forms(token)
     allowed = (git_executable, f"{git_executable}.exe")
+    path = token.casefold().replace("\\", "/")
+    trusted = path in allowed or path == "/usr/bin/git" or re.fullmatch(r"[a-z]:/program files/git/cmd/git\.exe", path) is not None
     prefixes = (f"{git_executable}-", f"{git_executable}.")
     embedded = raw[2:] if re.match(r"^[a-zA-Z]:", raw) else ""
     embedded_canonical = _win32_path_canonical(embedded)
@@ -68,10 +69,9 @@ def git_executable_identity(token: str, git_executable: str) -> str | None:
     )
     if alias or direct:
         return raw
-    return git_executable if canonical in allowed else None
+    return git_executable if canonical in allowed and trusted else path if canonical in allowed else None
 
 def _safe_git_operand(value: str) -> bool:
-    """Return whether a revision/path operand is lexically repo-relative."""
     if not value or value.startswith("-"):
         return False
     if any(ord(char) < 32 or ord(char) == 127 for char in value):

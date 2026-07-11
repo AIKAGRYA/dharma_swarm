@@ -501,6 +501,15 @@ def test_gate_rejects_git_global_options_and_aliases(
         "/usr/local/libexec/git-core/git-push origin HEAD",
         "git-send-pack origin HEAD",
         "git-http-push origin HEAD",
+        "./git status --short",
+        "bin/git diff --check",
+        "../git rev-parse HEAD",
+        "./git.exe status --short",
+        '"bin\\git.exe" status --short',
+        "C:git.exe status --short",
+        "/tmp/git status --short",
+        "/usr/local/bin/git status --short",
+        '"\\\\server\\share\\git.exe" status --short',
         "git-push.git status --short",
         "/tmp/git-push.git status --short",
         "git-push.exe.git status --short",
@@ -694,7 +703,6 @@ def test_gate_rejects_git_global_options_and_aliases(
         ),
         ("/usr/bin/git status --short", ["/usr/bin/git", "status", "--short"]),
         ("git.exe status --short", ["git.exe", "status", "--short"]),
-        ("C:git.exe status --short", ["C:git.exe", "status", "--short"]),
         (
             '"C:\\Program Files\\Git\\cmd\\git.exe" status --short',
             ["C:\\Program Files\\Git\\cmd\\git.exe", "status", "--short"],
@@ -852,7 +860,6 @@ def test_direct_git_gate_strips_inherited_git_environment(
     commands = (
         "git status --short",
         "git.exe status --short",
-        "C:git.exe status --short",
         "/usr/bin/git status --short",
         '"C:\\Program Files\\Git\\cmd\\git.exe" status --short',
     )
