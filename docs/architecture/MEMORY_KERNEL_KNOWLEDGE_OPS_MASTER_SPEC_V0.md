@@ -497,6 +497,11 @@ Tests prove Python flag plumbing and simulate archive output, but do not exercis
 an implemented Go archive writer (`tests/test_world_radar_go_bridge.py:131-224,
 233-289`).
 
+**[R/Q] This runtime defect is unresolved. It blocks any v0.2 merge, rollout,
+source-vault, or production-integration claim until the Phase 0 Go-to-vault exit
+fixture passes; the worked trace is a target contract, not evidence that capture
+is live.**
+
 **[I]** This is a precise example of why a canonical source-capture contract is
 needed: the system can retain derived observations while the source bytes needed
 for future verification disappear. The fix is not a World Radar-specific wiki;
@@ -1155,12 +1160,20 @@ and revision exist in append-only `security_events`. Restore verifies the fold
 against the independently copied `security_checkpoints` chain before serving.
 
 `authority_clock(singleton=1)` deliberately serializes the v0 writer and will
-eventually contend; it is not a scale claim. Instrument lock wait, transaction
-service time, queue depth, aborts, and end-to-end write latency. Partitioned
-authority becomes a design trigger only when a replayable load test at twice the
-measured peak misses an operator-approved write/recovery SLO in three runs after
-batching/index/transaction tuning, or independent principals require an
-availability domain one writer cannot provide. Crossing that trigger starts a
+eventually contend; it is not a scale claim. Instrument per-commit lock wait,
+transaction service time, one-minute arrival/queue-depth buckets, abort reason,
+and end-to-end latency. After 30 representative operating days, define observed
+peak as the p99 of non-maintenance, nonzero one-minute commit-arrival rates. Run
+three 30-minute replays at `2 ×` that rate with production-sized payload/index
+mix. The provisional pass rule is: no fence/semantic abort, non-idempotency abort
+rate below 0.1%, p99 lock wait below 25% of the operator-approved write-latency
+SLO, and queue drained within two one-minute buckets after load stops. Thresholds
+must be ratified from the baseline rather than silently inherited.
+
+Partitioned authority becomes a design trigger only when this test misses a hard
+write/recovery SLO in all three runs after batching/index/transaction tuning, or
+independent principals require an availability domain one writer cannot
+provide. Crossing that trigger starts a
 new protocol ADR (namespace ownership, coordinated basis vector or explicit
 non-atomic reads, quorum/election/fencing, cross-namespace transaction rules);
 it never silently shards the singleton contract.
@@ -1556,6 +1569,30 @@ origin alone does not require PostgreSQL. PostgreSQL earns selection only when
 concurrent writers, database-enforced multi-principal isolation, replication/
 PITR, or a measured recovery SLA outweigh its administration. If custody,
 offline operation, and one local writer dominate, SQLite may remain authority.
+
+Experiment 13 uses one frozen corpus/proposal trace and the same fault schedule
+for every candidate. Its scorecard records:
+
+- pass/fail of C01–C11 and identical authorized current/as-of results;
+- p50/p95/p99 commit/read latency, lock wait, throughput, aborts, database/WAL
+  growth, backup size, and CPU/RAM/disk at baseline and `2 ×` peak;
+- crash points, corruption detection, achieved RPO/RTO, stale-primary fencing,
+  pre-deletion restore behavior, and coordinated vault recovery;
+- capability parity, defense-in-depth isolation, migration/export/import
+  round-trip, and exact auditability;
+- operator minutes for install, upgrade, key/certificate rotation, backup,
+  restore, diagnosis, monthly maintenance, and one simulated incident;
+- extra always-on services, credentials, network exposure, and annualized
+  compute/storage cost.
+
+Hard security/semantic/recovery failures disqualify an engine; averages cannot
+hide them. Among passing engines, select the simplest/custody-compatible one
+meeting operator-approved SLO/RPO/RTO. PostgreSQL wins only if SQLite misses a
+declared concurrency/isolation/recovery requirement by more than measurement
+uncertainty and the gain repays its measured operator boundary. XTDB wins only
+if its temporal/recovery advantage survives the same rule. Otherwise SQLite
+remains authority. The decision receipt publishes raw runs and the rejected
+alternative, not a fashion-weighted total score.
 
 **[Q] Operator deployment choice:** locate the primary on the always-on VPS if
 continuous autonomous agents dominate; locate it on Apple Silicon if local
@@ -2394,6 +2431,11 @@ sources.
 Contradictions are immutable assessments over assertion groups, not mutable sets
 or overwrite triggers:
 
+There is no canonical `ContradictionSet` type. Each assessment body is
+append-only and the DDL's canonical-row triggers forbid update/delete; any
+“current contradiction group/open/resolved” collection is a disposable fold
+over assessments and resolution decisions at a named basis.
+
 ```text
 ContradictionAssessmentBody {
   proposition_family,
@@ -2778,6 +2820,30 @@ or acceptance evidence. They cannot satisfy v1 until experiment 4 replaces them
 with measured Mac/VPS/corpus distributions, failure bounds, and
 operator-approved RPO/RTO; missing measurements fail the gate rather than
 inheriting these numbers.
+
+Phase timing is explicit: `C06_projection_raze` proves functional rebuild and
+fallback on the bounded SQLite corpus before `v0-reference`; full-corpus
+experiment 4 measures Mac/VPS distributions and is a **Phase 4 activation and
+v1 prerequisite**. It cannot be deferred past selection of a production
+authority or replaced by the planning goals above.
+
+Fallback activation is fail-closed and measurable. A projection is bypassed
+immediately when its object/inventory digest fails, source or security watermark
+is absent/behind the query requirement, current canonical hydration disagrees,
+ACL/deletion canary fails, active definition/build cannot be resolved, or its
+validation is revoked. Those conditions cannot be overridden by latency. A
+non-security performance fallback occurs after three consecutive declared SLO
+windows fail and exact/lexical fallback remains within its own budget. The query
+trace names the trigger and degraded lane; an authorized activation/rollback
+decision changes the persistent pointer after validation.
+
+Every production definition therefore commits measured full/incremental
+recovery p50/p95 time, compute/money/storage cost, tamper-canary results, exact/
+lexical fallback latency/capacity, and maximum security/source lag for the actual
+Mac/VPS corpus. Missing or exceeded hard values keep the projection disabled.
+Optional vector recovery may miss its planning goal and remain disabled without
+blocking exact/lexical service; canonical/security or exact/lexical recovery
+misses block v1 activation.
 
 Every backup records canonical transaction basis, vault inventory basis,
 security watermark, and recovery-ledger watermark. The recovery-control ledger
@@ -3739,7 +3805,7 @@ Mandatory `v0-reference` fixture IDs are frozen with the release:
 | `C07_correction_contradiction` | modality-preserving correction plus comparator truth table and selected support assessments |
 | `C08_delete_restore` | deny-serving, erasure closure, offline cache expiry, and pre-deletion backup non-resurrection |
 | `C09_compiler_degraded` | exact/SQL/FTS/file context and answer verification with no model/network/embedding/graph |
-| `C10_root_pressure` | experiment 16 rejects/accepts seventh-root candidates by the normative promotion rule |
+| `C16_seventh_root_pressure` | experiment 16 rejects/accepts seventh-root candidates by the normative promotion rule |
 | `C11_offline_crdt_boundary` | §4.8 two-node A→B/B→A draft convergence, provenance/retry preservation, current-grant rejection, and hard rejection of ACL/support/decision/identity/side-effect fields |
 
 The release manifest names schema/rule versions and exact expected error codes;
