@@ -1,7 +1,7 @@
 {
   "id": "onboard-one-door-WP-O1R",
-  "base_ref": "ed5ede2f3db74e140670b127e8ca08701dc473e1",
-  "branch": "agent/wp-o1r-command-guard-final",
+  "base_ref": "0184df4acb327ddbb228eee6c4e84b75b8dc58d2",
+  "branch": "agent/wp-o1r-command-guard",
   "worktree": ".",
   "intent": "Implement only WP-O1R: close interpreter/path-routed live-command and direct-Git lexical bypasses, preserve the exact admitted read-only Git grammar, and sanitize every admitted direct-Git child environment including negative-control env -i encoding.",
   "allowed_files": [
@@ -46,6 +46,7 @@
     "docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md",
     "docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md",
     "docs/plans/INWARD_ASCENT_PHASE0_DOSSIER_2026-07-07.md",
+    "docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md",
     "docs/plans/TAM_MASTER_PROMPT_2026-07-07.md",
     "docs/plans/TAM_TRANSDIMENSIONAL_ABUNDANCE_MACHINE_2026-07-07.md",
     "docs/plans/handoffs/DHARMAGRAPH_HANDOFF_CLAUDE.md",
@@ -66,6 +67,7 @@
     "scripts/governance/frontier_ledger.py",
     "scripts/governance/hygiene/**",
     "scripts/governance/inward_ascent_baseline.py",
+    "scripts/governance/loop1_consumption_check.py",
     "scripts/governance/pramana_probe.py",
     "scripts/governance/tam_axes.py",
     "scripts/governance/tam_ledger.py",
@@ -93,6 +95,9 @@
     "tests/test_graph_durable_invoker.py",
     "tests/test_graph_reconciler.py",
     "tests/test_langgraph_differential_oracle.py",
+    "tests/test_loop1_consumption.py",
+    "tests/test_loop1_consumption_check.py",
+    "tests/test_loop_supervisor_tristate.py",
     "tests/test_orchestration_genome.py",
     "tests/test_orchestrator_v1.py",
     "tests/test_pr_merge_control_github_reviews.py",
@@ -143,7 +148,7 @@
     },
     {
       "name": "docops-changed",
-      "command": "python3 scripts/docops/check_docops_integrity.py --changed-from ed5ede2f3db74e140670b127e8ca08701dc473e1",
+      "command": "python3 scripts/docops/check_docops_integrity.py --changed-from 0184df4acb327ddbb228eee6c4e84b75b8dc58d2",
       "expected_exit": 0,
       "env": {
         "PYTHONPATH": ".venv/lib/python3.12/site-packages:."
@@ -215,7 +220,7 @@
     },
     {
       "name": "quality-ratchet",
-      "command": "python3 scripts/governance/hygiene/ratchet.py --max-baseline-age-days 45 --baseline-merge-base-of ed5ede2f3db74e140670b127e8ca08701dc473e1",
+      "command": "python3 scripts/governance/hygiene/ratchet.py --max-baseline-age-days 45 --baseline-merge-base-of 0184df4acb327ddbb228eee6c4e84b75b8dc58d2",
       "expected_exit": 0,
       "env": {
         "PYTHONPATH": ".venv/lib/python3.12/site-packages:."
@@ -273,7 +278,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "ed5ede2f3db74e140670b127e8ca08701dc473e1",
+      "checked_at_sha": "0184df4acb327ddbb228eee6c4e84b75b8dc58d2",
       "details": []
     },
     "interface_mismatches": [
@@ -286,6 +291,6 @@
     ],
     "honest_blockers": [],
     "rollback": "Revert the WP-O1R implementation commit, then remove the tracked WP-O1R packet only after no external AgentOps report remains in use; leave WP-O1, WP-O1R-B0, and the merged WP-O1R admission amendments intact.",
-    "packet_digest": "2fc0e2f7aa2f2f2449e989a0d466b2daba59eff2a25fd2ff7f23ad7451426f39"
+    "packet_digest": "8c26546eb9b26d47e84c41f1f61311f40950ead217469227d3e3139b51f0e267"
   }
 }

@@ -43,32 +43,32 @@ def command_token_forms(token: str) -> set[str]:
     forms.update(basename.rsplit(".", 1)[-1] for basename in basenames)
     return {form.replace("_", "-") for form in forms if form}
 
-def _git_executable_forms(token: str) -> set[str]:
-    """Return executable forms without treating an arbitrary dotted leaf as Git."""
-    raw = token.casefold()
-    separator_canonical = raw.replace("\\", "/")
-    win32_canonical = _win32_path_canonical(raw)
-    basenames = {
-        separator_canonical.rsplit("/", 1)[-1],
-        win32_canonical.rsplit("/", 1)[-1],
-    }
-    basenames.update(
-        basename[2:]
-        for basename in tuple(basenames)
-        if re.match(r"^[a-zA-Z]:", basename)
-    )
-    forms = {raw, separator_canonical, win32_canonical, *basenames}
-    forms.update(basename[:-4] for basename in basenames if basename.endswith(".exe"))
-    return {form.replace("_", "-") for form in forms if form}
+def _git_executable_forms(token: str) -> tuple[str, str]:
+    """Return raw and Win32-canonical executable basenames."""
+    raw = token.casefold().replace("\\", "/")
+    canonical = _win32_path_canonical(raw)
+    forms = [
+        (leaf[2:] if leaf == value and re.match(r"^[a-zA-Z]:", leaf) else leaf).replace("_", "-")
+        for value in (raw, canonical)
+        for leaf in (value.rsplit("/", 1)[-1],)
+    ]
+    return forms[0], forms[1]
 
 def git_executable_identity(token: str, git_executable: str) -> str | None:
     """Identify direct Git and git-* executables across POSIX/Windows paths."""
-    forms = _git_executable_forms(token)
-    if git_executable in forms:
-        return git_executable
+    raw, canonical = _git_executable_forms(token)
+    allowed = (git_executable, f"{git_executable}.exe")
     prefixes = (f"{git_executable}-", f"{git_executable}.")
-    direct = sorted(form for form in forms if form.startswith(prefixes))
-    return direct[0] if direct else None
+    embedded = raw[2:] if re.match(r"^[a-zA-Z]:", raw) else ""
+    embedded_canonical = _win32_path_canonical(embedded)
+    alias = (raw != canonical and canonical in allowed) or embedded in allowed or embedded_canonical in allowed
+    direct = next(
+        (form for form in (raw, canonical, embedded, embedded_canonical) if form.startswith(prefixes) and form != allowed[1]),
+        None,
+    )
+    if alias or direct:
+        return raw
+    return git_executable if canonical in allowed else None
 
 def _safe_git_operand(value: str) -> bool:
     """Return whether a revision/path operand is lexically repo-relative."""

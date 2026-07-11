@@ -1,5 +1,5 @@
 {
   "version": 3,
-  "sidebarVisible": true,
+  "sidebarVisible": "collapsed",
   "sidebarMode": "toc"
 }

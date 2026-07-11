@@ -514,6 +514,29 @@ def test_gate_rejects_git_global_options_and_aliases(
         '"C:\\tmp\\git.fake" status --short',
         "git.fake. status --short",
         "git.fake::$DATA status --short",
+        "git. status --short",
+        "git.exe. status --short",
+        '"git.exe " status --short',
+        "git.exe::$DATA status --short",
+        "git.exe.::$DATA status --short",
+        "git.exe:payload status --short",
+        '"git " status --short',
+        "git:payload status --short",
+        "git::$DATA status --short",
+        '"./git " status --short',
+        '"./git:payload" status --short',
+        '"C:\\tmp\\git " status --short',
+        '"C:\\tmp\\git::$DATA" status --short',
+        "/tmp/C:git.exe status --short",
+        "./C:git status --short",
+        "/tmp/C:git::$DATA status --short",
+        '"./C:git " status --short',
+        "/tmp/C:git.exe. status --short",
+        "/tmp/C:git-push status --short",
+        '"C:\\Program Files\\Git\\cmd\\git.exe." status --short',
+        '"C:\\Program Files\\Git\\cmd\\git.exe " status --short',
+        '"C:\\Program Files\\Git\\cmd\\git.exe.::$DATA" status --short',
+        '"C:\\Program Files\\Git\\cmd\\git.exe:payload" status --short',
         '"C:\\Program Files\\Git\\mingw64\\libexec\\git-core\\git-push.exe" origin HEAD',
         '"C:\\Program Files\\Git\\cmd\\git.exe." push origin HEAD',
         '"C:\\Program Files\\Git\\cmd\\git.exe " push origin HEAD',
@@ -671,10 +694,13 @@ def test_gate_rejects_git_global_options_and_aliases(
         ),
         ("/usr/bin/git status --short", ["/usr/bin/git", "status", "--short"]),
         ("git.exe status --short", ["git.exe", "status", "--short"]),
+        ("C:git.exe status --short", ["C:git.exe", "status", "--short"]),
         (
             '"C:\\Program Files\\Git\\cmd\\git.exe" status --short',
             ["C:\\Program Files\\Git\\cmd\\git.exe", "status", "--short"],
         ),
+        ("git.foo/tool status --short", ["git.foo/tool", "status", "--short"]),
+        ("./git.foo/tool status --short", ["./git.foo/tool", "status", "--short"]),
     )
     rejected_results: list[
         tuple[str, list[str] | None, dict[str, str] | None, str | None]
@@ -826,6 +852,7 @@ def test_direct_git_gate_strips_inherited_git_environment(
     commands = (
         "git status --short",
         "git.exe status --short",
+        "C:git.exe status --short",
         "/usr/bin/git status --short",
         '"C:\\Program Files\\Git\\cmd\\git.exe" status --short',
     )
@@ -866,6 +893,29 @@ def test_direct_git_gate_strips_inherited_git_environment(
         '"C:\\tmp\\git.fake" status --short',
         "git.fake. status --short",
         "git.fake::$DATA status --short",
+        "git. status --short",
+        "git.exe. status --short",
+        '"git.exe " status --short',
+        "git.exe::$DATA status --short",
+        "git.exe.::$DATA status --short",
+        "git.exe:payload status --short",
+        '"git " status --short',
+        "git:payload status --short",
+        "git::$DATA status --short",
+        '"./git " status --short',
+        '"./git:payload" status --short',
+        '"C:\\tmp\\git " status --short',
+        '"C:\\tmp\\git::$DATA" status --short',
+        "/tmp/C:git.exe status --short",
+        "./C:git status --short",
+        "/tmp/C:git::$DATA status --short",
+        '"./C:git " status --short',
+        "/tmp/C:git.exe. status --short",
+        "/tmp/C:git-push status --short",
+        '"C:\\Program Files\\Git\\cmd\\git.exe." status --short',
+        '"C:\\Program Files\\Git\\cmd\\git.exe " status --short',
+        '"C:\\Program Files\\Git\\cmd\\git.exe.::$DATA" status --short',
+        '"C:\\Program Files\\Git\\cmd\\git.exe:payload" status --short',
     )
     for command in disguised_git:
         with pytest.raises(agentops.AgentOpsError, match="not allowed"):
@@ -873,7 +923,10 @@ def test_direct_git_gate_strips_inherited_git_environment(
                 {"name": "disguised-git", "command": command}, 0,
             )
 
-    for command in ("evil.git status --short", "tool.GIT status --short"):
+    for command in (
+        "evil.git status --short", "tool.GIT status --short",
+        "git.foo/tool status --short", "./git.foo/tool status --short",
+    ):
         dotted_non_git = agentops.parse_gate(
             {"name": "dotted-non-git", "command": command}, 0,
         )

@@ -1,0 +1,145 @@
+{
+  "report_type": "pr_lifecycle",
+  "generated_at": "2026-07-11T06:00Z",
+  "audit_sha": "77772c52448edc1b533f831bbc8c6f2e1cf64c77",
+  "summary": {
+    "total_open_before": 7,
+    "auto_closed": 0,
+    "total_open_after": 7,
+    "conflicting_prs": 2,
+    "green_and_ready_non_draft": 0,
+    "green_ci_draft_only": 1
+  },
+  "auto_close_scan": {
+    "criteria": "mergeable=CONFLICTING AND age > 7 days",
+    "eligible": [],
+    "near_threshold": [
+      {
+        "number": 773,
+        "title": "NĀGA-IR spec triple + receipt emission (combined PR #2 + PR #3)",
+        "mergeable": "CONFLICTING",
+        "created_at": "2026-07-04T08:46:18Z",
+        "age_hours": 165.2,
+        "note": "~2h under 7-day threshold at report time. Will be eligible shortly."
+      }
+    ],
+    "conflicting_not_yet_eligible": [
+      {
+        "number": 837,
+        "title": "chore(docops): reconcile generated counts",
+        "mergeable": "CONFLICTING",
+        "created_at": "2026-07-08T00:29:06Z",
+        "age_hours": 77.5,
+        "note": "3 days old, not yet eligible. Rebase recommended."
+      }
+    ]
+  },
+  "duplicate_auto_grounding_scan": {
+    "duplicates_found": [],
+    "note": "No duplicate auto-grounding PRs targeting same topic. Each chore/governance pattern has a single open instance."
+  },
+  "pr_ci_health": [
+    {
+      "number": 879,
+      "title": "fix(onboarding): close direct command lexical bypasses",
+      "draft": true,
+      "mergeable": "UNKNOWN",
+      "created_at": "2026-07-11T05:24:15Z",
+      "ci_failures": ["Quality ratchet", "CODEOWNERS blast-radius routing", "pytest (3.11)", "pytest (3.12)"],
+      "status": "FAILING"
+    },
+    {
+      "number": 874,
+      "title": "feat(control-plane): honest gateway health and BoardStore shadow wiring",
+      "draft": false,
+      "mergeable": "UNKNOWN",
+      "created_at": "2026-07-11T03:49:52Z",
+      "ci_failures": ["Fourfold Shakti Warrant", "Hygiene delta-ratchet", "Quality ratchet", "CODEOWNERS blast-radius routing", "pytest (3.11)", "pytest (3.12)"],
+      "status": "FAILING"
+    },
+    {
+      "number": 868,
+      "title": "docs: full A2A fleet and SSOT control-plane audit",
+      "draft": false,
+      "mergeable": "UNKNOWN",
+      "created_at": "2026-07-11T01:51:29Z",
+      "ci_failures": ["pytest (3.11)", "pytest (3.12)"],
+      "status": "FAILING"
+    },
+    {
+      "number": 866,
+      "title": "governance: admit LOOP-1 CLOSED_LIVE work-packet campaign (WP-LC0)",
+      "draft": false,
+      "mergeable": "UNKNOWN",
+      "created_at": "2026-07-11T00:02:38Z",
+      "ci_failures": ["pytest (3.11)"],
+      "ci_partial_passes": ["pytest (3.12) SUCCESS"],
+      "status": "NEAR_GREEN"
+    },
+    {
+      "number": 853,
+      "title": "chore(governance): spine adoption metric refresh 2026-07-10T0000Z",
+      "draft": true,
+      "mergeable": "UNKNOWN",
+      "created_at": "2026-07-10T00:02:09Z",
+      "ci_failures": [],
+      "status": "GREEN_BUT_DRAFT"
+    },
+    {
+      "number": 837,
+      "title": "chore(docops): reconcile generated counts",
+      "draft": false,
+      "mergeable": "CONFLICTING",
+      "created_at": "2026-07-08T00:29:06Z",
+      "ci_failures": [],
+      "status": "CONFLICTING_NEEDS_REBASE"
+    },
+    {
+      "number": 773,
+      "title": "NĀGA-IR spec triple + receipt emission (combined PR #2 + PR #3)",
+      "draft": false,
+      "mergeable": "CONFLICTING",
+      "created_at": "2026-07-04T08:46:18Z",
+      "ci_failures": [],
+      "status": "CONFLICTING_NEAR_AUTO_CLOSE"
+    }
+  ],
+  "recommended_actions": [
+    {
+      "priority": 1,
+      "pr": 773,
+      "action": "URGENT: Rebase or close. CONFLICTING and crosses 7-day auto-close threshold in ~2h (by 2026-07-11T08:46Z). Branch preserved if auto-closed.",
+      "owner": "operator"
+    },
+    {
+      "priority": 2,
+      "pr": 837,
+      "action": "Rebase chore(docops) — CONFLICTING. Low-risk 2-file doc counts change. 4 days old.",
+      "owner": "operator"
+    },
+    {
+      "priority": 3,
+      "pr": 866,
+      "action": "Investigate pytest (3.11) failure. Core governance track WP-LC0 — nearly green.",
+      "owner": "operator"
+    },
+    {
+      "priority": 4,
+      "pr": 868,
+      "action": "Investigate pytest (3.11)+(3.12) failures. Docs-only PR but pytest must pass.",
+      "owner": "operator"
+    },
+    {
+      "priority": 5,
+      "pr": 874,
+      "action": "Multiple CI failures including Fourfold Shakti Warrant and Hygiene ratchet. Needs investigation.",
+      "owner": "operator"
+    },
+    {
+      "priority": 6,
+      "pr": 853,
+      "action": "All CI green — un-draft when ready to merge spine metric refresh.",
+      "owner": "operator"
+    }
+  ]
+}
