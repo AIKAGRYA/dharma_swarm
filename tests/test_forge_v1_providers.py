@@ -112,6 +112,39 @@ def test_pool_completion_routes_kimi_for_coding_to_kimi_code_provider(monkeypatc
     assert wire_model == "kimi-for-coding"
 
 
+def test_pool_completion_routes_moonshot_prefix_to_moonshot_provider(monkeypatch):
+    captured = {}
+    provider = object()
+
+    def fake_resolve(provider_type, *, model=None, timeout_seconds=None):
+        captured["provider_type"] = provider_type
+        captured["model"] = model
+        captured["timeout_seconds"] = timeout_seconds
+        return RuntimeProviderConfig(
+            provider=provider_type,
+            default_model=model,
+            timeout_seconds=timeout_seconds,
+            available=True,
+        )
+
+    monkeypatch.setattr(
+        "dharma_swarm.runtime_provider.resolve_runtime_provider_config",
+        fake_resolve,
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.runtime_provider.create_runtime_provider",
+        lambda config: provider,
+    )
+
+    resolved_provider, wire_model = _provider_for_model("moonshot:kimi-k2.7-code")
+
+    assert resolved_provider is provider
+    assert captured["provider_type"] == ProviderType.MOONSHOT
+    assert captured["model"] == "kimi-k2.7-code"
+    assert captured["timeout_seconds"] == 240
+    assert wire_model == "kimi-k2.7-code"
+
+
 def test_pool_completion_routes_glm_52_to_zhipu_provider(monkeypatch):
     captured = {}
     provider = object()

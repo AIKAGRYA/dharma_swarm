@@ -106,8 +106,18 @@ def test_llm_propose_parses_json_from_noisy_reply():
     assert result.tokens_used == 42 and result.operator == "llm_propose"
 
 
-def test_llm_propose_malformed_reply_is_evidence_not_crash():
-    result = mutation.llm_propose_genome({"g": 1}, complete_fn=lambda p: ("no json here", 5))
+def test_llm_propose_non_json_reply_is_salvaged_as_freeform_compost():
+    parent = merged_with_defaults({"generator_model": "m", "extra_instruction": "prior"})
+    result = mutation.llm_propose_genome(parent, complete_fn=lambda p: ("try a smaller patch first", 5))
+    assert result.genome is not None
+    assert result.parse_issues == ("salvaged_non_json_as_freeform",)
+    assert result.genome["mutation_parse_salvage"] is True
+    assert "try a smaller patch first" in result.genome["extra_instruction"]
+    assert result.genome["generator_model"] == "m"
+
+
+def test_llm_propose_empty_reply_is_evidence_not_crash():
+    result = mutation.llm_propose_genome({"g": 1}, complete_fn=lambda p: ("   ", 5))
     assert result.genome is None and result.parse_issues == ("no_json_object_found",)
 
 
