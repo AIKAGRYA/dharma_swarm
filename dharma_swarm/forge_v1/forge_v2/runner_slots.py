@@ -47,6 +47,8 @@ def _prefix_provider(model_id: str):
         return ProviderType.ANTHROPIC
     if mid.startswith("glm-5.2") or mid.startswith("zai/") or mid.startswith("z-ai/"):
         return ProviderType.ZHIPU
+    if mid.startswith("moonshot:"):
+        return ProviderType.MOONSHOT  # RSI-LAB travel route: api.moonshot.ai lane
     if mid in {"kimi-for-coding", "kimi-code"} or mid.startswith("kimi_code/") or mid.startswith("kimi-code/"):
         return ProviderType.KIMI_CODE
     if mid.startswith("nvidia/") or mid.startswith("meta/") or "llama" in mid:
@@ -68,7 +70,8 @@ def _slot_for_id(model_id: str):
         return _SimpleSlot(route.model_id, route.provider, getattr(entry, "tier", "strong"))
     prov = _prefix_provider(model_id)
     if prov is not None:
-        return _SimpleSlot(model_id, prov, "frontier")
+        wire = model_id.split(":", 1)[1] if model_id.startswith("moonshot:") else model_id
+        return _SimpleSlot(wire, prov, "frontier")
     return None
 
 

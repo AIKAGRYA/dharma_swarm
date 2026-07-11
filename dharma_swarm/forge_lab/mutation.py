@@ -92,6 +92,32 @@ def _extract_json_object(text: str) -> tuple[dict[str, Any] | None, tuple[str, .
     return None, ("no_json_object_found",)
 
 
+def _text_as_freeform_genome(text: str, parent: dict[str, Any]) -> dict[str, Any] | None:
+    """Salvage a non-JSON mutation reply without over-governing free-form evolution.
+
+    The wild lane should not discard a useful natural-language strategy just
+    because the model forgot the JSON envelope. Preserve the parent's executable
+    scaffold, inject the raw idea as ``extra_instruction``, and mark it as
+    salvaged compost. This keeps creativity in-bounds while still making the
+    parse failure observable in notes/ignored fields.
+    """
+    idea = (text or "").strip()
+    if not idea:
+        return None
+    idea = idea[:4000]
+    child = dict(parent)
+    prior = str(child.get("extra_instruction") or "").strip()
+    child["extra_instruction"] = (
+        (prior + "\n\n" if prior else "")
+        + "SALVAGED_MUTATION_IDEA:\n"
+        + idea
+    )
+    child.setdefault("arm_kind", "freeform_single")
+    child["notes"] = "salvaged_non_json_mutation_reply"
+    child["mutation_parse_salvage"] = True
+    return child
+
+
 def _mutation_prompt(
     parent: dict[str, Any],
     failures: Sequence[dict[str, Any]],
@@ -107,6 +133,9 @@ def _mutation_prompt(
         "injected into the coding agent's repair prompt — rewrite it boldly based "
         "on the failure evidence. You may also invent additional keys; unknown keys "
         "are preserved for future operators.\n\n"
+        "STRICT OUTPUT CONTRACT: reply with exactly one JSON object. No markdown, "
+        "no prose before or after. If you want free-form creativity, put it inside "
+        "the extra_instruction string.\n\n"
         "Executable genes (children outside these still get archived, but cannot "
         "be graded today):\n"
         '  arm_kind: one of "freeform_single" | "self_moa" | "verify_chain" | "mixed_moa"\n'
@@ -114,6 +143,9 @@ def _mutation_prompt(
         "  k: 1..8 (self_moa only) · per_call_tokens: 256..32768 · window_chars: 1000..200000\n"
         "  extra_instruction: any text (the wild gene)\n"
         '  notes: one line explaining WHY this mutation, given the failures\n'
+        "Minimum valid reply example:\n"
+        '{"arm_kind":"freeform_single","per_call_tokens":12000,"window_chars":24000,'
+        '"extra_instruction":"new strategy here","notes":"why this child"}\n'
     )
     parts = [role, "PARENT GENOME:\n" + json.dumps(parent, indent=2, default=str)]
     if second_parent is not None:
@@ -147,6 +179,10 @@ def llm_propose_genome(
     except Exception as exc:  # provider errors are evidence, not crashes
         return MutationResult(None, operator, notes=f"provider_error:{exc}", parse_issues=("provider_error",))
     genome, issues = _extract_json_object(text or "")
+    if genome is None and issues and issues[0] == "no_json_object_found":
+        genome = _text_as_freeform_genome(text or "", parent)
+        if genome is not None:
+            issues = ("salvaged_non_json_as_freeform",)
     notes = ""
     if isinstance(genome, dict):
         notes = str(genome.get("notes") or "")
