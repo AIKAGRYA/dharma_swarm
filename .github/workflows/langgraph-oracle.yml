@@ -44,6 +44,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          # The gauntlet replay proves rubric-freeze provenance with real git
+          # ancestry (git log -1 -- rubric, merge-base --is-ancestor); a
+          # shallow clone resolves every path to the fetch boundary commit and
+          # fails the custody check with a false mismatch.
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
