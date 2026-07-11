@@ -13,7 +13,9 @@ import argparse
 import asyncio
 import hashlib
 import json
+import os
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
@@ -25,6 +27,10 @@ if str(REPO_ROOT) not in sys.path:
 from scripts.runtime.a2a_send import (  # noqa: E402
     ACK_TIER_HANDLER_ACKED,
     ACK_TIER_NO_CONTACT,
+)
+from scripts.runtime.a2a_topology import (  # noqa: E402
+    DEFAULT_COMPATIBILITY_STREAM,
+    REPLY_CONSUMER_PREFIX,
 )
 from scripts.runtime.pr_merge_control import stamp, utc_now  # noqa: E402
 
@@ -91,6 +97,59 @@ def write_reply_receipt(receipt_root: Path, receipt: dict[str, Any]) -> Path:
     return path
 
 
+def commit_reply_receipt(receipt_root: Path, receipt: dict[str, Any]) -> dict[str, Any]:
+    """Atomically commit one idempotent capture receipt before source ACK."""
+
+    receipt_root.mkdir(parents=True, exist_ok=True)
+    payload_sha = str(receipt.get("reply_payload_sha256") or "")
+    reply_subject = str(receipt.get("reply_subject") or "")
+    if not payload_sha or not reply_subject:
+        raise ValueError("capture receipt requires reply subject and payload hash")
+    capture_id = "reply_capture_" + hashlib.sha256(
+        f"{reply_subject}|{payload_sha}".encode("utf-8")
+    ).hexdigest()[:32]
+    target = _safe_token(receipt.get("to") or receipt.get("target_uid"))
+    packet_id = _safe_token(receipt.get("packet_id"))
+    path = receipt_root / f"{target}-{packet_id}-{capture_id}.json"
+    receipt = {**receipt, "capture_id": capture_id, "receipt_path": str(path)}
+
+    if path.exists():
+        committed = _read_json(path)
+        if (
+            committed.get("capture_id") != capture_id
+            or committed.get("reply_payload_sha256") != payload_sha
+        ):
+            raise RuntimeError(f"reply capture collision at {path}")
+        return committed
+
+    payload = (json.dumps(receipt, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=receipt_root)
+    temp_path = Path(temp_name)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        try:
+            os.link(temp_path, path)
+        except FileExistsError:
+            committed = _read_json(path)
+            if (
+                committed.get("capture_id") != capture_id
+                or committed.get("reply_payload_sha256") != payload_sha
+            ):
+                raise RuntimeError(f"reply capture collision at {path}")
+            return committed
+        directory_fd = os.open(receipt_root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    finally:
+        temp_path.unlink(missing_ok=True)
+    return receipt
+
+
 def _payload_from_message(message: NatsMessageLike) -> tuple[dict[str, Any], str]:
     sha = hashlib.sha256(message.data).hexdigest()
     try:
@@ -109,6 +168,13 @@ def _schema(payload: dict[str, Any]) -> str:
 def _is_domain_receipt(payload: dict[str, Any]) -> bool:
     schema = _schema(payload)
     return schema in DOMAIN_REPLY_SCHEMAS
+
+
+def reply_consumer_name(reply_subject: str) -> str:
+    """Return the stable durable consumer name for one exact reply subject."""
+
+    digest = hashlib.sha256(reply_subject.encode("utf-8")).hexdigest()[:32]
+    return f"{REPLY_CONSUMER_PREFIX}{digest}"
 
 
 def pending_reply_targets(
@@ -182,6 +248,7 @@ async def capture_reply_message(
     stream: str,
     endpoint: str,
 ) -> dict[str, Any]:
+    recoverable_receipt_path = ""
     try:
         if str(message.subject) != target.reply_subject:
             receipt = {
@@ -243,6 +310,8 @@ async def capture_reply_message(
                 else "untyped reply_subject payload captured; this is not semantic collaboration"
             ),
         }
+        receipt = commit_reply_receipt(receipt_root, receipt)
+        recoverable_receipt_path = str(receipt["receipt_path"])
         await message.ack()
     except Exception as exc:
         try:
@@ -265,6 +334,15 @@ async def capture_reply_message(
             "domain_receipt_claim": False,
             "error": f"{type(exc).__name__}: {exc}",
         }
+        if recoverable_receipt_path:
+            receipt["recoverable_receipt_path"] = recoverable_receipt_path
+            receipt["operator_contact_note"] = (
+                "reply receipt was durably committed, but source broker ACK failed; "
+                "redelivery will reuse the committed receipt"
+            )
+            return receipt
+    if receipt.get("receipt_path"):
+        return receipt
     receipt_path = write_reply_receipt(receipt_root, receipt)
     receipt["receipt_path"] = str(receipt_path)
     return receipt
@@ -307,7 +385,11 @@ async def capture_target_once(
     nc = await nats.connect(servers=[endpoint], allow_reconnect=False, max_reconnect_attempts=0)
     try:
         js = nc.jetstream()
-        sub = await js.pull_subscribe(target.reply_subject, stream=stream)
+        sub = await js.pull_subscribe(
+            target.reply_subject,
+            durable=reply_consumer_name(target.reply_subject),
+            stream=stream,
+        )
         try:
             messages = await sub.fetch(1, timeout=timeout_s)
         except NatsTimeoutError:
@@ -366,7 +448,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--send-receipt-root", default=str(DEFAULT_SEND_RECEIPT_ROOT))
     parser.add_argument("--receipt-root", default=str(DEFAULT_REPLY_RECEIPT_ROOT))
     parser.add_argument("--endpoint", default="nats://127.0.0.1:4222")
-    parser.add_argument("--stream", default="DHARMA_FLEET")
+    parser.add_argument("--stream", default=DEFAULT_COMPATIBILITY_STREAM)
     parser.add_argument("--timeout", type=float, default=1.0)
     parser.add_argument("--limit", type=int, default=1)
     parser.add_argument("--json", action="store_true")
