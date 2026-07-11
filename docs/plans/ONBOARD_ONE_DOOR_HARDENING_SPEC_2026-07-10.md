@@ -2232,3 +2232,137 @@ the receipt and requires a new independent run from acquisition.
 baseline and MUST NOT begin WP-00 until the complete onboarding implementation,
 merge-blocking CI admission, and this independent clean-room proof have merged.
 The qualifying baseline is captured only from the resulting merged `main` SHA.**
+
+## §14 Autonomous campaign controller
+
+This section defines how one focused autonomous campaign executes §§0–13 until
+the terminal gate holds. It is an execution state machine, not a second spec or
+truth owner. Authority precedence remains exactly the §0 contract and canonical
+ownership map; §14 owns orchestration only
+(`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:14-22`,
+`docs/governance/CANONICAL_DOC_STACK.md:52-70`). Nothing here may waive or
+reinterpret a work-packet envelope, expected exit, kill criterion, ownership
+boundary, operator decision, or independent-proof requirement above.
+
+### 14.1 One campaign, narrow merge nodes
+
+“Nonstop” means continuous orchestration across the narrow PR and ownership
+boundaries required by this specification. It never means a long-lived mega-PR
+or a branch that accumulates later work before its prerequisite has merged.
+For each node, start from freshly fetched `main` in a clean isolated checkout.
+The controller advances through this dependency graph:
+
+```text
+controller admission
+  -> WP-O2
+  -> D3
+  -> WP-O3
+  -> A3
+  -> WP-O4
+  -> C1 phase 2
+  -> D2
+  -> WP-O5
+  -> M6-1
+  -> WP-O6 candidate
+  -> §13 independent clean-room proof
+  -> merge WP-O6 + proof candidate
+  -> track evidence closure PR
+  -> fresh-main terminal audit
+```
+
+The controller re-derives D1, A1, A2, A4, WP-O1, WP-O1R-B0, and WP-O1R at the
+relevant baseline instead of trusting their reported completion. Any C1 phase-1
+change is preparatory only and never closes C1; §9.4 requires the post-WP-O4
+shared context and live branch-protection result
+(`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1776-1787,1953-1969`,
+`docs/governance/ACTIVE_TRACK.yaml:1617-1637`). Live state comes from current
+owners and Git; dated statements elsewhere in this evidence body are not
+promotion markers. Titanium remains blocked for the entire graph
+(`docs/governance/ACTIVE_TRACK.yaml:1635-1637`).
+
+### 14.2 Per-node execution loop
+
+For every implementation node, the controller performs the same fail-closed
+loop:
+
+1. Fetch current `main`; record the exact SHA, tool versions, current ownership,
+   prerequisite evidence, and surface collisions.
+2. Materialize the complete Session Entry Packet outside the worktree; inspect
+   and preflight it at an exact clean baseline; then copy identical bytes to the
+   tracked packet path as the first admitted diff.
+3. Add the named failing-first tests, implement only the declared envelope, and
+   run every packet gate and negative control at its declared expected exit.
+4. Run AgentOps closeout across committed and working diffs, push a narrow PR,
+   observe all required PR and merge-group CI, and obtain a decorrelated review
+   on the exact candidate head.
+5. Treat every failure or substantive review finding as more work on that node.
+   Any author change invalidates the prior verifier result. Repeat until green,
+   merge, prove the merge commit on `main`, and only then advance the baseline.
+
+The packet author is never the sole verifier. Prefer a different agent/model
+and host. The §13 verifier authored none of WP-O1 through WP-O6, receives no
+implementation-author assistance after sterile acquisition begins, and must
+restart from acquisition after any candidate change.
+
+### 14.3 Resumption without another ledger
+
+The controller creates no campaign checkpoint, receipt store, or competing
+status document. On every restart it re-derives:
+
+```text
+next node = first node in §14.1 without mechanically valid merged evidence
+```
+
+Evidence comes from `origin/main`, `ACTIVE_TRACK.yaml` blockers, byte-bound
+work packets, owner records, PR/merge-group checks, and the standard external
+AgentOps/CI artifacts. A PR title, branch, task claim, self-score, or artifact
+existence without correspondence never counts as completion. The durable
+mission controller may retain scheduling state, but it has no authority to
+promote a node.
+
+Before terminal closure, reconcile the active track's completion criteria with
+the rigorous evidence kinds accepted by `check_track_status.py`; pytest-backed
+criteria use the existing test-proof kind and landed/independent evidence is
+represented explicitly. Never make arbitrary command execution rigorous merely
+to produce a green count. WP-O5 and §13 evidence must be represented rather
+than inferred from adjacent criteria. This is the explicit track-evidence
+closure node above, owned as a governance PR that updates `ACTIVE_TRACK.yaml`
+and its managed renders only after the proof candidate merges
+(`scripts/governance/check_track_status.py:530-547,551-563,639-653`,
+`docs/governance/ACTIVE_TRACK.yaml:1646-1692`).
+
+### 14.4 Authority gates and stop rules
+
+- D3 is the recorded reader sweep on every declared fleet host. A discovered
+  reader is upgraded before the WP-O3 writer flip
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1947-1951`,
+  `docs/governance/ACTIVE_TRACK.yaml:1689-1692`).
+- A3 is a separate authority-document PR; it cannot ride an implementation
+  packet
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1971-1984`).
+- C1 phase 2 belongs to merge authority and includes live required-context,
+  parity-manifest, automerge, and branch-protection proof
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1953-1969`).
+- D2 is a separately merged operator-authored ratification after WP-O4 and C1;
+  an implementation author cannot mint or backdate it
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1932-1945`).
+- M6-1 is a DharmaGraph-owner change or explicit transfer before WP-O6 touches
+  `pyproject.toml`
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1986-1993`).
+- U1 preempts the campaign if a newly observed exposure requires containment
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1995-2003`).
+
+Pause only for a concrete external authority/access boundary, unreachable
+required host, missing branch-protection privilege, owner refusal, unavailable
+terminal trace capability, or an explicit packet kill criterion. Record the
+exact command, exit, and evidence, then continue any disjoint preparation that
+§§0–13 explicitly permit. Never widen a packet in flight, weaken a probe, skip
+a required control, add `continue-on-error`, or promote an unmeasured claim.
+
+The campaign ends only when every §10 criterion, D1/D2/D3/C1/M6-1, A1–A4,
+WP-O1/WP-O1R-B0/WP-O1R/WP-O2–WP-O6, strict-default behavior, performance/
+output/determinism/mutation contract, §13 proof, and the track-evidence closure
+PR have merged and been re-derived from fresh `main`
+(`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2005-2025,2067-2234`).
+Only then may the active track close and Titanium capture its qualifying
+baseline.
