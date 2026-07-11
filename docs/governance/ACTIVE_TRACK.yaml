@@ -134,15 +134,22 @@ active_tracks:
     name: Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
     status: ACTIVE
     opened_at: "2026-06-11"
-    verified_at: "2026-07-01"
+    verified_at: "2026-07-11"
     ttl_days: 21
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
     complements:
       - runtime-truth-reconciliation-2026-06
+    depends_on:
+      - organism-rewire-2026-07
     owned_surfaces:
       - reports/loop_closure/**
       - CYBERNETIC_LOOP_MAP.md
+      - docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md
+      - scripts/governance/loop1_consumption_check.py
+      - tests/test_loop_supervisor_tristate.py
+      - tests/test_loop1_consumption.py
+      - tests/test_loop1_consumption_check.py
     moves_vital_signs:
       - quality_gates
       - eval_coverage
@@ -384,6 +391,18 @@ active_tracks:
           - one_wire_live_state
           - command_to_replay
           - tests_run
+      # WP-LC campaign criteria (spec docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md §7.1)
+      # — deliberately RED until their packets land (#864 WP-O1R precedent).
+      - id: loop_supervisor_tristate_honest
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/test_loop_supervisor_tristate.py", "-q"]
+      - id: loop1_consumption_unit_proof
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/test_loop1_consumption.py", "-q"]
+      - id: loop1_consumption_check_replays
+        kind: command_passes
+        command: ["python3", "scripts/governance/loop1_consumption_check.py", "--check"]
+        timeout_s: 60
 
     non_goals:
       - Do not weaken, bypass, or hard-code any telos gate to close a loop.
@@ -394,7 +413,7 @@ active_tracks:
 
     next_items:
       - id: 1
-        what: "TOOL SHIPPED 2026-07-03 (execution on daemon host remains operator): scripts/runtime/dispatch_dropoff_quarantine.py — dry-run default, REQUIRED --before cutoff, --execute stamps quarantined_at/quarantine_reason on existing delegation_runs rows (idempotent ALTER, no new store, rows stay auditable) and writes a JSON receipt (counts + rowid-list sha256) under ~/.dharma/loop_closure/. Audit now reports dropoff_live=N / dropoff_quarantined_historical=M separately (cybernetics_codex excludes only explicitly-stamped rows and always reports the quarantined tally — never hides it). 7 fixture-DB tests green. REMAINING: operator runs it on the daemon host against the real runtime.db (~2191 historical rows), cutoff at/before the spine-dispatch fix timestamp."
+        what: "TOOL SHIPPED 2026-07-03 (execution on daemon host remains operator): scripts/runtime/dispatch_dropoff_quarantine.py — dry-run default, REQUIRED --before cutoff, --execute stamps quarantined_at/quarantine_reason on existing delegation_runs rows (idempotent ALTER, no new store, rows stay auditable) and writes a JSON receipt (counts + rowid-list sha256) under ~/.dharma/loop_closure/. Audit now reports dropoff_live=N / dropoff_quarantined_historical=M separately (cybernetics_codex excludes only explicitly-stamped rows and always reports the quarantined tally — never hides it). 7 fixture-DB tests green. REMAINING: operator runs it on the daemon host against the real runtime.db (~2191 historical rows), cutoff at/before the spine-dispatch fix timestamp. [AMENDED 2026-07-11: EXECUTED 2026-07-03 on the then-daemon host (Mac, db_path /Users/dhyana/.dharma/state/runtime.db) — cutoff 2026-07-02T00:00:00Z, quarantined_now=2191, dropoff_live_after=0, dry-run/execute rowid-sha256 identical; repo witness a9d6f6a6b reports/loop_closure/2026-07-03_dispatch_dropoff_quarantine.json; host-delegation ratified by this admission merge. Residual owned by WP-LC2: verify the CURRENT daemon host's container DB — any live dropoffs there postdate the #755 spine fix and are real signal, never quarantinable.]"
         kind: code
         blocker: true
       - id: 2
@@ -405,6 +424,34 @@ active_tracks:
         what: "Promote each HARNESS_PROVEN loop only after its declared live owner-surface criterion passes on the daemon branch that actually runs."
         kind: governance
         blocker: true
+      - id: 4
+        what: "WP-LC0 admission record (this merge): LOOP-1 CLOSED_LIVE campaign admitted; spec docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md is the detail authority (WP-LC0..LC5). Operator decision register 2026-07-11: D-LC2 consumption wire RATIFIED (bounded ModelRouter feedback extension — reorder-only, demotion cap, delegation_runs-receipts-only, fail-open to default order); D-LC3 one redeploy + one restart AUTHORIZED (date open; item 8 precondition); D-LC1 resolved by the 2026-07-03 execution; D-LC5 dharmagraph sign-off route PRE-APPROVED as fallback. Managed-block regeneration touches docs/governance/BUILD_SESSION_ENTRYPOINT.md as a packet-scoped shared-surface exception (rendered bytes only, no ownership claim — the #859 .gitignore pattern)."
+        kind: governance
+        blocker: false
+      - id: 5
+        what: "WP-LC1 — 4-state loop-health honesty (NEVER_STARTED|RUNNING|STALLED|DISABLED; never-started must not render OK — loop_supervisor.py is_stalled returns False at last_tick==0 and the CLI collapses to OK/STALLED), register the five factory-only loops (archaeology, guardian, health-api, gauntlet, world-model — record_tick silently no-ops for unregistered names), thread supervisor ticks through the named-loop factories (~20 sites). Spec §6 WP-LC1; criterion loop_supervisor_tristate_honest RED until landed."
+        kind: code
+        blocker: false
+      - id: 6
+        what: "WP-LC3 — the ratified consumption wire: receipt-grounded provider deprioritization as an extension of the shared ModelRouter's existing feedback loop (providers.py ModelRouter; feedback via agent_runner._record_router_feedback); evidence (consumed_trace_ids, decision delta, per-process boot_id) rides RoutingDecision (model_routing.py); dharma_swarm/orchestrator.py is NOT edited (dharmagraph-owned; D-LC5 sign-off fallback pre-approved). Spec §6 WP-LC3 boundedness rules are hard requirements."
+        kind: code
+        blocker: false
+      - id: 7
+        what: "WP-LC4 — disjoint read-only checker scripts/governance/loop1_consumption_check.py validating P1..P4 from runtime.db (mode=ro) + witness chain, emitting reports/loop_closure/loop1_consumption_receipt.json (two-digest pattern, observed_at + host-binding keys); CI-safe --check exits with typed needs_host gap when host stores are absent. Spec §6 WP-LC4."
+        kind: code
+        blocker: false
+      - id: 8
+        what: "needs-owner -> organism-rewire-2026-07 (docker-compose.yml owner): commit the loopback binding (127.0.0.1:7433:7433) to main BEFORE any WP-LC2 redeploy — origin/main docker-compose.yml world-binds 7433:7433 and the daemon host's closure of that exposure is an uncommitted local patch (2026-07-09 forensics), so a clean redeploy silently reopens it. Hard precondition for executing D-LC3."
+        kind: ops
+        blocker: true
+      - id: 9
+        what: "needs-owner -> onboard-one-door-2026-07 (post-WP-O1R): generalize the Session Entry work_packet identity grammar (contract.py admits only WP-O<N>) so loop-closure-WP-LC<N> packets validate; until then WP-LC packets run in procedural compliance mode per spec §4 (all steps executed and receipted, deterministic rejection recorded as honest_blockers). D-LC4 approved 2026-07-11."
+        kind: governance
+        blocker: false
+      - id: 10
+        what: "WP-LC5 — the closure claim: one atomic governance PR carrying the fresh ON-HOST cybernetics_codex audit + the §7.2 criteria transition (closed_live 0->1, harness_proven 11->10, verdict map loop 1 -> CLOSED_LIVE) + claim_boundary 'CLOSED_LIVE 1/13; HARNESS_PROVEN 10/13; BLOCKED 2/13'. Anti-gaming: host-binding requires_keys on all three receipts, audit inputs chained to the operator-executed host_session receipt, NON-AUTHOR MERGE required, bot-PR/automerge label forbidden. Ship veto (any HARNESS_PROVEN blocks live-ship) stays — Loop-1 closure is not a track live-ship claim."
+        kind: governance
+        blocker: false
 
   - id: orchestration-arena-v1-2026-06
     name: Orchestration Arena v1 — frozen hermetic fitness + zero-weight orchestrator + DPI
