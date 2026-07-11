@@ -102,6 +102,12 @@ def test_section_and_heading_prose_boundaries() -> None:
     result = parse_broken_register_text(
         """### BR-900 — preamble must remain outside lifecycle sections
 - **status:** OPEN
+## OPEN SOURCE NOTES
+### BR-901 — an H2 prefix is prose, not a lifecycle section
+- **status:** OPEN
+## CLOSED-LOOP DESIGN
+### BR-902 — a hyphenated H2 prefix is also prose
+- **status:** FIXED
 ## OPEN ITEMS (1 open/partial)
 ### BR-001 — Open source dependency is stale
 - **severity:** BLOCKER
@@ -111,6 +117,8 @@ def test_section_and_heading_prose_boundaries() -> None:
     )
 
     assert "BR-900" not in result.by_id
+    assert "BR-901" not in result.by_id
+    assert "BR-902" not in result.by_id
     assert result.by_id["BR-001"].status == "UNKNOWN"
     assert _diagnostic_codes(result.by_id["BR-001"]) == {
         "missing_current_status",

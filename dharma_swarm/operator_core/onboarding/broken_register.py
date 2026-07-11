@@ -23,9 +23,16 @@ KNOWN_LIFECYCLES = OPEN_LIFECYCLES | CLOSED_LIFECYCLES
 
 _H2_RE = re.compile(r"^##\s+(?P<title>.+?)\s*$")
 _H3_RE = re.compile(r"^###\s+(?P<id>BR-\d+)\b(?P<rest>.*)$", re.IGNORECASE)
-_OPEN_HEADER_RE = re.compile(r"^OPEN(?:\s+ITEMS)?\b", re.IGNORECASE)
-_STALE_HEADER_RE = re.compile(r"^STALE-CLAIM\s+CORRECTIONS\b", re.IGNORECASE)
-_CLOSED_HEADER_RE = re.compile(r"^CLOSED(?:\s+ITEMS)?\b", re.IGNORECASE)
+_OPTIONAL_HEADER_METADATA = r"(?:\s+\([^)]*\))?\s*$"
+_OPEN_HEADER_RE = re.compile(
+    rf"^OPEN(?:\s+ITEMS)?{_OPTIONAL_HEADER_METADATA}", re.IGNORECASE
+)
+_STALE_HEADER_RE = re.compile(
+    rf"^STALE-CLAIM\s+CORRECTIONS{_OPTIONAL_HEADER_METADATA}", re.IGNORECASE
+)
+_CLOSED_HEADER_RE = re.compile(
+    rf"^CLOSED(?:\s+ITEMS)?{_OPTIONAL_HEADER_METADATA}", re.IGNORECASE
+)
 _DECLARED_OPEN_RE = re.compile(r"\((?P<count>\d+)\s+open(?:/partial)?\b", re.IGNORECASE)
 _BOLD_FIELD_RE = re.compile(
     r"^\s*(?:[-*+]\s*)?\*\*(?P<key>[A-Za-z_][\w-]*)\s*:\*\*\s*(?P<value>.*?)\s*$"
