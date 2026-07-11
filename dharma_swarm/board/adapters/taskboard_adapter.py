@@ -150,6 +150,11 @@ class TaskBoardAdapter:
         return self._event_log
 
     @property
+    def task_board(self) -> TaskBoard:
+        """Return the canonical TaskBoard owned by this projection adapter."""
+        return self._board
+
+    @property
     def cards(self) -> dict[CardId, Card]:
         return dict(self._cards)
 
@@ -243,18 +248,19 @@ class TaskBoardAdapter:
         new_card = new_card.model_copy(update={"version": new_version})
         self._cards[card_id] = new_card
 
-        self._event_log.append(
-            BoardEvent(
-                kind="card_transitioned",
-                card_id=card_id,
-                actor_id=actor_id,
-                actor_kind="agent",
-                card_version=new_version,
-                from_status=from_status,
-                to_status=new_card.status,
-                idempotency_key=f"tb_trans_{task_id}_{to_status.value}",
+        if kwargs.get("_emit_event", True):
+            self._event_log.append(
+                BoardEvent(
+                    kind="card_transitioned",
+                    card_id=card_id,
+                    actor_id=actor_id,
+                    actor_kind="agent",
+                    card_version=new_version,
+                    from_status=from_status,
+                    to_status=new_card.status,
+                    idempotency_key=f"tb_trans_{task_id}_{to_status.value}",
+                )
             )
-        )
         logger.info(
             "adapter.transition: %s %s→%s",
             card_id,
