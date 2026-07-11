@@ -57,7 +57,7 @@ def git_executable_identity(token: str, git_executable: str) -> str | None:
     raw, canonical = _git_executable_forms(token)
     allowed = (git_executable, f"{git_executable}.exe")
     path = token.lower().replace("\\", "/")
-    compatibility = _win32_path_canonical(unicodedata.normalize("NFKC", path)).rsplit("/", 1)[-1].lower()
+    compatibility = _git_executable_forms(unicodedata.normalize("NFKC", token))
     trusted = path in allowed or path == "/usr/bin/git" or re.fullmatch(r"c:/program files/git/cmd/git\.exe", path) is not None
     prefixes = (f"{git_executable}-", f"{git_executable}.")
     embedded = raw[2:] if re.match(r"^[a-zA-Z]:", raw) else ""
@@ -67,7 +67,7 @@ def git_executable_identity(token: str, git_executable: str) -> str | None:
         (form for form in (raw, canonical, embedded, embedded_canonical) if form.startswith(prefixes) and form != allowed[1]),
         None,
     )
-    if alias or direct or (not path.isascii() and (compatibility in allowed or compatibility.startswith(prefixes) and compatibility != allowed[1])):
+    if alias or direct or (not path.isascii() and any(form in allowed or form.startswith(prefixes) and form != allowed[1] for form in compatibility)):
         return raw
     return git_executable if canonical in allowed and trusted else path if canonical in allowed else None
 
