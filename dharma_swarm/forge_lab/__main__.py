@@ -1,3 +1,7 @@
-from dharma_swarm.forge_lab.cli import main
+"""Module entry point for the repo-owned RSI control surface."""
 
-raise SystemExit(main())
+from dharma_swarm.forge_lab.rsi_cli import main
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

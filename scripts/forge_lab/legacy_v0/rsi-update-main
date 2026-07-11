@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Update the run substrate to latest GitHub main, then RE-APPLY the travel
+# substrate fixes (keys, liveness receipt, origin/main ref, moonshot: routing).
+# Refuses while any rsi-* tmux session is running.
+set -euo pipefail
+source /root/rsi-lab/bin/rsi-env
+if tmux ls 2>/dev/null | grep -q "^rsi-"; then
+  echo "Refusing update while rsi-* tmux sessions exist (stop them first)." >&2
+  exit 1
+fi
+cd "$RSI_REPO"
+git fetch github main --prune || git fetch origin main --prune || true
+git checkout --detach github/main 2>/dev/null || git checkout --detach FETCH_HEAD
+echo "updated $RSI_REPO to $(git rev-parse --short HEAD)"
+echo "re-applying travel substrate fixes..."
+/root/rsi-lab/bin/rsi-fix-substrate
+echo "rsi-update-main complete — substrate is runnable."

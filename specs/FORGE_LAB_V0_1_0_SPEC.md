@@ -5,7 +5,8 @@ are not yet complete
 
 **Target release:** `dharma_swarm.forge_lab` `0.1.0`
 
-**Current release:** `0.0.0`
+**Current release:** `0.1.0-dev` (Packet A CLI skeleton; live campaign paths
+remain fail-closed)
 
 **Canonical host:** Meghadharma (`meghadharma-cloud`)
 
@@ -140,9 +141,15 @@ Meghadharma MUST remain authoritative for:
 - local lightweight evaluation workers;
 - backup and restore status.
 
-There MUST be one canonical Forge checkout and one canonical installed control
-surface. The current split between `/root/rsi-lab/current/repo` and
-`/root/rsi-lab/current-main/repo` MUST be removed during migration.
+The canonical Forge source checkout is `/root/rsi-lab/current/repo`; canonical
+state, environment, and dependency roots are `/root/rsi-lab/current/state`,
+`/root/rsi-lab/current/.venv`, and `/root/rsi-lab/current/pydeps`. New v0.1
+commands MUST report and use those roots. `/root/rsi-lab/current-main/repo` is a
+deprecated recovery worktree and MUST NOT launch a new campaign. It may be
+removed only after its branch is preserved, its worktree is clean, and no
+campaign is active. The `/root/rsi-lab/current` symlink MUST NOT be repointed
+through `current-main`, whose state/dependency links already resolve back to
+`current` and would form a path loop.
 
 ### 5.2 Evaluation workers
 

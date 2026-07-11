@@ -12,7 +12,7 @@
 # On MeghaDharma's isolated RSI lab clone, run with:
 #   BASE=/root/rsi-lab/current
 #   cd "$BASE/repo"
-#   HOME="$BASE/state" PYTHONPATH="$BASE/repo:$BASE/pydeps" bash scripts/agents/register_codex_rsi_lab_manager.sh
+#   DHARMA_HOME="$BASE/state/.dharma" bash scripts/agents/register_codex_rsi_lab_manager.sh
 
 set -euo pipefail
 
@@ -25,12 +25,22 @@ MODEL="codex-runtime-selected"
 PROVIDER="openai"
 DESCRIPTION="Codex CLI manager for the isolated MeghaDharma RSI/Forge lab. Monitors experiments, runs explicitly assigned bounded lab operations, preserves logs and after-run notes, and enforces no-positive-lift claim boundaries."
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-DHARMA_HOME_RESOLVED="${DHARMA_HOME:-${HOME}/.dharma}"
+LAB_BASE="${RSI_LAB_BASE:-/root/rsi-lab/current}"
+REPO_ROOT="${RSI_LAB_REPO:-${LAB_BASE}/repo}"
+STATE_ROOT="${RSI_LAB_STATE:-${LAB_BASE}/state}"
+VENV_ROOT="${RSI_LAB_VENV:-${LAB_BASE}/.venv}"
+PYDEPS_ROOT="${RSI_LAB_PYDEPS:-${LAB_BASE}/pydeps}"
+PYTHON_BIN="${RSI_LAB_PYTHON:-${VENV_ROOT}/bin/python}"
+DHARMA_HOME_RESOLVED="${DHARMA_HOME:-${STATE_ROOT}/.dharma}"
 RECEIPT_FILE="${DHARMA_HOME_RESOLVED}/onboarding/receipts.jsonl"
-PYDEPS_ROOT="${RSI_LAB_PYDEPS:-$(cd "$REPO_ROOT/.." && pwd)/pydeps}"
+export DHARMA_HOME="${DHARMA_HOME_RESOLVED}"
 
 cd "$REPO_ROOT"
+
+if [ ! -x "$PYTHON_BIN" ]; then
+  echo "[register_codex_rsi_lab_manager] ERROR: canonical Python is not executable: ${PYTHON_BIN}"
+  exit 1
+fi
 
 if [ -d "$PYDEPS_ROOT" ]; then
   export PYTHONPATH="${REPO_ROOT}:${PYDEPS_ROOT}:${PYTHONPATH:-}"
@@ -51,15 +61,14 @@ if [ -f "$RECEIPT_FILE" ] && grep -q "\"callsign\": *\"${CALLSIGN}\"" "$RECEIPT_
   exit 0
 fi
 
-if ! python3 -c "import dharma_swarm.roaming_onboarding" 2>/dev/null; then
+if ! "$PYTHON_BIN" -c "import dharma_swarm.roaming_onboarding" 2>/dev/null; then
   echo "[register_codex_rsi_lab_manager] ERROR: cannot import dharma_swarm.roaming_onboarding"
-  echo "[register_codex_rsi_lab_manager] Set PYTHONPATH to include the repo and dependencies, for example:"
-  echo "    PYTHONPATH=\$BASE/repo:\$BASE/pydeps bash scripts/agents/register_codex_rsi_lab_manager.sh"
+  echo "[register_codex_rsi_lab_manager] Check canonical repo, venv, and pydeps paths under ${LAB_BASE}"
   exit 1
 fi
 
 set +e
-python3 -m dharma_swarm.roaming_onboarding \
+"$PYTHON_BIN" -m dharma_swarm.roaming_onboarding \
   --callsign "$CALLSIGN" \
   --agent-uid "$AGENT_UID" \
   --harness "$HARNESS" \

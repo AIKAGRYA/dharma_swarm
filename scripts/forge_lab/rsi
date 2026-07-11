@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Keep the repo-owned development launcher pinned to the canonical Forge Lab
+# environment. Each location remains overridable for an isolated checkout.
+base="${RSI_LAB_BASE:-/root/rsi-lab/current}"
+repo="${RSI_LAB_REPO:-${base}/repo}"
+python="${RSI_LAB_PYTHON:-${base}/.venv/bin/python}"
+pydeps="${RSI_LAB_PYDEPS:-${base}/pydeps}"
+
+if [[ ! -x "${python}" ]]; then
+    printf 'rsi: canonical Python is not executable: %s\n' "${python}" >&2
+    exit 2
+fi
+
+export PYTHONPATH="${repo}:${pydeps}${PYTHONPATH:+:${PYTHONPATH}}"
+exec "${python}" -m dharma_swarm.forge_lab "$@"

@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source /root/rsi-lab/bin/rsi-env
+cd "$RSI_REPO"
+echo "=== RSI LAB STATUS $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
+echo "repo=$RSI_REPO"
+echo "head=$(git rev-parse --short HEAD) full=$(git rev-parse HEAD)"
+echo "branch=$(git branch --show-current || true) status=$(git status --short --branch | head -1)"
+echo "python=$($RSI_PY --version 2>&1)"
+echo "disk=$(df -h / | tail -1)"
+echo "budget_env DHARMA_MODEL_BUDGET_USD=$DHARMA_MODEL_BUDGET_USD FORGE_MODEL_CALL_TIMEOUT_S=$FORGE_MODEL_CALL_TIMEOUT_S"
+echo
+printf "active_tasks="
+"$RSI_PY" - <<'PY'
+import sqlite3, pathlib, os
+p=pathlib.Path(os.environ["RSI_STATE"])/".dharma/forge_v1/taskbed.db"
+if not p.exists():
+ print("missing")
+ raise SystemExit
+conn=sqlite3.connect(p)
+print(conn.execute("select count(*) from taskbed_tasks where active=1").fetchone()[0])
+for row in conn.execute("select taskbed, contamination_state, active, count(*) from taskbed_tasks group by taskbed, contamination_state, active order by 1,2,3"):
+ print("task_count", row)
+print("allocations", conn.execute("select count(*) from taskbed_allocations").fetchone()[0])
+PY
+echo
+echo "tmux sessions:"
+tmux ls 2>/dev/null | grep "^rsi-" || echo "  none"
+echo
+echo "latest run logs:"
+ls -1t "$RSI_STATE/rsi_runs"/*.log 2>/dev/null | head -5 | sed "s#^#  #" || echo "  none"
+echo
+echo "latest closeouts:"
+"$RSI_PY" - <<'PY'
+import json, pathlib, os
+root = pathlib.Path(os.environ["RSI_STATE"]) / ".dharma/evolution_archive/agent_evolution"
+paths = sorted(root.glob("*/closeout.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:5] if root.exists() else []
+if not paths:
+    print("  none")
+for p in paths:
+    d = json.loads(p.read_text())
+    print("  {} {} state={} graded={} best={} path={}".format(
+        d.get("created_at", ""),
+        d.get("experiment_id", ""),
+        d.get("closeout_state", ""),
+        d.get("graded_count", d.get("graded", "")),
+        d.get("best_fitness", d.get("best_pass_rate", "")),
+        p.parent,
+    ))
+PY
