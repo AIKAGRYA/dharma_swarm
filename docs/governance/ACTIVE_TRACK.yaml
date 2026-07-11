@@ -77,7 +77,11 @@ spine_objectives:
 track_policy:
   model: "1..N co-equal active tracks; typed graph; WIP-limited; surface-owned"
   min_active: 1             # floor — single-track default holds until a 2nd is opened
-  max_active: 10            # hard ceiling — focus protection; CI ERROR above this
+  max_active: 11            # hard ceiling — focus protection; CI ERROR above this.
+                            # Raised 10->11 by operator DECREE (GOLDEN SEAL, 2026-07-12
+                            # 00:36 JST, custody grade DECREE: "I want this as an ACTIVE
+                            # TRACK, instantiated now, even if that means breaking WIP").
+                            # Restore to 10 at the next track closure.
   warn_active: 8            # soft signal — "you're spreading thin"; CI WARN above this (bumped 5->8 2026-07-07: reconcile admitted helm terminal + safety TCB with REAL behavioral gates; hyperbolic-time-chamber landed via #830)
   min_active_grace_days: 7  # advisory: how long an empty portfolio is tolerable (empty warns immediately; not auto-enforced)
   min_active_grace_enforced: false  # explicit tombstone: grace is advisory, NOT auto-failed by CI (downstream JSON consumers read this directly)
@@ -1708,6 +1712,107 @@ active_tracks:
       - No strict-default promotion without the merged operator-authored D2 record (spec §9.2).
       - No active sibling-track surface edit; pyproject.toml stays forbidden until M6-1 resolves with the DharmaGraph owner (spec §9.6).
       - No performance target met by removing or deferring a required validation (spec WP-O6 kill criterion).
+
+  - id: darshan-publication-2026-07
+    name: Darshan — publication venture cell (multi-disciplinary voice of clear seeing)
+    status: ACTIVE
+    opened_at: "2026-07-12"
+    verified_at: "2026-07-12"
+    ttl_days: 30
+    owner: "@AmitabhainArunachala"
+    serves: revenue-external-humans-served
+    complements:
+      - company-builder-parity-2026-07
+    owned_surfaces:
+      - docs/plans/DARSHAN_CHARTER_2026-07-12.md
+      - reports/darshan/**
+      - reports/tam/**
+    moves_vital_signs:
+      - eval_coverage
+    target_closure_kind: CLOSED_NOT_PROD
+    claim_boundary: >-
+      Admitted by operator DECREE (GOLDEN SEAL, 2026-07-12 00:36 JST; canonical
+      text at ~/.dharma/agents/darshan_fable/DECREE_GOLDEN_SEAL.md). Criteria
+      prove the publication organ exists and its output is receipted — never
+      audience, revenue, or influence claims (those are TAM-board readings,
+      measured not narrated). Posting to third-party platforms (Medium,
+      Substack, Reddit, etc.) stays operator-gated per platform regardless of
+      criteria state. The Darshan-owned site itself may publish pieces that
+      have passed the editorial law (both-fires + discernment + operator read).
+
+    description: |
+      Operator-decreed publication venture (seed: 2026-05-26 lodestone,
+      wiki darshan-publication-venture-cell; decree: GOLDEN SEAL 2026-07-12).
+      Darshan is a multi-disciplinary voice of truth — deep research in one
+      hand, grounded contemplative vision in the other — that carves the
+      estate's telos into public words, gives the MI/R_V research a platform
+      independent of academic acceptance, and feeds back to the swarm: every
+      article ends its open questions as typed research/build candidates.
+      Structure: seven desks (Bridge, Instrument, Witness Ledger, Noosphere
+      Weather, Field Notes, Readings in Fire, Polity); one head-editor holon
+      (darshan_fable, seat externalized at ~/.dharma/agents/darshan_fable/);
+      two competing entrepreneurial author personas (staged; external GO
+      operator-gated); a zero-dependency static site; the VWRITE pipeline as
+      production substrate. Editorial law (both-fires, register tags
+      FACT/HYPOTHESIS/WILD, fourth option, citation-or-silence, salvage with
+      every kill) is enforced on every piece — anti-feed by charter: no
+      engagement bait, no trackers, no outrage farming.
+
+    completion_criteria:
+      - id: darshan_charter_exists
+        kind: file_contains
+        file: docs/plans/DARSHAN_CHARTER_2026-07-12.md
+        pattern: "editorial law"
+      - id: darshan_issue_one_receipt_valid
+        # RED until Issue One actually publishes to the Darshan site with a
+        # digest-sealed receipt (deliberate-RED precedent: #864/#866).
+        kind: receipt_valid
+        file: reports/darshan/issue_one_receipt.json
+        expect_digest: true
+        requires_keys:
+          - schema
+          - observed_at
+          - articles
+          - site_build_sha256
+          - editorial_law_passes
+          - content_digest
+
+    next_items:
+      - id: 1
+        what: "Issue One: ~6 articles (The Silenced No + five decreed topics: China land purchases, Chinese-model Tibet silence, frontier-model gatekeeping, Iran/Swiss-channel epistemics, Kali Yuga/AI time) through the full editorial law — both-fires pass, independent discernment pass, operator read — then site publish + digest-sealed issue receipt at reports/darshan/issue_one_receipt.json. Drafting pipeline ran 2026-07-12; law passes remain."
+        kind: code
+        blocker: false
+      - id: 2
+        what: "Website deployment decision (operator, from phone is fine): GitHub Pages / Cloudflare Pages / agni VPS. Site scaffold built locally at ~/darshan_site (zero-dependency static, python3 scripts/build.py). Until decided, the site exists locally only."
+        kind: ops
+        blocker: true
+      - id: 3
+        what: "Two competing entrepreneurial author personas: staged under ~/.dharma/agents/darshan_fable/authors/ with voices, beats, platform strategies, monetization models, competition scoreboard. EXTERNAL POSTING GATE (blocker): no third-party platform post until operator GO per platform — one phone message suffices, logged here when given."
+        kind: governance
+        blocker: true
+      - id: 4
+        what: "VWRITE massive evolution: integration brief at ~/.dharma/darshan/INTEGRATION_BRIEF.md (recon 2026-07-12 incl. agni/dokka/NIKKI); v0.1 spec lands as its own governance amendment once operator reviews the brief."
+        kind: code
+        blocker: false
+      - id: 5
+        what: "Fleet registration: darshan_fable agent card (~/.dharma/agents/darshan_fable/identity/agent_card.json) registered via a2a agent onboarding; nurture heartbeat live (com.dharma.darshan-nurture, 07:45/19:45, phone digest at ~/.dharma/darshan/LATEST.md). Kill-switch: launchctl unload."
+        kind: ops
+        blocker: false
+      - id: 6
+        what: "Editorial queue (post-Issue-One, ~14 slots to the decreed ~20): maintained at ~/.dharma/darshan/editorial_queue.md; each published piece must emit its open questions as typed swarm work — an article that spawns no downstream work is decoration (editorial law 6)."
+        kind: governance
+        blocker: false
+      - id: 7
+        what: "OPERATOR CONTEXT (standing): operator walking Japan for peace (Soya->Hateruma) from 2026-07; ~15% interaction, phone-first. All decisions batch to ~/.dharma/darshan/DECISIONS_PENDING.md; never block on operator except items marked blocker here."
+        kind: governance
+        blocker: false
+
+    non_goals:
+      - No third-party platform posting without per-platform operator GO (the external boundary stays operator-held; this decree does not lift the outreach lease for anything but the Darshan-owned site).
+      - No engagement optimization, trackers, analytics, or feed mechanics — Darshan is anti-feed by charter; its authors compete on earnings/reach WITHOUT slop (competition rules in authors/COMPETITION.md).
+      - No revenue claims on this track — receipted dollars are TAM-board readings (honest_arr), never narrated here.
+      - No new digest/receipt primitives — stable_digest/utc_now (memory_kernel.write_receipts) and the receipt_valid contract, as everywhere.
+      - No geopolitical piece publishes without register tags and a steelman of the criticized parties — citation-or-silence applies doubly to charged topics.
 
 closed_tracks:
   - id: runtime-truth-spine-adoption-2026-06
