@@ -157,6 +157,38 @@ def test_underclaim_detector_flags_shipped_but_open_items() -> None:
     assert ucs[0]["blocker"] is True
 
 
+def test_outcome_verdict_gates_shippability(tmp_path: Path) -> None:
+    """A digest-valid receipt that reports a non-passing verdict (AMBER, 45%)
+    must block shippability — the exact company-builder-parity false positive:
+    the receipt_valid criterion proves the scoreboard is real, this proves it
+    says the game was won. A GREEN verdict passes; no receipt is unaffected."""
+    sys.path.insert(0, str(REPO_ROOT / "scripts/governance"))
+    from check_track_status import _outcome_verdict_blocks  # type: ignore
+
+    def _receipt(verdict: str, **extra) -> str:
+        rel = f"reports/r_{verdict.lower()}.json"
+        payload = {"schema": "x", "verdict": verdict, **extra}
+        (tmp_path / "reports").mkdir(exist_ok=True)
+        (tmp_path / rel).write_text(json.dumps(payload), encoding="utf-8")
+        return rel
+
+    amber = {"completion_criteria": [
+        {"id": "r", "kind": "receipt_valid",
+         "file": _receipt("AMBER", parity_pct=45.0)}]}
+    blocks = _outcome_verdict_blocks(amber, repo_root=tmp_path)
+    assert blocks and "AMBER" in blocks[0] and "45.0" in blocks[0]
+
+    green = {"completion_criteria": [
+        {"id": "r", "kind": "receipt_valid", "file": _receipt("GREEN")}]}
+    assert _outcome_verdict_blocks(green, repo_root=tmp_path) == []
+
+    # A track with no receipt_valid criteria is untouched.
+    assert _outcome_verdict_blocks(
+        {"completion_criteria": [{"id": "x", "kind": "file_exists", "file": "y"}]},
+        repo_root=tmp_path,
+    ) == []
+
+
 @pytest.mark.timeout(270)
 def test_underclaims_surface_in_evidence_payload() -> None:
     """Every track payload carries the underclaims field, and any underclaim in

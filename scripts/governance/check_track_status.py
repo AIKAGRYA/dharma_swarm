@@ -1752,6 +1752,57 @@ def detect_dependency_cycle(tracks: list[dict[str, Any]], findings: list[Finding
             break
 
 
+# A receipt's `verdict` clears the outcome bar only when it says the work is
+# DONE. Anything else — a traffic-light AMBER/RED, a NOT_FINISHED, a PARTIAL —
+# means the track's own scoreboard reports the game is not won, no matter how
+# valid and digest-sealed the receipt is.
+_PASSING_OUTCOME_VERDICTS = frozenset({
+    "GREEN", "FINISHED", "DONE", "COMPLETE", "COMPLETED", "PASS", "PASSED",
+    "READY", "VERIFIED", "SHIPPABLE", "CLOSED_LIVE", "OK", "SUCCESS",
+})
+
+
+def _outcome_verdict_blocks(
+    t: dict[str, Any], repo_root: Path = REPO_ROOT
+) -> list[str]:
+    """Block shippability when a track's own outcome receipt reports a
+    non-passing verdict.
+
+    A ``receipt_valid`` criterion proves the receipt is real, digest-sealed and
+    replayable — it does NOT check whether the receipt SAYS the work is done. A
+    valid receipt reading ``verdict: AMBER`` (parity 45%) otherwise satisfies
+    every criterion and the track reads "shippable", which is how an agent ends
+    up telling the operator "this is shippable, let's ship" on a 45%-done track.
+    This reads each receipt's own top-level ``verdict`` and refuses
+    shippability unless it clears the bar — measure the outcome, not just the
+    scoreboard's integrity.
+    """
+    blocks: list[str] = []
+    for c in t.get("completion_criteria") or []:
+        if not isinstance(c, dict) or c.get("kind") != "receipt_valid":
+            continue
+        rel = str(c.get("file") or "")
+        if not rel.endswith(".json"):  # chained .jsonl histories are not outcome docs
+            continue
+        try:
+            data = json.loads((repo_root / rel).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue  # readability is already the receipt_valid criterion's job
+        if not isinstance(data, dict):
+            continue
+        verdict = data.get("verdict")
+        if isinstance(verdict, str) and verdict.strip().upper() not in _PASSING_OUTCOME_VERDICTS:
+            extra = ""
+            for key in ("parity_pct", "score", "score_pct", "percent"):
+                if key in data:
+                    extra = f", {key}={data[key]}"
+                    break
+            blocks.append(
+                f"outcome receipt {rel} reports verdict={verdict!r}{extra} — not a "
+                "passing verdict; the track's own scoreboard says the work is not done")
+    return blocks
+
+
 def evaluate_track(t: dict[str, Any]) -> dict[str, Any]:
     prereqs = [evaluate_criterion(c) for c in (t.get("prerequisites") or [])]
     comps = [evaluate_criterion(c) for c in (t.get("completion_criteria") or [])]
@@ -1829,6 +1880,7 @@ def evaluate_track(t: dict[str, Any]) -> dict[str, Any]:
             f"invalid target closure kind {target_closure_kind!r}; known {sorted(CLOSURE_KINDS)}")
     final_boss_blocks = _final_boss_blocks(t, target_closure_kind)
     ship_blocks.extend(final_boss_blocks)
+    ship_blocks.extend(_outcome_verdict_blocks(t))
     shippable = criteria_pass and not ship_blocks
 
     return {
@@ -2133,15 +2185,21 @@ def run(args: argparse.Namespace) -> int:
                     criterion_id=c.id))
 
         if r["shippable"]:
-            findings.append(Finding("INFO", f"track-shippable:{tid}",
-                f"[{tid}] all {r['total']} criteria pass, rigorous evidence present, "
-                "no open blockers — SHIPPABLE (rigorous bar). Close it."))
+            findings.append(Finding("INFO", f"track-criteria-complete:{tid}",
+                f"[{tid}] all {r['total']} completion criteria pass under the rigorous "
+                "bar with no open blockers and a passing outcome verdict. This is a "
+                "CRITERIA-READINESS signal, NOT a ship-or-close verdict. Closing still "
+                "requires declaring a closure_kind and passing the closure gauntlet — a "
+                "production closure runs the Final Boss review (7 dimensions x >=2 rounds "
+                "x >=6 decorrelated reviewers x score 100, zero disagreements). Do NOT "
+                "'ship' or 'close' on this signal alone; confirm the track's own outcome "
+                "receipts and next_items first."))
         elif r.get("criteria_pass"):
             findings.append(Finding("INFO", f"track-provisional:{tid}",
                 f"[{tid}] {r['passed']}/{r['total']} criteria pass but NOT shippable "
                 f"under the rigorous bar: {'; '.join(r['ship_blocks'])}. "
-                "Existence checks are not closure (see REALITY_DEBT_LEDGER.md / "
-                "cybernetics_codex._evaluate_loop_closure_replay)."))
+                "Criteria passing is not closure, and a valid receipt is not a passing "
+                "outcome (see REALITY_DEBT_LEDGER.md / the Final Boss closure gauntlet)."))
         elif r["completion"]:
             findings.append(Finding("INFO", f"track-in-progress:{tid}",
                 f"[{tid}] {r['passed']}/{r['total']} completion criteria pass."))
