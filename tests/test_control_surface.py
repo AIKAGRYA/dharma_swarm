@@ -346,10 +346,13 @@ class TestManifestIsNotObservedTruth:
 class TestBrokenRegister:
     def test_parses_open_items(self, tmp_broken_register: Path) -> None:
         rows = _broken_register_rows(tmp_broken_register)
-        assert len(rows) >= 2
+        assert len(rows) == 2
 
         br099 = [r for r in rows if "BR-099" in r.label][0]
         assert br099.kind == "broken_register"
+        assert br099.lifecycle_status == "OPEN"
+        assert br099.lifecycle_is_open_like is True
+        assert br099.lifecycle_is_closed_like is False
         assert br099.coherence_state == "drifted"
         assert br099.priority == "p0"  # BLOCKER -> p0
         assert br099.desired_state == "FIXED"
@@ -526,6 +529,8 @@ class TestHumanDecisionPolicy:
             kind="broken_register",
             label="BR-999: test",
             declared_state="OPEN",
+            lifecycle_status="OPEN",
+            lifecycle_is_open_like=True,
         )
         assert _needs_human_decision(row) is True
 
@@ -1299,6 +1304,8 @@ class TestHumanDecisionContext:
             kind="broken_register",
             label="BR-099: test",
             declared_state="OPEN",
+            lifecycle_status="OPEN",
+            lifecycle_is_open_like=True,
         )
         ctx = _build_human_decision_context(row)
         assert ctx.required is True
