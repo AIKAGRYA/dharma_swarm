@@ -69,6 +69,84 @@ if _bootstrapped_operator_core:
 REPORT_ROOT = Path("reports") / "agentops"
 _TRUSTED_HOST_PATH = "/usr/sbin:/usr/bin:/sbin:/bin"
 
+# --- O4-B11: positive command-family allowlist -------------------------------
+# One authoritative table (spec §WP-O4). Positive gates are admitted ONLY when
+# their argv matches an enumerated family below; everything else fails closed
+# BEFORE subprocess execution. This is command-family confinement, not a
+# semantic proof about trusted code — pytest and an allowlisted repository
+# script can themselves perform I/O; WP-O6's syscall/no-network evidence is
+# the terminal oracle. Direct-Git token normalization and grammar remain
+# owned by the contract module and its private WP-O1R lexical helper; this
+# table only decides execution admission. Negative controls are exempt: they
+# rejection and run jailed. Extending this table is a governance-reviewed
+# admission change, never a drive-by edit.
+
+_PYTHON_EXECUTABLES = frozenset({"python", "python3"})
+_ALLOWED_PYTHON_MODULE_PREFIXES = (
+    ("-m", "pytest"),
+    ("-m", "ruff", "check"),
+)
+_ALLOWED_REPO_SCRIPTS = frozenset({
+    "scripts/governance/agent_onboard.py",
+    "scripts/governance/check_track_status.py",
+    "scripts/governance/orientation_graph.py",
+    "scripts/governance/repo_status.py",
+    "scripts/governance/spine_bypass_report.py",
+    "scripts/governance/trust_gate_status.py",
+    "scripts/docops/check_docops_integrity.py",
+})
+_FORBIDDEN_SCRIPT_ARGS = frozenset({"--write-context"})
+_ALLOWED_MAKE_TARGETS = frozenset({
+    "onboard", "orient", "test", "test-fast", "docops-integrity",
+    "hygiene-check", "module-budget", "agent-build-preflight",
+    "agent-build-closeout",
+})
+
+
+def _base_name(token: str) -> str:
+    return Path(token).name
+
+
+def admit_gate_command(gate: GateSpec) -> None:
+    """Fail closed unless the positive gate matches an enumerated family.
+
+    Packet-supplied environment is empty by default and no family enumerates
+    an allowed key, so any env-carrying gate is rejected outright."""
+    argv, command = gate.argv, gate.command
+    if gate.env:
+        raise AgentOpsError(
+            f"gate command may not carry packet-supplied environment: {command}")
+    head = _base_name(argv[0])
+    if head == "git":
+        # Shape already validated by the O1R direct-Git grammar in parse_gate.
+        return
+    if head in _PYTHON_EXECUTABLES:
+        rest = tuple(argv[1:])
+        for prefix in _ALLOWED_PYTHON_MODULE_PREFIXES:
+            if rest[: len(prefix)] == prefix:
+                return
+        if argv[1:2] and argv[1].startswith("scripts/"):
+            script, script_args = argv[1], argv[2:]
+            if script in _ALLOWED_REPO_SCRIPTS and not (
+                set(script_args) & _FORBIDDEN_SCRIPT_ARGS
+            ):
+                return
+        raise AgentOpsError(
+            f"gate command is outside the positive interpreter allowlist: {command}")
+    if head == "make":
+        targets = [token for token in argv[1:] if "=" not in token]
+        variables = [token for token in argv[1:] if "=" in token]
+        if (
+            len(targets) == 1
+            and targets[0] in _ALLOWED_MAKE_TARGETS
+            and all(token.split("=", 1)[0] in {"PACKET", "ARGS"} for token in variables)
+        ):
+            return
+        raise AgentOpsError(
+            f"gate command is outside the positive make-target allowlist: {command}")
+    raise AgentOpsError(
+        f"gate command executable is not in the positive command-family allowlist: {command}")
+
 
 def run_command(
     argv: list[str],
@@ -875,6 +953,8 @@ def execute_packet(
         _validate_session_envelope(
             source, packet_path, packet, inspect=True, require_tracked_copy=False
         )
+        for gate in packet.gates:
+            admit_gate_command(gate)  # O4-B11 fails closed at preflight too
         target = _packet_target(source, packet)
         summary = {
             "job_id": packet.id,
@@ -919,6 +999,7 @@ def execute_packet(
         return 1, report
 
     for gate in packet.gates:
+        admit_gate_command(gate)  # O4-B11: fail closed before execution
         gate_result = run_gate(target_root, gate)
         report["gates"].append(gate_result)
     for control in packet.negative_controls:

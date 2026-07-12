@@ -51,12 +51,30 @@ def minimal_packet(tmp_path: Path, repo: Path, **overrides: object) -> dict[str,
         "intent": "Verify AgentOps test packet.",
         "allowed_files": ["allowed.txt", "reports/agentops/**"],
         "forbidden_files": ["forbidden.txt"],
-        "gates": [{"name": "smoke", "command": f"{sys.executable} -c \"print('ok')\""}],
+        # Positive gates must come from an O4-B11 allowlisted family.
+        "gates": [{"name": "smoke", "command": "git status --porcelain"}],
         "commit": {"allowed": False, "message": "chore(agentops): test"},
         "approval": {"before_commit": True, "before_merge": True},
     }
     payload.update(overrides)
     return payload
+
+
+def stub_gate_script(repo: Path, body: str) -> str:
+    """Install a committed fixture stub at an O4-B11-allowlisted script path.
+
+    Positive gates pass the command-family allowlist before execution, so
+    fixtures that need scripted gate behavior (specific exits, file writes)
+    route through an enumerated repo-script name instead of ``python -c``.
+    The allowlist is lexical command-family confinement by design — the
+    stub demonstrates, not defeats, that boundary."""
+    rel = "scripts/governance/agent_onboard.py"
+    target = repo / rel
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(body, encoding="utf-8")
+    assert run(["git", "add", rel], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "fixture: stub gate script"], cwd=repo).returncode == 0
+    return f"{sys.executable} {rel}"
 
 
 def write_packet(tmp_path: Path, payload: dict[str, object]) -> Path:
@@ -93,7 +111,7 @@ def session_packet(repo: Path, **overrides: object) -> dict[str, object]:
         "allowed_files": ["allowed.txt", f"reports/agentops/work_packets/{packet_id}.json"],
         "forbidden_files": ["forbidden.txt"],
         "gates": [
-            {"name": "declared-gate", "command": f'{sys.executable} -c "raise SystemExit(0)"',
+            {"name": "declared-gate", "command": "git status --porcelain",
              "expected_exit": 0}
         ],
         "negative_controls": [
@@ -306,10 +324,11 @@ def test_runner_minimal_help_writes_no_repo_bytecode(tmp_path: Path) -> None:
 
 def test_commit_policy_refuses_when_gates_fail(tmp_path: Path) -> None:
     repo = init_repo(tmp_path)
+    fail_command = stub_gate_script(repo, "raise SystemExit(7)\n")
     payload = minimal_packet(
         tmp_path,
         repo,
-        gates=[{"name": "fail", "command": f"{sys.executable} -c \"raise SystemExit(7)\""}],
+        gates=[{"name": "fail", "command": fail_command}],
         commit={"allowed": True, "message": "chore(agentops): should not commit"},
         approval={"before_commit": False, "before_merge": True},
     )
@@ -325,9 +344,10 @@ def test_commit_policy_refuses_when_gates_fail(tmp_path: Path) -> None:
 
 def test_commit_policy_refuses_when_human_approval_required(tmp_path: Path) -> None:
     repo = init_repo(tmp_path)
-    write_command = (
-        f"{sys.executable} -c "
-        "\"from pathlib import Path; Path('allowed.txt').write_text('dirty', encoding='utf-8')\""
+    write_command = stub_gate_script(
+        repo,
+        "from pathlib import Path\n"
+        "Path('allowed.txt').write_text('dirty', encoding='utf-8')\n",
     )
     payload = minimal_packet(
         tmp_path,
@@ -1202,12 +1222,13 @@ def test_external_packet_rejects_lexical_resolved_and_git_admin_paths(
 
 def test_declared_expected_exits_and_isolated_negative_controls(tmp_path: Path) -> None:
     repo = init_session_repo(tmp_path)
+    seven_command = stub_gate_script(repo, "raise SystemExit(7)\n")
     payload = session_packet(
         repo,
         gates=[
             {
                 "name": "expected-seven",
-                "command": f'{sys.executable} -c "raise SystemExit(7)"',
+                "command": seven_command,
                 "expected_exit": 7,
             }
         ],
@@ -1550,3 +1571,67 @@ def test_session_entry_collision_adversarial_matrix() -> None:
         sibling_patterns={"sibling": ["api/**"]},
         actual_paths=["docs/a.md", "api/main.py"],
     ) == []
+
+
+def test_positive_gate_command_family_allowlist_rejects_transitive_routes() -> None:
+    """O4-B11: positive gates pass one fail-closed command-family allowlist
+    BEFORE subprocess execution. The five spec witnesses must be rejected;
+    the enumerated pytest/ruff/read-only-script/make/direct-Git families pass.
+    Negative controls are exempt (they exist to prove rejection, jailed)."""
+    witnesses = [
+        "python3 -c \"import subprocess; subprocess.run(['git','push','origin','HEAD'])\"",
+        "python3 -c \"import os; os.system('git push origin HEAD')\"",
+        "gh pr merge 1",
+        "ssh host git-receive-pack repo",
+        "curl -X POST https://api.github.invalid/merges",
+    ]
+    for index, command in enumerate(witnesses):
+        try:
+            gate = agentops.parse_gate({"name": f"witness-{index}", "command": command}, index)
+        except agentops.AgentOpsError:
+            continue  # rejected even earlier, by O1R lexical admission
+        with pytest.raises(agentops.AgentOpsError):
+            agentops.admit_gate_command(gate)
+
+    rejected_families = [
+        "python3 - <<'PY'\nprint('stdin')\nPY",
+        "node -e \"require('child_process')\"",
+        "wget https://example.invalid/x",
+        "python3 scripts/runtime/pr_merge_control.py",
+        "python3 scripts/governance/orientation_graph.py --write-context",
+        "make evolve",
+        "rsync -a . remote:copy",
+    ]
+    for index, command in enumerate(rejected_families):
+        try:
+            gate = agentops.parse_gate({"name": f"family-{index}", "command": command}, index)
+        except agentops.AgentOpsError:
+            continue
+        with pytest.raises(agentops.AgentOpsError):
+            agentops.admit_gate_command(gate)
+
+    accepted = [
+        "python3 -m pytest tests/test_agent_work_packet.py -q",
+        "python3 -m ruff check dharma_swarm/operator_core/onboarding",
+        "python3 scripts/governance/agent_onboard.py --json",
+        "python3 scripts/docops/check_docops_integrity.py",
+        "python3 scripts/governance/orientation_graph.py",
+        "make onboard",
+        "make agent-build-preflight PACKET=reports/agentops/work_packets/x.json",
+        "git status --porcelain",
+    ]
+    for index, command in enumerate(accepted):
+        gate = agentops.parse_gate({"name": f"accepted-{index}", "command": command}, index)
+        agentops.admit_gate_command(gate)  # must not raise
+
+
+def test_positive_gate_allowlist_rejects_packet_supplied_environment() -> None:
+    """Packet-supplied env is empty by default and no family enumerates an
+    allowed key — an env-carrying gate fails closed (O4-B11)."""
+    gate = agentops.parse_gate(
+        {"name": "env-carrier", "command": "python3 -m pytest -q",
+         "env": {"PYTHONPATH": "/tmp/injected"}},
+        0,
+    )
+    with pytest.raises(agentops.AgentOpsError):
+        agentops.admit_gate_command(gate)

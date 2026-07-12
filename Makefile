@@ -435,10 +435,21 @@ claim-evidence:
 mutation-test:
 	$(REPO_PYTHON) scripts/governance/run_mutation_score.py --threshold $(MUTATION_THRESHOLD)
 
+# Packet-aware admission (WP-O4): when PACKET is provided, the shared
+# AgentOps evaluator runs exactly once per phase — preflight validates the
+# packet envelope fail-closed before any edit; closeout re-evaluates the same
+# packet (envelope + gates + negative controls) before PR admission. Without
+# PACKET the legacy baseline behavior is unchanged.
 agent-build-preflight: verifier-selfcheck onboard hygiene-check
+ifdef PACKET
+	$(PYTHON) scripts/governance/run_agent_work_packet.py --packet $(PACKET) --dry-run
+endif
 	@printf "\nAgent build preflight complete. Use the task route from make onboard; close out with: make agent-build-closeout\n"
 
 agent-build-closeout:
+ifdef PACKET
+	$(PYTHON) scripts/governance/run_agent_work_packet.py --packet $(PACKET) --dry-run
+endif
 	$(PYTHON) scripts/governance/hygiene/scan.py --output /tmp/dharma-hygiene-audit.txt
 	-$(PYTHON) scripts/governance/substrate_audit.py
 	$(MAKE) governance-all
@@ -449,16 +460,19 @@ spine-check:
 
 # Single-door onboarding: prints the current operating reality from existing
 # owners (ACTIVE_TRACK.yaml, LIVE_OPS_DASHBOARD.md, BROKEN_REGISTER.md,
-# ACTIVE_SURFACE_MANIFEST.yaml). Always exits 0. Run this before any build
-# session — humans and agents both.
+# ACTIVE_SURFACE_MANIFEST.yaml). Always exits 0 pre-WP-O5 except usage
+# errors (exit 2). Documented flags forward via ARGS (spec §2.1), e.g.
+# `make onboard ARGS=--json`. Run this before any build session.
 onboard:
-	$(PYTHON) scripts/governance/agent_onboard.py
+	$(PYTHON) scripts/governance/agent_onboard.py $(ARGS)
 
 # Whole-system orientation: identity, tracks, lanes, agents, receipts, A2A,
-# body state, and broken register. Explicitly emits generated repo_context
-# artifacts from existing owners; the artifacts own no facts.
+# body state, and broken register. Deep, mutation-free projection — it
+# regenerates NOTHING (WP-O4 / spec §2.1). The tracked context artifacts are
+# refreshed only by their explicit owner command:
+#   $(PYTHON) scripts/governance/orientation_graph.py --write-context
 orient:
-	$(PYTHON) scripts/governance/orientation_graph.py --write-context
+	$(PYTHON) scripts/governance/orientation_graph.py
 
 # Fleet-identity onboarding: the join route for a NEW persistent A2A agent
 # (card, runtime registration, roster, git seat, announcement, presence) plus

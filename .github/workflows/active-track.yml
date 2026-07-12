@@ -92,6 +92,42 @@ jobs:
           name: active-track-evidence
           path: reports/governance/active_track_evidence.*
 
+  # WP-O4 (O4-B5/O4-B10): CI runs the SAME onboarding door command as local
+  # sessions (`make onboard` → scripts/governance/agent_onboard.py), fail-on-
+  # error — no continue-on-error, no weaker flags. PR jobs check out the
+  # DECLARED PR HEAD, never the synthetic merge tree, so what CI admits is
+  # byte-identical to what the author ran. Pre-WP-O5 the door's legacy exit
+  # contract keeps this green except on usage/crash; when WP-O5 flips strict-
+  # by-default, this same invocation becomes the enforcing context (C1
+  # promotes it to merge-blocking separately — no merge authority claimed
+  # here).
+  onboarding-admission:
+    name: Onboarding admission parity
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout declared head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+
+      - name: Install minimal deps
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pyyaml
+
+      - name: Run the one door (same command as local)
+        run: |
+          set -euo pipefail
+          make onboard
+
   # Derived status rollups (active_track_evidence.{json,md},
   # track_portfolio.json, trust_gate_status.json) are NOT tracked on main —
   # they are rewritten in place with a generated_at timestamp on every run and
