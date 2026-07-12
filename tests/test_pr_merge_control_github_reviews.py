@@ -1,4 +1,7 @@
-"""Tests for the native-GitHub-review -> Mike receipt bridge (D4 always-on).
+"""Tests for Mike's automerge admission and native GitHub review bridge.
+
+The admission regression keeps the active-track exemption removed and the
+privileged workflow pinned to trusted default-branch policy data.
 
 The bridge lets a trusted installed reviewer-App's GitHub review stand in as
 that agent's review receipt when no local receipt file exists — the credential-
@@ -23,6 +26,22 @@ from scripts.runtime.pr_merge_control import (
 def _review(login: str, state: str, when: str = "2026-06-24T00:00:00Z", commit: str = "") -> dict:
     # REST review shape: user.login / state / submitted_at / commit_id.
     return {"user": {"login": login}, "state": state, "submitted_at": when, "commit_id": commit}
+
+
+def test_automerge_workflow_has_no_advisory_check_exemption():
+    repo_root = Path(__file__).resolve().parents[1]
+    workflow = (repo_root / ".github/workflows/automerge.yml").read_text(encoding="utf-8")
+
+    assert "ADVISORY_CHECKS" not in workflow
+    assert 'REQUIRED_CHECKS: "' not in workflow
+    assert "Advisory (ignored)" not in workflow
+    assert "ACTIVE_TRACK remains advisory" not in workflow
+    assert "ref: ${{ github.event.repository.default_branch }}" in workflow
+    assert "ref: ${{ github.workflow_sha }}" not in workflow
+    assert "scripts/runtime/pr_merge_control.py automerge-required-contexts" not in workflow
+    assert "scripts/governance/ci_parity_manifest.json" in workflow
+    assert "jq -ce" in workflow
+    assert "--argjson req" in workflow
 
 
 def test_codex_commented_review_counts_as_clean_receipt():

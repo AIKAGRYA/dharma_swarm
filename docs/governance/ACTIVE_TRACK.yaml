@@ -77,7 +77,11 @@ spine_objectives:
 track_policy:
   model: "1..N co-equal active tracks; typed graph; WIP-limited; surface-owned"
   min_active: 1             # floor — single-track default holds until a 2nd is opened
-  max_active: 10            # hard ceiling — focus protection; CI ERROR above this
+  max_active: 11            # hard ceiling — focus protection; CI ERROR above this.
+                            # Raised 10->11 by operator DECREE (GOLDEN SEAL, 2026-07-12
+                            # 00:36 JST, custody grade DECREE: "I want this as an ACTIVE
+                            # TRACK, instantiated now, even if that means breaking WIP").
+                            # Restore to 10 at the next track closure.
   warn_active: 8            # soft signal — "you're spreading thin"; CI WARN above this (bumped 5->8 2026-07-07: reconcile admitted helm terminal + safety TCB with REAL behavioral gates; hyperbolic-time-chamber landed via #830)
   min_active_grace_days: 7  # advisory: how long an empty portfolio is tolerable (empty warns immediately; not auto-enforced)
   min_active_grace_enforced: false  # explicit tombstone: grace is advisory, NOT auto-failed by CI (downstream JSON consumers read this directly)
@@ -909,6 +913,12 @@ active_tracks:
       - docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md
       - docs/plans/handoffs/DHARMAGRAPH_HANDOFF_DEVIN.md
       - docs/plans/handoffs/DHARMAGRAPH_HANDOFF_CLAUDE.md
+      - scripts/governance/dharmagraph_parity_gauntlet.py
+      - tests/oracle_support/dharmagraph_gauntlet.py
+      - tests/test_dharmagraph_parity_gauntlet.py
+      - docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json
+      - docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json
+      - reports/governance/dharmagraph_parity/**
     moves_vital_signs:
       - quality_gates
       - eval_coverage
@@ -970,6 +980,36 @@ active_tracks:
         kind: file_contains
         file: docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md
         pattern: "Kill criterion"
+      # Parity gauntlet (2026-07-12): rubric frozen BEFORE results (V1 66214c5c7,
+      # completeness-corrected V2 7b8662ed5); builder + independent judge both
+      # graded 31.00/100 (MATCH), receipts digest-sealed. These criteria verify
+      # the EVIDENCE is intact and replayable — the 100/100 bar itself lives in
+      # the blocker next-item below, which keeps closeout blocked under the bar.
+      - id: parity_builder_receipt_valid
+        kind: receipt_valid
+        file: reports/governance/dharmagraph_parity/builder_receipt.json
+        expect_digest: true
+        requires_keys:
+          - score
+          - verdict
+          - gaps
+          - capabilities
+          - rubric
+          - shas
+          - environment
+          - stable_digest
+      - id: parity_judge_receipt_valid
+        kind: receipt_valid
+        file: reports/governance/dharmagraph_parity/judge_receipt.json
+        expect_digest: true
+        requires_keys:
+          - score
+          - judge
+          - stable_digest
+      - id: parity_gauntlet_check_passes
+        kind: command_passes
+        command: ["bash", "scripts/governance/run_python_with_repo_env.sh", "scripts/governance/dharmagraph_parity_gauntlet.py", "--check"]
+        timeout_s: 120
 
     next_items:
       - id: 1
@@ -991,6 +1031,186 @@ active_tracks:
       - id: 5
         what: "Operator: provision the ONE daemon VPS (existing droplet, RUNBOOK section 3e) so the Phase 0b reconciler runs against a live daemon; second VPS deferred until daemon + oracle CI green."
         kind: ops
+        blocker: false
+      - id: 6
+        what: "BLOCKER: parity gauntlet judge-signed at 100/100 (or operator-ratified non-goal set) — closeout blocked below the bar. Judge-signed grade 2026-07-12: 31.00/100 (builder and judge receipts reconcile MATCH; digest-sealed under reports/governance/dharmagraph_parity/; replay: scripts/governance/run_python_with_repo_env.sh scripts/governance/dharmagraph_parity_gauntlet.py --check). Rubric frozen before results (V2 at 7b8662ed5); all pre-2026-07-11 parity scores are VOID (self-graded, real langgraph never installed — see rubric preamble). Full evidence per cell: reports/governance/dharmagraph_parity/PARITY_MATRIX.md. The gap cards below (ids 7-45) are the complete work list; N/A requires operator ratification, self-declared rationales score 0."
+        kind: code
+        blocker: true
+      - id: 7
+        what: "parity-gap-lg01-schemas: LG01 State, input, output, and context schemas with partial updates — 1/2 points at weight 4. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 8
+        what: "parity-gap-lg02-node-policies: LG02 Node registration metadata, schemas, destinations, and default policies — 0/2 points at weight 2. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 9
+        what: "parity-gap-lg03-defer: LG03 Deferred and finalization nodes — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 10
+        what: "parity-gap-lg04-topology: LG04 Static topology, sequence, entry/finish, and ALL barrier edges — 1/2 points at weight 2. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 11
+        what: "parity-gap-lg06-supersteps: LG06 Bulk-synchronous parallel supersteps and step atomicity — 1/2 points at weight 2. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 12
+        what: "parity-gap-lg07-send: LG07 Dynamic Send fan-out and map-reduce — 1/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 13
+        what: "parity-gap-lg08-command: LG08 Command update, multi-target goto, parent routing, and resume — 1/2 points at weight 2. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 14
+        what: "parity-gap-lg09-cycles: LG09 Cycles, recursion caps, and managed remaining-step state — 1/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 15
+        what: "parity-gap-lg10-reducers: LG10 Reducer and channel semantics with concurrent-write conflicts — 1/2 points at weight 4. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 16
+        what: "parity-gap-lg11-messages: LG11 Message accumulation, replacement, removal, and formatting — 0/2 points at weight 2. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 17
+        what: "parity-gap-lg12-invocation: LG12 Compilation and sync/async single-run interfaces — 1/2 points at weight 4. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 18
+        what: "parity-gap-lg13-batch: LG13 Batch, as-completed, and max-concurrency interfaces — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 19
+        what: "parity-gap-lg14-checkpoint-protocol: LG14 Checkpoint schema, saver protocol, pending writes, lineage, and serializer — 1/2 points at weight 4. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 20
+        what: "parity-gap-lg15-thread-resume: LG15 Thread-scoped continuity and resume — 0/2 points at weight 9. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 21
+        what: "parity-gap-lg16-history: LG16 State inspection, history, and replay — 1/2 points at weight 2. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 22
+        what: "parity-gap-lg17-fork-time-travel: LG17 Manual state update, bulk update, fork, and time travel — 1/2 points at weight 8. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 23
+        what: "parity-gap-lg18-process-restart: LG18 Durability ordering and process-restart recovery — 1/2 points at weight 10. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 24
+        what: "parity-gap-lg19-static-interrupts: LG19 Static interrupt-before and interrupt-after — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 25
+        what: "parity-gap-lg20-dynamic-interrupt: LG20 Dynamic HITL interrupt and resume — 0/2 points at weight 2. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 26
+        what: "parity-gap-lg21-streaming: LG21 Seven standard stream modes, multi-mode, typed v2, and subgraph namespaces — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 27
+        what: "parity-gap-lg22-stream-v3: LG22 Experimental event stream v3 and transformer projections — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 28
+        what: "parity-gap-lg23-subgraphs: LG23 Nested graphs, parent commands, inheritance, nested state, and streaming — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 29
+        what: "parity-gap-lg24-retry: LG24 Retry selection, backoff, jitter, attempts, and write clearing — 0/2 points at weight 4. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 30
+        what: "parity-gap-lg25-timeout: LG25 Hard/idle timeout, heartbeat, and retry interaction — 0/2 points at weight 2. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 31
+        what: "parity-gap-lg26-errors: LG26 Error propagation, sibling cancellation, handlers, and atomic writes — 1/2 points at weight 4. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 32
+        what: "parity-gap-lg27-store: LG27 Long-term Store CRUD, namespaces, filters, paging, async, and batch — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 33
+        what: "parity-gap-lg28-store-vector: LG28 Store semantic/vector indexing and TTL — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 34
+        what: "parity-gap-lg29-cache: LG29 Node/task result caching and TTL/backend protocol — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 35
+        what: "parity-gap-lg30-config-context: LG30 Config, context, runtime injection, and propagation — 0/2 points at weight 4. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 36
+        what: "parity-gap-lg31-callbacks: LG31 Graph lifecycle callbacks and interrupt/resume events — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 37
+        what: "parity-gap-lg32-functional-api: LG32 Functional task/entrypoint API — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 38
+        what: "parity-gap-lg33-pregel: LG33 Low-level Pregel and channel composition API — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 39
+        what: "parity-gap-lg34-introspection: LG34 Topology introspection and schema export — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 40
+        what: "parity-gap-lg35-drain: LG35 Cooperative drain with checkpointed continuation — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 41
+        what: "parity-gap-app01-handoff: APP01 Active-agent state and handoff ownership through DharmaGraph integration — 1/2 points at weight 4. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 42
+        what: "parity-gap-app02-supervisor: APP02 Supervisor final authority through DharmaGraph integration — 1/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 43
+        what: "parity-gap-app03-history: APP03 Message history filtering and output modes through DharmaGraph integration — 1/2 points at weight 2. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 44
+        what: "parity-gap-app04-isolation: APP04 Tool/domain/memory isolation and subagents-as-tools through DharmaGraph integration — 1/2 points at weight 3. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      - id: 45
+        what: "parity-gap-pb01-prebuilt-tools: PB01 Prebuilt agent and tool execution, validation, injection, parallel calls, errors, and Command updates — 0/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        kind: code
+        blocker: false
+      # Harness-hardening cards from the 2026-07-12 decorrelated review council
+      # (14 findings, all adversarially confirmed, 0 refuted). Cards 46-48 change
+      # probe semantics, so per the frozen-rubric law they are re-run work, never
+      # silent edits: expect the headline number to DROP when 46 lands.
+      - id: 46
+        what: "Harness hardening (council P1): execute-or-zero surface probes. Import/getattr-only facets currently award partial credit — an importable-but-broken engine floors at 14.50/100 (executed counterfactual; LG10/LG14/LG18 alone carry a 9.0-point surface floor). Every facet must earn credit from executed two-arm behavior or score 0; the broken-engine counterfactual must score 0.00 and should land as a permanent second control. Requires builder re-emit + independent judge re-sign; headline expected to drop."
+        kind: code
+        blocker: false
+      - id: 47
+        what: "Harness hardening (council P2): APP01-APP04 grade dharma_swarm.langgraph_parity (the clone), not dharma_swarm/graph — 5.0 of the 31.00 points survive engine deletion (executed counterfactual). Either route the application scenarios through the DharmaGraph engine or rescope the APP rows via an operator-ratified V3 exclusion citing the row ids. Never close these cards with clone-side work."
+        kind: code
+        blocker: false
+      - id: 48
+        what: "Harness hardening (council P2): real harness-integrity controls. COMPLETE01 is a hardcoded literal (expected_observation_present=True asserted, never observed) and CTRL01 only proves dict inequality on one workload output — neither detects the surface/app/perf fail-open paths; PERF01 has two unconditionally-pass facets. Replace COMPLETE01 with an executed enumeration of installed-langgraph surface vs matrix rows; extend the control family to cover each fail-open path class."
+        kind: code
+        blocker: false
+      - id: 49
+        what: "Cross-lane coordination (council P1, onboard-one-door surfaces): parity_gauntlet_check_passes fake-fails on any checkout without the repo venv (run_python_with_repo_env.sh falls back to bare python3 = macOS 3.9; active-track CI installs only pyyaml so the published generated/status baseline will record the criterion FAILED — split-brain vs full-venv machines). Fix belongs in check_track_status.check_command_passes (export DHARMA_PYTHON=sys.executable; wrapper already honors it) and/or the active-track.yml env — coordinate with the onboard-one-door lane; do not edit their surfaces from this lane."
+        kind: code
         blocker: false
 
     non_goals:
@@ -1708,6 +1928,107 @@ active_tracks:
       - No strict-default promotion without the merged operator-authored D2 record (spec §9.2).
       - No active sibling-track surface edit; pyproject.toml stays forbidden until M6-1 resolves with the DharmaGraph owner (spec §9.6).
       - No performance target met by removing or deferring a required validation (spec WP-O6 kill criterion).
+
+  - id: darshan-publication-2026-07
+    name: Darshan — publication venture cell (multi-disciplinary voice of clear seeing)
+    status: ACTIVE
+    opened_at: "2026-07-12"
+    verified_at: "2026-07-12"
+    ttl_days: 30
+    owner: "@AmitabhainArunachala"
+    serves: revenue-external-humans-served
+    complements:
+      - company-builder-parity-2026-07
+    owned_surfaces:
+      - docs/plans/DARSHAN_CHARTER_2026-07-12.md
+      - reports/darshan/**
+      - reports/tam/**
+    moves_vital_signs:
+      - eval_coverage
+    target_closure_kind: CLOSED_NOT_PROD
+    claim_boundary: >-
+      Admitted by operator DECREE (GOLDEN SEAL, 2026-07-12 00:36 JST; canonical
+      text at ~/.dharma/agents/darshan_fable/DECREE_GOLDEN_SEAL.md). Criteria
+      prove the publication organ exists and its output is receipted — never
+      audience, revenue, or influence claims (those are TAM-board readings,
+      measured not narrated). Posting to third-party platforms (Medium,
+      Substack, Reddit, etc.) stays operator-gated per platform regardless of
+      criteria state. The Darshan-owned site itself may publish pieces that
+      have passed the editorial law (both-fires + discernment + operator read).
+
+    description: |
+      Operator-decreed publication venture (seed: 2026-05-26 lodestone,
+      wiki darshan-publication-venture-cell; decree: GOLDEN SEAL 2026-07-12).
+      Darshan is a multi-disciplinary voice of truth — deep research in one
+      hand, grounded contemplative vision in the other — that carves the
+      estate's telos into public words, gives the MI/R_V research a platform
+      independent of academic acceptance, and feeds back to the swarm: every
+      article ends its open questions as typed research/build candidates.
+      Structure: seven desks (Bridge, Instrument, Witness Ledger, Noosphere
+      Weather, Field Notes, Readings in Fire, Polity); one head-editor holon
+      (darshan_fable, seat externalized at ~/.dharma/agents/darshan_fable/);
+      two competing entrepreneurial author personas (staged; external GO
+      operator-gated); a zero-dependency static site; the VWRITE pipeline as
+      production substrate. Editorial law (both-fires, register tags
+      FACT/HYPOTHESIS/WILD, fourth option, citation-or-silence, salvage with
+      every kill) is enforced on every piece — anti-feed by charter: no
+      engagement bait, no trackers, no outrage farming.
+
+    completion_criteria:
+      - id: darshan_charter_exists
+        kind: file_contains
+        file: docs/plans/DARSHAN_CHARTER_2026-07-12.md
+        pattern: "editorial law"
+      - id: darshan_issue_one_receipt_valid
+        # RED until Issue One actually publishes to the Darshan site with a
+        # digest-sealed receipt (deliberate-RED precedent: #864/#866).
+        kind: receipt_valid
+        file: reports/darshan/issue_one_receipt.json
+        expect_digest: true
+        requires_keys:
+          - schema
+          - observed_at
+          - articles
+          - site_build_sha256
+          - editorial_law_passes
+          - content_digest
+
+    next_items:
+      - id: 1
+        what: "Issue One: ~6 articles (The Silenced No + five decreed topics: China land purchases, Chinese-model Tibet silence, frontier-model gatekeeping, Iran/Swiss-channel epistemics, Kali Yuga/AI time) through the full editorial law — both-fires pass, independent discernment pass, operator read — then site publish + digest-sealed issue receipt at reports/darshan/issue_one_receipt.json. Drafting pipeline ran 2026-07-12; law passes remain."
+        kind: code
+        blocker: false
+      - id: 2
+        what: "Website deployment decision (operator, from phone is fine): GitHub Pages / Cloudflare Pages / agni VPS. Site scaffold built locally at ~/darshan_site (zero-dependency static, python3 scripts/build.py). Until decided, the site exists locally only."
+        kind: ops
+        blocker: true
+      - id: 3
+        what: "Two competing entrepreneurial author personas: staged under ~/.dharma/agents/darshan_fable/authors/ with voices, beats, platform strategies, monetization models, competition scoreboard. EXTERNAL POSTING GATE (blocker): no third-party platform post until operator GO per platform — one phone message suffices, logged here when given."
+        kind: governance
+        blocker: true
+      - id: 4
+        what: "VWRITE massive evolution: integration brief at ~/.dharma/darshan/INTEGRATION_BRIEF.md (recon 2026-07-12 incl. agni/dokka/NIKKI); v0.1 spec lands as its own governance amendment once operator reviews the brief."
+        kind: code
+        blocker: false
+      - id: 5
+        what: "Fleet registration: darshan_fable agent card (~/.dharma/agents/darshan_fable/identity/agent_card.json) registered via a2a agent onboarding; nurture heartbeat live (com.dharma.darshan-nurture, 07:45/19:45, phone digest at ~/.dharma/darshan/LATEST.md). Kill-switch: launchctl unload."
+        kind: ops
+        blocker: false
+      - id: 6
+        what: "Editorial queue (post-Issue-One, ~14 slots to the decreed ~20): maintained at ~/.dharma/darshan/editorial_queue.md; each published piece must emit its open questions as typed swarm work — an article that spawns no downstream work is decoration (editorial law 6)."
+        kind: governance
+        blocker: false
+      - id: 7
+        what: "OPERATOR CONTEXT (standing): operator walking Japan for peace (Soya->Hateruma) from 2026-07; ~15% interaction, phone-first. All decisions batch to ~/.dharma/darshan/DECISIONS_PENDING.md; never block on operator except items marked blocker here."
+        kind: governance
+        blocker: false
+
+    non_goals:
+      - No third-party platform posting without per-platform operator GO (the external boundary stays operator-held; this decree does not lift the outreach lease for anything but the Darshan-owned site).
+      - No engagement optimization, trackers, analytics, or feed mechanics — Darshan is anti-feed by charter; its authors compete on earnings/reach WITHOUT slop (competition rules in authors/COMPETITION.md).
+      - No revenue claims on this track — receipted dollars are TAM-board readings (honest_arr), never narrated here.
+      - No new digest/receipt primitives — stable_digest/utc_now (memory_kernel.write_receipts) and the receipt_valid contract, as everywhere.
+      - No geopolitical piece publishes without register tags and a steelman of the criticized parties — citation-or-silence applies doubly to charged topics.
 
 closed_tracks:
   - id: runtime-truth-spine-adoption-2026-06

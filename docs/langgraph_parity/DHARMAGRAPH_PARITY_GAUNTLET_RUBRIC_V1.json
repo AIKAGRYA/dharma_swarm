@@ -1,0 +1,262 @@
+{
+  "schema": "dharma_swarm.dharmagraph_parity_rubric.v1",
+  "status": "FROZEN_BEFORE_RESULTS",
+  "frozen_on": "2026-07-11",
+  "subject": "DharmaGraph plus the dharma_swarm application patterns that depend on graph semantics",
+  "comparison_target": {
+    "distribution": "langgraph",
+    "version": "1.2.4",
+    "git_tag": "1.2.4",
+    "git_sha": "054a6f3d8b48d022a4881af3ba3dc0ddc3ac0690",
+    "checkpoint_distribution": "langgraph-checkpoint==4.1.1",
+    "persistent_checkpoint_adapter": "langgraph-checkpoint-sqlite==3.1.0",
+    "pin_citations": [
+      "pyproject.toml:49",
+      "pyproject.toml:52",
+      ".github/workflows/langgraph-oracle.yml:3",
+      ".github/workflows/langgraph-oracle.yml:50"
+    ]
+  },
+  "non_gating_drift_target": {
+    "distribution": "langgraph",
+    "version": "1.2.8",
+    "git_tag": "1.2.8",
+    "git_sha": "23652c54be18ce59f697aa38f10075ee91913220",
+    "purpose": "Report public-surface and outcome drift only; it never changes the frozen grade target."
+  },
+  "scope": {
+    "included": [
+      "Installed LangGraph Python core StateGraph, Pregel, functional API, checkpoint, store, cache, runtime, stream, callback, and graph-UI message semantics",
+      "Every neutral DharmaGraph capability exported by dharma_swarm/graph/__init__.py",
+      "Every graph-adjacent application pattern used by dharma_swarm and carried by the June Gates A-E custody contract",
+      "Equivalent-workload performance reporting on three representative workloads"
+    ],
+    "operator_ratified_exclusions": [
+      {
+        "surface": "LangGraph Platform, LangGraph Server/Deployment RemoteGraph, cloud services, and JavaScript SDK",
+        "citation": "/Users/dhyana/handoffs/2026-07-11_dharmagraph_parity_gauntlet_prompt.md:17",
+        "effect": "Out of scope; not represented as a scored row."
+      }
+    ],
+    "not_excluded": [
+      "langgraph.prebuilt agent/tool patterns",
+      "langgraph.graph.ui message/reducer helpers",
+      "functional API",
+      "low-level Pregel/channel API",
+      "experimental public stream v3 surface"
+    ],
+    "na_rule": "A row may be N/A only when a later operator-ratified non-goal cites the exact row id. Builder or judge rationale alone scores 0."
+  },
+  "prior_scores": {
+    "status": "VOID",
+    "cutoff": "2026-07-11",
+    "reasons": [
+      "The June 100/100 was self-graded against local gates by the builder.",
+      "Real LangGraph was not installed or executed in that score chain.",
+      "The scored subject was the clone/orchestration stack, before the neutral DharmaGraph engine existed."
+    ],
+    "citations": [
+      "reports/langgraph_parity/VERIFIER_MATRIX.md:11",
+      "reports/langgraph_parity/VERIFIER_MATRIX.md:68",
+      "docs/langgraph_parity/LANGGRAPH_PARITY_CONTRACT.md:1",
+      "dharma_swarm/graph/__init__.py:1"
+    ],
+    "forbidden_evidence": [
+      "reports/langgraph_parity/allnight/SCOREBOARD.json",
+      "reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md",
+      "any pre-2026-07-11 parity number"
+    ]
+  },
+  "grading": {
+    "bar": 100,
+    "formula": "sum(row.weight * row.points / 2) over non-N/A rows, divided by the frozen non-N/A weight sum, multiplied by 100",
+    "rounding": "Decimal arithmetic; present to two decimal places; no upward integer rounding",
+    "scale": {
+      "2": "Every frozen facet in the row is proven by an executed two-arm differential against installed LangGraph 1.2.4, or a DharmaGraph surpass is proven with an executed receipt and LangGraph absence evidence.",
+      "1": "At least one frozen facet is proven by executed evidence, but one or more facets are missing, caveated, not integrated, or divergent.",
+      "0": "No facet is proven, the arm is missing, the differential fails, evidence is only static/self-graded, or a claimed N/A lacks operator ratification.",
+      "N/A": "Operator-ratified exact-row non-goal with citation only."
+    },
+    "evidence_law": [
+      "Every facet must have an executed differential id and captured two-arm outcome, or an executed public-surface absence probe.",
+      "Static citations may explain custody but never upgrade a point by themselves.",
+      "A clone-only or synthetic benchmark result cannot prove DharmaGraph engine parity.",
+      "A deliberately broken comparator control must produce a mismatch; if it compares equal, the whole run is invalid.",
+      "Shared workload parameters are allowed; shared expected-value literals are forbidden. Outcomes are compared arm-to-arm."
+    ]
+  },
+  "weighting": {
+    "method": "Frozen static reachability inventory plus claim-critical floors",
+    "eligible_usage_roots": [
+      "dharma_swarm/",
+      "api/",
+      "scripts/"
+    ],
+    "excluded_usage_roots": [
+      "tests/",
+      "docs/",
+      "reports/",
+      "benchmarks/",
+      "scripts/verify/",
+      "dharma_swarm/graph/",
+      "dharma_swarm/langgraph_parity/"
+    ],
+    "counting_rule": "Count one file:function:anchor cluster per capability when reachable from SwarmManager.init/tick or another non-test production caller. A cluster may pressure multiple distinct capabilities but is deduplicated within each row.",
+    "coverage_floor": 1,
+    "claim_critical_floors": {
+      "LG04": 2,
+      "LG06": 2,
+      "LG14": 4,
+      "LG15": 9,
+      "LG16": 2,
+      "LG17": 8,
+      "LG18": 10
+    },
+    "durability_floor_reason": "Crash/restart, resume, and fork/time-travel cannot disappear merely because the neutral core is not yet on the production hot path; sovereign durable graph runtime is the track claim.",
+    "usage_citations": [
+      "dharma_swarm/graph/__init__.py:7",
+      "dharma_swarm/orchestrator.py:2527",
+      "dharma_swarm/orchestrator.py:2539",
+      "dharma_swarm/orchestrator.py:2561",
+      "dharma_swarm/swarm.py:702",
+      "dharma_swarm/swarm.py:2311",
+      "dharma_swarm/swarm.py:2350",
+      "dharma_swarm/swarm.py:2403"
+    ],
+    "total_weight": 100
+  },
+  "custody_gates": {
+    "A": "Active-agent state and handoff ownership",
+    "B": "Supervisor final authority",
+    "C": "Message-history filtering and output modes",
+    "D": "Tool, domain, memory, and subagent isolation",
+    "E": "Receipts, checkpoints, durability, and benchmark evidence",
+    "citation": "docs/langgraph_parity/LANGGRAPH_PARITY_CONTRACT.md:60"
+  },
+  "corpus": {
+    "june_task_count": 26,
+    "june_multi_hop_subset_count": 12,
+    "june_task_source": "dharma_swarm/langgraph_parity/benchmark_tasks.py:19",
+    "june_tasks": [
+      "climate_finance_multihop",
+      "climate_checkpoint_reload",
+      "finance_legal_pipeline",
+      "security_legal_retry_patch",
+      "supply_finance_fan_in",
+      "supply_finance_legal_send",
+      "travel_finance_pipeline",
+      "growth_finance_broadcast",
+      "medical_interrupt_resume",
+      "a2a_blocker_queue",
+      "vendor_timeout_cancellation",
+      "security_patch_review",
+      "climate_broadcast_measurement",
+      "finance_fan_in_variance",
+      "contract_policy_check",
+      "growth_provider_fallback",
+      "travel_memory_isolation",
+      "medical_tool_boundary",
+      "security_subagent_tool_review",
+      "climate_finance_budget_retry",
+      "supply_broadcast_inventory",
+      "legal_finance_fan_out_policy",
+      "growth_finance_command_send",
+      "travel_finance_a2a_operator",
+      "climate_cancellation_watch",
+      "supply_eta_risk"
+    ],
+    "multi_hop_subset": [
+      "climate_finance_multihop",
+      "finance_legal_pipeline",
+      "security_legal_retry_patch",
+      "supply_finance_fan_in",
+      "supply_finance_legal_send",
+      "travel_finance_pipeline",
+      "growth_finance_broadcast",
+      "security_subagent_tool_review",
+      "climate_finance_budget_retry",
+      "legal_finance_fan_out_policy",
+      "growth_finance_command_send",
+      "travel_finance_a2a_operator"
+    ],
+    "existing_real_oracle_scenarios": [
+      "swarm_default_active_agent_and_visibility",
+      "swarm_accepted_handoff_then_resume",
+      "swarm_transfer_back_to_original",
+      "swarm_rejected_transfer_tool_not_visible",
+      "swarm_rejected_transfer_unknown_agent",
+      "swarm_visibility_scoped_per_active_agent",
+      "swarm_checkpoint_survives_restart",
+      "supervisor_delegates_and_is_final_author",
+      "supervisor_forward_message_exact",
+      "supervisor_hides_routing_when_handoffs_off",
+      "supervisor_output_mode_last_message",
+      "supervisor_output_mode_full_history",
+      "supervisor_distractor_isolation"
+    ],
+    "new_parametric_workloads": [
+      "seeded_linear_reducer_chain",
+      "seeded_conditional_branch",
+      "seeded_send_map_reduce",
+      "seeded_barrier_parallel_overlap",
+      "seeded_cycle_limit",
+      "seeded_checkpoint_resume_fork",
+      "seeded_error_atomicity",
+      "seeded_api_surface_probe"
+    ],
+    "performance_workloads": [
+      "seeded_linear_reducer_chain",
+      "seeded_send_map_reduce",
+      "seeded_checkpoint_resume_fork"
+    ],
+    "broken_control": {
+      "id": "CTRL01",
+      "workload": "seeded_linear_reducer_chain",
+      "mutation": "Perturb only the DharmaGraph outcome after execution by a deterministic nonzero delta.",
+      "required_observation": "Comparator verdict is mismatch/fail.",
+      "invalid_run_condition": "Comparator verdict is parity/pass."
+    }
+  },
+  "capabilities": [
+    {"id":"LG01","name":"State, input, output, and context schemas with partial updates","class":"core","weight":4,"usage_count":3,"legacy_gates":["E"],"reference":"site-packages/langgraph/graph/state.py:130","dharma_custody":"dharma_swarm/graph/state.py:50","facets":["typed_state_schema","input_schema","output_schema","context_schema","partial_updates"],"probe_kind":"schema_surface","gap_card":"parity-gap-lg01-schemas"},
+    {"id":"LG02","name":"Node registration metadata, schemas, destinations, and default policies","class":"core","weight":2,"usage_count":1,"legacy_gates":["D"],"reference":"site-packages/langgraph/graph/state.py:271","dharma_custody":"dharma_swarm/graph/compiler.py:119","facets":["node_metadata","node_input_schema","destinations","node_defaults","node_retry","node_cache","node_error_handler","node_timeout"],"probe_kind":"node_policy_surface","gap_card":"parity-gap-lg02-node-policies"},
+    {"id":"LG03","name":"Deferred and finalization nodes","class":"core","weight":1,"usage_count":0,"legacy_gates":[],"reference":"site-packages/langgraph/graph/state.py:662","dharma_custody":"dharma_swarm/graph/compiler.py:119","facets":["deferred_node","after_finish_trigger"],"probe_kind":"defer_surface","gap_card":"parity-gap-lg03-defer"},
+    {"id":"LG04","name":"Static topology, sequence, entry/finish, and ALL barrier edges","class":"core","weight":2,"usage_count":0,"legacy_gates":["A"],"reference":"site-packages/langgraph/graph/state.py:915","dharma_custody":"dharma_swarm/graph/compiler.py:108","facets":["nodes","static_edges","sequence","barrier_edges","entry_finish","compile_validation"],"probe_kind":"parametric_topology","gap_card":"parity-gap-lg04-topology"},
+    {"id":"LG05","name":"Conditional routing and conditional entry","class":"core","weight":1,"usage_count":0,"legacy_gates":["A"],"reference":"site-packages/langgraph/graph/state.py:969","dharma_custody":"dharma_swarm/graph/compiler.py:132","facets":["conditional_edges","conditional_entry","multi_target_branch"],"probe_kind":"parametric_conditional","gap_card":"parity-gap-lg05-conditional"},
+    {"id":"LG06","name":"Bulk-synchronous parallel supersteps and step atomicity","class":"core","weight":2,"usage_count":0,"legacy_gates":["E"],"reference":"site-packages/langgraph/pregel/main.py:448","dharma_custody":"dharma_swarm/graph/scheduler.py:254","facets":["parallel_actor_overlap","barrier_visibility","step_atomicity","sibling_failure_stops_step"],"probe_kind":"parametric_parallel","gap_card":"parity-gap-lg06-supersteps"},
+    {"id":"LG07","name":"Dynamic Send fan-out and map-reduce","class":"core","weight":1,"usage_count":0,"legacy_gates":["A","D"],"reference":"site-packages/langgraph/types.py:664","dharma_custody":"dharma_swarm/graph/routing.py:72","facets":["send_dynamic_fanout","map_reduce","custom_branch_state","send_timeout"],"probe_kind":"parametric_send","gap_card":"parity-gap-lg07-send"},
+    {"id":"LG08","name":"Command update, multi-target goto, parent routing, and resume","class":"core","weight":2,"usage_count":1,"legacy_gates":["A"],"reference":"site-packages/langgraph/types.py:758","dharma_custody":"dharma_swarm/graph/routing.py:93","facets":["command_update","command_goto","command_multi_target","command_send","command_parent","command_resume"],"probe_kind":"parametric_command","gap_card":"parity-gap-lg08-command"},
+    {"id":"LG09","name":"Cycles, recursion caps, and managed remaining-step state","class":"core","weight":1,"usage_count":0,"legacy_gates":[],"reference":"site-packages/langgraph/errors.py:67","dharma_custody":"dharma_swarm/graph/scheduler.py:152","facets":["cycles","recursion_limit","limit_error","remaining_steps"],"probe_kind":"parametric_cycle","gap_card":"parity-gap-lg09-cycles"},
+    {"id":"LG10","name":"Reducer and channel semantics with concurrent-write conflicts","class":"core","weight":4,"usage_count":3,"legacy_gates":["C","E"],"reference":"site-packages/langgraph/channels/__init__.py:14","dharma_custody":"dharma_swarm/graph/channels.py:96","facets":["last_value","binary_reducer","topic","barrier","ephemeral","overwrite","concurrent_conflict"],"probe_kind":"parametric_reducers","gap_card":"parity-gap-lg10-reducers"},
+    {"id":"LG11","name":"Message accumulation, replacement, removal, and formatting","class":"core","weight":2,"usage_count":1,"legacy_gates":["C"],"reference":"site-packages/langgraph/graph/message.py:29","dharma_custody":"dharma_swarm/langgraph_parity/state.py:114","facets":["append_message","replace_by_id","remove_message","remove_all","invalid_remove","openai_format","ui_message_helpers"],"probe_kind":"message_surface","gap_card":"parity-gap-lg11-messages"},
+    {"id":"LG12","name":"Compilation and sync/async single-run interfaces","class":"core","weight":4,"usage_count":3,"legacy_gates":["E"],"reference":"site-packages/langgraph/pregel/main.py:2635","dharma_custody":"dharma_swarm/graph/scheduler.py:113","facets":["compile","sync_invoke","async_invoke","sync_stream","async_stream"],"probe_kind":"invoke_surface","gap_card":"parity-gap-lg12-invocation"},
+    {"id":"LG13","name":"Batch, as-completed, and max-concurrency interfaces","class":"core","weight":1,"usage_count":0,"legacy_gates":["E"],"reference":"site-packages/langchain_core/runnables/base.py:919","dharma_custody":"dharma_swarm/graph/scheduler.py:129","facets":["batch","abatch","batch_as_completed","abatch_as_completed","max_concurrency"],"probe_kind":"batch_surface","gap_card":"parity-gap-lg13-batch"},
+    {"id":"LG14","name":"Checkpoint schema, saver protocol, pending writes, lineage, and serializer","class":"durability","weight":4,"usage_count":0,"legacy_gates":["E"],"reference":"site-packages/langgraph/checkpoint/base/__init__.py:38","dharma_custody":"dharma_swarm/graph/checkpoint.py:41","facets":["checkpoint_schema","sync_saver","async_saver","pending_writes","lineage","serializer"],"probe_kind":"checkpoint_surface","gap_card":"parity-gap-lg14-checkpoint-protocol"},
+    {"id":"LG15","name":"Thread-scoped continuity and resume","class":"durability","weight":9,"usage_count":0,"legacy_gates":["A","E"],"reference":"site-packages/langgraph/checkpoint/base/__init__.py:176","dharma_custody":"dharma_swarm/graph/scheduler.py:193","facets":["thread_id","checkpoint_id","thread_resume","checkpoint_parent","multi_turn_state"],"probe_kind":"parametric_resume","gap_card":"parity-gap-lg15-thread-resume"},
+    {"id":"LG16","name":"State inspection, history, and replay","class":"durability","weight":2,"usage_count":0,"legacy_gates":["E"],"reference":"site-packages/langgraph/pregel/main.py:1390","dharma_custody":"dharma_swarm/graph/types.py:110","facets":["get_state","get_state_history","async_state_api","replay"],"probe_kind":"history_surface","gap_card":"parity-gap-lg16-history"},
+    {"id":"LG17","name":"Manual state update, bulk update, fork, and time travel","class":"durability","weight":8,"usage_count":0,"legacy_gates":["E"],"reference":"site-packages/langgraph/pregel/main.py:1588","dharma_custody":"dharma_swarm/graph/types.py:129","facets":["update_state","bulk_update_state","fork","time_travel","new_branch"],"probe_kind":"parametric_fork","gap_card":"parity-gap-lg17-fork-time-travel"},
+    {"id":"LG18","name":"Durability ordering and process-restart recovery","class":"durability","weight":10,"usage_count":0,"legacy_gates":["E"],"reference":"site-packages/langgraph/types.py:87","dharma_custody":"dharma_swarm/graph/durable_invoker.py:241","facets":["durability_sync","durability_async","durability_exit","persistent_process_restart","pending_write_recovery"],"probe_kind":"process_restart","gap_card":"parity-gap-lg18-process-restart"},
+    {"id":"LG19","name":"Static interrupt-before and interrupt-after","class":"core","weight":1,"usage_count":0,"legacy_gates":["E"],"reference":"site-packages/langgraph/graph/state.py:1164","dharma_custody":"dharma_swarm/checkpoint.py:49","facets":["interrupt_before","interrupt_after"],"probe_kind":"interrupt_surface","gap_card":"parity-gap-lg19-static-interrupts"},
+    {"id":"LG20","name":"Dynamic HITL interrupt and resume","class":"core","weight":2,"usage_count":1,"legacy_gates":["B","E"],"reference":"site-packages/langgraph/types.py:535","dharma_custody":"dharma_swarm/checkpoint.py:49","facets":["dynamic_interrupt","resume_value","multiple_interrupts","interrupt_order","node_reexecution"],"probe_kind":"dynamic_interrupt_surface","gap_card":"parity-gap-lg20-dynamic-interrupt"},
+    {"id":"LG21","name":"Seven standard stream modes, multi-mode, typed v2, and subgraph namespaces","class":"core","weight":1,"usage_count":0,"legacy_gates":["C","E"],"reference":"site-packages/langgraph/types.py:120","dharma_custody":"dharma_swarm/graph/scheduler.py:311","facets":["values_stream","updates_stream","messages_stream","custom_stream","checkpoints_stream","tasks_stream","debug_stream","multi_mode","typed_v2","subgraph_namespace"],"probe_kind":"stream_surface","gap_card":"parity-gap-lg21-streaming"},
+    {"id":"LG22","name":"Experimental event stream v3 and transformer projections","class":"core","weight":1,"usage_count":0,"legacy_gates":[],"reference":"site-packages/langgraph/stream/__init__.py:1","dharma_custody":"dharma_swarm/graph/scheduler.py:311","facets":["stream_events_v3","stream_transformers","builtin_transformers"],"probe_kind":"stream_v3_surface","gap_card":"parity-gap-lg22-stream-v3"},
+    {"id":"LG23","name":"Nested graphs, parent commands, inheritance, nested state, and streaming","class":"core","weight":1,"usage_count":0,"legacy_gates":["A","B","E"],"reference":"site-packages/langgraph/pregel/main.py:1074","dharma_custody":"dharma_swarm/graph/compiler.py:119","facets":["compiled_graph_as_node","recursive_discovery","parent_command","checkpointer_inheritance","nested_state_history","nested_streaming"],"probe_kind":"subgraph_surface","gap_card":"parity-gap-lg23-subgraphs"},
+    {"id":"LG24","name":"Retry selection, backoff, jitter, attempts, and write clearing","class":"core","weight":4,"usage_count":3,"legacy_gates":["D","E"],"reference":"site-packages/langgraph/types.py:416","dharma_custody":"dharma_swarm/orchestrator.py:1957","facets":["retry_selection","backoff","jitter","max_attempts","retry_on","writes_cleared"],"probe_kind":"retry_surface","gap_card":"parity-gap-lg24-retry"},
+    {"id":"LG25","name":"Hard/idle timeout, heartbeat, and retry interaction","class":"core","weight":2,"usage_count":1,"legacy_gates":["D","E"],"reference":"site-packages/langgraph/types.py:449","dharma_custody":"dharma_swarm/orchestrator.py:2947","facets":["hard_timeout","idle_timeout","heartbeat_refresh","timeout_retry"],"probe_kind":"timeout_surface","gap_card":"parity-gap-lg25-timeout"},
+    {"id":"LG26","name":"Error propagation, sibling cancellation, handlers, and atomic writes","class":"core","weight":4,"usage_count":3,"legacy_gates":["E"],"reference":"site-packages/langgraph/errors.py:16","dharma_custody":"dharma_swarm/graph/scheduler.py:285","facets":["invalid_update","unhandled_exception","sibling_cancellation","user_cancellation","error_handler","atomic_writes"],"probe_kind":"parametric_error","gap_card":"parity-gap-lg26-errors"},
+    {"id":"LG27","name":"Long-term Store CRUD, namespaces, filters, paging, async, and batch","class":"core","weight":1,"usage_count":0,"legacy_gates":["C","D"],"reference":"site-packages/langgraph/store/base/__init__.py:700","dharma_custody":"dharma_swarm/graph/scheduler.py:129","facets":["store_get","store_put","store_delete","store_search","namespaces","filters","paging","async_store","batch_store"],"probe_kind":"store_surface","gap_card":"parity-gap-lg27-store"},
+    {"id":"LG28","name":"Store semantic/vector indexing and TTL","class":"core","weight":1,"usage_count":0,"legacy_gates":["C","D"],"reference":"site-packages/langgraph/store/base/__init__.py:203","dharma_custody":"dharma_swarm/graph/scheduler.py:129","facets":["vector_index","semantic_query","store_filter","store_ttl","supports_ttl"],"probe_kind":"store_vector_surface","gap_card":"parity-gap-lg28-store-vector"},
+    {"id":"LG29","name":"Node/task result caching and TTL/backend protocol","class":"core","weight":1,"usage_count":0,"legacy_gates":["E"],"reference":"site-packages/langgraph/cache/base/__init__.py:15","dharma_custody":"dharma_swarm/graph/compiler.py:119","facets":["cache_policy","cache_backend","cache_ttl","cache_clear"],"probe_kind":"cache_surface","gap_card":"parity-gap-lg29-cache"},
+    {"id":"LG30","name":"Config, context, runtime injection, and propagation","class":"core","weight":5,"usage_count":4,"legacy_gates":["C","D","E"],"reference":"site-packages/langgraph/runtime.py:16","dharma_custody":"dharma_swarm/graph/types.py:43","facets":["runnable_config","context_schema","runtime_injection","execution_info","get_runtime","get_config","get_store","stream_writer","propagation"],"probe_kind":"config_surface","gap_card":"parity-gap-lg30-config-context"},
+    {"id":"LG31","name":"Graph lifecycle callbacks and interrupt/resume events","class":"core","weight":1,"usage_count":0,"legacy_gates":["E"],"reference":"site-packages/langgraph/callbacks.py:20","dharma_custody":"dharma_swarm/graph/types.py:72","facets":["graph_callback_handler","interrupt_event","resume_event","lifecycle_observability"],"probe_kind":"callback_surface","gap_card":"parity-gap-lg31-callbacks"},
+    {"id":"LG32","name":"Functional task/entrypoint API","class":"core","weight":1,"usage_count":0,"legacy_gates":["A","E"],"reference":"site-packages/langgraph/func/__init__.py:56","dharma_custody":"dharma_swarm/workflow.py:146","facets":["task_decorator","task_futures","parallel_tasks","entrypoint","previous","entrypoint_final","functional_checkpoint","functional_store","functional_retry_timeout_context"],"probe_kind":"functional_api_surface","gap_card":"parity-gap-lg32-functional-api"},
+    {"id":"LG33","name":"Low-level Pregel and channel composition API","class":"core","weight":1,"usage_count":0,"legacy_gates":["E"],"reference":"site-packages/langgraph/pregel/main.py:199","dharma_custody":"dharma_swarm/graph/channels.py:96","facets":["pregel","node_builder","subscribe","read","do","write","meta","low_level_retry_cache_timeout","managed_values"],"probe_kind":"pregel_surface","gap_card":"parity-gap-lg33-pregel"},
+    {"id":"LG34","name":"Topology introspection and schema export","class":"core","weight":1,"usage_count":0,"legacy_gates":["E"],"reference":"site-packages/langgraph/pregel/main.py:843","dharma_custody":"dharma_swarm/graph/scheduler.py:113","facets":["get_graph","xray_graph","get_subgraphs","input_json_schema","output_json_schema","context_json_schema","with_config"],"probe_kind":"introspection_surface","gap_card":"parity-gap-lg34-introspection"},
+    {"id":"LG35","name":"Cooperative drain with checkpointed continuation","class":"durability","weight":1,"usage_count":0,"legacy_gates":["E"],"reference":"site-packages/langgraph/runtime.py:79","dharma_custody":"dharma_swarm/graph/scheduler.py:129","facets":["run_control","graph_drained","checkpointed_drain","continuation"],"probe_kind":"drain_surface","gap_card":"parity-gap-lg35-drain"},
+    {"id":"APP01","name":"Active-agent state and handoff ownership through DharmaGraph integration","class":"application_portability","weight":4,"usage_count":3,"legacy_gates":["A"],"reference":"tests/oracle_support/langgraph_arm.py:110","dharma_custody":"dharma_swarm/orchestrator.py:174","facets":["default_active_agent","accepted_handoff","transfer_back","rejected_handoff","visibility_per_agent","checkpoint_restart","neutral_engine_integration"],"probe_kind":"application_swarm","gap_card":"parity-gap-app01-handoff"},
+    {"id":"APP02","name":"Supervisor final authority through DharmaGraph integration","class":"application_portability","weight":1,"usage_count":0,"legacy_gates":["B"],"reference":"tests/oracle_support/langgraph_arm.py:294","dharma_custody":"dharma_swarm/orchestrator.py:332","facets":["delegate","supervisor_final_author","evidence_synthesis","forward_exact","neutral_engine_integration"],"probe_kind":"application_supervisor","gap_card":"parity-gap-app02-supervisor"},
+    {"id":"APP03","name":"Message history filtering and output modes through DharmaGraph integration","class":"application_portability","weight":2,"usage_count":1,"legacy_gates":["C"],"reference":"tests/oracle_support/scenarios.py:151","dharma_custody":"dharma_swarm/orchestrator.py:2302","facets":["full_history","last_message","routing_hidden","distractor_isolation","neutral_engine_integration"],"probe_kind":"application_history","gap_card":"parity-gap-app03-history"},
+    {"id":"APP04","name":"Tool/domain/memory isolation and subagents-as-tools through DharmaGraph integration","class":"application_portability","weight":3,"usage_count":2,"legacy_gates":["D"],"reference":"site-packages/langgraph_prebuilt-1.1.0.dist-info/METADATA:2","dharma_custody":"dharma_swarm/langgraph_parity/isolation.py:173","facets":["tool_allowlist","domain_isolation","memory_isolation","unknown_target_rejected","subagents_as_tools","neutral_engine_integration"],"probe_kind":"application_isolation","gap_card":"parity-gap-app04-isolation"},
+    {"id":"PERF01","name":"Equivalent-workload wall-clock and overhead ratios","class":"performance","weight":1,"usage_count":0,"legacy_gates":["E"],"reference":"/Users/dhyana/handoffs/2026-07-11_dharmagraph_parity_gauntlet_prompt.md:114","dharma_custody":"dharma_swarm/graph/scheduler.py:129","facets":["linear_timing","send_timing","checkpoint_timing","overhead_ratios","environment_metadata"],"probe_kind":"performance","gap_card":"parity-gap-perf01-reporting"}
+  ]
+}
