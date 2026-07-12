@@ -12,6 +12,15 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_forge_bypass_hook_uses_repo_python_for_modern_syntax() -> None:
+    config = (REPO_ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
+
+    assert (
+        "entry: scripts/governance/run_python_with_repo_env.sh "
+        "scripts/governance/check_forge_bypass.py"
+    ) in config
+
+
 def test_hygiene_integrity_gate_passes() -> None:
     result = subprocess.run(
         [sys.executable, "scripts/governance/hygiene/check_hygiene_integrity.py"],

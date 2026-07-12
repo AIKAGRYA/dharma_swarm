@@ -40,7 +40,7 @@ repos:
         stages: [pre-commit]
       - id: dharma-forge-bypass
         name: dharma forge bypass guard
-        entry: python3 scripts/governance/check_forge_bypass.py
+        entry: scripts/governance/run_python_with_repo_env.sh scripts/governance/check_forge_bypass.py
         language: system
         pass_filenames: false
         always_run: true

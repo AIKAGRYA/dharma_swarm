@@ -3,6 +3,10 @@
 This module is intentionally small and boring.  It is not the superseded
 ``coordination_substrate`` lease stack; it is the Phase-A local lease primitive
 described by the receipted A2A/NATS loop spec.
+
+Version 1 is a scoped, checksummed local capability receipt.  Its
+``content_hash`` detects accidental/tampered-at-rest changes; it is *not* an
+operator signature and must not be represented as cryptographic authority.
 """
 
 from __future__ import annotations
@@ -157,7 +161,10 @@ def build_execution_lease(
         "custody_grade": custody_grade,
         "allowed_actions": _as_list(allowed_actions),
         "allowed_paths": [str(Path(path).expanduser()) for path in (allowed_paths or [])],
-        "forbidden_actions": _as_list(forbidden_actions) or list(DEFAULT_FORBIDDEN_ACTIONS),
+        # Callers may add denials but cannot remove the baseline denials.
+        "forbidden_actions": sorted(
+            set(DEFAULT_FORBIDDEN_ACTIONS) | set(_as_list(forbidden_actions))
+        ),
         "budget": {
             "max_seconds": int(max_seconds),
             "max_model_calls": int(max_model_calls),
@@ -175,7 +182,7 @@ def build_execution_lease(
 
 def _path_allowed(path: str | Path, allowed_paths: Sequence[str]) -> bool:
     if not allowed_paths:
-        return True
+        return False
     candidate = Path(path).expanduser().resolve(strict=False)
     for allowed in allowed_paths:
         base = Path(allowed).expanduser().resolve(strict=False)
@@ -196,9 +203,9 @@ def validate_execution_lease(
 ) -> LeaseValidation:
     errors: list[str] = []
     warnings: list[str] = []
-    lease_id = str(lease.get("lease_id") or "")
     if not isinstance(lease, Mapping):
-        return LeaseValidation(False, ("lease must be an object",), lease_id=lease_id)
+        return LeaseValidation(False, ("lease must be an object",))
+    lease_id = str(lease.get("lease_id") or "")
     if lease.get("schema_version") != SCHEMA_VERSION:
         errors.append(f"schema_version must be {SCHEMA_VERSION}")
     if not lease_id:
@@ -232,15 +239,34 @@ def validate_execution_lease(
     if lease_id and lease_id in revoked:
         errors.append("lease is revoked")
 
-    allowed_actions = set(str(item) for item in lease.get("allowed_actions") or [])
-    forbidden_actions = set(str(item) for item in lease.get("forbidden_actions") or [])
+    raw_allowed_actions = lease.get("allowed_actions")
+    raw_forbidden_actions = lease.get("forbidden_actions")
+    if not isinstance(raw_allowed_actions, list):
+        errors.append("allowed_actions must be a list")
+        raw_allowed_actions = []
+    if not isinstance(raw_forbidden_actions, list):
+        errors.append("forbidden_actions must be a list")
+        raw_forbidden_actions = []
+    allowed_actions = set(str(item) for item in raw_allowed_actions)
+    forbidden_actions = set(str(item) for item in raw_forbidden_actions)
+    missing_baseline_denials = set(DEFAULT_FORBIDDEN_ACTIONS) - forbidden_actions
+    if missing_baseline_denials:
+        errors.append("forbidden_actions must include the baseline denials")
+    if requested_actions and not allowed_actions:
+        errors.append("requested actions require a non-empty allowed_actions scope")
     for action in requested_actions or []:
         action = str(action)
         if action in forbidden_actions:
             errors.append(f"requested action is forbidden: {action}")
-        elif allowed_actions and action not in allowed_actions:
+        elif action not in allowed_actions:
             errors.append(f"requested action is not allowed: {action}")
-    allowed_paths = [str(item) for item in lease.get("allowed_paths") or []]
+    raw_allowed_paths = lease.get("allowed_paths")
+    if not isinstance(raw_allowed_paths, list):
+        errors.append("allowed_paths must be a list")
+        raw_allowed_paths = []
+    allowed_paths = [str(item) for item in raw_allowed_paths]
+    if requested_paths and not allowed_paths:
+        errors.append("requested paths require a non-empty allowed_paths scope")
     for path in requested_paths or []:
         if not _path_allowed(path, allowed_paths):
             errors.append(f"requested path is outside lease allowed_paths: {path}")

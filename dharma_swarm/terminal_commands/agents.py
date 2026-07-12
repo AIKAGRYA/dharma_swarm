@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+from pathlib import Path
 
 
 # ---------------------------------------------------------------------------
@@ -106,7 +107,7 @@ def _cmd_agent_talk(
     max_tokens: int = 400,
 ) -> None:
     """Talk to a registered sovereign holon through the explicit routing mode."""
-    from scripts.holon_talk import talk
+    from dharma_swarm.terminal_commands._holons import talk
 
     rc = asyncio.run(
         talk(name, message, routing_mode=routing_mode, max_tokens=max_tokens)
@@ -122,11 +123,111 @@ def _cmd_agent_run(
     routing_mode: str = "declared-first",
 ) -> None:
     """Run governed cycles for a registered sovereign holon."""
-    from scripts.holon_run import run
+    from dharma_swarm.terminal_commands._holons import run
 
     rc = asyncio.run(run(name, cycles, routing_mode=routing_mode))
     if rc != 0:
         raise SystemExit(rc)
+
+
+def _cmd_agent_bootstrap(
+    name: str,
+    *,
+    from_agent: str = "",
+    role: str = "",
+    provider: str = "",
+    model: str = "",
+    prompt_file: str = "",
+    harness: str = "codex",
+    endpoint: str = "local://dgc-agent",
+    dharma_home: str = "",
+    apply: bool = False,
+) -> None:
+    """Plan or idempotently materialize a canonical sovereign holon."""
+    from dharma_swarm.holon_bridge import load_holon
+    from dharma_swarm.holon_system.identity.bootstrap import (
+        HolonBootstrapError,
+        HolonBootstrapSpec,
+        apply_holon_bootstrap,
+        plan_holon_bootstrap,
+    )
+    from dharma_swarm.model_hierarchy import default_model
+    from dharma_swarm.models import ProviderType
+
+    source = load_holon(from_agent) if from_agent else None
+    selected_provider = (provider or (source.provider_type if source else "")).strip().lower()
+    if not selected_provider:
+        raise HolonBootstrapError("--provider is required unless --from-agent is used")
+    try:
+        provider_type = ProviderType(selected_provider)
+    except ValueError as exc:
+        raise HolonBootstrapError(f"unsupported provider: {selected_provider}") from exc
+    selected_model = (model or (source.model if source else "")).strip()
+    if not selected_model:
+        selected_model = default_model(provider_type)
+
+    if prompt_file:
+        prompt_path = Path(prompt_file).expanduser()
+        if not prompt_path.is_file():
+            raise HolonBootstrapError(f"prompt file not found: {prompt_path}")
+        system_prompt = prompt_path.read_text(encoding="utf-8-sig")
+    elif source is not None:
+        system_prompt = source.system_prompt
+    else:
+        raise HolonBootstrapError("--prompt-file is required unless --from-agent is used")
+
+    selected_role = (
+        role
+        or (str(source.identity.get("role") or "") if source is not None else "")
+        or "general"
+    )
+    spec = HolonBootstrapSpec(
+        name=name,
+        role=selected_role,
+        provider=selected_provider,
+        model=selected_model,
+        system_prompt=system_prompt,
+        harness=harness,
+        endpoint=endpoint,
+        description=f"{name} materialized through dgc agent bootstrap",
+    )
+    home = Path(dharma_home).expanduser() if dharma_home else None
+    if apply:
+        result = asyncio.run(apply_holon_bootstrap(spec, dharma_home=home))
+    else:
+        result = {
+            "ok": True,
+            "status": "plan_only",
+            "applied": False,
+            "plan": plan_holon_bootstrap(spec, dharma_home=home).to_dict(),
+        }
+    print(json.dumps(result, indent=2, sort_keys=True))
+
+
+def _cmd_agent_remote_preflight(
+    ssh_alias: str,
+    *,
+    name: str = "codex_composer",
+    timeout: int = 5,
+) -> None:
+    """Run the fixed read-only SSH/runtime inventory for one configured alias."""
+    from dharma_swarm.holon_system.transport.ssh_preflight import (
+        RemoteHolonPreflightError,
+        invalid_input_result,
+        run_remote_holon_preflight,
+    )
+
+    try:
+        result = run_remote_holon_preflight(
+            ssh_alias,
+            name,
+            connect_timeout=timeout,
+        )
+    except RemoteHolonPreflightError as exc:
+        result = invalid_input_result(exc)
+    print(json.dumps(result, indent=2, sort_keys=True))
+    if not result["ok"]:
+        raise SystemExit(1)
 
 
 def _cmd_agent_kill(name: str, *, reason: str = "", clear: bool = False) -> None:
