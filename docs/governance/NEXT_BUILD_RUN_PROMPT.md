@@ -24,10 +24,13 @@ edge**, adding zero uncosted governance. Work on branch
 **Pass 1 — deterministic spine (all four proven-green in this checkout; run, read every line):**
 
 - `make onboard` — behavior contract + live 7-track portfolio (this is the gate; trust it over prose).
-- `make orient` — regenerate `reports/orientation/repo_context.md` *fresh* (the committed copy
-  goes stale; do NOT commit your regen — it's the truth-graph track's surface). Read the
-  whole-system graph: identity, tracks, lanes, agent heartbeats, A2A bus, body, broken
-  register. Note the `loop1_live` flag.
+- `make orient` — deep, mutation-free projection over the same admission packet: it
+  regenerates NOTHING (contract: `docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md`
+  §2.1; enforced by WP-O4). A stale tracked orientation context is a typed condition, not a
+  cue to regenerate inside the doorway — refresh it only via its explicit owner command
+  `python3 scripts/governance/orientation_graph.py --write-context`, never from entry,
+  preflight, closeout, or CI. Read the whole-system graph: identity, tracks, lanes, agent
+  heartbeats, A2A bus, body, broken register. Note the `loop1_live` flag.
 - `make xray` + `make status` — static inventory + cross-agent snapshot.
 - `python3 scripts/governance/spine_bypass_report.py` — live substrate-nativeness; currently
   **5 intentional bypasses on the allowlist** = your drain-to-zero target.
