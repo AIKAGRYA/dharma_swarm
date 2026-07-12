@@ -115,6 +115,45 @@ def test_executable_assertion_passes_and_fails(tmp_path: Path) -> None:
     assert any("doc says 1" in finding.message for finding in findings)
 
 
+def test_writer_collapses_merge_duplicated_count_rows(tmp_path: Path) -> None:
+    """A merge=union merge duplicates a whole managed count row; the writer must
+    COLLAPSE byte-identical duplicate rows to one, not merely correct both copies'
+    values. Regression: SOVEREIGN_MANIFEST count rows needed a hand dedupe after
+    every doc-touching merge because the value rewrite left two identical rows and
+    the assertion-duplicate tripwire kept failing."""
+    repo = tmp_path
+    write(repo / "dharma_swarm" / "a.py", "x = 1\n")
+    manifest = repo / "docs" / "governance" / "SOVEREIGN_MANIFEST.md"
+    row = "| Total Python modules | **1** | count |"
+    write(manifest, f"# Manifest\n\n{row}\n{row}\n\ntail\n")  # duplicated by a merge
+    config_path = base_config(repo)
+    config = load_config(config_path)
+    config["assertions"] = [
+        {
+            "id": "total-python",
+            "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
+            "regex": r"Total Python modules \| \*\*(\d+)\*\*",
+            "metric": "dharma_python_modules",
+        }
+    ]
+    save_config(config_path, config)
+
+    findings = docops.write_assertion_counts(repo, config, {"dharma_python_modules": 1})
+
+    assert manifest.read_text(encoding="utf-8").count("Total Python modules") == 1
+    assert any(finding.check == "assertion-dedupe" for finding in findings)
+
+    # The strict gate now passes — no manual dedupe needed.
+    check_findings, _ = docops.run_checks(
+        repo, config_path, None, docops.parse_iso_date("2026-05-05"), False
+    )
+    assert [f for f in check_findings if f.severity == "FAIL"] == []
+
+    # Idempotent: a second write makes no further change and re-collapses nothing.
+    again = docops.write_assertion_counts(repo, config, {"dharma_python_modules": 1})
+    assert not any(finding.check == "assertion-dedupe" for finding in again)
+
+
 def test_path_guard_catches_missing_markdown_link_and_backticked_path(tmp_path: Path) -> None:
     repo = tmp_path
     write(repo / "README.md", "See [missing](docs/missing.md) and `dharma_swarm/nope.py`.\n")

@@ -641,16 +641,47 @@ def _replace_capture_group(match: re.Match[str], new_value: str) -> str:
     return whole[:rel_start] + new_value + whole[rel_end:]
 
 
+def _collapse_duplicate_assertion_lines(
+    text: str, assertions: list[dict[str, Any]]
+) -> tuple[str, int]:
+    """Collapse byte-identical full lines that carry an asserted count token to a
+    single occurrence, preserving order (first wins).
+
+    A ``merge=union`` merge appends a whole managed count row a second time; the
+    per-match value rewrite above then corrects BOTH copies' values but leaves
+    two identical rows, which the ``assertion-duplicate`` tripwire rejects — so
+    the writer was not actually idempotent and every doc-touching merge needed a
+    hand dedupe. Only exact full-line duplicates that match an assertion regex
+    are removed (a distinct row with a coincidentally equal count is never a
+    byte-identical line), and an asserted token is required to appear exactly
+    once anyway (that is what the tripwire enforces), so collapsing to one is
+    consistent with the gate, not a weakening of it.
+    """
+    patterns = [re.compile(a["regex"]) for a in assertions]
+    seen: set[str] = set()
+    kept: list[str] = []
+    removed = 0
+    for line in text.split("\n"):
+        if line.strip() and any(p.search(line) for p in patterns):
+            if line in seen:
+                removed += 1
+                continue
+            seen.add(line)
+        kept.append(line)
+    return "\n".join(kept), removed
+
+
 def write_assertion_counts(
     repo_root: Path, config: dict[str, Any], metrics: dict[str, int]
 ) -> list[Finding]:
-    """Rewrite every asserted count token in place to match live metrics.
+    """Rewrite every asserted count token in place to match live metrics, then
+    collapse any merge-duplicated count rows to a single occurrence.
 
     Driven by the same ``assertions`` config that ``check_assertions`` reads, so
     the writer can never drift from the gate. Each assertion's regex capture
-    group is replaced with the live metric value (comma style preserved), for
-    every non-overlapping match — which also collapses ``merge=union`` duplicate
-    rows to a single correct value. Idempotent.
+    group is replaced with the live metric value (comma style preserved) for
+    every non-overlapping match; then byte-identical duplicate count lines
+    (``merge=union`` artifacts) are collapsed. Idempotent and merge-healing.
     """
     findings: list[Finding] = []
     by_doc: dict[Path, list[dict[str, Any]]] = {}
@@ -683,6 +714,16 @@ def write_assertion_counts(
                 return _replace_capture_group(m, _format_count(_expected, m.group(1)))
 
             text = pattern.sub(_sub, text)
+        text, collapsed = _collapse_duplicate_assertion_lines(text, assertions)
+        if collapsed:
+            findings.append(
+                Finding(
+                    "INFO",
+                    "assertion-dedupe",
+                    f"{doc_path.name}: collapsed {collapsed} merge-duplicated count "
+                    "row(s) to a single occurrence",
+                )
+            )
         if text != original:
             doc_path.write_text(text, encoding="utf-8")
     return findings
