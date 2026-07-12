@@ -1279,6 +1279,34 @@ def test_session_entry_rejects_symlinked_tracked_custody(tmp_path: Path) -> None
         )
 
 
+@pytest.mark.parametrize("hidden_flag", ["--assume-unchanged", "--skip-worktree"])
+def test_session_entry_rejects_hidden_index_custody_flags(
+    tmp_path: Path,
+    hidden_flag: str,
+) -> None:
+    repo = init_session_repo(tmp_path)
+    payload = seal_packet(session_packet(repo))
+    external = write_external_packet(tmp_path, payload)
+    tracked = tracked_packet_path(repo, payload)
+    tracked.parent.mkdir(parents=True)
+    tracked.write_text("{}\n", encoding="utf-8")
+    stage_path(repo, tracked)
+    relative = tracked.relative_to(repo).as_posix()
+    flagged = run(["git", "update-index", hidden_flag, "--", relative], cwd=repo)
+    assert flagged.returncode == 0, flagged.stderr
+    tracked.write_bytes(external.read_bytes())
+
+    packet = agentops.load_work_packet(external)
+    with pytest.raises(agentops.AgentOpsError, match="index|flag|custody"):
+        agentops._validate_session_envelope(
+            repo,
+            external,
+            packet,
+            inspect=False,
+            require_tracked_copy=True,
+        )
+
+
 def test_session_envelope_rejects_custody_free_execution_mode(tmp_path: Path) -> None:
     repo = init_session_repo(tmp_path)
     payload = seal_packet(session_packet(repo))
