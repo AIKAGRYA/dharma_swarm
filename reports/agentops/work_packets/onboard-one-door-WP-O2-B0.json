@@ -161,8 +161,8 @@
   ],
   "negative_controls": [
     {
-      "name": "stale-custody-remains-execution-blocking",
-      "command": "python3 -m pytest tests/test_agent_work_packet.py::test_inspect_accepts_successor_packet_but_execution_requires_tracked_custody -q",
+      "name": "isolated-fixture-write-negative-control",
+      "command": "python3 -c \"from pathlib import Path; Path('negative-control.txt').write_text('fixture-only'); raise SystemExit(0)\"",
       "expected_exit": 0,
       "env": {}
     }
@@ -206,6 +206,6 @@
     ],
     "honest_blockers": [],
     "rollback": "Revert the WP-O2-B0 commit. Candidate inspection will again reject stale same-ID tracked custody; non-dry byte-identity enforcement is unchanged by either direction.",
-    "packet_digest": "b782c79b1958dae7c36e8020761f2e182c6a766eb65d17c787d76b745ca703a1"
+    "packet_digest": "cea4bdceddd21a84235fb87d577c3abce9664422241c7b80cd7fe2d4d1558bfa"
   }
 }

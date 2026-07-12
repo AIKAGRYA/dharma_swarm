@@ -1593,6 +1593,7 @@ raise SystemExit(8)
     escaped_env = seal_packet(escaped_env)
     external = write_external_packet(tmp_path / "env", escaped_env)
     tracked.write_bytes(external.read_bytes())
+    stage_path(repo, tracked)
     with pytest.raises(agentops.AgentOpsError, match="env.*points into source"):
         agentops.execute_packet(
             external,
