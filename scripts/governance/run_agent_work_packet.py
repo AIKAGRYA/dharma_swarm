@@ -24,7 +24,7 @@ import types
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
@@ -199,12 +199,76 @@ def run_command(
         timeout=timeout_seconds, check=False, preexec_fn=preexec_fn,
     )
 
+def trusted_git_environment(
+    inherited: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    source = os.environ if inherited is None else inherited
+    environment = {
+        key: value
+        for key, value in source.items()
+        if not key.casefold().startswith("git_")
+    }
+    environment["GIT_CONFIG_GLOBAL"] = os.devnull
+    environment["GIT_CONFIG_NOSYSTEM"] = "1"
+    environment["GIT_OPTIONAL_LOCKS"] = "0"
+    return environment
+
+
+def trusted_git_identity_probe_environment(
+    inherited: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    """Allow only the user's global config while discovering commit identity.
+
+    Every inherited ``GIT_*`` control remains stripped and system config stays
+    disabled.  The probe runs only ``git config --global --get user.*``; the
+    actual commit still runs with global and system config disabled.
+    """
+
+    environment = trusted_git_environment(inherited)
+    environment.pop("GIT_CONFIG_GLOBAL", None)
+    return environment
+
+
 def run_git(args: list[str], *, cwd: Path, check: bool = True) -> subprocess.CompletedProcess[str]:
-    result = run_command(["git", *args], cwd=cwd)
+    result = run_command(
+        ["git", *args],
+        cwd=cwd,
+        env=trusted_git_environment(),
+    )
     if check and result.returncode != 0:
         detail = (result.stderr or result.stdout).strip()
         raise AgentOpsError(f"git {' '.join(args)} failed: {detail}")
     return result
+
+
+def _identity_config_value(repo_root: Path, key: str) -> str | None:
+    local = run_git(["config", "--local", "--get", key], cwd=repo_root, check=False)
+    result = local
+    if local.returncode != 0:
+        result = run_command(
+            ["git", "config", "--global", "--get", key],
+            cwd=repo_root,
+            env=trusted_git_identity_probe_environment(),
+        )
+    if result.returncode != 0:
+        return None
+    value = result.stdout.removesuffix("\n")
+    if not value or any(character in value for character in "\x00\r\n"):
+        raise AgentOpsError(f"git {key} contains an invalid identity value")
+    return value
+
+
+def trusted_git_commit_environment(repo_root: Path) -> dict[str, str]:
+    environment = trusted_git_environment()
+    name = _identity_config_value(repo_root, "user.name")
+    email = _identity_config_value(repo_root, "user.email")
+    if name is not None:
+        environment["GIT_AUTHOR_NAME"] = name
+        environment["GIT_COMMITTER_NAME"] = name
+    if email is not None:
+        environment["GIT_AUTHOR_EMAIL"] = email
+        environment["GIT_COMMITTER_EMAIL"] = email
+    return environment
 
 def repo_root_from(path: Path) -> Path:
     return Path(run_git(["rev-parse", "--show-toplevel"], cwd=path).stdout.strip()).resolve()
@@ -250,10 +314,12 @@ def _validate_external_packet_path(repo_root: Path, packet_path: Path) -> None:
 def _probe_tool_version(name: str, repo_root: Path) -> str:
     if name == "python":
         return platform.python_version()
-    commands = {"git": ["git", "--version"], "make": ["make", "--version"]}
-    if name not in commands:
+    if name == "git":
+        result = run_git(["--version"], cwd=repo_root, check=False)
+    elif name == "make":
+        result = run_command(["make", "--version"], cwd=repo_root)
+    else:
         raise AgentOpsError(f"session_entry declares unsupported tool: {name}")
-    result = run_command(commands[name], cwd=repo_root)
     if result.returncode != 0:
         raise AgentOpsError(f"could not probe declared tool {name}")
     first_line = result.stdout.splitlines()[0] if result.stdout.splitlines() else ""
@@ -262,8 +328,12 @@ def _probe_tool_version(name: str, repo_root: Path) -> str:
         raise AgentOpsError(f"could not parse {name} version from {first_line!r}")
     return match.group(1)
 
-def load_raw_packet(path: Path) -> dict[str, Any]:
-    text = path.read_text(encoding="utf-8")
+def load_raw_packet(
+    path: Path,
+    *,
+    content: bytes | None = None,
+) -> dict[str, Any]:
+    text = (path.read_bytes() if content is None else content).decode("utf-8")
     suffix = path.suffix.lower()
     if suffix == ".json":
         data = json.loads(text)
@@ -279,8 +349,12 @@ def load_raw_packet(path: Path) -> dict[str, Any]:
         raise AgentOpsError("work packet root must be an object")
     return data
 
-def load_work_packet(path: Path) -> WorkPacket:
-    return parse_work_packet(load_raw_packet(path))
+def load_work_packet(
+    path: Path,
+    *,
+    content: bytes | None = None,
+) -> WorkPacket:
+    return parse_work_packet(load_raw_packet(path, content=content))
 
 def git_lines(repo_root: Path, args: list[str]) -> list[str]:
     output = run_git(args, cwd=repo_root).stdout
@@ -288,6 +362,22 @@ def git_lines(repo_root: Path, args: list[str]) -> list[str]:
 
 def git_status(repo_root: Path) -> str:
     return run_git(["status", "--short"], cwd=repo_root).stdout
+
+
+def git_object_id_for_bytes(repo_root: Path, content: bytes) -> str:
+    result = subprocess.run(
+        ["git", "hash-object", "--stdin"],
+        cwd=repo_root,
+        env=trusted_git_environment(),
+        input=content,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if result.returncode != 0:
+        detail = result.stderr.decode("utf-8", errors="replace").strip()
+        raise AgentOpsError(f"could not hash packet candidate for index custody: {detail}")
+    return result.stdout.decode("ascii").strip()
 
 
 def inspect_scope(repo_root: Path, packet: WorkPacket) -> ScopeState:
@@ -391,10 +481,18 @@ def _validate_session_envelope(
     *,
     inspect: bool,
     require_tracked_copy: bool,
-) -> None:
+    candidate_bytes: bytes | None = None,
+) -> str:
     entry = packet.session_entry
     if entry is None:
-        return
+        return "not_session_entry"
+    if inspect == require_tracked_copy:
+        raise AgentOpsError(
+            "internal session envelope mode must choose either inspect or tracked custody"
+        )
+    candidate = packet_path.read_bytes() if candidate_bytes is None else candidate_bytes
+    if packet_path.read_bytes() != candidate:
+        raise AgentOpsError("external Session Entry Packet changed during validation")
     _validate_external_packet_path(repo_root, packet_path)
     base_hash = resolve_base_ref(repo_root, packet.base_ref)
     if packet.base_ref != base_hash:
@@ -432,19 +530,56 @@ def _validate_session_envelope(
     if entry.collision.status != "clear" or entry.collision.details:
         raise AgentOpsError("session_entry collision declaration disagrees with recomputation")
     tracked = repo_root / "reports/agentops/work_packets" / f"{packet.id}.json"
-    if tracked.exists() and tracked.read_bytes() != packet_path.read_bytes():
-        raise AgentOpsError("tracked copy must be byte-identical to external Session Entry Packet")
-    if require_tracked_copy and not tracked.exists():
-        raise AgentOpsError(f"tracked copy is missing: {tracked.relative_to(repo_root)}")
-    if require_tracked_copy:
-        relative = tracked.relative_to(repo_root).as_posix()
-        indexed = run_git(
-            ["ls-files", "--error-unmatch", "--", relative],
-            cwd=repo_root,
-            check=False,
+    relative = tracked.relative_to(repo_root).as_posix()
+    if relative not in packet.allowed_files:
+        raise AgentOpsError(
+            f"allowed_files must name the exact canonical tracked packet path: {relative}"
         )
+    forbidden = matching_patterns(relative, packet.forbidden_files)
+    if forbidden:
+        raise AgentOpsError(
+            f"canonical tracked packet path is forbidden by packet envelope: {forbidden}"
+        )
+    if tracked.is_symlink():
+        raise AgentOpsError(f"tracked copy must be a regular non-symlink file: {relative}")
+
+    indexed = run_git(
+        ["ls-files", "--error-unmatch", "--", relative],
+        cwd=repo_root,
+        check=False,
+    )
+    tracked_state = "absent"
+    if tracked.exists():
+        if not tracked.is_file():
+            raise AgentOpsError(f"tracked copy must be a regular file: {relative}")
         if indexed.returncode != 0:
-            raise AgentOpsError(f"tracked copy is not in the Git index: {relative}")
+            raise AgentOpsError(f"existing tracked copy is not in the Git index: {relative}")
+        tracked_state = (
+            "identical" if tracked.read_bytes() == candidate else "present_nonidentical"
+        )
+
+    if require_tracked_copy:
+        if tracked_state == "absent":
+            raise AgentOpsError(f"tracked copy is missing: {relative}")
+        if tracked_state != "identical":
+            raise AgentOpsError(
+                "tracked copy must be byte-identical to external Session Entry Packet"
+            )
+        index_flags = git_lines(repo_root, ["ls-files", "-v", "--", relative])
+        if len(index_flags) != 1 or not index_flags[0].startswith("H "):
+            raise AgentOpsError(
+                f"tracked packet custody rejects hidden or special index flags: {relative}"
+            )
+        index_rows = git_lines(repo_root, ["ls-files", "--stage", "--", relative])
+        if len(index_rows) != 1:
+            raise AgentOpsError(f"tracked packet has ambiguous Git index custody: {relative}")
+        index_fields = index_rows[0].split(maxsplit=3)
+        if len(index_fields) != 4 or index_fields[0] != "100644" or index_fields[2] != "0":
+            raise AgentOpsError(f"tracked packet is not a regular stage-0 index blob: {relative}")
+        if index_fields[1] != git_object_id_for_bytes(repo_root, candidate):
+            raise AgentOpsError(
+                f"tracked packet custody must be staged byte-identically in the Git index: {relative}"
+            )
     if inspect:
         if head_for(repo_root) != base_hash:
             raise AgentOpsError("inspect requires exact HEAD == packet.base_ref")
@@ -452,6 +587,9 @@ def _validate_session_envelope(
             raise AgentOpsError("inspect branch does not match packet.branch")
         if git_status(repo_root):
             raise AgentOpsError("inspect requires an exact clean HEAD")
+    if packet_path.read_bytes() != candidate:
+        raise AgentOpsError("external Session Entry Packet changed during validation")
+    return tracked_state
 
 
 def trim_output(output: str, max_chars: int) -> str:
@@ -789,6 +927,7 @@ def run_negative_control(repo_root: Path, gate: GateSpec) -> dict[str, Any]:
             clone = run_command(
                 ["git", "clone", "--no-checkout", "--no-hardlinks",
                  str(repo_root), str(fixture)], cwd=repo_root,
+                env=trusted_git_environment(),
             )
             if clone.returncode != 0:
                 detail = (clone.stderr or clone.stdout).strip()
@@ -941,7 +1080,11 @@ def should_commit(report: dict[str, Any], packet: WorkPacket, final_scope: Scope
 
 def create_commit(repo_root: Path, files: list[str], message: str) -> str:
     run_git(["add", "--", *files], cwd=repo_root)
-    result = run_git(["commit", "-m", message], cwd=repo_root, check=False)
+    result = run_command(
+        ["git", "commit", "-m", message],
+        cwd=repo_root,
+        env=trusted_git_commit_environment(repo_root),
+    )
     if result.returncode != 0:
         detail = (result.stderr or result.stdout).strip()
         raise AgentOpsError(f"git commit failed: {detail}")
@@ -976,7 +1119,8 @@ def execute_packet(
     report_root: Path | None = None,
 ) -> tuple[int, dict[str, Any] | None]:
     source = require_repo_root((source_root or Path.cwd()).resolve())
-    packet = load_work_packet(packet_path)
+    candidate_bytes = packet_path.read_bytes()
+    packet = load_work_packet(packet_path, content=candidate_bytes)
     if packet.session_entry is not None and packet_path.suffix.lower() != ".json":
         raise AgentOpsError("Session Entry Packet must use JSON")
     external_reports = (
@@ -988,8 +1132,13 @@ def execute_packet(
         raise AgentOpsError("session_entry execution requires an explicit external report_root")
 
     if dry_run:
-        _validate_session_envelope(
-            source, packet_path, packet, inspect=True, require_tracked_copy=False
+        tracked_copy_state = _validate_session_envelope(
+            source,
+            packet_path,
+            packet,
+            inspect=True,
+            require_tracked_copy=False,
+            candidate_bytes=candidate_bytes,
         )
         for gate in packet.gates:
             admit_gate_command(gate)  # O4-B11 fails closed at preflight too
@@ -1002,7 +1151,28 @@ def execute_packet(
             "intent": packet.intent,
             "allowed_files": packet.allowed_files,
             "forbidden_files": packet.forbidden_files,
-            "gates": [gate.command for gate in packet.gates],
+            "packet_digest": (
+                packet.session_entry.packet_digest
+                if packet.session_entry is not None
+                else None
+            ),
+            "tracked_copy_state": tracked_copy_state,
+            "gates": [
+                {
+                    "name": gate.name,
+                    "command": gate.command,
+                    "expected_exit": gate.expected_exit,
+                }
+                for gate in packet.gates
+            ],
+            "negative_controls": [
+                {
+                    "name": control.name,
+                    "command": control.command,
+                    "expected_exit": control.expected_exit,
+                }
+                for control in packet.negative_controls
+            ],
             "commit_allowed": packet.commit.allowed,
             "approval": {
                 "before_commit": packet.approval.before_commit,
@@ -1017,7 +1187,12 @@ def execute_packet(
         return 0, None
 
     _validate_session_envelope(
-        source, packet_path, packet, inspect=False, require_tracked_copy=True
+        source,
+        packet_path,
+        packet,
+        inspect=False,
+        require_tracked_copy=True,
+        candidate_bytes=candidate_bytes,
     )
     target_root = prepare_worktree(source, packet)
     output_root = external_reports or target_root  # legacy v0 compatibility only
@@ -1042,6 +1217,15 @@ def execute_packet(
         report["gates"].append(gate_result)
     for control in packet.negative_controls:
         report["negative_controls"].append(run_negative_control(target_root, control))
+
+    _validate_session_envelope(
+        source,
+        packet_path,
+        packet,
+        inspect=False,
+        require_tracked_copy=True,
+        candidate_bytes=candidate_bytes,
+    )
 
     final_scope = inspect_scope(target_root, packet)
     report["scope"] = scope_to_dict(final_scope)

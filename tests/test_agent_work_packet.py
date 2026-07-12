@@ -1023,6 +1023,44 @@ def test_direct_git_gate_strips_inherited_git_environment(
     assert encoded_non_git["KEEP_ME"] == "yes"
 
 
+def test_create_commit_uses_global_identity_without_trusting_git_controls(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_repo(tmp_path)
+    assert run(["git", "config", "--unset", "user.name"], cwd=repo).returncode == 0
+    assert run(["git", "config", "--unset", "user.email"], cwd=repo).returncode == 0
+    assert run(
+        ["git", "config", "user.useConfigOnly", "true"], cwd=repo
+    ).returncode == 0
+
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / ".gitconfig").write_text(
+        "[user]\n\tname = Global AgentOps\n\temail = global-agentops@example.invalid\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("GIT_AUTHOR_NAME", "Inherited Attacker")
+    monkeypatch.setenv("GIT_AUTHOR_EMAIL", "attacker@example.invalid")
+    monkeypatch.setenv("GIT_COMMITTER_NAME", "Inherited Attacker")
+    monkeypatch.setenv("GIT_COMMITTER_EMAIL", "attacker@example.invalid")
+
+    changed = repo / "allowed.txt"
+    changed.write_text("identity probe\n", encoding="utf-8")
+    commit = agentops.create_commit(repo, ["allowed.txt"], "test: global identity")
+
+    assert commit == agentops.head_for(repo)
+    identity = agentops.run_git(
+        ["show", "-s", "--format=%an%n%ae%n%cn%n%ce", "HEAD"], cwd=repo
+    ).stdout.splitlines()
+    assert identity == [
+        "Global AgentOps",
+        "global-agentops@example.invalid",
+        "Global AgentOps",
+        "global-agentops@example.invalid",
+    ]
+
+
 def test_session_entry_rejects_each_missing_required_field(tmp_path: Path) -> None:
     repo = init_session_repo(tmp_path)
     valid = seal_packet(session_packet(repo))
@@ -1139,6 +1177,311 @@ def test_session_entry_accepts_exact_wp_o1r_identity_only(tmp_path: Path) -> Non
     with pytest.raises(agentops.AgentOpsError, match="work_packet.*packet id"):
         agentops.parse_work_packet(
             packet_for("WP-O1R", packet_id="onboard-one-door-WP-O1")
+        )
+
+
+def test_inspect_accepts_successor_packet_but_execution_requires_tracked_custody(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    repo = init_session_repo(tmp_path)
+
+    stale_payload = seal_packet(session_packet(repo))
+    stale_external = write_external_packet(tmp_path / "stale", stale_payload)
+    tracked = tracked_packet_path(repo, stale_payload)
+    tracked.parent.mkdir(parents=True)
+    tracked.write_bytes(stale_external.read_bytes())
+    stage_path(repo, tracked)
+    committed = run(
+        ["git", "commit", "-m", "fixture: stale tracked session packet"],
+        cwd=repo,
+    )
+    assert committed.returncode == 0, committed.stderr
+
+    payload = seal_packet(session_packet(repo))
+    external = write_external_packet(tmp_path / "fresh", payload)
+    report_root = tmp_path / "external-reports"
+    entry = payload["session_entry"]
+    assert isinstance(entry, dict)
+    assert tracked_packet_path(repo, payload) == tracked
+    assert tracked.read_bytes() != external.read_bytes()
+
+    executed: list[str] = []
+
+    def pass_without_io(
+        _repo: Path,
+        gate: agentops.GateSpec,
+        **_kwargs: object,
+    ) -> dict[str, object]:
+        executed.append(gate.name)
+        return {
+            "name": gate.name,
+            "command": gate.command,
+            "expected_exit": gate.expected_exit,
+            "exit_code": gate.expected_exit,
+            "passed": True,
+            "timed_out": False,
+            "output": "",
+            "duration_seconds": 0.0,
+        }
+
+    monkeypatch.setattr(agentops, "run_gate", pass_without_io)
+    monkeypatch.setattr(agentops, "run_negative_control", pass_without_io)
+
+    exit_code, report = agentops.execute_packet(
+        external,
+        source_root=repo,
+        dry_run=True,
+    )
+    assert exit_code == 0 and report is None
+    summary = json.loads(capsys.readouterr().out)
+    assert summary["packet_digest"] == entry["packet_digest"]
+    assert summary["tracked_copy_state"] == "present_nonidentical"
+    assert summary["gates"] == [
+        {
+            "name": "declared-gate",
+            "command": "git status --porcelain",
+            "expected_exit": 0,
+        }
+    ]
+    assert summary["negative_controls"] == [
+        {
+            "name": "declared-negative",
+            "command": payload["negative_controls"][0]["command"],
+            "expected_exit": 0,
+        }
+    ]
+    assert executed == []
+
+    with pytest.raises(agentops.AgentOpsError, match="byte-identical|tracked copy"):
+        agentops.execute_packet(
+            external,
+            source_root=repo,
+            allow_existing_changes=True,
+            report_root=report_root,
+        )
+    assert executed == []
+
+    tracked.write_bytes(external.read_bytes())
+    with pytest.raises(agentops.AgentOpsError, match="index|stage|unstaged|custody"):
+        agentops.execute_packet(
+            external,
+            source_root=repo,
+            allow_existing_changes=True,
+            report_root=report_root,
+        )
+    assert executed == []
+
+    stage_path(repo, tracked)
+    exit_code, report = agentops.execute_packet(
+        external,
+        source_root=repo,
+        allow_existing_changes=True,
+        report_root=report_root,
+    )
+    assert exit_code == 0 and report is not None
+    assert report["status"] == "passed"
+    assert executed == ["declared-gate", "declared-negative"]
+
+
+def test_session_entry_requires_canonical_tracked_path_in_allowed_files(
+    tmp_path: Path,
+) -> None:
+    repo = init_session_repo(tmp_path)
+    payload = session_packet(repo)
+    payload["allowed_files"] = ["allowed.txt"]
+    external = write_external_packet(tmp_path, seal_packet(payload))
+
+    with pytest.raises(agentops.AgentOpsError, match="allowed_files"):
+        agentops.execute_packet(external, source_root=repo, dry_run=True)
+
+
+def test_session_entry_rejects_symlinked_tracked_custody(tmp_path: Path) -> None:
+    repo = init_session_repo(tmp_path)
+    payload = seal_packet(session_packet(repo))
+    external = write_external_packet(tmp_path, payload)
+    tracked = tracked_packet_path(repo, payload)
+    tracked.parent.mkdir(parents=True)
+    tracked.symlink_to(external)
+    stage_path(repo, tracked)
+
+    packet = agentops.load_work_packet(external)
+    with pytest.raises(agentops.AgentOpsError, match="regular|symlink"):
+        agentops._validate_session_envelope(
+            repo,
+            external,
+            packet,
+            inspect=False,
+            require_tracked_copy=True,
+        )
+
+
+@pytest.mark.parametrize("hidden_flag", ["--assume-unchanged", "--skip-worktree"])
+def test_session_entry_rejects_hidden_index_custody_flags(
+    tmp_path: Path,
+    hidden_flag: str,
+) -> None:
+    repo = init_session_repo(tmp_path)
+    payload = seal_packet(session_packet(repo))
+    external = write_external_packet(tmp_path, payload)
+    tracked = tracked_packet_path(repo, payload)
+    tracked.parent.mkdir(parents=True)
+    tracked.write_text("{}\n", encoding="utf-8")
+    stage_path(repo, tracked)
+    relative = tracked.relative_to(repo).as_posix()
+    flagged = run(["git", "update-index", hidden_flag, "--", relative], cwd=repo)
+    assert flagged.returncode == 0, flagged.stderr
+    tracked.write_bytes(external.read_bytes())
+
+    packet = agentops.load_work_packet(external)
+    with pytest.raises(agentops.AgentOpsError, match="index|flag|custody"):
+        agentops._validate_session_envelope(
+            repo,
+            external,
+            packet,
+            inspect=False,
+            require_tracked_copy=True,
+        )
+
+
+def test_session_entry_custody_ignores_inherited_git_index_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_session_repo(tmp_path)
+    payload = seal_packet(session_packet(repo))
+    external = write_external_packet(tmp_path, payload)
+    tracked = tracked_packet_path(repo, payload)
+    tracked.parent.mkdir(parents=True)
+    tracked.write_text("{}\n", encoding="utf-8")
+    stage_path(repo, tracked)
+
+    actual_index = repo / ".git/index"
+    alternate_index = tmp_path / "alternate-index"
+    alternate_index.write_bytes(actual_index.read_bytes())
+    monkeypatch.setenv("GIT_INDEX_FILE", str(alternate_index))
+    tracked.write_bytes(external.read_bytes())
+    stage_path(repo, tracked)
+
+    packet = agentops.load_work_packet(external)
+    with pytest.raises(agentops.AgentOpsError, match="index|custody"):
+        agentops._validate_session_envelope(
+            repo,
+            external,
+            packet,
+            inspect=False,
+            require_tracked_copy=True,
+        )
+
+
+def test_all_internal_git_subprocesses_use_trusted_environment() -> None:
+    tree = ast.parse(RUNNER_PATH.read_text(encoding="utf-8"))
+    probe = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_probe_tool_version"
+    )
+    probe_calls = {
+        node.func.id
+        for node in ast.walk(probe)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+    assert "run_git" in probe_calls
+
+    violations: list[int] = []
+    identity_probe_lines: list[int] = []
+    commit_environment_lines: list[int] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not node.args:
+            continue
+        argv = node.args[0]
+        if not isinstance(argv, (ast.List, ast.Tuple)) or not argv.elts:
+            continue
+        head = argv.elts[0]
+        if not isinstance(head, ast.Constant) or head.value != "git":
+            continue
+        env = next((item.value for item in node.keywords if item.arg == "env"), None)
+        helper = (
+            env.func.id
+            if isinstance(env, ast.Call) and isinstance(env.func, ast.Name)
+            else ""
+        )
+        literal_prefix = [
+            item.value if isinstance(item, ast.Constant) else None
+            for item in argv.elts[:4]
+        ]
+        if helper == "trusted_git_environment":
+            continue
+        if helper == "trusted_git_identity_probe_environment":
+            if literal_prefix == ["git", "config", "--global", "--get"]:
+                identity_probe_lines.append(node.lineno)
+                continue
+        if helper == "trusted_git_commit_environment":
+            if literal_prefix[:2] == ["git", "commit"]:
+                commit_environment_lines.append(node.lineno)
+                continue
+        violations.append(node.lineno)
+
+    assert violations == []
+    assert len(identity_probe_lines) == 1
+    assert len(commit_environment_lines) == 1
+
+
+def test_session_envelope_rejects_custody_free_execution_mode(tmp_path: Path) -> None:
+    repo = init_session_repo(tmp_path)
+    payload = seal_packet(session_packet(repo))
+    external = write_external_packet(tmp_path, payload)
+    packet = agentops.load_work_packet(external)
+
+    with pytest.raises(agentops.AgentOpsError, match="envelope mode|custody"):
+        agentops._validate_session_envelope(
+            repo,
+            external,
+            packet,
+            inspect=False,
+            require_tracked_copy=False,
+        )
+
+
+def test_execution_rechecks_external_packet_custody_after_gates(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_session_repo(tmp_path)
+    payload = seal_packet(session_packet(repo))
+    external = write_external_packet(tmp_path, payload)
+    tracked = tracked_packet_path(repo, payload)
+    tracked.parent.mkdir(parents=True)
+    tracked.write_bytes(external.read_bytes())
+    stage_path(repo, tracked)
+
+    def mutate_external(
+        _repo: Path,
+        gate: agentops.GateSpec,
+        **_kwargs: object,
+    ) -> dict[str, object]:
+        external.write_bytes(external.read_bytes() + b" ")
+        return {
+            "name": gate.name,
+            "command": gate.command,
+            "expected_exit": gate.expected_exit,
+            "exit_code": gate.expected_exit,
+            "passed": True,
+            "timed_out": False,
+            "output": "",
+            "duration_seconds": 0.0,
+        }
+
+    monkeypatch.setattr(agentops, "run_gate", mutate_external)
+    monkeypatch.setattr(agentops, "run_negative_control", mutate_external)
+
+    with pytest.raises(agentops.AgentOpsError, match="changed|custody|byte-identical"):
+        agentops.execute_packet(
+            external,
+            source_root=repo,
+            allow_existing_changes=True,
+            report_root=tmp_path / "external-reports",
         )
 
 
@@ -1341,6 +1684,7 @@ raise SystemExit(8)
     escaped_env = seal_packet(escaped_env)
     external = write_external_packet(tmp_path / "env", escaped_env)
     tracked.write_bytes(external.read_bytes())
+    stage_path(repo, tracked)
     with pytest.raises(agentops.AgentOpsError, match="env.*points into source"):
         agentops.execute_packet(
             external,
