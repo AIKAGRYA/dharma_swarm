@@ -1,5 +1,5 @@
 {
-  "audit_sha": "dcde323a89f4db62b825f5fe214a036848c24263",
+  "audit_sha": "29e8e587c6c9d03e675e50d22822868fba6830f8",
   "classification_rule": "joined requires all joined evidence patterns; adapter-ready requires all adapter evidence patterns when joined is incomplete; quarantine and legacy require explicit source markers; missing means no tracked surface or insufficient evidence.",
   "classification_vocabulary": [
     "joined",
@@ -11,8 +11,10 @@
   "doc_anchor_status": "ok",
   "metric": "spine_adoption_metric",
   "missing_doc_anchors": [],
-  "source_status": "clean",
-  "source_status_entries": [],
+  "source_status": "dirty",
+  "source_status_entries": [
+    "UU reports/governance/spine_adoption_metric.json"
+  ],
   "summary": {
     "adapter_ready_count": 2,
     "adoption_pct": 93.8,
@@ -1747,5 +1749,5 @@
       "status": "legacy"
     }
   ],
-  "tracked_file_count": 4965
+  "tracked_file_count": 4959
 }
