@@ -208,7 +208,7 @@ def test_livingdock_context_is_bounded_and_evidence_backed(tmp_path):
 
 def test_holon_talk_declared_first_uses_identity_model(tmp_path, monkeypatch):
     """The explicit declared-first CLI mode must preserve the identity-declared model."""
-    from scripts import holon_talk
+    from dharma_swarm.terminal_commands import _holons as holon_talk
 
     root = _make_agent(tmp_path, model="identity-model", provider="ollama")
     h = load_holon("opus_composer", agents_root=root)
@@ -240,8 +240,8 @@ def test_holon_talk_free_first_walks_canonical_chain(monkeypatch):
     """free-first must use preferred_runtime_provider_configs and skip the claude_code door."""
     from types import SimpleNamespace
 
-    from scripts import holon_talk
     from dharma_swarm.runtime_provider import ProviderType
+    from dharma_swarm.terminal_commands import _holons as holon_talk
 
     configs = [
         SimpleNamespace(provider=ProviderType.CLAUDE_CODE, default_model="claude-opus-4-8"),
@@ -270,7 +270,7 @@ async def test_holon_talk_declared_failure_falls_back_with_receipt_provenance(
     tmp_path, monkeypatch, capsys
 ):
     """Declared-route failure text must fall back once and record fallback_from in the receipt."""
-    from scripts import holon_talk
+    from dharma_swarm.terminal_commands import _holons as holon_talk
 
     monkeypatch.setenv("HOME", str(tmp_path))
     root = _make_agent(tmp_path / "agents-root")
@@ -308,6 +308,17 @@ async def test_holon_talk_declared_failure_falls_back_with_receipt_provenance(
     assert receipt["model"] == "ollama/glm-5:cloud"
     assert receipt["fallback_from"] == "claude_code/claude-opus-4-8"
     assert "opus_composer" in receipt["reply"]
+
+
+def test_holon_script_wrappers_export_package_runtime():
+    """Source-tree script entry points remain compatible aliases."""
+    from scripts import holon_run, holon_talk
+    from dharma_swarm.terminal_commands import _holons
+
+    assert holon_talk.talk is _holons.talk
+    assert holon_talk._resolve_provider is _holons._resolve_provider
+    assert holon_run.run is _holons.run
+    assert holon_run._make_free_runner is _holons._make_free_runner
 
 
 # --- Criterion 2: holon_reply routes through the holon's OWN model AND streams freely ---

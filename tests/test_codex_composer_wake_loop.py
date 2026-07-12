@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from dharma_swarm.operator_core.execution_lease import build_execution_lease, write_execution_lease
 from scripts.runtime import codex_composer_wake_loop as wake
 
@@ -199,6 +201,7 @@ def test_valid_file_backed_execution_lease_is_recognized_for_classification(tmp_
                 "status": "pending",
                 "body": "Please write an allowed artifact and close the task.",
                 "requires_execution_lease": True,
+                "requested_actions": ["write_artifact", "close_task"],
                 "execution_lease_id": lease["lease_id"],
             }
         )
@@ -214,6 +217,119 @@ def test_valid_file_backed_execution_lease_is_recognized_for_classification(tmp_
     assert observed["execution_lease"]["valid"] is True
     assert receipt["work"]["work_requiring_execution_lease"] == []
     assert receipt["safety"]["source_mutation_performed"] is False
+
+
+def test_execution_lease_does_not_authorize_an_unscoped_requested_action(tmp_path: Path) -> None:
+    paths = _paths(tmp_path)
+    task_id = "scope-mismatch-task"
+    lease = build_execution_lease(
+        issued_to="codex_composer",
+        task_id=task_id,
+        allowed_actions=["read"],
+    )
+    write_execution_lease(lease, paths.leases)
+    record = {
+        "trigger_id": task_id,
+        "kind": "task",
+        "source_path": str(paths.task_queue),
+        "summary": "Please write an artifact.",
+        "status": "pending",
+    }
+    payload = {
+        "id": task_id,
+        "body": "Please write an artifact.",
+        "requires_execution_lease": True,
+        "requested_actions": ["write_artifact"],
+        "execution_lease_id": lease["lease_id"],
+    }
+
+    classified = wake.classify_record(
+        record,
+        payload,
+        agent_uid="codex_composer",
+        lease_root=paths.leases,
+    )
+
+    assert classified["requested_actions"] == ["write_artifact"]
+    assert classified["has_execution_lease"] is False
+    assert classified["blocked"] is True
+    assert any("write_artifact" in error for error in classified["execution_lease"]["errors"])
+
+
+def test_lease_required_payload_without_typed_action_scope_stays_blocked(tmp_path: Path) -> None:
+    paths = _paths(tmp_path)
+    task_id = "missing-declared-scope-task"
+    lease = build_execution_lease(
+        issued_to="codex_composer",
+        task_id=task_id,
+        allowed_actions=["write_artifact"],
+    )
+    write_execution_lease(lease, paths.leases)
+    record = {
+        "trigger_id": task_id,
+        "kind": "task",
+        "source_path": str(paths.task_queue),
+        "summary": "Alter the artifact.",
+        "status": "pending",
+    }
+    payload = {
+        "id": task_id,
+        "body": "Alter the artifact.",
+        "requires_execution_lease": True,
+        "execution_lease_id": lease["lease_id"],
+    }
+
+    classified = wake.classify_record(
+        record,
+        payload,
+        agent_uid="codex_composer",
+        lease_root=paths.leases,
+    )
+
+    assert classified["declared_actions"] == []
+    assert classified["has_execution_lease"] is False
+    assert classified["blocked"] is True
+    assert any(
+        "must declare non-empty requested_actions" in error
+        for error in classified["execution_lease"]["errors"]
+    )
+
+
+def test_execution_lease_enforces_explicit_requested_path(tmp_path: Path) -> None:
+    paths = _paths(tmp_path)
+    task_id = "path-scope-mismatch-task"
+    lease = build_execution_lease(
+        issued_to="codex_composer",
+        task_id=task_id,
+        allowed_actions=["write_artifact"],
+        allowed_paths=[paths.repo_root / "allowed"],
+    )
+    write_execution_lease(lease, paths.leases)
+    record = {
+        "trigger_id": task_id,
+        "kind": "task",
+        "source_path": str(paths.task_queue),
+        "summary": "Write the requested artifact.",
+        "status": "pending",
+    }
+    payload = {
+        "id": task_id,
+        "body": "Write the requested artifact.",
+        "target_path": str(paths.repo_root / "outside" / "artifact.md"),
+        "requires_execution_lease": True,
+        "requested_actions": ["write_artifact"],
+        "execution_lease_id": lease["lease_id"],
+    }
+
+    classified = wake.classify_record(
+        record,
+        payload,
+        agent_uid="codex_composer",
+        lease_root=paths.leases,
+    )
+
+    assert classified["has_execution_lease"] is False
+    assert any("outside lease allowed_paths" in error for error in classified["execution_lease"]["errors"])
 
 
 def test_inbox_delivery_packet_matches_file_backed_lease_by_packet_id(tmp_path: Path) -> None:
@@ -240,6 +356,7 @@ def test_inbox_delivery_packet_matches_file_backed_lease_by_packet_id(tmp_path: 
                 "reply_subject": f"dharma.agent.codex_composer.inbox.reply.{packet_id}",
                 "target_uid": "codex_composer",
                 "content": "Write PHASE_A_ENGINEERING_SPEC.md in the shared handoff directory.",
+                "requested_actions": ["write_artifact"],
             },
         },
     )
@@ -318,6 +435,105 @@ def test_start_requires_activation_lease_and_stop_is_idempotent(tmp_path: Path) 
     assert start["wake_loop_active"] is False
     assert stopped["ok"] is True
     assert stopped["wake_loop_active"] is False
+
+
+@pytest.mark.parametrize("session", ["-L/tmp/socket", "bad:target", "bad session", "../escape"])
+def test_tmux_session_rejects_option_and_target_injection(tmp_path: Path, session: str) -> None:
+    paths = _paths(tmp_path)
+    args = type("Args", (), {"session": session})()
+
+    with pytest.raises(ValueError, match="single safe token"):
+        wake._session_for(args, paths)
+
+
+def test_start_rejects_nonempty_but_unloadable_activation_lease(tmp_path: Path) -> None:
+    paths = _paths(tmp_path)
+    args = type(
+        "Args",
+        (),
+        {
+            "activation_lease": "convincing-looking-text",
+            "interval_s": 5.0,
+            "orientation_timeout_s": 1.0,
+            "max_cycles": 1,
+            "skip_orientation_command": True,
+            "session": "codex-composer-test",
+        },
+    )()
+
+    start = wake.start_loop(args, paths)
+
+    assert start["status"] == "blocked_activation_lease_invalid"
+    assert start["wake_loop_active"] is False
+    assert start["activation_lease_validation"]["valid"] is False
+
+
+def test_activation_lease_must_bind_agent_task_and_start_action(tmp_path: Path) -> None:
+    paths = _paths(tmp_path)
+    wrong_scope = build_execution_lease(
+        issued_to="codex_composer",
+        task_id="some-other-task",
+        allowed_actions=["read"],
+    )
+    write_execution_lease(wrong_scope, paths.leases)
+
+    status = wake.activation_lease_status(wrong_scope["lease_id"], paths)
+
+    assert status["valid"] is False
+    assert status["requested_action"] == "wake_loop_start"
+    assert any("task_id" in error for error in status["errors"])
+    assert any("not allowed" in error for error in status["errors"])
+
+
+def test_activation_lease_accepts_exact_local_scope(tmp_path: Path) -> None:
+    paths = _paths(tmp_path)
+    lease = build_execution_lease(
+        issued_to="codex_composer",
+        issuer="operator",
+        task_id="wake-loop-start:codex_composer",
+        allowed_actions=["wake_loop_start"],
+    )
+    write_execution_lease(lease, paths.leases)
+
+    status = wake.activation_lease_status(lease["lease_id"], paths)
+
+    assert status["valid"] is True
+    assert status["authority_assurance"] == "local_scoped_checksum_not_operator_signature"
+
+
+def test_repeated_loop_revalidates_lease_before_every_cycle(tmp_path: Path, monkeypatch) -> None:
+    paths = _paths(tmp_path)
+    args = type(
+        "Args",
+        (),
+        {
+            "activation_lease": "lease-id",
+            "interval_s": 0.0,
+            "orientation_timeout_s": 1.0,
+            "max_cycles": 0,
+            "skip_orientation_command": True,
+        },
+    )()
+    validations = iter(
+        [
+            {"valid": True, "lease_id": "lease-id", "errors": []},
+            {"valid": False, "lease_id": "lease-id", "errors": ["lease is expired"]},
+        ]
+    )
+    run_calls: list[str] = []
+    monkeypatch.setattr(wake, "activation_lease_status", lambda *_: next(validations))
+    monkeypatch.setattr(wake, "run_once", lambda *_args, **_kwargs: run_calls.append("ran"))
+    monkeypatch.setattr(wake.time, "sleep", lambda *_: None)
+
+    result = wake.loop_cycles(args, paths)
+
+    assert result == 2
+    assert run_calls == ["ran"]
+    status = json.loads(paths.status.read_text(encoding="utf-8"))
+    assert status["last_loop_block"]["cycles_completed"] == 1
+    assert status["last_loop_block"]["activation_lease_validation"]["errors"] == [
+        "lease is expired"
+    ]
 
 
 def _seed_fable_context(root: Path) -> None:
