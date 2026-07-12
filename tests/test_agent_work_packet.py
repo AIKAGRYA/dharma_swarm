@@ -1199,7 +1199,7 @@ def test_inspect_accepts_successor_packet_but_execution_requires_tracked_custody
     assert exit_code == 0 and report is None
     summary = json.loads(capsys.readouterr().out)
     assert summary["packet_digest"] == entry["packet_digest"]
-    assert summary["tracked_copy_state"] == "stale_successor"
+    assert summary["tracked_copy_state"] == "present_nonidentical"
     assert summary["gates"] == [
         {
             "name": "declared-gate",

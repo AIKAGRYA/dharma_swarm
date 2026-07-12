@@ -24,7 +24,7 @@ import types
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
@@ -199,8 +199,27 @@ def run_command(
         timeout=timeout_seconds, check=False, preexec_fn=preexec_fn,
     )
 
+def trusted_git_environment(
+    inherited: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    source = os.environ if inherited is None else inherited
+    environment = {
+        key: value
+        for key, value in source.items()
+        if not key.casefold().startswith("git_")
+    }
+    environment["GIT_CONFIG_GLOBAL"] = os.devnull
+    environment["GIT_CONFIG_NOSYSTEM"] = "1"
+    environment["GIT_OPTIONAL_LOCKS"] = "0"
+    return environment
+
+
 def run_git(args: list[str], *, cwd: Path, check: bool = True) -> subprocess.CompletedProcess[str]:
-    result = run_command(["git", *args], cwd=cwd)
+    result = run_command(
+        ["git", *args],
+        cwd=cwd,
+        env=trusted_git_environment(),
+    )
     if check and result.returncode != 0:
         detail = (result.stderr or result.stdout).strip()
         raise AgentOpsError(f"git {' '.join(args)} failed: {detail}")
@@ -302,6 +321,7 @@ def git_object_id_for_bytes(repo_root: Path, content: bytes) -> str:
     result = subprocess.run(
         ["git", "hash-object", "--stdin"],
         cwd=repo_root,
+        env=trusted_git_environment(),
         input=content,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -488,7 +508,7 @@ def _validate_session_envelope(
         if indexed.returncode != 0:
             raise AgentOpsError(f"existing tracked copy is not in the Git index: {relative}")
         tracked_state = (
-            "identical" if tracked.read_bytes() == candidate else "stale_successor"
+            "identical" if tracked.read_bytes() == candidate else "present_nonidentical"
         )
 
     if require_tracked_copy:
