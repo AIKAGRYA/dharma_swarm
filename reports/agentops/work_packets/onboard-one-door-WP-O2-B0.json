@@ -178,9 +178,9 @@
   "session_entry": {
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
-      "python": "3.12.13",
-      "git": "2.50.1",
-      "make": "3.81"
+      "python": "3.12.3",
+      "git": "2.43.0",
+      "make": "4.3"
     },
     "authority_precedence": [
       "executable",
@@ -206,6 +206,6 @@
     ],
     "honest_blockers": [],
     "rollback": "Revert the WP-O2-B0 commit. Candidate inspection will again reject stale same-ID tracked custody; non-dry byte-identity enforcement is unchanged by either direction.",
-    "packet_digest": "fa8139b2680914ee4d2537ed3273a3331f697db1258ff7e86cb1ff48c8e55271"
+    "packet_digest": "b782c79b1958dae7c36e8020761f2e182c6a766eb65d17c787d76b745ca703a1"
   }
 }
