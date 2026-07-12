@@ -157,6 +157,101 @@ def test_underclaim_detector_flags_shipped_but_open_items() -> None:
     assert ucs[0]["blocker"] is True
 
 
+def test_outcome_verdict_gates_shippability(tmp_path: Path) -> None:
+    """A digest-valid receipt that reports a non-passing verdict (AMBER, 45%)
+    must block shippability — the exact company-builder-parity false positive:
+    the receipt_valid criterion proves the scoreboard is real, this proves it
+    says the game was won. A GREEN verdict passes; no receipt is unaffected."""
+    sys.path.insert(0, str(REPO_ROOT / "scripts/governance"))
+    from check_track_status import _outcome_verdict_blocks  # type: ignore
+
+    def _receipt(verdict: str, **extra) -> str:
+        rel = f"reports/r_{verdict.lower()}.json"
+        payload = {"schema": "x", "verdict": verdict, **extra}
+        (tmp_path / "reports").mkdir(exist_ok=True)
+        (tmp_path / rel).write_text(json.dumps(payload), encoding="utf-8")
+        return rel
+
+    amber = {"completion_criteria": [
+        {"id": "r", "kind": "receipt_valid",
+         "file": _receipt("AMBER", parity_pct=45.0)}]}
+    blocks = _outcome_verdict_blocks(amber, repo_root=tmp_path)
+    assert blocks and "AMBER" in blocks[0] and "45.0" in blocks[0]
+
+    green = {"completion_criteria": [
+        {"id": "r", "kind": "receipt_valid", "file": _receipt("GREEN")}]}
+    assert _outcome_verdict_blocks(green, repo_root=tmp_path) == []
+
+    # A track with no receipt_valid criteria is untouched.
+    assert _outcome_verdict_blocks(
+        {"completion_criteria": [{"id": "x", "kind": "file_exists", "file": "y"}]},
+        repo_root=tmp_path,
+    ) == []
+
+    # A receipt with NO `verdict` key is opt-out: it is not a scoreboard, so the
+    # gate stays silent (blocking every verdict-less receipt would over-fire).
+    no_verdict_rel = "reports/r_none.json"
+    (tmp_path / no_verdict_rel).write_text(
+        json.dumps({"schema": "x", "parity_pct": 12.0}), encoding="utf-8")
+    assert _outcome_verdict_blocks(
+        {"completion_criteria": [
+            {"id": "r", "kind": "receipt_valid", "file": no_verdict_rel}]},
+        repo_root=tmp_path,
+    ) == []
+
+    # But a PRESENT-yet-malformed (non-string) verdict must NOT bypass the gate:
+    # `verdict: ["AMBER"]` / `verdict: null` are treated as failing, not skipped
+    # (greptile P1, PR #900).
+    for bad in ([{"AMBER": True}], None, 45, ["AMBER"]):
+        bad_rel = f"reports/r_bad_{abs(hash(repr(bad)))}.json"
+        (tmp_path / bad_rel).write_text(
+            json.dumps({"schema": "x", "verdict": bad}), encoding="utf-8")
+        got = _outcome_verdict_blocks(
+            {"completion_criteria": [
+                {"id": "r", "kind": "receipt_valid", "file": bad_rel}]},
+            repo_root=tmp_path,
+        )
+        assert got and "malformed" in got[0], f"malformed verdict {bad!r} bypassed the gate"
+
+
+def test_outcome_verdict_triggers_hard_false_shippable_claim() -> None:
+    """A track that DECLARES `status: shippable` while its own outcome receipt
+    reports a non-passing verdict must trip the hard `false-shippable-claim`
+    ERROR — not merely the advisory ship_block. The outcome-verdict signal reads
+    committed file data, so it is always a REAL false claim, never a "could not
+    observe" (devin, PR #900)."""
+    sys.path.insert(0, str(REPO_ROOT / "scripts/governance"))
+    from check_track_status import _real_false_shippable_claim  # type: ignore
+
+    # A shippable declaration on a passing (GREEN) receipt is NOT a false claim.
+    green_result = {"shippable": True, "completion": [], "prereqs": [],
+                    "open_blocker_count": 0, "active_ship_veto_count": 0,
+                    "outcome_verdict_blocks": []}
+    assert _real_false_shippable_claim({"status": "shippable"}, green_result) is False
+
+    # Same declaration, but evaluate_track said not-shippable BECAUSE the outcome
+    # receipt is non-passing (and NOTHING else is wrong: rigorous criterion
+    # declared, nothing executed-failed, no open blockers). Pre-fix this slipped
+    # through real_false_claim; it must now fire.
+    from check_track_status import CriterionResult  # type: ignore
+
+    passing_receipt = CriterionResult(
+        id="r", kind="receipt_valid", passed=True, detail="digest ok")
+    amber_result = {
+        "shippable": False,
+        "completion": [passing_receipt],
+        "prereqs": [],
+        "open_blocker_count": 0,
+        "active_ship_veto_count": 0,
+        "outcome_verdict_blocks": ["outcome receipt reports verdict='AMBER' ..."],
+    }
+    assert _real_false_shippable_claim({"status": "shippable"}, amber_result) is True
+
+    # An ACTIVE (non-shippable-declaring) track is never a false claim, however
+    # bad its receipt — the ERROR is only for tracks that CLAIM shippable.
+    assert _real_false_shippable_claim({"status": "ACTIVE"}, amber_result) is False
+
+
 @pytest.mark.timeout(270)
 def test_underclaims_surface_in_evidence_payload() -> None:
     """Every track payload carries the underclaims field, and any underclaim in
