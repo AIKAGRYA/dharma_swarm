@@ -1794,7 +1794,7 @@ active_tracks:
     name: One-door onboarding — strict, fast, deterministic session admission
     status: ACTIVE
     opened_at: "2026-07-10"
-    verified_at: "2026-07-10"
+    verified_at: "2026-07-12"
     ttl_days: 30
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
@@ -1855,6 +1855,20 @@ active_tracks:
       Titanium vNext (PR #854 plan) baseline capture and WP-00 stay blocked
       until this track's implementation, merge-blocking CI admission (C1),
       and independent clean-room proof have merged.
+      REALITY RESET 2026-07-12 (operator-directed): an independent clean-clone
+      audit at dcde323 plus this session's re-derivation found the campaign is
+      roughly halfway, not done. "Merged" had been reported as "done" — the
+      exact merged-not-equal-done trap this track exists to kill. WP-O2 (PR #887)
+      merged the REJECTED parser; the repaired commit 8ce46a1a never entered a
+      PR or main (verified not an ancestor of dcde323). WP-O3's compact engine
+      exists but is orphaned — make onboard still runs the 1888-line legacy
+      always-zero door (Makefile:469-470). WP-O4 lacks committed-range closeout,
+      external-only proof, and merge-group binding. O2/O3/O4 are reopened as
+      blockers below; C1 is registered-but-awaiting-semantic-revalidation;
+      D2/D3 stay blocked. The engine hits the latency/shape target when called
+      directly (cli.py, ~0.25s warm) — the remaining work is correspondence,
+      hardening, and wiring, not a rewrite. Full recovery plan tracked with the
+      operator; this entry is the ledger correction, not the plan.
     prerequisites:
       - id: onboard_spec_on_main
         kind: file_exists
@@ -1897,14 +1911,45 @@ active_tracks:
       - id: wp_o6_readiness_property_battery
         kind: command_passes
         command: ["python3", "-m", "pytest", "tests/properties/test_onboarding_readiness_properties.py", "-q"]
+      # REALITY-RESET behavioral criterion (2026-07-12; strengthened after a
+      # Codex review on PR #902). The command_passes criteria above prove the WP
+      # unit tests are GREEN; they do NOT prove the BEHAVIOR landed. This one
+      # proves the public make-onboard door actually delegates to the compact
+      # engine. It is BEHAVIORAL, not a substring check: a substring like
+      # "onboarding import" both false-PASSES a dead/commented import and
+      # false-FAILS a valid direct-module shim (import ...onboarding.cli),
+      # constraining WP-O3's import style instead of measuring the door. Instead
+      # this runs the acceptance test that invokes the door and asserts it enters
+      # the compact CLI. It is pinned to an EXACT nodeid, NOT -k: pytest -k exits 0
+      # by deselection when the test is merely absent (a false pass), whereas a
+      # missing nodeid errors (exit 4). So it FAILS today by design (WP-O3 has not
+      # written the test and the door is not wired); it passes only when WP-O3 adds
+      # a module-level `def test_door_delegates_to_compact_engine` in
+      # tests/test_make_onboarding_contract.py that invokes the door and it
+      # genuinely delegates. Evidence, not prose, holds the track open.
+      - id: wp_o3_door_delegates_to_compact_engine
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/test_make_onboarding_contract.py::test_door_delegates_to_compact_engine", "-q"]
     next_items:
       - id: D2
         what: "D2 PENDING — operator ratification of strict-by-default after WP-O4/C1 (exact record format in spec §9.2; the implementation author cannot mint it; WP-O5 preflight verifies the record is a merged ancestor)"
         kind: governance
         blocker: true
       - id: C1
-        what: "C1 PENDING — merge-authority owner (merge-master-mike-d4-2026-06 lane) registers the shared onboarding admission context as required + parity-manifest + automerge-required in its own coordinated change (spec §9.4); WP-O5 and the terminal clean-room proof block until merged"
+        what: "C1 PROVISIONAL (reality reset 2026-07-12) — the 'Onboarding admission parity' context IS live in branch protection AND in ci_parity_manifest.json (PR #898 / dcde323), so the registration mechanics landed. BUT it currently guards the LEGACY always-zero door (make onboard -> agent_onboard.py returns 0 despite blocked truth), not strict admission semantics. Awaiting SEMANTIC revalidation: after WP-O3/O4 wire the strict door, re-test the live required context against that actual door and confirm it fails-closed on blocked truth (spec §9.4). Blocker stays until the guarded door is the strict one."
         kind: governance
+        blocker: true
+      - id: WP-O2
+        what: "WP-O2 INCOMPLETE (reality reset 2026-07-12) — PR #887 merged the older REJECTED parser implementation; the repaired commit 8ce46a1a never entered a PR or main (verified: not an ancestor of dcde323). The canonical broken_register.py IS wired into the door (agent_onboard.py:58-66 importlib-loads it) but is the buggy version: the open-section header regex at broken_register.py:26 anchors only the START, not the end, so it treats '## OPEN SOURCE NOTES' as the OPEN section; it also still admits pre-section entries, treats heading prose as lifecycle, and mishandles CLOSED+FIXED equivalence. The wp_o2_single_parser_six_consumers criterion is GREEN but only proves the unit tests pass, not adversarial correctness. Acceptance: re-admit WP-O2 at fresh main, port the repaired v4 parser, restore the public control-surface schema (audit: widened 23->26 fields), add the reproduced adversarial cases (pre-section, OPEN SOURCE NOTES, CLOSED+FIXED, heading-prose), surface parser diagnostics, and require exact-head Linux AgentOps plus independent review. This is the FIRST honestly-incomplete node."
+        kind: code
+        blocker: true
+      - id: WP-O3
+        what: "WP-O3 INCOMPLETE (reality reset 2026-07-12) — the compact engine exists (dharma_swarm/operator_core/onboarding/cli.py, 363 lines, ~0.25s warm, 49-line render) but is ORPHANED: make onboard still runs the 1888-line legacy always-zero door (Makefile:469-470 -> scripts/governance/agent_onboard.py), which has NO import of the compact readiness/render/cli engine (only an importlib path-load of broken_register.py at :58). Clean-clone evidence: public make onboard is 508 lines, 4.6-7.7s warm, receipt v1, answers only 1/4 onboarding questions, still performs hidden refresh plus GitHub activity, writes ignored repo artifacts, and returns 0 despite blocked truth. Acceptance (spec §6 WP-O3, B1-B11): wire agent_onboard.py as a thin compatibility shim to the compact engine so strict typed verdicts/exit codes reach the public door; preserve corrupt receipts; enforce cross-head cache misses; implement real cache reuse/deltas; eliminate network/refresh/source-write/bytecode-write paths; flip the writer to v2 ONLY after D3. Acceptance signal (criterion wp_o3_door_delegates_to_compact_engine): WP-O3 must add a BEHAVIORAL test named exactly `def test_door_delegates_to_compact_engine` (module-level) in tests/test_make_onboarding_contract.py that invokes the public make-onboard door and asserts it enters the compact CLI — the criterion pins that exact pytest nodeid (not a source-substring check: a Codex review on PR #902 flagged that a substring both false-passes a dead import and false-fails a direct-module shim). Currently FAILS (exit 4, nodeid not found): no such test, door not wired."
+        kind: code
+        blocker: true
+      - id: WP-O4
+        what: "WP-O4 INCOMPLETE (reality reset 2026-07-12) — committed-range closeout, external-only syscall proof, and merge-group packet binding remain absent (independent audit at dcde323). The allowlist/CI-parity slices landed (PR #897) but the closeout envelope does not yet enforce base...HEAD plus working/staged/untracked as a union, reject packet-swap, prove external-only writes, discover the PR packet, or bind the merge group. Acceptance (spec §4.2, §6 WP-O4): implement real base...HEAD plus working/staged/untracked closeout, packet-swap rejection, external-only syscall proof, PR packet discovery, and merge-group binding; then re-close C1 by re-testing the live required context against the ACTUAL strict door."
+        kind: code
         blocker: true
       - id: D3
         what: "D3 PENDING — operator answered 'no idea' 2026-07-10, so this resolves by evidence, not recall: on EACH fleet host (Mac daemon, VPS, any Warp/Oz seat) run the reader sweep and record the output — (1) grep -rn onboard_receipt ~/.dharma /etc/cron* /etc/systemd/system ~/Library/LaunchAgents ~/bin 2>/dev/null | grep -v ops/onboard_receipt.json$ ; (2) crontab -l 2>/dev/null | grep -i onboard ; (3) command -v lsof >/dev/null && lsof ~/.dharma/ops/onboard_receipt.json 2>/dev/null. All three empty on every host = D3 disconfirmed (record host list + date here, flip blocker false). Any hit = that reader gets a v1+v2 dual-read upgrade before the WP-O3 writer flip (spec §9.3)."
