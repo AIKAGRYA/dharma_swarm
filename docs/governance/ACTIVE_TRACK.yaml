@@ -1911,18 +1911,25 @@ active_tracks:
       - id: wp_o6_readiness_property_battery
         kind: command_passes
         command: ["python3", "-m", "pytest", "tests/properties/test_onboarding_readiness_properties.py", "-q"]
-      # REALITY-RESET behavioral criterion (2026-07-12). The command_passes
-      # criteria above prove the WP unit tests are GREEN; they do NOT prove the
-      # BEHAVIOR landed. This one measures whether the public door actually
-      # delegates to the compact engine, and FAILS today by design: agent_onboard.py
-      # (the make-onboard door) has no `from ...onboarding import ...` statement,
-      # only an importlib path-load of broken_register.py at :58. It passes only
-      # once WP-O3 wires the door as a thin shim over the compact readiness/render
-      # engine. Evidence, not prose, now holds the track open.
+      # REALITY-RESET behavioral criterion (2026-07-12; strengthened after a
+      # Codex review on PR #902). The command_passes criteria above prove the WP
+      # unit tests are GREEN; they do NOT prove the BEHAVIOR landed. This one
+      # proves the public make-onboard door actually delegates to the compact
+      # engine. It is BEHAVIORAL, not a substring check: a substring like
+      # "onboarding import" both false-PASSES a dead/commented import and
+      # false-FAILS a valid direct-module shim (import ...onboarding.cli),
+      # constraining WP-O3's import style instead of measuring the door. Instead
+      # this runs the acceptance test that invokes the door and asserts it enters
+      # the compact CLI. It is pinned to an EXACT nodeid, NOT -k: pytest -k exits 0
+      # by deselection when the test is merely absent (a false pass), whereas a
+      # missing nodeid errors (exit 4). So it FAILS today by design (WP-O3 has not
+      # written the test and the door is not wired); it passes only when WP-O3 adds
+      # a module-level `def test_door_delegates_to_compact_engine` in
+      # tests/test_make_onboarding_contract.py that invokes the door and it
+      # genuinely delegates. Evidence, not prose, holds the track open.
       - id: wp_o3_door_delegates_to_compact_engine
-        kind: file_contains
-        file: scripts/governance/agent_onboard.py
-        pattern: "onboarding import"
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/test_make_onboarding_contract.py::test_door_delegates_to_compact_engine", "-q"]
     next_items:
       - id: D2
         what: "D2 PENDING — operator ratification of strict-by-default after WP-O4/C1 (exact record format in spec §9.2; the implementation author cannot mint it; WP-O5 preflight verifies the record is a merged ancestor)"
@@ -1937,7 +1944,7 @@ active_tracks:
         kind: code
         blocker: true
       - id: WP-O3
-        what: "WP-O3 INCOMPLETE (reality reset 2026-07-12) — the compact engine exists (dharma_swarm/operator_core/onboarding/cli.py, 363 lines, ~0.25s warm, 49-line render) but is ORPHANED: make onboard still runs the 1888-line legacy always-zero door (Makefile:469-470 -> scripts/governance/agent_onboard.py), which has NO import of the compact readiness/render/cli engine (only an importlib path-load of broken_register.py at :58). Clean-clone evidence: public make onboard is 508 lines, 4.6-7.7s warm, receipt v1, answers only 1/4 onboarding questions, still performs hidden refresh plus GitHub activity, writes ignored repo artifacts, and returns 0 despite blocked truth. Acceptance (spec §6 WP-O3, B1-B11): wire agent_onboard.py as a thin compatibility shim to the compact engine so strict typed verdicts/exit codes reach the public door; preserve corrupt receipts; enforce cross-head cache misses; implement real cache reuse/deltas; eliminate network/refresh/source-write/bytecode-write paths; flip the writer to v2 ONLY after D3. Machine signal: wp_o3_door_delegates_to_compact_engine (currently FAILS)."
+        what: "WP-O3 INCOMPLETE (reality reset 2026-07-12) — the compact engine exists (dharma_swarm/operator_core/onboarding/cli.py, 363 lines, ~0.25s warm, 49-line render) but is ORPHANED: make onboard still runs the 1888-line legacy always-zero door (Makefile:469-470 -> scripts/governance/agent_onboard.py), which has NO import of the compact readiness/render/cli engine (only an importlib path-load of broken_register.py at :58). Clean-clone evidence: public make onboard is 508 lines, 4.6-7.7s warm, receipt v1, answers only 1/4 onboarding questions, still performs hidden refresh plus GitHub activity, writes ignored repo artifacts, and returns 0 despite blocked truth. Acceptance (spec §6 WP-O3, B1-B11): wire agent_onboard.py as a thin compatibility shim to the compact engine so strict typed verdicts/exit codes reach the public door; preserve corrupt receipts; enforce cross-head cache misses; implement real cache reuse/deltas; eliminate network/refresh/source-write/bytecode-write paths; flip the writer to v2 ONLY after D3. Acceptance signal (criterion wp_o3_door_delegates_to_compact_engine): WP-O3 must add a BEHAVIORAL test named exactly `def test_door_delegates_to_compact_engine` (module-level) in tests/test_make_onboarding_contract.py that invokes the public make-onboard door and asserts it enters the compact CLI — the criterion pins that exact pytest nodeid (not a source-substring check: a Codex review on PR #902 flagged that a substring both false-passes a dead import and false-fails a direct-module shim). Currently FAILS (exit 4, nodeid not found): no such test, door not wired."
         kind: code
         blocker: true
       - id: WP-O4
