@@ -269,10 +269,12 @@ def _validate_external_packet_path(repo_root: Path, packet_path: Path) -> None:
 def _probe_tool_version(name: str, repo_root: Path) -> str:
     if name == "python":
         return platform.python_version()
-    commands = {"git": ["git", "--version"], "make": ["make", "--version"]}
-    if name not in commands:
+    if name == "git":
+        result = run_git(["--version"], cwd=repo_root, check=False)
+    elif name == "make":
+        result = run_command(["make", "--version"], cwd=repo_root)
+    else:
         raise AgentOpsError(f"session_entry declares unsupported tool: {name}")
-    result = run_command(commands[name], cwd=repo_root)
     if result.returncode != 0:
         raise AgentOpsError(f"could not probe declared tool {name}")
     first_line = result.stdout.splitlines()[0] if result.stdout.splitlines() else ""
@@ -880,6 +882,7 @@ def run_negative_control(repo_root: Path, gate: GateSpec) -> dict[str, Any]:
             clone = run_command(
                 ["git", "clone", "--no-checkout", "--no-hardlinks",
                  str(repo_root), str(fixture)], cwd=repo_root,
+                env=trusted_git_environment(),
             )
             if clone.returncode != 0:
                 detail = (clone.stderr or clone.stdout).strip()
