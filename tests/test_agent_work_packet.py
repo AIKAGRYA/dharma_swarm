@@ -1635,3 +1635,72 @@ def test_positive_gate_allowlist_rejects_packet_supplied_environment() -> None:
     )
     with pytest.raises(agentops.AgentOpsError):
         agentops.admit_gate_command(gate)
+
+
+def test_positive_gate_allowlist_rejects_make_variable_injection() -> None:
+    """Make expands `$(ARGS)`/`$(PACKET)` unquoted in a shell and runs
+    `$(shell …)` during recipe expansion, so a variable value is executable
+    surface. Values carrying shell/make metacharacters fail closed
+    (Greptile + Codex P1 on #897); benign flag/path values still pass."""
+    injections = [
+        "make onboard 'ARGS=$(shell git push origin HEAD)'",
+        "make onboard 'ARGS=--json;id'",
+        "make onboard 'ARGS=--json && id'",
+        "make onboard 'ARGS=`id`'",
+        "make onboard 'ARGS=--json|tee /tmp/x'",
+        "make agent-build-preflight 'PACKET=$(shell touch /tmp/x)'",
+    ]
+    for index, command in enumerate(injections):
+        gate = agentops.parse_gate({"name": f"inject-{index}", "command": command}, index)
+        with pytest.raises(agentops.AgentOpsError):
+            agentops.admit_gate_command(gate)
+
+    benign = [
+        "make onboard ARGS=--json",
+        "make onboard 'ARGS=--deep --net'",
+        "make agent-build-preflight PACKET=reports/agentops/work_packets/x.json",
+    ]
+    for index, command in enumerate(benign):
+        gate = agentops.parse_gate({"name": f"benign-{index}", "command": command}, index)
+        agentops.admit_gate_command(gate)  # must not raise
+
+
+def test_positive_gate_allowlist_rejects_path_qualified_shims() -> None:
+    """The basename may look trusted, but subprocess.run executes the literal
+    argv[0] — a path-qualified shim runs attacker code (Codex P1 on #897).
+    Bare `python3`/`make`/`git` and the exact running interpreter still pass."""
+    shims = [
+        "./python3 -m pytest -q",
+        "/tmp/make onboard",
+        "/tmp/git status --porcelain",
+        "../evil/python3 -m pytest",
+    ]
+    for index, command in enumerate(shims):
+        try:
+            gate = agentops.parse_gate({"name": f"shim-{index}", "command": command}, index)
+        except agentops.AgentOpsError:
+            continue  # rejected even earlier by O1R lexical admission
+        with pytest.raises(agentops.AgentOpsError):
+            agentops.admit_gate_command(gate)
+
+    # The exact running interpreter (absolute path) is the trusted host python.
+    trusted = agentops.parse_gate(
+        {"name": "host-python", "command": f"{sys.executable} -m pytest -q"}, 0
+    )
+    agentops.admit_gate_command(trusted)  # must not raise
+
+
+def test_positive_gate_allowlist_rejects_abbreviated_write_context() -> None:
+    """argparse admits any unambiguous prefix, so `--write` resolves to
+    `--write-context` — the exact-token check must reject every abbreviation
+    (Codex P2 on #897)."""
+    for abbrev in ("--write", "--w", "--writ", "--write-c"):
+        command = f"python3 scripts/governance/orientation_graph.py {abbrev}"
+        gate = agentops.parse_gate({"name": "abbrev", "command": command}, 0)
+        with pytest.raises(agentops.AgentOpsError):
+            agentops.admit_gate_command(gate)
+    # A genuinely different flag that is not a prefix of the forbidden one passes.
+    ok = agentops.parse_gate(
+        {"name": "json", "command": "python3 scripts/governance/orientation_graph.py --json"}, 0
+    )
+    agentops.admit_gate_command(ok)  # must not raise

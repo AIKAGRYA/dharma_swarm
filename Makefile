@@ -435,21 +435,24 @@ claim-evidence:
 mutation-test:
 	$(REPO_PYTHON) scripts/governance/run_mutation_score.py --threshold $(MUTATION_THRESHOLD)
 
-# Packet-aware admission (WP-O4): when PACKET is provided, the shared
-# AgentOps evaluator runs exactly once per phase — preflight validates the
-# packet envelope fail-closed before any edit; closeout re-evaluates the same
-# packet (envelope + gates + negative controls) before PR admission. Without
-# PACKET the legacy baseline behavior is unchanged.
+# Packet-aware preflight (WP-O4 / O4-B2): when PACKET is provided, the shared
+# AgentOps evaluator validates the packet envelope fail-closed BEFORE any edit.
+# --dry-run is the correct pre-edit mode — it requires the exact clean baseline
+# (HEAD == base_ref, clean tree) and admits the gate command families, without
+# running gates. Without PACKET the legacy baseline behavior is unchanged.
 agent-build-preflight: verifier-selfcheck onboard hygiene-check
 ifdef PACKET
 	$(PYTHON) scripts/governance/run_agent_work_packet.py --packet $(PACKET) --dry-run
 endif
 	@printf "\nAgent build preflight complete. Use the task route from make onboard; close out with: make agent-build-closeout\n"
 
+# Closeout runs the hygiene + governance bundle. Post-edit packet
+# re-evaluation over the base...HEAD + working/staged/untracked diff-classes
+# is WP-O4-B3 (declared next slice) and is NOT wired here: --dry-run is the
+# WRONG mode for closeout — it demands HEAD == base_ref, so it fails against
+# the very packet whose work has been committed, and for legacy packets it
+# returns before running gates. A correct closeout mode lands with O4-B3.
 agent-build-closeout:
-ifdef PACKET
-	$(PYTHON) scripts/governance/run_agent_work_packet.py --packet $(PACKET) --dry-run
-endif
 	$(PYTHON) scripts/governance/hygiene/scan.py --output /tmp/dharma-hygiene-audit.txt
 	-$(PYTHON) scripts/governance/substrate_audit.py
 	$(MAKE) governance-all

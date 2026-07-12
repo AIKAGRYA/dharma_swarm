@@ -95,7 +95,16 @@ _ALLOWED_REPO_SCRIPTS = frozenset({
     "scripts/governance/trust_gate_status.py",
     "scripts/docops/check_docops_integrity.py",
 })
-_FORBIDDEN_SCRIPT_ARGS = frozenset({"--write-context"})
+# Long options that must never reach an allowlisted script, including every
+# argparse prefix-abbreviation of them (default abbreviation turns `--write`
+# into `--write-context`).
+_FORBIDDEN_SCRIPT_FLAGS = ("--write-context",)
+_ALLOWED_MAKE_VARIABLES = frozenset({"PACKET", "ARGS"})
+# Make expands `$(ARGS)`/`$(PACKET)` unquoted in a shell and runs `$(shell …)`
+# during recipe expansion, so a variable VALUE is executable surface. Confine
+# it to a conservative positive charset that excludes every shell/make
+# metacharacter (`$`, backtick, `;`, `|`, `&`, redirects, parens, glob, …).
+_SAFE_MAKE_VALUE = re.compile(r"^[A-Za-z0-9 _./=:,+-]*$")
 _ALLOWED_MAKE_TARGETS = frozenset({
     "onboard", "orient", "test", "test-fast", "docops-integrity",
     "hygiene-check", "module-budget", "agent-build-preflight",
@@ -103,8 +112,29 @@ _ALLOWED_MAKE_TARGETS = frozenset({
 })
 
 
-def _base_name(token: str) -> str:
-    return Path(token).name
+def _is_trusted_python(token: str) -> bool:
+    """A bare `python`/`python3`, or the exact running interpreter path.
+
+    A path-qualified shim (`./python3`, `/tmp/python3`) whose basename merely
+    looks trusted is rejected: ``subprocess.run`` executes the literal path,
+    not the basename."""
+    if token in _PYTHON_EXECUTABLES:
+        return True
+    try:
+        return Path(token).resolve() == Path(sys.executable).resolve()
+    except OSError:
+        return False
+
+
+def _has_forbidden_script_flag(script_args: list[str]) -> bool:
+    for arg in script_args:
+        if not arg.startswith("--"):
+            continue
+        # arg is an abbreviation of a forbidden flag iff the forbidden flag
+        # starts with it (argparse admits any unambiguous prefix).
+        if any(forbidden.startswith(arg) for forbidden in _FORBIDDEN_SCRIPT_FLAGS):
+            return True
+    return False
 
 
 def admit_gate_command(gate: GateSpec) -> None:
@@ -116,31 +146,39 @@ def admit_gate_command(gate: GateSpec) -> None:
     if gate.env:
         raise AgentOpsError(
             f"gate command may not carry packet-supplied environment: {command}")
-    head = _base_name(argv[0])
+    head = argv[0]
     if head == "git":
-        # Shape already validated by the O1R direct-Git grammar in parse_gate.
+        # Bare `git` only; shape + executable identity (incl. path-qualified
+        # shim rejection) are already validated by the O1R direct-Git grammar
+        # in parse_gate. A path-qualified git falls through to the final raise.
         return
-    if head in _PYTHON_EXECUTABLES:
+    if _is_trusted_python(head):
         rest = tuple(argv[1:])
         for prefix in _ALLOWED_PYTHON_MODULE_PREFIXES:
             if rest[: len(prefix)] == prefix:
                 return
         if argv[1:2] and argv[1].startswith("scripts/"):
             script, script_args = argv[1], argv[2:]
-            if script in _ALLOWED_REPO_SCRIPTS and not (
-                set(script_args) & _FORBIDDEN_SCRIPT_ARGS
+            if script in _ALLOWED_REPO_SCRIPTS and not _has_forbidden_script_flag(
+                script_args
             ):
                 return
         raise AgentOpsError(
             f"gate command is outside the positive interpreter allowlist: {command}")
     if head == "make":
         targets = [token for token in argv[1:] if "=" not in token]
-        variables = [token for token in argv[1:] if "=" in token]
-        if (
-            len(targets) == 1
-            and targets[0] in _ALLOWED_MAKE_TARGETS
-            and all(token.split("=", 1)[0] in {"PACKET", "ARGS"} for token in variables)
-        ):
+        for token in argv[1:]:
+            if "=" not in token:
+                continue
+            key, _, value = token.partition("=")
+            if key not in _ALLOWED_MAKE_VARIABLES:
+                raise AgentOpsError(
+                    f"gate command uses a non-allowlisted make variable {key!r}: {command}")
+            if not _SAFE_MAKE_VALUE.fullmatch(value):
+                raise AgentOpsError(
+                    f"gate command make variable {key!r} value carries shell/make "
+                    f"metacharacters: {command}")
+        if len(targets) == 1 and targets[0] in _ALLOWED_MAKE_TARGETS:
             return
         raise AgentOpsError(
             f"gate command is outside the positive make-target allowlist: {command}")

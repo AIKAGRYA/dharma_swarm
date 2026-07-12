@@ -72,10 +72,15 @@ def test_preflight_recipe_evaluates_packet_exactly_once() -> None:
     assert "--dry-run" in recipe
 
 
-def test_closeout_recipe_evaluates_packet_exactly_once() -> None:
+def test_closeout_does_not_run_the_broken_dry_run_packet_eval() -> None:
+    """--dry-run is the WRONG closeout mode: it requires HEAD == base_ref, so
+    it fails against the very packet whose work has been committed, and for
+    legacy packets it returns before running gates. Correct post-edit packet
+    re-evaluation is WP-O4-B3 (declared next slice); closeout must not claim
+    it by wiring the broken command (Codex P2 on #897)."""
     recipe = _recipe("agent-build-closeout")
-    assert recipe.count("run_agent_work_packet.py") == 1
-    assert "--packet $(PACKET)" in recipe
+    assert "run_agent_work_packet.py" not in recipe
+    assert "governance-all" in recipe
 
 
 def test_preflight_with_invalid_packet_fails_closed(tmp_path: Path) -> None:
