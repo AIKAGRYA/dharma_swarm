@@ -1167,6 +1167,15 @@ def test_create_commit_ignores_local_identity_hooks_and_signing(
         ["git", "config", "gpg.program", str(signer)], cwd=repo
     ).returncode == 0
     assert run(["git", "config", "commit.gpgSign", "true"], cwd=repo).returncode == 0
+    fsmonitor_marker = tmp_path / "fsmonitor-ran"
+    fsmonitor = tmp_path / "fsmonitor"
+    fsmonitor.write_text(
+        f"#!/bin/sh\ntouch '{fsmonitor_marker}'\nexit 1\n", encoding="utf-8"
+    )
+    fsmonitor.chmod(0o755)
+    assert run(
+        ["git", "config", "core.fsmonitor", str(fsmonitor)], cwd=repo
+    ).returncode == 0
 
     changed = repo / "local-controls.txt"
     changed.write_text("local controls probe\n", encoding="utf-8")
@@ -1174,6 +1183,7 @@ def test_create_commit_ignores_local_identity_hooks_and_signing(
 
     assert not hook_marker.exists()
     assert not signer_marker.exists()
+    assert not fsmonitor_marker.exists()
     identity = agentops.run_git(
         ["show", "-s", "--format=%an%n%ae%n%cn%n%ce", "HEAD"], cwd=repo
     ).stdout.splitlines()
