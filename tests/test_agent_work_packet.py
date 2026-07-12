@@ -1023,6 +1023,44 @@ def test_direct_git_gate_strips_inherited_git_environment(
     assert encoded_non_git["KEEP_ME"] == "yes"
 
 
+def test_create_commit_uses_global_identity_without_trusting_git_controls(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_repo(tmp_path)
+    assert run(["git", "config", "--unset", "user.name"], cwd=repo).returncode == 0
+    assert run(["git", "config", "--unset", "user.email"], cwd=repo).returncode == 0
+    assert run(
+        ["git", "config", "user.useConfigOnly", "true"], cwd=repo
+    ).returncode == 0
+
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / ".gitconfig").write_text(
+        "[user]\n\tname = Global AgentOps\n\temail = global-agentops@example.invalid\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("GIT_AUTHOR_NAME", "Inherited Attacker")
+    monkeypatch.setenv("GIT_AUTHOR_EMAIL", "attacker@example.invalid")
+    monkeypatch.setenv("GIT_COMMITTER_NAME", "Inherited Attacker")
+    monkeypatch.setenv("GIT_COMMITTER_EMAIL", "attacker@example.invalid")
+
+    changed = repo / "allowed.txt"
+    changed.write_text("identity probe\n", encoding="utf-8")
+    commit = agentops.create_commit(repo, ["allowed.txt"], "test: global identity")
+
+    assert commit == agentops.head_for(repo)
+    identity = agentops.run_git(
+        ["show", "-s", "--format=%an%n%ae%n%cn%n%ce", "HEAD"], cwd=repo
+    ).stdout.splitlines()
+    assert identity == [
+        "Global AgentOps",
+        "global-agentops@example.invalid",
+        "Global AgentOps",
+        "global-agentops@example.invalid",
+    ]
+
+
 def test_session_entry_rejects_each_missing_required_field(tmp_path: Path) -> None:
     repo = init_session_repo(tmp_path)
     valid = seal_packet(session_packet(repo))
