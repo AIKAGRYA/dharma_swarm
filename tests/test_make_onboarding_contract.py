@@ -11,10 +11,14 @@ from __future__ import annotations
 
 import re
 import subprocess
+import sys
 from pathlib import Path
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MAKEFILE = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
+RUNNER = "scripts/governance/run_agent_work_packet.py"
 
 
 def _recipe(target: str) -> str:
@@ -51,6 +55,7 @@ def test_orient_recipe_never_writes_context() -> None:
     )
 
 
+@pytest.mark.timeout(180)
 def test_make_orient_attempts_no_repository_write() -> None:
     before = _porcelain()
     result = _make("orient")
@@ -83,12 +88,20 @@ def test_closeout_does_not_run_the_broken_dry_run_packet_eval() -> None:
     assert "governance-all" in recipe
 
 
-def test_preflight_with_invalid_packet_fails_closed(tmp_path: Path) -> None:
+def test_preflight_packet_evaluation_fails_closed(tmp_path: Path) -> None:
+    """The exact command the Makefile preflight runs for PACKET
+    (`run_agent_work_packet.py --packet <p> --dry-run`) must fail closed on an
+    invalid packet. Exercised directly, not through `make agent-build-preflight`
+    — that target chains verifier-selfcheck/onboard/hygiene-check, minutes of
+    unrelated work that flapped the 30s per-test budget on CI (#897)."""
     bogus = tmp_path / "bogus-packet.json"
-    bogus.write_text("{\"id\": \"nope\"}", encoding="utf-8")
-    result = _make(f"PACKET={bogus}", "agent-build-preflight")
+    bogus.write_text('{"id": "nope"}', encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, RUNNER, "--packet", str(bogus), "--dry-run"],
+        cwd=REPO_ROOT, capture_output=True, text=True, timeout=120,
+    )
     assert result.returncode != 0, (
-        "an invalid packet must fail preflight, not degrade to baseline"
+        "an invalid packet must fail the preflight evaluator, not pass"
     )
 
 
@@ -101,6 +114,7 @@ def test_a2a_identity_target_command_is_unchanged() -> None:
 
 # --- O4-B8: ARGS forwarding and usage exits -----------------------------------
 
+@pytest.mark.timeout(120)
 def test_make_forwards_onboard_args_and_usage_exit() -> None:
     recipe = _recipe("onboard")
     assert "agent_onboard.py $(ARGS)" in recipe
