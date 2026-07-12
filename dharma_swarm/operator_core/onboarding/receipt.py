@@ -1,12 +1,21 @@
-"""Strict reader-first negotiation for onboarding receipt v1 and v2."""
+"""Strict reader-first negotiation, cache manifest, lock, delta, and atomic
+write for onboarding receipts v1 and v2."""
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import re
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Iterator, Mapping
+
+try:  # pragma: no cover - non-POSIX host degrades, matching spine/receipt.py
+    import fcntl
+except ImportError:  # pragma: no cover
+    fcntl = None  # type: ignore[assignment]
 
 from dharma_swarm.memory_kernel.write_receipts import stable_digest
 
@@ -305,8 +314,141 @@ def load_receipt(path: Path) -> LoadedReceipt:
     raise UnsupportedReceiptSchema(f"unsupported onboarding receipt major: v{major}")
 
 
+def resolve_ops_dir(repo_root: Path, env: Mapping[str, str] | None = None) -> Path:
+    """Resolve the external receipt directory, proving it is outside the
+    worktree and ``.git`` (spec §2.2).  Direct and symlink escapes into the
+    repository are ``CONFIG_ERROR``.  The proof itself is owned by
+    ``contract.resolve_external_dir`` (WP-O1); this only picks the candidate."""
+    from .contract import resolve_external_dir
+
+    environ = os.environ if env is None else env
+    raw = environ.get("DHARMA_OPS_DIR", "")
+    candidate = Path(raw).expanduser() if raw else Path.home() / ".dharma" / "ops"
+    return resolve_external_dir(
+        candidate, repo_root=repo_root, field="receipt directory (DHARMA_OPS_DIR)"
+    )
+
+
+def receipt_path(repo_root: Path, env: Mapping[str, str] | None = None) -> Path:
+    return resolve_ops_dir(repo_root, env) / "onboard_receipt.json"
+
+
+@contextmanager
+def _receipt_lock(target: Path) -> Iterator[None]:
+    """Advisory sidecar flock serializing read→delta→validate→replace
+    (pattern: dharma_swarm/spine/receipt.py:275-296; same POSIX limits)."""
+    if fcntl is None:  # pragma: no cover - non-POSIX host
+        yield
+        return
+    lock_path = target.with_name(target.name + ".lock")
+    with lock_path.open("w") as lock_handle:
+        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
+
+
+def build_input_manifest(repo_root: Path, relpaths: Mapping[str, list[str]]) -> dict[str, Any]:
+    """Sorted content-hash manifest over the transitive inputs actually
+    consumed, grouped by spec §3.2 category.  Missing files hash as absent —
+    presence/absence is itself an invalidator."""
+    manifest: dict[str, Any] = {}
+    for category in sorted(relpaths):
+        rows: dict[str, str] = {}
+        for rel in sorted(set(relpaths[category])):
+            path = repo_root / rel
+            try:
+                rows[rel] = hashlib.sha256(path.read_bytes()).hexdigest()
+            except OSError:
+                rows[rel] = "ABSENT"
+        manifest[category] = rows
+    return manifest
+
+
+def cache_key(manifest: Mapping[str, Any], environment_class: str) -> str:
+    """One deterministic key over the whole manifest plus environment class."""
+    return stable_digest({"environment_class": environment_class, "manifest": manifest})
+
+
+def section_fingerprints(manifest: Mapping[str, Any]) -> dict[str, str]:
+    """Map each static section to the digest of exactly the manifest
+    categories it consumes, making per-section reparse executable."""
+    def _over(*categories: str) -> str:
+        return stable_digest({c: manifest.get(c, {}) for c in sorted(categories)})
+
+    return {
+        "contract": _over("entry_implementation", "instruction_custody"),
+        "portfolio": _over("intent_surface_breakage"),
+        "orientation": _over("intent_surface_breakage", "instruction_custody"),
+        "toolchain": _over("dependency_contract"),
+    }
+
+
+def compute_delta(
+    previous: Mapping[str, Any] | None,
+    current_stable_core: Mapping[str, Any],
+    current_conditions: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Stable + condition delta against the immediately previous valid,
+    applicable v2 receipt.  v1 can never seed a delta (spec §3.3/§3.4)."""
+    empty = {"previous_stable_digest": "", "added": [], "resolved": [], "changed": []}
+    if not previous or previous.get("schema") != RECEIPT_SCHEMA_V2:
+        return empty
+    prev_conditions = {
+        str(row.get("id")): str(row.get("state"))
+        for row in previous.get("live_delta", {}).get("conditions", [])
+        if isinstance(row, dict)
+    }
+    now_conditions = {
+        str(row.get("id")): str(row.get("state")) for row in current_conditions
+    }
+    added = sorted(set(now_conditions) - set(prev_conditions))
+    resolved = sorted(set(prev_conditions) - set(now_conditions))
+    changed = sorted(
+        cid
+        for cid in set(now_conditions) & set(prev_conditions)
+        if now_conditions[cid] != prev_conditions[cid]
+    )
+    return {
+        "previous_stable_digest": str(previous.get("stable_digest", "")),
+        "added": added,
+        "resolved": resolved,
+        "changed": changed,
+    }
+
+
+def write_receipt(
+    payload: Mapping[str, Any],
+    *,
+    repo_root: Path,
+    env: Mapping[str, str] | None = None,
+) -> Path:
+    """Atomically replace the one receipt path under the sidecar lock.
+
+    The payload must already validate under the versioned loader — a writer
+    that can emit an unloadable receipt is a corruption source, so validation
+    is not optional here."""
+    target = receipt_path(repo_root, env)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    body = json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+    with _receipt_lock(target):
+        temp = target.with_name(target.name + ".tmp")
+        temp.write_text(body, encoding="utf-8")
+        load_receipt(temp)  # fail-closed before replace
+        os.replace(temp, target)
+    return target
+
+
 __all__ = [
     "_VOLATILE_KEYS",
+    "build_input_manifest",
+    "cache_key",
+    "compute_delta",
     "compute_stable_digest",
     "load_receipt",
+    "receipt_path",
+    "resolve_ops_dir",
+    "section_fingerprints",
+    "write_receipt",
 ]

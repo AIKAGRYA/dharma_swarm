@@ -1,0 +1,285 @@
+"""Read-only evidence collection for the onboarding door.
+
+Collection only — no policy, no rendering, no writes, no network.  Every
+function here observes the repository, toolchain, portfolio, and generated
+projections and returns typed dicts shaped for the v2 receipt's
+``stable_core`` and ``live_delta`` partitions (spec §3.1).  Deciding what the
+evidence MEANS is ``readiness.py``'s job.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+
+# The canonical max-five first-read list (docs/governance/CANONICAL_DOC_STACK.md
+# §max-five; mirrored in spec §2.5).  "onboard output" is the door itself.
+REQUIRED_READING = (
+    "onboard output",
+    "CLAUDE.md",
+    "reports/swarm_genome/2026-06-11/SYNTHESIS.md",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/governance/ANTI_SLOP_RULES.md",
+)
+
+# Instruction-custody surfaces hashed into the contract block.  These are the
+# inputs whose silent change must invalidate any cached static section
+# (spec §3.2, instruction-custody row).
+CONTRACT_SOURCES = (
+    "CLAUDE.md",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/governance/ANTI_SLOP_RULES.md",
+    "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
+    "docs/governance/CANONICAL_DOC_STACK.md",
+    "docs/state/BROKEN_REGISTER.md",
+    "pyproject.toml",
+    "uv.lock",
+)
+
+_PROJECTION_STALE_MINUTES = 24 * 60
+
+
+def _git(*args: str, cwd: Path = REPO_ROOT) -> str:
+    try:
+        proc = subprocess.run(
+            ["git", *args], cwd=cwd, capture_output=True, text=True, timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return proc.stdout.strip() if proc.returncode == 0 else ""
+
+
+def _sha256_file(path: Path) -> str:
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return ""
+
+
+def repo_identity() -> dict[str, str]:
+    """Stable repository identity: owner/repo, HEAD, branch."""
+    url = _git("remote", "get-url", "origin")
+    identity = ""
+    if url:
+        tail = url.rstrip("/").removesuffix(".git")
+        parts = tail.replace(":", "/").split("/")
+        if len(parts) >= 2:
+            identity = f"{parts[-2]}/{parts[-1]}"
+    return {
+        "identity": identity,
+        "head": _git("rev-parse", "HEAD"),
+        "branch": _git("rev-parse", "--abbrev-ref", "HEAD"),
+    }
+
+
+def repo_live_state(base_ref: str = "origin/main") -> dict[str, Any]:
+    """Volatile repository state for the live partition."""
+    status = _git("status", "--porcelain")
+    conflicted = any(
+        line[:2] in {"DD", "AU", "UD", "UA", "DU", "AA", "UU"}
+        for line in status.splitlines()
+    )
+    ahead = behind = 0
+    counts = _git("rev-list", "--left-right", "--count", f"{base_ref}...HEAD")
+    if counts:
+        left, _, right = counts.partition("\t")
+        try:
+            behind, ahead = int(left), int(right)
+        except ValueError:
+            ahead = behind = 0
+    return {
+        "base": base_ref,
+        "dirty": bool(status),
+        "conflicted": conflicted,
+        "ahead": ahead,
+        "behind": behind,
+    }
+
+
+def toolchain_versions() -> dict[str, str]:
+    """Normalized versions of the universally required hermetic tools."""
+    versions: dict[str, str] = {
+        "python": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+    }
+    for tool in ("git", "make"):
+        if shutil.which(tool) is None:
+            versions[tool] = ""
+            continue
+        try:
+            proc = subprocess.run(
+                [tool, "--version"], capture_output=True, text=True, timeout=10,
+            )
+            first = (proc.stdout or "").splitlines()[0] if proc.stdout else ""
+            versions[tool] = first.strip()
+        except (OSError, subprocess.TimeoutExpired, IndexError):
+            versions[tool] = ""
+    return versions
+
+
+def contract_sources() -> dict[str, Any]:
+    """Hash the instruction-custody surfaces the contract stands on."""
+    hashes: dict[str, str] = {}
+    for rel in CONTRACT_SOURCES:
+        digest = _sha256_file(REPO_ROOT / rel)
+        if digest:
+            hashes[rel] = digest
+    joined = "\n".join(f"{k}={v}" for k, v in sorted(hashes.items()))
+    return {
+        "required_files": sorted(hashes),
+        "source_hashes": hashes,
+        "contract_digest": hashlib.sha256(joined.encode("utf-8")).hexdigest(),
+    }
+
+
+def _load_yaml_tracks(path: Path) -> list[dict[str, Any]]:
+    try:
+        import yaml
+    except ImportError:
+        return _scrape_tracks(path)
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return []
+    rows = data.get("active_tracks") if isinstance(data, dict) else None
+    if not isinstance(rows, list):
+        return []
+    return [row for row in rows if isinstance(row, dict)]
+
+
+def _scrape_tracks(path: Path) -> list[dict[str, Any]]:
+    """Dependency-light fallback: track ids only, no nested detail."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    rows: list[dict[str, Any]] = []
+    in_active = False
+    for line in text.splitlines():
+        if line.startswith("active_tracks:"):
+            in_active = True
+            continue
+        if in_active and line and not line[0].isspace():
+            break
+        stripped = line.strip()
+        if in_active and stripped.startswith("- id:"):
+            rows.append({"id": stripped.split(":", 1)[1].strip().strip("'\"")})
+    return rows
+
+
+def portfolio_snapshot(selected_track: str = "") -> dict[str, Any]:
+    """Static portfolio projection: declared track ids, never live status."""
+    rows = _load_yaml_tracks(REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml")
+    tracks = sorted(
+        {str(row.get("id", "")) for row in rows if row.get("id")}
+    )
+    return {
+        "tracks": tracks,
+        "selected_track": selected_track,
+        "ownership_conflicts": [],
+    }
+
+
+def orientation_static() -> dict[str, Any]:
+    """Static orientation over owner files, via the canonical parser only."""
+    broken: dict[str, Any]
+    try:
+        from .broken_register import parse_broken_register
+
+        parsed = parse_broken_register(REPO_ROOT / "docs/state/BROKEN_REGISTER.md")
+        broken = {
+            "total": parsed.total,
+            "open_like": parsed.open_count,
+            "closed_like": parsed.closed_count,
+            "unknown": parsed.unknown_count,
+        }
+    except Exception as exc:  # canonical parser owns semantics; type the gap
+        broken = {"error": f"{type(exc).__name__}"}
+    surfaces = {
+        rel: bool((REPO_ROOT / rel).exists())
+        for rel in (
+            "foundations/THE_ORGANISM.md",
+            "docs/vision_maps/NORTH_STAR.md",
+            "docs/MEGAFILE_INDEX.md",
+            "INTERFACE_MISMATCH_MAP.md",
+        )
+    }
+    return {
+        "identity": {"repo_root": REPO_ROOT.name},
+        "broken_register": broken,
+        "static_surfaces": surfaces,
+    }
+
+
+def projection_freshness() -> dict[str, Any]:
+    """Typed freshness of generated projections.  NEVER regenerates anything.
+
+    Missing or stale generated evidence is a condition for readiness policy;
+    the door must not run any producer (spec §2.2: hidden refresh removed).
+    """
+    rel = "reports/governance/active_track_evidence.json"
+    path = REPO_ROOT / rel
+    if not path.exists():
+        return {rel: {"present": False, "age_minutes": None}}
+    import time
+
+    try:
+        age_minutes = max(0.0, (time.time() - path.stat().st_mtime) / 60.0)
+    except OSError:
+        return {rel: {"present": False, "age_minutes": None}}
+    return {
+        rel: {
+            "present": True,
+            "age_minutes": round(age_minutes, 1),
+            "stale": age_minutes > _PROJECTION_STALE_MINUTES,
+        }
+    }
+
+
+def collect_stable_core(
+    *,
+    packet: dict[str, Any] | None = None,
+    selected_track: str = "onboard-one-door-2026-07",
+) -> dict[str, Any]:
+    """Assemble the full v2 ``stable_core`` partition."""
+    packet_block = {
+        "id": "", "digest": "", "track": "", "owner": "",
+        "allowed_files": [], "forbidden_files": [],
+    }
+    if packet:
+        packet_block.update({
+            "id": str(packet.get("id", "")),
+            "digest": str(packet.get("digest", "")),
+            "track": str(packet.get("track", "")),
+            "owner": str(packet.get("owner", "")),
+            "allowed_files": list(packet.get("allowed_files", [])),
+            "forbidden_files": list(packet.get("forbidden_files", [])),
+        })
+    return {
+        "repository": repo_identity(),
+        "contract": contract_sources(),
+        "packet": packet_block,
+        "portfolio": portfolio_snapshot(selected_track),
+        "orientation": orientation_static(),
+        "required_reading": list(REQUIRED_READING),
+    }
+
+
+__all__ = [
+    "CONTRACT_SOURCES",
+    "REPO_ROOT",
+    "REQUIRED_READING",
+    "collect_stable_core",
+    "contract_sources",
+    "orientation_static",
+    "portfolio_snapshot",
+    "projection_freshness",
+    "repo_identity",
+    "repo_live_state",
+    "toolchain_versions",
+]
