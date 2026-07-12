@@ -1195,7 +1195,7 @@ def test_create_commit_ignores_local_identity_hooks_and_signing(
     ]
 
 
-def test_create_commit_rejects_local_executable_filters(
+def test_create_commit_stages_exact_bytes_without_local_filters(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     repo = init_repo(tmp_path)
@@ -1206,23 +1206,119 @@ def test_create_commit_rejects_local_executable_filters(
         encoding="utf-8",
     )
     monkeypatch.setattr(agentops, "_os_account_home", lambda: trusted_home, raising=False)
+    attributes = repo / ".gitattributes"
+    attributes.write_text("filtered.txt filter=danger\n", encoding="utf-8")
+    assert run(["git", "add", ".gitattributes"], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "add filter attributes"], cwd=repo).returncode == 0
     filter_marker = tmp_path / "filter-ran"
+    filter_script = tmp_path / "filter-script"
+    filter_script.write_text(
+        f"#!/bin/sh\ntouch '{filter_marker}'\ncat\n", encoding="utf-8"
+    )
+    filter_script.chmod(0o755)
     assert run(
-        [
-            "git", "config", "filter.danger.clean",
-            f"sh -c 'touch {filter_marker}; cat'",
-        ],
+        ["git", "config", "filter.danger.clean", str(filter_script)],
         cwd=repo,
     ).returncode == 0
     changed = repo / "filtered.txt"
     changed.write_text("filter probe\n", encoding="utf-8")
 
-    with pytest.raises(agentops.AgentOpsError, match="clean/process filters"):
-        agentops.create_commit(repo, [changed.name], "test: reject filter")
+    agentops.create_commit(repo, [changed.name], "test: bypass local filter")
     assert not filter_marker.exists()
     assert agentops.run_git(
-        ["diff", "--cached", "--name-only"], cwd=repo
-    ).stdout == ""
+        ["show", "HEAD:filtered.txt"], cwd=repo
+    ).stdout == "filter probe\n"
+
+
+def test_create_commit_stages_exact_bytes_without_worktree_filters(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_repo(tmp_path)
+    trusted_home = tmp_path / "trusted-home"
+    trusted_home.mkdir()
+    (trusted_home / ".gitconfig").write_text(
+        "[user]\n\tname = Trusted OS User\n\temail = trusted@example.invalid\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(agentops, "_os_account_home", lambda: trusted_home, raising=False)
+    (repo / ".gitattributes").write_text(
+        "filtered.txt filter=danger\n", encoding="utf-8"
+    )
+    assert run(["git", "add", ".gitattributes"], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "add filter attributes"], cwd=repo).returncode == 0
+    filter_marker = tmp_path / "worktree-filter-ran"
+    filter_script = tmp_path / "worktree-filter"
+    filter_script.write_text(
+        f"#!/bin/sh\ntouch '{filter_marker}'\ncat\n", encoding="utf-8"
+    )
+    filter_script.chmod(0o755)
+    assert run(
+        ["git", "config", "extensions.worktreeConfig", "true"], cwd=repo
+    ).returncode == 0
+    assert run(
+        [
+            "git", "config", "--worktree", "filter.danger.clean",
+            str(filter_script),
+        ],
+        cwd=repo,
+    ).returncode == 0
+    changed = repo / "filtered.txt"
+    changed.write_text("worktree filter probe\n", encoding="utf-8")
+
+    agentops.create_commit(repo, [changed.name], "test: bypass worktree filter")
+    assert not filter_marker.exists()
+    assert agentops.run_git(
+        ["show", "HEAD:filtered.txt"], cwd=repo
+    ).stdout == "worktree filter probe\n"
+
+
+def test_create_commit_filter_install_race_cannot_execute(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_repo(tmp_path)
+    trusted_home = tmp_path / "trusted-home"
+    trusted_home.mkdir()
+    (trusted_home / ".gitconfig").write_text(
+        "[user]\n\tname = Trusted OS User\n\temail = trusted@example.invalid\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(agentops, "_os_account_home", lambda: trusted_home, raising=False)
+    (repo / ".gitattributes").write_text(
+        "filtered.txt filter=danger\n", encoding="utf-8"
+    )
+    assert run(["git", "add", ".gitattributes"], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "add filter attributes"], cwd=repo).returncode == 0
+    filter_marker = tmp_path / "racing-filter-ran"
+    filter_script = tmp_path / "racing-filter"
+    filter_script.write_text(
+        f"#!/bin/sh\ntouch '{filter_marker}'\ncat\n", encoding="utf-8"
+    )
+    filter_script.chmod(0o755)
+    changed = repo / "filtered.txt"
+    changed.write_text("race filter probe\n", encoding="utf-8")
+    original_hash = agentops.git_object_id_for_bytes
+    race_armed = False
+
+    def install_filter_before_hash(
+        root: Path, content: bytes, *, write: bool = False,
+    ) -> str:
+        nonlocal race_armed
+        if write and not race_armed:
+            assert run(
+                ["git", "config", "filter.danger.clean", str(filter_script)],
+                cwd=repo,
+            ).returncode == 0
+            race_armed = True
+        return original_hash(root, content, write=write)
+
+    monkeypatch.setattr(agentops, "git_object_id_for_bytes", install_filter_before_hash)
+    agentops.create_commit(repo, [changed.name], "test: bypass filter race")
+
+    assert race_armed is True
+    assert not filter_marker.exists()
+    assert agentops.run_git(
+        ["show", "HEAD:filtered.txt"], cwd=repo
+    ).stdout == "race filter probe\n"
 
 
 @pytest.mark.parametrize(
