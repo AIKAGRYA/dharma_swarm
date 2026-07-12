@@ -214,6 +214,21 @@ def trusted_git_environment(
     return environment
 
 
+def trusted_git_identity_probe_environment(
+    inherited: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    """Allow only the user's global config while discovering commit identity.
+
+    Every inherited ``GIT_*`` control remains stripped and system config stays
+    disabled.  The probe runs only ``git config --global --get user.*``; the
+    actual commit still runs with global and system config disabled.
+    """
+
+    environment = trusted_git_environment(inherited)
+    environment.pop("GIT_CONFIG_GLOBAL", None)
+    return environment
+
+
 def run_git(args: list[str], *, cwd: Path, check: bool = True) -> subprocess.CompletedProcess[str]:
     result = run_command(
         ["git", *args],
@@ -224,6 +239,36 @@ def run_git(args: list[str], *, cwd: Path, check: bool = True) -> subprocess.Com
         detail = (result.stderr or result.stdout).strip()
         raise AgentOpsError(f"git {' '.join(args)} failed: {detail}")
     return result
+
+
+def _identity_config_value(repo_root: Path, key: str) -> str | None:
+    local = run_git(["config", "--local", "--get", key], cwd=repo_root, check=False)
+    result = local
+    if local.returncode != 0:
+        result = run_command(
+            ["git", "config", "--global", "--get", key],
+            cwd=repo_root,
+            env=trusted_git_identity_probe_environment(),
+        )
+    if result.returncode != 0:
+        return None
+    value = result.stdout.removesuffix("\n")
+    if not value or any(character in value for character in "\x00\r\n"):
+        raise AgentOpsError(f"git {key} contains an invalid identity value")
+    return value
+
+
+def trusted_git_commit_environment(repo_root: Path) -> dict[str, str]:
+    environment = trusted_git_environment()
+    name = _identity_config_value(repo_root, "user.name")
+    email = _identity_config_value(repo_root, "user.email")
+    if name is not None:
+        environment["GIT_AUTHOR_NAME"] = name
+        environment["GIT_COMMITTER_NAME"] = name
+    if email is not None:
+        environment["GIT_AUTHOR_EMAIL"] = email
+        environment["GIT_COMMITTER_EMAIL"] = email
+    return environment
 
 def repo_root_from(path: Path) -> Path:
     return Path(run_git(["rev-parse", "--show-toplevel"], cwd=path).stdout.strip()).resolve()
@@ -1035,7 +1080,11 @@ def should_commit(report: dict[str, Any], packet: WorkPacket, final_scope: Scope
 
 def create_commit(repo_root: Path, files: list[str], message: str) -> str:
     run_git(["add", "--", *files], cwd=repo_root)
-    result = run_git(["commit", "-m", message], cwd=repo_root, check=False)
+    result = run_command(
+        ["git", "commit", "-m", message],
+        cwd=repo_root,
+        env=trusted_git_commit_environment(repo_root),
+    )
     if result.returncode != 0:
         detail = (result.stderr or result.stdout).strip()
         raise AgentOpsError(f"git commit failed: {detail}")

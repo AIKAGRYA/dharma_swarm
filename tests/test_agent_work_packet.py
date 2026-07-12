@@ -1390,6 +1390,8 @@ def test_all_internal_git_subprocesses_use_trusted_environment() -> None:
     assert "run_git" in probe_calls
 
     violations: list[int] = []
+    identity_probe_lines: list[int] = []
+    commit_environment_lines: list[int] = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call) or not node.args:
             continue
@@ -1400,15 +1402,30 @@ def test_all_internal_git_subprocesses_use_trusted_environment() -> None:
         if not isinstance(head, ast.Constant) or head.value != "git":
             continue
         env = next((item.value for item in node.keywords if item.arg == "env"), None)
-        trusted = (
-            isinstance(env, ast.Call)
-            and isinstance(env.func, ast.Name)
-            and env.func.id == "trusted_git_environment"
+        helper = (
+            env.func.id
+            if isinstance(env, ast.Call) and isinstance(env.func, ast.Name)
+            else ""
         )
-        if not trusted:
-            violations.append(node.lineno)
+        literal_prefix = [
+            item.value if isinstance(item, ast.Constant) else None
+            for item in argv.elts[:4]
+        ]
+        if helper == "trusted_git_environment":
+            continue
+        if helper == "trusted_git_identity_probe_environment":
+            if literal_prefix == ["git", "config", "--global", "--get"]:
+                identity_probe_lines.append(node.lineno)
+                continue
+        if helper == "trusted_git_commit_environment":
+            if literal_prefix[:2] == ["git", "commit"]:
+                commit_environment_lines.append(node.lineno)
+                continue
+        violations.append(node.lineno)
 
     assert violations == []
+    assert len(identity_probe_lines) == 1
+    assert len(commit_environment_lines) == 1
 
 
 def test_session_envelope_rejects_custody_free_execution_mode(tmp_path: Path) -> None:
