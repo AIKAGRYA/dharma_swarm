@@ -83,10 +83,7 @@ spec-forge/
 .superpowers/
 
 # Local agent/tool indexes and runtime traces.
-# .agents/skills/ is a tracked registry (see CLAUDE.md "Skills & Agent Role
-# Registries") — keep it visible while ignoring the rest of .agents/.
-.agents/*
-!.agents/skills/
+.agents/
 .codex/
 .gitnexus/
 .mcp_data/
