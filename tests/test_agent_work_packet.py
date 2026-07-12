@@ -1153,6 +1153,12 @@ def test_create_commit_ignores_local_identity_hooks_and_signing(
         f"#!/bin/sh\ntouch '{hook_marker}'\n", encoding="utf-8"
     )
     pre_commit.chmod(0o755)
+    reference_hook_marker = tmp_path / "reference-hook-ran"
+    reference_hook = hooks / "reference-transaction"
+    reference_hook.write_text(
+        f"#!/bin/sh\ntouch '{reference_hook_marker}'\n", encoding="utf-8"
+    )
+    reference_hook.chmod(0o755)
     assert run(
         ["git", "config", "core.hooksPath", str(hooks)], cwd=repo
     ).returncode == 0
@@ -1182,6 +1188,7 @@ def test_create_commit_ignores_local_identity_hooks_and_signing(
     agentops.create_commit(repo, [changed.name], "test: isolate local controls")
 
     assert not hook_marker.exists()
+    assert not reference_hook_marker.exists()
     assert not signer_marker.exists()
     assert not fsmonitor_marker.exists()
     identity = agentops.run_git(
@@ -1193,6 +1200,9 @@ def test_create_commit_ignores_local_identity_hooks_and_signing(
         "Trusted OS User",
         "trusted@example.invalid",
     ]
+    assert agentops.run_git(
+        ["reflog", "-1", "--format=%gN%n%gE", "HEAD"], cwd=repo
+    ).stdout.splitlines() == ["Trusted OS User", "trusted@example.invalid"]
 
 
 def test_create_commit_stages_exact_bytes_without_local_filters(
@@ -1319,6 +1329,49 @@ def test_create_commit_filter_install_race_cannot_execute(
     assert agentops.run_git(
         ["show", "HEAD:filtered.txt"], cwd=repo
     ).stdout == "race filter probe\n"
+
+
+def test_create_commit_plumbing_preserves_binary_mode_and_deletion(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_repo(tmp_path)
+    doomed = repo / "delete-me.txt"
+    doomed.write_text("remove me\n", encoding="utf-8")
+    assert run(["git", "add", "delete-me.txt"], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "add deletion fixture"], cwd=repo).returncode == 0
+    trusted_home = tmp_path / "trusted-home"
+    trusted_home.mkdir()
+    (trusted_home / ".gitconfig").write_text(
+        "[user]\n\tname = Trusted OS User\n\temail = trusted@example.invalid\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(agentops, "_os_account_home", lambda: trusted_home, raising=False)
+    binary = repo / "binary.bin"
+    binary_bytes = b"\x00\xffexact\n"
+    binary.write_bytes(binary_bytes)
+    executable = repo / "tool.sh"
+    executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    executable.chmod(0o755)
+    doomed.unlink()
+
+    agentops.create_commit(
+        repo,
+        ["binary.bin", "delete-me.txt", "tool.sh"],
+        "test: exact plumbing parity",
+    )
+
+    binary_result = subprocess.run(
+        ["git", "show", "HEAD:binary.bin"], cwd=repo, capture_output=True, check=False
+    )
+    assert binary_result.returncode == 0
+    assert binary_result.stdout == binary_bytes
+    assert agentops.run_git(
+        ["ls-tree", "HEAD", "--", "tool.sh"], cwd=repo
+    ).stdout.startswith("100755 blob ")
+    assert run(
+        ["git", "cat-file", "-e", "HEAD:delete-me.txt"], cwd=repo
+    ).returncode != 0
+    assert agentops.git_status(repo) == ""
 
 
 @pytest.mark.parametrize(
@@ -1742,18 +1795,22 @@ def test_all_internal_git_subprocesses_use_trusted_environment() -> None:
             and create_commit.lineno <= node.lineno <= (create_commit.end_lineno or node.lineno)
         )
         if helper == "trusted_git_commit_environment" or trusted_commit_variable:
-            if (
-                "commit" in literal_values
-                and "--no-verify" in literal_values
-                and "--no-gpg-sign" in literal_values
-            ):
+            commit_tree_safe = (
+                "commit-tree" in literal_values
+                and "-S" not in literal_values
+            )
+            update_ref_safe = (
+                "update-ref" in literal_values
+                and "core.logAllRefUpdates=true" in literal_values
+            )
+            if commit_tree_safe or update_ref_safe:
                 commit_environment_lines.append(node.lineno)
                 continue
         violations.append(node.lineno)
 
     assert violations == []
     assert len(identity_probe_lines) == 1
-    assert len(commit_environment_lines) == 1
+    assert len(commit_environment_lines) == 2
 
 
 def test_session_envelope_rejects_custody_free_execution_mode(tmp_path: Path) -> None:
