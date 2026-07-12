@@ -1142,6 +1142,200 @@ def test_session_entry_accepts_exact_wp_o1r_identity_only(tmp_path: Path) -> Non
         )
 
 
+def test_inspect_accepts_successor_packet_but_execution_requires_tracked_custody(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    repo = init_session_repo(tmp_path)
+
+    stale_payload = seal_packet(session_packet(repo))
+    stale_external = write_external_packet(tmp_path / "stale", stale_payload)
+    tracked = tracked_packet_path(repo, stale_payload)
+    tracked.parent.mkdir(parents=True)
+    tracked.write_bytes(stale_external.read_bytes())
+    stage_path(repo, tracked)
+    committed = run(
+        ["git", "commit", "-m", "fixture: stale tracked session packet"],
+        cwd=repo,
+    )
+    assert committed.returncode == 0, committed.stderr
+
+    payload = seal_packet(session_packet(repo))
+    external = write_external_packet(tmp_path / "fresh", payload)
+    report_root = tmp_path / "external-reports"
+    entry = payload["session_entry"]
+    assert isinstance(entry, dict)
+    assert tracked_packet_path(repo, payload) == tracked
+    assert tracked.read_bytes() != external.read_bytes()
+
+    executed: list[str] = []
+
+    def pass_without_io(
+        _repo: Path,
+        gate: agentops.GateSpec,
+        **_kwargs: object,
+    ) -> dict[str, object]:
+        executed.append(gate.name)
+        return {
+            "name": gate.name,
+            "command": gate.command,
+            "expected_exit": gate.expected_exit,
+            "exit_code": gate.expected_exit,
+            "passed": True,
+            "timed_out": False,
+            "output": "",
+            "duration_seconds": 0.0,
+        }
+
+    monkeypatch.setattr(agentops, "run_gate", pass_without_io)
+    monkeypatch.setattr(agentops, "run_negative_control", pass_without_io)
+
+    exit_code, report = agentops.execute_packet(
+        external,
+        source_root=repo,
+        dry_run=True,
+    )
+    assert exit_code == 0 and report is None
+    summary = json.loads(capsys.readouterr().out)
+    assert summary["packet_digest"] == entry["packet_digest"]
+    assert summary["tracked_copy_state"] == "stale_successor"
+    assert summary["gates"] == [
+        {
+            "name": "declared-gate",
+            "command": "git status --porcelain",
+            "expected_exit": 0,
+        }
+    ]
+    assert summary["negative_controls"] == [
+        {
+            "name": "declared-negative",
+            "command": payload["negative_controls"][0]["command"],
+            "expected_exit": 0,
+        }
+    ]
+    assert executed == []
+
+    with pytest.raises(agentops.AgentOpsError, match="byte-identical|tracked copy"):
+        agentops.execute_packet(
+            external,
+            source_root=repo,
+            allow_existing_changes=True,
+            report_root=report_root,
+        )
+    assert executed == []
+
+    tracked.write_bytes(external.read_bytes())
+    with pytest.raises(agentops.AgentOpsError, match="index|stage|unstaged|custody"):
+        agentops.execute_packet(
+            external,
+            source_root=repo,
+            allow_existing_changes=True,
+            report_root=report_root,
+        )
+    assert executed == []
+
+    stage_path(repo, tracked)
+    exit_code, report = agentops.execute_packet(
+        external,
+        source_root=repo,
+        allow_existing_changes=True,
+        report_root=report_root,
+    )
+    assert exit_code == 0 and report is not None
+    assert report["status"] == "passed"
+    assert executed == ["declared-gate", "declared-negative"]
+
+
+def test_session_entry_requires_canonical_tracked_path_in_allowed_files(
+    tmp_path: Path,
+) -> None:
+    repo = init_session_repo(tmp_path)
+    payload = session_packet(repo)
+    payload["allowed_files"] = ["allowed.txt"]
+    external = write_external_packet(tmp_path, seal_packet(payload))
+
+    with pytest.raises(agentops.AgentOpsError, match="allowed_files"):
+        agentops.execute_packet(external, source_root=repo, dry_run=True)
+
+
+def test_session_entry_rejects_symlinked_tracked_custody(tmp_path: Path) -> None:
+    repo = init_session_repo(tmp_path)
+    payload = seal_packet(session_packet(repo))
+    external = write_external_packet(tmp_path, payload)
+    tracked = tracked_packet_path(repo, payload)
+    tracked.parent.mkdir(parents=True)
+    tracked.symlink_to(external)
+    stage_path(repo, tracked)
+
+    packet = agentops.load_work_packet(external)
+    with pytest.raises(agentops.AgentOpsError, match="regular|symlink"):
+        agentops._validate_session_envelope(
+            repo,
+            external,
+            packet,
+            inspect=False,
+            require_tracked_copy=True,
+        )
+
+
+def test_session_envelope_rejects_custody_free_execution_mode(tmp_path: Path) -> None:
+    repo = init_session_repo(tmp_path)
+    payload = seal_packet(session_packet(repo))
+    external = write_external_packet(tmp_path, payload)
+    packet = agentops.load_work_packet(external)
+
+    with pytest.raises(agentops.AgentOpsError, match="envelope mode|custody"):
+        agentops._validate_session_envelope(
+            repo,
+            external,
+            packet,
+            inspect=False,
+            require_tracked_copy=False,
+        )
+
+
+def test_execution_rechecks_external_packet_custody_after_gates(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_session_repo(tmp_path)
+    payload = seal_packet(session_packet(repo))
+    external = write_external_packet(tmp_path, payload)
+    tracked = tracked_packet_path(repo, payload)
+    tracked.parent.mkdir(parents=True)
+    tracked.write_bytes(external.read_bytes())
+    stage_path(repo, tracked)
+
+    def mutate_external(
+        _repo: Path,
+        gate: agentops.GateSpec,
+        **_kwargs: object,
+    ) -> dict[str, object]:
+        external.write_bytes(external.read_bytes() + b" ")
+        return {
+            "name": gate.name,
+            "command": gate.command,
+            "expected_exit": gate.expected_exit,
+            "exit_code": gate.expected_exit,
+            "passed": True,
+            "timed_out": False,
+            "output": "",
+            "duration_seconds": 0.0,
+        }
+
+    monkeypatch.setattr(agentops, "run_gate", mutate_external)
+    monkeypatch.setattr(agentops, "run_negative_control", mutate_external)
+
+    with pytest.raises(agentops.AgentOpsError, match="changed|custody|byte-identical"):
+        agentops.execute_packet(
+            external,
+            source_root=repo,
+            allow_existing_changes=True,
+            report_root=tmp_path / "external-reports",
+        )
+
+
 def test_external_entry_packet_bootstrap_and_digest_binding(tmp_path: Path) -> None:
     repo = init_session_repo(tmp_path)
     payload = seal_packet(session_packet(repo))
