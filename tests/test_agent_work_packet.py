@@ -1039,6 +1039,7 @@ def test_create_commit_uses_global_identity_without_trusting_git_controls(
         "[user]\n\tname = Global AgentOps\n\temail = global-agentops@example.invalid\n",
         encoding="utf-8",
     )
+    monkeypatch.setattr(agentops, "_os_account_home", lambda: home, raising=False)
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("GIT_AUTHOR_NAME", "Inherited Attacker")
     monkeypatch.setenv("GIT_AUTHOR_EMAIL", "attacker@example.invalid")
@@ -1059,6 +1060,156 @@ def test_create_commit_uses_global_identity_without_trusting_git_controls(
         "Global AgentOps",
         "global-agentops@example.invalid",
     ]
+
+
+@pytest.mark.parametrize("redirect", ["HOME", "XDG_CONFIG_HOME"])
+def test_commit_identity_ignores_inherited_config_redirects(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, redirect: str,
+) -> None:
+    repo = init_repo(tmp_path)
+    assert run(["git", "config", "--unset", "user.name"], cwd=repo).returncode == 0
+    assert run(["git", "config", "--unset", "user.email"], cwd=repo).returncode == 0
+    assert run(
+        ["git", "config", "user.useConfigOnly", "true"], cwd=repo
+    ).returncode == 0
+
+    trusted_home = tmp_path / "trusted-home"
+    attacker_home = tmp_path / "attacker-home"
+    empty_home = tmp_path / "empty-home"
+    trusted_home.mkdir()
+    attacker_home.mkdir()
+    empty_home.mkdir()
+    trusted_config = trusted_home / ".gitconfig"
+    attacker_config = attacker_home / ".gitconfig"
+    if redirect == "XDG_CONFIG_HOME":
+        trusted_config = trusted_home / ".config/git/config"
+        attacker_config = attacker_home / "git/config"
+    trusted_config.parent.mkdir(parents=True, exist_ok=True)
+    attacker_config.parent.mkdir(parents=True, exist_ok=True)
+    trusted_config.write_text(
+        "[user]\n\tname = Trusted OS User\n\temail = trusted@example.invalid\n",
+        encoding="utf-8",
+    )
+    attacker_config.write_text(
+        "[user]\n\tname = Redirected Attacker\n\temail = attacker@example.invalid\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        agentops, "_os_account_home", lambda: trusted_home, raising=False
+    )
+    if redirect == "HOME":
+        monkeypatch.setenv("HOME", str(attacker_home))
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(empty_home))
+    else:
+        monkeypatch.setenv("HOME", str(empty_home))
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(attacker_home))
+
+    changed = repo / f"{redirect.lower()}-identity.txt"
+    changed.write_text("redirect probe\n", encoding="utf-8")
+    agentops.create_commit(repo, [changed.name], f"test: ignore {redirect}")
+    identity = agentops.run_git(
+        ["show", "-s", "--format=%an%n%ae%n%cn%n%ce", "HEAD"], cwd=repo
+    ).stdout.splitlines()
+    assert identity == [
+        "Trusted OS User",
+        "trusted@example.invalid",
+        "Trusted OS User",
+        "trusted@example.invalid",
+    ]
+
+
+def test_create_commit_ignores_local_identity_hooks_and_signing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_repo(tmp_path)
+    trusted_home = tmp_path / "trusted-home"
+    trusted_home.mkdir()
+    (trusted_home / ".gitconfig").write_text(
+        "[user]\n\tname = Trusted OS User\n\temail = trusted@example.invalid\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(agentops, "_os_account_home", lambda: trusted_home, raising=False)
+    monkeypatch.setenv("HOME", str(trusted_home))
+    monkeypatch.setenv("EMAIL", "fallback-poison@example.invalid")
+    assert run(["git", "config", "user.name", "Local Attacker"], cwd=repo).returncode == 0
+    assert run(
+        ["git", "config", "user.email", "local-attacker@example.invalid"], cwd=repo
+    ).returncode == 0
+
+    hook_marker = tmp_path / "hook-ran"
+    hooks = tmp_path / "hooks"
+    hooks.mkdir()
+    pre_commit = hooks / "pre-commit"
+    pre_commit.write_text(
+        f"#!/bin/sh\ntouch '{hook_marker}'\n", encoding="utf-8"
+    )
+    pre_commit.chmod(0o755)
+    assert run(
+        ["git", "config", "core.hooksPath", str(hooks)], cwd=repo
+    ).returncode == 0
+
+    signer_marker = tmp_path / "signer-ran"
+    signer = tmp_path / "signer"
+    signer.write_text(
+        f"#!/bin/sh\ntouch '{signer_marker}'\nexit 1\n", encoding="utf-8"
+    )
+    signer.chmod(0o755)
+    assert run(
+        ["git", "config", "gpg.program", str(signer)], cwd=repo
+    ).returncode == 0
+    assert run(["git", "config", "commit.gpgSign", "true"], cwd=repo).returncode == 0
+
+    changed = repo / "local-controls.txt"
+    changed.write_text("local controls probe\n", encoding="utf-8")
+    agentops.create_commit(repo, [changed.name], "test: isolate local controls")
+
+    assert not hook_marker.exists()
+    assert not signer_marker.exists()
+    identity = agentops.run_git(
+        ["show", "-s", "--format=%an%n%ae%n%cn%n%ce", "HEAD"], cwd=repo
+    ).stdout.splitlines()
+    assert identity == [
+        "Trusted OS User",
+        "trusted@example.invalid",
+        "Trusted OS User",
+        "trusted@example.invalid",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("identity_config", "expected"),
+    [
+        (
+            "[user]\n\tname = First\n\tname = Second\n"
+            "\temail = trusted@example.invalid\n",
+            "exactly one",
+        ),
+        ("[user]\n\tname = Trusted OS User\n", "complete"),
+    ],
+)
+def test_commit_identity_requires_one_complete_global_pair(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    identity_config: str,
+    expected: str,
+) -> None:
+    repo = init_repo(tmp_path)
+    assert run(["git", "config", "--unset", "user.name"], cwd=repo).returncode == 0
+    assert run(["git", "config", "--unset", "user.email"], cwd=repo).returncode == 0
+    assert run(
+        ["git", "config", "user.useConfigOnly", "true"], cwd=repo
+    ).returncode == 0
+    trusted_home = tmp_path / "trusted-home"
+    trusted_home.mkdir()
+    (trusted_home / ".gitconfig").write_text(identity_config, encoding="utf-8")
+    monkeypatch.setattr(agentops, "_os_account_home", lambda: trusted_home, raising=False)
+    monkeypatch.setenv("HOME", str(trusted_home))
+    monkeypatch.setenv("EMAIL", "fallback-poison@example.invalid")
+    changed = repo / "invalid-identity.txt"
+    changed.write_text("invalid identity probe\n", encoding="utf-8")
+
+    with pytest.raises(agentops.AgentOpsError, match=expected):
+        agentops.create_commit(repo, [changed.name], "test: reject identity")
 
 
 def test_session_entry_rejects_each_missing_required_field(tmp_path: Path) -> None:
