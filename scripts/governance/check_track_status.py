@@ -1790,17 +1790,64 @@ def _outcome_verdict_blocks(
             continue  # readability is already the receipt_valid criterion's job
         if not isinstance(data, dict):
             continue
+        # Opt-out by ABSENCE: a receipt with no `verdict` key is not a
+        # scoreboard, so this gate has nothing to say about it (blocking every
+        # verdict-less receipt would over-fire on evidence bundles). But a
+        # PRESENT verdict must clear the bar — and a present-but-malformed
+        # (non-string) verdict is treated as failing, not silently skipped:
+        # otherwise `verdict: ["AMBER"]` or `verdict: null` would bypass the
+        # gate (greptile P1, PR #900). The digest seal already prevents editing
+        # the field without failing receipt_valid first; this closes the
+        # remaining shape-based hole.
+        if "verdict" not in data:
+            continue
         verdict = data.get("verdict")
-        if isinstance(verdict, str) and verdict.strip().upper() not in _PASSING_OUTCOME_VERDICTS:
+        passing = (
+            isinstance(verdict, str)
+            and verdict.strip().upper() in _PASSING_OUTCOME_VERDICTS
+        )
+        if not passing:
             extra = ""
             for key in ("parity_pct", "score", "score_pct", "percent"):
                 if key in data:
                     extra = f", {key}={data[key]}"
                     break
+            reason = ("not a passing verdict" if isinstance(verdict, str)
+                      else "a malformed (non-string) verdict")
             blocks.append(
-                f"outcome receipt {rel} reports verdict={verdict!r}{extra} — not a "
-                "passing verdict; the track's own scoreboard says the work is not done")
+                f"outcome receipt {rel} reports verdict={verdict!r}{extra} — {reason}; "
+                "the track's own scoreboard does not say the work is done")
     return blocks
+
+
+def _real_false_shippable_claim(t: dict[str, Any], r: dict[str, Any]) -> bool:
+    """A track DECLARES ``status: shippable`` while ``evaluate_track`` says it is
+    not — but only for a REAL reason, never a merely-unrun gate.
+
+    A rigorous criterion that could not be RUN in this environment (e.g. the
+    minimal-deps battery has no pytest) is unverified, not a false claim;
+    blocking on it would manufacture exactly the untrustworthy signal we are
+    removing. This fires when: an open blocker exists, the track declares NO
+    rigorous criterion at all (existence-only theater — the core trap), a
+    criterion actually ran and failed, an active ship veto fired, OR the track's
+    own outcome receipt reports a non-passing verdict. That last signal reads
+    committed file data, not an environment-dependent probe, so unlike an unrun
+    gate it can never be a "could not observe" false alarm — a declared-shippable
+    track sitting on a 45%/AMBER receipt is exactly the false claim this must
+    catch (devin, PR #900); the advisory ship_block alone let it pass CI.
+    """
+    if str(t.get("status") or "").lower() != "shippable" or r["shippable"]:
+        return False
+    declares_rigorous = any(c.kind in RIGOROUS_KINDS for c in r["completion"])
+    executed_failure = any(
+        (not c.passed) and getattr(c, "executed", True)
+        for c in (r["completion"] + r["prereqs"]))
+    return (
+        r["open_blocker_count"] > 0
+        or r.get("active_ship_veto_count", 0) > 0
+        or not declares_rigorous
+        or executed_failure
+        or bool(r.get("outcome_verdict_blocks")))
 
 
 def evaluate_track(t: dict[str, Any]) -> dict[str, Any]:
@@ -1880,7 +1927,8 @@ def evaluate_track(t: dict[str, Any]) -> dict[str, Any]:
             f"invalid target closure kind {target_closure_kind!r}; known {sorted(CLOSURE_KINDS)}")
     final_boss_blocks = _final_boss_blocks(t, target_closure_kind)
     ship_blocks.extend(final_boss_blocks)
-    ship_blocks.extend(_outcome_verdict_blocks(t))
+    outcome_verdict_blocks = _outcome_verdict_blocks(t)
+    ship_blocks.extend(outcome_verdict_blocks)
     shippable = criteria_pass and not ship_blocks
 
     return {
@@ -1893,6 +1941,7 @@ def evaluate_track(t: dict[str, Any]) -> dict[str, Any]:
         "criteria_pass": criteria_pass,    # legacy lenient bar (existence checks)
         "ship_blocks": ship_blocks,
         "final_boss_blocks": final_boss_blocks,
+        "outcome_verdict_blocks": outcome_verdict_blocks,
         "target_closure_kind": target_closure_kind or "VERIFIED_SLICE",
         "graduation_profile": _graduation_profile(t),
         "has_rigorous_evidence": has_rigorous_evidence,
@@ -2116,33 +2165,17 @@ def run(args: argparse.Namespace) -> int:
         # `status: shippable` on existence-only criteria would still pass green.
         # This is the "AI slop" trap the operator named: a green flag with no
         # real check behind it. Now a declared-shippable track that fails the
-        # rigorous bar is a hard ERROR (non-zero exit), so the false-closure
-        # claim blocks instead of merely informing.
-        declared_status = str(t.get("status") or "").lower()
-        if declared_status == "shippable" and not r["shippable"]:
-            # Only block for a REAL false-closure reason. A rigorous criterion
-            # that could not be RUN in this environment (e.g. the minimal-deps
-            # gate has no pytest) is unverified, not a false claim — blocking on
-            # it would manufacture exactly the kind of untrustworthy signal we
-            # are trying to remove. Fire when: an open blocker exists, OR the
-            # track declares NO rigorous criterion at all (existence-only
-            # theater — the core trap), OR a criterion actually ran and failed.
-            declares_rigorous = any(c.kind in RIGOROUS_KINDS for c in r["completion"])
-            executed_failure = any(
-                (not c.passed) and getattr(c, "executed", True)
-                for c in (r["completion"] + r["prereqs"]))
-            real_false_claim = (
-                r["open_blocker_count"] > 0
-                or r.get("active_ship_veto_count", 0) > 0
-                or not declares_rigorous
-                or executed_failure)
-            if real_false_claim:
-                blocks = "; ".join(r["ship_blocks"]) or "rigorous bar not met"
-                findings.append(Finding("ERROR", f"false-shippable-claim:{tid}",
-                    f"[{tid}] declares status: shippable but FAILS the rigorous bar: {blocks}. "
-                    "A track cannot be marked shippable without >=1 rigorous criterion "
-                    "(test_passes / commit_on_main / receipt_valid / pr_merged) and zero "
-                    "open blockers. Either add real evidence or change status back to ACTIVE."))
+        # rigorous bar for a REAL reason (not a merely-unrun gate) is a hard
+        # ERROR — see _real_false_shippable_claim for the doctrine, incl. the
+        # outcome-verdict signal that reads committed file data and so is never
+        # a "could not observe" false alarm.
+        if _real_false_shippable_claim(t, r):
+            blocks = "; ".join(r["ship_blocks"]) or "rigorous bar not met"
+            findings.append(Finding("ERROR", f"false-shippable-claim:{tid}",
+                f"[{tid}] declares status: shippable but FAILS the rigorous bar: {blocks}. "
+                "A track cannot be marked shippable without >=1 rigorous criterion "
+                "(test_passes / commit_on_main / receipt_valid / pr_merged) and zero "
+                "open blockers. Either add real evidence or change status back to ACTIVE."))
 
         # Underclaims => the ledger is BEHIND reality (inverse of false-shippable).
         # WARN, not ERROR: the owner reconciles by annotating the item DONE, by
