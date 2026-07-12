@@ -1307,6 +1307,36 @@ def test_session_entry_rejects_hidden_index_custody_flags(
         )
 
 
+def test_session_entry_custody_ignores_inherited_git_index_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_session_repo(tmp_path)
+    payload = seal_packet(session_packet(repo))
+    external = write_external_packet(tmp_path, payload)
+    tracked = tracked_packet_path(repo, payload)
+    tracked.parent.mkdir(parents=True)
+    tracked.write_text("{}\n", encoding="utf-8")
+    stage_path(repo, tracked)
+
+    actual_index = repo / ".git/index"
+    alternate_index = tmp_path / "alternate-index"
+    alternate_index.write_bytes(actual_index.read_bytes())
+    monkeypatch.setenv("GIT_INDEX_FILE", str(alternate_index))
+    tracked.write_bytes(external.read_bytes())
+    stage_path(repo, tracked)
+
+    packet = agentops.load_work_packet(external)
+    with pytest.raises(agentops.AgentOpsError, match="index|custody"):
+        agentops._validate_session_envelope(
+            repo,
+            external,
+            packet,
+            inspect=False,
+            require_tracked_copy=True,
+        )
+
+
 def test_session_envelope_rejects_custody_free_execution_mode(tmp_path: Path) -> None:
     repo = init_session_repo(tmp_path)
     payload = seal_packet(session_packet(repo))
