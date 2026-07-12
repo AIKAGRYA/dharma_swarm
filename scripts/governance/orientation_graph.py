@@ -1066,7 +1066,11 @@ def render_graph(graph: OrientationGraph) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Render the whole organism at once from its owners."
+        description="Render the whole organism at once from its owners.",
+        # No prefix abbreviation: `--write` must not silently resolve to
+        # `--write-context`, or the WP-O4 positive-gate allowlist (which
+        # forbids the write flag) could be bypassed by an abbreviated form.
+        allow_abbrev=False,
     )
     parser.add_argument(
         "--json",

@@ -201,3 +201,20 @@ records the boundary in the report. AgentOps v0 never merges and never pushes.
 AgentOps v0 makes a repeatable local workflow, not an authority transfer. The
 human operator remains responsible for approving integration, interpreting
 quality, and deciding what should enter the main rollup.
+
+## Positive Gate Command Admission (WP-O4)
+
+Positive gates pass one fail-closed command-family allowlist before any
+subprocess execution (`scripts/governance/run_agent_work_packet.py`,
+`admit_gate_command`; O4-B11). Admitted families: the exact WP-O1R direct-Git
+grammar, `python -m pytest …`, `python -m ruff check …`, the enumerated
+read-only governance/DocOps scripts (never with `--write-context`), and the
+enumerated Make targets with only `PACKET=`/`ARGS=` variables. Everything
+else — inline interpreters (`python -c`, `node -e`), network clients
+(`gh`, `ssh`, `curl`, `wget`), shell-capable wrappers, unknown executables,
+and any gate carrying packet-supplied environment — fails closed before it
+runs. Negative controls are exempt: they exist to prove rejection and run
+jailed. This is command-family confinement, not a semantic proof (an
+allowlisted script can itself perform I/O); WP-O6's syscall/no-network
+evidence remains the terminal oracle. Extending the table is a
+governance-reviewed admission change.
