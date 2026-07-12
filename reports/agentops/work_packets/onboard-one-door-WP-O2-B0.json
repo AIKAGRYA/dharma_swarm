@@ -7,7 +7,9 @@
   "allowed_files": [
     "scripts/governance/run_agent_work_packet.py",
     "tests/test_agent_work_packet.py",
-    "reports/agentops/work_packets/onboard-one-door-WP-O2-B0.json"
+    "reports/agentops/work_packets/onboard-one-door-WP-O2-B0.json",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "docs/docops/AUTO_INVENTORY.md"
   ],
   "forbidden_files": [
     ".github/workflows/automerge.yml",
@@ -204,6 +206,6 @@
     ],
     "honest_blockers": [],
     "rollback": "Revert the WP-O2-B0 commit. Candidate inspection will again reject stale same-ID tracked custody; non-dry byte-identity enforcement is unchanged by either direction.",
-    "packet_digest": "725a4f95d37ea25bd473048c62a5792a010a5dde9544497d9748cdab93902dab"
+    "packet_digest": "fa8139b2680914ee4d2537ed3273a3331f697db1258ff7e86cb1ff48c8e55271"
   }
 }
