@@ -6,8 +6,9 @@
   "base_rubric": {
     "path": "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json",
     "schema": "dharma_swarm.dharmagraph_parity_gauntlet.rubric.v1",
-    "freeze_commit_sha": "66214c5c71425abaeee811e0bf5f7eb58c365eca",
-    "materialization": "Load the immutable V1 object, append each facet_addition to the named row, apply weight_updates, append capability_additions, merge corpus_additions, and require 41 unique rows whose integer weights sum to 100."
+    "freeze_commit_sha": "6965d38dc8df4bc487e97465ed2f08ffa8274e31",
+    "materialization": "Load the immutable V1 object, append each facet_addition to the named row, apply weight_updates, append capability_additions, merge corpus_additions, and require 41 unique rows whose integer weights sum to 100.",
+    "freeze_lineage": "Pre-result freeze commits 66214c5c71425abaeee811e0bf5f7eb58c365eca (V1) and 7b8662ed5 (V2 completeness correction) lived on the PR #889 branch; the squash merge 6965d38dc8df4bc487e97465ed2f08ffa8274e31 collapsed that lineage into one commit on main, so the on-main custody anchor is the squash commit. The rubric content is byte-identical to the pre-result freeze; the original commit-ordered freeze proof survives at refs/pull/889/head (fetchable: git fetch origin refs/pull/889/head)."
   },
   "supersedes": {
     "rubric": "DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json",
