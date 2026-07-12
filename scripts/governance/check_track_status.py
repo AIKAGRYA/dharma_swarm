@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -461,6 +462,22 @@ def _resolve_command_for_current_runtime(command: list[str]) -> list[str]:
     return command
 
 
+def _missing_environment_module(output: str) -> str | None:
+    """Top-level module named by a trailing ``No module named ...`` error when
+    that module is NOT part of this repository. Mirrors the test_passes
+    doctrine above: a third-party import absent from a minimal-deps
+    environment (the governance gate installs only pyyaml) means the check
+    could not be RUN — it says nothing about the code. A missing repo-local
+    module remains a real failure."""
+    matches = re.findall(r"No module named '?([A-Za-z0-9_.]+)'?", output)
+    if not matches:
+        return None
+    top = matches[-1].split(".")[0]
+    if (REPO_ROOT / top).is_dir() or (REPO_ROOT / f"{top}.py").exists():
+        return None
+    return top
+
+
 def check_command_passes(
     command: list[str],
     *,
@@ -469,6 +486,13 @@ def check_command_passes(
 ) -> CriterionResult:
     kind = "command_passes"
     resolved_command = _resolve_command_for_current_runtime(command)
+    env = None
+    if "DHARMA_PYTHON" not in os.environ:
+        # Wrapper-routed criteria (run_python_with_repo_env.sh) honor
+        # DHARMA_PYTHON; point them at this dependency-complete interpreter so
+        # track truth does not depend on one checkout's `.venv` — the same
+        # portability doctrine as _resolve_command_for_current_runtime.
+        env = {**os.environ, "DHARMA_PYTHON": sys.executable}
     try:
         result = subprocess.run(
             resolved_command,
@@ -476,6 +500,7 @@ def check_command_passes(
             capture_output=True,
             text=True,
             timeout=max(1, timeout_s),
+            env=env,
         )
     except subprocess.TimeoutExpired as exc:
         return CriterionResult(
@@ -498,6 +523,13 @@ def check_command_passes(
         detail += f" (resolved from {' '.join(command)})"
     if output:
         detail += f"; output: {output}"
+    if result.returncode != 0:
+        missing = _missing_environment_module(output)
+        if missing is not None:
+            return CriterionResult(
+                id="", kind=kind, passed=False, executed=False,
+                detail=f"{' '.join(resolved_command)} could not execute here: "
+                       f"environment lacks '{missing}' (not evidence of regression); {detail}")
     return CriterionResult(id="", kind=kind, passed=result.returncode == 0, detail=detail)
 
 

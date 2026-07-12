@@ -20,6 +20,7 @@ from check_track_status import (  # type: ignore  # noqa: E402
     detect_dependency_cycle,
     _parse_minimal_yaml,
     _resolve_command_for_current_runtime,
+    check_command_passes,
     Finding,
 )
 
@@ -285,6 +286,59 @@ def test_command_passes_resolves_missing_repo_venv(monkeypatch) -> None:
     resolved = _resolve_command_for_current_runtime(["./.venv/bin/python", "scripts/check.py"])
 
     assert resolved == [sys.executable, "scripts/check.py"]
+
+
+def test_command_passes_exports_dharma_python(monkeypatch) -> None:
+    """Wrapper-routed criteria (run_python_with_repo_env.sh honors
+    DHARMA_PYTHON) must see this checker's dependency-complete interpreter,
+    not fall back to a checkout-local `.venv` or bare python3."""
+    monkeypatch.delenv("DHARMA_PYTHON", raising=False)
+    probe = (
+        "import os, sys; "
+        "sys.exit(0 if os.environ.get('DHARMA_PYTHON') == sys.executable else 1)"
+    )
+
+    result = check_command_passes([sys.executable, "-c", probe])
+
+    assert result.passed
+    assert result.executed
+
+
+def test_command_passes_respects_existing_dharma_python(monkeypatch) -> None:
+    monkeypatch.setenv("DHARMA_PYTHON", "/operator/pinned/python")
+    probe = (
+        "import os, sys; "
+        "sys.exit(0 if os.environ.get('DHARMA_PYTHON') == '/operator/pinned/python' else 1)"
+    )
+
+    result = check_command_passes([sys.executable, "-c", probe])
+
+    assert result.passed
+
+
+def test_command_passes_missing_third_party_module_is_unverified() -> None:
+    """A minimal-deps environment (the governance gate installs only pyyaml)
+    cannot RUN import-heavy criteria. That is `executed=False` — could not
+    observe — never a hard fail that publishes a fake regression baseline."""
+    result = check_command_passes(
+        [sys.executable, "-c", "import definitely_absent_third_party_xyz"]
+    )
+
+    assert not result.passed
+    assert not result.executed
+    assert "definitely_absent_third_party_xyz" in result.detail
+    assert "not evidence of regression" in result.detail
+
+
+def test_command_passes_missing_repo_module_stays_a_real_failure() -> None:
+    """A repo-local module that fails to import is evidence about the code,
+    not the environment — it must remain an executed hard failure."""
+    probe = "import dharma_swarm.definitely_absent_internal_module"
+
+    result = check_command_passes([sys.executable, "-c", probe])
+
+    assert not result.passed
+    assert result.executed
 
 
 # --- closed_tracks shape validation -----------------------------------------
