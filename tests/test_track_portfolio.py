@@ -341,6 +341,19 @@ def test_command_passes_missing_repo_module_stays_a_real_failure() -> None:
     assert result.executed
 
 
+def test_command_passes_explicit_skip_is_unverified_never_pass(monkeypatch) -> None:
+    """DHARMA_TRACK_STATUS_SKIP_COMMANDS=1 (set by callers that own command
+    execution, e.g. the enclosing pytest suite) records the criterion as
+    UNVERIFIED — passed stays False so a skip can never mint a green."""
+    monkeypatch.setenv("DHARMA_TRACK_STATUS_SKIP_COMMANDS", "1")
+
+    result = check_command_passes([sys.executable, "-c", "raise SystemExit(0)"])
+
+    assert not result.passed
+    assert not result.executed
+    assert "caller owns command execution" in result.detail
+
+
 # --- closed_tracks shape validation -----------------------------------------
 
 def test_closed_track_non_dict_is_error() -> None:

@@ -29,10 +29,21 @@ MANAGED_FILES = [
 ]
 
 
-def _run(script: Path, *args: str, timeout: int = 60) -> subprocess.CompletedProcess:
+def _run(
+    script: Path, *args: str, timeout: int = 60, skip_commands: bool = False,
+) -> subprocess.CompletedProcess:
+    env = None
+    if skip_commands:
+        # This suite already executes every pytest-battery criterion as
+        # first-class tests; re-running them inside the checker is quadratic
+        # (suite → checker → suite) and grows with the portfolio. The checker
+        # records them as UNVERIFIED under this flag — never a fake pass.
+        import os
+
+        env = {**os.environ, "DHARMA_TRACK_STATUS_SKIP_COMMANDS": "1"}
     return subprocess.run(
         [sys.executable, str(script), *args],
-        cwd=REPO_ROOT, capture_output=True, text=True, timeout=timeout,
+        cwd=REPO_ROOT, capture_output=True, text=True, timeout=timeout, env=env,
     )
 
 
@@ -65,11 +76,11 @@ def test_active_track_loads() -> None:
 @pytest.mark.timeout(270)
 def test_check_track_status_runs() -> None:
     """The checker runs to completion and writes evidence JSON."""
-    # The checker executes every track's command_passes criteria, so its
-    # wall-clock grows with the admitted portfolio: ~50s on a warm fast host
-    # at 10 tracks (2026-07-11), slower on shared CI runners. The budget must
-    # bound "hung", not "busy" — a tight bound here blocks unrelated PRs.
-    result = _run(CHECK_SCRIPT, "--warn-only", timeout=240)
+    # Command criteria are skipped here (recorded UNVERIFIED): this suite
+    # already runs every pytest-battery criterion directly, and executing
+    # them again inside the checker made the checker's wall-clock grow with
+    # the portfolio until it starved CI runners (2026-07-12, PR #894).
+    result = _run(CHECK_SCRIPT, "--warn-only", timeout=240, skip_commands=True)
     assert result.returncode == 0, result.stderr
     assert EVIDENCE.exists(), "evidence JSON must be written"
     payload = json.loads(EVIDENCE.read_text())
@@ -151,8 +162,8 @@ def test_underclaims_surface_in_evidence_payload() -> None:
     """Every track payload carries the underclaims field, and any underclaim in
     the payload also surfaces as a WARN line in the checker output — the ledger
     can fall behind reality, but never silently."""
-    # Same portfolio-scaled budget as test_check_track_status_runs above.
-    result = _run(CHECK_SCRIPT, timeout=240)
+    # Same command-skip doctrine as test_check_track_status_runs above.
+    result = _run(CHECK_SCRIPT, timeout=240, skip_commands=True)
     payload = json.loads(EVIDENCE.read_text(encoding="utf-8"))
     out = result.stdout + result.stderr
     for tr in payload.get("active_tracks", []):

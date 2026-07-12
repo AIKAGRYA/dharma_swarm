@@ -485,6 +485,16 @@ def check_command_passes(
     cwd: str | None = None,
 ) -> CriterionResult:
     kind = "command_passes"
+    if os.environ.get("DHARMA_TRACK_STATUS_SKIP_COMMANDS") == "1":
+        # Explicit caller opt-out, for callers that already own execution of
+        # the same work — e.g. the pytest suite invokes this checker while the
+        # suite itself runs every pytest-battery criterion as first-class
+        # tests; re-running them here is quadratic (suite → checker → suite).
+        # Unverified, never a fake pass and never a fake regression.
+        return CriterionResult(
+            id="", kind=kind, passed=False, executed=False,
+            detail=f"{' '.join(command)} not executed: "
+                   "DHARMA_TRACK_STATUS_SKIP_COMMANDS=1 (caller owns command execution)")
     resolved_command = _resolve_command_for_current_runtime(command)
     env = None
     if "DHARMA_PYTHON" not in os.environ:
@@ -2095,9 +2105,12 @@ def run(args: argparse.Namespace) -> int:
                 "narrow it to the remaining live edge, or strengthen the criterion.",
                 criterion_id=uc["evidence_criterion"]))
 
-        # Prerequisite failures => track mis-declared.
+        # Prerequisite failures => track mis-declared.  An unexecuted check
+        # (minimal env / explicit skip) is not evidence of a missing
+        # prerequisite — same doctrine as the regression guard below.
         for c in r["prereqs"]:
-            if not c.passed and c.kind in {"file_exists", "file_contains", "command_passes"}:
+            if (not c.passed and getattr(c, "executed", True)
+                    and c.kind in {"file_exists", "file_contains", "command_passes"}):
                 findings.append(Finding("ERROR", f"prerequisite:{tid}:{c.id}",
                     f"[{tid}] prerequisite failed: {c.detail}. The work it builds on "
                     "does not exist.", criterion_id=c.id))
