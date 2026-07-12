@@ -1118,6 +1118,15 @@ def test_commit_identity_ignores_inherited_config_redirects(
     ]
 
 
+def test_os_account_home_ignores_environment_redirects(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected = agentops._os_account_home()
+    monkeypatch.setenv("HOME", str(tmp_path / "redirected-home"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "redirected-xdg"))
+    assert agentops._os_account_home() == expected
+
+
 def test_create_commit_ignores_local_identity_hooks_and_signing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1176,6 +1185,36 @@ def test_create_commit_ignores_local_identity_hooks_and_signing(
     ]
 
 
+def test_create_commit_rejects_local_executable_filters(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_repo(tmp_path)
+    trusted_home = tmp_path / "trusted-home"
+    trusted_home.mkdir()
+    (trusted_home / ".gitconfig").write_text(
+        "[user]\n\tname = Trusted OS User\n\temail = trusted@example.invalid\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(agentops, "_os_account_home", lambda: trusted_home, raising=False)
+    filter_marker = tmp_path / "filter-ran"
+    assert run(
+        [
+            "git", "config", "filter.danger.clean",
+            f"sh -c 'touch {filter_marker}; cat'",
+        ],
+        cwd=repo,
+    ).returncode == 0
+    changed = repo / "filtered.txt"
+    changed.write_text("filter probe\n", encoding="utf-8")
+
+    with pytest.raises(agentops.AgentOpsError, match="clean/process filters"):
+        agentops.create_commit(repo, [changed.name], "test: reject filter")
+    assert not filter_marker.exists()
+    assert agentops.run_git(
+        ["diff", "--cached", "--name-only"], cwd=repo
+    ).stdout == ""
+
+
 @pytest.mark.parametrize(
     ("identity_config", "expected"),
     [
@@ -1210,6 +1249,9 @@ def test_commit_identity_requires_one_complete_global_pair(
 
     with pytest.raises(agentops.AgentOpsError, match=expected):
         agentops.create_commit(repo, [changed.name], "test: reject identity")
+    assert agentops.run_git(
+        ["diff", "--cached", "--name-only"], cwd=repo
+    ).stdout == ""
 
 
 def test_session_entry_rejects_each_missing_required_field(tmp_path: Path) -> None:
@@ -1539,6 +1581,24 @@ def test_all_internal_git_subprocesses_use_trusted_environment() -> None:
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
     }
     assert "run_git" in probe_calls
+    create_commit = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "create_commit"
+    )
+    commit_environment_assignments = [
+        node
+        for node in ast.walk(create_commit)
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "commit_environment"
+            for target in node.targets
+        )
+        and isinstance(node.value, ast.Call)
+        and isinstance(node.value.func, ast.Name)
+        and node.value.func.id == "trusted_git_commit_environment"
+    ]
+    assert len(commit_environment_assignments) == 1
 
     violations: list[int] = []
     identity_probe_lines: list[int] = []
@@ -1558,18 +1618,29 @@ def test_all_internal_git_subprocesses_use_trusted_environment() -> None:
             if isinstance(env, ast.Call) and isinstance(env.func, ast.Name)
             else ""
         )
-        literal_prefix = [
+        literal_values = [
             item.value if isinstance(item, ast.Constant) else None
-            for item in argv.elts[:4]
+            for item in argv.elts
         ]
         if helper == "trusted_git_environment":
             continue
         if helper == "trusted_git_identity_probe_environment":
-            if literal_prefix == ["git", "config", "--global", "--get"]:
+            if literal_values[:6] == [
+                "git", "config", "--global", "--no-includes", "--get-all", None,
+            ]:
                 identity_probe_lines.append(node.lineno)
                 continue
-        if helper == "trusted_git_commit_environment":
-            if literal_prefix[:2] == ["git", "commit"]:
+        trusted_commit_variable = (
+            isinstance(env, ast.Name)
+            and env.id == "commit_environment"
+            and create_commit.lineno <= node.lineno <= (create_commit.end_lineno or node.lineno)
+        )
+        if helper == "trusted_git_commit_environment" or trusted_commit_variable:
+            if (
+                "commit" in literal_values
+                and "--no-verify" in literal_values
+                and "--no-gpg-sign" in literal_values
+            ):
                 commit_environment_lines.append(node.lineno)
                 continue
         violations.append(node.lineno)

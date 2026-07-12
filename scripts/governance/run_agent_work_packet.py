@@ -224,8 +224,12 @@ def trusted_git_identity_probe_environment(
     actual commit still runs with global and system config disabled.
     """
 
+    home = _os_account_home()
     environment = trusted_git_environment(inherited)
     environment.pop("GIT_CONFIG_GLOBAL", None)
+    environment.pop("EMAIL", None)
+    environment["HOME"] = str(home)
+    environment["XDG_CONFIG_HOME"] = str(home / ".config")
     return environment
 
 
@@ -241,20 +245,46 @@ def run_git(args: list[str], *, cwd: Path, check: bool = True) -> subprocess.Com
     return result
 
 
+def _os_account_home() -> Path:
+    """Return the OS account database home, never an inherited env redirect."""
+
+    try:
+        import pwd
+
+        home = Path(pwd.getpwuid(os.getuid()).pw_dir).resolve(strict=True)
+    except (AttributeError, ImportError, KeyError, OSError) as exc:
+        raise AgentOpsError(
+            "cannot resolve a trusted OS-account home for Git identity"
+        ) from exc
+    if not home.is_dir() or home.stat().st_uid != os.getuid():
+        raise AgentOpsError("trusted OS-account home has invalid ownership")
+    return home
+
+
 def _identity_config_value(repo_root: Path, key: str) -> str | None:
-    local = run_git(["config", "--local", "--get", key], cwd=repo_root, check=False)
-    result = local
-    if local.returncode != 0:
-        result = run_command(
-            ["git", "config", "--global", "--get", key],
-            cwd=repo_root,
-            env=trusted_git_identity_probe_environment(),
-        )
-    if result.returncode != 0:
+    result = run_command(
+        ["git", "config", "--global", "--no-includes", "--get-all", key],
+        cwd=repo_root,
+        env=trusted_git_identity_probe_environment(),
+    )
+    if result.returncode not in (0, 1):
+        detail = (result.stderr or result.stdout).strip()
+        raise AgentOpsError(f"cannot read trusted Git {key}: {detail}")
+    values = result.stdout.splitlines() if result.returncode == 0 else []
+    if not values:
         return None
-    value = result.stdout.removesuffix("\n")
-    if not value or any(character in value for character in "\x00\r\n"):
-        raise AgentOpsError(f"git {key} contains an invalid identity value")
+    if len(values) != 1:
+        raise AgentOpsError(
+            f"trusted global Git {key} must contain exactly one value; "
+            f"observed {len(values)}"
+        )
+    value = values[0].strip()
+    if not value or any(character in value for character in "\x00\r\n<>"):
+        raise AgentOpsError(f"trusted global Git {key} contains an invalid value")
+    if key == "user.email" and (
+        "@" not in value or any(character.isspace() for character in value)
+    ):
+        raise AgentOpsError("trusted global Git user.email is not a plain email")
     return value
 
 
@@ -262,12 +292,17 @@ def trusted_git_commit_environment(repo_root: Path) -> dict[str, str]:
     environment = trusted_git_environment()
     name = _identity_config_value(repo_root, "user.name")
     email = _identity_config_value(repo_root, "user.email")
-    if name is not None:
-        environment["GIT_AUTHOR_NAME"] = name
-        environment["GIT_COMMITTER_NAME"] = name
-    if email is not None:
-        environment["GIT_AUTHOR_EMAIL"] = email
-        environment["GIT_COMMITTER_EMAIL"] = email
+    if not name or not email:
+        raise AgentOpsError("trusted global Git identity must be a complete pair")
+    home = _os_account_home()
+    environment.pop("EMAIL", None)
+    environment["HOME"] = str(home)
+    environment["XDG_CONFIG_HOME"] = str(home / ".config")
+    environment["GIT_AUTHOR_NAME"] = name
+    environment["GIT_AUTHOR_EMAIL"] = email
+    environment["GIT_COMMITTER_NAME"] = name
+    environment["GIT_COMMITTER_EMAIL"] = email
+    environment["GIT_PAGER"] = ""
     return environment
 
 def repo_root_from(path: Path) -> Path:
@@ -1079,11 +1114,33 @@ def should_commit(report: dict[str, Any], packet: WorkPacket, final_scope: Scope
 
 
 def create_commit(repo_root: Path, files: list[str], message: str) -> str:
-    run_git(["add", "--", *files], cwd=repo_root)
-    result = run_command(
-        ["git", "commit", "-m", message],
+    commit_environment = trusted_git_commit_environment(repo_root)
+    local_filters = run_git(
+        [
+            "config", "--local", "--includes", "--get-regexp",
+            r"^filter\..*\.(clean|process)$",
+        ],
         cwd=repo_root,
-        env=trusted_git_commit_environment(repo_root),
+        check=False,
+    )
+    if local_filters.returncode == 0 and local_filters.stdout.strip():
+        raise AgentOpsError(
+            "local Git clean/process filters are not allowed during governed commit"
+        )
+    if local_filters.returncode not in (0, 1):
+        detail = (local_filters.stderr or local_filters.stdout).strip()
+        raise AgentOpsError(f"cannot inspect local Git filters: {detail}")
+    run_git(["-c", "core.fsmonitor=false", "add", "--", *files], cwd=repo_root)
+    result = run_command(
+        [
+            "git",
+            "-c", f"core.hooksPath={os.devnull}",
+            "-c", "core.fsmonitor=false",
+            "-c", "commit.gpgSign=false",
+            "commit", "--no-verify", "--no-gpg-sign", "-m", message,
+        ],
+        cwd=repo_root,
+        env=commit_environment,
     )
     if result.returncode != 0:
         detail = (result.stderr or result.stdout).strip()
