@@ -1337,6 +1337,42 @@ def test_session_entry_custody_ignores_inherited_git_index_file(
         )
 
 
+def test_all_internal_git_subprocesses_use_trusted_environment() -> None:
+    tree = ast.parse(RUNNER_PATH.read_text(encoding="utf-8"))
+    probe = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_probe_tool_version"
+    )
+    probe_calls = {
+        node.func.id
+        for node in ast.walk(probe)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+    assert "run_git" in probe_calls
+
+    violations: list[int] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not node.args:
+            continue
+        argv = node.args[0]
+        if not isinstance(argv, (ast.List, ast.Tuple)) or not argv.elts:
+            continue
+        head = argv.elts[0]
+        if not isinstance(head, ast.Constant) or head.value != "git":
+            continue
+        env = next((item.value for item in node.keywords if item.arg == "env"), None)
+        trusted = (
+            isinstance(env, ast.Call)
+            and isinstance(env.func, ast.Name)
+            and env.func.id == "trusted_git_environment"
+        )
+        if not trusted:
+            violations.append(node.lineno)
+
+    assert violations == []
+
+
 def test_session_envelope_rejects_custody_free_execution_mode(tmp_path: Path) -> None:
     repo = init_session_repo(tmp_path)
     payload = seal_packet(session_packet(repo))
