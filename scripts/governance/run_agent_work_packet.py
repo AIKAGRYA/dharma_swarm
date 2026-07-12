@@ -298,6 +298,21 @@ def git_status(repo_root: Path) -> str:
     return run_git(["status", "--short"], cwd=repo_root).stdout
 
 
+def git_object_id_for_bytes(repo_root: Path, content: bytes) -> str:
+    result = subprocess.run(
+        ["git", "hash-object", "--stdin"],
+        cwd=repo_root,
+        input=content,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if result.returncode != 0:
+        detail = result.stderr.decode("utf-8", errors="replace").strip()
+        raise AgentOpsError(f"could not hash packet candidate for index custody: {detail}")
+    return result.stdout.decode("ascii").strip()
+
+
 def inspect_scope(repo_root: Path, packet: WorkPacket) -> ScopeState:
     tracked = sorted(set(git_lines(repo_root, ["diff", "--name-only"])))
     staged = sorted(set(git_lines(repo_root, ["diff", "--name-only", "--cached"])))
@@ -483,12 +498,18 @@ def _validate_session_envelope(
             raise AgentOpsError(
                 "tracked copy must be byte-identical to external Session Entry Packet"
             )
-        index_match = run_git(
-            ["diff", "--quiet", "--", relative],
-            cwd=repo_root,
-            check=False,
-        )
-        if index_match.returncode != 0:
+        index_flags = git_lines(repo_root, ["ls-files", "-v", "--", relative])
+        if len(index_flags) != 1 or not index_flags[0].startswith("H "):
+            raise AgentOpsError(
+                f"tracked packet custody rejects hidden or special index flags: {relative}"
+            )
+        index_rows = git_lines(repo_root, ["ls-files", "--stage", "--", relative])
+        if len(index_rows) != 1:
+            raise AgentOpsError(f"tracked packet has ambiguous Git index custody: {relative}")
+        index_fields = index_rows[0].split(maxsplit=3)
+        if len(index_fields) != 4 or index_fields[0] != "100644" or index_fields[2] != "0":
+            raise AgentOpsError(f"tracked packet is not a regular stage-0 index blob: {relative}")
+        if index_fields[1] != git_object_id_for_bytes(repo_root, candidate):
             raise AgentOpsError(
                 f"tracked packet custody must be staged byte-identically in the Git index: {relative}"
             )
