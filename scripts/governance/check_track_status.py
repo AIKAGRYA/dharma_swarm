@@ -455,6 +455,8 @@ def _resolve_command_for_current_runtime(command: list[str]) -> list[str]:
     if not command:
         return command
     executable = command[0]
+    if executable in {"python", "python3"}:
+        return [sys.executable, *command[1:]]
     if executable == "pytest":
         return [sys.executable, "-m", "pytest", *command[1:]]
     if executable in {"./.venv/bin/python", ".venv/bin/python"} and not Path(executable).exists():
@@ -2100,10 +2102,11 @@ def check_lifecycle_transition(head_p: dict[str, Any], findings: list[Finding],
 
 def run(args: argparse.Namespace) -> int:
     findings: list[Finding] = []
+    reports_dir = Path(getattr(args, "reports_dir", REPORTS_DIR))
     if not ACTIVE_TRACK_PATH.exists():
         findings.append(Finding("ERROR", "active-track-missing",
                                 f"{ACTIVE_TRACK_PATH} not found"))
-        emit_reports(findings, None, [])
+        emit_reports(findings, None, [], reports_dir)
         return 2
 
     raw = load_active_track(ACTIVE_TRACK_PATH)
@@ -2117,7 +2120,7 @@ def run(args: argparse.Namespace) -> int:
         findings.append(Finding("ERROR", "no-active-track",
             "ACTIVE_TRACK.yaml declares no tracks (active_tracks empty and "
             "active_track missing). Declare at least one track."))
-        emit_reports(findings, p, [])
+        emit_reports(findings, p, [], reports_dir)
         return 2
 
     # Portfolio-level graph invariants.
@@ -2239,7 +2242,7 @@ def run(args: argparse.Namespace) -> int:
 
         track_results.append((t, r))
 
-    emit_reports(findings, p, track_results)
+    emit_reports(findings, p, track_results, reports_dir)
     return 1 if any(f.severity == "ERROR" for f in findings) else 0
 
 
@@ -2278,9 +2281,13 @@ def _track_payload(t: dict[str, Any], r: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def emit_reports(findings: list[Finding], portfolio: dict[str, Any] | None,
-                 track_results: list[tuple[dict[str, Any], dict[str, Any]]]) -> None:
-    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+def emit_reports(
+    findings: list[Finding],
+    portfolio: dict[str, Any] | None,
+    track_results: list[tuple[dict[str, Any], dict[str, Any]]],
+    reports_dir: Path,
+) -> None:
+    reports_dir.mkdir(parents=True, exist_ok=True)
     portfolio = portfolio or {"active_tracks": [], "primary": None,
                               "spine_objectives": [], "track_policy": {}, "vital_signs": {}}
 
@@ -2318,9 +2325,9 @@ def emit_reports(findings: list[Finding], portfolio: dict[str, Any] | None,
         "findings": [asdict(f) for f in findings],
     }
     text = json.dumps(payload, indent=2) + "\n"
-    (REPORTS_DIR / "active_track_evidence.json").write_text(text, encoding="utf-8")
+    (reports_dir / "active_track_evidence.json").write_text(text, encoding="utf-8")
     # Richer name for the dashboard contract (same payload; one source of truth).
-    (REPORTS_DIR / "track_portfolio.json").write_text(text, encoding="utf-8")
+    (reports_dir / "track_portfolio.json").write_text(text, encoding="utf-8")
 
     md = ["# Track Portfolio Evidence",
           "",
@@ -2365,7 +2372,7 @@ def emit_reports(findings: list[Finding], portfolio: dict[str, Any] | None,
         for f in findings:
             md.append(f"- **{f.severity}** `{f.check}`: {f.message}")
         md.append("")
-    (REPORTS_DIR / "active_track_evidence.md").write_text("\n".join(md), encoding="utf-8")
+    (reports_dir / "active_track_evidence.md").write_text("\n".join(md), encoding="utf-8")
 
     for f in findings:
         stream = sys.stderr if f.severity == "ERROR" else sys.stdout
@@ -2383,6 +2390,13 @@ def main() -> int:
     parser.add_argument("--base", default=None,
                         help="Git ref to diff lifecycle transitions against "
                              "(default: origin/$GITHUB_BASE_REF, else origin/main).")
+    parser.add_argument(
+        "--reports-dir",
+        type=Path,
+        default=REPORTS_DIR,
+        help="Directory for derived evidence outputs "
+             "(default: reports/governance in this checkout).",
+    )
     args = parser.parse_args()
     code = run(args)
     if args.warn_only:

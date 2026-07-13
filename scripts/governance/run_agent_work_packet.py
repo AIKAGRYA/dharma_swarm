@@ -3108,12 +3108,13 @@ def _admission_gate_environment(
     source_root: Path,
     packet_id: str,
 ) -> dict[str, str]:
-    """Route known Python/pytest/Ruff/TMP caches outside the source tree."""
+    """Route known Python/pytest/Hypothesis/Ruff/TMP caches outside the source tree."""
     _trusted_gate_interpreter(source_root)
     _reject_local_repository_controls(source_root, base_ref=None)
     cache_root = report_root / REPORT_ROOT / packet_id / "tool-cache"
     cache_directories = {
         "pycache": cache_root / "pycache",
+        "hypothesis": cache_root / "hypothesis",
         "xdg": cache_root / "xdg",
         "ruff": cache_root / "ruff",
         "tmp": cache_root / "tmp",
@@ -3140,6 +3141,7 @@ def _admission_gate_environment(
         "PYTHONHASHSEED": "0",
         "PYTHONNOUSERSITE": "1",
         "PYTHONPYCACHEPREFIX": str(cache_directories["pycache"]),
+        "HYPOTHESIS_STORAGE_DIRECTORY": str(cache_directories["hypothesis"]),
         "PYTEST_ADDOPTS": "-p no:cacheprovider",
         "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
         "XDG_CACHE_HOME": str(cache_directories["xdg"]),

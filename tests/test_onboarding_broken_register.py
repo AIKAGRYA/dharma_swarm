@@ -276,16 +276,30 @@ def test_all_six_consumers_share_canonical_parser() -> None:
         assert "parse_broken_register(" in source, relative
 
 
-def test_agent_onboard_remains_importable_before_dependency_bootstrap() -> None:
+def test_agent_onboard_remains_importable_before_dependency_bootstrap(
+    tmp_path: Path,
+) -> None:
+    fixture_root = tmp_path / "minimal-onboard-repo"
+    fixture_files = (
+        "scripts/governance/agent_onboard.py",
+        "dharma_swarm/operator_core/onboarding/broken_register.py",
+    )
+    for relative in fixture_files:
+        source = REPO_ROOT / relative
+        target = fixture_root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(source.read_bytes())
+
     result = subprocess.run(
         [
             sys.executable,
+            "-B",
             "-I",
             "-S",
-            str(REPO_ROOT / "scripts/governance/agent_onboard.py"),
+            str(fixture_root / "scripts/governance/agent_onboard.py"),
             "--help",
         ],
-        cwd=REPO_ROOT,
+        cwd=fixture_root,
         capture_output=True,
         text=True,
         timeout=20,
@@ -293,6 +307,8 @@ def test_agent_onboard_remains_importable_before_dependency_bootstrap() -> None:
 
     assert result.returncode == 0, result.stderr
     assert "--fast" in result.stdout
+    assert not list(fixture_root.rglob("__pycache__"))
+    assert not list(fixture_root.rglob("*.pyc"))
 
 
 def test_header_count_drift_is_reported() -> None:
