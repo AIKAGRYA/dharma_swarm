@@ -73,3 +73,45 @@ Plus ≥7 unit tests in `tests/test_graph_reconciler.py` (fixture DBs, per the `
 ## Definition of done (whole lane)
 
 Phase 0a PR merged + Phase 0b PR merged, each with: baseline-diffed full-suite results, the chaos receipt (0b), zero new gate failures, PR bodies citing `dharmagraph-engine-2026-07` and the spec section implemented. Track criteria that must flip green from your work: `phase0a_dead_engines_deleted`, `phase0b_reconciler_tests_pass`.
+
+---
+
+# TRANCHE 2 — Persistence/Resume Kernel (LG14–LG18) — issued 2026-07-13
+
+**Status of the lane above: COMPLETE.** Phase 0a/0b landed (PRs #798/#799/#800; `tests/test_graph_chaos_receipt.py` passes; track ledger `docs/governance/ACTIVE_TRACK.yaml` next_items 2–4 marked DONE). Do NOT redo it. This tranche builds ON that machinery: `dharma_swarm/graph/checkpoint.py`, `graph/reconciler.py`, `graph/durable_invoker.py`, `graph/effects.py`.
+
+## Mission
+
+Close the five highest-weight durability gaps from the judge-signed parity gauntlet as ONE coherent persistence/resume kernel — not five scattered card fixes. Judge-signed baseline: **31.00/100, verdict NOT_FINISHED** (`reports/governance/dharmagraph_parity/PARITY_MATRIX.md`; receipts digest-sealed under `reports/governance/dharmagraph_parity/`). Closing this tranche moves the trajectory toward ~52 — do not claim any score; only a fresh judge-run gauntlet grades.
+
+## Vision constraints (operator-confirmed 2026-07-12; seed doc in PR #909 — read it from that branch if unmerged)
+
+- **Workload-agnostic, always.** No first-passenger specialization; never tune the engine for one demo, agent, provider, or model.
+- **Verification is permanent; ratification dissolves.** Every capability lands behind a receipt + a falsification test (a test that would CATCH the capability lying), not a human babysitter.
+- Engine requirements, verbatim: durable complexity; multi-day campaign bearing; provider/model/agent-agnostic organizing intelligence.
+
+## The five cards (weights and unproven facets from PARITY_MATRIX.md — the facet lists ARE the work breakdown)
+
+| Card | Weight | Now | Unproven facets (each needs a proving scenario) |
+|---|---|---|---|
+| LG18 process-restart durability | 10 | 1/2 | durability_sync, durability_async, durability_exit, persistent_process_restart, pending_write_recovery, delta_channel_durable_history |
+| LG15 thread-scoped resume | 9 | 0/2 | thread_id, checkpoint_id, thread_resume, checkpoint_parent, multi_turn_state |
+| LG17 update/fork/time-travel | 8 | 1/2 | update_state, bulk_update_state |
+| LG14 checkpoint protocol | 4 | 1/2 | sync_saver, async_saver, pending_writes, serializer, delete_thread, delete_for_runs, copy_thread, prune, get_delta_channel_history, async_checkpoint_lifecycle |
+| LG16 state/history/replay | 2 | 1/2 | get_state, get_state_history, async_state_api |
+
+Gap ids: `parity-gap-lg18-process-restart`, `-lg15-thread-resume`, `-lg17-fork-time-travel`, `-lg14-checkpoint-protocol`, `-lg16-history` (`ACTIVE_TRACK.yaml` next_items; the 100/100 bar blocker is next_item 6).
+
+## Acceptance oracle (uncharmable — never self-grade)
+
+- DoD per card: the gap flips to 2/2 **in a fresh gauntlet run**: `bash scripts/governance/run_python_with_repo_env.sh scripts/governance/dharmagraph_parity_gauntlet.py` against rubric `docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json`. Independent judge rerun required before any closure claim; self-declared N/A scores 0 (operator ratification only).
+- **Environment trap (verified 2026-07-13):** two track criteria (`phase1_oracle_tests_pass`, `parity_gauntlet_check_passes`) fail on any host without real langgraph — `--check` exits 2 with `langgraph_version: installed='NOT_INSTALLED' expected='1.2.4'`. Install the `[test-oracle]` extra FIRST and record it in your entry receipt; those two must be green on your VM before you write code, or your baseline is meaningless.
+- **Rubric files are read-only for this tranche.** `DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json` and the gauntlet script are track surfaces, but moving the score by editing the rubric or grader is a governance violation — closure comes from capabilities only.
+
+## Guardrails
+
+- Track `dharmagraph-engine-2026-07`; stay inside its owned surfaces (`ACTIVE_TRACK.yaml:897-921`). New code goes in `dharma_swarm/graph/` modules (<500 lines each); `orchestrator.py` is at its module-budget ceiling — minimal seam edits only, with hot-path ack (`[impact-checked]`) for `swarm.py`/`orchestrator.py` per `scripts/uplift_guards/hotpath_guard.py`.
+- **Do NOT start Phase 2 crowning** (routing `_dispatch_topology_genome` through the graph engine): that is separately gated on the oracle CI flipping to blocking plus an operator go (`ACTIVE_TRACK.yaml` next_item 4 note).
+- Adjacent ring (LG25 heartbeat/timeout, LG24 retry, LG30 config/context, APP01 neutral-engine handoff) is NEXT tranche — only pull one in if it falls out of this kernel for free.
+- No new truth stores; runtime receipts under `~/.dharma/`, never git. One PR per coherent slice, draft PRs, independent review, never self-merge. Branch naming: `devin/dharmagraph-tranche2-<slice>`.
+- On entry: `make onboard`, re-derive the parity baseline at YOUR entry SHA, cite file:line for every claim in PR bodies.
