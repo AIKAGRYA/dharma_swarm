@@ -59,9 +59,11 @@ closed_tracks: []
         repo / "docs/state/BROKEN_REGISTER.md",
         """
 # Broken Register
+## OPEN ITEMS
 ### BR-001 — open real defect
 - **status:** OPEN — still broken
 
+## CLOSED ITEMS
 ### BR-002 — fixed defect with noisy words
 - **status:** **FIXED 2026-05-20** — mentioned PARTIAL and not stale in prose
 """,

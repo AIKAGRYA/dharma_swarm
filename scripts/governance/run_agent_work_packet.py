@@ -1164,9 +1164,54 @@ def _read_regular_worktree_file(repo_root: Path, relative: str) -> tuple[str, by
     return mode, b"".join(chunks)
 
 
+def _core_filemode_enabled(repo_root: Path) -> bool:
+    result = run_git(
+        ["config", "--bool", "--get", "core.fileMode"],
+        cwd=repo_root,
+        check=False,
+    )
+    if result.returncode == 1:
+        return True
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip()
+        raise AgentOpsError(f"cannot read core.fileMode: {detail}")
+    value = result.stdout.strip()
+    if value not in {"true", "false"}:
+        raise AgentOpsError(f"core.fileMode returned an invalid boolean: {value!r}")
+    return value == "true"
+
+
+def _tracked_regular_index_mode(repo_root: Path, relative: str) -> str | None:
+    result = run_git(
+        ["ls-files", "--stage", "-z", "--", relative],
+        cwd=repo_root,
+    )
+    rows = [row for row in result.stdout.split("\x00") if row]
+    if not rows:
+        return None
+    if len(rows) != 1:
+        raise AgentOpsError(f"governed commit path has ambiguous index stages: {relative}")
+    metadata, separator, indexed_path = rows[0].partition("\t")
+    fields = metadata.split()
+    if (
+        not separator
+        or indexed_path != relative
+        or len(fields) != 3
+        or fields[2] != "0"
+    ):
+        raise AgentOpsError(f"governed commit path has invalid index metadata: {relative}")
+    mode = fields[0]
+    if mode not in {"100644", "100755"}:
+        raise AgentOpsError(
+            f"governed commit path has unsupported tracked mode {mode}: {relative}"
+        )
+    return mode
+
+
 def _stage_exact_files(repo_root: Path, files: list[str]) -> None:
     """Stage exact worktree bytes without Git clean/process filters."""
 
+    filemode_enabled = _core_filemode_enabled(repo_root)
     for relative in files:
         unmerged = run_git(
             ["-c", "core.fsmonitor=false", "ls-files", "-u", "--", relative],
@@ -1178,6 +1223,7 @@ def _stage_exact_files(repo_root: Path, files: list[str]) -> None:
         if snapshot is None:
             run_git(
                 [
+                    "-c", f"core.hooksPath={os.devnull}",
                     "-c", "core.fsmonitor=false", "update-index",
                     "--force-remove", "--", relative,
                 ],
@@ -1185,9 +1231,12 @@ def _stage_exact_files(repo_root: Path, files: list[str]) -> None:
             )
             continue
         mode, content = snapshot
+        if not filemode_enabled:
+            mode = _tracked_regular_index_mode(repo_root, relative) or mode
         object_id = git_object_id_for_bytes(repo_root, content, write=True)
         run_git(
             [
+                "-c", f"core.hooksPath={os.devnull}",
                 "-c", "core.fsmonitor=false", "update-index", "--add",
                 "--cacheinfo", mode, object_id, relative,
             ],
@@ -1206,7 +1255,11 @@ def create_commit(repo_root: Path, files: list[str], message: str) -> str:
         raise AgentOpsError("governed commit requires an attached branch HEAD")
     _stage_exact_files(repo_root, files)
     tree = run_git(
-        ["-c", "core.fsmonitor=false", "write-tree"], cwd=repo_root
+        [
+            "-c", f"core.hooksPath={os.devnull}",
+            "-c", "core.fsmonitor=false", "write-tree",
+        ],
+        cwd=repo_root,
     ).stdout.strip()
     result = run_command(
         [

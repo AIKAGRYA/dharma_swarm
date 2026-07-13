@@ -1127,6 +1127,91 @@ def test_os_account_home_ignores_environment_redirects(
     assert agentops._os_account_home() == expected
 
 
+def _install_trusted_commit_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trusted_home = tmp_path / "trusted-home"
+    trusted_home.mkdir()
+    (trusted_home / ".gitconfig").write_text(
+        "[user]\n\tname = Trusted OS User\n\temail = trusted@example.invalid\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        agentops, "_os_account_home", lambda: trusted_home, raising=False
+    )
+
+
+def test_create_commit_disables_default_reference_transaction_hook(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_repo(tmp_path)
+    _install_trusted_commit_identity(tmp_path, monkeypatch)
+    marker = tmp_path / "reference-transaction-ran"
+    hook = repo / ".git/hooks/reference-transaction"
+    hook.write_text(f"#!/bin/sh\ntouch '{marker}'\n", encoding="utf-8")
+    hook.chmod(0o755)
+    changed = repo / "reference-hook.txt"
+    changed.write_text("reference hook probe\n", encoding="utf-8")
+
+    agentops.create_commit(repo, [changed.name], "test: disable reference hook")
+
+    assert not marker.exists()
+
+
+def test_create_commit_disables_post_index_change_hook_during_staging(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_repo(tmp_path)
+    _install_trusted_commit_identity(tmp_path, monkeypatch)
+    doomed = repo / "doomed.txt"
+    doomed.write_text("remove me\n", encoding="utf-8")
+    assert run(["git", "add", doomed.name], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "add doomed"], cwd=repo).returncode == 0
+    marker = tmp_path / "post-index-change-ran"
+    hook = repo / ".git/hooks/post-index-change"
+    hook.write_text(f"#!/bin/sh\ntouch '{marker}'\n", encoding="utf-8")
+    hook.chmod(0o755)
+    changed = repo / "index-hook.txt"
+    changed.write_text("index hook probe\n", encoding="utf-8")
+    doomed.unlink()
+
+    agentops.create_commit(
+        repo, [changed.name, doomed.name], "test: disable index hook"
+    )
+
+    assert not marker.exists()
+    assert agentops.run_git(
+        ["show", f"HEAD:{changed.name}"], cwd=repo
+    ).stdout == "index hook probe\n"
+    assert agentops.run_git(
+        ["cat-file", "-e", f"HEAD:{doomed.name}"], cwd=repo, check=False
+    ).returncode != 0
+
+
+def test_create_commit_preserves_tracked_executable_when_filemode_is_false(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_repo(tmp_path)
+    executable = repo / "tool.sh"
+    executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    executable.chmod(0o755)
+    assert run(["git", "add", "tool.sh"], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "add executable"], cwd=repo).returncode == 0
+    assert run(["git", "config", "core.fileMode", "false"], cwd=repo).returncode == 0
+    executable.chmod(0o644)
+    executable.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    _install_trusted_commit_identity(tmp_path, monkeypatch)
+
+    agentops.create_commit(repo, [executable.name], "test: preserve executable")
+
+    assert agentops.run_git(
+        ["ls-tree", "HEAD", "--", executable.name], cwd=repo
+    ).stdout.startswith("100755 blob ")
+    assert agentops.run_git(
+        ["show", f"HEAD:{executable.name}"], cwd=repo
+    ).stdout == "#!/bin/sh\nexit 1\n"
+
+
 def test_create_commit_ignores_local_identity_hooks_and_signing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:

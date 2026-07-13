@@ -84,6 +84,8 @@ class TestCountBrokenRegister:
 
     def test_investigating_counted_as_open(self, tmp_path: Path):
         content = """\
+## OPEN ITEMS
+
 ### BR-020 — New issue
 - **status:** INVESTIGATING
 """

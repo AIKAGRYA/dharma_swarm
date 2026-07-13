@@ -45,7 +45,9 @@ def fake_repo(tmp_path: Path) -> Path:
     )
     (tmp_path / "docs/state").mkdir(parents=True)
     (tmp_path / "docs/state/BROKEN_REGISTER.md").write_text(
+        "# BROKEN REGISTER\n\n## OPEN ITEMS\n\n"
         "### BR-001 — thing one\n**status:** OPEN\n\n"
+        "## CLOSED ITEMS\n\n"
         "### BR-002 — thing two\n**status:** FIXED\n\n"
         "### BR-003 — thing three\n**status:** FIXED\n",
         encoding="utf-8",
@@ -168,8 +170,10 @@ def test_parse_broken_counts(fake_repo: Path) -> None:
 def test_c4_unknown_lifecycle_cannot_inflate_closed_ratio(fake_repo: Path) -> None:
     register = fake_repo / "docs/state/BROKEN_REGISTER.md"
     register.write_text(
+        "# BROKEN REGISTER\n\n## OPEN ITEMS\n\n"
         "### BR-001 — open\n**status:** OPEN\n\n"
         "### BR-002 — malformed\n**status:** DEGRADED\n\n"
+        "## CLOSED ITEMS\n\n"
         "### BR-003 — fixed\n**status:** FIXED\n",
         encoding="utf-8",
     )
