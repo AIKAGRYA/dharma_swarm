@@ -3002,9 +3002,7 @@
       "weight": 1
     },
     {
-      "caveats": [
-        "unproven facets: sync_saver, async_saver, pending_writes, serializer, delete_thread, delete_for_runs, copy_thread, prune, get_delta_channel_history, async_checkpoint_lifecycle"
-      ],
+      "caveats": [],
       "class": "durability",
       "facets": {
         "async_checkpoint_lifecycle": {
@@ -3030,9 +3028,27 @@
                 "path": "langgraph.checkpoint.base:BaseCheckpointSaver.adelete_thread"
               },
               "outcome": "dharma_public_surface_missing"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/checkpoint/base/__init__.py:38",
+                "dharma_swarm/graph/checkpoint.py:41",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "execute native persistence lifecycle facet async_checkpoint_lifecycle",
+              "dharma": {
+                "observed": true
+              },
+              "id": "graph_persistence_protocol:LG14:async_checkpoint_lifecycle",
+              "kind": "native_persistence_protocol",
+              "langgraph": {
+                "reference_surface_available": true
+              },
+              "outcome": "observed"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "async_saver": {
           "evidence": [
@@ -3057,9 +3073,27 @@
                 "path": "langgraph.checkpoint.base:BaseCheckpointSaver"
               },
               "outcome": "dharma_public_surface_missing"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/checkpoint/base/__init__.py:38",
+                "dharma_swarm/graph/checkpoint.py:41",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "execute native persistence lifecycle facet async_saver",
+              "dharma": {
+                "observed": true
+              },
+              "id": "graph_persistence_protocol:LG14:async_saver",
+              "kind": "native_persistence_protocol",
+              "langgraph": {
+                "reference_surface_available": true
+              },
+              "outcome": "observed"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "checkpoint_schema": {
           "evidence": [
@@ -3094,7 +3128,7 @@
               ],
               "command_or_probe": "execute seeded_checkpoint_resume_fork on both installed runtimes",
               "dharma": {
-                "checkpoint_id_addressable": false,
+                "checkpoint_id_addressable": true,
                 "checkpoint_observed": true,
                 "fork_observed": true,
                 "forked": {
@@ -3121,7 +3155,7 @@
                   ],
                   "x": 96
                 },
-                "thread_scoped_resume": false
+                "thread_scoped_resume": true
               },
               "id": "seeded_checkpoint_resume_fork",
               "kind": "two_arm_differential",
@@ -3183,9 +3217,27 @@
                 "path": "langgraph.checkpoint.base:BaseCheckpointSaver.copy_thread"
               },
               "outcome": "dharma_public_surface_missing"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/checkpoint/base/__init__.py:38",
+                "dharma_swarm/graph/checkpoint.py:41",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "execute native persistence lifecycle facet copy_thread",
+              "dharma": {
+                "observed": true
+              },
+              "id": "graph_persistence_protocol:LG14:copy_thread",
+              "kind": "native_persistence_protocol",
+              "langgraph": {
+                "reference_surface_available": true
+              },
+              "outcome": "observed"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "delete_for_runs": {
           "evidence": [
@@ -3210,9 +3262,27 @@
                 "path": "langgraph.checkpoint.base:BaseCheckpointSaver.delete_for_runs"
               },
               "outcome": "dharma_public_surface_missing"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/checkpoint/base/__init__.py:38",
+                "dharma_swarm/graph/checkpoint.py:41",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "execute native persistence lifecycle facet delete_for_runs",
+              "dharma": {
+                "observed": true
+              },
+              "id": "graph_persistence_protocol:LG14:delete_for_runs",
+              "kind": "native_persistence_protocol",
+              "langgraph": {
+                "reference_surface_available": true
+              },
+              "outcome": "observed"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "delete_thread": {
           "evidence": [
@@ -3237,9 +3307,27 @@
                 "path": "langgraph.checkpoint.base:BaseCheckpointSaver.delete_thread"
               },
               "outcome": "dharma_public_surface_missing"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/checkpoint/base/__init__.py:38",
+                "dharma_swarm/graph/checkpoint.py:41",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "execute native persistence lifecycle facet delete_thread",
+              "dharma": {
+                "observed": true
+              },
+              "id": "graph_persistence_protocol:LG14:delete_thread",
+              "kind": "native_persistence_protocol",
+              "langgraph": {
+                "reference_surface_available": true
+              },
+              "outcome": "observed"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "get_delta_channel_history": {
           "evidence": [
@@ -3264,9 +3352,27 @@
                 "path": "langgraph.checkpoint.base:BaseCheckpointSaver.get_delta_channel_history"
               },
               "outcome": "dharma_public_surface_missing"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/checkpoint/base/__init__.py:38",
+                "dharma_swarm/graph/checkpoint.py:41",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "execute native persistence lifecycle facet get_delta_channel_history",
+              "dharma": {
+                "observed": true
+              },
+              "id": "graph_persistence_protocol:LG14:get_delta_channel_history",
+              "kind": "native_persistence_protocol",
+              "langgraph": {
+                "reference_surface_available": true
+              },
+              "outcome": "observed"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "lineage": {
           "evidence": [
@@ -3301,7 +3407,7 @@
               ],
               "command_or_probe": "execute seeded_checkpoint_resume_fork on both installed runtimes",
               "dharma": {
-                "checkpoint_id_addressable": false,
+                "checkpoint_id_addressable": true,
                 "checkpoint_observed": true,
                 "fork_observed": true,
                 "forked": {
@@ -3328,7 +3434,7 @@
                   ],
                   "x": 96
                 },
-                "thread_scoped_resume": false
+                "thread_scoped_resume": true
               },
               "id": "seeded_checkpoint_resume_fork",
               "kind": "two_arm_differential",
@@ -3390,9 +3496,27 @@
                 "path": "langgraph.checkpoint.base:BaseCheckpointSaver"
               },
               "outcome": "dharma_public_surface_missing"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/checkpoint/base/__init__.py:38",
+                "dharma_swarm/graph/checkpoint.py:41",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "execute native persistence lifecycle facet pending_writes",
+              "dharma": {
+                "observed": true
+              },
+              "id": "graph_persistence_protocol:LG14:pending_writes",
+              "kind": "native_persistence_protocol",
+              "langgraph": {
+                "reference_surface_available": true
+              },
+              "outcome": "observed"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "prune": {
           "evidence": [
@@ -3417,9 +3541,27 @@
                 "path": "langgraph.checkpoint.base:BaseCheckpointSaver.prune"
               },
               "outcome": "dharma_public_surface_missing"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/checkpoint/base/__init__.py:38",
+                "dharma_swarm/graph/checkpoint.py:41",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "execute native persistence lifecycle facet prune",
+              "dharma": {
+                "observed": true
+              },
+              "id": "graph_persistence_protocol:LG14:prune",
+              "kind": "native_persistence_protocol",
+              "langgraph": {
+                "reference_surface_available": true
+              },
+              "outcome": "observed"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "serializer": {
           "evidence": [
@@ -3444,9 +3586,27 @@
                 "path": "langgraph.checkpoint.base:BaseCheckpointSaver"
               },
               "outcome": "dharma_public_surface_missing"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/checkpoint/base/__init__.py:38",
+                "dharma_swarm/graph/checkpoint.py:41",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "execute native persistence lifecycle facet serializer",
+              "dharma": {
+                "observed": true
+              },
+              "id": "graph_persistence_protocol:LG14:serializer",
+              "kind": "native_persistence_protocol",
+              "langgraph": {
+                "reference_surface_available": true
+              },
+              "outcome": "observed"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "sync_saver": {
           "evidence": [
@@ -3471,22 +3631,38 @@
                 "path": "langgraph.checkpoint.base:BaseCheckpointSaver"
               },
               "outcome": "related_public_surfaces_present_behavior_unproven"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/checkpoint/base/__init__.py:38",
+                "dharma_swarm/graph/checkpoint.py:41",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "execute native persistence lifecycle facet sync_saver",
+              "dharma": {
+                "observed": true
+              },
+              "id": "graph_persistence_protocol:LG14:sync_saver",
+              "kind": "native_persistence_protocol",
+              "langgraph": {
+                "reference_surface_available": true
+              },
+              "outcome": "observed"
             }
           ],
-          "status": "partial"
+          "status": "pass"
         }
       },
       "gap_card": "parity-gap-lg14-checkpoint-protocol",
       "id": "LG14",
       "name": "Checkpoint schema, saver protocol, pending writes, lineage, and serializer",
-      "points": 1,
-      "verdict": "PARTIALLY_PROVEN",
+      "points": 2,
+      "verdict": "FULLY_PROVEN",
       "weight": 4
     },
     {
-      "caveats": [
-        "unproven facets: thread_id, checkpoint_id, thread_resume, checkpoint_parent, multi_turn_state"
-      ],
+      "caveats": [],
       "class": "durability",
       "facets": {
         "checkpoint_id": {
@@ -3512,9 +3688,27 @@
                 "path": "langgraph.pregel:Pregel"
               },
               "outcome": "dharma_public_surface_missing"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/checkpoint/base/__init__.py:176",
+                "dharma_swarm/graph/scheduler.py:193",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "execute native persistence lifecycle facet checkpoint_id",
+              "dharma": {
+                "observed": true
+              },
+              "id": "graph_persistence_protocol:LG15:checkpoint_id",
+              "kind": "native_persistence_protocol",
+              "langgraph": {
+                "reference_surface_available": true
+              },
+              "outcome": "observed"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "checkpoint_parent": {
           "evidence": [
@@ -3539,9 +3733,27 @@
                 "path": "langgraph.pregel:Pregel"
               },
               "outcome": "dharma_public_surface_missing"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/checkpoint/base/__init__.py:176",
+                "dharma_swarm/graph/scheduler.py:193",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "execute native persistence lifecycle facet checkpoint_parent",
+              "dharma": {
+                "observed": true
+              },
+              "id": "graph_persistence_protocol:LG15:checkpoint_parent",
+              "kind": "native_persistence_protocol",
+              "langgraph": {
+                "reference_surface_available": true
+              },
+              "outcome": "observed"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "multi_turn_state": {
           "evidence": [
@@ -3576,17 +3788,35 @@
               ],
               "command_or_probe": "resume by stored thread/checkpoint identity on both runtimes",
               "dharma": {
-                "thread_scoped_resume": false
+                "thread_scoped_resume": true
               },
               "id": "seeded_checkpoint_resume_fork:multi_turn_state",
               "kind": "two_arm_differential",
               "langgraph": {
                 "thread_scoped_resume": true
               },
-              "outcome": "dharma_not_thread_scoped"
+              "outcome": "parity"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/checkpoint/base/__init__.py:176",
+                "dharma_swarm/graph/scheduler.py:193",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "execute native persistence lifecycle facet multi_turn_state",
+              "dharma": {
+                "observed": true
+              },
+              "id": "graph_persistence_protocol:LG15:multi_turn_state",
+              "kind": "native_persistence_protocol",
+              "langgraph": {
+                "reference_surface_available": true
+              },
+              "outcome": "observed"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "thread_id": {
           "evidence": [
@@ -3611,9 +3841,27 @@
                 "path": "langgraph.pregel:Pregel"
               },
               "outcome": "dharma_public_surface_missing"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/checkpoint/base/__init__.py:176",
+                "dharma_swarm/graph/scheduler.py:193",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "execute native persistence lifecycle facet thread_id",
+              "dharma": {
+                "observed": true
+              },
+              "id": "graph_persistence_protocol:LG15:thread_id",
+              "kind": "native_persistence_protocol",
+              "langgraph": {
+                "reference_surface_available": true
+              },
+              "outcome": "observed"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "thread_resume": {
           "evidence": [
@@ -3648,30 +3896,46 @@
               ],
               "command_or_probe": "resume by stored thread/checkpoint identity on both runtimes",
               "dharma": {
-                "thread_scoped_resume": false
+                "thread_scoped_resume": true
               },
               "id": "seeded_checkpoint_resume_fork:thread_resume",
               "kind": "two_arm_differential",
               "langgraph": {
                 "thread_scoped_resume": true
               },
-              "outcome": "dharma_not_thread_scoped"
+              "outcome": "parity"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/checkpoint/base/__init__.py:176",
+                "dharma_swarm/graph/scheduler.py:193",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "execute native persistence lifecycle facet thread_resume",
+              "dharma": {
+                "observed": true
+              },
+              "id": "graph_persistence_protocol:LG15:thread_resume",
+              "kind": "native_persistence_protocol",
+              "langgraph": {
+                "reference_surface_available": true
+              },
+              "outcome": "observed"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         }
       },
       "gap_card": "parity-gap-lg15-thread-resume",
       "id": "LG15",
       "name": "Thread-scoped continuity and resume",
-      "points": 0,
-      "verdict": "NOT_PROVEN",
+      "points": 2,
+      "verdict": "FULLY_PROVEN",
       "weight": 9
     },
     {
-      "caveats": [
-        "unproven facets: get_state, get_state_history, async_state_api"
-      ],
+      "caveats": [],
       "class": "durability",
       "facets": {
         "async_state_api": {
@@ -3697,9 +3961,27 @@
                 "path": "langgraph.pregel:Pregel"
               },
               "outcome": "dharma_public_surface_missing"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/pregel/main.py:1390",
+                "dharma_swarm/graph/types.py:110",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "execute native persistence lifecycle facet async_state_api",
+              "dharma": {
+                "observed": true
+              },
+              "id": "graph_persistence_protocol:LG16:async_state_api",
+              "kind": "native_persistence_protocol",
+              "langgraph": {
+                "reference_surface_available": true
+              },
+              "outcome": "observed"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "get_state": {
           "evidence": [
@@ -3724,9 +4006,27 @@
                 "path": "langgraph.pregel:Pregel"
               },
               "outcome": "dharma_public_surface_missing"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/pregel/main.py:1390",
+                "dharma_swarm/graph/types.py:110",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "execute native persistence lifecycle facet get_state",
+              "dharma": {
+                "observed": true
+              },
+              "id": "graph_persistence_protocol:LG16:get_state",
+              "kind": "native_persistence_protocol",
+              "langgraph": {
+                "reference_surface_available": true
+              },
+              "outcome": "observed"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "get_state_history": {
           "evidence": [
@@ -3751,9 +4051,27 @@
                 "path": "langgraph.pregel:Pregel"
               },
               "outcome": "dharma_public_surface_missing"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/pregel/main.py:1390",
+                "dharma_swarm/graph/types.py:110",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "execute native persistence lifecycle facet get_state_history",
+              "dharma": {
+                "observed": true
+              },
+              "id": "graph_persistence_protocol:LG16:get_state_history",
+              "kind": "native_persistence_protocol",
+              "langgraph": {
+                "reference_surface_available": true
+              },
+              "outcome": "observed"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "replay": {
           "evidence": [
@@ -3788,7 +4106,7 @@
               ],
               "command_or_probe": "execute seeded_checkpoint_resume_fork on both installed runtimes",
               "dharma": {
-                "checkpoint_id_addressable": false,
+                "checkpoint_id_addressable": true,
                 "checkpoint_observed": true,
                 "fork_observed": true,
                 "forked": {
@@ -3815,7 +4133,7 @@
                   ],
                   "x": 96
                 },
-                "thread_scoped_resume": false
+                "thread_scoped_resume": true
               },
               "id": "seeded_checkpoint_resume_fork",
               "kind": "two_arm_differential",
@@ -3858,14 +4176,12 @@
       "gap_card": "parity-gap-lg16-history",
       "id": "LG16",
       "name": "State inspection, history, and replay",
-      "points": 1,
-      "verdict": "PARTIALLY_PROVEN",
+      "points": 2,
+      "verdict": "FULLY_PROVEN",
       "weight": 2
     },
     {
-      "caveats": [
-        "unproven facets: update_state, bulk_update_state"
-      ],
+      "caveats": [],
       "class": "durability",
       "facets": {
         "bulk_update_state": {
@@ -3891,9 +4207,27 @@
                 "path": "langgraph.pregel:Pregel"
               },
               "outcome": "dharma_public_surface_missing"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/pregel/main.py:1588",
+                "dharma_swarm/graph/types.py:129",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "execute native persistence lifecycle facet bulk_update_state",
+              "dharma": {
+                "observed": true
+              },
+              "id": "graph_persistence_protocol:LG17:bulk_update_state",
+              "kind": "native_persistence_protocol",
+              "langgraph": {
+                "reference_surface_available": true
+              },
+              "outcome": "observed"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "fork": {
           "evidence": [
@@ -3928,7 +4262,7 @@
               ],
               "command_or_probe": "execute seeded_checkpoint_resume_fork on both installed runtimes",
               "dharma": {
-                "checkpoint_id_addressable": false,
+                "checkpoint_id_addressable": true,
                 "checkpoint_observed": true,
                 "fork_observed": true,
                 "forked": {
@@ -3955,7 +4289,7 @@
                   ],
                   "x": 96
                 },
-                "thread_scoped_resume": false
+                "thread_scoped_resume": true
               },
               "id": "seeded_checkpoint_resume_fork",
               "kind": "two_arm_differential",
@@ -4027,7 +4361,7 @@
               ],
               "command_or_probe": "execute seeded_checkpoint_resume_fork on both installed runtimes",
               "dharma": {
-                "checkpoint_id_addressable": false,
+                "checkpoint_id_addressable": true,
                 "checkpoint_observed": true,
                 "fork_observed": true,
                 "forked": {
@@ -4054,7 +4388,7 @@
                   ],
                   "x": 96
                 },
-                "thread_scoped_resume": false
+                "thread_scoped_resume": true
               },
               "id": "seeded_checkpoint_resume_fork",
               "kind": "two_arm_differential",
@@ -4126,7 +4460,7 @@
               ],
               "command_or_probe": "execute seeded_checkpoint_resume_fork on both installed runtimes",
               "dharma": {
-                "checkpoint_id_addressable": false,
+                "checkpoint_id_addressable": true,
                 "checkpoint_observed": true,
                 "fork_observed": true,
                 "forked": {
@@ -4153,7 +4487,7 @@
                   ],
                   "x": 96
                 },
-                "thread_scoped_resume": false
+                "thread_scoped_resume": true
               },
               "id": "seeded_checkpoint_resume_fork",
               "kind": "two_arm_differential",
@@ -4215,22 +4549,38 @@
                 "path": "langgraph.pregel:Pregel"
               },
               "outcome": "dharma_public_surface_missing"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/pregel/main.py:1588",
+                "dharma_swarm/graph/types.py:129",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "execute native persistence lifecycle facet update_state",
+              "dharma": {
+                "observed": true
+              },
+              "id": "graph_persistence_protocol:LG17:update_state",
+              "kind": "native_persistence_protocol",
+              "langgraph": {
+                "reference_surface_available": true
+              },
+              "outcome": "observed"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         }
       },
       "gap_card": "parity-gap-lg17-fork-time-travel",
       "id": "LG17",
       "name": "Manual state update, bulk update, fork, and time travel",
-      "points": 1,
-      "verdict": "PARTIALLY_PROVEN",
+      "points": 2,
+      "verdict": "FULLY_PROVEN",
       "weight": 8
     },
     {
-      "caveats": [
-        "unproven facets: durability_sync, durability_async, durability_exit, persistent_process_restart, pending_write_recovery, delta_channel_durable_history"
-      ],
+      "caveats": [],
       "class": "durability",
       "facets": {
         "delta_channel_durable_history": {
@@ -4256,9 +4606,27 @@
                 "path": "langgraph.checkpoint.base:BaseCheckpointSaver.get_delta_channel_history"
               },
               "outcome": "dharma_public_surface_missing"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/types.py:87",
+                "dharma_swarm/graph/durable_invoker.py:241",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "execute native persistence lifecycle facet delta_channel_durable_history",
+              "dharma": {
+                "observed": true
+              },
+              "id": "graph_persistence_protocol:LG18:delta_channel_durable_history",
+              "kind": "native_persistence_protocol",
+              "langgraph": {
+                "reference_surface_available": true
+              },
+              "outcome": "observed"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "durability_async": {
           "evidence": [
@@ -4283,9 +4651,27 @@
                 "path": "langgraph.pregel:Pregel"
               },
               "outcome": "dharma_public_surface_missing"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/types.py:87",
+                "dharma_swarm/graph/durable_invoker.py:241",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "execute native persistence lifecycle facet durability_async",
+              "dharma": {
+                "observed": true
+              },
+              "id": "graph_persistence_protocol:LG18:durability_async",
+              "kind": "native_persistence_protocol",
+              "langgraph": {
+                "reference_surface_available": true
+              },
+              "outcome": "observed"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "durability_exit": {
           "evidence": [
@@ -4310,9 +4696,27 @@
                 "path": "langgraph.pregel:Pregel"
               },
               "outcome": "dharma_public_surface_missing"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/types.py:87",
+                "dharma_swarm/graph/durable_invoker.py:241",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "execute native persistence lifecycle facet durability_exit",
+              "dharma": {
+                "observed": true
+              },
+              "id": "graph_persistence_protocol:LG18:durability_exit",
+              "kind": "native_persistence_protocol",
+              "langgraph": {
+                "reference_surface_available": true
+              },
+              "outcome": "observed"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "durability_sync": {
           "evidence": [
@@ -4337,9 +4741,27 @@
                 "path": "langgraph.pregel:Pregel"
               },
               "outcome": "related_public_surfaces_present_behavior_unproven"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/types.py:87",
+                "dharma_swarm/graph/durable_invoker.py:241",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "execute native persistence lifecycle facet durability_sync",
+              "dharma": {
+                "observed": true
+              },
+              "id": "graph_persistence_protocol:LG18:durability_sync",
+              "kind": "native_persistence_protocol",
+              "langgraph": {
+                "reference_surface_available": true
+              },
+              "outcome": "observed"
             }
           ],
-          "status": "partial"
+          "status": "pass"
         },
         "pending_write_recovery": {
           "evidence": [
@@ -4372,7 +4794,25 @@
                 "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
                 "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
               ],
-              "command_or_probe": "inspect failed-superstep state without conflating atomic rollback with pending-write recovery",
+              "command_or_probe": "execute native persistence lifecycle facet pending_write_recovery",
+              "dharma": {
+                "observed": true
+              },
+              "id": "graph_persistence_protocol:LG18:pending_write_recovery",
+              "kind": "native_persistence_protocol",
+              "langgraph": {
+                "reference_surface_available": true
+              },
+              "outcome": "observed"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/types.py:87",
+                "dharma_swarm/graph/durable_invoker.py:241",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "inspect failed-superstep state separately from pending-write journal recovery",
               "dharma": {
                 "conflict_rejected": true,
                 "exception_propagated": true,
@@ -4385,10 +4825,10 @@
                 "exception_propagated": true,
                 "x_after_failed_step": 27
               },
-              "outcome": "dharma_has_no_pending_write_journal_or_recovery_api"
+              "outcome": "native_pending_write_probe_reported_separately"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "persistent_process_restart": {
           "evidence": [
@@ -4424,7 +4864,7 @@
               "command_or_probe": "seed checkpoint in one process, exit, resume in a second process on each arm",
               "dharma": {
                 "fresh_process_count": 2,
-                "persistence": "harness_serialized_run_checkpoint",
+                "persistence": "native_graph_persistence_kernel",
                 "phases": [
                   {
                     "log": [
@@ -4489,14 +4929,14 @@
               "outcome": "parity"
             }
           ],
-          "status": "partial"
+          "status": "pass"
         }
       },
       "gap_card": "parity-gap-lg18-process-restart",
       "id": "LG18",
       "name": "Durability ordering and process-restart recovery",
-      "points": 1,
-      "verdict": "PARTIALLY_PROVEN",
+      "points": 2,
+      "verdict": "FULLY_PROVEN",
       "weight": 10
     },
     {
@@ -9590,25 +10030,25 @@
               ],
               "command_or_probe": "time both arms for 5 iterations",
               "dharma": {
-                "median_seconds": 0.0013714660001369339,
+                "median_seconds": 0.007008792999840807,
                 "samples_seconds": [
-                  0.001435676999790303,
-                  0.0013714660001369339,
-                  0.0012459930001114117,
-                  0.0014083440000831615,
-                  0.0011638020000646065
+                  0.007081345000187866,
+                  0.007008792999840807,
+                  0.006864265999865893,
+                  0.006955695000215201,
+                  0.007072612999763805
                 ]
               },
               "id": "performance:seeded_checkpoint_resume_fork",
               "kind": "wall_clock_performance",
               "langgraph": {
-                "median_seconds": 0.00900797400004194,
+                "median_seconds": 0.008572720999836747,
                 "samples_seconds": [
-                  0.009268489000078262,
-                  0.008959854000067935,
-                  0.008969472999979189,
-                  0.009200982000038493,
-                  0.00900797400004194
+                  0.008572720999836747,
+                  0.009534411000004184,
+                  0.010253783999814914,
+                  0.00854927399996086,
+                  0.008550873000331194
                 ]
               },
               "outcome": "measured_semantics_parity"
@@ -9650,17 +10090,17 @@
               "command_or_probe": "record interpreter, platform, and installed LangGraph version",
               "dharma": {
                 "langgraph_version": "1.2.4",
-                "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
-                "python_executable": "/usr/local/bin/python3",
-                "python_version": "3.11.15"
+                "platform": "Linux-5.15.200-x86_64-with-glibc2.35",
+                "python_executable": "/home/ubuntu/repos/dharma-swarm/.venv/bin/python",
+                "python_version": "3.12.8"
               },
               "id": "performance:environment-metadata",
               "kind": "runtime_environment",
               "langgraph": {
                 "langgraph_version": "1.2.4",
-                "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
-                "python_executable": "/usr/local/bin/python3",
-                "python_version": "3.11.15"
+                "platform": "Linux-5.15.200-x86_64-with-glibc2.35",
+                "python_executable": "/home/ubuntu/repos/dharma-swarm/.venv/bin/python",
+                "python_version": "3.12.8"
               },
               "outcome": "recorded"
             }
@@ -9700,25 +10140,25 @@
               ],
               "command_or_probe": "time both arms for 5 iterations",
               "dharma": {
-                "median_seconds": 0.0007583229998999741,
+                "median_seconds": 0.0007395950001409801,
                 "samples_seconds": [
-                  0.0009357609999369743,
-                  0.0008352899999408692,
-                  0.0007362799999555136,
-                  0.0007583229998999741,
-                  0.0005790629998045915
+                  0.0008340459999089944,
+                  0.0007637509997948655,
+                  0.0005857619999005692,
+                  0.0007395950001409801,
+                  0.0005791569997199986
                 ]
               },
               "id": "performance:seeded_linear_reducer_chain",
               "kind": "wall_clock_performance",
               "langgraph": {
-                "median_seconds": 0.004519925000067815,
+                "median_seconds": 0.004248091999670578,
                 "samples_seconds": [
-                  0.00461261899999954,
-                  0.004519925000067815,
-                  0.004862352999907671,
-                  0.004437181999946915,
-                  0.004432186000030924
+                  0.004419236999638088,
+                  0.00419012299971655,
+                  0.004248091999670578,
+                  0.004394954999952461,
+                  0.004215952999857109
                 ]
               },
               "outcome": "measured_semantics_parity"
@@ -9759,9 +10199,9 @@
               ],
               "command_or_probe": "compute Dharma median / LangGraph median",
               "dharma": {
-                "seeded_checkpoint_resume_fork": 0.15225021743297087,
-                "seeded_linear_reducer_chain": 0.16777335904657634,
-                "seeded_send_map_reduce": 0.1345212072047188
+                "seeded_checkpoint_resume_fork": 0.8175692408482998,
+                "seeded_linear_reducer_chain": 0.17410051387736722,
+                "seeded_send_map_reduce": 0.11922031579754022
               },
               "id": "performance:overhead-ratios",
               "kind": "wall_clock_performance",
@@ -9806,25 +10246,25 @@
               ],
               "command_or_probe": "time both arms for 5 iterations",
               "dharma": {
-                "median_seconds": 0.0005657210001572821,
+                "median_seconds": 0.0005436629999167053,
                 "samples_seconds": [
-                  0.000540250000085507,
-                  0.0005818520000957506,
-                  0.0005140350001511251,
-                  0.0005657210001572821,
-                  0.0005922170000758342
+                  0.0005481629996211268,
+                  0.0005436629999167053,
+                  0.0004673849998653168,
+                  0.0005490490002557635,
+                  0.0004424909998306248
                 ]
               },
               "id": "performance:seeded_send_map_reduce",
               "kind": "wall_clock_performance",
               "langgraph": {
-                "median_seconds": 0.004205441000067367,
+                "median_seconds": 0.004560153999591421,
                 "samples_seconds": [
-                  0.004541958000118029,
-                  0.0037725470001532813,
-                  0.004205441000067367,
-                  0.00379953700007718,
-                  0.004280641999912405
+                  0.00512248399991222,
+                  0.004524472999946738,
+                  0.004560153999591421,
+                  0.0034708110001702153,
+                  0.00462423699991632
                 ]
               },
               "outcome": "measured_semantics_parity"
@@ -10804,14 +11244,14 @@
       "supply_eta_risk"
     ]
   },
-  "digest": "793f6738523d42af9ac825e0f301dcc85e2cdb174b29854e88bdcb7efaf283a7",
+  "digest": "c56a3764e0290afb86e5bdd9dd26435af8776dff082fe57beaff65c21a148eb7",
   "environment": {
     "langgraph_checkpoint_sqlite_version": "3.1.0",
     "langgraph_checkpoint_version": "4.1.1",
     "langgraph_version": "1.2.4",
-    "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
-    "python_executable": "/usr/local/bin/python3",
-    "python_version": "3.11.15"
+    "platform": "Linux-5.15.200-x86_64-with-glibc2.35",
+    "python_executable": "/home/ubuntu/repos/dharma-swarm/.venv/bin/python",
+    "python_version": "3.12.8"
   },
   "gaps": [
     {
@@ -10909,46 +11349,6 @@
       "name": "Batch, as-completed, and max-concurrency interfaces",
       "points": 0,
       "weight": 1
-    },
-    {
-      "capability_id": "LG14",
-      "closure_condition": "All frozen facets prove 2/2 in an independent judge rerun.",
-      "gap_card": "parity-gap-lg14-checkpoint-protocol",
-      "name": "Checkpoint schema, saver protocol, pending writes, lineage, and serializer",
-      "points": 1,
-      "weight": 4
-    },
-    {
-      "capability_id": "LG15",
-      "closure_condition": "All frozen facets prove 2/2 in an independent judge rerun.",
-      "gap_card": "parity-gap-lg15-thread-resume",
-      "name": "Thread-scoped continuity and resume",
-      "points": 0,
-      "weight": 9
-    },
-    {
-      "capability_id": "LG16",
-      "closure_condition": "All frozen facets prove 2/2 in an independent judge rerun.",
-      "gap_card": "parity-gap-lg16-history",
-      "name": "State inspection, history, and replay",
-      "points": 1,
-      "weight": 2
-    },
-    {
-      "capability_id": "LG17",
-      "closure_condition": "All frozen facets prove 2/2 in an independent judge rerun.",
-      "gap_card": "parity-gap-lg17-fork-time-travel",
-      "name": "Manual state update, bulk update, fork, and time travel",
-      "points": 1,
-      "weight": 8
-    },
-    {
-      "capability_id": "LG18",
-      "closure_condition": "All frozen facets prove 2/2 in an independent judge rerun.",
-      "gap_card": "parity-gap-lg18-process-restart",
-      "name": "Durability ordering and process-restart recovery",
-      "points": 1,
-      "weight": 10
     },
     {
       "capability_id": "LG19",
@@ -11142,14 +11542,14 @@
       "version": "1.2.8"
     }
   },
-  "observed_at": "2026-07-12T02:14:44Z",
+  "observed_at": "2026-07-13T09:55:28Z",
   "performance": {
     "clock": "time.perf_counter",
     "environment_metadata": {
       "langgraph_version": "1.2.4",
-      "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
-      "python_executable": "/usr/local/bin/python3",
-      "python_version": "3.11.15"
+      "platform": "Linux-5.15.200-x86_64-with-glibc2.35",
+      "python_executable": "/home/ubuntu/repos/dharma-swarm/.venv/bin/python",
+      "python_version": "3.12.8"
     },
     "iterations": 5,
     "timing_decides_semantic_parity": false,
@@ -11157,83 +11557,83 @@
     "workloads": {
       "seeded_checkpoint_resume_fork": {
         "dharma": {
-          "median_seconds": 0.0013714660001369339,
+          "median_seconds": 0.007008792999840807,
           "samples_seconds": [
-            0.001435676999790303,
-            0.0013714660001369339,
-            0.0012459930001114117,
-            0.0014083440000831615,
-            0.0011638020000646065
+            0.007081345000187866,
+            0.007008792999840807,
+            0.006864265999865893,
+            0.006955695000215201,
+            0.007072612999763805
           ]
         },
-        "dharma_median_seconds": 0.0013714660001369339,
+        "dharma_median_seconds": 0.007008792999840807,
         "iterations": 5,
         "langgraph": {
-          "median_seconds": 0.00900797400004194,
+          "median_seconds": 0.008572720999836747,
           "samples_seconds": [
-            0.009268489000078262,
-            0.008959854000067935,
-            0.008969472999979189,
-            0.009200982000038493,
-            0.00900797400004194
+            0.008572720999836747,
+            0.009534411000004184,
+            0.010253783999814914,
+            0.00854927399996086,
+            0.008550873000331194
           ]
         },
-        "langgraph_median_seconds": 0.00900797400004194,
-        "overhead_ratio_dharma_to_langgraph": 0.15225021743297087,
+        "langgraph_median_seconds": 0.008572720999836747,
+        "overhead_ratio_dharma_to_langgraph": 0.8175692408482998,
         "semantic_parity_all_iterations": true
       },
       "seeded_linear_reducer_chain": {
         "dharma": {
-          "median_seconds": 0.0007583229998999741,
+          "median_seconds": 0.0007395950001409801,
           "samples_seconds": [
-            0.0009357609999369743,
-            0.0008352899999408692,
-            0.0007362799999555136,
-            0.0007583229998999741,
-            0.0005790629998045915
+            0.0008340459999089944,
+            0.0007637509997948655,
+            0.0005857619999005692,
+            0.0007395950001409801,
+            0.0005791569997199986
           ]
         },
-        "dharma_median_seconds": 0.0007583229998999741,
+        "dharma_median_seconds": 0.0007395950001409801,
         "iterations": 5,
         "langgraph": {
-          "median_seconds": 0.004519925000067815,
+          "median_seconds": 0.004248091999670578,
           "samples_seconds": [
-            0.00461261899999954,
-            0.004519925000067815,
-            0.004862352999907671,
-            0.004437181999946915,
-            0.004432186000030924
+            0.004419236999638088,
+            0.00419012299971655,
+            0.004248091999670578,
+            0.004394954999952461,
+            0.004215952999857109
           ]
         },
-        "langgraph_median_seconds": 0.004519925000067815,
-        "overhead_ratio_dharma_to_langgraph": 0.16777335904657634,
+        "langgraph_median_seconds": 0.004248091999670578,
+        "overhead_ratio_dharma_to_langgraph": 0.17410051387736722,
         "semantic_parity_all_iterations": true
       },
       "seeded_send_map_reduce": {
         "dharma": {
-          "median_seconds": 0.0005657210001572821,
+          "median_seconds": 0.0005436629999167053,
           "samples_seconds": [
-            0.000540250000085507,
-            0.0005818520000957506,
-            0.0005140350001511251,
-            0.0005657210001572821,
-            0.0005922170000758342
+            0.0005481629996211268,
+            0.0005436629999167053,
+            0.0004673849998653168,
+            0.0005490490002557635,
+            0.0004424909998306248
           ]
         },
-        "dharma_median_seconds": 0.0005657210001572821,
+        "dharma_median_seconds": 0.0005436629999167053,
         "iterations": 5,
         "langgraph": {
-          "median_seconds": 0.004205441000067367,
+          "median_seconds": 0.004560153999591421,
           "samples_seconds": [
-            0.004541958000118029,
-            0.0037725470001532813,
-            0.004205441000067367,
-            0.00379953700007718,
-            0.004280641999912405
+            0.00512248399991222,
+            0.004524472999946738,
+            0.004560153999591421,
+            0.0034708110001702153,
+            0.00462423699991632
           ]
         },
-        "langgraph_median_seconds": 0.004205441000067367,
-        "overhead_ratio_dharma_to_langgraph": 0.1345212072047188,
+        "langgraph_median_seconds": 0.004560153999591421,
+        "overhead_ratio_dharma_to_langgraph": 0.11922031579754022,
         "semantic_parity_all_iterations": true
       }
     }
@@ -12246,11 +12646,11 @@
       "Timing data is reporting-only and never determines semantic parity."
     ],
     "process_restart": {
-      "caveat": "Dharma halts from its checkpoint callback and recovers from the documented JSON-serializable RunCheckpoint, but the harness supplies persistence; LangGraph uses its public SQLite saver.",
+      "caveat": "Both arms persist through their public native checkpoint adapters and reopen them in a fresh process.",
       "comparison_verdict": "parity",
       "dharma": {
         "fresh_process_count": 2,
-        "persistence": "harness_serialized_run_checkpoint",
+        "persistence": "native_graph_persistence_kernel",
         "phases": [
           {
             "log": [
@@ -15817,9 +16217,9 @@
         "semantic_comparison_verdict": "parity"
       },
       "seeded_checkpoint_resume_fork": {
-        "comparison_verdict": "mismatch",
+        "comparison_verdict": "parity",
         "dharma": {
-          "checkpoint_id_addressable": false,
+          "checkpoint_id_addressable": true,
           "checkpoint_observed": true,
           "fork_observed": true,
           "forked": {
@@ -15846,7 +16246,7 @@
             ],
             "x": 96
           },
-          "thread_scoped_resume": false
+          "thread_scoped_resume": true
         },
         "id": "seeded_checkpoint_resume_fork",
         "langgraph": {
@@ -16010,7 +16410,7 @@
   "role": "builder",
   "rubric": {
     "base_rubric_commit_sha": "6965d38dc8df4bc487e97465ed2f08ffa8274e31",
-    "head_sha": "4d1b24556692f3d5f7ad6d16c38f1f357f8cab1c",
+    "head_sha": "ea4a8354d294bec0386cf036da8a6ce07ee39b23",
     "rubric_blob_digest": "44ba1f42550563b3f2b5e167b80440250228e4b3d045a2654c9e8b62c87d2338",
     "rubric_commit_sha": "9fe56ce57deba94c2f0bdee03028145a2ae7b2cc",
     "rubric_predates_head": true,
@@ -16018,12 +16418,12 @@
   },
   "schema": "dharma_swarm.dharmagraph_parity_receipt.v1",
   "score": {
-    "display": "31.00/100",
-    "earned": "31.00",
+    "display": "52.00/100",
+    "earned": "52.00",
     "possible": "100.00"
   },
   "shas": {
-    "dharma_git_sha": "4d1b24556692f3d5f7ad6d16c38f1f357f8cab1c",
+    "dharma_git_sha": "ea4a8354d294bec0386cf036da8a6ce07ee39b23",
     "langgraph_git_sha": "054a6f3d8b48d022a4881af3ba3dc0ddc3ac0690",
     "rubric_commit_sha": "9fe56ce57deba94c2f0bdee03028145a2ae7b2cc"
   },
@@ -16034,7 +16434,7 @@
     },
     {
       "path": "dharma_swarm/graph/__init__.py",
-      "sha256": "d9e0fee931bfb288b99fe2b846fac4c8d11944292a77f095287660fd2b2f3f87"
+      "sha256": "9f60db81402ba243b19f0d0eb59a597e6d76baae0054d8620c3bc151177e44cd"
     },
     {
       "path": "dharma_swarm/graph/channels.py",
@@ -16061,6 +16461,14 @@
       "sha256": "f76a392ae6c532933f7ee7490c3bc7f9abb36e50adbc2e8d2f40af03f8c855d3"
     },
     {
+      "path": "dharma_swarm/graph/persistence.py",
+      "sha256": "b47226bea871d66613f187124d6c02e0f25693ec2cc6c7b1507cb284519b77b0"
+    },
+    {
+      "path": "dharma_swarm/graph/persistence_adapter.py",
+      "sha256": "df5bbbd87a254768ec434842d9f9a90feae8200e6d3ca4c5adb810bd15f2bfad"
+    },
+    {
       "path": "dharma_swarm/graph/receipt_chain.py",
       "sha256": "015bfca2430f82d7b2c81676fd412a4d1dc067d4625c0b21162548a46bb4a5cd"
     },
@@ -16078,7 +16486,7 @@
     },
     {
       "path": "dharma_swarm/graph/scheduler.py",
-      "sha256": "b8cacbcbeac9da947d4ee66575c45654463a1b01c619de0d5f25e046d8df2a28"
+      "sha256": "db3ebbfa954880f2690af0fa7c397b94255a9fc4053b84a66680df47fc428a4a"
     },
     {
       "path": "dharma_swarm/graph/state.py",
@@ -16170,7 +16578,7 @@
     },
     {
       "path": "tests/oracle_support/dharmagraph_gauntlet.py",
-      "sha256": "731cb634df2305e727d80de166560803be91cd003b7266193b115f79d869095b"
+      "sha256": "3e4c4189e7ef2727e068a8ad203817c4b2464f6ac830a63f0525ee8acbc06031"
     },
     {
       "path": "tests/oracle_support/langgraph_arm.py",
@@ -16186,7 +16594,7 @@
     },
     {
       "path": "tests/test_dharmagraph_parity_gauntlet.py",
-      "sha256": "22ce9be1cfbe3a2d0b593cb9e97bf53137215ed082b28b0e25fffce080c5546c"
+      "sha256": "45770b4cb386d0f55ae3f084d5985eb97d55e192888e0d6f883bfda582b3e784"
     },
     {
       "path": "tests/test_graph_neutral_langgraph_oracle.py",
@@ -16201,7 +16609,7 @@
       "sha256": "7c5a84fce68c1aee7a23124d286c60abb460516822861b97924bd42402e2c369"
     }
   ],
-  "source_tree_digest": "780b7824398234b3768ef6b7032d952b6a964679a1fa0595369bb0b55868bda0",
+  "source_tree_digest": "6e37b0e52e8b39e7e87e704cc60afeab0f9b8444c084f86db05801da0dfbf3c0",
   "stable_core": {
     "capabilities": [
       {
@@ -16419,90 +16827,80 @@
         "weight": 1
       },
       {
-        "caveats": [
-          "unproven facets: sync_saver, async_saver, pending_writes, serializer, delete_thread, delete_for_runs, copy_thread, prune, get_delta_channel_history, async_checkpoint_lifecycle"
-        ],
+        "caveats": [],
         "facet_statuses": {
-          "async_checkpoint_lifecycle": "missing",
-          "async_saver": "missing",
+          "async_checkpoint_lifecycle": "pass",
+          "async_saver": "pass",
           "checkpoint_schema": "pass",
-          "copy_thread": "missing",
-          "delete_for_runs": "missing",
-          "delete_thread": "missing",
-          "get_delta_channel_history": "missing",
+          "copy_thread": "pass",
+          "delete_for_runs": "pass",
+          "delete_thread": "pass",
+          "get_delta_channel_history": "pass",
           "lineage": "pass",
-          "pending_writes": "missing",
-          "prune": "missing",
-          "serializer": "missing",
-          "sync_saver": "partial"
+          "pending_writes": "pass",
+          "prune": "pass",
+          "serializer": "pass",
+          "sync_saver": "pass"
         },
         "id": "LG14",
-        "points": 1,
-        "verdict": "PARTIALLY_PROVEN",
+        "points": 2,
+        "verdict": "FULLY_PROVEN",
         "weight": 4
       },
       {
-        "caveats": [
-          "unproven facets: thread_id, checkpoint_id, thread_resume, checkpoint_parent, multi_turn_state"
-        ],
+        "caveats": [],
         "facet_statuses": {
-          "checkpoint_id": "missing",
-          "checkpoint_parent": "missing",
-          "multi_turn_state": "missing",
-          "thread_id": "missing",
-          "thread_resume": "missing"
+          "checkpoint_id": "pass",
+          "checkpoint_parent": "pass",
+          "multi_turn_state": "pass",
+          "thread_id": "pass",
+          "thread_resume": "pass"
         },
         "id": "LG15",
-        "points": 0,
-        "verdict": "NOT_PROVEN",
+        "points": 2,
+        "verdict": "FULLY_PROVEN",
         "weight": 9
       },
       {
-        "caveats": [
-          "unproven facets: get_state, get_state_history, async_state_api"
-        ],
+        "caveats": [],
         "facet_statuses": {
-          "async_state_api": "missing",
-          "get_state": "missing",
-          "get_state_history": "missing",
+          "async_state_api": "pass",
+          "get_state": "pass",
+          "get_state_history": "pass",
           "replay": "pass"
         },
         "id": "LG16",
-        "points": 1,
-        "verdict": "PARTIALLY_PROVEN",
+        "points": 2,
+        "verdict": "FULLY_PROVEN",
         "weight": 2
       },
       {
-        "caveats": [
-          "unproven facets: update_state, bulk_update_state"
-        ],
+        "caveats": [],
         "facet_statuses": {
-          "bulk_update_state": "missing",
+          "bulk_update_state": "pass",
           "fork": "pass",
           "new_branch": "pass",
           "time_travel": "pass",
-          "update_state": "missing"
+          "update_state": "pass"
         },
         "id": "LG17",
-        "points": 1,
-        "verdict": "PARTIALLY_PROVEN",
+        "points": 2,
+        "verdict": "FULLY_PROVEN",
         "weight": 8
       },
       {
-        "caveats": [
-          "unproven facets: durability_sync, durability_async, durability_exit, persistent_process_restart, pending_write_recovery, delta_channel_durable_history"
-        ],
+        "caveats": [],
         "facet_statuses": {
-          "delta_channel_durable_history": "missing",
-          "durability_async": "missing",
-          "durability_exit": "missing",
-          "durability_sync": "partial",
-          "pending_write_recovery": "missing",
-          "persistent_process_restart": "partial"
+          "delta_channel_durable_history": "pass",
+          "durability_async": "pass",
+          "durability_exit": "pass",
+          "durability_sync": "pass",
+          "pending_write_recovery": "pass",
+          "persistent_process_restart": "pass"
         },
         "id": "LG18",
-        "points": 1,
-        "verdict": "PARTIALLY_PROVEN",
+        "points": 2,
+        "verdict": "FULLY_PROVEN",
         "weight": 10
       },
       {
@@ -16928,11 +17326,6 @@
       "LG11",
       "LG12",
       "LG13",
-      "LG14",
-      "LG15",
-      "LG16",
-      "LG17",
-      "LG18",
       "LG19",
       "LG20",
       "LG21",
@@ -16960,9 +17353,9 @@
     "rubric_commit_sha": "9fe56ce57deba94c2f0bdee03028145a2ae7b2cc",
     "rubric_schema": "dharma_swarm.dharmagraph_parity_gauntlet.rubric.v2",
     "schema": "dharma_swarm.dharmagraph_parity_receipt.stable.v1",
-    "score": "31.00",
+    "score": "52.00",
     "seed": 20260711,
-    "source_tree_digest": "780b7824398234b3768ef6b7032d952b6a964679a1fa0595369bb0b55868bda0",
+    "source_tree_digest": "6e37b0e52e8b39e7e87e704cc60afeab0f9b8444c084f86db05801da0dfbf3c0",
     "target": {
       "checkpoint_distribution": "langgraph-checkpoint==4.1.1",
       "distribution": "langgraph",
@@ -16979,6 +17372,6 @@
     },
     "weight_denominator": 100
   },
-  "stable_digest": "6b78c48b6197012eb80fead40d64178ef86f69f0412b8b736ca32cce3cfbef3f",
+  "stable_digest": "5b6c6a877b31ddec07c4b240fbce7c55c11ccce941b901dcffff528166416698",
   "verdict": "NOT_FINISHED"
 }
