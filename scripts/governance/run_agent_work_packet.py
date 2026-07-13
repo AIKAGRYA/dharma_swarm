@@ -70,6 +70,7 @@ if _bootstrapped_operator_core:
 
 REPORT_ROOT = Path("reports") / "agentops"
 _TRUSTED_HOST_PATH = "/usr/sbin:/usr/bin:/sbin:/bin"
+_DARWIN_USER_TEMP_PARENT = Path("/private/var/folders")
 _MAX_GATE_TIMEOUT_SECONDS = 300
 _MAX_ADMISSION_TIMEOUT_SECONDS = 480
 _MAX_BINDING_BYTES = 1_000_000
@@ -2238,17 +2239,59 @@ def report_paths(repo_root: Path, job_id: str, timestamp: str) -> tuple[Path, Pa
     return report_dir / "report.json", report_dir / "report.md"
 
 
+def _darwin_account_temp_root() -> Path:
+    """Resolve the OS-account temp root without trusting ``TMPDIR``.
+
+    Darwin's ``getconf DARWIN_USER_TEMP_DIR`` reads the account-scoped value
+    from the operating system.  Invoke the fixed host tool under a minimal
+    environment so a caller cannot redirect report-root admission through an
+    inherited temporary-directory variable or executable search path.
+    """
+
+    getconf = _trusted_host_tool("getconf")
+    try:
+        result = run_command(
+            [getconf, "DARWIN_USER_TEMP_DIR"],
+            cwd=Path("/"),
+            env={"PATH": _TRUSTED_HOST_PATH, "LANG": "C", "LC_ALL": "C"},
+            timeout_seconds=5,
+        )
+    except (OSError, subprocess.SubprocessError, UnicodeError) as exc:
+        raise AgentOpsError("cannot resolve trusted Darwin account temp root") from exc
+    lines = result.stdout.splitlines()
+    if result.returncode != 0 or len(lines) != 1:
+        detail = (result.stderr or result.stdout).strip()
+        raise AgentOpsError(
+            f"cannot resolve trusted Darwin account temp root: {detail or 'invalid output'}"
+        )
+    raw = lines[0].strip()
+    if not raw or raw != lines[0] or "\x00" in raw or not Path(raw).is_absolute():
+        raise AgentOpsError("trusted Darwin account temp root is not an absolute path")
+    try:
+        root = Path(raw).resolve(strict=True)
+        parent = _DARWIN_USER_TEMP_PARENT.resolve(strict=True)
+    except OSError as exc:
+        raise AgentOpsError("trusted Darwin account temp root is unavailable") from exc
+    try:
+        relative = root.relative_to(parent)
+    except ValueError as exc:
+        raise AgentOpsError(
+            "trusted Darwin account temp root escapes /private/var/folders"
+        ) from exc
+    if (
+        len(relative.parts) != 3
+        or len(relative.parts[0]) != 2
+        or re.fullmatch(r"[A-Za-z0-9_]+", relative.parts[1]) is None
+        or relative.parts[2] != "T"
+    ):
+        raise AgentOpsError("trusted Darwin account temp root has an invalid shape")
+    return root
+
+
 def _private_report_anchor(target: Path) -> tuple[Path, bool]:
     candidates: list[tuple[Path, bool]] = []
     if os.name == "posix":
         candidates.append((Path("/tmp").resolve(), True))
-        # macOS uses a private, per-account temporary root under
-        # /private/var/folders rather than /tmp. Treat it as private only after
-        # the normal owner/mode check below; an environment-selected TMPDIR is
-        # never granted the shared-anchor exemption.
-        account_temp = Path(tempfile.gettempdir()).resolve()
-        if account_temp != candidates[0][0]:
-            candidates.append((account_temp, False))
     else:  # pragma: no cover - Windows fallback
         candidates.append((Path(tempfile.gettempdir()).resolve(), True))
     try:
@@ -2256,11 +2299,25 @@ def _private_report_anchor(target: Path) -> tuple[Path, bool]:
     except AgentOpsError:
         pass
     matches = [item for item in candidates if _is_within(target, item[0])]
-    if not matches:
-        raise AgentOpsError(
-            "report_root must be beneath the trusted temp anchor or OS-account home"
-        )
-    return max(matches, key=lambda item: len(item[0].parts))
+    if matches:
+        return max(matches, key=lambda item: len(item[0].parts))
+    if os.name == "posix" and sys.platform == "darwin":
+        # GitHub/macOS runners use a private per-account root rather than /tmp.
+        # Consult it only when the established /tmp and account-home anchors do
+        # not already cover the target. Its authority comes from Darwin
+        # getconf, never TMPDIR.
+        # The fixed parent is only a cheap rejection prefilter; admission still
+        # requires the strict OS-account root returned by getconf. This avoids
+        # changing the canonical error (or spawning a probe) for unrelated
+        # targets such as /opt/reports.
+        darwin_parent = _DARWIN_USER_TEMP_PARENT.resolve(strict=False)
+        if _is_within(target, darwin_parent):
+            account_temp = _darwin_account_temp_root()
+            if _is_within(target, account_temp):
+                return account_temp, False
+    raise AgentOpsError(
+        "report_root must be beneath the trusted temp anchor or OS-account home"
+    )
 
 
 def _validate_private_directory(path: Path, *, allow_shared_anchor: bool = False) -> None:
