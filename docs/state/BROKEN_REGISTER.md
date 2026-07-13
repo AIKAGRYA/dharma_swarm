@@ -21,7 +21,7 @@
 
 ---
 
-## OPEN ITEMS (7 open/partial — BR-007 reopened 2026-07-01; BR-023 added 2026-07-03; rest re-verified 2026-06-15)
+## OPEN ITEMS (9 open/partial — canonical parser count reconciled 2026-07-14)
 
 > **Re-verification pass executed 2026-06-15 (perplexity-computer, Stage 1 EVIDENCE_ONLY):** the register had drifted 22 days since the 2026-05-24 git touch. All 5 OPEN items below have refreshed `last_verified` dates with a `re-verification 2026-06-15` note. No new BRs opened in this pass. No status flips: behavior on disk is unchanged for BR-003 / BR-004 / BR-005 / BR-013 / BR-014. Anti-Slop note: PROD-issue #521 cites this BR-003 as 'Owner doc' but its own owner doc `docs/governance/PROD_READINESS_TOP10.md` does not exist on any branch — BR-003 is real and tracked here; the PROD-issue is the orphan.
 
@@ -33,13 +33,18 @@
 
 ### BR-007 — REOPENED 2026-07-01 — runtime.db and ontology.db sync still broken
 - **first_observed:** 2026-05-10 closure later disproven; independently re-confirmed 2026-06-10 and 2026-07-01.
-- **last_verified:** 2026-07-01
-- **age_days:** 52 since original closure claim; 21 since the 2026-06-10 re-confirmation.
+- **last_verified:** 2026-07-14
+- **age_days:** 65 since original closure claim; 34 since the 2026-06-10 re-confirmation.
 - **severity:** BLOCKER
 - **domain:** runtime / state
-- **root_cause:** The closure evidence assumed one canonical ontology/runtime path and an enabled sync path. The 2026-07-01 audit found the live `store_sync` cron disabled in `~/.dharma/cron/jobs.json`, no sync-derived rows in the live runtime DB, and two diverged `ontology.db` copies with materially different object populations.
+- **root_cause:** The closure evidence assumed one canonical ontology/runtime path and an enabled sync path. The 2026-07-14 operator-Mac host-local snapshot still finds `store_sync.enabled=false`, a populated home ontology beside a zero-byte checkout ontology, and no sync-derived ontology artifact rows in the inspected runtime DB.
 - **blast_radius:** Ontology/runtime self-recognition remains split; status surfaces can claim closure from code presence while live state never converges.
-- **evidence:** `docs/governance/AUDIT_2026-07-01.md`; `dharma_swarm/cron_runner.py` still exposes `store_sync`, but live scheduler state has `store_sync.enabled=false`; ontology path resolution remains split between repo-local `dharma_swarm/ontology.db` and `~/.dharma/ontology.db`.
+- **evidence (host-local witness; observed 2026-07-13T20:11:55Z / 2026-07-14T05:11:55+09:00 and independently replayed 2026-07-14 06:39 JST with the same results):** exact read-only operator-Mac commands and outputs:
+  - `jq -c '.. | objects | select(.id? == "store_sync") | {id,handler,enabled}' ~/.dharma/cron/jobs.json` → `{"id":"store_sync","handler":"store_sync","enabled":false}`
+  - `sqlite3 -readonly ~/.dharma/ontology.db 'SELECT COUNT(*) FROM objects;'` → `22065`
+  - `stat -f '%z' "$HOME/dharma_swarm/dharma_swarm/ontology.db"` → `0`
+  - `sqlite3 -readonly ~/.dharma/state/runtime.db "SELECT COUNT(*), SUM(CASE WHEN artifact_id LIKE 'ont-%' THEN 1 ELSE 0 END) FROM artifact_records;"` → `4241|0`
+  - These commands make the snapshot reproducible on that host. Clean clone/CI and every other seat remain **Unobserved** for these host files; the witness refutes the former global closure claim but does not prove fleet-wide topology or authorize store consolidation. `dharma_swarm/cron_runner.py` exposes code, but code presence is not live convergence.
 - **status:** OPEN — documentation corrected. Do not re-enable `store_sync` or consolidate database files until the operator chooses the canonical `ontology.db` copy and a backup/merge plan exists.
 
 ### BR-003 — Apply gate present but closed (self-evolution loop)
@@ -65,16 +70,16 @@
 - **evidence:** `scripts/diagnostics/proposal_gate_probe.py` (per-gate map); `tests/evolution_gate_helpers.py` + `tests/test_evolution_gate_helpers.py` (self-validating helper); `docs/architecture/EVOLUTION_PROPOSAL_GATE_CONTRACT.md` (contract).
 - **status:** WORKAROUND — contract mapped, self-validating helper built, `test_integration` + `godel_claw` routed through it. Remaining evolution test files to be routed as CI surfaces them. WS4 itself is correct and intentionally unchanged; do not weaken it.
 
-### BR-022 — Center of gravity is inward: outward edge unowned + governance rent uninstrumented
+### BR-022 — Outward receipt quorum below authority; governance-rent instrument Unobserved
 - **first_observed:** 2026-06-21
-- **last_verified:** 2026-06-21
-- **age_days:** 0
+- **last_verified:** 2026-07-14
+- **age_days:** 23 since first_observed; 11 calendar days since the latest tracked authority artifact as of 2026-07-14 JST.
 - **severity:** STALE
 - **domain:** outward
-- **root_cause:** Strategic read-only finding (not a runtime breakage). Two coupled structural gaps. (1) **Outward edge unowned:** the `revenue-external-humans-served` spine objective ("value leaves the house and someone acts on it") has zero active track — confirmed at `docs/governance/ACTIVE_TRACK.yaml:61` and rendered as "**no active track**" by `make onboard`. All 7 active tracks serve `substrate-nativeness`; `research-depth` is also unowned. (2) **Governance rent uninstrumented:** `CLAUDE.md` (Transcendence Principle) states as doctrine that "Every governance mechanism must be evaluated against its diversity cost" and the metabolic test is "does each gate prevent more drift than the coordination tax it imposes" — but no instrument computes a per-gate rent/diversity-cost measure; the Krogh-Vedelsby diversity term (`diversity_archive.py`) exists but is not wired to gate-addition decisions. Governance accretes (watcher surfaces grow faster than watched runtime) with no metabolic ledger to flag autoimmune tip-over.
-- **blast_radius:** Organism cannot yet "feed itself" (no outward acted-receipt revenue loop) while the immune/governance layer keeps expanding uncosted. Risk is twofold: (a) vision tracks (campaigns, economic/legal/ecological build loops, recursive AI-building-AI) all sit downstream of an outward edge that has no owner; (b) ungoverned governance growth silently raises the coordination tax on every agent. Both are second-order, not blocking any single dispatch.
-- **evidence:** `docs/governance/ACTIVE_TRACK.yaml:61-63` (revenue objective, no serving track); `make onboard` render (spine objectives section: revenue + research-depth = no active track); `CLAUDE.md` Transcendence Principle ("Every governance mechanism must be evaluated against its diversity cost"); `dharma_swarm/diversity_archive.py` (Krogh-Vedelsby term exists, unwired to gate decisions). NOTE: claims (1) are ledger-confirmed; claim (2) is an asserted negative ("no instrument found") and must be verified by the working agent before action — search for any gate-cost/rent instrument before treating it as absent.
-- **status:** OPEN — shelved for a future agent per operator (2026-06-21). Two candidate work packets: (A) open a `revenue-external-humans-served` track with an owned outward surface + acted-receipt quorum (One Wire, N>=5/M>=3 per `loop-closure-2026-06`); (B) instrument per-gate metabolic rent (prevented-drift vs coordination-tax) so governance additions are decided against a measure, not a vibe. Do NOT auto-add governance to close this — that would deepen it.
+- **root_cause:** The original ownership claim is Refuted: current `ACTIVE_TRACK.yaml` declares `revenue-external-humans-served` owners in `company-builder-parity-2026-07` and `darshan-publication-2026-07`, and a `research-depth` owner in `hyperbolic-time-chamber-2026-07`. Those are intent declarations, not evidence that external value was delivered. The latest tracked Measurement Guardian authority artifact on exact base c631a492 records only N=3 confirmed acted receipts across M=1 domain, below the required N>=5/M>=3, with `v1_external_threshold_ready=false` and `fitness_authority_granted=false`. Later untracked or live state is Unobserved. The exhaustive claim that no executable per-gate rent/diversity-cost instrument exists is also Unobserved; repository search alone cannot prove system-wide absence.
+- **blast_radius:** Outward work has named owners, but archive-fitness authority and a repeatable external-value loop remain blocked below the tracked receipt quorum. Governance coordination cost may remain unmeasured, but no absence claim is promoted without an authority-complete census.
+- **evidence:** `docs/governance/ACTIVE_TRACK.yaml` (two declared revenue owners and one declared research owner); `reports/forge/measurement-guardian/cycle-004-intake-restart.json` (observed `2026-07-03T14:45:00Z`; `confirmed_receipt_count=3`, `domain_count=1`, required 5/3, `v1_external_threshold_ready=false`, `fitness_authority_granted=false`); `docs/architecture/EXTERNAL_GRADIENT_PORTFOLIO_SPEC.md` (N>=5/M>=3 boundary); `CLAUDE.md` Transcendence Principle and `dharma_swarm/diversity_archive.py` establish the doctrine/adjacent diversity measure but do not prove exhaustive rent-instrument absence.
+- **status:** PARTIAL — the ownership-absence claim is Refuted; the latest tracked authority artifact proves receipt quorum below threshold, while later state and the governance-rent instrument census remain Unobserved. Do not add another governance mechanism merely to close this row.
 
 ### BR-023 — Provider key-loading split-brain (four loaders, shadow stores, lying credit heuristic)
 - **first_observed:** 2026-07-03 (weeks of symptoms; formalized after tri-agent local audit + repo sweep)
