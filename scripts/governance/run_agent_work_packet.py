@@ -15,6 +15,7 @@ import os
 import platform
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import sysconfig
@@ -191,11 +192,12 @@ def run_command(
     *,
     cwd: Path,
     env: dict[str, str] | None = None,
+    input_text: str | None = None,
     timeout_seconds: int | None = None,
     preexec_fn: Callable[[], None] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        argv, cwd=cwd, env=env, capture_output=True, text=True,
+        argv, cwd=cwd, env=env, input=input_text, capture_output=True, text=True,
         timeout=timeout_seconds, check=False, preexec_fn=preexec_fn,
     )
 
@@ -224,8 +226,12 @@ def trusted_git_identity_probe_environment(
     actual commit still runs with global and system config disabled.
     """
 
+    home = _os_account_home()
     environment = trusted_git_environment(inherited)
     environment.pop("GIT_CONFIG_GLOBAL", None)
+    environment.pop("EMAIL", None)
+    environment["HOME"] = str(home)
+    environment["XDG_CONFIG_HOME"] = str(home / ".config")
     return environment
 
 
@@ -241,20 +247,46 @@ def run_git(args: list[str], *, cwd: Path, check: bool = True) -> subprocess.Com
     return result
 
 
+def _os_account_home() -> Path:
+    """Return the OS account database home, never an inherited env redirect."""
+
+    try:
+        import pwd
+
+        home = Path(pwd.getpwuid(os.getuid()).pw_dir).resolve(strict=True)
+    except (AttributeError, ImportError, KeyError, OSError) as exc:
+        raise AgentOpsError(
+            "cannot resolve a trusted OS-account home for Git identity"
+        ) from exc
+    if not home.is_dir() or home.stat().st_uid != os.getuid():
+        raise AgentOpsError("trusted OS-account home has invalid ownership")
+    return home
+
+
 def _identity_config_value(repo_root: Path, key: str) -> str | None:
-    local = run_git(["config", "--local", "--get", key], cwd=repo_root, check=False)
-    result = local
-    if local.returncode != 0:
-        result = run_command(
-            ["git", "config", "--global", "--get", key],
-            cwd=repo_root,
-            env=trusted_git_identity_probe_environment(),
-        )
-    if result.returncode != 0:
+    result = run_command(
+        ["git", "config", "--global", "--no-includes", "--get-all", key],
+        cwd=repo_root,
+        env=trusted_git_identity_probe_environment(),
+    )
+    if result.returncode not in (0, 1):
+        detail = (result.stderr or result.stdout).strip()
+        raise AgentOpsError(f"cannot read trusted Git {key}: {detail}")
+    values = result.stdout.splitlines() if result.returncode == 0 else []
+    if not values:
         return None
-    value = result.stdout.removesuffix("\n")
-    if not value or any(character in value for character in "\x00\r\n"):
-        raise AgentOpsError(f"git {key} contains an invalid identity value")
+    if len(values) != 1:
+        raise AgentOpsError(
+            f"trusted global Git {key} must contain exactly one value; "
+            f"observed {len(values)}"
+        )
+    value = values[0].strip()
+    if not value or any(character in value for character in "\x00\r\n<>"):
+        raise AgentOpsError(f"trusted global Git {key} contains an invalid value")
+    if key == "user.email" and (
+        "@" not in value or any(character.isspace() for character in value)
+    ):
+        raise AgentOpsError("trusted global Git user.email is not a plain email")
     return value
 
 
@@ -262,12 +294,18 @@ def trusted_git_commit_environment(repo_root: Path) -> dict[str, str]:
     environment = trusted_git_environment()
     name = _identity_config_value(repo_root, "user.name")
     email = _identity_config_value(repo_root, "user.email")
-    if name is not None:
-        environment["GIT_AUTHOR_NAME"] = name
-        environment["GIT_COMMITTER_NAME"] = name
-    if email is not None:
-        environment["GIT_AUTHOR_EMAIL"] = email
-        environment["GIT_COMMITTER_EMAIL"] = email
+    if not name or not email:
+        raise AgentOpsError("trusted global Git identity must be a complete pair")
+    home = _os_account_home()
+    environment.pop("EMAIL", None)
+    environment["HOME"] = str(home)
+    environment["XDG_CONFIG_HOME"] = str(home / ".config")
+    environment["GIT_AUTHOR_NAME"] = name
+    environment["GIT_AUTHOR_EMAIL"] = email
+    environment["GIT_COMMITTER_NAME"] = name
+    environment["GIT_COMMITTER_EMAIL"] = email
+    environment["GIT_CONFIG"] = os.devnull
+    environment["GIT_PAGER"] = ""
     return environment
 
 def repo_root_from(path: Path) -> Path:
@@ -364,9 +402,14 @@ def git_status(repo_root: Path) -> str:
     return run_git(["status", "--short"], cwd=repo_root).stdout
 
 
-def git_object_id_for_bytes(repo_root: Path, content: bytes) -> str:
+def git_object_id_for_bytes(
+    repo_root: Path, content: bytes, *, write: bool = False,
+) -> str:
     result = subprocess.run(
-        ["git", "hash-object", "--stdin"],
+        [
+            "git", "hash-object", *(["-w"] if write else []),
+            "--no-filters", "--stdin",
+        ],
         cwd=repo_root,
         env=trusted_git_environment(),
         input=content,
@@ -376,7 +419,8 @@ def git_object_id_for_bytes(repo_root: Path, content: bytes) -> str:
     )
     if result.returncode != 0:
         detail = result.stderr.decode("utf-8", errors="replace").strip()
-        raise AgentOpsError(f"could not hash packet candidate for index custody: {detail}")
+        action = "write" if write else "hash"
+        raise AgentOpsError(f"could not {action} exact Git blob: {detail}")
     return result.stdout.decode("ascii").strip()
 
 
@@ -1078,17 +1122,175 @@ def should_commit(report: dict[str, Any], packet: WorkPacket, final_scope: Scope
     return True, "commit permitted"
 
 
-def create_commit(repo_root: Path, files: list[str], message: str) -> str:
-    run_git(["add", "--", *files], cwd=repo_root)
-    result = run_command(
-        ["git", "commit", "-m", message],
+def _read_regular_worktree_file(repo_root: Path, relative: str) -> tuple[str, bytes] | None:
+    rel_path = Path(relative)
+    if rel_path.is_absolute() or not rel_path.parts or ".." in rel_path.parts:
+        raise AgentOpsError(f"governed commit path is not repo-relative: {relative}")
+    path = repo_root.joinpath(*rel_path.parts)
+    try:
+        parent = path.parent.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        if not path.exists() and not path.is_symlink():
+            return None
+        raise AgentOpsError(f"cannot resolve governed commit path {relative}: {exc}") from exc
+    if not _is_within(parent, repo_root):
+        raise AgentOpsError(f"governed commit path escapes the repository: {relative}")
+    if not hasattr(os, "O_NOFOLLOW"):
+        raise AgentOpsError("governed commit requires no-follow file reads")
+    flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise AgentOpsError(
+            f"governed commit path must be a regular non-symlink file: {relative}"
+        ) from exc
+    try:
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode):
+            raise AgentOpsError(
+                f"governed commit path must be a regular file: {relative}"
+            )
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(descriptor, 1024 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+    finally:
+        os.close(descriptor)
+    mode = "100755" if metadata.st_mode & 0o111 else "100644"
+    return mode, b"".join(chunks)
+
+
+def _core_filemode_enabled(repo_root: Path) -> bool:
+    result = run_git(
+        ["config", "--bool", "--get", "core.fileMode"],
         cwd=repo_root,
-        env=trusted_git_commit_environment(repo_root),
+        check=False,
+    )
+    if result.returncode == 1:
+        return True
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip()
+        raise AgentOpsError(f"cannot read core.fileMode: {detail}")
+    value = result.stdout.strip()
+    if value not in {"true", "false"}:
+        raise AgentOpsError(f"core.fileMode returned an invalid boolean: {value!r}")
+    return value == "true"
+
+
+def _tracked_regular_index_mode(repo_root: Path, relative: str) -> str | None:
+    result = run_git(
+        ["ls-files", "--stage", "-z", "--", relative],
+        cwd=repo_root,
+    )
+    rows = [row for row in result.stdout.split("\x00") if row]
+    if not rows:
+        return None
+    if len(rows) != 1:
+        raise AgentOpsError(f"governed commit path has ambiguous index stages: {relative}")
+    metadata, separator, indexed_path = rows[0].partition("\t")
+    fields = metadata.split()
+    if (
+        not separator
+        or indexed_path != relative
+        or len(fields) != 3
+        or fields[2] != "0"
+    ):
+        raise AgentOpsError(f"governed commit path has invalid index metadata: {relative}")
+    mode = fields[0]
+    if mode not in {"100644", "100755"}:
+        raise AgentOpsError(
+            f"governed commit path has unsupported tracked mode {mode}: {relative}"
+        )
+    return mode
+
+
+def _stage_exact_files(repo_root: Path, files: list[str]) -> None:
+    """Stage exact worktree bytes without Git clean/process filters."""
+
+    filemode_enabled = _core_filemode_enabled(repo_root)
+    for relative in files:
+        unmerged = run_git(
+            ["-c", "core.fsmonitor=false", "ls-files", "-u", "--", relative],
+            cwd=repo_root,
+        )
+        if unmerged.stdout.strip():
+            raise AgentOpsError(f"cannot govern an unmerged index path: {relative}")
+        snapshot = _read_regular_worktree_file(repo_root, relative)
+        if snapshot is None:
+            run_git(
+                [
+                    "-c", f"core.hooksPath={os.devnull}",
+                    "-c", "core.fsmonitor=false", "update-index",
+                    "--force-remove", "--", relative,
+                ],
+                cwd=repo_root,
+            )
+            continue
+        mode, content = snapshot
+        if not filemode_enabled:
+            mode = _tracked_regular_index_mode(repo_root, relative) or mode
+        object_id = git_object_id_for_bytes(repo_root, content, write=True)
+        run_git(
+            [
+                "-c", f"core.hooksPath={os.devnull}",
+                "-c", "core.fsmonitor=false", "update-index", "--add",
+                "--cacheinfo", mode, object_id, relative,
+            ],
+            cwd=repo_root,
+        )
+
+
+def create_commit(repo_root: Path, files: list[str], message: str) -> str:
+    commit_environment = trusted_git_commit_environment(repo_root)
+    parent = head_for(repo_root)
+    branch = run_git(
+        ["symbolic-ref", "--quiet", "HEAD"], cwd=repo_root, check=False
+    )
+    branch_ref = branch.stdout.strip()
+    if branch.returncode != 0 or not branch_ref.startswith("refs/heads/"):
+        raise AgentOpsError("governed commit requires an attached branch HEAD")
+    _stage_exact_files(repo_root, files)
+    tree = run_git(
+        [
+            "-c", f"core.hooksPath={os.devnull}",
+            "-c", "core.fsmonitor=false", "write-tree",
+        ],
+        cwd=repo_root,
+    ).stdout.strip()
+    result = run_command(
+        [
+            "git", "-c", "commit.gpgSign=false",
+            "commit-tree", tree, "-p", parent,
+        ],
+        cwd=repo_root,
+        env=commit_environment,
+        input_text=f"{message}\n",
     )
     if result.returncode != 0:
         detail = (result.stderr or result.stdout).strip()
-        raise AgentOpsError(f"git commit failed: {detail}")
-    return head_for(repo_root)
+        raise AgentOpsError(f"git commit-tree failed: {detail}")
+    commit_hash = result.stdout.strip()
+    if not re.fullmatch(r"[0-9a-f]{40,64}", commit_hash):
+        raise AgentOpsError("git commit-tree returned an invalid object id")
+    ref_result = run_command(
+        [
+            "git", "-c", f"core.hooksPath={os.devnull}",
+            "-c", "core.logAllRefUpdates=true",
+            "update-ref", "-m", message, branch_ref, commit_hash, parent,
+        ],
+        cwd=repo_root,
+        env=commit_environment,
+    )
+    if ref_result.returncode != 0:
+        detail = (ref_result.stderr or ref_result.stdout).strip()
+        raise AgentOpsError(f"git update-ref failed: {detail}")
+    if head_for(repo_root) != commit_hash:
+        raise AgentOpsError("governed commit ref update did not reach the new object")
+    return commit_hash
 
 
 def base_report(packet: WorkPacket, target_root: Path, *, dry_run: bool) -> dict[str, Any]:

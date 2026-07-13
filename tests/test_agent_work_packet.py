@@ -1039,6 +1039,7 @@ def test_create_commit_uses_global_identity_without_trusting_git_controls(
         "[user]\n\tname = Global AgentOps\n\temail = global-agentops@example.invalid\n",
         encoding="utf-8",
     )
+    monkeypatch.setattr(agentops, "_os_account_home", lambda: home, raising=False)
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("GIT_AUTHOR_NAME", "Inherited Attacker")
     monkeypatch.setenv("GIT_AUTHOR_EMAIL", "attacker@example.invalid")
@@ -1059,6 +1060,442 @@ def test_create_commit_uses_global_identity_without_trusting_git_controls(
         "Global AgentOps",
         "global-agentops@example.invalid",
     ]
+
+
+@pytest.mark.parametrize("redirect", ["HOME", "XDG_CONFIG_HOME"])
+def test_commit_identity_ignores_inherited_config_redirects(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, redirect: str,
+) -> None:
+    repo = init_repo(tmp_path)
+    assert run(["git", "config", "--unset", "user.name"], cwd=repo).returncode == 0
+    assert run(["git", "config", "--unset", "user.email"], cwd=repo).returncode == 0
+    assert run(
+        ["git", "config", "user.useConfigOnly", "true"], cwd=repo
+    ).returncode == 0
+
+    trusted_home = tmp_path / "trusted-home"
+    attacker_home = tmp_path / "attacker-home"
+    empty_home = tmp_path / "empty-home"
+    trusted_home.mkdir()
+    attacker_home.mkdir()
+    empty_home.mkdir()
+    trusted_config = trusted_home / ".gitconfig"
+    attacker_config = attacker_home / ".gitconfig"
+    if redirect == "XDG_CONFIG_HOME":
+        trusted_config = trusted_home / ".config/git/config"
+        attacker_config = attacker_home / "git/config"
+    trusted_config.parent.mkdir(parents=True, exist_ok=True)
+    attacker_config.parent.mkdir(parents=True, exist_ok=True)
+    trusted_config.write_text(
+        "[user]\n\tname = Trusted OS User\n\temail = trusted@example.invalid\n",
+        encoding="utf-8",
+    )
+    attacker_config.write_text(
+        "[user]\n\tname = Redirected Attacker\n\temail = attacker@example.invalid\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        agentops, "_os_account_home", lambda: trusted_home, raising=False
+    )
+    if redirect == "HOME":
+        monkeypatch.setenv("HOME", str(attacker_home))
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(empty_home))
+    else:
+        monkeypatch.setenv("HOME", str(empty_home))
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(attacker_home))
+
+    changed = repo / f"{redirect.lower()}-identity.txt"
+    changed.write_text("redirect probe\n", encoding="utf-8")
+    agentops.create_commit(repo, [changed.name], f"test: ignore {redirect}")
+    identity = agentops.run_git(
+        ["show", "-s", "--format=%an%n%ae%n%cn%n%ce", "HEAD"], cwd=repo
+    ).stdout.splitlines()
+    assert identity == [
+        "Trusted OS User",
+        "trusted@example.invalid",
+        "Trusted OS User",
+        "trusted@example.invalid",
+    ]
+
+
+def test_os_account_home_ignores_environment_redirects(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected = agentops._os_account_home()
+    monkeypatch.setenv("HOME", str(tmp_path / "redirected-home"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "redirected-xdg"))
+    assert agentops._os_account_home() == expected
+
+
+def _install_trusted_commit_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trusted_home = tmp_path / "trusted-home"
+    trusted_home.mkdir()
+    (trusted_home / ".gitconfig").write_text(
+        "[user]\n\tname = Trusted OS User\n\temail = trusted@example.invalid\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        agentops, "_os_account_home", lambda: trusted_home, raising=False
+    )
+
+
+def test_create_commit_disables_default_reference_transaction_hook(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_repo(tmp_path)
+    _install_trusted_commit_identity(tmp_path, monkeypatch)
+    marker = tmp_path / "reference-transaction-ran"
+    hook = repo / ".git/hooks/reference-transaction"
+    hook.write_text(f"#!/bin/sh\ntouch '{marker}'\n", encoding="utf-8")
+    hook.chmod(0o755)
+    changed = repo / "reference-hook.txt"
+    changed.write_text("reference hook probe\n", encoding="utf-8")
+
+    agentops.create_commit(repo, [changed.name], "test: disable reference hook")
+
+    assert not marker.exists()
+
+
+def test_create_commit_disables_post_index_change_hook_during_staging(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_repo(tmp_path)
+    _install_trusted_commit_identity(tmp_path, monkeypatch)
+    doomed = repo / "doomed.txt"
+    doomed.write_text("remove me\n", encoding="utf-8")
+    assert run(["git", "add", doomed.name], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "add doomed"], cwd=repo).returncode == 0
+    marker = tmp_path / "post-index-change-ran"
+    hook = repo / ".git/hooks/post-index-change"
+    hook.write_text(f"#!/bin/sh\ntouch '{marker}'\n", encoding="utf-8")
+    hook.chmod(0o755)
+    changed = repo / "index-hook.txt"
+    changed.write_text("index hook probe\n", encoding="utf-8")
+    doomed.unlink()
+
+    agentops.create_commit(
+        repo, [changed.name, doomed.name], "test: disable index hook"
+    )
+
+    assert not marker.exists()
+    assert agentops.run_git(
+        ["show", f"HEAD:{changed.name}"], cwd=repo
+    ).stdout == "index hook probe\n"
+    assert agentops.run_git(
+        ["cat-file", "-e", f"HEAD:{doomed.name}"], cwd=repo, check=False
+    ).returncode != 0
+
+
+def test_create_commit_preserves_tracked_executable_when_filemode_is_false(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_repo(tmp_path)
+    executable = repo / "tool.sh"
+    executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    executable.chmod(0o755)
+    assert run(["git", "add", "tool.sh"], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "add executable"], cwd=repo).returncode == 0
+    assert run(["git", "config", "core.fileMode", "false"], cwd=repo).returncode == 0
+    executable.chmod(0o644)
+    executable.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    _install_trusted_commit_identity(tmp_path, monkeypatch)
+
+    agentops.create_commit(repo, [executable.name], "test: preserve executable")
+
+    assert agentops.run_git(
+        ["ls-tree", "HEAD", "--", executable.name], cwd=repo
+    ).stdout.startswith("100755 blob ")
+    assert agentops.run_git(
+        ["show", f"HEAD:{executable.name}"], cwd=repo
+    ).stdout == "#!/bin/sh\nexit 1\n"
+
+
+def test_create_commit_ignores_local_identity_hooks_and_signing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_repo(tmp_path)
+    trusted_home = tmp_path / "trusted-home"
+    trusted_home.mkdir()
+    (trusted_home / ".gitconfig").write_text(
+        "[user]\n\tname = Trusted OS User\n\temail = trusted@example.invalid\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(agentops, "_os_account_home", lambda: trusted_home, raising=False)
+    monkeypatch.setenv("HOME", str(trusted_home))
+    monkeypatch.setenv("EMAIL", "fallback-poison@example.invalid")
+    assert run(["git", "config", "user.name", "Local Attacker"], cwd=repo).returncode == 0
+    assert run(
+        ["git", "config", "user.email", "local-attacker@example.invalid"], cwd=repo
+    ).returncode == 0
+
+    hook_marker = tmp_path / "hook-ran"
+    hooks = tmp_path / "hooks"
+    hooks.mkdir()
+    pre_commit = hooks / "pre-commit"
+    pre_commit.write_text(
+        f"#!/bin/sh\ntouch '{hook_marker}'\n", encoding="utf-8"
+    )
+    pre_commit.chmod(0o755)
+    reference_hook_marker = tmp_path / "reference-hook-ran"
+    reference_hook = hooks / "reference-transaction"
+    reference_hook.write_text(
+        f"#!/bin/sh\ntouch '{reference_hook_marker}'\n", encoding="utf-8"
+    )
+    reference_hook.chmod(0o755)
+    assert run(
+        ["git", "config", "core.hooksPath", str(hooks)], cwd=repo
+    ).returncode == 0
+
+    signer_marker = tmp_path / "signer-ran"
+    signer = tmp_path / "signer"
+    signer.write_text(
+        f"#!/bin/sh\ntouch '{signer_marker}'\nexit 1\n", encoding="utf-8"
+    )
+    signer.chmod(0o755)
+    assert run(
+        ["git", "config", "gpg.program", str(signer)], cwd=repo
+    ).returncode == 0
+    assert run(["git", "config", "commit.gpgSign", "true"], cwd=repo).returncode == 0
+    fsmonitor_marker = tmp_path / "fsmonitor-ran"
+    fsmonitor = tmp_path / "fsmonitor"
+    fsmonitor.write_text(
+        f"#!/bin/sh\ntouch '{fsmonitor_marker}'\nexit 1\n", encoding="utf-8"
+    )
+    fsmonitor.chmod(0o755)
+    assert run(
+        ["git", "config", "core.fsmonitor", str(fsmonitor)], cwd=repo
+    ).returncode == 0
+
+    changed = repo / "local-controls.txt"
+    changed.write_text("local controls probe\n", encoding="utf-8")
+    agentops.create_commit(repo, [changed.name], "test: isolate local controls")
+
+    assert not hook_marker.exists()
+    assert not reference_hook_marker.exists()
+    assert not signer_marker.exists()
+    assert not fsmonitor_marker.exists()
+    identity = agentops.run_git(
+        ["show", "-s", "--format=%an%n%ae%n%cn%n%ce", "HEAD"], cwd=repo
+    ).stdout.splitlines()
+    assert identity == [
+        "Trusted OS User",
+        "trusted@example.invalid",
+        "Trusted OS User",
+        "trusted@example.invalid",
+    ]
+    assert agentops.run_git(
+        ["reflog", "-1", "--format=%gN%n%gE", "HEAD"], cwd=repo
+    ).stdout.splitlines() == ["Trusted OS User", "trusted@example.invalid"]
+
+
+def test_create_commit_stages_exact_bytes_without_local_filters(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_repo(tmp_path)
+    trusted_home = tmp_path / "trusted-home"
+    trusted_home.mkdir()
+    (trusted_home / ".gitconfig").write_text(
+        "[user]\n\tname = Trusted OS User\n\temail = trusted@example.invalid\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(agentops, "_os_account_home", lambda: trusted_home, raising=False)
+    attributes = repo / ".gitattributes"
+    attributes.write_text("filtered.txt filter=danger\n", encoding="utf-8")
+    assert run(["git", "add", ".gitattributes"], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "add filter attributes"], cwd=repo).returncode == 0
+    filter_marker = tmp_path / "filter-ran"
+    filter_script = tmp_path / "filter-script"
+    filter_script.write_text(
+        f"#!/bin/sh\ntouch '{filter_marker}'\ncat\n", encoding="utf-8"
+    )
+    filter_script.chmod(0o755)
+    assert run(
+        ["git", "config", "filter.danger.clean", str(filter_script)],
+        cwd=repo,
+    ).returncode == 0
+    changed = repo / "filtered.txt"
+    changed.write_text("filter probe\n", encoding="utf-8")
+
+    agentops.create_commit(repo, [changed.name], "test: bypass local filter")
+    assert not filter_marker.exists()
+    assert agentops.run_git(
+        ["show", "HEAD:filtered.txt"], cwd=repo
+    ).stdout == "filter probe\n"
+
+
+def test_create_commit_stages_exact_bytes_without_worktree_filters(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_repo(tmp_path)
+    trusted_home = tmp_path / "trusted-home"
+    trusted_home.mkdir()
+    (trusted_home / ".gitconfig").write_text(
+        "[user]\n\tname = Trusted OS User\n\temail = trusted@example.invalid\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(agentops, "_os_account_home", lambda: trusted_home, raising=False)
+    (repo / ".gitattributes").write_text(
+        "filtered.txt filter=danger\n", encoding="utf-8"
+    )
+    assert run(["git", "add", ".gitattributes"], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "add filter attributes"], cwd=repo).returncode == 0
+    filter_marker = tmp_path / "worktree-filter-ran"
+    filter_script = tmp_path / "worktree-filter"
+    filter_script.write_text(
+        f"#!/bin/sh\ntouch '{filter_marker}'\ncat\n", encoding="utf-8"
+    )
+    filter_script.chmod(0o755)
+    assert run(
+        ["git", "config", "extensions.worktreeConfig", "true"], cwd=repo
+    ).returncode == 0
+    assert run(
+        [
+            "git", "config", "--worktree", "filter.danger.clean",
+            str(filter_script),
+        ],
+        cwd=repo,
+    ).returncode == 0
+    changed = repo / "filtered.txt"
+    changed.write_text("worktree filter probe\n", encoding="utf-8")
+
+    agentops.create_commit(repo, [changed.name], "test: bypass worktree filter")
+    assert not filter_marker.exists()
+    assert agentops.run_git(
+        ["show", "HEAD:filtered.txt"], cwd=repo
+    ).stdout == "worktree filter probe\n"
+
+
+def test_create_commit_filter_install_race_cannot_execute(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_repo(tmp_path)
+    trusted_home = tmp_path / "trusted-home"
+    trusted_home.mkdir()
+    (trusted_home / ".gitconfig").write_text(
+        "[user]\n\tname = Trusted OS User\n\temail = trusted@example.invalid\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(agentops, "_os_account_home", lambda: trusted_home, raising=False)
+    (repo / ".gitattributes").write_text(
+        "filtered.txt filter=danger\n", encoding="utf-8"
+    )
+    assert run(["git", "add", ".gitattributes"], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "add filter attributes"], cwd=repo).returncode == 0
+    filter_marker = tmp_path / "racing-filter-ran"
+    filter_script = tmp_path / "racing-filter"
+    filter_script.write_text(
+        f"#!/bin/sh\ntouch '{filter_marker}'\ncat\n", encoding="utf-8"
+    )
+    filter_script.chmod(0o755)
+    changed = repo / "filtered.txt"
+    changed.write_text("race filter probe\n", encoding="utf-8")
+    original_hash = agentops.git_object_id_for_bytes
+    race_armed = False
+
+    def install_filter_before_hash(
+        root: Path, content: bytes, *, write: bool = False,
+    ) -> str:
+        nonlocal race_armed
+        if write and not race_armed:
+            assert run(
+                ["git", "config", "filter.danger.clean", str(filter_script)],
+                cwd=repo,
+            ).returncode == 0
+            race_armed = True
+        return original_hash(root, content, write=write)
+
+    monkeypatch.setattr(agentops, "git_object_id_for_bytes", install_filter_before_hash)
+    agentops.create_commit(repo, [changed.name], "test: bypass filter race")
+
+    assert race_armed is True
+    assert not filter_marker.exists()
+    assert agentops.run_git(
+        ["show", "HEAD:filtered.txt"], cwd=repo
+    ).stdout == "race filter probe\n"
+
+
+def test_create_commit_plumbing_preserves_binary_mode_and_deletion(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_repo(tmp_path)
+    doomed = repo / "delete-me.txt"
+    doomed.write_text("remove me\n", encoding="utf-8")
+    assert run(["git", "add", "delete-me.txt"], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "add deletion fixture"], cwd=repo).returncode == 0
+    trusted_home = tmp_path / "trusted-home"
+    trusted_home.mkdir()
+    (trusted_home / ".gitconfig").write_text(
+        "[user]\n\tname = Trusted OS User\n\temail = trusted@example.invalid\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(agentops, "_os_account_home", lambda: trusted_home, raising=False)
+    binary = repo / "binary.bin"
+    binary_bytes = b"\x00\xffexact\n"
+    binary.write_bytes(binary_bytes)
+    executable = repo / "tool.sh"
+    executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    executable.chmod(0o755)
+    doomed.unlink()
+
+    agentops.create_commit(
+        repo,
+        ["binary.bin", "delete-me.txt", "tool.sh"],
+        "test: exact plumbing parity",
+    )
+
+    binary_result = subprocess.run(
+        ["git", "show", "HEAD:binary.bin"], cwd=repo, capture_output=True, check=False
+    )
+    assert binary_result.returncode == 0
+    assert binary_result.stdout == binary_bytes
+    assert agentops.run_git(
+        ["ls-tree", "HEAD", "--", "tool.sh"], cwd=repo
+    ).stdout.startswith("100755 blob ")
+    assert run(
+        ["git", "cat-file", "-e", "HEAD:delete-me.txt"], cwd=repo
+    ).returncode != 0
+    assert agentops.git_status(repo) == ""
+
+
+@pytest.mark.parametrize(
+    ("identity_config", "expected"),
+    [
+        (
+            "[user]\n\tname = First\n\tname = Second\n"
+            "\temail = trusted@example.invalid\n",
+            "exactly one",
+        ),
+        ("[user]\n\tname = Trusted OS User\n", "complete"),
+    ],
+)
+def test_commit_identity_requires_one_complete_global_pair(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    identity_config: str,
+    expected: str,
+) -> None:
+    repo = init_repo(tmp_path)
+    assert run(["git", "config", "--unset", "user.name"], cwd=repo).returncode == 0
+    assert run(["git", "config", "--unset", "user.email"], cwd=repo).returncode == 0
+    assert run(
+        ["git", "config", "user.useConfigOnly", "true"], cwd=repo
+    ).returncode == 0
+    trusted_home = tmp_path / "trusted-home"
+    trusted_home.mkdir()
+    (trusted_home / ".gitconfig").write_text(identity_config, encoding="utf-8")
+    monkeypatch.setattr(agentops, "_os_account_home", lambda: trusted_home, raising=False)
+    monkeypatch.setenv("HOME", str(trusted_home))
+    monkeypatch.setenv("EMAIL", "fallback-poison@example.invalid")
+    changed = repo / "invalid-identity.txt"
+    changed.write_text("invalid identity probe\n", encoding="utf-8")
+
+    with pytest.raises(agentops.AgentOpsError, match=expected):
+        agentops.create_commit(repo, [changed.name], "test: reject identity")
+    assert agentops.run_git(
+        ["diff", "--cached", "--name-only"], cwd=repo
+    ).stdout == ""
 
 
 def test_session_entry_rejects_each_missing_required_field(tmp_path: Path) -> None:
@@ -1388,6 +1825,24 @@ def test_all_internal_git_subprocesses_use_trusted_environment() -> None:
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
     }
     assert "run_git" in probe_calls
+    create_commit = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "create_commit"
+    )
+    commit_environment_assignments = [
+        node
+        for node in ast.walk(create_commit)
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "commit_environment"
+            for target in node.targets
+        )
+        and isinstance(node.value, ast.Call)
+        and isinstance(node.value.func, ast.Name)
+        and node.value.func.id == "trusted_git_commit_environment"
+    ]
+    assert len(commit_environment_assignments) == 1
 
     violations: list[int] = []
     identity_probe_lines: list[int] = []
@@ -1407,25 +1862,40 @@ def test_all_internal_git_subprocesses_use_trusted_environment() -> None:
             if isinstance(env, ast.Call) and isinstance(env.func, ast.Name)
             else ""
         )
-        literal_prefix = [
+        literal_values = [
             item.value if isinstance(item, ast.Constant) else None
-            for item in argv.elts[:4]
+            for item in argv.elts
         ]
         if helper == "trusted_git_environment":
             continue
         if helper == "trusted_git_identity_probe_environment":
-            if literal_prefix == ["git", "config", "--global", "--get"]:
+            if literal_values[:6] == [
+                "git", "config", "--global", "--no-includes", "--get-all", None,
+            ]:
                 identity_probe_lines.append(node.lineno)
                 continue
-        if helper == "trusted_git_commit_environment":
-            if literal_prefix[:2] == ["git", "commit"]:
+        trusted_commit_variable = (
+            isinstance(env, ast.Name)
+            and env.id == "commit_environment"
+            and create_commit.lineno <= node.lineno <= (create_commit.end_lineno or node.lineno)
+        )
+        if helper == "trusted_git_commit_environment" or trusted_commit_variable:
+            commit_tree_safe = (
+                "commit-tree" in literal_values
+                and "-S" not in literal_values
+            )
+            update_ref_safe = (
+                "update-ref" in literal_values
+                and "core.logAllRefUpdates=true" in literal_values
+            )
+            if commit_tree_safe or update_ref_safe:
                 commit_environment_lines.append(node.lineno)
                 continue
         violations.append(node.lineno)
 
     assert violations == []
     assert len(identity_probe_lines) == 1
-    assert len(commit_environment_lines) == 1
+    assert len(commit_environment_lines) == 2
 
 
 def test_session_envelope_rejects_custody_free_execution_mode(tmp_path: Path) -> None:
