@@ -1,8 +1,8 @@
-# DharmaGraph x LangGraph parity: 31.00/100
+# DharmaGraph x LangGraph parity: 52.00/100
 
 **Verdict: NOT_FINISHED. Closeout blocked: true.**
 
-Target: LangGraph `1.2.4` at tag SHA `054a6f3d8b48d022a4881af3ba3dc0ddc3ac0690`. Rubric commit: `9fe56ce57deba94c2f0bdee03028145a2ae7b2cc`. Dharma SHA: `4d1b24556692f3d5f7ad6d16c38f1f357f8cab1c`.
+Target: LangGraph `1.2.4` at tag SHA `054a6f3d8b48d022a4881af3ba3dc0ddc3ac0690`. Rubric commit: `9fe56ce57deba94c2f0bdee03028145a2ae7b2cc`. Dharma SHA: `951a04263cb46aaca85f5e44f3074a5ac8644907`.
 
 ## Gaps
 
@@ -18,11 +18,6 @@ Target: LangGraph `1.2.4` at tag SHA `054a6f3d8b48d022a4881af3ba3dc0ddc3ac0690`.
 - `LG11` — Message accumulation, replacement, removal, and formatting (0/2, weight 2); card `parity-gap-lg11-messages`.
 - `LG12` — Compilation and sync/async single-run interfaces (1/2, weight 4); card `parity-gap-lg12-invocation`.
 - `LG13` — Batch, as-completed, and max-concurrency interfaces (0/2, weight 1); card `parity-gap-lg13-batch`.
-- `LG14` — Checkpoint schema, saver protocol, pending writes, lineage, and serializer (1/2, weight 4); card `parity-gap-lg14-checkpoint-protocol`.
-- `LG15` — Thread-scoped continuity and resume (0/2, weight 9); card `parity-gap-lg15-thread-resume`.
-- `LG16` — State inspection, history, and replay (1/2, weight 2); card `parity-gap-lg16-history`.
-- `LG17` — Manual state update, bulk update, fork, and time travel (1/2, weight 8); card `parity-gap-lg17-fork-time-travel`.
-- `LG18` — Durability ordering and process-restart recovery (1/2, weight 10); card `parity-gap-lg18-process-restart`.
 - `LG19` — Static interrupt-before and interrupt-after (0/2, weight 1); card `parity-gap-lg19-static-interrupts`.
 - `LG20` — Dynamic HITL interrupt and resume (0/2, weight 2); card `parity-gap-lg20-dynamic-interrupt`.
 - `LG21` — Seven standard stream modes, multi-mode, typed v2, and subgraph namespaces (0/2, weight 1); card `parity-gap-lg21-streaming`.
@@ -63,11 +58,11 @@ Target: LangGraph `1.2.4` at tag SHA `054a6f3d8b48d022a4881af3ba3dc0ddc3ac0690`.
 | `LG11` | Message accumulation, replacement, removal, and formatting | 2 | 0 | 0.00 | append_message:surface-lg11-append_message, invalid_remove:surface-lg11-invalid_remove, openai_format:surface-lg11-openai_format | unproven facets: append_message, replace_by_id, remove_message, remove_all, invalid_remove, openai_format, ui_message_helpers |
 | `LG12` | Compilation and sync/async single-run interfaces | 4 | 1 | 2.00 | async_invoke:surface-lg12-async_invoke, async_stream:surface-lg12-async_stream, compile:surface-lg12-compile | unproven facets: sync_invoke, sync_stream, async_stream, typed_v2_invoke, typed_v2_ainvoke |
 | `LG13` | Batch, as-completed, and max-concurrency interfaces | 1 | 0 | 0.00 | abatch:surface-lg13-abatch, abatch_as_completed:surface-lg13-abatch_as_completed, batch:surface-lg13-batch | unproven facets: batch, abatch, batch_as_completed, abatch_as_completed, max_concurrency |
-| `LG14` | Checkpoint schema, saver protocol, pending writes, lineage, and serializer | 4 | 1 | 2.00 | async_checkpoint_lifecycle:surface-lg14-async_checkpoint_lifecycle, async_saver:surface-lg14-async_saver, checkpoint_schema:surface-lg14-checkpoint_schema | unproven facets: sync_saver, async_saver, pending_writes, serializer, delete_thread, delete_for_runs, copy_thread, prune, get_delta_channel_history, async_checkpoint_lifecycle |
-| `LG15` | Thread-scoped continuity and resume | 9 | 0 | 0.00 | checkpoint_id:surface-lg15-checkpoint_id, checkpoint_parent:surface-lg15-checkpoint_parent, multi_turn_state:surface-lg15-multi_turn_state | unproven facets: thread_id, checkpoint_id, thread_resume, checkpoint_parent, multi_turn_state |
-| `LG16` | State inspection, history, and replay | 2 | 1 | 1.00 | async_state_api:surface-lg16-async_state_api, get_state:surface-lg16-get_state, get_state_history:surface-lg16-get_state_history | unproven facets: get_state, get_state_history, async_state_api |
-| `LG17` | Manual state update, bulk update, fork, and time travel | 8 | 1 | 4.00 | bulk_update_state:surface-lg17-bulk_update_state, fork:surface-lg17-fork, new_branch:surface-lg17-new_branch | unproven facets: update_state, bulk_update_state |
-| `LG18` | Durability ordering and process-restart recovery | 10 | 1 | 5.00 | delta_channel_durable_history:surface-lg18-delta_channel_durable_history, durability_async:surface-lg18-durability_async, durability_exit:surface-lg18-durability_exit | unproven facets: durability_sync, durability_async, durability_exit, persistent_process_restart, pending_write_recovery, delta_channel_durable_history |
+| `LG14` | Checkpoint schema, saver protocol, pending writes, lineage, and serializer | 4 | 2 | 4.00 | async_checkpoint_lifecycle:surface-lg14-async_checkpoint_lifecycle, async_saver:surface-lg14-async_saver, checkpoint_schema:surface-lg14-checkpoint_schema | — |
+| `LG15` | Thread-scoped continuity and resume | 9 | 2 | 9.00 | checkpoint_id:surface-lg15-checkpoint_id, checkpoint_parent:surface-lg15-checkpoint_parent, multi_turn_state:surface-lg15-multi_turn_state | — |
+| `LG16` | State inspection, history, and replay | 2 | 2 | 2.00 | async_state_api:surface-lg16-async_state_api, get_state:surface-lg16-get_state, get_state_history:surface-lg16-get_state_history | — |
+| `LG17` | Manual state update, bulk update, fork, and time travel | 8 | 2 | 8.00 | bulk_update_state:surface-lg17-bulk_update_state, fork:surface-lg17-fork, new_branch:surface-lg17-new_branch | — |
+| `LG18` | Durability ordering and process-restart recovery | 10 | 2 | 10.00 | delta_channel_durable_history:surface-lg18-delta_channel_durable_history, durability_async:surface-lg18-durability_async, durability_exit:surface-lg18-durability_exit | — |
 | `LG19` | Static interrupt-before and interrupt-after | 1 | 0 | 0.00 | interrupt_after:surface-lg19-interrupt_after, interrupt_before:surface-lg19-interrupt_before | unproven facets: interrupt_before, interrupt_after |
 | `LG20` | Dynamic HITL interrupt and resume | 2 | 0 | 0.00 | dynamic_interrupt:surface-lg20-dynamic_interrupt, interrupt_order:surface-lg20-interrupt_order, multiple_interrupts:surface-lg20-multiple_interrupts | unproven facets: dynamic_interrupt, resume_value, multiple_interrupts, interrupt_order, node_reexecution |
 | `LG21` | Seven standard stream modes, multi-mode, typed v2, and subgraph namespaces | 1 | 0 | 0.00 | checkpoints_stream:surface-lg21-checkpoints_stream, custom_stream:surface-lg21-custom_stream, debug_stream:surface-lg21-debug_stream | unproven facets: values_stream, updates_stream, messages_stream, custom_stream, checkpoints_stream, tasks_stream, debug_stream, multi_mode, typed_v2, subgraph_namespace |
@@ -111,9 +106,9 @@ Target: LangGraph `1.2.4` at tag SHA `054a6f3d8b48d022a4881af3ba3dc0ddc3ac0690`.
   "clock": "time.perf_counter",
   "environment_metadata": {
     "langgraph_version": "1.2.4",
-    "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
-    "python_executable": "/usr/local/bin/python3",
-    "python_version": "3.11.15"
+    "platform": "Linux-5.15.200-x86_64-with-glibc2.35",
+    "python_executable": "/home/ubuntu/repos/dharma-swarm/.venv/bin/python",
+    "python_version": "3.12.8"
   },
   "iterations": 5,
   "timing_decides_semantic_parity": false,
@@ -121,87 +116,87 @@ Target: LangGraph `1.2.4` at tag SHA `054a6f3d8b48d022a4881af3ba3dc0ddc3ac0690`.
   "workloads": {
     "seeded_checkpoint_resume_fork": {
       "dharma": {
-        "median_seconds": 0.0013714660001369339,
+        "median_seconds": 0.007234525000001213,
         "samples_seconds": [
-          0.001435676999790303,
-          0.0013714660001369339,
-          0.0012459930001114117,
-          0.0014083440000831615,
-          0.0011638020000646065
+          0.007244085999985828,
+          0.007242695999991611,
+          0.007043022999994264,
+          0.007207231999984742,
+          0.007234525000001213
         ]
       },
-      "dharma_median_seconds": 0.0013714660001369339,
+      "dharma_median_seconds": 0.007234525000001213,
       "iterations": 5,
       "langgraph": {
-        "median_seconds": 0.00900797400004194,
+        "median_seconds": 0.00979368200000863,
         "samples_seconds": [
-          0.009268489000078262,
-          0.008959854000067935,
-          0.008969472999979189,
-          0.009200982000038493,
-          0.00900797400004194
+          0.008376390999984551,
+          0.00989047300001289,
+          0.00950149799999167,
+          0.010212206999995033,
+          0.00979368200000863
         ]
       },
-      "langgraph_median_seconds": 0.00900797400004194,
-      "overhead_ratio_dharma_to_langgraph": 0.15225021743297087,
+      "langgraph_median_seconds": 0.00979368200000863,
+      "overhead_ratio_dharma_to_langgraph": 0.7386930676322591,
       "semantic_parity_all_iterations": true
     },
     "seeded_linear_reducer_chain": {
       "dharma": {
-        "median_seconds": 0.0007583229998999741,
+        "median_seconds": 0.0007657259999973576,
         "samples_seconds": [
-          0.0009357609999369743,
-          0.0008352899999408692,
-          0.0007362799999555136,
-          0.0007583229998999741,
-          0.0005790629998045915
+          0.0008951779999790688,
+          0.0007709909999960018,
+          0.0006182049999949868,
+          0.0007657259999973576,
+          0.0006047509999973499
         ]
       },
-      "dharma_median_seconds": 0.0007583229998999741,
+      "dharma_median_seconds": 0.0007657259999973576,
       "iterations": 5,
       "langgraph": {
-        "median_seconds": 0.004519925000067815,
+        "median_seconds": 0.004333032999994657,
         "samples_seconds": [
-          0.00461261899999954,
-          0.004519925000067815,
-          0.004862352999907671,
-          0.004437181999946915,
-          0.004432186000030924
+          0.00439045999999621,
+          0.00426723500001458,
+          0.004333032999994657,
+          0.004369687000007616,
+          0.0042239500000107455
         ]
       },
-      "langgraph_median_seconds": 0.004519925000067815,
-      "overhead_ratio_dharma_to_langgraph": 0.16777335904657634,
+      "langgraph_median_seconds": 0.004333032999994657,
+      "overhead_ratio_dharma_to_langgraph": 0.17671824793356103,
       "semantic_parity_all_iterations": true
     },
     "seeded_send_map_reduce": {
       "dharma": {
-        "median_seconds": 0.0005657210001572821,
+        "median_seconds": 0.0005530020000037439,
         "samples_seconds": [
-          0.000540250000085507,
-          0.0005818520000957506,
-          0.0005140350001511251,
-          0.0005657210001572821,
-          0.0005922170000758342
+          0.0005727669999942009,
+          0.0005780099999981303,
+          0.00045763500000362,
+          0.0005530020000037439,
+          0.000450360999991517
         ]
       },
-      "dharma_median_seconds": 0.0005657210001572821,
+      "dharma_median_seconds": 0.0005530020000037439,
       "iterations": 5,
       "langgraph": {
-        "median_seconds": 0.004205441000067367,
+        "median_seconds": 0.004937331999997241,
         "samples_seconds": [
-          0.004541958000118029,
-          0.0037725470001532813,
-          0.004205441000067367,
-          0.00379953700007718,
-          0.004280641999912405
+          0.004853949999983342,
+          0.005207014000006893,
+          0.005019973999992544,
+          0.004937331999997241,
+          0.004052599000004875
         ]
       },
-      "langgraph_median_seconds": 0.004205441000067367,
-      "overhead_ratio_dharma_to_langgraph": 0.1345212072047188,
+      "langgraph_median_seconds": 0.004937331999997241,
+      "overhead_ratio_dharma_to_langgraph": 0.11200421604300721,
       "semantic_parity_all_iterations": true
     }
   }
 }
 ```
 
-Receipt stable digest: `6b78c48b6197012eb80fead40d64178ef86f69f0412b8b736ca32cce3cfbef3f`.
+Receipt stable digest: `1c31741104fb18f51a0478819385cc665e308bf064647f01029a20012cb658c1`.

@@ -312,22 +312,19 @@ def test_full_harness_covers_every_frozen_row_and_broken_control() -> None:
         if integration and integration["status"] != "pass":
             assert observation["points"] < 2
 
-    # Guard against three attractive but false equivalences discovered in
-    # adversarial review: explicit checkpoint objects are not thread-scoped
-    # continuity, ordinary completion is not cooperative drain, and atomic
-    # rollback is not pending-write recovery.
-    assert (
-        result["capabilities"]["LG15"]["facets"]["thread_resume"]["status"] == "missing"
-    )
-    assert result["capabilities"]["LG15"]["points"] == 0
+    # The persistence kernel must prove native identity/journal behavior rather
+    # than relabel explicit checkpoints or atomic rollback.
+    assert result["capabilities"]["LG15"]["facets"]["thread_resume"]["status"] == "pass"
+    assert result["capabilities"]["LG15"]["points"] == 2
     assert (
         result["capabilities"]["LG35"]["facets"]["graph_drained"]["status"] == "missing"
     )
     assert result["capabilities"]["LG35"]["points"] == 0
     assert (
         result["capabilities"]["LG18"]["facets"]["pending_write_recovery"]["status"]
-        == "missing"
+        == "pass"
     )
+    assert result["capabilities"]["LG18"]["points"] == 2
     assert (
         result["capabilities"]["PERF01"]["facets"]["environment_metadata"]["status"]
         == "pass"
@@ -337,6 +334,7 @@ def test_full_harness_covers_every_frozen_row_and_broken_control() -> None:
     assert result["completeness_control"]["id"] == "COMPLETE01"
 
     restart = result["raw_evidence"]["process_restart"]
+    assert restart["dharma"]["persistence"] == "native_graph_persistence_kernel"
     for arm in ("dharma", "langgraph"):
         assert restart[arm]["fresh_process_count"] == 2
         assert restart[arm]["phases"][0]["log"] == ["a"]

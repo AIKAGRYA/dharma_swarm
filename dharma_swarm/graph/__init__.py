@@ -23,6 +23,13 @@ from dharma_swarm.graph.channels import (
 )
 from dharma_swarm.graph.checkpoint import DispatchCheckpoint, GraphCheckpointStore
 from dharma_swarm.graph.compiler import GraphBuilder, GraphCompileError
+from dharma_swarm.graph.persistence import (
+    GraphCheckpointRecord,
+    GraphPendingWrite,
+    GraphPersistenceKernel,
+    GraphSerializer,
+    JsonGraphSerializer,
+)
 from dharma_swarm.graph.routing import (
     BranchDestinationError,
     Command,
@@ -79,6 +86,10 @@ __all__ = [
     "GraphBuilder",
     "GraphCheckpointStore",
     "GraphCompileError",
+    "GraphCheckpointRecord",
+    "GraphPendingWrite",
+    "GraphPersistenceKernel",
+    "GraphSerializer",
     "GraphRunEvent",
     "GraphRunResult",
     "RunCheckpoint",
@@ -99,6 +110,7 @@ __all__ = [
     "TopicChannel",
     "TriggerChannel",
     "UnknownChannelError",
+    "JsonGraphSerializer",
     "derive_graph_side_effect_key",
     "append_dispatch_receipt_to_machine_chain",
     "dispatch_machine_receipt",
