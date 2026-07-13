@@ -188,8 +188,8 @@
   },
   "negative_controls": [
     {
-      "name": "isolated-fixture-write-control",
-      "command": "python3 -c \"from pathlib import Path; Path('negative-control.txt').write_text('fixture-only'); raise SystemExit(0)\"",
+      "name": "wp-o4r-base-authority-absence-control",
+      "command": "python3 -c \"import subprocess; base='414f4c096bbb63061279b58e780b27765b3d99ae'; contract=subprocess.check_output(['git','show',f'{base}:dharma_swarm/operator_core/onboarding/contract.py'],text=True); track=subprocess.check_output(['git','show',f'{base}:docs/governance/ACTIVE_TRACK.yaml'],text=True); owned=track.split('  - id: onboard-one-door-2026-07',1)[1].split('    moves_vital_signs:',1)[0]; paths=('scripts/governance/check_track_status.py','tests/test_active_track_governance.py','tests/test_track_portfolio.py'); raise SystemExit(0 if 'WP-O4R' not in contract and all(f'      - {path}' not in owned for path in paths) else 9)\"",
       "expected_exit": 0,
       "env": {}
     }
@@ -232,6 +232,6 @@
       "Any main movement before merge invalidates this packet base, collision record, digest, preflight binding, and closeout evidence."
     ],
     "rollback": "revert the exact WP-O4R grammar admission, three exact One-Door ownership entries, WP-O4R blocker and spec clause, managed authority projections, DocOps counts, and this WP-O4-B0 packet together",
-    "packet_digest": "77f3aa29772e20423ca5d57bec74d2e286ee4e60f13d0d40745e7a3b3186bfcb"
+    "packet_digest": "300fc7a4c39fa1de981b449d4ee10fe6a18fb8cc77280c68f781054c54083f50"
   }
 }
