@@ -449,9 +449,30 @@ def test_ci_pr_head_and_merge_group_packet_binding(tmp_path: Path) -> None:
             event_head=unbound_head,
         )
 
-    # The packet's exact event base is also a rebase requirement. Evaluating a
-    # behind/diverged PR head would run stale code while claiming a newer base,
-    # so it must fail closed until the packet branch contains that base.
+    unrelated_history, _, unrelated_head = _new_event_repo(
+        tmp_path, "unrelated-history"
+    )
+    unrelated_tree = _git(
+        unrelated_history, "rev-parse", f"{unrelated_head}^{{tree}}"
+    )
+    unrelated_base = _git(
+        unrelated_history,
+        "commit-tree",
+        unrelated_tree,
+        "-m",
+        "unrelated event base",
+    )
+    with pytest.raises(agentops.AgentOpsError, match="unrelated histories"):
+        agentops.discover_ci_packets(
+            unrelated_history,
+            event_name="pull_request",
+            event_base=unrelated_base,
+            event_head=unrelated_head,
+        )
+
+    # A behind/diverged PR with no onboarding-owned change evaluates from its
+    # true merge base and baseline-passes without a repository-wide freshness
+    # gate.
     behind, _, behind_common = _new_event_repo(tmp_path, "behind-event-base")
     _git(behind, "switch", "-c", "feature")
     _git(behind, "switch", "main")
@@ -461,19 +482,48 @@ def test_ci_pr_head_and_merge_group_packet_binding(tmp_path: Path) -> None:
         packets=[],
     )
     _git(behind, "switch", "feature")
-    behind_head, _ = _commit_event(
+    behind_unrelated_head, _ = _commit_event(
+        behind,
+        changes={"notes.txt": "unrelated stale-branch change\n"},
+        packets=[],
+    )
+    assert behind_common != behind_base
+    exit_code, summary = agentops.execute_ci_event(
+        source_root=behind,
+        event_name="pull_request",
+        event_base=behind_base,
+        event_head=behind_unrelated_head,
+        report_root=tmp_path / "behind-unrelated-reports",
+    )
+    assert exit_code == 0
+    assert summary["status"] == "passed"
+    assert summary["packets"] == []
+
+    # Exact-base custody remains fail-closed once the same branch carries an
+    # onboarding-owned change and packet whose declared base is not in HEAD.
+    behind_owned_head, _ = _commit_event(
         behind,
         changes={"owned/a.txt": "stale branch change\n"},
         packets=[("WP-O4", behind_base, ["owned/a.txt"])],
     )
-    assert behind_common != behind_base
+    report_root = tmp_path / "behind-owned-reports"
     with pytest.raises(agentops.AgentOpsError, match="base is not an ancestor"):
-        agentops.discover_ci_packets(
-            behind,
+        agentops.execute_ci_event(
+            source_root=behind,
             event_name="pull_request",
             event_base=behind_base,
-            event_head=behind_head,
+            event_head=behind_owned_head,
+            report_root=report_root,
         )
+    config_reports = [
+        json.loads(path.read_text(encoding="utf-8"))
+        for path in report_root.rglob("report.json")
+    ]
+    assert len(config_reports) == 1
+    assert config_reports[0]["status"] == "config_error"
+    assert config_reports[0]["error"] == (
+        "CI event base is not an ancestor of the event head"
+    )
 
     # ACTIVE -> inactive changes only authority. With no concurrently owned
     # code or packet change there is nothing to bind, so this transition passes.

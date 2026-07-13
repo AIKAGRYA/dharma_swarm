@@ -1285,13 +1285,26 @@ def _discover_ci_packet_bindings(
     working, staged, untracked = _exact_live_scope_paths(root)
     if working or staged or untracked:
         raise AgentOpsError("CI packet evaluation requires an exact clean event checkout")
-    ancestry = run_git(
-        ["merge-base", "--is-ancestor", base, head], cwd=root, check=False
-    )
-    if ancestry.returncode != 0:
-        raise AgentOpsError("CI event base is not an ancestor of the event head")
+    diff_base = base
+    if event_name == "pull_request":
+        merge_base = run_git(["merge-base", base, head], cwd=root, check=False)
+        if merge_base.returncode != 0 or not merge_base.stdout.strip():
+            raise AgentOpsError(
+                "CI pull-request event base and head have unrelated histories"
+            )
+        diff_base = _exact_event_sha(
+            root,
+            merge_base.stdout.strip(),
+            field="pull-request merge base",
+        )
+    else:
+        ancestry = run_git(
+            ["merge-base", "--is-ancestor", base, head], cwd=root, check=False
+        )
+        if ancestry.returncode != 0:
+            raise AgentOpsError("CI event base is not an ancestor of the event head")
 
-    base_tracks = _active_tracks_at(root, base)
+    base_tracks = _active_tracks_at(root, diff_base)
     head_tracks = _active_tracks_at(root, head)
     track, owned_patterns, siblings = _ci_authority_context(
         base_tracks, head_tracks
@@ -1303,7 +1316,7 @@ def _discover_ci_packet_bindings(
                 root,
                 [
                     "diff", "--no-ext-diff", "--no-textconv", "--no-renames",
-                    "--name-only", "-z", f"{base}...{head}", "--",
+                    "--name-only", "-z", f"{diff_base}...{head}", "--",
                 ],
             )
         )
@@ -1321,6 +1334,12 @@ def _discover_ci_packet_bindings(
     )
     if not owned_changed:
         return []
+    if event_name == "pull_request":
+        ancestry = run_git(
+            ["merge-base", "--is-ancestor", base, head], cwd=root, check=False
+        )
+        if ancestry.returncode != 0:
+            raise AgentOpsError("CI event base is not an ancestor of the event head")
     if event_name == "pull_request" and len(packet_relatives) != 1:
         raise AgentOpsError(
             "owned-surface PR must change exactly one matching onboarding packet"
