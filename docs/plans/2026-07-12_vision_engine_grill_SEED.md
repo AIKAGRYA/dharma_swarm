@@ -70,10 +70,18 @@ statement.
 
 6. **REAL PROBLEM NAMED.** "The wiring is not working and the agents aren't
    working" — agents keep asking *narrowing* questions that shortsell the substrate.
-   Matches `docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md:18` (§1): crash-resumable
-   dispatch FALSE (`orchestrator.py:2403-2407`; no boot reconciler for
-   `delegation_runs`), 5+ fragmented executors, heartbeat unwired
-   (`runtime_state.py:2062` has zero production callers).
+   Matches `docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md:18` (§1) **as diagnosed
+   2026-07-05**: crash-resumable dispatch FALSE (`orchestrator.py:2403-2407`; dispatch
+   is a detached `asyncio.create_task`, no boot reconciler for `delegation_runs`),
+   5+ fragmented executors, heartbeat then-unwired (`heartbeat_claim_sync`,
+   `runtime_state.py:2074`).
+   > Re-derived on current main 2026-07-13 (citation-or-silence, not copied polish):
+   > the heartbeat has SINCE been wired — `dharma_swarm/graph/reconciler.py:480` now
+   > calls `heartbeat_claim_sync` ("wires the previously-orphaned" one, `:450`). Treat
+   > these spec-§1 lines as the DATED grill diagnosis; re-derive current engine status
+   > against main before acting. (The `:2062` in the first draft of this seed was a
+   > stale line copied from the spec without re-derivation — the exact mistake the
+   > rule forbids; `heartbeat_claim_sync` is at `:2074`.)
 
 ---
 
