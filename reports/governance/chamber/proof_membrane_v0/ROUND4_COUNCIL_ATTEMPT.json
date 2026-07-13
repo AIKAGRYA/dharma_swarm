@@ -1,0 +1,221 @@
+{
+  "blockers": [
+    "qwen3coder: verdict=revise",
+    "qwen3coder: disagreement=The implementation incorrectly treats model agreement as runtime authority and fails to adhere to the strict governance requirements regarding evidence presentation and claim scope limitations.",
+    "minimaxm3: CriticResponseError invalid critic JSON from ollama:minimax-m3:cloud; actual_model=minimax-m3; content_len=52670; parse_error=JSONDecodeError: Extra data: line 11 column 1 (char 360); preview=Let me carefully review this target. The review is asking me to evaluate whether the Hyperbolic Chamber Proof Membrane V0 should be approved at 100/100, following strict criteria outlined in the prompt.\\n\\nThe prompt specifies 8 conditions for approv ... le_contract, ManifestEntryV1, _exact_keys)\",\\n    \"dharma_swarm/chamber/replay.py (_run_checkpoint_type, _validated_manifest_snapshot, execute_world, run_bundle_once)\",\\n    \"dharma_swarm/chamber/replay_worker.py (stdlib-only bootstrap, inert package",
+    "minimaxm3: disagreement=invalid critic JSON from ollama:minimax-m3:cloud; actual_model=minimax-m3; content_len=52670; parse_error=JSONDecodeError: Extra data: line 11 column 1 (char 360); preview=Let me carefully review this target. The review is asking me to eval"
+  ],
+  "conviction_gate": "hold_blockers",
+  "critic_count": 6,
+  "critics": [
+    {
+      "actual_model": "glm-5.2",
+      "lane_id": "glm52",
+      "latency_ms": 49347,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "reports/agentops/work_packets/hyperbolic-time-chamber-WP-O99-proof-membrane-v0-2026-07-14.json \u2014 revised gates: dependency-light-chamber-regression-tests excludes test_chamber_gym_git_history.py; dependency-light-graph-checkpoint-tests runs only test_graph_checkpoint.py; proof-membrane-tests, semantic-negative-tests, ruff, diff-check all retained; honest_blockers discloses the split",
+          "reports/governance/chamber/proof_membrane_v0/AGENTOPS_CLOSEOUT_ATTEMPT1.json \u2014 status failed, preserved with actual causes: existing-chamber-regression-tests exit 1 (python3 No module named pytest), graph-adjacent-regression-tests exit 1 (async def not supported, pytest-asyncio needed), negative-control exit 71 (sandbox-exec Operation not permitted)",
+          "reports/governance/chamber/proof_membrane_v0/RESEARCH_AND_VERIFICATION.md \u2014 full 33/102/22 test counts recorded as separate evidence; first closeout failure disclosed as host invocation requirement not product regression; final closeout must be rerun with revised packet",
+          "reports/governance/chamber/proof_membrane_v0/COUNCIL_REVIEW.md \u2014 Round 4 section describes the two distinct claims (dependency-light admission vs full plugin-aware evidence); no Round 3 vote inherited",
+          "reports/governance/chamber/proof_membrane_v0/dharmagraph_fork_alias.replay_bundle.v1.json \u2014 source_revision df435af863e651287de3f637509a45d59b133ad3, 7 manifest entries with sha256 digests, scope_digest == bundle_digest 8f29d827...",
+          "reports/governance/chamber/proof_membrane_v0/verification_receipt.json \u2014 100/100 unique PIDs, verified true, semantic_digest 5babd795... consistent across all processes",
+          "tests/test_chamber_traces.py \u2014 all semantic negative tests present: fabricated_verification, reproduced_violation_cannot_authorize_promotion, parity_score_cannot_discharge_production_ready, control_evidence_cannot_be_relabeled, direct_claim_and_authority_shapes, gate_refuses_each_semantic_coercion (12 parametrized), bundle_path_swap, deeply_immutable, registered_effect_once, immutable_and_evaluator",
+          "docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md Part IV \u2014 strongest claim HARNESS_PROVEN only; MiroFish untrusted candidate generation; kill criteria unchanged"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "Round 4 packet revision is an honest environment-compatible admission boundary, not removal of failing product evidence. The two gates that failed in the first closeout (git-history gym scorer needing python3+pytest on PATH, and neutral-cycle suite needing pytest-asyncio) are correctly removed from the dependency-light admission slice while the full 33/102/22 plugin-aware results remain explicitly recorded and separately required. All proof-membrane tests, semantic negative tests (direct-construction, proposition, candidate/arm, scope, authority), Ruff, and diff remain in the governed gates. The replay bundle still pins commit df435af863e651287de3f637509a45d59b133ad3 and the same seven manifest byte digests. MiroFish and external simulators remain untrusted candidate foundries. The strongest claim remains exact-scope HARNESS_PROVEN, never CLOSED_LIVE or production readiness. The failed first closeout (AGENTOPS_CLOSEOUT_ATTEMPT1.json) is preserved with its actual causes (PATH exclusion, plugin autoload disabled, sandbox-exec denial) and is not rewritten as a pass. The final closeout must be rerun with the revised packet under a host context able to create its nested jail, not by editing or suppressing a report. All eight approval criteria are satisfied.",
+        "verdict": "approve"
+      },
+      "provider": "ollama",
+      "raw_response": "{\"verdict\":\"approve\",\"score\":100,\"summary\":\"Round 4 packet revision is an honest environment-compatible admission boundary, not removal of failing product evidence. The two gates that failed in the first closeout (git-history gym scorer needing python3+pytest on PATH, and neutral-cycle suite needing pytest-asyncio) are correctly removed from the dependency-light admission slice while the full 33/102/22 plugin-aware results remain explicitly recorded and separately required. All proof-membrane tests, semantic negative tests (direct-construction, proposition, candidate/arm, scope, authority), Ruff, and diff remain in the governed gates. The replay bundle still pins commit df435af863e651287de3f637509a45d59b133ad3 and the same seven manifest byte digests. MiroFish and external simulators remain untrusted candidate foundries. The strongest claim remains exact-scope HARNESS_PROVEN, never CLOSED_LIVE or production readiness. The failed first closeout (AGENTOPS_CLOSEOUT_ATTEMPT1.json) is preserved with its actual causes (PATH exclusion, plugin autoload disabled, sandbox-exec denial) and is not rewritten as a pass. The final closeout must be rerun with the revised packet under a host context able to create its nested jail, not by editing or suppressing a report. All eight approval criteria are satisfied.\",\"blockers\":[],\"required_changes\":[],\"evidence_checked\":[\"reports/agentops/work_packets/hyperbolic-time-chamber-WP-O99-proof-membrane-v0-2026-07-14.json \u2014 revised gates: dependency-light-chamber-regression-tests excludes test_chamber_gym_git_history.py; dependency-light-graph-checkpoint-tests runs only test_graph_checkpoint.py; proof-membrane-tests, semantic-negative-tests, ruff, diff-check all retained; honest_blockers discloses the split\",\"reports/governance/chamber/proof_membrane_v0/AGENTOPS_CLOSEOUT_ATTEMPT1.json \u2014 status failed, preserved with actual causes: existing-chamber-regression-tests exit 1 (python3 No module named pytest), graph-adjacent-regression-tests exit 1 (async def not supported, pytest-asyncio needed), negative-control exit 71 (sandbox-exec Operation not permitted)\",\"reports/governance/chamber/proof_membrane_v0/RESEARCH_AND_VERIFICATION.md \u2014 full 33/102/22 test counts recorded as separate evidence; first closeout failure disclosed as host invocation requirement not product regression; final closeout must be rerun with revised packet\",\"reports/governance/chamber/proof_membrane_v0/COUNCIL_REVIEW.md \u2014 Round 4 section describes the two distinct claims (dependency-light admission vs full plugin-aware evidence); no Round 3 vote inherited\",\"reports/governance/chamber/proof_membrane_v0/dharmagraph_fork_alias.replay_bundle.v1.json \u2014 source_revision df435af863e651287de3f637509a45d59b133ad3, 7 manifest entries with sha256 digests, scope_digest == bundle_digest 8f29d827...\",\"reports/governance/chamber/proof_membrane_v0/verification_receipt.json \u2014 100/100 unique PIDs, verified true, semantic_digest 5babd795... consistent across all processes\",\"tests/test_chamber_traces.py \u2014 all semantic negative tests present: fabricated_verification, reproduced_violation_cannot_authorize_promotion, parity_score_cannot_discharge_production_ready, control_evidence_cannot_be_relabeled, direct_claim_and_authority_shapes, gate_refuses_each_semantic_coercion (12 parametrized), bundle_path_swap, deeply_immutable, registered_effect_once, immutable_and_evaluator\",\"docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md Part IV \u2014 strongest claim HARNESS_PROVEN only; MiroFish untrusted candidate generation; kill criteria unchanged\"],\"explicit_disagreement\":\"\"}",
+      "requested_model": "glm-5.2:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "kimi-k2.5",
+      "lane_id": "kimi27code",
+      "latency_ms": 171057,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "reports/agentops/work_packets/hyperbolic-time-chamber-WP-O99-proof-membrane-v0-2026-07-14.json: revised dependency-light gates, honest_blockers disclosure of PATH/plugin constraints, and explicit requirement for full plugin-aware suites",
+          "reports/governance/chamber/proof_membrane_v0/AGENTOPS_CLOSEOUT_ATTEMPT1.json: preserved first closeout failure with exit_code 1, pytest/python3 PATH errors, and sandbox-exec denial",
+          "reports/governance/chamber/proof_membrane_v0/dharmagraph_fork_alias.replay_bundle.v1.json: source_revision df435af863e651287de3f637509a45d59b133ad3 and seven manifest SHA-256 digests unchanged from Round 3",
+          "docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md Part IV.2: MiroFish explicitly untrusted as outer world foundry only",
+          "docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md Part IV.5: claim ceiling HARNESS_PROVEN with kill criteria prohibiting CLOSED_LIVE/production readiness claims",
+          "tests/test_chamber_traces.py: negative tests for fabricated verification, direct claim/authority construction, proposition/candidate/arm/scope mismatches, and semantic coercion gates",
+          "reports/governance/chamber/proof_membrane_v0/RESEARCH_AND_VERIFICATION.md: disclosure of full 102-test chamber suite run outside admission process and requirement for final closeout rerun"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "Round 4 review confirms the revised packet satisfies all eight approval criteria: (1) The dependency-light slice is an honest admission boundary necessitated by disabled plugin autoload and trusted-host PATH constraints, not a concealment of product failure. (2) Full plugin-aware test suites (102 chamber, 22 graph-adjacent) remain explicitly required and recorded in the proof ledger. (3) All semantic negative tests (fabricated verification, direct claim construction, proposition/candidate/arm/scope/authority coercion) are present and executable. (4) The replay bundle pins implementation commit df435af863e651287de3f637509a45d59b133ad3 and the identical seven manifest byte digests from Round 3. (5) MiroFish and external simulators are explicitly confined to untrusted candidate generation with no path to promotion authority. (6) The strongest claim remains exact-scope HARNESS_PROVEN with explicit disclaimers of CLOSED_LIVE, production readiness, universal determinism, and automatic RCA. (7) The first AgentOps closeout failure is preserved intact in AGENTOPS_CLOSEOUT_ATTEMPT1.json with actual causes (missing pytest in PATH, disabled pytest-asyncio, sandbox-exec denial). (8) The final closeout is obtained by rerunning the revised packet under compatible host context, not by report suppression. No blockers remain.",
+        "verdict": "approve"
+      },
+      "provider": "ollama",
+      "raw_response": "{\n  \"verdict\": \"approve\",\n  \"score\": 100,\n  \"summary\": \"Round 4 review confirms the revised packet satisfies all eight approval criteria: (1) The dependency-light slice is an honest admission boundary necessitated by disabled plugin autoload and trusted-host PATH constraints, not a concealment of product failure. (2) Full plugin-aware test suites (102 chamber, 22 graph-adjacent) remain explicitly required and recorded in the proof ledger. (3) All semantic negative tests (fabricated verification, direct claim construction, proposition/candidate/arm/scope/authority coercion) are present and executable. (4) The replay bundle pins implementation commit df435af863e651287de3f637509a45d59b133ad3 and the identical seven manifest byte digests from Round 3. (5) MiroFish and external simulators are explicitly confined to untrusted candidate generation with no path to promotion authority. (6) The strongest claim remains exact-scope HARNESS_PROVEN with explicit disclaimers of CLOSED_LIVE, production readiness, universal determinism, and automatic RCA. (7) The first AgentOps closeout failure is preserved intact in AGENTOPS_CLOSEOUT_ATTEMPT1.json with actual causes (missing pytest in PATH, disabled pytest-asyncio, sandbox-exec denial). (8) The final closeout is obtained by rerunning the revised packet under compatible host context, not by report suppression. No blockers remain.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"reports/agentops/work_packets/hyperbolic-time-chamber-WP-O99-proof-membrane-v0-2026-07-14.json: revised dependency-light gates, honest_blockers disclosure of PATH/plugin constraints, and explicit requirement for full plugin-aware suites\",\n    \"reports/governance/chamber/proof_membrane_v0/AGENTOPS_CLOSEOUT_ATTEMPT1.json: preserved first closeout failure with exit_code 1, pytest/python3 PATH errors, and sandbox-exec denial\",\n    \"reports/governance/chamber/proof_membrane_v0/dharmagraph_fork_alias.replay_bundle.v1.json: source_revision df435af863e651287de3f637509a45d59b133ad3 and seven manifest SHA-256 digests unchanged from Round 3\",\n    \"docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md Part IV.2: MiroFish explicitly untrusted as outer world foundry only\",\n    \"docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md Part IV.5: claim ceiling HARNESS_PROVEN with kill criteria prohibiting CLOSED_LIVE/production readiness claims\",\n    \"tests/test_chamber_traces.py: negative tests for fabricated verification, direct claim/authority construction, proposition/candidate/arm/scope mismatches, and semantic coercion gates\",\n    \"reports/governance/chamber/proof_membrane_v0/RESEARCH_AND_VERIFICATION.md: disclosure of full 102-test chamber suite run outside admission process and requirement for final closeout rerun\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "kimi-k2.7-code:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "qwen3-coder:480b-cloud",
+      "lane_id": "qwen3coder",
+      "latency_ms": 15063,
+      "ok": true,
+      "parsed": {
+        "blockers": [
+          "The packet change removes failing product evidence instead of maintaining an honest environment-compatible admission boundary.",
+          "The first closeout report (AGENTOPS_CLOSEOUT_ATTEMPT1.json) is not preserved with its actual causes as mandated.",
+          "Test execution discrepancies show full plugin-aware suites were run outside the dependency-stripped admission process, violating governance truthfulness.",
+          "The claim scope incorrectly asserts CLOSED_LIVE instead of remaining at HARNESS_PROVEN, exceeding authorized production readiness claims."
+        ],
+        "evidence_checked": [
+          "docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md",
+          "dharma_swarm/chamber/replay_contract.py",
+          "dharma_swarm/chamber/replay.py",
+          "dharma_swarm/chamber/replay_worker.py",
+          "dharma_swarm/chamber/verification.py",
+          "dharma_swarm/chamber/proof.py",
+          "tests/test_chamber_traces.py",
+          "reports/governance/chamber/proof_membrane_v0/dharmagraph_fork_alias.replay_bundle.v1.json",
+          "reports/governance/chamber/proof_membrane_v0/verification_receipt.json",
+          "reports/agentops/work_packets/hyperbolic-time-chamber-WP-O99-proof-membrane-v0-2026-07-14.json",
+          "reports/governance/chamber/proof_membrane_v0/AGENTOPS_CLOSEOUT_ATTEMPT1.json",
+          "reports/governance/chamber/proof_membrane_v0/RESEARCH_AND_VERIFICATION.md",
+          "reports/governance/chamber/proof_membrane_v0/COUNCIL_REVIEW.md",
+          "reports/governance/chamber/proof_membrane_v0/ROUND3_COUNCIL_SUMMARY.json"
+        ],
+        "explicit_disagreement": "The implementation incorrectly treats model agreement as runtime authority and fails to adhere to the strict governance requirements regarding evidence presentation and claim scope limitations.",
+        "required_changes": [
+          "Revise the packet to honestly reflect environment-compatible admission boundaries without removing failing product evidence.",
+          "Ensure the failed first closeout report is preserved with its actual causes and not hidden or reinterpreted.",
+          "Correctly describe the full plugin-aware test results as separate required evidence, not as part of the governed runner's execution.",
+          "Limit the claim scope to HARNESS_PROVEN and avoid asserting CLOSED_LIVE, production readiness, universal determinism, or automatic root-cause analysis."
+        ],
+        "score": 30,
+        "summary": "The review identifies critical blockers preventing approval of the Hyperbolic Chamber Proof Membrane V0. The implementation fails to meet essential criteria for production-grade integration, specifically regarding environment compatibility, evidence integrity, and governance adherence. Key issues include the removal of failing product evidence rather than honest environment-compatible admission boundaries, failure to preserve the first closeout report as required, and discrepancies in test execution that indicate potential manipulation of evidence. Additionally, the claim scope exceeds HARNESS_PROVEN, asserting CLOSED_LIVE which is explicitly disallowed.",
+        "verdict": "revise"
+      },
+      "provider": "ollama",
+      "raw_response": "{\n  \"verdict\": \"revise\",\n  \"score\": 30,\n  \"summary\": \"The review identifies critical blockers preventing approval of the Hyperbolic Chamber Proof Membrane V0. The implementation fails to meet essential criteria for production-grade integration, specifically regarding environment compatibility, evidence integrity, and governance adherence. Key issues include the removal of failing product evidence rather than honest environment-compatible admission boundaries, failure to preserve the first closeout report as required, and discrepancies in test execution that indicate potential manipulation of evidence. Additionally, the claim scope exceeds HARNESS_PROVEN, asserting CLOSED_LIVE which is explicitly disallowed.\",\n  \"blockers\": [\n    \"The packet change removes failing product evidence instead of maintaining an honest environment-compatible admission boundary.\",\n    \"The first closeout report (AGENTOPS_CLOSEOUT_ATTEMPT1.json) is not preserved with its actual causes as mandated.\",\n    \"Test execution discrepancies show full plugin-aware suites were run outside the dependency-stripped admission process, violating governance truthfulness.\",\n    \"The claim scope incorrectly asserts CLOSED_LIVE instead of remaining at HARNESS_PROVEN, exceeding authorized production readiness claims.\"\n  ],\n  \"required_changes\": [\n    \"Revise the packet to honestly reflect environment-compatible admission boundaries without removing failing product evidence.\",\n    \"Ensure the failed first closeout report is preserved with its actual causes and not hidden or reinterpreted.\",\n    \"Correctly describe the full plugin-aware test results as separate required evidence, not as part of the governed runner's execution.\",\n    \"Limit the claim scope to HARNESS_PROVEN and avoid asserting CLOSED_LIVE, production readiness, universal determinism, or automatic root-cause analysis.\"\n  ],\n  \"evidence_checked\": [\n    \"docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md\",\n    \"dharma_swarm/chamber/replay_contract.py\",\n    \"dharma_swarm/chamber/replay.py\",\n    \"dharma_swarm/chamber/replay_worker.py\",\n    \"dharma_swarm/chamber/verification.py\",\n    \"dharma_swarm/chamber/proof.py\",\n    \"tests/test_chamber_traces.py\",\n    \"reports/governance/chamber/proof_membrane_v0/dharmagraph_fork_alias.replay_bundle.v1.json\",\n    \"reports/governance/chamber/proof_membrane_v0/verification_receipt.json\",\n    \"reports/agentops/work_packets/hyperbolic-time-chamber-WP-O99-proof-membrane-v0-2026-07-14.json\",\n    \"reports/governance/chamber/proof_membrane_v0/AGENTOPS_CLOSEOUT_ATTEMPT1.json\",\n    \"reports/governance/chamber/proof_membrane_v0/RESEARCH_AND_VERIFICATION.md\",\n    \"reports/governance/chamber/proof_membrane_v0/COUNCIL_REVIEW.md\",\n    \"reports/governance/chamber/proof_membrane_v0/ROUND3_COUNCIL_SUMMARY.json\"\n  ],\n  \"explicit_disagreement\": \"The implementation incorrectly treats model agreement as runtime authority and fails to adhere to the strict governance requirements regarding evidence presentation and claim scope limitations.\"\n}",
+      "requested_model": "qwen3-coder:480b-cloud",
+      "required": true
+    },
+    {
+      "actual_model": "deepseek-v4-pro",
+      "lane_id": "deepseekv4pro",
+      "latency_ms": 24642,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md Part IV (scope, MiroFish confinement, claim ceiling, kill criteria)",
+          "dharma_swarm/chamber/replay_contract.py (strict data-only contracts, registered IDs, digest checks, direct-object type enforcement)",
+          "dharma_swarm/chamber/replay.py (source-exact graph/types.py loading, isolated execution, manifest binding, bundle construction)",
+          "dharma_swarm/chamber/replay_worker.py (stdlib-only bootstrap, inert package shells, loaded-source digest recording, stdin bundle input)",
+          "dharma_swarm/chamber/verification.py (100 fresh-process replay, unique PIDs, per-process transcript, environment contract, ephemeral witness)",
+          "dharma_swarm/chamber/proof.py (typed claims, evaluator-owned capabilities, exact obligation/effect-binding gate, rejection of Refutes, mismatched propositions, fabricated authority, relabeled candidates)",
+          "tests/test_chamber_traces.py (33 tests covering bundle integrity, 100-process agreement, manifest drift, direct-object bypass, unknown properties, nondeterminism, promotion gate semantics, authority shapes, evaluator instance binding, duplicate mint prevention)",
+          "reports/governance/chamber/proof_membrane_v0/dharmagraph_fork_alias.replay_bundle.v1.json (committed bundle with exact manifest, source revision, and semantic digests)",
+          "reports/governance/chamber/proof_membrane_v0/verification_receipt.json (100 completed replays, unique PIDs, consistent semantic digest, loaded-source digests, environment records, no OS attestation claim)",
+          "reports/governance/chamber/proof_membrane_v0/RESEARCH_AND_VERIFICATION.md (engine placement, non-claims, kill criteria, explicit trusted-process boundary, full suite results)",
+          "reports/governance/chamber/proof_membrane_v0/COUNCIL_REVIEW.md (Round 1/2/3 history, Round 4 pending, no inherited approvals)",
+          "reports/governance/chamber/proof_membrane_v0/ROUND3_COUNCIL_SUMMARY.json (six 100/100 approvals, zero blockers)",
+          "reports/agentops/work_packets/hyperbolic-time-chamber-WP-O99-proof-membrane-v0-2026-07-14.json (revised packet with dependency-light gates, allowed/forbidden files, honest blockers)",
+          "reports/governance/chamber/proof_membrane_v0/AGENTOPS_CLOSEOUT_ATTEMPT1.json (preserved failed closeout with actual causes)"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "The packet change is an honest environment-compatible admission boundary, not removal of failing product evidence. The full plugin-aware results (33 focused, 102 full chamber, 22 graph-adjacent) remain explicitly recorded and required. All direct-construction, proposition, candidate/arm, scope, and authority negative tests remain present. The replay bundle still pins implementation commit df435af863e651287de3f637509a45d59b133ad3 and the same seven manifest byte digests. MiroFish and other external simulators remain untrusted candidate foundries. The strongest claim remains exact-scope HARNESS_PROVEN, never CLOSED_LIVE, production readiness, universal determinism, or automatic root-cause analysis. The failed first closeout is preserved with its actual causes. The revised packet is ready for rerun under a host context able to create its nested jail; no report editing or suppression is required. All eight approval conditions are satisfied.",
+        "verdict": "approve"
+      },
+      "provider": "ollama",
+      "raw_response": "{\n  \"verdict\": \"approve\",\n  \"score\": 100,\n  \"summary\": \"The packet change is an honest environment-compatible admission boundary, not removal of failing product evidence. The full plugin-aware results (33 focused, 102 full chamber, 22 graph-adjacent) remain explicitly recorded and required. All direct-construction, proposition, candidate/arm, scope, and authority negative tests remain present. The replay bundle still pins implementation commit df435af863e651287de3f637509a45d59b133ad3 and the same seven manifest byte digests. MiroFish and other external simulators remain untrusted candidate foundries. The strongest claim remains exact-scope HARNESS_PROVEN, never CLOSED_LIVE, production readiness, universal determinism, or automatic root-cause analysis. The failed first closeout is preserved with its actual causes. The revised packet is ready for rerun under a host context able to create its nested jail; no report editing or suppression is required. All eight approval conditions are satisfied.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md Part IV (scope, MiroFish confinement, claim ceiling, kill criteria)\",\n    \"dharma_swarm/chamber/replay_contract.py (strict data-only contracts, registered IDs, digest checks, direct-object type enforcement)\",\n    \"dharma_swarm/chamber/replay.py (source-exact graph/types.py loading, isolated execution, manifest binding, bundle construction)\",\n    \"dharma_swarm/chamber/replay_worker.py (stdlib-only bootstrap, inert package shells, loaded-source digest recording, stdin bundle input)\",\n    \"dharma_swarm/chamber/verification.py (100 fresh-process replay, unique PIDs, per-process transcript, environment contract, ephemeral witness)\",\n    \"dharma_swarm/chamber/proof.py (typed claims, evaluator-owned capabilities, exact obligation/effect-binding gate, rejection of Refutes, mismatched propositions, fabricated authority, relabeled candidates)\",\n    \"tests/test_chamber_traces.py (33 tests covering bundle integrity, 100-process agreement, manifest drift, direct-object bypass, unknown properties, nondeterminism, promotion gate semantics, authority shapes, evaluator instance binding, duplicate mint prevention)\",\n    \"reports/governance/chamber/proof_membrane_v0/dharmagraph_fork_alias.replay_bundle.v1.json (committed bundle with exact manifest, source revision, and semantic digests)\",\n    \"reports/governance/chamber/proof_membrane_v0/verification_receipt.json (100 completed replays, unique PIDs, consistent semantic digest, loaded-source digests, environment records, no OS attestation claim)\",\n    \"reports/governance/chamber/proof_membrane_v0/RESEARCH_AND_VERIFICATION.md (engine placement, non-claims, kill criteria, explicit trusted-process boundary, full suite results)\",\n    \"reports/governance/chamber/proof_membrane_v0/COUNCIL_REVIEW.md (Round 1/2/3 history, Round 4 pending, no inherited approvals)\",\n    \"reports/governance/chamber/proof_membrane_v0/ROUND3_COUNCIL_SUMMARY.json (six 100/100 approvals, zero blockers)\",\n    \"reports/agentops/work_packets/hyperbolic-time-chamber-WP-O99-proof-membrane-v0-2026-07-14.json (revised packet with dependency-light gates, allowed/forbidden files, honest blockers)\",\n    \"reports/governance/chamber/proof_membrane_v0/AGENTOPS_CLOSEOUT_ATTEMPT1.json (preserved failed closeout with actual causes)\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "deepseek-v4-pro:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "minimax-m3",
+      "failure_reason": "invalid critic JSON from ollama:minimax-m3:cloud; actual_model=minimax-m3; content_len=52670; parse_error=JSONDecodeError: Extra data: line 11 column 1 (char 360); preview=Let me carefully review this target. The review is asking me to evaluate whether the Hyperbolic Chamber Proof Membrane V0 should be approved at 100/100, following strict criteria outlined in the prompt.\\n\\nThe prompt specifies 8 conditions for approv ... le_contract, ManifestEntryV1, _exact_keys)\",\\n    \"dharma_swarm/chamber/replay.py (_run_checkpoint_type, _validated_manifest_snapshot, execute_world, run_bundle_once)\",\\n    \"dharma_swarm/chamber/replay_worker.py (stdlib-only bootstrap, inert package",
+      "failure_type": "CriticResponseError",
+      "lane_id": "minimaxm3",
+      "latency_ms": 97472,
+      "ok": false,
+      "parsed": {
+        "blockers": [
+          "invalid critic JSON from ollama:minimax-m3:cloud; actual_model=minimax-m3; content_len=52670; parse_error=JSONDecodeError: Extra data: line 11 column 1 (char 360); preview=Let me carefully review this target. The review is asking me to evaluate whether the Hyperbolic Chamber Proof Membrane V0 should be approved at 100/100, following strict criteria outlined in the prompt.\\n\\nThe prompt specifies 8 conditions for approv ... le_contract, ManifestEntryV1, _exact_keys)\",\\n    \"dharma_swarm/chamber/replay.py (_run_checkpoint_type, _validated_manifest_snapshot, execute_world, run_bundle_once)\",\\n    \"dharma_swarm/chamber/replay_worker.py (stdlib-only bootstrap, inert package"
+        ],
+        "evidence_checked": [],
+        "explicit_disagreement": "invalid critic JSON from ollama:minimax-m3:cloud; actual_model=minimax-m3; content_len=52670; parse_error=JSONDecodeError: Extra data: line 11 column 1 (char 360); preview=Let me carefully review this target. The review is asking me to evaluate whether the Hyperbolic Chamber Proof Membrane V0 should be approved at 100/100, following strict criteria outlined in the prompt.\\n\\nThe prompt specifies 8 conditions for approv ... le_contract, ManifestEntryV1, _exact_keys)\",\\n    \"dharma_swarm/chamber/replay.py (_run_checkpoint_type, _validated_manifest_snapshot, execute_world, run_bundle_once)\",\\n    \"dharma_swarm/chamber/replay_worker.py (stdlib-only bootstrap, inert package",
+        "required_changes": [
+          "Make ollama:minimax-m3:cloud reachable or mark the lane optional with justification."
+        ],
+        "score": 0,
+        "summary": "minimaxm3 could not run.",
+        "verdict": "blocked"
+      },
+      "provider": "ollama",
+      "raw_response_preview": "Let me carefully review this target. The review is asking me to evaluate whether the Hyperbolic Chamber Proof Membrane V0 should be approved at 100/100, following strict criteria outlined in the prompt.\\n\\nThe prompt specifies 8 conditions for approv ... le_contract, ManifestEntryV1, _exact_keys)\",\\n    \"dharma_swarm/chamber/replay.py (_run_checkpoint_type, _validated_manifest_snapshot, execute_world, run_bundle_once)\",\\n    \"dharma_swarm/chamber/replay_worker.py (stdlib-only bootstrap, inert package",
+      "requested_model": "minimax-m3:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "nvidia/nemotron-3-super-120b-a12b:free",
+      "lane_id": "nemotron3ultra",
+      "latency_ms": 74701,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md",
+          "reports/agentops/work_packets/hyperbolic-time-chamber-WP-O99-proof-membrane-v0-2026-07-14.json",
+          "reports/governance/chamber/proof_membrane_v0/AGENTOPS_CLOSEOUT_ATTEMPT1.json",
+          "reports/governance/chamber/proof_membrane_v0/RESEARCH_AND_VERIFICATION.md",
+          "reports/governance/chamber/proof_membrane_v0/dharmagraph_fork_alias.replay_bundle.v1.json",
+          "reports/governance/chamber/proof_membrane_v0/verification_receipt.json",
+          "tests/test_chamber_traces.py",
+          "reports/governance/chamber/proof_membrane_v0/COUNCIL_REVIEW.md",
+          "reports/governance/chamber/proof_membrane_v0/ROUND3_COUNCIL_SUMMARY.json"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "The packet has been revised to honestly describe the dependency-light admission boundary, the full plugin-aware suites remain explicitly recorded and required, all negative tests are present, the replay bundle pins the correct commit and manifests, MiroFish is correctly confined to untrusted scenario generation, the strongest claim is HARNESS_PROVEN, the failed closeout is preserved, and the research ledger indicates that the checks (including the dependency-light slices and full suites) have passed.",
+        "verdict": "approve"
+      },
+      "provider": "openrouter_free",
+      "raw_response": "{\n  \"verdict\": \"approve\",\n  \"score\": 100,\n  \"summary\": \"The packet has been revised to honestly describe the dependency-light admission boundary, the full plugin-aware suites remain explicitly recorded and required, all negative tests are present, the replay bundle pins the correct commit and manifests, MiroFish is correctly confined to untrusted scenario generation, the strongest claim is HARNESS_PROVEN, the failed closeout is preserved, and the research ledger indicates that the checks (including the dependency-light slices and full suites) have passed.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md\",\n    \"reports/agentops/work_packets/hyperbolic-time-chamber-WP-O99-proof-membrane-v0-2026-07-14.json\",\n    \"reports/governance/chamber/proof_membrane_v0/AGENTOPS_CLOSEOUT_ATTEMPT1.json\",\n    \"reports/governance/chamber/proof_membrane_v0/RESEARCH_AND_VERIFICATION.md\",\n    \"reports/governance/chamber/proof_membrane_v0/dharmagraph_fork_alias.replay_bundle.v1.json\",\n    \"reports/governance/chamber/proof_membrane_v0/verification_receipt.json\",\n    \"tests/test_chamber_traces.py\",\n    \"reports/governance/chamber/proof_membrane_v0/COUNCIL_REVIEW.md\",\n    \"reports/governance/chamber/proof_membrane_v0/ROUND3_COUNCIL_SUMMARY.json\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "required": true
+    }
+  ],
+  "generated_at": "20260713T175333Z",
+  "max_evidence_chars": 0,
+  "max_output_tokens": 12000,
+  "persistent_agent_witness": {
+    "agent": "palantir-pilot",
+    "blocker": "",
+    "fresh": true,
+    "heartbeat_age_seconds": 12,
+    "heartbeat_timestamp": "2026-07-13T17:53:21Z",
+    "max_heartbeat_age_seconds": 300,
+    "raw_status": "status=running session=dharma_palantir_pilot_a2a_worker\nsubject=dharma.a2a.palantir-pilot\nconsumer=palantir_pilot_a2a\nstream=DHARMA_FLEET\nheartbeat=/Users/dhyana/.dharma/a2a_bus/worker_heartbeats/palantir-pilot.json\nlog=/Users/dhyana/.dharma/logs/palantir_pilot_a2a_worker/dharma_palantir_pilot_a2a_worker.log\n--- heartbeat ---\n{\n    \"agent_id\": \"palantir_pilot\",\n    \"callsign\": \"palantir-pilot\",\n    \"consumer\": \"palantir_pilot_a2a\",\n    \"cycle\": 5740,\n    \"last_receipt_path\": \"\",\n    \"receipt_count\": 0,\n    \"schema_version\": \"dharma.a2a.palantir_pilot.worker_heartbeat.v1\",\n    \"status\": \"IDLE\",\n    \"stream\": \"DHARMA_FLEET\",\n    \"subject\": \"dharma.a2a.palantir-pilot\",\n    \"suppress_no_messages\": true,\n    \"timestamp\": \"2026-07-13T17:53:21Z\"\n}\n--- consumer ---\n{\n  \"stream_name\": \"DHARMA_FLEET\",\n  \"name\": \"palantir_pilot_a2a\",\n  \"config\": {\n    \"ack_policy\": \"explicit\",\n    \"ack_wait\": 30000000000,\n    \"deliver_policy\": \"all\",\n    \"durable_name\": \"palantir_pilot_a2a\",\n    \"name\": \"palantir_pilot_a2a\",\n    \"filter_subject\": \"dharma.a2a.palantir-pilot\",\n    \"max_ack_pending\": 1000,\n    \"max_deliver\": -1,\n    \"max_waiting\": 512,\n    \"replay_policy\": \"instant\",\n    \"num_replicas\": 0,\n    \"metadata\": {\n      \"_nats.level\": \"3\",\n      \"_nats.req.level\": \"0\",\n      \"_nats.ver\": \"2.12.6\"\n    },\n    \"pause_until\": \"0001-01-01T00:00:00Z\"\n  },\n  \"created\": \"2026-07-10T15:21:55.497881Z\",\n  \"delivered\": {\n    \"consumer_seq\": 0,\n    \"stream_seq\": 0\n  },\n  \"ack_floor\": {\n    \"consumer_seq\": 0,\n    \"stream_seq\": 0\n  },\n  \"num_ack_pending\": 0,\n  \"num_redelivered\": 0,\n  \"num_waiting\": 1,\n  \"num_pending\": 0,\n  \"ts\": \"2026-07-13T17:53:33.173415Z\"\n}\n--- pane tail ---\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+    "status": "running"
+  },
+  "prompt_chars": 330029,
+  "prompt_file": "/Users/dhyana/ds_hyperbolic_chamber_v0_20260714/reports/governance/chamber/proof_membrane_v0/ROUND4_COUNCIL_PROMPT.md",
+  "prompt_words_estimate": 23465,
+  "required_critic_count": 6,
+  "schema_version": "codex.decorrelated_review_council.v1",
+  "score_avg": 71.67,
+  "score_min": 0,
+  "target_score": 100,
+  "timeout_seconds": 900
+}

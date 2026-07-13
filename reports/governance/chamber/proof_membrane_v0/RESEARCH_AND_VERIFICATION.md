@@ -187,6 +187,17 @@ remain separate required evidence above. A final closeout must be rerun with
 the revised packet under a host context able to create its nested jail, and a
 new council round must review this exact evidence split.
 
+The revised closeout was then rerun from the same clean-base preflight under a
+host context that could create the nested macOS jail. It passed: scope was
+clean; diff, 33 focused proof tests, 84 dependency-light chamber regressions,
+22 semantic-negative tests, 12 synchronous checkpoint tests, and Ruff were
+green; the isolated custody-write control returned its expected zero exit; and
+final Git status was empty. The packet digest was
+`015d84edf32817581451c1c2808f3033b5d78f0893fed03abea60bf83ceca814`.
+The raw report is `AGENTOPS_CLOSEOUT_FINAL.json`. This pass does not overwrite
+attempt 1 or claim the governed runner executed the separately recorded full
+102/22 plugin-aware suites.
+
 ## Primary research locators
 
 - [MiroFish upstream workflow](https://github.com/666ghj/MiroFish/blob/96096ea0ff42b1a30cbc41a1560b8c91090f9968/README.md#L86-L92)

@@ -80,7 +80,7 @@ is retained explicitly rather than silently described as Kimi 2.7.
 This satisfies PM0-10 as a review gate only. It does not create provenance,
 runtime authority, or a product-readiness claim.
 
-## Round 4 — pending final admission-envelope review
+## Round 4 — held
 
 After Round 3, the first governed closeout failed closed for two environment
 reasons preserved in `AGENTOPS_CLOSEOUT_ATTEMPT1.json`: the admission runner
@@ -90,6 +90,19 @@ The negative-control jail also encountered macOS `sandbox-exec` denial under
 the already-sandboxed build process.
 
 The packet now distinguishes dependency-light admission slices from the full
-plugin-aware test evidence. Round 4 must decide whether that is an honest
-boundary correction or an illicit weakening. No Round 3 vote is inherited for
-the changed packet bytes.
+plugin-aware test evidence. Four lanes approved at 100. Qwen returned 30/revise
+with four claims contradicted by attached fields: it said the failed report was
+not preserved, said V0 asserted `CLOSED_LIVE`, said model agreement created
+runtime authority, and treated the explicit two-environment split as hidden.
+MiniMax emitted 52,670 characters with extra data instead of one valid JSON
+object, so the runner correctly typed that lane blocked. Persistent witness
+`palantir-pilot` was fresh at 12 seconds. Conviction remained
+`hold_blockers`; no approval carried forward.
+
+## Round 5 — pending compact fact-check review
+
+The revised packet subsequently passed governed closeout with clean scope, all
+six positive gates, and the isolated negative control green. Round 5 receives
+a compact locator map plus the failed report, passed report, exact packet,
+proof semantics, test source, bundle, and research ledger. Every dissent must
+cite contradicting attached bytes; every lane must emit parseable bounded JSON.
