@@ -23,9 +23,18 @@ KNOWN_LIFECYCLES = OPEN_LIFECYCLES | CLOSED_LIFECYCLES
 
 _H2_RE = re.compile(r"^##\s+(?P<title>.+?)\s*$")
 _H3_RE = re.compile(r"^###\s+(?P<id>BR-\d+)\b(?P<rest>.*)$", re.IGNORECASE)
-_OPEN_HEADER_RE = re.compile(r"^OPEN(?:\s+ITEMS)?\b", re.IGNORECASE)
-_STALE_HEADER_RE = re.compile(r"^STALE-CLAIM\s+CORRECTIONS\b", re.IGNORECASE)
-_CLOSED_HEADER_RE = re.compile(r"^CLOSED(?:\s+ITEMS)?\b", re.IGNORECASE)
+_OPEN_HEADER_RE = re.compile(
+    r"^OPEN(?:\s+ITEMS)?(?:\s+\([^)]*\))?$",
+    re.IGNORECASE,
+)
+_STALE_HEADER_RE = re.compile(
+    r"^STALE-CLAIM\s+CORRECTIONS(?:\s+\([^)]*\))?$",
+    re.IGNORECASE,
+)
+_CLOSED_HEADER_RE = re.compile(
+    r"^CLOSED(?:\s+ITEMS)?(?:\s+\([^)]*\))?$",
+    re.IGNORECASE,
+)
 _DECLARED_OPEN_RE = re.compile(r"\((?P<count>\d+)\s+open(?:/partial)?\b", re.IGNORECASE)
 _BOLD_FIELD_RE = re.compile(
     r"^\s*(?:[-*+]\s*)?\*\*(?P<key>[A-Za-z_][\w-]*)\s*:\*\*\s*(?P<value>.*?)\s*$"
@@ -167,20 +176,19 @@ def _normalize_lifecycle(value: str) -> Lifecycle:
 
 
 def _heading_lifecycle(rest: str) -> Lifecycle | None:
-    candidate = rest.lstrip()
-    if candidate.startswith("("):
-        candidate = candidate[1:].lstrip()
-    else:
-        candidate = re.sub(r"^[—–-]\s*", "", candidate)
     match = re.match(
-        r"(?P<status>REOPENED|OPEN|PARTIAL|INVESTIGATING|WORKAROUND|FIXED|CLOSED)\b",
-        candidate,
+        r"^\s*\(\s*(?P<status>REOPENED|OPEN|PARTIAL|INVESTIGATING|WORKAROUND|FIXED|CLOSED)\b[^)]*\)",
+        rest,
         re.IGNORECASE,
     )
     if match is None:
         return None
     status = match.group("status").upper()
     return "OPEN" if status == "REOPENED" else status  # type: ignore[return-value]
+
+
+def _lifecycles_equivalent(left: Lifecycle, right: Lifecycle) -> bool:
+    return left == right or left in CLOSED_LIFECYCLES and right in CLOSED_LIFECYCLES
 
 
 def _parse_fields(body_lines: list[str]) -> tuple[dict[str, str], dict[str, list[str]]]:
@@ -227,7 +235,10 @@ def _build_occurrence(draft: _OccurrenceDraft, source: str) -> BrokenRegisterOcc
                     line=draft.line,
                 )
             )
-        elif heading_status is not None and heading_status != status:
+        elif (
+            heading_status is not None
+            and not _lifecycles_equivalent(heading_status, status)
+        ):
             diagnostics.append(
                 _diagnostic(
                     "contradictory_lifecycle",
@@ -307,7 +318,7 @@ def parse_broken_register_text(
     source: str = "<memory>",
 ) -> BrokenRegisterResult:
     occurrences: list[BrokenRegisterOccurrence] = []
-    section = "current"
+    section = "outside"
     declared_open_count: int | None = None
     draft: _OccurrenceDraft | None = None
 

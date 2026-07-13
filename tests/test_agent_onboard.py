@@ -163,6 +163,37 @@ def test_broken_register_parser_counts(tmp_path, monkeypatch):
     assert info["top_open"][0]["status_word"] == "OPEN"
 
 
+def test_broken_register_diagnostics_are_structured_and_rendered(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    mod = _load_module()
+    br = tmp_path / "BROKEN_REGISTER.md"
+    br.write_text(
+        """# BROKEN REGISTER
+## OPEN ITEMS (0 open/partial)
+### BR-404 — current item without lifecycle metadata
+- **severity:** DEGRADED
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(mod, "BROKEN_REGISTER", br)
+
+    info = mod._parse_broken_register()
+    diagnostics = info["diagnostics"]
+    assert len(diagnostics) == 1
+    diagnostic = diagnostics[0]
+    assert set(diagnostic) == {"code", "message", "br_id", "line"}
+    assert diagnostic["code"] == "missing_current_status"
+    assert diagnostic["br_id"] == "BR-404"
+    assert diagnostic["line"] == 3
+    mod.render_broken_register()
+    output = capsys.readouterr().out
+    assert "missing_current_status" in output
+    assert "BR-404" in output
+
+
 def test_broken_register_parser_missing_file(tmp_path, monkeypatch):
     mod = _load_module()
     monkeypatch.setattr(mod, "BROKEN_REGISTER", tmp_path / "does_not_exist.md")
@@ -355,6 +386,11 @@ def test_json_mode_emits_valid_receipt(tmp_path):
         "broken_register",
     ):
         assert key in payload, f"receipt missing key: {key}"
+    assert set(payload["broken_register"]) == {
+        "total",
+        "open_count",
+        "closed_count",
+    }
     # The same payload must land on disk for fleet consumers.
     receipt = tmp_path / "onboard_receipt.json"
     assert receipt.exists()
