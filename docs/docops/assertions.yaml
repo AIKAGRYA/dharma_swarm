@@ -18,6 +18,13 @@
       "verify": "git ls-files dharma_swarm | rg '^dharma_swarm/[^/]+\\.py$' | wc -l"
     },
     {
+      "id": "manifest-python-loc",
+      "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
+      "regex": "Total Python LOC \\| \\*\\*([\\d,]+)\\*\\*",
+      "metric": "total_python_loc",
+      "verify": "git ls-files dharma_swarm | rg '\\.py$' | xargs wc -l | tail -1"
+    },
+    {
       "id": "manifest-test-files",
       "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
       "regex": "Test files \\| \\*\\*([\\d,]+)\\*\\*",
