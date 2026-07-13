@@ -1,9 +1,9 @@
 {
   "id": "onboard-one-door-WP-O4",
-  "base_ref": "ec61fda4a88c45339b1487fe6c49f711e4eceb7f",
+  "base_ref": "2d2de7b1bfdd982b09334b7154e3e26425c55211",
   "branch": "codex/darwin-temp-authority-20260713",
   "worktree": ".",
-  "intent": "Correct the WP-O4 Darwin report-root authority widening merged by PR #918: replace environment-selected tempfile authority with OS-account getconf authority, prove native direct filesystem-write confinement, and bind stock GNU Make 3.81 compatibility into CI truth — no branch-protection edit, no merge-authority change, and no broader sandbox claim.",
+  "intent": "Correct the WP-O4 Darwin report-root authority widening merged by PR #918: replace environment-selected tempfile authority with OS-account getconf authority, prove native direct filesystem-write confinement, bind stock GNU Make 3.81 compatibility into CI truth, and keep the duplicate-free CI contract plus merge-gate fixtures aligned with that new required check — no branch-protection edit, no merge-authority change, and no broader sandbox claim.",
   "allowed_files": [
     "Makefile",
     "scripts/governance/run_agent_work_packet.py",
@@ -15,6 +15,7 @@
     "tests/test_orientation_graph.py",
     "tests/test_make_onboarding_contract.py",
     "tests/test_onboarding_ci_contract.py",
+    "tests/test_pr_merge_control.py",
     "reports/agentops/work_packets/onboard-one-door-WP-O4.json",
     "docs/governance/SOVEREIGN_MANIFEST.md",
     "docs/docops/AUTO_INVENTORY.md"
@@ -147,7 +148,7 @@
   "gates": [
     {
       "name": "wp-o4-focused-battery",
-      "command": "python3 -m pytest tests/test_make_onboarding_contract.py tests/test_onboarding_ci_contract.py tests/test_agent_work_packet.py tests/test_orientation_graph.py -q",
+      "command": "python3 -m pytest tests/test_make_onboarding_contract.py tests/test_onboarding_ci_contract.py tests/test_agent_work_packet.py tests/test_orientation_graph.py tests/test_pr_merge_control.py -q",
       "argv": [
         "python3",
         "-m",
@@ -156,6 +157,7 @@
         "tests/test_onboarding_ci_contract.py",
         "tests/test_agent_work_packet.py",
         "tests/test_orientation_graph.py",
+        "tests/test_pr_merge_control.py",
         "-q"
       ],
       "env": {},
@@ -178,7 +180,7 @@
     },
     {
       "name": "ruff-wp-o4",
-      "command": "python3 -m ruff check scripts/governance/run_agent_work_packet.py tests/test_make_onboarding_contract.py tests/test_onboarding_ci_contract.py tests/test_agent_work_packet.py",
+      "command": "python3 -m ruff check scripts/governance/run_agent_work_packet.py tests/test_make_onboarding_contract.py tests/test_onboarding_ci_contract.py tests/test_agent_work_packet.py tests/test_pr_merge_control.py",
       "argv": [
         "python3",
         "-m",
@@ -187,7 +189,8 @@
         "scripts/governance/run_agent_work_packet.py",
         "tests/test_make_onboarding_contract.py",
         "tests/test_onboarding_ci_contract.py",
-        "tests/test_agent_work_packet.py"
+        "tests/test_agent_work_packet.py",
+        "tests/test_pr_merge_control.py"
       ],
       "env": {},
       "expected_exit": 0
@@ -228,7 +231,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "ec61fda4a88c45339b1487fe6c49f711e4eceb7f",
+      "checked_at_sha": "2d2de7b1bfdd982b09334b7154e3e26425c55211",
       "details": []
     },
     "interface_mismatches": [
@@ -243,7 +246,7 @@
     "Repository-wide agent-build-closeout remains externally blocked until live NATS production evidence is no more than 24 hours old; never bypass or fabricate that operator-owned evidence.",
     "C1 semantic revalidation remains outside WP-O4 and may occur only after the strict O3+O4 door is merged; this packet makes no C1 closure claim."
     ],
-    "rollback": "revert the Darwin getconf authority helper, macOS CI-truth registration, native confinement tests, and this WP-O4 amendment together",
-    "packet_digest": "7d30ac6f40cadcbd2211ab051f57946b1cd16a7baa546175c7e725673803e4f5"
+    "rollback": "revert the Darwin getconf authority helper, macOS CI-truth registration, duplicate-key contract repair, merge-gate required-check fixture, native confinement tests, and this WP-O4 amendment together",
+    "packet_digest": "0da52901d8f2d1aded8c84a042a6e8c25ea7ddd20085e78fa65ef5cad5008275"
   }
 }

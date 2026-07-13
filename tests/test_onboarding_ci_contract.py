@@ -47,6 +47,14 @@ def _job_block(name: str) -> str:
     return match.group(0)
 
 
+def _unique_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        assert key not in result, f"duplicate CI truth contract key: {key}"
+        result[key] = value
+    return result
+
+
 def _git(repo: Path, *args: str) -> str:
     result = subprocess.run(
         ["git", *args], cwd=repo, capture_output=True, text=True, check=False
@@ -353,7 +361,10 @@ def test_macos_compatibility_job_is_required_and_executable() -> None:
     ):
         assert proof in makefile
 
-    contract = json.loads(CI_TRUTH_CONTRACT.read_text(encoding="utf-8"))
+    contract = json.loads(
+        CI_TRUTH_CONTRACT.read_text(encoding="utf-8"),
+        object_pairs_hook=_unique_json_object,
+    )
     required = next(
         check
         for check in contract["required"]

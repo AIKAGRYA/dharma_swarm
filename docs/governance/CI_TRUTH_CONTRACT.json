@@ -63,9 +63,7 @@
       "local_command": "make test",
       "failure_category": "test_failure",
       "autofix": "manual"
-    }
-  ],
-  "advisory": [
+    },
     {
       "id": "active_track",
       "names": ["ACTIVE_TRACK governance gate"],
