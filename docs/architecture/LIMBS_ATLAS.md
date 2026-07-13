@@ -14,6 +14,10 @@ discoverable from one place (MEGAFILE_INDEX recursion rule 2).
 
 - [`NAVIGATION.md`](NAVIGATION.md) — the static module map (770+ modules, 12
   layers). May lag code; regenerate with `make xray`.
+- [`HOLON_RUNTIME_FULL_ESTATE_MAP.md`](HOLON_RUNTIME_FULL_ESTATE_MAP.md) — the
+  current holon-specific body synthesis across repo implementation,
+  `~/.dharma` runtime evidence, the parallel `~/.hermes` ecosystem, recent work,
+  and a dated readiness witness.
 - [`../../ACTIVE_SURFACE_MANIFEST.yaml`](../../ACTIVE_SURFACE_MANIFEST.yaml) —
   machine-readable authority for which surfaces are active / projection / adapter
   / research / frozen.

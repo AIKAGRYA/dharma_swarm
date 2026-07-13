@@ -1,5 +1,10 @@
 # 03 — Holon System Code Map and Hermes-Organ Comparison
 
+> **Historical lane map:** This describes the pre-merge collapse plan, including
+> surfaces subsequently deleted or rebuilt. Use
+> [`../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md`](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md)
+> for the current body synthesis and dated readiness witness.
+
 ## Core distinction
 
 ```text

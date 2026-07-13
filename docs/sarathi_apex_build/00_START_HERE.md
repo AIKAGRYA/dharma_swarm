@@ -1,60 +1,81 @@
-# 00 — Start Here: Sarathi Holon System Organization v1.1
+# 00 — Start Here: Sarathi Holon System
 
-Status: **organization and collapse lane in progress**. Do not use this document
-to claim a living Sarathi.
+Status: **collapse base landed; effect and durable-service closure remain**.
+Do not use this document to claim a living Sarathi.
+
+For the current holon-specific body synthesis, read
+[`../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md`](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md).
 
 ## Locked sentence
 
-Sarathi is the apex holon that **uses** persistent-agent lineage, the
-LivingAgentKernel, the canonical holon runtime, and existing orchestration, then
-**adds** deterministic reversibility gating and operator-facing continuity. It is
-not a parallel rewrite and not identity docs alone.
+Sarathi is intended to be the apex holon that **composes** persistent-agent
+lineage, the Living Agent Kernel, the direct holon runtime, canonical provider
+routing, existing orchestration/A2A, and deterministic authority gates, then
+adds operator-facing continuity. It is not a parallel rewrite and not identity
+documents alone.
 
-## What changed in v1.1
+## Landed baseline
 
-- The reversibility gate and wake brick already landed on the dirty
-  `agent/magpie-seed` line at `f18fe8476`; this clean lane ports it instead of
-  re-deriving it.
-- Work happens on `feat/holon-system-collapse-base`, a worktree from
-  `origin/main`.
-- The standalone `holon/` fork is treated as a duplicate body to collapse in
-  Phase B, not a canonical runtime.
-- The done condition is machine-checkable: `python3 scripts/governance/sprawl_guard.py` must exit `0`.
+- PR #821 merged the clean collapse lane into main at `0beef7584`.
+- The duplicate repo-root `holon/` package was removed.
+- `load_holon` and `holon_wake_cycle` each have one canonical definition.
+- The reversibility primitive, runtime seam, thin `holon_system` facade, Sarathi
+  projections, and sprawl guard are present on main.
+- The facade's Sarathi gateway and pulse correctly emit
+  `wake_loop_active=false` and `alive_claim=false`
+  (`dharma_swarm/holon_system/sarathi/gateway.py:15-24`;
+  `dharma_swarm/holon_system/sarathi/pulse.py:12-25`).
 
-## What is organized here
+Reproduce the merge/collapse claims with:
 
-This front door connects four things that were previously easy to confuse:
+```bash
+git show -s --format='%H %cs %s' 0beef7584
+test ! -d holon && echo 'root holon fork absent'
+PYTHONPATH=$PWD /Users/dhyana/dharma_swarm/.venv/bin/python \
+  scripts/governance/sprawl_guard.py
+```
 
-1. **Source code:** repo-owned Python, tests, schemas, docs.
-2. **Runtime state:** mutable identities, inboxes, heartbeats, and receipts under `~/.dharma`.
-3. **Side ecosystem:** Nous Hermes Agent under `~/.hermes`, including `hermes-m5` as a field-ops peer, not a dharma holon lineage source.
-4. **Proof gates:** deterministic checks and receipts that decide when claims can be promoted.
+The original branch/worktree names and test counts in the dated subdocuments are
+historical evidence of that merge, not current deployment facts.
 
-## Current proof status
+## Proposed proof level
 
-| Claim | Evidence | Status |
-|---|---|---|
-| Clean branch exists | `git branch --show-current` → `feat/holon-system-collapse-base`; HEAD `8a3a2e657` after first port commit. | Done |
-| Gate ported | `dharma_swarm/operator_core/reversibility_gate.py`; `tests/test_reversibility_gate.py`; `holon_runtime.py` accepts caller-supplied `planned_action`. | Done |
-| Wake profile has Sarathi | `scripts/runtime/codex_composer_wake_loop.py` registers `sarathi` as a `WakeProfile`. | Done |
-| Scoped gate tests | `.venv/bin/python -m pytest tests/test_reversibility_gate.py tests/test_holon_runtime.py tests/test_codex_composer_wake_loop.py -q` → `39 passed in 0.62s`. | Done |
-| Collapse spine | `holon/` fork deleted after migrating `scripts/verify_holon_harness_prod.py` to canonical `dharma_swarm.holon_runtime`; sprawl guard exits `0`. | Done |
-| Facade package | Fresh `dharma_swarm/holon_system/` thin facade package added; Sarathi source package added under `holon_system/sarathi/`; import tests pass. | Done |
-| Sarathi liveness | No unattended proof and no `wake_loop_active=true` claim. | Not alive |
+```text
+IdentityPresent
+  -> DialogueProven
+  -> ProposalCycleProven
+  -> GovernedEffectProven
+  -> ReceiptBound
+  -> DurableServiceProven
+```
 
-## Surface claim for this lane
+This build-history file does not assign a current promotion level; the estate
+map keeps the dated witness and exact re-run commands. The runner asks which
+action should happen next (`scripts/holon_run.py:32-62`) and does not pass
+`planned_action`, `spend_fn`, or an execution lease
+(`scripts/holon_run.py:66-87`). The six names above are proposed promotion types;
+current source still uses weaker booleans
+(`dharma_swarm/holon_system/observability/proof_gates.py:6-11`).
+
+## Surface contract
 
 ```yaml
-surface: sarathi_apex_holon_system_v1_1
-canonical_code_home: dharma_swarm/holon_system plus canonical dharma_swarm/holon_*.py substrate
-canonical_runtime_home: ~/.dharma/agents/sarathi and ~/.dharma/a2a_bus/*/sarathi*
-canonical_doc_home: docs/sarathi_apex_build
-forbidden_new_files:
-  - duplicate load_holon implementations
-  - duplicate holon_wake_cycle implementations
-  - new orchestrator/router/task-store/bus/receipt spine
-proof_before_alive:
-  - tests for reversibility gate and holon runtime
-  - python3 scripts/governance/sprawl_guard.py exits 0
-  - unattended wake receipt before wake_loop_active=true
+surface: sarathi_apex_holon_system
+holon_body_reference: docs/architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md
+canonical_runtime_primitives:
+  - dharma_swarm/holon_bridge.py::load_holon
+  - dharma_swarm/holon_runtime.py::holon_wake_cycle
+  - dharma_swarm/operator_core/living_agent_kernel.py
+  - dharma_swarm/operator_core/execution_lease.py
+  - dharma_swarm/operator_core/reversibility_gate.py
+canonical_runtime_home: ~/.dharma/agents/sarathi
+forbidden:
+  - duplicate identity loader or wake-cycle body
+  - new provider router, orchestrator, task store, A2A bus, or receipt spine
+  - alive claim from PID, tmux, identity, heartbeat, or proposal alone
+proposed_promotion_gate: DurableServiceProven
+current_enforcement: not_composed
+current_candidate_helper: sprawl_guard_clean_and_wake_loop_active_booleans
 ```
+
+The next work is specified in [`07_BACKLOG.md`](07_BACKLOG.md).
