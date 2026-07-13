@@ -1,14 +1,15 @@
 {
   "id": "onboard-one-door-WP-O4",
-  "base_ref": "15c0b5ad2a5327e1a938660c491328b452fdf865",
-  "branch": "codex/onboard-macos-admission-20260713",
+  "base_ref": "ec61fda4a88c45339b1487fe6c49f711e4eceb7f",
+  "branch": "codex/darwin-temp-authority-20260713",
   "worktree": ".",
-  "intent": "Correct only the WP-O4 host-portability defects reproduced after PR #912 merged: GNU Make 3.81 parser compatibility without weakening command-line injection guards, macOS private-temporary-root validation, an executable macOS sandbox profile sourced from the trusted host path, and case-insensitive-filesystem test portability — no new workflow authority, no branch-protection edit, no merge-authority change, and no strict-default flip.",
+  "intent": "Correct the WP-O4 Darwin report-root authority widening merged by PR #918: replace environment-selected tempfile authority with OS-account getconf authority, prove native direct filesystem-write confinement, and bind stock GNU Make 3.81 compatibility into CI truth — no branch-protection edit, no merge-authority change, and no broader sandbox claim.",
   "allowed_files": [
     "Makefile",
     "scripts/governance/run_agent_work_packet.py",
     "scripts/governance/orientation_graph.py",
     "docs/governance/AGENTOPS.md",
+    "docs/governance/CI_TRUTH_CONTRACT.json",
     ".github/workflows/active-track.yml",
     "tests/test_agent_work_packet.py",
     "tests/test_orientation_graph.py",
@@ -194,7 +195,7 @@
   ],
   "commit": {
     "allowed": true,
-    "message": "fix(onboarding): support macOS admission semantics [impact-checked]"
+    "message": "fix(agentops): bind Darwin temp authority to getconf [impact-checked]"
   },
   "approval": {
     "before_commit": false,
@@ -227,12 +228,12 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "15c0b5ad2a5327e1a938660c491328b452fdf865",
+      "checked_at_sha": "ec61fda4a88c45339b1487fe6c49f711e4eceb7f",
       "details": []
     },
     "interface_mismatches": [
-    "ACTIVE_TRACK still describes merged WP-O2, WP-O3, and WP-O4 work as incomplete; that authority-owned ledger reconciliation is outside this corrective packet.",
-    "PR #912 merged before the independent macOS review completed; this packet corrects the reproduced host-portability defects without claiming that the wider One-Door track is closed."
+      "ACTIVE_TRACK still describes merged WP-O2, WP-O3, and WP-O4 work as incomplete; that authority-owned ledger reconciliation is outside this corrective amendment.",
+      "PR #918 auto-merged before independent review caught its TMPDIR trust widening; this amendment narrows that authority and does not claim that the wider One-Door track is closed."
     ],
     "closest_existing_implementation": [
       "scripts/governance/run_agent_work_packet.py",
@@ -242,7 +243,7 @@
     "Repository-wide agent-build-closeout remains externally blocked until live NATS production evidence is no more than 24 hours old; never bypass or fabricate that operator-owned evidence.",
     "C1 semantic revalidation remains outside WP-O4 and may occur only after the strict O3+O4 door is merged; this packet makes no C1 closure claim."
     ],
-    "rollback": "revert the Makefile, AgentOps runner, packet, and the two macOS portability test updates together",
-    "packet_digest": "35dbed3b7a90ad90ed8e6fcbac2ae07ca059b81f3a2a5c55f1b0ef2a6bdb9c2b"
+    "rollback": "revert the Darwin getconf authority helper, macOS CI-truth registration, native confinement tests, and this WP-O4 amendment together",
+    "packet_digest": "7d30ac6f40cadcbd2211ab051f57946b1cd16a7baa546175c7e725673803e4f5"
   }
 }

@@ -29,6 +29,14 @@
       "local_command": "python3 scripts/governance/check_pr_coherence_delta.py",
       "failure_category": "pr_body_contract",
       "autofix": "limited"
+    },
+    {
+      "id": "onboarding_macos_compatibility",
+      "names": ["Onboarding macOS 3.81 compatibility"],
+      "owner": "onboarding",
+      "local_command": "/usr/bin/make -n onboard && /usr/bin/make -n orient && /usr/bin/make -n help",
+      "failure_category": "host_compatibility",
+      "autofix": "manual"
     }
   ],
   "advisory": [

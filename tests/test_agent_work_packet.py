@@ -9,6 +9,7 @@ import os
 import stat
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -3015,6 +3016,41 @@ def test_darwin_negative_confinement_executes_and_denies_outside_write(
     )
     assert denied_create.returncode != 0
     assert not outside_create.exists()
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="requires Darwin getconf")
+def test_darwin_account_temp_root_native_and_prepares_report_root(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TMPDIR", "/attacker-selected-temp")
+    monkeypatch.setenv("PATH", "/attacker-selected-path")
+    native = subprocess.run(
+        ["/usr/bin/getconf", "DARWIN_USER_TEMP_DIR"],
+        cwd=Path("/"),
+        env={"PATH": agentops._TRUSTED_HOST_PATH, "LANG": "C", "LC_ALL": "C"},
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=5,
+    )
+    assert native.returncode == 0, native.stderr
+    assert len(native.stdout.splitlines()) == 1
+    expected = Path(native.stdout.strip()).resolve(strict=True)
+
+    account_temp = agentops._darwin_account_temp_root()
+    assert account_temp == expected
+    assert account_temp.is_relative_to(Path("/private/var/folders").resolve(strict=True))
+
+    with tempfile.TemporaryDirectory(
+        dir=account_temp, prefix="dharma-agentops-native-proof-"
+    ) as outer:
+        report_root = Path(outer) / "reports"
+        prepared = agentops._prepare_private_report_root(
+            report_root, repo_root=REPO_ROOT
+        )
+        assert prepared == report_root.resolve()
+        assert prepared.is_dir()
+        assert stat.S_IMODE(prepared.stat().st_mode) == 0o700
 
 
 def test_darwin_account_temp_root_uses_getconf_with_scrubbed_environment(
