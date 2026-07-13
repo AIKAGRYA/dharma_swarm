@@ -13,6 +13,13 @@ document stack (`docs/governance/CANONICAL_DOC_STACK.md`). **Supersedes/replaces
 nothing — a new record with no repo-level authority (per `docs/AGENTS.md:18-24`, only
 the named owner files make authority claims).
 
+**Location:** this `report` lives under `docs/plans/` (working-doc space, exempt from
+the canonical-authority guard). It is deliberately NOT in `docs/vision_maps/` (the
+authority/vision space): a non-authority record does not belong there. The distinct
+**honeycomb CANON seed** named in "Canon edits pending ratification" below is what
+targets `docs/vision_maps/` — and only upon operator ratification, as a separate
+future doc, not this record.
+
 **Provenance:** grill run via `.claude/skills/grill-me/SKILL.md` (adapted from Matt
 Pocock's grill-me, MIT). Original ephemeral log:
 `~/.dharma/grill/2026-07-12-vision-and-engine-grill.md` (home dir, not git — the
