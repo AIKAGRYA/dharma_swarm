@@ -198,6 +198,16 @@ The raw report is `AGENTOPS_CLOSEOUT_FINAL.json`. This pass does not overwrite
 attempt 1 or claim the governed runner executed the separately recorded full
 102/22 plugin-aware suites.
 
+The final bounded-schema council then returned `pass_fullness`: all six
+required lanes independently returned approve/100, with zero blockers and
+empty disagreement fields. `palantir-pilot` was running and fresh at 27
+seconds. After that review, local executable checks were rerun on the reviewed
+bytes: 33 focused tests passed, all 102 chamber tests passed, all 22
+graph-adjacent tests passed, 22 selected semantic-negative tests passed, and
+Ruff, `py_compile`, and `git diff --check` were green. The council result is
+review evidence; these executable results and the runtime witness remain
+separate claims.
+
 ## Primary research locators
 
 - [MiroFish upstream workflow](https://github.com/666ghj/MiroFish/blob/96096ea0ff42b1a30cbc41a1560b8c91090f9968/README.md#L86-L92)
