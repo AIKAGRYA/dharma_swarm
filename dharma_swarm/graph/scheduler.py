@@ -52,6 +52,7 @@ from dharma_swarm.graph.errors import (
     NodeResultError,
     SuperstepLimitError,
 )
+from dharma_swarm.graph.persistence import GraphPersistenceKernel
 from dharma_swarm.graph.routing import (
     BranchSpec,
     Command,
@@ -136,6 +137,9 @@ class CompiledGraph:
         superstep_cap: int | None = None,
         resume_from: RunCheckpoint | None = None,
         on_checkpoint: Callable[[RunCheckpoint], None] | None = None,
+        persistence: GraphPersistenceKernel | None = None,
+        thread_id: str | None = None,
+        checkpoint_id: str | None = None,
     ) -> GraphRunResult:
         """Run the graph from START to quiescence and return the committed result.
 
@@ -152,6 +156,18 @@ class CompiledGraph:
         active_effects: EffectsProvider = (
             effects if effects is not None else LiveEffects()
         )
+        if (persistence is None) != (thread_id is None):
+            raise ValueError("persistence and thread_id must be provided together")
+        persisted_parent_id: str | None = None
+        if persistence is not None and thread_id is not None and resume_from is None:
+            persisted = persistence.get_checkpoint_record(thread_id, checkpoint_id)
+            if persisted is not None and input is None:
+                resume_from = persisted.checkpoint
+                persisted_parent_id = persisted.checkpoint_id
+            elif checkpoint_id is not None or input is None:
+                raise KeyError(
+                    f"checkpoint {checkpoint_id!r} not found for thread {thread_id!r}"
+                )
         run_id = graph_run_id
         if run_id is None and resume_from is not None:
             run_id = resume_from.graph_run_id
@@ -176,19 +192,30 @@ class CompiledGraph:
         versions_seen: dict[str, dict[str, int]] = {n: {} for n in self.nodes}
         events: list[GraphRunEvent] = []
 
-        def _emit_checkpoint(step: int, current_digest: str) -> None:
-            if on_checkpoint is None:
-                return
-            on_checkpoint(
-                RunCheckpoint(
-                    graph_run_id=run_id,
-                    graph_id=self.graph_id,
-                    superstep=step,
-                    state_digest=current_digest,
-                    channels=state.checkpoint_channels(),
-                    versions_seen={n: dict(v) for n, v in versions_seen.items()},
-                )
+        def _emit_checkpoint(
+            step: int, current_digest: str, pending_task_id: str | None = None
+        ) -> None:
+            nonlocal persisted_parent_id
+            checkpoint = RunCheckpoint(
+                graph_run_id=run_id,
+                graph_id=self.graph_id,
+                superstep=step,
+                state_digest=current_digest,
+                channels=state.checkpoint_channels(),
+                versions_seen={n: dict(v) for n, v in versions_seen.items()},
             )
+            if persistence is not None and thread_id is not None:
+                record = persistence.put_run_checkpoint(
+                    thread_id,
+                    checkpoint,
+                    parent_checkpoint_id=persisted_parent_id,
+                    metadata={"graph_id": self.graph_id, "graph_run_id": run_id},
+                )
+                persisted_parent_id = record.checkpoint_id
+                if pending_task_id is not None:
+                    persistence.clear_pending_writes(thread_id, pending_task_id)
+            if on_checkpoint is not None:
+                on_checkpoint(checkpoint)
 
         if resume_from is not None:
             state.restore_channels(resume_from.channels)
@@ -285,6 +312,15 @@ class CompiledGraph:
             pending.sort(
                 key=lambda write: (write.channel, write.node_id, write.task_seq)
             )
+            pending_task_id = f"{run_id}:{superstep}"
+            if persistence is not None and thread_id is not None:
+                persistence.put_writes(
+                    thread_id,
+                    [(write.channel, write.value) for write in pending],
+                    pending_task_id,
+                    checkpoint_id=persisted_parent_id,
+                    task_path="+".join(sorted(executed)),
+                )
             state.apply_writes(pending, superstep)
             digest = state.digest()
             for node_id, task_seq in event_ids:
@@ -306,7 +342,7 @@ class CompiledGraph:
                     state_ref=digest,
                 )
             committed = superstep
-            _emit_checkpoint(superstep, digest)
+            _emit_checkpoint(superstep, digest, pending_task_id)
 
         return GraphRunResult(
             graph_run_id=run_id,

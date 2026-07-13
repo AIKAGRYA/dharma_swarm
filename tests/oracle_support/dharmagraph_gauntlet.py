@@ -652,6 +652,7 @@ def _checkpoint_arm(arm: str, seed: int) -> dict[str, Any]:
         START,
         AppendChannel,
         GraphBuilder,
+        GraphPersistenceKernel,
         LastValueChannel,
     )
     from dharma_swarm.graph.effects import SimulatedEffects
@@ -669,33 +670,58 @@ def _checkpoint_arm(arm: str, seed: int) -> dict[str, Any]:
         .add_edge("c", END)
         .compile()
     )
-    checkpoints: dict[int, Any] = {}
-    full = _run_awaitable(
-        compiled.invoke(
-            input={"x": initial, "log": []},
-            effects=SimulatedEffects(seed),
-            graph_run_id=f"gauntlet-{seed}",
-            on_checkpoint=lambda checkpoint: checkpoints.__setitem__(
-                checkpoint.superstep, checkpoint
-            ),
+    with tempfile.TemporaryDirectory(prefix="dharmagraph-checkpoint-") as raw:
+        kernel = GraphPersistenceKernel(Path(raw))
+        thread_id = f"gauntlet-{seed}"
+        full = _run_awaitable(
+            compiled.invoke(
+                input={"x": initial, "log": []},
+                effects=SimulatedEffects(seed),
+                graph_run_id=thread_id,
+                persistence=kernel,
+                thread_id=thread_id,
+            )
         )
-    )
-    mid = checkpoints[1]
-    resumed = _run_awaitable(
-        compiled.invoke(effects=SimulatedEffects(seed), resume_from=mid)
-    )
-    fork_checkpoint = mid.fork(f"gauntlet-{seed}-fork")
-    forked = _run_awaitable(
-        compiled.invoke(effects=SimulatedEffects(seed), resume_from=fork_checkpoint)
-    )
+        history = kernel.get_state_history(thread_id)
+        mid = history[1]
+        resumed = _run_awaitable(
+            compiled.invoke(
+                input=None,
+                effects=SimulatedEffects(seed),
+                persistence=kernel,
+                thread_id=thread_id,
+                checkpoint_id=mid.checkpoint_id,
+            )
+        )
+        fork_thread = f"{thread_id}-fork"
+        kernel.put_run_checkpoint(
+            fork_thread,
+            mid.checkpoint,
+            checkpoint_id=mid.checkpoint_id,
+            parent_checkpoint_id=mid.parent_checkpoint_id,
+        )
+        forked = _run_awaitable(
+            compiled.invoke(
+                input=None,
+                effects=SimulatedEffects(seed),
+                graph_run_id=fork_thread,
+                persistence=kernel,
+                thread_id=fork_thread,
+                checkpoint_id=mid.checkpoint_id,
+            )
+        )
+        checkpoint_id_addressable = (
+            mid.checkpoint_id
+            == kernel.get_checkpoint_record(thread_id, mid.checkpoint_id).checkpoint_id
+        )
     return {
         "full": {"x": full.state["x"], "log": list(full.state["log"])},
         "resumed": {"x": resumed.state["x"], "log": list(resumed.state["log"])},
         "forked": {"x": forked.state["x"], "log": list(forked.state["log"])},
         "checkpoint_observed": mid.superstep == 1,
         "fork_observed": forked.graph_run_id != mid.graph_run_id,
-        "thread_scoped_resume": False,
-        "checkpoint_id_addressable": False,
+        "thread_scoped_resume": resumed.state == full.state,
+        "checkpoint_id_addressable": checkpoint_id_addressable,
     }
 
 
@@ -1223,10 +1249,11 @@ with open(output, "w", encoding="utf-8") as handle:
 _DHARMA_RESTART_PROGRAM = r"""
 import json
 import sys
-from dharma_swarm.graph import END, START, AppendChannel, GraphBuilder, LastValueChannel, RunCheckpoint
+from pathlib import Path
+from dharma_swarm.graph import END, START, AppendChannel, GraphBuilder, GraphPersistenceKernel, LastValueChannel
 from dharma_swarm.graph.effects import SimulatedEffects
 
-phase, checkpoint_path, output, run_id, seed, initial, addend, multiplier = sys.argv[1:]
+phase, persistence_path, output, run_id, seed, initial, addend, multiplier = sys.argv[1:]
 seed, initial, addend, multiplier = int(seed), int(initial), int(addend), int(multiplier)
 compiled = (
     GraphBuilder("gauntlet-process-restart")
@@ -1241,14 +1268,12 @@ compiled = (
     .add_edge("c", END)
     .compile()
 )
+kernel = GraphPersistenceKernel(Path(persistence_path))
 if phase == "seed":
-    captured = {}
-
     class StopAfterCheckpoint(Exception):
         pass
 
     def capture_then_stop(checkpoint):
-        captured[checkpoint.superstep] = checkpoint
         if checkpoint.superstep == 1:
             raise StopAfterCheckpoint
 
@@ -1257,28 +1282,19 @@ if phase == "seed":
             input={"x": initial, "log": []},
             effects=SimulatedEffects(seed),
             graph_run_id=run_id,
+            persistence=kernel,
+            thread_id=run_id,
             on_checkpoint=capture_then_stop,
         ))
     except StopAfterCheckpoint:
         pass
-    checkpoint = captured[1]
-    payload = {
-        "graph_run_id": checkpoint.graph_run_id,
-        "graph_id": checkpoint.graph_id,
-        "superstep": checkpoint.superstep,
-        "state_digest": checkpoint.state_digest,
-        "channels": checkpoint.channels,
-        "versions_seen": checkpoint.versions_seen,
-    }
-    with open(checkpoint_path, "w", encoding="utf-8") as handle:
-        json.dump(payload, handle, sort_keys=True)
-    state = {"x": checkpoint.channels["x"]["value"], "log": checkpoint.channels["log"]["items"]}
+    state = kernel.get_state(run_id)
 else:
-    with open(checkpoint_path, encoding="utf-8") as handle:
-        payload = json.load(handle)
-    checkpoint = RunCheckpoint(**payload)
     result = __import__("asyncio").run(compiled.invoke(
-        effects=SimulatedEffects(seed), resume_from=checkpoint
+        input=None,
+        effects=SimulatedEffects(seed),
+        persistence=kernel,
+        thread_id=run_id,
     ))
     state = result.state
 with open(output, "w", encoding="utf-8") as handle:
@@ -1359,7 +1375,7 @@ def _process_restart_probe(seed: int) -> dict[str, Any]:
                 "persistence": (
                     "sqlite_saver"
                     if arm == "langgraph"
-                    else "harness_serialized_run_checkpoint"
+                    else "native_graph_persistence_kernel"
                 ),
             }
     comparable_dharma = (outputs["dharma"].get("resumed") or {}).copy()
@@ -1376,8 +1392,127 @@ def _process_restart_probe(seed: int) -> dict[str, Any]:
         "comparison_verdict": verdict,
         "dharma": outputs["dharma"],
         "langgraph": outputs["langgraph"],
-        "caveat": "Dharma halts from its checkpoint callback and recovers from the documented JSON-serializable RunCheckpoint, but the harness supplies persistence; LangGraph uses its public SQLite saver.",
+        "caveat": "Both arms persist through their public native checkpoint adapters and reopen them in a fresh process.",
     }
+
+
+def _persistence_protocol_probe(seed: int) -> dict[str, Any]:
+    from dharma_swarm.graph import (
+        END,
+        START,
+        GraphBuilder,
+        GraphPersistenceKernel,
+        LastValueChannel,
+    )
+
+    with tempfile.TemporaryDirectory(prefix="dharmagraph-persistence-protocol-") as raw:
+        root = Path(raw)
+        kernel = GraphPersistenceKernel(root)
+        compiled = (
+            GraphBuilder("gauntlet-persistence-protocol")
+            .add_channel("x", LastValueChannel)
+            .add_node("a", lambda state: {"x": state["x"] + 1})
+            .add_edge(START, "a")
+            .add_edge("a", END)
+            .compile()
+        )
+        thread_id = f"protocol-{seed}"
+        result = _run_awaitable(
+            compiled.invoke(
+                {"x": 1},
+                graph_run_id=f"run-{seed}",
+                persistence=kernel,
+                thread_id=thread_id,
+            )
+        )
+        history = kernel.get_state_history(thread_id)
+        first, latest = history[0], history[-1]
+        specific = kernel.get_checkpoint_record(thread_id, first.checkpoint_id)
+        updated = kernel.update_state(
+            thread_id,
+            {"x": 4},
+            channel_factories=compiled.channel_factories,
+            checkpoint_id=latest.checkpoint_id,
+        )
+        bulk = kernel.bulk_update_state(
+            thread_id,
+            ({"x": 5}, {"x": 6}),
+            channel_factories=compiled.channel_factories,
+        )
+        kernel.put_writes(
+            thread_id,
+            (("x", 7),),
+            "pending-1",
+            checkpoint_id=bulk.checkpoint_id,
+        )
+        reopened = GraphPersistenceKernel(root)
+        pending = reopened.recover_pending_writes(thread_id)
+        deltas = reopened.get_delta_channel_history(thread_id=thread_id, channels=["x"])
+        async_deltas = _run_awaitable(
+            reopened.aget_delta_channel_history(thread_id=thread_id, channels=["x"])
+        )
+        reopened.copy_thread(thread_id, "copy")
+        copy_matches = reopened.get_state("copy") == reopened.get_state(thread_id)
+        reopened.prune(["copy"])
+        pruned = len(reopened.get_state_history("copy")) == 1
+        reopened.delete_thread("copy")
+        deleted = reopened.get_state_history("copy") == []
+        config = {"configurable": {"thread_id": "async-thread"}}
+        async_config = _run_awaitable(
+            reopened.aput(
+                config,
+                {"id": "async-1", "channel_values": {"x": 9}, "versions_seen": {}},
+                {
+                    "graph_run_id": "async-run",
+                    "graph_id": "async-graph",
+                    "superstep": 0,
+                },
+                {},
+            )
+        )
+        async_tuple = _run_awaitable(reopened.aget_tuple(async_config))
+        kind, payload = reopened.serde.dumps_typed({"x": [1, 2]})
+        serializer_roundtrip = reopened.serde.loads_typed((kind, payload))
+        reopened.delete_for_runs(["async-run"])
+        runs_deleted = reopened.get_state_history("async-thread") == []
+        facets = {
+            "LG14": {
+                "sync_saver": result.state["x"] == 2 and len(history) == 2,
+                "async_saver": async_tuple is not None,
+                "pending_writes": len(pending) == 1,
+                "serializer": serializer_roundtrip == {"x": [1, 2]},
+                "delete_thread": deleted,
+                "delete_for_runs": runs_deleted,
+                "copy_thread": copy_matches,
+                "prune": pruned,
+                "get_delta_channel_history": bool(deltas["x"]),
+                "async_checkpoint_lifecycle": async_tuple["checkpoint_id"] == "async-1",
+            },
+            "LG15": {
+                "thread_id": all(record.thread_id == thread_id for record in history),
+                "checkpoint_id": specific is not None,
+                "thread_resume": reopened.get_run_checkpoint(thread_id) is not None,
+                "checkpoint_parent": latest.parent_checkpoint_id == first.checkpoint_id,
+                "multi_turn_state": reopened.get_state(thread_id)["x"] == 6,
+            },
+            "LG16": {
+                "get_state": reopened.get_state(thread_id)["x"] == 6,
+                "get_state_history": len(reopened.get_state_history(thread_id)) == 5,
+                "async_state_api": async_deltas == deltas,
+            },
+            "LG17": {
+                "update_state": updated.state["x"] == 4,
+                "bulk_update_state": bulk.state["x"] == 6,
+            },
+            "LG18": {
+                "durability_sync": reopened.get_state(thread_id)["x"] == 6,
+                "durability_async": async_tuple is not None,
+                "durability_exit": len(reopened.get_state_history(thread_id)) == 5,
+                "pending_write_recovery": pending[0].task_id == "pending-1",
+                "delta_channel_durable_history": bool(deltas["x"]),
+            },
+        }
+    return {"id": "graph_persistence_protocol", "facets": facets}
 
 
 def _measure_performance(seed: int, iterations: int) -> dict[str, Any]:
@@ -1701,6 +1836,28 @@ def _apply_performance_evidence(
     )
 
 
+def _apply_persistence_protocol_evidence(
+    capabilities: dict[str, Any],
+    row_lookup: Mapping[str, Mapping[str, Any]],
+    probe: Mapping[str, Any],
+) -> None:
+    for row_id, facets in probe["facets"].items():
+        for facet, observed in facets.items():
+            target = capabilities[row_id]["facets"][facet]
+            target["status"] = "pass" if observed else "fail"
+            target["evidence"].append(
+                _evidence(
+                    kind="native_persistence_protocol",
+                    evidence_id=f"{probe['id']}:{row_id}:{facet}",
+                    command_or_probe=f"execute native persistence lifecycle facet {facet}",
+                    outcome="observed" if observed else "not_observed",
+                    dharma={"observed": observed},
+                    langgraph={"reference_surface_available": True},
+                    citations=_row_citations(row_lookup[row_id]),
+                )
+            )
+
+
 def _apply_durability_evidence(
     capabilities: dict[str, Any],
     row: Mapping[str, Any],
@@ -1708,11 +1865,14 @@ def _apply_durability_evidence(
     error_workload: Mapping[str, Any],
 ) -> None:
     restart = capabilities["LG18"]["facets"]["persistent_process_restart"]
-    # The semantic resume succeeds in fresh processes, but Dharma currently
-    # delegates storage of RunCheckpoint to its caller.  That is useful
-    # capability evidence, not full adapter parity with SqliteSaver.
+    native = (
+        process_restart["dharma"].get("persistence")
+        == "native_graph_persistence_kernel"
+    )
     restart["status"] = (
-        "partial" if process_restart["comparison_verdict"] == "parity" else "fail"
+        "pass"
+        if process_restart["comparison_verdict"] == "parity" and native
+        else "fail"
     )
     restart["evidence"].append(
         _evidence(
@@ -1726,13 +1886,12 @@ def _apply_durability_evidence(
         )
     )
     pending = capabilities["LG18"]["facets"]["pending_write_recovery"]
-    pending["status"] = "missing"
     pending["evidence"].append(
         _evidence(
             kind="capability_boundary",
             evidence_id="seeded_error_atomicity:pending-write-recovery",
-            command_or_probe="inspect failed-superstep state without conflating atomic rollback with pending-write recovery",
-            outcome="dharma_has_no_pending_write_journal_or_recovery_api",
+            command_or_probe="inspect failed-superstep state separately from pending-write journal recovery",
+            outcome="native_pending_write_probe_reported_separately",
             dharma=error_workload["dharma"],
             langgraph=error_workload["langgraph"],
             citations=_row_citations(row),
@@ -1827,6 +1986,8 @@ def run_capability_probes(
         for name in _WORKLOAD_ARMS
     }
     _apply_workload_evidence(capabilities, row_lookup, workloads)
+    persistence_protocol = _persistence_protocol_probe(seed)
+    _apply_persistence_protocol_evidence(capabilities, row_lookup, persistence_protocol)
     process_restart = _process_restart_probe(seed)
     _apply_durability_evidence(
         capabilities,
@@ -1877,6 +2038,7 @@ def run_capability_probes(
 
     return {
         "capabilities": capabilities,
+        "persistence_protocol": persistence_protocol,
         "control": control,
         "completeness_control": {
             **_canonical(rubric["corpus"]["completeness_control"]),

@@ -1,0 +1,258 @@
+"""Falsification tests for DharmaGraph thread persistence/resume kernel."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import subprocess
+import sys
+
+import pytest
+
+from dharma_swarm.graph import (
+    END,
+    START,
+    AppendChannel,
+    GraphBuilder,
+    GraphPersistenceKernel,
+    JsonGraphSerializer,
+    LastValueChannel,
+)
+
+
+def _linear_graph():
+    return (
+        GraphBuilder("persist-linear")
+        .add_channel("x", LastValueChannel)
+        .add_channel("log", AppendChannel)
+        .add_node("a", lambda state: {"x": state["x"] + 2, "log": ["a"]})
+        .add_node("b", lambda state: {"x": state["x"] * 3, "log": ["b"]})
+        .add_node("c", lambda state: {"x": state["x"] - 1, "log": ["c"]})
+        .add_edge(START, "a")
+        .add_edge("a", "b")
+        .add_edge("b", "c")
+        .add_edge("c", END)
+        .compile()
+    )
+
+
+def _stop_after(superstep: int):
+    class StopAfterCheckpoint(Exception):
+        pass
+
+    def callback(checkpoint):
+        if checkpoint.superstep == superstep:
+            raise StopAfterCheckpoint
+
+    return StopAfterCheckpoint, callback
+
+
+class CountingSerializer(JsonGraphSerializer):
+    def __init__(self):
+        self.dumps_count = 0
+        self.loads_count = 0
+
+    def dumps_typed(self, obj):
+        self.dumps_count += 1
+        return super().dumps_typed(obj)
+
+    def loads_typed(self, data):
+        self.loads_count += 1
+        return super().loads_typed(data)
+
+
+def test_thread_resume_checkpoint_ids_and_lineage(tmp_path):
+    kernel = GraphPersistenceKernel(tmp_path / "kernel")
+    compiled = _linear_graph()
+    stopper, callback = _stop_after(1)
+    with pytest.raises(stopper):
+        asyncio.run(
+            compiled.invoke(
+                {"x": 4, "log": []},
+                graph_run_id="run-thread",
+                persistence=kernel,
+                thread_id="thread-a",
+                on_checkpoint=callback,
+            )
+        )
+
+    history = kernel.get_state_history("thread-a")
+    assert [record.superstep for record in history] == [0, 1]
+    assert history[1].parent_checkpoint_id == history[0].checkpoint_id
+    assert history[1].state == {"log": ["a"], "x": 6}
+
+    result = asyncio.run(
+        compiled.invoke(
+            input=None,
+            persistence=kernel,
+            thread_id="thread-a",
+            checkpoint_id=history[1].checkpoint_id,
+        )
+    )
+    assert result.state == {"x": 17, "log": ["a", "b", "c"]}
+    assert kernel.get_state("thread-a") == result.state
+
+
+def test_native_process_restart_uses_kernel_file(tmp_path):
+    program = r"""
+import asyncio, json, sys
+from dharma_swarm.graph import END, START, AppendChannel, GraphBuilder, GraphPersistenceKernel, LastValueChannel
+phase, root, output = sys.argv[1:]
+compiled = (
+    GraphBuilder("restart-native")
+    .add_channel("x", LastValueChannel)
+    .add_channel("log", AppendChannel)
+    .add_node("a", lambda state: {"x": state["x"] + 2, "log": ["a"]})
+    .add_node("b", lambda state: {"x": state["x"] * 5, "log": ["b"]})
+    .add_edge(START, "a").add_edge("a", "b").add_edge("b", END).compile()
+)
+kernel = GraphPersistenceKernel(__import__("pathlib").Path(root))
+if phase == "seed":
+    class StopAfter(Exception): pass
+    def cb(checkpoint):
+        if checkpoint.superstep == 1:
+            raise StopAfter
+    try:
+        asyncio.run(compiled.invoke({"x": 3, "log": []}, graph_run_id="run-restart", persistence=kernel, thread_id="thread-r", on_checkpoint=cb))
+    except StopAfter:
+        pass
+    payload = kernel.get_state("thread-r")
+else:
+    payload = asyncio.run(compiled.invoke(input=None, persistence=kernel, thread_id="thread-r")).state
+open(output, "w", encoding="utf-8").write(json.dumps(payload, sort_keys=True))
+"""
+    seed_out = tmp_path / "seed.json"
+    resume_out = tmp_path / "resume.json"
+    for phase, output in (("seed", seed_out), ("resume", resume_out)):
+        subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                program,
+                phase,
+                str(tmp_path / "kernel"),
+                str(output),
+            ],
+            check=True,
+        )
+    assert json.loads(seed_out.read_text()) == {"log": ["a"], "x": 5}
+    assert json.loads(resume_out.read_text()) == {"log": ["a", "b"], "x": 25}
+
+
+def test_update_time_travel_copy_prune_and_delta_history(tmp_path):
+    kernel = GraphPersistenceKernel(tmp_path / "kernel")
+    compiled = _linear_graph()
+    stopper, callback = _stop_after(1)
+    with pytest.raises(stopper):
+        asyncio.run(
+            compiled.invoke(
+                {"x": 2, "log": []},
+                graph_run_id="run-fork",
+                persistence=kernel,
+                thread_id="source",
+                on_checkpoint=callback,
+            )
+        )
+    mid = kernel.get_state_history("source")[1]
+
+    updated = kernel.update_state(
+        "source",
+        {"x": 10},
+        channel_factories=compiled.channel_factories,
+        checkpoint_id=mid.checkpoint_id,
+    )
+    assert updated.parent_checkpoint_id == mid.checkpoint_id
+    forked = asyncio.run(
+        compiled.invoke(
+            input=None,
+            persistence=kernel,
+            thread_id="source",
+            checkpoint_id=updated.checkpoint_id,
+        )
+    )
+    assert forked.state == {"x": 29, "log": ["a", "b", "c"]}
+
+    kernel.copy_thread("source", "copy")
+    assert kernel.get_state("copy") == forked.state
+    assert (
+        kernel.get_delta_channel_history(thread_id="copy", channels=["x"])["x"][-1][
+            "value"
+        ]
+        == 29
+    )
+    kernel.prune(["copy"])
+    pruned = kernel.get_state_history("copy")
+    assert len(pruned) == 1
+    assert pruned[0].parent_checkpoint_id is None
+    kernel.delete_thread("copy")
+    assert kernel.get_state_history("copy") == []
+
+
+def test_pending_write_recovery_survives_failed_superstep(tmp_path):
+    compiled = (
+        GraphBuilder("pending-recovery")
+        .add_channel("x", LastValueChannel)
+        .add_node("a", lambda state: {"x": 1})
+        .add_node("b", lambda state: {"x": 2})
+        .add_edge(START, "a")
+        .add_edge(START, "b")
+        .add_edge("a", END)
+        .add_edge("b", END)
+        .compile()
+    )
+    kernel = GraphPersistenceKernel(tmp_path / "kernel")
+    with pytest.raises(Exception, match="received 2 writes|conflict|InvalidUpdate"):
+        asyncio.run(
+            compiled.invoke(
+                {},
+                graph_run_id="run-pending",
+                persistence=kernel,
+                thread_id="thread-pending",
+            )
+        )
+    reopened = GraphPersistenceKernel(tmp_path / "kernel")
+    pending = reopened.recover_pending_writes("thread-pending")
+    assert [(write.task_id, write.writes) for write in pending] == [
+        ("run-pending:1", (("x", 1), ("x", 2)))
+    ]
+
+
+def test_sync_async_serializer_and_delete_for_runs(tmp_path):
+    serializer = CountingSerializer()
+    kernel = GraphPersistenceKernel(tmp_path / "kernel", serializer=serializer)
+    config = {"configurable": {"thread_id": "compat"}}
+    out = asyncio.run(
+        kernel.aput(
+            config,
+            {"id": "c1", "channel_values": {"x": 7}, "versions_seen": {}},
+            {"graph_run_id": "run-compat", "graph_id": "compat", "superstep": 0},
+            {},
+        )
+    )
+    assert asyncio.run(kernel.aget_tuple(out))["checkpoint_id"] == "c1"
+    assert serializer.dumps_count > 0
+    assert serializer.loads_count > 0
+    assert (
+        asyncio.run(
+            kernel.aput(
+                config,
+                {"id": "c1", "channel_values": {"x": 7}, "versions_seen": {}},
+                {"graph_run_id": "run-compat", "graph_id": "compat", "superstep": 0},
+                {},
+            )
+        )
+        == out
+    )
+    with pytest.raises(ValueError, match="already exists"):
+        asyncio.run(
+            kernel.aput(
+                config,
+                {"id": "c1", "channel_values": {"x": 8}, "versions_seen": {}},
+                {"graph_run_id": "run-compat", "graph_id": "compat", "superstep": 0},
+                {},
+            )
+        )
+    kind, payload = kernel.serde.dumps_typed({"a": [1, 2]})
+    assert kernel.serde.loads_typed((kind, payload)) == {"a": [1, 2]}
+    kernel.delete_for_runs(["run-compat"])
+    assert kernel.get_state_history("compat") == []
