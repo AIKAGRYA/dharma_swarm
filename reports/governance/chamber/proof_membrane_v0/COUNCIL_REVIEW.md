@@ -99,10 +99,20 @@ object, so the runner correctly typed that lane blocked. Persistent witness
 `palantir-pilot` was fresh at 12 seconds. Conviction remained
 `hold_blockers`; no approval carried forward.
 
-## Round 5 — pending compact fact-check review
+## Round 5 — held on response-schema fullness
 
 The revised packet subsequently passed governed closeout with clean scope, all
-six positive gates, and the isolated negative control green. Round 5 receives
-a compact locator map plus the failed report, passed report, exact packet,
-proof semantics, test source, bundle, and research ledger. Every dissent must
-cite contradicting attached bytes; every lane must emit parseable bounded JSON.
+six positive gates, and the isolated negative control green. GLM, Kimi, Qwen,
+DeepSeek, and MiniMax each substantively approved at 100; Qwen explicitly
+retracted the Round 4 contradictions after checking the locators. The runner
+still held because MiniMax put `"None."` in `explicit_disagreement`, which is
+non-empty, and Nemotron's 100/approve response was truncated inside a JSON
+string. Persistent witness `palantir-pilot` was fresh at three seconds. The
+schema failures are blockers under the council contract even though their
+visible content favored approval.
+
+## Round 6 — pending bounded-schema review
+
+All six lanes receive the same compact evidence with a strict example object,
+an empty disagreement requirement for approval, at most five evidence entries,
+and a 120-word summary limit. No prior vote is inherited.
