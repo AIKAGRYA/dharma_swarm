@@ -4295,6 +4295,32 @@ def test_admitted_direct_git_disables_repo_local_fsmonitor(
     assert not marker.exists()
 
 
+def test_admission_routes_hostile_hypothesis_storage_outside_source(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_repo(tmp_path)
+    hostile_storage = repo / ".hypothesis"
+    monkeypatch.setenv("HYPOTHESIS_STORAGE_DIRECTORY", str(hostile_storage))
+    report_root = tmp_path / "gate-reports"
+    report_root.mkdir(mode=0o700)
+
+    environment = agentops._admission_gate_environment(
+        report_root, repo, "packet"
+    )
+
+    expected = (
+        report_root
+        / agentops.REPORT_ROOT
+        / "packet"
+        / "tool-cache"
+        / "hypothesis"
+    )
+    assert environment["HYPOTHESIS_STORAGE_DIRECTORY"] == str(expected)
+    assert expected.is_dir()
+    assert not hostile_storage.exists()
+
+
 def test_admitted_make_ignores_repo_venv_and_git_fsmonitor_shims(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
