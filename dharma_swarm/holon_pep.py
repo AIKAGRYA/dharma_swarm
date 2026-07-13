@@ -90,7 +90,10 @@ def check_lease(
     for lease in hs.load_leases(uid, agents_root):
         lid = str(lease.get("lease_id", "?"))
         checked.append(lid)
-        ok, _why = hs.verify_lease(lease, allowed_signers=allowed)
+        try:
+            ok, _why = hs.verify_lease(lease, allowed_signers=allowed)
+        except Exception:  # a malformed lease must not crash the gate — treat as invalid
+            ok = False
         if ok and action_class in lease.get("scope", []):
             return True, lid, checked
     return False, "no valid lease covers this action", checked

@@ -119,6 +119,8 @@ def verify_lease(
     scope = lease["scope"]
     if not isinstance(scope, list) or not scope:
         return False, "empty scope"
+    if not all(isinstance(s, str) for s in scope):
+        return False, "malformed scope (non-string element)"
     bad = set(scope) - ACTION_CLASSES
     if bad:
         return False, f"unknown action classes {sorted(bad)}"
@@ -136,6 +138,8 @@ def issue_lease(
     session_id: str | None = None,
 ) -> dict[str, Any]:
     scope = list(scope)
+    if not all(isinstance(s, str) for s in scope):
+        raise LeaseError("scope elements must be strings")
     bad = set(scope) - ACTION_CLASSES
     if bad:
         raise LeaseError(f"unknown action classes {sorted(bad)}")
@@ -155,8 +159,16 @@ def issue_lease(
 
 
 def leases_dir(holon: str, agents_root: Path | None = None) -> Path:
-    root = agents_root or (Path.home() / ".dharma" / "agents")
-    return root / holon / "leases"
+    # holon is an untrusted id; refuse anything that isn't a plain path segment so a
+    # crafted holon (e.g. "../../x") cannot escape agents_root via write/load_lease.
+    safe = str(holon).replace(":", "_").replace("/", "_").replace("\\", "_")
+    if safe != str(holon) or safe in ("", ".", ".."):
+        raise LeaseError(f"unsafe holon id: {holon!r}")
+    root = (agents_root or (Path.home() / ".dharma" / "agents")).resolve()
+    d = root / safe / "leases"
+    if not d.resolve().is_relative_to(root):
+        raise LeaseError(f"holon path escapes agents_root: {holon!r}")
+    return d
 
 
 def write_lease(lease: dict[str, Any], agents_root: Path | None = None) -> Path:
@@ -170,7 +182,10 @@ def write_lease(lease: dict[str, Any], agents_root: Path | None = None) -> Path:
 
 def load_leases(holon: str, agents_root: Path | None = None) -> list[dict[str, Any]]:
     """All lease JSONs in the seat's store (non-recursive — refusals/ is skipped)."""
-    d = leases_dir(holon, agents_root)
+    try:
+        d = leases_dir(holon, agents_root)
+    except LeaseError:
+        return []  # an unsafe holon id has no loadable store; never crash a grade
     if not d.exists():
         return []
     out: list[dict[str, Any]] = []

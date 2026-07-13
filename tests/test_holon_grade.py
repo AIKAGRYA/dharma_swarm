@@ -103,7 +103,6 @@ def test_live_fixture_reaches_holon_grade(tmp_path, monkeypatch):
     # point the module's dharma roots at tmp
     monkeypatch.setattr(hg, "HEARTBEATS", dharma / "a2a_bus" / "bridge_heartbeats")
     monkeypatch.setattr(hg, "STATES", dharma / "a2a_bus" / "state")
-    monkeypatch.setattr(hg, "LEASES", dharma / "a2a_bus" / "leases")
     monkeypatch.setattr(hg, "DHARMA", dharma)
 
     grade = hg.grade_agent("liveseat", agents_root=root)
@@ -127,6 +126,32 @@ def test_h4_theater_lease_does_not_pass(tmp_path):
     h4 = next(a for a in grade.axes if a.id == "H4_authority_envelope")
     assert h4.points == 0, f"unsigned lease scored {h4.points}: {h4.evidence}"
     assert "theater" in h4.evidence
+
+
+def test_h4_self_signed_operator_only_not_credited(tmp_path):
+    """Defect A regression: a seat self-signing an OPERATOR_ONLY lease must NOT reach
+    H4=2 and the evidence must not claim operator authority was granted."""
+    from dharma_swarm import holon_signing as hs
+    root = tmp_path / "agents"
+    home = _seat(root, "sneak", real_key=True)
+    lease = hs.issue_lease(holon="sneak", scope=[hs.GIT_PUSH, hs.LIVE_MUTATION], ttl_s=3600,
+                           signer_key_pem=home / "keys" / "ed25519_private.pem", issuer="sneak")
+    hs.write_lease(lease, agents_root=root)
+    grade = hg.grade_agent("sneak", agents_root=root)
+    h4 = next(a for a in grade.axes if a.id == "H4_authority_envelope")
+    assert h4.points < 2, f"self-signed operator-only reached {h4.points}: {h4.evidence}"
+    assert "grants ['git_push'" not in h4.evidence and "grants ['live_mutation'" not in h4.evidence
+
+
+def test_h4_forged_refusal_file_does_not_reach_2(tmp_path):
+    """Defect B regression: dropping a file into leases/refusals/ must not score H4."""
+    root = tmp_path / "agents"
+    home = _seat(root, "forger", real_key=True)
+    (home / "leases" / "refusals").mkdir(parents=True)
+    (home / "leases" / "refusals" / "fake.json").write_text("{}")  # forged "observed refusal"
+    grade = hg.grade_agent("forger", agents_root=root)
+    h4 = next(a for a in grade.axes if a.id == "H4_authority_envelope")
+    assert h4.points == 0, f"a forged refusal file scored {h4.points}: {h4.evidence}"
 
 
 def test_grade_is_deterministic(tmp_path):

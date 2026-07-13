@@ -81,6 +81,54 @@ def test_issue_rejects_unknown_action_class(tmp_path):
                        signer_key_pem=pem, issuer="seat")
 
 
+def test_malformed_scope_rejected_not_crash(tmp_path):
+    """A signed lease with a non-string scope element must fail closed, not crash."""
+    from datetime import timedelta
+    pem, pub = _keypair(tmp_path)
+    now = hs._now()
+    lease = hs.sign_lease({
+        "schema_version": hs.LEASE_SCHEMA, "lease_id": "lease:x:1", "holon": "seat",
+        "issuer": "seat", "scope": [["nested"]], "issued_at": hs._iso(now),
+        "expires_at": hs._iso(now + timedelta(hours=1)),
+    }, pem)
+    ok, why = hs.verify_lease(lease, allowed_signers={pub})
+    assert not ok and "malformed scope" in why
+
+
+def test_leases_dir_rejects_traversal(tmp_path):
+    with pytest.raises(hs.LeaseError):
+        hs.leases_dir("../../etc", agents_root=tmp_path)
+    with pytest.raises(hs.LeaseError):
+        hs.leases_dir("..", agents_root=tmp_path)
+    assert hs.load_leases("../../etc", agents_root=tmp_path) == []  # never crash a grade
+    pem, _pub = _keypair(tmp_path)
+    lease = hs.issue_lease(holon="a/b", scope=[hs.READ_ONLY], ttl_s=60,
+                           signer_key_pem=pem, issuer="seat")
+    with pytest.raises(hs.LeaseError):
+        hs.write_lease(lease, agents_root=tmp_path)  # traversal holon refused
+
+
+def test_expiry_boundary(tmp_path):
+    from datetime import timedelta
+    pem, pub = _keypair(tmp_path)
+    lease = hs.issue_lease(holon="seat", scope=[hs.READ_ONLY], ttl_s=3600,
+                           signer_key_pem=pem, issuer="seat")
+    exp = hs._parse_iso(lease["expires_at"])
+    assert not hs.verify_lease(lease, allowed_signers={pub}, now=exp)[0]  # now==exp => expired
+    assert hs.verify_lease(lease, allowed_signers={pub}, now=exp - timedelta(seconds=1))[0]
+
+
+def test_canonical_determinism_and_roundtrip(tmp_path):
+    import json
+    pem, pub = _keypair(tmp_path)
+    lease = hs.issue_lease(holon="seat", scope=[hs.READ_ONLY, hs.REPLY_ONLY], ttl_s=3600,
+                           signer_key_pem=pem, issuer="seat")
+    reloaded = json.loads(json.dumps(lease))  # the auditor re-derivation guarantee
+    assert hs.verify_lease(reloaded, allowed_signers={pub})[0]
+    shuffled = {k: lease[k] for k in reversed(list(lease.keys()))}  # key-order independence
+    assert hs.verify_lease(shuffled, allowed_signers={pub})[0]
+
+
 def test_write_load_roundtrip(tmp_path):
     pem, _pub = _keypair(tmp_path)
     root = tmp_path / "agents"
