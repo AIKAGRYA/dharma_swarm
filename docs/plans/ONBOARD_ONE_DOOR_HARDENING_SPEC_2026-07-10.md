@@ -1569,6 +1569,34 @@ claim merge authority; C1 must separately promote that context before WP-O5.
 | O4-B10 | PR CI checks out the declared head; merge-group packets are each bound or the group blocks | `test_ci_pr_head_and_merge_group_packet_binding` |
 | O4-B11 | Positive gates use one fail-closed command-family allowlist before execution: exact O1R Git grammar and explicitly enumerated pytest/Ruff/read-only governance/DocOps/Make forms pass; inline interpreters, alternate mutation/network clients, shell-capable wrappers, and unknown executables fail | `test_positive_gate_command_family_allowlist_rejects_transitive_routes` |
 
+#### WP-O4R — corrective generated-artifact confinement repair
+
+WP-O4R is a narrow post-WP-O4 corrective packet discovered during exact-main
+closeout after PR #920. It may be sealed only after the separately reviewed
+`WP-O4-B0` authority bootstrap has merged. That bootstrap admits the literal
+`WP-O4R` Session Entry identity and the three previously unowned surfaces; it
+does not implement this repair and must not generalize arbitrary `WP-O<N>R`
+suffixes.
+
+The WP-O4R implementation envelope is exactly:
+
+- `scripts/governance/check_track_status.py`
+- `scripts/governance/run_agent_work_packet.py`
+- `tests/test_active_track_governance.py`
+- `tests/test_agent_work_packet.py`
+- `tests/test_onboarding_broken_register.py`
+- `tests/test_track_portfolio.py`
+- `reports/agentops/work_packets/onboard-one-door-WP-O4R.json`
+
+It may only route Hypothesis/cache storage outside source, make active-track
+report output explicitly relocatable, prevent the dependency-bootstrap probe
+from writing bytecode, resolve admitted bare Python criteria through the
+current interpreter, and add the tests needed to prove those boundaries.
+Acceptance requires a fresh exact-main preflight, committed-range closeout,
+exact PR-event replay, zero generated or ignored source leaves, and independent
+review. It does not close the wider WP-O4 syscall boundary, WP-O6, C1, or the
+One-Door track.
+
 CI packet discovery is conditional and fail-closed. A PR with no change in the
 onboarding track's owned surfaces runs the shared baseline evaluator but needs
 no packet. A PR that changes any owned surface must change exactly one matching

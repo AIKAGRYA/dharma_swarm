@@ -306,9 +306,9 @@ def _parse_session_entry(raw: Any, payload: Mapping[str, Any], packet_id: str) -
     if not all(isinstance(item, str) and item for item in closest):
         raise AgentOpsError("closest_existing_implementation entries must be strings")
     work_packet = _required_text(raw, "work_packet")
-    if not re.fullmatch(r"(?:WP-O[1-9][0-9]*|WP-O1R)", work_packet) or not re.search(
+    if not re.fullmatch(r"(?:WP-O[1-9][0-9]*|WP-O1R|WP-O4R)", work_packet) or not re.search(
         rf"(?:^|-){re.escape(work_packet)}(?:-|$)", packet_id
-    ):
+    ) or (work_packet == "WP-O4R" and packet_id != "onboard-one-door-WP-O4R"):
         raise AgentOpsError("session_entry.work_packet does not match packet id")
     return SessionEntry(
         schema=schema, tool_versions=dict(tools),
