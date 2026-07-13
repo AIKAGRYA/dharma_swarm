@@ -386,6 +386,11 @@ def test_json_mode_emits_valid_receipt(tmp_path):
         "broken_register",
     ):
         assert key in payload, f"receipt missing key: {key}"
+    assert set(payload["broken_register"]) == {
+        "total",
+        "open_count",
+        "closed_count",
+    }
     # The same payload must land on disk for fleet consumers.
     receipt = tmp_path / "onboard_receipt.json"
     assert receipt.exists()
