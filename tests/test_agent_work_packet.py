@@ -2119,6 +2119,36 @@ def test_session_entry_accepts_exact_wp_o1r_identity_only(tmp_path: Path) -> Non
         )
 
 
+def test_session_entry_accepts_exact_wp_o4r_identity_only(tmp_path: Path) -> None:
+    repo = init_session_repo(tmp_path)
+
+    def packet_for(work_packet: str, *, packet_id: str | None = None) -> dict[str, object]:
+        payload = session_packet(repo)
+        identity = packet_id or f"onboard-one-door-{work_packet}"
+        payload["id"] = identity
+        payload["allowed_files"] = [
+            "allowed.txt",
+            f"reports/agentops/work_packets/{identity}.json",
+        ]
+        entry = payload["session_entry"]
+        assert isinstance(entry, dict)
+        entry["work_packet"] = work_packet
+        return seal_packet(payload)
+
+    parsed = agentops.parse_work_packet(packet_for("WP-O4R"))
+    assert parsed.session_entry is not None
+    assert parsed.session_entry.work_packet == "WP-O4R"
+
+    for rejected in ("WP-O3R", "WP-O4RR", "WP-O4R2", "WP-O4r", "WP-O5R"):
+        with pytest.raises(agentops.AgentOpsError, match="work_packet.*packet id"):
+            agentops.parse_work_packet(packet_for(rejected))
+
+    with pytest.raises(agentops.AgentOpsError, match="work_packet.*packet id"):
+        agentops.parse_work_packet(
+            packet_for("WP-O4R", packet_id="onboard-one-door-WP-O4")
+        )
+
+
 def test_inspect_accepts_successor_packet_but_execution_requires_tracked_custody(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
