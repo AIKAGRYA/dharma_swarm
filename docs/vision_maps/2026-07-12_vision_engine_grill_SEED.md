@@ -1,10 +1,17 @@
 # Vision + Engine Grill — Decision Seed (2026-07-12)
 
-**Doc role:** `vision_seed` / decision record — **NOT ratified canon.** This is a
-durable, dated, custody-labeled capture of decisions the operator confirmed in a
-live grill session, preserved per the NORTH_STAR §9 canon-metabolism rule so they
-survive beyond ephemeral session state. It becomes canon only through the explicit
-operator-ratified edits named in "Canon edits pending ratification" below.
+**Doc role:** `report` (vision-seed / decision record) — **NOT ratified canon.**
+This is a durable, dated, custody-labeled capture of decisions the operator confirmed
+in a live grill session, preserved per the NORTH_STAR canon-metabolism rule
+(`docs/vision_maps/NORTH_STAR.md:175`, §9) so they survive beyond ephemeral session
+state. It becomes canon only through the explicit operator-ratified edits named in
+"Canon edits pending ratification" below. (`report` per the closed role vocabulary
+in `docs/AGENTS.md:30-40`.)
+
+**Subordinate to:** `CLAUDE.md`, `docs/vision_maps/NORTH_STAR.md`, and the canonical
+document stack (`docs/governance/CANONICAL_DOC_STACK.md`). **Supersedes/replaces:**
+nothing — a new record with no repo-level authority (per `docs/AGENTS.md:18-24`, only
+the named owner files make authority claims).
 
 **Provenance:** grill run via `.claude/skills/grill-me/SKILL.md` (adapted from Matt
 Pocock's grill-me, MIT). Original ephemeral log:
@@ -49,21 +56,24 @@ statement.
    matter — that is TAM.") Requirements, verbatim: **durable complexity, multi-day
    campaign bearing, provider/model/agent-agnostic organizing intelligence.** These
    map to the workload-agnostic top of the parity rubric — **LG18 (w10), LG15 (w9),
-   LG17 (w8)**, plus LG24 / LG25 / LG30 / APP01. **Next build phase: DharmaGraph
-   spec Phase 0b (crash-resume + exactly-once dispatch), then the durability
-   cluster.**
+   LG17 (w8)**, plus LG24 / LG25 / LG30 / APP01 (weights per
+   `reports/governance/dharmagraph_parity/PARITY_MATRIX.md`). **Next build phase:
+   DharmaGraph spec Phase 0b (`docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md:77`;
+   crash-resume + exactly-once dispatch), then the durability cluster.**
 
 6. **REAL PROBLEM NAMED.** "The wiring is not working and the agents aren't
    working" — agents keep asking *narrowing* questions that shortsell the substrate.
-   Matches DharmaGraph spec §1: crash-resumable dispatch FALSE, orphaned delegation
-   runs, 5 fragmented executors, heartbeat unwired.
+   Matches `docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md:18` (§1): crash-resumable
+   dispatch FALSE (`orchestrator.py:2403-2407`; no boot reconciler for
+   `delegation_runs`), 5+ fragmented executors, heartbeat unwired
+   (`runtime_state.py:2062` has zero production callers).
 
 ---
 
 ## The two 2026-07-12 drills agree on the target
 
 This grill (Decision 5) and the independent **DharmaGraph × LangGraph parity
-gauntlet** (`reports/governance/dharmagraph_parity/PARITY_MATRIX.md` — **31.00/100,
+gauntlet** (`reports/governance/dharmagraph_parity/PARITY_MATRIX.md:1-3` — **31.00/100,
 NOT_FINISHED**, judge-signed, committed `6965d38` / resealed `6644d57`) point at the
 same rows. The highest-weight open parity gaps are exactly the durability cluster:
 
