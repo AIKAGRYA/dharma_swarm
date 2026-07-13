@@ -117,6 +117,7 @@ def render_compact(receipt: Mapping[str, Any]) -> str:
 
     lines.append("")
     tracks = core.get("portfolio", {}).get("tracks", [])
+    lines.append("ACTIVE PORTFOLIO")
     lines.append(f"Declared portfolio ({len(tracks)} track(s); live state is NOT here):")
     for track_id in tracks[:12]:
         marker = "▶" if track_id == track else "-"
@@ -142,9 +143,11 @@ def render_compact(receipt: Mapping[str, Any]) -> str:
         lines.append(f"  [{'ok' if present else 'MISSING'}] {rel}")
 
     lines.append("")
+    lines.append("LIVING AXIOMS")
     lines.append("Required reading (canonical max-five):")
     lines.append("  " + " · ".join(core.get("required_reading", [])[:5]))
     lines.append("")
+    lines.append("WHAT TO DO NEXT")
     lines.append("Next: repair any blocker, rerun make onboard, then")
     lines.append("      make agent-build-preflight PACKET=<path>")
 
