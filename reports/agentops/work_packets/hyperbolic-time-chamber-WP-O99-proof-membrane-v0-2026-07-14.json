@@ -156,12 +156,11 @@
       "expected_exit": 0
     },
     {
-      "name": "existing-chamber-regression-tests",
-      "command": "python3 -m pytest -q tests/test_chamber_daily_delta.py tests/test_chamber_gym_git_history.py tests/test_chamber_ledger_history.py tests/test_chamber_predictions.py tests/test_chamber_sandbox.py tests/test_chamber_traces.py tests/test_transcendence_ledger.py",
+      "name": "dependency-light-chamber-regression-tests",
+      "command": "python3 -m pytest -q tests/test_chamber_daily_delta.py tests/test_chamber_ledger_history.py tests/test_chamber_predictions.py tests/test_chamber_sandbox.py tests/test_chamber_traces.py tests/test_transcendence_ledger.py",
       "argv": [
         "python3", "-m", "pytest", "-q",
         "tests/test_chamber_daily_delta.py",
-        "tests/test_chamber_gym_git_history.py",
         "tests/test_chamber_ledger_history.py",
         "tests/test_chamber_predictions.py",
         "tests/test_chamber_sandbox.py",
@@ -173,21 +172,20 @@
     },
     {
       "name": "proof-membrane-semantic-negative-tests",
-      "command": "python3 -m pytest -q tests/test_chamber_traces.py -k 'tamper or unknown_property or semantic_coercion or fabricated_verification or bundle_path_swap or direct_bundle or deeply_immutable or relabeled or registered_effect_once or immutable_and_evaluator'",
+      "command": "python3 -m pytest -q tests/test_chamber_traces.py -k 'tamper or unknown_property or semantic_coercion or fabricated_verification or bundle_path_swap or direct_bundle or deeply_immutable or relabeled or registered_effect_once or immutable_and_evaluator or direct_claim'",
       "argv": [
         "python3", "-m", "pytest", "-q", "tests/test_chamber_traces.py", "-k",
-        "tamper or unknown_property or semantic_coercion or fabricated_verification or bundle_path_swap or direct_bundle or deeply_immutable or relabeled or registered_effect_once or immutable_and_evaluator"
+        "tamper or unknown_property or semantic_coercion or fabricated_verification or bundle_path_swap or direct_bundle or deeply_immutable or relabeled or registered_effect_once or immutable_and_evaluator or direct_claim"
       ],
       "env": {},
       "expected_exit": 0
     },
     {
-      "name": "graph-adjacent-regression-tests",
-      "command": "python3 -m pytest -q tests/test_graph_checkpoint.py tests/test_graph_neutral_cycles_resume.py",
+      "name": "dependency-light-graph-checkpoint-tests",
+      "command": "python3 -m pytest -q tests/test_graph_checkpoint.py",
       "argv": [
         "python3", "-m", "pytest", "-q",
-        "tests/test_graph_checkpoint.py",
-        "tests/test_graph_neutral_cycles_resume.py"
+        "tests/test_graph_checkpoint.py"
       ],
       "env": {},
       "expected_exit": 0
@@ -256,9 +254,10 @@
     ],
     "honest_blockers": [
       "V0 cannot establish CLOSED_LIVE, whole-organism determinism, automatic RCA, or production readiness.",
-      "A final repository-wide closeout may remain red on unrelated host-owned or live-system evidence; no such gate may be bypassed or fabricated."
+      "A final repository-wide closeout may remain red on unrelated host-owned or live-system evidence; no such gate may be bypassed or fabricated.",
+      "Governed closeout deliberately disables pytest plugin autoload and exposes only the trusted host PATH. Its packet gates therefore use dependency-light regression slices; the full plugin-aware chamber and graph-adjacent suites are separately required and recorded in the proof ledger."
     ],
     "rollback": "revert the chamber proof/replay modules, owned test extension, Part IV spec, V0 receipts, and this packet together; no production state or live authority is changed",
-    "packet_digest": "8884aaf3d43828de49cacb20d4fb61b7cd99b7a97038d2371e6295c47b6f4cb7"
+    "packet_digest": "015d84edf32817581451c1c2808f3033b5d78f0893fed03abea60bf83ceca814"
   }
 }

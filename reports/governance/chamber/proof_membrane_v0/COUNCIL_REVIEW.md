@@ -79,3 +79,17 @@ is retained explicitly rather than silently described as Kimi 2.7.
 
 This satisfies PM0-10 as a review gate only. It does not create provenance,
 runtime authority, or a product-readiness claim.
+
+## Round 4 — pending final admission-envelope review
+
+After Round 3, the first governed closeout failed closed for two environment
+reasons preserved in `AGENTOPS_CLOSEOUT_ATTEMPT1.json`: the admission runner
+disables pytest plugin autoload and supplies only a trusted host PATH, while
+two packet gates assumed pytest-asyncio and a nested `python3` with pytest.
+The negative-control jail also encountered macOS `sandbox-exec` denial under
+the already-sandboxed build process.
+
+The packet now distinguishes dependency-light admission slices from the full
+plugin-aware test evidence. Round 4 must decide whether that is an honest
+boundary correction or an illicit weakening. No Round 3 vote is inherited for
+the changed packet bytes.
