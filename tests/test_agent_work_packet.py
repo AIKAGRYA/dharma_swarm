@@ -2143,10 +2143,16 @@ def test_session_entry_accepts_exact_wp_o4r_identity_only(tmp_path: Path) -> Non
         with pytest.raises(agentops.AgentOpsError, match="work_packet.*packet id"):
             agentops.parse_work_packet(packet_for(rejected))
 
-    with pytest.raises(agentops.AgentOpsError, match="work_packet.*packet id"):
-        agentops.parse_work_packet(
-            packet_for("WP-O4R", packet_id="onboard-one-door-WP-O4")
-        )
+    for rejected_packet_id in (
+        "onboard-one-door-WP-O4",
+        "onboard-one-door-WP-O4R-B1",
+        "other-WP-O4R",
+        "WP-O4R",
+    ):
+        with pytest.raises(agentops.AgentOpsError, match="work_packet.*packet id"):
+            agentops.parse_work_packet(
+                packet_for("WP-O4R", packet_id=rejected_packet_id)
+            )
 
 
 def test_inspect_accepts_successor_packet_but_execution_requires_tracked_custody(
