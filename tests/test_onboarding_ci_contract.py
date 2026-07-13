@@ -20,6 +20,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+MAKEFILE = REPO_ROOT / "Makefile"
 WORKFLOW = REPO_ROOT / ".github/workflows/active-track.yml"
 CI_TRUTH_CONTRACT = REPO_ROOT / "docs/governance/CI_TRUTH_CONTRACT.json"
 RUNNER = REPO_ROOT / "scripts/governance/run_agent_work_packet.py"
@@ -333,12 +334,16 @@ def test_macos_compatibility_job_is_required_and_executable() -> None:
     assert 'git archive --format=tar HEAD | tar -xf - -C "${install_source}"' in job
     assert 'python3 -m pip install "${install_source}[dev]"' in job
     assert "pip install 'pytest>=7.0'" not in job
+    reproducer = "/usr/bin/make onboarding-macos-compatibility"
+    assert job.count(reproducer) == 1
+    makefile = MAKEFILE.read_text(encoding="utf-8")
+    assert "onboarding-macos-compatibility:\n\t@set -eu;" in makefile
     for command in (
         "/usr/bin/make -n onboard",
         "/usr/bin/make -n orient",
         "/usr/bin/make -n help",
     ):
-        assert command in job
+        assert command in makefile
     for proof in (
         "test_darwin_negative_confinement_executes_and_denies_outside_write",
         "test_darwin_account_temp_root_native_and_prepares_report_root",
@@ -346,15 +351,15 @@ def test_macos_compatibility_job_is_required_and_executable() -> None:
         "test_darwin_report_anchor_rejects_environment_minted_temp_root",
         "test_private_report_anchor_enforces_owner_mode_and_symlink_boundaries",
     ):
-        assert proof in job
+        assert proof in makefile
 
     contract = json.loads(CI_TRUTH_CONTRACT.read_text(encoding="utf-8"))
-    required = {
-        name
+    required = next(
+        check
         for check in contract["required"]
-        for name in check.get("names", [])
-    }
-    assert "Onboarding macOS 3.81 compatibility" in required
+        if "Onboarding macOS 3.81 compatibility" in check.get("names", [])
+    )
+    assert required["local_command"] == reproducer
 
 
 def test_ci_runner_context_is_resolved_only_after_job_assignment() -> None:

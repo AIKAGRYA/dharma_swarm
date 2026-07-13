@@ -2306,9 +2306,15 @@ def _private_report_anchor(target: Path) -> tuple[Path, bool]:
         # Consult it only when the established /tmp and account-home anchors do
         # not already cover the target. Its authority comes from Darwin
         # getconf, never TMPDIR.
-        account_temp = _darwin_account_temp_root()
-        if _is_within(target, account_temp):
-            return account_temp, False
+        # The fixed parent is only a cheap rejection prefilter; admission still
+        # requires the strict OS-account root returned by getconf. This avoids
+        # changing the canonical error (or spawning a probe) for unrelated
+        # targets such as /opt/reports.
+        darwin_parent = _DARWIN_USER_TEMP_PARENT.resolve(strict=False)
+        if _is_within(target, darwin_parent):
+            account_temp = _darwin_account_temp_root()
+            if _is_within(target, account_temp):
+                return account_temp, False
     raise AgentOpsError(
         "report_root must be beneath the trusted temp anchor or OS-account home"
     )

@@ -3203,6 +3203,22 @@ def test_darwin_report_anchor_rejects_environment_minted_temp_root(
     )
 
 
+def test_darwin_report_anchor_skips_getconf_for_unrelated_target(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(agentops.sys, "platform", "darwin")
+    monkeypatch.setattr(
+        agentops,
+        "_darwin_account_temp_root",
+        lambda: (_ for _ in ()).throw(
+            AssertionError("unrelated target must not probe Darwin account temp")
+        ),
+    )
+
+    with pytest.raises(agentops.AgentOpsError, match="trusted temp anchor"):
+        agentops._private_report_anchor(Path("/opt/untrusted-agentops/reports"))
+
+
 def test_darwin_report_anchor_keeps_tmp_and_home_when_getconf_is_unavailable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -34,7 +34,7 @@
       "id": "onboarding_macos_compatibility",
       "names": ["Onboarding macOS 3.81 compatibility"],
       "owner": "onboarding",
-      "local_command": "/usr/bin/make -n onboard && /usr/bin/make -n orient && /usr/bin/make -n help",
+      "local_command": "/usr/bin/make onboarding-macos-compatibility",
       "failure_category": "host_compatibility",
       "autofix": "manual"
     }
