@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -15,6 +18,94 @@ spec = importlib.util.spec_from_file_location("orientation_graph", SCRIPT)
 og = importlib.util.module_from_spec(spec)
 sys.modules["orientation_graph"] = og
 spec.loader.exec_module(og)
+
+
+def _copy_tracked_checkout(destination: Path) -> None:
+    """Create a genuine clean Git checkout of the current implementation."""
+    subprocess.run(
+        ["git", "clone", "--quiet", "--shared", str(REPO_ROOT), str(destination)],
+        check=True,
+        timeout=120,
+    )
+    listed = subprocess.run(
+        ["git", "ls-files", "-z"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        check=True,
+        timeout=60,
+    ).stdout
+    for raw_relative in listed.split(b"\0"):
+        if not raw_relative:
+            continue
+        relative = os.fsdecode(raw_relative)
+        source = REPO_ROOT / relative
+        target = destination / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if not source.exists() and not source.is_symlink():
+            target.unlink(missing_ok=True)
+        elif source.is_symlink():
+            target.unlink(missing_ok=True)
+            target.symlink_to(os.readlink(source))
+        elif source.is_file():
+            shutil.copy2(source, target)
+    subprocess.run(
+        ["git", "-C", str(destination), "add", "-A"],
+        check=True,
+        timeout=60,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(destination),
+            "-c",
+            "user.name=WP-O4 test",
+            "-c",
+            "user.email=wp-o4-test@example.invalid",
+            "commit",
+            "--quiet",
+            "--allow-empty",
+            "-m",
+            "snapshot implementation under test",
+        ],
+        check=True,
+        timeout=60,
+    )
+    assert not subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=destination,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=30,
+    ).stdout
+
+
+def _tree_snapshot(root: Path) -> dict[str, tuple[object, ...]]:
+    """Snapshot content, including ignored files that Git status can conceal."""
+    snapshot: dict[str, tuple[object, ...]] = {}
+    for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root).as_posix()
+        if path.is_symlink():
+            snapshot[relative] = ("symlink", os.readlink(path))
+        elif path.is_file():
+            snapshot[relative] = (
+                "file",
+                path.stat().st_mode,
+                hashlib.sha256(path.read_bytes()).hexdigest(),
+            )
+    return snapshot
+
+
+def _clean_subprocess_env(tmp_path: Path) -> dict[str, str]:
+    env = os.environ.copy()
+    # Prove the script's own boundary rather than inheriting the closeout
+    # harness's bytecode protection.
+    env.pop("PYTHONDONTWRITEBYTECODE", None)
+    env.pop("PYTHONPYCACHEPREFIX", None)
+    env["HOME"] = str(tmp_path / "home")
+    env["XDG_CACHE_HOME"] = str(tmp_path / "xdg-cache")
+    return env
 
 
 def test_packet_has_all_axes():
@@ -64,17 +155,86 @@ def test_custody_counts_registered_canon():
 
 
 def test_orientation_graph_render_is_read_only(tmp_path):
-    before = subprocess.run(
-        ["git", "status", "--porcelain"], cwd=REPO_ROOT, capture_output=True, text=True
-    ).stdout
+    checkout = tmp_path / "clean-checkout"
+    _copy_tracked_checkout(checkout)
+    before = _tree_snapshot(checkout)
     result = subprocess.run(
-        [sys.executable, str(SCRIPT)], cwd=REPO_ROOT, capture_output=True, text=True
+        [
+            sys.executable,
+            "scripts/governance/orientation_graph.py",
+        ],
+        cwd=checkout,
+        capture_output=True,
+        text=True,
+        timeout=180,
+        env=_clean_subprocess_env(tmp_path),
     )
-    assert result.returncode == 0
-    after = subprocess.run(
-        ["git", "status", "--porcelain"], cwd=REPO_ROOT, capture_output=True, text=True
-    ).stdout
-    assert before == after, "orientation graph must not write owner files"
+    assert result.returncode == 0, result.stderr[-2000:]
+    assert _tree_snapshot(checkout) == before, (
+        "orientation graph must not create ignored bytecode/cache files or "
+        "change tracked owner files on its first import"
+    )
+
+
+def test_explicit_context_refresh_writes_only_two_paths(tmp_path):
+    """O4-B1b: a fresh process changes exactly the two owner artifacts."""
+    checkout = tmp_path / "clean-checkout"
+    _copy_tracked_checkout(checkout)
+    expected = {
+        "reports/orientation/repo_context.json",
+        "reports/orientation/repo_context.md",
+    }
+    for relative in expected:
+        (checkout / relative).unlink()
+    subprocess.run(
+        ["git", "-C", str(checkout), "add", "-A"],
+        check=True,
+        timeout=30,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(checkout),
+            "-c",
+            "user.name=WP-O4 test",
+            "-c",
+            "user.email=wp-o4-test@example.invalid",
+            "commit",
+            "--quiet",
+            "-m",
+            "remove generated context before refresh",
+        ],
+        check=True,
+        timeout=30,
+    )
+    before = _tree_snapshot(checkout)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/governance/orientation_graph.py",
+            "--write-context",
+        ],
+        cwd=checkout,
+        capture_output=True,
+        text=True,
+        timeout=180,
+        env=_clean_subprocess_env(tmp_path),
+    )
+    assert result.returncode == 0, result.stderr[-2000:]
+
+    after = _tree_snapshot(checkout)
+    changed = {
+        relative
+        for relative in set(before) | set(after)
+        if before.get(relative) != after.get(relative)
+    }
+    assert changed == expected
+    assert not any(
+        relative.endswith(".pyc") or "__pycache__" in relative.split("/")
+        for relative in after
+    ), "explicit refresh created repository bytecode/cache files"
 
 
 def test_json_mode_is_machine_parseable():
