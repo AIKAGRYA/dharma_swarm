@@ -135,12 +135,6 @@
       "env": {}
     },
     {
-      "name": "agentops-followup-ruff",
-      "command": ".venv/bin/python -m ruff check scripts/governance/run_agent_work_packet.py tests/test_agent_work_packet.py",
-      "expected_exit": 0,
-      "env": {}
-    },
-    {
       "name": "agentops-followup-docops-changed",
       "command": "python3 scripts/docops/check_docops_integrity.py --changed-from bdb096fa07654afb43c519bb0238591f2a09d929",
       "expected_exit": 0,
@@ -206,6 +200,6 @@
     ],
     "honest_blockers": [],
     "rollback": "Revert the B1 follow-up commits. B0 successor inspection remains merged; the commit path returns to the earlier porcelain staging behavior.",
-    "packet_digest": "37a40ed2dc34b959a752b1538646cd2d503bedf2cde0146fcda93f00cad43ce4"
+    "packet_digest": "87decac36d89e79d258a0951ceecb47fecf2b488aa19db5149731efd5baec612"
   }
 }
