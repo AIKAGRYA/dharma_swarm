@@ -44,7 +44,7 @@
   - owns: docs/vision_maps/MASTER_2026-07-07_hyperbolic_time_chamber.md, docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md, docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md, docs/plans/INWARD_ASCENT_PHASE0_DOSSIER_2026-07-07.md, scripts/governance/inward_ascent_baseline.py, scripts/governance/frontier_ledger.py, scripts/governance/transcendence_ledger.py, dharma_swarm/chamber/**, tests/test_chamber_traces.py, tests/test_chamber_gym_git_history.py, tests/test_chamber_daily_delta.py, tests/test_chamber_predictions.py, tests/test_chamber_sandbox.py, tests/test_chamber_ledger_history.py, tests/test_transcendence_ledger.py, reports/governance/inward_ascent/**, reports/governance/chamber/**
 - **`company-builder-parity-2026-07`** — TAM (Transdimensional Abundance Machine) — the live Company-Builder Parity board (ACTIVE, serves `revenue-external-humans-served`, verified 2026-07-07, open blocker items: 0)
   - owns: scripts/governance/tam_ledger.py, scripts/governance/tam_axes.py, reports/governance/tam/**, tests/test_tam_ledger.py, docs/plans/TAM_TRANSDIMENSIONAL_ABUNDANCE_MACHINE_2026-07-07.md, docs/plans/TAM_MASTER_PROMPT_2026-07-07.md, docs/research/POLSIA_COFOUNDER_BLUEPRINT_GENEALOGY_2026-07-07.md
-- **`onboard-one-door-2026-07`** — One-door onboarding — strict, fast, deterministic session admission (ACTIVE, serves `substrate-nativeness`, verified 2026-07-14, open blocker items: 7)
+- **`onboard-one-door-2026-07`** — One-door onboarding — strict, fast, deterministic session admission (ACTIVE, serves `substrate-nativeness`, verified 2026-07-14, open blocker items: 8)
   - owns: AGENTS.md, Makefile, .github/workflows/structure.yml, .github/workflows/active-track.yml, docs/governance/ANTI_SLOP_RULES.md, docs/governance/AGENTOPS.md, docs/governance/BUILD_SESSION_ENTRYPOINT.md, scripts/docops/check_docops_integrity.py, scripts/governance/agent_onboard.py, scripts/governance/orientation_graph.py, scripts/governance/trust_gate_status.py, scripts/governance/repo_status.py, scripts/governance/run_agent_work_packet.py, scripts/governance/check_track_status.py, dharma_swarm/operator_core/onboarding/**, dharma_swarm/operator_core/control_surface.py, dharma_swarm/operator_core/control_surface_models.py, dharma_swarm/operator_core/operator_coherence/git_governance.py, tests/test_agent_onboard.py, tests/test_orientation_graph.py, tests/test_trust_gate_status.py, tests/test_repo_status.py, tests/test_control_surface.py, tests/test_operator_coherence_cockpit.py, tests/test_agent_work_packet.py, tests/test_active_track_governance.py, tests/test_track_portfolio.py, tests/test_docops_integrity.py, tests/test_make_onboarding_contract.py, tests/test_onboarding_*.py, tests/properties/test_onboarding_readiness_properties.py, reports/agentops/work_packets/onboard-one-door-WP-O*.json
 - **`darshan-publication-2026-07`** — Darshan — publication venture cell (multi-disciplinary voice of clear seeing) (ACTIVE, serves `revenue-external-humans-served`, verified 2026-07-12, open blocker items: 2)
   - owns: docs/plans/DARSHAN_CHARTER_2026-07-12.md, reports/darshan/**, reports/tam/**
@@ -170,13 +170,13 @@ append-style refreshes quadruplicated rows and broke `make docops-integrity`).
 |--------|-------|-------------|
 | Total Python modules | **1010** | git ls-files dharma_swarm \| rg '\.py$' \| wc -l |
 | Top-level (flat) modules | **443 (44.2%)** | git ls-files dharma_swarm \| rg '^dharma_swarm/[^/]+\.py$' \| wc -l |
-| Total Python LOC | **362,308** | wc -l across dharma_swarm Python modules |
+| Total Python LOC | **362,309** | wc -l across dharma_swarm Python modules |
 | Test files | **899** | git ls-files tests \| rg '\.py$' \| wc -l |
-| Test functions | **13,404 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test functions | **13,407 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **12,885 (measured 2026-07-10, cloud checkout)** | python3 -m pytest tests/ --collect-only -q |
 | Collection errors | **35 (measured 2026-07-10, cloud checkout — env-dependent optional extras; 0 on the operator host 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
 | Markdown files | **1,427** | git ls-files \| rg '\.md$' \| wc -l (excl. AGENTS.md, reports/docops) |
-| Markdown total lines | **300,283** | wc -l across all tracked .md |
+| Markdown total lines | **300,326** | wc -l across all tracked .md |
 | Bridge files | **29** | find dharma_swarm -name "*bridge*.py" -type f |
 | Adapter files | **27** | find dharma_swarm -type f \| rg -i "adapter" |
 | Router files | **19** | find dharma_swarm -type f \| rg -i "rout" |

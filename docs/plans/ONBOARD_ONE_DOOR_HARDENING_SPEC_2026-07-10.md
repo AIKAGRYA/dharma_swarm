@@ -1068,7 +1068,7 @@ records that SHA and the empty `git status --porcelain=v1`, and may edit only:
 Only the mechanically required §6 count-refresh outputs may join those two
 files. B0's sole behavior change is to accept exact `WP-O1R` as a
 `session_entry.work_packet` value while preserving `WP-O1` and `WP-O10`, the
-packet-id token check, and rejection of `WP-O2R`, `WP-O1RR`, `WP-O1R2`,
+packet-id token check, and rejection of `WP-O6R`, `WP-O1RR`, `WP-O1R2`,
 `WP-O1r`, and every other suffix. Its sole named test is
 `test_session_entry_accepts_exact_wp_o1r_identity_only`.
 
@@ -1451,6 +1451,49 @@ claim upgrade, no host verdict work, no new parser class/grammar family.
 **Kill criterion:** any seventh direct parser found at implementation SHA must
 stop the packet. Obtain an operator-approved envelope/ownership amendment or
 record a blocking dependency; do not ship a false “one parser” claim.
+
+#### WP-O2R — corrective truth-ledger reconciliation
+
+WP-O2R is a narrow post-WP-O4R correction discovered while reconciling exact
+main after PR #926. The canonical WP-O2 envelope above deliberately forbids
+BROKEN_REGISTER content cleanup, runtime-status claim upgrades, and host
+verdict work, so that authority must not be borrowed for this repair. WP-O2R
+may be sealed only after a separately reviewed `WP-O2-B3` authority bootstrap
+has merged. The bootstrap admits literal `WP-O2R` as one exact Session Entry
+identity and grants the two otherwise-unowned ledgers as exact packet-scoped
+shared-surface exceptions. They do not become broad One-Door
+`owned_surfaces`. The bootstrap does not perform the reconciliation or
+generalize arbitrary `WP-O<N>R` suffixes. B3 is used because B0-B2 are already
+tracked, unrelated WP-O2 corrective packets and must remain immutable.
+
+The WP-O2R implementation envelope is exactly:
+
+- `docs/governance/ACTIVE_TRACK.yaml`
+- `CLAUDE.md`
+- `docs/governance/SOVEREIGN_MANIFEST.md`
+- `docs/governance/BUILD_SESSION_ENTRYPOINT.md`
+- `docs/docops/AUTO_INVENTORY.md`
+- `docs/state/BROKEN_REGISTER.md`
+- `INTERFACE_MISMATCH_MAP.md`
+- `tests/test_onboarding_broken_register.py`
+- `reports/agentops/work_packets/onboard-one-door-WP-O2R.json`
+
+It may only reconcile landed One-Door authority and implementation history,
+managed projections, canonical broken-register counts/lifecycle labels, and
+explicitly bounded evidence already observed for those ledger claims.
+Host-local evidence must include exact read-only commands and outputs while
+typing clean clone, CI, every other seat, fleet topology, and consolidation
+authority as Unobserved. Every named WP-O2 behavior test remains required;
+in particular, `test_header_count_drift_is_reported` must keep a synthetic
+stale-header fixture while a separate positive test proves the current
+register and mismatch-map projections agree.
+
+Acceptance requires fresh exact-main preflight, committed-range closeout,
+exact PR-event replay, a meaningful exact-base stale-ledger control, zero
+generated or ignored source leaves, and independent review. WP-O2R changes no
+parser/runtime behavior, database contents, scheduler state, receipt writer,
+cache, fallback scraper, merge authority, strict default, One-Door closure,
+or Titanium readiness.
 
 ### WP-O3 — Unified CLI, readiness, receipt cache, live delta, and host typing (L)
 
