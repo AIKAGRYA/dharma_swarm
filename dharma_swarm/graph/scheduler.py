@@ -240,6 +240,20 @@ class CompiledGraph:
             superstep = 0
             _emit_checkpoint(0, digest)
 
+        if run_persistence.pending_write is not None:
+            superstep += 1
+            tasks = self._prepare_tasks(state, state.versions, versions_seen)
+            pending_task_id = run_persistence.replay(
+                state, versions_seen, self.triggers, tasks, run_id, superstep
+            )
+            digest, committed = state.digest(), superstep
+            events.extend(
+                GraphRunEvent(
+                    run_id, self.graph_id, task.node_id, superstep, "ok", digest, task.seq
+                )
+                for task in tasks
+            )
+            _emit_checkpoint(superstep, digest, pending_task_id)
         while True:
             superstep += 1
             start_versions = state.versions

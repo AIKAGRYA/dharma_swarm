@@ -93,6 +93,41 @@ def test_thread_resume_checkpoint_ids_and_lineage(tmp_path):
     assert kernel.get_state("thread-a") == result.state
 
 
+def test_explicit_resume_checkpoint_preserves_fork_parent(tmp_path):
+    kernel = GraphPersistenceKernel(tmp_path / "kernel")
+    compiled = _linear_graph()
+    asyncio.run(
+        compiled.invoke(
+            {"x": 2, "log": []},
+            graph_run_id="run-original",
+            persistence=kernel,
+            thread_id="thread-fork",
+        )
+    )
+    original = kernel.get_state_history("thread-fork")
+    selected = original[1]
+    latest = original[-1]
+
+    asyncio.run(
+        compiled.invoke(
+            input=None,
+            graph_run_id="run-child",
+            resume_from=selected.checkpoint,
+            persistence=kernel,
+            thread_id="thread-fork",
+            checkpoint_id=selected.checkpoint_id,
+        )
+    )
+
+    child = next(
+        record
+        for record in kernel.get_state_history("thread-fork")
+        if record.checkpoint.graph_run_id == "run-child"
+    )
+    assert child.parent_checkpoint_id == selected.checkpoint_id
+    assert child.parent_checkpoint_id != latest.checkpoint_id
+
+
 def test_native_process_restart_uses_kernel_file(tmp_path):
     program = r"""
 import asyncio, json, sys
@@ -215,6 +250,100 @@ def test_pending_write_recovery_survives_failed_superstep(tmp_path):
     assert [(write.task_id, write.writes) for write in pending] == [
         ("run-pending:1", (("x", 1), ("x", 2)))
     ]
+
+
+def test_default_resume_replays_pending_writes_without_reexecuting_node(tmp_path):
+    calls = 0
+
+    def node(state):
+        nonlocal calls
+        calls += 1
+        return {"x": state["x"] + 1}
+
+    compiled = (
+        GraphBuilder("pending-runtime-replay")
+        .add_channel("x", LastValueChannel)
+        .add_node("a", node)
+        .add_edge(START, "a")
+        .add_edge("a", END)
+        .compile()
+    )
+    kernel = GraphPersistenceKernel(tmp_path / "kernel")
+    stopper, callback = _stop_after(0)
+    with pytest.raises(stopper):
+        asyncio.run(
+            compiled.invoke(
+                {"x": 0},
+                graph_run_id="run-replay",
+                persistence=kernel,
+                thread_id="thread-replay",
+                on_checkpoint=callback,
+            )
+        )
+    root = kernel.get_state_history("thread-replay")[0]
+    kernel.put_writes(
+        "thread-replay",
+        [("x", 1)],
+        "run-replay:1",
+        checkpoint_id=root.checkpoint_id,
+        task_path="a",
+    )
+
+    result = asyncio.run(
+        compiled.invoke(
+            input=None,
+            persistence=kernel,
+            thread_id="thread-replay",
+        )
+    )
+
+    assert calls == 0
+    assert result.state == {"x": 1}
+    assert [(event.node_id, event.superstep) for event in result.events] == [("a", 1)]
+    history = kernel.get_state_history("thread-replay")
+    assert [record.superstep for record in history] == [0, 1]
+    assert history[1].parent_checkpoint_id == root.checkpoint_id
+    assert kernel.recover_pending_writes("thread-replay") == []
+
+
+def test_default_resume_clears_pending_write_after_checkpoint_commit(tmp_path):
+    compiled = (
+        GraphBuilder("pending-after-commit")
+        .add_channel("log", AppendChannel)
+        .add_node("a", lambda state: {"log": ["a"]})
+        .add_edge(START, "a")
+        .add_edge("a", END)
+        .compile()
+    )
+    kernel = GraphPersistenceKernel(tmp_path / "kernel")
+    result = asyncio.run(
+        compiled.invoke(
+            {"log": []},
+            graph_run_id="run-committed",
+            persistence=kernel,
+            thread_id="thread-committed",
+        )
+    )
+    history = kernel.get_state_history("thread-committed")
+    kernel.put_writes(
+        "thread-committed",
+        [("log", ["a"])],
+        "run-committed:1",
+        checkpoint_id=history[0].checkpoint_id,
+        task_path="a",
+    )
+
+    resumed = asyncio.run(
+        compiled.invoke(
+            input=None,
+            persistence=kernel,
+            thread_id="thread-committed",
+        )
+    )
+
+    assert resumed.state == result.state == {"log": ["a"]}
+    assert len(kernel.get_state_history("thread-committed")) == 2
+    assert kernel.recover_pending_writes("thread-committed") == []
 
 
 def test_sync_async_serializer_and_delete_for_runs(tmp_path):
