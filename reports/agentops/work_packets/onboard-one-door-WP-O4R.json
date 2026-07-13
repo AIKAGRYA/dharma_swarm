@@ -1,26 +1,20 @@
 {
-  "id": "onboard-one-door-WP-O4",
-  "base_ref": "2d2de7b1bfdd982b09334b7154e3e26425c55211",
-  "branch": "codex/darwin-temp-authority-20260713",
+  "id": "onboard-one-door-WP-O4R",
+  "base_ref": "088ba8ab24d4fcd9783d43e1300d238891fd4977",
+  "branch": "codex/agentops-generated-boundary-20260714",
   "worktree": ".",
-  "intent": "Correct the WP-O4 Darwin report-root authority widening merged by PR #918: replace environment-selected tempfile authority with OS-account getconf authority, prove native direct filesystem-write confinement, bind stock GNU Make 3.81 compatibility into CI truth, and keep the duplicate-free CI contract plus merge-gate fixtures aligned with that new required check — no branch-protection edit, no merge-authority change, and no broader sandbox claim.",
+  "intent": "Repair the WP-O4 self-invalidation boundary only: route Hypothesis storage outside the source tree, make active-track derived-report output explicitly relocatable, prevent the dependency-bootstrap probe from writing bytecode, and resolve bare Python criteria through the current interpreter. Preserve forbidden-first leaf scope, reject ignored/generated source artifacts, leave One-Door promotion and Titanium surfaces untouched, and make no wider readiness or production claim.",
   "allowed_files": [
-    "Makefile",
+    "scripts/governance/check_track_status.py",
     "scripts/governance/run_agent_work_packet.py",
-    "scripts/governance/orientation_graph.py",
-    "docs/governance/AGENTOPS.md",
-    "docs/governance/CI_TRUTH_CONTRACT.json",
-    ".github/workflows/active-track.yml",
+    "tests/test_active_track_governance.py",
     "tests/test_agent_work_packet.py",
-    "tests/test_orientation_graph.py",
-    "tests/test_make_onboarding_contract.py",
-    "tests/test_onboarding_ci_contract.py",
-    "tests/test_pr_merge_control.py",
-    "reports/agentops/work_packets/onboard-one-door-WP-O4.json",
-    "docs/governance/SOVEREIGN_MANIFEST.md",
-    "docs/docops/AUTO_INVENTORY.md"
+    "tests/test_onboarding_broken_register.py",
+    "tests/test_track_portfolio.py",
+    "reports/agentops/work_packets/onboard-one-door-WP-O4R.json"
   ],
   "forbidden_files": [
+    ".github/workflows/active-track.yml",
     ".github/workflows/automerge.yml",
     ".github/workflows/branch-janitor.yml",
     ".github/workflows/codex-mention-router.yml",
@@ -35,6 +29,7 @@
     "CLAUDE.md",
     "CYBERNETIC_LOOP_MAP.md",
     "Dockerfile.swarm",
+    "Makefile",
     "dharma_swarm/archive.py",
     "dharma_swarm/chamber/**",
     "dharma_swarm/checkpoint.py",
@@ -43,7 +38,10 @@
     "dharma_swarm/diversity_archive.py",
     "dharma_swarm/evolution_safety.py",
     "dharma_swarm/graph/**",
+    "dharma_swarm/operator_core/control_surface.py",
+    "dharma_swarm/operator_core/control_surface_models.py",
     "dharma_swarm/operator_core/onboarding/**",
+    "dharma_swarm/operator_core/operator_coherence/git_governance.py",
     "dharma_swarm/orchestrator.py",
     "dharma_swarm/organism.py",
     "dharma_swarm/strange_loop.py",
@@ -53,6 +51,8 @@
     "dharma_swarm/world_radar/**",
     "docker-compose.yml",
     "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/governance/AGENTOPS.md",
+    "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
     "docs/governance/NEXT_BUILD_RUN_PROMPT.md",
     "docs/governance/hygiene/patterns/AI-M1.yaml",
     "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json",
@@ -84,20 +84,23 @@
     "reports/governance/tam/**",
     "reports/loop_closure/**",
     "reports/tam/**",
+    "scripts/docops/check_docops_integrity.py",
     "scripts/governance/agent_onboard.py",
     "scripts/governance/arena_truth_report.py",
     "scripts/governance/branch_janitor.py",
     "scripts/governance/check_claim_evidence_binding.py",
-    "scripts/governance/check_track_status.py",
     "scripts/governance/dharmagraph_parity_gauntlet.py",
     "scripts/governance/frontier_ledger.py",
     "scripts/governance/hygiene/**",
     "scripts/governance/inward_ascent_baseline.py",
     "scripts/governance/loop1_consumption_check.py",
+    "scripts/governance/orientation_graph.py",
     "scripts/governance/pramana_probe.py",
+    "scripts/governance/repo_status.py",
     "scripts/governance/tam_axes.py",
     "scripts/governance/tam_ledger.py",
     "scripts/governance/transcendence_ledger.py",
+    "scripts/governance/trust_gate_status.py",
     "scripts/governance/verify_corral_findings.py",
     "scripts/runtime/merge_master_mike_daemon.py",
     "scripts/runtime/pr_merge_control.py",
@@ -115,9 +118,11 @@
     "tests/test_chamber_traces.py",
     "tests/test_checkpoint.py",
     "tests/test_claim_evidence_binding.py",
+    "tests/test_control_surface.py",
     "tests/test_coordination_closure_checks.py",
     "tests/test_council_profiles.py",
     "tests/test_dharmagraph_parity_gauntlet.py",
+    "tests/test_docops_integrity.py",
     "tests/test_dpi.py",
     "tests/test_evolution_safety.py",
     "tests/test_graph_checkpoint.py",
@@ -127,17 +132,23 @@
     "tests/test_loop1_consumption.py",
     "tests/test_loop1_consumption_check.py",
     "tests/test_loop_supervisor_tristate.py",
+    "tests/test_make_onboarding_contract.py",
     "tests/test_onboarding_cache.py",
+    "tests/test_onboarding_ci_contract.py",
     "tests/test_onboarding_cli.py",
     "tests/test_onboarding_readiness.py",
+    "tests/test_operator_coherence_cockpit.py",
     "tests/test_orchestration_genome.py",
     "tests/test_orchestrator_v1.py",
+    "tests/test_orientation_graph.py",
     "tests/test_pr_merge_control_github_reviews.py",
     "tests/test_pramana.py",
     "tests/test_pramana_probe.py",
+    "tests/test_repo_status.py",
     "tests/test_tam_ledger.py",
     "tests/test_topology_execution.py",
     "tests/test_transcendence_ledger.py",
+    "tests/test_trust_gate_status.py",
     "tests/test_verify_corral_findings.py",
     "tests/test_workflow.py",
     "tools/evidence_ingestor_go/**",
@@ -147,50 +158,35 @@
   ],
   "gates": [
     {
-      "name": "wp-o4-focused-battery",
-      "command": "python3 -m pytest tests/test_make_onboarding_contract.py tests/test_onboarding_ci_contract.py tests/test_agent_work_packet.py tests/test_orientation_graph.py tests/test_pr_merge_control.py -q",
+      "name": "wp-o4r-focused-battery",
+      "command": "python3 -m pytest tests/test_active_track_governance.py tests/test_agent_work_packet.py tests/test_onboarding_broken_register.py tests/test_track_portfolio.py -q",
       "argv": [
         "python3",
         "-m",
         "pytest",
-        "tests/test_make_onboarding_contract.py",
-        "tests/test_onboarding_ci_contract.py",
+        "tests/test_active_track_governance.py",
         "tests/test_agent_work_packet.py",
-        "tests/test_orientation_graph.py",
-        "tests/test_pr_merge_control.py",
+        "tests/test_onboarding_broken_register.py",
+        "tests/test_track_portfolio.py",
         "-q"
       ],
       "env": {},
       "expected_exit": 0
     },
     {
-      "name": "wp-o4-allowlist",
-      "command": "python3 -m pytest tests/test_agent_work_packet.py -q -k positive_gate_command_family_allowlist_rejects_transitive_routes",
-      "argv": [
-        "python3",
-        "-m",
-        "pytest",
-        "tests/test_agent_work_packet.py",
-        "-q",
-        "-k",
-        "positive_gate_command_family_allowlist_rejects_transitive_routes"
-      ],
-      "env": {},
-      "expected_exit": 0
-    },
-    {
-      "name": "ruff-wp-o4",
-      "command": "python3 -m ruff check scripts/governance/run_agent_work_packet.py tests/test_make_onboarding_contract.py tests/test_onboarding_ci_contract.py tests/test_agent_work_packet.py tests/test_pr_merge_control.py",
+      "name": "ruff-wp-o4r",
+      "command": "python3 -m ruff check scripts/governance/check_track_status.py scripts/governance/run_agent_work_packet.py tests/test_active_track_governance.py tests/test_agent_work_packet.py tests/test_onboarding_broken_register.py tests/test_track_portfolio.py",
       "argv": [
         "python3",
         "-m",
         "ruff",
         "check",
+        "scripts/governance/check_track_status.py",
         "scripts/governance/run_agent_work_packet.py",
-        "tests/test_make_onboarding_contract.py",
-        "tests/test_onboarding_ci_contract.py",
+        "tests/test_active_track_governance.py",
         "tests/test_agent_work_packet.py",
-        "tests/test_pr_merge_control.py"
+        "tests/test_onboarding_broken_register.py",
+        "tests/test_track_portfolio.py"
       ],
       "env": {},
       "expected_exit": 0
@@ -198,7 +194,7 @@
   ],
   "commit": {
     "allowed": true,
-    "message": "fix(agentops): bind Darwin temp authority to getconf [impact-checked]"
+    "message": "fix(onboarding): confine generated admission artifacts [impact-checked]"
   },
   "approval": {
     "before_commit": false,
@@ -206,8 +202,8 @@
   },
   "negative_controls": [
     {
-      "name": "isolated-fixture-write-control",
-      "command": "python3 -c \"from pathlib import Path; Path('negative-control.txt').write_text('fixture-only'); raise SystemExit(0)\"",
+      "name": "wp-o4r-base-self-invalidation-control",
+      "command": "python3 -c \"import subprocess; base='088ba8ab24d4fcd9783d43e1300d238891fd4977'; show=lambda path: subprocess.run(['git','show',base+':'+path],check=True,capture_output=True,text=True).stdout; runner=show('scripts/governance/run_agent_work_packet.py'); checker=show('scripts/governance/check_track_status.py'); bootstrap=show('tests/test_onboarding_broken_register.py'); block=bootstrap.split('def test_agent_onboard_remains_importable_before_dependency_bootstrap',1)[1].split('\\ndef ',1)[0]; bare=any('if executable in' in line and 'python3' in line and './.venv' not in line for line in checker.splitlines()); defects='HYPOTHESIS_STORAGE_DIRECTORY' not in runner and '--reports-dir' not in checker and not bare and not any('-B' in line for line in block.splitlines()); raise SystemExit(0 if defects else 9)\"",
       "expected_exit": 0,
       "env": {}
     }
@@ -226,27 +222,31 @@
       "git",
       "owner_files"
     ],
-    "work_packet": "WP-O4",
+    "work_packet": "WP-O4R",
     "active_track": "onboard-one-door-2026-07",
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "2d2de7b1bfdd982b09334b7154e3e26425c55211",
+      "checked_at_sha": "088ba8ab24d4fcd9783d43e1300d238891fd4977",
       "details": []
     },
     "interface_mismatches": [
-      "ACTIVE_TRACK still describes merged WP-O2, WP-O3, and WP-O4 work as incomplete; that authority-owned ledger reconciliation is outside this corrective amendment.",
-      "PR #918 auto-merged before independent review caught its TMPDIR trust widening; this amendment narrows that authority and does not claim that the wider One-Door track is closed."
+      "The positive-gate environment omitted HYPOTHESIS_STORAGE_DIRECTORY, so ambient or hostile Hypothesis configuration could materialize generated state inside the source tree.",
+      "The active-track checker fixed derived evidence output to reports/governance under its source root, so otherwise read-only admission and onboarding checks could mutate source-derived report files.",
+      "The dependency-bootstrap probe executed the copied source script without Python's -B switch, allowing bytecode generation during the minimal dependency-free check.",
+      "Track command criteria normalized pytest and a missing repository .venv interpreter but left bare python and python3 commands PATH-resolved instead of binding them to the current trusted interpreter."
     ],
     "closest_existing_implementation": [
       "scripts/governance/run_agent_work_packet.py",
-      "dharma_swarm/operator_core/onboarding/contract.py"
+      "scripts/governance/check_track_status.py"
     ],
     "honest_blockers": [
-    "Repository-wide agent-build-closeout remains externally blocked until live NATS production evidence is no more than 24 hours old; never bypass or fabricate that operator-owned evidence.",
-    "C1 semantic revalidation remains outside WP-O4 and may occur only after the strict O3+O4 door is merged; this packet makes no C1 closure claim."
+      "This leaf repair does not close WP-O4 syscall confinement, WP-O6 terminal no-network proof, C1/D2/O5/M6-1, the One-Door track, or Titanium readiness.",
+      "Promotion still requires an exact-head push/PR replay, decorrelated council review, terminal required CI, and Mike's merge gate; local packet success is not merge authority.",
+      "Any movement from exact base 088ba8ab24d4fcd9783d43e1300d238891fd4977 invalidates base_ref, collision.checked_at_sha, packet_digest, deterministic preflight binding, and every exact-range proof; reseal and rerun from the new exact clean baseline.",
+      "Post-merge One-Door status remains constrained by D3 fleet evidence and the remaining ordered hardening criteria; this packet makes no readiness or production claim."
     ],
-    "rollback": "revert the Darwin getconf authority helper, macOS CI-truth registration, duplicate-key contract repair, merge-gate required-check fixture, native confinement tests, and this WP-O4 amendment together",
-    "packet_digest": "0da52901d8f2d1aded8c84a042a6e8c25ea7ddd20085e78fa65ef5cad5008275"
+    "rollback": "revert the Hypothesis cache routing, explicit active-track reports directory, isolated no-bytecode bootstrap fixture, current-interpreter command resolution, their four focused test modules, and this WP-O4R packet together",
+    "packet_digest": "068b31972fbf912544dd5f99ba7efce0fc196fbec2d061f03ba29f8c560ec9f2"
   }
 }

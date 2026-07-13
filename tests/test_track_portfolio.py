@@ -280,6 +280,19 @@ def test_command_passes_resolves_pytest_to_current_interpreter() -> None:
     assert resolved[3:] == ["-q", "tests/test_nats_transport.py"]
 
 
+def test_command_passes_resolves_bare_python_to_current_interpreter() -> None:
+    for executable in ("python", "python3"):
+        resolved = _resolve_command_for_current_runtime(
+            [executable, "scripts/governance/check_track_status.py", "--warn-only"]
+        )
+
+        assert resolved == [
+            sys.executable,
+            "scripts/governance/check_track_status.py",
+            "--warn-only",
+        ]
+
+
 def test_command_passes_resolves_missing_repo_venv(monkeypatch) -> None:
     monkeypatch.setattr("check_track_status.Path.exists", lambda _path: False)
 

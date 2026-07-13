@@ -1068,7 +1068,7 @@ records that SHA and the empty `git status --porcelain=v1`, and may edit only:
 Only the mechanically required §6 count-refresh outputs may join those two
 files. B0's sole behavior change is to accept exact `WP-O1R` as a
 `session_entry.work_packet` value while preserving `WP-O1` and `WP-O10`, the
-packet-id token check, and rejection of `WP-O2R`, `WP-O1RR`, `WP-O1R2`,
+packet-id token check, and rejection of `WP-O6R`, `WP-O1RR`, `WP-O1R2`,
 `WP-O1r`, and every other suffix. Its sole named test is
 `test_session_entry_accepts_exact_wp_o1r_identity_only`.
 
@@ -1452,6 +1452,49 @@ claim upgrade, no host verdict work, no new parser class/grammar family.
 stop the packet. Obtain an operator-approved envelope/ownership amendment or
 record a blocking dependency; do not ship a false “one parser” claim.
 
+#### WP-O2R — corrective truth-ledger reconciliation
+
+WP-O2R is a narrow post-WP-O4R correction discovered while reconciling exact
+main after PR #926. The canonical WP-O2 envelope above deliberately forbids
+BROKEN_REGISTER content cleanup, runtime-status claim upgrades, and host
+verdict work, so that authority must not be borrowed for this repair. WP-O2R
+may be sealed only after a separately reviewed `WP-O2-B3` authority bootstrap
+has merged. The bootstrap admits literal `WP-O2R` as one exact Session Entry
+identity and grants the two otherwise-unowned ledgers as exact packet-scoped
+shared-surface exceptions. They do not become broad One-Door
+`owned_surfaces`. The bootstrap does not perform the reconciliation or
+generalize arbitrary `WP-O<N>R` suffixes. B3 is used because B0-B2 are already
+tracked, unrelated WP-O2 corrective packets and must remain immutable.
+
+The WP-O2R implementation envelope is exactly:
+
+- `docs/governance/ACTIVE_TRACK.yaml`
+- `CLAUDE.md`
+- `docs/governance/SOVEREIGN_MANIFEST.md`
+- `docs/governance/BUILD_SESSION_ENTRYPOINT.md`
+- `docs/docops/AUTO_INVENTORY.md`
+- `docs/state/BROKEN_REGISTER.md`
+- `INTERFACE_MISMATCH_MAP.md`
+- `tests/test_onboarding_broken_register.py`
+- `reports/agentops/work_packets/onboard-one-door-WP-O2R.json`
+
+It may only reconcile landed One-Door authority and implementation history,
+managed projections, canonical broken-register counts/lifecycle labels, and
+explicitly bounded evidence already observed for those ledger claims.
+Host-local evidence must include exact read-only commands and outputs while
+typing clean clone, CI, every other seat, fleet topology, and consolidation
+authority as Unobserved. Every named WP-O2 behavior test remains required;
+in particular, `test_header_count_drift_is_reported` must keep a synthetic
+stale-header fixture while a separate positive test proves the current
+register and mismatch-map projections agree.
+
+Acceptance requires fresh exact-main preflight, committed-range closeout,
+exact PR-event replay, a meaningful exact-base stale-ledger control, zero
+generated or ignored source leaves, and independent review. WP-O2R changes no
+parser/runtime behavior, database contents, scheduler state, receipt writer,
+cache, fallback scraper, merge authority, strict default, One-Door closure,
+or Titanium readiness.
+
 ### WP-O3 — Unified CLI, readiness, receipt cache, live delta, and host typing (L)
 
 **Closes:** hidden refresh/network mutation, lossful precedence, v2 writer,
@@ -1568,6 +1611,34 @@ claim merge authority; C1 must separately promote that context before WP-O5.
 | O4-B9 | Preflight/closeout write only to the external root; syscall guard plus ordinary/ignored status prove no source write attempt | `test_make_admission_reports_are_external_and_read_only` |
 | O4-B10 | PR CI checks out the declared head; merge-group packets are each bound or the group blocks | `test_ci_pr_head_and_merge_group_packet_binding` |
 | O4-B11 | Positive gates use one fail-closed command-family allowlist before execution: exact O1R Git grammar and explicitly enumerated pytest/Ruff/read-only governance/DocOps/Make forms pass; inline interpreters, alternate mutation/network clients, shell-capable wrappers, and unknown executables fail | `test_positive_gate_command_family_allowlist_rejects_transitive_routes` |
+
+#### WP-O4R — corrective generated-artifact confinement repair
+
+WP-O4R is a narrow post-WP-O4 corrective packet discovered during exact-main
+closeout after PR #920. It may be sealed only after the separately reviewed
+`WP-O4-B0` authority bootstrap has merged. That bootstrap admits the literal
+`WP-O4R` Session Entry identity and the three previously unowned surfaces; it
+does not implement this repair and must not generalize arbitrary `WP-O<N>R`
+suffixes.
+
+The WP-O4R implementation envelope is exactly:
+
+- `scripts/governance/check_track_status.py`
+- `scripts/governance/run_agent_work_packet.py`
+- `tests/test_active_track_governance.py`
+- `tests/test_agent_work_packet.py`
+- `tests/test_onboarding_broken_register.py`
+- `tests/test_track_portfolio.py`
+- `reports/agentops/work_packets/onboard-one-door-WP-O4R.json`
+
+It may only route Hypothesis/cache storage outside source, make active-track
+report output explicitly relocatable, prevent the dependency-bootstrap probe
+from writing bytecode, resolve admitted bare Python criteria through the
+current interpreter, and add the tests needed to prove those boundaries.
+Acceptance requires a fresh exact-main preflight, committed-range closeout,
+exact PR-event replay, zero generated or ignored source leaves, and independent
+review. It does not close the wider WP-O4 syscall boundary, WP-O6, C1, or the
+One-Door track.
 
 CI packet discovery is conditional and fail-closed. A PR with no change in the
 onboarding track's owned surfaces runs the shared baseline evaluator but needs

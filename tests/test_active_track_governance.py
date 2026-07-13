@@ -16,7 +16,12 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ACTIVE_TRACK = REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml"
-EVIDENCE = REPO_ROOT / "reports/governance/active_track_evidence.json"
+SOURCE_REPORTS_DIR = REPO_ROOT / "reports/governance"
+DERIVED_REPORT_NAMES = {
+    "active_track_evidence.json",
+    "active_track_evidence.md",
+    "track_portfolio.json",
+}
 
 CHECK_SCRIPT = REPO_ROOT / "scripts/governance/check_track_status.py"
 RENDER_SCRIPT = REPO_ROOT / "scripts/governance/render_active_track_includes.py"
@@ -47,6 +52,16 @@ def _run(
     )
 
 
+def _report_snapshot(directory: Path) -> dict[str, tuple[int, bytes] | None]:
+    snapshot: dict[str, tuple[int, bytes] | None] = {}
+    for name in DERIVED_REPORT_NAMES:
+        path = directory / name
+        snapshot[name] = (
+            (path.stat().st_mtime_ns, path.read_bytes()) if path.exists() else None
+        )
+    return snapshot
+
+
 def test_active_track_yaml_exists() -> None:
     assert ACTIVE_TRACK.exists(), "ACTIVE_TRACK.yaml is the single source of truth for the current track."
 
@@ -74,19 +89,29 @@ def test_active_track_loads() -> None:
 
 
 @pytest.mark.timeout(270)
-def test_check_track_status_runs() -> None:
+def test_check_track_status_runs(tmp_path: Path) -> None:
     """The checker runs to completion and writes evidence JSON."""
     # Command criteria are skipped here (recorded UNVERIFIED): this suite
     # already runs every pytest-battery criterion directly, and executing
     # them again inside the checker made the checker's wall-clock grow with
     # the portfolio until it starved CI runners (2026-07-12, PR #894).
-    result = _run(CHECK_SCRIPT, "--warn-only", timeout=240, skip_commands=True)
+    reports_dir = tmp_path / "governance-reports"
+    source_before = _report_snapshot(SOURCE_REPORTS_DIR)
+    result = _run(
+        CHECK_SCRIPT,
+        "--warn-only",
+        "--reports-dir",
+        str(reports_dir),
+        timeout=240,
+        skip_commands=True,
+    )
     assert result.returncode == 0, result.stderr
-    assert EVIDENCE.exists(), "evidence JSON must be written"
-    payload = json.loads(EVIDENCE.read_text())
+    assert {path.name for path in reports_dir.iterdir()} == DERIVED_REPORT_NAMES
+    payload = json.loads((reports_dir / "active_track_evidence.json").read_text())
     assert "active_track_id" in payload
     assert "criteria" in payload
     assert isinstance(payload["criteria"], list)
+    assert _report_snapshot(SOURCE_REPORTS_DIR) == source_before
 
 
 def test_managed_blocks_in_sync() -> None:
@@ -253,15 +278,27 @@ def test_outcome_verdict_triggers_hard_false_shippable_claim() -> None:
 
 
 @pytest.mark.timeout(270)
-def test_underclaims_surface_in_evidence_payload() -> None:
+def test_underclaims_surface_in_evidence_payload(tmp_path: Path) -> None:
     """Every track payload carries the underclaims field, and any underclaim in
     the payload also surfaces as a WARN line in the checker output — the ledger
     can fall behind reality, but never silently."""
     # Same command-skip doctrine as test_check_track_status_runs above.
-    result = _run(CHECK_SCRIPT, timeout=240, skip_commands=True)
-    payload = json.loads(EVIDENCE.read_text(encoding="utf-8"))
+    reports_dir = tmp_path / "governance-reports"
+    source_before = _report_snapshot(SOURCE_REPORTS_DIR)
+    result = _run(
+        CHECK_SCRIPT,
+        "--reports-dir",
+        str(reports_dir),
+        timeout=240,
+        skip_commands=True,
+    )
+    assert {path.name for path in reports_dir.iterdir()} == DERIVED_REPORT_NAMES
+    payload = json.loads(
+        (reports_dir / "active_track_evidence.json").read_text(encoding="utf-8")
+    )
     out = result.stdout + result.stderr
     for tr in payload.get("active_tracks", []):
         assert "underclaims" in tr, f"track {tr.get('id')} missing underclaims field"
         for uc in tr["underclaims"]:
             assert f"track-underclaim:{tr['id']}:{uc['item_id']}" in out
+    assert _report_snapshot(SOURCE_REPORTS_DIR) == source_before

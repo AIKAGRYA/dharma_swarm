@@ -1794,7 +1794,7 @@ active_tracks:
     name: One-door onboarding — strict, fast, deterministic session admission
     status: ACTIVE
     opened_at: "2026-07-10"
-    verified_at: "2026-07-12"
+    verified_at: "2026-07-14"
     ttl_days: 30
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
@@ -1815,6 +1815,7 @@ active_tracks:
       - scripts/governance/trust_gate_status.py
       - scripts/governance/repo_status.py
       - scripts/governance/run_agent_work_packet.py
+      - scripts/governance/check_track_status.py
       - dharma_swarm/operator_core/onboarding/**
       - dharma_swarm/operator_core/control_surface.py
       - dharma_swarm/operator_core/control_surface_models.py
@@ -1826,6 +1827,8 @@ active_tracks:
       - tests/test_control_surface.py
       - tests/test_operator_coherence_cockpit.py
       - tests/test_agent_work_packet.py
+      - tests/test_active_track_governance.py
+      - tests/test_track_portfolio.py
       - tests/test_docops_integrity.py
       - tests/test_make_onboarding_contract.py
       - tests/test_onboarding_*.py
@@ -1849,7 +1852,10 @@ active_tracks:
       with default-deny scope enforcement, AGENTS.md custody repair
       (registered canon, absent on disk, gitignored), compact 40-70-line
       render, and warm<1s/cold<5s targets. Work proceeds only through the
-      spec's admitted sequence WP-O1, WP-O1R-B0, WP-O1R, and WP-O2..WP-O6;
+      spec's admitted sequence WP-O1, WP-O1R-B0, WP-O1R, WP-O2..WP-O4,
+      the separately merged WP-O4-B0 authority bootstrap, exact corrective
+      WP-O4R, the separately merged WP-O2-B3 truth-ledger authority
+      bootstrap, exact corrective WP-O2R, and then WP-O5..WP-O6;
       the spec (§6-§13) is the detail authority — this entry is the admission
       record, not a second spec.
       Titanium vNext (PR #854 plan) baseline capture and WP-00 stay blocked
@@ -1899,6 +1905,9 @@ active_tracks:
       - id: wp_o2_single_parser_six_consumers
         kind: command_passes
         command: ["python3", "-m", "pytest", "tests/test_onboarding_broken_register.py", "tests/test_agent_onboard.py", "tests/test_orientation_graph.py", "tests/test_trust_gate_status.py", "tests/test_repo_status.py", "tests/test_control_surface.py", "tests/test_operator_coherence_cockpit.py", "-q"]
+      - id: wp_o2r_exact_identifier_bridge
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/test_agent_work_packet.py::test_session_entry_accepts_exact_wp_o2r_identity_only", "-q"]
       - id: wp_o3_cli_readiness_cache_delta
         kind: command_passes
         command: ["python3", "-m", "pytest", "tests/test_onboarding_cli.py", "tests/test_onboarding_readiness.py", "tests/test_onboarding_cache.py", "tests/test_agent_onboard.py", "-q"]
@@ -1908,6 +1917,9 @@ active_tracks:
       - id: wp_o4_positive_gate_command_allowlist
         kind: command_passes
         command: ["python3", "-m", "pytest", "tests/test_agent_work_packet.py", "-q", "-k", "positive_gate_command_family_allowlist_rejects_transitive_routes"]
+      - id: wp_o4r_exact_identifier_bridge
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/test_agent_work_packet.py::test_session_entry_accepts_exact_wp_o4r_identity_only", "-q"]
       - id: wp_o6_readiness_property_battery
         kind: command_passes
         command: ["python3", "-m", "pytest", "tests/properties/test_onboarding_readiness_properties.py", "-q"]
@@ -1951,6 +1963,14 @@ active_tracks:
         what: "WP-O4 INCOMPLETE (reality reset 2026-07-12) — committed-range closeout, external-only syscall proof, and merge-group packet binding remain absent (independent audit at dcde323). The allowlist/CI-parity slices landed (PR #897) but the closeout envelope does not yet enforce base...HEAD plus working/staged/untracked as a union, reject packet-swap, prove external-only writes, discover the PR packet, or bind the merge group. Acceptance (spec §4.2, §6 WP-O4): implement real base...HEAD plus working/staged/untracked closeout, packet-swap rejection, external-only syscall proof, PR packet discovery, and merge-group binding; then re-close C1 by re-testing the live required context against the ACTUAL strict door."
         kind: code
         blocker: true
+      - id: WP-O4R
+        what: "WP-O4R BLOCKED pending this separately merged WP-O4-B0 authority bootstrap — close the post-#920 AgentOps self-invalidation defect only: route Hypothesis storage outside source, make active-track report output explicitly relocatable, prevent dependency-bootstrap bytecode writes, and resolve bare Python criteria through the current interpreter. Exact implementation envelope: scripts/governance/check_track_status.py, scripts/governance/run_agent_work_packet.py, tests/test_active_track_governance.py, tests/test_agent_work_packet.py, tests/test_onboarding_broken_register.py, tests/test_track_portfolio.py, plus reports/agentops/work_packets/onboard-one-door-WP-O4R.json. Acceptance requires a fresh exact-main preflight, committed-range closeout, PR-event replay, zero generated/ignored source leaves, and independent review. This repair does not close broader WP-O4, WP-O6 syscall confinement, or One-Door."
+        kind: code
+        blocker: true
+      - id: WP-O2R
+        what: "WP-O2R BLOCKED pending this separately merged WP-O2-B3 authority bootstrap — reconcile only post-#926 One-Door authority history and managed projections, canonical broken-register counts/status labels, and explicitly bounded host-local evidence. Exact implementation envelope: docs/governance/ACTIVE_TRACK.yaml, CLAUDE.md, docs/governance/SOVEREIGN_MANIFEST.md, docs/governance/BUILD_SESSION_ENTRYPOINT.md, docs/docops/AUTO_INVENTORY.md, docs/state/BROKEN_REGISTER.md, INTERFACE_MISMATCH_MAP.md, tests/test_onboarding_broken_register.py, plus reports/agentops/work_packets/onboard-one-door-WP-O2R.json. BROKEN_REGISTER.md and INTERFACE_MISMATCH_MAP.md are collision-free, packet-scoped shared-surface exceptions only; they do not become broad One-Door owned_surfaces. Preserve every named WP-O2 regression, including a synthetic stale-header diagnostic; mark clean clone/CI and every non-observed seat Unobserved. No parser/runtime/database/scheduler change, strict promotion, One-Door closure, or Titanium claim is admitted."
+        kind: governance
+        blocker: true
       - id: D3
         what: "D3 PENDING — operator answered 'no idea' 2026-07-10, so this resolves by evidence, not recall: on EACH fleet host (Mac daemon, VPS, any Warp/Oz seat) run the reader sweep and record the output — (1) grep -rn onboard_receipt ~/.dharma /etc/cron* /etc/systemd/system ~/Library/LaunchAgents ~/bin 2>/dev/null | grep -v ops/onboard_receipt.json$ ; (2) crontab -l 2>/dev/null | grep -i onboard ; (3) command -v lsof >/dev/null && lsof ~/.dharma/ops/onboard_receipt.json 2>/dev/null. All three empty on every host = D3 disconfirmed (record host list + date here, flip blocker false). Any hit = that reader gets a v1+v2 dual-read upgrade before the WP-O3 writer flip (spec §9.3)."
         kind: governance
@@ -1966,6 +1986,14 @@ active_tracks:
       - id: 1R
         what: "WP-O1R — after the separately merged exact-identifier bootstrap and module-budget/environment admission amendment, remediate both admitted Session Entry direct-command lexical P1s through contract.py plus exactly one private subordinate _command_lexical.py helper, and close inherited GIT_* execution control in run_agent_work_packet.py, under the exact §6 WP-O1R envelope: interpreter/path-routed live targets plus direct Git global-option/config/alias/env/direct-executable/argument-shape bypasses. The dependency is one-way: the stdlib-only helper returns lexical values/booleans and only mechanically evaluates exact shapes using grammar constants passed by contract.py; it defines no allowlist of its own. contract.py retains _parse_command, grammar ownership, final admission decisions/AgentOpsError, the direct-Git environment builder, and sole parser/public policy ownership. The runner calls that builder before normal execution and before negative-control env -i argv encoding, strips inherited GIT_* controls case-insensitively, then sets exactly GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM=1, and GIT_OPTIONAL_LOCKS=0. The helper is not exported and may not become a second direct-command lexical engine or owner. Extraction is mandatory so contract.py and the helper stay <=500 lines and modules_over_500_lines stays <=207. Preserve only the exact admitted read-only Git command shapes. This closes admitted direct-Git children, not trusted-host runner-internal Git calls or O4/O6 PATH/syscall/network boundaries. External/tracked filename, packet id, and work_packet identity are all onboard-one-door-WP-O1R / WP-O1R as specified. Must merge before WP-O2; WP-O2 and later packets remain untouched."
         kind: code
+        blocker: false
+      - id: 4R-B0
+        what: "WP-O4-B0 — one-time authority bootstrap under the already-admitted WP-O4 Session Entry identity: admit literal WP-O4R only, add the three exact collision-free ownership paths required by the corrective repair, amend the spec/ledger, and regenerate managed projections. No WP-O4R implementation is included; this bootstrap must merge before its packet is sealed."
+        kind: governance
+        blocker: false
+      - id: 2R-B3
+        what: "WP-O2-B3 — one-time truth-ledger authority bootstrap under the already-admitted WP-O2 Session Entry identity (B0-B2 are prior, unrelated WP-O2 repair packets): admit literal WP-O2R only, grant docs/state/BROKEN_REGISTER.md and INTERFACE_MISMATCH_MAP.md as exact collision-free packet-scoped exceptions without adding broad owned_surfaces, amend the spec/ledger, and regenerate managed projections. No WP-O2R ledger reconciliation or host-state mutation is included; this bootstrap must merge before its packet is sealed."
+        kind: governance
         blocker: false
     non_goals:
       - No gate weakening, no new truth store, receipt store, digest primitive, or parser family — reuse stable_digest/utc_now (memory_kernel.write_receipts), the ledger --check replay contract, and the needs_host vocabulary chain (spec §2.4, §3.1).

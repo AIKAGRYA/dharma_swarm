@@ -20,7 +20,9 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+MAKEFILE = REPO_ROOT / "Makefile"
 WORKFLOW = REPO_ROOT / ".github/workflows/active-track.yml"
+CI_TRUTH_CONTRACT = REPO_ROOT / "docs/governance/CI_TRUTH_CONTRACT.json"
 RUNNER = REPO_ROOT / "scripts/governance/run_agent_work_packet.py"
 TRACK_PATH = "docs/governance/ACTIVE_TRACK.yaml"
 TRACK_ID = "onboard-one-door-2026-07"
@@ -43,6 +45,14 @@ def _job_block(name: str) -> str:
     )
     assert match, f"workflow job {name!r} not found in active-track.yml"
     return match.group(0)
+
+
+def _unique_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        assert key not in result, f"duplicate CI truth contract key: {key}"
+        result[key] = value
+    return result
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -322,6 +332,45 @@ def test_ci_admission_has_no_weakening_flags() -> None:
         "tests/test_orientation_graph.py",
     ):
         assert (REPO_ROOT / relative).is_file()
+
+
+def test_macos_compatibility_job_is_required_and_executable() -> None:
+    job = _job_block("onboarding-macos-compatibility")
+    assert "runs-on: macos-14" in job
+    assert "python-version: \"3.12\"" in job
+    assert "python-version: \"3.12.13\"" not in job
+    assert 'git archive --format=tar HEAD | tar -xf - -C "${install_source}"' in job
+    assert 'python3 -m pip install "${install_source}[dev]"' in job
+    assert "pip install 'pytest>=7.0'" not in job
+    reproducer = "/usr/bin/make onboarding-macos-compatibility"
+    assert job.count(reproducer) == 1
+    makefile = MAKEFILE.read_text(encoding="utf-8")
+    assert "onboarding-macos-compatibility:\n\t@set -eu;" in makefile
+    for command in (
+        "/usr/bin/make -n onboard",
+        "/usr/bin/make -n orient",
+        "/usr/bin/make -n help",
+    ):
+        assert command in makefile
+    for proof in (
+        "test_darwin_negative_confinement_executes_and_denies_outside_write",
+        "test_darwin_account_temp_root_native_and_prepares_report_root",
+        "test_darwin_account_temp_root_uses_getconf_with_scrubbed_environment",
+        "test_darwin_report_anchor_rejects_environment_minted_temp_root",
+        "test_private_report_anchor_enforces_owner_mode_and_symlink_boundaries",
+    ):
+        assert proof in makefile
+
+    contract = json.loads(
+        CI_TRUTH_CONTRACT.read_text(encoding="utf-8"),
+        object_pairs_hook=_unique_json_object,
+    )
+    required = next(
+        check
+        for check in contract["required"]
+        if "Onboarding macOS 3.81 compatibility" in check.get("names", [])
+    )
+    assert required["local_command"] == reproducer
 
 
 def test_ci_runner_context_is_resolved_only_after_job_assignment() -> None:

@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agentops-report-root-check agent-build-preflight agent-build-closeout spine-check onboard orient status a2a-status a2a-up a2a-send go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test slop-ratchet slop-baseline
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agentops-report-root-check agent-build-preflight agent-build-closeout spine-check onboard onboarding-macos-compatibility orient status a2a-status a2a-up a2a-send go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test slop-ratchet slop-baseline
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently. Freeze a
@@ -261,6 +261,7 @@ help:
 	@echo "  make memory-kernel-full-power-preflight Run M2-M5 governed live preflight"
 	@echo "  make operator-prod-smoke Run fast read-only operator production smoke"
 	@echo "  make onboard      Render current operating reality (active track, live ops, broken register, axioms)"
+	@echo "  make onboarding-macos-compatibility  Reproduce the required GNU Make 3.81 + Darwin proof"
 	@echo "  make orient       Render the whole organism at once (identity, organs, tracks, custody, liveness)"
 	@echo "  make agent-onboard Fleet-identity join route + identity-surface drift check (new A2A agents)"
 	@echo "  make agent-build-preflight Run onboarding + hygiene integrity before agent work"
@@ -689,6 +690,24 @@ spine-check:
 # `make onboard ARGS=--json`. Run this before any build session.
 onboard:
 	$(PYTHON) scripts/governance/agent_onboard.py $(ARGS)
+
+# Full local reproducer for the required macOS compatibility context. Invoke
+# this target through stock /usr/bin/make so a parser regression fails before
+# any recipe can falsely report success.
+onboarding-macos-compatibility:
+	@set -eu; \
+		version="$$(/usr/bin/make --version | sed -n '1p')"; \
+		test "$$version" = "GNU Make 3.81"; \
+		printf '%s\n' "$$version"
+	@/usr/bin/make -n onboard >/dev/null
+	@/usr/bin/make -n orient >/dev/null
+	@/usr/bin/make -n help >/dev/null
+	$(PYTHON) -m pytest -q \
+		tests/test_agent_work_packet.py::test_darwin_negative_confinement_executes_and_denies_outside_write \
+		tests/test_agent_work_packet.py::test_darwin_account_temp_root_native_and_prepares_report_root \
+		tests/test_agent_work_packet.py::test_darwin_account_temp_root_uses_getconf_with_scrubbed_environment \
+		tests/test_agent_work_packet.py::test_darwin_report_anchor_rejects_environment_minted_temp_root \
+		tests/test_agent_work_packet.py::test_private_report_anchor_enforces_owner_mode_and_symlink_boundaries
 
 # Whole-system orientation: identity, tracks, lanes, agents, receipts, A2A,
 # body state, and broken register. Deep, mutation-free projection — it

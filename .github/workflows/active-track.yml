@@ -182,6 +182,42 @@ jobs:
             !${{ runner.temp }}/dharma-agentops/**/tool-cache/**
           if-no-files-found: error
 
+  # Stock macOS ships GNU Make 3.81, whose parser rejects target-specific
+  # assignments with multiple modifiers (for example `override export`). Keep
+  # this host proof separate from the required Linux admission context so its
+  # stable name does not change when the compatibility matrix grows.
+  onboarding-macos-compatibility:
+    name: Onboarding macOS 3.81 compatibility
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+    runs-on: macos-14
+    timeout-minutes: 15
+    steps:
+      - name: Checkout declared head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          # macos-14 is arm64 and does not publish every CPython patch.
+          python-version: "3.12"
+
+      - name: Install repository-declared proof dependencies
+        run: |
+          set -euo pipefail
+          install_source="${RUNNER_TEMP}/dharma-agentops-bootstrap/package-source"
+          mkdir -p "${install_source}"
+          git archive --format=tar HEAD | tar -xf - -C "${install_source}"
+          python3 -m pip install "${install_source}[dev]"
+
+      - name: Execute the governed macOS compatibility reproducer
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+          PYTHONPYCACHEPREFIX: ${{ runner.temp }}/dharma-agentops/pycache
+          PYTEST_ADDOPTS: -p no:cacheprovider
+        run: /usr/bin/make onboarding-macos-compatibility
+
   # Derived status rollups (active_track_evidence.{json,md},
   # track_portfolio.json, trust_gate_status.json) are NOT tracked on main —
   # they are rewritten in place with a generated_at timestamp on every run and
