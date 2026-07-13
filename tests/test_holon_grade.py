@@ -83,8 +83,15 @@ def test_live_fixture_reaches_holon_grade(tmp_path, monkeypatch):
     (dharma / "a2a_bus" / "bridge_heartbeats" / "liveseat.json").write_text(json.dumps({"receipt_count": 5}))
     (dharma / "a2a_bus" / "state").mkdir(parents=True)
     (dharma / "a2a_bus" / "state" / "liveseat.json").write_text(json.dumps({"process_running": True}))
-    (dharma / "a2a_bus" / "leases").mkdir(parents=True)
-    (dharma / "a2a_bus" / "leases" / "lease-1.json").write_text("{}")
+    # H4: a real signed lease in the seat's own store + an observed PEP refusal.
+    # Exercises the whole sign -> verify -> enforce -> refuse path, not a bare file.
+    from dharma_swarm import holon_signing as hs
+    from dharma_swarm import holon_pep as pep
+    lease = hs.issue_lease(holon="liveseat", scope=[hs.READ_ONLY, hs.REPLY_ONLY], ttl_s=3600,
+                           signer_key_pem=home / "keys" / "ed25519_private.pem", issuer="liveseat")
+    hs.write_lease(lease, agents_root=root)
+    with pytest.raises(pep.LeaseDenied):  # unleased operator-only action -> refusal receipt
+        pep.enforce_lease("liveseat", hs.GIT_PUSH, agents_root=root)
     (dharma / "agent_memory" / "liveseat").mkdir(parents=True)
     (dharma / "agent_memory" / "liveseat" / "MEMORY.md").write_text("who i am")
     (dharma / "agent_memory" / "liveseat" / ".growth_loop").write_text("")
@@ -104,6 +111,22 @@ def test_live_fixture_reaches_holon_grade(tmp_path, monkeypatch):
     assert grade.has_holon_shape, f"live fixture should have holon shape: {shape}"
     # every invariant axis should be live-durable => holon-grade LIVE
     assert grade.is_holon_grade_live, f"live fixture invariant axes not all 2: {shape}"
+
+
+def test_h4_theater_lease_does_not_pass(tmp_path):
+    """A bare/unsigned lease file must NOT score H4=2 — the exact theater the H4 gap named.
+
+    The old check scored 2 for any non-empty lease dir. A real authority envelope
+    requires a signed, verifiable lease, so an unsigned file scores 0.
+    """
+    root = tmp_path / "agents"
+    home = _seat(root, "faker", real_key=True)
+    (home / "leases").mkdir()
+    (home / "leases" / "bare.json").write_text("{}")  # unsigned = theater
+    grade = hg.grade_agent("faker", agents_root=root)
+    h4 = next(a for a in grade.axes if a.id == "H4_authority_envelope")
+    assert h4.points == 0, f"unsigned lease scored {h4.points}: {h4.evidence}"
+    assert "theater" in h4.evidence
 
 
 def test_grade_is_deterministic(tmp_path):

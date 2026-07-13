@@ -1,0 +1,132 @@
+{
+  "schema": "dharma_swarm.holon_grade.v1",
+  "uid": "opus",
+  "probed_at": "2026-07-13T15:35:13Z",
+  "score": 0.0,
+  "has_holon_shape": false,
+  "is_holon_grade_live": false,
+  "invariant_axes": [
+    "H1_identity_honest_liveness",
+    "H2_dialogue_face",
+    "H3_wake_metabolism",
+    "H4_authority_envelope",
+    "H5_memory_truth_precedence",
+    "H6_delegation_surface",
+    "H7_receipts_verification"
+  ],
+  "axes": [
+    {
+      "id": "H1_identity_honest_liveness",
+      "weight": 6,
+      "invariant": true,
+      "points": 0,
+      "evidence": "no identity.json"
+    },
+    {
+      "id": "H2_dialogue_face",
+      "weight": 8,
+      "invariant": true,
+      "points": 0,
+      "evidence": "no talk/reply-subject surface"
+    },
+    {
+      "id": "H3_wake_metabolism",
+      "weight": 12,
+      "invariant": true,
+      "points": 0,
+      "evidence": "no wake machinery"
+    },
+    {
+      "id": "H4_authority_envelope",
+      "weight": 8,
+      "invariant": true,
+      "points": 0,
+      "evidence": "no authority envelope declared"
+    },
+    {
+      "id": "H5_memory_truth_precedence",
+      "weight": 8,
+      "invariant": true,
+      "points": 0,
+      "evidence": "no memory surface"
+    },
+    {
+      "id": "H6_delegation_surface",
+      "weight": 7,
+      "invariant": true,
+      "points": 0,
+      "evidence": "no delegation surface"
+    },
+    {
+      "id": "H7_receipts_verification",
+      "weight": 8,
+      "invariant": true,
+      "points": 0,
+      "evidence": "no receipt discipline"
+    },
+    {
+      "id": "O1_always_on_presence",
+      "weight": 6,
+      "invariant": false,
+      "points": 0,
+      "evidence": "no transport heartbeat"
+    },
+    {
+      "id": "O2_scheduling_cron",
+      "weight": 5,
+      "invariant": false,
+      "points": 0,
+      "evidence": "no scheduled job"
+    },
+    {
+      "id": "O3_multi_channel",
+      "weight": 4,
+      "invariant": false,
+      "points": 0,
+      "evidence": "no channel"
+    },
+    {
+      "id": "O4_callable_gateway",
+      "weight": 5,
+      "invariant": false,
+      "points": 0,
+      "evidence": "no callable gateway (filesystem probe cannot see one; CLI --gateway-url overrides)"
+    },
+    {
+      "id": "O5_memory_growth_loop",
+      "weight": 5,
+      "invariant": false,
+      "points": 0,
+      "evidence": "no memory dir"
+    },
+    {
+      "id": "O6_governed_self_improvement",
+      "weight": 5,
+      "invariant": false,
+      "points": 0,
+      "evidence": "no governed self-improvement loop"
+    },
+    {
+      "id": "O7_task_queue_execution",
+      "weight": 5,
+      "invariant": false,
+      "points": 0,
+      "evidence": "inbound docked but not consumed (0 in inbox, receipt_count=0)"
+    },
+    {
+      "id": "O8_recovery_resume",
+      "weight": 4,
+      "invariant": false,
+      "points": 0,
+      "evidence": "recovery unproven (needs a launchd/systemd unit — checked in CLI)"
+    },
+    {
+      "id": "O9_security_key_custody",
+      "weight": 4,
+      "invariant": false,
+      "points": 0,
+      "evidence": "no seat key"
+    }
+  ],
+  "digest": "e003340dda8dc3e244efb542709d248a0f59ab524f0cf5f8175f7b85aca48aaa"
+}

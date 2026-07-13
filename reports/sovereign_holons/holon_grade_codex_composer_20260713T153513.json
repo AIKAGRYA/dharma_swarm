@@ -1,0 +1,132 @@
+{
+  "schema": "dharma_swarm.holon_grade.v1",
+  "uid": "codex_composer",
+  "probed_at": "2026-07-13T15:35:13Z",
+  "score": 29.5,
+  "has_holon_shape": false,
+  "is_holon_grade_live": false,
+  "invariant_axes": [
+    "H1_identity_honest_liveness",
+    "H2_dialogue_face",
+    "H3_wake_metabolism",
+    "H4_authority_envelope",
+    "H5_memory_truth_precedence",
+    "H6_delegation_surface",
+    "H7_receipts_verification"
+  ],
+  "axes": [
+    {
+      "id": "H1_identity_honest_liveness",
+      "weight": 6,
+      "invariant": true,
+      "points": 1,
+      "evidence": "identity present but incomplete (no key or no honest liveness)"
+    },
+    {
+      "id": "H2_dialogue_face",
+      "weight": 8,
+      "invariant": true,
+      "points": 1,
+      "evidence": "reply protocol documented; no autonomous responder (session-borne only)"
+    },
+    {
+      "id": "H3_wake_metabolism",
+      "weight": 12,
+      "invariant": true,
+      "points": 2,
+      "evidence": "wake loop active, heartbeat 282931s old"
+    },
+    {
+      "id": "H4_authority_envelope",
+      "weight": 8,
+      "invariant": true,
+      "points": 0,
+      "evidence": "authority mode 'read_only_until_execution_lease' declared but lease store absent — gate is theater"
+    },
+    {
+      "id": "H5_memory_truth_precedence",
+      "weight": 8,
+      "invariant": true,
+      "points": 0,
+      "evidence": "no memory surface"
+    },
+    {
+      "id": "H6_delegation_surface",
+      "weight": 7,
+      "invariant": true,
+      "points": 0,
+      "evidence": "no delegation surface"
+    },
+    {
+      "id": "H7_receipts_verification",
+      "weight": 8,
+      "invariant": true,
+      "points": 0,
+      "evidence": "no receipt discipline"
+    },
+    {
+      "id": "O1_always_on_presence",
+      "weight": 6,
+      "invariant": false,
+      "points": 2,
+      "evidence": "heartbeat fresh (24s) — process alive"
+    },
+    {
+      "id": "O2_scheduling_cron",
+      "weight": 5,
+      "invariant": false,
+      "points": 1,
+      "evidence": "scheduled wake proven once, stale"
+    },
+    {
+      "id": "O3_multi_channel",
+      "weight": 4,
+      "invariant": false,
+      "points": 1,
+      "evidence": "single NATS channel only (no operator-facing channel visible)"
+    },
+    {
+      "id": "O4_callable_gateway",
+      "weight": 5,
+      "invariant": false,
+      "points": 0,
+      "evidence": "no callable gateway (filesystem probe cannot see one; CLI --gateway-url overrides)"
+    },
+    {
+      "id": "O5_memory_growth_loop",
+      "weight": 5,
+      "invariant": false,
+      "points": 0,
+      "evidence": "no automated growth loop (hand-edited only)"
+    },
+    {
+      "id": "O6_governed_self_improvement",
+      "weight": 5,
+      "invariant": false,
+      "points": 0,
+      "evidence": "no governed self-improvement loop"
+    },
+    {
+      "id": "O7_task_queue_execution",
+      "weight": 5,
+      "invariant": false,
+      "points": 0,
+      "evidence": "inbound docked but not consumed (176 in inbox, receipt_count=0)"
+    },
+    {
+      "id": "O8_recovery_resume",
+      "weight": 4,
+      "invariant": false,
+      "points": 0,
+      "evidence": "recovery unproven (needs a launchd/systemd unit — checked in CLI)"
+    },
+    {
+      "id": "O9_security_key_custody",
+      "weight": 4,
+      "invariant": false,
+      "points": 0,
+      "evidence": "no seat key"
+    }
+  ],
+  "digest": "6a1a6f69bc9d9218e13e7aaa282706fc311f251d74a66d9949972b144cd0bf74"
+}

@@ -211,16 +211,33 @@ def _check_H3_wake(home: Path, uid: str) -> tuple[int, str]:
 
 
 def _check_H4_authority(home: Path, uid: str) -> tuple[int, str]:
+    # A real authority envelope is: mode declared AND >=1 signed, non-expired lease
+    # in the seat's own store that verifies against the seat pubkey, AND an observed
+    # PEP refusal proving the gate fired at runtime. A non-empty dir is no longer
+    # enough — a bare/unsigned store scores 0 (the "gate is theater" the H4 gap named).
     ident = _load_json(home / "identity.json") or {}
     mode = str(ident.get("authority_mode", ""))
     declared = "lease" in mode or "read_only" in mode
-    store_exists = LEASES.exists()
-    store_populated = store_exists and any(LEASES.iterdir())
-    if declared and store_populated:
-        return 2, f"authority mode '{mode}' + populated lease store (enforceable)"
-    if declared:
-        return 0, f"authority mode '{mode}' declared but lease store {'empty' if store_exists else 'absent'} — gate is theater"
-    return 0, "no authority envelope declared"
+    if not declared:
+        return 0, "no authority envelope declared"
+    lease_dir = home / "leases"
+    seat_pub = str(ident.get("public_key", ""))
+    try:
+        from dharma_swarm import holon_signing as hs
+        allowed = {seat_pub} if seat_pub else set()
+        valid = sum(1 for lz in hs.load_leases(uid, agents_root=home.parent)
+                    if hs.verify_lease(lz, allowed_signers=allowed)[0])
+    except Exception as exc:  # cryptography missing / unreadable — degrade, never crash
+        return 1, f"authority '{mode}' declared; lease verification unavailable ({type(exc).__name__})"
+    refusals = lease_dir / "refusals"
+    refused = refusals.exists() and any(refusals.glob("*.json"))
+    if valid and refused:
+        return 2, f"authority '{mode}' + {valid} signed lease(s) + observed PEP refusal (enforced)"
+    if valid:
+        return 1, f"authority '{mode}' + {valid} signed lease(s) but no observed refusal yet"
+    if lease_dir.exists() and any(lease_dir.glob("*.json")):
+        return 0, f"authority '{mode}' declared but no VALID signed lease in store — gate is theater"
+    return 0, f"authority '{mode}' declared but no lease store — gate is theater"
 
 
 def _check_H5_memory(home: Path, uid: str) -> tuple[int, str]:
