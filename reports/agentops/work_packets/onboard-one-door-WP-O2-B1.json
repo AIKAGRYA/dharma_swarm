@@ -136,7 +136,7 @@
     },
     {
       "name": "agentops-followup-ruff",
-      "command": "python3 -m ruff check scripts/governance/run_agent_work_packet.py tests/test_agent_work_packet.py",
+      "command": ".venv/bin/python -m ruff check scripts/governance/run_agent_work_packet.py tests/test_agent_work_packet.py",
       "expected_exit": 0,
       "env": {}
     },
@@ -206,6 +206,6 @@
     ],
     "honest_blockers": [],
     "rollback": "Revert the B1 follow-up commits. B0 successor inspection remains merged; the commit path returns to the earlier porcelain staging behavior.",
-    "packet_digest": "0ddf6619f79c179f49f09d4ad167c800575fa0bbef9d58b157a185ddfdab37d4"
+    "packet_digest": "37a40ed2dc34b959a752b1538646cd2d503bedf2cde0146fcda93f00cad43ce4"
   }
 }
