@@ -1,18 +1,27 @@
 from __future__ import annotations
 
+import importlib.util
 import subprocess
 import sys
 from pathlib import Path
 
-from dharma_swarm.operator_core.onboarding.broken_register import (
-    find_broken_register_references,
-    parse_broken_register,
-    parse_broken_register_text,
-    validate_broken_register_references,
-)
-
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
+_PARSER_PATH = (
+    REPO_ROOT / "dharma_swarm/operator_core/onboarding/broken_register.py"
+)
+_SPEC = importlib.util.spec_from_file_location(
+    "_dharma_broken_register_test",
+    _PARSER_PATH,
+)
+assert _SPEC is not None and _SPEC.loader is not None
+_PARSER = importlib.util.module_from_spec(_SPEC)
+sys.modules[_SPEC.name] = _PARSER
+_SPEC.loader.exec_module(_PARSER)
+
+find_broken_register_references = _PARSER.find_broken_register_references
+parse_broken_register = _PARSER.parse_broken_register
+parse_broken_register_text = _PARSER.parse_broken_register_text
+validate_broken_register_references = _PARSER.validate_broken_register_references
 
 
 def _diagnostic_codes(value: object) -> set[str]:
@@ -29,7 +38,7 @@ status: OPEN
 - **status:** PARTIAL — still active
 ### BR-003 — bold value
 **status:** **FIXED 2026-07-11** — done
-### BR-004 — REOPENED 2026-07-11 — heading lifecycle
+### BR-004 (REOPENED 2026-07-11) — heading lifecycle
 ### BR-005 (CLOSED 2026-07-11) — heading closed
 ## STALE-CLAIM CORRECTIONS
 ### BR-999 — must not parse
@@ -51,6 +60,66 @@ status: OPEN
         "BR-006": "CLOSED",
     }
     assert (result.total, result.open_count, result.closed_count) == (6, 3, 3)
+
+
+def test_entries_before_first_lifecycle_section_are_excluded() -> None:
+    result = parse_broken_register_text(
+        """# BROKEN REGISTER
+### BR-900 — introductory example, not a register occurrence
+- **status:** OPEN
+## OPEN ITEMS (1 open/partial)
+### BR-001 — current defect
+- **status:** OPEN
+"""
+    )
+
+    assert set(result.by_id) == {"BR-001"}
+    assert (result.total, result.open_count, result.closed_count) == (1, 1, 0)
+
+
+def test_non_lifecycle_h2_does_not_open_register_section() -> None:
+    result = parse_broken_register_text(
+        """# BROKEN REGISTER
+## OPEN SOURCE NOTES
+### BR-900 — example mentioned in notes
+- **status:** OPEN
+## OPEN ITEMS (1 open/partial)
+### BR-001 — current defect
+- **status:** OPEN
+"""
+    )
+
+    assert set(result.by_id) == {"BR-001"}
+    assert (result.total, result.open_count, result.closed_count) == (1, 1, 0)
+
+
+def test_prose_heading_does_not_supply_lifecycle() -> None:
+    result = parse_broken_register_text(
+        """## OPEN ITEMS (0 open/partial)
+### BR-003 — OPEN source documentation mentions this example
+- **severity:** DEGRADED
+"""
+    )
+
+    entry = result.by_id["BR-003"]
+    assert entry.status == "UNKNOWN"
+    assert entry.is_open_like is False
+    assert _diagnostic_codes(entry) == {"missing_current_status"}
+
+
+def test_closed_and_fixed_metadata_are_equivalent() -> None:
+    for heading_status, field_status in (("CLOSED", "FIXED"), ("FIXED", "CLOSED")):
+        result = parse_broken_register_text(
+            f"""## OPEN ITEMS (0 open/partial)
+### BR-003 ({heading_status} 2026-07-13) — resolved defect
+- **status:** {field_status} 2026-07-13 — independently verified
+"""
+        )
+
+        entry = result.by_id["BR-003"]
+        assert entry.status == field_status
+        assert entry.is_closed_like is True
+        assert "contradictory_lifecycle" not in _diagnostic_codes(entry)
 
 
 def test_reopened_id_wins_over_closed_history() -> None:
@@ -110,7 +179,7 @@ def test_duplicate_current_status_is_diagnostic() -> None:
 
     contradiction = parse_broken_register_text(
         """## OPEN ITEMS (0 open/partial)
-### BR-003 — REOPENED — contradictory metadata
+### BR-003 (REOPENED) — contradictory metadata
 - **status:** FIXED
 """
     ).by_id["BR-003"]
@@ -237,3 +306,19 @@ def test_drift_triage_br_ids_resolve() -> None:
     assert len(orphan) == 1
     assert orphan[0].code == "orphan_reference"
     assert orphan[0].br_id == "BR-999"
+
+
+def _run_dependency_free_control(argv: list[str]) -> int:
+    if argv == ["--negative-malformed"]:
+        test_incidental_status_words_do_not_classify()
+        test_duplicate_current_status_is_diagnostic()
+        test_header_count_drift_is_reported()
+        return 0
+    if argv == ["--negative-orphan"]:
+        test_drift_triage_br_ids_resolve()
+        return 0
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(_run_dependency_free_control(sys.argv[1:]))
