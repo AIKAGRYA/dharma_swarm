@@ -168,6 +168,25 @@ treated as identity-equivalent. No earlier approval was inherited. This closes
 the external review gate, not the runtime proof gate: the executable replay and
 local checks remain the authority for the bounded harness claim.
 
+The first AgentOps closeout then failed closed. Its scope check and four
+dependency-light gates passed, but the broad chamber gate called a nested
+`python3` after the runner intentionally replaced PATH with trusted host tools,
+and the graph-neutral suite required pytest-asyncio after the runner
+intentionally disabled plugin autoload. The negative-control jail also met a
+macOS `sandbox-exec: sandbox_apply: Operation not permitted` denial because the
+build process was already sandboxed. The raw failed report is retained as
+`AGENTOPS_CLOSEOUT_ATTEMPT1.json`; it is not rewritten as a code failure or a
+pass.
+
+The governed packet is revised to name only the dependency-light slices that
+the admission contract can actually execute. It still requires the focused
+proof suite, semantic negatives, synchronous graph checkpoints, other
+dependency-light chamber regressions, Ruff, diff, and an isolated negative
+control. The full plugin-aware 102-test chamber and 22-test graph-adjacent runs
+remain separate required evidence above. A final closeout must be rerun with
+the revised packet under a host context able to create its nested jail, and a
+new council round must review this exact evidence split.
+
 ## Primary research locators
 
 - [MiroFish upstream workflow](https://github.com/666ghj/MiroFish/blob/96096ea0ff42b1a30cbc41a1560b8c91090f9968/README.md#L86-L92)
