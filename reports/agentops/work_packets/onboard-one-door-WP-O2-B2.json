@@ -1,26 +1,14 @@
 {
-  "id": "onboard-one-door-WP-O2",
-  "base_ref": "bdb096fa07654afb43c519bb0238591f2a09d929",
-  "branch": "agent/wp-o2-canonical-broken-register-v5",
+  "id": "onboard-one-door-WP-O2-B2",
+  "base_ref": "6044bbc5f810cf12be9e564d22d00e159309ffab",
+  "branch": "agent/onboard-one-door-wp-o2-b2",
   "worktree": ".",
-  "intent": "Implement only WP-O2: one dependency-light canonical BROKEN_REGISTER lifecycle parser, migrate exactly the six admitted static orientation consumers without changing their public projection shapes, and diagnose malformed lifecycle, section-boundary drift, header-count drift, and orphan BR references without changing register content or runtime truth.",
+  "intent": "Carry the bounded post-#907 WP-O2 correction: preserve the canonical six-consumer parser contract while diagnosing BR entry headings outside recognized OPEN or CLOSED lifecycle sections, and repair the historical WP-O2 packet's replay hygiene without changing BROKEN_REGISTER content, canonical counts, or public projection shapes.",
   "allowed_files": [
     "dharma_swarm/operator_core/onboarding/broken_register.py",
-    "scripts/governance/agent_onboard.py",
-    "scripts/governance/orientation_graph.py",
-    "scripts/governance/trust_gate_status.py",
-    "scripts/governance/repo_status.py",
-    "dharma_swarm/operator_core/control_surface.py",
-    "dharma_swarm/operator_core/operator_coherence/git_governance.py",
-    "dharma_swarm/operator_core/control_surface_models.py",
-    "tests/test_agent_onboard.py",
-    "tests/test_orientation_graph.py",
-    "tests/test_trust_gate_status.py",
-    "tests/test_repo_status.py",
-    "tests/test_control_surface.py",
-    "tests/test_operator_coherence_cockpit.py",
     "tests/test_onboarding_broken_register.py",
     "reports/agentops/work_packets/onboard-one-door-WP-O2.json",
+    "reports/agentops/work_packets/onboard-one-door-WP-O2-B2.json",
     "docs/governance/SOVEREIGN_MANIFEST.md",
     "docs/docops/AUTO_INVENTORY.md"
   ],
@@ -163,43 +151,43 @@
   ],
   "gates": [
     {
-      "name": "wp-o2-canonical-parser-and-consumers",
+      "name": "wp-o2-b2-canonical-parser-and-consumers",
       "command": "python3 -m pytest tests/test_onboarding_broken_register.py tests/test_agent_onboard.py tests/test_orientation_graph.py tests/test_trust_gate_status.py tests/test_repo_status.py tests/test_control_surface.py tests/test_operator_coherence_cockpit.py -q",
       "expected_exit": 0,
       "env": {}
     },
     {
-      "name": "docops-changed",
-      "command": "python3 scripts/docops/check_docops_integrity.py --changed-from bdb096fa07654afb43c519bb0238591f2a09d929",
+      "name": "wp-o2-b2-docops-changed",
+      "command": "python3 scripts/docops/check_docops_integrity.py --changed-from 6044bbc5f810cf12be9e564d22d00e159309ffab",
       "expected_exit": 0,
       "env": {}
     },
     {
-      "name": "docops-integrity",
+      "name": "wp-o2-b2-docops-integrity",
       "command": "python3 scripts/docops/check_docops_integrity.py",
       "expected_exit": 0,
       "env": {}
     },
     {
-      "name": "ruff",
-      "command": "python3 -m ruff check dharma_swarm/operator_core/onboarding/broken_register.py scripts/governance/agent_onboard.py scripts/governance/orientation_graph.py scripts/governance/trust_gate_status.py scripts/governance/repo_status.py dharma_swarm/operator_core/control_surface.py dharma_swarm/operator_core/operator_coherence/git_governance.py dharma_swarm/operator_core/control_surface_models.py tests/test_onboarding_broken_register.py tests/test_agent_onboard.py tests/test_orientation_graph.py tests/test_trust_gate_status.py tests/test_repo_status.py tests/test_control_surface.py tests/test_operator_coherence_cockpit.py",
+      "name": "wp-o2-b2-ruff",
+      "command": "python3 -m ruff check dharma_swarm/operator_core/onboarding/broken_register.py tests/test_onboarding_broken_register.py",
       "expected_exit": 0,
       "env": {}
     },
     {
-      "name": "module-budget",
+      "name": "wp-o2-b2-module-budget",
       "command": "make module-budget",
       "expected_exit": 0,
       "env": {}
     },
     {
-      "name": "hygiene-check",
+      "name": "wp-o2-b2-hygiene-check",
       "command": "make hygiene-check",
       "expected_exit": 0,
       "env": {}
     },
     {
-      "name": "diff-check",
+      "name": "wp-o2-b2-diff-check",
       "command": "git diff --check",
       "expected_exit": 0,
       "env": {}
@@ -221,7 +209,7 @@
   ],
   "commit": {
     "allowed": false,
-    "message": "feat(onboarding): unify broken register lifecycle parsing"
+    "message": "fix(onboarding): diagnose out-of-section broken-register entries"
   },
   "approval": {
     "before_commit": true,
@@ -246,20 +234,19 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "bdb096fa07654afb43c519bb0238591f2a09d929",
+      "checked_at_sha": "6044bbc5f810cf12be9e564d22d00e159309ffab",
       "details": []
     },
-    "interface_mismatches": [],
+    "interface_mismatches": [
+      "The merged WP-O2 parser excludes entry headings outside lifecycle sections but did not retain a typed diagnostic for those rejected headings."
+    ],
     "closest_existing_implementation": [
-      "scripts/governance/agent_onboard.py",
-      "scripts/governance/orientation_graph.py",
-      "scripts/governance/trust_gate_status.py",
-      "scripts/governance/repo_status.py",
-      "dharma_swarm/operator_core/control_surface.py",
-      "dharma_swarm/operator_core/operator_coherence/git_governance.py"
+      "dharma_swarm/operator_core/onboarding/broken_register.py",
+      "tests/test_onboarding_broken_register.py",
+      "reports/agentops/work_packets/onboard-one-door-WP-O2.json"
     ],
     "honest_blockers": [],
-    "rollback": "Revert the WP-O2 implementation commit as one unit so all six consumers return to their legacy parsers together; remove the tracked WP-O2 packet only after no external AgentOps report remains in use. Never revert a single consumer alone.",
-    "packet_digest": "65f25468c817b13adb5310c57d92989a7f6e0e545e43fae10bcd12a1258ff479"
+    "rollback": "Revert the WP-O2-B2 correction as one unit: remove the out-of-section diagnostic and its regression, restore the historical WP-O2 packet bytes, and remove this B2 packet. Do not revert only the parser or only the packet hygiene repair.",
+    "packet_digest": "fd036fbf0a42532f278822661c1d05c2ee9008db9cbdbc2a04dfa3800500bdfc"
   }
 }

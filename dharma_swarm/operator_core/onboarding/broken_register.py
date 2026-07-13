@@ -318,6 +318,7 @@ def parse_broken_register_text(
     source: str = "<memory>",
 ) -> BrokenRegisterResult:
     occurrences: list[BrokenRegisterOccurrence] = []
+    parse_diagnostics: list[BrokenRegisterDiagnostic] = []
     section = "outside"
     declared_open_count: int | None = None
     draft: _OccurrenceDraft | None = None
@@ -349,9 +350,18 @@ def parse_broken_register_text(
         h3 = _H3_RE.match(line)
         if h3 is not None:
             flush()
-            if section not in {"current", "closed"}:
-                continue
             br_id = h3.group("id").upper()
+            if section not in {"current", "closed"}:
+                parse_diagnostics.append(
+                    _diagnostic(
+                        "entry_outside_lifecycle_section",
+                        f"{br_id} appears outside an OPEN or CLOSED lifecycle section",
+                        source=source,
+                        br_id=br_id,
+                        line=line_number,
+                    )
+                )
+                continue
             rest = h3.group("rest")
             draft = _OccurrenceDraft(
                 br_id=br_id,
@@ -371,11 +381,12 @@ def parse_broken_register_text(
         grouped.setdefault(occurrence.id, []).append(occurrence)
 
     entries: list[BrokenRegisterEntry] = []
-    diagnostics: list[BrokenRegisterDiagnostic] = [
+    diagnostics = list(parse_diagnostics)
+    diagnostics.extend(
         diagnostic
         for occurrence in occurrences
         for diagnostic in occurrence.diagnostics
-    ]
+    )
     for br_id, history_items in grouped.items():
         history = tuple(history_items)
         current = [item for item in history if item.section == "current"]

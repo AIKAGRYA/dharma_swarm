@@ -77,6 +77,25 @@ def test_entries_before_first_lifecycle_section_are_excluded() -> None:
     assert (result.total, result.open_count, result.closed_count) == (1, 1, 0)
 
 
+def test_entry_outside_lifecycle_section_is_diagnostic() -> None:
+    result = parse_broken_register_text(
+        """# BROKEN REGISTER
+## OPEN ITEM
+### BR-900 — singular near-miss section must not admit an entry
+- **status:** OPEN
+"""
+    )
+
+    outside = [
+        diagnostic
+        for diagnostic in result.diagnostics
+        if diagnostic.code == "entry_outside_lifecycle_section"
+    ]
+    assert result.entries == ()
+    assert len(outside) >= 1
+    assert outside[0].br_id == "BR-900"
+
+
 def test_non_lifecycle_h2_does_not_open_register_section() -> None:
     result = parse_broken_register_text(
         """# BROKEN REGISTER
@@ -312,6 +331,7 @@ def _run_dependency_free_control(argv: list[str]) -> int:
     if argv == ["--negative-malformed"]:
         test_incidental_status_words_do_not_classify()
         test_duplicate_current_status_is_diagnostic()
+        test_entry_outside_lifecycle_section_is_diagnostic()
         test_header_count_drift_is_reported()
         return 0
     if argv == ["--negative-orphan"]:
