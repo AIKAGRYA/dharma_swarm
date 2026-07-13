@@ -10,12 +10,12 @@ Do not hand-edit the generated block.
 | Top-level Dharma Python modules | 443 |
 | Dharma Python LOC | 362,308 |
 | Test files | 899 |
-| Test function occurrences | 13,387 |
+| Test function occurrences | 13,391 |
 | Markdown files | 1,427 |
-| Markdown total lines | 300,007 |
+| Markdown total lines | 300,255 |
 | Bridge files | 29 |
 | Adapter files | 27 |
 | Orchestrator files | 6 |
 | Router files | 19 |
-| Authority candidate docs | 645 |
+| Authority candidate docs | 644 |
 <!-- DOCOPS:END -->

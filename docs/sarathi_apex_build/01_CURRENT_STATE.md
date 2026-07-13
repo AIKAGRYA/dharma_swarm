@@ -1,5 +1,10 @@
 # 01 — Current State Capture (2026-07-07)
 
+> **Dated evidence:** This captures the pre-merge collapse worktree. Use
+> [`../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md`](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md)
+> for current-main body synthesis and its dated runtime witness; use onboarding
+> and `docs/state/LIVE_OPS_DASHBOARD.md` for current operating state.
+
 All commands below were read-only and run from
 `/Users/dhyana/ds_holon_collapse_20260707` on the clean branch.
 

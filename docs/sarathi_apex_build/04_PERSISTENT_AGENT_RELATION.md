@@ -1,5 +1,9 @@
 # 04 — Persistent-Agent Relation
 
+> **Design lineage:** This composition sketch is retained for context. Current
+> implementation and lifecycle boundaries are owned by
+> [`../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md`](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md).
+
 The stack is composition, not replacement:
 
 ```text

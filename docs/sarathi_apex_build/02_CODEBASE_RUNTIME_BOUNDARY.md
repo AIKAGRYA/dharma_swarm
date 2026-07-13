@@ -1,5 +1,10 @@
 # 02 — Codebase / Runtime Boundary Verdict
 
+> **Dated lane detail:** The boundary principle remains valid, but counts and
+> the dated surface witness defer to
+> [`../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md`](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md);
+> current operating state remains owned by onboarding and Live Ops.
+
 ## Verdict
 
 Keep the boundary. Do **not** merge repo and runtime homes.

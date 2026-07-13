@@ -1,5 +1,10 @@
 # 06 — Proof Gates
 
+> **Collapse-lane gate record:** Gates 1–9 describe the work that landed through
+> PR #821. The current promotion ladder and remaining effect/service proof are
+> owned by
+> [`../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md`](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md).
+
 ## Ten gates
 
 | Gate | Requirement | Current status |
