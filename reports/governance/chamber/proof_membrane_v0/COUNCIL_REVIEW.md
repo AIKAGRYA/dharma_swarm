@@ -111,8 +111,23 @@ string. Persistent witness `palantir-pilot` was fresh at three seconds. The
 schema failures are blockers under the council contract even though their
 visible content favored approval.
 
-## Round 6 — pending bounded-schema review
+## Round 6 — passed at full conviction
 
-All six lanes receive the same compact evidence with a strict example object,
-an empty disagreement requirement for approval, at most five evidence entries,
-and a 120-word summary limit. No prior vote is inherited.
+Durable runner receipts: `ROUND6_COUNCIL_SUMMARY.json` and
+`ROUND6_COUNCIL_SUMMARY.md`.
+
+| Lane | Requested route | Actual model | Verdict | Score |
+|---|---|---|---|---:|
+| glm52 | `ollama:glm-5.2:cloud` | `glm-5.2` | approve | 100 |
+| kimi27code | `ollama:kimi-k2.7-code:cloud` | `kimi-k2.7-code` | approve | 100 |
+| qwen3coder | `ollama:qwen3-coder:480b-cloud` | `qwen3-coder:480b-cloud` | approve | 100 |
+| deepseekv4pro | `ollama:deepseek-v4-pro:cloud` | `deepseek-v4-pro` | approve | 100 |
+| minimaxm3 | `ollama:minimax-m3:cloud` | `minimax-m3` | approve | 100 |
+| nemotron3ultra | `openrouter_free:nvidia/nemotron-3-ultra-550b-a55b:free` | `nvidia/nemotron-3-ultra-550b-a55b:free` | approve | 100 |
+
+Conviction gate: `pass_fullness`; minimum and mean score: 100; blockers:
+zero; every disagreement field empty. Persistent witness `palantir-pilot` was
+running and fresh with a 27-second heartbeat age. No prior vote was inherited.
+
+This closes the user's independent-model review condition and PM0-10 for the
+bounded exact-scope harness claim. It still does not create runtime authority.

@@ -1,0 +1,180 @@
+{
+  "blockers": [],
+  "conviction_gate": "pass_fullness",
+  "critic_count": 6,
+  "critics": [
+    {
+      "actual_model": "glm-5.2",
+      "lane_id": "glm52",
+      "latency_ms": 15914,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "AGENTOPS_CLOSEOUT_ATTEMPT1.json:status=failed",
+          "AGENTOPS_CLOSEOUT_FINAL.json:status=passed, gates[0-5].passed=true, negative_controls[0].passed=true",
+          "dharmagraph_fork_alias.replay_bundle.v1.json:manifest[7 entries], source_revision=df435af863e651287de3f637509a45d59b133ad3",
+          "proof.py:mint_authorization/evaluate/promote contain no council/model input; EPI-EVIDENCE-UNATTESTED, EPI-PROP-MISMATCH, EPI-AUTHORITY-MISSING codes present",
+          "RESEARCH_AND_VERIFICATION.md:claim ceiling HARNESS_PROVEN, MiroFish untrusted, full 102/22 suites separately required"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "All eight required conditions verified against attached evidence. Attempt1 is present and typed failed. Final closeout is passed with six green gates and green negative control. Dependency-light and full plugin-aware suites remain distinct. Proof.py rejects fabrication, semantic mismatch, and unissued authority via named fail-closed codes. No council/model import path exists into PromotionEvaluator. MiroFish is classified as untrusted candidate source. Seven-source manifest pins df435af863e651287de3f637509a45d59b133ad3. Claim ceiling is HARNESS_PROVEN, never CLOSED_LIVE.",
+        "verdict": "approve"
+      },
+      "provider": "ollama",
+      "raw_response": "{\"verdict\":\"approve\",\"score\":100,\"summary\":\"All eight required conditions verified against attached evidence. Attempt1 is present and typed failed. Final closeout is passed with six green gates and green negative control. Dependency-light and full plugin-aware suites remain distinct. Proof.py rejects fabrication, semantic mismatch, and unissued authority via named fail-closed codes. No council/model import path exists into PromotionEvaluator. MiroFish is classified as untrusted candidate source. Seven-source manifest pins df435af863e651287de3f637509a45d59b133ad3. Claim ceiling is HARNESS_PROVEN, never CLOSED_LIVE.\",\"blockers\":[],\"required_changes\":[],\"evidence_checked\":[\"AGENTOPS_CLOSEOUT_ATTEMPT1.json:status=failed\",\"AGENTOPS_CLOSEOUT_FINAL.json:status=passed, gates[0-5].passed=true, negative_controls[0].passed=true\",\"dharmagraph_fork_alias.replay_bundle.v1.json:manifest[7 entries], source_revision=df435af863e651287de3f637509a45d59b133ad3\",\"proof.py:mint_authorization/evaluate/promote contain no council/model input; EPI-EVIDENCE-UNATTESTED, EPI-PROP-MISMATCH, EPI-AUTHORITY-MISSING codes present\",\"RESEARCH_AND_VERIFICATION.md:claim ceiling HARNESS_PROVEN, MiroFish untrusted, full 102/22 suites separately required\"],\"explicit_disagreement\":\"\"}",
+      "requested_model": "glm-5.2:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "kimi-k2.7-code",
+      "lane_id": "kimi27code",
+      "latency_ms": 36208,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "AGENTOPS_CLOSEOUT_ATTEMPT1.json: \"status\": \"failed\"; AGENTOPS_CLOSEOUT_FINAL.json: \"status\": \"passed\", gates[0..5].passed=true, negative_controls[0].passed=true",
+          "work_packet.json honest_blockers[2]: full plugin-aware suites separately required and recorded",
+          "dharma_swarm/chamber/proof.py: no council/model import; evaluate() rejects EPI-EVIDENCE-UNATTESTED and EPI-AUTHORITY-*",
+          "dharmagraph_fork_alias.replay_bundle.v1.json: \"source_revision\": \"df435af863e651287de3f637509a45d59b133ad3\" with 7 manifest entries",
+          "docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md: \"strongest allowed final claim is HARNESS_PROVEN\"; \"Model agreement is a review gate, not truth\""
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "Attempt 1 is preserved as failed; the final closeout passes with six green gates and a green negative control. Dependency-light and full plugin-aware suites remain distinct. proof.py and the test suite reject fabrication, semantic mismatch, and unissued authority. The seven-source manifest pins df435af863e651287de3f637509a45d59b133ad3, and the claim ceiling is HARNESS_PROVEN. All eight approval conditions are concretely satisfied.",
+        "verdict": "approve"
+      },
+      "provider": "ollama",
+      "raw_response": "{\n  \"verdict\": \"approve\",\n  \"score\": 100,\n  \"summary\": \"Attempt 1 is preserved as failed; the final closeout passes with six green gates and a green negative control. Dependency-light and full plugin-aware suites remain distinct. proof.py and the test suite reject fabrication, semantic mismatch, and unissued authority. The seven-source manifest pins df435af863e651287de3f637509a45d59b133ad3, and the claim ceiling is HARNESS_PROVEN. All eight approval conditions are concretely satisfied.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"AGENTOPS_CLOSEOUT_ATTEMPT1.json: \\\"status\\\": \\\"failed\\\"; AGENTOPS_CLOSEOUT_FINAL.json: \\\"status\\\": \\\"passed\\\", gates[0..5].passed=true, negative_controls[0].passed=true\",\n    \"work_packet.json honest_blockers[2]: full plugin-aware suites separately required and recorded\",\n    \"dharma_swarm/chamber/proof.py: no council/model import; evaluate() rejects EPI-EVIDENCE-UNATTESTED and EPI-AUTHORITY-*\",\n    \"dharmagraph_fork_alias.replay_bundle.v1.json: \\\"source_revision\\\": \\\"df435af863e651287de3f637509a45d59b133ad3\\\" with 7 manifest entries\",\n    \"docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md: \\\"strongest allowed final claim is HARNESS_PROVEN\\\"; \\\"Model agreement is a review gate, not truth\\\"\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "kimi-k2.7-code:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "qwen3-coder:480b-cloud",
+      "lane_id": "qwen3coder",
+      "latency_ms": 4681,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "AGENTOPS_CLOSEOUT_ATTEMPT1.json:269",
+          "RESEARCH_AND_VERIFICATION.md:104-113",
+          "RESEARCH_AND_VERIFICATION.md:223-224",
+          "AGENTOPS_CLOSEOUT_FINAL.json:225",
+          "reports/governance/chamber/proof_membrane_v0/dharmagraph_fork_alias.replay_bundle.v1.json:source_revision"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "All seven required verification criteria are met: attempt 1 preserved as failed, distinct full vs governed tests, HARNESS_PROVEN ceiling, model consensus is review-only, final governed result passes with six gates green, exact seven-source replay manifest pins df435af863e651287de3f637509a45d59b133ad3, and claim ceiling is exact-scope HARNESS_PROVEN.",
+        "verdict": "approve"
+      },
+      "provider": "ollama",
+      "raw_response": "{\n  \"verdict\": \"approve\",\n  \"score\": 100,\n  \"summary\": \"All seven required verification criteria are met: attempt 1 preserved as failed, distinct full vs governed tests, HARNESS_PROVEN ceiling, model consensus is review-only, final governed result passes with six gates green, exact seven-source replay manifest pins df435af863e651287de3f637509a45d59b133ad3, and claim ceiling is exact-scope HARNESS_PROVEN.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"AGENTOPS_CLOSEOUT_ATTEMPT1.json:269\",\n    \"RESEARCH_AND_VERIFICATION.md:104-113\",\n    \"RESEARCH_AND_VERIFICATION.md:223-224\",\n    \"AGENTOPS_CLOSEOUT_FINAL.json:225\",\n    \"reports/governance/chamber/proof_membrane_v0/dharmagraph_fork_alias.replay_bundle.v1.json:source_revision\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "qwen3-coder:480b-cloud",
+      "required": true
+    },
+    {
+      "actual_model": "deepseek-v4-pro",
+      "lane_id": "deepseekv4pro",
+      "latency_ms": 18874,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "AGENTOPS_CLOSEOUT_ATTEMPT1.json: status: failed",
+          "AGENTOPS_CLOSEOUT_FINAL.json: status: passed, all gates passed, control passed",
+          "RESEARCH_AND_VERIFICATION.md: full 102/22 tests distinct from governed gates",
+          "tests/test_chamber_traces.py: test_fabricated_verification_cannot_mint_runtime_claim, test_gate_refuses_each_semantic_coercion",
+          "dharmagraph_fork_alias.replay_bundle.v1.json: source_revision: df435af863e651287de3f637509a45d59b133ad3, manifest has 7 entries"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "All eight conditions verified: attempt1 failed, final closeout passed with six gates and control green, dependency-light and full tests distinct, proof semantics reject fabrication and mismatches, council output cannot mint authority, MiroFish untrusted, manifest pins df435af..., claim ceiling HARNESS_PROVEN. No blockers.",
+        "verdict": "approve"
+      },
+      "provider": "ollama",
+      "raw_response": "{\n  \"verdict\": \"approve\",\n  \"score\": 100,\n  \"summary\": \"All eight conditions verified: attempt1 failed, final closeout passed with six gates and control green, dependency-light and full tests distinct, proof semantics reject fabrication and mismatches, council output cannot mint authority, MiroFish untrusted, manifest pins df435af..., claim ceiling HARNESS_PROVEN. No blockers.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"AGENTOPS_CLOSEOUT_ATTEMPT1.json: status: failed\",\n    \"AGENTOPS_CLOSEOUT_FINAL.json: status: passed, all gates passed, control passed\",\n    \"RESEARCH_AND_VERIFICATION.md: full 102/22 tests distinct from governed gates\",\n    \"tests/test_chamber_traces.py: test_fabricated_verification_cannot_mint_runtime_claim, test_gate_refuses_each_semantic_coercion\",\n    \"dharmagraph_fork_alias.replay_bundle.v1.json: source_revision: df435af863e651287de3f637509a45d59b133ad3, manifest has 7 entries\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "deepseek-v4-pro:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "minimax-m3",
+      "lane_id": "minimaxm3",
+      "latency_ms": 25852,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "AGENTOPS_CLOSEOUT_ATTEMPT1.json:status=\"failed\" with existing-chamber-regression-tests passed:false and graph-adjacent-regression-tests passed:false plus negative_control passed:false (sandbox-exec denial)",
+          "AGENTOPS_CLOSEOUT_FINAL.json:status=\"passed\"; 6 gates all passed:true (diff-check, proof-membrane-tests 33, dependency-light-chamber 84, semantic-negative 22, dependency-light-graph 12, ruff); negative_control passed:true; scope.passed:true; final_git_status empty; packet_digest 015d84edf32817581451c1c2808f3033b5d78f0893fed03abea60bf83ceca814",
+          "dharmagraph_fork_alias.replay_bundle.v1.json:source_revision=df435af863e651287de3f637509a45d59b133ad3; manifest has exactly 7 entries (proof.py, replay.py, replay_contract.py, replay_worker.py, verification.py, traces.py, graph/types.py)",
+          "dharma_swarm/chamber/proof.py:PromotionEvaluator.mint_authorization requires pre-authorized obligation key + trusted principal + registered effect handler; _claim_is_attested verifies _CLAIM_SEAL witness; evaluate returns deny codes EPI-EVIDENCE-UNATTESTED, EPI-AUTHORITY-UNISSUED, EPI-AUTHORITY-MISMATCH, EPI-SUBJECT-REFUTES, EPI-PROP-MISMATCH, EPI-MODALITY-MISMATCH, EPI-REVISION-UNDURABLE; no council/model import",
+          "HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md:Part IV.2 admits MiroFish only as Generated ScenarioCandidateV1 (untrusted); Part IV.5 states 'strongest allowed final claim is HARNESS_PROVEN for the exact bundle and the committed implementation revision named inside it; never CLOSED_LIVE, universal determinism, automatic RCA, or production readiness'",
+          "RESEARCH_AND_VERIFICATION.md:104-113,181-188:102 chamber and 22 graph-adjacent plugin-aware tests recorded separately from the governed runner's 84+12 dependency-light subset; non-claims at lines 213-235 explicitly exclude CLOSED_LIVE"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "All eight approval conditions verified against concrete evidence. Attempt 1 preserved as failed with two broad-suite gate failures plus sandbox denial; final closeout is typed passed with 6 gates green (33+84+22+12 tests plus diff/Ruff) and negative control green. Dependency-light (84/12) and full plugin-aware (102/22) suites remain distinct per RESEARCH_AND_VERIFICATION.md:104-113,181-188. proof.py rejects fabrication, modality/proposition/scope mismatch, and unissued capabilities via named codes (EPI-EVIDENCE-UNATTESTED, EPI-AUTHORITY-UNISSUED, EPI-SUBJECT-REFUTES, etc.); council cannot mint authority. MiroFish pinned to Generated candidate role only. Bundle manifest has exactly seven source entries pinning df435af863e651287de3f637509a45d59b133ad3. Claim ceiling is HARNESS_PROVEN, never CLOSED_LIVE.",
+        "verdict": "approve"
+      },
+      "provider": "ollama",
+      "raw_response": "{\"verdict\":\"approve\",\"score\":100,\"summary\":\"All eight approval conditions verified against concrete evidence. Attempt 1 preserved as failed with two broad-suite gate failures plus sandbox denial; final closeout is typed passed with 6 gates green (33+84+22+12 tests plus diff/Ruff) and negative control green. Dependency-light (84/12) and full plugin-aware (102/22) suites remain distinct per RESEARCH_AND_VERIFICATION.md:104-113,181-188. proof.py rejects fabrication, modality/proposition/scope mismatch, and unissued capabilities via named codes (EPI-EVIDENCE-UNATTESTED, EPI-AUTHORITY-UNISSUED, EPI-SUBJECT-REFUTES, etc.); council cannot mint authority. MiroFish pinned to Generated candidate role only. Bundle manifest has exactly seven source entries pinning df435af863e651287de3f637509a45d59b133ad3. Claim ceiling is HARNESS_PROVEN, never CLOSED_LIVE.\",\"blockers\":[],\"required_changes\":[],\"evidence_checked\":[\"AGENTOPS_CLOSEOUT_ATTEMPT1.json:status=\\\"failed\\\" with existing-chamber-regression-tests passed:false and graph-adjacent-regression-tests passed:false plus negative_control passed:false (sandbox-exec denial)\",\"AGENTOPS_CLOSEOUT_FINAL.json:status=\\\"passed\\\"; 6 gates all passed:true (diff-check, proof-membrane-tests 33, dependency-light-chamber 84, semantic-negative 22, dependency-light-graph 12, ruff); negative_control passed:true; scope.passed:true; final_git_status empty; packet_digest 015d84edf32817581451c1c2808f3033b5d78f0893fed03abea60bf83ceca814\",\"dharmagraph_fork_alias.replay_bundle.v1.json:source_revision=df435af863e651287de3f637509a45d59b133ad3; manifest has exactly 7 entries (proof.py, replay.py, replay_contract.py, replay_worker.py, verification.py, traces.py, graph/types.py)\",\"dharma_swarm/chamber/proof.py:PromotionEvaluator.mint_authorization requires pre-authorized obligation key + trusted principal + registered effect handler; _claim_is_attested verifies _CLAIM_SEAL witness; evaluate returns deny codes EPI-EVIDENCE-UNATTESTED, EPI-AUTHORITY-UNISSUED, EPI-AUTHORITY-MISMATCH, EPI-SUBJECT-REFUTES, EPI-PROP-MISMATCH, EPI-MODALITY-MISMATCH, EPI-REVISION-UNDURABLE; no council/model import\",\"HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md:Part IV.2 admits MiroFish only as Generated ScenarioCandidateV1 (untrusted); Part IV.5 states 'strongest allowed final claim is HARNESS_PROVEN for the exact bundle and the committed implementation revision named inside it; never CLOSED_LIVE, universal determinism, automatic RCA, or production readiness'\",\"RESEARCH_AND_VERIFICATION.md:104-113,181-188:102 chamber and 22 graph-adjacent plugin-aware tests recorded separately from the governed runner's 84+12 dependency-light subset; non-claims at lines 213-235 explicitly exclude CLOSED_LIVE\"],\"explicit_disagreement\":\"\"}",
+      "requested_model": "minimax-m3:cloud",
+      "required": true
+    },
+    {
+      "actual_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "lane_id": "nemotron3ultra",
+      "latency_ms": 64241,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "AGENTOPS_CLOSEOUT_ATTEMPT1.json:status=failed",
+          "AGENTOPS_CLOSEOUT_FINAL.json:status=passed,scope.passed=true,6 gates passed",
+          "RESEARCH_AND_VERIFICATION.md:104-113,181-188 (full vs dependency-light split)",
+          "dharma_swarm/chamber/proof.py:283-331 (evaluator gates, no council/model path)",
+          "dharmagraph_fork_alias.replay_bundle.v1.json:source_revision=df435af863e651287de3f637509a45d59b133ad3"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 100,
+        "summary": "All eight approval criteria verified: attempt 1 failed and preserved; final closeout passed with six green gates and clean scope; dependency-light and full plugin-aware tests remain distinct; proof semantics reject fabrication, semantic mismatch, and unissued authority; council/model output cannot mint evaluator permission; MiroFish/external simulators are untrusted candidate sources only; replay manifest pins df435af863e651287de3f637509a45d59b133ad3 across seven sources; claim ceiling is exact-scope HARNESS_PROVEN.",
+        "verdict": "approve"
+      },
+      "provider": "openrouter_free",
+      "raw_response": "{\n  \"verdict\": \"approve\",\n  \"score\": 100,\n  \"summary\": \"All eight approval criteria verified: attempt 1 failed and preserved; final closeout passed with six green gates and clean scope; dependency-light and full plugin-aware tests remain distinct; proof semantics reject fabrication, semantic mismatch, and unissued authority; council/model output cannot mint evaluator permission; MiroFish/external simulators are untrusted candidate sources only; replay manifest pins df435af863e651287de3f637509a45d59b133ad3 across seven sources; claim ceiling is exact-scope HARNESS_PROVEN.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"AGENTOPS_CLOSEOUT_ATTEMPT1.json:status=failed\",\n    \"AGENTOPS_CLOSEOUT_FINAL.json:status=passed,scope.passed=true,6 gates passed\",\n    \"RESEARCH_AND_VERIFICATION.md:104-113,181-188 (full vs dependency-light split)\",\n    \"dharma_swarm/chamber/proof.py:283-331 (evaluator gates, no council/model path)\",\n    \"dharmagraph_fork_alias.replay_bundle.v1.json:source_revision=df435af863e651287de3f637509a45d59b133ad3\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "required": true
+    }
+  ],
+  "generated_at": "20260713T231906Z",
+  "max_evidence_chars": 0,
+  "max_output_tokens": 6000,
+  "persistent_agent_witness": {
+    "agent": "palantir-pilot",
+    "blocker": "",
+    "fresh": true,
+    "heartbeat_age_seconds": 27,
+    "heartbeat_timestamp": "2026-07-13T23:18:39Z",
+    "max_heartbeat_age_seconds": 300,
+    "raw_status": "status=running session=dharma_palantir_pilot_a2a_worker\nsubject=dharma.a2a.palantir-pilot\nconsumer=palantir_pilot_a2a\nstream=DHARMA_FLEET\nheartbeat=/Users/dhyana/.dharma/a2a_bus/worker_heartbeats/palantir-pilot.json\nlog=/Users/dhyana/.dharma/logs/palantir_pilot_a2a_worker/dharma_palantir_pilot_a2a_worker.log\n--- heartbeat ---\n{\n    \"agent_id\": \"palantir_pilot\",\n    \"callsign\": \"palantir-pilot\",\n    \"consumer\": \"palantir_pilot_a2a\",\n    \"cycle\": 6369,\n    \"last_receipt_path\": \"\",\n    \"receipt_count\": 0,\n    \"schema_version\": \"dharma.a2a.palantir_pilot.worker_heartbeat.v1\",\n    \"status\": \"IDLE\",\n    \"stream\": \"DHARMA_FLEET\",\n    \"subject\": \"dharma.a2a.palantir-pilot\",\n    \"suppress_no_messages\": true,\n    \"timestamp\": \"2026-07-13T23:18:39Z\"\n}\n--- consumer ---\n{\n  \"stream_name\": \"DHARMA_FLEET\",\n  \"name\": \"palantir_pilot_a2a\",\n  \"config\": {\n    \"ack_policy\": \"explicit\",\n    \"ack_wait\": 30000000000,\n    \"deliver_policy\": \"all\",\n    \"durable_name\": \"palantir_pilot_a2a\",\n    \"name\": \"palantir_pilot_a2a\",\n    \"filter_subject\": \"dharma.a2a.palantir-pilot\",\n    \"max_ack_pending\": 1000,\n    \"max_deliver\": -1,\n    \"max_waiting\": 512,\n    \"replay_policy\": \"instant\",\n    \"num_replicas\": 0,\n    \"metadata\": {\n      \"_nats.level\": \"3\",\n      \"_nats.req.level\": \"0\",\n      \"_nats.ver\": \"2.12.6\"\n    },\n    \"pause_until\": \"0001-01-01T00:00:00Z\"\n  },\n  \"created\": \"2026-07-10T15:21:55.497881Z\",\n  \"delivered\": {\n    \"consumer_seq\": 0,\n    \"stream_seq\": 0\n  },\n  \"ack_floor\": {\n    \"consumer_seq\": 0,\n    \"stream_seq\": 0\n  },\n  \"num_ack_pending\": 0,\n  \"num_redelivered\": 0,\n  \"num_waiting\": 1,\n  \"num_pending\": 0,\n  \"ts\": \"2026-07-13T23:19:06.012285Z\"\n}\n--- pane tail ---\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+    "status": "running"
+  },
+  "prompt_chars": 149659,
+  "prompt_file": "/Users/dhyana/ds_hyperbolic_chamber_v0_20260714/reports/governance/chamber/proof_membrane_v0/ROUND6_COUNCIL_PROMPT.md",
+  "prompt_words_estimate": 12384,
+  "required_critic_count": 6,
+  "schema_version": "codex.decorrelated_review_council.v1",
+  "score_avg": 100.0,
+  "score_min": 100,
+  "target_score": 100,
+  "timeout_seconds": 900
+}
