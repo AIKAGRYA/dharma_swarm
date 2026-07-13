@@ -2109,7 +2109,7 @@ def test_session_entry_accepts_exact_wp_o1r_identity_only(tmp_path: Path) -> Non
         assert parsed.session_entry is not None
         assert parsed.session_entry.work_packet == work_packet
 
-    for rejected in ("WP-O2R", "WP-O1RR", "WP-O1R2", "WP-O1r"):
+    for rejected in ("WP-O6R", "WP-O1RR", "WP-O1R2", "WP-O1r"):
         with pytest.raises(agentops.AgentOpsError, match="work_packet.*packet id"):
             agentops.parse_work_packet(packet_for(rejected))
 
@@ -2117,6 +2117,42 @@ def test_session_entry_accepts_exact_wp_o1r_identity_only(tmp_path: Path) -> Non
         agentops.parse_work_packet(
             packet_for("WP-O1R", packet_id="onboard-one-door-WP-O1")
         )
+
+
+def test_session_entry_accepts_exact_wp_o2r_identity_only(tmp_path: Path) -> None:
+    repo = init_session_repo(tmp_path)
+
+    def packet_for(work_packet: str, *, packet_id: str | None = None) -> dict[str, object]:
+        payload = session_packet(repo)
+        identity = packet_id or f"onboard-one-door-{work_packet}"
+        payload["id"] = identity
+        payload["allowed_files"] = [
+            "allowed.txt",
+            f"reports/agentops/work_packets/{identity}.json",
+        ]
+        entry = payload["session_entry"]
+        assert isinstance(entry, dict)
+        entry["work_packet"] = work_packet
+        return seal_packet(payload)
+
+    parsed = agentops.parse_work_packet(packet_for("WP-O2R"))
+    assert parsed.session_entry is not None
+    assert parsed.session_entry.work_packet == "WP-O2R"
+
+    for rejected in ("WP-O2RR", "WP-O2R2", "WP-O2r"):
+        with pytest.raises(agentops.AgentOpsError, match="work_packet.*packet id"):
+            agentops.parse_work_packet(packet_for(rejected))
+
+    for rejected_packet_id in (
+        "onboard-one-door-WP-O2",
+        "onboard-one-door-WP-O2R-B1",
+        "other-WP-O2R",
+        "WP-O2R",
+    ):
+        with pytest.raises(agentops.AgentOpsError, match="work_packet.*packet id"):
+            agentops.parse_work_packet(
+                packet_for("WP-O2R", packet_id=rejected_packet_id)
+            )
 
 
 def test_session_entry_accepts_exact_wp_o4r_identity_only(tmp_path: Path) -> None:

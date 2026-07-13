@@ -1854,7 +1854,8 @@ active_tracks:
       render, and warm<1s/cold<5s targets. Work proceeds only through the
       spec's admitted sequence WP-O1, WP-O1R-B0, WP-O1R, WP-O2..WP-O4,
       the separately merged WP-O4-B0 authority bootstrap, exact corrective
-      WP-O4R, and then WP-O5..WP-O6;
+      WP-O4R, the separately merged WP-O2-B3 truth-ledger authority
+      bootstrap, exact corrective WP-O2R, and then WP-O5..WP-O6;
       the spec (§6-§13) is the detail authority — this entry is the admission
       record, not a second spec.
       Titanium vNext (PR #854 plan) baseline capture and WP-00 stay blocked
@@ -1904,6 +1905,9 @@ active_tracks:
       - id: wp_o2_single_parser_six_consumers
         kind: command_passes
         command: ["python3", "-m", "pytest", "tests/test_onboarding_broken_register.py", "tests/test_agent_onboard.py", "tests/test_orientation_graph.py", "tests/test_trust_gate_status.py", "tests/test_repo_status.py", "tests/test_control_surface.py", "tests/test_operator_coherence_cockpit.py", "-q"]
+      - id: wp_o2r_exact_identifier_bridge
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/test_agent_work_packet.py::test_session_entry_accepts_exact_wp_o2r_identity_only", "-q"]
       - id: wp_o3_cli_readiness_cache_delta
         kind: command_passes
         command: ["python3", "-m", "pytest", "tests/test_onboarding_cli.py", "tests/test_onboarding_readiness.py", "tests/test_onboarding_cache.py", "tests/test_agent_onboard.py", "-q"]
@@ -1963,6 +1967,10 @@ active_tracks:
         what: "WP-O4R BLOCKED pending this separately merged WP-O4-B0 authority bootstrap — close the post-#920 AgentOps self-invalidation defect only: route Hypothesis storage outside source, make active-track report output explicitly relocatable, prevent dependency-bootstrap bytecode writes, and resolve bare Python criteria through the current interpreter. Exact implementation envelope: scripts/governance/check_track_status.py, scripts/governance/run_agent_work_packet.py, tests/test_active_track_governance.py, tests/test_agent_work_packet.py, tests/test_onboarding_broken_register.py, tests/test_track_portfolio.py, plus reports/agentops/work_packets/onboard-one-door-WP-O4R.json. Acceptance requires a fresh exact-main preflight, committed-range closeout, PR-event replay, zero generated/ignored source leaves, and independent review. This repair does not close broader WP-O4, WP-O6 syscall confinement, or One-Door."
         kind: code
         blocker: true
+      - id: WP-O2R
+        what: "WP-O2R BLOCKED pending this separately merged WP-O2-B3 authority bootstrap — reconcile only post-#926 One-Door authority history and managed projections, canonical broken-register counts/status labels, and explicitly bounded host-local evidence. Exact implementation envelope: docs/governance/ACTIVE_TRACK.yaml, CLAUDE.md, docs/governance/SOVEREIGN_MANIFEST.md, docs/governance/BUILD_SESSION_ENTRYPOINT.md, docs/docops/AUTO_INVENTORY.md, docs/state/BROKEN_REGISTER.md, INTERFACE_MISMATCH_MAP.md, tests/test_onboarding_broken_register.py, plus reports/agentops/work_packets/onboard-one-door-WP-O2R.json. BROKEN_REGISTER.md and INTERFACE_MISMATCH_MAP.md are collision-free, packet-scoped shared-surface exceptions only; they do not become broad One-Door owned_surfaces. Preserve every named WP-O2 regression, including a synthetic stale-header diagnostic; mark clean clone/CI and every non-observed seat Unobserved. No parser/runtime/database/scheduler change, strict promotion, One-Door closure, or Titanium claim is admitted."
+        kind: governance
+        blocker: true
       - id: D3
         what: "D3 PENDING — operator answered 'no idea' 2026-07-10, so this resolves by evidence, not recall: on EACH fleet host (Mac daemon, VPS, any Warp/Oz seat) run the reader sweep and record the output — (1) grep -rn onboard_receipt ~/.dharma /etc/cron* /etc/systemd/system ~/Library/LaunchAgents ~/bin 2>/dev/null | grep -v ops/onboard_receipt.json$ ; (2) crontab -l 2>/dev/null | grep -i onboard ; (3) command -v lsof >/dev/null && lsof ~/.dharma/ops/onboard_receipt.json 2>/dev/null. All three empty on every host = D3 disconfirmed (record host list + date here, flip blocker false). Any hit = that reader gets a v1+v2 dual-read upgrade before the WP-O3 writer flip (spec §9.3)."
         kind: governance
@@ -1981,6 +1989,10 @@ active_tracks:
         blocker: false
       - id: 4R-B0
         what: "WP-O4-B0 — one-time authority bootstrap under the already-admitted WP-O4 Session Entry identity: admit literal WP-O4R only, add the three exact collision-free ownership paths required by the corrective repair, amend the spec/ledger, and regenerate managed projections. No WP-O4R implementation is included; this bootstrap must merge before its packet is sealed."
+        kind: governance
+        blocker: false
+      - id: 2R-B3
+        what: "WP-O2-B3 — one-time truth-ledger authority bootstrap under the already-admitted WP-O2 Session Entry identity (B0-B2 are prior, unrelated WP-O2 repair packets): admit literal WP-O2R only, grant docs/state/BROKEN_REGISTER.md and INTERFACE_MISMATCH_MAP.md as exact collision-free packet-scoped exceptions without adding broad owned_surfaces, amend the spec/ledger, and regenerate managed projections. No WP-O2R ledger reconciliation or host-state mutation is included; this bootstrap must merge before its packet is sealed."
         kind: governance
         blocker: false
     non_goals:
