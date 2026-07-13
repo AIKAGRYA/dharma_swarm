@@ -814,7 +814,17 @@ def _parse_broken_register() -> dict[str, Any]:
         "total": result.total,
         "open_count": result.open_count,
         "closed_count": result.closed_count,
+        "unknown_count": result.unknown_count,
         "top_open": top_open,
+        "diagnostics": [
+            {
+                "code": diagnostic.code,
+                "message": diagnostic.message,
+                "br_id": diagnostic.br_id,
+                "line": diagnostic.line,
+            }
+            for diagnostic in result.diagnostics
+        ],
     }
 
 
@@ -824,12 +834,27 @@ def render_broken_register() -> None:
     if not info.get("present"):
         print("  MISSING — BROKEN_REGISTER.md not found")
         return
-    print(f"  Items: total={info['total']} open-like={info['open_count']} closed-like={info['closed_count']}")
+    print(
+        f"  Items: total={info['total']} open-like={info['open_count']} "
+        f"closed-like={info['closed_count']} unknown={info['unknown_count']}"
+    )
     top = info.get("top_open") or []
     if top:
         print("  Top open items:")
         for it in top:
             print(f"    - [{it['status_word']}] {it['heading']}")
+    diagnostics = info.get("diagnostics") or []
+    if diagnostics:
+        print("  Diagnostics:")
+        for diagnostic in diagnostics:
+            location = diagnostic.get("br_id") or "register"
+            line = diagnostic.get("line") or 0
+            if line:
+                location = f"{location} line {line}"
+            print(
+                f"    - [{diagnostic.get('code', 'unknown')}] {location}: "
+                f"{diagnostic.get('message', '')}"
+            )
 
 
 def render_trust_gate() -> None:

@@ -701,9 +701,6 @@ def _broken_register_rows(repo_root: Path | None = None) -> list[ControlSurfaceR
             declared_state=status_text,
             desired_state="FIXED",
             observed_state=status_text,
-            lifecycle_status=entry.status,
-            lifecycle_is_open_like=entry.is_open_like,
-            lifecycle_is_closed_like=entry.is_closed_like,
             coherence_state="drifted" if entry.status == "OPEN" else "partial",
             priority="p0" if severity == "BLOCKER" else "p1" if severity == "DEGRADED" else "p2",
             owner_module=domain,
@@ -711,6 +708,11 @@ def _broken_register_rows(repo_root: Path | None = None) -> list[ControlSurfaceR
             gap_codes=[f"severity:{severity}"],
             next_action=f"close {entry.id}",
             freshness=fields.get("last_verified", ""),
+            raw={
+                "status": entry.status,
+                "is_open_like": entry.is_open_like,
+                "is_closed_like": entry.is_closed_like,
+            },
         )
         ev_text = fields.get("evidence", "")
         if ev_text:
