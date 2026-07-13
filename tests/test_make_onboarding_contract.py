@@ -21,6 +21,12 @@ MAKEFILE = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
 RUNNER = "scripts/governance/run_agent_work_packet.py"
 
 
+@pytest.fixture(autouse=True)
+def _no_bytecode(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make targets spawn Python subprocesses; avoid writing __pycache__ into the repo."""
+    monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", "1")
+
+
 def _recipe(target: str) -> str:
     match = re.search(
         rf"^{re.escape(target)}:.*\n((?:\t.*\n|ifdef .*\n|endif\n)*)",
@@ -121,4 +127,17 @@ def test_make_forwards_onboard_args_and_usage_exit() -> None:
     result = _make("onboard", "ARGS=--definitely-not-a-real-flag")
     assert result.returncode == 2, (
         f"unknown onboard flags must keep exit 2, got {result.returncode}"
+    )
+
+
+@pytest.mark.timeout(120)
+def test_door_delegates_to_compact_engine(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The public make-onboard door must invoke the compact CLI engine."""
+    monkeypatch.setenv("DHARMA_OPS_DIR", str(tmp_path / "ops"))
+    result = _make("onboard")
+    assert result.returncode == 0, result.stderr[-2000:]
+    assert "DHARMA ONBOARD" in result.stdout, (
+        "make onboard must render the compact CLI header"
     )
