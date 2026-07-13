@@ -93,12 +93,12 @@ is no longer a forced first-read surface.
 | Cybernetics Codex operating protocol | `docs/agents/cybernetics_codex/PROTOCOLS.md` | Defers to Cybernetics Codex audit, `CYBERNETIC_LOOP_MAP.md`, and `reports/loop_closure/cybernetics_codex/` for live loop truth |
 | Agent onboarding (ops) | `docs/ops/AGENT_ONBOARDING.md`, `docs/ops/CODEX_TOOLBELT_ONBOARDING.md`, `docs/ops/A2A_AGENT_ONBOARDING.md`, `docs/ops/A2A_QUICKSTART.md` | — |
 | Module-level what-does-what | `docs/architecture/NAVIGATION.md` | — |
-| Sovereign holon call-chain map | `docs/architecture/AGENT_HOLON_CODE_MAP.md` | Defers to code and scoped tests for executable truth |
-| Holon runtime estate map | `docs/architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md` | Companion to `AGENT_HOLON_CODE_MAP.md`; defers to live repo/runtime commands for current counts |
-| Sarathi holon-system front door | `docs/sarathi_apex_build/README.md` | Owns the read order for the Sarathi collapse lane; subdocs defer to it for navigation |
+| Hermes-class holon body synthesis (reference) | `docs/architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md` | Depth-on-demand reference across repo source, `~/.dharma`, `~/.hermes`, recent work, and a dated witness; defers live state to onboarding/`docs/state/LIVE_OPS_DASHBOARD.md` and executable claims to code/tests/receipts |
+| Sovereign holon call-chain index | `docs/architecture/AGENT_HOLON_CODE_MAP.md` | Subordinate quick index; defers to `HOLON_RUNTIME_FULL_ESTATE_MAP.md` for all estate and liveness claims |
+| Sarathi holon-system build history | `docs/sarathi_apex_build/README.md` | Owns the dated collapse-lane narrative; defers to `HOLON_RUNTIME_FULL_ESTATE_MAP.md` for current body synthesis and onboarding/Live Ops for live state |
 | Sarathi holon-system lane start | `docs/sarathi_apex_build/00_START_HERE.md` | Defers to `README.md` for read order and to tests/PR checks for proof |
 | Sarathi code/runtime boundary | `docs/sarathi_apex_build/02_CODEBASE_RUNTIME_BOUNDARY.md` | Defers to `README.md` and runtime state commands for current facts |
-| Sarathi holon-system code map | `docs/sarathi_apex_build/03_HOLON_SYSTEM_CODE_MAP.md` | Defers to `AGENT_HOLON_CODE_MAP.md`, `HOLON_RUNTIME_FULL_ESTATE_MAP.md`, and source code |
+| Sarathi holon-system code map | `docs/sarathi_apex_build/03_HOLON_SYSTEM_CODE_MAP.md` | Historical lane map; defers to `HOLON_RUNTIME_FULL_ESTATE_MAP.md` and current source code |
 | Sarathi collapse backlog | `docs/sarathi_apex_build/07_BACKLOG.md` | Working-plan status; defers to PR state and proof gates |
 | Sarathi anti-sprawl harness policy | `docs/sarathi_apex_build/90_ANTI_SPRAWL_HARNESS.md` | Defers to `scripts/governance/sprawl_guard.py` for enforcement |
 | Sarathi sprawl harness runbook | `docs/sarathi_apex_build/91_SPRAWL_HARNESS_RUNBOOK.md` | Defers to `scripts/governance/sprawl_guard.py` output |

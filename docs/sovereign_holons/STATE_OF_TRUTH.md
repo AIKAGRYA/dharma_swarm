@@ -1,4 +1,12 @@
-# STATE OF TRUTH — Docs vs. Code vs. Wired
+# STATE OF TRUTH — Historical 2026-06-08 Snapshot
+
+> **Superseded for current operations (2026-07-13):** This file accurately
+> preserves a June audit, but its missing-body verdict predates the landed holon
+> bridge/runtime work. Read
+> [`../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md`](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md)
+> for current-main body synthesis, a dated witness, and remaining gaps; use
+> onboarding/Live Ops for current operating state. Do not use the score below as
+> a present-tense claim.
 
 **Written:** 2026-06-08 (evening) · **Author:** opus_composer, by reading the actual source, not the docs
 **Why this file exists:** Everything else in this folder describes what we *intend* to build. This file

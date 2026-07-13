@@ -1,5 +1,9 @@
 # 05 — Sarathi Apex Map
 
+> **Sarathi intent, not current operating state:** For the landed body synthesis,
+> dated witness, and proposed promotion model, use
+> [`../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md`](../architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md).
+
 ## What Sarathi is
 
 Sarathi is intended to be the apex continuity holon over the holon system: a
