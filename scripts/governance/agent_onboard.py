@@ -135,37 +135,82 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _bootstrap_namespace(name: str, path: Path) -> None:
+    """Register a package path without executing its ``__init__.py``."""
+    namespace = types.ModuleType(name)
+    namespace.__path__ = [str(path)]
+    namespace.__package__ = name
+    namespace.__spec__ = None  # type: ignore[assignment]
+    sys.modules[name] = namespace
+
+
+def _install_pre311_stdlib_compat() -> list[tuple[Any, str]]:
+    """Install only the 3.11 stdlib names used by compact-door dependencies."""
+    import datetime as datetime_module
+    import enum as enum_module
+
+    installed: list[tuple[Any, str]] = []
+    if not hasattr(enum_module, "StrEnum"):
+        class StrEnum(str, enum_module.Enum):
+            def __str__(self) -> str:
+                return str(self.value)
+
+        setattr(enum_module, "StrEnum", StrEnum)
+        installed.append((enum_module, "StrEnum"))
+    if not hasattr(datetime_module, "UTC"):
+        setattr(datetime_module, "UTC", datetime_module.timezone.utc)
+        installed.append((datetime_module, "UTC"))
+    return installed
+
+
 def _load_cli_module() -> Any:
     """Load the compact onboarding engine, falling back to a namespace bootstrap.
 
-    The compact engine and the onboarding subsystem are stdlib + PyYAML; only
-    the top-level ``dharma_swarm/__init__.py`` imports ``pydantic``.  In minimal
-    environments (e.g. CI's ``Onboarding admission parity`` job) we bootstrap
-    ``dharma_swarm`` as a namespace package so the door can render without
-    installing optional runtime dependencies.
+    Supported interpreters prefer the normal package import.  In minimal or
+    pre-3.11 environments (including the macOS system Python), namespace
+    packages bypass eager runtime initializers so the compact door can render
+    without importing the full runtime dependency graph.
     """
-    try:
-        import dharma_swarm.operator_core.onboarding.cli as cli
+    # The runtime package requires Python 3.11+, but this public compatibility
+    # door must also run on the macOS system Python.  On older interpreters,
+    # skip the package initializer entirely: it can fail while evaluating
+    # runtime-only type annotations before the ImportError fallback is reached.
+    if sys.version_info >= (3, 11):
+        try:
+            import dharma_swarm.operator_core.onboarding.cli as cli
 
-        return cli
-    except (ImportError, ModuleNotFoundError):
-        pass
+            return cli
+        except (ImportError, ModuleNotFoundError):
+            pass
 
     # Drop any partial initialization from the failed normal import.
     for name in list(sys.modules.keys()):
         if name == "dharma_swarm" or name.startswith("dharma_swarm."):
             del sys.modules[name]
 
-    # Bootstrap dharma_swarm as a namespace package so __init__.py (which
-    # requires pydantic) is not executed; the onboarding modules are loaded from
-    # disk through their own __init__.py files.
-    namespace = types.ModuleType("dharma_swarm")
-    namespace.__path__ = [str(REPO_ROOT / "dharma_swarm")]
-    namespace.__package__ = "dharma_swarm"
-    namespace.__spec__ = None  # type: ignore[assignment]
-    sys.modules["dharma_swarm"] = namespace
+    # Bootstrap every package on the compact door's import path.  In addition
+    # to the top-level runtime initializer, onboarding/__init__.py and
+    # memory_kernel/__init__.py eagerly import Python-3.11-only runtime code.
+    _bootstrap_namespace("dharma_swarm", REPO_ROOT / "dharma_swarm")
+    _bootstrap_namespace(
+        "dharma_swarm.operator_core",
+        REPO_ROOT / "dharma_swarm/operator_core",
+    )
+    _bootstrap_namespace(
+        "dharma_swarm.operator_core.onboarding",
+        REPO_ROOT / "dharma_swarm/operator_core/onboarding",
+    )
+    _bootstrap_namespace(
+        "dharma_swarm.memory_kernel",
+        REPO_ROOT / "dharma_swarm/memory_kernel",
+    )
 
-    import dharma_swarm.operator_core.onboarding.cli as cli
+    installed_compat = _install_pre311_stdlib_compat()
+    try:
+        import dharma_swarm.operator_core.onboarding.cli as cli
+    finally:
+        for module, name in reversed(installed_compat):
+            delattr(module, name)
 
     return cli
 

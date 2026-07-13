@@ -66,6 +66,78 @@ def test_onboard_exits_zero_and_delegates_to_compact_cli() -> None:
     assert "WHAT TO DO NEXT" in result.stdout
 
 
+def test_loader_selects_bootstrap_mode_by_interpreter() -> None:
+    """Pre-3.11 skips package init; supported Python keeps the normal import."""
+
+    def probe(*, emulate_pre311: bool) -> dict[str, Any]:
+        version_override = """
+class _VersionInfo(tuple):
+    major = property(lambda self: self[0])
+    minor = property(lambda self: self[1])
+    micro = property(lambda self: self[2])
+
+sys.version_info = _VersionInfo((3, 9, 0, 'final', 0))
+if hasattr(datetime_module, 'UTC'):
+    delattr(datetime_module, 'UTC')
+if hasattr(enum_module, 'StrEnum'):
+    delattr(enum_module, 'StrEnum')
+""" if emulate_pre311 else ""
+        code = f"""
+import datetime as datetime_module
+import enum as enum_module
+import importlib.util
+import json
+import sys
+
+spec = importlib.util.spec_from_file_location('agent_onboard_probe', {str(ONBOARD_SCRIPT)!r})
+assert spec is not None and spec.loader is not None
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+{version_override}
+cli = module._load_cli_module()
+package = sys.modules['dharma_swarm']
+print(json.dumps({{
+    'cli': cli.__name__,
+    'namespace_bootstrap': package.__spec__ is None,
+    'operator_core_namespace': sys.modules['dharma_swarm.operator_core'].__spec__ is None,
+    'onboarding_namespace': sys.modules['dharma_swarm.operator_core.onboarding'].__spec__ is None,
+    'memory_kernel_namespace': sys.modules['dharma_swarm.memory_kernel'].__spec__ is None,
+    'package_file': getattr(package, '__file__', None),
+    'compat_cleaned': not hasattr(datetime_module, 'UTC') and not hasattr(enum_module, 'StrEnum'),
+}}))
+"""
+        env = dict(os.environ)
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            cwd=REPO_ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert result.returncode == 0, result.stderr
+        return json.loads(result.stdout)
+
+    legacy = probe(emulate_pre311=True)
+    assert legacy["cli"] == "dharma_swarm.operator_core.onboarding.cli"
+    assert legacy["namespace_bootstrap"] is True
+    assert legacy["operator_core_namespace"] is True
+    assert legacy["onboarding_namespace"] is True
+    assert legacy["memory_kernel_namespace"] is True
+    assert legacy["package_file"] is None
+    assert legacy["compat_cleaned"] is True
+
+    native = probe(emulate_pre311=False)
+    assert native["cli"] == "dharma_swarm.operator_core.onboarding.cli"
+    if sys.version_info >= (3, 11):
+        assert native["namespace_bootstrap"] is False
+        assert native["package_file"].endswith("dharma_swarm/__init__.py")
+    else:
+        assert native["namespace_bootstrap"] is True
+        assert native["compat_cleaned"] is True
+
+
 def test_onboard_json_emits_machine_projection() -> None:
     result = _run("--json")
     assert result.returncode == 0, result.stderr

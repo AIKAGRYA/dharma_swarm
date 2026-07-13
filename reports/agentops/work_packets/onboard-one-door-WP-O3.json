@@ -1,9 +1,9 @@
 {
   "id": "onboard-one-door-WP-O3",
-  "base_ref": "58e204335b7725d9da44350138d035b8889c3eaf",
-  "branch": "devin/onboard-one-door-WP-O3",
+  "base_ref": "c14b950bc5009f2200d9425155010be508ead981",
+  "branch": "codex/onboard-py39-portability",
   "worktree": ".",
-  "intent": "Implement only WP-O3: unified onboarding CLI engine, lossless readiness precedence, deterministic render, receipt v2 writer machinery behind the D3 gate, and cache input-manifest groundwork \u2014 no Make/CI alias change, no strict-default flip, no active-track checker rewrite, no network-derived admission, no second cache file.",
+  "intent": "Correct only the residual WP-O3 interpreter boundary reproduced after the compact door merged: make the public shim load on macOS system Python 3.9 without executing Python-3.11-only package initializers, while preserving the normal package import on supported interpreters \u2014 no Make/CI change, no writer-schema flip, no strict-default flip, no active-track checker rewrite, and no network-derived admission.",
   "allowed_files": [
     "dharma_swarm/operator_core/onboarding/evidence.py",
     "dharma_swarm/operator_core/onboarding/readiness.py",
@@ -202,7 +202,7 @@
   ],
   "commit": {
     "allowed": true,
-    "message": "feat(onboarding): implement WP-O3 unified CLI, readiness, receipt v2 machinery [impact-checked]"
+    "message": "fix(onboarding): support the macOS Python 3.9 door [impact-checked]"
   },
   "approval": {
     "before_commit": false,
@@ -211,11 +211,11 @@
   "negative_controls": [
     {
       "name": "no-writer-flip-before-d3",
-      "command": "python3 -c \"from dharma_swarm.operator_core.onboarding import cli; assert cli.WRITER_SCHEMA_DEFAULT == 'v1'\"",
+      "command": "python3 -c \"import runpy; door = runpy.run_path('scripts/governance/agent_onboard.py', run_name='agent_onboard_negative'); assert door['_load_cli_module']().WRITER_SCHEMA_DEFAULT == 'v1'\"",
       "argv": [
         "python3",
         "-c",
-        "from dharma_swarm.operator_core.onboarding import cli; assert cli.WRITER_SCHEMA_DEFAULT == 'v1'"
+        "import runpy; door = runpy.run_path('scripts/governance/agent_onboard.py', run_name='agent_onboard_negative'); assert door['_load_cli_module']().WRITER_SCHEMA_DEFAULT == 'v1'"
       ],
       "env": {},
       "expected_exit": 0
@@ -224,9 +224,9 @@
   "session_entry": {
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
-      "python": "3.12.8",
-      "git": "2.34.1",
-      "make": "4.3"
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
     },
     "authority_precedence": [
       "executable",
@@ -240,10 +240,13 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "58e204335b7725d9da44350138d035b8889c3eaf",
+      "checked_at_sha": "c14b950bc5009f2200d9425155010be508ead981",
       "details": []
     },
-    "interface_mismatches": [],
+    "interface_mismatches": [
+      "ACTIVE_TRACK still describes merged WP-O2, WP-O3, and WP-O4 work as incomplete; that authority-owned ledger reconciliation is outside this corrective packet.",
+      "WP-O4 packet closeout on macOS is blocked by this residual Python 3.9 door crash; the separate O4 portability follow-up remains unmerged until this dependency lands."
+    ],
     "closest_existing_implementation": [
       "scripts/governance/agent_onboard.py",
       "dharma_swarm/operator_core/onboarding/receipt.py"
@@ -252,7 +255,7 @@
       "D3 unresolved: fleet-host reader sweep pending, so the on-disk receipt writer default stays v1; v2 writer machinery lands tested but not flipped (spec \u00a73.3 step 4).",
       "Cache reuse is groundwork only in this packet slice: input manifest, key, and fingerprints are computed and tested, but no static-section reuse occurs \u2014 every run recomputes (spec \u00a73.2 adversarial matrix completes before reuse is enabled)."
     ],
-    "rollback": "revert the WP-O3 packet commit(s) as one unit; the WP-O1 loader and WP-O2 canonical parser remain",
-    "packet_digest": "237af1215692b7fe290cd70bc45cad8adb38bc7606f5b22c643c4eedd1c0a4c1"
+    "rollback": "revert the agent_onboard shim, its interpreter-selection tests, and this packet update together",
+    "packet_digest": "f31e241e4704d1405fd5129246925069958ede9037bbf3f6aa8b4294b2f1387c"
   }
 }
