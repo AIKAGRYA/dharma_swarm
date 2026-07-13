@@ -1,11 +1,18 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status a2a-status a2a-up a2a-send go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test slop-ratchet slop-baseline
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agentops-report-root-check agent-build-preflight agent-build-closeout spine-check onboard orient status a2a-status a2a-up a2a-send go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test slop-ratchet slop-baseline
 
 # Prefer the repo venv when present so onboarding sections that need repo
-# dependencies (pydantic, yaml) render instead of degrading silently.
-PYTHON ?= $(shell test -x .venv/bin/python && echo .venv/bin/python || echo python3)
+# dependencies (pydantic, yaml) render instead of degrading silently. Freeze a
+# caller value lexically: recursive Make syntax in an override must never be
+# evaluated while admission variables are exported to a recipe or submake.
+ifeq ($(origin PYTHON),undefined)
+PYTHON := $(shell test -x .venv/bin/python && echo .venv/bin/python || echo python3)
+else
+override PYTHON := $(value PYTHON)
+endif
+export PYTHON
 REPO_PYTHON ?= PYTHONPATH=. $(PYTHON)
 PYTEST ?= pytest
 MUTATION_THRESHOLD ?= 0.60
@@ -24,6 +31,142 @@ GO_WORLD_SCOUT_MODULE := tools/world_scout_go
 GO_MODULES := $(GO_SDK_MODULE) $(GO_EVIDENCE_MODULE) $(GO_GITHUB_INGESTOR_MODULE) $(GO_WORLD_SIGNAL_INGESTOR_MODULE) $(GO_WORLD_SCOUT_MODULE)
 GO_CACHE_DIR ?= /tmp/dharma-swarm-go-build
 GO_MOD_CACHE_DIR ?= /tmp/dharma-swarm-go-mod
+# AgentOps admission receipts must never enter the source checkout. Reuse the
+# already-external onboarding ops root when declared; otherwise choose an
+# explicit host-temporary default. The runner revalidates this boundary.
+override _AGENTOPS_REPORT_ROOT_INPUT := $(strip $(value AGENTOPS_REPORT_ROOT))
+ifeq ($(_AGENTOPS_REPORT_ROOT_INPUT),)
+override _AGENTOPS_REPORT_ROOT_INPUT := $(if $(strip $(value DHARMA_OPS_DIR)),$(value DHARMA_OPS_DIR),/tmp/dharma-agentops-$(shell /usr/bin/id -u))
+endif
+override export AGENTOPS_REPORT_ROOT := $(_AGENTOPS_REPORT_ROOT_INPUT)
+override export AGENTOPS_CACHE_ROOT := $(AGENTOPS_REPORT_ROOT)/cache
+override AGENTOPS_PYTEST_ADDOPTS := -p no:cacheprovider
+override PACKET := $(value PACKET)
+export PACKET
+
+# AgentOps must bootstrap outside the checkout.  Keep this interpreter
+# independent from the repository-oriented PYTHON default above: merely
+# creating .venv/bin/python must never make admission execute repository
+# bytes before the runner can validate them.  Preserve a caller spelling
+# literally so Make functions in a command-line value stay data for the
+# fail-closed shell grammar check below.
+ifeq ($(origin AGENTOPS_PYTHON),undefined)
+override _AGENTOPS_PYTHON_INPUT := python3
+else
+override _AGENTOPS_PYTHON_INPUT := $(value AGENTOPS_PYTHON)
+endif
+override AGENTOPS_PYTHON := $(_AGENTOPS_PYTHON_INPUT)
+
+# Resolve the AgentOps bootstrap without executing it.  Only fixed host tools
+# are used until both the lexical path and the resolved target are proven to
+# be regular executables outside the source checkout and its Git state.  The
+# macro checks the canonical target but leaves the absolute lexical launcher
+# in $$agentops_python.  That executes one exact identity without a second
+# PATH search while preserving an external venv's site-packages semantics.
+define _AGENTOPS_RESOLVE_PYTHON
+set -eu; \
+agentops_raw="$${AGENTOPS_PYTHON-}"; \
+case "$$agentops_raw" in \
+  ""|*[!A-Za-z0-9_./+-]*) printf '%s\n' "AgentOps error: AGENTOPS_PYTHON must be a simple executable path" >&2; exit 2;; \
+esac; \
+agentops_source="$$(pwd -P)"; \
+agentops_host_path=/usr/sbin:/usr/bin:/sbin:/bin; \
+agentops_readlink="$$(PATH="$$agentops_host_path" command -v readlink 2>/dev/null || :)"; \
+agentops_env="$$(PATH="$$agentops_host_path" command -v env 2>/dev/null || :)"; \
+agentops_git="$$(PATH="$$agentops_host_path" command -v git 2>/dev/null || :)"; \
+if test -z "$$agentops_readlink" || test -z "$$agentops_env" || test -z "$$agentops_git"; then \
+  printf '%s\n' "AgentOps error: trusted host path resolver is unavailable" >&2; exit 2; \
+fi; \
+agentops_resolve() { \
+  agentops_resolve_path="$$1"; \
+  case "$$agentops_resolve_path" in /*) :;; *) return 1;; esac; \
+  agentops_resolve_links=0; \
+  while :; do \
+    while test "$$agentops_resolve_path" != / && test "$${agentops_resolve_path%/}" != "$$agentops_resolve_path"; do \
+      agentops_resolve_path="$${agentops_resolve_path%/}"; \
+    done; \
+    if test "$$agentops_resolve_path" = /; then printf '%s\n' /; return 0; fi; \
+    if test ! -e "$$agentops_resolve_path" && test ! -L "$$agentops_resolve_path"; then return 1; fi; \
+    agentops_resolve_dir="$${agentops_resolve_path%/*}"; \
+    agentops_resolve_base="$${agentops_resolve_path##*/}"; \
+    test -n "$$agentops_resolve_dir" || agentops_resolve_dir=/; \
+    agentops_resolve_dir="$$(CDPATH= cd -P "$$agentops_resolve_dir" 2>/dev/null && pwd -P)" || return 1; \
+    if test "$$agentops_resolve_dir" = /; then \
+      agentops_resolve_candidate="/$$agentops_resolve_base"; \
+    else \
+      agentops_resolve_candidate="$$agentops_resolve_dir/$$agentops_resolve_base"; \
+    fi; \
+    if test -L "$$agentops_resolve_candidate"; then \
+      agentops_resolve_links=$$((agentops_resolve_links + 1)); \
+      test "$$agentops_resolve_links" -le 64 || return 1; \
+      agentops_resolve_target="$$($$agentops_readlink "$$agentops_resolve_candidate" 2>/dev/null)" || return 1; \
+      case "$$agentops_resolve_target" in \
+        /*) agentops_resolve_path="$$agentops_resolve_target";; \
+        *) agentops_resolve_path="$$agentops_resolve_dir/$$agentops_resolve_target";; \
+      esac; \
+    else \
+      printf '%s\n' "$$agentops_resolve_candidate"; \
+      return 0; \
+    fi; \
+  done; \
+}; \
+agentops_git_dir="$$($$agentops_env -i PATH="$$agentops_host_path" HOME=/ GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null "$$agentops_git" -C "$$agentops_source" rev-parse --absolute-git-dir 2>/dev/null || :)"; \
+agentops_common_raw="$$($$agentops_env -i PATH="$$agentops_host_path" HOME=/ GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null "$$agentops_git" -C "$$agentops_source" rev-parse --git-common-dir 2>/dev/null || :)"; \
+if test -z "$$agentops_git_dir" || test -z "$$agentops_common_raw"; then \
+  printf '%s\n' "AgentOps error: source Git state cannot be resolved" >&2; exit 2; \
+fi; \
+case "$$agentops_common_raw" in \
+  /*) agentops_common_lexical="$$agentops_common_raw";; \
+  *) agentops_common_lexical="$$agentops_source/$$agentops_common_raw";; \
+esac; \
+agentops_git_dir="$$(agentops_resolve "$$agentops_git_dir" 2>/dev/null || :)"; \
+agentops_common_dir="$$(agentops_resolve "$$agentops_common_lexical" 2>/dev/null || :)"; \
+if test -z "$$agentops_git_dir" || test -z "$$agentops_common_dir"; then \
+  printf '%s\n' "AgentOps error: source Git state cannot be normalized" >&2; exit 2; \
+fi; \
+agentops_search_path=; \
+agentops_path_remaining="$${PATH-}:"; \
+while test -n "$$agentops_path_remaining"; do \
+  agentops_path_entry="$${agentops_path_remaining%%:*}"; \
+  agentops_path_remaining="$${agentops_path_remaining#*:}"; \
+  case "$$agentops_path_entry" in \
+    /*) agentops_path_lexical="$$agentops_path_entry";; \
+    *) agentops_path_lexical="$$agentops_source/$${agentops_path_entry:-.}";; \
+  esac; \
+  agentops_path_resolved="$$(agentops_resolve "$$agentops_path_lexical" 2>/dev/null || :)"; \
+  test -n "$$agentops_path_resolved" && test -d "$$agentops_path_resolved" || continue; \
+  agentops_path_allowed=1; \
+  for agentops_boundary in "$$agentops_source" "$$agentops_git_dir" "$$agentops_common_dir"; do \
+    case "$$agentops_path_lexical" in "$$agentops_boundary"|"$$agentops_boundary"/*) agentops_path_allowed=0;; esac; \
+    case "$$agentops_path_resolved" in "$$agentops_boundary"|"$$agentops_boundary"/*) agentops_path_allowed=0;; esac; \
+  done; \
+  if test "$$agentops_path_allowed" = 1; then \
+    agentops_search_path="$${agentops_search_path:+$$agentops_search_path:}$$agentops_path_resolved"; \
+  fi; \
+done; \
+agentops_search_path="$${agentops_search_path:+$$agentops_search_path:}$$agentops_host_path"; \
+case "$$agentops_raw" in \
+  /*) agentops_lexical="$$agentops_raw";; \
+  */*) agentops_lexical="$$agentops_source/$$agentops_raw";; \
+  *) agentops_lexical="$$(PATH="$$agentops_search_path" command -v "$$agentops_raw" 2>/dev/null || :)";; \
+esac; \
+case "$$agentops_lexical" in \
+  /*) :;; \
+  *) printf '%s\n' "AgentOps error: AGENTOPS_PYTHON is unavailable on the external host PATH" >&2; exit 2;; \
+esac; \
+if test ! -f "$$agentops_lexical" || test ! -x "$$agentops_lexical"; then \
+  printf '%s\n' "AgentOps error: AGENTOPS_PYTHON is not an executable regular file" >&2; exit 2; \
+fi; \
+agentops_python_resolved="$$(agentops_resolve "$$agentops_lexical" 2>/dev/null || :)"; \
+if test -z "$$agentops_python_resolved" || test ! -f "$$agentops_python_resolved" || test ! -x "$$agentops_python_resolved"; then \
+  printf '%s\n' "AgentOps error: AGENTOPS_PYTHON cannot be resolved" >&2; exit 2; \
+fi; \
+for agentops_boundary in "$$agentops_source" "$$agentops_git_dir" "$$agentops_common_dir"; do \
+  case "$$agentops_lexical" in "$$agentops_boundary"|"$$agentops_boundary"/*) printf '%s\n' "AgentOps error: AGENTOPS_PYTHON must be external to source and Git state" >&2; exit 2;; esac; \
+  case "$$agentops_python_resolved" in "$$agentops_boundary"|"$$agentops_boundary"/*) printf '%s\n' "AgentOps error: AGENTOPS_PYTHON must be external to source and Git state" >&2; exit 2;; esac; \
+done; \
+agentops_python="$$agentops_lexical"
+endef
 
 help:
 	@echo ""
@@ -435,27 +578,59 @@ claim-evidence:
 mutation-test:
 	$(REPO_PYTHON) scripts/governance/run_mutation_score.py --threshold $(MUTATION_THRESHOLD)
 
-# Packet-aware preflight (WP-O4 / O4-B2): when PACKET is provided, the shared
-# AgentOps evaluator validates the packet envelope fail-closed BEFORE any edit.
-# --dry-run is the correct pre-edit mode — it requires the exact clean baseline
-# (HEAD == base_ref, clean tree) and admits the gate command families, without
-# running gates. Without PACKET the legacy baseline behavior is unchanged.
-agent-build-preflight: verifier-selfcheck onboard hygiene-check
+# Packet-aware preflight (WP-O4 / O4-B2): verifier-selfcheck reaches the
+# onboarding door exactly once; do not also list onboard as a direct
+# prerequisite. When PACKET is provided, the shared AgentOps evaluator records
+# a digest-bound admission receipt outside the checkout and requires the exact
+# clean baseline (HEAD == base_ref) before any implementation edit.
+# Target-specific exports flow through the validation prerequisite and every
+# later recursive Make call. The validator therefore runs before any cache or
+# onboarding receipt write, even under `make -j`; after it passes, onboarding
+# is confined to a child of the same external root. Command-line overrides
+# cannot weaken these boundaries, including when Make propagates them to a
+# submake through MAKEOVERRIDES.
+agentops-report-root-check agent-build-preflight agent-build-closeout: override export PYTHONDONTWRITEBYTECODE := 1
+agentops-report-root-check agent-build-preflight agent-build-closeout: override export PYTHONPYCACHEPREFIX := $(AGENTOPS_CACHE_ROOT)/python-pycache
+agentops-report-root-check agent-build-preflight agent-build-closeout: override export PYTEST_ADDOPTS := $(AGENTOPS_PYTEST_ADDOPTS)
+agentops-report-root-check agent-build-preflight agent-build-closeout: override export RUFF_CACHE_DIR := $(AGENTOPS_CACHE_ROOT)/ruff
+agentops-report-root-check agent-build-preflight agent-build-closeout: override export XDG_CACHE_HOME := $(AGENTOPS_CACHE_ROOT)/xdg
+agentops-report-root-check agent-build-preflight agent-build-closeout: override export DHARMA_OPS_DIR := $(AGENTOPS_REPORT_ROOT)/onboard
+agentops-report-root-check agent-build-preflight agent-build-closeout: override export AGENTOPS_PYTHON := $(_AGENTOPS_PYTHON_INPUT)
+agentops-report-root-check agent-build-preflight agent-build-closeout: override export PYTHON := $(_AGENTOPS_PYTHON_INPUT)
+agentops-report-root-check agent-build-preflight agent-build-closeout: override export VENV_PYTHON := $(_AGENTOPS_PYTHON_INPUT)
+agentops-report-root-check agent-build-preflight agent-build-closeout: override export PYTEST := $(_AGENTOPS_PYTHON_INPUT) -m pytest
+agentops-report-root-check agent-build-preflight agent-build-closeout: override export REPO_PYTHON := PYTHONPATH=. $(_AGENTOPS_PYTHON_INPUT)
+
+agentops-report-root-check:
+	@$(_AGENTOPS_RESOLVE_PYTHON); \
+	"$$agentops_python" scripts/governance/run_agent_work_packet.py --validate-report-root "$${AGENTOPS_REPORT_ROOT}" --validate-report-child cache --validate-report-child onboard
+
+agent-build-preflight: agentops-report-root-check
+	@$(_AGENTOPS_RESOLVE_PYTHON); \
+	$(MAKE) -s verifier-selfcheck MAKEOVERRIDES= AGENTOPS_PYTHON="$$agentops_python" PYTHON="$$agentops_python" VENV_PYTHON="$$agentops_python" PYTEST="$$agentops_python -m pytest" REPO_PYTHON="PYTHONPATH=. $$agentops_python"
+	@$(_AGENTOPS_RESOLVE_PYTHON); \
+	$(MAKE) -s hygiene-check MAKEOVERRIDES= AGENTOPS_PYTHON="$$agentops_python" PYTHON="$$agentops_python" VENV_PYTHON="$$agentops_python" PYTEST="$$agentops_python -m pytest" REPO_PYTHON="PYTHONPATH=. $$agentops_python"
 ifdef PACKET
-	$(PYTHON) scripts/governance/run_agent_work_packet.py --packet $(PACKET) --dry-run
+	@$(_AGENTOPS_RESOLVE_PYTHON); \
+	"$$agentops_python" scripts/governance/run_agent_work_packet.py --packet "$${PACKET}" --preflight --report-root "$${AGENTOPS_REPORT_ROOT}"
 endif
 	@printf "\nAgent build preflight complete. Use the task route from make onboard; close out with: make agent-build-closeout\n"
 
-# Closeout runs the hygiene + governance bundle. Post-edit packet
-# re-evaluation over the base...HEAD + working/staged/untracked diff-classes
-# is WP-O4-B3 (declared next slice) and is NOT wired here: --dry-run is the
-# WRONG mode for closeout — it demands HEAD == base_ref, so it fails against
-# the very packet whose work has been committed, and for legacy packets it
-# returns before running gates. A correct closeout mode lands with O4-B3.
-agent-build-closeout:
-	$(PYTHON) scripts/governance/hygiene/scan.py --output /tmp/dharma-hygiene-audit.txt
-	-$(PYTHON) scripts/governance/substrate_audit.py
-	$(MAKE) governance-all
+# Closeout keeps the established hygiene + governance bundle and, for a packet
+# run, invokes the same evaluator in descendant-aware closeout mode exactly
+# once. Its report root is explicit and external; the evaluator checks the
+# preflight digest plus committed/working/staged/untracked scope union.
+agent-build-closeout: agentops-report-root-check
+ifdef PACKET
+	@$(_AGENTOPS_RESOLVE_PYTHON); \
+	"$$agentops_python" scripts/governance/run_agent_work_packet.py --packet "$${PACKET}" --closeout --report-root "$${AGENTOPS_REPORT_ROOT}"
+endif
+	@$(_AGENTOPS_RESOLVE_PYTHON); \
+	"$$agentops_python" scripts/governance/hygiene/scan.py --output /tmp/dharma-hygiene-audit.txt
+	-@$(_AGENTOPS_RESOLVE_PYTHON); \
+	"$$agentops_python" scripts/governance/substrate_audit.py
+	@$(_AGENTOPS_RESOLVE_PYTHON); \
+	$(MAKE) governance-all MAKEOVERRIDES= AGENTOPS_PYTHON="$$agentops_python" PYTHON="$$agentops_python" VENV_PYTHON="$$agentops_python" PYTEST="$$agentops_python -m pytest" REPO_PYTHON="PYTHONPATH=. $$agentops_python"
 	@printf "\nAgent build closeout complete. Hygiene audit receipt: /tmp/dharma-hygiene-audit.txt · Substrate audit: /tmp/dharma-substrate-audit.txt\n"
 
 spine-check:
@@ -474,6 +649,7 @@ onboard:
 # regenerates NOTHING (WP-O4 / spec §2.1). The tracked context artifacts are
 # refreshed only by their explicit owner command:
 #   $(PYTHON) scripts/governance/orientation_graph.py --write-context
+orient: override export PYTHONDONTWRITEBYTECODE := 1
 orient:
 	$(PYTHON) scripts/governance/orientation_graph.py
 

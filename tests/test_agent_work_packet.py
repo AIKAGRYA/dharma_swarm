@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -68,7 +69,7 @@ def stub_gate_script(repo: Path, body: str) -> str:
     route through an enumerated repo-script name instead of ``python -c``.
     The allowlist is lexical command-family confinement by design — the
     stub demonstrates, not defeats, that boundary."""
-    rel = "scripts/governance/agent_onboard.py"
+    rel = "scripts/governance/orientation_graph.py"
     target = repo / rel
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(body, encoding="utf-8")
@@ -172,6 +173,23 @@ def tree_snapshot(root: Path) -> dict[str, str]:
     }
 
 
+def tree_state_snapshot(root: Path) -> dict[str, tuple[int, int, str]]:
+    """Capture files, directories, symlinks, modes, and regular-file bytes."""
+    snapshot: dict[str, tuple[int, int, str]] = {}
+    for path in [root, *root.rglob("*")]:
+        metadata = path.lstat()
+        relative = "." if path == root else path.relative_to(root).as_posix()
+        kind = stat.S_IFMT(metadata.st_mode)
+        if stat.S_ISREG(metadata.st_mode):
+            payload = hashlib.sha256(path.read_bytes()).hexdigest()
+        elif stat.S_ISLNK(metadata.st_mode):
+            payload = os.readlink(path)
+        else:
+            payload = ""
+        snapshot[relative] = (kind, stat.S_IMODE(metadata.st_mode), payload)
+    return snapshot
+
+
 def reseal_packet(payload: dict[str, object]) -> None:
     entry = payload["session_entry"]
     assert isinstance(entry, dict)
@@ -179,12 +197,20 @@ def reseal_packet(payload: dict[str, object]) -> None:
 
 
 def install_source_write_guard(monkeypatch: pytest.MonkeyPatch, repo: Path) -> None:
-    def require_external(path: Path) -> None:
+    root = repo.resolve()
+
+    def require_external(path: Path, *, dir_fd: int | None = None) -> None:
+        candidate = Path(path)
+        if not candidate.is_absolute():
+            base = Path.cwd()
+            if dir_fd is not None and Path(f"/proc/self/fd/{dir_fd}").exists():
+                base = Path(os.readlink(f"/proc/self/fd/{dir_fd}"))
+            candidate = base / candidate
         try:
-            path.resolve().relative_to(repo.resolve())
+            candidate.resolve(strict=False).relative_to(root)
         except ValueError:
             return
-        raise AssertionError(f"AgentOps attempted a source/.git write: {path}")
+        raise AssertionError(f"AgentOps attempted a source/.git write: {candidate}")
 
     def guard(name: str) -> None:
         original = getattr(Path, name)
@@ -202,6 +228,43 @@ def install_source_write_guard(monkeypatch: pytest.MonkeyPatch, repo: Path) -> N
         return original_replace(path, target)
 
     monkeypatch.setattr(Path, "replace", guarded_replace)
+
+    original_open = os.open
+
+    def guarded_open(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        flags: int,
+        *args: int,
+        dir_fd: int | None = None,
+        **kwargs: int,
+    ) -> int:
+        write_flags = os.O_WRONLY | os.O_RDWR | os.O_APPEND | os.O_CREAT | os.O_TRUNC
+        if flags & write_flags and not isinstance(path, bytes):
+            require_external(Path(path), dir_fd=dir_fd)
+        return original_open(path, flags, *args, dir_fd=dir_fd, **kwargs)
+
+    monkeypatch.setattr(os, "open", guarded_open)
+
+    def guard_os_destination(name: str) -> None:
+        original = getattr(os, name)
+
+        def guarded(
+            path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+            *args: object,
+            _original=original,
+            dir_fd: int | None = None,
+            **kwargs: object,
+        ):
+            if not isinstance(path, bytes):
+                require_external(Path(path), dir_fd=dir_fd)
+            if dir_fd is not None:
+                kwargs["dir_fd"] = dir_fd
+            return _original(path, *args, **kwargs)
+
+        monkeypatch.setattr(os, name, guarded)
+
+    for name in ("mkdir", "unlink", "remove", "rmdir", "chmod", "truncate", "utime"):
+        guard_os_destination(name)
 
 
 def test_parses_minimal_valid_work_packet(tmp_path: Path) -> None:
@@ -270,6 +333,417 @@ def test_detects_forbidden_changed_files(tmp_path: Path) -> None:
     assert scope.violations == [
         {"path": "forbidden.txt", "reason": "forbidden", "patterns": ["forbidden.txt"]}
     ]
+
+
+def test_scope_hashes_raw_worktree_bytes_and_exec_mode(tmp_path: Path) -> None:
+    """Status filters and core.fileMode cannot make raw worktree drift clean."""
+    repo = init_repo(tmp_path)
+    packet = agentops.parse_work_packet(
+        minimal_packet(tmp_path, repo, allowed_files=["README.md"])
+    )
+    readme = repo / "README.md"
+    assert run(["git", "config", "core.fileMode", "false"], cwd=repo).returncode == 0
+    readme.chmod(0o755)
+
+    mode_scope = agentops.inspect_scope(repo, packet)
+    assert mode_scope.changed_files == ["README.md"]
+
+    readme.chmod(0o644)
+    assert run(["git", "config", "core.autocrlf", "true"], cwd=repo).returncode == 0
+    readme.write_bytes(b"base\r\n")
+    bytes_scope = agentops.inspect_scope(repo, packet)
+    assert bytes_scope.changed_files == ["README.md"]
+
+
+@pytest.mark.parametrize("outside", [False, True], ids=["in_repo", "out_of_repo"])
+def test_scope_rejects_symlink_ancestor_even_with_identical_tracked_bytes(
+    tmp_path: Path, outside: bool,
+) -> None:
+    repo = init_repo(tmp_path)
+    governed = repo / "governed"
+    governed.mkdir()
+    (governed / "payload.py").write_text("VALUE = 1\n", encoding="utf-8")
+    assert run(["git", "add", "governed/payload.py"], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "add governed payload"], cwd=repo).returncode == 0
+    target = (tmp_path / "outside-target") if outside else (repo / "alternate")
+    target.mkdir()
+    (target / "payload.py").write_text("VALUE = 1\n", encoding="utf-8")
+    # Remove the tracked directory after moving its file, then replace that
+    # lexical ancestor with a symlink to byte-identical content.
+    (governed / "payload.py").unlink()
+    governed.rmdir()
+    governed.symlink_to(target, target_is_directory=True)
+    packet = agentops.parse_work_packet(
+        minimal_packet(tmp_path, repo, allowed_files=["governed/**"])
+    )
+
+    with pytest.raises(agentops.AgentOpsError, match="symlink.*ancestor"):
+        agentops.inspect_scope(repo, packet)
+
+
+def test_scope_rejects_tracked_fifo_without_blocking(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_repo(tmp_path)
+    payload = repo / "allowed.txt"
+    payload.write_text("regular\n", encoding="utf-8")
+    assert run(["git", "add", "allowed.txt"], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "add fifo fixture"], cwd=repo).returncode == 0
+    payload.unlink()
+    os.mkfifo(payload)
+    packet = agentops.parse_work_packet(minimal_packet(tmp_path, repo))
+    original_open = agentops.os.open
+
+    def bounded_open(path: object, flags: int, *args: object, **kwargs: object) -> int:
+        if os.fspath(path) == os.fspath(payload):
+            assert flags & getattr(os, "O_NONBLOCK", 0), (
+                "tracked special files must be opened nonblocking"
+            )
+        return original_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(agentops.os, "open", bounded_open)
+
+    with pytest.raises(agentops.AgentOpsError, match="regular non-symlink|regular file"):
+        agentops.inspect_scope(repo, packet)
+
+
+def test_scope_rejects_local_clean_filter_before_it_can_hide_bytes(
+    tmp_path: Path,
+) -> None:
+    repo = init_repo(tmp_path)
+    (repo / "allowed.txt").write_text("baseline\n", encoding="utf-8")
+    (repo / ".gitattributes").write_text(
+        "allowed.txt filter=hide\n", encoding="utf-8"
+    )
+    assert run(["git", "add", "allowed.txt", ".gitattributes"], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "add filtered fixture"], cwd=repo).returncode == 0
+    marker = tmp_path / "clean-filter-ran"
+    filter_script = tmp_path / "hide-clean"
+    filter_script.write_text(
+        f"#!/bin/sh\ntouch '{marker}'\nprintf 'baseline\\n'\n", encoding="utf-8"
+    )
+    filter_script.chmod(0o755)
+    assert run(
+        ["git", "config", "filter.hide.clean", str(filter_script)], cwd=repo
+    ).returncode == 0
+    (repo / "allowed.txt").write_text("forbidden changed bytes\n", encoding="utf-8")
+
+    assert run(["git", "diff", "--name-only"], cwd=repo).stdout == ""
+    assert marker.exists(), "ordinary Git must exercise the false-clean witness"
+    marker.unlink()
+    packet = agentops.parse_work_packet(minimal_packet(tmp_path, repo))
+    with pytest.raises(agentops.AgentOpsError, match=r"filter\.\*"):
+        agentops.inspect_scope(repo, packet)
+    assert not marker.exists(), "AgentOps must reject before executing the filter"
+
+
+def test_scope_enumerates_case_variant_that_git_ignorecase_hides(
+    tmp_path: Path,
+) -> None:
+    repo = init_repo(tmp_path)
+    tests_dir = repo / "tests"
+    tests_dir.mkdir()
+    (tests_dir / "test_payload.py").write_text("VALUE = 1\n", encoding="utf-8")
+    assert run(["git", "add", "tests/test_payload.py"], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "add case fixture"], cwd=repo).returncode == 0
+    assert run(["git", "config", "core.ignoreCase", "true"], cwd=repo).returncode == 0
+    (tests_dir / "test_Payload.py").write_text(
+        "def test_case_variant_executes():\n    assert True\n", encoding="utf-8"
+    )
+    assert run(["git", "ls-files", "--others", "-z"], cwd=repo).stdout == ""
+
+    packet = agentops.parse_work_packet(
+        minimal_packet(tmp_path, repo, allowed_files=["tests/**"])
+    )
+    scope = agentops.inspect_scope(repo, packet)
+    assert "tests/test_Payload.py" in scope.untracked_files
+    assert "tests/test_Payload.py" in scope.changed_files
+
+
+def test_agentops_committed_range_scope_gate(tmp_path: Path) -> None:
+    """O4-B4: committed paths use the existing forbidden-over-allowed matcher."""
+    repo = init_repo(tmp_path)
+    (repo / "forbidden.txt").write_text("rename source\n", encoding="utf-8")
+    assert run(["git", "add", "forbidden.txt"], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "forbidden rename fixture"], cwd=repo).returncode == 0
+    base = run(["git", "rev-parse", "HEAD"], cwd=repo).stdout.strip()
+    packet = agentops.parse_work_packet(
+        minimal_packet(
+            tmp_path,
+            repo,
+            base_ref=base,
+            allowed_files=["allowed.txt", "forbidden.txt"],
+            forbidden_files=["forbidden.txt"],
+        )
+    )
+    assert run(["git", "mv", "forbidden.txt", "allowed.txt"], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "rename forbidden to allowed"], cwd=repo).returncode == 0
+
+    scope = agentops.inspect_scope(repo, packet, base_ref=base)
+
+    assert scope.tracked_changed_files == ["allowed.txt", "forbidden.txt"]
+    assert scope.changed_files == ["allowed.txt", "forbidden.txt"]
+    assert scope.violations == [
+        {"path": "forbidden.txt", "reason": "forbidden", "patterns": ["forbidden.txt"]}
+    ]
+
+
+def test_agentops_committed_range_ignores_git_replace_objects(tmp_path: Path) -> None:
+    repo = init_repo(tmp_path)
+    ordinary_env = {
+        key: value
+        for key, value in os.environ.items()
+        if not key.casefold().startswith("git_")
+    }
+
+    def ordinary_git(args: list[str]) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", *args],
+            cwd=repo,
+            env=ordinary_env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    base = run(["git", "rev-parse", "HEAD"], cwd=repo).stdout.strip()
+    (repo / "forbidden.txt").write_text("committed\n", encoding="utf-8")
+    assert run(["git", "add", "forbidden.txt"], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "add forbidden path"], cwd=repo).returncode == 0
+    actual_head = run(["git", "rev-parse", "HEAD"], cwd=repo).stdout.strip()
+    assert ordinary_git(["replace", actual_head, base]).returncode == 0
+    assert ordinary_git(["read-tree", "--reset", "-u", base]).returncode == 0
+
+    # Establish the adversarial witness: ordinary Git honors the replacement
+    # and reports an empty tree/range, while actual-object Git sees the commit.
+    assert ordinary_git(["status", "--short"]).stdout == ""
+    assert ordinary_git(
+        ["diff", "--name-only", f"{base}...HEAD", "--"]
+    ).stdout == ""
+    assert ordinary_git(
+        [
+            "--no-replace-objects", "diff", "--name-only",
+            f"{base}...HEAD", "--",
+        ]
+    ).stdout.splitlines() == ["forbidden.txt"]
+    packet = agentops.parse_work_packet(
+        minimal_packet(
+            tmp_path,
+            repo,
+            base_ref=base,
+            allowed_files=["forbidden.txt"],
+            forbidden_files=["forbidden.txt"],
+        )
+    )
+
+    scope = agentops.inspect_scope(repo, packet, base_ref=base)
+
+    assert scope.changed_files == ["forbidden.txt"]
+    assert scope.violations == [
+        {"path": "forbidden.txt", "reason": "forbidden", "patterns": ["forbidden.txt"]}
+    ]
+
+
+def test_agentops_rejects_legacy_grafts_that_fabricate_base_ancestry(
+    tmp_path: Path,
+) -> None:
+    repo = init_repo(tmp_path)
+    base = run(["git", "rev-parse", "HEAD"], cwd=repo).stdout.strip()
+    assert run(["git", "switch", "--orphan", "unrelated"], cwd=repo).returncode == 0
+    assert run(["git", "rm", "-rf", "--ignore-unmatch", "."], cwd=repo).returncode == 0
+    (repo / "README.md").write_text("unrelated root\n", encoding="utf-8")
+    assert run(["git", "add", "README.md"], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "unrelated root"], cwd=repo).returncode == 0
+    head = run(["git", "rev-parse", "HEAD"], cwd=repo).stdout.strip()
+    assert run(
+        ["git", "merge-base", "--is-ancestor", base, head], cwd=repo
+    ).returncode != 0
+    grafts = repo / ".git/info/grafts"
+    grafts.write_text(f"{head} {base}\n", encoding="utf-8")
+    assert run(
+        ["git", "merge-base", "--is-ancestor", base, head], cwd=repo
+    ).returncode == 0, "ordinary Git must prove the forged-ancestry witness"
+
+    packet = agentops.parse_work_packet(
+        minimal_packet(tmp_path, repo, base_ref=base, branch="unrelated")
+    )
+    with pytest.raises(agentops.AgentOpsError, match="info/grafts"):
+        agentops.inspect_scope(repo, packet, base_ref=base)
+
+
+@pytest.mark.parametrize(
+    ("filename", "deceptive_allowed"),
+    [
+        (" allowed.txt", "allowed.txt"),
+        ("allowed.txt ", "allowed.txt"),
+        ("line\nbreak.txt", "linebreak.txt"),
+    ],
+)
+def test_agentops_scope_preserves_exact_unusual_git_pathnames(
+    tmp_path: Path,
+    filename: str,
+    deceptive_allowed: str,
+) -> None:
+    repo = init_repo(tmp_path)
+    base = run(["git", "rev-parse", "HEAD"], cwd=repo).stdout.strip()
+    (repo / filename).write_text("committed\n", encoding="utf-8")
+    assert run(["git", "add", "--", filename], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "add unusual path"], cwd=repo).returncode == 0
+    packet = agentops.parse_work_packet(
+        minimal_packet(
+            tmp_path,
+            repo,
+            base_ref=base,
+            allowed_files=[deceptive_allowed],
+            forbidden_files=[],
+        )
+    )
+
+    scope = agentops.inspect_scope(repo, packet, base_ref=base)
+
+    assert scope.changed_files == [filename]
+    assert scope.violations == [
+        {"path": filename, "reason": "outside_allowed_scope", "patterns": []}
+    ]
+
+
+def test_agentops_scope_rejects_backslash_git_pathname(tmp_path: Path) -> None:
+    repo = init_repo(tmp_path)
+    base = run(["git", "rev-parse", "HEAD"], cwd=repo).stdout.strip()
+    filename = "allowed\\evil.py"
+    (repo / filename).write_text("committed\n", encoding="utf-8")
+    assert run(["git", "add", "--", filename], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "add ambiguous path"], cwd=repo).returncode == 0
+    packet = agentops.parse_work_packet(
+        minimal_packet(
+            tmp_path,
+            repo,
+            base_ref=base,
+            allowed_files=["allowed/evil.py"],
+            forbidden_files=[],
+        )
+    )
+
+    with pytest.raises(agentops.AgentOpsError, match="backslash"):
+        agentops.inspect_scope(repo, packet, base_ref=base)
+
+
+@pytest.mark.parametrize("local_exclude", ["info", "config", "worktree"])
+def test_agentops_scope_rejects_local_excludes_hiding_pytest_code(
+    tmp_path: Path,
+    local_exclude: str,
+) -> None:
+    repo = init_repo(tmp_path)
+    tests_dir = repo / "tests"
+    tests_dir.mkdir()
+    (tests_dir / "test_ok.py").write_text(
+        "def test_ok():\n    assert True\n",
+        encoding="utf-8",
+    )
+    assert run(["git", "add", "tests/test_ok.py"], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "add tracked test"], cwd=repo).returncode == 0
+    marker = tmp_path / f"hidden-{local_exclude}-executed"
+    (tests_dir / "conftest.py").write_text(
+        "from pathlib import Path\n"
+        f"Path({str(marker)!r}).touch()\n",
+        encoding="utf-8",
+    )
+    if local_exclude == "info":
+        exclude = Path(
+            run(["git", "rev-parse", "--git-path", "info/exclude"], cwd=repo)
+            .stdout.strip()
+        )
+        if not exclude.is_absolute():
+            exclude = repo / exclude
+        exclude.write_text("tests/conftest.py\n", encoding="utf-8")
+    else:
+        exclude = tmp_path / "local-excludes"
+        exclude.write_text("tests/conftest.py\n", encoding="utf-8")
+        if local_exclude == "worktree":
+            assert run(
+                ["git", "config", "extensions.worktreeConfig", "true"], cwd=repo
+            ).returncode == 0
+            config_scope = "--worktree"
+        else:
+            config_scope = "--local"
+        assert run(
+            ["git", "config", config_scope, "core.excludesFile", str(exclude)],
+            cwd=repo,
+        ).returncode == 0
+
+    assert run(["git", "status", "--short"], cwd=repo).stdout == ""
+    witness = subprocess.run(
+        [sys.executable, "-m", "pytest", "tests/test_ok.py", "-q"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "PYTEST_ADDOPTS": "-p no:cacheprovider",
+            "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert witness.returncode == 0, witness.stdout + witness.stderr
+    assert marker.exists()
+    marker.unlink()
+    base = run(["git", "rev-parse", "HEAD"], cwd=repo).stdout.strip()
+    packet = agentops.parse_work_packet(
+        minimal_packet(
+            tmp_path,
+            repo,
+            base_ref=base,
+            allowed_files=["tests/**"],
+        )
+    )
+
+    with pytest.raises(agentops.AgentOpsError, match="exclude|gitignore"):
+        agentops.inspect_scope(repo, packet, base_ref=base)
+    assert not marker.exists()
+
+
+def test_agentops_scope_includes_self_hidden_untracked_gitignore(
+    tmp_path: Path,
+) -> None:
+    repo = init_repo(tmp_path)
+    tests_dir = repo / "tests"
+    tests_dir.mkdir()
+    (tests_dir / ".gitignore").write_text(
+        "conftest.py\n.gitignore\n", encoding="utf-8"
+    )
+    (tests_dir / "conftest.py").write_text("hidden fixture\n", encoding="utf-8")
+    assert run(["git", "status", "--short"], cwd=repo).stdout == ""
+    packet = agentops.parse_work_packet(
+        minimal_packet(
+            tmp_path,
+            repo,
+            allowed_files=["tests/**"],
+            forbidden_files=[],
+        )
+    )
+
+    scope = agentops.inspect_scope(repo, packet)
+
+    assert scope.untracked_files == ["tests/.gitignore", "tests/conftest.py"]
+    assert scope.changed_files == ["tests/.gitignore", "tests/conftest.py"]
+    assert scope.violations == []
+
+
+def test_agentops_scope_rejects_space_prefixed_info_exclude_pattern(
+    tmp_path: Path,
+) -> None:
+    repo = init_repo(tmp_path)
+    exclude = Path(
+        run(["git", "rev-parse", "--git-path", "info/exclude"], cwd=repo)
+        .stdout.strip()
+    )
+    if not exclude.is_absolute():
+        exclude = repo / exclude
+    exclude.write_text(" #active-pattern\n", encoding="utf-8")
+    packet = agentops.parse_work_packet(minimal_packet(tmp_path, repo))
+
+    with pytest.raises(agentops.AgentOpsError, match="info/exclude"):
+        agentops.inspect_scope(repo, packet)
 
 
 def test_gate_result_recording(tmp_path: Path) -> None:
@@ -879,6 +1353,8 @@ def test_direct_git_gate_strips_inherited_git_environment(
     safe_git = {
         "GIT_CONFIG_GLOBAL": os.devnull,
         "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_ATTR_NOSYSTEM": "1",
+        "GIT_NO_REPLACE_OBJECTS": "1",
         "GIT_OPTIONAL_LOCKS": "0",
     }
     commands = (
@@ -899,7 +1375,9 @@ def test_direct_git_gate_strips_inherited_git_environment(
             key: value for key, value in child_env.items()
             if key.casefold().startswith("git_")
         } == safe_git
-        for key in ("HOME", "XDG_CONFIG_HOME", "PATH", "KEEP_ME", "GITHUB_ACTIONS"):
+        assert child_env["HOME"] == os.devnull
+        assert child_env["XDG_CONFIG_HOME"] == os.devnull
+        for key in ("PATH", "KEEP_ME", "GITHUB_ACTIONS"):
             assert child_env[key] == poisoned[key]
         assert poisoned == original
 
@@ -983,7 +1461,9 @@ def test_direct_git_gate_strips_inherited_git_environment(
     negative_gate = agentops.parse_gate(
         {"name": "negative-git-env", "command": "git status --short"}, 0,
     )
-    agentops.run_negative_control(source, negative_gate)
+    agentops.run_negative_control(
+        source, negative_gate, temp_root=external_tmp
+    )
     negative_child = captured.pop()
     negative_argv = negative_child["argv"]
     assert isinstance(negative_argv, list)
@@ -1010,7 +1490,9 @@ def test_direct_git_gate_strips_inherited_git_environment(
         },
         0,
     )
-    agentops.run_negative_control(source, non_git_negative)
+    agentops.run_negative_control(
+        source, non_git_negative, temp_root=external_tmp
+    )
     non_git_argv = captured.pop()["argv"]
     assert isinstance(non_git_argv, list)
     shell_index = non_git_argv.index("/bin/sh")
@@ -1148,6 +1630,7 @@ def test_create_commit_disables_default_reference_transaction_hook(
     _install_trusted_commit_identity(tmp_path, monkeypatch)
     marker = tmp_path / "reference-transaction-ran"
     hook = repo / ".git/hooks/reference-transaction"
+    hook.parent.mkdir(parents=True, exist_ok=True)
     hook.write_text(f"#!/bin/sh\ntouch '{marker}'\n", encoding="utf-8")
     hook.chmod(0o755)
     changed = repo / "reference-hook.txt"
@@ -1169,6 +1652,7 @@ def test_create_commit_disables_post_index_change_hook_during_staging(
     assert run(["git", "commit", "-m", "add doomed"], cwd=repo).returncode == 0
     marker = tmp_path / "post-index-change-ran"
     hook = repo / ".git/hooks/post-index-change"
+    hook.parent.mkdir(parents=True, exist_ok=True)
     hook.write_text(f"#!/bin/sh\ntouch '{marker}'\n", encoding="utf-8")
     hook.chmod(0o755)
     changed = repo / "index-hook.txt"
@@ -1584,6 +2068,21 @@ def test_session_entry_truth_fields_are_cross_bound(tmp_path: Path) -> None:
     empty_gates = session_packet(repo, gates=[])
     with pytest.raises(agentops.AgentOpsError, match="at least one gate"):
         agentops.parse_work_packet(seal_packet(empty_gates))
+
+    track_path = repo / "docs/governance/ACTIVE_TRACK.yaml"
+    track_document = json.loads(track_path.read_text(encoding="utf-8"))
+    track_document["active_tracks"][0]["status"] = "SHIPPABLE"
+    track_path.write_text(json.dumps(track_document), encoding="utf-8")
+    assert run(["git", "add", "--", track_path.relative_to(repo).as_posix()], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "mark fixture track shippable"], cwd=repo).returncode == 0
+    shippable = seal_packet(session_packet(repo))
+    external = write_external_packet(tmp_path / "shippable", shippable)
+    exit_code, report = agentops.execute_packet(
+        external,
+        source_root=repo,
+        dry_run=True,
+    )
+    assert exit_code == 0 and report is None
 
 
 def test_session_entry_accepts_exact_wp_o1r_identity_only(tmp_path: Path) -> None:
@@ -2009,6 +2508,134 @@ def test_external_entry_packet_bootstrap_and_digest_binding(tmp_path: Path) -> N
         execute(dry_run=True)
 
 
+def test_preflight_rejects_nonportable_session_worktree(tmp_path: Path) -> None:
+    repo = init_session_repo(tmp_path)
+    payload = session_packet(repo)
+    payload["worktree"] = "/tmp/not-portable"
+    payload = seal_packet(payload)
+    external = write_external_packet(tmp_path, payload)
+
+    with pytest.raises(agentops.AgentOpsError, match='portable worktree "\\."'):
+        agentops.execute_packet(
+            external,
+            source_root=repo,
+            preflight=True,
+            report_root=tmp_path / "external-reports",
+        )
+
+
+def test_preflight_exact_clean_rejects_status_hidden_untracked_path(
+    tmp_path: Path,
+) -> None:
+    repo = init_session_repo(tmp_path)
+    assert run(
+        ["git", "config", "status.showUntrackedFiles", "no"], cwd=repo
+    ).returncode == 0
+    payload = seal_packet(session_packet(repo))
+    external = write_external_packet(tmp_path, payload)
+    (repo / "allowed.txt").write_text("status-hidden baseline drift\n", encoding="utf-8")
+    assert run(["git", "status", "--porcelain"], cwd=repo).stdout == ""
+
+    with pytest.raises(agentops.AgentOpsError, match="exact clean HEAD"):
+        agentops.execute_packet(
+            external,
+            source_root=repo,
+            preflight=True,
+            report_root=tmp_path / "external-reports",
+        )
+
+
+def test_closeout_rejects_each_diff_class_and_packet_swap(tmp_path: Path) -> None:
+    """O4-B3: closeout binds preflight digest and the complete Git diff union."""
+    for diff_class in ("committed", "staged", "unstaged", "untracked"):
+        case_root = tmp_path / diff_class
+        case_root.mkdir()
+        repo = init_session_repo(case_root)
+        forbidden = repo / "forbidden.txt"
+        forbidden.write_text("base\n", encoding="utf-8")
+        assert run(["git", "add", "forbidden.txt"], cwd=repo).returncode == 0
+        assert run(["git", "commit", "-m", "forbidden fixture"], cwd=repo).returncode == 0
+
+        payload = seal_packet(session_packet(repo))
+        external = write_external_packet(case_root, payload)
+        report_root = case_root / "external-reports"
+        exit_code, report = agentops.execute_packet(
+            external,
+            source_root=repo,
+            preflight=True,
+            report_root=report_root,
+        )
+        assert exit_code == 0 and report is not None
+
+        tracked = tracked_packet_path(repo, payload)
+        tracked.parent.mkdir(parents=True)
+        tracked.write_bytes(external.read_bytes())
+        stage_path(repo, tracked)
+        if diff_class == "committed":
+            forbidden.write_text("committed\n", encoding="utf-8")
+            assert run(["git", "add", "forbidden.txt"], cwd=repo).returncode == 0
+            assert run(["git", "commit", "-m", "forbidden committed"], cwd=repo).returncode == 0
+        elif diff_class == "staged":
+            forbidden.write_text("staged\n", encoding="utf-8")
+            assert run(["git", "add", "forbidden.txt"], cwd=repo).returncode == 0
+        elif diff_class == "unstaged":
+            forbidden.write_text("unstaged\n", encoding="utf-8")
+        else:
+            (repo / "outside.txt").write_text("untracked\n", encoding="utf-8")
+
+        exit_code, report = agentops.execute_packet(
+            tracked,
+            source_root=repo,
+            closeout=True,
+            report_root=report_root,
+        )
+        assert exit_code == 1 and report is not None
+        expected = "outside.txt" if diff_class == "untracked" else "forbidden.txt"
+        assert expected in report["scope"]["changed_files"]
+        assert any(row["path"] == expected for row in report["scope"]["violations"])
+
+    swap_root = tmp_path / "packet-swap"
+    swap_root.mkdir()
+    repo = init_session_repo(swap_root)
+    original = seal_packet(session_packet(repo))
+    external = write_external_packet(swap_root, original)
+    report_root = swap_root / "external-reports"
+    exit_code, report = agentops.execute_packet(
+        external,
+        source_root=repo,
+        preflight=True,
+        report_root=report_root,
+    )
+    assert exit_code == 0 and report is not None
+
+    swapped = copy.deepcopy(original)
+    swapped["intent"] = "A different, independently sealed packet."
+    reseal_packet(swapped)
+    tracked = tracked_packet_path(repo, swapped)
+    tracked.parent.mkdir(parents=True)
+    tracked.write_text(json.dumps(swapped, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    stage_path(repo, tracked)
+    with pytest.raises(agentops.AgentOpsError, match="preflight.*digest|digest.*preflight"):
+        agentops.execute_packet(
+            tracked,
+            source_root=repo,
+            closeout=True,
+            report_root=report_root,
+        )
+
+    tracked.write_text(
+        json.dumps(original, separators=(",", ":")), encoding="utf-8"
+    )
+    stage_path(repo, tracked)
+    with pytest.raises(agentops.AgentOpsError, match="preflight.*digest|digest.*preflight"):
+        agentops.execute_packet(
+            tracked,
+            source_root=repo,
+            closeout=True,
+            report_root=report_root,
+        )
+
+
 def test_external_packet_rejects_lexical_resolved_and_git_admin_paths(
     tmp_path: Path,
 ) -> None:
@@ -2187,9 +2814,7 @@ def test_negative_control_rejects_fixture_symlink_back_to_source(tmp_path: Path)
         )
 
 
-def test_negative_control_temp_root_must_be_external(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_negative_control_temp_root_must_be_external(tmp_path: Path) -> None:
     repo = init_session_repo(tmp_path)
     gate = agentops.parse_gate(
         {
@@ -2201,10 +2826,8 @@ def test_negative_control_temp_root_must_be_external(
         require_expected_exit=True,
     )
     before = tree_snapshot(repo)
-    monkeypatch.setenv("TMPDIR", str(repo))
-
     with pytest.raises(agentops.AgentOpsError, match="temp root.*repository|temp root"):
-        agentops.run_negative_control(repo, gate)
+        agentops.run_negative_control(repo, gate, temp_root=repo)
     assert tree_snapshot(repo) == before
 
 
@@ -2284,41 +2907,230 @@ def test_nonroot_linux_uses_passwordless_sudo_chroot_with_uid_drop(
         agentops._negative_confinement(jail, fixture)
 
 
-def test_external_report_root_is_mandatory_and_read_only(
+def test_make_admission_reports_are_external_and_read_only(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """O4-B9: preflight/closeout attempt no source or Git-state write."""
     repo = init_session_repo(tmp_path)
     (repo / ".gitignore").write_text("ignored-state.txt\n", encoding="utf-8")
     assert run(["git", "add", ".gitignore"], cwd=repo).returncode == 0
     assert run(["git", "commit", "-m", "ignore fixture state"], cwd=repo).returncode == 0
-    (repo / "ignored-state.txt").write_text("must remain byte-identical\n", encoding="utf-8")
 
-    payload = seal_packet(session_packet(repo))
+    payload = session_packet(repo)
+    allowed = payload["allowed_files"]
+    assert isinstance(allowed, list)
+    allowed.append("ignored-state.txt")
+    payload = seal_packet(payload)
     external = write_external_packet(tmp_path, payload)
+    before_preflight = tree_state_snapshot(repo)
+    status_before_preflight = agentops.git_status(repo)
+
+    with pytest.raises(agentops.AgentOpsError, match="report.*root|report_root"):
+        agentops.execute_packet(
+            external, source_root=repo, preflight=True
+        )
+    assert tree_state_snapshot(repo) == before_preflight
+
+    report_root = tmp_path / "external-reports"
+    with monkeypatch.context() as preflight_guard:
+        install_source_write_guard(preflight_guard, repo)
+        exit_code, report = agentops.execute_packet(
+            external,
+            source_root=repo,
+            preflight=True,
+            report_root=report_root,
+        )
+    assert exit_code == 0 and report is not None
+    assert report["phase"] == "preflight"
+    assert tree_state_snapshot(repo) == before_preflight
+    assert agentops.git_status(repo) == status_before_preflight
+
     tracked = tracked_packet_path(repo, payload)
     tracked.parent.mkdir(parents=True)
     tracked.write_bytes(external.read_bytes())
     stage_path(repo, tracked)
-    before = tree_snapshot(repo)
+    # Preflight requires a truly clean baseline, including ignored paths.  Add
+    # this allowed ignored fixture only for closeout, where it proves the
+    # evaluator observes it and leaves its bytes untouched.
+    (repo / "ignored-state.txt").write_text(
+        "must remain byte-identical\n", encoding="utf-8"
+    )
+    before_closeout = tree_state_snapshot(repo)
+    status_before_closeout = agentops.git_status(repo)
+    ignored_bytes = (repo / "ignored-state.txt").read_bytes()
 
-    with pytest.raises(agentops.AgentOpsError, match="report.*root|report_root"):
-        agentops.execute_packet(
-            external, source_root=repo, allow_existing_changes=True
+    negative_temp_roots: list[Path] = []
+    real_negative_control = agentops.run_negative_control
+
+    def observed_negative_control(
+        source: Path,
+        gate: agentops.GateSpec,
+        *,
+        temp_root: Path,
+        **kwargs: object,
+    ) -> dict[str, object]:
+        negative_temp_roots.append(temp_root)
+        return real_negative_control(
+            source,
+            gate,
+            temp_root=temp_root,
+            **kwargs,
         )
+
+    # Keep the real admitted Git gate and confined negative control executable.
+    # The in-process OS/Path guard catches attempted source writes immediately;
+    # the complete state snapshot also catches subprocess writes, ignored files,
+    # mode changes, symlinks, and Git-admin mutations.
+    monkeypatch.setattr(agentops, "run_negative_control", observed_negative_control)
+    install_source_write_guard(monkeypatch, repo)
+    exit_code, report = agentops.execute_packet(
+        tracked,
+        source_root=repo,
+        closeout=True,
+        report_root=report_root,
+    )
+    assert exit_code == 0 and report is not None
+    assert report["phase"] == "closeout"
+    assert len(list(report_root.rglob("report.json"))) >= 2
+    assert len(list(report_root.rglob("report.md"))) >= 2
+    assert negative_temp_roots == [
+        report_root
+        / "reports/agentops"
+        / str(payload["id"])
+        / "tool-cache/tmp"
+    ]
+    for directory in [report_root, *[path for path in report_root.rglob("*") if path.is_dir()]]:
+        assert directory.stat().st_mode & 0o077 == 0
+    for report_path in report_root.rglob("report.*"):
+        assert report_path.stat().st_mode & 0o777 == 0o600
+    assert tree_state_snapshot(repo) == before_closeout
+    assert agentops.git_status(repo) == status_before_closeout
+    assert (repo / "ignored-state.txt").read_bytes() == ignored_bytes
+
+
+def test_ci_event_without_packet_still_emits_external_report(tmp_path: Path) -> None:
+    repo = init_session_repo(tmp_path)
+    base = run(["git", "rev-parse", "HEAD"], cwd=repo).stdout.strip()
+    (repo / "notes.txt").write_text("unrelated event change\n", encoding="utf-8")
+    assert run(["git", "add", "notes.txt"], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "unrelated event"], cwd=repo).returncode == 0
+    head = run(["git", "rev-parse", "HEAD"], cwd=repo).stdout.strip()
+    before = tree_snapshot(repo)
+    report_root = tmp_path / "ci-reports"
+
+    exit_code, report = agentops.execute_ci_event(
+        source_root=repo,
+        event_name="pull_request",
+        event_base=base,
+        event_head=head,
+        report_root=report_root,
+    )
+
+    assert exit_code == 0
+    assert report["status"] == "passed"
+    assert report["packets"] == []
+    reports = list(report_root.rglob("report.json"))
+    assert len(reports) == 1
+    assert json.loads(reports[0].read_text(encoding="utf-8"))["phase"] == "ci-event"
     assert tree_snapshot(repo) == before
 
-    install_source_write_guard(monkeypatch, repo)
+
+def test_ci_event_config_error_exit_three_writes_external_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = init_session_repo(tmp_path)
+    stale_head = run(["git", "rev-parse", "HEAD"], cwd=repo).stdout.strip()
+    (repo / "notes.txt").write_text("advance checkout\n", encoding="utf-8")
+    assert run(["git", "add", "notes.txt"], cwd=repo).returncode == 0
+    assert run(["git", "commit", "-m", "advance checkout"], cwd=repo).returncode == 0
+    current_head = run(["git", "rev-parse", "HEAD"], cwd=repo).stdout.strip()
+    report_root = tmp_path / "config-error-reports"
+    monkeypatch.chdir(repo)
+
+    exit_code = agentops.main(
+        [
+            "--ci-event", "pull_request",
+            "--event-base", current_head,
+            "--event-head", stale_head,
+            "--report-root", str(report_root),
+        ]
+    )
+
+    assert exit_code == 3
+    reports = list(report_root.rglob("report.json"))
+    assert len(reports) == 1
+    payload = json.loads(reports[0].read_text(encoding="utf-8"))
+    assert payload["status"] == "config_error"
+    assert "event head" in payload["error"]
+
+
+def test_session_entry_cli_requires_explicit_admission_phase(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = init_session_repo(tmp_path)
+    payload = seal_packet(session_packet(repo))
+    external = write_external_packet(tmp_path, payload)
+    before = tree_snapshot(repo)
+    monkeypatch.chdir(repo)
+
+    def must_not_execute(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("phase-less Session Entry route must not execute")
+
+    monkeypatch.setattr(agentops, "execute_packet", must_not_execute)
+    exit_code = agentops.main(
+        [
+            "--packet", str(external),
+            "--report-root", str(tmp_path / "unused-reports"),
+        ]
+    )
+
+    assert exit_code == 2
+    assert tree_snapshot(repo) == before
+
+
+def test_admission_cache_root_rejects_nested_symlink_into_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = init_session_repo(tmp_path)
+    payload = seal_packet(session_packet(repo))
+    external = write_external_packet(tmp_path, payload)
     report_root = tmp_path / "external-reports"
     exit_code, report = agentops.execute_packet(
         external,
         source_root=repo,
-        allow_existing_changes=True,
+        preflight=True,
         report_root=report_root,
     )
     assert exit_code == 0 and report is not None
-    assert list(report_root.rglob("report.json"))
-    assert list(report_root.rglob("report.md"))
-    assert tree_snapshot(repo) == before
+    tracked = tracked_packet_path(repo, payload)
+    tracked.parent.mkdir(parents=True)
+    tracked.write_bytes(external.read_bytes())
+    stage_path(repo, tracked)
+
+    cache_root = (
+        report_root
+        / "reports/agentops"
+        / str(payload["id"])
+        / "tool-cache"
+    )
+    cache_root.mkdir(parents=True)
+    (cache_root / "pycache").symlink_to(repo, target_is_directory=True)
+
+    def must_not_run(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("cache boundary must fail before a gate runs")
+
+    monkeypatch.setattr(agentops, "run_gate", must_not_run)
+    monkeypatch.setattr(agentops, "run_negative_control", must_not_run)
+    with pytest.raises(
+        agentops.AgentOpsError,
+        match="report destination|inside repository|symlink",
+    ):
+        agentops.execute_packet(
+            tracked,
+            source_root=repo,
+            closeout=True,
+            report_root=report_root,
+        )
 
 
 def test_external_report_root_rejects_nested_symlink_into_source(
@@ -2350,6 +3162,45 @@ def test_external_report_root_rejects_nested_symlink_into_source(
             report_root=report_root,
         )
     assert tree_snapshot(repo) == before
+
+
+def test_validate_report_root_prepares_children_and_rejects_source_symlink(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    repo = init_repo(tmp_path)
+    monkeypatch.chdir(repo)
+    report_root = tmp_path / "validated-report-root"
+
+    assert agentops.main(
+        [
+            "--validate-report-root", str(report_root),
+            "--validate-report-child", "cache",
+            "--validate-report-child", "onboard",
+        ]
+    ) == 0
+    assert (report_root / "cache").is_dir()
+    assert (report_root / "onboard").is_dir()
+    assert stat.S_IMODE((report_root / "cache").stat().st_mode) == 0o700
+    assert stat.S_IMODE((report_root / "onboard").stat().st_mode) == 0o700
+
+    (report_root / "cache").rmdir()
+    (report_root / "cache").symlink_to(repo, target_is_directory=True)
+    before = tree_state_snapshot(repo)
+    assert agentops.main(
+        [
+            "--validate-report-root", str(report_root),
+            "--validate-report-child", "cache",
+            "--validate-report-child", "onboard",
+        ]
+    ) == 2
+    captured = capsys.readouterr()
+    assert any(
+        token in captured.err
+        for token in ("symlink", "escapes", "inside repository", "external")
+    )
+    assert tree_state_snapshot(repo) == before
 
 
 def test_session_entry_collision_adversarial_matrix() -> None:
@@ -2427,12 +3278,15 @@ def test_positive_gate_command_family_allowlist_rejects_transitive_routes() -> N
     accepted = [
         "python3 -m pytest tests/test_agent_work_packet.py -q",
         "python3 -m ruff check dharma_swarm/operator_core/onboarding",
-        "python3 scripts/governance/agent_onboard.py --json",
         "python3 scripts/docops/check_docops_integrity.py",
+        "python3 scripts/docops/check_docops_integrity.py --changed-from "
+        "0123456789abcdef0123456789abcdef01234567",
         "python3 scripts/governance/orientation_graph.py",
-        "make onboard",
-        "make agent-build-preflight PACKET=reports/agentops/work_packets/x.json",
+        "make docops-integrity",
         "git status --porcelain",
+        "git.exe status --porcelain",
+        "/usr/bin/git status --porcelain",
+        '"C:\\Program Files\\Git\\cmd\\git.exe" status --porcelain',
     ]
     for index, command in enumerate(accepted):
         gate = agentops.parse_gate({"name": f"accepted-{index}", "command": command}, index)
@@ -2469,11 +3323,7 @@ def test_positive_gate_allowlist_rejects_make_variable_injection() -> None:
         with pytest.raises(agentops.AgentOpsError):
             agentops.admit_gate_command(gate)
 
-    benign = [
-        "make onboard ARGS=--json",
-        "make onboard 'ARGS=--deep --net'",
-        "make agent-build-preflight PACKET=reports/agentops/work_packets/x.json",
-    ]
+    benign = ["make docops-integrity", "make hygiene-check", "make module-budget"]
     for index, command in enumerate(benign):
         gate = agentops.parse_gate({"name": f"benign-{index}", "command": command}, index)
         agentops.admit_gate_command(gate)  # must not raise
@@ -2504,6 +3354,89 @@ def test_positive_gate_allowlist_rejects_path_qualified_shims() -> None:
     agentops.admit_gate_command(trusted)  # must not raise
 
 
+def test_positive_gate_preserves_venv_python_and_rejects_alias_swap(
+    tmp_path: Path,
+) -> None:
+    repo = init_repo(tmp_path)
+    alias = tmp_path / "current-python-alias"
+    alias.symlink_to(sys.executable)
+    for index, executable in enumerate(("python", "python3", sys.executable)):
+        gate = agentops.parse_gate(
+            {
+                "name": f"python-alias-{index}",
+                "command": f"{executable} -m pytest -q",
+            },
+            index,
+        )
+        agentops.admit_gate_command(gate)
+        normalized = agentops._trusted_positive_gate_argv(gate.argv, repo_root=repo)
+        assert normalized[0] == sys.executable
+
+    # A path alias is not an exact running-interpreter identity, even while it
+    # resolves to that interpreter.  This removes the symlink TOCTOU entirely.
+    alias_gate = agentops.parse_gate(
+        {
+            "name": "python-alias",
+            "command": f"{alias} -m pytest -q",
+        },
+        99,
+    )
+    with pytest.raises(agentops.AgentOpsError, match="not in the positive"):
+        agentops.admit_gate_command(alias_gate)
+
+    # Simulate a post-admission argv substitution.  Normalization must fail
+    # closed rather than execute an unrecognized replacement path.
+    admitted = agentops.parse_gate(
+        {
+            "name": "python-swap",
+            "command": f"{sys.executable} -m pytest -q",
+        },
+        100,
+    )
+    agentops.admit_gate_command(admitted)
+    admitted.argv[0] = str(alias)
+    with pytest.raises(agentops.AgentOpsError, match="lost trusted identity"):
+        agentops._trusted_positive_gate_argv(admitted.argv, repo_root=repo)
+
+    # The exact lexical path matters when sys.executable is a venv symlink;
+    # resolving it would silently select the base interpreter instead.
+    assert agentops._trusted_positive_gate_argv(
+        [sys.executable, "-m", "pytest", "-q"], repo_root=repo
+    )[0] == sys.executable
+
+
+def test_positive_git_forms_normalize_to_hardened_host_argv(tmp_path: Path) -> None:
+    repo = init_repo(tmp_path)
+    trusted = agentops._trusted_host_tool("git")
+    commands = (
+        "git status --porcelain",
+        "git.exe status --porcelain",
+        "/usr/bin/git status --porcelain",
+        '"C:\\Program Files\\Git\\cmd\\git.exe" status --porcelain',
+    )
+    for index, command in enumerate(commands):
+        gate = agentops.parse_gate(
+            {"name": f"trusted-git-{index}", "command": command}, index
+        )
+        agentops.admit_gate_command(gate)
+        assert agentops._trusted_positive_gate_argv(gate.argv, repo_root=repo) == [
+            trusted,
+            "-c", "core.fsmonitor=false",
+            "-c", f"core.hooksPath={os.devnull}",
+            "status", "--porcelain",
+        ]
+
+    diff = agentops.parse_gate(
+        {"name": "trusted-diff", "command": "git diff --check"}, 0
+    )
+    assert agentops._trusted_positive_gate_argv(diff.argv, repo_root=repo) == [
+        trusted,
+        "-c", "core.fsmonitor=false",
+        "-c", f"core.hooksPath={os.devnull}",
+        "diff", "--no-ext-diff", "--no-textconv", "--check",
+    ]
+
+
 def test_positive_gate_allowlist_rejects_abbreviated_write_context() -> None:
     """argparse admits any unambiguous prefix, so `--write` resolves to
     `--write-context` — the exact-token check must reject every abbreviation
@@ -2515,6 +3448,732 @@ def test_positive_gate_allowlist_rejects_abbreviated_write_context() -> None:
             agentops.admit_gate_command(gate)
     # A genuinely different flag that is not a prefix of the forbidden one passes.
     ok = agentops.parse_gate(
-        {"name": "json", "command": "python3 scripts/governance/orientation_graph.py --json"}, 0
+        {
+            "name": "json",
+            "command": "python3 scripts/governance/orientation_graph.py --json",
+        },
+        0,
     )
     agentops.admit_gate_command(ok)  # must not raise
+
+
+def test_ci_authority_transition_uses_conservative_endpoint_union() -> None:
+    def row(
+        track_id: str,
+        status: str,
+        owner: str,
+        surfaces: list[str],
+    ) -> dict[str, object]:
+        return {
+            "id": track_id,
+            "status": status,
+            "owner": owner,
+            "owned_surfaces": surfaces,
+        }
+
+    onboarding = agentops._ONBOARDING_TRACK_ID
+    cases = [
+        (
+            [row(onboarding, "ACTIVE", "base", ["old/**"])],
+            [row(onboarding, "PAUSED", "head", ["new/**"])],
+            "base",
+            ["old/**"],
+        ),
+        (
+            [row(onboarding, "PAUSED", "base", ["old/**"])],
+            [row(onboarding, "ACTIVE", "head", ["new/**"])],
+            "head",
+            ["new/**"],
+        ),
+        (
+            [row(onboarding, "ACTIVE", "base", ["old/**", "shared/**"])],
+            [row(onboarding, "ACTIVE", "head", ["new/**", "shared/**"])],
+            "head",
+            ["new/**", "old/**", "shared/**"],
+        ),
+        (
+            [row(onboarding, "ACTIVE", "base", ["old/**"])],
+            [row(onboarding, "SHIPPABLE", "head", ["new/**"])],
+            "head",
+            ["new/**", "old/**"],
+        ),
+        (
+            [row(onboarding, "SHIPPABLE", "base", ["old/**"])],
+            [row(onboarding, "PAUSED", "head", ["new/**"])],
+            "base",
+            ["old/**"],
+        ),
+        (
+            [row(onboarding, "PAUSED", "base", ["old/**"])],
+            [row(onboarding, "PAUSED", "head", ["new/**"])],
+            None,
+            [],
+        ),
+    ]
+    for base, head, expected_owner, expected_surfaces in cases:
+        effective, surfaces, _siblings = agentops._ci_authority_context(base, head)
+        assert (None if effective is None else effective["owner"]) == expected_owner
+        assert surfaces == expected_surfaces
+
+    base = [
+        row(onboarding, "ACTIVE", "base", ["owner-old/**"]),
+        row("sibling", "ACTIVE", "sibling-base", ["sibling-old/**"]),
+    ]
+    head = [
+        row(onboarding, "ACTIVE", "head", ["owner-new/**"]),
+        row("sibling", "SHIPPABLE", "sibling-head", ["sibling-new/**"]),
+    ]
+    _effective, surfaces, siblings = agentops._ci_authority_context(base, head)
+    assert surfaces == ["owner-new/**", "owner-old/**"]
+    assert siblings == {"sibling": ["sibling-new/**", "sibling-old/**"]}
+
+
+def test_gate_timeout_caps_each_gate_and_aggregate_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    gate = agentops.parse_gate(
+        {
+            "name": "bounded",
+            "command": "git status --porcelain",
+            "timeout_seconds": 900,
+        },
+        0,
+    )
+    monkeypatch.setattr(agentops.time, "monotonic", lambda: 100.0)
+    assert agentops._bounded_gate(gate, deadline=1_000.0).timeout_seconds == 300
+    assert agentops._bounded_gate(gate, deadline=131.0).timeout_seconds == 31
+    with pytest.raises(agentops.AgentOpsError, match="aggregate gate timeout"):
+        agentops._bounded_gate(gate, deadline=100.0)
+
+
+def test_owner_config_and_packet_decode_errors_are_normalized(tmp_path: Path) -> None:
+    valid = {
+        "id": agentops._ONBOARDING_TRACK_ID,
+        "status": "ACTIVE",
+        "owner": "owner",
+        "owned_surfaces": ["tests/**"],
+    }
+    malformed = [
+        {"active_tracks": [valid, copy.deepcopy(valid)]},
+        {"active_tracks": ["not-an-object"]},
+        {"active_tracks": [{**valid, "owned_surfaces": ["tests/**", "tests/**"]}]},
+    ]
+    for document in malformed:
+        with pytest.raises(agentops.AgentOpsError):
+            agentops._parse_active_tracks_document(
+                json.dumps(document), source="adversarial ACTIVE_TRACK.yaml"
+            )
+
+    undecodable = tmp_path / "packet.json"
+    undecodable.write_bytes(b"\xff\xfe")
+    with pytest.raises(agentops.AgentOpsError, match="read|decode|packet"):
+        agentops.load_raw_packet(undecodable)
+
+
+@pytest.mark.parametrize("layer", ["committed", "staged", "working"])
+def test_scope_rejects_non_regular_mode_in_each_diff_layer(
+    tmp_path: Path,
+    layer: str,
+) -> None:
+    repo = init_repo(tmp_path)
+    base = run(["git", "rev-parse", "HEAD"], cwd=repo).stdout.strip()
+    packet = agentops.parse_work_packet(
+        minimal_packet(
+            tmp_path,
+            repo,
+            base_ref=base,
+            allowed_files=["allowed.txt"],
+            forbidden_files=[],
+        )
+    )
+    (repo / "allowed.txt").symlink_to("README.md")
+    if layer in {"committed", "staged"}:
+        stage_path(repo, repo / "allowed.txt")
+    if layer == "committed":
+        assert run(["git", "commit", "-m", "symlink"], cwd=repo).returncode == 0
+
+    scope = agentops.inspect_scope(repo, packet, base_ref=base)
+
+    assert any(
+        violation["path"] == "allowed.txt"
+        and violation["reason"] == "non_regular_mode"
+        for violation in scope.violations
+    )
+
+
+def test_scope_allows_a_governed_regular_file_deletion(tmp_path: Path) -> None:
+    repo = init_repo(tmp_path)
+    allowed = repo / "allowed.txt"
+    allowed.write_text("delete me\n", encoding="utf-8")
+    stage_path(repo, allowed)
+    assert run(["git", "commit", "-m", "add governed file"], cwd=repo).returncode == 0
+    base = run(["git", "rev-parse", "HEAD"], cwd=repo).stdout.strip()
+    packet = agentops.parse_work_packet(
+        minimal_packet(
+            tmp_path,
+            repo,
+            base_ref=base,
+            allowed_files=["allowed.txt"],
+            forbidden_files=[],
+        )
+    )
+    allowed.unlink()
+    stage_path(repo, allowed)
+    assert run(["git", "commit", "-m", "delete governed file"], cwd=repo).returncode == 0
+
+    scope = agentops.inspect_scope(repo, packet, base_ref=base)
+
+    assert scope.changed_files == ["allowed.txt"]
+    assert scope.violations == []
+
+
+def test_report_publication_is_dirfd_bound_and_cleans_post_replace_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    report_root = tmp_path / "reports-root"
+    report_root.mkdir(mode=0o700)
+    destination = report_root / "reports/agentops/job/stamp/report.json"
+    agentops._ensure_private_report_directory(report_root, destination.parent)
+    original_fsync = agentops.os.fsync
+    failed = False
+
+    def fail_first_directory_fsync(descriptor: int) -> None:
+        nonlocal failed
+        if not failed and agentops.stat.S_ISDIR(agentops.os.fstat(descriptor).st_mode):
+            failed = True
+            raise OSError("injected post-replace directory fsync failure")
+        original_fsync(descriptor)
+
+    monkeypatch.setattr(agentops.os, "fsync", fail_first_directory_fsync)
+    with pytest.raises(agentops.AgentOpsError, match="atomically publish"):
+        agentops._atomic_report_write(report_root, destination, "{}\n")
+    assert not destination.exists()
+    assert list(destination.parent.glob(".*.tmp")) == []
+
+    monkeypatch.setattr(agentops.os, "fsync", original_fsync)
+    source = tmp_path / "source"
+    source.mkdir()
+    report = {
+        "job_id": "job",
+        "status": "passed",
+        "base_ref": "base",
+        "branch": "branch",
+        "worktree": ".",
+        "intent": "race probe",
+        "scope": {"passed": True, "changed_files": [], "violations": []},
+        "gates": [],
+        "negative_controls": [],
+        "commit_hash": None,
+        "commit_decision": "none",
+    }
+    stamp_parent = report_root / "reports/agentops/job/race"
+    moved_parent = report_root / "moved-race"
+
+    def swap_parent_before_json() -> None:
+        stamp_parent.rename(moved_parent)
+        stamp_parent.symlink_to(source, target_is_directory=True)
+
+    with pytest.raises(agentops.AgentOpsError, match="no-follow|report directory"):
+        agentops.write_report(
+            report_root,
+            report,
+            "race",
+            before_json=swap_parent_before_json,
+        )
+    assert not (source / "report.json").exists()
+    assert not (moved_parent / "report.json").exists()
+    assert not (moved_parent / "report.md").exists()
+
+
+def test_report_revalidation_failure_invalidates_preexisting_pair(
+    tmp_path: Path,
+) -> None:
+    report_root = tmp_path / "reports-root"
+    report_root.mkdir(mode=0o700)
+    json_path, md_path = agentops.report_paths(report_root, "job", "stable")
+    agentops._ensure_private_report_directory(report_root, json_path.parent)
+    agentops._atomic_report_write(report_root, json_path, '{"status":"old"}\n')
+    agentops._atomic_report_write(report_root, md_path, "- Status: passed\n")
+    report = {
+        "job_id": "job",
+        "status": "passed",
+        "base_ref": "base",
+        "branch": "branch",
+        "worktree": ".",
+        "intent": "revalidation failure probe",
+        "scope": {"passed": True, "changed_files": [], "violations": []},
+        "gates": [],
+        "negative_controls": [],
+        "commit_hash": None,
+        "commit_decision": "none",
+    }
+
+    def reject_revalidation() -> None:
+        raise agentops.AgentOpsError("injected revalidation failure")
+
+    with pytest.raises(agentops.AgentOpsError, match="injected revalidation"):
+        agentops.write_report(
+            report_root,
+            report,
+            "stable",
+            before_json=reject_revalidation,
+        )
+    assert not json_path.exists()
+    assert not md_path.exists()
+
+
+def test_report_json_publication_uses_held_dirfd_across_post_verify_parent_swap(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    report_root = tmp_path / "reports-root"
+    report_root.mkdir(mode=0o700)
+    report = {
+        "job_id": "job",
+        "status": "passed",
+        "base_ref": "base",
+        "branch": "branch",
+        "worktree": ".",
+        "intent": "post-verification parent swap probe",
+        "scope": {"passed": True, "changed_files": [], "violations": []},
+        "gates": [],
+        "negative_controls": [],
+        "commit_hash": None,
+        "commit_decision": "none",
+    }
+    json_path, md_path = agentops.report_paths(report_root, "job", "race")
+    moved_parent = report_root / "moved-race"
+    original_write_at = agentops._atomic_report_write_at
+    publication_parent_identity: tuple[int, int] | None = None
+    swapped = False
+
+    def swap_after_verification_before_json(
+        parent_descriptor: int,
+        name: str,
+        text: str,
+        *,
+        display_path: Path,
+    ) -> None:
+        nonlocal publication_parent_identity, swapped
+        identity = agentops.os.fstat(parent_descriptor)
+        observed = (identity.st_dev, identity.st_ino)
+        if publication_parent_identity is None:
+            publication_parent_identity = observed
+        else:
+            assert observed == publication_parent_identity
+        if name == json_path.name and not swapped:
+            json_path.parent.rename(moved_parent)
+            json_path.parent.mkdir(mode=0o700)
+            json_path.write_text('{"status":"forged"}\n', encoding="utf-8")
+            md_path.write_text("- Status: forged\n", encoding="utf-8")
+            swapped = True
+        original_write_at(
+            parent_descriptor,
+            name,
+            text,
+            display_path=display_path,
+        )
+
+    monkeypatch.setattr(agentops, "_atomic_report_write_at", swap_after_verification_before_json)
+    with pytest.raises(agentops.AgentOpsError, match="directory custody changed"):
+        agentops.write_report(report_root, report, "race")
+
+    assert swapped
+    assert not json_path.exists()
+    assert not md_path.exists()
+    assert not (moved_parent / json_path.name).exists()
+    assert not (moved_parent / md_path.name).exists()
+
+
+def test_preflight_binding_read_rejects_parent_swap(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    report_root = tmp_path / "report-root"
+    report_root.mkdir(mode=0o700)
+    binding = report_root / "reports/agentops/job/preflight/report.json"
+    agentops._ensure_private_report_directory(report_root, binding.parent)
+    agentops._atomic_report_write(report_root, binding, "{}\n")
+    attacker = tmp_path / "attacker"
+    attacker.mkdir()
+    (attacker / "report.json").write_text('{"status":"forged"}\n', encoding="utf-8")
+    moved = report_root / "moved-binding"
+    original_read = agentops.os.read
+    swapped = False
+
+    def swap_during_read(descriptor: int, amount: int) -> bytes:
+        nonlocal swapped
+        chunk = original_read(descriptor, amount)
+        if not swapped:
+            swapped = True
+            binding.parent.rename(moved)
+            binding.parent.symlink_to(attacker, target_is_directory=True)
+        return chunk
+
+    monkeypatch.setattr(agentops.os, "read", swap_during_read)
+    with pytest.raises(agentops.AgentOpsError, match="directory|no-follow|custody"):
+        agentops._read_private_report_file(report_root, binding)
+
+
+def test_trusted_git_environment_is_minimal() -> None:
+    environment = agentops.trusted_git_environment(
+        {
+            "PATH": "/tmp/shims",
+            "LD_PRELOAD": "/tmp/loader.so",
+            "PYTHONPATH": "/tmp/python",
+            "MAKEFILES": "/tmp/makefile",
+            "GIT_CONFIG_GLOBAL": "/tmp/gitconfig",
+        }
+    )
+    assert environment == {
+        "PATH": agentops._TRUSTED_HOST_PATH,
+        "HOME": os.devnull,
+        "XDG_CONFIG_HOME": os.devnull,
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_ATTR_NOSYSTEM": "1",
+        "GIT_NO_REPLACE_OBJECTS": "1",
+        "GIT_OPTIONAL_LOCKS": "0",
+    }
+
+
+def test_admitted_direct_git_disables_repo_local_fsmonitor(
+    tmp_path: Path,
+) -> None:
+    repo = init_repo(tmp_path)
+    witness_environment = agentops.trusted_git_environment()
+    marker = tmp_path / "direct-git-fsmonitor-ran"
+    hook = repo / ".git/hooks/fsmonitor-agentops"
+    hook.parent.mkdir(parents=True, exist_ok=True)
+    hook.write_text(
+        f"#!/bin/sh\ntouch '{marker}'\nprintf '1\\n'\n",
+        encoding="utf-8",
+    )
+    hook.chmod(0o755)
+    assert (
+        subprocess.run(
+            ["git", "config", "core.fsmonitor", str(hook)],
+            cwd=repo,
+            env=witness_environment,
+            capture_output=True,
+            text=True,
+            check=False,
+        ).returncode
+        == 0
+    )
+
+    # Establish that the repository-local helper is live before exercising the
+    # admitted path; otherwise a marker assertion could false-pass.
+    assert (
+        subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=repo,
+            env=witness_environment,
+            capture_output=True,
+            text=True,
+            check=False,
+        ).returncode
+        == 0
+    )
+    assert marker.exists()
+    marker.unlink()
+
+    report_root = tmp_path / "direct-git-reports"
+    report_root.mkdir(mode=0o700)
+    environment = agentops._admission_gate_environment(report_root, repo, "packet")
+    gate = agentops.parse_gate(
+        {"name": "direct-git", "command": "git status --porcelain"}, 0
+    )
+    agentops.admit_gate_command(gate)
+    result = agentops.run_gate(
+        repo,
+        gate,
+        base_env=environment,
+        normalize_positive_executable=True,
+    )
+
+    assert result["passed"] is True
+    assert not marker.exists()
+
+
+def test_admitted_make_ignores_repo_venv_and_git_fsmonitor_shims(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_repo(tmp_path)
+    venv_python = repo / ".venv/bin/python"
+    venv_python.parent.mkdir(parents=True)
+    venv_python.write_text("#!/bin/sh\ntouch venv-executed\nexit 99\n", encoding="utf-8")
+    venv_python.chmod(0o755)
+    hook = repo / ".git/hooks/fsmonitor-agentops"
+    hook.parent.mkdir(parents=True, exist_ok=True)
+    hook.write_text("#!/bin/sh\ntouch fsmonitor-executed\necho\n", encoding="utf-8")
+    hook.chmod(0o755)
+    assert run(["git", "config", "core.fsmonitor", str(hook)], cwd=repo).returncode == 0
+    (repo / "Makefile").write_text(
+        "PYTHON ?= $(shell test -x .venv/bin/python && echo .venv/bin/python || echo python3)\n"
+        "docops-integrity:\n"
+        "\t@$(PYTHON) -c \"print('trusted')\"\n"
+        "\t@git status --porcelain >/dev/null\n",
+        encoding="utf-8",
+    )
+    report_root = tmp_path / "gate-reports"
+    report_root.mkdir(mode=0o700)
+    monkeypatch.setenv("PYTHONPATH", "/tmp/poison")
+    monkeypatch.setenv("MAKEFILES", "/tmp/poison.mk")
+    environment = agentops._admission_gate_environment(
+        report_root, repo, "packet"
+    )
+    gate = agentops.parse_gate(
+        {"name": "make", "command": "make docops-integrity"}, 0
+    )
+    agentops.admit_gate_command(gate)
+
+    result = agentops.run_gate(
+        repo,
+        gate,
+        base_env=environment,
+        normalize_positive_executable=True,
+    )
+
+    assert result["passed"] is True
+    assert not (repo / "venv-executed").exists()
+    assert not (repo / "fsmonitor-executed").exists()
+    assert "PYTHONPATH" not in environment
+    assert "MAKEFILES" not in environment
+    assert environment["GIT_CONFIG_VALUE_0"] == "false"
+    assert environment["GIT_CONFIG_VALUE_1"] == os.devnull
+
+
+def test_admission_rejects_repo_venv_before_sibling_git_can_run(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_repo(tmp_path)
+    venv_bin = repo / ".venv/bin"
+    venv_bin.mkdir(parents=True)
+    runner_python = venv_bin / "python"
+    runner_python.write_text("#!/bin/sh\nexit 99\n", encoding="utf-8")
+    runner_python.chmod(0o755)
+    marker = repo / "venv-git-executed"
+    venv_git = venv_bin / "git"
+    venv_git.write_text(
+        "#!/bin/sh\ntouch venv-git-executed\nexit 0\n",
+        encoding="utf-8",
+    )
+    venv_git.chmod(0o755)
+    monkeypatch.setattr(agentops.sys, "executable", str(runner_python))
+    report_root = tmp_path / "gate-reports"
+    report_root.mkdir(mode=0o700)
+
+    with pytest.raises(agentops.AgentOpsError, match="external to source"):
+        agentops._admission_gate_environment(report_root, repo, "packet")
+    assert not marker.exists()
+
+
+def test_admitted_make_rejects_interpreter_make_expansion(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_repo(tmp_path)
+    (repo / "Makefile").write_text("module-budget:\n\t@true\n", encoding="utf-8")
+    injected = repo / "auto-var-injected"
+    malicious = repo / "$(shell touch auto-var-injected)" / "python"
+    monkeypatch.setattr(agentops.sys, "executable", str(malicious))
+    gate = agentops.parse_gate(
+        {"name": "make", "command": "make module-budget"}, 0
+    )
+    agentops.admit_gate_command(gate)
+
+    with pytest.raises(agentops.AgentOpsError, match="Make-safe"):
+        agentops.run_gate(
+            repo,
+            gate,
+            base_env={"PATH": agentops._TRUSTED_HOST_PATH},
+            normalize_positive_executable=True,
+        )
+    assert not injected.exists()
+
+
+def test_negative_control_ignores_ambient_execution_injection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = init_repo(tmp_path)
+    shim_root = tmp_path / "shims"
+    shim_root.mkdir()
+    shim = shim_root / "python3"
+    shim.write_text("#!/bin/sh\ntouch ambient-python-ran\nexit 99\n", encoding="utf-8")
+    shim.chmod(0o755)
+    monkeypatch.setenv("PATH", str(shim_root))
+    monkeypatch.setenv("PYTHONPATH", "/tmp/ambient-pythonpath")
+    monkeypatch.setenv("MAKEFILES", "/tmp/ambient.mk")
+    fixture = tmp_path / "fixture"
+    fixture.mkdir()
+    safe = agentops._negative_environment(
+        repo, fixture, tmp_path / "jail", {}, jailed=False
+    )
+    assert safe["PYTHONPATH"] == str(fixture)
+    assert str(shim_root) not in safe["PATH"]
+    assert "MAKEFILES" not in safe
+    for key in ("PATH", "LD_PRELOAD", "DYLD_INSERT_LIBRARIES", "PYTHONHOME", "MAKEFILES"):
+        with pytest.raises(agentops.AgentOpsError, match="may not override"):
+            agentops._negative_environment(
+                repo,
+                tmp_path / f"fixture-{key}",
+                tmp_path / "jail",
+                {key: "attacker"},
+                jailed=False,
+            )
+
+    external_tmp = tmp_path / "negative-tmp"
+    external_tmp.mkdir()
+    gate = agentops.parse_gate(
+        {
+            "name": "negative-python",
+            "command": "python3 -c \"raise SystemExit(0)\"",
+            "expected_exit": 0,
+        },
+        0,
+        require_expected_exit=True,
+    )
+    result = agentops.run_negative_control(
+        repo, gate, temp_root=external_tmp
+    )
+    assert result["passed"] is True
+    assert not (repo / "ambient-python-ran").exists()
+
+
+@pytest.mark.parametrize("drift", ["branch", "status", "parent"])
+def test_preflight_final_revalidation_leaves_no_binding_on_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    drift: str,
+) -> None:
+    repo = init_session_repo(tmp_path)
+    payload = seal_packet(session_packet(repo))
+    external = write_external_packet(tmp_path, payload)
+    report_root = tmp_path / "preflight-reports"
+    original_atomic_write_at = agentops._atomic_report_write_at
+    mutated = False
+
+    def mutate_after_markdown(
+        parent_descriptor: int,
+        name: str,
+        text: str,
+        *,
+        display_path: Path,
+    ) -> None:
+        nonlocal mutated
+        original_atomic_write_at(
+            parent_descriptor, name, text, display_path=display_path
+        )
+        if name == "report.md" and not mutated:
+            mutated = True
+            if drift == "branch":
+                result = run(["git", "switch", "-c", "preflight-drift"], cwd=repo)
+                assert result.returncode == 0, result.stderr
+            else:
+                if drift == "status":
+                    (repo / "preflight-drift.txt").write_text(
+                        "dirty\n", encoding="utf-8"
+                    )
+                else:
+                    moved = report_root / "moved-preflight"
+                    display_path.parent.rename(moved)
+                    display_path.parent.symlink_to(repo, target_is_directory=True)
+
+    monkeypatch.setattr(agentops, "_atomic_report_write_at", mutate_after_markdown)
+    with pytest.raises(
+        agentops.AgentOpsError,
+        match="branch|clean HEAD|no-follow|report directory",
+    ):
+        agentops.execute_packet(
+            external,
+            source_root=repo,
+            preflight=True,
+            report_root=report_root,
+        )
+    packet = agentops.load_work_packet(external)
+    assert not agentops.preflight_binding_path(report_root, packet).exists()
+    assert not (repo / "report.json").exists()
+
+
+@pytest.mark.parametrize("drift", ["branch", "head"])
+def test_closeout_rejects_gate_induced_branch_or_head_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    drift: str,
+) -> None:
+    repo = init_session_repo(tmp_path)
+    payload = seal_packet(session_packet(repo))
+    external = write_external_packet(tmp_path, payload)
+    report_root = tmp_path / "closeout-reports"
+    exit_code, report = agentops.execute_packet(
+        external,
+        source_root=repo,
+        preflight=True,
+        report_root=report_root,
+    )
+    assert exit_code == 0 and report is not None
+    tracked = tracked_packet_path(repo, payload)
+    tracked.parent.mkdir(parents=True)
+    tracked.write_bytes(external.read_bytes())
+    stage_path(repo, tracked)
+    mutated = False
+
+    def mutate_gate(
+        _repo: Path,
+        gate: agentops.GateSpec,
+        **_kwargs: object,
+    ) -> dict[str, object]:
+        nonlocal mutated
+        if not mutated:
+            mutated = True
+            command = (
+                ["git", "switch", "-c", "closeout-drift"]
+                if drift == "branch"
+                else ["git", "commit", "-m", "gate moved HEAD"]
+            )
+            result = run(command, cwd=repo)
+            assert result.returncode == 0, result.stderr
+        return {
+            "name": gate.name,
+            "command": gate.command,
+            "expected_exit": gate.expected_exit,
+            "exit_code": gate.expected_exit,
+            "passed": True,
+            "timed_out": False,
+            "output": "",
+            "duration_seconds": 0.0,
+        }
+
+    def pass_control(
+        _repo: Path,
+        gate: agentops.GateSpec,
+        **_kwargs: object,
+    ) -> dict[str, object]:
+        return {
+            "name": gate.name,
+            "command": gate.command,
+            "expected_exit": gate.expected_exit,
+            "exit_code": gate.expected_exit,
+            "passed": True,
+            "timed_out": False,
+            "output": "",
+            "duration_seconds": 0.0,
+        }
+
+    monkeypatch.setattr(agentops, "run_gate", mutate_gate)
+    monkeypatch.setattr(agentops, "run_negative_control", pass_control)
+    with pytest.raises(agentops.AgentOpsError, match="branch changed|HEAD changed"):
+        agentops.execute_packet(
+            tracked,
+            source_root=repo,
+            closeout=True,
+            report_root=report_root,
+        )
+    assert len(list(report_root.rglob("report.json"))) == 1

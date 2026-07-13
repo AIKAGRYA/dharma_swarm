@@ -10,6 +10,7 @@ local commit candidate. It never merges or pushes.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import platform
@@ -22,10 +23,10 @@ import sysconfig
 import tempfile
 import time
 import types
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Iterable, Mapping
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
@@ -69,6 +70,30 @@ if _bootstrapped_operator_core:
 
 REPORT_ROOT = Path("reports") / "agentops"
 _TRUSTED_HOST_PATH = "/usr/sbin:/usr/bin:/sbin:/bin"
+_MAX_GATE_TIMEOUT_SECONDS = 300
+_MAX_ADMISSION_TIMEOUT_SECONDS = 480
+_MAX_BINDING_BYTES = 1_000_000
+_ONBOARDING_TRACK_ID = "onboard-one-door-2026-07"
+_CI_PACKET_PATH = re.compile(
+    r"^reports/agentops/work_packets/onboard-one-door-WP-O[^/]*\.json$"
+)
+_ACTIVE_TRACK_PATH = "docs/governance/ACTIVE_TRACK.yaml"
+_LIVE_TRACK_STATUSES = frozenset({"ACTIVE", "SHIPPABLE"})
+
+
+@dataclass(frozen=True)
+class _CiPacketBinding:
+    """Exact packet bytes and model accepted by CI discovery."""
+
+    path: Path
+    packet: WorkPacket
+    candidate_bytes: bytes
+    candidate_sha256: str
+
+
+def _has_live_track_authority(row: Mapping[str, Any] | None) -> bool:
+    return row is not None and str(row.get("status", "")).upper() in _LIVE_TRACK_STATUSES
+
 
 # --- O4-B11: positive command-family allowlist -------------------------------
 # One authoritative table (spec §WP-O4). Positive gates are admitted ONLY when
@@ -83,59 +108,103 @@ _TRUSTED_HOST_PATH = "/usr/sbin:/usr/bin:/sbin:/bin"
 # admission change, never a drive-by edit.
 
 _PYTHON_EXECUTABLES = frozenset({"python", "python3"})
-_ALLOWED_PYTHON_MODULE_PREFIXES = (
-    ("-m", "pytest"),
-    ("-m", "ruff", "check"),
-)
-_ALLOWED_REPO_SCRIPTS = frozenset({
-    "scripts/governance/agent_onboard.py",
-    "scripts/governance/check_track_status.py",
-    "scripts/governance/orientation_graph.py",
-    "scripts/governance/repo_status.py",
-    "scripts/governance/spine_bypass_report.py",
-    "scripts/governance/trust_gate_status.py",
-    "scripts/docops/check_docops_integrity.py",
-})
-# Long options that must never reach an allowlisted script, including every
-# argparse prefix-abbreviation of them (default abbreviation turns `--write`
-# into `--write-context`).
-_FORBIDDEN_SCRIPT_FLAGS = ("--write-context",)
-_ALLOWED_MAKE_VARIABLES = frozenset({"PACKET", "ARGS"})
-# Make expands `$(ARGS)`/`$(PACKET)` unquoted in a shell and runs `$(shell …)`
-# during recipe expansion, so a variable VALUE is executable surface. Confine
-# it to a conservative positive charset that excludes every shell/make
-# metacharacter (`$`, backtick, `;`, `|`, `&`, redirects, parens, glob, …).
-_SAFE_MAKE_VALUE = re.compile(r"^[A-Za-z0-9 _./=:,+-]*$")
+_TRUSTED_GIT_EXECUTABLES = frozenset({"git", "git.exe", "/usr/bin/git"})
+_ALLOWED_REPO_SCRIPT_ARGV = {
+    "scripts/governance/orientation_graph.py": {
+        (),
+        ("--json",),
+        ("--graph",),
+        ("--graph-json",),
+    },
+    "scripts/docops/check_docops_integrity.py": {()},
+}
+# Only no-argument, read-only Make recipes are admitted. The runner supplies
+# trusted interpreter variables after admission so repo-local `.venv` shims
+# cannot become a transitive executable route.
+_SAFE_GATE_TARGET = re.compile(r"^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$")
+_SAFE_PYTEST_SELECTOR = re.compile(r"^[A-Za-z0-9_ ()-]+$")
 _ALLOWED_MAKE_TARGETS = frozenset({
-    "onboard", "orient", "test", "test-fast", "docops-integrity",
-    "hygiene-check", "module-budget", "agent-build-preflight",
-    "agent-build-closeout",
+    "docops-integrity", "hygiene-check", "module-budget",
 })
+
+
+def _admit_make_argv(argv: list[str]) -> bool:
+    return len(argv) == 1 and argv[0] in _ALLOWED_MAKE_TARGETS
 
 
 def _is_trusted_python(token: str) -> bool:
     """A bare `python`/`python3`, or the exact running interpreter path.
 
-    A path-qualified shim (`./python3`, `/tmp/python3`) whose basename merely
-    looks trusted is rejected: ``subprocess.run`` executes the literal path,
-    not the basename."""
-    if token in _PYTHON_EXECUTABLES:
-        return True
-    try:
-        return Path(token).resolve() == Path(sys.executable).resolve()
-    except OSError:
+    Resolving arbitrary aliases here creates an admission/execution race: a
+    symlink can point at the running interpreter during admission and be
+    replaced before execution.  It also erases virtual-environment identity.
+    Keep the admitted path set lexical and finite; execution normalizes the
+    bare forms to this process's exact ``sys.executable`` spelling.
+    """
+    return token in _PYTHON_EXECUTABLES or token == sys.executable
+
+
+def _is_trusted_git(token: str) -> bool:
+    """Mirror the exact trusted executable forms admitted by the O1R parser.
+
+    Gate normalization replaces every admitted form with the trusted host Git,
+    so the Windows spelling is safe to accept even when CI runs on Linux.  No
+    other path-qualified executable is admitted.
+    """
+    normalized = token.lower().replace("\\", "/")
+    return normalized in _TRUSTED_GIT_EXECUTABLES or re.fullmatch(
+        r"c:/program files/git/cmd/git\.exe", normalized
+    ) is not None
+
+
+def _safe_gate_target(value: str, *, pytest: bool = False) -> bool:
+    path = value.split("::", 1)[0] if pytest else value
+    if not path or path.startswith(("/", "-")) or "\\" in path:
         return False
+    if any(part in {"", ".", ".."} for part in path.split("/")):
+        return False
+    if not _SAFE_GATE_TARGET.fullmatch(path):
+        return False
+    return not pytest or path == "tests" or path.startswith("tests/")
 
 
-def _has_forbidden_script_flag(script_args: list[str]) -> bool:
-    for arg in script_args:
-        if not arg.startswith("--"):
+def _admit_pytest_argv(argv: list[str]) -> bool:
+    index = 0
+    while index < len(argv):
+        token = argv[index]
+        if token == "-q":
+            index += 1
             continue
-        # arg is an abbreviation of a forbidden flag iff the forbidden flag
-        # starts with it (argparse admits any unambiguous prefix).
-        if any(forbidden.startswith(arg) for forbidden in _FORBIDDEN_SCRIPT_FLAGS):
-            return True
-    return False
+        if token == "-k":
+            if index + 1 >= len(argv) or not _SAFE_PYTEST_SELECTOR.fullmatch(
+                argv[index + 1]
+            ):
+                return False
+            index += 2
+            continue
+        if not _safe_gate_target(token, pytest=True):
+            return False
+        index += 1
+    return True
+
+
+def _admit_python_argv(argv: list[str]) -> bool:
+    if argv[:2] == ["-m", "pytest"]:
+        return _admit_pytest_argv(argv[2:])
+    if argv[:3] == ["-m", "ruff", "check"]:
+        targets = argv[3:]
+        return bool(targets) and all(_safe_gate_target(target) for target in targets)
+    if not argv or not argv[0].startswith("scripts/"):
+        return False
+    allowed = _ALLOWED_REPO_SCRIPT_ARGV.get(argv[0])
+    if allowed is not None and tuple(argv[1:]) in allowed:
+        return True
+    return (
+        argv[0] == "scripts/docops/check_docops_integrity.py"
+        and len(argv) == 3
+        and argv[1] == "--changed-from"
+        and re.fullmatch(r"[0-9a-fA-F]{40}", argv[2]) is not None
+    )
 
 
 def admit_gate_command(gate: GateSpec) -> None:
@@ -148,38 +217,18 @@ def admit_gate_command(gate: GateSpec) -> None:
         raise AgentOpsError(
             f"gate command may not carry packet-supplied environment: {command}")
     head = argv[0]
-    if head == "git":
-        # Bare `git` only; shape + executable identity (incl. path-qualified
-        # shim rejection) are already validated by the O1R direct-Git grammar
-        # in parse_gate. A path-qualified git falls through to the final raise.
+    if _is_trusted_git(head):
+        # Shape + executable identity are already validated by the O1R direct-
+        # Git grammar in parse_gate.  B11 admits the same exact executable
+        # spellings, then execution normalizes all of them to trusted host Git.
         return
     if _is_trusted_python(head):
-        rest = tuple(argv[1:])
-        for prefix in _ALLOWED_PYTHON_MODULE_PREFIXES:
-            if rest[: len(prefix)] == prefix:
-                return
-        if argv[1:2] and argv[1].startswith("scripts/"):
-            script, script_args = argv[1], argv[2:]
-            if script in _ALLOWED_REPO_SCRIPTS and not _has_forbidden_script_flag(
-                script_args
-            ):
-                return
+        if _admit_python_argv(argv[1:]):
+            return
         raise AgentOpsError(
             f"gate command is outside the positive interpreter allowlist: {command}")
     if head == "make":
-        targets = [token for token in argv[1:] if "=" not in token]
-        for token in argv[1:]:
-            if "=" not in token:
-                continue
-            key, _, value = token.partition("=")
-            if key not in _ALLOWED_MAKE_VARIABLES:
-                raise AgentOpsError(
-                    f"gate command uses a non-allowlisted make variable {key!r}: {command}")
-            if not _SAFE_MAKE_VALUE.fullmatch(value):
-                raise AgentOpsError(
-                    f"gate command make variable {key!r} value carries shell/make "
-                    f"metacharacters: {command}")
-        if len(targets) == 1 and targets[0] in _ALLOWED_MAKE_TARGETS:
+        if _admit_make_argv(argv[1:]):
             return
         raise AgentOpsError(
             f"gate command is outside the positive make-target allowlist: {command}")
@@ -204,14 +253,21 @@ def run_command(
 def trusted_git_environment(
     inherited: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
-    source = os.environ if inherited is None else inherited
+    del inherited  # inherited loader/Python/Make/Git injection is never trusted
     environment = {
-        key: value
-        for key, value in source.items()
-        if not key.casefold().startswith("git_")
+        "PATH": _TRUSTED_HOST_PATH,
+        # Disable implicit per-user ignore/attribute discovery as well as Git
+        # configuration.  GIT_CONFIG_GLOBAL alone does not suppress the
+        # default $XDG_CONFIG_HOME/git/ignore path.
+        "HOME": os.devnull,
+        "XDG_CONFIG_HOME": os.devnull,
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
     }
     environment["GIT_CONFIG_GLOBAL"] = os.devnull
     environment["GIT_CONFIG_NOSYSTEM"] = "1"
+    environment["GIT_ATTR_NOSYSTEM"] = "1"
+    environment["GIT_NO_REPLACE_OBJECTS"] = "1"
     environment["GIT_OPTIONAL_LOCKS"] = "0"
     return environment
 
@@ -237,12 +293,41 @@ def trusted_git_identity_probe_environment(
 
 def run_git(args: list[str], *, cwd: Path, check: bool = True) -> subprocess.CompletedProcess[str]:
     result = run_command(
-        ["git", *args],
+        [
+            "git",
+            "-c", "core.fsmonitor=false",
+            "-c", f"core.hooksPath={os.devnull}",
+            *args,
+        ],
         cwd=cwd,
         env=trusted_git_environment(),
     )
     if check and result.returncode != 0:
         detail = (result.stderr or result.stdout).strip()
+        raise AgentOpsError(f"git {' '.join(args)} failed: {detail}")
+    return result
+
+
+def run_git_bytes(
+    args: list[str], *, cwd: Path, check: bool = True,
+) -> subprocess.CompletedProcess[bytes]:
+    result = subprocess.run(
+        [
+            "git",
+            "-c", "core.fsmonitor=false",
+            "-c", f"core.hooksPath={os.devnull}",
+            *args,
+        ],
+        cwd=cwd,
+        env=trusted_git_environment(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if check and result.returncode != 0:
+        detail = (result.stderr or result.stdout).decode(
+            "utf-8", errors="surrogateescape"
+        ).strip()
         raise AgentOpsError(f"git {' '.join(args)} failed: {detail}")
     return result
 
@@ -355,7 +440,7 @@ def _probe_tool_version(name: str, repo_root: Path) -> str:
     if name == "git":
         result = run_git(["--version"], cwd=repo_root, check=False)
     elif name == "make":
-        result = run_command(["make", "--version"], cwd=repo_root)
+        result = run_command([_trusted_host_tool("make"), "--version"], cwd=repo_root)
     else:
         raise AgentOpsError(f"session_entry declares unsupported tool: {name}")
     if result.returncode != 0:
@@ -371,7 +456,11 @@ def load_raw_packet(
     *,
     content: bytes | None = None,
 ) -> dict[str, Any]:
-    text = (path.read_bytes() if content is None else content).decode("utf-8")
+    try:
+        raw = path.read_bytes() if content is None else content
+        text = raw.decode("utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise AgentOpsError(f"cannot read UTF-8 work packet {path}: {exc}") from exc
     suffix = path.suffix.lower()
     if suffix == ".json":
         data = json.loads(text)
@@ -394,11 +483,48 @@ def load_work_packet(
 ) -> WorkPacket:
     return parse_work_packet(load_raw_packet(path, content=content))
 
-def git_lines(repo_root: Path, args: list[str]) -> list[str]:
-    output = run_git(args, cwd=repo_root).stdout
-    return [line.strip().replace("\\", "/") for line in output.splitlines() if line.strip()]
+
+def _read_packet_bytes(path: Path) -> bytes:
+    try:
+        return path.read_bytes()
+    except OSError as exc:
+        raise AgentOpsError(f"cannot read work packet {path}: {exc}") from exc
+
+def git_nul_records(repo_root: Path, args: list[str]) -> list[str]:
+    """Return exact NUL-delimited Git records without pathname normalization."""
+    output = run_git_bytes(args, cwd=repo_root).stdout
+    if not output:
+        return []
+    if not output.endswith(b"\0"):
+        raise AgentOpsError("Git pathname output was not NUL terminated")
+    records = output[:-1].split(b"\0")
+    if any(not record for record in records):
+        raise AgentOpsError("Git pathname output contained an empty record")
+    return [os.fsdecode(record) for record in records]
+
+
+def _validate_observed_git_paths(paths: Iterable[str]) -> None:
+    for path in paths:
+        try:
+            path.encode("utf-8", errors="strict")
+        except UnicodeEncodeError as exc:
+            raise AgentOpsError("Git path is not valid UTF-8") from exc
+        components = path.split("/")
+        if (
+            not path
+            or path.startswith("/")
+            or "\0" in path
+            or any(component in {"", ".", ".."} for component in components)
+        ):
+            raise AgentOpsError(f"Git reported a non-relative governed path: {path!r}")
+        if "\\" in path:
+            raise AgentOpsError(
+                f"Git path contains an ambiguous backslash spelling: {path!r}"
+            )
+
 
 def git_status(repo_root: Path) -> str:
+    _reject_local_repository_controls(repo_root, base_ref=None)
     return run_git(["status", "--short"], cwd=repo_root).stdout
 
 
@@ -424,10 +550,474 @@ def git_object_id_for_bytes(
     return result.stdout.decode("ascii").strip()
 
 
-def inspect_scope(repo_root: Path, packet: WorkPacket) -> ScopeState:
-    tracked = sorted(set(git_lines(repo_root, ["diff", "--name-only"])))
-    staged = sorted(set(git_lines(repo_root, ["diff", "--name-only", "--cached"])))
-    untracked = sorted(set(git_lines(repo_root, ["ls-files", "--others", "--exclude-standard"])))
+def _reject_hidden_index_flags(repo_root: Path) -> None:
+    hidden = sorted(
+        row
+        for row in git_nul_records(repo_root, ["ls-files", "-v", "-z"])
+        if not row.startswith("H ")
+    )
+    if hidden:
+        raise AgentOpsError(
+            "governed scope rejects hidden, sparse, or special index flags: "
+            f"{hidden}"
+        )
+
+
+def _local_git_info_text(repo_root: Path, relative: str) -> str:
+    raw_path = run_git(
+        ["rev-parse", "--git-path", relative], cwd=repo_root
+    ).stdout.strip()
+    control_path = Path(raw_path).expanduser()
+    if not control_path.is_absolute():
+        control_path = repo_root / control_path
+    try:
+        parent = control_path.parent.resolve(strict=True)
+    except FileNotFoundError:
+        return ""
+    except OSError as exc:
+        raise AgentOpsError(f"cannot inspect local Git {relative}: {exc}") from exc
+    if not any(_is_within(parent, root) for root in _git_admin_roots(repo_root)):
+        raise AgentOpsError(f"local Git {relative} escapes Git administration state")
+    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
+        raise AgentOpsError("local Git control inspection requires no-follow reads")
+    directory_flags = (
+        os.O_RDONLY
+        | os.O_DIRECTORY
+        | os.O_NOFOLLOW
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+    descriptors: list[int] = []
+    descriptor: int | None = None
+    try:
+        descriptors.append(os.open(parent.anchor, directory_flags))
+        for component in parent.parts[1:]:
+            descriptors.append(
+                os.open(component, directory_flags, dir_fd=descriptors[-1])
+            )
+        file_flags = (
+            os.O_RDONLY
+            | os.O_NOFOLLOW
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NONBLOCK", 0)
+        )
+        try:
+            descriptor = os.open(
+                control_path.name,
+                file_flags,
+                dir_fd=descriptors[-1],
+            )
+        except FileNotFoundError:
+            return ""
+        identity = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(identity.st_mode)
+            or identity.st_size > _MAX_BINDING_BYTES
+        ):
+            raise AgentOpsError(
+                f"local Git {relative} must be a bounded regular file"
+            )
+        chunks: list[bytes] = []
+        remaining = _MAX_BINDING_BYTES + 1
+        while remaining:
+            chunk = os.read(descriptor, min(65_536, remaining))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        if remaining == 0:
+            raise AgentOpsError(f"local Git {relative} exceeds the read limit")
+        current = os.stat(
+            control_path.name,
+            dir_fd=descriptors[-1],
+            follow_symlinks=False,
+        )
+        if current.st_dev != identity.st_dev or current.st_ino != identity.st_ino:
+            raise AgentOpsError(f"local Git {relative} custody changed during read")
+        verification = parent.resolve(strict=True)
+        verified = os.stat(verification, follow_symlinks=False)
+        held_parent = os.fstat(descriptors[-1])
+        if (
+            verified.st_dev != held_parent.st_dev
+            or verified.st_ino != held_parent.st_ino
+        ):
+            raise AgentOpsError(
+                f"local Git {relative} directory changed during read"
+            )
+        return b"".join(chunks).decode("utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise AgentOpsError(f"cannot read UTF-8 local Git {relative}: {exc}") from exc
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        for item in reversed(descriptors):
+            os.close(item)
+
+
+def _reject_config_values(repo_root: Path, key: str) -> None:
+    configured = run_git(
+        ["config", "--includes", "--get-all", key],
+        cwd=repo_root,
+        check=False,
+    )
+    if configured.returncode not in (0, 1):
+        detail = (configured.stderr or configured.stdout).strip()
+        raise AgentOpsError(f"cannot inspect local Git {key}: {detail}")
+    if configured.returncode == 0 and configured.stdout.splitlines():
+        raise AgentOpsError(f"governed scope rejects repository-local {key}")
+
+
+def _reject_mutable_gitattributes(
+    repo_root: Path, *, base_ref: str | None,
+) -> None:
+    def attribute_paths(paths: Iterable[str]) -> list[str]:
+        return sorted(
+            path for path in paths if path.rsplit("/", 1)[-1] == ".gitattributes"
+        )
+
+    indexed_paths = set(git_nul_records(repo_root, ["ls-files", "-z"]))
+    untracked = attribute_paths(
+        path for path in _filesystem_leaf_paths(repo_root) if path not in indexed_paths
+    )
+    if untracked:
+        raise AgentOpsError(
+            f"governed scope rejects untracked .gitattributes controls: {untracked}"
+        )
+    staged = attribute_paths(
+        git_nul_records(
+            repo_root,
+            [
+                "diff", "--cached", "--no-ext-diff", "--no-textconv",
+                "--no-renames", "--name-only", "-z", "--",
+            ],
+        )
+    )
+    if staged:
+        raise AgentOpsError(
+            f"governed scope requires stable staged .gitattributes policy: {staged}"
+        )
+    tracked = attribute_paths(git_nul_records(repo_root, ["ls-files", "-z"]))
+    for path in tracked:
+        index_rows = git_nul_records(
+            repo_root,
+            [
+                "--literal-pathspecs", "ls-files", "--stage", "-z", "--", path,
+            ],
+        )
+        index_meta = index_rows[0].split("\t", 1)[0].split() if len(index_rows) == 1 else []
+        if len(index_meta) != 3 or index_meta[0] not in {"100644", "100755"} or index_meta[2] != "0":
+            raise AgentOpsError(f"tracked .gitattributes has unsafe index custody: {path}")
+        index_oid = index_meta[1]
+        head_rows = git_nul_records(
+            repo_root,
+            ["--literal-pathspecs", "ls-tree", "-z", "HEAD", "--", path],
+        )
+        head_meta = head_rows[0].split("\t", 1)[0].split() if len(head_rows) == 1 else []
+        if len(head_meta) != 3 or head_meta[2] != index_oid:
+            raise AgentOpsError(f"tracked .gitattributes is staged or HEAD-ambiguous: {path}")
+        snapshot = _read_regular_worktree_file(repo_root, path)
+        if snapshot is None:
+            raise AgentOpsError(f"tracked .gitattributes is absent: {path}")
+        worktree_mode, content = snapshot
+        if worktree_mode != index_meta[0]:
+            raise AgentOpsError(f"tracked .gitattributes has mode drift: {path}")
+        if git_object_id_for_bytes(repo_root, content) != index_oid:
+            raise AgentOpsError(f"tracked .gitattributes has working-tree drift: {path}")
+    if base_ref is not None:
+        committed = attribute_paths(
+            git_nul_records(
+                repo_root,
+                [
+                    "diff", "--no-ext-diff", "--no-textconv", "--no-renames",
+                    "--name-only", "-z", f"{base_ref}...HEAD", "--",
+                ],
+            )
+        )
+        if committed:
+            raise AgentOpsError(
+                f"governed scope requires stable .gitattributes policy: {committed}"
+            )
+
+
+def _reject_local_repository_controls(
+    repo_root: Path, *, base_ref: str | None,
+) -> None:
+    """Reject local filters/ignore state that can falsify Git scope evidence."""
+    _reject_config_values(repo_root, "core.excludesFile")
+    _reject_config_values(repo_root, "core.attributesFile")
+    filters = run_git(
+        ["config", "--includes", "--get-regexp", r"^filter\."],
+        cwd=repo_root,
+        check=False,
+    )
+    if filters.returncode not in (0, 1):
+        detail = (filters.stderr or filters.stdout).strip()
+        raise AgentOpsError(f"cannot inspect local Git filter configuration: {detail}")
+    if filters.returncode == 0 and filters.stdout.splitlines():
+        raise AgentOpsError("governed scope rejects repository-local filter.* config")
+    for relative in ("info/exclude", "info/attributes", "info/grafts"):
+        text = _local_git_info_text(repo_root, relative)
+        active = [
+            line for line in text.splitlines()
+            if line.strip() and not line.startswith("#")
+        ]
+        if active:
+            raise AgentOpsError(
+                f"governed scope rejects active repository-local .git/{relative} entries"
+            )
+    _reject_mutable_gitattributes(repo_root, base_ref=base_ref)
+
+
+def _index_entries(repo_root: Path) -> dict[str, tuple[str, str]]:
+    """Return the exact stage-0 index map as path -> (mode, object id)."""
+    entries: dict[str, tuple[str, str]] = {}
+    records = git_nul_records(repo_root, ["ls-files", "--stage", "-z"])
+    for record in records:
+        metadata, separator, path = record.partition("\t")
+        fields = metadata.split()
+        if not separator or len(fields) != 3 or fields[2] != "0":
+            raise AgentOpsError("governed scope rejects ambiguous Git index stages")
+        if path in entries:
+            raise AgentOpsError(f"governed scope rejects duplicate index path: {path!r}")
+        entries[path] = (fields[0], fields[1])
+    _validate_observed_git_paths(entries)
+    return entries
+
+
+def _tree_entries(repo_root: Path, ref: str) -> dict[str, tuple[str, str]]:
+    """Return an exact recursive tree map without attributes or diff drivers."""
+    entries: dict[str, tuple[str, str]] = {}
+    records = git_nul_records(
+        repo_root, ["ls-tree", "-r", "--full-tree", "-z", ref]
+    )
+    for record in records:
+        metadata, separator, path = record.partition("\t")
+        fields = metadata.split()
+        if not separator or len(fields) != 3:
+            raise AgentOpsError(f"cannot parse governed Git tree entry at {ref}")
+        if path in entries:
+            raise AgentOpsError(f"governed tree contains duplicate path: {path!r}")
+        entries[path] = (fields[0], fields[2])
+    _validate_observed_git_paths(entries)
+    return entries
+
+
+def _git_blob_oid(content: bytes, *, object_format: str) -> str:
+    """Hash raw bytes using Git's blob framing, without filters or subprocesses."""
+    if object_format not in {"sha1", "sha256"}:
+        raise AgentOpsError(f"unsupported Git object format: {object_format!r}")
+    digest = hashlib.new(object_format)
+    digest.update(f"blob {len(content)}\0".encode("ascii"))
+    digest.update(content)
+    return digest.hexdigest()
+
+
+def _filesystem_leaf_paths(repo_root: Path) -> list[str]:
+    """Enumerate source leaves without Git ignore or case-folding policy."""
+    root = repo_root.resolve()
+    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
+        raise AgentOpsError("governed scope requires no-follow directory enumeration")
+    directory_flags = (
+        os.O_RDONLY
+        | os.O_DIRECTORY
+        | os.O_NOFOLLOW
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+    leaves: list[str] = []
+    try:
+        root_descriptor = os.open(root, directory_flags)
+    except OSError as exc:
+        raise AgentOpsError(f"cannot open governed source root: {exc}") from exc
+    pending: list[tuple[int, str]] = [(root_descriptor, "")]
+
+    def close_pending() -> None:
+        while pending:
+            descriptor, _ = pending.pop()
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+
+    while pending:
+        directory_descriptor, prefix = pending.pop()
+        try:
+            with os.scandir(directory_descriptor) as iterator:
+                entries = list(iterator)
+        except OSError as exc:
+            os.close(directory_descriptor)
+            close_pending()
+            raise AgentOpsError(f"cannot enumerate governed source tree: {exc}") from exc
+        try:
+            for entry in entries:
+                relative = f"{prefix}/{entry.name}" if prefix else entry.name
+                if relative == ".git":
+                    continue
+                try:
+                    is_directory = entry.is_dir(follow_symlinks=False)
+                except OSError as exc:
+                    close_pending()
+                    raise AgentOpsError(
+                        f"cannot inspect governed source path {relative!r}: {exc}"
+                    ) from exc
+                if is_directory:
+                    try:
+                        child_descriptor = os.open(
+                            entry.name,
+                            directory_flags,
+                            dir_fd=directory_descriptor,
+                        )
+                    except OSError as exc:
+                        close_pending()
+                        raise AgentOpsError(
+                            f"governed source directory changed during enumeration: "
+                            f"{relative!r}: {exc}"
+                        ) from exc
+                    pending.append((child_descriptor, relative))
+                else:
+                    # Regular files, symlinks, FIFOs, sockets, and devices all
+                    # affect the executable source surface and are leaves.
+                    leaves.append(relative)
+        finally:
+            os.close(directory_descriptor)
+    _validate_observed_git_paths(leaves)
+    return sorted(set(leaves))
+
+
+def _exact_live_scope_paths(
+    repo_root: Path,
+) -> tuple[list[str], list[str], list[str]]:
+    """Return raw worktree, staged, and all-untracked path classes.
+
+    This deliberately does not trust ``git status`` or worktree ``git diff``:
+    clean filters, autocrlf, stat-cache tricks, and core.fileMode can otherwise
+    make changed executable bytes or modes appear clean.  Every tracked regular
+    file is read no-follow and hashed using Git's raw blob framing.
+    """
+    index = _index_entries(repo_root)
+    head = _tree_entries(repo_root, "HEAD")
+    staged = sorted(
+        path for path in set(index) | set(head) if index.get(path) != head.get(path)
+    )
+    object_format = run_git(
+        ["rev-parse", "--show-object-format"], cwd=repo_root
+    ).stdout.strip()
+    working: list[str] = []
+    for path, (index_mode, index_oid) in sorted(index.items()):
+        if index_mode in {"100644", "100755"}:
+            snapshot = _read_regular_worktree_file(repo_root, path)
+            if snapshot is None:
+                working.append(path)
+                continue
+            worktree_mode, content = snapshot
+            if (
+                worktree_mode != index_mode
+                or _git_blob_oid(content, object_format=object_format) != index_oid
+            ):
+                working.append(path)
+            continue
+        if index_mode == "120000":
+            link_bytes = _read_symlink_worktree_file(repo_root, path)
+            if link_bytes is None:
+                working.append(path)
+                continue
+            if _git_blob_oid(link_bytes, object_format=object_format) != index_oid:
+                working.append(path)
+            continue
+        raise AgentOpsError(
+            f"governed scope rejects unsupported tracked mode {index_mode}: {path}"
+        )
+    # Do not ask Git which files are untracked: core.ignoreCase and ignore
+    # controls can omit executable leaves.  Compare an independent no-follow
+    # filesystem enumeration with the exact index instead.
+    untracked = sorted(set(_filesystem_leaf_paths(repo_root)) - set(index))
+    _validate_observed_git_paths([*working, *staged, *untracked])
+    return sorted(set(working)), staged, untracked
+
+
+
+def _changed_path_mode_violations(
+    repo_root: Path,
+    *,
+    committed_paths: list[str],
+    staged_paths: list[str],
+    working_paths: list[str],
+) -> list[dict[str, Any]]:
+    findings: dict[str, list[str]] = {}
+
+    def record(path: str, layer: str, mode: str) -> None:
+        findings.setdefault(path, []).append(f"{layer}:{mode}")
+
+    for path in sorted(set(committed_paths)):
+        rows = git_nul_records(
+            repo_root,
+            ["--literal-pathspecs", "ls-tree", "-z", "HEAD", "--", path],
+        )
+        if not rows:  # deletion at HEAD is allowed
+            continue
+        mode = rows[0].split(maxsplit=1)[0]
+        if len(rows) != 1 or mode not in {"100644", "100755"}:
+            record(path, "HEAD", mode or "ambiguous")
+
+    for path in sorted(set(staged_paths)):
+        rows = git_nul_records(
+            repo_root,
+            ["--literal-pathspecs", "ls-files", "--stage", "-z", "--", path],
+        )
+        if not rows:  # staged deletion is allowed
+            continue
+        fields = rows[0].split(maxsplit=3) if len(rows) == 1 else []
+        mode = fields[0] if fields else "ambiguous"
+        stage = fields[2] if len(fields) == 4 else "ambiguous"
+        if len(rows) != 1 or mode not in {"100644", "100755"} or stage != "0":
+            record(path, "index", f"{mode}/stage-{stage}")
+
+    for path in sorted(set(working_paths)):
+        try:
+            metadata = os.lstat(repo_root / path)
+        except FileNotFoundError:  # working deletion is allowed
+            continue
+        except OSError as exc:
+            raise AgentOpsError(f"cannot inspect governed worktree path {path}: {exc}") from exc
+        if not stat.S_ISREG(metadata.st_mode):
+            record(path, "worktree", oct(stat.S_IFMT(metadata.st_mode)))
+
+    return [
+        {
+            "path": path,
+            "reason": "non_regular_mode",
+            "patterns": sorted(layers),
+        }
+        for path, layers in sorted(findings.items())
+    ]
+
+
+def inspect_scope(
+    repo_root: Path,
+    packet: WorkPacket,
+    *,
+    base_ref: str | None = None,
+) -> ScopeState:
+    """Inspect the complete packet diff with one forbidden-first matcher.
+
+    ``base_ref`` turns on closeout semantics: committed ``base...HEAD`` paths
+    are folded into the same tracked bucket as unstaged paths.  Staged and
+    untracked paths remain separately visible, while ``changed_files`` is the
+    de-duplicated union used by the existing scope policy.
+    """
+    _reject_hidden_index_flags(repo_root)
+    _reject_local_repository_controls(repo_root, base_ref=base_ref)
+    unstaged, staged, untracked = _exact_live_scope_paths(repo_root)
+    if base_ref is not None:
+        base = _tree_entries(repo_root, base_ref)
+        head = _tree_entries(repo_root, "HEAD")
+        committed = sorted(
+            path
+            for path in set(base) | set(head)
+            if base.get(path) != head.get(path)
+        )
+    else:
+        committed = []
+    tracked = sorted(set(committed + unstaged))
+    _validate_observed_git_paths([*committed, *unstaged, *staged, *untracked])
     changed = sorted(set(tracked + staged + untracked))
     violations: list[dict[str, Any]] = []
     for path in changed:
@@ -437,6 +1027,14 @@ def inspect_scope(repo_root: Path, packet: WorkPacket) -> ScopeState:
             violations.append({"path": path, "reason": "forbidden", "patterns": forbidden})
         elif not allowed:
             violations.append({"path": path, "reason": "outside_allowed_scope", "patterns": []})
+    violations.extend(
+        _changed_path_mode_violations(
+            repo_root,
+            committed_paths=committed,
+            staged_paths=staged,
+            working_paths=sorted(set(unstaged + untracked)),
+        )
+    )
     return ScopeState(
         tracked_changed_files=tracked,
         staged_files=staged,
@@ -464,10 +1062,15 @@ def verify_base_is_ancestor(repo_root: Path, base_hash: str) -> None:
         raise AgentOpsError(f"target worktree HEAD does not contain base_ref {base_hash}")
 
 
-def _packet_target(source_root: Path, packet: WorkPacket) -> Path:
+def _require_portable_session_worktree(packet: WorkPacket) -> None:
     if packet.session_entry is not None:
         if packet.worktree != Path("."):
             raise AgentOpsError('session_entry packets require portable worktree "."')
+
+
+def _packet_target(source_root: Path, packet: WorkPacket) -> Path:
+    _require_portable_session_worktree(packet)
+    if packet.session_entry is not None:
         return source_root
     return packet.worktree.expanduser().resolve()
 
@@ -500,22 +1103,453 @@ def prepare_worktree(source_root: Path, packet: WorkPacket) -> Path:
     return target_root
 
 
-def _active_tracks(repo_root: Path) -> list[dict[str, Any]]:
-    path = repo_root / "docs/governance/ACTIVE_TRACK.yaml"
+def _parse_active_tracks_document(text: str, *, source: str) -> list[dict[str, Any]]:
     try:
-        text = path.read_text(encoding="utf-8")
         try:
             data = json.loads(text)
         except json.JSONDecodeError:
             import yaml  # type: ignore[import-not-found]
 
-            data = yaml.safe_load(text)
-    except (OSError, ValueError) as exc:
-        raise AgentOpsError(f"cannot read active-track owner config: {exc}") from exc
+            try:
+                data = yaml.safe_load(text)
+            except Exception as exc:
+                raise AgentOpsError(f"invalid YAML work packet: {exc}") from exc
+    except Exception as exc:
+        # PyYAML exposes parser/scanner errors outside ValueError. Keep the
+        # owner-policy boundary fail-closed without leaking parser tracebacks.
+        raise AgentOpsError(
+            f"cannot parse active-track owner config {source}: {exc}"
+        ) from exc
     rows = data.get("active_tracks") if isinstance(data, dict) else None
     if not isinstance(rows, list):
         raise AgentOpsError("ACTIVE_TRACK.yaml active_tracks must be a list")
-    return [row for row in rows if isinstance(row, dict)]
+    result: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict):
+            raise AgentOpsError(f"ACTIVE_TRACK.yaml row {index} must be an object")
+        track_id = row.get("id")
+        status_value = row.get("status")
+        owner = row.get("owner")
+        surfaces = row.get("owned_surfaces")
+        if not isinstance(track_id, str) or not track_id.strip():
+            raise AgentOpsError(f"ACTIVE_TRACK.yaml row {index} has invalid id")
+        if track_id in seen_ids:
+            raise AgentOpsError(f"ACTIVE_TRACK.yaml contains duplicate id: {track_id}")
+        if not isinstance(status_value, str) or not status_value.strip():
+            raise AgentOpsError(f"ACTIVE_TRACK.yaml {track_id} has invalid status")
+        if not isinstance(owner, str) or not owner.strip():
+            raise AgentOpsError(f"ACTIVE_TRACK.yaml {track_id} has invalid owner")
+        if not isinstance(surfaces, list) or not surfaces or not all(
+            isinstance(surface, str) and surface.strip() for surface in surfaces
+        ):
+            raise AgentOpsError(
+                f"ACTIVE_TRACK.yaml {track_id} has invalid owned_surfaces"
+            )
+        if len(set(surfaces)) != len(surfaces):
+            raise AgentOpsError(
+                f"ACTIVE_TRACK.yaml {track_id} repeats an owned surface"
+            )
+        seen_ids.add(track_id)
+        result.append(dict(row))
+    return result
+
+
+def _active_tracks(repo_root: Path) -> list[dict[str, Any]]:
+    path = repo_root / "docs/governance/ACTIVE_TRACK.yaml"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise AgentOpsError(f"cannot read active-track owner config: {exc}") from exc
+    return _parse_active_tracks_document(text, source=str(path))
+
+
+def _active_tracks_at(repo_root: Path, commit: str) -> list[dict[str, Any]]:
+    try:
+        result = run_git(
+            ["show", f"{commit}:docs/governance/ACTIVE_TRACK.yaml"],
+            cwd=repo_root,
+            check=False,
+        )
+    except (OSError, UnicodeError) as exc:
+        raise AgentOpsError(
+            f"cannot read active-track owner config at {commit}: {exc}"
+        ) from exc
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip()
+        raise AgentOpsError(
+            f"cannot read active-track owner config at {commit}: {detail}"
+        )
+    return _parse_active_tracks_document(
+        result.stdout,
+        source=f"{commit}:docs/governance/ACTIVE_TRACK.yaml",
+    )
+
+
+def _exact_event_sha(repo_root: Path, value: str, *, field: str) -> str:
+    if not re.fullmatch(r"[0-9a-f]{40}", value):
+        raise AgentOpsError(f"CI {field} must be an exact 40-character commit SHA")
+    result = run_git(
+        ["rev-parse", "--verify", f"{value}^{{commit}}"],
+        cwd=repo_root,
+        check=False,
+    )
+    resolved = result.stdout.strip()
+    if result.returncode != 0 or resolved != value:
+        raise AgentOpsError(f"CI {field} does not resolve exactly: {value}")
+    return resolved
+
+
+def _ci_track_from_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    matches = [
+        row
+        for row in rows
+        if row.get("id") == _ONBOARDING_TRACK_ID
+        and _has_live_track_authority(row)
+    ]
+    if len(matches) != 1:
+        raise AgentOpsError(
+            "CI packet discovery requires exactly one live onboarding track"
+        )
+    patterns = matches[0].get("owned_surfaces")
+    if not isinstance(patterns, list) or not patterns or not all(
+        isinstance(pattern, str) and pattern for pattern in patterns
+    ):
+        raise AgentOpsError("CI onboarding track owned_surfaces is missing or malformed")
+    return matches[0]
+
+
+def _ci_track(repo_root: Path) -> dict[str, Any]:
+    return _ci_track_from_rows(_active_tracks(repo_root))
+
+
+def _ci_authority_context(
+    base_rows: list[dict[str, Any]],
+    head_rows: list[dict[str, Any]],
+) -> tuple[dict[str, Any] | None, list[str], dict[str, list[str]]]:
+    # Status transition truth table: each ACTIVE/SHIPPABLE endpoint contributes
+    # its surfaces; the live head owns, otherwise the live base owns. This
+    # admits an authority-only transition while conservatively guarding code.
+    base_by_id = {str(row["id"]): row for row in base_rows}
+    head_by_id = {str(row["id"]): row for row in head_rows}
+    base_track = base_by_id.get(_ONBOARDING_TRACK_ID)
+    head_track = head_by_id.get(_ONBOARDING_TRACK_ID)
+    base_active = _has_live_track_authority(base_track)
+    head_active = _has_live_track_authority(head_track)
+    effective_track = head_track if head_active else base_track if base_active else None
+    owned_patterns = sorted(
+        {
+            str(value)
+            for row, active in ((base_track, base_active), (head_track, head_active))
+            if row is not None and active
+            for value in row["owned_surfaces"]
+        }
+    )
+    siblings: dict[str, list[str]] = {}
+    for track_id in sorted(set(base_by_id) | set(head_by_id)):
+        if track_id == _ONBOARDING_TRACK_ID:
+            continue
+        surfaces: set[str] = set()
+        for rows in (base_by_id, head_by_id):
+            row = rows.get(track_id)
+            if _has_live_track_authority(row):
+                assert row is not None
+                surfaces.update(str(value) for value in row["owned_surfaces"])
+        siblings[track_id] = sorted(surfaces)
+    return effective_track, owned_patterns, siblings
+
+
+def _discover_ci_packet_bindings(
+    repo_root: Path,
+    *,
+    event_name: str,
+    event_base: str,
+    event_head: str,
+) -> list[_CiPacketBinding]:
+    """Discover and retain every exact onboarding packet accepted for CI.
+
+    The returned bindings are stable-sorted and carry both the validated bytes
+    and the model parsed from those same bytes.  CI execution must consume
+    these bindings directly so packet custody cannot change between discovery
+    and evaluation.
+    """
+    root = require_repo_root(repo_root.resolve())
+    if event_name not in {"pull_request", "merge_group"}:
+        raise AgentOpsError(f"unsupported CI event for packet discovery: {event_name}")
+    base = _exact_event_sha(root, event_base, field="event base")
+    head = _exact_event_sha(root, event_head, field="event head")
+    if head_for(root) != head:
+        raise AgentOpsError("CI checkout HEAD does not match the declared event head")
+    _reject_hidden_index_flags(root)
+    _reject_local_repository_controls(root, base_ref=None)
+    working, staged, untracked = _exact_live_scope_paths(root)
+    if working or staged or untracked:
+        raise AgentOpsError("CI packet evaluation requires an exact clean event checkout")
+    diff_base = base
+    if event_name == "pull_request":
+        merge_base = run_git(["merge-base", base, head], cwd=root, check=False)
+        if merge_base.returncode != 0 or not merge_base.stdout.strip():
+            raise AgentOpsError(
+                "CI pull-request event base and head have unrelated histories"
+            )
+        diff_base = _exact_event_sha(
+            root,
+            merge_base.stdout.strip(),
+            field="pull-request merge base",
+        )
+    else:
+        ancestry = run_git(
+            ["merge-base", "--is-ancestor", base, head], cwd=root, check=False
+        )
+        if ancestry.returncode != 0:
+            raise AgentOpsError("CI event base is not an ancestor of the event head")
+
+    base_tracks = _active_tracks_at(root, diff_base)
+    head_tracks = _active_tracks_at(root, head)
+    track, owned_patterns, siblings = _ci_authority_context(
+        base_tracks, head_tracks
+    )
+
+    changed = sorted(
+        set(
+            git_nul_records(
+                root,
+                [
+                    "diff", "--no-ext-diff", "--no-textconv", "--no-renames",
+                    "--name-only", "-z", f"{diff_base}...{head}", "--",
+                ],
+            )
+        )
+    )
+    _validate_observed_git_paths(changed)
+    packet_relatives = sorted(path for path in changed if _CI_PACKET_PATH.fullmatch(path))
+    owned_changed = sorted(
+        path
+        for path in changed
+        if _CI_PACKET_PATH.fullmatch(path)
+        or (
+            path != _ACTIVE_TRACK_PATH
+            and matching_patterns(path, owned_patterns)
+        )
+    )
+    if not owned_changed:
+        return []
+    if event_name == "pull_request":
+        ancestry = run_git(
+            ["merge-base", "--is-ancestor", base, head], cwd=root, check=False
+        )
+        if ancestry.returncode != 0:
+            raise AgentOpsError("CI event base is not an ancestor of the event head")
+    if event_name == "pull_request" and len(packet_relatives) != 1:
+        raise AgentOpsError(
+            "owned-surface PR must change exactly one matching onboarding packet"
+        )
+    if event_name == "merge_group" and not packet_relatives:
+        raise AgentOpsError(
+            "owned-surface merge group must change at least one onboarding packet"
+        )
+    if packet_relatives and track is None:
+        raise AgentOpsError(
+            "CI onboarding packet changed without ACTIVE endpoint authority"
+        )
+
+    packets: list[_CiPacketBinding] = []
+    for relative in packet_relatives:
+        path = root / relative
+        if path.is_symlink() or not path.is_file():
+            raise AgentOpsError(f"CI packet must be a regular tracked file: {relative}")
+        indexed = run_git(
+            ["ls-files", "--error-unmatch", "--", relative],
+            cwd=root,
+            check=False,
+        )
+        if indexed.returncode != 0:
+            raise AgentOpsError(f"CI packet is absent from the Git index: {relative}")
+        candidate_bytes = _read_packet_bytes(path)
+        candidate_oid = git_object_id_for_bytes(root, candidate_bytes)
+        event_head_rows = git_nul_records(
+            root,
+            [
+                "--literal-pathspecs",
+                "ls-tree",
+                "-z",
+                head,
+                "--",
+                relative,
+            ],
+        )
+        event_head_metadata, separator, event_head_path = (
+            event_head_rows[0].partition("\t")
+            if len(event_head_rows) == 1
+            else ("", "", "")
+        )
+        event_head_fields = event_head_metadata.split()
+        if (
+            not separator
+            or event_head_path != relative
+            or len(event_head_fields) != 3
+            or event_head_fields[0] != "100644"
+            or event_head_fields[1] != "blob"
+            or event_head_fields[2] != candidate_oid
+        ):
+            raise AgentOpsError(
+                f"CI event-head packet snapshot is not exact: {relative}"
+            )
+        event_head_oid = event_head_fields[2]
+        packet = load_work_packet(path, content=candidate_bytes)
+        canonical = f"reports/agentops/work_packets/{packet.id}.json"
+        if canonical != relative:
+            raise AgentOpsError(
+                f"CI packet id/path custody mismatch: {relative} != {canonical}"
+            )
+        if relative not in packet.allowed_files:
+            raise AgentOpsError(
+                f"CI packet must explicitly allow its own canonical path: {relative}"
+            )
+        self_forbidden = matching_patterns(relative, packet.forbidden_files)
+        if self_forbidden:
+            raise AgentOpsError(
+                f"CI packet forbids its own canonical path: {relative}: {self_forbidden}"
+            )
+        entry = packet.session_entry
+        if entry is None:
+            raise AgentOpsError(f"CI packet lacks session_entry: {relative}")
+        _require_portable_session_worktree(packet)
+        if entry.active_track != _ONBOARDING_TRACK_ID:
+            raise AgentOpsError(f"CI packet active_track mismatch: {relative}")
+        assert track is not None
+        if entry.owner != track.get("owner"):
+            raise AgentOpsError(f"CI packet owner mismatch: {relative}")
+        packet_base = _exact_event_sha(root, packet.base_ref, field="packet base")
+        if entry.collision.checked_at_sha != packet_base:
+            raise AgentOpsError(
+                f"CI packet collision baseline does not bind packet base: {relative}"
+            )
+        if entry.collision.status != "clear" or entry.collision.details:
+            raise AgentOpsError(f"CI packet collision declaration is not clear: {relative}")
+        missing_forbidden = sorted(
+            {pattern for patterns in siblings.values() for pattern in patterns}
+            - set(packet.forbidden_files)
+        )
+        if missing_forbidden:
+            raise AgentOpsError(
+                f"CI packet forbidden_files omit sibling owned surfaces: {missing_forbidden}"
+            )
+        collisions = detect_surface_collisions(
+            allowed_patterns=packet.allowed_files,
+            sibling_patterns=siblings,
+            actual_paths=changed,
+        )
+        if collisions:
+            raise AgentOpsError(f"CI packet ownership collision: {collisions}")
+        index_flags = git_nul_records(
+            root,
+            ["--literal-pathspecs", "ls-files", "-v", "-z", "--", relative],
+        )
+        if len(index_flags) != 1 or not index_flags[0].startswith("H "):
+            raise AgentOpsError(f"CI packet has hidden or special index custody: {relative}")
+        index_rows = git_nul_records(
+            root,
+            [
+                "--literal-pathspecs", "ls-files", "--stage", "-z", "--",
+                relative,
+            ],
+        )
+        index_fields = index_rows[0].split(maxsplit=3) if len(index_rows) == 1 else []
+        if (
+            len(index_fields) != 4
+            or index_fields[0] != "100644"
+            or index_fields[2] != "0"
+            or index_fields[1] != event_head_oid
+        ):
+            raise AgentOpsError(f"CI packet index custody is not exact stage-0: {relative}")
+        if event_name == "pull_request":
+            if packet_base != base:
+                raise AgentOpsError(
+                    f"PR packet base does not bind the declared event base: {relative}"
+                )
+        else:
+            bound = run_git(
+                ["merge-base", "--is-ancestor", packet_base, base],
+                cwd=root,
+                check=False,
+            )
+            if bound.returncode != 0:
+                raise AgentOpsError(
+                    f"merge-group packet base does not bind group lineage: {relative}"
+                )
+        if _read_packet_bytes(path) != candidate_bytes:
+            raise AgentOpsError(f"CI packet changed during discovery: {relative}")
+        packets.append(
+            _CiPacketBinding(
+                path=path.resolve(),
+                packet=packet,
+                candidate_bytes=candidate_bytes,
+                candidate_sha256=hashlib.sha256(candidate_bytes).hexdigest(),
+            )
+        )
+
+    coverage: dict[str, list[str]] = {}
+    for changed_path in owned_changed:
+        claimants = [
+            binding.path.relative_to(root).as_posix()
+            for binding in packets
+            if matching_patterns(changed_path, binding.packet.allowed_files)
+            and not matching_patterns(changed_path, binding.packet.forbidden_files)
+        ]
+        coverage[changed_path] = sorted(claimants)
+    gaps = sorted(path for path, claimants in coverage.items() if not claimants)
+    overlaps = {
+        path: claimants for path, claimants in coverage.items() if len(claimants) > 1
+    }
+    if gaps:
+        raise AgentOpsError(
+            f"CI onboarding packet coverage gap; paths are not covered exactly once: {gaps}"
+        )
+    if overlaps:
+        raise AgentOpsError(
+            "CI onboarding packet coverage overlap; paths have multiple claimants: "
+            f"{overlaps}"
+        )
+    return sorted(packets, key=lambda binding: str(binding.path))
+
+
+def discover_ci_packets(
+    repo_root: Path,
+    *,
+    event_name: str,
+    event_base: str,
+    event_head: str,
+) -> list[Path]:
+    """Return stable canonical paths for packets bound to a CI event."""
+    return [
+        binding.path
+        for binding in _discover_ci_packet_bindings(
+            repo_root,
+            event_name=event_name,
+            event_base=event_base,
+            event_head=event_head,
+        )
+    ]
+
+
+def _ci_packet_binding_identity(
+    bindings: Iterable[_CiPacketBinding],
+) -> list[tuple[Path, str, bytes]]:
+    """Return an explicit exact identity without comparing parsed models."""
+    return [
+        (binding.path, binding.candidate_sha256, binding.candidate_bytes)
+        for binding in bindings
+    ]
+
+
+def _require_ci_packet_snapshots(bindings: Iterable[_CiPacketBinding]) -> None:
+    """Fail if any packet no longer matches its discovery-time snapshot."""
+    for binding in bindings:
+        if _read_packet_bytes(binding.path) != binding.candidate_bytes:
+            raise AgentOpsError(
+                f"CI packet snapshot changed after discovery: {binding.packet.id}"
+            )
 
 
 def _validate_session_envelope(
@@ -526,18 +1560,33 @@ def _validate_session_envelope(
     inspect: bool,
     require_tracked_copy: bool,
     candidate_bytes: bytes | None = None,
+    allow_tracked_input: bool = False,
+    scope_base_ref: str | None = None,
 ) -> str:
     entry = packet.session_entry
     if entry is None:
         return "not_session_entry"
+    _require_portable_session_worktree(packet)
     if inspect == require_tracked_copy:
         raise AgentOpsError(
             "internal session envelope mode must choose either inspect or tracked custody"
         )
-    candidate = packet_path.read_bytes() if candidate_bytes is None else candidate_bytes
-    if packet_path.read_bytes() != candidate:
+    candidate = _read_packet_bytes(packet_path) if candidate_bytes is None else candidate_bytes
+    if _read_packet_bytes(packet_path) != candidate:
         raise AgentOpsError("external Session Entry Packet changed during validation")
-    _validate_external_packet_path(repo_root, packet_path)
+    tracked = repo_root / "reports/agentops/work_packets" / f"{packet.id}.json"
+    packet_raw = packet_path.expanduser()
+    packet_lexical = (
+        packet_raw if packet_raw.is_absolute() else Path(os.path.abspath(packet_raw))
+    )
+    canonical = tracked.resolve(strict=False)
+    is_canonical_tracked_input = (
+        allow_tracked_input
+        and packet_lexical == canonical
+        and packet_raw.resolve(strict=False) == canonical
+    )
+    if not is_canonical_tracked_input:
+        _validate_external_packet_path(repo_root, packet_path)
     base_hash = resolve_base_ref(repo_root, packet.base_ref)
     if packet.base_ref != base_hash:
         raise AgentOpsError("session_entry base_ref must be the exact 40-character HEAD SHA")
@@ -551,8 +1600,11 @@ def _validate_session_envelope(
                 f"declared {declared}, actual {actual}"
             )
     selected = next((row for row in _active_tracks(repo_root) if row.get("id") == entry.active_track), None)
-    if selected is None or selected.get("status") != "ACTIVE":
-        raise AgentOpsError(f"session_entry active_track is not ACTIVE: {entry.active_track}")
+    if not _has_live_track_authority(selected):
+        raise AgentOpsError(
+            "session_entry active_track is not ACTIVE or SHIPPABLE: "
+            f"{entry.active_track}"
+        )
     if selected.get("owner") != entry.owner:
         raise AgentOpsError("session_entry owner does not match ACTIVE_TRACK.yaml")
     siblings = {
@@ -563,7 +1615,14 @@ def _validate_session_envelope(
     missing = sorted({p for patterns in siblings.values() for p in patterns} - set(packet.forbidden_files))
     if missing:
         raise AgentOpsError(f"forbidden_files omit sibling owned surfaces: {missing}")
-    actual = sorted(set(git_lines(repo_root, ["ls-files"]) + inspect_scope(repo_root, packet).changed_files))
+    live_scope = inspect_scope(repo_root, packet, base_ref=scope_base_ref)
+    actual = sorted(
+        set(
+            git_nul_records(repo_root, ["ls-files", "-z"])
+            + live_scope.changed_files
+        )
+    )
+    _validate_observed_git_paths(actual)
     collisions = detect_surface_collisions(
         allowed_patterns=packet.allowed_files,
         sibling_patterns=siblings,
@@ -573,7 +1632,6 @@ def _validate_session_envelope(
         raise AgentOpsError(f"session_entry ownership collision: {collisions}")
     if entry.collision.status != "clear" or entry.collision.details:
         raise AgentOpsError("session_entry collision declaration disagrees with recomputation")
-    tracked = repo_root / "reports/agentops/work_packets" / f"{packet.id}.json"
     relative = tracked.relative_to(repo_root).as_posix()
     if relative not in packet.allowed_files:
         raise AgentOpsError(
@@ -609,12 +1667,21 @@ def _validate_session_envelope(
             raise AgentOpsError(
                 "tracked copy must be byte-identical to external Session Entry Packet"
             )
-        index_flags = git_lines(repo_root, ["ls-files", "-v", "--", relative])
+        index_flags = git_nul_records(
+            repo_root,
+            ["--literal-pathspecs", "ls-files", "-v", "-z", "--", relative],
+        )
         if len(index_flags) != 1 or not index_flags[0].startswith("H "):
             raise AgentOpsError(
                 f"tracked packet custody rejects hidden or special index flags: {relative}"
             )
-        index_rows = git_lines(repo_root, ["ls-files", "--stage", "--", relative])
+        index_rows = git_nul_records(
+            repo_root,
+            [
+                "--literal-pathspecs", "ls-files", "--stage", "-z", "--",
+                relative,
+            ],
+        )
         if len(index_rows) != 1:
             raise AgentOpsError(f"tracked packet has ambiguous Git index custody: {relative}")
         index_fields = index_rows[0].split(maxsplit=3)
@@ -629,9 +1696,9 @@ def _validate_session_envelope(
             raise AgentOpsError("inspect requires exact HEAD == packet.base_ref")
         if branch_for(repo_root) != packet.branch:
             raise AgentOpsError("inspect branch does not match packet.branch")
-        if git_status(repo_root):
+        if live_scope.changed_files:
             raise AgentOpsError("inspect requires an exact clean HEAD")
-    if packet_path.read_bytes() != candidate:
+    if _read_packet_bytes(packet_path) != candidate:
         raise AgentOpsError("external Session Entry Packet changed during validation")
     return tracked_state
 
@@ -656,7 +1723,9 @@ def _copy_file_into_jail(source: Path, jail: Path, lexical: Path | None = None) 
 
 
 def _copy_elf_dependencies(source: Path, jail: Path) -> None:
-    result = run_command(["ldd", str(source.resolve())], cwd=source.parent)
+    result = run_command(
+        [_trusted_host_tool("ldd"), str(source.resolve())], cwd=source.parent
+    )
     if result.returncode != 0:
         return
     for line in result.stdout.splitlines():
@@ -670,7 +1739,7 @@ def _copy_elf_dependencies(source: Path, jail: Path) -> None:
 def _copy_executable_into_jail(command: str, jail: Path) -> None:
     lexical = Path(command).expanduser()
     if not lexical.is_absolute():
-        resolved = shutil.which(command)
+        resolved = shutil.which(command, path=_TRUSTED_HOST_PATH)
         if resolved is None:
             raise AgentOpsError(f"negative-control executable is unavailable: {command}")
         lexical = Path(resolved)
@@ -681,7 +1750,7 @@ def _copy_executable_into_jail(command: str, jail: Path) -> None:
 
 
 def _copy_python_runtime(jail: Path) -> None:
-    executable = Path(sys.executable)
+    executable = Path(getattr(sys, "_base_executable", sys.executable))
     _copy_executable_into_jail(str(executable), jail)
     stdlib = Path(sysconfig.get_path("stdlib")).resolve()
     target = _jail_path(jail, stdlib)
@@ -748,9 +1817,13 @@ def _negative_environment(
     jailed: bool,
 ) -> dict[str, str]:
     safe = {
-        key: value
-        for key, value in os.environ.items()
-        if key in {"LANG", "LC_ALL", "PATH", "PATHEXT", "SYSTEMROOT", "TZ", "WINDIR"}
+        "PATH": (
+            f"{Path(getattr(sys, '_base_executable', sys.executable)).parent}:"
+            f"{_TRUSTED_HOST_PATH}"
+        ),
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "TZ": "UTC",
     }
     home, tmp, pycache = fixture / ".home", fixture / ".tmp", fixture / ".pycache"
     for path in (home, tmp, pycache):
@@ -765,12 +1838,17 @@ def _negative_environment(
         "OLDPWD": "/fixture" if jailed else str(fixture),
         "PYTHONDONTWRITEBYTECODE": "1",
         "PYTHONPYCACHEPREFIX": inside(pycache),
+        "PYTHONNOUSERSITE": "1",
         "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "GIT_CONFIG_GLOBAL": os.devnull,
         "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_ATTR_NOSYSTEM": "1",
+        "GIT_NO_REPLACE_OBJECTS": "1",
+        "GIT_OPTIONAL_LOCKS": "0",
     })
     if jailed:
         safe["DHARMA_AGENTOPS_JAILED"] = "1"
-    pythonpath = declared.get("PYTHONPATH", os.environ.get("PYTHONPATH", ""))
+    pythonpath = declared.get("PYTHONPATH", "")
     entries = [
         _copy_pythonpath_entry(
             item, repo_root=repo_root, fixture=fixture, jail=jail,
@@ -790,8 +1868,8 @@ def _negative_environment(
         if upper in {
             "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
             "GIT_ALTERNATE_OBJECT_DIRECTORIES", "HOME", "OLDPWD", "PWD", "TMPDIR",
-            "VIRTUAL_ENV", "PYTHONPYCACHEPREFIX",
-        }:
+            "TEMP", "TMP", "VIRTUAL_ENV", "PATH", "PATHEXT", "BASH_ENV", "ENV",
+        } or upper.startswith(("GIT_", "LD_", "DYLD_", "PYTHON", "PYTEST", "MAKE")):
             raise AgentOpsError(f"negative-control env may not override {key}")
         if str(repo_root.resolve()) in value:
             raise AgentOpsError(f"negative-control env {key} points into source")
@@ -902,6 +1980,91 @@ def _reject_fixture_symlink_escapes(fixture: Path) -> None:
             raise AgentOpsError(f"negative-control fixture symlink escapes isolation: {path}")
 
 
+def _trusted_host_tool(name: str) -> str:
+    resolved = shutil.which(name, path=_TRUSTED_HOST_PATH)
+    if resolved is None:
+        raise AgentOpsError(f"trusted host executable is unavailable: {name}")
+    path = Path(resolved).resolve()
+    if not path.is_file():
+        raise AgentOpsError(f"trusted host executable is not a file: {name}")
+    return str(path)
+
+
+def _trusted_gate_interpreter(repo_root: Path) -> str:
+    raw = sys.executable
+    if not re.fullmatch(r"/[A-Za-z0-9_./+-]+", raw):
+        raise AgentOpsError(
+            "gate interpreter must be an absolute Make-safe executable path"
+        )
+    lexical = Path(raw)
+    try:
+        resolved = lexical.resolve(strict=True)
+    except OSError as exc:
+        raise AgentOpsError(f"gate interpreter is unavailable: {raw}") from exc
+    if not resolved.is_file():
+        raise AgentOpsError(f"gate interpreter is not a regular file: {raw}")
+    for boundary in {repo_root.resolve(), *_git_admin_roots(repo_root)}:
+        if _is_within(lexical, boundary) or _is_within(resolved, boundary):
+            raise AgentOpsError(
+                "gate interpreter must be external to source and Git state"
+            )
+    return raw
+
+
+def _trusted_positive_gate_argv(argv: list[str], *, repo_root: Path) -> list[str]:
+    result = list(argv)
+    interpreter = _trusted_gate_interpreter(repo_root)
+    if _is_trusted_python(result[0]):
+        # Preserve the lexical venv executable.  Resolving this symlink to the
+        # base interpreter drops the venv's installed gate dependencies.
+        result[0] = interpreter
+    elif _is_trusted_git(result[0]):
+        git_args = result[1:]
+        if git_args[:1] == ["diff"]:
+            git_args[1:1] = ["--no-ext-diff", "--no-textconv"]
+        result = [
+            _trusted_host_tool("git"),
+            "-c", "core.fsmonitor=false",
+            "-c", f"core.hooksPath={os.devnull}",
+            *git_args,
+        ]
+    elif result[0] == "make":
+        result[0] = _trusted_host_tool("make")
+        result.extend(
+            [
+                f"AGENTOPS_PYTHON={interpreter}",
+                f"PYTHON={interpreter}",
+                f"VENV_PYTHON={interpreter}",
+                f"PYTEST={interpreter} -m pytest",
+                f"REPO_PYTHON=PYTHONPATH=. {interpreter}",
+            ]
+        )
+    else:
+        # Admission and execution are intentionally separate checks.  Never
+        # fall through to a packet path if the executable identity changed in
+        # between (for example through a mutable argv or swapped alias).
+        raise AgentOpsError(
+            f"gate executable lost trusted identity before execution: {result[0]}"
+        )
+    return result
+
+
+def _bounded_gate(gate: GateSpec, *, deadline: float) -> GateSpec:
+    remaining = int(deadline - time.monotonic())
+    if remaining <= 0:
+        raise AgentOpsError(
+            f"AgentOps aggregate gate timeout exceeded {_MAX_ADMISSION_TIMEOUT_SECONDS}s"
+        )
+    return replace(
+        gate,
+        timeout_seconds=min(
+            gate.timeout_seconds,
+            _MAX_GATE_TIMEOUT_SECONDS,
+            remaining,
+        ),
+    )
+
+
 def run_gate(
     repo_root: Path,
     gate: GateSpec,
@@ -909,13 +2072,31 @@ def run_gate(
     base_env: dict[str, str] | None = None,
     preexec_fn: Callable[[], None] | None = None,
     argv_prefix: list[str] | None = None,
+    normalize_positive_executable: bool = False,
 ) -> dict[str, Any]:
     started = time.monotonic()
     inherited = os.environ if base_env is None else base_env
     env = build_gate_environment(gate, inherited)
+    if _is_trusted_git(gate.argv[0]):
+        # The dependency-light contract strips hostile inherited Git state;
+        # the WP-O4 runner additionally requires actual object identities for
+        # every direct Git gate, never repository-local replace refs or
+        # implicit user/system ignore and attribute state.
+        env["HOME"] = os.devnull
+        env["XDG_CONFIG_HOME"] = os.devnull
+        env["GIT_CONFIG_GLOBAL"] = os.devnull
+        env["GIT_CONFIG_NOSYSTEM"] = "1"
+        env["GIT_ATTR_NOSYSTEM"] = "1"
+        env["GIT_NO_REPLACE_OBJECTS"] = "1"
+        env["GIT_OPTIONAL_LOCKS"] = "0"
     try:
+        gate_argv = (
+            _trusted_positive_gate_argv(gate.argv, repo_root=repo_root)
+            if normalize_positive_executable
+            else gate.argv
+        )
         result = run_command(
-            [*(argv_prefix or []), *gate.argv],
+            [*(argv_prefix or []), *gate_argv],
             cwd=repo_root,
             env=env,
             timeout_seconds=gate.timeout_seconds,
@@ -945,15 +2126,16 @@ def run_gate(
     }
 
 
-def run_negative_control(repo_root: Path, gate: GateSpec) -> dict[str, Any]:
+def run_negative_control(
+    repo_root: Path,
+    gate: GateSpec,
+    *,
+    temp_root: Path,
+) -> dict[str, Any]:
     ignored_names = {".git", ".venv", "node_modules", "__pycache__", ".pytest_cache"}
     ignored = shutil.ignore_patterns(*ignored_names)
-    candidate = next(
-        (os.environ[name] for name in ("TMPDIR", "TEMP", "TMP") if os.environ.get(name)),
-        "/tmp" if os.name == "posix" else str(Path.cwd()),
-    )
     temp_root = resolve_external_dir(
-        candidate, repo_root=repo_root, field="negative-control temp root"
+        temp_root, repo_root=repo_root, field="negative-control temp root"
     )
     if not temp_root.is_dir():
         raise AgentOpsError(f"negative-control temp root is not a directory: {temp_root}")
@@ -969,8 +2151,9 @@ def run_negative_control(repo_root: Path, gate: GateSpec) -> dict[str, Any]:
             shutil.copytree(source_git, fixture / ".git", symlinks=False)
         else:
             clone = run_command(
-                ["git", "clone", "--no-checkout", "--no-hardlinks",
-                 str(repo_root), str(fixture)], cwd=repo_root,
+                [_trusted_host_tool("git"), "-c", "core.fsmonitor=false", "clone",
+                 "--no-checkout", "--no-hardlinks", str(repo_root), str(fixture)],
+                cwd=repo_root,
                 env=trusted_git_environment(),
             )
             if clone.returncode != 0:
@@ -987,17 +2170,40 @@ def run_negative_control(repo_root: Path, gate: GateSpec) -> dict[str, Any]:
             else:
                 shutil.copy2(source, target, follow_symlinks=False)
         _reject_fixture_symlink_escapes(fixture)
+        control_gate = gate
+        if _is_trusted_python(gate.argv[0]):
+            control_gate = replace(
+                gate,
+                argv=[
+                    str(
+                        Path(
+                            getattr(sys, "_base_executable", sys.executable)
+                        ).resolve()
+                    ),
+                    *gate.argv[1:],
+                ],
+            )
         preexec_fn, argv_prefix, jailed, env_via_argv = _negative_confinement(
             jail, fixture
         )
         control_env = _negative_environment(
-            repo_root, fixture, jail, gate.env, jailed=jailed
+            repo_root, fixture, jail, control_gate.env, jailed=jailed
         )
         if jailed:
-            _prepare_jail(jail, gate)
+            _prepare_jail(jail, control_gate)
         host_env = control_env
         if env_via_argv:
-            control_env = build_gate_environment(replace(gate, env={}), control_env)
+            control_env = build_gate_environment(
+                replace(control_gate, env={}), control_env
+            )
+            if _is_trusted_git(control_gate.argv[0]):
+                control_env["HOME"] = os.devnull
+                control_env["XDG_CONFIG_HOME"] = os.devnull
+                control_env["GIT_CONFIG_GLOBAL"] = os.devnull
+                control_env["GIT_CONFIG_NOSYSTEM"] = "1"
+                control_env["GIT_ATTR_NOSYSTEM"] = "1"
+                control_env["GIT_NO_REPLACE_OBJECTS"] = "1"
+                control_env["GIT_OPTIONAL_LOCKS"] = "0"
             argv_prefix = [
                 *argv_prefix,
                 *_environment_argv(control_env),
@@ -1009,7 +2215,7 @@ def run_negative_control(repo_root: Path, gate: GateSpec) -> dict[str, Any]:
             host_env = {"PATH": _TRUSTED_HOST_PATH}
         return run_gate(
             fixture,
-            replace(gate, env={}),
+            replace(control_gate, env={}),
             base_env=host_env,
             preexec_fn=preexec_fn,
             argv_prefix=argv_prefix,
@@ -1026,6 +2232,121 @@ def report_paths(repo_root: Path, job_id: str, timestamp: str) -> tuple[Path, Pa
     return report_dir / "report.json", report_dir / "report.md"
 
 
+def _private_report_anchor(target: Path) -> tuple[Path, bool]:
+    candidates: list[tuple[Path, bool]] = []
+    if os.name == "posix":
+        candidates.append((Path("/tmp").resolve(), True))
+    else:  # pragma: no cover - Windows fallback
+        candidates.append((Path(tempfile.gettempdir()).resolve(), True))
+    try:
+        candidates.append((_os_account_home(), False))
+    except AgentOpsError:
+        pass
+    matches = [item for item in candidates if _is_within(target, item[0])]
+    if not matches:
+        raise AgentOpsError(
+            "report_root must be beneath the trusted temp anchor or OS-account home"
+        )
+    return max(matches, key=lambda item: len(item[0].parts))
+
+
+def _validate_private_directory(path: Path, *, allow_shared_anchor: bool = False) -> None:
+    try:
+        metadata = os.lstat(path)
+    except OSError as exc:
+        raise AgentOpsError(f"cannot inspect report directory {path}: {exc}") from exc
+    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
+        raise AgentOpsError(f"report directory must be a non-symlink directory: {path}")
+    if allow_shared_anchor:
+        return
+    if metadata.st_uid != os.geteuid():
+        raise AgentOpsError(f"report directory is not owned by the current euid: {path}")
+    if stat.S_IMODE(metadata.st_mode) & 0o022:
+        raise AgentOpsError(f"report directory is group/world writable: {path}")
+
+
+def _prepare_private_report_root(candidate: Path, *, repo_root: Path) -> Path:
+    root = resolve_external_dir(candidate, repo_root=repo_root, field="report_root")
+    anchor, shared_anchor = _private_report_anchor(root)
+    _validate_private_directory(anchor, allow_shared_anchor=shared_anchor)
+    if root == anchor:
+        raise AgentOpsError("report_root may not be the shared output anchor itself")
+    cursor = anchor
+    for part in root.relative_to(anchor).parts:
+        cursor = cursor / part
+        if cursor.exists() or cursor.is_symlink():
+            _validate_private_directory(cursor)
+        else:
+            try:
+                cursor.mkdir(mode=0o700)
+            except OSError as exc:
+                raise AgentOpsError(
+                    f"cannot create private report directory {cursor}: {exc}"
+                ) from exc
+            _validate_private_directory(cursor)
+    try:
+        root.chmod(0o700)
+    except OSError as exc:
+        raise AgentOpsError(f"cannot secure report_root {root}: {exc}") from exc
+    return root
+
+
+def _prepare_private_report_children(
+    report_root: Path,
+    children: list[str],
+    *,
+    repo_root: Path,
+) -> list[Path]:
+    """Create and verify declared relative output/cache roots in one pass."""
+    prepared: list[Path] = []
+    for child in children:
+        if (
+            not child
+            or child.startswith("/")
+            or "\\" in child
+            or not _SAFE_GATE_TARGET.fullmatch(child)
+            or any(part in {"", ".", ".."} for part in child.split("/"))
+        ):
+            raise AgentOpsError(
+                f"report child must be a safe relative path beneath report_root: {child}"
+            )
+        destination = report_root.joinpath(*child.split("/"))
+        sentinel = destination / ".agentops-report-child-boundary"
+        # Validate the lexical chain before creating anything.  This rejects
+        # an existing child symlink even when it resolves back into the source
+        # checkout (or to a different location under the report root).
+        _validate_report_destination(report_root, sentinel, repo_root)
+        _ensure_private_report_directory(report_root, destination)
+        _validate_report_destination(report_root, sentinel, repo_root)
+        prepared.append(destination)
+    return prepared
+
+
+def _ensure_private_report_directory(report_root: Path, directory: Path) -> None:
+    root = report_root.resolve()
+    target = directory.resolve(strict=False)
+    if not _is_within(target, root):
+        raise AgentOpsError(f"report directory escapes report_root: {directory}")
+    _validate_private_directory(root)
+    cursor = root
+    for part in target.relative_to(root).parts:
+        cursor = cursor / part
+        if cursor.exists() or cursor.is_symlink():
+            _validate_private_directory(cursor)
+        else:
+            try:
+                cursor.mkdir(mode=0o700)
+            except OSError as exc:
+                raise AgentOpsError(
+                    f"cannot create private report directory {cursor}: {exc}"
+                ) from exc
+            _validate_private_directory(cursor)
+        try:
+            cursor.chmod(0o700)
+        except OSError as exc:
+            raise AgentOpsError(f"cannot secure report directory {cursor}: {exc}") from exc
+
+
 def _validate_report_destination(
     report_root: Path, report_path: Path, source_root: Path
 ) -> None:
@@ -1040,6 +2361,20 @@ def _validate_report_destination(
         cursor = cursor / part
         if cursor.is_symlink():
             raise AgentOpsError(f"report destination contains a symlink: {cursor}")
+        if cursor.exists():
+            _validate_private_directory(cursor)
+    if report_path.exists() or report_path.is_symlink():
+        try:
+            metadata = os.lstat(report_path)
+        except OSError as exc:
+            raise AgentOpsError(f"cannot inspect report destination {report_path}: {exc}") from exc
+        if (
+            stat.S_ISLNK(metadata.st_mode)
+            or not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_uid != os.geteuid()
+            or stat.S_IMODE(metadata.st_mode) & 0o022
+        ):
+            raise AgentOpsError(f"report destination is not a private regular file: {report_path}")
     resolve_external_dir(
         report_path.parent,
         repo_root=source_root,
@@ -1058,23 +2393,209 @@ def scope_to_dict(scope: ScopeState) -> dict[str, Any]:
     }
 
 
+def _open_report_directory_chain(report_root: Path, directory: Path) -> list[int]:
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    descriptors: list[int] = []
+    try:
+        descriptors.append(os.open(report_root, flags))
+        for part in directory.relative_to(report_root).parts:
+            descriptors.append(os.open(part, flags, dir_fd=descriptors[-1]))
+        return descriptors
+    except (OSError, ValueError) as exc:
+        for descriptor in reversed(descriptors):
+            os.close(descriptor)
+        raise AgentOpsError(
+            f"cannot open no-follow report directory chain {directory}: {exc}"
+        ) from exc
+
+
+def _atomic_report_write_at(
+    parent_descriptor: int,
+    name: str,
+    text: str,
+    *,
+    display_path: Path,
+) -> None:
+    """Atomically publish one report file through an already-custodied dirfd."""
+    if not name or name in {".", ".."} or Path(name).name != name:
+        raise AgentOpsError(f"invalid report publication name: {name!r}")
+    temporary = f".{name}.{os.getpid()}.{time.time_ns()}.tmp"
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    descriptor: int | None = None
+    published = False
+    parent_identity = os.fstat(parent_descriptor)
+    if (
+        parent_identity.st_uid != os.geteuid()
+        or not stat.S_ISDIR(parent_identity.st_mode)
+        or stat.S_IMODE(parent_identity.st_mode) & 0o022
+    ):
+        raise AgentOpsError("report parent directory lost private custody")
+    try:
+        descriptor = os.open(temporary, flags, 0o600, dir_fd=parent_descriptor)
+        with os.fdopen(descriptor, "wb") as handle:
+            descriptor = None
+            handle.write(text.encode("utf-8"))
+            handle.flush()
+            os.fchmod(handle.fileno(), 0o600)
+            os.fsync(handle.fileno())
+        os.replace(
+            temporary,
+            name,
+            src_dir_fd=parent_descriptor,
+            dst_dir_fd=parent_descriptor,
+        )
+        published = True
+        metadata = os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or stat.S_ISLNK(metadata.st_mode)
+            or metadata.st_uid != os.geteuid()
+            or stat.S_IMODE(metadata.st_mode) != 0o600
+        ):
+            raise OSError("published report is not a private current-euid regular file")
+        os.fsync(parent_descriptor)
+    except (OSError, AgentOpsError) as exc:
+        if descriptor is not None:
+            os.close(descriptor)
+        try:
+            os.unlink(temporary, dir_fd=parent_descriptor)
+        except FileNotFoundError:
+            pass
+        except OSError:
+            pass
+        if published:
+            try:
+                os.unlink(name, dir_fd=parent_descriptor)
+                os.fsync(parent_descriptor)
+            except FileNotFoundError:
+                pass
+            except OSError:
+                pass
+        raise AgentOpsError(
+            f"cannot atomically publish report {display_path}: {exc}"
+        ) from exc
+
+
+def _atomic_report_write(report_root: Path, path: Path, text: str) -> None:
+    directory_descriptors = _open_report_directory_chain(report_root, path.parent)
+    parent_descriptor = directory_descriptors[-1]
+    parent_identity = os.fstat(parent_descriptor)
+    published = False
+    try:
+        _atomic_report_write_at(
+            parent_descriptor,
+            path.name,
+            text,
+            display_path=path,
+        )
+        published = True
+        verification = _open_report_directory_chain(report_root, path.parent)
+        try:
+            verified_identity = os.fstat(verification[-1])
+            if (
+                verified_identity.st_dev != parent_identity.st_dev
+                or verified_identity.st_ino != parent_identity.st_ino
+            ):
+                raise AgentOpsError(
+                    "report directory custody changed during publication"
+                )
+        finally:
+            for item in reversed(verification):
+                os.close(item)
+    except Exception:
+        if published:
+            _unlink_report_names(parent_descriptor, (path.name,))
+        raise
+    finally:
+        for item in reversed(directory_descriptors):
+            os.close(item)
+
+
+def _unlink_report_names(parent_descriptor: int, names: Iterable[str]) -> None:
+    failures: list[str] = []
+    for name in names:
+        try:
+            os.unlink(name, dir_fd=parent_descriptor)
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            failures.append(f"{name}: {exc}")
+    try:
+        os.fsync(parent_descriptor)
+    except OSError as exc:
+        failures.append(f"directory fsync: {exc}")
+    if failures:
+        raise AgentOpsError(
+            f"cannot invalidate incomplete report pair: {failures}"
+        )
+
+
 def write_report(
     repo_root: Path,
     report: dict[str, Any],
     timestamp: str,
     *,
     source_root: Path | None = None,
+    before_json: Callable[[], None] | None = None,
 ) -> tuple[Path, Path]:
     json_path, md_path = report_paths(repo_root, report["job_id"], timestamp)
     if source_root is not None:
         _validate_report_destination(repo_root, json_path, source_root)
         _validate_report_destination(repo_root, md_path, source_root)
-    json_path.parent.mkdir(parents=True, exist_ok=True)
+    _ensure_private_report_directory(repo_root, json_path.parent)
     if source_root is not None:
         _validate_report_destination(repo_root, json_path, source_root)
         _validate_report_destination(repo_root, md_path, source_root)
-    json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    md_path.write_text(render_markdown_report(report), encoding="utf-8")
+    custody = _open_report_directory_chain(repo_root, json_path.parent)
+    parent_descriptor = custody[-1]
+    parent_identity = os.fstat(parent_descriptor)
+    names = (json_path.name, md_path.name)
+
+    def verify_canonical_parent() -> None:
+        verification = _open_report_directory_chain(repo_root, json_path.parent)
+        try:
+            current = os.fstat(verification[-1])
+            if (
+                current.st_dev != parent_identity.st_dev
+                or current.st_ino != parent_identity.st_ino
+            ):
+                _unlink_report_names(verification[-1], names)
+                raise AgentOpsError(
+                    "report directory custody changed during publication"
+                )
+        finally:
+            for descriptor in reversed(verification):
+                os.close(descriptor)
+
+    try:
+        _atomic_report_write_at(
+            parent_descriptor,
+            md_path.name,
+            render_markdown_report(report),
+            display_path=md_path,
+        )
+        if before_json is not None:
+            before_json()
+        verify_canonical_parent()
+        _atomic_report_write_at(
+            parent_descriptor,
+            json_path.name,
+            json.dumps(report, indent=2, sort_keys=True) + "\n",
+            display_path=json_path,
+        )
+        verify_canonical_parent()
+    except Exception as exc:
+        try:
+            _unlink_report_names(parent_descriptor, names)
+        except AgentOpsError as cleanup_exc:
+            raise AgentOpsError(
+                f"report publication failed and pair invalidation failed: {cleanup_exc}"
+            ) from exc
+        raise
+    finally:
+        for descriptor in reversed(custody):
+            os.close(descriptor)
     return json_path, md_path
 
 
@@ -1122,27 +2643,106 @@ def should_commit(report: dict[str, Any], packet: WorkPacket, final_scope: Scope
     return True, "commit permitted"
 
 
-def _read_regular_worktree_file(repo_root: Path, relative: str) -> tuple[str, bytes] | None:
+def _open_governed_parent_chain(
+    repo_root: Path, relative: str,
+) -> tuple[list[int], str] | None:
+    """Open every parent component no-follow; return held dirfds + basename."""
     rel_path = Path(relative)
-    if rel_path.is_absolute() or not rel_path.parts or ".." in rel_path.parts:
+    if (
+        rel_path.is_absolute()
+        or not rel_path.parts
+        or "\\" in relative
+        or any(part in {"", ".", ".."} for part in rel_path.parts)
+    ):
         raise AgentOpsError(f"governed commit path is not repo-relative: {relative}")
-    path = repo_root.joinpath(*rel_path.parts)
+    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
+        raise AgentOpsError("governed scope requires no-follow file reads")
+    flags = (
+        os.O_RDONLY
+        | os.O_DIRECTORY
+        | os.O_NOFOLLOW
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+    descriptors: list[int] = []
     try:
-        parent = path.parent.resolve(strict=True)
-    except (OSError, RuntimeError) as exc:
-        if not path.exists() and not path.is_symlink():
-            return None
-        raise AgentOpsError(f"cannot resolve governed commit path {relative}: {exc}") from exc
-    if not _is_within(parent, repo_root):
-        raise AgentOpsError(f"governed commit path escapes the repository: {relative}")
-    if not hasattr(os, "O_NOFOLLOW"):
-        raise AgentOpsError("governed commit requires no-follow file reads")
-    flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
-    try:
-        descriptor = os.open(path, flags)
+        descriptors.append(os.open(repo_root.resolve(), flags))
+        for component in rel_path.parts[:-1]:
+            descriptors.append(os.open(component, flags, dir_fd=descriptors[-1]))
     except FileNotFoundError:
+        for descriptor in reversed(descriptors):
+            os.close(descriptor)
         return None
     except OSError as exc:
+        for descriptor in reversed(descriptors):
+            os.close(descriptor)
+        raise AgentOpsError(
+            f"governed commit path has a symlink or non-directory ancestor: "
+            f"{relative}: {exc}"
+        ) from exc
+    return descriptors, rel_path.name
+
+
+def _read_symlink_worktree_file(repo_root: Path, relative: str) -> bytes | None:
+    opened = _open_governed_parent_chain(repo_root, relative)
+    if opened is None:
+        return None
+    descriptors, name = opened
+    try:
+        try:
+            identity = os.stat(
+                name, dir_fd=descriptors[-1], follow_symlinks=False
+            )
+        except FileNotFoundError:
+            return None
+        except OSError as exc:
+            raise AgentOpsError(
+                f"cannot inspect governed symlink {relative}: {exc}"
+            ) from exc
+        if not stat.S_ISLNK(identity.st_mode):
+            return None
+        try:
+            target = os.readlink(name, dir_fd=descriptors[-1])
+            current = os.stat(
+                name, dir_fd=descriptors[-1], follow_symlinks=False
+            )
+        except OSError as exc:
+            raise AgentOpsError(
+                f"cannot read governed symlink {relative}: {exc}"
+            ) from exc
+        if (
+            current.st_dev != identity.st_dev
+            or current.st_ino != identity.st_ino
+            or not stat.S_ISLNK(current.st_mode)
+        ):
+            raise AgentOpsError(
+                f"governed symlink custody changed during read: {relative}"
+            )
+        return os.fsencode(target)
+    finally:
+        for descriptor in reversed(descriptors):
+            os.close(descriptor)
+
+
+def _read_regular_worktree_file(repo_root: Path, relative: str) -> tuple[str, bytes] | None:
+    opened = _open_governed_parent_chain(repo_root, relative)
+    if opened is None:
+        return None
+    directory_descriptors, name = opened
+    flags = (
+        os.O_RDONLY
+        | os.O_NOFOLLOW
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+    )
+    try:
+        descriptor = os.open(name, flags, dir_fd=directory_descriptors[-1])
+    except FileNotFoundError:
+        for item in reversed(directory_descriptors):
+            os.close(item)
+        return None
+    except OSError as exc:
+        for item in reversed(directory_descriptors):
+            os.close(item)
         raise AgentOpsError(
             f"governed commit path must be a regular non-symlink file: {relative}"
         ) from exc
@@ -1158,8 +2758,28 @@ def _read_regular_worktree_file(repo_root: Path, relative: str) -> tuple[str, by
             if not chunk:
                 break
             chunks.append(chunk)
+        try:
+            current = os.stat(
+                name,
+                dir_fd=directory_descriptors[-1],
+                follow_symlinks=False,
+            )
+        except OSError as exc:
+            raise AgentOpsError(
+                f"cannot revalidate governed commit path {relative}: {exc}"
+            ) from exc
+        if (
+            current.st_dev != metadata.st_dev
+            or current.st_ino != metadata.st_ino
+            or not stat.S_ISREG(current.st_mode)
+        ):
+            raise AgentOpsError(
+                f"governed commit path custody changed during read: {relative}"
+            )
     finally:
         os.close(descriptor)
+        for item in reversed(directory_descriptors):
+            os.close(item)
     mode = "100755" if metadata.st_mode & 0o111 else "100644"
     return mode, b"".join(chunks)
 
@@ -1312,26 +2932,750 @@ def base_report(packet: WorkPacket, target_root: Path, *, dry_run: bool) -> dict
     }
 
 
+def _require_session_entry(packet: WorkPacket, *, phase: str) -> None:
+    if packet.session_entry is None:
+        raise AgentOpsError(f"{phase} requires a Session Entry Packet")
+
+
+def _preflight_timestamp(packet: WorkPacket) -> str:
+    return f"preflight-{packet.base_ref}"
+
+
+def preflight_binding_path(report_root: Path, packet: WorkPacket) -> Path:
+    """Return the one deterministic external preflight binding path."""
+    return report_paths(report_root, packet.id, _preflight_timestamp(packet))[0]
+
+
+def _validate_preflight_binding(
+    report_root: Path,
+    source_root: Path,
+    packet: WorkPacket,
+    candidate_bytes: bytes,
+) -> dict[str, Any]:
+    entry = packet.session_entry
+    assert entry is not None
+    path = preflight_binding_path(report_root, packet)
+    _validate_report_destination(report_root, path, source_root)
+    try:
+        binding = json.loads(_read_private_report_file(report_root, path))
+    except (AgentOpsError, UnicodeError, json.JSONDecodeError) as exc:
+        raise AgentOpsError(f"cannot read deterministic preflight binding: {exc}") from exc
+    expected = {
+        "phase": "preflight",
+        "status": "passed",
+        "job_id": packet.id,
+        "base_ref": packet.base_ref,
+        "branch": packet.branch,
+        "target_head": packet.base_ref,
+        "packet_digest": entry.packet_digest,
+        "packet_bytes_sha256": hashlib.sha256(candidate_bytes).hexdigest(),
+    }
+    mismatches = {
+        key: {"expected": value, "actual": binding.get(key)}
+        for key, value in expected.items()
+        if binding.get(key) != value
+    }
+    if mismatches:
+        raise AgentOpsError(
+            f"closeout preflight binding or packet digest mismatch: {mismatches}"
+        )
+    return binding
+
+
+def _read_private_report_file(report_root: Path, path: Path) -> bytes:
+    """Read a bounded private report through a no-follow directory chain."""
+    directory_descriptors = _open_report_directory_chain(report_root, path.parent)
+    parent_descriptor = directory_descriptors[-1]
+    parent_identity = os.fstat(parent_descriptor)
+    descriptor: int | None = None
+    try:
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(path.name, flags, dir_fd=parent_descriptor)
+        identity = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(identity.st_mode)
+            or identity.st_uid != os.geteuid()
+            or stat.S_IMODE(identity.st_mode) != 0o600
+            or identity.st_size > _MAX_BINDING_BYTES
+        ):
+            raise AgentOpsError("preflight binding is not a bounded private regular file")
+        chunks: list[bytes] = []
+        remaining = _MAX_BINDING_BYTES + 1
+        while remaining:
+            chunk = os.read(descriptor, min(65_536, remaining))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        if remaining == 0:
+            raise AgentOpsError("preflight binding exceeds the read limit")
+        current = os.stat(path.name, dir_fd=parent_descriptor, follow_symlinks=False)
+        if current.st_dev != identity.st_dev or current.st_ino != identity.st_ino:
+            raise AgentOpsError("preflight binding custody changed during read")
+        verification = _open_report_directory_chain(report_root, path.parent)
+        try:
+            verified_parent = os.fstat(verification[-1])
+            if (
+                verified_parent.st_dev != parent_identity.st_dev
+                or verified_parent.st_ino != parent_identity.st_ino
+            ):
+                raise AgentOpsError("preflight binding directory changed during read")
+        finally:
+            for item in reversed(verification):
+                os.close(item)
+        return b"".join(chunks)
+    except OSError as exc:
+        raise AgentOpsError(f"cannot open deterministic preflight binding: {exc}") from exc
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        for item in reversed(directory_descriptors):
+            os.close(item)
+
+
+def _admission_gate_environment(
+    report_root: Path,
+    source_root: Path,
+    packet_id: str,
+) -> dict[str, str]:
+    """Route known Python/pytest/Ruff/TMP caches outside the source tree."""
+    _trusted_gate_interpreter(source_root)
+    _reject_local_repository_controls(source_root, base_ref=None)
+    cache_root = report_root / REPORT_ROOT / packet_id / "tool-cache"
+    cache_directories = {
+        "pycache": cache_root / "pycache",
+        "xdg": cache_root / "xdg",
+        "ruff": cache_root / "ruff",
+        "tmp": cache_root / "tmp",
+        "ops": report_root / "ops" / packet_id,
+        "home": report_root / "home" / packet_id,
+    }
+    for directory in cache_directories.values():
+        sentinel = directory / ".agentops-cache-boundary"
+        _validate_report_destination(report_root, sentinel, source_root)
+        _ensure_private_report_directory(report_root, directory)
+        _validate_report_destination(report_root, sentinel, source_root)
+    environment = {
+        # Positive gate argv normalization pins Python to ``sys.executable``
+        # and resolves Git/Make from the trusted host path.  Do not add the
+        # interpreter's sibling directory here: a repository-local venv may
+        # contain untracked executables (for example ``.venv/bin/git``) that a
+        # transitive Make or DocOps child could otherwise resolve first.
+        "PATH": _TRUSTED_HOST_PATH,
+        "HOME": str(cache_directories["home"]),
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "TZ": "UTC",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONHASHSEED": "0",
+        "PYTHONNOUSERSITE": "1",
+        "PYTHONPYCACHEPREFIX": str(cache_directories["pycache"]),
+        "PYTEST_ADDOPTS": "-p no:cacheprovider",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "XDG_CACHE_HOME": str(cache_directories["xdg"]),
+        "RUFF_CACHE_DIR": str(cache_directories["ruff"]),
+        "TMPDIR": str(cache_directories["tmp"]),
+        "TEMP": str(cache_directories["tmp"]),
+        "TMP": str(cache_directories["tmp"]),
+        "DHARMA_OPS_DIR": str(cache_directories["ops"]),
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_ATTR_NOSYSTEM": "1",
+        "GIT_NO_REPLACE_OBJECTS": "1",
+        "GIT_OPTIONAL_LOCKS": "0",
+        "GIT_CONFIG_COUNT": "2",
+        "GIT_CONFIG_KEY_0": "core.fsmonitor",
+        "GIT_CONFIG_VALUE_0": "false",
+        "GIT_CONFIG_KEY_1": "core.hooksPath",
+        "GIT_CONFIG_VALUE_1": os.devnull,
+    }
+    return environment
+
+
+def _write_phase_report(
+    output_root: Path,
+    source_root: Path,
+    report: dict[str, Any],
+    timestamp: str,
+    *,
+    before_json: Callable[[], None] | None = None,
+) -> None:
+    for destination in report_paths(output_root, report["job_id"], timestamp):
+        _validate_report_destination(output_root, destination, source_root)
+    write_report(
+        output_root,
+        report,
+        timestamp,
+        source_root=source_root,
+        before_json=before_json,
+    )
+
+
+def _execute_preflight(
+    source: Path,
+    packet_path: Path,
+    packet: WorkPacket,
+    candidate_bytes: bytes,
+    report_root: Path | None,
+) -> tuple[int, dict[str, Any]]:
+    # Reject a repository-local bootstrap interpreter before any packet or
+    # report operation.  Startup-time sitecustomize has already run by this
+    # point, so the Make entrypoint independently enforces the same boundary
+    # before launching this process.
+    _trusted_gate_interpreter(source)
+    _require_session_entry(packet, phase="preflight")
+    if report_root is None:
+        raise AgentOpsError("preflight requires an explicit external report_root")
+    tracked_copy_state = _validate_session_envelope(
+        source,
+        packet_path,
+        packet,
+        inspect=True,
+        require_tracked_copy=False,
+        candidate_bytes=candidate_bytes,
+    )
+    for gate in packet.gates:
+        admit_gate_command(gate)
+    entry = packet.session_entry
+    assert entry is not None
+    report = base_report(packet, source, dry_run=True)
+    report.update(
+        {
+            "phase": "preflight",
+            "packet_digest": entry.packet_digest,
+            "packet_bytes_sha256": hashlib.sha256(candidate_bytes).hexdigest(),
+            "tracked_copy_state": tracked_copy_state,
+            "commit_decision": "preflight is validation-only",
+            "status": "passed",
+        }
+    )
+
+    def revalidate_before_binding_publish() -> None:
+        _validate_session_envelope(
+            source,
+            packet_path,
+            packet,
+            inspect=True,
+            require_tracked_copy=False,
+            candidate_bytes=candidate_bytes,
+        )
+
+    _write_phase_report(
+        report_root,
+        source,
+        report,
+        _preflight_timestamp(packet),
+        before_json=revalidate_before_binding_publish,
+    )
+    return 0, report
+
+
+def _execute_closeout(
+    source: Path,
+    packet_path: Path,
+    packet: WorkPacket,
+    candidate_bytes: bytes,
+    report_root: Path | None,
+) -> tuple[int, dict[str, Any]]:
+    _require_session_entry(packet, phase="closeout")
+    if report_root is None:
+        raise AgentOpsError("closeout requires an explicit external report_root")
+    _validate_session_envelope(
+        source,
+        packet_path,
+        packet,
+        inspect=False,
+        require_tracked_copy=True,
+        candidate_bytes=candidate_bytes,
+        allow_tracked_input=True,
+        scope_base_ref=packet.base_ref,
+    )
+    target_root = prepare_worktree(source, packet)
+    expected_head = head_for(target_root)
+    _validate_preflight_binding(
+        report_root, source, packet, candidate_bytes
+    )
+    entry = packet.session_entry
+    assert entry is not None
+    timestamp = timestamp_slug()
+    report = base_report(packet, target_root, dry_run=False)
+    report.update(
+        {
+            "phase": "closeout",
+            "packet_digest": entry.packet_digest,
+            "packet_bytes_sha256": hashlib.sha256(candidate_bytes).hexdigest(),
+            "commit_decision": "closeout is read-only; commit disabled",
+        }
+    )
+    for destination in report_paths(report_root, packet.id, timestamp):
+        _validate_report_destination(report_root, destination, source)
+
+    initial_scope = inspect_scope(target_root, packet, base_ref=packet.base_ref)
+    report["scope"] = scope_to_dict(initial_scope)
+    if not initial_scope.passed:
+        report["final_git_status"] = git_status(target_root)
+        report["status"] = "failed"
+        _write_phase_report(report_root, source, report, timestamp)
+        return 1, report
+
+    gate_environment = _admission_gate_environment(
+        report_root, source, packet.id
+    )
+    deadline = time.monotonic() + _MAX_ADMISSION_TIMEOUT_SECONDS
+    for gate in packet.gates:
+        admit_gate_command(gate)
+        report["gates"].append(
+            run_gate(
+                target_root,
+                _bounded_gate(gate, deadline=deadline),
+                base_env=gate_environment,
+                normalize_positive_executable=True,
+            )
+        )
+    for control in packet.negative_controls:
+        report["negative_controls"].append(
+            run_negative_control(
+                target_root,
+                _bounded_gate(control, deadline=deadline),
+                temp_root=Path(gate_environment["TMPDIR"]),
+            )
+        )
+
+    if branch_for(target_root) != packet.branch:
+        raise AgentOpsError("closeout branch changed during gate execution")
+    verify_base_is_ancestor(target_root, packet.base_ref)
+    if head_for(target_root) != expected_head:
+        raise AgentOpsError("closeout HEAD changed during gate execution")
+    _validate_session_envelope(
+        source,
+        packet_path,
+        packet,
+        inspect=False,
+        require_tracked_copy=True,
+        candidate_bytes=candidate_bytes,
+        allow_tracked_input=True,
+        scope_base_ref=packet.base_ref,
+    )
+    _validate_preflight_binding(
+        report_root, source, packet, candidate_bytes
+    )
+    final_scope = inspect_scope(target_root, packet, base_ref=packet.base_ref)
+    report["scope"] = scope_to_dict(final_scope)
+    report["final_git_status"] = git_status(target_root)
+    checks_passed = all(
+        row["passed"]
+        for key in ("gates", "negative_controls")
+        for row in report[key]
+    )
+    report["status"] = "passed" if checks_passed and final_scope.passed else "failed"
+    if branch_for(target_root) != packet.branch or head_for(target_root) != expected_head:
+        raise AgentOpsError("closeout branch or HEAD changed before report publication")
+    verify_base_is_ancestor(target_root, packet.base_ref)
+    _validate_session_envelope(
+        source,
+        packet_path,
+        packet,
+        inspect=False,
+        require_tracked_copy=True,
+        candidate_bytes=candidate_bytes,
+        allow_tracked_input=True,
+        scope_base_ref=packet.base_ref,
+    )
+    _validate_preflight_binding(
+        report_root, source, packet, candidate_bytes
+    )
+
+    def revalidate_before_closeout_publish() -> None:
+        if branch_for(target_root) != packet.branch or head_for(target_root) != expected_head:
+            raise AgentOpsError("closeout branch or HEAD changed during report publication")
+        verify_base_is_ancestor(target_root, packet.base_ref)
+        _validate_session_envelope(
+            source,
+            packet_path,
+            packet,
+            inspect=False,
+            require_tracked_copy=True,
+            candidate_bytes=candidate_bytes,
+            allow_tracked_input=True,
+            scope_base_ref=packet.base_ref,
+        )
+        _validate_preflight_binding(
+            report_root, source, packet, candidate_bytes
+        )
+        current_scope = inspect_scope(target_root, packet, base_ref=packet.base_ref)
+        if scope_to_dict(current_scope) != report["scope"]:
+            raise AgentOpsError("closeout scope changed during report publication")
+        if git_status(target_root) != report["final_git_status"]:
+            raise AgentOpsError("closeout Git status changed during report publication")
+
+    _write_phase_report(
+        report_root,
+        source,
+        report,
+        timestamp,
+        before_json=revalidate_before_closeout_publish,
+    )
+    return (0 if report["status"] == "passed" else 1), report
+
+
+def _scope_for_event_paths(paths: list[str], packet: WorkPacket) -> ScopeState:
+    changed = sorted(set(paths))
+    violations: list[dict[str, Any]] = []
+    for path in changed:
+        forbidden = matching_patterns(path, packet.forbidden_files)
+        allowed = matching_patterns(path, packet.allowed_files)
+        if forbidden:
+            violations.append(
+                {"path": path, "reason": "forbidden", "patterns": forbidden}
+            )
+        elif not allowed:
+            violations.append(
+                {"path": path, "reason": "outside_allowed_scope", "patterns": []}
+            )
+    return ScopeState(
+        tracked_changed_files=changed,
+        staged_files=[],
+        untracked_files=[],
+        changed_files=changed,
+        violations=violations,
+    )
+
+
+def _ci_scope_with_committed_paths(
+    repo_root: Path,
+    packet: WorkPacket,
+    committed_paths: list[str],
+) -> ScopeState:
+    """Combine assigned merge-group commits with every live worktree class."""
+    working = inspect_scope(repo_root, packet)
+    tracked = sorted(set(committed_paths + working.tracked_changed_files))
+    changed = sorted(set(tracked + working.staged_files + working.untracked_files))
+    matched = _scope_for_event_paths(changed, packet)
+    mode_violations = _changed_path_mode_violations(
+        repo_root,
+        committed_paths=committed_paths,
+        staged_paths=working.staged_files,
+        working_paths=sorted(
+            set(working.tracked_changed_files + working.untracked_files)
+        ),
+    )
+    return ScopeState(
+        tracked_changed_files=tracked,
+        staged_files=working.staged_files,
+        untracked_files=working.untracked_files,
+        changed_files=changed,
+        violations=[*matched.violations, *mode_violations],
+    )
+
+
+def _ci_summary_report(
+    source: Path,
+    *,
+    event_name: str,
+    event_base: str,
+    event_head: str,
+    status: str,
+    packets: list[str],
+    error: str | None = None,
+) -> dict[str, Any]:
+    report = {
+        "job_id": "onboarding-ci-event",
+        "base_ref": event_base,
+        "branch": "detached-event-head",
+        "worktree": ".",
+        "intent": "Bind CI onboarding admission to the declared event range.",
+        "allowed_files": [],
+        "forbidden_files": [],
+        "approval": {"before_commit": True, "before_merge": True},
+        "dry_run": False,
+        "target_head": head_for(source),
+        "scope": {
+            "tracked_changed_files": [],
+            "staged_files": [],
+            "untracked_files": [],
+            "changed_files": [],
+            "violations": [],
+            "passed": status == "passed",
+        },
+        "gates": [],
+        "negative_controls": [],
+        "commit_hash": None,
+        "commit_decision": "CI event evaluation never commits",
+        "final_git_status": git_status(source),
+        "status": status,
+        "phase": "ci-event",
+        "event_name": event_name,
+        "event_base": event_base,
+        "event_head": event_head,
+        "packets": packets,
+    }
+    if error is not None:
+        report["error"] = error
+    return report
+
+
+def execute_ci_event(
+    *,
+    source_root: Path | None = None,
+    event_name: str,
+    event_base: str,
+    event_head: str,
+    report_root: Path | None,
+) -> tuple[int, dict[str, Any]]:
+    """Run the shared evaluator for a PR or merge-group event.
+
+    CI deliberately skips only local-machine facts (declared host tool
+    versions, attached branch, and the author's external preflight record).
+    Packet parsing/digest, owner/collision/sibling/index custody, exact event
+    range, forbidden-first coverage, gates, controls, and external reports all
+    remain mandatory.
+    """
+    source = require_repo_root((source_root or Path.cwd()).resolve())
+    if report_root is None:
+        raise AgentOpsError("CI event evaluation requires an external report_root")
+    output_root = _prepare_private_report_root(report_root, repo_root=source)
+    timestamp = timestamp_slug()
+    packet_ids: list[str] = []
+    try:
+        bindings = _discover_ci_packet_bindings(
+            source,
+            event_name=event_name,
+            event_base=event_base,
+            event_head=event_head,
+        )
+        packet_ids = [binding.packet.id for binding in bindings]
+        discovered_identity = _ci_packet_binding_identity(bindings)
+
+        def require_packet_snapshots() -> None:
+            _require_ci_packet_snapshots(bindings)
+
+        def require_full_event_binding() -> None:
+            require_packet_snapshots()
+            rediscovered = _discover_ci_packet_bindings(
+                source,
+                event_name=event_name,
+                event_base=event_base,
+                event_head=event_head,
+            )
+            if _ci_packet_binding_identity(rediscovered) != discovered_identity:
+                raise AgentOpsError(
+                    "CI packet set or snapshot changed during evaluator execution"
+                )
+
+        # Close the discovery/execution boundary before deriving any scope or
+        # invoking any packet-declared command.
+        require_packet_snapshots()
+        changed = sorted(
+            set(
+                git_nul_records(
+                    source,
+                    [
+                        "diff", "--no-ext-diff", "--no-textconv", "--no-renames", "--name-only",
+                        "-z", f"{event_base}...{event_head}", "--",
+                    ],
+                )
+            )
+        )
+        _validate_observed_git_paths(changed)
+        _track, owned_patterns, _siblings = _ci_authority_context(
+            _active_tracks_at(source, event_base),
+            _active_tracks_at(source, event_head),
+        )
+        owned_changed = [
+            path
+            for path in changed
+            if _CI_PACKET_PATH.fullmatch(path)
+            or (
+                path != _ACTIVE_TRACK_PATH
+                and matching_patterns(path, owned_patterns)
+            )
+        ]
+        all_passed = True
+        deadline = time.monotonic() + _MAX_ADMISSION_TIMEOUT_SECONDS
+        for binding in bindings:
+            packet = binding.packet
+            require_packet_snapshots()
+            entry = packet.session_entry
+            assert entry is not None
+            claimed = [
+                path
+                for path in owned_changed
+                if matching_patterns(path, packet.allowed_files)
+                and not matching_patterns(path, packet.forbidden_files)
+            ]
+            forbidden_event = [
+                path
+                for path in changed
+                if matching_patterns(path, packet.forbidden_files)
+            ]
+            # A merge group may contain several disjoint packets, so a packet
+            # evaluates its exact-once claims rather than every other packet's
+            # claimed paths.  It must nevertheless retain every full-event
+            # path it explicitly forbids, even when that path sits outside the
+            # track-owned surfaces; filtering to positive claims alone would
+            # turn a forbidden change into a false pass.
+            committed_scope_paths = sorted(set(claimed + forbidden_event))
+            scope = (
+                inspect_scope(source, packet, base_ref=event_base)
+                if event_name == "pull_request"
+                else _ci_scope_with_committed_paths(
+                    source, packet, committed_scope_paths
+                )
+            )
+            report = base_report(packet, source, dry_run=False)
+            report.update(
+                {
+                    "phase": "ci-event",
+                    "event_name": event_name,
+                    "event_base": event_base,
+                    "event_head": event_head,
+                    "packet_digest": entry.packet_digest,
+                    "packet_bytes_sha256": binding.candidate_sha256,
+                    "scope": scope_to_dict(scope),
+                    "commit_decision": "CI event evaluation never commits",
+                }
+            )
+            if not scope.passed:
+                report["status"] = "failed"
+                report["final_git_status"] = git_status(source)
+                _write_phase_report(
+                    output_root,
+                    source,
+                    report,
+                    timestamp,
+                    before_json=require_packet_snapshots,
+                )
+                require_packet_snapshots()
+                all_passed = False
+                continue
+            gate_environment = _admission_gate_environment(
+                output_root, source, packet.id
+            )
+            for gate in packet.gates:
+                require_packet_snapshots()
+                admit_gate_command(gate)
+                report["gates"].append(
+                    run_gate(
+                        source,
+                        _bounded_gate(gate, deadline=deadline),
+                        base_env=gate_environment,
+                        normalize_positive_executable=True,
+                    )
+                )
+                require_packet_snapshots()
+            for control in packet.negative_controls:
+                require_packet_snapshots()
+                report["negative_controls"].append(
+                    run_negative_control(
+                        source,
+                        _bounded_gate(control, deadline=deadline),
+                        temp_root=Path(gate_environment["TMPDIR"]),
+                    )
+                )
+                require_packet_snapshots()
+            final_scope = (
+                inspect_scope(source, packet, base_ref=event_base)
+                if event_name == "pull_request"
+                else _ci_scope_with_committed_paths(
+                    source, packet, committed_scope_paths
+                )
+            )
+            report["scope"] = scope_to_dict(final_scope)
+            checks_passed = final_scope.passed and all(
+                row["passed"]
+                for key in ("gates", "negative_controls")
+                for row in report[key]
+            )
+            report["status"] = "passed" if checks_passed else "failed"
+            report["final_git_status"] = git_status(source)
+            _write_phase_report(
+                output_root,
+                source,
+                report,
+                timestamp,
+                before_json=require_packet_snapshots,
+            )
+            require_packet_snapshots()
+            all_passed = all_passed and checks_passed
+
+        require_full_event_binding()
+        summary = _ci_summary_report(
+            source,
+            event_name=event_name,
+            event_base=event_base,
+            event_head=event_head,
+            status="passed" if all_passed else "failed",
+            packets=packet_ids,
+        )
+        _write_phase_report(
+            output_root,
+            source,
+            summary,
+            timestamp,
+            before_json=require_full_event_binding,
+        )
+        require_full_event_binding()
+        return (0 if all_passed else 1), summary
+    except (AgentOpsError, json.JSONDecodeError) as exc:
+        summary = _ci_summary_report(
+            source,
+            event_name=event_name,
+            event_base=event_base,
+            event_head=event_head,
+            status="config_error",
+            packets=packet_ids,
+            error=str(exc),
+        )
+        _write_phase_report(output_root, source, summary, timestamp)
+        raise
+
+
 def execute_packet(
     packet_path: Path,
     *,
     source_root: Path | None = None,
     dry_run: bool = False,
+    preflight: bool = False,
+    closeout: bool = False,
     allow_existing_changes: bool = False,
     report_root: Path | None = None,
 ) -> tuple[int, dict[str, Any] | None]:
     source = require_repo_root((source_root or Path.cwd()).resolve())
-    candidate_bytes = packet_path.read_bytes()
+    if sum((dry_run, preflight, closeout)) > 1:
+        raise AgentOpsError("choose exactly one of inspect, preflight, or closeout")
+    if (preflight or closeout) and allow_existing_changes:
+        raise AgentOpsError(
+            "preflight/closeout compute the complete envelope and do not allow "
+            "--allow-existing-changes"
+        )
+    candidate_bytes = _read_packet_bytes(packet_path)
     packet = load_work_packet(packet_path, content=candidate_bytes)
     if packet.session_entry is not None and packet_path.suffix.lower() != ".json":
         raise AgentOpsError("Session Entry Packet must use JSON")
     external_reports = (
-        resolve_external_dir(report_root, repo_root=source)
+        _prepare_private_report_root(report_root, repo_root=source)
         if report_root is not None
         else None
     )
     if packet.session_entry is not None and not dry_run and external_reports is None:
         raise AgentOpsError("session_entry execution requires an explicit external report_root")
+
+    if preflight:
+        return _execute_preflight(
+            source,
+            packet_path,
+            packet,
+            candidate_bytes,
+            external_reports,
+        )
+    if closeout:
+        return _execute_closeout(
+            source,
+            packet_path,
+            packet,
+            candidate_bytes,
+            external_reports,
+        )
 
     if dry_run:
         tracked_copy_state = _validate_session_envelope(
@@ -1413,12 +3757,35 @@ def execute_packet(
         write_report(output_root, report, timestamp, source_root=report_source)
         return 1, report
 
+    legacy_gate_root = (
+        output_root
+        if packet.session_entry is not None
+        else _prepare_private_report_root(
+            Path("/tmp") / f"dharma-agentops-legacy-{os.geteuid()}",
+            repo_root=source,
+        )
+    )
+    legacy_gate_environment = _admission_gate_environment(
+        legacy_gate_root, source, packet.id
+    )
+    deadline = time.monotonic() + _MAX_ADMISSION_TIMEOUT_SECONDS
     for gate in packet.gates:
         admit_gate_command(gate)  # O4-B11: fail closed before execution
-        gate_result = run_gate(target_root, gate)
+        gate_result = run_gate(
+            target_root,
+            _bounded_gate(gate, deadline=deadline),
+            base_env=legacy_gate_environment,
+            normalize_positive_executable=True,
+        )
         report["gates"].append(gate_result)
     for control in packet.negative_controls:
-        report["negative_controls"].append(run_negative_control(target_root, control))
+        report["negative_controls"].append(
+            run_negative_control(
+                target_root,
+                _bounded_gate(control, deadline=deadline),
+                temp_root=Path(legacy_gate_environment["TMPDIR"]),
+            )
+        )
 
     _validate_session_envelope(
         source,
@@ -1449,12 +3816,43 @@ def execute_packet(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run a governed AgentOps work packet")
-    parser.add_argument("--packet", required=True, type=Path, help="Path to JSON/YAML work packet")
-    parser.add_argument(
+    parser.add_argument("--packet", type=Path, help="Path to JSON/YAML work packet")
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument(
         "--dry-run",
         "--inspect",
         action="store_true",
         help="Validate and print intended actions without creating a worktree, running gates, or committing",
+    )
+    modes.add_argument(
+        "--preflight",
+        action="store_true",
+        help="Bind an external packet to an exact clean baseline and external report",
+    )
+    modes.add_argument(
+        "--closeout",
+        action="store_true",
+        help="Evaluate base...HEAD plus working state against the preflight binding",
+    )
+    modes.add_argument(
+        "--ci-event",
+        choices=("pull_request", "merge_group"),
+        help="Discover and evaluate packets for a declared CI event range",
+    )
+    modes.add_argument(
+        "--validate-report-root",
+        type=Path,
+        help="Validate one external report root without loading a packet",
+    )
+    parser.add_argument(
+        "--validate-report-child",
+        action="append",
+        default=[],
+        metavar="RELATIVE",
+        help=(
+            "Prepare and validate a relative cache/output child beneath "
+            "--validate-report-root; repeat for multiple children"
+        ),
     )
     parser.add_argument(
         "--allow-existing-changes",
@@ -1466,25 +3864,80 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Explicit external root for reports; required for Session Entry execution",
     )
+    parser.add_argument("--event-base", help="Exact CI event base commit SHA")
+    parser.add_argument("--event-head", help="Exact CI event head commit SHA")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.validate_report_child and args.validate_report_root is None:
+        parser.error("--validate-report-child requires --validate-report-root")
+    if args.validate_report_root is not None:
+        if args.packet is not None or args.report_root is not None:
+            parser.error("--validate-report-root accepts no packet or --report-root")
+        if args.event_base is not None or args.event_head is not None:
+            parser.error("--validate-report-root accepts no event range")
+        if args.allow_existing_changes:
+            parser.error("--validate-report-root accepts no execution flags")
+    elif args.ci_event:
+        if args.packet is not None:
+            parser.error("--ci-event discovers packets and does not accept --packet")
+        if args.event_base is None or args.event_head is None:
+            parser.error("--ci-event requires --event-base and --event-head")
+        if args.allow_existing_changes:
+            parser.error("--ci-event does not allow --allow-existing-changes")
+    else:
+        if args.packet is None:
+            parser.error("--packet is required outside CI event mode")
+        if args.event_base is not None or args.event_head is not None:
+            parser.error("--event-base/--event-head require --ci-event")
     try:
-        exit_code, report = execute_packet(
-            args.packet,
-            dry_run=args.dry_run,
-            allow_existing_changes=args.allow_existing_changes,
-            report_root=args.report_root,
-        )
+        if args.validate_report_root is not None:
+            source = require_repo_root(Path.cwd().resolve())
+            validated = _prepare_private_report_root(
+                args.validate_report_root,
+                repo_root=source,
+            )
+            children = _prepare_private_report_children(
+                validated,
+                args.validate_report_child,
+                repo_root=source,
+            )
+            print(f"Validated external report root: {validated}")
+            for child in children:
+                print(f"Validated external report child: {child}")
+            return 0
+        if args.ci_event:
+            exit_code, report = execute_ci_event(
+                event_name=args.ci_event,
+                event_base=args.event_base,
+                event_head=args.event_head,
+                report_root=args.report_root,
+            )
+        else:
+            assert args.packet is not None
+            if not (args.dry_run or args.preflight or args.closeout):
+                candidate = load_work_packet(args.packet)
+                if candidate.session_entry is not None:
+                    raise AgentOpsError(
+                        "Session Entry Packet requires --inspect, --preflight, or --closeout"
+                    )
+            exit_code, report = execute_packet(
+                args.packet,
+                dry_run=args.dry_run,
+                preflight=args.preflight,
+                closeout=args.closeout,
+                allow_existing_changes=args.allow_existing_changes,
+                report_root=args.report_root,
+            )
     except AgentOpsError as exc:
         print(f"AgentOps error: {exc}", file=sys.stderr)
-        return 2
+        return 3 if args.ci_event else 2
     except json.JSONDecodeError as exc:
         print(f"AgentOps error: invalid JSON packet: {exc}", file=sys.stderr)
-        return 2
+        return 3 if args.ci_event else 2
 
     if report is not None:
         print(f"Status: {report['status']}")

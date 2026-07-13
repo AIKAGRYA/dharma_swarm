@@ -22,7 +22,9 @@ Doctrine line that must hold (same as the reconciliation track's):
 Usage:
     python3 scripts/governance/orientation_graph.py          # human view
     python3 scripts/governance/orientation_graph.py --json   # machine packet
-    make orient                                             # writes repo_context artifacts
+    make orient                                             # deep read-only view
+    python3 scripts/governance/orientation_graph.py --write-context
+                                                            # explicit refresh
 
 Write behavior: default and --json never write; --write-context writes only
 reports/orientation/repo_context.{json,md}. Exit code: always 0
@@ -42,6 +44,13 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+# This projection is read-only by default, and its explicit refresh owns only
+# the two context artifacts below.  Disable bytecode before importing any
+# repository module so a pristine checkout never gains ignored __pycache__
+# files merely by invoking either route.  `make orient` also exports the
+# interpreter-level switch so the policy applies from process start.
+sys.dont_write_bytecode = True
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
