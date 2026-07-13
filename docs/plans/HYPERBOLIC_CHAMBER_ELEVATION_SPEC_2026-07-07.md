@@ -427,3 +427,287 @@ evidence. Majority-verify any number that feeds the ledger.
 *Feed order when reusing: this file's Part III is the complete prompt; a
 fresh instance needs nothing else in hand. Parts I–II are its engineering
 appendix; the Phase-0 dossier and chamber doctrine are its law.*
+
+---
+
+## Part IV — Proof Membrane V0 (operator-requested 2026-07-14 supplement)
+
+**Role:** implementation-ready, bounded supplement to the ratified chamber
+track. It specifies one proof-plane slice; it does not replace Parts I–III,
+create a new active track, or claim production closure.
+
+**Authority:** subordinate to `make onboard`,
+`docs/governance/ACTIVE_TRACK.yaml`, the chamber doctrine, and executable
+verification receipts. External simulators, Forge, councils, builders, and
+this document may propose evidence; none may mint promotion authority.
+
+### IV.1 Decision
+
+Build the chamber as a cross-cutting **acceptance membrane**, not a universal
+simulation platform. V0 wraps one real, current defect without editing the
+DharmaGraph-owned surface:
+
+```text
+OUTER WORLD FOUNDRY (untrusted candidates)
+MiroFish / OASIS / Forge / Hypothesis / vendor tools
+        ↓ ScenarioCandidateV1 — generated, never authoritative
+
+INNER PROOF CHAMBER (this V0)
+WorldV1 + exact repository-source manifest + explicit choices/faults/properties
+        ↓ source-exact RunCheckpoint.fork execution in an isolated worker
+causal observation + minimized ReplayBundleV1
+        ↓ 100 fresh-process RuntimeVerifier executions
+typed reproduced claim
+
+PROMOTION MEMBRANE
+exact proposition + exact scope + evaluator-minted capability
+        ↓ allow or named fail-closed rejection
+```
+
+The specimen is `RunCheckpoint.fork`: at the current baseline, the child and
+parent retain the same nested channel objects, so mutating the child mutates
+the parent (`dharma_swarm/graph/types.py:129-138`; reproduce with the command
+recorded in the V0 receipt). This supplement preserves and proves that defect;
+the `dharmagraph-engine-2026-07` owner decides and lands the eventual fix.
+
+### IV.2 Where MiroFish and other engines fit
+
+MiroFish is an outer **world foundry**, not the chamber or the court. The
+inspected upstream pipeline turns documents into a graph, personas, parallel
+Twitter/Reddit-style agent activity, and an LLM-generated report. Its runner
+uses stochastic agent activation, concurrent platforms, non-zero-temperature
+LLM calls, wall-clock data, and recreated databases. Its "seed" is source
+material, not a complete reproducibility seed. Therefore its strongest
+admissible output is:
+
+```text
+Claim<ScenarioCandidate, Generated, Principal<MiroFishAdapter>,
+      Scope<inputs, model, provider, config, upstream_commit>>
+```
+
+It has no implicit conversion to a reproduced Dharma property. If adopted
+later, run it as a quarantined process boundary, pin its AGPL upstream commit,
+and compile selected output into ordinary deterministic fixtures. Never pass
+its report confidence, majority vote, claimed authority, or network access
+into `RuntimeVerifier`.
+
+The adjacent-engine table is V0 **admission policy**, not a claim that every
+engine was exhaustively audited. The primary sources below support the engines
+used to choose the immediate boundary; grouped social/RL tools remain
+`not_inspected_for_admission` until their own pinned adapter dossier exists.
+
+| Family | Admissible contribution | V0 decision |
+|---|---|---|
+| Hypothesis/property testing | generate and shrink explicit choices | borrow now; bundle, not seed/database, is canonical |
+| FoundationDB/VOPR-style simulation | explicit entropy, time, and fault-input design | borrow the pattern; do not transplant an engine |
+| Antithesis | later container schedule/fault search and vendor observation | integrate after local execution semantics close |
+| Maelstrom/Jepsen | later transport history and real-cluster consistency evidence | defer until the A2A local seam closes |
+| TLA+/P/Apalache | abstract promotion/crash protocol obligations | later; never proof that Python conforms by itself |
+| rr/Shuttle | debugging or schedule-trace attachments | optional later instrumentation |
+| MiroFish/OASIS/Concordia/SOTOPIA/AgentSociety | social, collusion, deception, and policy scenarios | untrusted candidate generation only |
+| PettingZoo/Melting Pot/OpenSpiel | reset/step, substrate/scenario, explicit-choice interface ideas | borrow interfaces; no V0 dependency |
+| SimPy/Mesa/Determinator | alternate scheduler or execution world | do not add in V0 |
+
+Primary prior-art locators: [MiroFish upstream workflow](https://github.com/666ghj/MiroFish/blob/96096ea0ff42b1a30cbc41a1560b8c91090f9968/README.md#L86-L92),
+[MiroFish random activation](https://github.com/666ghj/MiroFish/blob/96096ea0ff42b1a30cbc41a1560b8c91090f9968/backend/scripts/run_parallel_simulation.py#L1040-L1080),
+[MiroFish LLM client](https://github.com/666ghj/MiroFish/blob/96096ea0ff42b1a30cbc41a1560b8c91090f9968/backend/app/utils/llm_client.py#L35-L68),
+[MiroFish AGPL-3.0 license](https://github.com/666ghj/MiroFish/blob/96096ea0ff42b1a30cbc41a1560b8c91090f9968/LICENSE),
+[OASIS](https://github.com/camel-ai/oasis),
+[Antithesis DST](https://antithesis.com/docs/resources/deterministic_simulation_testing/),
+[FoundationDB simulation](https://apple.github.io/foundationdb/testing.html),
+[Maelstrom](https://github.com/jepsen-io/maelstrom), and
+[Hypothesis stateful testing](https://hypothesis.readthedocs.io/en/latest/stateful.html).
+
+### IV.3 V0 data and authority model
+
+`WorldV1` is data only:
+
+- a registered `scenario_id` (no deserialized callable or command);
+- deterministic fixtures;
+- ordered choices;
+- explicit faults (empty for the fork-alias specimen);
+- activated property IDs;
+- declared nondeterminism (must be empty in V0).
+
+`ReplayBundleV1` adds:
+
+- distinct, registered candidate identities for the production specimen and
+  corrected-control arms; callers cannot supply or relabel them after replay;
+- the exact relative-path/SHA-256 manifest;
+- the source revision when every manifest byte is already committed, otherwise
+  the explicit non-promotable marker `WORKTREE`;
+- expected semantic observations and property verdicts;
+- one deliberately corrected control world;
+- a digest covering every serialized field; this complete bundle digest is the
+  V0 scope digest, rather than a digest of the file list alone.
+
+The manifest binds the complete set of **repository source** admitted to this
+slice, not a whole operating-system image. The command-line path immediately
+re-execs a stdlib-only bootstrap that installs inert `dharma_swarm` package
+shells, so neither `dharma_swarm/__init__.py` nor the broad
+`dharma_swarm/graph/__init__.py` export surface runs. The worker loads the
+manifested chamber modules only, executes `graph/types.py` from the validated
+byte snapshot, rejects any widened import set in that file, and reports the
+exact loaded repository paths **and the digests of the bytes actually loaded**
+in every process record. Python, `git`, `PATH`, and the fresh environment are
+recorded, but V0 is not an interpreter/stdlib image or operating-system
+attestation claim.
+
+The verifier emits one of two semantic subjects:
+
+```text
+Satisfies<P>  # the activated property held
+Refutes<P>    # the activated property was violated
+```
+
+and binds it as:
+
+```text
+Claim<Subject<P>, Candidate<C>, Arm<A>, Reproduced,
+      Principal<RuntimeVerifier>, Scope<S>>
+```
+
+Serialized evidence may carry provenance, but operational permission remains
+evaluator-owned and non-deserializable:
+
+```text
+Authorize<K, P, Promote<C>, S>
+```
+
+V0 adds two deliberately ephemeral witnesses: one minted only by the live
+fresh-process verifier and one bound to the resulting claim. Neither survives
+serialization. A fabricated `FreshProcessVerification` or a public `Claim`
+dataclass constructed directly from deserialized typed fields is therefore
+evidence-shaped data, not `RuntimeVerifier` provenance. This is a
+trusted-process semantic boundary, not
+a defense against arbitrary Python already executing inside the evaluator:
+underscored objects, frozen dataclasses, and module-private seals are not a
+security boundary. Durable cross-process verifier provenance requires a later
+trusted signing or attestation service; V0 does not pretend Python privacy is
+that boundary.
+
+The evaluator is configured independently with its allowed obligation and a
+fixed `(candidate_id, effect_binding_id)` handler in read-only evaluator state.
+Evidence cannot add an obligation, supply an arbitrary callback, or choose
+what effect executes. Its public one-shot authorization record binds evaluator
+instance, principal, candidate, evidence arm, source revision, bundle,
+proposition, required properties, effect binding, effect, and scope. The
+evaluator also retains the original binding in its private issued-capability
+registry, so low-level dataclass retargeting fails closed under the supported
+boundary. V0 does not claim handler-code attestation; the only positive handler
+is a synthetic test recorder.
+
+Promotion is callable only when all checks hold:
+
+1. `Subject` is `Satisfies` (a reproducible counterexample is valuable but
+   cannot authorize promotion).
+2. candidate identity and scenario/control evidence arm match the independently
+   configured obligation; control evidence cannot be relabeled as production.
+3. `P == PromotionObligation(C)` exactly; no confidence ladder or semantic
+   guess. A real `ParityScore(52)` must be rejected for `ProductionReady` as
+   `EPI-PROP-MISMATCH`.
+4. source revision, complete bundle digest, and `S == Bundle(C)` match exactly;
+   `WORKTREE` is non-promotable outside the explicit test-only evaluator.
+5. modality is `Reproduced` and principal is `RuntimeVerifier`.
+6. every required property was activated **and satisfied**, not merely named.
+7. the corrected control behaved oppositely; a corrected control that still
+   violates the property is `EPI-CONTROL-INVALID`.
+8. the verifier ran in fresh isolated processes and its live witness still
+   binds the receipt; each child consumed the parent's canonical bundle bytes
+   over stdin, not a mutable path, and executed no repository source outside
+   the declared worker closure.
+9. the evaluator possesses the matching in-memory capability. A payload with
+   `"authority":"RuntimeVerifier"` is ordinary data and cannot satisfy it.
+
+There is no universal modality ladder. `Generated`, `Observed`,
+`VendorReproduced`, `ModelChecked`, and `Reproduced` retain distinct meanings
+and require explicit proof-producing transitions.
+
+### IV.4 Exact vertical slice
+
+The registered scenario performs only these actions:
+
+1. load the committed `graph/types.py` bytes from the validated manifest
+   snapshot without executing the graph package initializer;
+2. construct a `RunCheckpoint` from frozen nested channel fixtures and call
+   that source-exact production `RunCheckpoint.fork` method;
+3. append one frozen value to the child's nested list;
+4. observe both parent and child values;
+5. evaluate `dharmagraph.checkpoint.fork_parent_isolated.v1`;
+6. run a corrected deep-copy control against the same fixture.
+
+The minimized failing world contains no scheduler, provider, network, clock,
+filesystem race, broker, or whole-swarm model. If this slice requires any of
+those, V0 stops and the ordinary defect returns to the DharmaGraph owner.
+
+Implementation stays on the existing track-owned surfaces:
+
+- `dharma_swarm/chamber/replay.py` — registered fork scenario, exact manifest,
+  committed-source binding, and one-process execution;
+- `dharma_swarm/chamber/replay_contract.py` — strict data-only world/bundle
+  schema split out to keep every chamber module below 500 lines;
+- `dharma_swarm/chamber/replay_worker.py` — stdlib-only bootstrap that admits
+  only the declared repository-source closure and bypasses package initializer
+  side effects;
+- `dharma_swarm/chamber/verification.py` — immutable-stdin fresh-process
+  runner, per-process transcript, and ephemeral verifier witness;
+- `dharma_swarm/chamber/proof.py` — typed claim, ephemeral claim witness,
+  immutable evaluator capability, separately configured policy/effect, and
+  exact candidate/revision/bundle/proposition/property/scope gate;
+- `tests/test_chamber_traces.py` — bundle integrity, 100-process replay,
+  manifest drift, corrected control, and authority/proposition rejection;
+- `reports/governance/chamber/proof_membrane_v0/` — preserved bundle and
+  machine verification receipt.
+
+No production promotion path, graph code, Forge code, A2A transport, runtime
+spine, scheduler, database, provider, or active-track declaration changes in
+V0.
+
+### IV.5 Acceptance matrix
+
+| ID | Required outcome |
+|---|---|
+| PM0-1 | current fork-alias bundle reproduces the same semantic digest in 100/100 fresh processes |
+| PM0-2 | corrected deep-copy control satisfies parent isolation and therefore does not reproduce the defect |
+| PM0-3 | one-byte bundle/manifest drift, recomputed fixture drift, mutable-path substitution, direct in-memory contract bypass, and undeclared repository-source execution fail closed before or without changing child execution |
+| PM0-4 | missing/unknown property and declared nondeterminism fail closed |
+| PM0-5 | `Refutes<fork_parent_isolated>` cannot authorize any promotion |
+| PM0-6 | `Satisfies<ParityScore(52)>` cannot discharge `ProductionReady`; the evaluator-registered effect count remains zero |
+| PM0-7 | serialized authority-shaped data, caller-supplied candidate relabeling, and objects fabricated through supported constructors cannot create provenance or evaluator permission; arbitrary in-process Python remains trusted |
+| PM0-8 | only the verifier-attested corrected-control candidate/arm may cross the positive V0 test gate, with separately configured policy/fixed effect binding and a registry-backed one-shot exact capability; this proves mechanics, not a repaired production seam or handler-code attestation |
+| PM0-9 | focused chamber tests, all pre-existing chamber tests, graph-adjacent tests, Ruff, diff checks, and governance closeout pass |
+| PM0-10 | all six required decorrelated external model lanes approve scope and semantics after seeing executable evidence, and the persistent witness is fresh; any dissent produces another repair cycle |
+
+Model agreement is a review gate, not truth. After council review, rerun all
+local executable checks on the reviewed bytes. PM0-10 is necessarily pending
+while a council round is running: each lane assesses PM0-1 through PM0-9 and
+the implementation boundaries, and its recorded approval contributes to the
+post-round PM0-10 result. A lane must not reject the reviewed bytes merely
+because the not-yet-finished round has not already approved itself. The
+strongest allowed final
+claim is `HARNESS_PROVEN` for the exact bundle and the committed implementation
+revision named inside it; never
+`CLOSED_LIVE`, universal determinism, automatic RCA, or production readiness.
+
+### IV.6 Kill criteria and next seam
+
+Stop V0 rather than expand it if it needs a second scheduler, new persistence
+owner, live provider, broker, container platform, MiroFish runtime, or whole-
+swarm simulator. Stop promotion if any required property/control/scope check
+is missing or if the council agrees while executable evidence is red.
+
+After V0 closes, hand the preserved defect to the DharmaGraph track. The V0
+schema intentionally freezes the failing specimen and cannot certify a repair.
+A V1 repair bundle must invert the production expectation, retain a known-bad
+negative control, bind the repaired commit, and emit the matching `Satisfies`
+claim before the chamber moves down the real path:
+
+```text
+TaskBoard -> Orchestrator.route_next -> _run_task_via_spine
+          -> invoke_agent -> DurableInvoker -> FixtureAgentInvoker
+          -> authorized settlement
+```
+
+Transport duplication/reordering, Maelstrom/Jepsen, Antithesis containers,
+and MiroFish/OASIS-generated social adversaries are later adapters, admitted
+one at a time by the same exact-scope membrane.
