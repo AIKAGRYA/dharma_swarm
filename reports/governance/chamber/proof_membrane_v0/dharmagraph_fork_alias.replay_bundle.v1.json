@@ -1,0 +1,125 @@
+{
+  "bundle_digest": "8f29d8279aa5cd4a99f4861fb0df557356c9942b88112673b26f1568e1c91085",
+  "bundle_id": "dharmagraph-fork-alias-current-main-v1",
+  "control_candidate_id": "dharmagraph.run_checkpoint.deepcopy-control-fixture.v1",
+  "control_world": {
+    "activated_properties": [
+      "dharmagraph.checkpoint.fork_parent_isolated.v1"
+    ],
+    "choices": [
+      {
+        "name": "fork_strategy",
+        "value": "deepcopy_control"
+      },
+      {
+        "name": "append_value",
+        "value": "child-only"
+      }
+    ],
+    "declared_nondeterminism": [],
+    "faults": [],
+    "fixtures": {
+      "checkpoint": {
+        "channels": {
+          "messages": {
+            "values": [
+              "parent-only"
+            ]
+          }
+        },
+        "graph_id": "fixture-graph",
+        "graph_run_id": "parent-run",
+        "state_digest": "fixture-state-digest",
+        "superstep": 1,
+        "versions_seen": {
+          "node-a": {
+            "messages": 1
+          }
+        }
+      },
+      "child_run_id": "child-run"
+    },
+    "scenario_id": "dharmagraph.run_checkpoint.fork_alias.v1",
+    "schema": "dharma_world.v1"
+  },
+  "expectation": {
+    "control_semantic_digest": "c750b3470d9af1a54e1177a63b2bd4f8dd031f75f55fc19a2f70a60db3edb3e6",
+    "control_verdict": true,
+    "property_id": "dharmagraph.checkpoint.fork_parent_isolated.v1",
+    "scenario_semantic_digest": "7e215b28cc0ad055f2dc12a32246f1cb99c4bbb960162d3b356fa0d354928673",
+    "scenario_verdict": false
+  },
+  "manifest": [
+    {
+      "path": "dharma_swarm/chamber/proof.py",
+      "sha256": "9b0d5e92b8cc27bb2b61c1ba92c72e6e2e109e868aff5f98cb3ede97ff08e5fb"
+    },
+    {
+      "path": "dharma_swarm/chamber/replay.py",
+      "sha256": "792d395f54ea825743bb8cf48c1ba57f047d7b7106c22d1385313be291ffa29b"
+    },
+    {
+      "path": "dharma_swarm/chamber/replay_contract.py",
+      "sha256": "f10a8f06fde030b0cdd05ddb98c9bc682a0c2af31633302feff34f8bc0b0e012"
+    },
+    {
+      "path": "dharma_swarm/chamber/replay_worker.py",
+      "sha256": "5054fcb6c45e78558f8f281298c64e229b517b5576041305605c7595780f521b"
+    },
+    {
+      "path": "dharma_swarm/chamber/verification.py",
+      "sha256": "fa595128206b85b5d82b0e1cf59ef049d12f8d48289a569876acaeb588a81b59"
+    },
+    {
+      "path": "dharma_swarm/chamber/traces.py",
+      "sha256": "53d3763b0a2308abbfa7243d388a61c525bb8899ecdf80af6a7a3a7ae5d95329"
+    },
+    {
+      "path": "dharma_swarm/graph/types.py",
+      "sha256": "74b98c6bc441aa0984328e598cbf243b46cf0148b0fd7742f35665bbaae99163"
+    }
+  ],
+  "scenario_candidate_id": "dharmagraph.run_checkpoint.current-fork-specimen.v1",
+  "schema": "dharma_replay_bundle.v1",
+  "source_revision": "df435af863e651287de3f637509a45d59b133ad3",
+  "world": {
+    "activated_properties": [
+      "dharmagraph.checkpoint.fork_parent_isolated.v1"
+    ],
+    "choices": [
+      {
+        "name": "fork_strategy",
+        "value": "production"
+      },
+      {
+        "name": "append_value",
+        "value": "child-only"
+      }
+    ],
+    "declared_nondeterminism": [],
+    "faults": [],
+    "fixtures": {
+      "checkpoint": {
+        "channels": {
+          "messages": {
+            "values": [
+              "parent-only"
+            ]
+          }
+        },
+        "graph_id": "fixture-graph",
+        "graph_run_id": "parent-run",
+        "state_digest": "fixture-state-digest",
+        "superstep": 1,
+        "versions_seen": {
+          "node-a": {
+            "messages": 1
+          }
+        }
+      },
+      "child_run_id": "child-run"
+    },
+    "scenario_id": "dharmagraph.run_checkpoint.fork_alias.v1",
+    "schema": "dharma_world.v1"
+  }
+}
