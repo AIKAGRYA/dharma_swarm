@@ -1,9 +1,9 @@
 {
   "id": "onboard-one-door-WP-O4",
-  "base_ref": "debff832ac4cbf7b385664d00f184f0ffdb909c4",
-  "branch": "agent/onboard-one-door-wp-o4-closeout",
+  "base_ref": "15c0b5ad2a5327e1a938660c491328b452fdf865",
+  "branch": "codex/onboard-macos-admission-20260713",
   "worktree": ".",
-  "intent": "Implement only WP-O4: mutation-free make orient, packet-aware single-evaluation preflight/closeout, the O4-B11 positive command-family allowlist before gate execution, and the fail-on-error CI admission job that runs the same door command as local sessions — no new workflow authority, no branch-protection edit, no merge-authority change, no strict-default flip.",
+  "intent": "Correct only the WP-O4 host-portability defects reproduced after PR #912 merged: GNU Make 3.81 parser compatibility without weakening command-line injection guards, macOS private-temporary-root validation, an executable macOS sandbox profile sourced from the trusted host path, and case-insensitive-filesystem test portability — no new workflow authority, no branch-protection edit, no merge-authority change, and no strict-default flip.",
   "allowed_files": [
     "Makefile",
     "scripts/governance/run_agent_work_packet.py",
@@ -194,7 +194,7 @@
   ],
   "commit": {
     "allowed": true,
-    "message": "feat(onboarding): implement WP-O4 make/CI admission parity + positive gate allowlist [impact-checked]"
+    "message": "fix(onboarding): support macOS admission semantics [impact-checked]"
   },
   "approval": {
     "before_commit": false,
@@ -211,9 +211,9 @@
   "session_entry": {
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
-      "python": "3.12.13",
-      "git": "2.43.0",
-      "make": "4.3"
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
     },
     "authority_precedence": [
       "executable",
@@ -227,12 +227,12 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "debff832ac4cbf7b385664d00f184f0ffdb909c4",
+      "checked_at_sha": "15c0b5ad2a5327e1a938660c491328b452fdf865",
       "details": []
     },
     "interface_mismatches": [
-    "ACTIVE_TRACK still describes merged WP-O2 as incomplete; that authority-owned correction is outside WP-O4.",
-    "ACTIVE_TRACK still labels WP-O3 incomplete after PR #913 merged at 6044bbc5; that authority-owned reconciliation is outside WP-O4."
+    "ACTIVE_TRACK still describes merged WP-O2, WP-O3, and WP-O4 work as incomplete; that authority-owned ledger reconciliation is outside this corrective packet.",
+    "PR #912 merged before the independent macOS review completed; this packet corrects the reproduced host-portability defects without claiming that the wider One-Door track is closed."
     ],
     "closest_existing_implementation": [
       "scripts/governance/run_agent_work_packet.py",
@@ -242,7 +242,7 @@
     "Repository-wide agent-build-closeout remains externally blocked until live NATS production evidence is no more than 24 hours old; never bypass or fabricate that operator-owned evidence.",
     "C1 semantic revalidation remains outside WP-O4 and may occur only after the strict O3+O4 door is merged; this packet makes no C1 closure claim."
     ],
-    "rollback": "revert Makefile, runner, orientation shim, workflow, packet, tests, and mechanical DocOps count rows together as one packet",
-    "packet_digest": "1efa9ed251cab1e249f8f7f9a8c60a0d37c432f58e2d2baf2ec6757e4fc419bd"
+    "rollback": "revert the Makefile, AgentOps runner, packet, and the two macOS portability test updates together",
+    "packet_digest": "35dbed3b7a90ad90ed8e6fcbac2ae07ca059b81f3a2a5c55f1b0ef2a6bdb9c2b"
   }
 }

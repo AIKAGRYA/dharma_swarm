@@ -7,6 +7,9 @@
 # dependencies (pydantic, yaml) render instead of degrading silently. Freeze a
 # caller value lexically: recursive Make syntax in an override must never be
 # evaluated while admission variables are exported to a recipe or submake.
+ifneq ($(findstring $$,$(value PYTHON)),)
+$(error PYTHON must not contain Make expansion syntax)
+endif
 ifeq ($(origin PYTHON),undefined)
 PYTHON := $(shell test -x .venv/bin/python && echo .venv/bin/python || echo python3)
 else
@@ -38,10 +41,19 @@ override _AGENTOPS_REPORT_ROOT_INPUT := $(strip $(value AGENTOPS_REPORT_ROOT))
 ifeq ($(_AGENTOPS_REPORT_ROOT_INPUT),)
 override _AGENTOPS_REPORT_ROOT_INPUT := $(if $(strip $(value DHARMA_OPS_DIR)),$(value DHARMA_OPS_DIR),/tmp/dharma-agentops-$(shell /usr/bin/id -u))
 endif
-override export AGENTOPS_REPORT_ROOT := $(_AGENTOPS_REPORT_ROOT_INPUT)
-override export AGENTOPS_CACHE_ROOT := $(AGENTOPS_REPORT_ROOT)/cache
+ifneq ($(findstring $$,$(_AGENTOPS_REPORT_ROOT_INPUT)),)
+$(error AGENTOPS_REPORT_ROOT and DHARMA_OPS_DIR must not contain Make expansion syntax)
+endif
+override AGENTOPS_REPORT_ROOT := $(_AGENTOPS_REPORT_ROOT_INPUT)
+export AGENTOPS_REPORT_ROOT
+override AGENTOPS_CACHE_ROOT := $(AGENTOPS_REPORT_ROOT)/cache
+export AGENTOPS_CACHE_ROOT
 override AGENTOPS_PYTEST_ADDOPTS := -p no:cacheprovider
-override PACKET := $(value PACKET)
+override _AGENTOPS_PACKET_INPUT := $(value PACKET)
+ifneq ($(findstring $$,$(_AGENTOPS_PACKET_INPUT)),)
+$(error PACKET must not contain Make expansion syntax)
+endif
+override PACKET := $(_AGENTOPS_PACKET_INPUT)
 export PACKET
 
 # AgentOps must bootstrap outside the checkout.  Keep this interpreter
@@ -55,7 +67,11 @@ override _AGENTOPS_PYTHON_INPUT := python3
 else
 override _AGENTOPS_PYTHON_INPUT := $(value AGENTOPS_PYTHON)
 endif
+ifneq ($(findstring $$,$(_AGENTOPS_PYTHON_INPUT)),)
+$(error AGENTOPS_PYTHON must not contain Make expansion syntax)
+endif
 override AGENTOPS_PYTHON := $(_AGENTOPS_PYTHON_INPUT)
+export AGENTOPS_PYTHON
 
 # Resolve the AgentOps bootstrap without executing it.  Only fixed host tools
 # are used until both the lexical path and the resolved target are proven to
@@ -166,6 +182,24 @@ for agentops_boundary in "$$agentops_source" "$$agentops_git_dir" "$$agentops_co
   case "$$agentops_python_resolved" in "$$agentops_boundary"|"$$agentops_boundary"/*) printf '%s\n' "AgentOps error: AGENTOPS_PYTHON must be external to source and Git state" >&2; exit 2;; esac; \
 done; \
 agentops_python="$$agentops_lexical"
+endef
+
+# Export the fixed AgentOps execution environment inside each recipe shell.
+# Values derived from caller paths stay in already-exported shell variables;
+# they are never interpolated into shell source. This is compatible with GNU
+# Make 3.81, which cannot combine target-specific `override` and `export`.
+define _AGENTOPS_EXPORT_ENV
+export PYTHONDONTWRITEBYTECODE=1; \
+export PYTHONPYCACHEPREFIX="$${AGENTOPS_REPORT_ROOT}/cache/python-pycache"; \
+export PYTEST_ADDOPTS='-p no:cacheprovider'; \
+export RUFF_CACHE_DIR="$${AGENTOPS_REPORT_ROOT}/cache/ruff"; \
+export XDG_CACHE_HOME="$${AGENTOPS_REPORT_ROOT}/cache/xdg"; \
+export DHARMA_OPS_DIR="$${AGENTOPS_REPORT_ROOT}/onboard"; \
+export AGENTOPS_PYTHON="$$agentops_python"; \
+export PYTHON="$$agentops_python"; \
+export VENV_PYTHON="$$agentops_python"; \
+export PYTEST="$$agentops_python -m pytest"; \
+export REPO_PYTHON="PYTHONPATH=. $$agentops_python"
 endef
 
 help:
@@ -589,29 +623,37 @@ mutation-test:
 # is confined to a child of the same external root. Command-line overrides
 # cannot weaken these boundaries, including when Make propagates them to a
 # submake through MAKEOVERRIDES.
-agentops-report-root-check agent-build-preflight agent-build-closeout: override export PYTHONDONTWRITEBYTECODE := 1
-agentops-report-root-check agent-build-preflight agent-build-closeout: override export PYTHONPYCACHEPREFIX := $(AGENTOPS_CACHE_ROOT)/python-pycache
-agentops-report-root-check agent-build-preflight agent-build-closeout: override export PYTEST_ADDOPTS := $(AGENTOPS_PYTEST_ADDOPTS)
-agentops-report-root-check agent-build-preflight agent-build-closeout: override export RUFF_CACHE_DIR := $(AGENTOPS_CACHE_ROOT)/ruff
-agentops-report-root-check agent-build-preflight agent-build-closeout: override export XDG_CACHE_HOME := $(AGENTOPS_CACHE_ROOT)/xdg
-agentops-report-root-check agent-build-preflight agent-build-closeout: override export DHARMA_OPS_DIR := $(AGENTOPS_REPORT_ROOT)/onboard
-agentops-report-root-check agent-build-preflight agent-build-closeout: override export AGENTOPS_PYTHON := $(_AGENTOPS_PYTHON_INPUT)
-agentops-report-root-check agent-build-preflight agent-build-closeout: override export PYTHON := $(_AGENTOPS_PYTHON_INPUT)
-agentops-report-root-check agent-build-preflight agent-build-closeout: override export VENV_PYTHON := $(_AGENTOPS_PYTHON_INPUT)
-agentops-report-root-check agent-build-preflight agent-build-closeout: override export PYTEST := $(_AGENTOPS_PYTHON_INPUT) -m pytest
-agentops-report-root-check agent-build-preflight agent-build-closeout: override export REPO_PYTHON := PYTHONPATH=. $(_AGENTOPS_PYTHON_INPUT)
+# GNU Make 3.81 rejects target-specific `override export VAR := value`.
+# Ordinary overrides keep Make-side policy fixed; `_AGENTOPS_EXPORT_ENV`
+# applies the same values to each recipe only after the trusted interpreter is
+# resolved, without globally exporting caller-controlled Make variables.
+agentops-report-root-check agent-build-preflight agent-build-closeout: override PYTHONDONTWRITEBYTECODE := 1
+agentops-report-root-check agent-build-preflight agent-build-closeout: override PYTHONPYCACHEPREFIX := $(AGENTOPS_CACHE_ROOT)/python-pycache
+agentops-report-root-check agent-build-preflight agent-build-closeout: override PYTEST_ADDOPTS := $(AGENTOPS_PYTEST_ADDOPTS)
+agentops-report-root-check agent-build-preflight agent-build-closeout: override RUFF_CACHE_DIR := $(AGENTOPS_CACHE_ROOT)/ruff
+agentops-report-root-check agent-build-preflight agent-build-closeout: override XDG_CACHE_HOME := $(AGENTOPS_CACHE_ROOT)/xdg
+agentops-report-root-check agent-build-preflight agent-build-closeout: override DHARMA_OPS_DIR := $(AGENTOPS_REPORT_ROOT)/onboard
+agentops-report-root-check agent-build-preflight agent-build-closeout: override AGENTOPS_PYTHON := $(_AGENTOPS_PYTHON_INPUT)
+agentops-report-root-check agent-build-preflight agent-build-closeout: override PYTHON := $(_AGENTOPS_PYTHON_INPUT)
+agentops-report-root-check agent-build-preflight agent-build-closeout: override VENV_PYTHON := $(_AGENTOPS_PYTHON_INPUT)
+agentops-report-root-check agent-build-preflight agent-build-closeout: override PYTEST := $(_AGENTOPS_PYTHON_INPUT) -m pytest
+agentops-report-root-check agent-build-preflight agent-build-closeout: override REPO_PYTHON := PYTHONPATH=. $(_AGENTOPS_PYTHON_INPUT)
 
 agentops-report-root-check:
 	@$(_AGENTOPS_RESOLVE_PYTHON); \
+	$(_AGENTOPS_EXPORT_ENV); \
 	"$$agentops_python" scripts/governance/run_agent_work_packet.py --validate-report-root "$${AGENTOPS_REPORT_ROOT}" --validate-report-child cache --validate-report-child onboard
 
 agent-build-preflight: agentops-report-root-check
 	@$(_AGENTOPS_RESOLVE_PYTHON); \
+	$(_AGENTOPS_EXPORT_ENV); \
 	$(MAKE) -s verifier-selfcheck MAKEOVERRIDES= AGENTOPS_PYTHON="$$agentops_python" PYTHON="$$agentops_python" VENV_PYTHON="$$agentops_python" PYTEST="$$agentops_python -m pytest" REPO_PYTHON="PYTHONPATH=. $$agentops_python"
 	@$(_AGENTOPS_RESOLVE_PYTHON); \
+	$(_AGENTOPS_EXPORT_ENV); \
 	$(MAKE) -s hygiene-check MAKEOVERRIDES= AGENTOPS_PYTHON="$$agentops_python" PYTHON="$$agentops_python" VENV_PYTHON="$$agentops_python" PYTEST="$$agentops_python -m pytest" REPO_PYTHON="PYTHONPATH=. $$agentops_python"
 ifdef PACKET
 	@$(_AGENTOPS_RESOLVE_PYTHON); \
+	$(_AGENTOPS_EXPORT_ENV); \
 	"$$agentops_python" scripts/governance/run_agent_work_packet.py --packet "$${PACKET}" --preflight --report-root "$${AGENTOPS_REPORT_ROOT}"
 endif
 	@printf "\nAgent build preflight complete. Use the task route from make onboard; close out with: make agent-build-closeout\n"
@@ -623,13 +665,17 @@ endif
 agent-build-closeout: agentops-report-root-check
 ifdef PACKET
 	@$(_AGENTOPS_RESOLVE_PYTHON); \
+	$(_AGENTOPS_EXPORT_ENV); \
 	"$$agentops_python" scripts/governance/run_agent_work_packet.py --packet "$${PACKET}" --closeout --report-root "$${AGENTOPS_REPORT_ROOT}"
 endif
 	@$(_AGENTOPS_RESOLVE_PYTHON); \
+	$(_AGENTOPS_EXPORT_ENV); \
 	"$$agentops_python" scripts/governance/hygiene/scan.py --output /tmp/dharma-hygiene-audit.txt
 	-@$(_AGENTOPS_RESOLVE_PYTHON); \
+	$(_AGENTOPS_EXPORT_ENV); \
 	"$$agentops_python" scripts/governance/substrate_audit.py
 	@$(_AGENTOPS_RESOLVE_PYTHON); \
+	$(_AGENTOPS_EXPORT_ENV); \
 	$(MAKE) governance-all MAKEOVERRIDES= AGENTOPS_PYTHON="$$agentops_python" PYTHON="$$agentops_python" VENV_PYTHON="$$agentops_python" PYTEST="$$agentops_python -m pytest" REPO_PYTHON="PYTHONPATH=. $$agentops_python"
 	@printf "\nAgent build closeout complete. Hygiene audit receipt: /tmp/dharma-hygiene-audit.txt · Substrate audit: /tmp/dharma-substrate-audit.txt\n"
 
@@ -649,9 +695,9 @@ onboard:
 # regenerates NOTHING (WP-O4 / spec §2.1). The tracked context artifacts are
 # refreshed only by their explicit owner command:
 #   $(PYTHON) scripts/governance/orientation_graph.py --write-context
-orient: override export PYTHONDONTWRITEBYTECODE := 1
+orient: override PYTHONDONTWRITEBYTECODE := 1
 orient:
-	$(PYTHON) scripts/governance/orientation_graph.py
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) scripts/governance/orientation_graph.py
 
 # Fleet-identity onboarding: the join route for a NEW persistent A2A agent
 # (card, runtime registration, roster, git seat, announcement, presence) plus
