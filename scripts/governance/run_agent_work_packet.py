@@ -1889,13 +1889,19 @@ def _environment_argv(env: dict[str, str]) -> list[str]:
 def _negative_confinement(
     jail: Path, fixture: Path
 ) -> tuple[Callable[[], None] | None, list[str], bool, bool]:
-    if sys.platform == "darwin" and shutil.which("sandbox-exec"):
+    if sys.platform == "darwin":
+        try:
+            sandbox_exec = _trusted_host_tool("sandbox-exec")
+        except AgentOpsError as exc:
+            raise AgentOpsError(
+                "negative-control write confinement is unavailable"
+            ) from exc
         escaped = str(fixture.resolve()).replace("\\", "\\\\").replace('"', '\\"')
         profile = (
-            '(version 1) (deny file-write*) '
+            '(version 1) (allow default) (deny file-write*) '
             f'(allow file-write* (subpath "{escaped}") (literal "/dev/null"))'
         )
-        return None, ["sandbox-exec", "-p", profile, "--"], False, False
+        return None, [sandbox_exec, "-p", profile, "--"], False, False
     if sys.platform != "linux":
         raise AgentOpsError("negative-control write confinement is unavailable")
     if os.geteuid() == 0:
@@ -2236,6 +2242,13 @@ def _private_report_anchor(target: Path) -> tuple[Path, bool]:
     candidates: list[tuple[Path, bool]] = []
     if os.name == "posix":
         candidates.append((Path("/tmp").resolve(), True))
+        # macOS uses a private, per-account temporary root under
+        # /private/var/folders rather than /tmp. Treat it as private only after
+        # the normal owner/mode check below; an environment-selected TMPDIR is
+        # never granted the shared-anchor exemption.
+        account_temp = Path(tempfile.gettempdir()).resolve()
+        if account_temp != candidates[0][0]:
+            candidates.append((account_temp, False))
     else:  # pragma: no cover - Windows fallback
         candidates.append((Path(tempfile.gettempdir()).resolve(), True))
     try:

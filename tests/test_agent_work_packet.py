@@ -447,6 +447,8 @@ def test_scope_enumerates_case_variant_that_git_ignorecase_hides(
     assert run(["git", "add", "tests/test_payload.py"], cwd=repo).returncode == 0
     assert run(["git", "commit", "-m", "add case fixture"], cwd=repo).returncode == 0
     assert run(["git", "config", "core.ignoreCase", "true"], cwd=repo).returncode == 0
+    if (tests_dir / "TEST_PAYLOAD.PY").exists():
+        pytest.skip("case-variant enumeration requires a case-sensitive filesystem")
     (tests_dir / "test_Payload.py").write_text(
         "def test_case_variant_executes():\n    assert True\n", encoding="utf-8"
     )
@@ -2905,6 +2907,43 @@ def test_nonroot_linux_uses_passwordless_sudo_chroot_with_uid_drop(
     )
     with pytest.raises(agentops.AgentOpsError, match="confinement is unavailable"):
         agentops._negative_confinement(jail, fixture)
+
+
+def test_darwin_negative_confinement_uses_trusted_allow_then_deny_profile(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    jail = tmp_path / "jail"
+    fixture = jail / "fixture"
+    fixture.mkdir(parents=True)
+    trusted_bin = tmp_path / "trusted"
+    trusted_bin.mkdir()
+    sandbox_exec = trusted_bin / "sandbox-exec"
+    sandbox_exec.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    sandbox_exec.chmod(0o755)
+    which_calls: list[tuple[str, str | None]] = []
+
+    def trusted_which(name: str, *, path: str | None = None) -> str | None:
+        which_calls.append((name, path))
+        if name == "sandbox-exec" and path == agentops._TRUSTED_HOST_PATH:
+            return str(sandbox_exec)
+        return None
+
+    monkeypatch.setattr(agentops.sys, "platform", "darwin")
+    monkeypatch.setattr(agentops.shutil, "which", trusted_which)
+    preexec_fn, prefix, jailed, env_via_argv = agentops._negative_confinement(
+        jail, fixture
+    )
+
+    assert preexec_fn is None
+    assert jailed is False
+    assert env_via_argv is False
+    assert which_calls == [("sandbox-exec", agentops._TRUSTED_HOST_PATH)]
+    assert prefix[0] == str(sandbox_exec.resolve())
+    assert prefix[1] == "-p"
+    assert prefix[-1] == "--"
+    profile = prefix[2]
+    assert "(allow default) (deny file-write*)" in profile
+    assert f'(subpath "{fixture.resolve()}")' in profile
 
 
 def test_make_admission_reports_are_external_and_read_only(

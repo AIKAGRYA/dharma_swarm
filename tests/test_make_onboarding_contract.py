@@ -176,7 +176,8 @@ def test_make_orient_attempts_no_repository_write(tmp_path: Path) -> None:
         "make orient wrote or changed the pristine tracked copy, including an "
         "ignored bytecode/cache path"
     )
-    assert "orient: override export PYTHONDONTWRITEBYTECODE := 1" in MAKEFILE
+    assert "orient: override PYTHONDONTWRITEBYTECODE := 1" in MAKEFILE
+    assert "\tPYTHONDONTWRITEBYTECODE=1 $(PYTHON)" in MAKEFILE
 
 
 def test_explicit_context_refresh_command_is_documented() -> None:
@@ -252,9 +253,11 @@ def test_make_admission_recipes_use_external_report_root(tmp_path: Path) -> None
     """Both Make admission modes declare one external receipt destination."""
     before = _porcelain()
     assert (
-        "override export AGENTOPS_CACHE_ROOT := $(AGENTOPS_REPORT_ROOT)/cache"
+        "override AGENTOPS_CACHE_ROOT := $(AGENTOPS_REPORT_ROOT)/cache"
         in MAKEFILE
     )
+    assert "export AGENTOPS_REPORT_ROOT" in MAKEFILE
+    assert "export AGENTOPS_CACHE_ROOT" in MAKEFILE
     assert "override AGENTOPS_PYTEST_ADDOPTS := -p no:cacheprovider" in MAKEFILE
     for cache_export in (
         "PYTHONDONTWRITEBYTECODE := 1",
@@ -265,12 +268,12 @@ def test_make_admission_recipes_use_external_report_root(tmp_path: Path) -> None
     ):
         assert (
             "agentops-report-root-check agent-build-preflight "
-            "agent-build-closeout: override export "
+            "agent-build-closeout: override "
             f"{cache_export}"
         ) in MAKEFILE
     assert (
         "agentops-report-root-check agent-build-preflight "
-        "agent-build-closeout: override export DHARMA_OPS_DIR := "
+        "agent-build-closeout: override DHARMA_OPS_DIR := "
         "$(AGENTOPS_REPORT_ROOT)/onboard"
     ) in MAKEFILE
     for interpreter_export in (
@@ -282,9 +285,17 @@ def test_make_admission_recipes_use_external_report_root(tmp_path: Path) -> None
     ):
         assert (
             "agentops-report-root-check agent-build-preflight "
-            "agent-build-closeout: override export "
+            "agent-build-closeout: override "
             f"{interpreter_export}"
         ) in MAKEFILE
+    assert "define _AGENTOPS_EXPORT_ENV" in MAKEFILE
+    for shell_export in (
+        "export PYTHONDONTWRITEBYTECODE=1",
+        'export DHARMA_OPS_DIR="$${AGENTOPS_REPORT_ROOT}/onboard"',
+        'export AGENTOPS_PYTHON="$$agentops_python"',
+        'export REPO_PYTHON="PYTHONPATH=. $$agentops_python"',
+    ):
+        assert shell_export in MAKEFILE
     assert "override _AGENTOPS_PYTHON_INPUT := python3" in MAKEFILE
     assert "AGENTOPS_RECURSIVE_OVERRIDES" not in MAKEFILE
     assert MAKEFILE.count("MAKEOVERRIDES=") == 3
@@ -295,12 +306,23 @@ def test_make_admission_recipes_use_external_report_root(tmp_path: Path) -> None
     env = os.environ.copy()
     env.pop("AGENTOPS_REPORT_ROOT", None)
     env.pop("DHARMA_OPS_DIR", None)
+    make_probe = tmp_path / "agentops-make-probe.mk"
+    make_probe.write_text(
+        f"include {(REPO_ROOT / 'Makefile').as_posix()}\n"
+        ".PHONY: __print_agentops_report_root __print_agentops_cache_policy\n"
+        "__print_agentops_report_root:\n"
+        "\t@printf '%s\\n' \"$(AGENTOPS_REPORT_ROOT)\"\n"
+        "__print_agentops_cache_policy:\n"
+        "\t@printf '%s|%s\\n' \"$(AGENTOPS_CACHE_ROOT)\" "
+        "\"$(AGENTOPS_PYTEST_ADDOPTS)\"\n",
+        encoding="utf-8",
+    )
     result = subprocess.run(
         [
             "make",
             "-s",
-            "--eval",
-            '__print_agentops_report_root: ; @printf \'%s\\n\' "$(AGENTOPS_REPORT_ROOT)"',
+            "-f",
+            str(make_probe),
             "__print_agentops_report_root",
         ],
         cwd=REPO_ROOT,
@@ -320,7 +342,7 @@ def test_make_admission_recipes_use_external_report_root(tmp_path: Path) -> None
         check=True,
         timeout=30,
     ).stdout.strip()
-    assert report_root == Path(f"/tmp/dharma-agentops-{uid}")
+    assert report_root == Path(f"/tmp/dharma-agentops-{uid}").resolve()
 
     packet = tmp_path / "packet with spaces.json"
     external_reports = tmp_path / "external reports"
@@ -328,9 +350,8 @@ def test_make_admission_recipes_use_external_report_root(tmp_path: Path) -> None
         [
             "make",
             "-s",
-            "--eval",
-            '__print_agentops_cache_policy: ; @printf \'%s|%s\\n\' '
-            '"$(AGENTOPS_CACHE_ROOT)" "$(AGENTOPS_PYTEST_ADDOPTS)"',
+            "-f",
+            str(make_probe),
             "__print_agentops_cache_policy",
             f"AGENTOPS_REPORT_ROOT={external_reports}",
             "AGENTOPS_CACHE_ROOT=.",
@@ -431,6 +452,68 @@ def test_make_report_root_metacharacters_never_become_shell(
     assert not shell_sentinel.exists()
     assert not make_sentinel.exists()
     assert _tree_snapshot(checkout) == before
+
+
+@pytest.mark.parametrize("source_variable", ["AGENTOPS_REPORT_ROOT", "DHARMA_OPS_DIR"])
+def test_make_report_root_shell_metacharacters_stay_data(
+    tmp_path: Path,
+    source_variable: str,
+) -> None:
+    """Shell-only syntax stays inert even without the earlier Make `$` guard."""
+    checkout = tmp_path / "clean-checkout"
+    _copy_tracked_checkout(checkout)
+    before = _tree_snapshot(checkout)
+    sentinel = checkout / "shell-source-write"
+    malicious = f'{tmp_path}/external"; touch shell-source-write; printf "'
+    env = os.environ.copy()
+    env.pop("AGENTOPS_REPORT_ROOT", None)
+    env.pop("DHARMA_OPS_DIR", None)
+    result = subprocess.run(
+        [
+            "make",
+            "-s",
+            "agentops-report-root-check",
+            f"{source_variable}={malicious}",
+            f"AGENTOPS_PYTHON={sys.executable}",
+        ],
+        cwd=checkout,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        env=env,
+    )
+
+    assert result.returncode in {0, 2}, result.stderr[-2000:]
+    assert not sentinel.exists()
+    assert _tree_snapshot(checkout) == before
+
+
+@pytest.mark.parametrize("variable", ["PYTHON", "PACKET"])
+def test_make_rejects_expansion_syntax_before_evaluation(
+    tmp_path: Path,
+    variable: str,
+) -> None:
+    """Global Make inputs reject function syntax without executing it."""
+    checkout = tmp_path / "clean-checkout"
+    _copy_tracked_checkout(checkout)
+    marker = tmp_path / f"{variable.lower()}-make-expansion-executed"
+    result = subprocess.run(
+        [
+            "make",
+            "-s",
+            "help",
+            f"{variable}=$(shell touch {marker})",
+        ],
+        cwd=checkout,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        env=os.environ.copy(),
+    )
+
+    assert result.returncode == 2
+    assert f"{variable} must not contain Make expansion syntax" in result.stderr
+    assert not marker.exists()
 
 
 @pytest.mark.parametrize("source_variable", ["AGENTOPS_REPORT_ROOT", "DHARMA_OPS_DIR"])
@@ -696,16 +779,17 @@ def test_make_agentops_bootstrap_preserves_external_venv_dependencies(
 
 
 @pytest.mark.parametrize(
-    "malicious_template",
+    ("malicious_template", "expected_error"),
     [
-        "$(shell touch {marker})",
-        "python3; touch {marker}",
+        ("$(shell touch {marker})", "must not contain Make expansion syntax"),
+        ("python3; touch {marker}", "must be a simple executable path"),
     ],
     ids=["make-expansion", "shell-expansion"],
 )
 def test_make_agentops_python_injection_is_inert(
     tmp_path: Path,
     malicious_template: str,
+    expected_error: str,
 ) -> None:
     """Caller-controlled interpreter text is frozen, validated, and inert."""
     checkout = tmp_path / "clean-checkout"
@@ -728,7 +812,7 @@ def test_make_agentops_python_injection_is_inert(
     )
 
     assert result.returncode == 2
-    assert "must be a simple executable path" in result.stderr
+    assert expected_error in result.stderr
     assert not marker.exists()
 
 
