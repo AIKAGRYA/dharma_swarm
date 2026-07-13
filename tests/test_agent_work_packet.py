@@ -2946,6 +2946,275 @@ def test_darwin_negative_confinement_uses_trusted_allow_then_deny_profile(
     assert f'(subpath "{fixture.resolve()}")' in profile
 
 
+@pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS sandbox-exec")
+def test_darwin_negative_confinement_executes_and_denies_outside_write(
+    tmp_path: Path,
+) -> None:
+    jail = tmp_path / "jail"
+    fixture = jail / "fixture"
+    fixture.mkdir(parents=True)
+    _preexec_fn, prefix, jailed, env_via_argv = agentops._negative_confinement(
+        jail, fixture
+    )
+    assert jailed is False and env_via_argv is False
+
+    inside = fixture / "inside-write"
+    allowed = subprocess.run(
+        [
+            *prefix,
+            "/bin/sh",
+            "-c",
+            'printf allowed > "$1"',
+            "agentops-sandbox-test",
+            str(inside),
+        ],
+        cwd=fixture,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    assert allowed.returncode == 0, allowed.stderr
+    assert inside.read_text(encoding="utf-8") == "allowed"
+
+    outside = tmp_path / "outside-victim"
+    outside.write_text("sentinel", encoding="utf-8")
+    denied = subprocess.run(
+        [
+            *prefix,
+            "/bin/sh",
+            "-c",
+            'printf denied > "$1"',
+            "agentops-sandbox-test",
+            str(outside),
+        ],
+        cwd=fixture,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    assert denied.returncode != 0
+    assert outside.read_text(encoding="utf-8") == "sentinel"
+
+    outside_create = tmp_path / "outside-create"
+    denied_create = subprocess.run(
+        [
+            *prefix,
+            "/bin/sh",
+            "-c",
+            'printf denied > "$1"',
+            "agentops-sandbox-test",
+            str(outside_create),
+        ],
+        cwd=fixture,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    assert denied_create.returncode != 0
+    assert not outside_create.exists()
+
+
+def test_darwin_account_temp_root_uses_getconf_with_scrubbed_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    parent = tmp_path / "private-var-folders"
+    account_temp = parent / "ab" / "opaque_account" / "T"
+    account_temp.mkdir(parents=True, mode=0o700)
+    hostile_tmpdir = tmp_path / "caller-selected-tmp"
+    hostile_tmpdir.mkdir()
+    monkeypatch.setenv("TMPDIR", str(hostile_tmpdir))
+    monkeypatch.setattr(agentops, "_DARWIN_USER_TEMP_PARENT", parent)
+    monkeypatch.setattr(
+        agentops,
+        "_trusted_host_tool",
+        lambda name: "/usr/bin/getconf" if name == "getconf" else "",
+    )
+    observed: dict[str, object] = {}
+
+    def fake_run_command(
+        argv: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        observed["argv"] = argv
+        observed.update(kwargs)
+        return subprocess.CompletedProcess(argv, 0, f"{account_temp}\n", "")
+
+    monkeypatch.setattr(agentops, "run_command", fake_run_command)
+
+    assert agentops._darwin_account_temp_root() == account_temp.resolve()
+    assert observed["argv"] == ["/usr/bin/getconf", "DARWIN_USER_TEMP_DIR"]
+    assert observed["cwd"] == Path("/")
+    assert observed["env"] == {
+        "PATH": agentops._TRUSTED_HOST_PATH,
+        "LANG": "C",
+        "LC_ALL": "C",
+    }
+    assert str(hostile_tmpdir) not in str(observed)
+
+
+@pytest.mark.parametrize(
+    "case",
+    ("nonzero", "multiline", "relative", "outside", "wrong-shape", "missing", "symlink"),
+)
+def test_darwin_account_temp_root_rejects_untrusted_getconf_results(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case: str
+) -> None:
+    parent = tmp_path / "private-var-folders"
+    valid = parent / "ab" / "opaque" / "T"
+    valid.mkdir(parents=True)
+    outside = tmp_path / "outside" / "T"
+    outside.mkdir(parents=True)
+    wrong_shape = parent / "too-shallow" / "T"
+    wrong_shape.mkdir(parents=True)
+    symlink = parent / "cd" / "symlinked" / "T"
+    symlink.parent.mkdir(parents=True)
+    symlink.symlink_to(outside, target_is_directory=True)
+    outputs = {
+        "nonzero": (1, "", "denied"),
+        "multiline": (0, f"{valid}\n{valid}\n", ""),
+        "relative": (0, "relative/T\n", ""),
+        "outside": (0, f"{outside}\n", ""),
+        "wrong-shape": (0, f"{wrong_shape}\n", ""),
+        "missing": (0, f"{parent / 'ef' / 'missing' / 'T'}\n", ""),
+        "symlink": (0, f"{symlink}\n", ""),
+    }
+    returncode, stdout, stderr = outputs[case]
+    monkeypatch.setattr(agentops, "_DARWIN_USER_TEMP_PARENT", parent)
+    monkeypatch.setattr(agentops, "_trusted_host_tool", lambda _name: "/usr/bin/getconf")
+    monkeypatch.setattr(
+        agentops,
+        "run_command",
+        lambda argv, **_kwargs: subprocess.CompletedProcess(
+            argv, returncode, stdout, stderr
+        ),
+    )
+
+    with pytest.raises(agentops.AgentOpsError, match="Darwin account temp root"):
+        agentops._darwin_account_temp_root()
+
+
+def test_darwin_account_temp_root_normalizes_probe_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(agentops, "_trusted_host_tool", lambda _name: "/usr/bin/getconf")
+
+    def time_out(argv: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        raise subprocess.TimeoutExpired(argv, 5)
+
+    monkeypatch.setattr(agentops, "run_command", time_out)
+    with pytest.raises(agentops.AgentOpsError, match="Darwin account temp root"):
+        agentops._darwin_account_temp_root()
+
+
+def test_private_report_anchor_is_darwin_only_and_never_reads_tmpdir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    caller_temp = Path("/tmp") / f"agentops-caller-{tmp_path.name}"
+    target = caller_temp / "reports"
+    monkeypatch.setenv("TMPDIR", str(caller_temp))
+    monkeypatch.setattr(agentops.sys, "platform", "linux")
+
+    def forbidden_temp_lookup() -> str:
+        raise AssertionError("non-Darwin report admission must not read TMPDIR")
+
+    monkeypatch.setattr(agentops.tempfile, "gettempdir", forbidden_temp_lookup)
+    monkeypatch.setattr(
+        agentops,
+        "_darwin_account_temp_root",
+        lambda: (_ for _ in ()).throw(
+            AssertionError("non-Darwin report admission used the Darwin anchor")
+        ),
+    )
+
+    anchor, shared = agentops._private_report_anchor(target.resolve())
+    assert anchor == Path("/tmp").resolve()
+    assert shared is True
+
+
+def test_private_report_anchor_accepts_only_os_derived_darwin_temp(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    account_temp = Path("/private/var/folders/ab/opaque-account/T")
+    target = account_temp / "agentops" / "reports"
+    monkeypatch.setattr(agentops.sys, "platform", "darwin")
+    monkeypatch.setattr(
+        agentops, "_darwin_account_temp_root", lambda: account_temp.resolve()
+    )
+
+    anchor, shared = agentops._private_report_anchor(target.resolve())
+    assert anchor == account_temp.resolve()
+    assert shared is False
+
+
+def test_darwin_report_anchor_rejects_environment_minted_temp_root(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    hostile = Path("/attacker-selected-private-temp")
+    account_temp = Path("/private/var/folders/ab/opaque-account/T")
+    monkeypatch.setattr(agentops.sys, "platform", "darwin")
+    monkeypatch.setattr(agentops.tempfile, "gettempdir", lambda: str(hostile))
+    monkeypatch.setattr(
+        agentops, "_darwin_account_temp_root", lambda: account_temp
+    )
+
+    with pytest.raises(agentops.AgentOpsError, match="trusted temp anchor"):
+        agentops._private_report_anchor(hostile / "reports")
+    assert agentops._private_report_anchor(account_temp / "reports") == (
+        account_temp,
+        False,
+    )
+
+
+def test_darwin_report_anchor_keeps_tmp_and_home_when_getconf_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(agentops.sys, "platform", "darwin")
+
+    def unavailable() -> Path:
+        raise AssertionError("established anchors must not consult getconf")
+
+    monkeypatch.setattr(agentops, "_darwin_account_temp_root", unavailable)
+    tmp_anchor = Path("/tmp").resolve()
+    assert agentops._private_report_anchor(tmp_anchor / "agentops" / "reports") == (
+        tmp_anchor,
+        True,
+    )
+    home = agentops._os_account_home()
+    assert agentops._private_report_anchor(home / ".dharma" / "agentops") == (
+        home,
+        False,
+    )
+
+
+def test_private_report_anchor_enforces_owner_mode_and_symlink_boundaries(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    anchor = tmp_path / "account-temp"
+    anchor.mkdir(mode=0o700)
+
+    anchor.chmod(0o720)
+    with pytest.raises(agentops.AgentOpsError, match="group/world writable"):
+        agentops._validate_private_directory(anchor)
+    anchor.chmod(0o700)
+
+    link = tmp_path / "account-temp-link"
+    link.symlink_to(anchor, target_is_directory=True)
+    with pytest.raises(agentops.AgentOpsError, match="non-symlink directory"):
+        agentops._validate_private_directory(link)
+
+    metadata = agentops.os.lstat(anchor)
+
+    class ForeignOwner:
+        st_mode = metadata.st_mode
+        st_uid = metadata.st_uid + 1
+
+    monkeypatch.setattr(agentops.os, "lstat", lambda _path: ForeignOwner())
+    with pytest.raises(agentops.AgentOpsError, match="not owned"):
+        agentops._validate_private_directory(anchor)
+
+
 def test_make_admission_reports_are_external_and_read_only(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
