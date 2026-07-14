@@ -1786,12 +1786,12 @@ independent-verifier exit requirements.
 
 **Owner:** D1-admitted track owner.
 
-**Prerequisites / merge dependency:** WP-O5 merged. `pyproject.toml` is owned by
-the active DharmaGraph track at this baseline
-(`docs/governance/ACTIVE_TRACK.yaml:834-854`), so
-M6-1 must either wait for that ownership to close or land an operator-approved,
-separate shared-file coordination prerequisite. WP-O6 may not edit it while the
-collision remains.
+**Prerequisites / merge dependency:** full WP-O3, WP-O5, the final post-WP-O5
+C1 enforcement proof, and M6-1 have merged. `pyproject.toml` is owned by the
+active DharmaGraph track at this baseline
+(`docs/governance/ACTIVE_TRACK.yaml:885-905`), so M6-1 must either wait for that
+ownership to close or land an operator-approved, separate shared-file
+coordination prerequisite. WP-O6 may not edit it while the collision remains.
 
 **Allowed files after M6-1:**
 
@@ -2381,11 +2381,11 @@ The controller re-derives D1, A1, A2, A4, WP-O1, WP-O1R-B0, and WP-O1R at the
 relevant baseline instead of trusting their reported completion. The
 pre-WP-O5 C1 proof is an authority/unlock boundary only and never closes C1;
 §9.4 requires the post-WP-O5 plain-command enforcement result
-(`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1776-1787,1953-1969`,
-`docs/governance/ACTIVE_TRACK.yaml:1617-1637`). Live state comes from current
-owners and Git; dated statements elsewhere in this evidence body are not
-promotion markers. Titanium remains blocked for the entire graph
-(`docs/governance/ACTIVE_TRACK.yaml:1635-1637`).
+(`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2049-2075`,
+`docs/governance/ACTIVE_TRACK.yaml:1909-1915,2009-2026`). Live state comes from
+current owners and Git; dated statements elsewhere in this evidence body are
+not promotion markers. Titanium remains blocked for the entire graph
+(`docs/governance/ACTIVE_TRACK.yaml:1914-1915`).
 
 ### 14.2 Per-node execution loop
 
@@ -2436,30 +2436,30 @@ than inferred from adjacent criteria. This is the explicit track-evidence
 closure node above, owned as a governance PR that updates `ACTIVE_TRACK.yaml`
 and its managed renders only after the proof candidate merges
 (`scripts/governance/check_track_status.py:530-547,551-563,639-653`,
-`docs/governance/ACTIVE_TRACK.yaml:1646-1692`).
+`docs/governance/ACTIVE_TRACK.yaml:1924-1983`).
 
 ### 14.4 Authority gates and stop rules
 
 - D3 is the recorded reader sweep on every declared fleet host. A discovered
   reader is upgraded before the WP-O3 writer flip
-  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1947-1951`,
-  `docs/governance/ACTIVE_TRACK.yaml:1689-1692`).
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2043-2047`,
+  `docs/governance/ACTIVE_TRACK.yaml:1989-1992`).
 - A3 is a separate authority-document PR; it cannot ride an implementation
   packet
-  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1971-1984`).
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2077-2087`).
 - C1 belongs to merge authority. Its pre-WP-O5 proof binds live required
   context, parity, automerge, and merge-group authority and uses exactly `make
   onboard ARGS=--strict`; its post-WP-O5 proof repeats BLOCKED through plain
   `make onboard` and is the only C1 closure point
-  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1953-1969`).
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2049-2075`).
 - D2 is a separately merged operator-authored ratification after the pre-WP-O5
   C1 authority/unlock proof; an implementation author cannot mint or backdate it
-  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1932-1945`).
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2027-2041`).
 - M6-1 is a DharmaGraph-owner change or explicit transfer before WP-O6 touches
   `pyproject.toml`
-  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1986-1993`).
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2092-2099`).
 - U1 preempts the campaign if a newly observed exposure requires containment
-  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1995-2003`).
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2101-2109`).
 
 Pause only for a concrete external authority/access boundary, unreachable
 required host, missing branch-protection privilege, owner refusal, unavailable
@@ -2472,6 +2472,6 @@ The campaign ends only when every §10 criterion, D1/D2/D3/C1/M6-1, A1–A4,
 WP-O1/WP-O1R-B0/WP-O1R/WP-O2–WP-O6, strict-default behavior, performance/
 output/determinism/mutation contract, §13 proof, and the track-evidence closure
 PR have merged and been re-derived from fresh `main`
-(`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2005-2025,2067-2234`).
+(`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2111-2131,2173-2341`).
 Only then may the active track close and Titanium capture its qualifying
 baseline.

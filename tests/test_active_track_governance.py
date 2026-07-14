@@ -16,6 +16,9 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ACTIVE_TRACK = REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml"
+ONE_DOOR_SPEC = (
+    REPO_ROOT / "docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md"
+)
 SOURCE_REPORTS_DIR = REPO_ROOT / "reports/governance"
 DERIVED_REPORT_NAMES = {
     "active_track_evidence.json",
@@ -158,6 +161,10 @@ def test_one_door_c1_has_ordered_pre_and_post_wp_o5_proofs() -> None:
     assert "pre-WP-O5 C1 authority/unlock proof" in items["D2"]["what"]
     assert "pre-WP-O5 C1 authority/unlock proof" in items["WP-O5"]["what"]
     assert "final post-WP-O5 C1 enforcement" in items["WP-O6"]["what"]
+
+    spec = ONE_DOOR_SPEC.read_text(encoding="utf-8")
+    assert "full WP-O3, WP-O5, the final post-WP-O5\nC1 enforcement proof" in spec
+    assert "ACTIVE_TRACK.yaml:885-905" in spec
 
 
 @pytest.mark.timeout(75)
