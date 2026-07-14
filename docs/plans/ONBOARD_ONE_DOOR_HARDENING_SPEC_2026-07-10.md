@@ -1718,9 +1718,11 @@ managed authority projections, `tests/test_active_track_governance.py`, and
 `reports/agentops/work_packets/onboard-one-door-WP-O4-B1.json`. It changes no
 runtime, workflow, branch setting, writer, cache, strict default, receipt store,
 fleet claim, or formal closure-node count. The packet classifies PR #928's
-cross-environment AgentOps discrepancy from the exact six-node successor
-manifest, byte-identical production runner/test blobs, and paired replays on
-unmodified base and candidate revisions. Both pass all six under external
+cross-environment AgentOps discrepancy from a six-node investigation set
+(five nodes disclosed by the Greptile/T-Rex result plus the bytecode node
+reconstructed from preserved run accounting and repo-local replay),
+byte-identical production runner/test blobs, and paired replays on unmodified
+base and candidate revisions. Both pass all six under external
 Python 3.12/root-chroot, reproduce only the bytecode node under a checkout-local
 venv/root-chroot, and reproduce all six under controlled unavailable-confinement
 injection. This is environment/capability-sensitive and base-reproducible, not a

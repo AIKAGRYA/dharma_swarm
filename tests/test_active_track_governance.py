@@ -222,12 +222,34 @@ def test_one_door_c1_has_ordered_pre_and_post_wp_o5_proofs() -> None:
     assert graph_positions == sorted(graph_positions), (
         "§14.1 must preserve the full ordered WP-O2R/C1/WP-O5/WP-O6 path"
     )
-    assert "parallel after WP-O2R: D3 -> WP-O3 activation" in graph_steps
-    assert "parallel after WP-O2R: M6-1" in graph_steps
-    assert "C1 post-WP-O5 + WP-O3 activation + M6-1" in graph_steps
+    wp_o2r_step = "-> WP-O2R reseal"
+    c1_post_step = (
+        "-> C1 post-WP-O5 final enforcement proof (plain `make onboard`)"
+    )
+    d3_o3_lane = "parallel after WP-O2R: D3 -> WP-O3 activation"
+    m6_lane = "parallel after WP-O2R: M6-1"
+    join_step = "C1 post-WP-O5 + WP-O3 activation + M6-1"
+    wp_o6_step = "-> WP-O6 candidate"
+    assert (
+        graph_steps.index(wp_o2r_step)
+        < graph_steps.index(d3_o3_lane)
+        < graph_steps.index(join_step)
+        < graph_steps.index(wp_o6_step)
+    )
+    assert (
+        graph_steps.index(wp_o2r_step)
+        < graph_steps.index(m6_lane)
+        < graph_steps.index(join_step)
+        < graph_steps.index(wp_o6_step)
+    )
+    assert (
+        graph_steps.index(c1_post_step)
+        < graph_steps.index(join_step)
+        < graph_steps.index(wp_o6_step)
+    )
 
     wp_o4_tail = spec_text.index(
-        "if CI cannot discover exactly one packet or reproduce the"
+        "local scope result from base/head, strict default cannot proceed."
     )
     wp_o4_b1 = spec_text.index("#### WP-O4-B1 —")
     wp_o5_start = spec_text.index("### WP-O5 —")

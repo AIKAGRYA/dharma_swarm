@@ -224,13 +224,13 @@
       "tests/test_active_track_governance.py"
     ],
     "honest_blockers": [
-      "The exact six-node manifest, byte-identical production runner/test blobs, and paired unmodified-base/candidate replays classify the PR #928 signature as environment/capability-sensitive and base-reproducible: both revisions pass all six under external Python 3.12.13 with root chroot, reproduce only the bytecode node under a checkout-local uv venv with the same chroot, and reproduce all six under controlled unavailable-confinement injection at the existing fail-closed boundary. This does not establish the proprietary runner's actual interpreter, user, chroot, or child-stderr conditions, which remain Unobserved, and no failed run is waived.",
+      "The six-node investigation set (five nodes disclosed by the Greptile/T-Rex result plus the bytecode node reconstructed from preserved run accounting and repo-local replay), byte-identical production runner/test blobs, and paired unmodified-base/candidate replays classify the PR #928 signature as environment/capability-sensitive and base-reproducible: both revisions pass all six under external Python 3.12.13 with root chroot, reproduce only the bytecode node under a checkout-local uv venv with the same chroot, and reproduce all six under controlled unavailable-confinement injection at the existing fail-closed boundary. This does not establish the proprietary runner's actual interpreter, user, chroot, or child-stderr conditions, which remain Unobserved, and no failed run is waived.",
       "This exact candidate cannot seal WP-O2R until a final exact-head six-lane council receipt plus legitimate non-author/operator approval exist; it must then merge and be reverified on current main.",
       "The pre-WP-O5 C1 proof still requires authenticated live branch-protection, automerge-negative, and real merge_group evidence; this clarification changes no repository setting.",
-      "Open PR #933 at head 20987114dd5e9b0f4389f6a8174f345b59342f7f edits a different managed block in docs/governance/SOVEREIGN_MANIFEST.md; serialize #932 first, then rebase and regenerate #933 so neither exact-base receipt is misapplied.",
+      "PR #933 (`chore/docops-autorefresh`) was an open rolling generated-DocOps lane at this packet's base/collision check and overlapped only a different managed block in docs/governance/SOVEREIGN_MANIFEST.md; serialize #932 first, then rebase and regenerate the then-current #933 head so neither exact-base receipt is misapplied.",
       "Any main movement before merge invalidates this packet base, collision record, digest, preflight binding, and closeout evidence."
     ],
     "rollback": "Revert the C1 two-proof wording, WP-O2R merged-but-unsealed status, managed authority renders, sequence regression, and this packet together; do not revert PR #928 or any onboarding runtime change.",
-    "packet_digest": "174786ef6e302faa709a80944b095fccf4706bc45d0555ea4b7436fff545f6e6"
+    "packet_digest": "4e398cff7a4f85fe57d06d7191bff1c62c55a00cc980f57607280df87d339bf5"
   }
 }
