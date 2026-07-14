@@ -168,10 +168,12 @@ def test_fast_maps_to_compact_with_deprecation_line(ops_dir: Path) -> None:
 
 # --- pre-D3 writer doctrine ----------------------------------------------------
 
-def test_writer_default_is_v1_until_d3() -> None:
+def test_writer_default_is_v2_after_d3() -> None:
+    """The merged operator D3 record (PR #941) authorizes the one
+    source-controlled flip; the sole writer default is now v2."""
     from dharma_swarm.operator_core.onboarding import cli
 
-    assert cli.WRITER_SCHEMA_DEFAULT == "v1"
+    assert cli.WRITER_SCHEMA_DEFAULT == "v2"
 
 
 def test_writer_migration_and_rollback_matrix(
@@ -187,34 +189,39 @@ def test_writer_migration_and_rollback_matrix(
     receipt = ops_dir / "onboard_receipt.json"
 
     assert _run([], ops_dir).returncode == 0
-    assert load_receipt(receipt).major == 1
-
-    monkeypatch.setenv("DHARMA_OPS_DIR", str(ops_dir))
-    monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", "1")
-    monkeypatch.delenv("DHARMA_ONBOARD_WRITER", raising=False)
-    monkeypatch.setattr(cli, "WRITER_SCHEMA_DEFAULT", "v2")
-    assert cli.assemble_and_run([]) == 0
-    capsys.readouterr()
     v2 = load_receipt(receipt)
-    assert v2.major == 2
+    assert v2.major == 2  # post-D3 default (PR #941)
     assert v2.payload["primary_verdict"] in {
         "READY", "BLOCKED", "NEEDS_HOST", "CONFIG_ERROR", "TOOLCHAIN_MISSING",
         "USAGE_ERROR",
     }
 
+    monkeypatch.setenv("DHARMA_OPS_DIR", str(ops_dir))
+    monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", "1")
+    monkeypatch.delenv("DHARMA_ONBOARD_WRITER", raising=False)
     monkeypatch.setattr(cli, "WRITER_SCHEMA_DEFAULT", "v1")
     assert cli.assemble_and_run([]) == 0
     capsys.readouterr()
-    assert load_receipt(receipt).major == 1
+    assert load_receipt(receipt).major == 1  # rollback stays loader-valid
+
+    monkeypatch.setattr(cli, "WRITER_SCHEMA_DEFAULT", "v2")
+    assert cli.assemble_and_run([]) == 0
+    capsys.readouterr()
+    assert load_receipt(receipt).major == 2  # roll-forward replaces cleanly
 
 
 def test_ambient_writer_override_is_denied_pre_d3(ops_dir: Path) -> None:
-    """O3R-B2: an ambient ``DHARMA_ONBOARD_WRITER`` differing from the
-    source-controlled default is denied — the on-disk receipt stays on
-    ``WRITER_SCHEMA_DEFAULT`` and a typed condition records the denial."""
+    """O3R-B2 (default-relative): an ambient ``DHARMA_ONBOARD_WRITER``
+    differing from the source-controlled default is denied — the on-disk
+    receipt stays on ``WRITER_SCHEMA_DEFAULT`` and a typed condition records
+    the denial. Post-D3 the default is v2, so ambient ``v1`` is the bypass."""
+    from dharma_swarm.operator_core.onboarding import cli
     from dharma_swarm.operator_core.onboarding.receipt import load_receipt
 
-    denied = _run(["--json"], ops_dir, DHARMA_ONBOARD_WRITER="v2")
+    default_major = int(cli.WRITER_SCHEMA_DEFAULT.removeprefix("v"))
+    other = "v1" if cli.WRITER_SCHEMA_DEFAULT == "v2" else "v2"
+
+    denied = _run(["--json"], ops_dir, DHARMA_ONBOARD_WRITER=other)
     assert denied.returncode == 0  # legacy pre-WP-O5 door still exits 0
     payload = json.loads(denied.stdout)
     assert payload["verdict"] == "CONFIG_ERROR"
@@ -222,18 +229,18 @@ def test_ambient_writer_override_is_denied_pre_d3(ops_dir: Path) -> None:
     rows = {row["id"]: row for row in payload["conditions"]}
     assert rows["writer_override_denied"]["state"] == "fail"
     assert "denied" in rows["writer_override_denied"]["reason"]
-    assert load_receipt(ops_dir / "onboard_receipt.json").major == 1
+    assert load_receipt(ops_dir / "onboard_receipt.json").major == default_major
 
-    strict = _run([], ops_dir, DHARMA_ONBOARD_WRITER="v2", DHARMA_ONBOARD_STRICT="1")
+    strict = _run([], ops_dir, DHARMA_ONBOARD_WRITER=other, DHARMA_ONBOARD_STRICT="1")
     assert strict.returncode == 3
 
     # An ambient value equal to the source-controlled default is a no-op,
     # not a denial.
-    matching = _run(["--json"], ops_dir, DHARMA_ONBOARD_WRITER="v1")
+    matching = _run(["--json"], ops_dir, DHARMA_ONBOARD_WRITER=cli.WRITER_SCHEMA_DEFAULT)
     assert matching.returncode == 0
     matching_ids = {row["id"] for row in json.loads(matching.stdout)["conditions"]}
     assert "writer_override_denied" not in matching_ids
-    assert load_receipt(ops_dir / "onboard_receipt.json").major == 1
+    assert load_receipt(ops_dir / "onboard_receipt.json").major == default_major
 
 
 def test_human_output_stays_inside_line_budget(ops_dir: Path) -> None:
