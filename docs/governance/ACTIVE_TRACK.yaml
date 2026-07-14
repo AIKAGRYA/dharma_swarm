@@ -791,6 +791,7 @@ active_tracks:
       - dharma_swarm/a2a/fleet_presence.py
       - dharma_swarm/a2a/node_registry.py
       - dharma_swarm/a2a/agent_directory.py
+      - dharma_swarm/a2a/registry_hydrator.py
       - dharma_swarm/a2a/__init__.py
       - api/main.py
       - dashboard/src/app/dashboard/a2a-node/**
@@ -799,6 +800,7 @@ active_tracks:
       - dashboard/src/lib/a2aNodeModel.ts
       - dashboard/src/lib/a2aNodeModel.test.ts
       - tests/test_fleet_presence.py
+      - tests/test_registry_hydrator.py
     moves_vital_signs:
       - quality_gates
       - eval_coverage

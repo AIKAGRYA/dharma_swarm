@@ -8,6 +8,7 @@
     "dharma_swarm/a2a/fleet_presence.py",
     "dharma_swarm/a2a/node_registry.py",
     "dharma_swarm/a2a/agent_directory.py",
+    "dharma_swarm/a2a/registry_hydrator.py",
     "dharma_swarm/a2a/__init__.py",
     "api/main.py",
     "dashboard/src/app/dashboard/a2a-node/**",
@@ -16,6 +17,7 @@
     "dashboard/src/lib/a2aNodeModel.ts",
     "dashboard/src/lib/a2aNodeModel.test.ts",
     "tests/test_fleet_presence.py",
+    "tests/test_registry_hydrator.py",
     "reports/agentops/work_packets/organism-rewire-WP-O7-durable-a2a-operator-node.json"
   ],
   "forbidden_files": [
@@ -220,6 +222,6 @@
       "The dashboard is a read model and cannot upgrade STORED receipts into delivered, processed, or effect claims."
     ],
     "rollback": "revert the fleet presence consumer, exact NodeRegistry/AgentDirectory wiring, phone operator node, tests, and packet together; no runtime migration is required",
-    "packet_digest": "f8d1f9a2db28fcc666ae0dde53489b8e3a005fc76a37c173b815875ebab60c5f"
+    "packet_digest": "b73e0ebc667aa0fffb19a91148d3ea54a0bfdf4fbde2e5f651ed104c6c6bd7bb"
   }
 }

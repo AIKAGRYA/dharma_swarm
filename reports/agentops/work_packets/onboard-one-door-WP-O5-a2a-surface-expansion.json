@@ -33,6 +33,7 @@
     "dharma_swarm/a2a/agent_directory.py",
     "dharma_swarm/a2a/fleet_presence.py",
     "dharma_swarm/a2a/node_registry.py",
+    "dharma_swarm/a2a/registry_hydrator.py",
     "dharma_swarm/archive.py",
     "dharma_swarm/chamber/**",
     "dharma_swarm/checkpoint.py",
@@ -112,6 +113,7 @@
     "tests/test_dpi.py",
     "tests/test_evolution_safety.py",
     "tests/test_fleet_presence.py",
+    "tests/test_registry_hydrator.py",
     "tests/test_graph_checkpoint.py",
     "tests/test_graph_durable_invoker.py",
     "tests/test_graph_reconciler.py",
@@ -205,6 +207,6 @@
       "The active portfolio remains at the operator-decreed maximum of 11; this change expands organism-rewire instead of opening a twelfth track."
     ],
     "rollback": "revert the organism-rewire owned-surface and next-item additions, regenerate active-track includes, and remove this packet in one commit",
-    "packet_digest": "48f83e5a6cf8a1cff06b9030caa18d55a51fc9245011a54e5424c39727ac28ef"
+    "packet_digest": "673024b125bd6934a3846f5f4cc5483e4ad90f27dc17c4988f19542c317317e7"
   }
 }
