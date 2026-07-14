@@ -152,7 +152,24 @@ def test_one_door_c1_has_ordered_pre_and_post_wp_o5_proofs() -> None:
         None,
     )
     assert track is not None, "onboard-one-door-2026-07 missing from active portfolio"
-    items = {str(item["id"]): item for item in track["next_items"]}
+    ordered_items = track["next_items"]
+    ordered_ids = [str(item["id"]) for item in ordered_items]
+    items = {str(item["id"]): item for item in ordered_items}
+
+    assert ordered_ids.count("C1") == 1, "C1 must remain one formal node"
+    expected_node_order = [
+        "WP-O4R",
+        "WP-O2R",
+        "C1",
+        "D2",
+        "WP-O5",
+        "M6-1",
+        "WP-O6",
+    ]
+    positions = [ordered_ids.index(node_id) for node_id in expected_node_order]
+    assert positions == sorted(positions), (
+        "One-Door next_items must preserve the reseal and C1/WP-O5/WP-O6 order"
+    )
 
     c1 = items["C1"]["what"]
     assert "make onboard ARGS=--strict" in c1
@@ -184,6 +201,28 @@ def test_one_door_c1_has_ordered_pre_and_post_wp_o5_proofs() -> None:
         "full WP-O3 activation, WP-O5, the final post-WP-O5 C1 enforcement "
         "proof, and M6-1 must all be merged"
     ) in wp_o6
+
+    controller_graph = (
+        spec_text
+        .split("### 14.1 One campaign, narrow merge nodes", maxsplit=1)[1]
+        .split("```text", maxsplit=1)[1]
+        .split("```", maxsplit=1)[0]
+    )
+    graph_steps = [line.strip() for line in controller_graph.splitlines()]
+    expected_graph_steps = [
+        "-> WP-O4",
+        "-> WP-O2R reseal",
+        "-> C1 pre-WP-O5 authority/unlock proof (`make onboard ARGS=--strict`)",
+        "-> D2",
+        "-> WP-O5",
+        "-> C1 post-WP-O5 final enforcement proof (plain `make onboard`)",
+        "-> M6-1",
+        "-> WP-O6 candidate",
+    ]
+    graph_positions = [graph_steps.index(step) for step in expected_graph_steps]
+    assert graph_positions == sorted(graph_positions), (
+        "§14.1 must preserve the full ordered WP-O2R/C1/WP-O5/WP-O6 path"
+    )
 
 
 @pytest.mark.timeout(75)

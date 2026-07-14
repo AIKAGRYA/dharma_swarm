@@ -1908,11 +1908,14 @@ active_tracks:
       parsing) can proceed independently of D3; C1 revalidation can also
       proceed now. D3 gates only public v2 writer/cache-delta activation. The
       pre-WP-O5 C1 authority/unlock proof uses exactly `make onboard
-      ARGS=--strict` and gates D2 then WP-O5; it does not close C1. After WP-O5,
-      the final C1 enforcement proof repeats the controlled BLOCKED case through
-      plain `make onboard` on the live PR, automerge, and merge-group paths.
-      Full WP-O3, WP-O5, final C1, and M6-1 gate WP-O6, which gates independent
-      terminal proof. Titanium remains blocked until that proof merges.
+      ARGS=--strict` and gates D2 then WP-O5; it does not close C1. The
+      classified WP-O2R reseal must receive its exact-head council receipt and
+      legitimate approval, merge, and be reverified before that terminal
+      sequence advances. After WP-O5, the final C1 enforcement proof repeats
+      the controlled BLOCKED case through plain `make onboard` on the live PR,
+      automerge, and merge-group paths. Full WP-O3, WP-O5, final C1, and M6-1
+      gate WP-O6, which gates independent terminal proof. Titanium remains
+      blocked until that proof merges.
     prerequisites:
       - id: onboard_spec_on_main
         kind: file_exists
@@ -2006,6 +2009,10 @@ active_tracks:
         what: "DONE 2026-07-14 — PR #924 separately granted the exact WP-O4R identity and collision-free surface authority; PR #926 then closed the exact corrective AgentOps self-invalidation envelope: Hypothesis storage is external, active-track report output is relocatable, dependency bootstrap suppresses source bytecode, and bare Python criteria resolve through the current interpreter. Exact-head Linux AgentOps, full CI, independent review, and the terminal six-lane council passed. This does not close C1, WP-O6 syscall confinement, or One-Door."
         kind: code
         blocker: false
+      - id: WP-O2R
+        what: "WP-O2R RESEAL PENDING — PR #928 head 65196c522913a77f2bf661941ee6f6ecff87e9ae merged as 6757fd42ae81ceaa4337b00ee4c1fc6196c7592c after PR #929 granted its identity/surface authority, but its live review record has zero APPROVED submissions and no final exact-head council receipt. The successor investigation recovered five disclosed Greptile/T-Rex failing nodes (`test_external_entry_packet_bootstrap_and_digest_binding`, `test_declared_expected_exits_and_isolated_negative_controls`, `test_negative_controls_confine_absolute_env_and_pythonpath_source_escapes`, `test_make_admission_reports_are_external_and_read_only`, and `test_negative_control_ignores_ambient_execution_injection`) and reconstructed the sixth as `test_runner_minimal_help_writes_no_repo_bytecode` from the preserved 149-pass/two-skip run plus repo-local replay. The O4/O4R runner and tests are byte-identical across the compared revisions; external temporary-venv base/head replays pass all six, a repo-local venv reproduces the bytecode node, and the current proprietary runner reproduces the other five. This is classified as a cross-runner environment/layout incompatibility on unchanged code, not a seven-file successor regression; the proprietary runner's exact environment and child stderr remain Unobserved, and no failed run is waived. Keep this blocker open only until the exact successor head receives a six-lane council receipt and legitimate non-author/operator approval, merges, and is reverified on current main; it must seal before the C1/WP-O5 terminal sequence advances."
+        kind: governance
+        blocker: true
       - id: C1
         what: "C1 PENDING, ONE NODE/TWO PROOFS — the pre-WP-O5 authority/unlock proof must bind the canonical context to live required-check and parity truth, prove pull_request/path-filter, automerge, and merge_group coverage, and run one controlled BLOCKED case using exactly `make onboard ARGS=--strict`; it unlocks only D2/WP-O5 and does not close C1. After WP-O5, final C1 proof must repeat the controlled BLOCKED case with plain `make onboard` and show the actual required context, branch protection, automerge, and merge queue reject it. PRs #920/#926 registered and exercised the tracked jobs but close neither proof."
         kind: governance
@@ -2028,10 +2035,6 @@ active_tracks:
         blocker: true
       - id: TERMINAL-PROOF
         what: "TERMINAL PROOF PENDING — a decorrelated verifier who authored none of WP-O1..WP-O6 must acquire a sterile fresh clone, bind the exact final candidate, run §13 independently, and merge that proof before the track can close or Titanium WP-00 can qualify its baseline."
-        kind: governance
-        blocker: true
-      - id: WP-O2R
-        what: "WP-O2R MERGED BUT UNSEALED — PR #928 head 65196c522913a77f2bf661941ee6f6ecff87e9ae merged as 6757fd42ae81ceaa4337b00ee4c1fc6196c7592c after PR #929 granted its identity/surface authority. Its seven-path reconciliation is on main, but the live review record contains zero APPROVED submissions, the PR body leaves the exact-head council rerun prospective, and Greptile reports a six-failure/149-pass/two-skip AgentOps run without the six node ids or a same-environment base comparison. Exact-head Linux reproductions currently pass 155/two-skip in both ordinary and confined environments, and exact base c631a492 passes 153/two-skip under the same confinement; those reruns bound but do not erase the proprietary-runner discrepancy. Keep this blocker open until a separately reviewed/operator-ratified successor recovers or reruns the exact manifest, classifies the discrepancy, obtains a final exact-head council receipt and legitimate approval, merges, and is reverified on main."
         kind: governance
         blocker: true
       - id: 1

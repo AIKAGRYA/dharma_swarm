@@ -3,7 +3,7 @@
   "base_ref": "a370d3cd51aa5d9f97b2c2654d99fa63b8ab9466",
   "branch": "agent/onboard-gate0-successor-20260714",
   "worktree": ".",
-  "intent": "Clarify Gate 0 without adding a formal closure node: split the single C1 node into a pre-WP-O5 authority/unlock proof using exactly make onboard ARGS=--strict and a post-WP-O5 final enforcement proof using plain make onboard; reconcile WP-O2R from prospective to merged-but-unsealed truth; and add a regression that prevents the circular sequence from returning. This packet changes no runtime, workflow, repository setting, writer, cache, strict default, fleet claim, or closure count.",
+  "intent": "Clarify Gate 0 without adding a formal closure node: split the single C1 node into a pre-WP-O5 authority/unlock proof using exactly make onboard ARGS=--strict and a post-WP-O5 final enforcement proof using plain make onboard; reconcile WP-O2R from prospective to a classified reseal pending exact-head council, legitimate approval, merge, and main revalidation; and add a regression that prevents the circular sequence from returning. This packet changes no runtime, workflow, repository setting, writer, cache, strict default, fleet claim, or closure count.",
   "allowed_files": [
     "CLAUDE.md",
     "docs/governance/ACTIVE_TRACK.yaml",
@@ -215,7 +215,7 @@
     },
     "interface_mismatches": [
       "Merged main encodes C1 as gating D2 and WP-O5 while requiring strict fail-closed behavior that plain make onboard cannot provide before WP-O5, and it contains no post-WP-O5 final C1 proof.",
-      "Merged main still labels WP-O2R a candidate after PR #928 merged, while #928 has zero APPROVED reviews, no final exact-head council receipt, and an unclassified six-test Greptile discrepancy.",
+      "Merged main still labels WP-O2R a candidate after PR #928 merged, while #928 has zero APPROVED reviews, no final exact-head council receipt, and a six-test Greptile discrepancy that this successor must classify without waiving.",
       "Live branch-protection truth remains unavailable without Administration-read authority; tracked workflow and parity structure are not a substitute."
     ],
     "closest_existing_implementation": [
@@ -224,11 +224,12 @@
       "tests/test_active_track_governance.py"
     ],
     "honest_blockers": [
-      "This candidate cannot seal WP-O2R until the exact Greptile six-test manifest and runner evidence are recovered or rerun, the discrepancy is classified, and a final exact-head council receipt plus legitimate approval exist.",
+      "The recovered five-node manifest, reconstructed sixth bytecode node, byte-identical source comparison, and same-environment base/head replays classify the PR #928 discrepancy as a cross-runner environment/layout incompatibility; the proprietary runner's exact environment and child stderr remain Unobserved, and no failed run is waived.",
+      "This exact candidate cannot seal WP-O2R until a final exact-head six-lane council receipt plus legitimate non-author/operator approval exist; it must then merge and be reverified on current main.",
       "The pre-WP-O5 C1 proof still requires authenticated live branch-protection, automerge-negative, and real merge_group evidence; this clarification changes no repository setting.",
       "Any main movement before merge invalidates this packet base, collision record, digest, preflight binding, and closeout evidence."
     ],
     "rollback": "Revert the C1 two-proof wording, WP-O2R merged-but-unsealed status, managed authority renders, sequence regression, and this packet together; do not revert PR #928 or any onboarding runtime change.",
-    "packet_digest": "e43f964a267373b647093e6cc030ec75c402aea985144a753c5fcf72c9ef7873"
+    "packet_digest": "89d8d0a5c25c4954b198e15802a63482ab20752e529715f94543c49e914e1529"
   }
 }

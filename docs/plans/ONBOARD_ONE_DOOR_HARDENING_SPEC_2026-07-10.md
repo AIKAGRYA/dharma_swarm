@@ -1640,27 +1640,6 @@ exact PR-event replay, zero generated or ignored source leaves, and independent
 review. It does not close the wider WP-O4 syscall boundary, WP-O6, C1, or the
 One-Door track.
 
-#### WP-O4-B1 — Gate-0 sequencing and WP-O2R seal successor
-
-WP-O4-B1 is a one-time governance-only clarification after PR #928. It keeps
-C1 as one formal node but makes its pre-WP-O5 unlock proof and post-WP-O5 final
-enforcement proof explicit; reconciles WP-O2R from prospective to merged but
-unsealed truth; and adds one regression that prevents the circular sequence
-from returning. The operator's 2026-07-14 terminal-closure directive is the
-proposal authority, but this packet is not ratified or sealed merely by being
-authored: `approval.before_merge=true`, a final exact-head council receipt, and
-a legitimate non-author/operator approval remain mandatory.
-
-Its implementation envelope is exactly
-`docs/governance/ACTIVE_TRACK.yaml`, this specification, the three existing
-managed authority projections, `tests/test_active_track_governance.py`, and
-`reports/agentops/work_packets/onboard-one-door-WP-O4-B1.json`. It changes no
-runtime, workflow, branch setting, writer, cache, strict default, receipt store,
-fleet claim, or formal closure-node count. The packet may classify PR #928's
-cross-environment AgentOps discrepancy only from preserved exact commands,
-test manifests, runners, outputs, and same-environment base/head evidence; an
-unavailable proprietary runner is `Unobserved`, never silently waived.
-
 CI packet discovery is conditional and fail-closed. A PR with no change in the
 onboarding track's owned surfaces runs the shared baseline evaluator but needs
 no packet. A PR that changes any owned surface must change exactly one matching
@@ -1721,6 +1700,31 @@ authority change, no generated context refresh in CI, no Titanium workflow.
 
 **Kill criterion:** if CI cannot discover exactly one packet or reproduce the
 local scope result from base/head, strict default cannot proceed.
+
+#### WP-O4-B1 — Gate-0 sequencing and WP-O2R seal successor
+
+WP-O4-B1 is a one-time governance-only clarification after PR #928. It keeps
+C1 as one formal node but makes its pre-WP-O5 unlock proof and post-WP-O5 final
+enforcement proof explicit; reconciles WP-O2R from prospective to merged but
+unsealed truth; and adds one regression that prevents the circular sequence
+from returning. The operator's 2026-07-14 terminal-closure directive is the
+proposal authority, but this packet is not ratified or sealed merely by being
+authored: `approval.before_merge=true`, a final exact-head council receipt, and
+a legitimate non-author/operator approval remain mandatory.
+
+Its implementation envelope is exactly
+`docs/governance/ACTIVE_TRACK.yaml`, this specification, the three existing
+managed authority projections, `tests/test_active_track_governance.py`, and
+`reports/agentops/work_packets/onboard-one-door-WP-O4-B1.json`. It changes no
+runtime, workflow, branch setting, writer, cache, strict default, receipt store,
+fleet claim, or formal closure-node count. The packet classifies PR #928's
+cross-environment AgentOps discrepancy from the five disclosed failing nodes,
+the sixth node reconstructed from the preserved run counts and repo-local
+replay, byte-identical O4/O4R sources, and same-environment base/head evidence.
+That evidence supports a runner environment/layout incompatibility
+classification; the proprietary runner's exact environment and child stderr
+remain `Unobserved`. The classification does not waive any failed run and does
+not replace the exact-head council or legitimate approval gates.
 
 ### WP-O5 — Strict-by-default promotion (S; isolated; operator-gated)
 
@@ -1869,9 +1873,10 @@ and blocks completion; it is not “fixed” by making a mandatory probe optiona
 ### 6.1 Dependency graph, critical path, and parallel work
 
 **Critical path:** D1 → WP-O1 → WP-O1R-B0 → WP-O1R → WP-O2 → D3 → WP-O3 →
-A3 → WP-O4 → pre-WP-O5 C1 authority/unlock proof → D2 → WP-O5 → final C1
-enforcement proof → WP-O6 → independent proof. M6-1 may advance in parallel
-but must join before WP-O6. A1+A2+A4 are external adapter prerequisites that
+A3 → WP-O4 → WP-O2R reseal → pre-WP-O5 C1 authority/unlock proof → D2 →
+WP-O5 → final C1 enforcement proof → M6-1 → WP-O6 → independent proof. M6-1
+may advance in parallel but must join at the displayed boundary before WP-O6.
+A1+A2+A4 are external adapter prerequisites that
 must join before the independent proof. The two C1 proofs are phases of one
 formal C1 node, not additional closure nodes.
 
@@ -2366,6 +2371,7 @@ controller admission
   -> WP-O3
   -> A3
   -> WP-O4
+  -> WP-O2R reseal
   -> C1 pre-WP-O5 authority/unlock proof (`make onboard ARGS=--strict`)
   -> D2
   -> WP-O5
