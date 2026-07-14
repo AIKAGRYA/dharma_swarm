@@ -46,6 +46,7 @@ AGENT_UID_ALIASES = {
     "devin": "devin-roaming-2987d222",
     "fable-5-cursor": "fable_5_cursor",
     "fable-claude-code": "fable_claude_code",
+    "fable-composer": "fable_composer",
     "perplexity": "perplexity-computer",
 }
 
