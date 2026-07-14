@@ -216,12 +216,23 @@ def test_one_door_c1_has_ordered_pre_and_post_wp_o5_proofs() -> None:
         "-> D2",
         "-> WP-O5",
         "-> C1 post-WP-O5 final enforcement proof (plain `make onboard`)",
-        "-> M6-1",
         "-> WP-O6 candidate",
     ]
     graph_positions = [graph_steps.index(step) for step in expected_graph_steps]
     assert graph_positions == sorted(graph_positions), (
         "§14.1 must preserve the full ordered WP-O2R/C1/WP-O5/WP-O6 path"
+    )
+    assert "parallel after WP-O2R: D3 -> WP-O3 activation" in graph_steps
+    assert "parallel after WP-O2R: M6-1" in graph_steps
+    assert "C1 post-WP-O5 + WP-O3 activation + M6-1" in graph_steps
+
+    wp_o4_tail = spec_text.index(
+        "if CI cannot discover exactly one packet or reproduce the"
+    )
+    wp_o4_b1 = spec_text.index("#### WP-O4-B1 —")
+    wp_o5_start = spec_text.index("### WP-O5 —")
+    assert wp_o4_tail < wp_o4_b1 < wp_o5_start, (
+        "WP-O4-B1 must follow the complete WP-O4 tail and precede WP-O5"
     )
 
 

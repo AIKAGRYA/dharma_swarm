@@ -1718,13 +1718,13 @@ managed authority projections, `tests/test_active_track_governance.py`, and
 `reports/agentops/work_packets/onboard-one-door-WP-O4-B1.json`. It changes no
 runtime, workflow, branch setting, writer, cache, strict default, receipt store,
 fleet claim, or formal closure-node count. The packet classifies PR #928's
-cross-environment AgentOps discrepancy from the five disclosed failing nodes,
-the sixth node reconstructed from the preserved run counts and repo-local
-replay, byte-identical O4/O4R sources, and same-environment base/head evidence.
-That evidence supports a runner environment/layout incompatibility
-classification; the proprietary runner's exact environment and child stderr
-remain `Unobserved`. The classification does not waive any failed run and does
-not replace the exact-head council or legitimate approval gates.
+cross-environment AgentOps discrepancy from the exact six-node successor
+manifest, byte-identical production runner/test blobs, and paired replays on
+unmodified base and candidate revisions. Both pass all six under external
+Python 3.12/root-chroot, reproduce only the bytecode node under a checkout-local
+venv/root-chroot, and reproduce all six under controlled unavailable-confinement
+injection. This is environment/capability-sensitive and base-reproducible, not a
+successor regression; proprietary-runner conditions remain `Unobserved`; no failed run is waived and exact-head council/approval gates remain mandatory.
 
 ### WP-O5 — Strict-by-default promotion (S; isolated; operator-gated)
 
@@ -1872,10 +1872,10 @@ and blocks completion; it is not “fixed” by making a mandatory probe optiona
 
 ### 6.1 Dependency graph, critical path, and parallel work
 
-**Critical path:** D1 → WP-O1 → WP-O1R-B0 → WP-O1R → WP-O2 → D3 → WP-O3 →
-A3 → WP-O4 → WP-O2R reseal → pre-WP-O5 C1 authority/unlock proof → D2 →
-WP-O5 → final C1 enforcement proof → M6-1 → WP-O6 → independent proof. M6-1
-may advance in parallel but must join at the displayed boundary before WP-O6.
+**Critical path:** D1 → WP-O1 → WP-O1R-B0 → WP-O1R → WP-O2 → A3 → WP-O4 →
+WP-O2R reseal → pre-WP-O5 C1 authority/unlock proof → D2 → WP-O5 → final C1
+enforcement proof → WP-O6 → independent proof. D3 → WP-O3 activation and M6-1
+are parallel lanes that may advance after reseal but must join before WP-O6.
 A1+A2+A4 are external adapter prerequisites that
 must join before the independent proof. The two C1 proofs are phases of one
 formal C1 node, not additional closure nodes.
@@ -2060,11 +2060,11 @@ admission parity` (`scripts/governance/ci_parity_manifest.json:38-41`); the
 workflow binds both `pull_request` and `merge_group` and checks out the declared
 event head (`.github/workflows/active-track.yml:19-23,106-109,130-134`); and the
 automerge policy consumes the manifest's complete required-context set
-(`.github/workflows/automerge.yml:99-123`). Those tracked surfaces do not prove
+(`.github/workflows/automerge.yml:99-123,196-200,243-260`). Those tracked surfaces do not prove
 the live required-check/ruleset binding, path-filter safety, or an observed
 merge-group rejection. Before WP-O5 the required job also invokes plain `make
 onboard`, whose documented legacy compatibility returns zero for BLOCKED truth
-(`.github/workflows/active-track.yml:95-105,150-155`).
+(`.github/workflows/active-track.yml:150-155`, `dharma_swarm/operator_core/onboarding/cli.py:291-296`).
 
 The **pre-WP-O5 authority/unlock proof** must therefore bind the canonical
 context and parity manifest to live GitHub required-check enforcement; prove
@@ -2367,8 +2367,6 @@ The controller advances through this dependency graph:
 ```text
 controller admission
   -> WP-O2
-  -> D3
-  -> WP-O3
   -> A3
   -> WP-O4
   -> WP-O2R reseal
@@ -2376,7 +2374,9 @@ controller admission
   -> D2
   -> WP-O5
   -> C1 post-WP-O5 final enforcement proof (plain `make onboard`)
-  -> M6-1
+parallel after WP-O2R: D3 -> WP-O3 activation
+parallel after WP-O2R: M6-1
+C1 post-WP-O5 + WP-O3 activation + M6-1
   -> WP-O6 candidate
   -> §13 independent clean-room proof
   -> merge WP-O6 + proof candidate
@@ -2388,11 +2388,11 @@ The controller re-derives D1, A1, A2, A4, WP-O1, WP-O1R-B0, and WP-O1R at the
 relevant baseline instead of trusting their reported completion. The
 pre-WP-O5 C1 proof is an authority/unlock boundary only and never closes C1;
 §9.4 requires the post-WP-O5 plain-command enforcement result
-(`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2052-2076`,
-`docs/governance/ACTIVE_TRACK.yaml:1905-1915,2009-2012`). Live state comes from
+(`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2055-2081`,
+`docs/governance/ACTIVE_TRACK.yaml:1905-1918,2012-2019`). Live state comes from
 current owners and Git; dated statements elsewhere in this evidence body are
 not promotion markers. Titanium remains blocked for the entire graph
-(`docs/governance/ACTIVE_TRACK.yaml:1914-1915`).
+(`docs/governance/ACTIVE_TRACK.yaml:1917-1918`).
 
 ### 14.2 Per-node execution loop
 
@@ -2443,30 +2443,30 @@ than inferred from adjacent criteria. This is the explicit track-evidence
 closure node above, owned as a governance PR that updates `ACTIVE_TRACK.yaml`
 and its managed renders only after the proof candidate merges
 (`scripts/governance/check_track_status.py:574-591,1073-1112,1855-1921`,
-`docs/governance/ACTIVE_TRACK.yaml:1924-2036`).
+`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2367-2384`).
 
 ### 14.4 Authority gates and stop rules
 
 - D3 is the recorded reader sweep on every declared fleet host. A discovered
   reader is upgraded before the WP-O3 writer flip
-  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2044-2048`,
-  `docs/governance/ACTIVE_TRACK.yaml:1989-1992`).
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2049-2053`,
+  `docs/governance/ACTIVE_TRACK.yaml:1992-1995`).
 - A3 is a separate authority-document PR; it cannot ride an implementation
   packet
-  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2078-2088`).
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2083-2091`).
 - C1 belongs to merge authority. Its pre-WP-O5 proof binds live required
   context, parity, automerge, and merge-group authority and uses exactly `make
   onboard ARGS=--strict`; its post-WP-O5 proof repeats BLOCKED through plain
   `make onboard` and is the only C1 closure point
-  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2052-2076`).
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2055-2081`).
 - D2 is a separately merged operator-authored ratification after the pre-WP-O5
   C1 authority/unlock proof; an implementation author cannot mint or backdate it
-  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2028-2042`).
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2033-2047`).
 - M6-1 is a DharmaGraph-owner change or explicit transfer before WP-O6 touches
   `pyproject.toml`
-  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2093-2100`).
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2098-2105`).
 - U1 preempts the campaign if a newly observed exposure requires containment
-  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2102-2110`).
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2107-2115`).
 
 Pause only for a concrete external authority/access boundary, unreachable
 required host, missing branch-protection privilege, owner refusal, unavailable
@@ -2479,6 +2479,6 @@ The campaign ends only when every §10 criterion, D1/D2/D3/C1/M6-1, A1–A4,
 WP-O1/WP-O1R-B0/WP-O1R/WP-O2–WP-O6, strict-default behavior, performance/
 output/determinism/mutation contract, §13 proof, and the track-evidence closure
 PR have merged and been re-derived from fresh `main`
-(`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2112-2132,2174-2342`).
+(`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2117-2137,2179-2346,2367-2384`).
 Only then may the active track close and Titanium capture its qualifying
 baseline.
