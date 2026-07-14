@@ -1640,6 +1640,27 @@ exact PR-event replay, zero generated or ignored source leaves, and independent
 review. It does not close the wider WP-O4 syscall boundary, WP-O6, C1, or the
 One-Door track.
 
+#### WP-O4-B1 — Gate-0 sequencing and WP-O2R seal successor
+
+WP-O4-B1 is a one-time governance-only clarification after PR #928. It keeps
+C1 as one formal node but makes its pre-WP-O5 unlock proof and post-WP-O5 final
+enforcement proof explicit; reconciles WP-O2R from prospective to merged but
+unsealed truth; and adds one regression that prevents the circular sequence
+from returning. The operator's 2026-07-14 terminal-closure directive is the
+proposal authority, but this packet is not ratified or sealed merely by being
+authored: `approval.before_merge=true`, a final exact-head council receipt, and
+a legitimate non-author/operator approval remain mandatory.
+
+Its implementation envelope is exactly
+`docs/governance/ACTIVE_TRACK.yaml`, this specification, the three existing
+managed authority projections, `tests/test_active_track_governance.py`, and
+`reports/agentops/work_packets/onboard-one-door-WP-O4-B1.json`. It changes no
+runtime, workflow, branch setting, writer, cache, strict default, receipt store,
+fleet claim, or formal closure-node count. The packet may classify PR #928's
+cross-environment AgentOps discrepancy only from preserved exact commands,
+test manifests, runners, outputs, and same-environment base/head evidence; an
+unavailable proprietary runner is `Unobserved`, never silently waived.
+
 CI packet discovery is conditional and fail-closed. A PR with no change in the
 onboarding track's owned surfaces runs the shared baseline evaluator but needs
 no packet. A PR that changes any owned surface must change exactly one matching
@@ -1847,8 +1868,11 @@ and blocks completion; it is not “fixed” by making a mandatory probe optiona
 ### 6.1 Dependency graph, critical path, and parallel work
 
 **Critical path:** D1 → WP-O1 → WP-O1R-B0 → WP-O1R → WP-O2 → D3 → WP-O3 →
-A3 → WP-O4 → C1+D2 → WP-O5 → M6-1 → WP-O6 → independent proof. A1+A2+A4 are
-external adapter prerequisites that must join before the independent proof.
+A3 → WP-O4 → pre-WP-O5 C1 authority/unlock proof → D2 → WP-O5 → final C1
+enforcement proof → WP-O6 → independent proof. M6-1 may advance in parallel
+but must join before WP-O6. A1+A2+A4 are external adapter prerequisites that
+must join before the independent proof. The two C1 proofs are phases of one
+formal C1 node, not additional closure nodes.
 
 Parser fixtures can be prepared in parallel with WP-O1 after the shared model
 interface is frozen. The named performance and clean-room test harnesses may be
@@ -2003,8 +2027,9 @@ into the safety track, the same owned-surface and packet requirements apply.
 ### 9.2 D2 — strict-by-default
 
 **Operator decision D2 remains open and unchanged:** explicitly ratify the
-WP-O5 strict-by-default flip after WP-O4 CI parity. Approval “in principle” is
-not the promotion marker. The implementation author cannot mint this approval.
+WP-O5 strict-by-default flip after the pre-WP-O5 C1 authority/unlock proof.
+Approval “in principle” is not the promotion marker. The implementation author
+cannot mint this approval.
 
 D2 is recorded through a separately merged, operator-authored governance PR:
 the admitted track's existing `next_items[D2]` entry changes from `PENDING,
@@ -2023,21 +2048,31 @@ confirm that no such reader remains. WP-O3 cannot switch the writer first.
 
 ### 9.4 C1 — merge-blocking CI admission
 
-**C1 is an external merge-authority dependency, not a WP-O4/O5 file grab.**
-The current workflow describes itself as advisory and weakens TTL on PRs
-(`.github/workflows/active-track.yml:3-17,62-77`); the parity manifest has no
-onboarding context (`scripts/governance/ci_parity_manifest.json:6-37`); and
-automerge explicitly ignores active-track contexts
-(`.github/workflows/automerge.yml:13-18,75-77`). The latter is owned by
-`merge-master-mike-d4-2026-06`
-(`docs/governance/ACTIVE_TRACK.yaml:564-580`).
+**C1 is one external merge-authority node with two ordered proofs, not a
+WP-O4/O5 file grab.** The tracked parity manifest now names `Onboarding
+admission parity` (`scripts/governance/ci_parity_manifest.json:38-41`); the
+workflow binds both `pull_request` and `merge_group` and checks out the declared
+event head (`.github/workflows/active-track.yml:19-23,106-109,130-134`); and the
+automerge policy consumes the manifest's complete required-context set
+(`.github/workflows/automerge.yml:99-123`). Those tracked surfaces do not prove
+the live required-check/ruleset binding, path-filter safety, or an observed
+merge-group rejection. Before WP-O5 the required job also invokes plain `make
+onboard`, whose documented legacy compatibility returns zero for BLOCKED truth
+(`.github/workflows/active-track.yml:95-105,150-155`).
 
-After WP-O4 establishes the shared CI command, the branch-protection/CI-truth
-owners must, in their own coordinated change, register its exact context as
-required and merge-queue-sensitive, add it to the existing parity manifest and
-automerge required set, and remove any advisory exemption. C1 records the live
-branch-protection result. WP-O5 and terminal proof block until that change is
-merged; this campaign creates no second CI-authority store.
+The **pre-WP-O5 authority/unlock proof** must therefore bind the canonical
+context and parity manifest to live GitHub required-check enforcement; prove
+the pull-request event and path-filter behavior; observe automerge and
+merge-queue/`merge_group` behavior; and preserve one controlled BLOCKED proof
+using exactly `make onboard ARGS=--strict`. It may unlock D2 and WP-O5, but it
+does not close C1 and must not silently change the required job to smuggle the
+strict-default flip into this phase.
+
+After D2 and WP-O5 merge, the **post-WP-O5 final enforcement proof** repeats the
+controlled BLOCKED case with plain `make onboard` and demonstrates rejection
+by the actual required context, branch protection, automerge, and merge queue.
+Only that second proof closes C1. WP-O6 and terminal proof remain blocked until
+it passes. This campaign creates no second CI-authority store.
 
 ### 9.5 A1/A2/A3/A4 — adapter and instruction-custody dependencies
 
@@ -2330,9 +2365,10 @@ controller admission
   -> WP-O3
   -> A3
   -> WP-O4
-  -> C1 phase 2
+  -> C1 pre-WP-O5 authority/unlock proof (`make onboard ARGS=--strict`)
   -> D2
   -> WP-O5
+  -> C1 post-WP-O5 final enforcement proof (plain `make onboard`)
   -> M6-1
   -> WP-O6 candidate
   -> §13 independent clean-room proof
@@ -2342,9 +2378,9 @@ controller admission
 ```
 
 The controller re-derives D1, A1, A2, A4, WP-O1, WP-O1R-B0, and WP-O1R at the
-relevant baseline instead of trusting their reported completion. Any C1 phase-1
-change is preparatory only and never closes C1; §9.4 requires the post-WP-O4
-shared context and live branch-protection result
+relevant baseline instead of trusting their reported completion. The
+pre-WP-O5 C1 proof is an authority/unlock boundary only and never closes C1;
+§9.4 requires the post-WP-O5 plain-command enforcement result
 (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1776-1787,1953-1969`,
 `docs/governance/ACTIVE_TRACK.yaml:1617-1637`). Live state comes from current
 owners and Git; dated statements elsewhere in this evidence body are not
@@ -2411,11 +2447,13 @@ and its managed renders only after the proof candidate merges
 - A3 is a separate authority-document PR; it cannot ride an implementation
   packet
   (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1971-1984`).
-- C1 phase 2 belongs to merge authority and includes live required-context,
-  parity-manifest, automerge, and branch-protection proof
+- C1 belongs to merge authority. Its pre-WP-O5 proof binds live required
+  context, parity, automerge, and merge-group authority and uses exactly `make
+  onboard ARGS=--strict`; its post-WP-O5 proof repeats BLOCKED through plain
+  `make onboard` and is the only C1 closure point
   (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1953-1969`).
-- D2 is a separately merged operator-authored ratification after WP-O4 and C1;
-  an implementation author cannot mint or backdate it
+- D2 is a separately merged operator-authored ratification after the pre-WP-O5
+  C1 authority/unlock proof; an implementation author cannot mint or backdate it
   (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1932-1945`).
 - M6-1 is a DharmaGraph-owner change or explicit transfer before WP-O6 touches
   `pyproject.toml`

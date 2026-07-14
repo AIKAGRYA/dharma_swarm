@@ -133,6 +133,27 @@ def test_managed_files_have_markers() -> None:
             f"{path} missing ACTIVE_TRACK end marker"
 
 
+def test_one_door_c1_has_ordered_pre_and_post_wp_o5_proofs() -> None:
+    """C1 must unlock WP-O5 before plain-command enforcement can close C1."""
+    sys.path.insert(0, str(REPO_ROOT / "scripts/governance"))
+    from check_track_status import load_active_track, normalize_portfolio  # type: ignore
+
+    portfolio = normalize_portfolio(load_active_track(ACTIVE_TRACK))
+    track = next(
+        item for item in portfolio["active_tracks"]
+        if item["id"] == "onboard-one-door-2026-07"
+    )
+    items = {str(item["id"]): item for item in track["next_items"]}
+
+    c1 = items["C1"]["what"]
+    assert "make onboard ARGS=--strict" in c1
+    assert "plain `make onboard`" in c1
+    assert "does not close C1" in c1
+    assert "pre-WP-O5 C1 authority/unlock proof" in items["D2"]["what"]
+    assert "pre-WP-O5 C1 authority/unlock proof" in items["WP-O5"]["what"]
+    assert "final post-WP-O5 C1 enforcement" in items["WP-O6"]["what"]
+
+
 @pytest.mark.timeout(75)
 def test_onboard_command_succeeds() -> None:
     """agent_onboard.py runs end-to-end and prints the active track section."""

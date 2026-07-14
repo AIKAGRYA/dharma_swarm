@@ -1906,10 +1906,13 @@ active_tracks:
       exact-identity authority bootstrap, the pre-D3 residual WP-O3 safety
       slice (typed Git observations, ambient-writer denial, and fallback
       parsing) can proceed independently of D3; C1 revalidation can also
-      proceed now. D3 gates only public v2 writer/cache-delta activation; C1
-      gates D2 and then WP-O5; WP-O5 plus M6-1 gate WP-O6, which gates
-      independent terminal proof. Titanium remains blocked until that proof
-      merges.
+      proceed now. D3 gates only public v2 writer/cache-delta activation. The
+      pre-WP-O5 C1 authority/unlock proof uses exactly `make onboard
+      ARGS=--strict` and gates D2 then WP-O5; it does not close C1. After WP-O5,
+      the final C1 enforcement proof repeats the controlled BLOCKED case through
+      plain `make onboard` on the live PR, automerge, and merge-group paths.
+      Full WP-O3, WP-O5, final C1, and M6-1 gate WP-O6, which gates independent
+      terminal proof. Titanium remains blocked until that proof merges.
     prerequisites:
       - id: onboard_spec_on_main
         kind: file_exists
@@ -2004,15 +2007,15 @@ active_tracks:
         kind: code
         blocker: false
       - id: C1
-        what: "C1 PENDING — the Onboarding admission parity context is registered, and merged PR #920 proved its admission and macOS jobs green, but merge authority still must capture explicit post-WP-O4 required-context, parity-manifest, automerge, and merge-queue evidence proving the strict door fails closed on blocked truth. PRs #920/#926 do not close that separate semantic authority dependency."
+        what: "C1 PENDING, ONE NODE/TWO PROOFS — the pre-WP-O5 authority/unlock proof must bind the canonical context to live required-check and parity truth, prove pull_request/path-filter, automerge, and merge_group coverage, and run one controlled BLOCKED case using exactly `make onboard ARGS=--strict`; it unlocks only D2/WP-O5 and does not close C1. After WP-O5, final C1 proof must repeat the controlled BLOCKED case with plain `make onboard` and show the actual required context, branch protection, automerge, and merge queue reject it. PRs #920/#926 registered and exercised the tracked jobs but close neither proof."
         kind: governance
         blocker: true
       - id: D2
-        what: "D2 PENDING — operator ratification of strict-by-default after WP-O4/C1 (exact record format in spec §9.2; the implementation author cannot mint it; WP-O5 preflight verifies the record is a merged ancestor)."
+        what: "D2 PENDING — separately merged operator ratification of strict-by-default after the pre-WP-O5 C1 authority/unlock proof (exact record format in spec §9.2; the implementation author cannot mint it; WP-O5 preflight verifies the record is a merged ancestor)."
         kind: governance
         blocker: true
       - id: WP-O5
-        what: "WP-O5 PENDING — after C1 and a separately merged operator-authored D2 record, promote strict verdict exits to the default while retaining one truthful --no-strict deprecation cycle; no automatic or author-minted promotion."
+        what: "WP-O5 PENDING — after the pre-WP-O5 C1 authority/unlock proof and a separately merged operator-authored D2 record, promote strict verdict exits to the default while retaining one truthful --no-strict deprecation cycle; no automatic or author-minted promotion. Final C1 enforcement remains pending afterward."
         kind: code
         blocker: true
       - id: M6-1
@@ -2020,7 +2023,7 @@ active_tracks:
         kind: governance
         blocker: true
       - id: WP-O6
-        what: "WP-O6 PENDING — after WP-O5 and M6-1, prove performance/line budgets, deterministic replay, concurrency/crash safety, mutation strength, exact exit matrices, and fresh-clone no-write/no-network behavior under the spec's terminal envelope."
+        what: "WP-O6 PENDING — after full WP-O3, WP-O5, final post-WP-O5 C1 enforcement, and M6-1, prove performance/line budgets, deterministic replay, concurrency/crash safety, mutation strength, exact exit matrices, and fresh-clone no-write/no-network behavior under the spec's terminal envelope."
         kind: code
         blocker: true
       - id: TERMINAL-PROOF
@@ -2028,9 +2031,9 @@ active_tracks:
         kind: governance
         blocker: true
       - id: WP-O2R
-        what: "WP-O2R CANDIDATE — PR #929 separately merged the exact identity and packet-scoped authority. This implementation, within the admitted nine-file allowed envelope, reconciles post-#926/#929 history, managed projections, canonical broken-register counts/status labels, the synthetic stale-header diagnostic, and explicitly bounded host-local evidence; its exact Git delta is seven paths because CLAUDE.md and BUILD_SESSION_ENTRYPOINT.md were already correct at c631a492. blocker=false records that this exact candidate has no remaining implementation dependency; Git/GitHub, not this prospective ledger text, remains authority for whether PR #928 has entered main. No parser/runtime/database/scheduler change, strict promotion, One-Door closure, or Titanium claim is admitted."
+        what: "WP-O2R MERGED BUT UNSEALED — PR #928 head 65196c522913a77f2bf661941ee6f6ecff87e9ae merged as 6757fd42ae81ceaa4337b00ee4c1fc6196c7592c after PR #929 granted its identity/surface authority. Its seven-path reconciliation is on main, but the live review record contains zero APPROVED submissions, the PR body leaves the exact-head council rerun prospective, and Greptile reports a six-failure/149-pass/two-skip AgentOps run without the six node ids or a same-environment base comparison. Exact-head Linux reproductions currently pass 155/two-skip in both ordinary and confined environments, and exact base c631a492 passes 153/two-skip under the same confinement; those reruns bound but do not erase the proprietary-runner discrepancy. Keep this blocker open until a separately reviewed/operator-ratified successor recovers or reruns the exact manifest, classifies the discrepancy, obtains a final exact-head council receipt and legitimate approval, merges, and is reverified on main."
         kind: governance
-        blocker: false
+        blocker: true
       - id: 1
         what: "WP-O1 — contract module, versioned receipt loader, portable Session Entry Packet, root AGENTS.md custody repair incl. .gitignore carve-out (spec §6 WP-O1: allowed files, failing-first tests O1-B1..B13, expected exits). AMENDED 2026-07-10 after a WP-O1 agent correctly stopped on the envelope conflict: .gitignore is admitted to the WP-O1 packet as a packet-scoped shared-surface exception (single edit: drop the /AGENTS.md ignore line) WITHOUT owned_surfaces claim, and the root pointer bytes are now pinned in the spec (O1-B13 asserts byte equality)."
         kind: code
