@@ -418,25 +418,52 @@ def compute_delta(
     }
 
 
+@contextmanager
+def receipt_transaction(
+    repo_root: Path, env: Mapping[str, str] | None = None,
+) -> Iterator[Path]:
+    """Hold the sidecar lock across a caller's whole read→decide→write span.
+
+    Spec §3.2 concurrency row: reuse and delta decisions taken from a prior
+    receipt read outside the lock can persist stale cache metadata when a
+    concurrent run replaces the prior first.  Callers that decide from the
+    prior must read it inside this transaction and pass
+    ``presumed_locked=True`` to ``write_receipt``.  The flock is not
+    reentrant — never call the locking ``write_receipt`` form inside."""
+    target = receipt_path(repo_root, env)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with _receipt_lock(target):
+        yield target
+
+
+def _replace_receipt(target: Path, payload: Mapping[str, Any]) -> None:
+    body = json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+    temp = target.with_name(target.name + ".tmp")
+    temp.write_text(body, encoding="utf-8")
+    load_receipt(temp)  # fail-closed before replace
+    os.replace(temp, target)
+
+
 def write_receipt(
     payload: Mapping[str, Any],
     *,
     repo_root: Path,
     env: Mapping[str, str] | None = None,
+    presumed_locked: bool = False,
 ) -> Path:
     """Atomically replace the one receipt path under the sidecar lock.
 
     The payload must already validate under the versioned loader — a writer
     that can emit an unloadable receipt is a corruption source, so validation
-    is not optional here."""
+    is not optional here.  ``presumed_locked=True`` is for callers already
+    inside ``receipt_transaction``; the flock is not reentrant."""
     target = receipt_path(repo_root, env)
     target.parent.mkdir(parents=True, exist_ok=True)
-    body = json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+    if presumed_locked:
+        _replace_receipt(target, payload)
+        return target
     with _receipt_lock(target):
-        temp = target.with_name(target.name + ".tmp")
-        temp.write_text(body, encoding="utf-8")
-        load_receipt(temp)  # fail-closed before replace
-        os.replace(temp, target)
+        _replace_receipt(target, payload)
     return target
 
 
@@ -448,6 +475,7 @@ __all__ = [
     "compute_stable_digest",
     "load_receipt",
     "receipt_path",
+    "receipt_transaction",
     "resolve_ops_dir",
     "section_fingerprints",
     "write_receipt",
