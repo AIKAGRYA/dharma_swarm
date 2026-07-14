@@ -11,8 +11,6 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -32,7 +30,6 @@ from dharma_swarm.operator_core.onboarding.receipt import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-CLI = "dharma_swarm.operator_core.onboarding.cli"
 
 
 # --- O3-B4 groundwork: manifest invalidation ---------------------------------
@@ -144,18 +141,24 @@ def test_unknown_future_major_is_explicitly_unsupported(tmp_path: Path) -> None:
         load_receipt(path)
 
 
-def test_cache_hit_is_honestly_false_while_reuse_is_disabled(tmp_path: Path) -> None:
+def test_cache_hit_is_honestly_false_while_reuse_is_disabled(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
     """This slice computes manifest/key/fingerprints but reuses nothing; a
     receipt claiming a cache hit before the §3.2 adversarial matrix lands
-    would be a false-green (spec: cache is a hint, never admission)."""
+    would be a false-green (spec: cache is a hint, never admission).  The v2
+    receipt is seeded through the source-controlled ``WRITER_SCHEMA_DEFAULT``
+    seam — the ambient ``DHARMA_ONBOARD_WRITER`` bypass is denied pre-D3
+    (O3R-B2)."""
+    from dharma_swarm.operator_core.onboarding import cli
+
     ops = tmp_path / "ops"
-    env = {**os.environ, "DHARMA_OPS_DIR": str(ops),
-           "DHARMA_ONBOARD_WRITER": "v2", "PYTHONDONTWRITEBYTECODE": "1"}
-    proc = subprocess.run(
-        [sys.executable, "-B", "-m", CLI, "--json"],
-        cwd=REPO_ROOT, env=env, capture_output=True, text=True, timeout=300,
-    )
-    assert proc.returncode == 0, proc.stderr
+    monkeypatch.setenv("DHARMA_OPS_DIR", str(ops))
+    monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", "1")
+    monkeypatch.delenv("DHARMA_ONBOARD_WRITER", raising=False)
+    monkeypatch.setattr(cli, "WRITER_SCHEMA_DEFAULT", "v2")
+    assert cli.assemble_and_run(["--json"]) == 0
+    capsys.readouterr()
     payload = load_receipt(ops / "onboard_receipt.json").payload
     assert payload["cache"]["hit"] is False
     assert payload["cache"]["miss_reasons"] == ["section_reuse_not_yet_enabled"]

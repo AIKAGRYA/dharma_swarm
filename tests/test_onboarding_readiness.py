@@ -11,6 +11,7 @@ import pytest
 
 from dharma_swarm.operator_core.onboarding.models import OnboardingContractError
 from dharma_swarm.operator_core.onboarding.readiness import (
+    VERDICT_CONFIG_ERROR,
     Condition,
     evaluate,
 )
@@ -137,6 +138,61 @@ def test_skipped_without_reason_is_a_contract_error() -> None:
 def test_unknown_state_is_a_contract_error() -> None:
     with pytest.raises(OnboardingContractError):
         Condition(id="x", state="green")
+
+
+def test_git_probe_failures_are_typed_config_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """O3R-B1: nonzero/timeout/OSError/malformed Git probes surface a typed
+    ``config`` condition and the verdict is CONFIG_ERROR — never a false
+    clean READY built from empty probe output."""
+    from dharma_swarm.operator_core.onboarding import cli, evidence
+
+    def broken_probe(*args: str, cwd=None) -> tuple[str, str]:
+        return "", f"exit 128: git {' '.join(args)}"
+
+    monkeypatch.setattr(evidence, "_git_probe", broken_probe)
+    live_state, probe_errors = evidence.observe_repo_live_state()
+    assert live_state["dirty"] is True  # fail-closed raw view, not false clean
+    assert set(probe_errors) == {"status", "ahead_behind"}
+
+    conditions = cli._collect_conditions(
+        live_state,
+        {"git": "git version test", "make": "GNU Make test"},
+        {},
+        {"broken_register": {"total": 0, "open_like": 0, "closed_like": 0, "unknown": 0}},
+        net=False,
+        probe_errors=probe_errors,
+    )
+    by_id = {condition.id: condition for condition in conditions}
+    assert by_id["git_state_observed"].state == "fail"
+    assert by_id["git_state_observed"].condition_class == "config"
+    assert by_id["repo_clean"].state == "not_observed"
+    assert by_id["repo_unconflicted"].state == "not_observed"
+
+    outcome = evaluate(conditions)
+    assert outcome.verdict == VERDICT_CONFIG_ERROR
+    assert outcome.exit_code == 3
+
+    def malformed_probe(*args: str, cwd=None) -> tuple[str, str]:
+        if args[0] == "status":
+            return "", ""
+        return "not-numbers", ""
+
+    monkeypatch.setattr(evidence, "_git_probe", malformed_probe)
+    state, errors = evidence.observe_repo_live_state()
+    assert state["ahead"] == 0 and state["behind"] == 0
+    assert "ahead_behind" in errors and "malformed" in errors["ahead_behind"]
+
+    def healthy_probe(*args: str, cwd=None) -> tuple[str, str]:
+        if args[0] == "status":
+            return "", ""
+        return "0\t0", ""
+
+    monkeypatch.setattr(evidence, "_git_probe", healthy_probe)
+    state, errors = evidence.observe_repo_live_state()
+    assert errors == {}
+    assert state["dirty"] is False
 
 
 def test_duplicate_condition_ids_are_rejected() -> None:

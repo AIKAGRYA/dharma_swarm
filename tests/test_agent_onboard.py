@@ -235,3 +235,40 @@ def test_receipt_payload_v1_only() -> None:
     payload = mod._receipt_payload({}, {}, [], [], None, {})
     assert payload["schema"] == "dharma_swarm.onboard_receipt.v1"
     assert "dharma_swarm.onboard_receipt.v2" not in str(payload)
+
+
+def test_scrape_tracks_matches_top_level_declarations(tmp_path: Path) -> None:
+    """O3R-B3: the dependency-free fallback returns exactly the top-level
+    ``active_tracks`` declarations — nested ``- id:`` rows (next_items,
+    prerequisites, completion_criteria) are not tracks."""
+    from dharma_swarm.operator_core.onboarding import evidence
+
+    fixture = tmp_path / "ACTIVE_TRACK.yaml"
+    fixture.write_text(
+        "meta: 1\n"
+        "active_tracks:\n"
+        "  - id: track-alpha\n"
+        "    next_items:\n"
+        "      - id: 1\n"
+        "        what: nested\n"
+        "      - id: WP-X1\n"
+        "  - id: track-beta\n"
+        "    prerequisites:\n"
+        "      - id: nested_prereq\n"
+        "closed_tracks:\n"
+        "  - id: not-a-live-track\n",
+        encoding="utf-8",
+    )
+    rows = evidence._scrape_tracks(fixture)
+    assert [row["id"] for row in rows] == ["track-alpha", "track-beta"]
+
+    yaml = pytest.importorskip("yaml")
+    real = REPO_ROOT / "docs" / "governance" / "ACTIVE_TRACK.yaml"
+    declared = [
+        str(row.get("id"))
+        for row in yaml.safe_load(real.read_text(encoding="utf-8"))["active_tracks"]
+        if isinstance(row, dict) and row.get("id")
+    ]
+    scraped = [row["id"] for row in evidence._scrape_tracks(real)]
+    assert scraped == declared
+    assert len(scraped) == len(set(scraped))

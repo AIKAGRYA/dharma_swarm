@@ -174,9 +174,14 @@ def test_writer_default_is_v1_until_d3() -> None:
     assert cli.WRITER_SCHEMA_DEFAULT == "v1"
 
 
-def test_writer_migration_and_rollback_matrix(ops_dir: Path) -> None:
-    """O3-B9 slice: default writes valid v1; DHARMA_ONBOARD_WRITER=v2 writes
-    valid v2; rolling back to v1 replaces the v2 receipt without corruption."""
+def test_writer_migration_and_rollback_matrix(
+    ops_dir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    """O3-B9 slice: default writes valid v1; the SOURCE-CONTROLLED
+    ``WRITER_SCHEMA_DEFAULT`` — never an ambient variable (O3R-B2) — is the
+    one seam that writes v2 after D3; rolling the default back to v1 replaces
+    the v2 receipt without corruption."""
+    from dharma_swarm.operator_core.onboarding import cli
     from dharma_swarm.operator_core.onboarding.receipt import load_receipt
 
     receipt = ops_dir / "onboard_receipt.json"
@@ -184,7 +189,12 @@ def test_writer_migration_and_rollback_matrix(ops_dir: Path) -> None:
     assert _run([], ops_dir).returncode == 0
     assert load_receipt(receipt).major == 1
 
-    assert _run([], ops_dir, DHARMA_ONBOARD_WRITER="v2").returncode == 0
+    monkeypatch.setenv("DHARMA_OPS_DIR", str(ops_dir))
+    monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", "1")
+    monkeypatch.delenv("DHARMA_ONBOARD_WRITER", raising=False)
+    monkeypatch.setattr(cli, "WRITER_SCHEMA_DEFAULT", "v2")
+    assert cli.assemble_and_run([]) == 0
+    capsys.readouterr()
     v2 = load_receipt(receipt)
     assert v2.major == 2
     assert v2.payload["primary_verdict"] in {
@@ -192,8 +202,38 @@ def test_writer_migration_and_rollback_matrix(ops_dir: Path) -> None:
         "USAGE_ERROR",
     }
 
-    assert _run([], ops_dir, DHARMA_ONBOARD_WRITER="v1").returncode == 0
+    monkeypatch.setattr(cli, "WRITER_SCHEMA_DEFAULT", "v1")
+    assert cli.assemble_and_run([]) == 0
+    capsys.readouterr()
     assert load_receipt(receipt).major == 1
+
+
+def test_ambient_writer_override_is_denied_pre_d3(ops_dir: Path) -> None:
+    """O3R-B2: an ambient ``DHARMA_ONBOARD_WRITER`` differing from the
+    source-controlled default is denied — the on-disk receipt stays on
+    ``WRITER_SCHEMA_DEFAULT`` and a typed condition records the denial."""
+    from dharma_swarm.operator_core.onboarding.receipt import load_receipt
+
+    denied = _run(["--json"], ops_dir, DHARMA_ONBOARD_WRITER="v2")
+    assert denied.returncode == 0  # legacy pre-WP-O5 door still exits 0
+    payload = json.loads(denied.stdout)
+    assert payload["verdict"] == "CONFIG_ERROR"
+    assert payload["exit_code"] == 3
+    rows = {row["id"]: row for row in payload["conditions"]}
+    assert rows["writer_override_denied"]["state"] == "fail"
+    assert "denied" in rows["writer_override_denied"]["reason"]
+    assert load_receipt(ops_dir / "onboard_receipt.json").major == 1
+
+    strict = _run([], ops_dir, DHARMA_ONBOARD_WRITER="v2", DHARMA_ONBOARD_STRICT="1")
+    assert strict.returncode == 3
+
+    # An ambient value equal to the source-controlled default is a no-op,
+    # not a denial.
+    matching = _run(["--json"], ops_dir, DHARMA_ONBOARD_WRITER="v1")
+    assert matching.returncode == 0
+    matching_ids = {row["id"] for row in json.loads(matching.stdout)["conditions"]}
+    assert "writer_override_denied" not in matching_ids
+    assert load_receipt(ops_dir / "onboard_receipt.json").major == 1
 
 
 def test_human_output_stays_inside_line_budget(ops_dir: Path) -> None:
