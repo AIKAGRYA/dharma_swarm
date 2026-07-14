@@ -247,3 +247,24 @@ class TestBuiltinSkills:
         assert "cartographer" in skills
         assert "surgeon" in skills
         assert "architect" in skills
+
+    def test_fable_composer_registered(self):
+        skills_dir = Path(__file__).parent.parent / "dharma_swarm" / "skills"
+        registry = SkillRegistry(skill_dirs=[skills_dir])
+        skills = registry.discover()
+        assert "fable_composer" in skills
+        skill = skills["fable_composer"]
+        assert "fable" in skill.keywords
+        assert skill.thread == "phenomenological"
+        # Receipt discipline is the role's one law — it must survive edits.
+        assert "Receipt" in skill.system_prompt
+        assert "citation-or-silence" in skill.system_prompt
+
+    def test_fable_composer_matches_fable_intents(self):
+        skills_dir = Path(__file__).parent.parent / "dharma_swarm" / "skills"
+        registry = SkillRegistry(skill_dirs=[skills_dir])
+        best = registry.match_best(
+            "compose a fable with a moral from the broken register"
+        )
+        assert best is not None
+        assert best.name == "fable_composer"
