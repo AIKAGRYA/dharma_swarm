@@ -15,8 +15,9 @@ import platform
 import shutil
 import subprocess
 import sys
-import types
 from dataclasses import dataclass
+from importlib.abc import SourceLoader
+from importlib.util import module_from_spec, spec_from_loader
 from pathlib import Path
 from typing import Any, Sequence, cast
 
@@ -188,6 +189,28 @@ def _fork_world(strategy: str) -> WorldV1:
     )
 
 
+class _SnapshotSourceLoader(SourceLoader):
+    """Execute one immutable source snapshot without rereading its path."""
+
+    def __init__(self, name: str, source: bytes, source_path: Path) -> None:
+        self._name = name
+        self._source = source
+        self._source_path = source_path
+
+    def get_filename(self, fullname: str) -> str:
+        if fullname != self._name:
+            raise ImportError(f"snapshot loader cannot serve {fullname!r}")
+        return str(self._source_path)
+
+    def get_data(self, path: str) -> bytes:
+        if Path(path) != self._source_path:
+            raise OSError(f"snapshot loader refuses undeclared path: {path}")
+        return self._source
+
+    def path_stats(self, path: str) -> dict[str, int]:
+        raise OSError(f"snapshot loader disables bytecode caching: {path}")
+
+
 def _run_checkpoint_type(source: bytes, source_path: Path) -> type[Any]:
     """Load exact graph/types.py bytes without executing graph/__init__.py."""
     try:
@@ -210,13 +233,15 @@ def _run_checkpoint_type(source: bytes, source_path: Path) -> type[Any]:
     module_name = f"_dharma_chamber_graph_types_{digest}"
     module = sys.modules.get(module_name)
     if module is None:
-        module = types.ModuleType(module_name)
-        module.__file__ = str(source_path)
-        module.__package__ = ""
+        loader = _SnapshotSourceLoader(module_name, source, source_path)
+        spec = spec_from_loader(module_name, loader)
+        if spec is None:
+            raise ReplayValidationError("cannot create graph types module spec")
+        module = module_from_spec(spec)
         sys.modules[module_name] = module
         try:
-            exec(compile(source, str(source_path), "exec"), module.__dict__)
-        except Exception:
+            loader.exec_module(module)
+        except BaseException:
             sys.modules.pop(module_name, None)
             raise
     checkpoint = getattr(module, "RunCheckpoint", None)
