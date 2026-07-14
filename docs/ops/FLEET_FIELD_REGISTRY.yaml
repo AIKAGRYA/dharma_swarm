@@ -202,7 +202,7 @@ unprobed_identities:
        (run 28993046529-era, ack + deterministic gate packet posted by github-actions) — a cloud
        session CAN summon Mike by PR comment; still unprobed for NATS/git-seat lanes'}
   - {agent_uid: fable_5_cursor, registered_card: examples/agents/fable_5_cursor.registration.json}
-  - {agent_uid: fable_composer, registered_card: examples/agents/fable_composer.registration.json, note: card path unverified; git seat inter_agent/fable_composer/ exists}
+  - {agent_uid: fable_composer, registered_card: examples/agents/fable_composer.registration.json, note: card authored 2026-07-14 (operator-directed seat wake); git seat inter_agent/fable_composer/ drained + acked 2026-07-14 — the only lane with a drain receipt}
   - {agent_uid: qwen_code, registered_card: examples/agents/qwen_code.registration.json}
   - {agent_uid: sis_steward, registered_card: examples/agents/sis_steward.registration.json}
   - {agent_uid: hermes-m5, registered_card: none, note: operator-Mac Hermes; reported "often stale/offline" by rushabdev}
