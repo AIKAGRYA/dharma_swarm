@@ -200,7 +200,11 @@ def _initialize_agent_directory(swarm: Any) -> None:
 
 
 async def _start_fleet_presence_consumer() -> asyncio.Task[None] | None:
-    """Start the opt-in JetStream presence projector and await broker readiness."""
+    """Start the opt-in JetStream presence projector and await broker readiness.
+
+    Impact checked: the default remains disabled, enabled startup fails loudly,
+    and lifespan shutdown always cancels the owned consumer task.
+    """
     if os.getenv("DHARMA_FLEET_PRESENCE_ENABLED") != "1":
         return None
     from dharma_swarm.a2a.fleet_presence import FleetPresenceConsumerConfig, FleetPresenceProjector, run_fleet_presence_consumer

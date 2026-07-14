@@ -486,14 +486,15 @@ async def run_fleet_presence_consumer(
             ) else ready.set_exception(exc)
         raise
     finally:
+        calls = []
+        labels = []
         if subscription is not None:
-            try:
-                await subscription.unsubscribe()
-            except Exception:
-                logger.exception("fleet presence unsubscribe failed")
+            calls.append(subscription.unsubscribe())
+            labels.append("unsubscribe")
         if connection is not None:
-            try:
-                await connection.drain()
-            except Exception:
-                logger.exception("fleet presence NATS drain failed")
+            calls.append(connection.drain())
+            labels.append("NATS drain")
+        for label, result in zip(labels, await asyncio.gather(*calls, return_exceptions=True), strict=True):
+            if isinstance(result, BaseException):
+                logger.error("fleet presence %s failed: %s", label, result)
 # fmt: on
