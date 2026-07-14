@@ -6,8 +6,6 @@ import {
   AlertTriangle,
   ArrowUpRight,
   Bot,
-  Clock3,
-  Inbox,
   RadioTower,
   Server,
 } from "lucide-react";
@@ -18,12 +16,20 @@ import {
   type ActivityItem,
   type RuntimeTruthState,
 } from "@/lib/a2aNodeModel";
-import type { AgentOut, TaskOut } from "@/lib/types";
 import {
-  classifyFleetError,
   deriveFleetNodeTruth as deriveNodeTruth,
   type FleetNode,
 } from "./a2aNodeFleet";
+import {
+  nodeReadFailureView,
+  type A2ANodeAgent,
+  type A2ANodePartialTruth,
+  type A2ANodeTask,
+} from "./a2aNodeReadModel";
+import {
+  FailureMessage,
+  SurfaceMessage,
+} from "./A2ANodeMessages";
 import styles from "./A2ANodeShell.module.css";
 
 const truthPresentation: Record<
@@ -55,10 +61,6 @@ const truthPresentation: Record<
     surface: "border-fuji/20 bg-fuji/[0.05]",
   },
 };
-
-export function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : "The runtime API did not answer.";
-}
 
 export function ageFrom(timestamp: string, nowMs: number): string {
   const parsed = inspectRfc3339Timestamp(timestamp, nowMs);
@@ -115,64 +117,6 @@ export function PanelHeader({
         </Link>
       ) : null}
     </header>
-  );
-}
-
-export function SurfaceMessage({
-  kind,
-  title,
-  detail,
-}: {
-  kind: "empty" | "error" | "loading" | "unknown";
-  title: string;
-  detail: string;
-}) {
-  const Icon =
-    kind === "error" || kind === "unknown"
-      ? AlertTriangle
-      : kind === "loading"
-        ? Clock3
-        : Inbox;
-  const alert = kind === "error" || kind === "unknown";
-  return (
-    <div
-      className={`rounded-2xl border px-4 py-5 ${
-        kind === "error"
-          ? "border-bengara/30 bg-bengara/[0.06]"
-          : kind === "unknown"
-            ? "border-fuji/35 bg-fuji/[0.07]"
-          : "border-sumi-700/35 bg-sumi-900/55"
-      }`}
-      role={alert ? "alert" : "status"}
-    >
-      <div className="flex items-start gap-3">
-        <Icon
-          size={16}
-          className={
-            kind === "error"
-              ? "mt-0.5 text-bengara"
-              : kind === "unknown"
-                ? "mt-0.5 text-fuji"
-                : "mt-0.5 text-kitsurubami/75"
-          }
-          aria-hidden="true"
-        />
-        <div>
-          <p
-            className={`text-sm font-medium ${
-              kind === "error"
-                ? "text-bengara"
-                : kind === "unknown"
-                  ? "text-fuji"
-                  : "text-torinoko"
-            }`}
-          >
-            {title}
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-kitsurubami/75">{detail}</p>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -237,7 +181,7 @@ function RemoteNodeCard({ node, nowMs }: { node: FleetNode; nowMs: number }) {
   );
 }
 
-function AgentCard({ agent }: { agent: AgentOut }) {
+function AgentCard({ agent }: { agent: A2ANodeAgent }) {
   const active = ["running", "active", "online"].includes(agent.status.toLowerCase());
   return (
     <article className="rounded-2xl border border-sumi-700/30 bg-sumi-900/45 p-4">
@@ -277,14 +221,19 @@ export function RosterPanel({
   agentsError,
 }: {
   nodes: FleetNode[];
-  agents: AgentOut[];
+  agents: A2ANodeAgent[];
   nowMs: number;
   fleetLoading: boolean;
   agentsLoading: boolean;
   fleetError: unknown;
   agentsError: unknown;
 }) {
-  const fleetFailure = fleetError ? classifyFleetError(fleetError) : null;
+  const fleetFailure = fleetError
+    ? nodeReadFailureView(fleetError, "Fleet registry")
+    : null;
+  const agentsFailure = agentsError
+    ? nodeReadFailureView(agentsError, "Agent registry")
+    : null;
 
   return (
     <div>
@@ -303,11 +252,7 @@ export function RosterPanel({
           <span className="font-mono text-xs text-kitsurubami/75">{nodes.length} observed</span>
         </div>
         {fleetFailure ? (
-          <SurfaceMessage
-            kind={fleetFailure.truth === "unknown" ? "unknown" : "error"}
-            title={fleetFailure.title}
-            detail={errorText(fleetError)}
-          />
+          <FailureMessage failure={fleetFailure} />
         ) : fleetLoading ? (
           <SurfaceMessage kind="loading" title="Reading fleet presence" detail="Waiting for the raw /api/fleet/nodes projection." />
         ) : nodes.length ? (
@@ -326,8 +271,8 @@ export function RosterPanel({
           </h2>
           <span className="font-mono text-xs text-kitsurubami/75">{agents.length} known</span>
         </div>
-        {agentsError ? (
-          <SurfaceMessage kind="error" title="Agent registry unreachable" detail={errorText(agentsError)} />
+        {agentsFailure ? (
+          <FailureMessage failure={agentsFailure} />
         ) : agentsLoading ? (
           <SurfaceMessage kind="loading" title="Reading known agents" detail="Waiting for the existing /api/agents surface." />
         ) : agents.length ? (
@@ -360,11 +305,12 @@ export function TasksPanel({
   isLoading,
   error,
 }: {
-  tasks: TaskOut[];
+  tasks: A2ANodeTask[];
   nowMs: number;
   isLoading: boolean;
   error: unknown;
 }) {
+  const failure = error ? nodeReadFailureView(error, "TaskBoard") : null;
   return (
     <div>
       <PanelHeader
@@ -373,8 +319,8 @@ export function TasksPanel({
         detail="A compact, read-only window onto TaskBoard. Assignment and creation stay on the existing task surface."
         action={{ href: "/dashboard/tasks", label: "Open task board" }}
       />
-      {error ? (
-        <SurfaceMessage kind="error" title="TaskBoard unreachable" detail={errorText(error)} />
+      {failure ? (
+        <FailureMessage failure={failure} />
       ) : isLoading ? (
         <SurfaceMessage kind="loading" title="Reading TaskBoard" detail="Waiting for /api/commands/tasks." />
       ) : tasks.length ? (
@@ -413,14 +359,25 @@ export function StreamPanel({
   isLoading,
   traceError,
   a2aError,
+  a2aPartial,
 }: {
   activity: ActivityItem[];
   nowMs: number;
   isLoading: boolean;
   traceError: unknown;
   a2aError: unknown;
+  a2aPartial: A2ANodePartialTruth | null;
 }) {
-  const emptyState = deriveStreamEmptyState(!traceError, !a2aError);
+  const traceFailure = traceError
+    ? nodeReadFailureView(traceError, "Trace activity")
+    : null;
+  const a2aFailure = a2aError
+    ? nodeReadFailureView(a2aError, "A2A receipt stream")
+    : null;
+  const emptyState = deriveStreamEmptyState(
+    traceFailure?.truth ?? "ok",
+    a2aFailure?.truth ?? "ok",
+  );
 
   return (
     <div>
@@ -430,8 +387,15 @@ export function StreamPanel({
         detail="Trace events and A2A evidence share one chronology. Malformed records remain visible as unknown evidence."
       />
       <div className="space-y-2">
-        {traceError ? <SurfaceMessage kind="error" title="Trace activity unreachable" detail={errorText(traceError)} /> : null}
-        {a2aError ? <SurfaceMessage kind="error" title="A2A receipt stream unreachable" detail={errorText(a2aError)} /> : null}
+        {traceFailure ? <FailureMessage failure={traceFailure} /> : null}
+        {a2aFailure ? <FailureMessage failure={a2aFailure} /> : null}
+        {a2aPartial ? (
+          <SurfaceMessage
+            kind="unknown"
+            title={a2aPartial.title}
+            detail={a2aPartial.detail}
+          />
+        ) : null}
       </div>
       {isLoading && !activity.length ? (
         <div className="mt-2"><SurfaceMessage kind="loading" title="Listening for evidence" detail="Reading trace and A2A surfaces." /></div>
@@ -474,7 +438,13 @@ export function StreamPanel({
       ) : (
         <div className="mt-2">
           <SurfaceMessage
-            kind={emptyState.state === "intentional-empty" ? "empty" : "error"}
+            kind={
+              emptyState.state === "intentional-empty"
+                ? "empty"
+                : emptyState.state === "unreachable"
+                  ? "error"
+                  : "unknown"
+            }
             title={emptyState.title}
             detail={emptyState.detail}
           />

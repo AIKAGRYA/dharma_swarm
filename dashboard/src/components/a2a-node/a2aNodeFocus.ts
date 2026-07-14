@@ -17,6 +17,24 @@ export interface TabKeyEventLike {
   preventDefault: () => void;
 }
 
+export interface IsolationElementLike {
+  parentElement: IsolationElementLike | null;
+  children: ArrayLike<IsolationElementLike>;
+  tagName?: string;
+  inert: boolean;
+  hasAttribute: (name: string) => boolean;
+  getAttribute: (name: string) => string | null;
+  setAttribute: (name: string, value: string) => void;
+  removeAttribute: (name: string) => void;
+}
+
+interface IsolationSnapshot {
+  element: IsolationElementLike;
+  inert: boolean;
+  hadInertAttribute: boolean;
+  ariaHidden: string | null;
+}
+
 export const DIALOG_FOCUSABLE_SELECTOR = [
   "a[href]",
   "button:not([disabled])",
@@ -68,4 +86,54 @@ export function trapDialogTabKey(
     event.preventDefault();
     targets[targetIndex]?.focus();
   }
+}
+
+export function isolateSiblingBranches(
+  dialog: IsolationElementLike,
+): () => void {
+  const snapshots: IsolationSnapshot[] = [];
+  let branch: IsolationElementLike | null = dialog;
+
+  while (branch?.parentElement) {
+    const parent: IsolationElementLike = branch.parentElement;
+    if (parent.tagName?.toLowerCase() === "html") {
+      break;
+    }
+    for (const sibling of Array.from(parent.children)) {
+      if (sibling === branch) {
+        continue;
+      }
+      snapshots.push({
+        element: sibling,
+        inert: sibling.inert,
+        hadInertAttribute: sibling.hasAttribute("inert"),
+        ariaHidden: sibling.getAttribute("aria-hidden"),
+      });
+      sibling.inert = true;
+      sibling.setAttribute("inert", "");
+      sibling.setAttribute("aria-hidden", "true");
+    }
+    branch = parent;
+  }
+
+  let restored = false;
+  return () => {
+    if (restored) {
+      return;
+    }
+    restored = true;
+    for (const snapshot of snapshots.reverse()) {
+      snapshot.element.inert = snapshot.inert;
+      if (snapshot.hadInertAttribute) {
+        snapshot.element.setAttribute("inert", "");
+      } else {
+        snapshot.element.removeAttribute("inert");
+      }
+      if (snapshot.ariaHidden === null) {
+        snapshot.element.removeAttribute("aria-hidden");
+      } else {
+        snapshot.element.setAttribute("aria-hidden", snapshot.ariaHidden);
+      }
+    }
+  };
 }

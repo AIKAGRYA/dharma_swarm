@@ -2,6 +2,7 @@ import {
   deriveFreshness,
   inspectRfc3339Timestamp,
 } from "./a2aNodeTimestamp.mjs";
+import { fetchNodeJson } from "./a2aNodeTransport.mjs";
 
 export type FleetRuntimeTruthState =
   | "runtime"
@@ -31,24 +32,8 @@ export interface RawFleetFetchOptions {
   nowMs?: number;
 }
 
-export interface FleetErrorClassification {
-  kind: "transport" | "projection" | "unknown";
-  truth: "unreachable" | "unknown";
-  title: string;
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-export class FleetTransportError extends Error {
-  readonly status: number | null;
-
-  constructor(message: string, status: number | null = null, cause?: unknown) {
-    super(message, cause === undefined ? undefined : { cause });
-    this.name = "FleetTransportError";
-    this.status = status;
-  }
 }
 
 export class FleetProjectionError extends Error {
@@ -213,62 +198,13 @@ export function deriveFleetNodeTruth(
   return { state: "unknown", ageMs: freshness.ageMs };
 }
 
-export function classifyFleetError(error: unknown): FleetErrorClassification {
-  if (error instanceof FleetTransportError) {
-    return {
-      kind: "transport",
-      truth: "unreachable",
-      title: "Fleet registry unreachable",
-    };
-  }
-  if (error instanceof FleetProjectionError) {
-    return {
-      kind: "projection",
-      truth: "unknown",
-      title: "UNKNOWN EVIDENCE · fleet projection rejected",
-    };
-  }
-  return {
-    kind: "unknown",
-    truth: "unknown",
-    title: "UNKNOWN EVIDENCE · unclassified fleet failure",
-  };
-}
-
 export async function fetchRawFleetNodes(
   options: RawFleetFetchOptions = {},
 ): Promise<FleetNodesResponse> {
-  const fetcher = options.fetcher ?? globalThis.fetch;
   const url = options.url ?? "/api/fleet/nodes";
-  let response: Response;
-  try {
-    response = await fetcher(url, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-    });
-  } catch (error) {
-    throw new FleetTransportError(
-      "Fleet registry transport failed before an HTTP response",
-      null,
-      error,
-    );
-  }
-
-  if (!response.ok) {
-    throw new FleetTransportError(
-      `Fleet registry returned ${response.status} ${response.statusText}`.trim(),
-      response.status,
-    );
-  }
-
-  let payload: unknown;
-  try {
-    payload = await response.json();
-  } catch (error) {
-    throw new FleetProjectionError(
-      "Fleet registry returned invalid JSON projection evidence",
-      error,
-    );
-  }
+  const payload = await fetchNodeJson({
+    url,
+    fetcher: options.fetcher,
+  });
   return parseFleetNodesResponse(payload, options.nowMs ?? Date.now());
 }

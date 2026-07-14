@@ -23,6 +23,8 @@ const STALE_AFTER_MS = 5 * 60 * 1_000;
 const UNREACHABLE_AFTER_MS = 15 * 60 * 1_000;
 const RFC3339_PATTERN =
   /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(\.\d{1,9})?(Z|([+-])(\d{2}):(\d{2}))$/;
+const PYTHON_DATETIME_PATTERN =
+  /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}(?:\.\d{6})?)([+-]\d{2}:\d{2})$/;
 
 /**
  * @param {string | null} raw
@@ -37,6 +39,23 @@ function invalidTimestamp(raw, issue, detail) {
 /** @param {number} year @param {number} month */
 function daysInMonth(year, month) {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+/**
+ * Normalize only Python's timezone-aware `str(datetime)` representation.
+ * Offset-less values, `Z` suffixes, and non-six-digit fractions are untouched
+ * so strict RFC3339 validation can reject them.
+ *
+ * @param {unknown} value
+ * @returns {unknown}
+ */
+export function normalizePythonDatetime(value) {
+  if (typeof value !== "string") {
+    return value;
+  }
+  const raw = value.trim();
+  const match = PYTHON_DATETIME_PATTERN.exec(raw);
+  return match ? `${match[1]}T${match[2]}${match[3]}` : value;
 }
 
 /**

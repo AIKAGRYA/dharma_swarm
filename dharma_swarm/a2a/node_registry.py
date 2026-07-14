@@ -7,12 +7,13 @@ import logging
 import os
 import re
 from collections.abc import Mapping
+from copy import deepcopy
 from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from threading import RLock
-from typing import Any
+from typing import Any, Callable
 
 import httpx
 
@@ -75,10 +76,6 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _utc_now_iso() -> str:
-    return _utc_now().isoformat()
-
-
 def _heartbeat_time(value: str) -> datetime | None:
     try:
         parsed = datetime.fromisoformat(value)
@@ -125,13 +122,15 @@ class RemoteNode:
         return d
 
 
+# fmt: off
 class NodeRegistry:
     """Thread-safe central directory persisted as one atomic JSON snapshot."""
 
-    def __init__(self, nodes_path: Path | None = None) -> None:
+    def __init__(self, nodes_path: Path | None = None, *, clock: Callable[[], datetime] | None = None) -> None:
         self._path = nodes_path or _NODES_PATH
         self._nodes: dict[str, RemoteNode] = {}
         self._lock = RLock()
+        self._clock = clock or _utc_now
         self._load()
 
     def _load(self) -> None:
@@ -172,20 +171,10 @@ class NodeRegistry:
         try:
             with self._lock:
                 self._path.parent.mkdir(parents=True, exist_ok=True)
-                data = (
-                    json.dumps(
-                        [node.to_dict() for node in self._nodes.values()],
-                        indent=2,
-                        default=str,
-                    )
-                    + "\n"
-                )
+                data = json.dumps([node.to_dict() for node in self._nodes.values()], indent=2, default=str) + "\n"
                 with NamedTemporaryFile(
-                    "w",
-                    encoding="utf-8",
-                    dir=self._path.parent,
-                    prefix=f".{self._path.name}.",
-                    delete=False,
+                    "w", encoding="utf-8", dir=self._path.parent,
+                    prefix=f".{self._path.name}.", delete=False,
                 ) as handle:
                     handle.write(data)
                     temporary = Path(handle.name)
@@ -197,11 +186,7 @@ class NodeRegistry:
             logger.error("Failed to persist node registry: %s", exc)
             return False
 
-    def _replace_node(
-        self,
-        node_id: str,
-        replacement: RemoteNode | None,
-    ) -> RemoteNode | None:
+    def _replace_node(self, node_id: str, replacement: RemoteNode | None) -> RemoteNode | None:
         previous = self._nodes.get(node_id)
         if replacement is None:
             self._nodes.pop(node_id, None)
@@ -218,7 +203,7 @@ class NodeRegistry:
     def register(self, node: RemoteNode) -> None:
         """Register or update a node in the fleet."""
         with self._lock:
-            self._replace_node(node.node_id, node)
+            self._replace_node(node.node_id, deepcopy(node))
         logger.info(
             "Registered fleet node: %s at %s",
             _sanitize(node.node_id),
@@ -236,11 +221,14 @@ class NodeRegistry:
 
     def get(self, node_id: str) -> RemoteNode | None:
         with self._lock:
-            return self._nodes.get(node_id)
+            self._refresh_stale_locked()
+            node = self._nodes.get(node_id)
+            return deepcopy(node) if node is not None else None
 
     def list_all(self) -> list[RemoteNode]:
         with self._lock:
-            return sorted(self._nodes.values(), key=lambda n: n.node_id)
+            self._refresh_stale_locked()
+            return sorted((deepcopy(node) for node in self._nodes.values()), key=lambda node: node.node_id)
 
     def list_online(self) -> list[RemoteNode]:
         return [n for n in self.list_all() if n.is_reachable()]
@@ -249,14 +237,38 @@ class NodeRegistry:
         with self._lock:
             return len(self._nodes)
 
+    def update_status(
+        self, node_id: str, *, status: str, observed_at: str = "", witness: str = "",
+    ) -> RemoteNode:
+        """Atomically persist an explicit, provenance-labelled status mutation."""
+        node_status = str(status or "").strip().lower()
+        observed, provenance = str(observed_at or "").strip(), str(witness or "").strip()
+        if node_status not in _NODE_STATUSES:
+            raise ValueError(f"invalid node status: {status!r}")
+        if node_status in {"online", "degraded"} and not observed:
+            raise ValueError("reachable status requires observed_at")
+        if node_status in {"online", "degraded"} and not provenance:
+            raise ValueError("reachable status requires a witness")
+        parsed = _heartbeat_time(observed) if observed else None
+        if observed and parsed is None:
+            raise ValueError("observed_at must be a timezone-aware ISO timestamp")
+        with self._lock:
+            current = self._nodes.get(node_id)
+            if current is None:
+                raise ValueError(f"Unknown node: {node_id}")
+            metadata = deepcopy(current.metadata)
+            if provenance:
+                metadata["status_witness"] = provenance
+            if parsed is not None:
+                metadata["status_observed_at"] = parsed.astimezone(timezone.utc).isoformat()
+            heartbeat = metadata.get("status_observed_at", current.last_heartbeat) if node_status in {"online", "degraded"} else current.last_heartbeat
+            updated = replace(current, status=node_status, last_heartbeat=heartbeat, metadata=metadata)
+            self._replace_node(node_id, updated)
+            return deepcopy(updated)
+
     def record_heartbeat(
-        self,
-        node_id: str,
-        *,
-        last_heartbeat: str,
-        status: str,
-        metadata: Mapping[str, Any] | None = None,
-        canonical_agent_uid: str = "",
+        self, node_id: str, *, last_heartbeat: str, status: str,
+        metadata: Mapping[str, Any] | None = None, canonical_agent_uid: str = "",
     ) -> RemoteNode:
         """Persist a heartbeat; unknown nodes require a projector-resolved UID."""
         node_id = str(node_id or "").strip()
@@ -270,7 +282,7 @@ class NodeRegistry:
         if metadata is not None and not isinstance(metadata, Mapping):
             raise TypeError("heartbeat metadata must be a mapping")
 
-        incoming_metadata = dict(metadata or {})
+        incoming_metadata = deepcopy(dict(metadata or {}))
         incoming_uid = str(incoming_metadata.get("agent_uid") or "").strip()
         incoming_time = _heartbeat_time(heartbeat_at)
         if incoming_time is None:
@@ -279,62 +291,36 @@ class NodeRegistry:
             current = self._nodes.get(node_id)
             if current is None and not uid:
                 raise ValueError(f"Unknown node identity: {node_id}")
-            existing_uid = str(
-                (current.metadata.get("agent_uid") if current is not None else "") or ""
-            ).strip()
+            existing_uid = str((current.metadata.get("agent_uid") if current is not None else "") or "").strip()
             identities = {value for value in (uid, incoming_uid, existing_uid) if value}
             if len(identities) > 1:
                 raise ValueError("heartbeat identity does not match registered node")
-            incoming_message_id = str(
-                incoming_metadata.get("presence_message_id") or ""
-            )
-            current_message_id = (
-                str(current.metadata.get("presence_message_id") or "")
-                if current is not None
-                else ""
-            )
-            current_time = (
-                _heartbeat_time(current.last_heartbeat) if current is not None else None
-            )
+            incoming_message_id = str(incoming_metadata.get("presence_message_id") or "")
+            current_message_id = str(current.metadata.get("presence_message_id") or "") if current is not None else ""
+            current_time = _heartbeat_time(current.last_heartbeat) if current is not None else None
             if current is not None and (
-                (
-                    bool(incoming_message_id)
-                    and current_message_id == incoming_message_id
-                )
+                (bool(incoming_message_id) and current_message_id == incoming_message_id)
                 or (current_time is not None and current_time >= incoming_time)
             ):
-                return current
+                return deepcopy(current)
             base = current or RemoteNode(node_id=node_id)
             merged_metadata = {**base.metadata, **incoming_metadata}
             if identities:
                 merged_metadata["agent_uid"] = next(iter(identities))
-            updated = replace(
-                base,
-                status=node_status,
-                last_heartbeat=heartbeat_at,
-                metadata=merged_metadata,
-            )
+            updated = replace(base, status=node_status, last_heartbeat=heartbeat_at, metadata=merged_metadata)
             self._replace_node(node_id, updated)
-            return updated
+            return deepcopy(updated)
 
     def rollback_heartbeat(
-        self,
-        node_id: str,
-        *,
-        expected_presence_message_id: str,
-        previous: RemoteNode | None,
+        self, node_id: str, *, expected_presence_message_id: str, previous: RemoteNode | None,
     ) -> bool:
         """Restore previous state only while the failed heartbeat is current."""
         with self._lock:
             current = self._nodes.get(node_id)
-            current_message_id = (
-                str(current.metadata.get("presence_message_id") or "")
-                if current is not None
-                else ""
-            )
+            current_message_id = str(current.metadata.get("presence_message_id") or "") if current is not None else ""
             if current_message_id != expected_presence_message_id:
                 return False
-            self._replace_node(node_id, previous)
+            self._replace_node(node_id, deepcopy(previous))
             return True
 
     def discover(self, capability: str) -> list[RemoteNode]:
@@ -348,74 +334,91 @@ class NodeRegistry:
 
     async def health_check(self, node_id: str, timeout: float = 10.0) -> RemoteNode:
         """Ping one node and persist its resulting health state."""
-        node = self._nodes.get(node_id)
-        if node is None:
+        with self._lock:
+            snapshot = deepcopy(self._nodes.get(node_id))
+        if snapshot is None:
             raise ValueError(f"Unknown node: {node_id}")
+        if not snapshot.endpoint:
+            with self._lock:
+                current = deepcopy(self._nodes[node_id])
+                current.status = "offline"
+                current.metadata["last_error"] = "No endpoint configured"
+                self._replace_node(node_id, current)
+                return deepcopy(current)
 
-        if not node.endpoint:
-            node.status = "offline"
-            node.metadata["last_error"] = "No endpoint configured"
-            self._persist()
-            return node
-
-        url = f"{node.endpoint.rstrip('/')}/a2a/health"
+        url = f"{snapshot.endpoint.rstrip('/')}/a2a/health"
         headers = {}
-        api_key = node.resolved_api_key()
+        api_key = snapshot.resolved_api_key()
         if api_key:
             headers["X-A2A-Key"] = api_key
-
+        data: dict[str, Any] | None = None
+        failure: Exception | None = None
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
                 resp = await client.get(url, headers=headers)
                 resp.raise_for_status()
                 data = resp.json()
-
-            node.status = data.get("status", "online")
-            node.last_heartbeat = _utc_now_iso()
-            node.capabilities = data.get("capabilities", node.capabilities)
-            node.metadata["task_counts"] = data.get("task_counts", {})
-            node.metadata.pop("last_error", None)
-            logger.info(
-                "Health check OK: %s (%s)", _sanitize(node_id), _sanitize(node.status)
-            )
-
         except Exception as exc:
-            node.metadata["last_error"] = str(exc)
-            _mark_stale(node)
-            logger.warning("Health check failed for %s: %s", _sanitize(node_id), exc)
-
-        self._persist()
-        return node
+            failure = exc
+        with self._lock:
+            current = deepcopy(self._nodes.get(node_id))
+            if current is None:
+                raise ValueError(f"Unknown node: {node_id}")
+            if failure is None and isinstance(data, dict):
+                current.status = str(data.get("status", "online"))
+                current.last_heartbeat = self._clock().astimezone(timezone.utc).isoformat()
+                current.capabilities = list(data.get("capabilities", current.capabilities))
+                current.metadata["task_counts"] = data.get("task_counts", {})
+                current.metadata.pop("last_error", None)
+                logger.info("Health check OK: %s", _sanitize(node_id))
+            else:
+                current.metadata["last_error"] = str(failure)
+                if not current.last_heartbeat and current.is_reachable():
+                    current.status = "unknown"
+                    current.metadata["status_witness"] = "health_check_failure"
+                    current.metadata["status_observed_at"] = self._clock().astimezone(timezone.utc).isoformat()
+                else:
+                    _mark_stale(current, now=self._clock())
+                logger.warning("Health check failed for %s: %s", _sanitize(node_id), failure)
+            self._replace_node(node_id, current)
+            return deepcopy(current)
 
     async def health_check_all(self, timeout: float = 10.0) -> list[RemoteNode]:
         """Ping every registered node and return updated states."""
+        with self._lock:
+            node_ids = list(self._nodes)
         results = []
-        for node_id in list(self._nodes):
+        for node_id in node_ids:
             result = await self.health_check(node_id, timeout=timeout)
             results.append(result)
         return results
 
     def degrade_stale_nodes(self) -> list[str]:
         """Persist staleness transitions and return changed node IDs."""
-        changed = []
-        now = _utc_now()
-        for node in self._nodes.values():
-            old_status = node.status
-            _mark_stale(node, now=now)
-            if node.status != old_status:
-                changed.append(node.node_id)
-
+        with self._lock:
+            changed = self._refresh_stale_locked()
         if changed:
-            self._persist()
             logger.info("Degraded stale nodes: %s", changed)
         return changed
+
+    def _refresh_stale_locked(self) -> list[str]:
+        previous: dict[str, RemoteNode] = {}
+        for node_id, current in tuple(self._nodes.items()):
+            updated = deepcopy(current)
+            _mark_stale(updated, now=self._clock())
+            if updated.status != current.status:
+                previous[node_id] = current
+                self._nodes[node_id] = updated
+        if previous and not self._persist():
+            self._nodes.update(previous)
+            raise RuntimeError("Failed to persist stale node transitions")
+        return sorted(previous)
+# fmt: on
 
 
 def _mark_stale(node: RemoteNode, now: datetime | None = None) -> None:
     """Update node status based on heartbeat age."""
     if not node.last_heartbeat:
-        if node.status not in ("unknown", "offline"):
-            node.status = "unknown"
         return
 
     now = now or _utc_now()
@@ -441,7 +444,7 @@ def _current_trace_id() -> str:
         if corr.trace_id:
             return corr.trace_id
     except Exception:
-        pass
+        logger.debug("Correlation context unavailable", exc_info=True)
     return ""
 
 

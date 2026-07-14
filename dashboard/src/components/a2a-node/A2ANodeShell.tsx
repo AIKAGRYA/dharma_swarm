@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Activity,
   ArrowUpRight,
@@ -17,11 +18,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useAgents } from "@/hooks/useAgents";
-import { useA2ASendCards } from "@/hooks/useControlSurface";
 import { useFleetNodes } from "@/hooks/useFleetNodes";
-import { useTasks } from "@/hooks/useTasks";
-import { useTraces } from "@/hooks/useTraces";
 import {
   buildReceiptLadder,
   deriveEvidenceComparisonNow,
@@ -36,15 +33,22 @@ import {
 } from "./A2ANodePanels";
 import { ReceiptsPanel } from "./A2AReceiptsPanel";
 import {
-  classifyFleetError,
   deriveFleetNodeTruth as deriveNodeTruth,
   type FleetNode,
 } from "./a2aNodeFleet";
+import { classifyNodeReadError } from "./a2aNodeReadModel";
 import {
+  isolateSiblingBranches,
   trapDialogTabKey,
   type FocusContainerLike,
+  type IsolationElementLike,
 } from "./a2aNodeFocus";
-import { useEvidenceDataUpdatedAt } from "./a2aNodeQueryClock";
+import {
+  useA2ANodeAgents,
+  useA2ANodeCards,
+  useA2ANodeTasks,
+  useA2ANodeTraces,
+} from "./useA2ANodeData";
 import styles from "./A2ANodeShell.module.css";
 
 type TabId = "roster" | "tasks" | "stream" | "receipts";
@@ -95,7 +99,9 @@ function fleetPosture(
   error: unknown,
 ): RuntimeTruthState {
   if (error) {
-    return classifyFleetError(error).truth;
+    return classifyNodeReadError(error).truth === "unreachable"
+      ? "unreachable"
+      : "unknown";
   }
   if (isLoading || nodes.length === 0) {
     return "unknown";
@@ -122,12 +128,12 @@ function freshestHeartbeatAge(nodes: FleetNode[], nowMs: number): number | null 
 }
 
 export function A2ANodeShell() {
-  const fleet = useFleetNodes();
-  const agents = useAgents();
-  const tasks = useTasks();
-  const traces = useTraces(48);
-  const a2a = useA2ASendCards("", 48);
-  const queryDataUpdatedAt = useEvidenceDataUpdatedAt();
+  const router = useRouter();
+  const fleetQuery = useFleetNodes();
+  const agentsQuery = useA2ANodeAgents();
+  const tasksQuery = useA2ANodeTasks();
+  const tracesQuery = useA2ANodeTraces();
+  const a2aQuery = useA2ANodeCards();
   const [activeTab, setActiveTab] = useState<TabId>("roster");
   const [nowMs, setNowMs] = useState<number | null>(null);
   const shellRef = useRef<HTMLDivElement | null>(null);
@@ -153,7 +159,16 @@ export function A2ANodeShell() {
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
+    const restoreIsolation = isolateSiblingBranches(
+      shell as unknown as IsolationElementLike,
+    );
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        router.push("/dashboard");
+        return;
+      }
       trapDialogTabKey(
         shell as unknown as FocusContainerLike,
         event,
@@ -161,40 +176,47 @@ export function A2ANodeShell() {
     };
     document.addEventListener("keydown", handleKeyDown);
     const focusFrame = window.requestAnimationFrame(() => {
-      tabRefs.current[0]?.focus();
+      tabRefs.current
+        .find((tab) => tab?.getAttribute("aria-selected") === "true")
+        ?.focus();
     });
 
     return () => {
       window.cancelAnimationFrame(focusFrame);
       document.removeEventListener("keydown", handleKeyDown);
+      restoreIsolation();
       if (previouslyFocused?.isConnected) {
         previouslyFocused.focus();
       }
     };
-  }, []);
+  }, [router]);
 
   const modelNowMs = deriveEvidenceComparisonNow(nowMs, [
-    queryDataUpdatedAt,
+    fleetQuery.dataUpdatedAt,
+    agentsQuery.dataUpdatedAt,
+    tasksQuery.dataUpdatedAt,
+    tracesQuery.dataUpdatedAt,
+    a2aQuery.dataUpdatedAt,
   ]);
   const activity = useMemo(
     () =>
       modelNowMs === 0
         ? []
-        : mergeActivity(traces.traces, a2a.cards, modelNowMs),
-    [traces.traces, a2a.cards, modelNowMs],
+        : mergeActivity(tracesQuery.traces, a2aQuery.cards, modelNowMs),
+    [tracesQuery.traces, a2aQuery.cards, modelNowMs],
   );
   const ladder = useMemo(
-    () => buildReceiptLadder(a2a.cards, modelNowMs),
-    [a2a.cards, modelNowMs],
+    () => buildReceiptLadder(a2aQuery.cards, modelNowMs),
+    [a2aQuery.cards, modelNowMs],
   );
   const posture = fleetPosture(
-    fleet.nodes,
+    fleetQuery.nodes,
     modelNowMs,
-    fleet.isLoading,
-    fleet.error,
+    fleetQuery.isLoading,
+    fleetQuery.error,
   );
   const postureView = transportPresentation[posture];
-  const freshestAge = freshestHeartbeatAge(fleet.nodes, modelNowMs);
+  const freshestAge = freshestHeartbeatAge(fleetQuery.nodes, modelNowMs);
   const activeIndex = tabs.findIndex((tab) => tab.id === activeTab);
 
   function selectTab(index: number) {
@@ -231,22 +253,22 @@ export function A2ANodeShell() {
       case "roster":
         return (
           <RosterPanel
-            nodes={fleet.nodes}
-            agents={agents.agents}
+            nodes={fleetQuery.nodes}
+            agents={agentsQuery.agents}
             nowMs={modelNowMs}
-            fleetLoading={fleet.isLoading}
-            agentsLoading={agents.isLoading}
-            fleetError={fleet.error}
-            agentsError={agents.error}
+            fleetLoading={fleetQuery.isLoading}
+            agentsLoading={agentsQuery.isLoading}
+            fleetError={fleetQuery.error}
+            agentsError={agentsQuery.error}
           />
         );
       case "tasks":
         return (
           <TasksPanel
-            tasks={tasks.tasks}
+            tasks={tasksQuery.tasks}
             nowMs={modelNowMs}
-            isLoading={tasks.isLoading}
-            error={tasks.error}
+            isLoading={tasksQuery.isLoading}
+            error={tasksQuery.error}
           />
         );
       case "stream":
@@ -255,20 +277,24 @@ export function A2ANodeShell() {
             activity={activity}
             nowMs={modelNowMs}
             isLoading={
-              traces.isLoading || a2a.isLoading || modelNowMs === 0
+              tracesQuery.isLoading ||
+              a2aQuery.isLoading ||
+              modelNowMs === 0
             }
-            traceError={traces.error}
-            a2aError={a2a.error}
+            traceError={tracesQuery.error}
+            a2aError={a2aQuery.error}
+            a2aPartial={a2aQuery.partial}
           />
         );
       case "receipts":
         return (
           <ReceiptsPanel
-            cards={a2a.cards}
+            cards={a2aQuery.cards}
             ladder={ladder}
             nowMs={modelNowMs}
-            isLoading={a2a.isLoading || modelNowMs === 0}
-            error={a2a.error}
+            isLoading={a2aQuery.isLoading || modelNowMs === 0}
+            error={a2aQuery.error}
+            partial={a2aQuery.partial}
           />
         );
     }
@@ -329,10 +355,10 @@ export function A2ANodeShell() {
               </span>
             </div>
             <div className="flex shrink-0 items-center gap-2 font-mono text-xs text-kitsurubami/75">
-              <span>{fleet.count} nodes</span>
+              <span>{fleetQuery.count} nodes</span>
               <span aria-hidden="true">·</span>
               <span>
-                {fleet.isFetching && !fleet.isLoading
+                {fleetQuery.isFetching && !fleetQuery.isLoading
                   ? "syncing"
                   : formatEvidenceAge(freshestAge)}
               </span>

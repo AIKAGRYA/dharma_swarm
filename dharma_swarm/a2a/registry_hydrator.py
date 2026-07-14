@@ -28,6 +28,7 @@ Design choices
   ``local://in-process``). The hydrator preserves them verbatim and lets
   the gateway/registry decide reachability separately.
 """
+
 from __future__ import annotations
 
 import json
@@ -110,6 +111,7 @@ def hydrate_from_receipts(
                 capabilities = _capabilities_from_card(cards_dir, callsign)
                 if capabilities:
                     existing.capabilities = capabilities
+                    registry.register(existing)
             continue
         seen.add(callsign)
 

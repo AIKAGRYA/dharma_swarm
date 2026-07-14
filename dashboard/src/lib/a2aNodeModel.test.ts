@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  classifyFleetError,
   deriveFleetNodeTruth,
   fetchRawFleetNodes,
   nodeStatusTone,
   parseFleetNodesResponse,
 } from "../components/a2a-node/a2aNodeFleet.ts";
+import { classifyNodeReadError } from "../components/a2a-node/a2aNodeReadModel.ts";
 import {
   RECEIPT_TIER_ORDER,
   buildReceiptLadder,
@@ -222,28 +222,34 @@ test("strict timestamps require RFC3339 offsets and never promote future evidenc
 });
 
 test("empty stream state only claims both sources answered when both succeeded", () => {
-  assert.deepEqual(deriveStreamEmptyState(true, true), {
+  assert.deepEqual(deriveStreamEmptyState("ok", "ok"), {
     state: "intentional-empty",
     title: "The evidence rail is quiet",
     detail: "Both sources answered without recent trace or A2A records.",
   });
-  assert.deepEqual(deriveStreamEmptyState(true, false), {
+  assert.deepEqual(deriveStreamEmptyState("ok", "blocked"), {
     state: "partial",
     title: "Partial evidence rail",
     detail:
-      "Trace activity answered, but A2A receipts are unreachable. No activity was returned by the available source.",
+      "Trace activity answered, but A2A receipts are blocked. No activity was returned by the available source.",
   });
-  assert.deepEqual(deriveStreamEmptyState(false, true), {
+  assert.deepEqual(deriveStreamEmptyState("unknown", "ok"), {
     state: "partial",
     title: "Partial evidence rail",
     detail:
-      "A2A receipts answered, but trace activity is unreachable. No activity was returned by the available source.",
+      "A2A receipts answered, but trace activity is unknown. No activity was returned by the available source.",
   });
-  assert.deepEqual(deriveStreamEmptyState(false, false), {
+  assert.deepEqual(deriveStreamEmptyState("unreachable", "unreachable"), {
     state: "unreachable",
     title: "Evidence rail unreachable",
     detail:
-      "Neither trace activity nor A2A receipts answered. No empty-state claim can be made.",
+      "Trace activity is unreachable; A2A receipts are unreachable. No empty-state claim can be made.",
+  });
+  assert.deepEqual(deriveStreamEmptyState("blocked", "unreachable"), {
+    state: "blocked",
+    title: "Evidence rail blocked",
+    detail:
+      "Trace activity is blocked; A2A receipts are unreachable. No empty-state claim can be made.",
   });
 });
 
@@ -350,21 +356,26 @@ test("production fleet fetch preserves the raw contract and rejects wrapped enve
     rejection = error;
   }
 
-  assert.deepEqual(classifyFleetError(rejection), {
+  assert.deepEqual(classifyNodeReadError(rejection), {
     kind: "projection",
     truth: "unknown",
-    title: "UNKNOWN EVIDENCE · fleet projection rejected",
   });
   assert.equal(String(calls[0]?.input), "/api/fleet/nodes");
   assert.equal(calls[0]?.init?.method, "GET");
 });
 
-test("fleet failures classify transport as unreachable and projection as unknown", async () => {
+test("fleet failures preserve auth, transport, and projection truth categories", async () => {
   const unavailable = (async () =>
-    new Response("maintenance", {
-      status: 503,
-      statusText: "Service Unavailable",
-    })) as typeof fetch;
+    Response.json(
+      {
+        error: {
+          kind: "upstream",
+          status: 503,
+          message: "Backend read was unavailable",
+        },
+      },
+      { status: 503 },
+    )) as typeof fetch;
 
   let transportFailure: unknown;
   try {
@@ -372,10 +383,31 @@ test("fleet failures classify transport as unreachable and projection as unknown
   } catch (error) {
     transportFailure = error;
   }
-  assert.deepEqual(classifyFleetError(transportFailure), {
-    kind: "transport",
+  assert.deepEqual(classifyNodeReadError(transportFailure), {
+    kind: "upstream",
     truth: "unreachable",
-    title: "Fleet registry unreachable",
+  });
+
+  const denied = (async () =>
+    Response.json(
+      {
+        error: {
+          kind: "auth",
+          status: 401,
+          message: "Backend authentication rejected this read",
+        },
+      },
+      { status: 401 },
+    )) as typeof fetch;
+  let authFailure: unknown;
+  try {
+    await fetchRawFleetNodes({ fetcher: denied, nowMs: MODEL_NOW });
+  } catch (error) {
+    authFailure = error;
+  }
+  assert.deepEqual(classifyNodeReadError(authFailure), {
+    kind: "auth",
+    truth: "blocked",
   });
 
   let projectionFailure: unknown;
@@ -384,10 +416,9 @@ test("fleet failures classify transport as unreachable and projection as unknown
   } catch (error) {
     projectionFailure = error;
   }
-  assert.deepEqual(classifyFleetError(projectionFailure), {
+  assert.deepEqual(classifyNodeReadError(projectionFailure), {
     kind: "projection",
     truth: "unknown",
-    title: "UNKNOWN EVIDENCE · fleet projection rejected",
   });
 });
 

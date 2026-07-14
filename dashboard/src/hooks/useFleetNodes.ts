@@ -5,15 +5,14 @@ import {
   fetchRawFleetNodes,
   type FleetNodesResponse,
 } from "@/components/a2a-node/a2aNodeFleet";
-import {
-  apiPath,
-} from "@/lib/api";
+
+const FLEET_PROXY_URL = "/dashboard/a2a-node/api/fleet/nodes";
 
 export function useFleetNodes() {
   const query = useQuery<FleetNodesResponse>({
     queryKey: ["fleet-nodes"],
     queryFn: () =>
-      fetchRawFleetNodes({ url: apiPath("/api/fleet/nodes") }),
+      fetchRawFleetNodes({ url: FLEET_PROXY_URL }),
     refetchInterval: 15_000,
   });
 

@@ -43,10 +43,21 @@ export interface Freshness {
 }
 
 export interface StreamEmptyState {
-  state: "intentional-empty" | "partial" | "unreachable";
+  state:
+    | "intentional-empty"
+    | "partial"
+    | "blocked"
+    | "unknown"
+    | "unreachable";
   title: string;
   detail: string;
 }
+
+export type StreamSourceTruth =
+  | "ok"
+  | "blocked"
+  | "unknown"
+  | "unreachable";
 
 export interface ActivityItem {
   id: string;
@@ -233,37 +244,45 @@ export function buildReceiptLadder(
 }
 
 export function deriveStreamEmptyState(
-  traceSucceeded: boolean,
-  a2aSucceeded: boolean,
+  traceState: StreamSourceTruth,
+  a2aState: StreamSourceTruth,
 ): StreamEmptyState {
-  if (traceSucceeded && a2aSucceeded) {
+  if (traceState === "ok" && a2aState === "ok") {
     return {
       state: "intentional-empty",
       title: "The evidence rail is quiet",
       detail: "Both sources answered without recent trace or A2A records.",
     };
   }
-  if (traceSucceeded) {
+  if (traceState === "ok") {
     return {
       state: "partial",
       title: "Partial evidence rail",
-      detail:
-        "Trace activity answered, but A2A receipts are unreachable. No activity was returned by the available source.",
+      detail: `Trace activity answered, but A2A receipts are ${a2aState}. No activity was returned by the available source.`,
     };
   }
-  if (a2aSucceeded) {
+  if (a2aState === "ok") {
     return {
       state: "partial",
       title: "Partial evidence rail",
-      detail:
-        "A2A receipts answered, but trace activity is unreachable. No activity was returned by the available source.",
+      detail: `A2A receipts answered, but trace activity is ${traceState}. No activity was returned by the available source.`,
     };
   }
+  const state =
+    traceState === "unreachable" && a2aState === "unreachable"
+      ? "unreachable"
+      : traceState === "blocked" || a2aState === "blocked"
+        ? "blocked"
+        : "unknown";
   return {
-    state: "unreachable",
-    title: "Evidence rail unreachable",
-    detail:
-      "Neither trace activity nor A2A receipts answered. No empty-state claim can be made.",
+    state,
+    title:
+      state === "unreachable"
+        ? "Evidence rail unreachable"
+        : state === "blocked"
+          ? "Evidence rail blocked"
+          : "Evidence rail truth unknown",
+    detail: `Trace activity is ${traceState}; A2A receipts are ${a2aState}. No empty-state claim can be made.`,
   };
 }
 

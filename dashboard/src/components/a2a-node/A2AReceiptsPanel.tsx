@@ -8,10 +8,13 @@ import {
 } from "@/lib/a2aNodeModel";
 import {
   PanelHeader,
-  SurfaceMessage,
   ageFrom,
-  errorText,
 } from "./A2ANodePanels";
+import { SurfaceMessage } from "./A2ANodeMessages";
+import {
+  nodeReadFailureView,
+  type A2ANodePartialTruth,
+} from "./a2aNodeReadModel";
 
 const tierDetail: Record<string, string> = {
   DOMAIN_RECEIPTED: "Target-owned domain receipt observed.",
@@ -27,13 +30,18 @@ export function ReceiptsPanel({
   nowMs,
   isLoading,
   error,
+  partial,
 }: {
   cards: readonly unknown[];
   ladder: ReceiptLadder;
   nowMs: number;
   isLoading: boolean;
   error: unknown;
+  partial: A2ANodePartialTruth | null;
 }) {
+  const failure = error
+    ? nodeReadFailureView(error, "Receipt projection")
+    : null;
   return (
     <div>
       <PanelHeader
@@ -42,11 +50,11 @@ export function ReceiptsPanel({
         detail="Strongest to weakest. Counts come only from explicit contact tiers; card status never upgrades a receipt."
         action={{ href: "/dashboard/command-post", label: "Command post" }}
       />
-      {error ? (
+      {failure ? (
         <SurfaceMessage
-          kind="error"
-          title="Receipt projection unreachable"
-          detail={errorText(error)}
+          kind={failure.surfaceKind}
+          title={failure.title}
+          detail={failure.detail}
         />
       ) : isLoading ? (
         <SurfaceMessage
@@ -56,6 +64,15 @@ export function ReceiptsPanel({
         />
       ) : (
         <>
+          {partial ? (
+            <div className="mb-3">
+              <SurfaceMessage
+                kind="unknown"
+                title={partial.title}
+                detail={partial.detail}
+              />
+            </div>
+          ) : null}
           <ol className="overflow-hidden rounded-2xl border border-sumi-700/35 bg-sumi-900/60">
             {ladder.tiers.map((item, index) => (
               <li
