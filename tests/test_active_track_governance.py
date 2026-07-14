@@ -162,8 +162,20 @@ def test_one_door_c1_has_ordered_pre_and_post_wp_o5_proofs() -> None:
     assert "pre-WP-O5 C1 authority/unlock proof" in items["WP-O5"]["what"]
     assert "final post-WP-O5 C1 enforcement" in items["WP-O6"]["what"]
 
+    spec_text = ONE_DOOR_SPEC.read_text(encoding="utf-8")
+    wp_o5 = " ".join(
+        spec_text
+        .split("### WP-O5 —", maxsplit=1)[1]
+        .split("\n### ", maxsplit=1)[0]
+        .split()
+    )
+    assert (
+        "pre-WP-O5 C1 authority/unlock proof has made the same admission "
+        "context merge-blocking using exactly `make onboard ARGS=--strict`"
+    ) in wp_o5
+
     wp_o6 = " ".join(
-        ONE_DOOR_SPEC.read_text(encoding="utf-8")
+        spec_text
         .split("### WP-O6 —", maxsplit=1)[1]
         .split("\n### ", maxsplit=1)[0]
         .split()

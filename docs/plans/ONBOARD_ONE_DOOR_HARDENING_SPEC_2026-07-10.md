@@ -1728,9 +1728,10 @@ local scope result from base/head, strict default cannot proceed.
 
 **Owner:** D1-admitted track owner; D2 remains operator-owned.
 
-**Prerequisites / merge dependency:** WP-O4 merged and green in CI; C1 has
-made the same admission context merge-blocking; D2 ratification has merged in
-the operator-owned form in §9.2; no unexplained baseline red.
+**Prerequisites / merge dependency:** WP-O4 merged and green in CI; the
+pre-WP-O5 C1 authority/unlock proof has made the same admission context
+merge-blocking using exactly `make onboard ARGS=--strict`; D2 ratification has
+merged in the operator-owned form in §9.2; no unexplained baseline red.
 
 **Allowed files:**
 
