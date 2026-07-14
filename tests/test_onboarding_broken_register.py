@@ -217,7 +217,7 @@ def test_current_register_canonical_counts() -> None:
         ("BR-007", "OPEN"),
         ("BR-003", "PARTIAL"),
         ("BR-021", "WORKAROUND"),
-        ("BR-022", "OPEN"),
+        ("BR-022", "PARTIAL"),
         ("BR-023", "PARTIAL"),
         ("BR-004", "PARTIAL"),
         ("BR-005", "PARTIAL"),
@@ -225,6 +225,23 @@ def test_current_register_canonical_counts() -> None:
         ("BR-014", "OPEN"),
     ]
     assert sum(len(entry.history) for entry in result.entries) == 27
+
+
+def test_sovereign_manifest_verified_metric_rows_are_unique() -> None:
+    manifest = (
+        REPO_ROOT / "docs/governance/SOVEREIGN_MANIFEST.md"
+    ).read_text(encoding="utf-8")
+    start = manifest.index("## VERIFIED NUMBERS")
+    end = manifest.index("## SYSTEM TOPOGRAPHY", start)
+    labels = [
+        line.split("|", 2)[1].strip()
+        for line in manifest[start:end].splitlines()
+        if line.startswith("| ") and not line.startswith("| Metric ")
+    ]
+
+    assert len(labels) == len(set(labels)), labels
+    assert labels.count("Tests collected (pytest)") == 1
+    assert labels.count("Collection errors") == 1
 
 
 def test_all_six_consumers_share_canonical_parser() -> None:
@@ -312,16 +329,55 @@ def test_agent_onboard_remains_importable_before_dependency_bootstrap(
 
 
 def test_header_count_drift_is_reported() -> None:
-    result = parse_broken_register(REPO_ROOT / "docs/state/BROKEN_REGISTER.md")
+    result = parse_broken_register_text(
+        """# BROKEN REGISTER
+## OPEN ITEMS (1 open/partial)
+### BR-001 — first open item
+- **status:** OPEN
+### BR-002 — second open-like item
+- **status:** PARTIAL
+## CLOSED ITEMS
+"""
+    )
     drift = [
         item for item in result.diagnostics
         if item.code == "open_header_count_drift"
     ]
 
-    assert result.declared_open_count == 7
+    assert result.declared_open_count == 1
+    assert result.open_count == 2
     assert len(drift) == 1
-    assert "declares 7" in drift[0].message
-    assert "observed 9" in drift[0].message
+    assert "declares 1" in drift[0].message
+    assert "observed 2" in drift[0].message
+
+
+def test_header_count_and_br007_map_match_canonical_truth() -> None:
+    register_path = REPO_ROOT / "docs/state/BROKEN_REGISTER.md"
+    result = parse_broken_register(register_path)
+    register_text = register_path.read_text(encoding="utf-8")
+    mismatch_map = (REPO_ROOT / "INTERFACE_MISMATCH_MAP.md").read_text(
+        encoding="utf-8"
+    )
+    br007_row = next(
+        line for line in mismatch_map.splitlines()
+        if line.startswith("| BR-007:")
+    )
+
+    assert result.declared_open_count == result.open_count == 9
+    assert not any(
+        item.code == "open_header_count_drift"
+        for item in result.diagnostics
+    )
+    assert "REOPENED" in br007_row
+    assert "✅ RESOLVED" not in br007_row
+    assert "operator-Mac host-local witness" in br007_row
+    assert "Clean clone/CI and other seats remain Unobserved" in br007_row
+    assert "evidence (host-local witness" in register_text
+    assert "sqlite3 -readonly ~/.dharma/ontology.db" in register_text
+    assert (
+        "Clean clone/CI and every other seat remain **Unobserved**"
+        in register_text
+    )
 
 
 def test_drift_triage_br_ids_resolve() -> None:
