@@ -1570,6 +1570,54 @@ file/history.
 any default path that can execute a network-capable transitive command blocks
 merge.
 
+#### WP-O3R — corrective pre-D3 safety slice
+
+WP-O3R is a narrow pre-D3 correction of the WP-O3 node discovered after the
+compact door merged (PRs #913/#916): the dependency-free `_scrape_tracks`
+fallback is Proven at c631a492 to return 247 rows/196 unique nested ids
+instead of the 11 top-level `active_tracks` declarations; failed Git probes
+(nonzero exit, timeout, OSError, malformed output) collapse to an empty
+string and render as a false clean/0/READY observation; and the ambient
+`DHARMA_ONBOARD_WRITER=v2` environment bypass contradicts the pre-D3
+source-controlled `WRITER_SCHEMA_DEFAULT = "v1"` doctrine (§3.3). The
+canonical WP-O3 packet identity and envelope were consumed by the immutable
+macOS Python 3.9 portability correction, so that authority must not be
+borrowed for this repair. WP-O3R may be sealed only after a separately
+reviewed `WP-O3-B0` authority bootstrap has merged. The bootstrap admits
+literal `WP-O3R` as one exact Session Entry identity bound injectively to
+canonical packet id `onboard-one-door-WP-O3R`; it does not perform the safety
+slice and does not generalize arbitrary `WP-O<N>R` suffixes. B0 is used
+because no earlier WP-O3 corrective bootstrap exists; later ones must take
+the next unconsumed suffix.
+
+The WP-O3R implementation envelope is exactly:
+
+- `dharma_swarm/operator_core/onboarding/evidence.py`
+- `dharma_swarm/operator_core/onboarding/readiness.py`
+- `dharma_swarm/operator_core/onboarding/cli.py`
+- `dharma_swarm/operator_core/onboarding/render.py` only for a
+  verdict-surface insufficiency proven by a failing test
+- `scripts/governance/agent_onboard.py` as compatibility shim only
+- `tests/test_onboarding_cli.py`
+- `tests/test_onboarding_readiness.py`
+- `tests/test_onboarding_cache.py`
+- `tests/test_agent_onboard.py`
+- `reports/agentops/work_packets/onboard-one-door-WP-O3R.json`
+
+**Behavior → named test map:**
+
+| ID | Behavior | Failing-first test |
+|---|---|---|
+| O3R-B1 | Nonzero/timeout/OSError/malformed Git probes surface a typed `config` condition and the verdict is `CONFIG_ERROR`, never a false clean READY | `test_git_probe_failures_are_typed_config_error` |
+| O3R-B2 | An ambient `DHARMA_ONBOARD_WRITER` differing from the source-controlled default is denied: the on-disk receipt stays on `WRITER_SCHEMA_DEFAULT` and a typed condition records the denial | `test_ambient_writer_override_is_denied_pre_d3` |
+| O3R-B3 | `_scrape_tracks` returns exactly the top-level `active_tracks` declarations and agrees with the PyYAML parse on the real file | `test_scrape_tracks_matches_top_level_declarations` |
+
+WP-O3R changes no writer default, activates no cache/section reuse or delta
+seeding, keeps strict exits opt-in pre-WP-O5, edits no Make/CI surface, does
+not close D3, and leaves every named WP-O3 behavior test green. Acceptance
+requires fresh exact-main preflight, committed-range closeout, and
+independent review.
+
 ### WP-O4 — Make, AgentOps envelope, mutation-free orient, closeout, and CI parity (L)
 
 **Closes:** double render, non-enforced committed diff scope, writeful orient,

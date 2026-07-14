@@ -1943,6 +1943,9 @@ active_tracks:
       - id: wp_o2r_exact_identifier_bridge
         kind: command_passes
         command: ["python3", "-m", "pytest", "tests/test_agent_work_packet.py::test_session_entry_accepts_exact_wp_o2r_identity_only", "-q"]
+      - id: wp_o3r_exact_identifier_bridge
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/test_agent_work_packet.py::test_session_entry_accepts_exact_wp_o3r_identity_only", "-q"]
       - id: wp_o3_cli_readiness_cache_delta
         kind: command_passes
         command: ["python3", "-m", "pytest", "tests/test_onboarding_cli.py", "tests/test_onboarding_readiness.py", "tests/test_onboarding_cache.py", "tests/test_agent_onboard.py", "-q"]
@@ -1988,7 +1991,11 @@ active_tracks:
         kind: governance
         blocker: true
       - id: WP-O3
-        what: "WP-O3 RESIDUAL — PR #913 merged the public compact-door delegation and #916 restored stock macOS Python 3.9 execution, but the spec's full node is not closed. After a separately merged exact-identity authority bootstrap, a pre-D3 safety packet may: constrain dependency-free `_scrape_tracks` (Proven at c631a492 as 247 rows/196 unique nested ids versus 11 top-level declarations), make nonzero/timeout/OSError/malformed Git probes typed CONFIG_ERROR instead of false clean/0/READY, and deny ambient DHARMA_ONBOARD_WRITER=v2 while the source-controlled default is v1. D3 alone gates public v2 writer/cache-delta activation; after D3, prove actual unchanged-input cache reuse/delta behavior and flip the sole writer under source-controlled authority."
+        what: "WP-O3 RESIDUAL — PR #913 merged the public compact-door delegation and #916 restored stock macOS Python 3.9 execution, but the spec's full node is not closed. After the separately merged WP-O3-B0 exact-identity authority bootstrap (3R-B0 below), the WP-O3R pre-D3 safety packet may: constrain dependency-free `_scrape_tracks` (Proven at c631a492 as 247 rows/196 unique nested ids versus 11 top-level declarations), make nonzero/timeout/OSError/malformed Git probes typed CONFIG_ERROR instead of false clean/0/READY, and deny ambient DHARMA_ONBOARD_WRITER=v2 while the source-controlled default is v1. D3 alone gates public v2 writer/cache-delta activation; after D3, prove actual unchanged-input cache reuse/delta behavior and flip the sole writer under source-controlled authority."
+        kind: code
+        blocker: true
+      - id: WP-O3R
+        what: "WP-O3R BLOCKED — the pre-D3 safety-slice implementation admitted by the separately merged WP-O3-B0 authority bootstrap (3R-B0 below). Within the exact spec §6 WP-O3R envelope it may: type nonzero/timeout/OSError/malformed Git probes as CONFIG_ERROR conditions instead of false clean/0/READY; deny any ambient DHARMA_ONBOARD_WRITER value that differs from the source-controlled WRITER_SCHEMA_DEFAULT (v1 pre-D3) with a typed condition instead of honoring the bypass; and constrain the dependency-free _scrape_tracks fallback to the top-level active_tracks declarations proven against the PyYAML parse of the real file. It may not flip the writer default, activate cache/section reuse or delta seeding, change strict exits, edit Make/CI, or close D3; it remains blocked until a WP-O3R packet binds an exact post-bootstrap main and seals fresh preflight/closeout evidence."
         kind: code
         blocker: true
       - id: A3
@@ -2049,6 +2056,10 @@ active_tracks:
         blocker: false
       - id: 2R-B3
         what: "DONE 2026-07-14 JST — PR #929 merged the one-time WP-O2-B3 truth-ledger authority bootstrap under the already-admitted WP-O2 Session Entry identity: literal WP-O2R only, its canonical packet identity, and exact collision-free packet-scoped authority for docs/state/BROKEN_REGISTER.md and INTERFACE_MISMATCH_MAP.md without broad owned_surfaces. It granted authority only; no WP-O2R ledger reconciliation or host-state mutation was included."
+        kind: governance
+        blocker: false
+      - id: 3R-B0
+        what: "WP-O3-B0 — one-time, separately reviewed exact-identifier authority bootstrap for the pre-D3 WP-O3 safety slice, using the already-admitted WP-O3 Session Entry identity with the first unconsumed B0 suffix: admit literal WP-O3R only, bind it injectively to canonical packet id onboard-one-door-WP-O3R, add the named identity regression, and record the blocked WP-O3R corrective node in the canonical spec and this ledger. It grants authority only; no onboarding runtime, writer, cache, scraper, or strict-exit implementation is included, and it must merge before any WP-O3R packet may validate."
         kind: governance
         blocker: false
     non_goals:
