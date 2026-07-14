@@ -70,6 +70,10 @@ Current examples:
 - [FORMAL_VERIFICATION_PRODUCTION_RESEARCH.md](/Users/dhyana/dharma_swarm/docs/research/FORMAL_VERIFICATION_PRODUCTION_RESEARCH.md)
 - [KAIZEN_EFFICIENCY_ANALYSIS.md](/Users/dhyana/dharma_swarm/docs/research/KAIZEN_EFFICIENCY_ANALYSIS.md)
 
+Integration dossiers:
+
+- [DHARMA_SCENARIO_TELEMETRY_EPISTEMIC_MEMBRANE_V1.md](DHARMA_SCENARIO_TELEMETRY_EPISTEMIC_MEMBRANE_V1.md) — proposed MiroFish/OASIS scenario-input and external observability membrane, with explicit evidence and promotion boundaries
+
 Rule:
 
 - if a document is exploratory, comparative, or synthesis-heavy rather than current operator doctrine, it belongs here before it belongs at `docs/` top level
