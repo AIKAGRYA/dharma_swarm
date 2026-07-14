@@ -253,14 +253,19 @@ jobs:
       # test_passes criterion rendered "environment lacks 'pytest'" and the
       # published projection could never verify a pytest-backed track (it
       # showed onboard-one-door at 0/15 forever). Install the same dev
-      # environment as tests.yml so criteria execute here. Fail-safe stays
-      # honest: if this install ever breaks, the checker still runs
-      # --warn-only and unexecuted criteria stay unverified — never a
-      # synthesized pass.
+      # environment as tests.yml so criteria execute here. Fail-safe: a
+      # dev-install failure degrades to the previous minimal (pyyaml-only)
+      # environment — the checker still runs --warn-only and unexecuted
+      # criteria render honestly unverified — rather than killing the job
+      # and leaving generated/status silently stale. Only the minimal
+      # fallback failing fails the job.
       - name: Install package + test deps
         run: |
           python3 -m pip install --upgrade pip
-          python3 -m pip install -e ".[dev]"
+          if ! python3 -m pip install -e ".[dev]"; then
+            echo "::warning::dev install failed; publishing minimal projection with unverified criteria"
+            python3 -m pip install pyyaml
+          fi
 
       - name: Regenerate derived status rollups
         run: |
