@@ -1,15 +1,12 @@
 {
-  "id": "onboard-one-door-WP-O5-a2a-surface-expansion",
-  "base_ref": "971923a71c18b0effb5bbf2db279e85e8a7db413",
+  "id": "onboard-one-door-WP-O6-a2a-surface-admission-repair",
+  "base_ref": "d3dc33808701c3ddbcff415a334b6daf02a4086c",
   "branch": "cursor/durable-a2a-operator-node-8e74",
   "worktree": ".",
-  "intent": "Record the operator-authorized bounded expansion of organism-rewire-2026-07 for one durable A2A presence and phone-first operator-node vertical slice. Reuse AgentDirectory, NodeRegistry, RuntimeStateStore, TaskBoard, existing API and dashboard surfaces; do not create a parallel identity, ledger, registry, router, or runtime authority.",
+  "intent": "Repair only the WP-O5 closeout self-invalidation: add the newly admitted organism-rewire A2A/operator-node surfaces to the historical governance packet forbidden set so the packet remains forbidden-first after ownership changes.",
   "allowed_files": [
-    "docs/governance/ACTIVE_TRACK.yaml",
-    "CLAUDE.md",
-    "docs/governance/SOVEREIGN_MANIFEST.md",
-    "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
-    "reports/agentops/work_packets/onboard-one-door-WP-O5-a2a-surface-expansion.json"
+    "reports/agentops/work_packets/onboard-one-door-WP-O5-a2a-surface-expansion.json",
+    "reports/agentops/work_packets/onboard-one-door-WP-O6-a2a-surface-admission-repair.json"
   ],
   "forbidden_files": [
     ".github/workflows/automerge.yml",
@@ -152,7 +149,7 @@
   ],
   "commit": {
     "allowed": true,
-    "message": "chore(governance): admit durable A2A operator slice [impact-checked]"
+    "message": "fix(governance): reseal A2A surface admission [impact-checked]"
   },
   "approval": {
     "before_commit": false,
@@ -160,8 +157,8 @@
   },
   "negative_controls": [
     {
-      "name": "base-has-no-durable-a2a-surface-ownership",
-      "command": "python3 -c \"import subprocess; base='971923a71c18b0effb5bbf2db279e85e8a7db413'; text=subprocess.run(['git','show',base+':docs/governance/ACTIVE_TRACK.yaml'],check=True,capture_output=True,text=True).stdout; raise SystemExit(0 if 'dharma_swarm/a2a/fleet_presence.py' not in text else 9)\"",
+      "name": "wp-o5-omits-prospective-sibling-forbidden-surface",
+      "command": "python3 -c \"import json,subprocess; base='d3dc33808701c3ddbcff415a334b6daf02a4086c'; text=subprocess.run(['git','show',base+':reports/agentops/work_packets/onboard-one-door-WP-O5-a2a-surface-expansion.json'],check=True,capture_output=True,text=True).stdout; packet=json.loads(text); raise SystemExit(0 if 'dharma_swarm/a2a/fleet_presence.py' not in packet['forbidden_files'] else 9)\"",
       "expected_exit": 0,
       "env": {}
     }
@@ -180,31 +177,26 @@
       "git",
       "owner_files"
     ],
-    "work_packet": "WP-O5",
+    "work_packet": "WP-O6",
     "active_track": "onboard-one-door-2026-07",
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "971923a71c18b0effb5bbf2db279e85e8a7db413",
+      "checked_at_sha": "d3dc33808701c3ddbcff415a334b6daf02a4086c",
       "details": []
     },
     "interface_mismatches": [
-      "The live fable_5_cursor durable consumer retained a hyphenated filter while the stream subject used underscores, proving subject identity drift can silently erase delivery.",
-      "A2A hub and operator-node source files are not owned by any active track even though organism-rewire next-items already own VPS shift and living-agent presence."
+      "A governance packet that expands sibling ownership self-invalidates at closeout unless it prospectively forbids the newly admitted sibling surfaces."
     ],
     "closest_existing_implementation": [
-      "dharma_swarm/a2a/agent_directory.py",
-      "dharma_swarm/a2a/node_registry.py",
-      "dharma_swarm/a2a/nats_transport.py",
-      "dharma_swarm/a2a/mailbox_gateway.py",
-      "dashboard/src/app/dashboard/control-surface/page.tsx"
+      "reports/agentops/work_packets/onboard-one-door-WP-O5-a2a-surface-expansion.json",
+      "scripts/governance/run_agent_work_packet.py"
     ],
     "honest_blockers": [
-      "This packet admits only a bounded vertical slice and does not claim the live AGNI hub, token rotation, or host deployment is production-ready.",
-      "Runtime authority remains JetStream plus existing RuntimeState and TaskBoard owners; the dashboard remains a read model.",
-      "The active portfolio remains at the operator-decreed maximum of 11; this change expands organism-rewire instead of opening a twelfth track."
+      "This repair changes packet custody only and makes no runtime, readiness, or production claim.",
+      "Implementation still requires a separate organism-rewire Session Entry packet."
     ],
-    "rollback": "revert the organism-rewire owned-surface and next-item additions, regenerate active-track includes, and remove this packet in one commit",
-    "packet_digest": "48f83e5a6cf8a1cff06b9030caa18d55a51fc9245011a54e5424c39727ac28ef"
+    "rollback": "revert the two packet-only repair changes together",
+    "packet_digest": "1966449c36be99f637fdcbca9eb730fb1084911f50ae493495bf7a12f11ad14c"
   }
 }
