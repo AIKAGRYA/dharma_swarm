@@ -6,7 +6,9 @@ No admission rule lives here.
 
 Writer doctrine (spec §3.3): the on-disk receipt stays **v1** until the D3
 fleet-reader inventory is recorded; ``WRITER_SCHEMA_DEFAULT`` is the one flag
-that flips after D3.  The v2 condition object is always assembled and is what
+that flips after D3.  An ambient ``DHARMA_ONBOARD_WRITER`` that differs from
+that source-controlled default is denied and typed, never honored (spec §6
+WP-O3R, O3R-B2).  The v2 condition object is always assembled and is what
 ``--json`` emits, whatever the on-disk schema (spec §2.2).
 
 Exit doctrine (spec §WP-O3 / O3-B11): before WP-O5, strict verdict exits are
@@ -129,20 +131,41 @@ def _collect_conditions(
     orientation: Mapping[str, Any],
     *,
     net: bool,
+    probe_errors: Mapping[str, str] | None = None,
 ) -> list[readiness.Condition]:
     conditions: list[readiness.Condition] = []
-    conditions.append(readiness.Condition(
-        id="repo_clean",
-        state="pass" if not live_state.get("dirty") else "fail",
-        condition_class="blocking",
-        reason="" if not live_state.get("dirty") else "working tree is dirty",
-    ))
-    conditions.append(readiness.Condition(
-        id="repo_unconflicted",
-        state="pass" if not live_state.get("conflicted") else "fail",
-        condition_class="blocking",
-        reason="" if not live_state.get("conflicted") else "merge conflicts present",
-    ))
+    errors = {str(k): str(v) for k, v in dict(probe_errors or {}).items() if v}
+    if "status" in errors:
+        # O3R-B1: an unobservable working tree is typed, never a false clean.
+        for condition_id in ("repo_clean", "repo_unconflicted"):
+            conditions.append(readiness.Condition(
+                id=condition_id,
+                state="not_observed",
+                condition_class="blocking",
+                reason="git status probe failed; state not observed",
+            ))
+    else:
+        conditions.append(readiness.Condition(
+            id="repo_clean",
+            state="pass" if not live_state.get("dirty") else "fail",
+            condition_class="blocking",
+            reason="" if not live_state.get("dirty") else "working tree is dirty",
+        ))
+        conditions.append(readiness.Condition(
+            id="repo_unconflicted",
+            state="pass" if not live_state.get("conflicted") else "fail",
+            condition_class="blocking",
+            reason="" if not live_state.get("conflicted") else "merge conflicts present",
+        ))
+    if errors:
+        conditions.append(readiness.Condition(
+            id="git_state_observed",
+            state="fail",
+            condition_class="config",
+            reason="; ".join(
+                f"{name}: {message}" for name, message in sorted(errors.items())
+            )[:200],
+        ))
     for tool in ("git", "make"):
         present = bool(toolchain.get(tool))
         conditions.append(readiness.Condition(
@@ -224,12 +247,12 @@ def assemble_and_run(argv: Sequence[str] | None = None) -> int:
         conditions.extend(packet_conditions)
 
     stable_core = evidence.collect_stable_core(packet=packet_block or None)
-    live_state = evidence.repo_live_state()
+    live_state, probe_errors = evidence.observe_repo_live_state()
     toolchain = evidence.toolchain_versions()
     freshness = evidence.projection_freshness()
     conditions.extend(_collect_conditions(
         live_state, toolchain, freshness, stable_core.get("orientation", {}),
-        net=bool(args.net),
+        net=bool(args.net), probe_errors=probe_errors,
     ))
 
     manifest = build_input_manifest(repo_root, _MANIFEST_CATEGORIES)
@@ -239,7 +262,22 @@ def assemble_and_run(argv: Sequence[str] | None = None) -> int:
     now = _utc_now()
     previous: dict[str, Any] | None = None
     persistence_condition: readiness.Condition
-    writer_schema = os.environ.get("DHARMA_ONBOARD_WRITER", WRITER_SCHEMA_DEFAULT)
+    # Pre-D3 sole-writer doctrine (O3R-B2): the on-disk schema comes only
+    # from the source-controlled default; a differing ambient override is
+    # denied and typed instead of honored.
+    writer_schema = WRITER_SCHEMA_DEFAULT
+    ambient_writer = os.environ.get("DHARMA_ONBOARD_WRITER")
+    if ambient_writer is not None and ambient_writer != WRITER_SCHEMA_DEFAULT:
+        conditions.append(readiness.Condition(
+            id="writer_override_denied",
+            state="fail",
+            condition_class="config",
+            reason=(
+                f"ambient DHARMA_ONBOARD_WRITER={ambient_writer!r} is denied "
+                f"until the operator D3 record merges; writer stays "
+                f"{WRITER_SCHEMA_DEFAULT!r}"
+            ),
+        ))
     try:
         target = receipt_path(repo_root)
         if target.exists():
