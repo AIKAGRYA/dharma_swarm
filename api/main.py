@@ -200,14 +200,11 @@ def _initialize_agent_directory(swarm: Any) -> None:
 
 
 async def _start_fleet_presence_consumer() -> asyncio.Task[None] | None:
-    """Start the opt-in JetStream presence projector and await broker readiness.
-
-    Impact checked: the default remains disabled, enabled startup fails loudly,
-    and lifespan shutdown always cancels the owned consumer task.
-    """
+    """Start the opt-in presence projector and await broker readiness."""
     if os.getenv("DHARMA_FLEET_PRESENCE_ENABLED") != "1":
         return None
     from dharma_swarm.a2a.fleet_presence import FleetPresenceConsumerConfig, FleetPresenceProjector, run_fleet_presence_consumer
+    from dharma_swarm.operator_core.runtime_truth import runtime_db_path_from_env
     from dharma_swarm.runtime_state import RuntimeStateStore
 
     cards = _state.get("card_registry")
@@ -216,7 +213,7 @@ async def _start_fleet_presence_consumer() -> asyncio.Task[None] | None:
         raise RuntimeError("fleet presence requires initialized card and node registries")
     config = FleetPresenceConsumerConfig.from_env()
     projector = FleetPresenceProjector(
-        card_registry=cards, node_registry=nodes, runtime_state=RuntimeStateStore(dharma_state_dir() / "runtime.db"),
+        card_registry=cards, node_registry=nodes, runtime_state=RuntimeStateStore(runtime_db_path_from_env()),
         compatibility_mode=config.compatibility_mode, max_future_skew_s=config.max_future_skew_s,
     )
     ready = asyncio.get_running_loop().create_future()

@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import re
 from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import asdict, dataclass, field, replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from threading import RLock
@@ -126,12 +127,31 @@ class RemoteNode:
 class NodeRegistry:
     """Thread-safe central directory persisted as one atomic JSON snapshot."""
 
-    def __init__(self, nodes_path: Path | None = None, *, clock: Callable[[], datetime] | None = None) -> None:
+    def __init__(
+        self, nodes_path: Path | None = None, *, clock: Callable[[], datetime] | None = None, max_future_skew_s: float = 60.0,
+    ) -> None:
+        if not math.isfinite(max_future_skew_s) or max_future_skew_s < 0:
+            raise ValueError("max_future_skew_s must be finite and non-negative")
         self._path = nodes_path or _NODES_PATH
         self._nodes: dict[str, RemoteNode] = {}
         self._lock = RLock()
         self._clock = clock or _utc_now
+        self._max_future_skew_s = max_future_skew_s
         self._load()
+
+    def _is_future(self, observed: datetime) -> bool:
+        now = self._clock()
+        if now.tzinfo is None:
+            raise ValueError("node registry clock must be timezone-aware")
+        return observed.astimezone(timezone.utc) > now.astimezone(timezone.utc) + timedelta(seconds=self._max_future_skew_s)
+
+    def _validated_heartbeat_time(self, value: str) -> datetime:
+        parsed = _heartbeat_time(value)
+        if parsed is None:
+            raise ValueError("heartbeat timestamp must be timezone-aware ISO")
+        if self._is_future(parsed):
+            raise ValueError("heartbeat timestamp exceeds allowed future skew")
+        return parsed
 
     def _load(self) -> None:
         if not self._path.exists():
@@ -141,9 +161,7 @@ class NodeRegistry:
             if isinstance(data, dict):
                 data = data.get("nodes", [])
             if not isinstance(data, list):
-                raise ValueError(
-                    "node registry JSON must be a list or object with a nodes list"
-                )
+                raise ValueError("node registry JSON must be a list or object with a nodes list")
             for item in data:
                 if not isinstance(item, dict):
                     continue
@@ -152,14 +170,9 @@ class NodeRegistry:
                 node_id = str(filtered.get("node_id", ""))
                 if not node_id:
                     continue
-                api_key_env = str(
-                    filtered.get("api_key_env") or _default_api_key_env(node_id)
-                )
+                api_key_env = str(filtered.get("api_key_env") or _default_api_key_env(node_id))
                 filtered["api_key_env"] = api_key_env
-
                 legacy_api_key = str(filtered.get("api_key") or "")
-                # Prefer the env reference. Only keep legacy plaintext in memory
-                # when no referenced env var is available, and never write it back.
                 filtered["api_key"] = "" if os.getenv(api_key_env) else legacy_api_key
                 node = RemoteNode(**filtered)
                 self._nodes[node.node_id] = node
@@ -173,8 +186,7 @@ class NodeRegistry:
                 self._path.parent.mkdir(parents=True, exist_ok=True)
                 data = json.dumps([node.to_dict() for node in self._nodes.values()], indent=2, default=str) + "\n"
                 with NamedTemporaryFile(
-                    "w", encoding="utf-8", dir=self._path.parent,
-                    prefix=f".{self._path.name}.", delete=False,
+                    "w", encoding="utf-8", dir=self._path.parent, prefix=f".{self._path.name}.", delete=False,
                 ) as handle:
                     handle.write(data)
                     temporary = Path(handle.name)
@@ -202,13 +214,11 @@ class NodeRegistry:
 
     def register(self, node: RemoteNode) -> None:
         """Register or update a node in the fleet."""
+        if node.last_heartbeat:
+            self._validated_heartbeat_time(node.last_heartbeat)
         with self._lock:
             self._replace_node(node.node_id, deepcopy(node))
-        logger.info(
-            "Registered fleet node: %s at %s",
-            _sanitize(node.node_id),
-            _sanitize(node.endpoint),
-        )
+        logger.info("Registered fleet node: %s at %s", _sanitize(node.node_id), _sanitize(node.endpoint))
 
     def unregister(self, node_id: str) -> bool:
         """Remove a node. Returns True if it existed."""
@@ -249,9 +259,7 @@ class NodeRegistry:
             raise ValueError("reachable status requires observed_at")
         if node_status in {"online", "degraded"} and not provenance:
             raise ValueError("reachable status requires a witness")
-        parsed = _heartbeat_time(observed) if observed else None
-        if observed and parsed is None:
-            raise ValueError("observed_at must be a timezone-aware ISO timestamp")
+        parsed = self._validated_heartbeat_time(observed) if observed else None
         with self._lock:
             current = self._nodes.get(node_id)
             if current is None:
@@ -284,9 +292,7 @@ class NodeRegistry:
 
         incoming_metadata = deepcopy(dict(metadata or {}))
         incoming_uid = str(incoming_metadata.get("agent_uid") or "").strip()
-        incoming_time = _heartbeat_time(heartbeat_at)
-        if incoming_time is None:
-            raise ValueError("last_heartbeat must be a timezone-aware ISO timestamp")
+        incoming_time = self._validated_heartbeat_time(heartbeat_at)
         with self._lock:
             current = self._nodes.get(node_id)
             if current is None and not uid:
@@ -298,6 +304,8 @@ class NodeRegistry:
             incoming_message_id = str(incoming_metadata.get("presence_message_id") or "")
             current_message_id = str(current.metadata.get("presence_message_id") or "") if current is not None else ""
             current_time = _heartbeat_time(current.last_heartbeat) if current is not None else None
+            if current_time is not None and self._is_future(current_time):
+                current_time = None
             if current is not None and (
                 (bool(incoming_message_id) and current_message_id == incoming_message_id)
                 or (current_time is not None and current_time >= incoming_time)
@@ -378,7 +386,7 @@ class NodeRegistry:
                     current.metadata["status_witness"] = "health_check_failure"
                     current.metadata["status_observed_at"] = self._clock().astimezone(timezone.utc).isoformat()
                 else:
-                    _mark_stale(current, now=self._clock())
+                    _mark_stale(current, now=self._clock(), max_future_skew_s=self._max_future_skew_s)
                 logger.warning("Health check failed for %s: %s", _sanitize(node_id), failure)
             self._replace_node(node_id, current)
             return deepcopy(current)
@@ -405,7 +413,7 @@ class NodeRegistry:
         previous: dict[str, RemoteNode] = {}
         for node_id, current in tuple(self._nodes.items()):
             updated = deepcopy(current)
-            _mark_stale(updated, now=self._clock())
+            _mark_stale(updated, now=self._clock(), max_future_skew_s=self._max_future_skew_s)
             if updated.status != current.status:
                 previous[node_id] = current
                 self._nodes[node_id] = updated
@@ -413,10 +421,7 @@ class NodeRegistry:
             self._nodes.update(previous)
             raise RuntimeError("Failed to persist stale node transitions")
         return sorted(previous)
-# fmt: on
-
-
-def _mark_stale(node: RemoteNode, now: datetime | None = None) -> None:
+def _mark_stale(node: RemoteNode, now: datetime | None = None, max_future_skew_s: float = 60.0) -> None:
     """Update node status based on heartbeat age."""
     if not node.last_heartbeat:
         return
@@ -429,9 +434,13 @@ def _mark_stale(node: RemoteNode, now: datetime | None = None) -> None:
         node.status = "unknown"
         return
 
-    if age > _HEARTBEAT_OFFLINE_SECONDS:
+    if last > now + timedelta(seconds=max_future_skew_s):
+        node.status = "unknown"
+    elif node.status in {"offline", "unknown"}:
+        return
+    elif age > _HEARTBEAT_OFFLINE_SECONDS and node.status in {"online", "degraded"}:
         node.status = "offline"
-    elif age > _HEARTBEAT_STALE_SECONDS:
+    elif age > _HEARTBEAT_STALE_SECONDS and node.status == "online":
         node.status = "degraded"
 
 
@@ -449,12 +458,8 @@ def _current_trace_id() -> str:
 
 
 async def dispatch_remote_task(
-    node: RemoteNode,
-    capability: str,
-    message: str,
-    from_agent: str = "dharma-hub",
-    metadata: dict[str, Any] | None = None,
-    timeout: float = 60.0,
+    node: RemoteNode, capability: str, message: str, from_agent: str = "dharma-hub",
+    metadata: dict[str, Any] | None = None, timeout: float = 60.0,
 ) -> dict[str, Any]:
     """Submit a task to a remote node and return its gateway response."""
     url = f"{node.endpoint.rstrip('/')}/a2a/tasks"
@@ -463,12 +468,7 @@ async def dispatch_remote_task(
     if api_key:
         headers["X-A2A-Key"] = api_key
 
-    body: dict[str, Any] = {
-        "from_agent": from_agent,
-        "capability": capability,
-        "messages": [{"role": "user", "content": message}],
-        "metadata": metadata or {},
-    }
+    body: dict[str, Any] = {"from_agent": from_agent, "capability": capability, "messages": [{"role": "user", "content": message}], "metadata": metadata or {}}
 
     trace_id = _current_trace_id()
     if trace_id:
@@ -480,11 +480,7 @@ async def dispatch_remote_task(
         return resp.json()
 
 
-async def poll_remote_task(
-    node: RemoteNode,
-    task_id: str,
-    timeout: float = 10.0,
-) -> dict[str, Any]:
+async def poll_remote_task(node: RemoteNode, task_id: str, timeout: float = 10.0) -> dict[str, Any]:
     """Poll and return one remote task's current gateway state."""
     url = f"{node.endpoint.rstrip('/')}/a2a/tasks/{task_id}"
     headers = {}
@@ -496,3 +492,4 @@ async def poll_remote_task(
         resp = await client.get(url, headers=headers)
         resp.raise_for_status()
         return resp.json()
+# fmt: on

@@ -468,8 +468,11 @@ async def test_api_presence_lifespan_opt_in_start_cancel_and_failure(tmp_path: P
     assert "_stop_fleet_presence_consumer" in lifespan_names
     monkeypatch.setenv("DHARMA_FLEET_PRESENCE_ENABLED", "1")
     monkeypatch.setenv("DHARMA_FLEET_PRESENCE_SUBJECT", fp.DEFAULT_PRESENCE_SUBJECT)
+    monkeypatch.setenv("DHARMA_STATE_DIR", str(tmp_path / "canonical-state"))
     cancelled = asyncio.Event()
+    runtime_paths: list[Path] = []
     async def running(*args: Any, **kwargs: Any) -> None:
+        runtime_paths.append(args[0].runtime_state.db_path)
         kwargs["ready"].set_result(None)
         try:
             await asyncio.Future()
@@ -478,6 +481,7 @@ async def test_api_presence_lifespan_opt_in_start_cancel_and_failure(tmp_path: P
     monkeypatch.setattr(fp, "run_fleet_presence_consumer", running)
     task = await api_main._start_fleet_presence_consumer()
     assert task and not task.done()
+    assert runtime_paths == [tmp_path / "canonical-state" / "runtime.db"]
     await api_main._stop_fleet_presence_consumer()
     assert cancelled.is_set()
     async def failing(*args: Any, **kwargs: Any) -> None:

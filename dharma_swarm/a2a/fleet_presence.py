@@ -242,7 +242,6 @@ def _heartbeat_metadata(body: Mapping[str, Any]) -> dict[str, Any]:
 # fmt: off
 class FleetPresenceProjector:
     """Persist validated heartbeats through CardRegistry, NodeRegistry and runtime state.
-
     Subject validation is not cryptographic authentication. NATS ACLs must bind
     each publisher to its own ``dharma.agent.<stable-uid>.presence`` subject.
     """

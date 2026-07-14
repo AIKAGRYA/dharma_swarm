@@ -4,8 +4,11 @@ import {
   ProxyRequestError,
   resolveProxyTarget,
 } from "../../../../../components/a2a-node/a2aNodeProxy.mjs";
+import { evaluateOperatorIngress } from "../../../../../components/a2a-node/a2aNodeIngressAuth.mjs";
 
 const DEFAULT_BACKEND_BASE_URL = "http://127.0.0.1:8420";
+const BASIC_CHALLENGE =
+  'Basic realm="A2A Operator Node", charset="UTF-8"';
 
 interface ProxyRouteContext {
   params: Promise<{ path: string[] }>;
@@ -22,18 +25,18 @@ function errorResponse(
     | "projection",
   message: string,
   status: number,
+  additionalHeaders: Record<string, string> = {},
 ): Response {
   return Response.json(
     { error: { kind, status, message } },
     {
       status,
-      headers: { "Cache-Control": "no-store" },
+      headers: {
+        "Cache-Control": "no-store",
+        ...additionalHeaders,
+      },
     },
   );
-}
-
-function rejectMethod(): Response {
-  return errorResponse("policy", "Only GET is allowed", 405);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -93,10 +96,47 @@ function safeUpstreamMessage(
   }
 }
 
+function operatorIngressError(request: Request): Response | null {
+  const ingress = evaluateOperatorIngress({
+    authorization: request.headers.get("Authorization"),
+    operatorUser: process.env.A2A_NODE_OPERATOR_USER,
+    operatorPassword: process.env.A2A_NODE_OPERATOR_PASSWORD,
+    nodeEnv: process.env.NODE_ENV,
+  });
+  if (ingress.state === "misconfigured") {
+    return errorResponse(
+      "configuration",
+      "Operator ingress authentication is unavailable",
+      503,
+    );
+  }
+  if (ingress.state === "unauthorized") {
+    return errorResponse(
+      "auth",
+      "Operator authentication required",
+      401,
+      { "WWW-Authenticate": BASIC_CHALLENGE },
+    );
+  }
+  return null;
+}
+
+function rejectMethod(request: Request): Response {
+  return (
+    operatorIngressError(request) ??
+    errorResponse("policy", "Only GET is allowed", 405)
+  );
+}
+
 export async function GET(
   request: Request,
   context: ProxyRouteContext,
 ): Promise<Response> {
+  const ingressError = operatorIngressError(request);
+  if (ingressError) {
+    return ingressError;
+  }
+
   let target: URL;
   try {
     const { path } = await context.params;

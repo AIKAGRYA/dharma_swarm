@@ -12,7 +12,7 @@ Verifies:
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -263,3 +263,131 @@ async def test_failed_health_check_demotes_online_node_without_heartbeat(
     persisted = NodeRegistry(nodes_path=path).get("online-without-heartbeat")
     assert persisted is not None
     assert persisted.status == result.status
+
+
+@pytest.mark.parametrize(
+    ("status", "age_seconds", "expected", "reachable"),
+    [
+        ("offline", 400, "offline", False),
+        ("unknown", 400, "unknown", False),
+        ("online", 400, "degraded", True),
+        ("degraded", 400, "degraded", True),
+        ("online", 1_000, "offline", False),
+        ("degraded", 1_000, "offline", False),
+        ("unknown", 1_000, "unknown", False),
+    ],
+)
+@pytest.mark.asyncio
+async def test_stale_projection_preserves_status_lattice_and_dispatch_safety(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    status: str,
+    age_seconds: int,
+    expected: str,
+    reachable: bool,
+) -> None:
+    now = datetime(2026, 7, 14, 22, 0, tzinfo=timezone.utc)
+    registry = NodeRegistry(
+        nodes_path=tmp_path / "nodes.json",
+        clock=lambda: now,
+    )
+    registry.register(
+        RemoteNode(
+            node_id="stale-node",
+            endpoint="https://node.invalid",
+            status=status,
+            last_heartbeat=(now - timedelta(seconds=age_seconds)).isoformat(),
+        )
+    )
+
+    projected = registry.get("stale-node")
+
+    assert projected is not None
+    assert projected.status == expected
+    assert projected.is_reachable() is reachable
+    if not reachable:
+        from api.routers import fleet
+
+        monkeypatch.setattr(fleet, "_get_registry", lambda: registry)
+        with pytest.raises(Exception) as blocked:
+            await fleet.dispatch_task(
+                {"node_id": "stale-node", "capability": "x", "message": "x"}
+            )
+        assert getattr(blocked.value, "status_code", None) == 503
+
+
+def test_future_heartbeat_boundaries_reject_direct_injection(
+    tmp_path: Path,
+) -> None:
+    now = datetime(2026, 7, 14, 22, 0, tzinfo=timezone.utc)
+    future = (now + timedelta(seconds=31)).isoformat()
+    registry = NodeRegistry(
+        nodes_path=tmp_path / "nodes.json",
+        clock=lambda: now,
+        max_future_skew_s=30,
+    )
+    with pytest.raises(ValueError, match="future"):
+        registry.register(
+            RemoteNode(
+                node_id="future-register",
+                status="online",
+                last_heartbeat=future,
+            )
+        )
+    registry.register(RemoteNode(node_id="known", status="unknown"))
+    with pytest.raises(ValueError, match="future"):
+        registry.record_heartbeat(
+            "known",
+            last_heartbeat=future,
+            status="online",
+            canonical_agent_uid="known-uid",
+        )
+    with pytest.raises(ValueError, match="future"):
+        registry.update_status(
+            "known",
+            status="online",
+            observed_at=future,
+            witness="direct-test",
+        )
+
+
+def test_loaded_future_heartbeat_projects_unknown_and_accepts_valid_recovery(
+    tmp_path: Path,
+) -> None:
+    now = datetime(2026, 7, 14, 22, 0, tzinfo=timezone.utc)
+    path = tmp_path / "nodes.json"
+    path.write_text(
+        json.dumps(
+            [
+                RemoteNode(
+                    node_id="future-loaded",
+                    status="online",
+                    last_heartbeat="2099-01-01T00:00:00+00:00",
+                    metadata={"agent_uid": "future-loaded-uid"},
+                ).to_dict()
+            ]
+        ),
+        encoding="utf-8",
+    )
+    registry = NodeRegistry(
+        nodes_path=path,
+        clock=lambda: now,
+        max_future_skew_s=30,
+    )
+
+    projected = registry.get("future-loaded")
+
+    assert projected is not None
+    assert projected.status == "unknown"
+    recovered = registry.record_heartbeat(
+        "future-loaded",
+        last_heartbeat=now.isoformat(),
+        status="online",
+        metadata={
+            "agent_uid": "future-loaded-uid",
+            "presence_message_id": "valid-recovery",
+        },
+        canonical_agent_uid="future-loaded-uid",
+    )
+    assert recovered.status == "online"
+    assert recovered.last_heartbeat == now.isoformat()
