@@ -8,7 +8,9 @@ fast and independent of the live ACTIVE_TRACK.yaml contents.
 """
 from __future__ import annotations
 
+import json
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -16,6 +18,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts/governance"))
 
 from check_track_status import (  # type: ignore  # noqa: E402
     EXTERNAL_ACTED_RECEIPT_REQUIRED_FIELDS,
+    check_gauntlet_verified,
     evaluate_criterion,
     normalize_portfolio,
     validate_portfolio_graph,
@@ -548,3 +551,137 @@ def test_readiness_score_cap_advances_only_on_contiguous_gate_label() -> None:
     assert cap is not None
     assert cap["cap_score"] == 75
     assert cap["within_cap"] is True
+
+
+# --- gauntlet_verified predicate -------------------------------------------
+
+def _write_gauntlet_receipt(path: Path, *, score=0.9, passed=4, total=4,
+                            tiers=(1, 2, 3, 4, 5), ts=None, **extra) -> Path:
+    receipt = {
+        "run_id": "gauntlet-test",
+        "timestamp": ts or datetime.now(timezone.utc).isoformat(),
+        "tiers_run": list(tiers),
+        "gauntlet_score": score,
+        "task_scores": [{"task_id": f"t{i}", "passed": i < passed} for i in range(total)],
+    }
+    receipt.update(extra)
+    path.write_text(json.dumps(receipt), encoding="utf-8")
+    return path
+
+
+def _gauntlet_criterion(path: Path, **kw) -> dict:
+    crit = {"id": "gauntlet_verified", "kind": "gauntlet_verified", "receipt": str(path)}
+    crit.update(kw)
+    return crit
+
+
+def test_gauntlet_verified_fresh_green_passes(tmp_path: Path) -> None:
+    receipt = _write_gauntlet_receipt(tmp_path / "g.json", score=0.9, passed=4, total=4)
+    res = evaluate_criterion(_gauntlet_criterion(receipt))
+    assert res.id == "gauntlet_verified"
+    assert res.kind == "gauntlet_verified"
+    assert res.passed is True
+
+
+def test_gauntlet_verified_missing_receipt_fails(tmp_path: Path) -> None:
+    res = evaluate_criterion(_gauntlet_criterion(tmp_path / "nope.json"))
+    assert res.passed is False
+    assert "MISSING" in res.detail
+
+
+def test_gauntlet_verified_stale_receipt_fails(tmp_path: Path) -> None:
+    old = (datetime.now(timezone.utc) - timedelta(hours=200)).isoformat()
+    receipt = _write_gauntlet_receipt(tmp_path / "g.json", ts=old)
+    res = evaluate_criterion(_gauntlet_criterion(receipt, max_age_hours=168))
+    assert res.passed is False
+    assert "stale" in res.detail
+
+
+def test_gauntlet_verified_failed_task_fails(tmp_path: Path) -> None:
+    receipt = _write_gauntlet_receipt(tmp_path / "g.json", passed=3, total=4)
+    res = evaluate_criterion(_gauntlet_criterion(receipt))
+    assert res.passed is False
+    assert "pass ratio" in res.detail
+
+
+def test_gauntlet_verified_low_score_fails(tmp_path: Path) -> None:
+    receipt = _write_gauntlet_receipt(tmp_path / "g.json", score=0.4, passed=4, total=4)
+    res = evaluate_criterion(_gauntlet_criterion(receipt, min_score=0.7))
+    assert res.passed is False
+    assert "min_score" in res.detail
+
+
+def test_gauntlet_verified_missing_required_tier_fails(tmp_path: Path) -> None:
+    receipt = _write_gauntlet_receipt(tmp_path / "g.json", tiers=(1, 2))
+    res = evaluate_criterion(_gauntlet_criterion(receipt, required_tiers=[1, 4]))
+    assert res.passed is False
+    assert "required tiers" in res.detail
+
+
+def test_gauntlet_verified_malformed_receipt_field() -> None:
+    res = evaluate_criterion({"id": "g", "kind": "gauntlet_verified"})
+    assert res.passed is False
+    assert "receipt" in res.detail
+
+
+def test_gauntlet_verified_independent_verifier_rejects_self_grade(tmp_path: Path) -> None:
+    receipt = _write_gauntlet_receipt(tmp_path / "g.json", verified_by="@owner")
+    res = evaluate_criterion(
+        _gauntlet_criterion(receipt, require_independent_verifier=True),
+        track={"owner": "@owner"},
+    )
+    assert res.passed is False
+    assert "worker must not judge" in res.detail
+
+
+def test_gauntlet_verified_independent_verifier_accepts_distinct(tmp_path: Path) -> None:
+    receipt = _write_gauntlet_receipt(
+        tmp_path / "g.json", verified_by="@verifier", produced_by="@owner")
+    res = evaluate_criterion(
+        _gauntlet_criterion(receipt, require_independent_verifier=True),
+        track={"owner": "@owner"},
+    )
+    assert res.passed is True
+
+
+def test_gauntlet_verified_now_injection_is_deterministic(tmp_path: Path) -> None:
+    ts = datetime(2026, 7, 1, 12, 0, tzinfo=timezone.utc)
+    receipt = _write_gauntlet_receipt(tmp_path / "g.json", ts=ts.isoformat())
+    fresh = check_gauntlet_verified(str(receipt), max_age_hours=24,
+                                    now=ts + timedelta(hours=1))
+    stale = check_gauntlet_verified(str(receipt), max_age_hours=24,
+                                    now=ts + timedelta(days=10))
+    assert fresh.passed is True
+    assert stale.passed is False
+
+
+# --- shippable-requires-gauntlet portfolio invariant ------------------------
+
+def test_track_policy_require_gauntlet_default_false() -> None:
+    p = _portfolio([_track("a")])
+    assert p["track_policy"]["require_gauntlet_for_shippable"] is False
+
+
+def test_gauntlet_gate_missing_warns_by_default() -> None:
+    p = _portfolio([_track("a")])
+    findings: list[Finding] = []
+    validate_portfolio_graph(p, findings)
+    gm = [f for f in findings if f.check.startswith("gauntlet-gate-missing")]
+    assert gm and gm[0].severity == "WARN"
+
+
+def test_gauntlet_gate_missing_is_error_when_armed() -> None:
+    p = _portfolio([_track("a")], policy={"require_gauntlet_for_shippable": True})
+    findings: list[Finding] = []
+    validate_portfolio_graph(p, findings)
+    gm = [f for f in findings if f.check.startswith("gauntlet-gate-missing")]
+    assert gm and gm[0].severity == "ERROR"
+
+
+def test_gauntlet_gate_declared_is_silent() -> None:
+    t = _track("a", completion_criteria=[
+        {"id": "g", "kind": "gauntlet_verified", "receipt": "reports/x.json"}])
+    p = _portfolio([t])
+    findings: list[Finding] = []
+    validate_portfolio_graph(p, findings)
+    assert not any(f.check.startswith("gauntlet-gate-missing") for f in findings)

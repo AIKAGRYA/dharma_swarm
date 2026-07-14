@@ -29,7 +29,7 @@ import shutil
 import subprocess
 import sys
 from dataclasses import asdict, dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -69,6 +69,14 @@ EXTERNAL_ACTED_RECEIPT_FORBIDDEN_MARKERS = (
     "passive reading",
     "simulated response",
 )
+
+# --- Gauntlet graduation-gate defaults -------------------------------------
+# The gauntlet predicate is deterministic and offline: it verifies a committed
+# receipt produced out-of-band by benchmarks/gauntlet.py (a GauntletReport). It
+# does NOT run the multi-hour live harness inside the governance gate; freshness
+# (max_age_hours) is what forces the heavy live run to be re-executed.
+GAUNTLET_DEFAULT_MAX_AGE_HOURS = 168.0   # 7 days
+GAUNTLET_DEFAULT_MIN_PASS_RATIO = 1.0    # green-or-it-did-not-graduate
 
 
 @dataclass
@@ -417,6 +425,148 @@ def check_pr_merged(pr_number: int) -> CriterionResult:
                                 detail=f"PR #{pr_number}: {type(exc).__name__}, skipped")
 
 
+def _parse_iso_timestamp(value: str) -> datetime | None:
+    """Parse an ISO-8601 timestamp (with or without trailing 'Z') into an aware
+    datetime; naive timestamps are assumed UTC. Returns None on failure — a
+    governance gate must convert a bad timestamp into a failing result, not crash.
+    """
+    if not isinstance(value, str) or not value.strip():
+        return None
+    text = value.strip()
+    if text.endswith(("Z", "z")):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        try:
+            parsed = datetime.strptime(text[:10], "%Y-%m-%d")
+        except ValueError:
+            return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def check_gauntlet_verified(
+    receipt_path: str,
+    *,
+    max_age_hours: float = GAUNTLET_DEFAULT_MAX_AGE_HOURS,
+    min_score: float = 0.0,
+    min_pass_ratio: float = GAUNTLET_DEFAULT_MIN_PASS_RATIO,
+    required_tiers: list[int] | None = None,
+    require_independent_verifier: bool = False,
+    owner: str | None = None,
+    now: datetime | None = None,
+) -> CriterionResult:
+    """Verify a committed gauntlet receipt is fresh, green, and (optionally)
+    independently graded — the executable graduation gate that a file-existence
+    criterion can never be.
+
+    Deliberately deterministic and offline: it reads a committed JSON receipt
+    shaped like ``benchmarks/gauntlet.py``'s ``GauntletReport`` (run_id,
+    timestamp, tiers_run, task_scores[].passed, gauntlet_score) and asserts the
+    receipt exists and is a JSON object naming real task_scores; is fresh
+    (age <= ``max_age_hours``); ``gauntlet_score`` >= ``min_score``; the task
+    pass ratio >= ``min_pass_ratio`` (default 1.0 = all passed); every tier in
+    ``required_tiers`` actually ran; and, when ``require_independent_verifier``
+    is set, that ``verified_by`` provenance exists and differs from both the
+    track ``owner`` and the ``produced_by`` runner (worker must not judge its
+    own work). It never invokes the live harness — that heavy, networked,
+    non-deterministic run happens out-of-band and deposits the receipt.
+    """
+    kind = "gauntlet_verified"
+    path = Path(receipt_path)
+    if not path.exists():
+        return CriterionResult(id="", kind=kind, passed=False,
+            detail=f"gauntlet receipt {receipt_path} MISSING — run benchmarks/gauntlet.py "
+                   "out-of-band and commit its receipt")
+    if not path.is_file():
+        return CriterionResult(id="", kind=kind, passed=False,
+                               detail=f"{receipt_path} is not a file")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8", errors="ignore"))
+    except (json.JSONDecodeError, OSError) as exc:
+        return CriterionResult(id="", kind=kind, passed=False,
+            detail=f"gauntlet receipt {receipt_path} unreadable: {type(exc).__name__}: {exc}")
+    if not isinstance(data, dict):
+        return CriterionResult(id="", kind=kind, passed=False,
+            detail=f"gauntlet receipt {receipt_path} is not a JSON object")
+
+    run_id = data.get("run_id", "?")
+
+    # Freshness — a graduation gauntlet result expires.
+    stamp = _parse_iso_timestamp(data.get("timestamp") or data.get("generated_at") or "")
+    if stamp is None:
+        return CriterionResult(id="", kind=kind, passed=False,
+            detail=f"gauntlet receipt {receipt_path} has no parseable timestamp/generated_at")
+    reference = now or datetime.now(timezone.utc)
+    if reference.tzinfo is None:
+        reference = reference.replace(tzinfo=timezone.utc)
+    age_hours = (reference - stamp).total_seconds() / 3600.0
+    if age_hours > max_age_hours:
+        return CriterionResult(id="", kind=kind, passed=False,
+            detail=f"gauntlet receipt stale: age={age_hours:.1f}h > max_age_hours={max_age_hours} "
+                   f"(run_id={run_id}); re-run the gauntlet")
+
+    # Score.
+    score = data.get("gauntlet_score")
+    if isinstance(score, bool) or not isinstance(score, (int, float)):
+        return CriterionResult(id="", kind=kind, passed=False,
+            detail=f"gauntlet receipt missing numeric gauntlet_score: {score!r} (run_id={run_id})")
+    if score < min_score:
+        return CriterionResult(id="", kind=kind, passed=False,
+            detail=f"gauntlet_score={float(score):.3f} < min_score={min_score} (run_id={run_id})")
+
+    # Task pass ratio — proves tasks actually ran and passed, not merely that a
+    # receipt file exists.
+    task_scores = data.get("task_scores")
+    if not isinstance(task_scores, list) or not task_scores:
+        return CriterionResult(id="", kind=kind, passed=False,
+            detail=f"gauntlet receipt has no task_scores — nothing was actually run (run_id={run_id})")
+    total = len(task_scores)
+    passed_tasks = sum(1 for t in task_scores if isinstance(t, dict) and t.get("passed") is True)
+    ratio = passed_tasks / total
+    if ratio < min_pass_ratio:
+        failed = [str(t.get("task_id", "?")) for t in task_scores
+                  if not (isinstance(t, dict) and t.get("passed") is True)]
+        return CriterionResult(id="", kind=kind, passed=False,
+            detail=f"gauntlet pass ratio {passed_tasks}/{total}={ratio:.2f} < "
+                   f"min_pass_ratio={min_pass_ratio}; failed: {', '.join(failed[:6])} (run_id={run_id})")
+
+    # Required tiers actually exercised.
+    tiers_run_raw = data.get("tiers_run")
+    tiers_run = ({int(t) for t in tiers_run_raw
+                  if isinstance(t, (int, float)) and not isinstance(t, bool)}
+                 if isinstance(tiers_run_raw, list) else set())
+    missing_tiers = sorted(set(required_tiers or []) - tiers_run)
+    if missing_tiers:
+        return CriterionResult(id="", kind=kind, passed=False,
+            detail=f"gauntlet did not run required tiers {missing_tiers}; "
+                   f"tiers_run={sorted(tiers_run)} (run_id={run_id})")
+
+    # Worker != judge (optional, fail-closed only when explicitly required).
+    if require_independent_verifier:
+        verified_by = data.get("verified_by")
+        produced_by = data.get("produced_by") or data.get("run_by")
+        if not isinstance(verified_by, str) or not verified_by.strip():
+            return CriterionResult(id="", kind=kind, passed=False,
+                detail=f"require_independent_verifier: receipt has no 'verified_by' provenance (run_id={run_id})")
+        verifier = verified_by.strip()
+        if owner and verifier == str(owner).strip():
+            return CriterionResult(id="", kind=kind, passed=False,
+                detail=f"require_independent_verifier: verified_by == owner ({owner}); "
+                       f"worker must not judge its own work (run_id={run_id})")
+        if produced_by and verifier == str(produced_by).strip():
+            return CriterionResult(id="", kind=kind, passed=False,
+                detail=f"require_independent_verifier: verified_by == produced_by; "
+                       f"independent verification required (run_id={run_id})")
+
+    return CriterionResult(id="", kind=kind, passed=True,
+        detail=(f"gauntlet fresh (age={age_hours:.1f}h <= {max_age_hours}h), "
+                f"score={float(score):.3f} >= {min_score}, pass={passed_tasks}/{total}, "
+                f"tiers={sorted(tiers_run)} (run_id={run_id})"))
+
+
 def evaluate_criterion(
     crit: dict[str, Any],
     *,
@@ -483,6 +633,28 @@ def evaluate_criterion(
                 )
         elif kind == "pr_merged":
             res = check_pr_merged(int(crit["pr"]))
+        elif kind == "gauntlet_verified":
+            receipt = crit.get("receipt")
+            required_tiers = crit.get("required_tiers")
+            if not isinstance(receipt, str) or not receipt:
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail="malformed criterion: 'receipt' must be a non-empty string")
+            elif required_tiers is not None and (
+                not isinstance(required_tiers, list)
+                or not all(isinstance(t, int) and not isinstance(t, bool) for t in required_tiers)
+            ):
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail="malformed criterion: 'required_tiers' must be a list of integers")
+            else:
+                res = check_gauntlet_verified(
+                    receipt,
+                    max_age_hours=float(crit.get("max_age_hours", GAUNTLET_DEFAULT_MAX_AGE_HOURS)),
+                    min_score=float(crit.get("min_score", 0.0)),
+                    min_pass_ratio=float(crit.get("min_pass_ratio", GAUNTLET_DEFAULT_MIN_PASS_RATIO)),
+                    required_tiers=[int(t) for t in required_tiers] if required_tiers else None,
+                    require_independent_verifier=bool(crit.get("require_independent_verifier", False)),
+                    owner=track.get("owner") if isinstance(track, dict) else None,
+                )
         else:
             res = CriterionResult(id="", kind=kind, passed=False,
                                   detail=f"unknown predicate kind: {kind!r}")
@@ -539,6 +711,9 @@ def normalize_portfolio(track: dict[str, Any] | None) -> dict[str, Any]:
             # advisory operator guidance, not auto-failed by CI.
             "min_active_grace_enforced": bool(policy.get("min_active_grace_enforced", False)),
             "allow_active_active_conflict": bool(policy.get("allow_active_active_conflict", False)),
+            # When True, an ACTIVE track that declares no gauntlet_verified gate is a
+            # hard ERROR (blocks graduation); default False keeps it advisory (WARN).
+            "require_gauntlet_for_shippable": bool(policy.get("require_gauntlet_for_shippable", False)),
             "surface_overlap": str(policy.get("surface_overlap", "warn")),
             "model": policy.get("model", "1..N co-equal active tracks; WIP-limited typed graph"),
         },
@@ -671,6 +846,24 @@ def validate_portfolio_graph(p: dict[str, Any], findings: list[Finding]) -> None
                     "Declare conflicts_with or split the surfaces."))
             else:
                 owner[s] = t.get("id")
+
+    # Gauntlet graduation gate — every ACTIVE track must DECLARE a
+    # gauntlet_verified completion criterion, so a track cannot graduate to
+    # SHIPPABLE on file-existence/string-match criteria alone. Whether the
+    # gauntlet *passes* is enforced by the criterion itself at evaluation time;
+    # this invariant only enforces that the gate is declared. Advisory (WARN)
+    # by default; ERROR when track_policy.require_gauntlet_for_shippable is set.
+    gauntlet_sev = "ERROR" if policy.get("require_gauntlet_for_shippable") else "WARN"
+    for t in active:
+        crits = t.get("completion_criteria") or []
+        has_gauntlet = any(
+            isinstance(c, dict) and c.get("kind") == "gauntlet_verified" for c in crits
+        )
+        if not has_gauntlet:
+            findings.append(Finding(gauntlet_sev, f"gauntlet-gate-missing:{t.get('id')}",
+                f"ACTIVE track '{t.get('id')}' declares no 'gauntlet_verified' completion "
+                "criterion — it can currently render SHIPPABLE without passing the gauntlet. "
+                "Add a gauntlet_verified gate to its completion_criteria."))
 
 
 def _int_or_none(value: Any) -> int | None:
