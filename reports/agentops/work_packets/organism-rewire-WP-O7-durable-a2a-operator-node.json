@@ -219,9 +219,10 @@
     ],
     "honest_blockers": [
       "Live host deployment, NATS credentials, token rotation, and JetStream KV/Object infrastructure remain host-owned and are not proven by hermetic tests.",
-      "The dashboard is a read model and cannot upgrade STORED receipts into delivered, processed, or effect claims."
+      "The dashboard is a read model and cannot upgrade STORED receipts into delivered, processed, or effect claims.",
+      "The exact organism-rewire surface ownership expansion is isolated in governance PR #949 and must land before this implementation."
     ],
     "rollback": "revert the fleet presence consumer, exact NodeRegistry/AgentDirectory wiring, phone operator node, tests, and packet together; no runtime migration is required",
-    "packet_digest": "096c8a95562649fa0154025cf7bb61edc98201c8568177a4228ddf8d1e4836b1"
+    "packet_digest": "59ef2348ce4aade0467bc8ee5731a0ef2498ed39f671db5dab57716623907b1b"
   }
 }
