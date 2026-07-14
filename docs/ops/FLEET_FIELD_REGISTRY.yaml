@@ -22,7 +22,7 @@
 #   docs/ops/A2A_AGENT_ONBOARDING.md               = how a NEW identity joins
 
 schema: dharma_fleet_field_registry.v1
-updated: "2026-07-09"
+updated: "2026-07-14"
 refreshed_by: field_probe_2026_07_09
 probe_synthesis: inter_agent/fleet/2026-07-09-field-probe-synthesis.md
 secret_policy: env_var_names_only
