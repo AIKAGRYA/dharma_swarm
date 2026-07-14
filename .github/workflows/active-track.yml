@@ -232,7 +232,9 @@ jobs:
     name: Publish derived status branch
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Raised from 10 with the full dev install below: the checker now actually
+    # executes the pytest-battery criteria (wp_o4's batch alone runs ~2.5 min).
+    timeout-minutes: 30
     permissions:
       contents: write
     steps:
@@ -246,10 +248,19 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install minimal deps
+      # CL1-B3 (closure spec ONBOARD_ONE_DOOR_CLOSURE_SPEC_2026-07-14.md):
+      # this job used to install only pyyaml, so every command_passes /
+      # test_passes criterion rendered "environment lacks 'pytest'" and the
+      # published projection could never verify a pytest-backed track (it
+      # showed onboard-one-door at 0/15 forever). Install the same dev
+      # environment as tests.yml so criteria execute here. Fail-safe stays
+      # honest: if this install ever breaks, the checker still runs
+      # --warn-only and unexecuted criteria stay unverified — never a
+      # synthesized pass.
+      - name: Install package + test deps
         run: |
           python3 -m pip install --upgrade pip
-          python3 -m pip install pyyaml
+          python3 -m pip install -e ".[dev]"
 
       - name: Regenerate derived status rollups
         run: |

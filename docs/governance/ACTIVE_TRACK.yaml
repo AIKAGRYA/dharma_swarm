@@ -1949,8 +1949,14 @@ active_tracks:
       - id: wp_o3_cli_readiness_cache_delta
         kind: command_passes
         command: ["python3", "-m", "pytest", "tests/test_onboarding_cli.py", "tests/test_onboarding_readiness.py", "tests/test_onboarding_cache.py", "tests/test_agent_onboard.py", "-q"]
+      # timeout_s raised from the 120 s default (closure spec CL1-B4): the
+      # batch's honest full runtime was witnessed at 152 s on 2026-07-14, so
+      # the default deadline recorded a timeout instead of the batch's real
+      # result. Raising the deadline is the truthful fix; trimming tests to
+      # fit the deadline would be a weakened check.
       - id: wp_o4_make_agentops_ci_parity
         kind: command_passes
+        timeout_s: 360
         command: ["python3", "-m", "pytest", "tests/test_make_onboarding_contract.py", "tests/test_onboarding_ci_contract.py", "tests/test_agent_work_packet.py", "tests/test_orientation_graph.py", "-q"]
       - id: wp_o4_positive_gate_command_allowlist
         kind: command_passes
@@ -1981,6 +1987,32 @@ active_tracks:
       - id: wp_o3_door_delegates_to_compact_engine
         kind: command_passes
         command: ["python3", "-m", "pytest", "tests/test_make_onboarding_contract.py::test_door_delegates_to_compact_engine", "-q"]
+      # CL-1 evidence-grade ratchet (2026-07-14, closure spec
+      # docs/plans/ONBOARD_ONE_DOOR_CLOSURE_SPEC_2026-07-14.md CL1-B1/CL1-B2).
+      # Every criterion above is command_passes, which is not a RIGOROUS kind
+      # and grades S0 in the evidence ladder — so even at all-green this track
+      # carried the "no rigorous evidence" and "S0 < required S2" ship blocks.
+      # The three commit_on_main criteria bind the landed WP waves to git
+      # history (S2, verifiable in any environment with git — including the
+      # dependency-light publish-status job). The two test_passes criteria bind
+      # the load-bearing batteries to executed pytest targets (S3, honestly
+      # downgraded to S2 because no independent oracle_source is declared).
+      # Additive only: no existing criterion was removed or weakened.
+      - id: wp_o2_wave_landed_on_main
+        kind: commit_on_main
+        commit: "e90809c8fbda63b40a4bef15c6ad5d4396090eb6"
+      - id: wp_o3_activation_landed_on_main
+        kind: commit_on_main
+        commit: "895e891be5cac3676fe546ca862ccd4e22efe9f5"
+      - id: wp_o4_wave_landed_on_main
+        kind: commit_on_main
+        commit: "414f4c096bbb63061279b58e780b27765b3d99ae"
+      - id: broken_register_parser_battery_executes
+        kind: test_passes
+        test: tests/test_onboarding_broken_register.py
+      - id: door_delegation_behavior_executes
+        kind: test_passes
+        test: tests/test_make_onboarding_contract.py::test_door_delegates_to_compact_engine
     next_items:
       - id: WP-O2
         what: "DONE 2026-07-13 — PRs #907/#911 merged the canonical boundary parser, restored the 23-key public control-surface mapping and packet replay, and added adversarial coverage for pre-section entries, OPEN SOURCE NOTES, heading prose, CLOSED/FIXED equivalence, and outside-lifecycle diagnostics."
