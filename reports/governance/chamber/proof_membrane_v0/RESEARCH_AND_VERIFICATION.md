@@ -2,7 +2,7 @@
 
 Date: 2026-07-14 (Asia/Tokyo)
 Frozen base: `2d2de7b1bfdd982b09334b7154e3e26425c55211`
-Committed implementation: `df435af863e651287de3f637509a45d59b133ad3`
+Committed implementation: `f1a15e72ecb641c3f167b9c0f581f0ce6b7492dc`
 Track: `hyperbolic-time-chamber-2026-07`
 Claim ceiling: `HARNESS_PROVEN` for the exact replay manifest only
 
@@ -26,7 +26,7 @@ forecast is calibrated, or whether production may change.
 | HC-002 | `Claim<NoExactReplayContractObserved, Inspected, MiroFish@96096ea, four_named_paths>` | README workflow, parallel runner, LLM client, and report-agent paths linked below expose stochastic/concurrent/model-driven inputs, but no complete exact-replay contract was observed in those paths | This is not an exhaustive absence claim; uninspected OASIS/provider internals or later upstream versions may add such a contract | A pinned contract capturing entropy, schedules, model exchanges, environment versions, and repeated semantic hashes falsifies this bounded observation |
 | HC-003 | `Claim<AntithesisUsefulForSearchAndReplay, Documented, vendor_docs, documented_scope>` | Antithesis deterministic-simulation and fault-injection documentation | Vendor execution cannot define Dharma's semantic proposition or evaluator permission | Export and reproduce one vendor-found failure under a Dharma exact-scope verifier |
 | HC-004 | `Claim<HypothesisUsefulForGenerationAndShrinking, Documented, official_docs, stateful_testing>` | Hypothesis stateful testing documentation | Its seed/database is not the canonical replay bundle and does not grant authority | Minimize a later registered Dharma world into the data-only bundle schema |
-| HC-005 | `Claim<Refutes<fork_parent_isolated>, Reproduced, RuntimeVerifier, scope:8f29d827...>` | Committed bundle and `verification_receipt.json` in this directory; 100 unique child PIDs carry one replay-payload digest and exact loaded-source digests | Demonstrates one current defect, not general determinism, a repaired graph, or OS attestation | DharmaGraph owner repairs it; a new repair-oriented bundle must then obtain an exact-scope `Satisfies` claim |
+| HC-005 | `Claim<Refutes<fork_parent_isolated>, Reproduced, RuntimeVerifier, scope:b490762a...>` | Committed bundle and `verification_receipt.json` in this directory; 100 unique child PIDs carry one replay-payload digest and exact loaded-source digests | Demonstrates one current defect, not general determinism, a repaired graph, or OS attestation | DharmaGraph owner repairs it; a new repair-oriented bundle must then obtain an exact-scope `Satisfies` claim |
 | HC-006 | `Claim<PromotionGateMechanics, Tested, local_pytest, owned_test_scope>` | `tests/test_chamber_traces.py`; wrong proposition, scope, modality, arm, candidate, effect binding, property, control, authority shape, evaluator instance, duplicate mint, and reuse are rejected | Trusted-process semantic boundary only; Python privacy, frozen dataclasses, and underscores are not a hostile-code security boundary | Bind a later production gate to a durable principal and transactional effect protocol without widening V0 |
 
 ## Engine placement
@@ -84,18 +84,18 @@ later path replacement cannot change child input.
 Durable artifacts:
 
 - `dharmagraph_fork_alias.replay_bundle.v1.json`
-  - source revision: `df435af863e651287de3f637509a45d59b133ad3`
-  - bundle and scope digest: `8f29d8279aa5cd4a99f4861fb0df557356c9942b88112673b26f1568e1c91085`
+  - source revision: `f1a15e72ecb641c3f167b9c0f581f0ce6b7492dc`
+  - bundle and scope digest: `b490762a3b5c1000b6fd899ceddf90f19c33c398af26eb33c7d3f34b338db261`
   - specimen candidate: `dharmagraph.run_checkpoint.current-fork-specimen.v1`
   - control candidate: `dharmagraph.run_checkpoint.deepcopy-control-fixture.v1`
   - failing specimen semantic digest: `7e215b28cc0ad055f2dc12a32246f1cb99c4bbb960162d3b356fa0d354928673`
   - passing control semantic digest: `c750b3470d9af1a54e1177a63b2bd4f8dd031f75f55fc19a2f70a60db3edb3e6`
 - `verification_receipt.json`
   - 100 requested, 100 completed, 100 unique child PIDs
-  - common per-run semantic digest: `5babd79576f0eea166eb8d82e956658b2022a83ef44e2365331a18803404b267`
-  - semantic receipt digest: `71535e6240641b661fbef84aec7a25e7c492939be65639f5be40184ce9962c38`
-  - transcript digest: `0aff471449b66fe826e6deb88ace9edd7d94ed873f6bb238b972377350d9e271`
-  - whole receipt digest: `052402a0b03a68f3f78539b00c427aa5a6d9ae276f26cacd9d849535457296b9`
+  - common per-run semantic digest: `d72c4d8f86185603289ece329efa752b3ddbd7ebe02c1c194988b6794f9c1287`
+  - semantic receipt digest: `b4d6caadf0c737b0f61f1f946b74107b1f459d1d0f8c60628dbe6c22a23d0852`
+  - transcript digest: `18378e372813687e9f1856fad5fa78d7940cc46fb3628168a9034b3c4ab6194f`
+  - whole receipt digest: `885d5992d6336ff9ea9b58cbba9c3549c99b080829c3aa6ffb53338aa1eb721b`
   - Python: `/Users/dhyana/dharma_swarm/.venv/bin/python`, CPython 3.13.12
   - Git: `/usr/bin/git`, SHA-256 `179301dcb41ea78accc3fa0048a7e6f6710d891945a751a34addd622020c1818`
 
@@ -103,19 +103,22 @@ Checks completed before this ledger was written:
 
 ```text
 pytest -q tests/test_chamber_traces.py
-33 passed in 18.05s
+36 passed in 9.82s
 
 pytest -q tests/test_graph_checkpoint.py tests/test_graph_neutral_cycles_resume.py
 22 passed in 0.20s
 
 PATH=<repository .venv first> pytest -q <all seven owned chamber suites>
-102 passed in 44.49s
+105 passed in 41.82s
 
 pytest -q tests/test_chamber_traces.py -k <semantic negative selection>
-22 passed, 11 deselected in 2.08s
+22 passed, 14 deselected in 1.52s
 
 ruff check <five proof/replay modules> tests/test_chamber_traces.py
 All checks passed
+
+semgrep --config .semgrep --error --baseline-commit origin/main
+0 findings across the changed Python targets
 
 git diff --check; py_compile; AgentOps packet parse/digest; commit hooks
 passed (including gitleaks, semgrep warn-only, docops, hygiene, contracts)
@@ -208,6 +211,23 @@ Ruff, `py_compile`, and `git diff --check` were green. The council result is
 review evidence; these executable results and the runtime witness remain
 separate claims.
 
+PR CI subsequently found two owned-rule `eval-or-exec` findings in the source
+snapshot loaders. This was a real admission defect, so no suppression was
+added. Commit `f1a15e72ecb641c3f167b9c0f581f0ce6b7492dc` replaces the direct
+dynamic-execution sinks with immutable, in-memory `SourceLoader` instances,
+explicitly disables bytecode-cache path probing, preserves module metadata,
+and removes partial modules from `sys.modules` after any failed execution.
+Direct tests mutate the backing path after capture and prove that only captured
+bytes execute; cancellation-style failures also leave no module-registry
+poisoning. Strict local Semgrep now reports zero findings.
+
+Because `replay.py`, `replay_worker.py`, and the manifest-declared test changed,
+the old Round 6 verdict and AgentOps closeout are historical evidence only.
+They are not inherited as review of `f1a15e72e`. The bundle and 100-process
+receipt above were regenerated against that exact commit, and a new council
+round must review these final bytes before the independent-model condition is
+claimed again.
+
 ## Primary research locators
 
 - [MiroFish upstream workflow](https://github.com/666ghj/MiroFish/blob/96096ea0ff42b1a30cbc41a1560b8c91090f9968/README.md#L86-L92)
@@ -235,6 +255,8 @@ execution, but it is not an OS sandbox, interpreter/stdlib image attestation,
 cryptographic principal, or proof against a precisely timed hostile source
 swap. Python-private seals and frozen dataclasses enforce supported-API
 semantics, not security against arbitrary code already inside the evaluator.
+The worker's own file digest remains a post-load filesystem read; V0 does not
+claim protection against a precisely timed hostile mutation of that file.
 Authorization is in-memory and single-evaluator only; handler code is not
 attested, concurrent mint/promote is not a free-threaded protocol, and handler
 failure after capability consumption is not transactionally retryable. No

@@ -1,5 +1,5 @@
 {
-  "bundle_digest": "8f29d8279aa5cd4a99f4861fb0df557356c9942b88112673b26f1568e1c91085",
+  "bundle_digest": "b490762a3b5c1000b6fd899ceddf90f19c33c398af26eb33c7d3f34b338db261",
   "bundle_id": "dharmagraph-fork-alias-current-main-v1",
   "control_candidate_id": "dharmagraph.run_checkpoint.deepcopy-control-fixture.v1",
   "control_world": {
@@ -56,7 +56,7 @@
     },
     {
       "path": "dharma_swarm/chamber/replay.py",
-      "sha256": "792d395f54ea825743bb8cf48c1ba57f047d7b7106c22d1385313be291ffa29b"
+      "sha256": "4e91b50f5c9d18b35a09b8d9b62da23bdd8159b758f4862b5444fd538b3d6c82"
     },
     {
       "path": "dharma_swarm/chamber/replay_contract.py",
@@ -64,7 +64,7 @@
     },
     {
       "path": "dharma_swarm/chamber/replay_worker.py",
-      "sha256": "5054fcb6c45e78558f8f281298c64e229b517b5576041305605c7595780f521b"
+      "sha256": "6e00ece06f20de61d857333e40347dcc823d13885c46ea32cb447075c28df91c"
     },
     {
       "path": "dharma_swarm/chamber/verification.py",
@@ -81,7 +81,7 @@
   ],
   "scenario_candidate_id": "dharmagraph.run_checkpoint.current-fork-specimen.v1",
   "schema": "dharma_replay_bundle.v1",
-  "source_revision": "df435af863e651287de3f637509a45d59b133ad3",
+  "source_revision": "f1a15e72ecb641c3f167b9c0f581f0ce6b7492dc",
   "world": {
     "activated_properties": [
       "dharmagraph.checkpoint.fork_parent_isolated.v1"

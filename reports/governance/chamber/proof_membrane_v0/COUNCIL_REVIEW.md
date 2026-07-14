@@ -131,3 +131,12 @@ running and fresh with a 27-second heartbeat age. No prior vote was inherited.
 
 This closes the user's independent-model review condition and PM0-10 for the
 bounded exact-scope harness claim. It still does not create runtime authority.
+
+## Round 7 — pending final-code review
+
+PR CI later found two owned Semgrep `eval-or-exec` violations in the snapshot
+loaders. Commit `f1a15e72ecb641c3f167b9c0f581f0ce6b7492dc` removes those sinks
+without suppression and adds direct captured-byte, metadata, cache-disable,
+and failure-cleanup tests. The exact bundle and 100-process receipt were
+regenerated. Round 6 is not inherited; `ROUND7_COUNCIL_PROMPT.md` asks all six
+required lanes to review the repaired code and new scope.
