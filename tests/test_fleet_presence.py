@@ -158,17 +158,17 @@ def _projector(
     )
 
 
-def _legacy(*, sender: str = "devin", uid: str = DEVIN_UID, packet: str = "hb-001") -> bytes:
+def _legacy(*, sender: str = "devin", uid: str = DEVIN_UID, packet: str = "hb-001", subject: str = SUBJECT) -> bytes:
     return json.dumps({
         "schema_version": "dharma.a2a.send.v1", "packet_id": packet, "timestamp": HEARTBEAT_AT,
-        "from": sender, "to": "fleet", "kind": "heartbeat", "route": "a2a", "subject": "dharma.a2a.fleet",
+        "from": sender, "to": "fleet", "kind": "heartbeat", "route": "a2a", "subject": subject,
         "content": json.dumps({"agent_uid": uid, "status": "online", "messages_received": 7, "uptime_s": 123.5}),
     }, sort_keys=True).encode()
 
 
-def _canonical(*, sender: str = "devin", uid: str = DEVIN_UID, message_id: str = "hb-canonical") -> bytes:
+def _canonical(*, sender: str = "devin", uid: str = DEVIN_UID, message_id: str = "hb-canonical", subject: str = SUBJECT) -> bytes:
     return json.dumps({
-        "schema": "dharma.nats.envelope.v1", "message_id": message_id, "subject": "dharma.a2a.fleet",
+        "schema": "dharma.nats.envelope.v1", "message_id": message_id, "subject": subject,
         "from_agent": sender, "to_agent": "fleet", "actor": {"from_agent": sender, "to_agent": "fleet"},
         "kind": "heartbeat", "created_at": HEARTBEAT_AT, "requires_ack": True,
         "payload": {"schema": "dharma.a2a.fleet_heartbeat.v1", "agent_uid": uid, "status": "online",
@@ -189,18 +189,18 @@ def test_node_registry_record_heartbeat_is_identity_checked_and_persisted(tmp_pa
     assert NodeRegistry(tmp_path / "nodes.json", clock=lambda: NOW).get("devin") == node
 
 
-@pytest.mark.parametrize(("payload", "field", "value"), [(_legacy(), "messages_received", 7), (_canonical(), "load", 0.25)])
+@pytest.mark.parametrize(("payload", "subject", "compat", "field", "value"), [(_legacy(subject=fp.FLEET_HEARTBEAT_SUBJECT), fp.FLEET_HEARTBEAT_SUBJECT, True, "messages_received", 7), (_canonical(), SUBJECT, True, "load", 0.25)])
 @pytest.mark.asyncio
-async def test_valid_legacy_and_canonical_heartbeats_project(tmp_path: Path, payload: bytes, field: str, value: Any) -> None:
-    nodes, message = _nodes(tmp_path), _Message(payload)
-    result = await _projector(tmp_path, nodes=nodes).consume_message(message)
+async def test_valid_legacy_and_canonical_heartbeats_project(tmp_path: Path, payload: bytes, subject: str, compat: bool, field: str, value: Any) -> None:
+    nodes, message = _nodes(tmp_path), _Message(payload, subject=subject)
+    result = await _projector(tmp_path, nodes=nodes, compatibility_mode=compat).consume_message(message)
     node = nodes.get("devin")
     assert result.status == "projected" and result.agent_uid == DEVIN_UID
     assert message.acked == 1 and message.nacked == 0 and node
     assert node.status == "online" and node.last_heartbeat == HEARTBEAT_AT and node.metadata[field] == value
 
 
-@pytest.mark.parametrize("case", ["payload_mismatch", "unknown", "subject_mismatch"])
+@pytest.mark.parametrize("case", ["payload_mismatch", "unknown", "envelope_subject_mismatch", "subject_uid_mismatch", "legacy_without_compat"])
 @pytest.mark.asyncio
 async def test_identity_rejections_nak_without_registry_pollution(tmp_path: Path, case: str) -> None:
     cards, payload, subject = _cards(tmp_path), _canonical(), SUBJECT
@@ -208,11 +208,15 @@ async def test_identity_rejections_nak_without_registry_pollution(tmp_path: Path
         cards, payload = _cards(tmp_path, hermes=True), _canonical(uid="hermes-m5")
     elif case == "unknown":
         cards, payload = _cards(tmp_path, empty=True), _canonical(sender="intruder", uid="intruder")
-    else:
+    elif case == "envelope_subject_mismatch":
         subject = "dharma.agent.hermes-m5.presence"
+    elif case == "subject_uid_mismatch":
+        subject, payload = "dharma.agent.hermes-m5.presence", _canonical(subject="dharma.agent.hermes-m5.presence")
+    else:
+        subject, payload = fp.FLEET_HEARTBEAT_SUBJECT, _legacy(subject=fp.FLEET_HEARTBEAT_SUBJECT)
     nodes, message = _nodes(tmp_path), _Message(payload, subject=subject)
-    with pytest.raises(fp.FleetPresenceError, match="mismatch|unknown"):
-        await _projector(tmp_path, cards=cards, nodes=nodes).consume_message(message)
+    with pytest.raises(fp.FleetPresenceError, match="mismatch|unknown|compatibility"):
+        await _projector(tmp_path, cards=cards, nodes=nodes, compatibility_mode=case == "subject_uid_mismatch").consume_message(message)
     assert message.nacked == 1 and message.acked == 0 and nodes.count() == 0
 
 
@@ -225,7 +229,7 @@ async def test_duplicate_and_ack_failure_preserve_one_completed_projection(tmp_p
     assert first.status == "projected" and duplicate.status == "duplicate" and duplicate.duplicate
     with pytest.raises(fp.FleetPresenceError, match="ack failed"):
         await projector.consume_message(_Message(data, fail_ack=True))
-    heartbeat, identity = fp.parse_fleet_heartbeat(data), fp._execution_identity(fp.parse_fleet_heartbeat(data), DEVIN_UID)
+    heartbeat, identity = fp.parse_fleet_heartbeat(data, transport_subject=SUBJECT), fp._execution_identity(fp.parse_fleet_heartbeat(data, transport_subject=SUBJECT), DEVIN_UID)
     record = await runtime.get_idempotency_record(identity.idempotency_key, f"fleet_presence:{DEVIN_UID}:{heartbeat.message_id}")
     assert record and record.status == "completed" and nodes.heartbeat_writes == 1
 
@@ -233,7 +237,7 @@ async def test_duplicate_and_ack_failure_preserve_one_completed_projection(tmp_p
 @pytest.mark.asyncio
 async def test_in_progress_delivery_does_not_steal_owner(tmp_path: Path) -> None:
     data, runtime = _legacy(), RuntimeStateStore(tmp_path / "runtime.db")
-    heartbeat = fp.parse_fleet_heartbeat(data)
+    heartbeat = fp.parse_fleet_heartbeat(data, transport_subject=SUBJECT)
     identity, key = fp._execution_identity(heartbeat, DEVIN_UID), f"fleet_presence:{DEVIN_UID}:{heartbeat.message_id}"
     await runtime.record_execution_identity(identity, source="test")
     assert await runtime.try_begin_idempotent_side_effect(identity, key)
@@ -250,7 +254,7 @@ async def test_reclaimed_owner_blocks_stale_original_completion(tmp_path: Path) 
     message = _Message(_legacy())
     with pytest.raises(fp.FleetPresenceError, match="lease lost"):
         await _projector(tmp_path, nodes=nodes, runtime=runtime).consume_message(message)
-    heartbeat = fp.parse_fleet_heartbeat(message.data)
+    heartbeat = fp.parse_fleet_heartbeat(message.data, transport_subject=SUBJECT)
     record = await runtime.get_idempotency_record(runtime.reclaimed_identity.idempotency_key, f"fleet_presence:{DEVIN_UID}:{heartbeat.message_id}")
     assert record and record.status == "started" and record.updated_at == runtime.reclaim_token
     assert nodes.count() == 0 and message.nacked == 1
@@ -272,7 +276,7 @@ async def test_ambiguous_cas_redelivery_repairs_without_overwriting_newer(tmp_pa
             metadata={"agent_uid": DEVIN_UID, "presence_message_id": "presence_newer"}, canonical_agent_uid=DEVIN_UID,
         )
     result = await projector.consume_message(_Message(data))
-    current, heartbeat = nodes.get("devin"), fp.parse_fleet_heartbeat(data)
+    current, heartbeat = nodes.get("devin"), fp.parse_fleet_heartbeat(data, transport_subject=SUBJECT)
     assert result.status == "duplicate" and current
     assert current.metadata["presence_message_id"] == ("presence_newer" if node_state == "newer" else heartbeat.message_id)
     receipts = await runtime.list_runtime_receipts(receipt_type="fleet_presence")
@@ -338,7 +342,7 @@ INVALID = [
 @pytest.mark.asyncio
 async def test_strict_boundary_errors_nak_without_pollution(tmp_path: Path, data: bytes) -> None:
     with pytest.raises(fp.InvalidFleetPresenceEnvelope):
-        fp.parse_fleet_heartbeat(data)
+        fp.parse_fleet_heartbeat(data, transport_subject=SUBJECT)
     nodes, message = _nodes(tmp_path), _Message(data)
     with pytest.raises(fp.InvalidFleetPresenceEnvelope):
         await _projector(tmp_path, nodes=nodes).consume_message(message)
@@ -361,7 +365,7 @@ async def test_agent_directory_exposes_heartbeat_without_becoming_authority(tmp_
     assert entry and entry.last_heartbeat == HEARTBEAT_AT and entry.status == "online"
 
 
-def test_presence_config_env_and_shared_subject_safety() -> None:
+def test_presence_config_env_and_subject_policy_safety(monkeypatch: pytest.MonkeyPatch) -> None:
     config = fp.FleetPresenceConsumerConfig.from_env({
         "NATS_URL": "nats://broker:4222", "NATS_USER": "fleet", "NATS_PASSWORD": "secret",
         "NATS_STREAM": "PRESENCE", "NATS_SUBJECT": "dharma.agent.*.presence", "NATS_CONSUMER": "presence",
@@ -371,8 +375,9 @@ def test_presence_config_env_and_shared_subject_safety() -> None:
     with pytest.raises(fp.FleetPresenceConfigurationError, match="shared"):
         fp.FleetPresenceConsumerConfig(subject="dharma.a2a.fleet")
     assert fp.FleetPresenceConsumerConfig(subject="dharma.a2a.fleet", compatibility_mode=True).compatibility_mode
-
-
+    monkeypatch.setattr(fp.hashlib, "sha256", lambda *_: pytest.fail("identity derived for invalid subject"))
+    with pytest.raises(fp.InvalidFleetPresenceEnvelope, match="subject"):
+        fp.parse_fleet_heartbeat(_canonical(subject="dharma.a2a.other"), transport_subject="dharma.a2a.other", compatibility_mode=True)
 @pytest.mark.parametrize("kind", ["registration", "task"])
 @pytest.mark.asyncio
 async def test_shared_compatibility_acks_nonheartbeat_traffic(tmp_path: Path, kind: str) -> None:

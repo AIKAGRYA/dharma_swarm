@@ -77,7 +77,7 @@ class FleetPresenceConsumerConfig:
             raise FleetPresenceConfigurationError("presence NATS config is incomplete")
         if bool(self.user) != bool(self.password):
             raise FleetPresenceConfigurationError("presence NATS user and password must be configured together")
-        if not _DEDICATED_FILTER.fullmatch(self.subject) and not self.compatibility_mode:
+        if not _DEDICATED_FILTER.fullmatch(self.subject) and not (self.compatibility_mode and self.subject == FLEET_HEARTBEAT_SUBJECT):
             raise FleetPresenceConfigurationError("unsafe shared presence subject requires compatibility mode")
         if not math.isfinite(self.max_future_skew_s) or self.max_future_skew_s < 0:
             raise FleetPresenceConfigurationError("invalid heartbeat future skew")
@@ -133,8 +133,14 @@ class FleetPresenceResult:
 
 
 # fmt: off
-def parse_fleet_heartbeat(data: bytes) -> FleetHeartbeat:
+def parse_fleet_heartbeat(data: bytes, *, transport_subject: str, compatibility_mode: bool = False) -> FleetHeartbeat:
     """Strictly validate untrusted legacy or canonical heartbeat JSON."""
+    if not isinstance(transport_subject, str) or not transport_subject.strip():
+        raise InvalidFleetPresenceEnvelope("invalid transport subject")
+    actual_subject = transport_subject.strip()
+    if actual_subject == FLEET_HEARTBEAT_SUBJECT and not compatibility_mode:
+        raise InvalidFleetPresenceEnvelope("shared subject requires compatibility mode")
+    _transport_agent_uid(actual_subject, compatibility_mode=compatibility_mode)
     envelope = _decode_envelope(data)
     canonical = envelope.get("schema") == NATS_ENVELOPE_SCHEMA
     if canonical:
@@ -155,7 +161,8 @@ def parse_fleet_heartbeat(data: bytes) -> FleetHeartbeat:
     _required_text(envelope, "kind", "heartbeat")
     sender = _required_text(envelope, sender_key)
     _required_text(envelope, target_key, "fleet")
-    subject = _required_text(envelope, "subject", FLEET_HEARTBEAT_SUBJECT)
+    if _required_text(envelope, "subject") != actual_subject:
+        raise InvalidFleetPresenceEnvelope("envelope/transport subject mismatch")
     source_id = _required_text(envelope, id_key)
     if canonical:
         actor = envelope.get("actor")
@@ -166,11 +173,9 @@ def parse_fleet_heartbeat(data: bytes) -> FleetHeartbeat:
     status = _heartbeat_status(body.get("status"))
     observed = _normalized_timestamp(timestamp)
     metadata = _heartbeat_metadata(body)
-    material = (sender, uid, status, observed, subject, source_id, schema, metadata)
+    material = (sender, uid, status, observed, actual_subject, source_id, schema, metadata)
     encoded = json.dumps(material, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode()
     return FleetHeartbeat(sender, uid, status, observed, f"presence_{hashlib.sha256(encoded).hexdigest()[:32]}", source_id, metadata)
-
-
 def _decode_envelope(data: bytes) -> dict[str, Any]:
     if not isinstance(data, bytes):
         raise InvalidFleetPresenceEnvelope("invalid fleet heartbeat data type")
@@ -184,8 +189,6 @@ def _decode_envelope(data: bytes) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise InvalidFleetPresenceEnvelope("invalid heartbeat JSON object")
     return value
-
-
 def _strict_json(value: str, label: str) -> Any:
     def finite(raw: str) -> float:
         parsed = float(raw)
@@ -197,8 +200,6 @@ def _strict_json(value: str, label: str) -> Any:
         return json.loads(value, parse_constant=lambda raw: (_ for _ in ()).throw(ValueError(f"non-finite JSON number: {raw}")), parse_float=finite)
     except (ValueError, OverflowError, RecursionError) as exc:
         raise InvalidFleetPresenceEnvelope(f"invalid {label} JSON") from exc
-
-
 def _required_text(payload: Mapping[str, Any], key: str, expected: str | None = None) -> str:
     value = payload.get(key)
     if not isinstance(value, str) or not value.strip():
@@ -208,13 +209,11 @@ def _required_text(payload: Mapping[str, Any], key: str, expected: str | None = 
         raise InvalidFleetPresenceEnvelope(f"invalid fleet heartbeat field: {key}")
     return text
 
-
 def _heartbeat_status(value: Any) -> str:
     status = value.strip().lower() if isinstance(value, str) else ""
     if status not in {"online", "degraded", "offline", "unknown"}:
         raise InvalidFleetPresenceEnvelope("invalid fleet heartbeat status")
     return status
-
 
 def _normalized_timestamp(value: Any) -> str:
     try:
@@ -224,7 +223,6 @@ def _normalized_timestamp(value: Any) -> str:
         return parsed.astimezone(timezone.utc).isoformat()
     except (ValueError, OverflowError, OSError) as exc:
         raise InvalidFleetPresenceEnvelope("invalid fleet heartbeat timestamp") from exc
-
 
 def _heartbeat_metadata(body: Mapping[str, Any]) -> dict[str, Any]:
     explicit = body.get("metadata", {})
@@ -268,7 +266,7 @@ class FleetPresenceProjector:
     async def consume_message(self, message: FleetPresenceMessage) -> FleetPresenceResult:
         """Persist idempotently before ACK; NAK rejected or unproven work."""
         try:
-            heartbeat = parse_fleet_heartbeat(message.data)
+            heartbeat = parse_fleet_heartbeat(message.data, transport_subject=message.subject, compatibility_mode=self.compatibility_mode)
             self._validate_time(heartbeat)
             card, agent_uid = self._resolve_identity(heartbeat)
             transport_uid = _transport_agent_uid(message.subject, compatibility_mode=self.compatibility_mode)
@@ -423,7 +421,7 @@ def _transport_agent_uid(subject: str, *, compatibility_mode: bool) -> str | Non
     match = _DEDICATED_MESSAGE.fullmatch(subject)
     if match:
         return match.group(1)
-    if compatibility_mode:
+    if compatibility_mode and subject == FLEET_HEARTBEAT_SUBJECT:
         return None
     raise InvalidFleetPresenceEnvelope("invalid dedicated fleet presence subject")
 
