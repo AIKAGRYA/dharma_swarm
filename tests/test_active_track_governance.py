@@ -135,14 +135,20 @@ def test_managed_files_have_markers() -> None:
 
 def test_one_door_c1_has_ordered_pre_and_post_wp_o5_proofs() -> None:
     """C1 must unlock WP-O5 before plain-command enforcement can close C1."""
-    sys.path.insert(0, str(REPO_ROOT / "scripts/governance"))
+    governance_path = str(REPO_ROOT / "scripts/governance")
+    if governance_path not in sys.path:
+        sys.path.insert(0, governance_path)
     from check_track_status import load_active_track, normalize_portfolio  # type: ignore
 
     portfolio = normalize_portfolio(load_active_track(ACTIVE_TRACK))
     track = next(
-        item for item in portfolio["active_tracks"]
-        if item["id"] == "onboard-one-door-2026-07"
+        (
+            item for item in portfolio["active_tracks"]
+            if item["id"] == "onboard-one-door-2026-07"
+        ),
+        None,
     )
+    assert track is not None, "onboard-one-door-2026-07 missing from active portfolio"
     items = {str(item["id"]): item for item in track["next_items"]}
 
     c1 = items["C1"]["what"]
