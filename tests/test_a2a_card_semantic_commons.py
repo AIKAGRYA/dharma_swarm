@@ -78,6 +78,7 @@ def test_resolver_finds_card_by_alias_and_returns_agent_inbox_route(tmp_path):
     registry.register(AgentCard(name="hermes-m5"))
 
     assert resolve_agent_uid("hermes") == "hermes-m5"
+    assert resolve_agent_uid("fable-composer") == "fable_composer"
     route = registry.resolve_a2a_inbox_route("hermes")
     assert route == A2AInboxRoute(agent_uid="hermes-m5")
     assert route.subject == "dharma.agent.hermes-m5.inbox"
