@@ -2155,6 +2155,43 @@ def test_session_entry_accepts_exact_wp_o2r_identity_only(tmp_path: Path) -> Non
             )
 
 
+def test_session_entry_accepts_exact_wp_o3r_identity_only(tmp_path: Path) -> None:
+    repo = init_session_repo(tmp_path)
+
+    def packet_for(work_packet: str, *, packet_id: str | None = None) -> dict[str, object]:
+        payload = session_packet(repo)
+        identity = packet_id or f"onboard-one-door-{work_packet}"
+        payload["id"] = identity
+        payload["allowed_files"] = [
+            "allowed.txt",
+            f"reports/agentops/work_packets/{identity}.json",
+        ]
+        entry = payload["session_entry"]
+        assert isinstance(entry, dict)
+        entry["work_packet"] = work_packet
+        return seal_packet(payload)
+
+    parsed = agentops.parse_work_packet(packet_for("WP-O3R"))
+    assert parsed.session_entry is not None
+    assert parsed.session_entry.work_packet == "WP-O3R"
+
+    for rejected in ("WP-O3RR", "WP-O3R2", "WP-O3r", "WP-O5R"):
+        with pytest.raises(agentops.AgentOpsError, match="work_packet.*packet id"):
+            agentops.parse_work_packet(packet_for(rejected))
+
+    for rejected_packet_id in (
+        "onboard-one-door-WP-O3",
+        "onboard-one-door-WP-O3-B0",
+        "onboard-one-door-WP-O3R-B1",
+        "other-WP-O3R",
+        "WP-O3R",
+    ):
+        with pytest.raises(agentops.AgentOpsError, match="work_packet.*packet id"):
+            agentops.parse_work_packet(
+                packet_for("WP-O3R", packet_id=rejected_packet_id)
+            )
+
+
 def test_session_entry_accepts_exact_wp_o4r_identity_only(tmp_path: Path) -> None:
     repo = init_session_repo(tmp_path)
 
@@ -2175,7 +2212,7 @@ def test_session_entry_accepts_exact_wp_o4r_identity_only(tmp_path: Path) -> Non
     assert parsed.session_entry is not None
     assert parsed.session_entry.work_packet == "WP-O4R"
 
-    for rejected in ("WP-O3R", "WP-O4RR", "WP-O4R2", "WP-O4r", "WP-O5R"):
+    for rejected in ("WP-O4RR", "WP-O4R2", "WP-O4r", "WP-O5R"):
         with pytest.raises(agentops.AgentOpsError, match="work_packet.*packet id"):
             agentops.parse_work_packet(packet_for(rejected))
 
