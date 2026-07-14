@@ -195,6 +195,32 @@ agents:
       - naming drift perplexity vs perplexity-computer (resolved by this registry + card: uid is perplexity-computer)
     probe_receipt: inter_agent/fable_claude_code/inbound/2026-07-09-perplexity-computer-probe-reply.md
 
+  - agent_uid: fable_composer
+    display_name: Fable 5 (Composer)
+    runtime: >-
+      Mac composer runtime seat (living-agent dock ~/.dharma/agents/fable_composer/);
+      woken 2026-07-14 by operator-directed Claude Code cloud session — cross-harness
+      wakes drain the git dock only and must disclose their harness in packets
+    registered_card: examples/agents/fable_composer.registration.json
+    lanes_available: [git_seat]
+    primary_lane: git_seat
+    live_on_hub: false
+    credential_env_names: []
+    listen_subjects:
+      - inter_agent/fable_composer/inbound/ (drained 2026-07-14; 3 packets answered)
+      - dharma.a2a.fable_composer (registered in scripts/runtime/a2a_doctor.py; no verified drain)
+    publish_subjects:
+      - inter_agent/<peer>/inbound/ (via pushed branches)
+      - dharma.a2a.fable_composer.reply.> (aspirational)
+    git_seat: inter_agent/fable_composer/
+    last_verified_send: 2026-07-14 (wiring ack + contact/relay reply, pushed branch)
+    last_verified_receive: 2026-07-14 (drained 2026-07-02T0500Z, 2026-07-02T0520Z, 2026-07-09 packets)
+    blockers:
+      - NATS subject has no verified drain; git dock is the only receipted lane
+      - Mac runtime state (~/.dharma/agents/fable_composer/) unreachable from cloud wakes —
+        hill-climb status and fugu relay still owe an operator-Mac session
+    probe_receipt: inter_agent/fable_claude_code/inbound/2026-07-09-fable_composer-wiring-ack.md
+
 # Known identities NOT probed on 2026-07-09 — do not treat as live without a receipt.
 unprobed_identities:
   - {agent_uid: merge_master_mike, registered_card: examples/agents/merge_master_mike.registration.json,
@@ -202,7 +228,6 @@ unprobed_identities:
        (run 28993046529-era, ack + deterministic gate packet posted by github-actions) — a cloud
        session CAN summon Mike by PR comment; still unprobed for NATS/git-seat lanes'}
   - {agent_uid: fable_5_cursor, registered_card: examples/agents/fable_5_cursor.registration.json}
-  - {agent_uid: fable_composer, registered_card: examples/agents/fable_composer.registration.json, note: card authored 2026-07-14 (operator-directed seat wake); git seat inter_agent/fable_composer/ drained + acked 2026-07-14 — the only lane with a drain receipt}
   - {agent_uid: qwen_code, registered_card: examples/agents/qwen_code.registration.json}
   - {agent_uid: sis_steward, registered_card: examples/agents/sis_steward.registration.json}
   - {agent_uid: hermes-m5, registered_card: none, note: operator-Mac Hermes; reported "often stale/offline" by rushabdev}
