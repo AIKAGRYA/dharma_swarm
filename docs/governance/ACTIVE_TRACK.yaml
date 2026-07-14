@@ -1902,20 +1902,20 @@ active_tracks:
       environments, so that identity must be normalized or explicitly added
       before closure. `WRITER_SCHEMA_DEFAULT` therefore remains v1, and the
       current ambient `DHARMA_ONBOARD_WRITER=v2` bypass remains a pre-D3 WP-O3
-      safety repair. The remaining work is a DAG: after a separately merged
-      exact-identity authority bootstrap, the pre-D3 residual WP-O3 safety
-      slice (typed Git observations, ambient-writer denial, and fallback
-      parsing) can proceed independently of D3; C1 revalidation can also
-      proceed now. D3 gates only public v2 writer/cache-delta activation. The
-      pre-WP-O5 C1 authority/unlock proof uses exactly `make onboard
-      ARGS=--strict` and gates D2 then WP-O5; it does not close C1. The
-      classified WP-O2R reseal must receive its exact-head council receipt and
-      legitimate approval, merge, and be reverified before that terminal
-      sequence advances. After WP-O5, the final C1 enforcement proof repeats
-      the controlled BLOCKED case through plain `make onboard` on the live PR,
-      automerge, and merge-group paths. Full WP-O3, WP-O5, final C1, and M6-1
-      gate WP-O6, which gates independent terminal proof. Titanium remains
-      blocked until that proof merges.
+      safety repair. The remaining work is a DAG: the classified WP-O2R reseal
+      must receive its exact-head council receipt and legitimate approval,
+      merge, and be reverified first. The already-authorized same-node WP-O4
+      O4-B9 tail repair then precedes the C1 terminal sequence. After the WP-O2R
+      reseal, the pre-D3 WP-O3 safety slice (typed Git observations,
+      ambient-writer denial, and fallback parsing) and M6-1 coordination may
+      advance in parallel; D3 gates only public v2 writer/cache-delta
+      activation. After the WP-O4 tail repair, the pre-WP-O5 C1
+      authority/unlock proof uses exactly `make onboard ARGS=--strict` and
+      gates D2 then WP-O5; it does not close C1. After WP-O5, the final C1
+      enforcement proof repeats the controlled BLOCKED case through plain
+      `make onboard` on the live PR, automerge, and merge-group paths. Full
+      WP-O3, WP-O5, final C1, and M6-1 gate WP-O6, which gates independent
+      terminal proof. Titanium remains blocked until that proof merges.
     prerequisites:
       - id: onboard_spec_on_main
         kind: file_exists
@@ -1989,28 +1989,32 @@ active_tracks:
         what: "DONE 2026-07-13 — PRs #907/#911 merged the canonical boundary parser, restored the 23-key public control-surface mapping and packet replay, and added adversarial coverage for pre-section entries, OPEN SOURCE NOTES, heading prose, CLOSED/FIXED equivalence, and outside-lifecycle diagnostics."
         kind: code
         blocker: false
-      - id: D3
-        what: "D3 PENDING — no canonical receipt-reader seat manifest yet binds every declared fleet filesystem substrate. At observed_at=2026-07-13T23:34:06Z, the operator Mac's only discovered external reader (~/.dharma/scripts/daily_pulse.py; sha256=e4956ab39248dd6224be227047d04d1853a07039c6930d68582769fa520e0e03) is Proven compatible with v1, v2, and unknown-schema fail-closed behavior; local Warp state plus bounded root/service-account/code/config/cron/systemd/open-handle sweeps on AGNI, Rushabdev, and the reachable Meghadharma cloud host Refute an external reader within that stated scope. Devin, Fable Claude Code, Perplexity Computer, and Oz environments dharma-spine-ops, dharma-swarm-dev, and dharma-dashboard remain Unobserved because no D3-safe noninteractive filesystem route is available; Git, NATS, and operator relay are not filesystem evidence. No separate remote-Warp filesystem substrate is declared, so it must be normalized to the named Oz environments or explicitly added. Per spec §9.3/§14.4, any Unobserved or unresolved declared seat blocks promotion; keep WRITER_SCHEMA_DEFAULT=v1, deny the ambient DHARMA_ONBOARD_WRITER=v2 bypass in the pre-D3 WP-O3 safety slice, and do not activate public v2 writer/cache-delta behavior until a separately merged operator-authored D3 record classifies every canonical seat as Proven compatible or Refuted as a reader."
-        kind: governance
-        blocker: true
-      - id: WP-O3
-        what: "WP-O3 RESIDUAL — PR #913 merged the public compact-door delegation and #916 restored stock macOS Python 3.9 execution, but the spec's full node is not closed. After a separately merged exact-identity authority bootstrap, a pre-D3 safety packet may: constrain dependency-free `_scrape_tracks` (Proven at c631a492 as 247 rows/196 unique nested ids versus 11 top-level declarations), make nonzero/timeout/OSError/malformed Git probes typed CONFIG_ERROR instead of false clean/0/READY, and deny ambient DHARMA_ONBOARD_WRITER=v2 while the source-controlled default is v1. D3 alone gates public v2 writer/cache-delta activation; after D3, prove actual unchanged-input cache reuse/delta behavior and flip the sole writer under source-controlled authority."
-        kind: code
-        blocker: true
       - id: A3
         what: "DONE 2026-07-12 — PR #895 repaired NEXT_BUILD_RUN_PROMPT so make orient no longer orders tracked-context regeneration."
         kind: governance
         blocker: false
-      - id: WP-O4
-        what: "DONE 2026-07-13 — PR #912 merged committed-range plus working/staged/untracked closeout, packet-swap rejection, external-only reports, PR packet discovery, merge-group binding, and the fail-closed command-family allowlist; PR #918 restored those admission semantics on stock macOS GNU Make 3.81, and PR #920 bound Darwin temp authority to getconf while proving the named admission/macOS CI jobs green. C1 remains a separate merge-authority dependency."
-        kind: code
-        blocker: false
       - id: WP-O4R
-        what: "DONE 2026-07-14 — PR #924 separately granted the exact WP-O4R identity and collision-free surface authority; PR #926 then closed the exact corrective AgentOps self-invalidation envelope: Hypothesis storage is external, active-track report output is relocatable, dependency bootstrap suppresses source bytecode, and bare Python criteria resolve through the current interpreter. Exact-head Linux AgentOps, full CI, independent review, and the terminal six-lane council passed. This does not close C1, WP-O6 syscall confinement, or One-Door."
+        what: "DONE 2026-07-14 — PR #924 separately granted the exact WP-O4R identity and collision-free surface authority; PR #926 then closed that exact runner/checker envelope: admitted-gate Hypothesis storage is external, active-track report output is relocatable, dependency bootstrap suppresses source bytecode, and bare Python criteria resolve through the current interpreter. Exact-head Linux AgentOps, full CI, independent review, and the terminal six-lane council passed. WP-O4R does not cover the Make verifier-selfcheck presteps; their newly reproduced O4-B9 target-export defect is truthfully open under WP-O4. This does not close C1, WP-O6 syscall confinement, or One-Door."
         kind: code
         blocker: false
       - id: WP-O2R
-        what: "WP-O2R RESEAL PENDING — PR #928 head 65196c522913a77f2bf661941ee6f6ecff87e9ae merged as 6757fd42ae81ceaa4337b00ee4c1fc6196c7592c after PR #929 granted its identity/surface authority, but its live review record has zero APPROVED submissions and no final exact-head council receipt. The successor investigation classifies a six-node affected set: five nodes disclosed by the Greptile/T-Rex result plus `test_runner_minimal_help_writes_no_repo_bytecode`, reconstructed from preserved run accounting and repo-local replay. The six nodes are `test_runner_minimal_help_writes_no_repo_bytecode`, `test_external_entry_packet_bootstrap_and_digest_binding`, `test_declared_expected_exits_and_isolated_negative_controls`, `test_negative_controls_confine_absolute_env_and_pythonpath_source_escapes`, `test_make_admission_reports_are_external_and_read_only`, and `test_negative_control_ignores_ambient_execution_injection`. The production runner and those tests are byte-identical between unmodified base a370d3cd51aa5d9f97b2c2654d99fa63b8ab9466 and the successor: both revisions pass all six under external Python 3.12.13 with root chroot, both reproduce only the bytecode node under a checkout-local uv venv with the same chroot, and a controlled unavailable-confinement injection at the existing fail-closed boundary reproduces the exact six-node signature on both. This classifies the signature as environment/capability-sensitive and base-reproducible, not introduced by the seven-file successor; it does not establish the proprietary runner's actual interpreter, user, chroot, or child-stderr conditions, which remain Unobserved, and no failed run is waived. Keep this blocker open only until the exact successor head receives a six-lane council receipt and legitimate non-author/operator approval, merges, and is reverified on current main; it must seal before the C1/WP-O5 terminal sequence advances."
+        what: "WP-O2R RESEAL PENDING — PR #928 head 65196c522913a77f2bf661941ee6f6ecff87e9ae merged as 6757fd42ae81ceaa4337b00ee4c1fc6196c7592c after PR #929 granted its identity/surface authority, but its live review record has zero APPROVED submissions and no final exact-head council receipt. Evidence and rerunnable commands: docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1770-1809. The successor investigation classifies a six-node affected set: five nodes disclosed by the Greptile/T-Rex result plus `test_runner_minimal_help_writes_no_repo_bytecode`, reconstructed from preserved run accounting and repo-local replay. The six nodes are `test_runner_minimal_help_writes_no_repo_bytecode`, `test_external_entry_packet_bootstrap_and_digest_binding`, `test_declared_expected_exits_and_isolated_negative_controls`, `test_negative_controls_confine_absolute_env_and_pythonpath_source_escapes`, `test_make_admission_reports_are_external_and_read_only`, and `test_negative_control_ignores_ambient_execution_injection`. The production runner and tests are byte-identical between unmodified base a370d3cd51aa5d9f97b2c2654d99fa63b8ab9466 and candidate ancestor 1961190c49366ca34a3cf4cb90a2bccf0f6c32c7: both pass all six under matched external Python 3.12.13/root-chroot and both reproduce only the bytecode node under a matched checkout-local uv venv/root-chroot. This classifies the signature as environment-sensitive and base-reproducible, not introduced by the successor; it does not establish the proprietary runner's actual interpreter, user, chroot, or child-stderr conditions, which remain Unobserved, and no failed run is waived. Keep this blocker open only until the exact successor head receives a six-lane council receipt and legitimate non-author/operator approval, merges, and is reverified on current main; it must seal before the C1/WP-O5 terminal sequence advances."
+        kind: governance
+        blocker: true
+      - id: WP-O4
+        what: "WP-O4 TAIL REPAIR PENDING AFTER WP-O2R — evidence and rerunnable commands: docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1615-1663. PRs #912/#918/#920 merged the original AgentOps envelope and platform repairs, but a sterile exact-main a370d3cd `make agent-build-preflight` reproduced an O4-B9 self-invalidation: verifier test collection wrote ignored `.hypothesis/constants` leaves before packet inspection, so the exact-clean gate rejected its own checkout. With `HYPOTHESIS_STORAGE_DIRECTORY` explicitly routed under the external AgentOps report root, the same command passed. The Makefile, runner, and Make-contract test blobs are byte-identical between a370d3cd and the Gate 0 successor, so this is base-reproducible rather than introduced by that successor. Existing WP-O4 authority owns the separate Makefile/contract-test/canonical-packet repair; merge the WP-O2R/Gate 0 successor first, then keep this blocker open until the repair merges and a fresh combined-main preflight proves zero ordinary and ignored source leaves. C1 remains a separate merge-authority dependency."
+        kind: code
+        blocker: true
+      - id: D3
+        what: "D3 PENDING, PARALLEL AFTER WP-O2R — no canonical receipt-reader seat manifest yet binds every declared fleet filesystem substrate. At observed_at=2026-07-13T23:34:06Z, the operator Mac's only discovered external reader (~/.dharma/scripts/daily_pulse.py; sha256=e4956ab39248dd6224be227047d04d1853a07039c6930d68582769fa520e0e03) is Proven compatible with v1, v2, and unknown-schema fail-closed behavior; local Warp state plus bounded root/service-account/code/config/cron/systemd/open-handle sweeps on AGNI, Rushabdev, and the reachable Meghadharma cloud host Refute an external reader within that stated scope. Devin, Fable Claude Code, Perplexity Computer, and Oz environments dharma-spine-ops, dharma-swarm-dev, and dharma-dashboard remain Unobserved because no D3-safe noninteractive filesystem route is available; Git, NATS, and operator relay are not filesystem evidence. No separate remote-Warp filesystem substrate is declared, so it must be normalized to the named Oz environments or explicitly added. Per spec §9.3/§14.4, any Unobserved or unresolved declared seat blocks promotion; keep WRITER_SCHEMA_DEFAULT=v1, deny the ambient DHARMA_ONBOARD_WRITER=v2 bypass in the pre-D3 WP-O3 safety slice, and do not activate public v2 writer/cache-delta behavior until a separately merged operator-authored D3 record classifies every canonical seat as Proven compatible or Refuted as a reader."
+        kind: governance
+        blocker: true
+      - id: WP-O3
+        what: "WP-O3 RESIDUAL, PARALLEL AFTER WP-O2R — PR #913 merged the public compact-door delegation and #916 restored stock macOS Python 3.9 execution, but the spec's full node is not closed. After a separately merged exact-identity authority bootstrap, a pre-D3 safety packet may: constrain dependency-free `_scrape_tracks` (Proven at c631a492 as 247 rows/196 unique nested ids versus 11 top-level declarations), make nonzero/timeout/OSError/malformed Git probes typed CONFIG_ERROR instead of false clean/0/READY, and deny ambient DHARMA_ONBOARD_WRITER=v2 while the source-controlled default is v1. D3 alone gates public v2 writer/cache-delta activation; after D3, prove actual unchanged-input cache reuse/delta behavior and flip the sole writer under source-controlled authority."
+        kind: code
+        blocker: true
+      - id: M6-1
+        what: "M6-1 PENDING, PARALLEL AFTER WP-O2R — before WP-O6 may touch pyproject.toml, the active DharmaGraph owner must land the exact mutmut configuration under its own packet or an explicit governance transfer must merge; warning-only overlap is insufficient. This lane has no ordering dependency on C1, D2, or WP-O5 and joins them only before WP-O6."
         kind: governance
         blocker: true
       - id: C1
@@ -2024,10 +2028,6 @@ active_tracks:
       - id: WP-O5
         what: "WP-O5 PENDING — after the pre-WP-O5 C1 authority/unlock proof and a separately merged operator-authored D2 record, promote strict verdict exits to the default while retaining one truthful --no-strict deprecation cycle; no automatic or author-minted promotion. Final C1 enforcement remains pending afterward."
         kind: code
-        blocker: true
-      - id: M6-1
-        what: "M6-1 PENDING — before WP-O6 may touch pyproject.toml, the active DharmaGraph owner must land the exact mutmut configuration under its own packet or an explicit governance transfer must merge; warning-only overlap is insufficient."
-        kind: governance
         blocker: true
       - id: WP-O6
         what: "WP-O6 PENDING — after full WP-O3, WP-O5, final post-WP-O5 C1 enforcement, and M6-1, prove performance/line budgets, deterministic replay, concurrency/crash safety, mutation strength, exact exit matrices, and fresh-clone no-write/no-network behavior under the spec's terminal envelope."

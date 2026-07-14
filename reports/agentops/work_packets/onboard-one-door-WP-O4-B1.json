@@ -3,7 +3,7 @@
   "base_ref": "a370d3cd51aa5d9f97b2c2654d99fa63b8ab9466",
   "branch": "agent/onboard-gate0-successor-20260714",
   "worktree": ".",
-  "intent": "Clarify Gate 0 without adding a formal closure node: split the single C1 node into a pre-WP-O5 authority/unlock proof using exactly make onboard ARGS=--strict and a post-WP-O5 final enforcement proof using plain make onboard; reconcile WP-O2R from prospective to a classified reseal pending exact-head council, legitimate approval, merge, and main revalidation; and add a regression that prevents the circular sequence from returning. This packet changes no runtime, workflow, repository setting, writer, cache, strict default, fleet claim, or closure count.",
+  "intent": "Clarify Gate 0 without adding a formal closure node: split the single C1 node into a pre-WP-O5 authority/unlock proof using exactly make onboard ARGS=--strict and a post-WP-O5 final enforcement proof using plain make onboard; reconcile WP-O2R from prospective to a classified reseal pending exact-head council, legitimate approval, merge, and main revalidation; truthfully reopen the existing WP-O4 O4-B9 predicate after an exact-main Make preflight self-invalidated on ignored Hypothesis state while preserving its already-ratified separate repair envelope (evidence and rerunnable commands: docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1615-1663); and add regressions that prevent either stale claim from returning. This packet changes no runtime, workflow, repository setting, writer, cache, strict default, fleet claim, or formal closure-node count.",
   "allowed_files": [
     "CLAUDE.md",
     "docs/governance/ACTIVE_TRACK.yaml",
@@ -189,6 +189,12 @@
       "command": "python3 -c \"import subprocess; base='a370d3cd51aa5d9f97b2c2654d99fa63b8ab9466'; show=lambda path: subprocess.check_output(['git','show',f'{base}:{path}'],text=True); track=show('docs/governance/ACTIVE_TRACK.yaml'); spec=show('docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md'); stale='gates D2 and then WP-O5' in track and 'WP-O2R CANDIDATE' in track and '  -> C1 phase 2\\n  -> D2\\n  -> WP-O5' in spec; raise SystemExit(0 if stale else 9)\"",
       "expected_exit": 0,
       "env": {}
+    },
+    {
+      "name": "wp-o4-base-self-invalidation-underclaim-control",
+      "command": "python3 -c \"import subprocess; base='a370d3cd51aa5d9f97b2c2654d99fa63b8ab9466'; show=lambda path: subprocess.check_output(['git','show',f'{base}:{path}'],text=True); track=show('docs/governance/ACTIVE_TRACK.yaml'); spec=show('docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md'); stale='id: WP-O4\\n        what: \\\"DONE 2026-07-13' in track and 'Exact-main O4-B9 tail repair' not in spec; raise SystemExit(0 if stale else 9)\"",
+      "expected_exit": 0,
+      "env": {}
     }
   ],
   "session_entry": {
@@ -216,6 +222,7 @@
     "interface_mismatches": [
       "Merged main encodes C1 as gating D2 and WP-O5 while requiring strict fail-closed behavior that plain make onboard cannot provide before WP-O5, and it contains no post-WP-O5 final C1 proof.",
       "Merged main still labels WP-O2R a candidate after PR #928 merged, while #928 has zero APPROVED reviews, no final exact-head council receipt, and a six-test Greptile discrepancy that this successor must classify without waiving.",
+      "A sterile exact-main preflight writes ignored Hypothesis state during verifier collection before AgentOps exact-clean inspection; the explicit external HYPOTHESIS_STORAGE_DIRECTORY control passes, while the ledger still calls WP-O4 and its broad Hypothesis claim complete (docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1615-1663).",
       "Live branch-protection truth remains unavailable without Administration-read authority; tracked workflow and parity structure are not a substitute."
     ],
     "closest_existing_implementation": [
@@ -224,13 +231,14 @@
       "tests/test_active_track_governance.py"
     ],
     "honest_blockers": [
-      "The six-node investigation set (five nodes disclosed by the Greptile/T-Rex result plus the bytecode node reconstructed from preserved run accounting and repo-local replay), byte-identical production runner/test blobs, and paired unmodified-base/candidate replays classify the PR #928 signature as environment/capability-sensitive and base-reproducible: both revisions pass all six under external Python 3.12.13 with root chroot, reproduce only the bytecode node under a checkout-local uv venv with the same chroot, and reproduce all six under controlled unavailable-confinement injection at the existing fail-closed boundary. This does not establish the proprietary runner's actual interpreter, user, chroot, or child-stderr conditions, which remain Unobserved, and no failed run is waived.",
+      "The six-node investigation evidence and rerunnable commands are recorded at docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1770-1809. Byte-identical production runner/test blobs plus matched unmodified-base/candidate replays classify the PR #928 signature as environment-sensitive and base-reproducible: both revisions pass all six under external Python 3.12.13 with root chroot and reproduce only the bytecode node under a checkout-local uv venv with the same chroot. This does not establish the proprietary runner's actual interpreter, user, chroot, or child-stderr conditions, which remain Unobserved, and no failed run is waived.",
       "This exact candidate cannot seal WP-O2R until a final exact-head six-lane council receipt plus legitimate non-author/operator approval exist; it must then merge and be reverified on current main.",
+      "The base-reproducible WP-O4 O4-B9 self-invalidation remains a code blocker after this governance-only head: merge #932 first, then land the already-authorized separate Makefile/contract-test/canonical-WP-O4-packet repair and prove fresh combined-main preflight with zero ordinary and ignored source leaves (docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1615-1663).",
       "The pre-WP-O5 C1 proof still requires authenticated live branch-protection, automerge-negative, and real merge_group evidence; this clarification changes no repository setting.",
       "PR #933 (`chore/docops-autorefresh`) was an open rolling generated-DocOps lane at this packet's base/collision check and overlapped only a different managed block in docs/governance/SOVEREIGN_MANIFEST.md; serialize #932 first, then rebase and regenerate the then-current #933 head so neither exact-base receipt is misapplied.",
       "Any main movement before merge invalidates this packet base, collision record, digest, preflight binding, and closeout evidence."
     ],
-    "rollback": "Revert the C1 two-proof wording, WP-O2R merged-but-unsealed status, managed authority renders, sequence regression, and this packet together; do not revert PR #928 or any onboarding runtime change.",
-    "packet_digest": "4e398cff7a4f85fe57d06d7191bff1c62c55a00cc980f57607280df87d339bf5"
+    "rollback": "Revert the C1 two-proof wording, WP-O2R merged-but-unsealed status, WP-O4 O4-B9 residual truth, managed authority renders, governance regressions, and this packet together; do not revert PR #928 or any onboarding runtime change.",
+    "packet_digest": "9804f35db5a195f526bd2a413f2d7699eb496ecadac5155dfdba722cbbef3daf"
   }
 }

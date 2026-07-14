@@ -157,18 +157,28 @@ def test_one_door_c1_has_ordered_pre_and_post_wp_o5_proofs() -> None:
     items = {str(item["id"]): item for item in ordered_items}
 
     assert ordered_ids.count("C1") == 1, "C1 must remain one formal node"
-    expected_node_order = [
+    sequential_spine = [
         "WP-O4R",
         "WP-O2R",
+        "WP-O4",
         "C1",
         "D2",
         "WP-O5",
-        "M6-1",
         "WP-O6",
     ]
-    positions = [ordered_ids.index(node_id) for node_id in expected_node_order]
+    positions = [ordered_ids.index(node_id) for node_id in sequential_spine]
     assert positions == sorted(positions), (
         "One-Door next_items must preserve the reseal and C1/WP-O5/WP-O6 order"
+    )
+    d3_o3_lane = ["WP-O2R", "D3", "WP-O3", "WP-O6"]
+    d3_o3_positions = [ordered_ids.index(node_id) for node_id in d3_o3_lane]
+    assert d3_o3_positions == sorted(d3_o3_positions), (
+        "D3/WP-O3 may run in parallel with C1 only after the WP-O2R reseal"
+    )
+    m6_lane = ["WP-O2R", "M6-1", "WP-O6"]
+    m6_positions = [ordered_ids.index(node_id) for node_id in m6_lane]
+    assert m6_positions == sorted(m6_positions), (
+        "M6-1 may run in parallel with C1/WP-O5 after the WP-O2R reseal"
     )
 
     c1 = items["C1"]["what"]
@@ -210,8 +220,9 @@ def test_one_door_c1_has_ordered_pre_and_post_wp_o5_proofs() -> None:
     )
     graph_steps = [line.strip() for line in controller_graph.splitlines()]
     expected_graph_steps = [
-        "-> WP-O4",
+        "-> WP-O4 baseline (merged)",
         "-> WP-O2R reseal",
+        "-> WP-O4 O4-B9 tail repair (same formal node)",
         "-> C1 pre-WP-O5 authority/unlock proof (`make onboard ARGS=--strict`)",
         "-> D2",
         "-> WP-O5",
@@ -256,6 +267,32 @@ def test_one_door_c1_has_ordered_pre_and_post_wp_o5_proofs() -> None:
     assert wp_o4_tail < wp_o4_b1 < wp_o5_start, (
         "WP-O4-B1 must follow the complete WP-O4 tail and precede WP-O5"
     )
+
+    wp_o4 = items["WP-O4"]
+    assert wp_o4["blocker"] is True
+    for marker in (
+        "WP-O4 TAIL REPAIR PENDING",
+        "make agent-build-preflight",
+        "HYPOTHESIS_STORAGE_DIRECTORY",
+        "ordinary and ignored source leaves",
+    ):
+        assert marker in wp_o4["what"]
+
+    wp_o4r = items["WP-O4R"]
+    assert wp_o4r["blocker"] is False
+    assert "runner/checker envelope" in wp_o4r["what"]
+    assert "does not cover the Make verifier-selfcheck presteps" in wp_o4r["what"]
+
+    spec_text = ONE_DOOR_SPEC.read_text(encoding="utf-8")
+    wp_o4_spec = " ".join(
+        spec_text
+        .split("### WP-O4 —", maxsplit=1)[1]
+        .split("### WP-O5 —", maxsplit=1)[0]
+        .split()
+    )
+    assert "HYPOTHESIS_STORAGE_DIRECTORY" in wp_o4_spec
+    assert "This remains an O4-B9 repair under WP-O4" in wp_o4_spec
+    assert "does not create a new formal closure node" in wp_o4_spec
 
 
 @pytest.mark.timeout(75)

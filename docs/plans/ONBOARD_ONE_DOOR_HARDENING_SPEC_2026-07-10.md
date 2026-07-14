@@ -1612,6 +1612,56 @@ claim merge authority; C1 must separately promote that context before WP-O5.
 | O4-B10 | PR CI checks out the declared head; merge-group packets are each bound or the group blocks | `test_ci_pr_head_and_merge_group_packet_binding` |
 | O4-B11 | Positive gates use one fail-closed command-family allowlist before execution: exact O1R Git grammar and explicitly enumerated pytest/Ruff/read-only governance/DocOps/Make forms pass; inline interpreters, alternate mutation/network clients, shell-capable wrappers, and unknown executables fail | `test_positive_gate_command_family_allowlist_rejects_transitive_routes` |
 
+**Exact-main O4-B9 tail repair (2026-07-14).** A sterile clone of exact main
+`a370d3cd51aa5d9f97b2c2654d99fa63b8ab9466` reproduced
+`make agent-build-preflight` self-invalidation: verifier test collection wrote
+ignored `.hypothesis/constants` leaves before the packet runner's exact-clean
+inspection. Repeating the same command with `HYPOTHESIS_STORAGE_DIRECTORY`
+fixed beneath the external AgentOps report root passed and left the checkout
+clean. The Makefile, runner, and Make-contract test blobs are byte-identical
+between that main and the Gate 0 successor, so this is base-reproducible rather
+than introduced by the successor.
+
+From separate sterile checkouts at that SHA, the dated reproduction used the
+following fully bound environment. The external packet is the exact bytes from
+successor ancestor `5135be4bf973e0d00a4e40781a21a4d752f6b83c` and has SHA-256
+`e19538d91d05d0eec4b3dfd69156fdd01f48acb05f6f7bc7bdb2181c95651ae3`:
+
+```bash
+export EXTERNAL_PYTHON=/tmp/ds928-trex-14321433/.venv/bin/python
+export EXTERNAL_PACKET=/tmp/pr932-wp-o4-b1-a370.json
+export PATH=/tmp/ds928-trex-14321433/.venv/bin:/usr/local/bin:/usr/bin:/bin
+export AGENTOPS_REPORT_ROOT=/tmp/pr932-a370-agentops-default
+git fetch origin agent/onboard-gate0-successor-20260714
+git show 5135be4bf973e0d00a4e40781a21a4d752f6b83c:reports/agentops/work_packets/onboard-one-door-WP-O4-B1.json > "$EXTERNAL_PACKET"
+test "$(sha256sum "$EXTERNAL_PACKET" | cut -d' ' -f1)" = \
+  e19538d91d05d0eec4b3dfd69156fdd01f48acb05f6f7bc7bdb2181c95651ae3
+AGENTOPS_PYTHON="$EXTERNAL_PYTHON" \
+  make agent-build-preflight PACKET="$EXTERNAL_PACKET"
+# exit 2; ordinary status clean; 1,020 ignored .hypothesis files / 847,011 bytes
+
+export AGENTOPS_REPORT_ROOT=/tmp/pr932-a370-agentops-explicit
+HYPOTHESIS_STORAGE_DIRECTORY="$AGENTOPS_REPORT_ROOT/cache/hypothesis" \
+AGENTOPS_PYTHON="$EXTERNAL_PYTHON" \
+  make agent-build-preflight PACKET="$EXTERNAL_PACKET"
+# exit 0; repository .hypothesis absent
+```
+
+The passing 2026-07-14 preflight JSON has SHA-256
+`ab293dc6e607da84b5afccfb384732dd60316d0ecf76b2a657674a9318c23aaf`.
+The recorded interpreter was external Python 3.12.13 with pytest 9.0.3 and
+Hypothesis 6.155.7. The negative attempt and pass are both retained; the pass
+does not erase the default-path failure.
+
+This remains an O4-B9 repair under WP-O4. Its separate implementation may
+change only `Makefile`, `tests/test_make_onboarding_contract.py`, and the
+canonical `reports/agentops/work_packets/onboard-one-door-WP-O4.json`: override
+hostile ambient Hypothesis storage, export the fixed external path through the
+target and recipe boundaries, and prove a fresh exact-main preflight leaves
+zero ordinary and ignored source leaves. It does not create a new formal
+closure node, widen WP-O4R, or combine this authority/truth reconciliation with
+the dependent runtime repair.
+
 #### WP-O4R — corrective generated-artifact confinement repair
 
 WP-O4R is a narrow post-WP-O4 corrective packet discovered during exact-main
@@ -1720,13 +1770,43 @@ runtime, workflow, branch setting, writer, cache, strict default, receipt store,
 fleet claim, or formal closure-node count. The packet classifies PR #928's
 cross-environment AgentOps discrepancy from a six-node investigation set
 (five nodes disclosed by the Greptile/T-Rex result plus the bytecode node
-reconstructed from preserved run accounting and repo-local replay),
-byte-identical production runner/test blobs, and paired replays on unmodified
-base and candidate revisions. Both pass all six under external
-Python 3.12/root-chroot, reproduce only the bytecode node under a checkout-local
-venv/root-chroot, and reproduce all six under controlled unavailable-confinement
-injection. This is environment/capability-sensitive and base-reproducible, not a
-successor regression; proprietary-runner conditions remain `Unobserved`; no failed run is waived and exact-head council/approval gates remain mandatory.
+reconstructed from preserved run accounting and repo-local replay). The
+reproduction revisions are unmodified main
+`a370d3cd51aa5d9f97b2c2654d99fa63b8ab9466` and candidate ancestor
+`1961190c49366ca34a3cf4cb90a2bccf0f6c32c7`; the latter is an ancestor of
+this successor, and later successor commits do not change the runner or test
+file.
+
+Run the six-node manifest below from each revision; `PYTHON` selects the
+profile named in the result table:
+
+```bash
+"$PYTHON" -m pytest -q \
+  tests/test_agent_work_packet.py::test_runner_minimal_help_writes_no_repo_bytecode \
+  tests/test_agent_work_packet.py::test_external_entry_packet_bootstrap_and_digest_binding \
+  tests/test_agent_work_packet.py::test_declared_expected_exits_and_isolated_negative_controls \
+  tests/test_agent_work_packet.py::test_negative_controls_confine_absolute_env_and_pythonpath_source_escapes \
+  tests/test_agent_work_packet.py::test_make_admission_reports_are_external_and_read_only \
+  tests/test_agent_work_packet.py::test_negative_control_ignores_ambient_execution_injection
+```
+
+The dated 2026-07-14 matched-environment receipts are:
+
+| Profile | a370d3cd | 1961190c | External transcript SHA-256 |
+|---|---|---|---|
+| External Python 3.12.13, pytest 9.0.3, root chroot | 6 passed | 6 passed | `31edf6b5d4a5760050fe94b9b4af7b15fad3d009abaf04b34a952487028914d6` / `913faacb76c3d6e5c6366caf5ab1e509ca13ad52bb8fb4a6a63b15fdb7771a93` |
+| Checkout-local uv venv resolving Python 3.12.13, same root chroot | 1 bytecode failure, 5 passed | 1 bytecode failure, 5 passed | `8ca8753346fa2e61e0af424776111c586260e61a39e5bfc8783ed28fe7f972a5` / `96d28b420c5a06e2c4d8c5efec4ab4774c39af41001c6416a06521e5f66c4bb0` |
+
+The source identity is independently rerunnable with
+`git rev-parse <REV>:scripts/governance/run_agent_work_packet.py` and
+`git rev-parse <REV>:tests/test_agent_work_packet.py`; both revisions return
+runner blob `39171adf294f9590be3044c7405ffef2b71fdbce` and test blob
+`fef0d72752dec143d57e123a6992ac1b682c0195`. The paired results therefore
+classify the observed signature as environment-sensitive and base-reproducible,
+not introduced by the successor. They do not reveal the proprietary runner's
+actual interpreter, user, chroot, or child-stderr conditions, which remain
+`Unobserved`; no failed run is waived and exact-head council/approval gates
+remain mandatory.
 
 ### WP-O5 — Strict-by-default promotion (S; isolated; operator-gated)
 
@@ -1874,10 +1954,11 @@ and blocks completion; it is not “fixed” by making a mandatory probe optiona
 
 ### 6.1 Dependency graph, critical path, and parallel work
 
-**Critical path:** D1 → WP-O1 → WP-O1R-B0 → WP-O1R → WP-O2 → A3 → WP-O4 →
-WP-O2R reseal → pre-WP-O5 C1 authority/unlock proof → D2 → WP-O5 → final C1
-enforcement proof → WP-O6 → independent proof. D3 → WP-O3 activation and M6-1
-are parallel lanes that may advance after reseal but must join before WP-O6.
+**Critical path:** D1 → WP-O1 → WP-O1R-B0 → WP-O1R → WP-O2 → A3 → merged
+WP-O4 baseline → WP-O2R reseal → WP-O4 O4-B9 tail repair under the same formal
+node → pre-WP-O5 C1 authority/unlock proof → D2 → WP-O5 → final C1 enforcement
+proof → WP-O6 → independent proof. D3 → WP-O3 activation and M6-1 are parallel
+lanes that may advance after reseal but must join before WP-O6.
 A1+A2+A4 are external adapter prerequisites that
 must join before the independent proof. The two C1 proofs are phases of one
 formal C1 node, not additional closure nodes.
@@ -2370,8 +2451,9 @@ The controller advances through this dependency graph:
 controller admission
   -> WP-O2
   -> A3
-  -> WP-O4
+  -> WP-O4 baseline (merged)
   -> WP-O2R reseal
+  -> WP-O4 O4-B9 tail repair (same formal node)
   -> C1 pre-WP-O5 authority/unlock proof (`make onboard ARGS=--strict`)
   -> D2
   -> WP-O5
@@ -2390,8 +2472,8 @@ The controller re-derives D1, A1, A2, A4, WP-O1, WP-O1R-B0, and WP-O1R at the
 relevant baseline instead of trusting their reported completion. The
 pre-WP-O5 C1 proof is an authority/unlock boundary only and never closes C1;
 §9.4 requires the post-WP-O5 plain-command enforcement result
-(`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2055-2081`,
-`docs/governance/ACTIVE_TRACK.yaml:1905-1918,2012-2019`). Live state comes from
+(`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2138-2164`,
+`docs/governance/ACTIVE_TRACK.yaml:1905-1918,2020-2035`). Live state comes from
 current owners and Git; dated statements elsewhere in this evidence body are
 not promotion markers. Titanium remains blocked for the entire graph
 (`docs/governance/ACTIVE_TRACK.yaml:1917-1918`).
@@ -2445,30 +2527,30 @@ than inferred from adjacent criteria. This is the explicit track-evidence
 closure node above, owned as a governance PR that updates `ACTIVE_TRACK.yaml`
 and its managed renders only after the proof candidate merges
 (`scripts/governance/check_track_status.py:574-591,1073-1112,1855-1921`,
-`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2367-2384`).
+`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2448-2468`).
 
 ### 14.4 Authority gates and stop rules
 
 - D3 is the recorded reader sweep on every declared fleet host. A discovered
   reader is upgraded before the WP-O3 writer flip
-  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2049-2053`,
-  `docs/governance/ACTIVE_TRACK.yaml:1992-1995`).
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2132-2136`,
+  `docs/governance/ACTIVE_TRACK.yaml:2008-2011`).
 - A3 is a separate authority-document PR; it cannot ride an implementation
   packet
-  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2083-2091`).
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2172-2174`).
 - C1 belongs to merge authority. Its pre-WP-O5 proof binds live required
   context, parity, automerge, and merge-group authority and uses exactly `make
   onboard ARGS=--strict`; its post-WP-O5 proof repeats BLOCKED through plain
   `make onboard` and is the only C1 closure point
-  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2055-2081`).
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2138-2164`).
 - D2 is a separately merged operator-authored ratification after the pre-WP-O5
   C1 authority/unlock proof; an implementation author cannot mint or backdate it
-  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2033-2047`).
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2116-2130`).
 - M6-1 is a DharmaGraph-owner change or explicit transfer before WP-O6 touches
   `pyproject.toml`
-  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2098-2105`).
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2181-2188`).
 - U1 preempts the campaign if a newly observed exposure requires containment
-  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2107-2115`).
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2190-2198`).
 
 Pause only for a concrete external authority/access boundary, unreachable
 required host, missing branch-protection privilege, owner refusal, unavailable
@@ -2481,6 +2563,6 @@ The campaign ends only when every §10 criterion, D1/D2/D3/C1/M6-1, A1–A4,
 WP-O1/WP-O1R-B0/WP-O1R/WP-O2–WP-O6, strict-default behavior, performance/
 output/determinism/mutation contract, §13 proof, and the track-evidence closure
 PR have merged and been re-derived from fresh `main`
-(`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2117-2137,2179-2346,2367-2384`).
+(`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2200-2220,2262-2429,2448-2468`).
 Only then may the active track close and Titanium capture its qualifying
 baseline.
