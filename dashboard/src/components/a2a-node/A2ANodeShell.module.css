@@ -1,0 +1,164 @@
+.viewport {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  isolation: isolate;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "transport"
+    "content"
+    "dock";
+  min-height: 100dvh;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      circle at 50% -10%,
+      color-mix(in srgb, var(--color-aozora) 8%, transparent),
+      transparent 34rem
+    ),
+    linear-gradient(
+      180deg,
+      var(--color-sumi-900) 0%,
+      var(--color-sumi-950) 42%,
+      color-mix(in srgb, var(--color-sumi-950) 92%, transparent) 100%
+    );
+  color: var(--color-torinoko);
+}
+
+.viewport::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  pointer-events: none;
+  opacity: 0.035;
+  background-image:
+    linear-gradient(
+      color-mix(in srgb, var(--color-torinoko) 40%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-torinoko) 30%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 40px 40px;
+  mask-image: linear-gradient(
+    to bottom,
+    var(--color-torinoko),
+    transparent 62%
+  );
+}
+
+.transport {
+  grid-area: transport;
+  padding-top: max(0.6rem, env(safe-area-inset-top));
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--color-sumi-600) 30%, transparent);
+  background: color-mix(in srgb, var(--color-sumi-950) 86%, transparent);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.transportInner {
+  width: min(100%, 72rem);
+  margin-inline: auto;
+}
+
+.scrollRegion {
+  grid-area: content;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+}
+
+.contentInner {
+  width: min(100%, 72rem);
+  min-height: 100%;
+  margin-inline: auto;
+  padding: 1rem 1rem 2rem;
+}
+
+.tabPanel {
+  animation: panel-enter 180ms ease-out both;
+}
+
+.bottomDock {
+  grid-area: dock;
+  padding-bottom: max(0.45rem, env(safe-area-inset-bottom));
+  border-top: 1px solid
+    color-mix(in srgb, var(--color-sumi-600) 35%, transparent);
+  background: color-mix(in srgb, var(--color-sumi-950) 94%, transparent);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.bottomDockInner {
+  width: min(100%, 36rem);
+  margin-inline: auto;
+  padding-inline: 0.5rem;
+}
+
+.streamRail {
+  position: absolute;
+  top: 1.5rem;
+  bottom: 1.5rem;
+  left: 1.05rem;
+  width: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in srgb, var(--color-sumi-600) 48%, transparent) 8%,
+    color-mix(in srgb, var(--color-sumi-600) 48%, transparent) 92%,
+    transparent
+  );
+}
+
+@keyframes panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (min-width: 48rem) {
+  .contentInner {
+    padding: 1.5rem 2rem 3rem;
+  }
+
+  .bottomDock {
+    padding-top: 0.35rem;
+  }
+
+  .bottomDockInner {
+    border: 1px solid
+      color-mix(in srgb, var(--color-sumi-600) 28%, transparent);
+    border-bottom: 0;
+    border-radius: 1rem 1rem 0 0;
+    background: color-mix(in srgb, var(--color-sumi-900) 82%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabPanel {
+    animation: none;
+  }
+
+  .viewport *,
+  .viewport *::before,
+  .viewport *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
