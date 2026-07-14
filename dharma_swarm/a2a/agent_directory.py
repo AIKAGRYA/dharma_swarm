@@ -30,6 +30,7 @@ class AgentDirectoryEntry:
     name: str = ""
     role: str = ""
     status: str = "unknown"
+    last_heartbeat: str = ""
     capabilities: list[str] = field(default_factory=list)
     endpoint: str = ""
     node_id: str = ""
@@ -108,8 +109,11 @@ class AgentDirectory:
             entry.node_id = node.node_id
             entry.endpoint = node.endpoint or entry.endpoint
             entry.status = node.status or entry.status
+            entry.last_heartbeat = node.last_heartbeat or entry.last_heartbeat
             if node.capabilities:
-                entry.capabilities = sorted(set(entry.capabilities) | set(node.capabilities))
+                entry.capabilities = sorted(
+                    set(entry.capabilities) | set(node.capabilities)
+                )
             if node.api_key_env:
                 credential_ref = f"env:{node.api_key_env}"
                 if credential_ref not in entry.credential_refs:
@@ -139,7 +143,13 @@ class AgentDirectory:
             entry = self._entry(entries, uid, name=callsign)
             entry.onboarding = {
                 key: str(receipt.get(key) or "")
-                for key in ("receipt_id", "harness", "department", "team_id", "created_at")
+                for key in (
+                    "receipt_id",
+                    "harness",
+                    "department",
+                    "team_id",
+                    "created_at",
+                )
                 if receipt.get(key)
             }
             self._mark_source(entry, "onboarding")

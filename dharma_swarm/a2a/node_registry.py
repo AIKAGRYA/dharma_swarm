@@ -1,19 +1,4 @@
-"""Node Registry — central directory of fleet nodes.
-
-Tracks all remote nodes (VPSes, Mac Minis, etc.) with:
-  - Endpoint URL, SSH alias, status, capabilities
-  - Heartbeat monitoring (last_seen timestamps)
-  - Capability-based discovery across the fleet
-
-Persistence: JSON file at ~/.dharma/a2a/nodes.json
-No new SQLite store — respects dharma.no-new-substrate rule.
-
-Four-question discipline:
-  1. Which loop?  Fleet health monitoring (sense node status → act on failures)
-  2. Which membrane?  Network boundary between hub and remote nodes
-  3. What artifact?  Node health records with capabilities + heartbeat
-  4. Self-correcting?  Stale heartbeats trigger status degradation
-"""
+"""Persistent fleet-node directory, health monitor, and remote dispatcher."""
 
 from __future__ import annotations
 
@@ -21,9 +6,12 @@ import json
 import logging
 import os
 import re
-from dataclasses import asdict, dataclass, field
+from collections.abc import Mapping
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
+from tempfile import NamedTemporaryFile
+from threading import RLock
 from typing import Any
 
 import httpx
@@ -80,6 +68,7 @@ _NODES_PATH = _STATE_DIR / "a2a" / "nodes.json"
 _HEARTBEAT_STALE_SECONDS = 300  # 5 minutes
 # Nodes with no heartbeat for this long are marked offline.
 _HEARTBEAT_OFFLINE_SECONDS = 900  # 15 minutes
+_NODE_STATUSES = frozenset({"online", "degraded", "offline", "unknown"})
 
 
 def _utc_now() -> datetime:
@@ -90,26 +79,17 @@ def _utc_now_iso() -> str:
     return _utc_now().isoformat()
 
 
-# ---------------------------------------------------------------------------
-# Data model
-# ---------------------------------------------------------------------------
+def _heartbeat_time(value: str) -> datetime | None:
+    try:
+        parsed = datetime.fromisoformat(value)
+        return parsed if parsed.tzinfo is not None else None
+    except (TypeError, ValueError, OverflowError):
+        return None
 
 
 @dataclass
 class RemoteNode:
-    """A remote node in the Dharma fleet.
-
-    Attributes:
-        node_id: Unique identifier (e.g. "agni", "rushabdev").
-        endpoint: HTTP URL for the node gateway (e.g. "http://157.245.193.15:8420").
-        ssh_alias: SSH config alias for fallback rsync (e.g. "agni").
-        status: Current status: online, degraded, offline, unknown.
-        last_heartbeat: ISO timestamp of last successful health check.
-        capabilities: List of capability names fetched from the remote agent card.
-        api_key: Runtime-only API key for authenticating to this node's gateway.
-        api_key_env: Environment variable that should hold the gateway API key.
-        metadata: Arbitrary extra data.
-    """
+    """Credential-safe runtime and persisted state for one fleet node."""
 
     node_id: str
     endpoint: str = ""
@@ -145,36 +125,14 @@ class RemoteNode:
         return d
 
 
-# ---------------------------------------------------------------------------
-# Registry
-# ---------------------------------------------------------------------------
-
-
 class NodeRegistry:
-    """Central directory of fleet nodes.
-
-    Stores nodes in memory and persists to JSON on disk.
-    Provides capability-based discovery across the fleet.
-
-    Usage::
-
-        reg = NodeRegistry()
-        reg.register(RemoteNode(
-            node_id="agni",
-            endpoint="http://157.245.193.15:8420",
-            ssh_alias="agni",
-            api_key="secret-key-here",
-        ))
-        nodes = reg.discover("code_review")
-        await reg.health_check_all()
-    """
+    """Thread-safe central directory persisted as one atomic JSON snapshot."""
 
     def __init__(self, nodes_path: Path | None = None) -> None:
         self._path = nodes_path or _NODES_PATH
         self._nodes: dict[str, RemoteNode] = {}
+        self._lock = RLock()
         self._load()
-
-    # -- persistence ---------------------------------------------------------
 
     def _load(self) -> None:
         if not self._path.exists():
@@ -184,7 +142,9 @@ class NodeRegistry:
             if isinstance(data, dict):
                 data = data.get("nodes", [])
             if not isinstance(data, list):
-                raise ValueError("node registry JSON must be a list or object with a nodes list")
+                raise ValueError(
+                    "node registry JSON must be a list or object with a nodes list"
+                )
             for item in data:
                 if not isinstance(item, dict):
                     continue
@@ -193,7 +153,9 @@ class NodeRegistry:
                 node_id = str(filtered.get("node_id", ""))
                 if not node_id:
                     continue
-                api_key_env = str(filtered.get("api_key_env") or _default_api_key_env(node_id))
+                api_key_env = str(
+                    filtered.get("api_key_env") or _default_api_key_env(node_id)
+                )
                 filtered["api_key_env"] = api_key_env
 
                 legacy_api_key = str(filtered.get("api_key") or "")
@@ -205,70 +167,187 @@ class NodeRegistry:
         except Exception as exc:
             logger.warning("Failed to load node registry from %s: %s", self._path, exc)
 
-    def _persist(self) -> None:
-        self._path.parent.mkdir(parents=True, exist_ok=True)
+    def _persist(self) -> bool:
+        temporary: Path | None = None
         try:
-            data = [n.to_dict() for n in self._nodes.values()]
-            self._path.write_text(
-                json.dumps(data, indent=2, default=str) + "\n",
-                encoding="utf-8",
-            )
+            with self._lock:
+                self._path.parent.mkdir(parents=True, exist_ok=True)
+                data = (
+                    json.dumps(
+                        [node.to_dict() for node in self._nodes.values()],
+                        indent=2,
+                        default=str,
+                    )
+                    + "\n"
+                )
+                with NamedTemporaryFile(
+                    "w",
+                    encoding="utf-8",
+                    dir=self._path.parent,
+                    prefix=f".{self._path.name}.",
+                    delete=False,
+                ) as handle:
+                    handle.write(data)
+                    temporary = Path(handle.name)
+                temporary.replace(self._path)
+            return True
         except Exception as exc:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
             logger.error("Failed to persist node registry: %s", exc)
+            return False
 
-    # -- registration --------------------------------------------------------
+    def _replace_node(
+        self,
+        node_id: str,
+        replacement: RemoteNode | None,
+    ) -> RemoteNode | None:
+        previous = self._nodes.get(node_id)
+        if replacement is None:
+            self._nodes.pop(node_id, None)
+        else:
+            self._nodes[node_id] = replacement
+        if self._persist():
+            return previous
+        if previous is None:
+            self._nodes.pop(node_id, None)
+        else:
+            self._nodes[node_id] = previous
+        raise RuntimeError(f"Failed to persist node registry update: {node_id}")
 
     def register(self, node: RemoteNode) -> None:
         """Register or update a node in the fleet."""
-        self._nodes[node.node_id] = node
-        self._persist()
-        logger.info("Registered fleet node: %s at %s", _sanitize(node.node_id), _sanitize(node.endpoint))
+        with self._lock:
+            self._replace_node(node.node_id, node)
+        logger.info(
+            "Registered fleet node: %s at %s",
+            _sanitize(node.node_id),
+            _sanitize(node.endpoint),
+        )
 
     def unregister(self, node_id: str) -> bool:
         """Remove a node. Returns True if it existed."""
-        if node_id not in self._nodes:
-            return False
-        del self._nodes[node_id]
-        self._persist()
+        with self._lock:
+            if node_id not in self._nodes:
+                return False
+            self._replace_node(node_id, None)
         logger.info("Unregistered fleet node: %s", _sanitize(node_id))
         return True
 
-    # -- retrieval -----------------------------------------------------------
-
     def get(self, node_id: str) -> RemoteNode | None:
-        return self._nodes.get(node_id)
+        with self._lock:
+            return self._nodes.get(node_id)
 
     def list_all(self) -> list[RemoteNode]:
-        return sorted(self._nodes.values(), key=lambda n: n.node_id)
+        with self._lock:
+            return sorted(self._nodes.values(), key=lambda n: n.node_id)
 
     def list_online(self) -> list[RemoteNode]:
         return [n for n in self.list_all() if n.is_reachable()]
 
     def count(self) -> int:
-        return len(self._nodes)
+        with self._lock:
+            return len(self._nodes)
 
-    # -- discovery -----------------------------------------------------------
+    def record_heartbeat(
+        self,
+        node_id: str,
+        *,
+        last_heartbeat: str,
+        status: str,
+        metadata: Mapping[str, Any] | None = None,
+        canonical_agent_uid: str = "",
+    ) -> RemoteNode:
+        """Persist a heartbeat; unknown nodes require a projector-resolved UID."""
+        node_id = str(node_id or "").strip()
+        uid = str(canonical_agent_uid or "").strip()
+        heartbeat_at = str(last_heartbeat or "").strip()
+        node_status = str(status or "").strip().lower()
+        if not node_id or not heartbeat_at:
+            raise ValueError("heartbeat node_id and last_heartbeat are required")
+        if node_status not in _NODE_STATUSES:
+            raise ValueError(f"invalid node heartbeat status: {status!r}")
+        if metadata is not None and not isinstance(metadata, Mapping):
+            raise TypeError("heartbeat metadata must be a mapping")
+
+        incoming_metadata = dict(metadata or {})
+        incoming_uid = str(incoming_metadata.get("agent_uid") or "").strip()
+        incoming_time = _heartbeat_time(heartbeat_at)
+        if incoming_time is None:
+            raise ValueError("last_heartbeat must be a timezone-aware ISO timestamp")
+        with self._lock:
+            current = self._nodes.get(node_id)
+            if current is None and not uid:
+                raise ValueError(f"Unknown node identity: {node_id}")
+            existing_uid = str(
+                (current.metadata.get("agent_uid") if current is not None else "") or ""
+            ).strip()
+            identities = {value for value in (uid, incoming_uid, existing_uid) if value}
+            if len(identities) > 1:
+                raise ValueError("heartbeat identity does not match registered node")
+            incoming_message_id = str(
+                incoming_metadata.get("presence_message_id") or ""
+            )
+            current_message_id = (
+                str(current.metadata.get("presence_message_id") or "")
+                if current is not None
+                else ""
+            )
+            current_time = (
+                _heartbeat_time(current.last_heartbeat) if current is not None else None
+            )
+            if current is not None and (
+                (
+                    bool(incoming_message_id)
+                    and current_message_id == incoming_message_id
+                )
+                or (current_time is not None and current_time >= incoming_time)
+            ):
+                return current
+            base = current or RemoteNode(node_id=node_id)
+            merged_metadata = {**base.metadata, **incoming_metadata}
+            if identities:
+                merged_metadata["agent_uid"] = next(iter(identities))
+            updated = replace(
+                base,
+                status=node_status,
+                last_heartbeat=heartbeat_at,
+                metadata=merged_metadata,
+            )
+            self._replace_node(node_id, updated)
+            return updated
+
+    def rollback_heartbeat(
+        self,
+        node_id: str,
+        *,
+        expected_presence_message_id: str,
+        previous: RemoteNode | None,
+    ) -> bool:
+        """Restore previous state only while the failed heartbeat is current."""
+        with self._lock:
+            current = self._nodes.get(node_id)
+            current_message_id = (
+                str(current.metadata.get("presence_message_id") or "")
+                if current is not None
+                else ""
+            )
+            if current_message_id != expected_presence_message_id:
+                return False
+            self._replace_node(node_id, previous)
+            return True
 
     def discover(self, capability: str) -> list[RemoteNode]:
         """Find online nodes that advertise a matching capability."""
         cap_lower = capability.lower()
         return [
-            n for n in self.list_online()
+            n
+            for n in self.list_online()
             if any(cap_lower in c.lower() for c in n.capabilities)
         ]
 
-    # -- health monitoring ---------------------------------------------------
-
     async def health_check(self, node_id: str, timeout: float = 10.0) -> RemoteNode:
-        """Ping a single node's health endpoint and update its status.
-
-        Args:
-            node_id: The node to check.
-            timeout: HTTP timeout in seconds.
-
-        Returns:
-            The updated RemoteNode.
-        """
+        """Ping one node and persist its resulting health state."""
         node = self._nodes.get(node_id)
         if node is None:
             raise ValueError(f"Unknown node: {node_id}")
@@ -296,7 +375,9 @@ class NodeRegistry:
             node.capabilities = data.get("capabilities", node.capabilities)
             node.metadata["task_counts"] = data.get("task_counts", {})
             node.metadata.pop("last_error", None)
-            logger.info("Health check OK: %s (%s)", _sanitize(node_id), _sanitize(node.status))
+            logger.info(
+                "Health check OK: %s (%s)", _sanitize(node_id), _sanitize(node.status)
+            )
 
         except Exception as exc:
             node.metadata["last_error"] = str(exc)
@@ -307,10 +388,7 @@ class NodeRegistry:
         return node
 
     async def health_check_all(self, timeout: float = 10.0) -> list[RemoteNode]:
-        """Ping all registered nodes and update statuses.
-
-        Returns list of all nodes with updated statuses.
-        """
+        """Ping every registered node and return updated states."""
         results = []
         for node_id in list(self._nodes):
             result = await self.health_check(node_id, timeout=timeout)
@@ -318,11 +396,7 @@ class NodeRegistry:
         return results
 
     def degrade_stale_nodes(self) -> list[str]:
-        """Mark nodes with stale heartbeats as degraded or offline.
-
-        Called periodically by Guardian or cron_runner.
-        Returns list of node_ids that changed status.
-        """
+        """Persist staleness transitions and return changed node IDs."""
         changed = []
         now = _utc_now()
         for node in self._nodes.values():
@@ -362,17 +436,13 @@ def _current_trace_id() -> str:
     """Read trace_id from CorrelationContext if available."""
     try:
         from dharma_swarm.correlation_context import get_correlation
+
         corr = get_correlation()
         if corr.trace_id:
             return corr.trace_id
     except Exception:
         pass
     return ""
-
-
-# ---------------------------------------------------------------------------
-# Remote task dispatch (used by A2AClient for cross-node delegation)
-# ---------------------------------------------------------------------------
 
 
 async def dispatch_remote_task(
@@ -383,23 +453,7 @@ async def dispatch_remote_task(
     metadata: dict[str, Any] | None = None,
     timeout: float = 60.0,
 ) -> dict[str, Any]:
-    """Submit a task to a remote node's gateway.
-
-    Args:
-        node: The target RemoteNode.
-        capability: Capability being requested.
-        message: Task instruction text.
-        from_agent: Requester identity.
-        metadata: Optional task metadata.
-        timeout: HTTP timeout in seconds.
-
-    Returns:
-        Task response dict from the remote gateway.
-
-    Raises:
-        httpx.HTTPStatusError: On non-2xx response.
-        httpx.ConnectError: If the node is unreachable.
-    """
+    """Submit a task to a remote node and return its gateway response."""
     url = f"{node.endpoint.rstrip('/')}/a2a/tasks"
     headers = {"Content-Type": "application/json"}
     api_key = node.resolved_api_key()
@@ -428,16 +482,7 @@ async def poll_remote_task(
     task_id: str,
     timeout: float = 10.0,
 ) -> dict[str, Any]:
-    """Poll a remote task's status.
-
-    Args:
-        node: The remote node running the task.
-        task_id: The task ID to poll.
-        timeout: HTTP timeout.
-
-    Returns:
-        Task status dict from the remote gateway.
-    """
+    """Poll and return one remote task's current gateway state."""
     url = f"{node.endpoint.rstrip('/')}/a2a/tasks/{task_id}"
     headers = {}
     api_key = node.resolved_api_key()
