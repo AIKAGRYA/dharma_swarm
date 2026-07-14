@@ -1,6 +1,6 @@
 {
   "id": "organism-rewire-WP-O7-durable-a2a-operator-node",
-  "base_ref": "ab902039214f17d218b687e0d8a7acfd0f97941d",
+  "base_ref": "971923a71c18b0effb5bbf2db279e85e8a7db413",
   "branch": "cursor/durable-a2a-operator-node-8e74",
   "worktree": ".",
   "intent": "Implement one operator-authorized, bounded vertical slice: consume live JetStream fleet presence into existing NodeRegistry and AgentDirectory truth, then expose a phone-first read-model node over existing API, TaskBoard, and receipt surfaces. Runtime coordination must not depend on GitHub and no parallel authority substrate may be introduced.",
@@ -179,7 +179,7 @@
   "negative_controls": [
     {
       "name": "base-has-no-fleet-presence-consumer",
-      "command": "python3 -c \"import subprocess; base='ab902039214f17d218b687e0d8a7acfd0f97941d'; p=subprocess.run(['git','cat-file','-e',base+':dharma_swarm/a2a/fleet_presence.py']); raise SystemExit(0 if p.returncode else 9)\"",
+      "command": "python3 -c \"import subprocess; base='971923a71c18b0effb5bbf2db279e85e8a7db413'; p=subprocess.run(['git','cat-file','-e',base+':dharma_swarm/a2a/fleet_presence.py']); raise SystemExit(0 if p.returncode else 9)\"",
       "expected_exit": 0,
       "env": {}
     }
@@ -203,7 +203,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "ab902039214f17d218b687e0d8a7acfd0f97941d",
+      "checked_at_sha": "971923a71c18b0effb5bbf2db279e85e8a7db413",
       "details": []
     },
     "interface_mismatches": [
@@ -222,6 +222,6 @@
       "The dashboard is a read model and cannot upgrade STORED receipts into delivered, processed, or effect claims."
     ],
     "rollback": "revert the fleet presence consumer, exact NodeRegistry/AgentDirectory wiring, phone operator node, tests, and packet together; no runtime migration is required",
-    "packet_digest": "b73e0ebc667aa0fffb19a91148d3ea54a0bfdf4fbde2e5f651ed104c6c6bd7bb"
+    "packet_digest": "096c8a95562649fa0154025cf7bb61edc98201c8568177a4228ddf8d1e4836b1"
   }
 }
