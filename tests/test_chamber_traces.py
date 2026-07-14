@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import pickle
+import sys
 from dataclasses import FrozenInstanceError, replace
+from importlib.util import module_from_spec, spec_from_loader
 from pathlib import Path
 
 import pytest
@@ -22,12 +25,18 @@ from dharma_swarm.chamber.proof import (
 from dharma_swarm.chamber.replay import (
     FORK_PROPERTY_ID,
     ReplayValidationError,
+    _SnapshotSourceLoader as ReplaySnapshotSourceLoader,
+    _run_checkpoint_type,
     build_fork_alias_bundle,
     execute_world,
     read_bundle,
     run_bundle_once,
     validate_manifest,
     write_bundle,
+)
+from dharma_swarm.chamber.replay_worker import (
+    _SnapshotSourceLoader as WorkerSnapshotSourceLoader,
+    _load as load_worker_snapshot,
 )
 from dharma_swarm.chamber.replay_contract import REPLAY_EXECUTED_SOURCE_PATHS
 from dharma_swarm.chamber.verification import (
@@ -201,6 +210,54 @@ def test_fork_alias_bundle_uses_real_defect_and_discriminating_control():
     assert replay["control_candidate_id"] == bundle.control_candidate_id
     assert replay["property_verdicts"] == {FORK_PROPERTY_ID: False}
     assert replay["control_property_verdicts"] == {FORK_PROPERTY_ID: True}
+
+
+@pytest.mark.parametrize(
+    "loader_type",
+    (ReplaySnapshotSourceLoader, WorkerSnapshotSourceLoader),
+)
+def test_snapshot_loader_executes_captured_bytes_without_path_reread(
+    tmp_path,
+    loader_type,
+):
+    source_path = (tmp_path / "captured.py").resolve()
+    source_path.write_text("VALUE = 'before-capture'\n", encoding="utf-8")
+    captured = b"VALUE = 'captured-snapshot'\n"
+    module_name = f"_chamber_snapshot_{loader_type.__module__.replace('.', '_')}"
+    loader = loader_type(module_name, captured, source_path)
+    spec = spec_from_loader(module_name, loader)
+    assert spec is not None
+    module = module_from_spec(spec)
+    sys.modules[module_name] = module
+    source_path.write_text("VALUE = 'changed-on-disk'\n", encoding="utf-8")
+    try:
+        loader.exec_module(module)
+        assert module.VALUE == "captured-snapshot"
+        assert module.__file__ == str(source_path)
+        assert module.__package__ == ""
+        assert module.__spec__ is spec
+        with pytest.raises(OSError, match="refuses undeclared path"):
+            loader.get_data(str(tmp_path / "undeclared.py"))
+        with pytest.raises(OSError, match="disables bytecode caching"):
+            loader.path_stats(str(source_path))
+    finally:
+        sys.modules.pop(module_name, None)
+
+
+def test_failed_snapshot_loads_do_not_poison_module_registry(tmp_path):
+    source_path = (tmp_path / "failure.py").resolve()
+    source_path.write_text("raise SystemExit(7)\n", encoding="utf-8")
+    worker_name = "_chamber_worker_snapshot_failure"
+    with pytest.raises(SystemExit):
+        load_worker_snapshot(worker_name, source_path, {}, tmp_path)
+    assert worker_name not in sys.modules
+
+    captured = source_path.read_bytes()
+    digest = hashlib.sha256(captured).hexdigest()
+    replay_name = f"_dharma_chamber_graph_types_{digest}"
+    with pytest.raises(SystemExit):
+        _run_checkpoint_type(captured, source_path)
+    assert replay_name not in sys.modules
 
 
 def test_bundle_tamper_and_recomputed_manifest_drift_both_fail_closed(tmp_path):

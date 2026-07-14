@@ -13,6 +13,8 @@ import json
 import os
 import sys
 import types
+from importlib.abc import SourceLoader
+from importlib.util import module_from_spec, spec_from_loader
 from pathlib import Path
 from types import ModuleType
 
@@ -24,13 +26,41 @@ def _package(name: str, path: Path) -> None:
     sys.modules[name] = module
 
 
+class _SnapshotSourceLoader(SourceLoader):
+    """Serve one captured file so module execution cannot reread changed bytes."""
+
+    def __init__(self, name: str, source: bytes, source_path: Path) -> None:
+        self._name = name
+        self._source = source
+        self._source_path = source_path
+
+    def get_filename(self, fullname: str) -> str:
+        if fullname != self._name:
+            raise ImportError(f"snapshot loader cannot serve {fullname!r}")
+        return str(self._source_path)
+
+    def get_data(self, path: str) -> bytes:
+        if Path(path) != self._source_path:
+            raise OSError(f"snapshot loader refuses undeclared path: {path}")
+        return self._source
+
+    def path_stats(self, path: str) -> dict[str, int]:
+        raise OSError(f"snapshot loader disables bytecode caching: {path}")
+
+
 def _load(name: str, path: Path, digests: dict[str, str], repo_root: Path) -> ModuleType:
     source = path.read_bytes()
-    module = types.ModuleType(name)
-    module.__file__ = str(path)
-    module.__package__ = name.rpartition(".")[0]
+    loader = _SnapshotSourceLoader(name, source, path)
+    spec = spec_from_loader(name, loader)
+    if spec is None:
+        raise ImportError(f"cannot create module spec for {name}")
+    module = module_from_spec(spec)
     sys.modules[name] = module
-    exec(compile(source, str(path), "exec"), module.__dict__)
+    try:
+        loader.exec_module(module)
+    except BaseException:
+        sys.modules.pop(name, None)
+        raise
     digests[path.relative_to(repo_root).as_posix()] = hashlib.sha256(source).hexdigest()
     return module
 
