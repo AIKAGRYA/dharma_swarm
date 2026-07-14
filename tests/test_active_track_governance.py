@@ -162,9 +162,16 @@ def test_one_door_c1_has_ordered_pre_and_post_wp_o5_proofs() -> None:
     assert "pre-WP-O5 C1 authority/unlock proof" in items["WP-O5"]["what"]
     assert "final post-WP-O5 C1 enforcement" in items["WP-O6"]["what"]
 
-    spec = ONE_DOOR_SPEC.read_text(encoding="utf-8")
-    assert "full WP-O3, WP-O5, the final post-WP-O5\nC1 enforcement proof" in spec
-    assert "ACTIVE_TRACK.yaml:885-905" in spec
+    wp_o6 = " ".join(
+        ONE_DOOR_SPEC.read_text(encoding="utf-8")
+        .split("### WP-O6 —", maxsplit=1)[1]
+        .split("\n### ", maxsplit=1)[0]
+        .split()
+    )
+    assert (
+        "full WP-O3 activation, WP-O5, the final post-WP-O5 C1 enforcement "
+        "proof, and M6-1 must all be merged"
+    ) in wp_o6
 
 
 @pytest.mark.timeout(75)

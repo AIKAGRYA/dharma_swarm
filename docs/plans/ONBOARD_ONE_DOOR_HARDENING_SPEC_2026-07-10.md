@@ -1786,12 +1786,12 @@ independent-verifier exit requirements.
 
 **Owner:** D1-admitted track owner.
 
-**Prerequisites / merge dependency:** full WP-O3, WP-O5, the final post-WP-O5
-C1 enforcement proof, and M6-1 have merged. `pyproject.toml` is owned by the
-active DharmaGraph track at this baseline
-(`docs/governance/ACTIVE_TRACK.yaml:885-905`), so M6-1 must either wait for that
-ownership to close or land an operator-approved, separate shared-file
-coordination prerequisite. WP-O6 may not edit it while the collision remains.
+**Prerequisites / merge dependency:** full WP-O3 activation, WP-O5, the final
+post-WP-O5 C1 enforcement proof, and M6-1 must all be merged and reverified on
+current `main`. `pyproject.toml` is owned by the active DharmaGraph track at
+this baseline (`docs/governance/ACTIVE_TRACK.yaml:885-904`), so M6-1 must either
+have that owner land the exact configuration change or merge an explicit
+ownership transfer before WP-O6 admits the file.
 
 **Allowed files after M6-1:**
 
@@ -2381,8 +2381,8 @@ The controller re-derives D1, A1, A2, A4, WP-O1, WP-O1R-B0, and WP-O1R at the
 relevant baseline instead of trusting their reported completion. The
 pre-WP-O5 C1 proof is an authority/unlock boundary only and never closes C1;
 §9.4 requires the post-WP-O5 plain-command enforcement result
-(`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2049-2075`,
-`docs/governance/ACTIVE_TRACK.yaml:1909-1915,2009-2026`). Live state comes from
+(`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2051-2075`,
+`docs/governance/ACTIVE_TRACK.yaml:1905-1915,2009-2012`). Live state comes from
 current owners and Git; dated statements elsewhere in this evidence body are
 not promotion markers. Titanium remains blocked for the entire graph
 (`docs/governance/ACTIVE_TRACK.yaml:1914-1915`).
@@ -2435,8 +2435,8 @@ to produce a green count. WP-O5 and §13 evidence must be represented rather
 than inferred from adjacent criteria. This is the explicit track-evidence
 closure node above, owned as a governance PR that updates `ACTIVE_TRACK.yaml`
 and its managed renders only after the proof candidate merges
-(`scripts/governance/check_track_status.py:530-547,551-563,639-653`,
-`docs/governance/ACTIVE_TRACK.yaml:1924-1983`).
+(`scripts/governance/check_track_status.py:574-591,1073-1112,1855-1921`,
+`docs/governance/ACTIVE_TRACK.yaml:1924-2036`).
 
 ### 14.4 Authority gates and stop rules
 
@@ -2451,7 +2451,7 @@ and its managed renders only after the proof candidate merges
   context, parity, automerge, and merge-group authority and uses exactly `make
   onboard ARGS=--strict`; its post-WP-O5 proof repeats BLOCKED through plain
   `make onboard` and is the only C1 closure point
-  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2049-2075`).
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2051-2075`).
 - D2 is a separately merged operator-authored ratification after the pre-WP-O5
   C1 authority/unlock proof; an implementation author cannot mint or backdate it
   (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2027-2041`).
