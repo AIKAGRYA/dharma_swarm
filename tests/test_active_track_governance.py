@@ -36,6 +36,52 @@ MANAGED_FILES = [
     REPO_ROOT / "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
 ]
 
+ONE_DOOR_PACKET_DIR = REPO_ROOT / "reports/agentops/work_packets"
+ADMITTED_ONE_DOOR_PACKET_NAMES = {
+    "onboard-one-door-WP-O1.json",
+    "onboard-one-door-WP-O1R.json",
+    "onboard-one-door-WP-O2.json",
+    "onboard-one-door-WP-O2-B0.json",
+    "onboard-one-door-WP-O2-B1.json",
+    "onboard-one-door-WP-O2-B2.json",
+    "onboard-one-door-WP-O2-B3.json",
+    "onboard-one-door-WP-O2R.json",
+    "onboard-one-door-WP-O3.json",
+    "onboard-one-door-WP-O3-P.json",
+    "onboard-one-door-WP-O3-D3.json",
+    "onboard-one-door-WP-O3-A.json",
+    "onboard-one-door-WP-O4.json",
+    "onboard-one-door-WP-O4R.json",
+    "onboard-one-door-WP-O4-B0.json",
+    "onboard-one-door-WP-O4-B1.json",
+    "onboard-one-door-WP-O4-B1-CLOSE.json",
+    "onboard-one-door-WP-O4-B9.json",
+    "onboard-one-door-WP-O4-B2.json",
+    "onboard-one-door-WP-O4-POLICY.json",
+    "onboard-one-door-WP-O4-C1.json",
+    "onboard-one-door-WP-O4-C1-CLOSE.json",
+    "onboard-one-door-WP-O5.json",
+    "onboard-one-door-WP-O5-D2.json",
+    "onboard-one-door-WP-O6.json",
+    "onboard-one-door-WP-O6-M6.json",
+    "onboard-one-door-WP-O6-CLOSE.json",
+    "onboard-one-door-WP-O6-FINAL.json",
+}
+POST_B2_ONE_DOOR_PACKET_NAMES = {
+    "onboard-one-door-WP-O3-P.json",
+    "onboard-one-door-WP-O3-D3.json",
+    "onboard-one-door-WP-O3-A.json",
+    "onboard-one-door-WP-O4-POLICY.json",
+    "onboard-one-door-WP-O4-C1.json",
+    "onboard-one-door-WP-O4-C1-CLOSE.json",
+    "onboard-one-door-WP-O5.json",
+    "onboard-one-door-WP-O5-D2.json",
+    "onboard-one-door-WP-O6.json",
+    "onboard-one-door-WP-O6-M6.json",
+    "onboard-one-door-WP-O6-CLOSE.json",
+    "onboard-one-door-WP-O6-FINAL.json",
+}
+
 
 def _run(
     script: Path, *args: str, timeout: int = 60, skip_commands: bool = False,
@@ -136,6 +182,67 @@ def test_managed_files_have_markers() -> None:
             f"{path} missing ACTIVE_TRACK end marker"
 
 
+def test_one_door_pre_b2_packet_names_and_state_implications_are_closed() -> None:
+    """Reject suffix escapes and out-of-order packets before B2 exists."""
+    governance_path = str(REPO_ROOT / "scripts/governance")
+    if governance_path not in sys.path:
+        sys.path.insert(0, governance_path)
+    from check_track_status import load_active_track, normalize_portfolio  # type: ignore
+
+    actual_names: set[str] = set()
+    for path in ONE_DOOR_PACKET_DIR.glob("*.json"):
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if (
+            payload.get("session_entry", {}).get("active_track")
+            != "onboard-one-door-2026-07"
+        ):
+            continue
+        assert payload.get("id") == path.stem, (
+            f"One-Door packet id/filename mismatch: {path.name}"
+        )
+        actual_names.add(path.name)
+    assert actual_names <= ADMITTED_ONE_DOOR_PACKET_NAMES, (
+        "unadmitted One-Door packet filename(s): "
+        f"{sorted(actual_names - ADMITTED_ONE_DOOR_PACKET_NAMES)}"
+    )
+
+    portfolio = normalize_portfolio(load_active_track(ACTIVE_TRACK))
+    matches = [
+        track
+        for family in (portfolio["active_tracks"], portfolio["closed_tracks"])
+        for track in family
+        if track["id"] == "onboard-one-door-2026-07"
+    ]
+    assert len(matches) == 1
+    items = {str(item["id"]): item for item in matches[0]["next_items"]}
+    wp_o2r_done = items["WP-O2R"]["blocker"] is False
+    wp_o4_done = items["WP-O4"]["blocker"] is False
+    b2_done = items["WP-O4-B2"]["blocker"] is False
+
+    b1_close = "onboard-one-door-WP-O4-B1-CLOSE.json"
+    b9 = "onboard-one-door-WP-O4-B9.json"
+    b2 = "onboard-one-door-WP-O4-B2.json"
+    assert not wp_o2r_done or b1_close in actual_names
+    assert not wp_o4_done or b9 in actual_names
+    assert not b2_done or b2 in actual_names
+    assert b9 not in actual_names or b1_close in actual_names
+    assert b2 not in actual_names or {b1_close, b9} <= actual_names
+    if b2 not in actual_names:
+        assert (b1_close in actual_names) == wp_o2r_done
+        assert (b9 in actual_names) == wp_o4_done
+        assert not wp_o4_done or wp_o2r_done
+        assert not (actual_names & POST_B2_ONE_DOOR_PACKET_NAMES), (
+            "post-B2 One-Door packet appeared before B2 cleared: "
+            f"{sorted(actual_names & POST_B2_ONE_DOOR_PACKET_NAMES)}"
+        )
+    else:
+        b2_what = str(items["WP-O4-B2"]["what"])
+        assert (
+            "stage=WP-O4-B2-DONE" in b2_what
+            or "stage=WP-O4-B2-POLICY-v" in b2_what
+        ), "B2 file exists without a mechanically installed controller stage"
+
+
 def test_one_door_c1_has_ordered_pre_and_post_wp_o5_proofs() -> None:
     """C1 must unlock WP-O5 before plain-command enforcement can close C1."""
     governance_path = str(REPO_ROOT / "scripts/governance")
@@ -144,14 +251,35 @@ def test_one_door_c1_has_ordered_pre_and_post_wp_o5_proofs() -> None:
     from check_track_status import load_active_track, normalize_portfolio  # type: ignore
 
     portfolio = normalize_portfolio(load_active_track(ACTIVE_TRACK))
-    track = next(
-        (
-            item for item in portfolio["active_tracks"]
-            if item["id"] == "onboard-one-door-2026-07"
-        ),
-        None,
+    track_id = "onboard-one-door-2026-07"
+    active_matches = [
+        item for item in portfolio["active_tracks"] if item["id"] == track_id
+    ]
+    closed_matches = [
+        item for item in portfolio["closed_tracks"] if item["id"] == track_id
+    ]
+    assert len(active_matches) + len(closed_matches) == 1, (
+        "onboard-one-door-2026-07 must exist exactly once across active and "
+        "closed portfolios"
     )
-    assert track is not None, "onboard-one-door-2026-07 missing from active portfolio"
+    track = (active_matches or closed_matches)[0]
+    if closed_matches:
+        assert track["status"] == "SHIPPED"
+        assert track["closure_kind"] == "CLOSED_NOT_PROD"
+        assert track.get("closed_at")
+        assert track.get("closed_by")
+        assert track.get("final_audit_digest")
+        restoration = track.get("wip_limit_at_closure")
+        assert isinstance(restoration, dict)
+        assert restoration.get("base_max_active") in {10, 11}
+        assert restoration.get("resulting_max_active") == 10
+        assert restoration.get("restored_by") in {
+            "onboard-one-door-WP-O6-FINAL",
+            "prior-track-closure",
+        }
+    else:
+        assert track["status"] in {"ACTIVE", "SHIPPABLE"}
+        assert track["target_closure_kind"] == "CLOSED_NOT_PROD"
     ordered_items = track["next_items"]
     ordered_ids = [str(item["id"]) for item in ordered_items]
     items = {str(item["id"]): item for item in ordered_items}
@@ -161,6 +289,7 @@ def test_one_door_c1_has_ordered_pre_and_post_wp_o5_proofs() -> None:
         "WP-O4R",
         "WP-O2R",
         "WP-O4",
+        "WP-O4-B2",
         "C1",
         "D2",
         "WP-O5",
@@ -170,24 +299,226 @@ def test_one_door_c1_has_ordered_pre_and_post_wp_o5_proofs() -> None:
     assert positions == sorted(positions), (
         "One-Door next_items must preserve the reseal and C1/WP-O5/WP-O6 order"
     )
-    d3_o3_lane = ["WP-O2R", "D3", "WP-O3", "WP-O6"]
-    d3_o3_positions = [ordered_ids.index(node_id) for node_id in d3_o3_lane]
-    assert d3_o3_positions == sorted(d3_o3_positions), (
-        "D3/WP-O3 may run in parallel with C1 only after the WP-O2R reseal"
-    )
-    m6_lane = ["WP-O2R", "M6-1", "WP-O6"]
-    m6_positions = [ordered_ids.index(node_id) for node_id in m6_lane]
-    assert m6_positions == sorted(m6_positions), (
-        "M6-1 may run in parallel with C1/WP-O5 after the WP-O2R reseal"
-    )
+    assert (
+        ordered_ids.index("WP-O4-B2")
+        < ordered_ids.index("D3")
+        < ordered_ids.index("WP-O3")
+        < ordered_ids.index("WP-O6")
+    ), "D3/WP-O3 must branch after WP-O4-B2 and join before WP-O6"
+    assert (
+        ordered_ids.index("WP-O4-B2")
+        < ordered_ids.index("M6-1")
+        < ordered_ids.index("WP-O6")
+    ), "M6-1 must branch after WP-O4-B2 and join before WP-O6"
 
-    c1 = items["C1"]["what"]
-    assert "make onboard ARGS=--strict" in c1
-    assert "plain `make onboard`" in c1
-    assert "does not close C1" in c1
-    assert "pre-WP-O5 C1 authority/unlock proof" in items["D2"]["what"]
-    assert "pre-WP-O5 C1 authority/unlock proof" in items["WP-O5"]["what"]
-    assert "final post-WP-O5 C1 enforcement" in items["WP-O6"]["what"]
+    def assert_transition_safe(
+        item: dict[str, object],
+        *,
+        pending_markers: tuple[str, ...] | tuple[tuple[str, ...], ...],
+        done_markers: tuple[str, ...] | tuple[tuple[str, ...], ...],
+    ) -> None:
+        what = str(item["what"])
+        markers = pending_markers if item["blocker"] else done_markers
+        variants = markers if markers and isinstance(markers[0], tuple) else (markers,)
+        assert any(all(marker in what for marker in variant) for variant in variants), (
+            f"{item['id']} does not match an admitted pending/done stage"
+        )
+
+    assert_transition_safe(
+        items["WP-O2R"],
+        pending_markers=(
+            "exact #932 successor",
+            "onboard-one-door-WP-O4-B1-CLOSE",
+            "WP-O4-B9 cannot begin before that record merges",
+        ),
+        done_markers=(
+            "stage=WP-O2R-DONE",
+            "onboard-one-door-WP-O4-B1-CLOSE",
+            "council",
+            "approval",
+            "main",
+        ),
+    )
+    c1_item = items["C1"]
+    assert_transition_safe(
+        c1_item,
+        pending_markers=(
+            (
+                "exact WP-O4-C1",
+                "external RUNNER_TEMP",
+                "JSON companion are semantically READY",
+                "strict/JSON projection-only BLOCKED control",
+                "WP-O5-D2 records that receipt here without closing C1",
+                "actual merge_group ejection",
+                "WP-O4-C1-CLOSE",
+            ),
+            (
+                "stage=WP-O4-C1-TRACKED",
+                "pre-WP-O5",
+                "post-WP-O5",
+                "WP-O4-C1-CLOSE",
+            ),
+            (
+                "stage=C1-PRE-O5-PROVEN",
+                "WP-O5-D2",
+                "post-WP-O5",
+                "WP-O4-C1-CLOSE",
+            ),
+            (
+                "stage=C1-PR-NEGATIVE",
+                "c1-proof-pr-projection-block",
+                "WP-O4-C1-CLOSE",
+            ),
+            (
+                "stage=C1-MERGE-GROUP-NEGATIVE",
+                "c1-proof-merge-group-projection-block",
+                "WP-O4-C1-CLOSE",
+            ),
+        ),
+        done_markers=(
+            "stage=C1-DONE",
+            "WP-O4-C1-CLOSE",
+            "pull-request",
+            "merge_group",
+        ),
+    )
+    b2_item = items["WP-O4-B2"]
+    assert_transition_safe(
+        b2_item,
+        pending_markers=(
+            "mandatory semantic track_effect admission",
+            "FIRST AFTER WP-O4-B9",
+            "atomically change this primary ACTIVE_TRACK owner",
+        ),
+        done_markers=(
+            ("stage=WP-O4-B2-DONE", "track_effect", "ACTIVE_TRACK"),
+            ("stage=WP-O4-B2-POLICY-v", "track_effect", "ACTIVE_TRACK"),
+        ),
+    )
+    wp_o4 = items["WP-O4"]
+    assert_transition_safe(
+        wp_o4,
+        pending_markers=(
+            "WP-O4 TAIL REPAIR PENDING AFTER WP-O2R",
+            "make agent-build-preflight",
+            "HYPOTHESIS_STORAGE_DIRECTORY",
+            "zero ordinary and ignored source leaves",
+        ),
+        done_markers=(
+            "stage=WP-O4-B9-DONE",
+            "onboard-one-door-WP-O4-B9",
+            "combined-main preflight",
+            "zero ordinary and ignored source leaves",
+        ),
+    )
+    assert (
+        "does not cover the Make verifier-selfcheck presteps"
+        in items["WP-O4R"]["what"]
+    )
+    assert items["WP-O4R"]["blocker"] is False
+    assert "runner/checker envelope" in items["WP-O4R"]["what"]
+    assert_transition_safe(
+        items["WP-O3"],
+        pending_markers=(
+            (
+                "WP-O3-P AFTER WP-O4-B2",
+                "finite producer/input/HEAD/expiry binding",
+                "D3 and WP-O3-P jointly gate exact WP-O3-A",
+            ),
+            (
+                "stage=WP-O3-P-DONE",
+                "WP-O3-A",
+                "D3",
+                "v2",
+            ),
+        ),
+        done_markers=("stage=WP-O3-A-DONE", "WP-O3-A", "D3", "v2", "cache"),
+    )
+    assert_transition_safe(
+        items["D3"],
+        pending_markers=(
+            "D3 PENDING",
+            "onboard-one-door-WP-O3-D3",
+            "Unobserved",
+        ),
+        done_markers=(
+            "stage=D3-DONE",
+            "onboard-one-door-WP-O3-D3",
+            "census",
+            "digest",
+        ),
+    )
+    assert_transition_safe(
+        items["D2"],
+        pending_markers=("self-referential merge SHA",),
+        done_markers=(
+            "D2 RATIFIED",
+            "decision_packet=reports/agentops/work_packets/"
+            "onboard-one-door-WP-O5-D2.json",
+            "decision_digest=",
+            "scope=WP-O5-strict-default",
+        ),
+    )
+    assert_transition_safe(
+        items["WP-O5"],
+        pending_markers=(
+            "exact operator packet WP-O5-D2",
+            "atomically update this item via track_effect",
+        ),
+        done_markers=("stage=WP-O5-DONE", "strict", "--no-strict"),
+    )
+    assert_transition_safe(
+        items["M6-1"],
+        pending_markers=(
+            "M6-1 PENDING",
+            "onboard-one-door-WP-O6-M6",
+            "DharmaGraph owner",
+        ),
+        done_markers=(
+            "stage=M6-1-DONE",
+            "onboard-one-door-WP-O6-M6",
+            "owner",
+            "ancestry",
+        ),
+    )
+    assert_transition_safe(
+        items["WP-O6"],
+        pending_markers=(
+            "merged WP-O4-C1-CLOSE",
+            "WP-O6-CLOSE",
+            "SHIPPABLE",
+            "fresh-main audit",
+            "WP-O6-FINAL",
+        ),
+        done_markers=(
+            ("stage=WP-O6-DONE", "WP-O6-CLOSE", "independent"),
+            ("stage=WP-O6-SEALED", "WP-O6-CLOSE", "SHIPPABLE", "independent"),
+        ),
+    )
+    assert_transition_safe(
+        items["TERMINAL-PROOF"],
+        pending_markers=(
+            "TERMINAL PROOF PENDING",
+            "WP-O6-CLOSE",
+            "SHIPPABLE",
+            "fresh main",
+            "WP-O6-FINAL",
+            "CLOSED_NOT_PROD",
+            "Titanium",
+        ),
+        done_markers=(
+            "stage=WP-O6-SEALED",
+            "WP-O6-CLOSE",
+            "SHIPPABLE",
+            "fresh-main",
+            "WP-O6-FINAL",
+            "CLOSED_NOT_PROD",
+            "Titanium",
+        ),
+    )
+    owned_surfaces = {str(surface) for surface in track["owned_surfaces"]}
+    assert "docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md" in owned_surfaces
+    assert "docs/ops/ONBOARD_RECEIPT_READER_CENSUS.yaml" in owned_surfaces
 
     spec_text = ONE_DOOR_SPEC.read_text(encoding="utf-8")
     wp_o5 = " ".join(
@@ -197,9 +528,30 @@ def test_one_door_c1_has_ordered_pre_and_post_wp_o5_proofs() -> None:
         .split()
     )
     assert (
-        "pre-WP-O5 C1 authority/unlock proof has made the same admission "
-        "context merge-blocking using exactly `make onboard ARGS=--strict`"
+        "pre-WP-O5 C1 authority/unlock proof has made the canonical admission "
+        "context a required merge-blocking context, has proven the documented "
+        "untimed projection bootstrap bound to its producer, inputs, and exact "
+        "event head before the normal plain `make onboard`, and has separately "
+        "retained the controlled `make onboard ARGS=--strict` BLOCKED result"
     ) in wp_o5
+    assert wp_o5.index("normal plain `make onboard`") < wp_o5.index(
+        "separately retained the controlled `make onboard ARGS=--strict`"
+    )
+    assert (
+        "WP-O4-B1/#932 → WP-O4-B1-CLOSE reseal record → "
+        "WP-O4 O4-B9 tail repair → WP-O4-B2 → "
+        "WP-O3-P safety → tracked WP-O4-C1 "
+        "implementation → pre-WP-O5 C1 authority proof"
+    ) in " ".join(spec_text.split())
+    assert "reports/agentops/work_packets/<packet.id>.json" in spec_text
+    assert "onboard-one-door-WP-O3-P" in spec_text
+    assert "onboard-one-door-WP-O4-B1-CLOSE" in spec_text
+    assert "onboard-one-door-WP-O4-B9" in spec_text
+    assert "onboard-one-door-WP-O4-C1" in spec_text
+    assert "track_effect.next_items: [WP-O3]" in spec_text
+    assert "track_effect.next_items: [C1]" in spec_text
+    assert "make onboard ARGS=--json" in spec_text
+    assert 'make onboard ARGS="--strict --json"' in spec_text
 
     wp_o6 = " ".join(
         spec_text
@@ -219,37 +571,70 @@ def test_one_door_c1_has_ordered_pre_and_post_wp_o5_proofs() -> None:
         .split("```", maxsplit=1)[0]
     )
     graph_steps = [line.strip() for line in controller_graph.splitlines()]
-    expected_graph_steps = [
-        "-> WP-O4 baseline (merged)",
-        "-> WP-O2R reseal",
-        "-> WP-O4 O4-B9 tail repair (same formal node)",
-        "-> C1 pre-WP-O5 authority/unlock proof (`make onboard ARGS=--strict`)",
-        "-> D2",
-        "-> WP-O5",
-        "-> C1 post-WP-O5 final enforcement proof (plain `make onboard`)",
-        "-> WP-O6 candidate",
-    ]
-    graph_positions = [graph_steps.index(step) for step in expected_graph_steps]
-    assert graph_positions == sorted(graph_positions), (
-        "§14.1 must preserve the full ordered WP-O2R/C1/WP-O5/WP-O6 path"
+    baseline_step = "-> WP-O4 baseline (merged)"
+    b1_step = "-> WP-O4-B1 / #932 exact-head council + merge"
+    wp_o2r_step = "-> WP-O4-B1-CLOSE WP-O2R reseal record"
+    wp_o4_b9_step = "-> WP-O4 O4-B9 tail repair (same formal node)"
+    b2_step = "-> WP-O4-B2 semantic ACTIVE_TRACK effect admission"
+    ready_step = "[READY IN PARALLEL IMMEDIATELY AFTER WP-O4-B2]"
+    wp_o3_p_lane = "[S] WP-O3-P projection-binding/diagnostic safety slice"
+    d3_lane = "[D] D3 fleet-seat census and reader classification"
+    m6_lane = "[M] M6-1 ownership reconciliation"
+    wp_o3_p_done = "[S] WP-O3-P"
+    c1_post_step = "-> WP-O4-C1-CLOSE"
+    c1_tracked_step = "-> C1 tracked WP-O4-C1 implementation slice"
+    c1_pre_step = (
+        "-> C1 pre-WP-O5 authority/unlock proof (bound projection bootstrap "
+        "-> plain `make onboard`; separate controlled "
+        "`make onboard ARGS=--strict` BLOCKED)"
     )
-    wp_o2r_step = "-> WP-O2R reseal"
-    c1_post_step = (
-        "-> C1 post-WP-O5 final enforcement proof (plain `make onboard`)"
-    )
-    d3_o3_lane = "parallel after WP-O2R: D3 -> WP-O3 activation"
-    m6_lane = "parallel after WP-O2R: M6-1"
-    join_step = "C1 post-WP-O5 + WP-O3 activation + M6-1"
+    d2_step = "-> operator WP-O5-D2 record (C1 partial proof + D2)"
+    wp_o5_step = "-> WP-O5"
+    c1_proof_step = "-> C1 post-WP-O5 proof-only PR + merge_group vehicles"
+    wp_o3_join = "[S] WP-O3-P + [D] D3"
+    wp_o3_a_step = "-> WP-O3-A activation"
+    join_step = "WP-O4-C1-CLOSE + WP-O3-A + [M] M6-1"
     wp_o6_step = "-> WP-O6 candidate"
+    wp_o6_proof_step = "-> §13 independent clean-room proof"
+    wp_o6_merge_step = "-> merge WP-O6 + proof candidate"
+    wp_o6_seal_step = "-> WP-O6-CLOSE SHIPPABLE/evidence PR"
+    terminal_audit_step = "-> fresh-main terminal audit of the SHIPPABLE merge"
+    wp_o6_final_step = "-> WP-O6-FINAL closed-track PR"
     assert (
-        graph_steps.index(wp_o2r_step)
-        < graph_steps.index(d3_o3_lane)
+        graph_steps.index(baseline_step)
+        < graph_steps.index(b1_step)
+        < graph_steps.index(wp_o2r_step)
+        < graph_steps.index(wp_o4_b9_step)
+        < graph_steps.index(b2_step)
+        < graph_steps.index(ready_step)
+    )
+    for lane in (wp_o3_p_lane, d3_lane, m6_lane):
+        assert graph_steps.index(ready_step) < graph_steps.index(lane)
+    assert (
+        graph_steps.index(wp_o3_p_lane)
+        < graph_steps.index(wp_o3_p_done)
+        < graph_steps.index(c1_tracked_step)
+        < graph_steps.index(c1_pre_step)
+        < graph_steps.index(d2_step)
+        < graph_steps.index(wp_o5_step)
+        < graph_steps.index(c1_proof_step)
+        < graph_steps.index(c1_post_step)
+    )
+    assert (
+        graph_steps.index(wp_o3_p_lane)
+        < graph_steps.index(wp_o3_join)
+        < graph_steps.index(wp_o3_a_step)
         < graph_steps.index(join_step)
         < graph_steps.index(wp_o6_step)
     )
     assert (
-        graph_steps.index(wp_o2r_step)
-        < graph_steps.index(m6_lane)
+        graph_steps.index(d3_lane)
+        < graph_steps.index(wp_o3_join)
+        < graph_steps.index(wp_o3_a_step)
+        < graph_steps.index(join_step)
+    )
+    assert (
+        graph_steps.index(m6_lane)
         < graph_steps.index(join_step)
         < graph_steps.index(wp_o6_step)
     )
@@ -258,6 +643,25 @@ def test_one_door_c1_has_ordered_pre_and_post_wp_o5_proofs() -> None:
         < graph_steps.index(join_step)
         < graph_steps.index(wp_o6_step)
     )
+    assert (
+        graph_steps.index(wp_o6_step)
+        < graph_steps.index(wp_o6_proof_step)
+        < graph_steps.index(wp_o6_merge_step)
+        < graph_steps.index(wp_o6_seal_step)
+        < graph_steps.index(terminal_audit_step)
+        < graph_steps.index(wp_o6_final_step)
+    )
+    resumption = " ".join(
+        spec_text
+        .split("### 14.3 Resumption without another ledger", maxsplit=1)[1]
+        .split("### 14.4", maxsplit=1)[0]
+        .split()
+    )
+    assert "ready set, not a textual serial cursor" in resumption
+    assert "ready nodes = every unclosed §14.1 node" in resumption
+    assert "next work = every collision-free ready node" in resumption
+    assert "WP-O3-P, D3, and M6-1 are all eligible immediately" in resumption
+    assert "first node in §14.1" not in resumption
 
     wp_o4_tail = spec_text.index(
         "local scope result from base/head, strict default cannot proceed."
@@ -267,33 +671,23 @@ def test_one_door_c1_has_ordered_pre_and_post_wp_o5_proofs() -> None:
     assert wp_o4_tail < wp_o4_b1 < wp_o5_start, (
         "WP-O4-B1 must follow the complete WP-O4 tail and precede WP-O5"
     )
-
-    wp_o4 = items["WP-O4"]
-    assert wp_o4["blocker"] is True
-    for marker in (
-        "WP-O4 TAIL REPAIR PENDING",
-        "make agent-build-preflight",
-        "HYPOTHESIS_STORAGE_DIRECTORY",
-        "ordinary and ignored source leaves",
-    ):
-        assert marker in wp_o4["what"]
-
-    wp_o4r = items["WP-O4R"]
-    assert wp_o4r["blocker"] is False
-    assert "runner/checker envelope" in wp_o4r["what"]
-    assert "does not cover the Make verifier-selfcheck presteps" in wp_o4r["what"]
-
-    spec_text = ONE_DOOR_SPEC.read_text(encoding="utf-8")
     wp_o4_spec = " ".join(
         spec_text
         .split("### WP-O4 —", maxsplit=1)[1]
         .split("### WP-O5 —", maxsplit=1)[0]
         .split()
     )
-    assert "HYPOTHESIS_STORAGE_DIRECTORY" in wp_o4_spec
     assert "This remains an O4-B9 repair under WP-O4" in wp_o4_spec
     assert "does not create a new formal closure node" in wp_o4_spec
-
+    assert "does not gate the reopened O4-B9 tail on residual WP-O3 or D3" in wp_o4_spec
+    assert (
+        "complete merge prerequisites are the already-landed WP-O4 baseline "
+        "and the merged WP-O4-B1-CLOSE record"
+    ) in wp_o4_spec
+    assert (
+        "prove a fresh exact-main preflight leaves zero ordinary and ignored "
+        "source leaves"
+    ) in wp_o4_spec
 
 @pytest.mark.timeout(75)
 def test_onboard_command_succeeds() -> None:

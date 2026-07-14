@@ -5,11 +5,15 @@ existing `make onboard` session doorway before Titanium vNext captures a
 dynamic baseline or begins WP-00. This document specifies work; it implements
 nothing.
 
-**Evidence baseline:** all repository claims in this revision were checked at
+**Historical evidence baseline:** the admission measurements in §1 were checked at
 `5e7304c7df36b0fe6a34ae458b6cc0212b2106b6`, the remote head of
-`claude/make-onboard-hardening-n1ww1s` at the start of the refinement. The
-refinement commit changes only this file, so cited code lines remain the
-reviewed lines.
+`claude/make-onboard-hardening-n1ww1s` at the start of the refinement. Later
+packets intentionally changed those files. Therefore every `path:line` in
+§§1.1–1.3 is a coordinate in that exact historical Git tree (reproduce with
+`git show 5e7304c7df36b0fe6a34ae458b6cc0212b2106b6:<path>`), never a claim that
+the same line on current HEAD still has those bytes. Current phase, blocker,
+and repaired/unrepaired truth lives in `ACTIVE_TRACK.yaml` and the dated
+successor records in §6/§14.
 
 **Authority precedence:** executable code, tests, locks, git state, and the
 single owner files named by `docs/governance/CANONICAL_DOC_STACK.md` win.
@@ -50,7 +54,7 @@ production or `CLOSED_LIVE` claims.
    active track, stop. Narrow the behavior, land the named prerequisite, or ask
    the operator; do not widen a packet during implementation.
 
-## §1 Measured current state and claim adjudication
+## §1 Recorded admission state and claim adjudication
 
 ### 1.1 Session record (2026-07-10)
 
@@ -154,7 +158,7 @@ These are measurements at the recorded SHA, not new parser semantics.
 
 Counts: **CONFIRMED 4 · CORRECTED 7 · NARROWED 3 · UNRESOLVED 0**.
 
-| Prior claim | Verdict | Current ground truth |
+| Prior claim | Verdict | Ground truth at the recorded SHA |
 |---|---|---|
 | `agent_onboard.py` is about 1,800 lines | CONFIRMED | 1,883 lines; `orientation_graph.py` is 1,149 lines (`scripts/governance/agent_onboard.py:1883`, `scripts/governance/orientation_graph.py:1149`). |
 | Normal output is 327 lines | CORRECTED | Measured output was 325 lines with no refresh/missing evidence and 466 lines after evidence generation. Output is state-dependent. |
@@ -172,6 +176,11 @@ Counts: **CONFIRMED 4 · CORRECTED 7 · NARROWED 3 · UNRESOLVED 0**.
 | Host absence is already coherently typed or neither command emits RED | CORRECTED | Neither command emits `NEEDS_HOST`; host absence is untyped prose/missing data with exit 0 (`scripts/governance/agent_onboard.py:703-729`; `scripts/governance/orientation_graph.py:608-636,1019-1024`). Onboarding can separately echo RED from a trust-gate projection (`scripts/governance/agent_onboard.py:830-860`). |
 
 ### 1.3 Structural findings that control the design
+
+These findings are the commit-bound admission inputs at
+`5e7304c7df36b0fe6a34ae458b6cc0212b2106b6`, not current completion claims.
+WP-O1–WP-O4 repaired many of them; the live owner rows and exact successor
+sections decide what remains.
 
 1. **Six direct broken-register parsers exist.** They are:
    `scripts/governance/agent_onboard.py:783-813`,
@@ -586,17 +595,26 @@ work-packet shape with required `session_entry`, expected-exit, and
 negative-control fields. It does not mislabel today's packet as an existing v1
 schema. JSON is mandatory;
 YAML remains optional only where PyYAML already exists, consistent with
-AgentOps (`docs/governance/AGENTOPS.md:10-45`). Each implementation PR records
-exactly one packet at:
+AgentOps (`docs/governance/AGENTOPS.md:10-45`). Each implementation or
+governance-record PR records exactly one canonical packet at:
 
 ```text
-reports/agentops/work_packets/onboard-one-door-WP-O<N>.json
+reports/agentops/work_packets/<packet.id>.json
 ```
 
-The post-WP-O1 security remediation admitted below uses the exact tracked path
-`reports/agentops/work_packets/onboard-one-door-WP-O1R.json`. `WP-O1R` is a
-distinct, literal packet identity; its one-time exact-identifier bootstrap and
-normal pre-edit validation sequence are pinned in §6 WP-O1R.
+Initial nodes use packet ids `onboard-one-door-WP-O<N>`. `WP-O1R`, `WP-O2R`,
+and `WP-O4R` are distinct repair identities with the bootstraps pinned in §6.
+The already-admitted numeric identities also permit these exact successor ids
+without widening `session_entry.work_packet`: `onboard-one-door-WP-O4-B1`,
+`onboard-one-door-WP-O4-B1-CLOSE`, `onboard-one-door-WP-O4-B9`,
+`onboard-one-door-WP-O4-B2`, `onboard-one-door-WP-O4-POLICY`,
+`onboard-one-door-WP-O3-P`,
+`onboard-one-door-WP-O3-D3`, `onboard-one-door-WP-O3-A`,
+`onboard-one-door-WP-O4-C1`, `onboard-one-door-WP-O4-C1-CLOSE`,
+`onboard-one-door-WP-O5-D2`, `onboard-one-door-WP-O6-M6`,
+`onboard-one-door-WP-O6-CLOSE`, and `onboard-one-door-WP-O6-FINAL`. Each canonical filename equals its packet id
+plus `.json`; the declared work packet remains respectively `WP-O4`, `WP-O3`,
+`WP-O5`, or `WP-O6`. No arbitrary suffix family is admitted.
 
 This reuses the existing tracked AgentOps packet surface; it is not a new
 receipt store. Before any code edit, however, the complete packet lives outside
@@ -692,17 +710,21 @@ Negative controls may never mutate the admitted source checkout.
   files. Forbidden patterns override allowed patterns. The same packet digest
   used at preflight must be present at closeout. Closeout accepts a descendant
   of the exact base; preflight does not.
-- Current AgentOps checks only unstaged/staged/untracked state
-  (`scripts/governance/run_agent_work_packet.py:354-385`); WP-O4 extends that existing matcher for
-  committed-range enforcement rather than implementing another scope engine.
-- Current non-dry AgentOps writes unignored reports inside the target worktree
-  (`scripts/governance/run_agent_work_packet.py:479-481,634-644,662`). WP-O1
-  adds an explicit external report root using the existing report schema;
-  preflight, closeout, and CI never fall back into the source tree.
+- At the admission baseline AgentOps checked only working/index/untracked
+  state. WP-O4 has since extended the same engine to the committed
+  `base_ref...HEAD` range (`scripts/governance/run_agent_work_packet.py:994-1044`)
+  rather than creating another scope engine.
+- At the admission baseline non-dry AgentOps could write reports inside the
+  target worktree. WP-O1/WP-O4R have since made the external report root
+  explicit and fail-closed; preflight, closeout, and CI do not fall back into
+  the source tree
+  (`scripts/governance/run_agent_work_packet.py:3198-3203,3251-3257,3502-3508,3728-3736`).
+  O4-B9 remains separately open because Make's verifier
+  presteps can still create ignored Hypothesis state before inspection.
 - Active-track overlap is not sufficient: current policy is warning-level and
   its current checker compares literal surface strings
-  (`docs/governance/ACTIVE_TRACK.yaml:77-85`,
-  `scripts/governance/check_track_status.py:1660-1670`). Admission must detect
+  (`docs/governance/ACTIVE_TRACK.yaml:77-89`,
+  `scripts/governance/check_track_status.py:1704-1714`). Admission must detect
   exact, ancestor/descendant, glob containment, and actual-diff collisions.
 - The cognitive readback may remain advisory; packet presence, schema, exact
   base, owner, collision, and scope enforcement may not.
@@ -814,8 +836,8 @@ explicitly. No dependency on D2.
 
 - `AGENTS.md`
 - `.gitignore` — shared, non-owned surface admitted for exactly one edit:
-  delete the root `/AGENTS.md` ignore line (`.gitignore:99` at the amendment
-  SHA). No other ignore rule may change; the track does NOT take
+  delete the root `/AGENTS.md` ignore line (line 99 at historical admission SHA
+  `5e7304c7df36b0fe6a34ae458b6cc0212b2106b6`). No other ignore rule may change; the track does NOT take
   `owned_surfaces` ownership of this file (other lanes edit it routinely —
   admission is packet-scoped). [AMENDED 2026-07-10: added after a WP-O1
   implementation agent correctly stopped on the exhaustive-envelope conflict.]
@@ -908,11 +930,11 @@ pointer.
 
 ### WP-O1R — Session Entry direct-command lexical remediation (S)
 
-**Closes:** two post-merge Session Entry direct-command lexical defects at
-`dharma_swarm/operator_core/onboarding/contract.py:169-185`. At baseline
-`94a3877c7799bbde7f0ac9adff060ee1f449683f`, only `argv[0]` receives basename
-normalization while later tokens are compared whole
-(`dharma_swarm/operator_core/onboarding/contract.py:178-184`). A read-only
+**Closes:** two post-merge Session Entry direct-command lexical defects
+recorded at lines 169–185 of
+`dharma_swarm/operator_core/onboarding/contract.py` in exact baseline
+`94a3877c7799bbde7f0ac9adff060ee1f449683f`. At that baseline, only `argv[0]`
+receives basename normalization while later tokens are compared whole. A read-only
 `parse_gate` probe must record all three commands below as accepted before the
 failing-first test is added:
 
@@ -1032,7 +1054,7 @@ command lexical implementation edit. Prove the ancestry with
 machine-enforced tracked filename are `onboard-one-door-WP-O1R.json`. The
 runner derives the required tracked path from `packet.id` and requires indexed
 byte equality
-(`scripts/governance/run_agent_work_packet.py:317-330`), so the packet must use
+(`scripts/governance/run_agent_work_packet.py:1575-1578,1636-1669`), so the packet must use
 the following injective identity:
 
 ```json
@@ -1042,16 +1064,15 @@ the following injective identity:
 }
 ```
 
-The current evaluator admits only numeric `WP-O<N>` values
-(`dharma_swarm/operator_core/onboarding/contract.py:286-290`), so exact
-pre-edit validation is impossible at baseline
+The evaluator at that baseline admitted only numeric `WP-O<N>` values, so exact
+pre-edit validation was impossible at baseline
 `94a3877c7799bbde7f0ac9adff060ee1f449683f`. Neither the
 filename nor an alias may mint authority: the merged spec/track admission owns
 the envelope, and the evaluator must check the same literal identity in the
 external packet content, tracked path, and report. The external source
 basename is a procedural requirement; the runner machine-checks its `.json`
 suffix and content, not that basename
-(`scripts/governance/run_agent_work_packet.py:861-878`).
+(`scripts/governance/run_agent_work_packet.py:426-435,455-485,1575-1590,3723-3726`).
 
 **WP-O1R-B0 exact-identifier bootstrap (separate prerequisite PR):** the
 previously merged direct-command admission amendment explicitly ratified one
@@ -1502,8 +1523,10 @@ determinism/cache, and untyped host gaps.
 
 **Owner:** D1-admitted track owner.
 
-**Prerequisites / merge dependency:** WP-O1 and WP-O2 merged; D3 external-reader
-inventory resolved before the writer changes; D2 not yet required.
+**Prerequisites / merge dependency:** WP-O1 and WP-O2 merged. The pre-D3
+projection-binding/diagnostic safety slice may merge before D3; D3 external-reader
+inventory remains mandatory before the writer/cache activation; D2 is not yet
+required.
 
 **Allowed files:**
 
@@ -1515,12 +1538,90 @@ inventory resolved before the writer changes; D2 not yet required.
   insufficiency proven by a failing test
 - `dharma_swarm/operator_core/onboarding/contract.py` under the same condition
 - `dharma_swarm/operator_core/onboarding/receipt.py` under the same condition
+- `scripts/governance/check_track_status.py` for projection binding output only;
+  no track-evaluation or evidence-grade semantics change
 - `scripts/governance/agent_onboard.py` as compatibility shim
 - `tests/test_onboarding_cli.py`
 - `tests/test_onboarding_readiness.py`
 - `tests/test_onboarding_cache.py`
 - `tests/test_agent_onboard.py`
-- `reports/agentops/work_packets/onboard-one-door-WP-O3.json`
+- `tests/test_active_track_governance.py` for producer/binding coverage only
+- `docs/governance/ACTIVE_TRACK.yaml`
+- `CLAUDE.md`, `docs/governance/BUILD_SESSION_ENTRYPOINT.md`, and
+  `docs/governance/SOVEREIGN_MANIFEST.md` as managed renders only
+- `reports/agentops/work_packets/onboard-one-door-WP-O3-A.json`
+
+The already-merged `onboard-one-door-WP-O3.json` remains historical evidence.
+The remaining post-D3 activation uses exact id `onboard-one-door-WP-O3-A`,
+`work_packet: WP-O3`, and `track_effect.next_items: [WP-O3]`; its Active Track
+update states only behavior present in that candidate tree and leaves the node
+open until its full acceptance contract is satisfied.
+
+The pre-D3 safety slice reuses the already-admitted numeric `WP-O3` identity;
+it needs no repair-identity bootstrap. Its packet id is exactly
+`onboard-one-door-WP-O3-P`, its `session_entry.work_packet` is exactly `WP-O3`,
+and its exact implementation envelope is:
+
+- `dharma_swarm/operator_core/onboarding/evidence.py`
+- `dharma_swarm/operator_core/onboarding/readiness.py`
+- `dharma_swarm/operator_core/onboarding/cli.py`
+- `dharma_swarm/operator_core/onboarding/models.py` only for a typed
+  Git-observation interface insufficiency proven by the named failing test
+- `scripts/governance/check_track_status.py` only to emit the binding metadata
+  for its existing ignored projection; its track-evaluation and evidence-grade
+  semantics remain byte-for-byte unchanged
+- `tests/test_agent_onboard.py`
+- `tests/test_onboarding_readiness.py`
+- `tests/test_onboarding_cli.py`
+- `tests/test_onboarding_cache.py` to remove the public ambient-v2 fixture while
+  retaining internal cache-groundwork coverage
+- `tests/test_active_track_governance.py`
+- `docs/governance/ACTIVE_TRACK.yaml`
+- `CLAUDE.md`, `docs/governance/BUILD_SESSION_ENTRYPOINT.md`, and
+  `docs/governance/SOVEREIGN_MANIFEST.md` as managed renders only
+- `reports/agentops/work_packets/onboard-one-door-WP-O3-P.json`
+
+The slice makes generated projection trust content-bound, makes the exact owner
+recovery command actionable, and closes the fallback-parser, Git-observation,
+and ambient-writer safety defects named below. It must merge before C1. It does
+not close WP-O3 or authorize the v2 writer/cache activation. Its mandatory
+`track_effect.next_items: [WP-O3]` atomically rewrites the canonical item to say
+that WP-O3-P behavior exists in the candidate tree while keeping the formal
+WP-O3 blocker open.
+
+Projection binding has exactly two context classes. The documented local owner
+command remains exactly `python3 scripts/governance/check_track_status.py`; it
+records `context_class=local`, source HEAD/tree, and a base only if the producer
+actually consumes one, never a fabricated PR event. C1 uses exactly:
+
+```bash
+DHARMA_TRACK_STATUS_SKIP_COMMANDS=1 \
+python3 scripts/governance/check_track_status.py \
+  --base "$EVENT_BASE" \
+  --binding-event "$EVENT_NAME" \
+  --binding-head "$EVENT_HEAD" \
+  --reports-dir "$PROJECTION_DIR"
+```
+
+That CI-event form requires `EVENT_NAME` to be `pull_request` or `merge_group`,
+requires observed HEAD to equal `EVENT_HEAD`, pins lifecycle comparison to
+`EVENT_BASE`, and writes only below the prevalidated external
+`$PROJECTION_DIR`. The door consumes its exact external
+`active_track_evidence.json` through a dedicated O3-P path override whose
+resolved regular-file target must remain outside the worktree and `.git`.
+
+The binding manifest is finite: source commit/tree; event/base/head when
+applicable; `ACTIVE_TRACK.yaml` and producer digests; producer argv/exit;
+Python, PyYAML, and Git versions; normalized locale/timezone; the exact
+`DHARMA_TRACK_STATUS_SKIP_COMMANDS=1` value in CI; generated-at, expires-at, and
+the 24-hour TTL with five-minute future-skew bound; and the resolved prior
+`generated/status` commit plus evidence-byte digest if used. A missing prior
+baseline is typed `Unobserved` with its recovery route but does not become
+admission truth. Arbitrary criterion subprocess inputs and live GitHub results
+are observation payload only: the canonical payload digest preserves what was
+observed, but those results neither grant onboarding READY nor join the finite
+freshness manifest. C1 live-authority receipts remain separate. This preserves
+the no-network-derived-admission boundary and does not claim syscall tracing.
 
 **Behavior → named test map:**
 
@@ -1537,6 +1638,10 @@ inventory resolved before the writer changes; D2 not yet required.
 | O3-B9 | v2 writer follows reader-first matrix; v1 is legacy display-only and cannot seed cache/delta | `test_writer_migration_and_rollback_matrix` |
 | O3-B10 | Receipt write failure/inside-repo path cannot return READY | `test_receipt_persistence_is_admission_requirement` |
 | O3-B11 | Pre-WP-O5 legacy exit mode changes only process exit, never v2 schema or observed conditions | `test_legacy_exit_compatibility_never_changes_v2_truth` |
+| O3-B12 | Projection freshness rejects mtime-only/unbound/expired/future-skewed bytes, verifies the finite local-or-event producer/input/HEAD binding and non-self-referential payload digest, confines the CI report path externally, and names the exact owner command on repair | `test_projection_binding_rejects_mtime_only_and_prints_exact_owner_command`, `test_track_status_emits_projection_binding`, `test_projection_binding_local_and_ci_event_contexts`, `test_projection_binding_expiry_and_external_path_confinement` |
+| O3-B13 | Dependency-free `_scrape_tracks` returns only top-level `active_tracks` rows and matches the PyYAML portfolio on the real owner file; nested ids never enter the portfolio | `test_dependency_free_track_scrape_matches_top_level_portfolio` |
+| O3-B14 | Git nonzero, timeout, `OSError`, malformed status, and malformed ahead/behind output become retained config conditions and strict `CONFIG_ERROR`/3; none collapse to clean, zero divergence, empty identity, or READY | `test_each_git_observation_failure_is_typed_config_error` |
+| O3-B15 | While `WRITER_SCHEMA_DEFAULT` is v1, ambient `DHARMA_ONBOARD_WRITER=v2` is denied as `CONFIG_ERROR`; only the source-controlled post-D3 flip may select the public v2 writer, and cache-groundwork tests construct internal v2 fixtures without that public bypass | `test_ambient_v2_writer_cannot_bypass_source_controlled_default`, `test_cache_hit_is_honestly_false_while_reuse_is_disabled` |
 
 Before WP-O5, strict exits are reachable only through `--strict` /
 `DHARMA_ONBOARD_STRICT=1`. Default exit compatibility remains, but v2 receipts
@@ -1553,18 +1658,43 @@ python3 -m pytest tests/test_onboarding_cli.py \
 python3 -m pytest tests/test_onboarding_cli.py \
   -q -k 'strict_ready_fixture or strict_blocked_fixture'
 # expected: 0; the fixtures assert underlying process exits 0 and 1 exactly
+python3 -m pytest \
+  tests/test_agent_onboard.py::test_dependency_free_track_scrape_matches_top_level_portfolio \
+  tests/test_onboarding_readiness.py::test_each_git_observation_failure_is_typed_config_error \
+  tests/test_onboarding_cli.py::test_ambient_v2_writer_cannot_bypass_source_controlled_default \
+  tests/test_onboarding_cache.py::test_cache_hit_is_honestly_false_while_reuse_is_disabled \
+  tests/test_onboarding_readiness.py::test_projection_binding_rejects_mtime_only_and_prints_exact_owner_command \
+  tests/test_active_track_governance.py::test_track_status_emits_projection_binding \
+  tests/test_active_track_governance.py::test_projection_binding_local_and_ci_event_contexts \
+  tests/test_onboarding_readiness.py::test_projection_binding_expiry_and_external_path_confinement -q
+# pre-D3 WP-O3-P exact safety gate; expected: 0 and every named node must exist
 ```
 
-**Rollback:** revert CLI/writer/readiness/cache as one packet; leave the
-v1/v2 loader and canonical parser. Remove the disposable v2 receipt or let the
-v1 writer replace it.
+WP-O3-P's packet also carries one isolated exact-base negative control. It
+archives the packet's `base_ref` outside the source worktree, runs read-only
+behavior probes against that snapshot, and exits 0 only when it reproduces all
+four old defects: nested fallback ids, false-clean Git failure, ambient v2
+selection, and mtime-only projection acceptance. A missing new test or a mere
+source substring is not the witness.
 
-**Evidence artifact:** external WP-O3 AgentOps report plus the single v2
-receipt under the same temporary external `DHARMA_OPS_DIR` fixture.
+**Rollback:** the pre-D3 WP-O3-P slice reverts evidence/readiness/CLI, producer
+binding metadata, its five test modules, tracker effect/renders, and its packet
+together; the full
+post-D3 WP-O3 activation reverts CLI/writer/readiness/cache as one packet while
+leaving the v1/v2 loader and canonical parser. Remove a disposable v2 receipt
+or let the v1 writer replace it.
+
+**Evidence artifact:** WP-O3-P produces its external AgentOps report, bound
+projection, current v1 receipt, and failing-first/base-control record. Only the
+post-D3 WP-O3-A activation produces the single v2 receipt under the same
+temporary external `DHARMA_OPS_DIR` fixture.
 
 **Forbidden/non-goals:** no Make/CI alias change, no strict-default flip, no
-active-track checker rewrite, no network-derived admission, no second cache
-file/history.
+active-track evaluation/evidence-grade rewrite, no network-derived admission,
+no second cache file/history. WP-O3-P may add producer/input/HEAD/expiry
+metadata to the existing derived projection only; it may not change any track
+verdict. Its CI path is an explicit external owner invocation, never a hidden
+refresh inside the door.
 
 **Kill criterion:** any cache path that can suppress a current hard check or
 any default path that can execute a network-capable transitive command blocks
@@ -1577,10 +1707,13 @@ and missing CI consumer.
 
 **Owner:** D1-admitted track owner.
 
-**Prerequisites / merge dependency:** WP-O3 merged; A3 has repaired the stale
-`make orient` instruction in its own authority-owned change; CI workflow
-ownership rechecked. WP-O4 adds a fail-on-error CI invocation but does not
-claim merge authority; C1 must separately promote that context before WP-O5.
+**Original baseline prerequisites / merge dependency:** the already-merged
+baseline WP-O4 required WP-O3 merged; A3 had repaired the stale `make orient`
+instruction in its own authority-owned change; and CI workflow ownership was
+rechecked. That baseline added a fail-on-error CI invocation but did not claim
+merge authority; C1 must separately promote that context before WP-O5. This
+paragraph does not gate the reopened O4-B9 tail on residual WP-O3 or D3; its
+complete current prerequisites are stated below.
 
 **Allowed files:**
 
@@ -1653,14 +1786,25 @@ The recorded interpreter was external Python 3.12.13 with pytest 9.0.3 and
 Hypothesis 6.155.7. The negative attempt and pass are both retained; the pass
 does not erase the default-path failure.
 
-This remains an O4-B9 repair under WP-O4. Its separate implementation may
-change only `Makefile`, `tests/test_make_onboarding_contract.py`, and the
-canonical `reports/agentops/work_packets/onboard-one-door-WP-O4.json`: override
+This remains an O4-B9 repair under WP-O4 and does not create a new formal
+closure node. Its complete merge prerequisites are the already-landed WP-O4
+baseline and the merged WP-O4-B1-CLOSE record; it does not wait for residual
+WP-O3 or D3. After that record merges, exact packet
+`onboard-one-door-WP-O4-B9` may change only `Makefile`,
+`tests/test_make_onboarding_contract.py`, `docs/governance/ACTIVE_TRACK.yaml`,
+the three managed authority renders, and its canonical packet: override
 hostile ambient Hypothesis storage, export the fixed external path through the
-target and recipe boundaries, and prove a fresh exact-main preflight leaves
-zero ordinary and ignored source leaves. It does not create a new formal
-closure node, widen WP-O4R, or combine this authority/truth reconciliation with
-the dependent runtime repair.
+target and recipe boundaries, atomically record the repaired WP-O4 item, and
+prove a fresh exact-main preflight leaves zero ordinary and ignored source
+leaves. The packet must merge before WP-O4-B2; it does not widen WP-O4R or
+combine this authority/truth reconciliation with a dependent runtime repair.
+On success it sets the existing WP-O4 item `blocker: false` with a `DONE`
+record containing exact `stage=WP-O4-B9-DONE`, naming
+`onboard-one-door-WP-O4-B9`, the fresh combined-main preflight, and the zero
+ordinary-and-ignored-source-leaf result.
+Its ancestry gate requires the unique B1-CLOSE introduction commit to be an
+ancestor of the B9 base; the exact-base negative control proves missing or
+reversed ancestry fails before any Make gate runs.
 
 #### WP-O4R — corrective generated-artifact confinement repair
 
@@ -1747,6 +1891,9 @@ paths and no report enters the worktree.
 
 **Forbidden/non-goals:** no new workflow, no branch-protection edit, no merge
 authority change, no generated context refresh in CI, no Titanium workflow.
+The later exact WP-O4-C1 exception may invoke one visible owner producer into a
+prevalidated external reports directory before the door; it does not authorize
+a hidden door refresh or any checkout/`.git` write.
 
 **Kill criterion:** if CI cannot discover exactly one packet or reproduce the
 local scope result from base/head, strict default cannot proceed.
@@ -1756,57 +1903,313 @@ local scope result from base/head, strict default cannot proceed.
 WP-O4-B1 is a one-time governance-only clarification after PR #928. It keeps
 C1 as one formal node but makes its pre-WP-O5 unlock proof and post-WP-O5 final
 enforcement proof explicit; reconciles WP-O2R from prospective to merged but
-unsealed truth; and adds one regression that prevents the circular sequence
-from returning. The operator's 2026-07-14 terminal-closure directive is the
+unsealed truth; truthfully reopens the reproduced WP-O4 O4-B9 tail; and adds
+regressions that prevent either stale claim from returning. The operator's
+2026-07-14 terminal-closure directive is the
 proposal authority, but this packet is not ratified or sealed merely by being
 authored: `approval.before_merge=true`, a final exact-head council receipt, and
 a legitimate non-author/operator approval remain mandatory.
+
+At this B1 candidate the owner has 19 ordered `next_items` and 11 mechanical
+blockers. Eight are the formal downstream tail in the existing 18-node closure
+ledger; WP-O2R reseal, WP-O4 O4-B9, and WP-O4-B2 are three explicit
+sequence/controller gates. They affect the rendered blocker count while
+pending but do not change the formal denominator or claim three new closure
+nodes.
 
 Its implementation envelope is exactly
 `docs/governance/ACTIVE_TRACK.yaml`, this specification, the three existing
 managed authority projections, `tests/test_active_track_governance.py`, and
 `reports/agentops/work_packets/onboard-one-door-WP-O4-B1.json`. It changes no
 runtime, workflow, branch setting, writer, cache, strict default, receipt store,
-fleet claim, or formal closure-node count. The packet classifies PR #928's
-cross-environment AgentOps discrepancy from a six-node investigation set
-(five nodes disclosed by the Greptile/T-Rex result plus the bytecode node
-reconstructed from preserved run accounting and repo-local replay). The
-reproduction revisions are unmodified main
-`a370d3cd51aa5d9f97b2c2654d99fa63b8ab9466` and candidate ancestor
-`1961190c49366ca34a3cf4cb90a2bccf0f6c32c7`; the latter is an ancestor of
-this successor, and later successor commits do not change the runner or test
-file.
+fleet claim, or formal closure-node count. It does not causally classify PR
+#928's reported proprietary cross-environment AgentOps discrepancy. The
+packet's exact allowed-file scope
+excludes the production runner and AgentOps test implementation, while its
+declared `pr928-related-agentops-suite-replay` gate reruns related suites in the
+candidate environment. The proprietary node manifest, interpreter/user/chroot
+conditions, child stderr, and causal explanation remain `Unobserved`; no failed
+run is waived and exact-head council/approval gates remain mandatory.
 
-Run the six-node manifest below from each revision; `PYTHON` selects the
-profile named in the result table:
+Because the pre-B2 numeric identity parser admits arbitrary suffixes
+(`dharma_swarm/operator_core/onboarding/contract.py:308-313`), B1's
+governance regression also enumerates every historical and finite admitted
+One-Door packet filename. Until the B2 packet/controller file exists it rejects
+every post-B2 packet and requires exact file/state implications
+`B1-CLOSE present ⇔ WP-O2R false`, `B9 present ⇔ WP-O4 false`, and
+WP-O2R before B9. B9 presence always implies B1-CLOSE presence; B2 presence
+always implies both predecessors plus a canonical installed/policy stage
+marker. After controller installation, a POLICY-governed reopen may change
+blocker state without deleting the historical packet files. The named test is
+`test_one_door_pre_b2_packet_names_and_state_implications_are_closed`.
 
-```bash
-"$PYTHON" -m pytest -q \
-  tests/test_agent_work_packet.py::test_runner_minimal_help_writes_no_repo_bytecode \
-  tests/test_agent_work_packet.py::test_external_entry_packet_bootstrap_and_digest_binding \
-  tests/test_agent_work_packet.py::test_declared_expected_exits_and_isolated_negative_controls \
-  tests/test_agent_work_packet.py::test_negative_controls_confine_absolute_env_and_pythonpath_source_escapes \
-  tests/test_agent_work_packet.py::test_make_admission_reports_are_external_and_read_only \
-  tests/test_agent_work_packet.py::test_negative_control_ignores_ambient_execution_injection
+#### WP-O4-B1-CLOSE — post-merge WP-O2R reseal record
+
+WP-O4-B1 cannot truthfully clear its own WP-O2R blocker before merge. The first
+subsequent One-Door merge is therefore exact governance packet
+`onboard-one-door-WP-O4-B1-CLOSE`, `work_packet: WP-O4`. Its envelope is only
+the packet, `docs/governance/ACTIVE_TRACK.yaml`, and the three managed authority
+renders. It ancestry-checks the exact #932 head and merge commit on current
+main, content-binds the final exact-head council receipt and legitimate
+non-author/operator approval, reruns the B1 sequence regression on that main,
+and changes only WP-O2R to a `DONE` / `blocker: false` record naming those
+digests and exact `stage=WP-O2R-DONE`. No self-authored or pre-merge receipt
+qualifies.
+
+This record changes no runtime, workflow, repository setting, other next-item,
+or formal closure-node count. Its exact-base negative control succeeds only
+when the B1 merge/ancestry or either external authority receipt is absent. It
+must merge before WP-O4-B9; because B2 is not active yet, this is the final
+governance-only reseal record before the separate pre-`track_effect` B9 code
+transition.
+
+#### WP-O4-B2 — mandatory semantic ACTIVE_TRACK effect admission
+
+WP-O4-B2 is the first subsequent One-Door merge after the separate WP-O4-B9
+repair and is a controller-durability follow-up, not a new formal closure node. The operator's
+2026-07-14 directive
+that `ACTIVE_TRACK.yaml` remain the primary continuously updated campaign state
+is proposal authority for this bounded change; normal packet, review, approval,
+and merge gates still apply. It uses the already-admitted `WP-O4` Session Entry
+identity with the exact B2 packet suffix. No separate identity or ownership
+bootstrap is required.
+
+Its implementation envelope is exactly:
+
+- `dharma_swarm/operator_core/onboarding/models.py`
+- `dharma_swarm/operator_core/onboarding/contract.py`
+- `dharma_swarm/operator_core/onboarding/_track_effect.py`
+- `scripts/governance/run_agent_work_packet.py`
+- `tests/test_agent_work_packet.py`
+- `tests/test_onboarding_ci_contract.py`
+- `tests/test_active_track_governance.py` for the finite pre-B2 packet-name/
+  state guard and its later policy-controlled allowlist only
+- `docs/governance/AGENTOPS.md`
+- this specification
+- `docs/governance/ACTIVE_TRACK.yaml`
+- `CLAUDE.md`, `docs/governance/BUILD_SESSION_ENTRYPOINT.md`, and
+  `docs/governance/SOVEREIGN_MANIFEST.md` as managed renders only
+- mechanical `docs/docops/AUTO_INVENTORY.md` refresh only if the admitted code
+  movement changes its generated counts
+- `reports/agentops/work_packets/onboard-one-door-WP-O4-B2.json`
+
+The packet schema gains one optional typed object:
+
+```json
+{
+  "track_effect": {
+    "track_id": "onboard-one-door-2026-07",
+    "kind": "update",
+    "observed_at": "2026-07-14T00:00:00Z",
+    "next_items": ["WP-O4-B2"]
+  }
+}
 ```
 
-The dated 2026-07-14 matched-environment receipts are:
+Within `track_effect`, `kind` is the closed enum
+`update | amend | reopen | seal | close`. The initial table contains no
+`reopen` row; such a row exists only after the bounded policy amendment
+procedure below.
 
-| Profile | a370d3cd | 1961190c | External transcript SHA-256 |
-|---|---|---|---|
-| External Python 3.12.13, pytest 9.0.3, root chroot | 6 passed | 6 passed | `31edf6b5d4a5760050fe94b9b4af7b15fad3d009abaf04b34a952487028914d6` / `913faacb76c3d6e5c6366caf5ab1e509ca13ad52bb8fb4a6a63b15fdb7771a93` |
-| Checkout-local uv venv resolving Python 3.12.13, same root chroot | 1 bytecode failure, 5 passed | 1 bytecode failure, 5 passed | `8ca8753346fa2e61e0af424776111c586260e61a39e5bfc8783ed28fe7f972a5` / `96d28b420c5a06e2c4d8c5efec4ab4774c39af41001c6416a06521e5f66c4bb0` |
+Optionality exists only for byte-exact replay of historical packets. CI event
+admission requires the field on every newly changed One-Door packet after B2.
+Historical parse compatibility does not authorize a historical, arbitrary, or
+suffixed id in a new event. New/changed One-Door packets use exactly this finite
+transition table; `next_items` order and `kind` are exact:
 
-The source identity is independently rerunnable with
-`git rev-parse <REV>:scripts/governance/run_agent_work_packet.py` and
-`git rev-parse <REV>:tests/test_agent_work_packet.py`; both revisions return
-runner blob `39171adf294f9590be3044c7405ffef2b71fdbce` and test blob
-`fef0d72752dec143d57e123a6992ac1b682c0195`. The paired results therefore
-classify the observed signature as environment-sensitive and base-reproducible,
-not introduced by the successor. They do not reveal the proprietary runner's
-actual interpreter, user, chroot, or child-stderr conditions, which remain
-`Unobserved`; no failed run is waived and exact-head council/approval gates
-remain mandatory.
+| Exact packet id | `work_packet` | kind | exact `next_items` | extra privilege |
+|---|---|---|---|---|
+| `onboard-one-door-WP-O4-B2` | `WP-O4` | `update` | `[WP-O4-B2]` | B2 self-bootstrap only |
+| `onboard-one-door-WP-O4-POLICY` | `WP-O4` | `amend` | `[WP-O4-B2]` | controller-policy amendment only |
+| `onboard-one-door-WP-O3-P` | `WP-O3` | `update` | `[WP-O3]` | none |
+| `onboard-one-door-WP-O3-D3` | `WP-O3` | `update` | `[D3]` | operator record only |
+| `onboard-one-door-WP-O3-A` | `WP-O3` | `update` | `[WP-O3]` | none |
+| `onboard-one-door-WP-O4-C1` | `WP-O4` | `update` | `[C1]` | tracked slice or named proof-only event variant |
+| `onboard-one-door-WP-O5-D2` | `WP-O5` | `update` | `[C1, D2]` | operator record only |
+| `onboard-one-door-WP-O5` | `WP-O5` | `update` | `[WP-O5]` | none |
+| `onboard-one-door-WP-O4-C1-CLOSE` | `WP-O4` | `update` | `[C1]` | exact live-proof record only |
+| `onboard-one-door-WP-O6-M6` | `WP-O6` | `update` | `[M6-1]` | owner-ancestry reconciliation only |
+| `onboard-one-door-WP-O6` | `WP-O6` | `update` | `[WP-O6]` | none |
+| `onboard-one-door-WP-O6-CLOSE` | `WP-O6` | `seal` | `[WP-O6, TERMINAL-PROOF]` | §14.3 evidence + SHIPPABLE transition only |
+| `onboard-one-door-WP-O6-FINAL` | `WP-O6` | `close` | `[WP-O6, TERMINAL-PROOF]` | §14.3 post-audit closed-track move only |
+
+The corresponding canonical head-stage markers are exact and monotonic:
+
+| Packet/event | Required head-stage marker(s) | Head blocker state |
+|---|---|---|
+| WP-O4-B2 | `stage=WP-O4-B2-DONE` | WP-O4-B2 false |
+| each WP-O4-POLICY version | `stage=WP-O4-B2-POLICY-v<N>` with increasing positive `N` | WP-O4-B2 false |
+| WP-O3-P | `stage=WP-O3-P-DONE` | WP-O3 true |
+| WP-O3-D3 | `stage=D3-DONE` | D3 false |
+| WP-O3-A | `stage=WP-O3-A-DONE` | WP-O3 false |
+| tracked WP-O4-C1 | `stage=WP-O4-C1-TRACKED` | C1 true |
+| WP-O5-D2 C1 update | `stage=C1-PRE-O5-PROVEN` | C1 true |
+| C1 pull-request proof vehicle | `stage=C1-PR-NEGATIVE` | C1 true; never merged |
+| C1 merge-group proof vehicle | `stage=C1-MERGE-GROUP-NEGATIVE` | C1 true; never merged |
+| WP-O4-C1-CLOSE | `stage=C1-DONE` | C1 false |
+| WP-O6-M6 | `stage=M6-1-DONE` | M6-1 false |
+| WP-O5 | `stage=WP-O5-DONE` | WP-O5 false |
+| WP-O6 | `stage=WP-O6-DONE` | WP-O6 false |
+| WP-O6-CLOSE | `stage=WP-O6-SEALED` in both mapped rows | both false; track SHIPPABLE |
+| WP-O6-FINAL | preserves both `stage=WP-O6-SEALED` rows | closed-track move only |
+
+The D2 row retains the exact ratification string in §9.2 in addition to its
+false blocker. Stage tokens are machine predicates, not permission to omit the
+packet-specific receipts and evidence named by each work package.
+
+Any later successor id requires a separately merged
+`onboard-one-door-WP-O4-POLICY` amendment; it cannot self-admit or implement the
+new successor in the same PR. That repeatable governance-only packet may change
+the transition table, its contract/runner policy implementation and tests,
+the matching literal packet-name/state allowlist in
+`tests/test_active_track_governance.py`, AGENTOPS documentation, the WP-O4-B2
+policy-version row, `verified_at`, and its
+managed renders/packet. With explicit operator approval and a mechanically
+zero-collision sibling-track check, it may append only the exact narrow
+`owned_surfaces` needed by a newly admitted future successor; the amendment
+must name that successor and its later envelope, and the successor cannot ride
+the same PR. It may not remove or broaden an existing claim, use a repository-
+wide glob, or touch Make, onboarding runtime, another next-item, owner,
+lifecycle, or external authority. The declared track equals
+`session_entry.active_track`; `next_items` is nonempty and duplicate-free; and
+the packet explicitly allows and does not forbid `ACTIVE_TRACK.yaml`. For each
+event, the checker computes the normalized base-to-head semantic diff of the
+one track before excluding the owner file from ordinary scope accounting. An
+`update` or `reopen` packet may change exactly its mapped next-item rows plus
+the required `verified_at` observation date. An `amend` packet has the same
+row/date limit but may additionally append only the operator-approved,
+collision-free future `owned_surfaces` described above. None may change track
+status, owner, prerequisites, completion criteria, or an unmapped row.
+`observed_at` is content-bound RFC 3339;
+`verified_at` equals its UTC calendar date, is nondecreasing from base, is no
+more than seven days old at CI, and is never future-dated. The sole `seal` row
+may additionally perform only §14.3's rigorous-evidence and `SHIPPABLE`
+transition. The sole `close` row may only move that byte-sealed entry from
+`active_tracks` to `closed_tracks` after the fresh-main audit. It uses the
+already-declared `target_closure_kind: CLOSED_NOT_PROD` as
+`closure_kind: CLOSED_NOT_PROD`. Because the 2026-07-12 decree temporarily
+raised `track_policy.max_active` from 10 to 11 only until the next track
+closure, `close` must also restore 11 to 10 and its matching policy comment
+when One-Door is that next closure; if a prior closure already restored 10,
+the policy bytes must remain unchanged. FINAL records
+`wip_limit_at_closure` with `base_max_active`, `resulting_max_active: 10`, and
+`restored_by` equal to `onboard-one-door-WP-O6-FINAL` or
+`prior-track-closure`; this receipt persists even if a later operator decree
+changes the global ceiling again. No other policy change is privileged.
+Every update/amend/reopen/seal mapped row must materially change; the close row preserves
+those row/evidence bytes while adding exact closure metadata. Every semantic
+track change must belong to exactly one mapped packet.
+
+Packet-to-row ownership is not enough: the controller also pins the exact
+base-to-head stage transition for each non-policy table row. Each transition
+has required base markers, required head markers, the permitted `blocker`
+direction, and evidence fields that must be preserved or append-only. Partial
+stages (for example O3-P before O3-A and the pre-WP-O5 C1 proof before
+C1-CLOSE) remain blockers; only their named completion transition may change
+`blocker: true` to `false`. No initially admitted or completed transition may
+change false back to true, replace or delete already-bound evidence, skip an
+intermediate stage, or reuse a packet id whose required head stage is already
+present on its base. The
+unmerged C1 event-proof variants are bound to their exact event/head and do not
+advance the merged row. They are the only completed-id exception besides
+WP-O4-POLICY: each is recognized by its reserved negative-control name and
+event, requires the merged `stage=WP-O4-C1-TRACKED` base, and is forbidden from
+merging. The first WP-O4-POLICY changes `stage=WP-O4-B2-DONE` to
+`stage=WP-O4-B2-POLICY-v1`; each repeat changes vN to exactly v<N+1> and
+appends the prior-preserving packet/spec-table digests. It cannot skip, repeat,
+or decrement a version.
+Before FINAL, a legitimate reopen or new repair requires a prior
+merged WP-O4-POLICY amendment that admits both a new exact governance-only
+`reopen` id and a later exact repair/completion id; neither may recycle a
+completed id. The reopen packet is a separate operator-approved PR, may only
+change its mapped row from false to true plus `verified_at`, preserves all
+prior evidence, and appends the incident/authority receipt. The repair cannot
+ride either the policy or reopen PR.
+
+The enforcement has distinct local stages so an agent cannot finish with a
+stale owner. Before edits, packet preflight validates the exact id, kind,
+mapping, `observed_at`, base-row truth, and predecessor state against the clean
+base; it does not demand a head effect that cannot exist yet. At local
+closeout, the runner compares the base-to-HEAD diff plus the worktree/index and
+requires the exact mapped `next_items` and `verified_at` semantic effect before
+the packet may be declared complete. Pull-request and `merge_group` CI replay
+the same closeout contract against their exact event base/head. Thus a changed
+One-Door packet cannot reach review, merge, or local completion while leaving
+the primary Active Track stale.
+
+The guard is persistent across lifecycle location. On every event that changes
+`ACTIVE_TRACK.yaml`, it finds the One-Door id exactly once across
+`active_tracks` plus `closed_tracks` and compares the full normalized entry.
+After WP-O6-FINAL, the closed entry and its closure receipts are immutable:
+removal, duplication, relocation, or byte-semantic evidence/history mutation
+fails even when the changing PR has no One-Door packet. The reopen mechanism
+above exists only while One-Door is still active; a post-FINAL incident opens a
+new governed track instead of rewriting closed history.
+
+Ordering is executable, not advisory. B2's self-bootstrap requires a base where
+WP-O2R and WP-O4 are already clear, the unique B1-CLOSE introduction commit is
+an ancestor of B9's introduction commit, and B9 is an ancestor of the B2 base.
+No intervening One-Door packet is admitted. Every other table row requires the
+unique B2 introduction commit as an ancestor of its base.
+The runner encodes §14.1's remaining predecessor table against base-row states
+and exact authority/evidence fields: O3-A requires O3-P plus cleared D3; C1's
+tracked slice requires O3-P; D2/WP-O5 require the pre-C1 receipt; C1-CLOSE
+requires WP-O5 plus both event proofs; O6 requires full O3, WP-O5, C1, and M6-1;
+O6-CLOSE requires merged O6 plus the independent receipt; and O6-FINAL requires
+the exact merged SHIPPABLE seal plus its fresh-main audit receipt. Missing,
+ambiguous, duplicate-introduction, descendant-only, or prose-only ancestry
+fails closed.
+
+Merge-group admission serializes this owner: at most one changed One-Door
+packet may appear in a group, and its aggregate One-Door semantic diff must
+equal the packet-bound diff. Unrelated packets may coexist only when they touch
+no One-Door owned or managed surface. Multiple One-Door packets, duplicate,
+swapped, unclaimed, free-riding, or aggregate-only effects fail closed. A YAML touch, comment,
+whitespace reflow, managed-render churn, missing/unreadable base, absent item,
+arbitrary suffix such as `onboard-one-door-WP-O4-EVASION`, or owner-transition
+bypass also fails closed. The B2 packet dogfoods the rule by changing only its
+mapped row plus bound `verified_at`, setting `blocker: false` with a `DONE`
+record naming WP-O4-B2, semantic `track_effect`, and `ACTIVE_TRACK` enforcement.
+
+Named tests are
+`test_track_effect_schema_is_typed_and_bound_to_session_packets`,
+`test_track_effect_schema_rejects_ambiguous_declarations`,
+`test_historical_session_packets_without_track_effect_remain_replayable`,
+`test_ci_track_effect_requires_semantic_active_track_progress`,
+`test_ci_track_effect_requires_exact_packet_transition_mapping`,
+`test_ci_track_effect_enforces_monotonic_row_stage_transitions`,
+`test_ci_track_effect_rejects_reused_completed_packet_id`,
+`test_ci_track_effect_preserves_bound_row_evidence`,
+`test_ci_track_effect_reopen_requires_prior_policy_and_operator_record`,
+`test_ci_track_effect_policy_amendment_cannot_self_admit_or_touch_runtime`,
+`test_ci_track_effect_policy_may_only_append_collision_free_future_surfaces`,
+`test_ci_track_effect_policy_version_increments_and_preserves_evidence`,
+`test_ci_track_effect_rejects_unclaimed_or_extra_track_changes`,
+`test_ci_track_effect_serializes_one_door_merge_group_effects`,
+`test_ci_track_effect_allows_only_terminal_close_privilege`,
+`test_ci_track_effect_requires_two_stage_terminal_transition`,
+`test_ci_track_effect_final_restores_temporary_wip_limit`,
+`test_ci_track_effect_enforces_b9_b2_and_terminal_ancestry`,
+`test_track_effect_preflight_validates_clean_base_without_requiring_head_effect`,
+`test_track_effect_closeout_requires_worktree_or_head_semantic_effect`,
+`test_track_effect_preserves_closed_one_door_history_on_later_owner_edits`,
+`test_ci_track_effect_requires_current_verified_at`,
+`test_ci_track_effect_rejects_duplicate_merge_group_claims`, and
+`test_ci_track_effect_fails_closed_when_merge_base_is_unavailable`. Its exact
+positive gate is `python3 -m pytest tests/test_agent_work_packet.py
+tests/test_onboarding_ci_contract.py -q` with expected exit 0. Its negative
+control binds the exact pre-B2 base and exits 0 only when the contract and
+runner lack B2's enforcement table and row-diff partition; the already-admitted
+pending B2 item is expected at that base and is not the negative witness. A
+missing new test is not sufficient.
+
+This mechanism does not let an unmapped packet promote evidence, change an
+owner, mutate lifecycle, or waive external authority. A mapped implementation
+may update or clear only its exact row when its behavior and required evidence
+land atomically; operator/live-authority rows retain their exact packet and
+authorship gates. Git ancestry, CI receipts, council review, and legitimate
+approval retain their authority. B2 itself closes none of D3, residual WP-O3,
+C1, D2, WP-O5, M6-1, WP-O6, terminal proof, One-Door, or Titanium.
 
 ### WP-O5 — Strict-by-default promotion (S; isolated; operator-gated)
 
@@ -1814,22 +2217,37 @@ remain mandatory.
 
 **Owner:** D1-admitted track owner; D2 remains operator-owned.
 
-**Prerequisites / merge dependency:** WP-O4 merged and green in CI; the
-pre-WP-O5 C1 authority/unlock proof has made the same admission context
-merge-blocking using exactly `make onboard ARGS=--strict`; D2 ratification has
-merged in the operator-owned form in §9.2; no unexplained baseline red.
+**Prerequisites / merge dependency:** WP-O4 merged and green in CI; the pre-D3
+WP-O3 projection-binding/diagnostic slice has merged; the pre-WP-O5 C1
+authority/unlock proof has made the canonical admission context a required
+merge-blocking context, has proven the documented untimed projection bootstrap
+bound to its producer, inputs, and exact event head before the normal plain
+`make onboard`, and has separately retained the controlled `make onboard
+ARGS=--strict` BLOCKED result; D2 ratification has merged in the operator-owned
+form in §9.2; no unexplained baseline red.
 
 **Allowed files:**
 
 - `dharma_swarm/operator_core/onboarding/readiness.py` — default only
+- `dharma_swarm/operator_core/onboarding/cli.py` — only strict-default
+  selection, `--no-strict` parsing, and propagation; no receipt/schema change
 - `scripts/governance/agent_onboard.py` — docstring/default shim only
 - `tests/test_agent_onboard.py`
+- `tests/test_onboarding_cli.py`
 - `tests/test_onboarding_readiness.py`
 - `tests/test_make_onboarding_contract.py`
 - `tests/test_onboarding_ci_contract.py`
 - `Makefile` only if default flag plumbing is unavoidable
 - `docs/governance/BUILD_SESSION_ENTRYPOINT.md` — concise behavior note
+- `docs/governance/ACTIVE_TRACK.yaml`
+- `CLAUDE.md` and `docs/governance/SOVEREIGN_MANIFEST.md` as managed renders
+  only; the already-listed entrypoint receives both its behavior note and
+  managed render in the same file
 - `reports/agentops/work_packets/onboard-one-door-WP-O5.json`
+
+After WP-O4-B2, the packet declares `track_effect.next_items: [WP-O5]` and
+updates that item to candidate-tree truth without claiming merge, final C1, or
+terminal closure.
 
 **Behavior → named test map:**
 
@@ -1848,7 +2266,8 @@ operator-reviewed change, never a timer inside the gate or part of WP-O5.
 
 ```bash
 python3 -m pytest tests/test_agent_onboard.py \
-  tests/test_onboarding_readiness.py tests/test_make_onboarding_contract.py \
+  tests/test_onboarding_cli.py tests/test_onboarding_readiness.py \
+  tests/test_make_onboarding_contract.py \
   tests/test_onboarding_ci_contract.py -q
 # expected: 0
 ```
@@ -1896,7 +2315,13 @@ ownership transfer before WP-O6 admits the file.
   configuration
 - `.github/workflows/active-track.yml` only to run the already-wired clean-room
   proof; no authority/required-check changes
+- `docs/governance/ACTIVE_TRACK.yaml`
+- `CLAUDE.md`, `docs/governance/BUILD_SESSION_ENTRYPOINT.md`, and
+  `docs/governance/SOVEREIGN_MANIFEST.md` as managed renders only
 - `reports/agentops/work_packets/onboard-one-door-WP-O6.json`
+
+The packet declares `track_effect.next_items: [WP-O6]` and keeps terminal proof
+and track closure separately open.
 
 **Behavior → named test map:**
 
@@ -1955,19 +2380,25 @@ and blocks completion; it is not “fixed” by making a mandatory probe optiona
 ### 6.1 Dependency graph, critical path, and parallel work
 
 **Critical path:** D1 → WP-O1 → WP-O1R-B0 → WP-O1R → WP-O2 → A3 → merged
-WP-O4 baseline → WP-O2R reseal → WP-O4 O4-B9 tail repair under the same formal
-node → pre-WP-O5 C1 authority/unlock proof → D2 → WP-O5 → final C1 enforcement
-proof → WP-O6 → independent proof. D3 → WP-O3 activation and M6-1 are parallel
-lanes that may advance after reseal but must join before WP-O6.
-A1+A2+A4 are external adapter prerequisites that
-must join before the independent proof. The two C1 proofs are phases of one
-formal C1 node, not additional closure nodes.
+WP-O4 baseline → WP-O4-B1/#932 → WP-O4-B1-CLOSE reseal record → WP-O4
+O4-B9 tail repair → WP-O4-B2 → WP-O3-P safety → tracked WP-O4-C1
+implementation → pre-WP-O5 C1 authority proof → operator WP-O5-D2 → WP-O5
+→ final C1 proof vehicles → WP-O4-C1-CLOSE → WP-O6 → independent proof →
+merge proof candidate → WP-O6-CLOSE SHIPPABLE seal → fresh-main audit →
+WP-O6-FINAL closed-track move. WP-O3-P + D3 →
+WP-O3-A and M6-1 are parallel lanes after B2 that must join before WP-O6.
+A B2 merge makes WP-O3-P, D3, and M6-1 eligible at the same time whenever
+their ownership surfaces and external authority are available: C1 waits only
+for WP-O3-P, while WP-O3-A waits for both WP-O3-P and D3.
+The already-repaired A1–A4 owner bytes are terminal revalidation inputs: a
+later owner regression reopens that adapter prerequisite before proof. They
+are not scheduled repair work and do not add closure nodes.
 
 Parser fixtures can be prepared in parallel with WP-O1 after the shared model
 interface is frozen. The named performance and clean-room test harnesses may be
 prepared after WP-O3, but final measurements/mutation results wait for the
-WP-O5 default and M6-1. A1/A2/A4 do not authorize edits in this campaign, but they
-must be repaired by their owners before terminal certification. WP-O1/O3 are
+WP-O5 default and M6-1. A1–A4 do not authorize edits in this campaign; terminal
+certification revalidates their cited owner bytes. WP-O1/O3 are
 the largest implementation risks; WP-O6 is the largest verification risk.
 
 ## §7 Global negative-control matrix
@@ -2041,17 +2472,16 @@ library default.
 
 ### 9.1 D1 — governance admission before implementation
 
-**Operator decision D1 remains open:** admit a standalone
-`onboard-one-door-2026-07` track or explicitly fold the full surface union into
-`sovereign-safety-tcb-2026-07`. Either choice requires a governance-only PR,
-managed-block regeneration, exact owner collision analysis, and ownership of
-the packet namespace. It does not create future packet files; §4 materializes
-each at its exact future baseline. It is not a one-line edit. A standalone
-track would be the tenth active track at the hard ceiling: on 2026-07-10,
+**Operator decision D1 resolved 2026-07-10:** the standalone
+`onboard-one-door-2026-07` track was admitted through governance-only authority,
+managed-block regeneration, exact owner collision analysis, and packet
+namespace ownership. It did not create future packet files; §4 materializes
+each at its exact future baseline. It was not a one-line edit. At admission the
+standalone track was tenth at the then-hard ceiling: on 2026-07-10,
 `python3 -c 'import pathlib,yaml; print(len(yaml.safe_load(pathlib.Path("docs/governance/ACTIVE_TRACK.yaml").read_text())["active_tracks"]))'`
-exited 0 with `9`, and policy sets `max_active: 10`
-(`docs/governance/ACTIVE_TRACK.yaml:77-85`). D1 must therefore
-be an explicit WIP decision, not automatic admission.
+exited 0 with `9`, and policy then set `max_active: 10`. Current policy is
+`max_active: 11` after the 2026-07-12 decree (`docs/governance/ACTIVE_TRACK.yaml:74-85`);
+D1 was therefore an explicit WIP decision, not automatic admission.
 
 Minimum standalone ownership union (recheck at admission SHA):
 
@@ -2120,20 +2550,56 @@ WP-O5 strict-by-default flip after the pre-WP-O5 C1 authority/unlock proof.
 Approval “in principle” is not the promotion marker. The implementation author
 cannot mint this approval.
 
-D2 is recorded through a separately merged, operator-authored governance PR:
-the admitted track's existing `next_items[D2]` entry changes from `PENDING,
-blocker: true` to exactly `D2 RATIFIED — operator=<handle>; pr=<number>;
-merge_commit=<40-hex>; scope=WP-O5-strict-default`, `blocker: false`, and the
-three managed authority blocks are regenerated. WP-O5 forbids those owner
-files; preflight verifies the referenced commit is an ancestor and the record
-predates the WP-O5 baseline. This reuses `ACTIVE_TRACK.yaml` and git history;
-it is not a general approval engine or proof of cryptographic identity.
+D2 is recorded through exact operator-authored packet
+`onboard-one-door-WP-O5-D2`, `work_packet: WP-O5`. Its governance-only envelope
+is the packet itself, `docs/governance/ACTIVE_TRACK.yaml`, and the three managed
+authority renders. After the pre-WP-O5 C1 live proof, the same PR declares
+`track_effect.next_items: [C1, D2]`: C1 records exact required-context,
+automerge, and merge-group evidence while remaining blocked for its post-WP-O5
+proof; D2 changes to exactly `D2 RATIFIED — operator=<handle>; pr=<number>;
+decision_packet=reports/agentops/work_packets/onboard-one-door-WP-O5-D2.json;
+decision_digest=<64-hex>; scope=WP-O5-strict-default` and `blocker: false`.
+
+The decision digest is the packet's canonical self-excluding AgentOps digest;
+it is knowable before commit and avoids an impossible self-referential merge
+SHA. WP-O5 preflight parses the current-main packet, recomputes that digest,
+requires the Active Track value to match, discovers the packet's unique
+introduction commit from Git history, and proves that commit is an ancestor of
+the WP-O5 base. The D2 PR number and legitimate operator authorship/approval
+remain externally reviewable. The packet cannot change runtime, workflow,
+strict default, D3, or another next-item. This reuses Active Track and Git; it
+is not a general approval engine or cryptographic identity claim.
 
 ### 9.3 D3 — off-repo receipt consumers
 
 **Operator decision D3:** identify every external fleet reader of
 `~/.dharma/ops/onboard_receipt.json`, approve its v2 upgrade, or explicitly
 confirm that no such reader remains. WP-O3 cannot switch the writer first.
+
+D3 uses exact operator-authored packet `onboard-one-door-WP-O3-D3`,
+`work_packet: WP-O3`. Its exact envelope is:
+
+- `docs/ops/ONBOARD_RECEIPT_READER_CENSUS.yaml` as the one canonical census
+- `docs/governance/ACTIVE_TRACK.yaml`
+- `CLAUDE.md`, `docs/governance/BUILD_SESSION_ENTRYPOINT.md`, and
+  `docs/governance/SOVEREIGN_MANIFEST.md` as managed renders only
+- `reports/agentops/work_packets/onboard-one-door-WP-O3-D3.json`
+
+The census schema binds observed-at, operator, receipt path, and every declared
+filesystem seat/substrate. Each seat records exact identity, observation route,
+reader status (`Proven compatible` or `Refuted as a reader`), v1/v2/unknown-
+major behavior where applicable, and content-addressed external evidence. It
+must cover the operator Mac/local Warp identity, AGNI, Rushabdev, Meghadharma,
+Devin, Fable Claude Code, Perplexity Computer, and the three named Oz
+environments; any distinct remote-Warp substrate is normalized to one of those
+or added explicitly. `Unobserved`, ambiguous identity, inaccessible evidence,
+or a reader lacking dual-read/unknown-major fail-closed behavior blocks D3.
+
+The packet declares `track_effect.next_items: [D3]`. Only when every canonical
+seat resolves may it set D3 `blocker: false`, citing the census SHA-256 and its
+own canonical packet digest. WP-O3-A preflight recomputes both from current
+main, discovers the D3 packet's unique introduction commit, and proves ancestry.
+The D3 packet changes no writer, cache, runtime, or strict default.
 
 ### 9.4 C1 — merge-blocking CI admission
 
@@ -2149,34 +2615,141 @@ merge-group rejection. Before WP-O5 the required job also invokes plain `make
 onboard`, whose documented legacy compatibility returns zero for BLOCKED truth
 (`.github/workflows/active-track.yml:150-155`, `dharma_swarm/operator_core/onboarding/cli.py:291-296`).
 
+The required projection is derived state, and the door deliberately reads but
+never regenerates it (`docs/governance/BUILD_SESSION_ENTRYPOINT.md:86`,
+`dharma_swarm/operator_core/onboarding/evidence.py:219-241`). Local recovery
+uses the documented ignored default; after WP-O3-P, the tracked C1 slice must
+use its bound external reports directory. Before the normal pre-WP-O5 plain invocation, the required job must
+therefore run the explicit untimed owner command from the exact event head and
+bind producer, finite inputs, expiry, and HEAD in its evidence artifact. The
+controlled negative separately withholds that projection and retains typed
+BLOCKED truth (`dharma_swarm/operator_core/onboarding/cli.py:154-166`). This
+visible bootstrap is part of C1 admission authority; it neither changes the
+door's default nor lets the door hide a refresh.
+
+To make that proof executable without borrowing live merge authority, C1 begins
+with one narrow tracked implementation slice under the already-admitted numeric
+WP-O4 identity. Its packet id is exactly `onboard-one-door-WP-O4-C1`, its
+`session_entry.work_packet` is exactly `WP-O4`, and its envelope is exactly:
+
+- `.github/workflows/active-track.yml`
+- `tests/test_onboarding_ci_contract.py`
+- `docs/governance/ACTIVE_TRACK.yaml`
+- `CLAUDE.md`, `docs/governance/BUILD_SESSION_ENTRYPOINT.md`, and
+  `docs/governance/SOVEREIGN_MANIFEST.md` as managed renders only
+- `reports/agentops/work_packets/onboard-one-door-WP-O4-C1.json`
+
+The packet declares `track_effect.next_items: [C1]` and atomically changes C1
+to state that the tracked slice exists in the candidate tree while leaving both
+live proofs open. The workflow sequence is exact:
+
+1. checkout the declared event head, assert ordinary and ignored source-leaf
+   equality with clean HEAD, and run the existing AgentOps event-range binding
+   before any producer;
+2. create `$PROJECTION_DIR` below `RUNNER_TEMP`, invoke WP-O3-P's exact
+   CI-event producer command, require exit 0, and verify its finite binding;
+3. run literal plain `make onboard`, require process exit 0 and the exact compact
+   READY first line, then run a same-fixture read-only `make onboard ARGS=--json`
+   companion and require `verdict=READY`, `exit_code=0`, and no blocking
+   condition in its machine projection;
+4. in a new disposable external state root copied from that READY fixture,
+   withhold only the projection, run literal `make onboard ARGS=--strict` and
+   require exit 1, then capture `make onboard ARGS="--strict --json"` and require
+   `verdict=BLOCKED`, `exit_code=1`, and the exact one-condition delta;
+5. archive the bound projection, compact/JSON outputs, AgentOps report, and
+   source-leaf comparisons under the existing external
+   `onboarding-admission-evidence` artifact
+   (`.github/workflows/active-track.yml:171-183`), then prove the checkout's complete
+   ordinary/ignored leaf set still equals the pre-producer baseline.
+
+The producer writes no source leaf, so there is nothing for later AgentOps to
+misclassify. The projection contains WP-O3-P's
+`projection_bootstrap_binding`; its `output_payload_sha256` covers canonical
+JSON with only that digest field removed. The door recomputes that domain and
+all finite in-tree/event/expiry bindings before the plain invocation. Missing,
+mismatched, expired, or future-skewed required fields block; optional command or
+GitHub observations do not become admission inputs. Archive the exact object,
+never a reusable mtime-only `generated/status` copy.
+
+The slice may not mutate a ruleset, required context, automerge policy, merge
+queue, parity manifest, default exit, or factual track verdict. It is the exact
+narrow exception to WP-O4's “no generated context refresh in CI” non-goal: one
+visible external owner bootstrap is allowed, while hidden refresh inside the
+door and any worktree/`.git` write remain forbidden. The merge-authority owner
+performs the external live proof only after this tracked slice has merged.
+
+Named failing-first tests are
+`test_c1_orders_clean_agentops_before_external_projection_and_plain_door`,
+`test_c1_ready_and_isolated_strict_json_companions_are_exact`,
+`test_c1_external_projection_leaves_source_tree_byte_clean`, and
+`test_c1_slice_cannot_mutate_live_authority_or_default`. The exact packet gate
+is those four node ids under `python3 -m pytest tests/test_onboarding_ci_contract.py
+-q`, expected exit 0. Its isolated base negative control reads the exact
+`base_ref` workflow and exits 0 only when it proves that external producer,
+binding, JSON companions, and ordering are all absent; missing future tests or
+a generic substring mismatch is not evidence.
+
 The **pre-WP-O5 authority/unlock proof** must therefore bind the canonical
 context and parity manifest to live GitHub required-check enforcement; prove
 the pull-request event and path-filter behavior; observe automerge and
-merge-queue/`merge_group` behavior; and preserve one controlled BLOCKED proof
-using exactly `make onboard ARGS=--strict`. It may unlock D2 and WP-O5, but it
-does not close C1 and must not silently change the required job to smuggle the
-strict-default flip into this phase.
+merge-queue/`merge_group` behavior; prove the bound projection bootstrap
+followed by normal plain `make onboard` plus its JSON companion; and preserve a
+separate controlled BLOCKED proof using exactly `make onboard ARGS=--strict`
+plus its strict JSON companion. It may unlock D2 and
+WP-O5, but it does not close C1 and must not silently change the required job to
+smuggle the strict-default flip into this phase.
 
-After D2 and WP-O5 merge, the **post-WP-O5 final enforcement proof** repeats the
-controlled BLOCKED case with plain `make onboard` and demonstrates rejection
-by the actual required context, branch protection, automerge, and merge queue.
-Only that second proof closes C1. WP-O6 and terminal proof remain blocked until
-it passes. This campaign creates no second CI-authority store.
+Both controlled negatives start from the same proven READY fixture in a new
+disposable external state root, then withhold or invalidate only the projection.
+They must assert process exit exactly 1, JSON `verdict=BLOCKED` / `exit_code=1`,
+and a condition-set delta consisting only of
+`active_track_projection_fresh=fail`; an unrelated dirty tree, receipt failure,
+tool gap, or second blocker invalidates the proof rather than satisfying it.
+
+After D2 and WP-O5 merge, the **post-WP-O5 final enforcement proof** first
+repeats the isolated controlled BLOCKED case with plain `make onboard`, then
+binds the same fixture into a deliberately red exact-event required-context
+pull-request run and demonstrates branch-protection and automerge refusal to
+enqueue it. A separate authorized controlled run that reaches `merge_group` and
+then fails the same required context proves queue ejection/failure; the red
+pull-request run is not accepted as merge-group evidence.
+
+Those red proofs use two proof-only, never-merged variants of the already merged
+`onboard-one-door-WP-O4-C1.json`, not undeclared workflow edits. Each branch
+changes only that packet, `ACTIVE_TRACK.yaml`, and its three managed renders;
+declares `track_effect.next_items: [C1]`; binds its exact base/event/head; and
+adds exactly one reserved negative-control name:
+`c1-proof-pr-projection-block` or
+`c1-proof-merge-group-projection-block`. The merged workflow first proves
+AgentOps/event binding green, then exposes the one-condition plain-door failure
+only for the named event: the PR variant is red only on `pull_request`; the
+merge-group variant stays green on its PR so it can enter the queue, then is red
+only on `merge_group`. Any other event/name combination is `CONFIG_ERROR`. The
+authority record captures exact heads, run URLs, artifact digests, and refusal/
+ejection observations; both proof PRs are then closed without merge.
+
+Finally, exact governance packet `onboard-one-door-WP-O4-C1-CLOSE` with
+`work_packet: WP-O4` may change only itself, `ACTIVE_TRACK.yaml`, and the three
+managed renders. Its `track_effect.next_items: [C1]` records those exact live
+receipts and clears C1 only after both proof vehicles pass. That record merges
+before WP-O6. Only these layers close C1; this campaign creates no second
+CI-authority store.
 
 ### 9.5 A1/A2/A3/A4 — adapter and instruction-custody dependencies
 
-- A1: repair `DEVIN.md`'s hard-coded checkout/`git pull main`/adjacent-expansion
-  conflict in its own authority-owned change.
-- A2: demote or refresh `QWEN.md`'s hard-coded stale branch/dirty-state adapter
-  in its own authority-owned change.
-- A3: repair `docs/governance/NEXT_BUILD_RUN_PROMPT.md:24-30`, which currently
-  orders `make orient` to regenerate tracked context, in its own
-  authority-owned change before WP-O4 changes that command.
-- A4: repair `docs/AGENTS.md:14-26` so owner files—not a generated onboarding
-  projection—win conflicts, without expanding WP-O1 into docs-wide cleanup.
+- A1 is repaired: `DEVIN.md` requires the assigned checkout/branch, forbids
+  startup integration of `main`, and defers scope to the exact packet and Active
+  Track owner (`DEVIN.md:20-42`).
+- A2 is repaired: `QWEN.md` is reference-only, derives checkout/live state from
+  owners, and forbids pull/checkout/reset/scope expansion (`QWEN.md:3-24`).
+- A3 is repaired: the current run prompt calls `make orient` mutation-free and
+  names the separate explicit owner writer (`docs/governance/NEXT_BUILD_RUN_PROMPT.md:24-33`).
+- A4 is repaired: `docs/AGENTS.md` states that onboarding is a projection and
+  owner files win conflicts (`docs/AGENTS.md:3-16`).
 
-These adapters must defer to the one-door packet discipline once repaired, but
-this campaign does not edit them.
+The controller revalidates those current bytes at the terminal baseline; it
+does not schedule another adapter repair unless a later owner change regresses
+one of these invariants.
 
 ### 9.6 M6-1 — shared `pyproject.toml`
 
@@ -2186,6 +2759,13 @@ packet, leaving `pyproject.toml` forbidden to WP-O6, or (b) a governance PR
 explicitly transfers/removes its ownership before WP-O6 admits the file. A
 warning-only overlap is not coordination. Until one of those two concrete
 paths merges, the file is forbidden.
+
+After that owner change/transfer is on main, exact governance packet
+`onboard-one-door-WP-O6-M6`, `work_packet: WP-O6`, changes only itself,
+`ACTIVE_TRACK.yaml`, and the three managed renders. Its
+`track_effect.next_items: [M6-1]` cites the owner commit, proves ancestry, and
+clears M6-1. Keeping this reconciliation separate prevents a One-Door packet
+from claiming DharmaGraph's `pyproject.toml` diff or becoming stale after it.
 
 ### 9.7 U1 — immediate operator verification, outside this spec
 
@@ -2201,8 +2781,9 @@ risky deploy path, not present external reachability.
 
 This campaign is complete only when:
 
-1. §1 claims remain current-HEAD cited and unsupported evidence language is
-   removed;
+1. §1 admission claims remain bound to their recorded Git tree, while every
+   present-tense successor claim is current-HEAD cited and unsupported evidence
+   language is removed;
 2. onboard, orient, preflight, closeout, CI, and A2A identity join have the
    non-overlapping responsibilities in §2;
 3. scalar precedence retains every observed condition and no nonpass check is
@@ -2217,25 +2798,33 @@ This campaign is complete only when:
 8. D1/D2/D3 and M6-1 are resolved at their specified boundaries;
 9. performance/output targets pass without weakening a check;
 10. independent clean-room proof passes with its receipt outside the worktree;
-11. Titanium remains blocked until that proof merges.
+11. Titanium remains blocked after that proof merges, through the SHIPPABLE
+    seal and fresh-main audit, until WP-O6-FINAL closes the track on merged
+    main.
 
-## §11 Validation for this specification-only refinement
+## §11 Validation for governance and implementation packets
 
-Before committing this document:
+For the current WP-O4-B1 governance successor, run at minimum:
 
 ```bash
 git diff --check
-python3 scripts/docops/check_docops_integrity.py --changed-from 5e7304c7df36b0fe6a34ae458b6cc0212b2106b6
+python3 -m pytest tests/test_onboarding_broken_register.py \
+  tests/test_active_track_governance.py tests/test_agent_work_packet.py -q
+python3 -m ruff check tests/test_active_track_governance.py
+python3 scripts/docops/check_docops_integrity.py \
+  --changed-from a370d3cd51aa5d9f97b2c2654d99fa63b8ab9466
 python3 scripts/governance/render_active_track_includes.py --check
 python3 scripts/governance/hygiene/check_hygiene_integrity.py
-pre-commit run --files docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md
 ```
 
 If a tool/dependency is unavailable, record the exact command and exit instead
 of skipping it silently. Classify pre-existing count drift separately from a
-new failure. Confirm only this file changed, no generated report/receipt entered
-the diff, every citation resolves at the reviewed SHA, all 14 adjudication
-rows/counts agree, all Behavior IDs map to named tests, and D1/D2 remain open.
+new failure. Confirm only the exact seven-file B1 envelope changed, no generated
+report/receipt entered the diff, every present-tense citation resolves at the
+reviewed SHA and every §1 historical citation resolves at its declared commit,
+all 14 adjudication rows/counts agree, every Behavior ID maps to a named test,
+D1 remains resolved, and D2 remains open. Later packets substitute their exact
+envelope, base, named gates, and expected exits; they may not weaken this floor.
 
 ## §12 Reference index
 
@@ -2256,7 +2845,7 @@ rows/counts agree, all Behavior IDs map to named tests, and D1/D2 remain open.
   `dharma_swarm/operator_core/control_surface_go.py:159-197` — existing
   `needs_host` vocabulary chain.
 - `docs/governance/CANONICAL_DOC_STACK.md:32-69` — first reads and ownership.
-- `docs/governance/ACTIVE_TRACK.yaml:77-85` — WIP and overlap policy.
+- `docs/governance/ACTIVE_TRACK.yaml:77-89` — WIP and overlap policy.
 - `docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md:67-70` — S/M/L convention.
 
 ## §13 Terminal independent clean-room proof and Titanium handoff
@@ -2425,8 +3014,10 @@ the receipt and requires a new independent run from acquisition.
 
 **Titanium vNext and PR #854 MUST NOT capture or freeze the dynamic campaign
 baseline and MUST NOT begin WP-00 until the complete onboarding implementation,
-merge-blocking CI admission, and this independent clean-room proof have merged.
-The qualifying baseline is captured only from the resulting merged `main` SHA.**
+merge-blocking CI admission, and independent clean-room proof have merged;
+WP-O6-CLOSE has then sealed that exact result as SHIPPABLE; the fresh-main audit
+has passed; and WP-O6-FINAL has moved the byte-sealed entry to `closed_tracks`.
+The qualifying baseline is only the resulting WP-O6-FINAL merged `main` SHA.**
 
 ## §14 Autonomous campaign controller
 
@@ -2434,7 +3025,7 @@ This section defines how one focused autonomous campaign executes §§0–13 unt
 the terminal gate holds. It is an execution state machine, not a second spec or
 truth owner. Authority precedence remains exactly the §0 contract and canonical
 ownership map; §14 owns orchestration only
-(`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:14-22`,
+(`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:18-26`,
 `docs/governance/CANONICAL_DOC_STACK.md:52-70`). Nothing here may waive or
 reinterpret a work-packet envelope, expected exit, kill criterion, ownership
 boundary, operator decision, or independent-proof requirement above.
@@ -2452,31 +3043,41 @@ controller admission
   -> WP-O2
   -> A3
   -> WP-O4 baseline (merged)
-  -> WP-O2R reseal
+  -> WP-O4-B1 / #932 exact-head council + merge
+  -> WP-O4-B1-CLOSE WP-O2R reseal record
   -> WP-O4 O4-B9 tail repair (same formal node)
-  -> C1 pre-WP-O5 authority/unlock proof (`make onboard ARGS=--strict`)
-  -> D2
+  -> WP-O4-B2 semantic ACTIVE_TRACK effect admission
+[READY IN PARALLEL IMMEDIATELY AFTER WP-O4-B2]
+  [S] WP-O3-P projection-binding/diagnostic safety slice
+  [D] D3 fleet-seat census and reader classification
+  [M] M6-1 ownership reconciliation
+[S] WP-O3-P
+  -> C1 tracked WP-O4-C1 implementation slice
+  -> C1 pre-WP-O5 authority/unlock proof (bound projection bootstrap -> plain `make onboard`; separate controlled `make onboard ARGS=--strict` BLOCKED)
+  -> operator WP-O5-D2 record (C1 partial proof + D2)
   -> WP-O5
-  -> C1 post-WP-O5 final enforcement proof (plain `make onboard`)
-parallel after WP-O2R: D3 -> WP-O3 activation
-parallel after WP-O2R: M6-1
-C1 post-WP-O5 + WP-O3 activation + M6-1
+  -> C1 post-WP-O5 proof-only PR + merge_group vehicles
+  -> WP-O4-C1-CLOSE
+[S] WP-O3-P + [D] D3
+  -> WP-O3-A activation
+WP-O4-C1-CLOSE + WP-O3-A + [M] M6-1
   -> WP-O6 candidate
   -> §13 independent clean-room proof
   -> merge WP-O6 + proof candidate
-  -> track evidence closure PR
-  -> fresh-main terminal audit
+  -> WP-O6-CLOSE SHIPPABLE/evidence PR
+  -> fresh-main terminal audit of the SHIPPABLE merge
+  -> WP-O6-FINAL closed-track PR
 ```
 
-The controller re-derives D1, A1, A2, A4, WP-O1, WP-O1R-B0, and WP-O1R at the
+The controller re-derives D1, A1–A4, WP-O1, WP-O1R-B0, and WP-O1R at the
 relevant baseline instead of trusting their reported completion. The
 pre-WP-O5 C1 proof is an authority/unlock boundary only and never closes C1;
 §9.4 requires the post-WP-O5 plain-command enforcement result
-(`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2138-2164`,
-`docs/governance/ACTIVE_TRACK.yaml:1905-1918,2020-2035`). Live state comes from
+(`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2692-2736`,
+`docs/governance/ACTIVE_TRACK.yaml:1985-1996`). Live state comes from
 current owners and Git; dated statements elsewhere in this evidence body are
 not promotion markers. Titanium remains blocked for the entire graph
-(`docs/governance/ACTIVE_TRACK.yaml:1917-1918`).
+(`docs/governance/ACTIVE_TRACK.yaml:1876-1879,2001-2004`).
 
 ### 14.2 Per-node execution loop
 
@@ -2488,12 +3089,16 @@ loop:
 2. Materialize the complete Session Entry Packet outside the worktree; inspect
    and preflight it at an exact clean baseline; then copy identical bytes to the
    tracked packet path as the first admitted diff.
-3. Add the named failing-first tests, implement only the declared envelope, and
+3. After WP-O4-B2 is a merged ancestor, declare the packet's typed
+   `track_effect`, explicitly allow `ACTIVE_TRACK.yaml`, and atomically change
+   every named canonical next-item to candidate-tree truth; a projection-only
+   or whitespace edit is rejected.
+4. Add the named failing-first tests, implement only the declared envelope, and
    run every packet gate and negative control at its declared expected exit.
-4. Run AgentOps closeout across committed and working diffs, push a narrow PR,
+5. Run AgentOps closeout across committed and working diffs, push a narrow PR,
    observe all required PR and merge-group CI, and obtain a decorrelated review
    on the exact candidate head.
-5. Treat every failure or substantive review finding as more work on that node.
+6. Treat every failure or substantive review finding as more work on that node.
    Any author change invalidates the prior verifier result. Repeat until green,
    merge, prove the merge commit on `main`, and only then advance the baseline.
 
@@ -2505,11 +3110,22 @@ restart from acquisition after any candidate change.
 ### 14.3 Resumption without another ledger
 
 The controller creates no campaign checkpoint, receipt store, or competing
-status document. On every restart it re-derives:
+status document. On every restart it re-derives the ready set, not a textual
+serial cursor:
 
 ```text
-next node = first node in §14.1 without mechanically valid merged evidence
+ready nodes = every unclosed §14.1 node whose incoming prerequisites have
+              mechanically valid merged evidence
+next work  = every collision-free ready node that its owner/authority permits;
+             use §14.1 order only as a deterministic tie-break when two ready
+             nodes cannot run together
 ```
+
+Thus WP-O3-P, D3, and M6-1 are all eligible immediately after WP-O4-B2. A
+blocked or slower external D3/M6-1 lane does not prevent the disjoint WP-O3-P
+and C1 path from advancing, and the C1 path does not defer either parallel
+lane. The explicit WP-O6 join still requires WP-O4-C1-CLOSE, WP-O3-A, and
+M6-1; readiness never weakens a join.
 
 Evidence comes from `origin/main`, `ACTIVE_TRACK.yaml` blockers, byte-bound
 work packets, owner records, PR/merge-group checks, and the standard external
@@ -2521,36 +3137,63 @@ promote a node.
 Before terminal closure, reconcile the active track's completion criteria with
 the rigorous evidence kinds accepted by `check_track_status.py`; pytest-backed
 criteria use the existing test-proof kind and landed/independent evidence is
-represented explicitly. Never make arbitrary command execution rigorous merely
-to produce a green count. WP-O5 and §13 evidence must be represented rather
-than inferred from adjacent criteria. This is the explicit track-evidence
-closure node above, owned as a governance PR that updates `ACTIVE_TRACK.yaml`
-and its managed renders only after the proof candidate merges
-(`scripts/governance/check_track_status.py:574-591,1073-1112,1855-1921`,
-`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2448-2468`).
+represented explicitly
+(`scripts/governance/check_track_status.py:574-591,1073-1112,1855-1934`).
+Never make arbitrary command execution rigorous merely to produce a green
+count. WP-O5 and §13 evidence must be represented rather than inferred from
+adjacent criteria. This is the explicit track-evidence
+closure node above. Exact packet `onboard-one-door-WP-O6-CLOSE`,
+`work_packet: WP-O6`, changes only itself, `ACTIVE_TRACK.yaml`, and the three
+managed renders after the proof candidate merges. Its
+`track_effect` has kind `seal` and `next_items: [WP-O6, TERMINAL-PROOF]`; it
+binds the merged WP-O6 and independent-receipt digests, represents their
+rigorous evidence kinds, clears both rows, and changes status only from ACTIVE
+to SHIPPABLE. The sealed TERMINAL-PROOF `DONE` text must still state that
+Titanium remains blocked through the fresh-main audit and merged WP-O6-FINAL.
+The complete entry remains in `active_tracks`; this packet does not close or
+relocate it.
+
+After that seal merges, the controller performs the fresh-main terminal audit
+from the exact SHIPPABLE commit. Exact governance packet
+`onboard-one-door-WP-O6-FINAL`, `work_packet: WP-O6`, then changes only itself,
+`ACTIVE_TRACK.yaml`, and the three managed renders. Its `track_effect` has kind
+`close` and names the two already-sealed base rows. It content-binds the seal
+commit and audit receipt, requires the base entry to be uniquely SHIPPABLE,
+removes it from `active_tracks`, and adds it exactly once to `closed_tracks`
+with status SHIPPED, `closure_kind: CLOSED_NOT_PROD`, `closed_at`, `closed_by`,
+the preserved next-item/evidence bytes, `final_audit_digest`, and the immutable
+`wip_limit_at_closure` receipt defined by WP-O4-B2. If
+`track_policy.max_active` is still the temporary decree value 11, FINAL also
+restores it and the matching comment to 10; if an earlier track closure already
+restored 10, FINAL leaves the policy untouched. The close
+validator compares that base active entry to the head closed entry; any changed
+sealed evidence, missing/duplicate id, or residual active copy fails closed.
+Neither terminal packet may infer WP-O5, C1, D3, or proof from adjacency
+(`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2780-2803,2851-3020`).
 
 ### 14.4 Authority gates and stop rules
 
 - D3 is the recorded reader sweep on every declared fleet host. A discovered
   reader is upgraded before the WP-O3 writer flip
-  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2132-2136`,
-  `docs/governance/ACTIVE_TRACK.yaml:2008-2011`).
-- A3 is a separate authority-document PR; it cannot ride an implementation
-  packet
-  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2172-2174`).
-- C1 belongs to merge authority. Its pre-WP-O5 proof binds live required
-  context, parity, automerge, and merge-group authority and uses exactly `make
-  onboard ARGS=--strict`; its post-WP-O5 proof repeats BLOCKED through plain
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2573-2602`,
+  `docs/governance/ACTIVE_TRACK.yaml:1973-1976`).
+- A1–A4 are already repaired. Revalidate the cited owner bytes at the terminal
+  baseline and reopen only if a later owner change regresses an invariant
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2738-2752`).
+- C1 belongs to merge authority. Its pre-WP-O5 proof runs the bound normal path
+  through plain `make onboard`, preserves a separate controlled `make onboard
+  ARGS=--strict` negative, and binds live required-context, parity, automerge,
+  and merge-group authority. Its post-WP-O5 proof repeats BLOCKED through plain
   `make onboard` and is the only C1 closure point
-  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2138-2164`).
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2692-2736`).
 - D2 is a separately merged operator-authored ratification after the pre-WP-O5
   C1 authority/unlock proof; an implementation author cannot mint or backdate it
-  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2116-2130`).
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2546-2571`).
 - M6-1 is a DharmaGraph-owner change or explicit transfer before WP-O6 touches
   `pyproject.toml`
-  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2181-2188`).
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2754-2768`).
 - U1 preempts the campaign if a newly observed exposure requires containment
-  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2190-2198`).
+  (`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2770-2778`).
 
 Pause only for a concrete external authority/access boundary, unreachable
 required host, missing branch-protection privilege, owner refusal, unavailable
@@ -2561,8 +3204,8 @@ a required control, add `continue-on-error`, or promote an unmeasured claim.
 
 The campaign ends only when every §10 criterion, D1/D2/D3/C1/M6-1, A1–A4,
 WP-O1/WP-O1R-B0/WP-O1R/WP-O2–WP-O6, strict-default behavior, performance/
-output/determinism/mutation contract, §13 proof, and the track-evidence closure
-PR have merged and been re-derived from fresh `main`
-(`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2200-2220,2262-2429,2448-2468`).
-Only then may the active track close and Titanium capture its qualifying
-baseline.
+output/determinism/mutation contract, §13 proof, and both track-evidence
+closure PRs have merged and been re-derived from fresh `main`
+(`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2546-2803,2851-3020`).
+Only the merged WP-O6-FINAL closed-track state ends the campaign and permits
+Titanium to capture that exact merged-main SHA as its qualifying baseline.

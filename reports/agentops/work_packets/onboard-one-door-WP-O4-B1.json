@@ -3,7 +3,7 @@
   "base_ref": "a370d3cd51aa5d9f97b2c2654d99fa63b8ab9466",
   "branch": "agent/onboard-gate0-successor-20260714",
   "worktree": ".",
-  "intent": "Clarify Gate 0 without adding a formal closure node: split the single C1 node into a pre-WP-O5 authority/unlock proof using exactly make onboard ARGS=--strict and a post-WP-O5 final enforcement proof using plain make onboard; reconcile WP-O2R from prospective to a classified reseal pending exact-head council, legitimate approval, merge, and main revalidation; truthfully reopen the existing WP-O4 O4-B9 predicate after an exact-main Make preflight self-invalidated on ignored Hypothesis state while preserving its already-ratified separate repair envelope (evidence and rerunnable commands: docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1615-1663); and add regressions that prevent either stale claim from returning. This packet changes no runtime, workflow, repository setting, writer, cache, strict default, fleet claim, or formal closure-node count.",
+  "intent": "Clarify Gate 0 without adding a formal closure node: keep WP-O2R pending through exact-head council, legitimate approval, #932 merge, and main revalidation while leaving the proprietary discrepancy Unobserved; require exact governance packet onboard-one-door-WP-O4-B1-CLOSE to record that landed reseal before the separate base-reproducible WP-O4 O4-B9 repair; statically close the arbitrary-suffix/out-of-order packet window until WP-O4-B2 is mechanically installed; make B2 the next One-Door merge after B9 and admit a closed transition table plus exact policy-amendment path so every later packet semantically updates ACTIVE_TRACK; add the collision-free specification and D3 census paths to One-Door owned_surfaces; retain the normal/plain versus controlled/strict C1 split, every parallel-lane join, and the two-stage WP-O6-CLOSE seal/fresh-main-audit/WP-O6-FINAL closure. This packet changes no runtime, workflow, repository setting, writer, cache, strict default, fleet observation, or formal closure count.",
   "allowed_files": [
     "CLAUDE.md",
     "docs/governance/ACTIVE_TRACK.yaml",
@@ -133,13 +133,14 @@
   "gates": [
     {
       "name": "gate0-sequence-regression",
-      "command": "python3 -m pytest tests/test_active_track_governance.py::test_active_track_loads tests/test_active_track_governance.py::test_managed_blocks_in_sync tests/test_active_track_governance.py::test_one_door_c1_has_ordered_pre_and_post_wp_o5_proofs -q",
+      "command": "python3 -m pytest tests/test_active_track_governance.py::test_active_track_loads tests/test_active_track_governance.py::test_managed_blocks_in_sync tests/test_active_track_governance.py::test_one_door_pre_b2_packet_names_and_state_implications_are_closed tests/test_active_track_governance.py::test_one_door_c1_has_ordered_pre_and_post_wp_o5_proofs -q",
       "argv": [
         "python3",
         "-m",
         "pytest",
         "tests/test_active_track_governance.py::test_active_track_loads",
         "tests/test_active_track_governance.py::test_managed_blocks_in_sync",
+        "tests/test_active_track_governance.py::test_one_door_pre_b2_packet_names_and_state_implications_are_closed",
         "tests/test_active_track_governance.py::test_one_door_c1_has_ordered_pre_and_post_wp_o5_proofs",
         "-q"
       ],
@@ -147,7 +148,7 @@
       "expected_exit": 0
     },
     {
-      "name": "pr928-cross-environment-agentops-replay",
+      "name": "pr928-related-agentops-suite-replay",
       "command": "python3 -m pytest tests/test_onboarding_broken_register.py tests/test_active_track_governance.py tests/test_agent_work_packet.py -q",
       "argv": [
         "python3",
@@ -177,7 +178,7 @@
   ],
   "commit": {
     "allowed": true,
-    "message": "fix(onboarding): clarify C1 sequence and reopen WP-O2R seal [impact-checked]"
+    "message": "docs(onboarding): bind executable closure state machine [impact-checked]"
   },
   "approval": {
     "before_commit": false,
@@ -221,8 +222,14 @@
     },
     "interface_mismatches": [
       "Merged main encodes C1 as gating D2 and WP-O5 while requiring strict fail-closed behavior that plain make onboard cannot provide before WP-O5, and it contains no post-WP-O5 final C1 proof.",
-      "Merged main still labels WP-O2R a candidate after PR #928 merged, while #928 has zero APPROVED reviews, no final exact-head council receipt, and a six-test Greptile discrepancy that this successor must classify without waiving.",
-      "A sterile exact-main preflight writes ignored Hypothesis state during verifier collection before AgentOps exact-clean inspection; the explicit external HYPOTHESIS_STORAGE_DIRECTORY control passes, while the ledger still calls WP-O4 and its broad Hypothesis claim complete (docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1615-1663).",
+      "Merged main still labels WP-O2R a candidate after PR #928 merged, while #928 has zero APPROVED reviews, no final exact-head council receipt, and a reported proprietary cross-environment AgentOps discrepancy that this successor must record as Unobserved without waiving.",
+      "A pre-merge successor cannot truthfully clear its own landed/revalidated WP-O2R claim; merged main has no exact post-merge reseal-record packet.",
+      "A sterile exact-main preflight writes ignored Hypothesis state during verifier collection before AgentOps exact-clean inspection; the explicit external HYPOTHESIS_STORAGE_DIRECTORY control passes, while the ledger still calls WP-O4 and its broad external-write claim complete.",
+      "The required fresh-checkout job invokes the door without first materializing and exact-head-binding the ignored active-track projection; strict-by-default would therefore block the normal path before it could exercise the intended controlled negative.",
+      "Merged main has no exact executable packet envelope for either the pre-D3 projection/parser/Git/writer safety repair or the tracked C1 bootstrap ordering; this governance packet admits those future slices but does not implement them.",
+      "Merged main has no persistent semantic track-effect controller, monotonic row-stage contract, or terminal active-to-closed transition guard; this packet admits exact WP-O4-B2 policy but does not implement that future enforcement.",
+      "Before B2, the executable numeric identity bridge accepts arbitrary suffixes and has no semantic transition controller; this candidate's finite packet-name/state regression is the temporary fail-closed guard and later WP-O4-POLICY is the only authorized allowlist update path.",
+      "The One-Door detail specification and canonical D3 census path are absent from its owned_surfaces, so spec/census-only drift can evade packet discovery; both admissions are collision-free against current sibling tracks.",
       "Live branch-protection truth remains unavailable without Administration-read authority; tracked workflow and parity structure are not a substitute."
     ],
     "closest_existing_implementation": [
@@ -231,14 +238,15 @@
       "tests/test_active_track_governance.py"
     ],
     "honest_blockers": [
-      "The six-node investigation evidence and rerunnable commands are recorded at docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1770-1809. Byte-identical production runner/test blobs plus matched unmodified-base/candidate replays classify the PR #928 signature as environment-sensitive and base-reproducible: both revisions pass all six under external Python 3.12.13 with root chroot and reproduce only the bytecode node under a checkout-local uv venv with the same chroot. This does not establish the proprietary runner's actual interpreter, user, chroot, or child-stderr conditions, which remain Unobserved, and no failed run is waived.",
-      "This exact candidate cannot seal WP-O2R until a final exact-head six-lane council receipt plus legitimate non-author/operator approval exist; it must then merge and be reverified on current main.",
-      "The base-reproducible WP-O4 O4-B9 self-invalidation remains a code blocker after this governance-only head: merge #932 first, then land the already-authorized separate Makefile/contract-test/canonical-WP-O4-packet repair and prove fresh combined-main preflight with zero ordinary and ignored source leaves (docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:1615-1663).",
-      "The pre-WP-O5 C1 proof still requires authenticated live branch-protection, automerge-negative, and real merge_group evidence; this clarification changes no repository setting.",
+      "The exact seven-file scope excludes the production runner and AgentOps test implementation, and the declared `pr928-related-agentops-suite-replay` is current-candidate evidence for related suites only. It does not reconstruct the proprietary runner's exact node manifest, interpreter/user/chroot conditions, child stderr, or causal explanation; those remain Unobserved and no failed run is waived.",
+      "This exact candidate cannot seal WP-O2R until a final exact-head six-lane council receipt plus legitimate non-author/operator approval exist; it must merge and be reverified on main, after which the unimplemented exact packet onboard-one-door-WP-O4-B1-CLOSE must bind those landed receipts and clear only WP-O2R.",
+      "The base-reproducible WP-O4 O4-B9 self-invalidation remains a code blocker after B1-CLOSE: land exact packet onboard-one-door-WP-O4-B9 and prove fresh combined-main preflight with zero ordinary and ignored source leaves.",
+      "WP-O4-B1-CLOSE, WP-O4-B9, WP-O4-B2, WP-O3-P, and WP-O4-C1 remain unimplemented future packets. In particular, ACTIVE_TRACK durability is specified but is not executable until B2 merges; B1-CLOSE and B9 must perform their two exact pre-B2 owner updates explicitly. The pre-WP-O5 C1 proof still requires authenticated live branch-protection, automerge-negative, real merge_group evidence, and a normal-path projection bootstrap bound to immutable producer/input/output values and the exact event head before the separate strict BLOCKED control; this clarification changes no workflow or repository setting.",
+      "WP-O6-CLOSE, its fresh-main SHIPPABLE audit, and WP-O6-FINAL are future terminal packets/records. Titanium remains blocked through the merged FINAL closed-track state; no terminal proof or formal track closure is claimed here.",
       "PR #933 (`chore/docops-autorefresh`) was an open rolling generated-DocOps lane at this packet's base/collision check and overlapped only a different managed block in docs/governance/SOVEREIGN_MANIFEST.md; serialize #932 first, then rebase and regenerate the then-current #933 head so neither exact-base receipt is misapplied.",
       "Any main movement before merge invalidates this packet base, collision record, digest, preflight binding, and closeout evidence."
     ],
-    "rollback": "Revert the C1 two-proof wording, WP-O2R merged-but-unsealed status, WP-O4 O4-B9 residual truth, managed authority renders, governance regressions, and this packet together; do not revert PR #928 or any onboarding runtime change.",
-    "packet_digest": "9804f35db5a195f526bd2a413f2d7699eb496ecadac5155dfdba722cbbef3daf"
+    "rollback": "Revert the WP-O4-B1-CLOSE/WP-O4-B9/WP-O4-B2/policy/WP-O3-P/WP-O4-C1 future-packet admission, pre-B2 finite packet-name/state guard, monotonic/persistent ACTIVE_TRACK transition contract, two-stage WP-O6-CLOSE/audit/WP-O6-FINAL terminal contract, specification and D3-census owned_surfaces, C1 two-proof wording, WP-O2R merged-but-unsealed status, managed authority renders, sequence regressions, and this packet together; do not revert PR #928 or any onboarding runtime change.",
+    "packet_digest": "6fbbf059bb12f8ae9647775feb5defcde8d66c614ec58b5a8eae3b92a482c5ca"
   }
 }
