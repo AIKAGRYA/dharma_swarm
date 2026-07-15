@@ -1,7 +1,7 @@
 {
   "id": "onboard-one-door-WP-O9",
-  "base_ref": "506bb6fe322e4acba9553f2d270eedaa9ee02d2d",
-  "branch": "cursor/active-track-dev-install-189d",
+  "base_ref": "9cc3739d583d6b68a19e6cfb56ca38a89bc43e1b",
+  "branch": "codex/pr958-onboard-wp-o9-20260715",
   "worktree": ".",
   "intent": "Repair the blocking ACTIVE_TRACK PR gate after CL-1 raised onboard-one-door to a pytest-backed 20/20 baseline. The job currently installs only PyYAML, so criteria cannot execute and the checker falsely reports regressions against generated/status. Install the project dev environment from an external git archive and confine checker caches outside the checkout before evaluation.",
   "allowed_files": [
@@ -150,7 +150,7 @@
   "negative_controls": [
     {
       "name": "wp-o9-base-uses-pyyaml-only",
-      "command": "python3 -c \"import subprocess; r=subprocess.run(['git','show','506bb6fe322e4acba9553f2d270eedaa9ee02d2d:.github/workflows/active-track.yml'],capture_output=True,text=True); raise SystemExit(0 if r.returncode == 0 and 'python3 -m pip install pyyaml' in r.stdout and 'dharma-active-track-bootstrap/package-source' not in r.stdout else 9)\"",
+      "command": "python3 -c \"import subprocess; r=subprocess.run(['git','show','9cc3739d583d6b68a19e6cfb56ca38a89bc43e1b:.github/workflows/active-track.yml'],capture_output=True,text=True); raise SystemExit(0 if r.returncode == 0 and 'python3 -m pip install pyyaml' in r.stdout and 'dharma-active-track-bootstrap/package-source' not in r.stdout else 9)\"",
       "env": {},
       "expected_exit": 0
     }
@@ -158,9 +158,9 @@
   "session_entry": {
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
-      "python": "3.12.3",
-      "git": "2.43.0",
-      "make": "4.3"
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
     },
     "authority_precedence": [
       "executable",
@@ -174,7 +174,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "506bb6fe322e4acba9553f2d270eedaa9ee02d2d",
+      "checked_at_sha": "9cc3739d583d6b68a19e6cfb56ca38a89bc43e1b",
       "details": []
     },
     "interface_mismatches": [
@@ -186,10 +186,10 @@
       "tests/test_onboarding_ci_contract.py"
     ],
     "honest_blockers": [
-      "This PR is stacked on the WP-O8 Hypothesis cache correction so the same full-dev checker does not create ignored source artifacts. Retarget it to main after WP-O8 merges.",
+      "This packet is independently main-bound. Its workflow bootstrap externalizes Hypothesis and all other evaluator caches itself, so it does not depend on the Makefile-only WP-O8 cache correction and may land first to break the checker bootstrap cycle.",
       "C1 live branch-protection and merge-group evidence remain operator-gated; this packet repairs checker execution only and does not close C1."
     ],
     "rollback": "revert the active-track job bootstrap, its CI contract test, and this packet together; the blocking checker then returns to PyYAML-only unverified criteria",
-    "packet_digest": "f4c6712157306dacb3eea1d844fd9cadda27ed51da6ea9c8480484f90e4def47"
+    "packet_digest": "e38b7c2fda5ed5ae355eeb9fa4596fe6f7247138ddef5b0ba55e90b745d7d131"
   }
 }
