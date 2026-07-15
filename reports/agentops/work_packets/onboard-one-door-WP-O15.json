@@ -18,6 +18,7 @@
     "dharma_swarm/model_routing.py",
     "dharma_swarm/orchestrate_live.py",
     "dharma_swarm/providers.py",
+    "dharma_swarm/receipt_consumption.py",
     "dharma_swarm/self_improve.py",
     "dharma_swarm/training_flywheel.py",
     "docs/governance/ACTIVE_TRACK.yaml",

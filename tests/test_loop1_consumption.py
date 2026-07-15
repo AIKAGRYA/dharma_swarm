@@ -6,7 +6,11 @@ from pathlib import Path
 
 from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
 from dharma_swarm.provider_policy import ProviderRouteRequest
-from dharma_swarm.providers import MAX_RECEIPT_DEMOTIONS, ModelRouter
+from dharma_swarm.providers import ModelRouter
+from dharma_swarm.receipt_consumption import (
+    MAX_RECEIPT_DEMOTIONS,
+    apply_receipt_consumption_ranking,
+)
 
 
 CHAIN = [
@@ -61,21 +65,14 @@ def _failed_receipt(
     }
 
 
-def _router(db_path: Path) -> ModelRouter:
-    return ModelRouter(
-        {provider: object() for provider in CHAIN},  # type: ignore[arg-type]
-        receipt_consumption_db_path=db_path,
-    )
-
-
 def test_failing_receipt_reorders_without_excluding_provider(tmp_path) -> None:
     db = _runtime_db(
         tmp_path / "runtime.db",
         [_failed_receipt(ProviderType.ANTHROPIC, "trace-anthropic")],
     )
-    router = _router(db)
-
-    reordered, applied, evidence = router._apply_receipt_consumption_ranking(CHAIN)
+    reordered, applied, evidence = apply_receipt_consumption_ranking(
+        CHAIN, db_path=db
+    )
 
     assert applied is True
     assert reordered == [
@@ -101,9 +98,9 @@ def test_no_failure_keeps_default_order_and_cites_nothing(tmp_path) -> None:
             }
         ],
     )
-    router = _router(db)
-
-    reordered, applied, evidence = router._apply_receipt_consumption_ranking(CHAIN)
+    reordered, applied, evidence = apply_receipt_consumption_ranking(
+        CHAIN, db_path=db
+    )
 
     assert reordered == CHAIN
     assert applied is False
@@ -113,9 +110,9 @@ def test_no_failure_keeps_default_order_and_cites_nothing(tmp_path) -> None:
 
 def test_malformed_store_fails_open_to_default_order(tmp_path) -> None:
     db = _runtime_db(tmp_path / "runtime.db", ["not-json"])
-    router = _router(db)
-
-    reordered, applied, evidence = router._apply_receipt_consumption_ranking(CHAIN)
+    reordered, applied, evidence = apply_receipt_consumption_ranking(
+        CHAIN, db_path=db
+    )
 
     assert reordered == CHAIN
     assert applied is False
@@ -131,9 +128,9 @@ def test_poisoning_bound_caps_demotions_and_keeps_every_provider(tmp_path) -> No
             for provider in CHAIN
         ],
     )
-    router = _router(db)
-
-    reordered, applied, evidence = router._apply_receipt_consumption_ranking(CHAIN)
+    reordered, applied, evidence = apply_receipt_consumption_ranking(
+        CHAIN, db_path=db
+    )
 
     assert applied is True
     assert set(reordered) == set(CHAIN)
@@ -153,28 +150,29 @@ def test_new_router_boot_consumes_prior_boot_receipt(tmp_path) -> None:
             )
         ],
     )
-    producer_process = _router(db)
-    consumer_process = _router(db)
-
-    _, applied, evidence = consumer_process._apply_receipt_consumption_ranking(CHAIN)
+    _, applied, evidence = apply_receipt_consumption_ranking(
+        CHAIN, db_path=db, boot_id="boot-b"
+    )
 
     assert applied is True
-    assert evidence.boot_id == consumer_process.receipt_consumption_boot_id
-    assert evidence.boot_id != producer_process.receipt_consumption_boot_id
+    assert evidence.boot_id == "boot-b"
+    assert evidence.boot_id != "boot-a"
     assert evidence.consumed_trace_ids == ("trace-prior-boot",)
 
 
-async def test_complete_for_task_uses_receipt_reordered_chain(tmp_path) -> None:
+async def test_complete_for_task_uses_receipt_reordered_chain(
+    tmp_path, monkeypatch
+) -> None:
     db = _runtime_db(
         tmp_path / "runtime.db",
         [_failed_receipt(ProviderType.ANTHROPIC, "trace-anthropic")],
     )
+    monkeypatch.setenv("DGC_ROUTER_RECEIPT_DB", str(db))
     router = ModelRouter(
         {
             ProviderType.ANTHROPIC: _Provider("anthropic"),
             ProviderType.OPENAI: _Provider("openai"),
         },
-        receipt_consumption_db_path=db,
         key_liveness_provider=lambda: None,
     )
     route_request = ProviderRouteRequest(

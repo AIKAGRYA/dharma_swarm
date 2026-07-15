@@ -150,6 +150,7 @@ active_tracks:
       - reports/loop_closure/**
       - CYBERNETIC_LOOP_MAP.md
       - docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md
+      - dharma_swarm/receipt_consumption.py
       - scripts/governance/loop1_consumption_check.py
       - tests/test_loop_supervisor_tristate.py
       - tests/test_loop1_consumption.py

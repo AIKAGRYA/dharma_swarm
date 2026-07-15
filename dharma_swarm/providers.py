@@ -15,7 +15,6 @@ import logging
 import os
 import random
 import shutil
-import sqlite3
 import time
 from abc import abstractmethod
 from collections.abc import AsyncIterator, Callable
@@ -50,7 +49,7 @@ from dharma_swarm.key_oracle import live_providers
 from dharma_swarm.cost_tracker import _estimate_cost
 from dharma_swarm.model_hierarchy import default_model as canonical_default_model
 from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
-from dharma_swarm.model_routing import ReceiptConsumptionEvidence
+from dharma_swarm.receipt_consumption import apply_receipt_consumption_ranking
 from dharma_swarm.jikoku_instrumentation import jikoku_traced_provider  # type: ignore
 from dharma_swarm.ollama_config import (
     OLLAMA_DEFAULT_CLOUD_MODEL,
@@ -90,12 +89,9 @@ from dharma_swarm.telemetry_plane import (
     RoutingDecisionRecord,
     TelemetryPlaneStore,
 )
-
 logger = logging.getLogger(__name__)
 
 KeyLivenessProvider = Callable[[], set[str] | None]
-MAX_RECEIPT_DEMOTIONS = 2
-RECEIPT_CONSUMPTION_WINDOW = 50
 
 
 class LLMProvider(BaseProvider):
@@ -2130,7 +2126,6 @@ class ModelRouter:
         telemetry_enabled: bool | None = None,
         telemetry_db_path: Path | None = None,
         key_liveness_provider: KeyLivenessProvider | None = None,
-        receipt_consumption_db_path: Path | None = None,
     ) -> None:
         self._providers = providers
         self._policy_router = policy_router or ProviderPolicyRouter()
@@ -2154,14 +2149,6 @@ class ModelRouter:
         self._session_affinity: dict[str, dict[str, Any]] = {}
         self._provider_rewards: dict[str, float] = {}
         self._provider_reward_counts: dict[str, int] = {}
-        env_receipt_db = os.environ.get("DGC_ROUTER_RECEIPT_DB", "").strip()
-        self._receipt_consumption_db_path = receipt_consumption_db_path or Path(
-            env_receipt_db or (Path.home() / ".dharma" / "state" / "runtime.db")
-        )
-        self._receipt_consumption_boot_id = uuid4().hex
-        self._last_receipt_consumption_evidence = ReceiptConsumptionEvidence(
-            boot_id=self._receipt_consumption_boot_id
-        )
 
         canary_percent_env = os.environ.get("DGC_ROUTER_CANARY_PERCENT")
         self._canary_percent = max(
@@ -2263,16 +2250,6 @@ class ModelRouter:
                 )
             else:
                 self._telemetry = None
-
-    @property
-    def receipt_consumption_boot_id(self) -> str:
-        """Return the per-process identity used by Loop 1 consumption evidence."""
-        return self._receipt_consumption_boot_id
-
-    @property
-    def last_receipt_consumption_evidence(self) -> ReceiptConsumptionEvidence:
-        """Return evidence from the most recent provider-ordering decision."""
-        return self._last_receipt_consumption_evidence
 
     @staticmethod
     def _parse_provider_type(raw: str) -> ProviderType | None:
@@ -2774,10 +2751,7 @@ class ModelRouter:
         return self._provider_rewards.get(self._reward_key(provider, model), 0.0)
 
     def _apply_reward_ranking(
-        self,
-        chain: list[ProviderType],
-        *,
-        model_hints: dict[ProviderType, str | None],
+        self, chain: list[ProviderType], *, model_hints: dict[ProviderType, str | None]
     ) -> list[ProviderType]:
         if not self._learning_enabled or len(chain) <= 1:
             return chain
@@ -2789,99 +2763,9 @@ class ModelRouter:
         scored.sort(reverse=True)
         return [provider for _, _, provider in scored]
 
-    def _apply_receipt_consumption_ranking(
-        self,
-        chain: list[ProviderType],
-        *,
-        window: int = RECEIPT_CONSUMPTION_WINDOW,
-    ) -> tuple[list[ProviderType], bool, ReceiptConsumptionEvidence]:
-        """Deprioritize recently failing providers using receipt-only evidence.
-
-        This wire is deliberately bounded: it opens the existing runtime DB
-        read-only, considers only ``delegation_runs.receipt_json``, demotes at
-        most ``MAX_RECEIPT_DEMOTIONS`` providers, and never removes a provider.
-        Any store or parse failure restores the caller's default order.
-        """
-
-        default_order = list(chain)
-
-        def fail_open(reason: str | None = None) -> tuple[
-            list[ProviderType], bool, ReceiptConsumptionEvidence
-        ]:
-            evidence = ReceiptConsumptionEvidence(
-                boot_id=self._receipt_consumption_boot_id,
-                fail_open_reason=reason,
-            )
-            self._last_receipt_consumption_evidence = evidence
-            return (default_order, False, evidence)
-
-        if len(default_order) <= 1:
-            return fail_open()
-
-        try:
-            db_path = self._receipt_consumption_db_path
-            conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-            try:
-                rows = conn.execute(
-                    """
-                    SELECT receipt_json
-                    FROM delegation_runs
-                    WHERE receipt_json IS NOT NULL AND receipt_json != ''
-                    ORDER BY started_at DESC, rowid DESC
-                    LIMIT ?
-                    """,
-                    (max(1, int(window)),),
-                ).fetchall()
-            finally:
-                conn.close()
-
-            failing_traces: dict[ProviderType, str] = {}
-            for (raw_receipt,) in rows:
-                receipt = json.loads(str(raw_receipt))
-                if not isinstance(receipt, dict):
-                    raise ValueError("receipt_json is not an object")
-                provider = self._parse_provider_type(str(receipt.get("provider") or ""))
-                if provider not in default_order or provider in failing_traces:
-                    continue
-                status = str(receipt.get("status") or "").strip().lower()
-                error_source = str(receipt.get("error_source") or "").strip().lower()
-                if status == "ok" and error_source in {"", "none"}:
-                    continue
-                trace_id = str(receipt.get("trace_id") or "").strip()
-                if not trace_id:
-                    raise ValueError("failing receipt is missing trace_id")
-                failing_traces[provider] = trace_id
-        except Exception as exc:
-            return fail_open(type(exc).__name__)
-
-        demoted = [
-            provider for provider in default_order if provider in failing_traces
-        ][:MAX_RECEIPT_DEMOTIONS]
-        if not demoted:
-            return fail_open()
-
-        reordered = [
-            provider for provider in default_order if provider not in demoted
-        ] + demoted
-        evidence = ReceiptConsumptionEvidence(
-            consumed_trace_ids=tuple(failing_traces[provider] for provider in demoted),
-            decision_delta={
-                "default_order": [provider.value for provider in default_order],
-                "reordered_order": [provider.value for provider in reordered],
-                "demoted_providers": [provider.value for provider in demoted],
-            },
-            boot_id=self._receipt_consumption_boot_id,
-            applied=reordered != default_order,
-        )
-        self._last_receipt_consumption_evidence = evidence
-        return (reordered, evidence.applied, evidence)
-
     def _apply_routing_memory_ranking(
-        self,
-        chain: list[ProviderType],
-        *,
-        task_signature: str,
-        model_hints: dict[ProviderType, str | None],
+        self, chain: list[ProviderType], *, task_signature: str,
+        model_hints: dict[ProviderType, str | None]
     ) -> tuple[list[ProviderType], bool, dict[str, float]]:
         if self._routing_memory is None or len(chain) <= 1:
             return (chain, False, {})
@@ -3166,9 +3050,8 @@ class ModelRouter:
             chain,
             model_hints=model_hints,
         )
-        chain, receipt_consumption_applied, receipt_evidence = (
-            self._apply_receipt_consumption_ranking(chain)
-        )
+        chain, receipt_consumption_applied, receipt_evidence = apply_receipt_consumption_ranking(chain)
+        self.last_receipt_consumption_evidence = receipt_evidence
         enriched_request.context["loop1_consumption"] = receipt_evidence.to_dict()
         if affinity_applied:
             decision = replace(
