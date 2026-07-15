@@ -876,7 +876,10 @@ def test_door_delegates_to_compact_engine(
 ) -> None:
     """The public make-onboard door must invoke the compact CLI engine."""
     monkeypatch.setenv("DHARMA_OPS_DIR", str(tmp_path / "ops"))
-    result = _make("onboard")
+    # WP-O5: the door is strict by default (a non-READY verdict exits nonzero),
+    # so --no-strict pins the legacy exit-0 and keeps this a pure delegation
+    # assertion — the compact CLI header, not the exit code, is the proof.
+    result = _make("onboard", "ARGS=--no-strict")
     assert result.returncode == 0, result.stderr[-2000:]
     assert "DHARMA ONBOARD" in result.stdout, (
         "make onboard must render the compact CLI header"
