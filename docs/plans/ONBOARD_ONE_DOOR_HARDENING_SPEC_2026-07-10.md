@@ -2054,14 +2054,21 @@ into the safety track, the same owned-surface and packet requirements apply.
 WP-O5 strict-by-default flip after WP-O4 CI parity. Approval “in principle” is
 not the promotion marker. The implementation author cannot mint this approval.
 
-D2 is recorded through a separately merged, operator-authored governance PR:
-the admitted track's existing `next_items[D2]` entry changes from `PENDING,
-blocker: true` to exactly `D2 RATIFIED — operator=<handle>; pr=<number>;
-merge_commit=<40-hex>; scope=WP-O5-strict-default`, `blocker: false`, and the
-three managed authority blocks are regenerated. WP-O5 forbids those owner
-files; preflight verifies the referenced commit is an ancestor and the record
-predates the WP-O5 baseline. This reuses `ACTIVE_TRACK.yaml` and git history;
-it is not a general approval engine or proof of cryptographic identity.
+D2 is recorded as two minimal governance commits because a commit cannot
+contain its own final hash. First, after C1 merges, a separately merged,
+operator-authored ratification-anchor PR changes only the existing D2 text to
+`D2 RATIFICATION ANCHOR — operator=<handle>;
+scope=WP-O5-strict-default; finalization=pending`, keeps `blocker: true`, and
+regenerates the three managed authority blocks. Second, a separate
+ledger-finalization PR changes that entry to exactly `D2 RATIFIED —
+operator=<handle>; pr=<anchor-number>;
+merge_commit=<anchor-merge-commit-40-hex>;
+scope=WP-O5-strict-default`, `blocker: false`, and regenerates the same blocks.
+The implementation author cannot mint either step. WP-O5 forbids those owner
+files; preflight verifies the referenced anchor commit is an ancestor and the
+final record predates the WP-O5 baseline. This reuses `ACTIVE_TRACK.yaml` and
+git history; it is not a general approval engine or proof of cryptographic
+identity.
 
 ### 9.3 D3 — off-repo receipt consumers
 
@@ -2086,6 +2093,17 @@ required and merge-queue-sensitive, add it to the existing parity manifest and
 automerge required set, and remove any advisory exemption. C1 records the live
 branch-protection result. WP-O5 and terminal proof block until that change is
 merged; this campaign creates no second CI-authority store.
+
+The live repository is currently personal-account-owned. GitHub exposes merge
+queues only for organization-owned repositories, so C1 must not fabricate a
+`merge_group` run or require a repository transfer merely to satisfy this
+campaign. While that platform boundary holds, `required_status_checks.strict`
+must be `true` (forcing every PR to be retested against current `main`), every
+manifest entry marked `regression_sensitive` must already declare the
+`merge_group` trigger, and the rejected merge-queue API request plus published
+availability boundary must be captured. If the repository later moves to an
+organization, a live merge-group run replaces this capability exception before
+strictness can be relaxed.
 
 ### 9.5 A1/A2/A3/A4 — adapter and instruction-custody dependencies
 
