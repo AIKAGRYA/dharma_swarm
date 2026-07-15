@@ -943,6 +943,8 @@ CONTEXT_AGENT_INTERVAL = int(os.environ.get("DGC_CONTEXT_AGENT_INTERVAL", "180")
 async def run_context_agent_loop(
     shutdown_event: asyncio.Event,
     signal_bus: SignalBus | None = None,
+    *,
+    supervisor: Any | None = None,
 ) -> None:
     """Run the context agent as a daemon loop.
 
@@ -952,6 +954,8 @@ async def run_context_agent_loop(
     logger.info("Context agent started (interval=%ds)", CONTEXT_AGENT_INTERVAL)
 
     while not shutdown_event.is_set():
+        if supervisor is not None:
+            supervisor.record_tick("context-agent")
         try:
             await agent.run_cycle()
         except Exception:

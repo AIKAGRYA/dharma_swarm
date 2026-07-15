@@ -32,6 +32,7 @@ class LoopHealth:
     """Health status of a single loop."""
     name: str
     last_tick: float = 0.0          # monotonic timestamp of last tick
+    registered_at: float = 0.0      # monotonic timestamp of registration
     expected_interval: float = 60.0  # seconds between ticks
     tick_count: int = 0
     error_count: int = 0
@@ -39,23 +40,38 @@ class LoopHealth:
     last_progress_score: float | None = None
     best_progress_score: float | None = None
     stagnant_cycles: int = 0
+    disabled: bool = False
+    disabled_reason: str = ""
 
     @property
     def stale_seconds(self) -> float:
         if self.last_tick == 0:
-            return 0.0
+            if self.registered_at == 0:
+                return 0.0
+            return time.monotonic() - self.registered_at
         return time.monotonic() - self.last_tick
 
     @property
     def is_stalled(self) -> bool:
-        if self.last_tick == 0:
-            return False  # Never ticked = not started yet
+        if self.disabled:
+            return False
         return self.stale_seconds > (2 * self.expected_interval)
+
+    @property
+    def state(self) -> str:
+        if self.disabled:
+            return "DISABLED"
+        if self.is_stalled:
+            return "STALLED"
+        if self.last_tick == 0:
+            return "NEVER_STARTED"
+        return "RUNNING"
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         d["stale_seconds"] = round(self.stale_seconds, 1)
         d["is_stalled"] = self.is_stalled
+        d["state"] = self.state
         return d
 
 
@@ -191,9 +207,18 @@ class LoopSupervisor:
         """Register a loop to be monitored."""
         self._loops[name] = LoopHealth(
             name=name,
+            registered_at=time.monotonic(),
             expected_interval=expected_interval,
         )
         self._error_windows[name] = _ErrorWindow()
+
+    def mark_disabled(self, name: str, reason: str = "") -> None:
+        """Mark a registered loop intentionally disabled and non-alerting."""
+        health = self._loops.get(name)
+        if health is None:
+            return
+        health.disabled = True
+        health.disabled_reason = reason
 
     def record_tick(self, loop_name: str) -> None:
         """Record that a loop has ticked (healthy heartbeat)."""
@@ -323,6 +348,8 @@ class LoopSupervisor:
         alerts: list[SupervisorAlert] = []
 
         for name, health in self._loops.items():
+            if health.disabled:
+                continue
             # Check stalls
             if health.is_stalled:
                 stale_factor = health.stale_seconds / health.expected_interval
@@ -454,11 +481,23 @@ def cmd_loop_status() -> int:
 
     loops = state.get("loops", {})
     for name, health in loops.items():
-        stalled = "STALLED" if health.get("is_stalled") else "OK"
+        state_label = health.get("state")
+        if not state_label:
+            if health.get("disabled"):
+                state_label = "DISABLED"
+            elif health.get("is_stalled"):
+                state_label = "STALLED"
+            elif health.get("last_tick", 0) == 0:
+                state_label = "NEVER_STARTED"
+            else:
+                state_label = "RUNNING"
         stale = health.get("stale_seconds", 0)
         ticks = health.get("tick_count", 0)
         errors = health.get("error_count", 0)
-        print(f"  {name:<20} {stalled:>8}  ticks={ticks}  errors={errors}  stale={stale:.0f}s")
+        print(
+            f"  {name:<20} {state_label:>14}  "
+            f"ticks={ticks}  errors={errors}  stale={stale:.0f}s"
+        )
 
     alerts = state.get("recent_alerts", [])
     if alerts:

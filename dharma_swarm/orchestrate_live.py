@@ -76,6 +76,28 @@ def _log(system: str, msg: str) -> None:
     logger.info("[%s] %s", system, msg)
 
 
+def _record_loop_tick(supervisor: Any | None, loop_name: str) -> None:
+    """Record a named loop heartbeat without coupling loop bodies to the watchdog."""
+    if supervisor is not None:
+        supervisor.record_tick(loop_name)
+
+
+async def _supervisor_heartbeat(
+    shutdown_event: asyncio.Event,
+    supervisor: Any | None,
+    loop_name: str,
+    interval: float,
+) -> None:
+    """Keep server-style loops observable while their owner coroutine blocks."""
+    while not shutdown_event.is_set():
+        _record_loop_tick(supervisor, loop_name)
+        try:
+            await asyncio.wait_for(shutdown_event.wait(), timeout=interval)
+            break
+        except asyncio.TimeoutError:
+            pass
+
+
 async def _drain_frontier_queue(board: Any, *, limit: int = 20) -> int:
     """Promote rows from frontier_tasks_pending.jsonl into the TaskBoard.
 
@@ -380,7 +402,11 @@ async def run_swarm_loop(
         _log("swarm", "Shutdown complete")
 
 
-async def run_pulse_loop(shutdown_event: asyncio.Event) -> None:
+async def run_pulse_loop(
+    shutdown_event: asyncio.Event,
+    *,
+    supervisor: Any | None = None,
+) -> None:
     """Pulse heartbeat — runs claude -p with thread rotation.
 
     Skips if running inside a Claude Code session (nested sessions not allowed).
@@ -400,6 +426,7 @@ async def run_pulse_loop(shutdown_event: asyncio.Event) -> None:
     daily_count = 0
 
     while not shutdown_event.is_set():
+        _record_loop_tick(supervisor, "pulse")
         if daily_count >= MAX_DAILY:
             _log("pulse", f"Daily limit ({MAX_DAILY}) reached")
             await asyncio.sleep(3600)
@@ -694,7 +721,11 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
         await asyncio.sleep(EVOLUTION_INTERVAL)
 
 
-async def run_health_loop(shutdown_event: asyncio.Event) -> None:
+async def run_health_loop(
+    shutdown_event: asyncio.Event,
+    *,
+    supervisor: Any | None = None,
+) -> None:
     """Health monitoring — detect anomalies, report status."""
     _log("health", f"Starting (interval={HEALTH_INTERVAL}s)")
     await asyncio.sleep(15)  # Let swarm init first
@@ -713,6 +744,7 @@ async def run_health_loop(shutdown_event: asyncio.Event) -> None:
     signal_bus = SignalBus.get()
 
     while not shutdown_event.is_set():
+        _record_loop_tick(supervisor, "health")
         try:
             # Drain WITNESS_AUDIT signals — close the S3* feedback loop
             witness_signals = signal_bus.drain(["WITNESS_AUDIT"])
@@ -915,7 +947,11 @@ REPLICATION_INTERVAL = 3600  # 1 hour between replication checks
 RECOGNITION_INTERVAL = 7200  # 2 hours between recognition synthesis
 
 
-async def _run_recognition_loop(shutdown_event: asyncio.Event) -> None:
+async def _run_recognition_loop(
+    shutdown_event: asyncio.Event,
+    *,
+    supervisor: Any | None = None,
+) -> None:
     """Periodic recognition synthesis — the strange loop's self-model.
 
     Every 2 hours, synthesizes signals from all subsystems into a recognition
@@ -947,6 +983,7 @@ async def _run_recognition_loop(shutdown_event: asyncio.Event) -> None:
 
     # Then run on the normal 2-hour cycle
     while not shutdown_event.is_set():
+        _record_loop_tick(supervisor, "recognition")
         await asyncio.sleep(RECOGNITION_INTERVAL)
         if shutdown_event.is_set():
             break
@@ -974,7 +1011,11 @@ async def _run_recognition_loop_UNUSED(shutdown_event: asyncio.Event) -> None:
     return  # pragma: no cover
 
 
-async def _run_witness_loop(shutdown_event: asyncio.Event) -> None:
+async def _run_witness_loop(
+    shutdown_event: asyncio.Event,
+    *,
+    supervisor: Any | None = None,
+) -> None:
     """S3* Sporadic Audit — random direct audit of agent behavior.
 
     Implements Beer's S3* function: the Witness samples recent traces,
@@ -990,6 +1031,7 @@ async def _run_witness_loop(shutdown_event: asyncio.Event) -> None:
     auditor = WitnessAuditor(cycle_seconds=WITNESS_INTERVAL)
 
     while not shutdown_event.is_set():
+        _record_loop_tick(supervisor, "witness")
         try:
             findings = await auditor.run_cycle()
             actionable = [f for f in findings if f.is_actionable]
@@ -1017,7 +1059,11 @@ async def _run_witness_loop(shutdown_event: asyncio.Event) -> None:
     _log("witness", "S3* Witness auditor stopped")
 
 
-async def _run_consolidation_loop(shutdown_event: asyncio.Event) -> None:
+async def _run_consolidation_loop(
+    shutdown_event: asyncio.Event,
+    *,
+    supervisor: Any | None = None,
+) -> None:
     """Consolidation Cycle — system-wide sleep/backpropagation.
 
     Two consolidator agents (Alpha/Beta) read ALL agents' state, have a
@@ -1045,6 +1091,7 @@ async def _run_consolidation_loop(shutdown_event: asyncio.Event) -> None:
         _log("consolidation", f"Neural consolidator init failed: {_ne}")
 
     while not shutdown_event.is_set():
+        _record_loop_tick(supervisor, "consolidation")
         # Neural pass first (algorithmic, fast, no LLM cost)
         if _neural is not None:
             try:
@@ -1181,7 +1228,11 @@ def _hunger_to_interval(hunger: float) -> float:
     return _GRIND_INTERVAL_SLOW - (ratio * (_GRIND_INTERVAL_SLOW - _GRIND_INTERVAL_FAST))
 
 
-async def run_free_evolution_grind(shutdown_event: asyncio.Event) -> None:
+async def run_free_evolution_grind(
+    shutdown_event: asyncio.Event,
+    *,
+    supervisor: Any | None = None,
+) -> None:
     """Nonstop free-tier evolution loop with adaptive hunger signal.
 
     Runs AutoProposer → DarwinEngine → MetaEvolution using ONLY free providers.
@@ -1223,6 +1274,7 @@ async def run_free_evolution_grind(shutdown_event: asyncio.Event) -> None:
     last_best_fitness = 0.0
 
     while not shutdown_event.is_set():
+        _record_loop_tick(supervisor, "free-grind")
         cycle_count += 1
 
         # Compute hunger
@@ -1368,7 +1420,11 @@ async def run_free_evolution_grind(shutdown_event: asyncio.Event) -> None:
     _log("grind", f"Free Evolution Grind stopped after {cycle_count} cycles")
 
 
-async def _run_replication_monitor_loop(shutdown_event: asyncio.Event) -> None:
+async def _run_replication_monitor_loop(
+    shutdown_event: asyncio.Event,
+    *,
+    supervisor: Any | None = None,
+) -> None:
     """Loop 9: Replication monitor -- process proposals, manage child lifecycles.
 
     Waits for consolidation to run first (initial delay = consolidation interval
@@ -1403,6 +1459,7 @@ async def _run_replication_monitor_loop(shutdown_event: asyncio.Event) -> None:
     child_tasks: list[asyncio.Task[None]] = []
 
     while not shutdown_event.is_set():
+        _record_loop_tick(supervisor, "replication")
         try:
             pending = protocol.get_pending_proposals()
             if pending:
@@ -1493,7 +1550,11 @@ async def _run_replication_monitor_loop(shutdown_event: asyncio.Event) -> None:
     _log("replication", "Replication monitor stopped")
 
 
-async def _run_zeitgeist_loop(shutdown_event: asyncio.Event) -> None:
+async def _run_zeitgeist_loop(
+    shutdown_event: asyncio.Event,
+    *,
+    supervisor: Any | None = None,
+) -> None:
     """S4 external-world intelligence — normalize public signal receipts.
 
     The live network scout is cron-gated. The orchestrator pass only drains
@@ -1508,6 +1569,7 @@ async def _run_zeitgeist_loop(shutdown_event: asyncio.Event) -> None:
     scanner = ZeitgeistScanner(state_dir=STATE_DIR)
 
     while not shutdown_event.is_set():
+        _record_loop_tick(supervisor, "zeitgeist")
         try:
             radar = run_world_radar_go_once(
                 state_dir=STATE_DIR,
@@ -1536,7 +1598,11 @@ async def _run_zeitgeist_loop(shutdown_event: asyncio.Event) -> None:
             pass
 
 
-async def _run_internal_pressure_loop(shutdown_event: asyncio.Event) -> None:
+async def _run_internal_pressure_loop(
+    shutdown_event: asyncio.Event,
+    *,
+    supervisor: Any | None = None,
+) -> None:
     """S4/S3 internal pressure monitor for witness, shared notes, and stigmergy."""
 
     await asyncio.sleep(30)
@@ -1545,6 +1611,7 @@ async def _run_internal_pressure_loop(shutdown_event: asyncio.Event) -> None:
     scanner = InternalPressureScanner(state_dir=STATE_DIR)
 
     while not shutdown_event.is_set():
+        _record_loop_tick(supervisor, "internal-pressure")
         try:
             signals = await scanner.scan()
             threats = [signal for signal in signals if signal.category == "threat"]
@@ -1564,7 +1631,11 @@ async def _run_internal_pressure_loop(shutdown_event: asyncio.Event) -> None:
             pass
 
 
-async def run_conductor_loop(shutdown_event: asyncio.Event) -> None:
+async def run_conductor_loop(
+    shutdown_event: asyncio.Event,
+    *,
+    supervisor: Any | None = None,
+) -> None:
     """Run persistent conductor agents alongside the orchestrator.
 
     Each conductor has its own wake interval and restart logic.
@@ -1597,6 +1668,7 @@ async def run_conductor_loop(shutdown_event: asyncio.Event) -> None:
     async def _run_with_restart(conductor: PersistentAgent, delay: float) -> None:
         await asyncio.sleep(delay)
         while not shutdown_event.is_set():
+            _record_loop_tick(supervisor, "conductors")
             try:
                 await conductor.run_loop(shutdown_event)
             except Exception as e:
@@ -1613,7 +1685,11 @@ async def run_conductor_loop(shutdown_event: asyncio.Event) -> None:
     )
 
 
-async def _run_world_model_loop(shutdown_event: asyncio.Event) -> None:
+async def _run_world_model_loop(
+    shutdown_event: asyncio.Event,
+    *,
+    supervisor: Any | None = None,
+) -> None:
     """World Model: living Forrester-style world state, snapshot-persisted every 6h.
 
     Seeded with 15 stocks (CO2, biodiversity, AI capability, institutional
@@ -1633,6 +1709,7 @@ async def _run_world_model_loop(shutdown_event: asyncio.Event) -> None:
             _log("world-model", f"World model init failed (non-fatal): {exc}")
         # Run update loop every 6 hours
         while not shutdown_event.is_set():
+            _record_loop_tick(supervisor, "world-model")
             try:
                 await asyncio.wait_for(shutdown_event.wait(), timeout=21600)
                 break
@@ -1650,7 +1727,11 @@ async def _run_world_model_loop(shutdown_event: asyncio.Event) -> None:
         _log("world-model", f"World model loop crashed: {exc}")
 
 
-async def _run_gauntlet_loop(shutdown_event: asyncio.Event) -> None:
+async def _run_gauntlet_loop(
+    shutdown_event: asyncio.Event,
+    *,
+    supervisor: Any | None = None,
+) -> None:
     """Gauntlet: run adversarial eval pressure on a schedule, feed scores into DGM.
 
     Tier 1+2 (correctness + research): every 2 hours.
@@ -1661,6 +1742,7 @@ async def _run_gauntlet_loop(shutdown_event: asyncio.Event) -> None:
     _log("gauntlet", "Gauntlet loop starting")
     _cycle = 0
     while not shutdown_event.is_set():
+        _record_loop_tick(supervisor, "gauntlet")
         try:
             await asyncio.wait_for(shutdown_event.wait(), timeout=7200)
             break
@@ -1700,19 +1782,31 @@ async def _run_gauntlet_loop(shutdown_event: asyncio.Event) -> None:
             _log("gauntlet", f"Gauntlet cycle failed: {exc}")
 
 
-async def _run_health_api(shutdown_event: asyncio.Event) -> None:
+async def _run_health_api(
+    shutdown_event: asyncio.Event,
+    *,
+    supervisor: Any | None = None,
+) -> None:
     """Health API: serves http://localhost:7433/health|metrics|loops|providers|telos"""
+    heartbeat = asyncio.create_task(
+        _supervisor_heartbeat(shutdown_event, supervisor, "health-api", 60)
+    )
     try:
         from dharma_swarm.swarm_health_api import run_health_api
         await run_health_api(shutdown_event)
     except Exception as exc:
         _log("health-api", f"Health API crashed: {exc}")
+    finally:
+        heartbeat.cancel()
+        await asyncio.gather(heartbeat, return_exceptions=True)
 
 
 async def _run_room_health_loop(
     shutdown_event: asyncio.Event,
     registry: Any,
     bridge: Any,
+    *,
+    supervisor: Any | None = None,
 ) -> None:
     """Fractal room health monitor — evaluates kill/spinout conditions.
 
@@ -1725,6 +1819,7 @@ async def _run_room_health_loop(
     from dharma_swarm.fractal.room_health import room_runtime_kpis
 
     while not shutdown_event.is_set():
+        _record_loop_tick(supervisor, "room-health")
         try:
             active = registry.active_rooms()
             now = datetime.now(timezone.utc)
@@ -1780,6 +1875,8 @@ async def _run_room_health_loop(
 async def _run_guardian_loop(
     shutdown_event: asyncio.Event,
     room_registry: Any | None = None,
+    *,
+    supervisor: Any | None = None,
 ) -> None:
     """Guardian Crew: continuous interface + loop + router health checking.
 
@@ -1791,6 +1888,9 @@ async def _run_guardian_loop(
     Writes GUARDIAN_REPORT.md to ~/.dharma/guardian/.
     Creates GitHub issues for BLOCKER-severity findings.
     """
+    heartbeat = asyncio.create_task(
+        _supervisor_heartbeat(shutdown_event, supervisor, "guardian", 14400)
+    )
     try:
         from dharma_swarm.guardian_crew import start_guardian_loop
         await start_guardian_loop(
@@ -1801,9 +1901,16 @@ async def _run_guardian_loop(
         )
     except Exception as exc:
         _log("guardian", f"Guardian loop crashed: {exc}")
+    finally:
+        heartbeat.cancel()
+        await asyncio.gather(heartbeat, return_exceptions=True)
 
 
-async def _run_archaeology_loop(shutdown_event: asyncio.Event) -> None:
+async def _run_archaeology_loop(
+    shutdown_event: asyncio.Event,
+    *,
+    supervisor: Any | None = None,
+) -> None:
     """Fang 7: Self-Reading Archaeology loop.
 
     Runs ArchaeologyIngestionDaemon on a 30-minute cycle.
@@ -1817,6 +1924,7 @@ async def _run_archaeology_loop(shutdown_event: asyncio.Event) -> None:
         daemon = ArchaeologyIngestionDaemon(state_dir=STATE_DIR, interval_seconds=1800)
 
         # Run once immediately at boot
+        _record_loop_tick(supervisor, "archaeology")
         try:
             counts = await asyncio.wait_for(daemon.run_once(), timeout=120.0)
             _log("archaeology", f"Boot ingestion complete: {counts}")
@@ -1827,6 +1935,7 @@ async def _run_archaeology_loop(shutdown_event: asyncio.Event) -> None:
 
         # Then loop every 30 minutes
         while not shutdown_event.is_set():
+            _record_loop_tick(supervisor, "archaeology")
             try:
                 await asyncio.wait_for(shutdown_event.wait(), timeout=1800)
                 break  # shutdown
@@ -1934,7 +2043,11 @@ def _wire_signal_subscribers(bus: Any) -> None:
     _log("signal-bus", f"Wired {sub_count} signal subscribers")
 
 
-async def _run_revenue_scout_loop(shutdown_event: asyncio.Event) -> None:
+async def _run_revenue_scout_loop(
+    shutdown_event: asyncio.Event,
+    *,
+    supervisor: Any | None = None,
+) -> None:
     """Revenue scout loop — autonomous target scouting every 6 hours.
 
     Also subscribes to REVENUE_SCOUT_TRIGGER on the signal bus so LLM
@@ -1947,6 +2060,7 @@ async def _run_revenue_scout_loop(shutdown_event: asyncio.Event) -> None:
         daemon = RevenueScoutDaemon()
 
         # Run once at boot (light cycle)
+        _record_loop_tick(supervisor, "revenue-scout")
         try:
             result = daemon.run_cycle()
             _log(
@@ -1959,6 +2073,7 @@ async def _run_revenue_scout_loop(shutdown_event: asyncio.Event) -> None:
             _log("revenue-scout", f"Boot cycle failed (non-fatal): {exc}")
 
         while not shutdown_event.is_set():
+            _record_loop_tick(supervisor, "revenue-scout")
             try:
                 await asyncio.wait_for(
                     shutdown_event.wait(), timeout=REVENUE_SCOUT_INTERVAL,
@@ -2081,7 +2196,7 @@ async def orchestrate(background: bool = False) -> None:
 
     # Strange Loop Phase 0: unified swarm tick handles evolution + living layers + health
     # Only genuinely independent loops remain as separate tasks
-    from dharma_swarm.context_agent import run_context_agent_loop
+    from dharma_swarm.context_agent import CONTEXT_AGENT_INTERVAL, run_context_agent_loop
     from dharma_swarm.training_flywheel import run_training_flywheel_loop
     from dharma_swarm.self_improve import run_self_improvement_loop
 
@@ -2115,57 +2230,88 @@ async def orchestrate(background: bool = False) -> None:
     from dharma_swarm.loop_supervisor import LoopSupervisor
     _supervisor = LoopSupervisor()
     _loop_intervals = {
-        "swarm": SWARM_TICK, "pulse": PULSE_INTERVAL, "health": 120,
+        "swarm": SWARM_TICK, "pulse": PULSE_INTERVAL, "health": HEALTH_INTERVAL,
         "zeitgeist": ZEITGEIST_INTERVAL, "internal-pressure": ZEITGEIST_INTERVAL,
         "witness": WITNESS_INTERVAL,
         "consolidation": CONSOLIDATION_INTERVAL, "recognition": 7200,
         "replication": 3600, "self-improve": 3600, "free-grind": 600,
-        "flywheel": 300, "conductors": 120, "context-agent": 60,
+        "flywheel": 300, "conductors": 120, "context-agent": CONTEXT_AGENT_INTERVAL,
+        "archaeology": 1800, "guardian": 14400, "health-api": 60,
+        "gauntlet": 7200, "world-model": 21600,
         "revenue-scout": REVENUE_SCOUT_INTERVAL,
     }
     if room_registry is not None and room_bridge is not None:
         _loop_intervals["room-health"] = 1800
     for loop_name, interval in _loop_intervals.items():
         _supervisor.register_loop(loop_name, expected_interval=float(interval))
+    if os.environ.get("CLAUDECODE"):
+        _supervisor.mark_disabled("pulse", "CLAUDECODE nested-session guard")
 
     task_factories: dict[str, Any] = {
         "swarm": lambda: run_swarm_loop(shutdown_event, signal_bus=bus, supervisor=_supervisor, room_registry=room_registry),
-        "pulse": lambda: run_pulse_loop(shutdown_event),
-        "recognition": lambda: _run_recognition_loop(shutdown_event),
-        "conductors": lambda: run_conductor_loop(shutdown_event),
-        "context-agent": lambda: run_context_agent_loop(shutdown_event, signal_bus=bus),
-        "zeitgeist": lambda: _run_zeitgeist_loop(shutdown_event),
-        "internal-pressure": lambda: _run_internal_pressure_loop(shutdown_event),
-        "witness": lambda: _run_witness_loop(shutdown_event),
-        "consolidation": lambda: _run_consolidation_loop(shutdown_event),
-        "replication": lambda: _run_replication_monitor_loop(shutdown_event),
-        "flywheel": lambda: run_training_flywheel_loop(shutdown_event),
-        "health": lambda: run_health_loop(shutdown_event),
-        "self-improve": lambda: run_self_improvement_loop(shutdown_event, interval=3600),
-        "free-grind": lambda: run_free_evolution_grind(shutdown_event),
+        "pulse": lambda: run_pulse_loop(shutdown_event, supervisor=_supervisor),
+        "recognition": lambda: _run_recognition_loop(shutdown_event, supervisor=_supervisor),
+        "conductors": lambda: run_conductor_loop(shutdown_event, supervisor=_supervisor),
+        "context-agent": lambda: run_context_agent_loop(
+            shutdown_event, signal_bus=bus, supervisor=_supervisor
+        ),
+        "zeitgeist": lambda: _run_zeitgeist_loop(shutdown_event, supervisor=_supervisor),
+        "internal-pressure": lambda: _run_internal_pressure_loop(
+            shutdown_event, supervisor=_supervisor
+        ),
+        "witness": lambda: _run_witness_loop(shutdown_event, supervisor=_supervisor),
+        "consolidation": lambda: _run_consolidation_loop(
+            shutdown_event, supervisor=_supervisor
+        ),
+        "replication": lambda: _run_replication_monitor_loop(
+            shutdown_event, supervisor=_supervisor
+        ),
+        "flywheel": lambda: run_training_flywheel_loop(
+            shutdown_event, supervisor=_supervisor
+        ),
+        "health": lambda: run_health_loop(shutdown_event, supervisor=_supervisor),
+        "self-improve": lambda: run_self_improvement_loop(
+            shutdown_event, interval=3600, supervisor=_supervisor
+        ),
+        "free-grind": lambda: run_free_evolution_grind(
+            shutdown_event, supervisor=_supervisor
+        ),
         # ── Fang 7: Self-Reading Archaeology ──
         # Ingests evolution archive, shared research, stigmergy marks, task
         # completions into MemoryPalace every 30 minutes. Produces
         # lessons_learned.md at ~/.dharma/meta/ — the anti-amnesia mechanism.
-        "archaeology": lambda: _run_archaeology_loop(shutdown_event),
+        "archaeology": lambda: _run_archaeology_loop(
+            shutdown_event, supervisor=_supervisor
+        ),
         # ── Guardian Crew: continuous interface + loop + router health checks ──
         # Runs at boot + every 4 hours. Writes state-local GUARDIAN_REPORT.md.
         # Creates GitHub issues for BLOCKER-severity findings.
-        "guardian": lambda: _run_guardian_loop(shutdown_event, room_registry=room_registry),
+        "guardian": lambda: _run_guardian_loop(
+            shutdown_event, room_registry=room_registry, supervisor=_supervisor
+        ),
         # ── Health API: curl http://localhost:7433/health ──
-        "health-api": lambda: _run_health_api(shutdown_event),
+        "health-api": lambda: _run_health_api(
+            shutdown_event, supervisor=_supervisor
+        ),
         # ── Gauntlet: adversarial eval pressure + DGM feedback loop ──
-        "gauntlet": lambda: _run_gauntlet_loop(shutdown_event),
+        "gauntlet": lambda: _run_gauntlet_loop(
+            shutdown_event, supervisor=_supervisor
+        ),
         # ── World Model: living Forrester-style world state updated by research ──
-        "world-model": lambda: _run_world_model_loop(shutdown_event),
+        "world-model": lambda: _run_world_model_loop(
+            shutdown_event, supervisor=_supervisor
+        ),
         # ── Revenue Scout: autonomous target scouting + intelligence ingestion ──
-        "revenue-scout": lambda: _run_revenue_scout_loop(shutdown_event),
+        "revenue-scout": lambda: _run_revenue_scout_loop(
+            shutdown_event, supervisor=_supervisor
+        ),
     }
     if room_registry is not None and room_bridge is not None:
         task_factories["room-health"] = lambda: _run_room_health_loop(
             shutdown_event,
             room_registry,
             room_bridge,
+            supervisor=_supervisor,
         )
     optional_clean_exit = {"pulse"}
     tasks = {
