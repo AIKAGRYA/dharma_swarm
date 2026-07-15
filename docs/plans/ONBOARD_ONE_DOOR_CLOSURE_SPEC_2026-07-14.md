@@ -253,18 +253,24 @@ merge-authority owners; do not edit automerge or protection yourself.
 **Closes:** blocker `D2` (`docs/governance/ACTIVE_TRACK.yaml:2017`).
 
 The exact, non-negotiable form is parent §9.2
-(`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2051-2065`): a
-separately merged, operator-authored governance PR changing `next_items[D2]`
-to exactly `D2 RATIFIED — operator=<handle>; pr=<number>;
-merge_commit=<40-hex>; scope=WP-O5-strict-default`, `blocker: false`, with
-the managed authority blocks regenerated. The implementation author cannot
-mint it; WP-O5's preflight verifies the record is a merged ancestor predating
-the WP-O5 baseline.
+(`docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md:2051-2065`). It is
+materialized without a self-referential commit hash: first, a separately
+merged, operator-authored governance PR changes only D2 to the intermediate
+ratification-anchor form in the parent spec while keeping it blocking. Then a
+separate ledger-finalization PR changes `next_items[D2]` to exactly
+`D2 RATIFIED — operator=<handle>; pr=<anchor-number>;
+merge_commit=<anchor-merge-commit-40-hex>;
+scope=WP-O5-strict-default`, `blocker: false`, with the managed authority
+blocks regenerated. The implementation author cannot mint either step;
+WP-O5's preflight verifies the referenced anchor is a merged ancestor
+predating the WP-O5 baseline.
 
 **What this spec adds:** the ready-to-send operator checklist — (1) confirm
-CL-2's C1 evidence merged; (2) author the one-line ledger flip in your own
-PR; (3) run `python3 scripts/governance/render_active_track_includes.py`;
-(4) merge before any WP-O5 packet is created. Nothing else.
+CL-2's C1 evidence merged; (2) author and merge the one-line blocking
+ratification anchor in your own PR; (3) finalize the ledger with that merged
+PR number and commit; (4) run
+`python3 scripts/governance/render_active_track_includes.py` in both steps;
+(5) merge both before any WP-O5 packet is created. Nothing else.
 
 ### CL-4 — WP-O5 strict-by-default promotion (S; code)
 
