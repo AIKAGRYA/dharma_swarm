@@ -265,6 +265,37 @@ def test_strict_ssh_and_sync_exclusion_contract_are_load_bearing() -> None:
     )
 
 
+def test_shallow_cache_materializes_the_release_tree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, source_release, plan = _make_release(tmp_path / "source")
+    source_repo = source_release / "repo"
+    _git(source_repo, "branch", "rsi-lab/canonical", str(plan["commit"]))
+    target_root = tmp_path / "target"
+    repository = str(source_repo)
+    monkeypatch.setattr(sync, "CANONICAL_REPOSITORY", repository)
+    monkeypatch.setattr(sync, "_remote_head", lambda: plan["commit"])
+    monkeypatch.setattr(
+        sync,
+        "_run_offline_verification",
+        lambda *args, **kwargs: {"network_or_provider_calls": False},
+    )
+    plan["canonical_repository"] = repository
+    plan["plan_digest"] = sync.plan_digest(plan)
+
+    result = sync.prepare_release(
+        plan,
+        target_root,
+        node="test",
+        local_venv=Path(sys.executable).resolve().parents[1],
+    )
+
+    checkout = Path(result["release"]) / "repo"
+    assert _git(checkout, "rev-parse", "HEAD") == plan["commit"]
+    assert _git(checkout, "rev-parse", "HEAD^{tree}") == plan["tree"]
+    assert sync._checkout_identity(checkout)["repo_clean"] is True
+
+
 def test_arbitrary_remote_and_non_atomic_current_are_rejected(tmp_path: Path) -> None:
     with pytest.raises(sync.SyncError) as remote_error:
         sync._validate_remote("surprise-host")

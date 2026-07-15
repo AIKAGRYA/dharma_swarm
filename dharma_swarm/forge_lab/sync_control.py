@@ -263,7 +263,7 @@ def _fetch_canonical(root: Path, expected_commit: str | None = None) -> Path:
             "--git-dir",
             str(cache),
             "update-ref",
-            f"refs/rsi-lab/releases/{fetched}",
+            "refs/heads/rsi-lab-canonical",
             fetched,
         ]
     )
@@ -644,8 +644,9 @@ def prepare_release(
                 [
                     "git",
                     "clone",
-                    "--local",
                     "--no-checkout",
+                    "--branch",
+                    "rsi-lab-canonical",
                     str(cache),
                     str(release / "repo"),
                 ],
