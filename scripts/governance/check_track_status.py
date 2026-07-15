@@ -467,10 +467,9 @@ def _resolve_command_for_current_runtime(command: list[str]) -> list[str]:
 def _missing_environment_module(output: str) -> str | None:
     """Top-level module named by a trailing ``No module named ...`` error when
     that module is NOT part of this repository. Mirrors the test_passes
-    doctrine above: a third-party import absent from a minimal-deps
-    environment (the governance gate installs only pyyaml) means the check
-    could not be RUN — it says nothing about the code. A missing repo-local
-    module remains a real failure."""
+    doctrine above: a third-party import absent from the current execution
+    environment means the check could not be RUN — it says nothing about the
+    code. A missing repo-local module remains a real failure."""
     matches = re.findall(r"No module named '?([A-Za-z0-9_.]+)'?", output)
     if not matches:
         return None

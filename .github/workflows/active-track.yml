@@ -42,11 +42,24 @@ jobs:
     name: ACTIVE_TRACK governance gate
     if: github.event_name != 'push'
     runs-on: ubuntu-latest
-    # The checker executes pytest-backed completion criteria. Keep this aligned
-    # with the publish job's proven full-dev budget instead of misclassifying a
-    # dependency-starved runner as a product regression.
-    timeout-minutes: 30
+    timeout-minutes: 10
     steps:
+      - name: Confine checker state outside checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          bootstrap="${RUNNER_TEMP}/dharma-active-track-bootstrap"
+          mkdir -p "${bootstrap}"/{pycache,xdg,ruff,pip,hypothesis}
+          printf '%s\n' \
+            'PYTHONDONTWRITEBYTECODE=1' \
+            "PYTHONPYCACHEPREFIX=${bootstrap}/pycache" \
+            'PYTEST_ADDOPTS=-p no:cacheprovider' \
+            "XDG_CACHE_HOME=${bootstrap}/xdg" \
+            "RUFF_CACHE_DIR=${bootstrap}/ruff" \
+            "PIP_CACHE_DIR=${bootstrap}/pip" \
+            "HYPOTHESIS_STORAGE_DIRECTORY=${bootstrap}/hypothesis" \
+            >> "${GITHUB_ENV}"
+
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -61,7 +74,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m pip install --upgrade pip
-          install_source="${RUNNER_TEMP}/dharma-active-track/package-source"
+          install_source="${RUNNER_TEMP}/dharma-active-track-bootstrap/package-source"
           mkdir -p "${install_source}"
           git archive --format=tar HEAD | tar -xf - -C "${install_source}"
           python3 -m pip install "${install_source}[dev]"
