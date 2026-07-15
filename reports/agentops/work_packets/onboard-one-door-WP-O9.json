@@ -134,7 +134,7 @@
     },
     {
       "name": "ruff-wp-o9",
-      "command": "python3 -m ruff check tests/test_onboarding_ci_contract.py",
+      "command": "python3 -m ruff check tests/test_onboarding_ci_contract.py scripts/governance/check_track_status.py",
       "env": {},
       "expected_exit": 0
     }
@@ -190,6 +190,6 @@
       "C1 live branch-protection and merge-group evidence remain operator-gated; this packet repairs checker execution only and does not close C1."
     ],
     "rollback": "revert the active-track job bootstrap, its CI contract test, and this packet together; the blocking checker then returns to PyYAML-only unverified criteria",
-    "packet_digest": "ddd075d49ada0b84fa64b74c4d21e001453c004f5869f0e49649c94786f22303"
+    "packet_digest": "f4c6712157306dacb3eea1d844fd9cadda27ed51da6ea9c8480484f90e4def47"
   }
 }
