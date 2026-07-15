@@ -2087,6 +2087,17 @@ automerge required set, and remove any advisory exemption. C1 records the live
 branch-protection result. WP-O5 and terminal proof block until that change is
 merged; this campaign creates no second CI-authority store.
 
+The live repository is currently personal-account-owned. GitHub exposes merge
+queues only for organization-owned repositories, so C1 must not fabricate a
+`merge_group` run or require a repository transfer merely to satisfy this
+campaign. While that platform boundary holds, `required_status_checks.strict`
+must be `true` (forcing every PR to be retested against current `main`), every
+manifest entry marked `regression_sensitive` must already declare the
+`merge_group` trigger, and the rejected merge-queue API request plus published
+availability boundary must be captured. If the repository later moves to an
+organization, a live merge-group run replaces this capability exception before
+strictness can be relaxed.
+
 ### 9.5 A1/A2/A3/A4 — adapter and instruction-custody dependencies
 
 - A1: repair `DEVIN.md`'s hard-coded checkout/`git pull main`/adjacent-expansion

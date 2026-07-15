@@ -220,9 +220,20 @@ in the C1 governance PR body and, where file-shaped, under
    `scripts/governance/ci_parity_manifest.json:38-43`) — cite, don't re-add.
 3. An automerge run log showing the manifest-driven required set enforcing
    the context (`.github/workflows/automerge.yml:99-120`).
-4. Merge-queue sensitivity: one merge-group run where the context executed
-   (it is declared `regression_sensitive: true` and must run there, manifest
-   note `:5`).
+4. Base-change sensitivity, using the strongest mechanism the hosting account
+   can actually provide:
+   - on an organization-owned repository with merge queue available, capture
+     one live `merge_group` run where the context executed (it is declared
+     `regression_sensitive: true` and must run there, manifest note `:5`);
+   - on a personal-account repository, where GitHub does not offer merge
+     queues, capture the repository owner type, the rejected merge-queue API
+     request, and GitHub's published availability boundary; require live
+     branch protection to report `required_status_checks.strict: true`, and
+     prove every regression-sensitive workflow (including this context)
+     already declares `merge_group`. This is the fail-closed equivalent
+     available on the current host: every PR is retested against current
+     `main`, while the workflow remains ready for a future organization
+     transfer. A synthetic event or prose claim is not a merge-group run.
 5. Fail-closed demonstration: one scratch PR carrying a deliberately BLOCKED
    onboarding truth (e.g. an undeclared forbidden file in the packet
    envelope) whose `Onboarding admission parity` check fails and whose merge
