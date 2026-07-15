@@ -2119,19 +2119,22 @@ active_tracks:
     name: Darshan — publication venture cell (multi-disciplinary voice of clear seeing)
     status: ACTIVE
     opened_at: "2026-07-12"
-    verified_at: "2026-07-12"
+    verified_at: "2026-07-15"
     ttl_days: 30
     owner: "@AmitabhainArunachala"
     serves: revenue-external-humans-served
     complements:
       - company-builder-parity-2026-07
     owned_surfaces:
+      - .github/workflows/darshan-pages.yml
       - docs/plans/DARSHAN_CHARTER_2026-07-12.md
       - reports/darshan/**
       - reports/tam/**
+      - tests/test_darshan_site.py
     moves_vital_signs:
       - eval_coverage
-    target_closure_kind: CLOSED_NOT_PROD
+    target_closure_kind: PRODUCTION_READY
+    graduation_profile: revenue_external
     claim_boundary: >-
       Admitted by operator DECREE (GOLDEN SEAL, 2026-07-12 00:36 JST; canonical
       text at ~/.dharma/agents/darshan_fable/DECREE_GOLDEN_SEAL.md). Criteria
@@ -2141,6 +2144,9 @@ active_tracks:
       Substack, Reddit, etc.) stays operator-gated per platform regardless of
       criteria state. The Darshan-owned site itself may publish pieces that
       have passed the editorial law (both-fires + discernment + operator read).
+      PRODUCTION_READY remains unclaimed until the public Pages deployment,
+      operator read, external delivery receipt, and ship_safe Final Boss
+      manifest all exist.
 
     description: |
       Operator-decreed publication venture (seed: 2026-05-26 lodestone,
@@ -2178,6 +2184,10 @@ active_tracks:
           - site_build_sha256
           - editorial_law_passes
           - content_digest
+      - id: darshan_site_tests_pass
+        kind: test_passes
+        test: tests/test_darshan_site.py
+        oracle_source: ".github/workflows/darshan-pages.yml"
 
     next_items:
       - id: 1
@@ -2185,13 +2195,13 @@ active_tracks:
         kind: code
         blocker: false
       - id: 2
-        what: "Website deployment decision (operator, from phone is fine): GitHub Pages / Cloudflare Pages / agni VPS. Site scaffold built locally at ~/darshan_site (zero-dependency static, python3 scripts/build.py). Until decided, the site exists locally only."
+        what: "DECIDED 2026-07-15: GitHub Pages. The governed zero-dependency site, deterministic builder, six Issue One sources, and least-privilege Pages workflow are staged in-repo. This remains a blocker until the workflow deploys from main and the public URL is independently verified."
         kind: ops
         blocker: true
       - id: 3
-        what: "Two competing entrepreneurial author personas: staged under ~/.dharma/agents/darshan_fable/authors/ with voices, beats, platform strategies, monetization models, competition scoreboard. EXTERNAL POSTING GATE (blocker): no third-party platform post until operator GO per platform — one phone message suffices, logged here when given."
+        what: "DEFERRED outside the production claim: no third-party platform posting is authorized. Issue One publishes only to the Darshan-owned GitHub Pages site; later platform adaptation still requires per-platform operator GO."
         kind: governance
-        blocker: true
+        blocker: false
       - id: 4
         what: "VWRITE massive evolution: integration brief at ~/.dharma/darshan/INTEGRATION_BRIEF.md (recon 2026-07-12 incl. agni/dokka/NIKKI); v0.1 spec lands as its own governance amendment once operator reviews the brief."
         kind: code
