@@ -347,6 +347,19 @@ def test_active_track_gate_installs_full_dev_environment_before_evaluation() -> 
     assert 'git archive --format=tar HEAD | tar -xf - -C "${install_source}"' in job
     assert install in job
     assert "python3 -m pip install pyyaml" not in job
+    assert 'python3 -m pip install ".[dev]"' not in job
+    assert 'python3 -m pip install -e ".[dev]"' not in job
+    for externalized in (
+        "'PYTHONDONTWRITEBYTECODE=1'",
+        '"PYTHONPYCACHEPREFIX=${bootstrap}/pycache"',
+        "'PYTEST_ADDOPTS=-p no:cacheprovider'",
+        '"XDG_CACHE_HOME=${bootstrap}/xdg"',
+        '"RUFF_CACHE_DIR=${bootstrap}/ruff"',
+        '"PIP_CACHE_DIR=${bootstrap}/pip"',
+        '"HYPOTHESIS_STORAGE_DIRECTORY=${bootstrap}/hypothesis"',
+    ):
+        assert externalized in job
+    assert not re.search(r"^\s+continue-on-error:", job, re.MULTILINE)
     assert job.index(install) < job.index(evaluate)
 
 
