@@ -265,6 +265,7 @@ def test_make_admission_recipes_use_external_report_root(tmp_path: Path) -> None
         "PYTEST_ADDOPTS := $(AGENTOPS_PYTEST_ADDOPTS)",
         "RUFF_CACHE_DIR := $(AGENTOPS_CACHE_ROOT)/ruff",
         "XDG_CACHE_HOME := $(AGENTOPS_CACHE_ROOT)/xdg",
+        "HYPOTHESIS_STORAGE_DIRECTORY := $(AGENTOPS_CACHE_ROOT)/hypothesis",
     ):
         assert (
             "agentops-report-root-check agent-build-preflight "
@@ -291,6 +292,7 @@ def test_make_admission_recipes_use_external_report_root(tmp_path: Path) -> None
     assert "define _AGENTOPS_EXPORT_ENV" in MAKEFILE
     for shell_export in (
         "export PYTHONDONTWRITEBYTECODE=1",
+        'export HYPOTHESIS_STORAGE_DIRECTORY="$${AGENTOPS_REPORT_ROOT}/cache/hypothesis"',
         'export DHARMA_OPS_DIR="$${AGENTOPS_REPORT_ROOT}/onboard"',
         'export AGENTOPS_PYTHON="$$agentops_python"',
         'export REPO_PYTHON="PYTHONPATH=. $$agentops_python"',
