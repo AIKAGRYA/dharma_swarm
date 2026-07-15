@@ -334,6 +334,22 @@ def test_ci_admission_has_no_weakening_flags() -> None:
         assert (REPO_ROOT / relative).is_file()
 
 
+def test_active_track_gate_installs_full_dev_environment_before_evaluation() -> None:
+    """The blocking checker must execute criteria, not compare an empty env."""
+    job = _job_block("active-track-governance")
+    install = 'python3 -m pip install "${install_source}[dev]"'
+    evaluate = "python3 scripts/governance/check_track_status.py"
+
+    assert (
+        'install_source="${RUNNER_TEMP}/dharma-active-track-bootstrap/package-source"'
+        in job
+    )
+    assert 'git archive --format=tar HEAD | tar -xf - -C "${install_source}"' in job
+    assert install in job
+    assert "python3 -m pip install pyyaml" not in job
+    assert job.index(install) < job.index(evaluate)
+
+
 def test_macos_compatibility_job_is_required_and_executable() -> None:
     job = _job_block("onboarding-macos-compatibility")
     assert "runs-on: macos-14" in job
