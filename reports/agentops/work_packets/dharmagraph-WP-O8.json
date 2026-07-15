@@ -143,8 +143,8 @@
   },
   "negative_controls": [
     {
-      "name": "m6-packet-parser-negative",
-      "command": "python3 -m pytest tests/test_agent_work_packet.py::test_rejects_missing_required_fields -q",
+      "name": "m6-base-lacks-readiness-target",
+      "command": "python3 -c \"import subprocess; r=subprocess.run(['git','show','506bb6fe322e4acba9553f2d270eedaa9ee02d2d:pyproject.toml'],capture_output=True,text=True); raise SystemExit(0 if r.returncode == 0 and 'dharma_swarm/operator_core/onboarding/readiness.py' not in r.stdout else 9)\"",
       "env": {},
       "expected_exit": 0
     }
@@ -185,6 +185,6 @@
       "No WP-O6 implementation or mutation-score claim is included; the full mutation run remains part of WP-O6."
     ],
     "rollback": "revert the pyproject.toml mutmut widening and this packet together; reopen M6-1 explicitly",
-    "packet_digest": "ae2b1b5cbb7fdc0908d51f16cb11b30521714230e3d7b940b60de53dc6e8e022"
+    "packet_digest": "baa238343809299e9a411c083a53aa60294fc5038bec1b27d967f1a19d159030"
   }
 }
