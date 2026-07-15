@@ -5,6 +5,7 @@ import importlib
 import sys
 
 from fastapi.testclient import TestClient
+from starlette.routing import Match
 
 
 class TestOrganismCompositionRoot:
@@ -120,15 +121,19 @@ def test_api_main_imports_without_api_keys(monkeypatch) -> None:
 def test_api_main_registers_dashboard_websocket_routes() -> None:
     import api.main as api_main
 
-    websocket_paths = {
-        route.path
-        for route in api_main.app.routes
-        if type(route).__name__ == "APIWebSocketRoute"
-    }
-
-    assert "/ws/agents" in websocket_paths
-    assert "/api/ws/agents" in websocket_paths
-    assert "/ws/chat/session/{session_id}" in websocket_paths
+    # FastAPI 0.139+ keeps included routers behind a lazy _IncludedRouter
+    # instead of flattening APIWebSocketRoute instances into app.routes.
+    # Exercise Starlette's public matching contract so the assertion verifies
+    # reachability across both representations.
+    for path in (
+        "/ws/agents",
+        "/api/ws/agents",
+        "/ws/chat/session/fixture-session",
+    ):
+        scope = {"type": "websocket", "path": path, "root_path": ""}
+        assert any(
+            route.matches(scope)[0] is Match.FULL for route in api_main.app.routes
+        ), f"WebSocket route is not registered: {path}"
 
 
 def test_api_main_fails_closed_for_blank_configured_key(monkeypatch) -> None:
