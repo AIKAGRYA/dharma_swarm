@@ -76,7 +76,7 @@ def test_package_and_cli_report_packet_a_version() -> None:
     assert payload["command"] == "version"
     assert payload["result"]["package_version"] == "0.1.0-dev"
     assert payload["result"]["source_commit"]
-    assert payload["result"]["canonical_checkout"] == "/root/rsi-lab/current/repo"
+    assert payload["result"]["canonical_checkout"] == str(REPO_ROOT)
     assert payload["result"]["source_checkout"] == str(REPO_ROOT)
     assert payload["result"]["source_tree_state"] in {"clean", "dirty", "unknown"}
     assert payload["result"]["implementation_status"] == "cli_skeleton"
@@ -105,6 +105,7 @@ def test_packet_a_registers_the_target_operator_command_tree() -> None:
         "worker",
         "alerts",
         "archive",
+        "sync",
     }
     assert set(_subcommands(root["provider"])) == {"selftest"}
     assert set(_subcommands(root["taskpack"])) == {"build"}
@@ -125,6 +126,13 @@ def test_packet_a_registers_the_target_operator_command_tree() -> None:
     assert set(_subcommands(root["worker"])) == {"list", "enroll", "revoke"}
     assert set(_subcommands(root["alerts"])) == {"list", "ack"}
     assert set(_subcommands(root["archive"])) == {"inspect"}
+    assert set(_subcommands(root["sync"])) == {
+        "status",
+        "plan",
+        "apply",
+        "converge",
+        "rollback",
+    }
 
 
 def test_repo_launcher_defaults_to_the_canonical_environment() -> None:
@@ -132,10 +140,12 @@ def test_repo_launcher_defaults_to_the_canonical_environment() -> None:
         encoding="utf-8"
     )
 
-    assert 'base="${RSI_LAB_BASE:-/root/rsi-lab/current}"' in launcher
+    assert 'base="/root/rsi-lab/current"' in launcher
+    assert 'base="${HOME}/.dharma/rsi-lab/current"' in launcher
     assert 'repo="${RSI_LAB_REPO:-${base}/repo}"' in launcher
     assert 'python="${RSI_LAB_PYTHON:-${base}/.venv/bin/python}"' in launcher
     assert 'pydeps="${RSI_LAB_PYDEPS:-${base}/pydeps}"' in launcher
+    assert "export PYTHONDONTWRITEBYTECODE=1" in launcher
 
 
 @pytest.mark.parametrize(

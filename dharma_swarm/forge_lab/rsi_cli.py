@@ -21,6 +21,8 @@ from dharma_swarm.forge_lab.version import (
 
 
 NOT_IMPLEMENTED_EXIT = 3
+DRIFT_EXIT = 4
+SYNC_FAILURE_EXIT = 5
 
 
 def _json_flag(parser: argparse.ArgumentParser) -> None:
@@ -271,6 +273,60 @@ def build_parser() -> argparse.ArgumentParser:
     archive_inspect.add_argument("candidate", nargs="?")
     _json_flag(archive_inspect)
 
+    sync = commands.add_parser(
+        "sync", help="verify and converge immutable RSI Lab code releases"
+    )
+    sync_commands = sync.add_subparsers(dest="sync_command", required=True)
+
+    sync_status = _leaf(
+        sync_commands,
+        "status",
+        command_path="sync status",
+        help_text="compare GitHub, Mac, and Meghadharma code identity",
+    )
+    sync_status.add_argument("--remote", default="meghadharma")
+    _json_flag(sync_status)
+
+    sync_plan = _leaf(
+        sync_commands,
+        "plan",
+        command_path="sync plan",
+        help_text="pin the canonical GitHub ref in a content-addressed manifest",
+    )
+    _json_flag(sync_plan)
+
+    sync_apply = _leaf(
+        sync_commands,
+        "apply",
+        command_path="sync apply",
+        help_text="prepare, verify, and atomically activate a stored manifest",
+    )
+    sync_apply.add_argument("--manifest", required=True)
+    sync_apply.add_argument("--request-id", required=True)
+    sync_apply.add_argument("--remote", default="meghadharma")
+    _json_flag(sync_apply)
+
+    sync_converge = _leaf(
+        sync_commands,
+        "converge",
+        command_path="sync converge",
+        help_text="plan and apply the current canonical ref in one explicit operation",
+    )
+    sync_converge.add_argument("--request-id", required=True)
+    sync_converge.add_argument("--remote", default="meghadharma")
+    _json_flag(sync_converge)
+
+    sync_rollback = _leaf(
+        sync_commands,
+        "rollback",
+        command_path="sync rollback",
+        help_text="atomically reactivate a previously verified full-SHA release",
+    )
+    sync_rollback.add_argument("--release", required=True)
+    sync_rollback.add_argument("--request-id", required=True)
+    sync_rollback.add_argument("--remote", default="meghadharma")
+    _json_flag(sync_rollback)
+
     return parser
 
 
@@ -320,11 +376,106 @@ def _fail_not_implemented(command_path: str, as_json: bool) -> int:
     return NOT_IMPLEMENTED_EXIT
 
 
+def _emit_sync_payload(
+    command_path: str,
+    result: dict[str, Any],
+    *,
+    as_json: bool,
+    ok: bool = True,
+) -> None:
+    if as_json:
+        print(
+            json.dumps(
+                {
+                    "schema": CLI_RESULT_SCHEMA,
+                    "ok": ok,
+                    "command": command_path,
+                    "result": result,
+                },
+                sort_keys=True,
+            )
+        )
+        return
+    if command_path == "sync status":
+        print(f"status: {'IN_SYNC' if result['in_sync'] else 'DRIFT'}")
+        print(f"github: {result['canonical'].get('commit') or 'unavailable'}")
+        for node in ("mac", "meghadharma"):
+            identity = result.get(node, {}).get("identity") or {}
+            print(
+                f"{node}: {identity.get('commit') or 'unavailable'} "
+                f"clean={identity.get('repo_clean', False)}"
+            )
+        for failure in result.get("failures", []):
+            print(f"failure: {failure}")
+        return
+    if command_path == "sync plan":
+        print(f"commit: {result['plan']['commit']}")
+        print(f"plan: {result['plan']['plan_digest']}")
+        print(f"path: {result['path']}")
+        return
+    print(f"commit: {result['commit']}")
+    if result.get("plan_digest"):
+        print(f"plan: {result['plan_digest']}")
+    if result.get("receipt"):
+        print(f"receipt: {result['receipt']}")
+
+
+def _dispatch_sync(args: argparse.Namespace) -> int:
+    from dharma_swarm.forge_lab import sync_orchestrator as sync_control
+
+    command_path = args._command_path
+    try:
+        if command_path == "sync status":
+            result = sync_control.sync_status(remote=args.remote)
+            _emit_sync_payload(
+                command_path, result, as_json=args.json, ok=result["in_sync"]
+            )
+            return 0 if result["in_sync"] else DRIFT_EXIT
+        if command_path == "sync plan":
+            plan, path = sync_control.create_plan()
+            result = {"plan": plan, "path": str(path)}
+        elif command_path == "sync apply":
+            plan, _ = sync_control.load_plan(args.manifest)
+            result = sync_control.apply_plan(
+                plan, request_id=args.request_id, remote=args.remote
+            )
+        elif command_path == "sync converge":
+            result = sync_control.converge(
+                request_id=args.request_id, remote=args.remote
+            )
+        elif command_path == "sync rollback":
+            result = sync_control.rollback(
+                args.release, request_id=args.request_id, remote=args.remote
+            )
+        else:  # pragma: no cover - parser owns the command set
+            raise sync_control.SyncError("UNKNOWN_SYNC_COMMAND", command_path)
+        _emit_sync_payload(command_path, result, as_json=args.json)
+        return 0
+    except sync_control.SyncError as exc:
+        message = str(exc)
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "schema": CLI_RESULT_SCHEMA,
+                        "ok": False,
+                        "command": command_path,
+                        "error": {"code": exc.code, "message": message},
+                    },
+                    sort_keys=True,
+                )
+            )
+        print(f"rsi {command_path} failed [{exc.code}]: {message}", file=sys.stderr)
+        return SYNC_FAILURE_EXIT
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     command_path = args._command_path
     if command_path == "version":
         return _emit_version(args.json)
+    if command_path.startswith("sync "):
+        return _dispatch_sync(args)
     return _fail_not_implemented(command_path, args.json)
 
 
