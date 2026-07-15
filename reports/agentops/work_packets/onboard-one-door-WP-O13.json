@@ -1,0 +1,38 @@
+{
+  "id": "onboard-one-door-WP-O13",
+  "base_ref": "e9e7816a9555292e78b19ef4644e72690048897d",
+  "branch": "cursor/loop1-consumption-wire-8828",
+  "worktree": ".",
+  "intent": "Bind Loop Closure WP-LC3 to the accepted onboarding packet grammar: read recent delegation_runs.receipt_json rows mode=ro, reorder but never exclude authorized providers, cap demotions, fail open on malformed stores, and carry trace/decision/boot evidence through the existing ModelRouter feedback seam. No orchestrator, archive, prompt, config, or live-host mutation is admitted.",
+  "allowed_files": [
+    "dharma_swarm/agent_runner.py",
+    "dharma_swarm/model_routing.py",
+    "dharma_swarm/providers.py",
+    "reports/agentops/work_packets/onboard-one-door-WP-O13.json",
+    "tests/test_loop1_consumption.py"
+  ],
+  "forbidden_files": [
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/swarm.py",
+    "docker-compose.yml",
+    "reports/loop_closure/**",
+    "scripts/runtime/**"
+  ],
+  "gates": [
+    {
+      "name": "loop1-consumption-wire",
+      "command": "python3 -m pytest tests/test_loop1_consumption.py tests/test_model_router_routing_memory.py tests/test_agent_runner_routing_feedback.py -q",
+      "expected_exit": 0,
+      "env": {}
+    }
+  ],
+  "negative_controls": [],
+  "commit": {
+    "allowed": true,
+    "message": "feat(loop-closure): consume receipts in provider routing"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  }
+}
