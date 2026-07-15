@@ -149,7 +149,10 @@ def _run_in_process(
     monkeypatch.setenv("DHARMA_OPS_DIR", str(ops))
     monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", "1")
     monkeypatch.delenv("DHARMA_ONBOARD_WRITER", raising=False)
-    assert cli.assemble_and_run(["--json"]) == 0
+    # WP-O5: strict verdict exits are the default; this helper only needs the
+    # door to have run so it can return the receipt payload, so --no-strict pins
+    # the legacy exit 0 and the exit code stays incidental to these cache tests.
+    assert cli.assemble_and_run(["--json", "--no-strict"]) == 0
     capsys.readouterr()
     return load_receipt(ops / "onboard_receipt.json").payload
 
@@ -253,8 +256,10 @@ def test_reuse_decision_is_serialized_under_receipt_lock(
     lock_path = ops / "onboard_receipt.json.lock"
     with lock_path.open("w") as lock_handle:
         fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+        # WP-O5: --no-strict pins the legacy exit 0 so the returncode assertion
+        # below stays about lock serialization, not the verdict exit code.
         proc = subprocess.Popen(
-            [sys.executable, "-B", "-m", "dharma_swarm.operator_core.onboarding.cli", "--json"],
+            [sys.executable, "-B", "-m", "dharma_swarm.operator_core.onboarding.cli", "--json", "--no-strict"],
             cwd=REPO_ROOT, env=env,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
         )

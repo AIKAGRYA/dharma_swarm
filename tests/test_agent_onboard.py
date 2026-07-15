@@ -1,8 +1,12 @@
 """Tests for scripts/governance/agent_onboard.py as a compact CLI shim.
 
-The public door must remain informational, always exit 0 by default, and
-delegate execution to the compact onboarding engine.  Strict verdicts and
-exit codes are reachable only through `--strict` / `DHARMA_ONBOARD_STRICT=1`.
+The public door delegates execution to the compact onboarding engine.  Under
+WP-O5 strict verdict exits are the DEFAULT — the process exit code equals the
+true verdict exit code (READY=0, BLOCKED=1, USAGE=2, ...).  The deprecated
+`--no-strict` / `DHARMA_ONBOARD_NO_STRICT=1` one-cycle opt-out restores the
+legacy "exit 0 except usage errors" behavior; tests that only need the door to
+have run (rendering, JSON shape, no-write, receipt persistence) pass it so the
+incidental exit-0 holds while their real assertion is unchanged.
 """
 
 from __future__ import annotations
@@ -57,8 +61,11 @@ def _run(
 
 
 def test_onboard_exits_zero_and_delegates_to_compact_cli() -> None:
-    """The default public door exits 0 and renders the compact CLI output."""
-    result = _run()
+    """The public door renders the compact CLI output; delegation, not the exit
+    code, is the assertion here.  WP-O5: --no-strict pins the legacy exit 0 so
+    the rendered-sections check is exit-independent (the true exit contract is
+    covered by test_onboard_strict_exits_true_exit_code)."""
+    result = _run("--no-strict")
     assert result.returncode == 0, result.stderr[-400:]
     assert "DHARMA ONBOARD" in result.stdout
     assert "ACTIVE PORTFOLIO" in result.stdout
@@ -139,7 +146,9 @@ print(json.dumps({{
 
 
 def test_onboard_json_emits_machine_projection() -> None:
-    result = _run("--json")
+    # WP-O5: this pins the JSON machine projection shape, not the exit code;
+    # --no-strict keeps the legacy exit 0 so the assertion stays about the JSON.
+    result = _run("--json", "--no-strict")
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
     assert payload["schema"] == "dharma_swarm.onboard_json.v1"
@@ -163,7 +172,9 @@ def test_onboard_unknown_flag_exits_two() -> None:
 
 
 def test_onboard_fast_is_deprecated() -> None:
-    result = _run("--fast")
+    # WP-O5: the --fast deprecation line is exit-independent; --no-strict pins
+    # the legacy exit 0 so this stays a pure deprecation-message assertion.
+    result = _run("--fast", "--no-strict")
     assert result.returncode == 0
     assert "deprecated" in result.stderr
 
@@ -176,7 +187,9 @@ def test_onboard_does_not_write_in_repo() -> None:
         text=True,
         timeout=60,
     ).stdout
-    result = _run()
+    # WP-O5: the no-worktree-write property is exit-independent; --no-strict
+    # pins the legacy exit 0 so this stays a pure no-write assertion.
+    result = _run("--no-strict")
     assert result.returncode == 0
     after = subprocess.run(
         ["git", "status", "--porcelain", "--ignored=matching"],
@@ -190,7 +203,9 @@ def test_onboard_does_not_write_in_repo() -> None:
 
 def test_receipt_is_written_to_ops_dir(tmp_path: Path) -> None:
     ops = tmp_path / "ops"
-    result = _run(ops_dir=ops)
+    # WP-O5: receipt persistence is exit-independent; --no-strict pins the
+    # legacy exit 0 so this stays a pure persistence assertion.
+    result = _run("--no-strict", ops_dir=ops)
     assert result.returncode == 0
     assert (ops / "onboard_receipt.json").exists()
 
