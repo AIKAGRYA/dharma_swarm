@@ -23,10 +23,6 @@ ALERT_FILE = STATE_DIR / "shared" / "loop_alert.md"
 SUPERVISOR_STATE = STATE_DIR / "loop_supervisor"
 
 
-# ---------------------------------------------------------------------------
-# Data models
-# ---------------------------------------------------------------------------
-
 @dataclass
 class LoopHealth:
     """Health status of a single loop."""
@@ -133,10 +129,6 @@ class SupervisorAlert:
         return asdict(self)
 
 
-# ---------------------------------------------------------------------------
-# Intervention levels
-# ---------------------------------------------------------------------------
-
 INTERVENTIONS = [
     "LOG_WARNING",     # Just log it
     "PAUSE_LOOP",      # Suggest loop pause
@@ -155,10 +147,6 @@ def _escalation_level(error_count: int, stale_factor: float) -> str:
         return "PAUSE_LOOP"
     return "LOG_WARNING"
 
-
-# ---------------------------------------------------------------------------
-# Retry storm detection
-# ---------------------------------------------------------------------------
 
 @dataclass
 class _ErrorWindow:
@@ -184,10 +172,6 @@ class _ErrorWindow:
             counts[key] = counts.get(key, 0) + 1
         return any(c >= threshold for c in counts.values())
 
-
-# ---------------------------------------------------------------------------
-# LoopSupervisor
-# ---------------------------------------------------------------------------
 
 class LoopSupervisor:
     """Watchdog that monitors all orchestrate_live loops.
@@ -464,10 +448,6 @@ class LoopSupervisor:
             return json.loads(state_file.read_text())
         return None
 
-
-# ---------------------------------------------------------------------------
-# CLI entry points
-# ---------------------------------------------------------------------------
 
 def cmd_loop_status() -> int:
     """Print loop health status."""
