@@ -42,7 +42,10 @@ jobs:
     name: ACTIVE_TRACK governance gate
     if: github.event_name != 'push'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # The checker executes pytest-backed completion criteria. Keep this aligned
+    # with the publish job's proven full-dev budget instead of misclassifying a
+    # dependency-starved runner as a product regression.
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -54,10 +57,14 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install minimal deps
+      - name: Install package + test deps
         run: |
+          set -euo pipefail
           python3 -m pip install --upgrade pip
-          python3 -m pip install pyyaml
+          install_source="${RUNNER_TEMP}/dharma-active-track/package-source"
+          mkdir -p "${install_source}"
+          git archive --format=tar HEAD | tar -xf - -C "${install_source}"
+          python3 -m pip install "${install_source}[dev]"
 
       - name: Evaluate ACTIVE_TRACK.yaml against tree
         run: |
