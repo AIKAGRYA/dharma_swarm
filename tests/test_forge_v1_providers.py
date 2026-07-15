@@ -7,12 +7,14 @@ Two layers:
 - LIVE (gated): a single real frontier-model call, skipped unless FORGE_LIVE=1
   so CI / offline never spends money.
 """
+import asyncio
 import os
 
 import pytest
 
 from dharma_swarm.forge_v1.fixtures import ADD_TASK
 from dharma_swarm.forge_v1.harness import verify
+from dharma_swarm.forge_v1.canonical import _call
 from dharma_swarm.forge_v1.providers import (
     FakeCompletion,
     LiveModel,
@@ -20,7 +22,7 @@ from dharma_swarm.forge_v1.providers import (
     _provider_for_model,
     _usage_tokens,
 )
-from dharma_swarm.models import ProviderType
+from dharma_swarm.models import LLMResponse, ProviderType
 from dharma_swarm.runtime_provider import RuntimeProviderConfig
 
 
@@ -174,6 +176,67 @@ def test_pool_completion_routes_glm_52_to_zhipu_provider(monkeypatch):
     assert captured["provider_type"] == ProviderType.ZHIPU
     assert captured["model"] == "glm-5.2"
     assert wire_model == "glm-5.2"
+
+
+def test_pool_completion_closes_provider_on_completion_loop(monkeypatch):
+    class _Provider:
+        complete_loop = None
+        close_loop = None
+        close_count = 0
+
+        async def complete(self, request):
+            self.complete_loop = asyncio.get_running_loop()
+            return LLMResponse(
+                content="OK",
+                model=request.model,
+                usage={"prompt_tokens": 2, "completion_tokens": 1},
+            )
+
+        async def close(self):
+            self.close_loop = asyncio.get_running_loop()
+            self.close_count += 1
+
+    provider = _Provider()
+    monkeypatch.setattr(
+        "dharma_swarm.forge_v1.providers._provider_for_model",
+        lambda model_id: (provider, model_id),
+    )
+
+    text, tokens = PoolCompletion("kimi-k2.7-code").complete("Reply OK")
+
+    assert text == "OK"
+    assert tokens == 3
+    assert provider.close_count == 1
+    assert provider.complete_loop is provider.close_loop
+
+
+def test_canonical_call_closes_provider_on_completion_loop():
+    class _Provider:
+        complete_loop = None
+        close_loop = None
+
+        async def complete(self, request):
+            self.complete_loop = asyncio.get_running_loop()
+            return LLMResponse(content="OK", model=request.model, usage={"total_tokens": 4})
+
+        async def close(self):
+            self.close_loop = asyncio.get_running_loop()
+
+    provider = _Provider()
+
+    text, tokens, stop_reason = _call(
+        provider,
+        "kimi-k2.7-code",
+        "Reply OK",
+        max_tokens=16,
+        temperature=1,
+        timeout_s=1,
+    )
+
+    assert text == "OK"
+    assert tokens == 4
+    assert stop_reason is None
+    assert provider.complete_loop is provider.close_loop
 
 
 # --- LIVE: gated single real call (skipped unless FORGE_LIVE=1) ---

@@ -116,6 +116,41 @@ def _usage_tokens(usage: dict) -> int:
     return int(total)
 
 
+async def _complete_and_close(
+    provider: object,
+    request: object,
+    *,
+    timeout_s: float | None = None,
+):
+    """Complete one Forge call and close the provider on the same event loop.
+
+    Forge exposes synchronous adapters over asynchronous providers.  Closing a
+    cached HTTP client after ``asyncio.run`` returns leaves its transport bound
+    to an already-closed loop; the SDK finalizer then emits ``Event loop is
+    closed`` during a later call.  Keep completion, timeout cancellation, and
+    cleanup inside one owned loop instead.
+    """
+    primary_error: BaseException | None = None
+    try:
+        completion = provider.complete(request)
+        if timeout_s is None:
+            return await completion
+        return await asyncio.wait_for(completion, timeout=timeout_s)
+    except BaseException as exc:
+        primary_error = exc
+        raise
+    finally:
+        close = getattr(provider, "close", None)
+        if callable(close):
+            try:
+                await close()
+            except Exception:
+                # Preserve the provider/timeout failure when cleanup also fails.
+                # A cleanup failure after a successful call remains load-bearing.
+                if primary_error is None:
+                    raise
+
+
 class FakeCompletion:
     """Offline backend: cycles through canned responses. complete(prompt) ->
     (text, tokens). Used to validate the prompt-build / patch-parse plumbing
@@ -157,7 +192,7 @@ class PoolCompletion:
             max_tokens=2048,
             temperature=0.2,
         )
-        response = asyncio.run(self._provider.complete(request))
+        response = asyncio.run(_complete_and_close(self._provider, request))
         return response.content or "", _usage_tokens(response.usage)
 
 
