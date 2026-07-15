@@ -7,6 +7,7 @@
   "allowed_files": [
     ".github/workflows/active-track.yml",
     "reports/agentops/work_packets/onboard-one-door-WP-O9.json",
+    "scripts/governance/check_track_status.py",
     "tests/test_onboarding_ci_contract.py"
   ],
   "forbidden_files": [
@@ -189,6 +190,6 @@
       "C1 live branch-protection and merge-group evidence remain operator-gated; this packet repairs checker execution only and does not close C1."
     ],
     "rollback": "revert the active-track job bootstrap, its CI contract test, and this packet together; the blocking checker then returns to PyYAML-only unverified criteria",
-    "packet_digest": "90662e4e28c2dbd87254d9d6221d2b0af55aa2f7363131934c209dd51131639b"
+    "packet_digest": "ddd075d49ada0b84fa64b74c4d21e001453c004f5869f0e49649c94786f22303"
   }
 }
