@@ -51,7 +51,9 @@ def ops_dir(tmp_path: Path) -> Path:
 def test_repeated_json_is_byte_identical(ops_dir: Path) -> None:
     first = _run(["--json"], ops_dir)
     second = _run(["--json"], ops_dir)
-    assert first.returncode == 0 and second.returncode == 0
+    # WP-O5: strict exits are the default, so the exit code is the true verdict
+    # code; determinism (not exit 0) is what this test pins.
+    assert first.returncode == second.returncode
     assert first.stdout == second.stdout
     payload = json.loads(first.stdout)
     assert payload["schema"] == "dharma_swarm.onboard_json.v1"
@@ -78,7 +80,9 @@ def test_json_carries_true_verdict_and_conditions(ops_dir: Path) -> None:
 @pytest.mark.parametrize("mode", [[], ["--deep"], ["--json"]])
 def test_all_entry_modes_attempt_no_repository_write(ops_dir: Path, mode: list[str]) -> None:
     before = _porcelain()
-    result = _run(mode, ops_dir)
+    # --no-strict pins the deterministic legacy exit; the no-write property this
+    # test asserts is mode- and exit-independent (WP-O5).
+    result = _run([*mode, "--no-strict"], ops_dir)
     assert result.returncode == 0, result.stderr
     assert _porcelain() == before
 
@@ -104,7 +108,9 @@ def test_receipt_persistence_is_admission_requirement(ops_dir: Path) -> None:
 
 
 def test_receipt_write_lands_outside_and_validates(ops_dir: Path) -> None:
-    result = _run([], ops_dir)
+    # Receipt persistence is exit-independent; --no-strict pins the legacy exit
+    # so this stays a pure persistence assertion post-WP-O5.
+    result = _run(["--no-strict"], ops_dir)
     assert result.returncode == 0
     receipt = ops_dir / "onboard_receipt.json"
     assert receipt.exists()
@@ -128,15 +134,16 @@ def test_strict_blocked_fixture(ops_dir: Path, tmp_path: Path) -> None:
         assert strict.returncode == 1
 
 
-def test_strict_ready_fixture(ops_dir: Path) -> None:
-    """Whatever the verdict, the legacy default exits 0 and strict exits the
-    receipt's true code — the pair can only both be zero when READY-like."""
-    legacy = _run([], ops_dir)
-    strict = _run(["--strict"], ops_dir)
+def test_default_is_strict_and_no_strict_is_legacy(ops_dir: Path) -> None:
+    """WP-O5: the default now exits the receipt's true code; --no-strict is the
+    deprecated opt-out that keeps exit 0 for everything except usage errors.
+    The default can only be 0 when the verdict is READY-like."""
+    default = _run([], ops_dir)
+    no_strict = _run(["--no-strict"], ops_dir)
     truth = json.loads(_run(["--json"], ops_dir).stdout)
-    assert legacy.returncode == 0
-    assert strict.returncode == truth["exit_code"]
-    if strict.returncode == 0:
+    assert default.returncode == truth["exit_code"]
+    assert no_strict.returncode == (truth["exit_code"] if truth["exit_code"] == 2 else 0)
+    if default.returncode == 0:
         assert truth["verdict"] in {"READY", "NEEDS_HOST"}
 
 
@@ -161,7 +168,8 @@ def test_unknown_flag_exits_two_and_retains_conditions(ops_dir: Path) -> None:
 
 
 def test_fast_maps_to_compact_with_deprecation_line(ops_dir: Path) -> None:
-    result = _run(["--fast"], ops_dir)
+    # The --fast deprecation line is exit-independent; --no-strict pins exit 0.
+    result = _run(["--fast", "--no-strict"], ops_dir)
     assert result.returncode == 0
     assert "deprecated" in result.stderr
 
@@ -188,7 +196,9 @@ def test_writer_migration_and_rollback_matrix(
 
     receipt = ops_dir / "onboard_receipt.json"
 
-    assert _run([], ops_dir).returncode == 0
+    # Writer schema migration is exit-independent; --no-strict pins exit 0 so
+    # this stays a pure receipt-schema assertion post-WP-O5.
+    assert _run(["--no-strict"], ops_dir).returncode == 0
     v2 = load_receipt(receipt)
     assert v2.major == 2  # post-D3 default (PR #941)
     assert v2.payload["primary_verdict"] in {
@@ -200,12 +210,12 @@ def test_writer_migration_and_rollback_matrix(
     monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", "1")
     monkeypatch.delenv("DHARMA_ONBOARD_WRITER", raising=False)
     monkeypatch.setattr(cli, "WRITER_SCHEMA_DEFAULT", "v1")
-    assert cli.assemble_and_run([]) == 0
+    assert cli.assemble_and_run(["--no-strict"]) == 0
     capsys.readouterr()
     assert load_receipt(receipt).major == 1  # rollback stays loader-valid
 
     monkeypatch.setattr(cli, "WRITER_SCHEMA_DEFAULT", "v2")
-    assert cli.assemble_and_run([]) == 0
+    assert cli.assemble_and_run(["--no-strict"]) == 0
     capsys.readouterr()
     assert load_receipt(receipt).major == 2  # roll-forward replaces cleanly
 
@@ -221,8 +231,8 @@ def test_ambient_writer_override_is_denied_pre_d3(ops_dir: Path) -> None:
     default_major = int(cli.WRITER_SCHEMA_DEFAULT.removeprefix("v"))
     other = "v1" if cli.WRITER_SCHEMA_DEFAULT == "v2" else "v2"
 
-    denied = _run(["--json"], ops_dir, DHARMA_ONBOARD_WRITER=other)
-    assert denied.returncode == 0  # legacy pre-WP-O5 door still exits 0
+    denied = _run(["--json", "--no-strict"], ops_dir, DHARMA_ONBOARD_WRITER=other)
+    assert denied.returncode == 0  # --no-strict opt-out keeps the legacy exit-0 (WP-O5)
     payload = json.loads(denied.stdout)
     assert payload["verdict"] == "CONFIG_ERROR"
     assert payload["exit_code"] == 3
@@ -231,12 +241,14 @@ def test_ambient_writer_override_is_denied_pre_d3(ops_dir: Path) -> None:
     assert "denied" in rows["writer_override_denied"]["reason"]
     assert load_receipt(ops_dir / "onboard_receipt.json").major == default_major
 
+    # WP-O5: strict is the default now, so the plain invocation surfaces the
+    # true CONFIG_ERROR exit (the DHARMA_ONBOARD_STRICT=1 env is a no-op).
     strict = _run([], ops_dir, DHARMA_ONBOARD_WRITER=other, DHARMA_ONBOARD_STRICT="1")
     assert strict.returncode == 3
 
     # An ambient value equal to the source-controlled default is a no-op,
-    # not a denial.
-    matching = _run(["--json"], ops_dir, DHARMA_ONBOARD_WRITER=cli.WRITER_SCHEMA_DEFAULT)
+    # not a denial (--no-strict pins exit 0 for this non-exit assertion).
+    matching = _run(["--json", "--no-strict"], ops_dir, DHARMA_ONBOARD_WRITER=cli.WRITER_SCHEMA_DEFAULT)
     assert matching.returncode == 0
     matching_ids = {row["id"] for row in json.loads(matching.stdout)["conditions"]}
     assert "writer_override_denied" not in matching_ids
