@@ -1,0 +1,121 @@
+{
+  "report_type": "pr_lifecycle",
+  "generated_at": "2026-07-15T00:00Z",
+  "audit_sha": "971923a71c18b0effb5bbf2db279e85e8a7db413",
+  "repo": "AmitabhainArunachala/dharma_swarm",
+  "summary": {
+    "total_open_before": 8,
+    "auto_closed": 0,
+    "total_open_after": 8,
+    "conflicting_prs": 1,
+    "green_and_ready_non_draft": 7,
+    "duplicate_auto_grounding_flagged": 0
+  },
+  "auto_close_scan": {
+    "criteria": "mergeable=CONFLICTING AND age > 7 days",
+    "eligible": [],
+    "conflicting_not_yet_eligible": [
+      {
+        "number": 932,
+        "title": "docs(onboarding): make One-Door closure state machine executable [impact-checked]",
+        "mergeable": "CONFLICTING",
+        "created_at": "2026-07-14T03:01:26Z",
+        "age_hours": 21.0,
+        "note": "21 hours old, not yet eligible (threshold: 7 days). Rebase recommended."
+      }
+    ]
+  },
+  "duplicate_auto_grounding_scan": {
+    "duplicates_found": [],
+    "note": "No duplicate auto-grounding PRs found. No open PRs with auto-grounding pattern. Each head branch is unique."
+  },
+  "green_and_ready_prs": [
+    {
+      "number": 949,
+      "title": "[impact-checked] Govern durable A2A operator slice",
+      "mergeable": "MERGEABLE",
+      "created_at": "2026-07-14T23:31:10Z",
+      "age_hours": 0.5,
+      "changedFiles": 5,
+      "additions": 239,
+      "deletions": 3
+    },
+    {
+      "number": 947,
+      "title": "[impact-checked] Add durable A2A presence and operator node",
+      "mergeable": "MERGEABLE",
+      "created_at": "2026-07-14T15:49:21Z",
+      "age_hours": 8.2,
+      "changedFiles": 32,
+      "additions": 7698,
+      "deletions": 232
+    },
+    {
+      "number": 946,
+      "title": "onboard-one-door closure: hill-climb spec + CL-1 evidence ratchet + WP-O6 property battery",
+      "mergeable": "MERGEABLE",
+      "created_at": "2026-07-14T14:28:01Z",
+      "age_hours": 9.5,
+      "changedFiles": 7,
+      "additions": 868,
+      "deletions": 12
+    },
+    {
+      "number": 943,
+      "title": "chore(docops): reconcile generated counts",
+      "mergeable": "MERGEABLE",
+      "created_at": "2026-07-14T09:32:20Z",
+      "age_hours": 14.5,
+      "changedFiles": 2,
+      "additions": 4,
+      "deletions": 4
+    },
+    {
+      "number": 930,
+      "title": "feat(chamber): add exact-scope proof membrane v0",
+      "mergeable": "MERGEABLE",
+      "created_at": "2026-07-13T23:50:28Z",
+      "age_hours": 24.2,
+      "changedFiles": 31,
+      "additions": 6902,
+      "deletions": 0
+    },
+    {
+      "number": 904,
+      "title": "feat(holon): authority-scoped remote fast path [impact-checked]",
+      "mergeable": "MERGEABLE",
+      "created_at": "2026-07-12T15:40:29Z",
+      "age_hours": 56.3,
+      "changedFiles": 30,
+      "additions": 4160,
+      "deletions": 316
+    },
+    {
+      "number": 886,
+      "title": "docs: Planetary Intelligence Commons — vision braid, field map, Causal Action Receipt IR spec, wedge roadmap (SEED)",
+      "mergeable": "MERGEABLE",
+      "created_at": "2026-07-11T13:16:31Z",
+      "age_hours": 82.7,
+      "changedFiles": 8,
+      "additions": 1568,
+      "deletions": 0
+    }
+  ],
+  "recommended_actions": [
+    {
+      "pr": 932,
+      "action": "REBASE_RECOMMENDED",
+      "reason": "CONFLICTING merge state. Created 21h ago. Rebase onto main to resolve conflicts. Will be eligible for auto-close at 2026-07-21T03:01Z if unresolved."
+    },
+    {
+      "pr": 904,
+      "action": "OPERATOR_REVIEW",
+      "reason": "56h old, MERGEABLE, 30 files changed. Aging without merge — may warrant operator review."
+    },
+    {
+      "pr": 886,
+      "action": "OPERATOR_REVIEW",
+      "reason": "82h old, MERGEABLE. Docs/vision PR — may need merge or deliberate hold decision."
+    }
+  ]
+}
