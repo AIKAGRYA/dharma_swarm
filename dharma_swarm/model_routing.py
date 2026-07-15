@@ -66,6 +66,26 @@ class RoutingDecision:
     signal: RoutingSignal | None = None
 
 
+@dataclass(frozen=True)
+class ReceiptConsumptionEvidence:
+    """Bounded proof that prior dispatch receipts changed provider ordering."""
+
+    consumed_trace_ids: tuple[str, ...] = ()
+    decision_delta: dict[str, Any] = field(default_factory=dict)
+    boot_id: str = ""
+    applied: bool = False
+    fail_open_reason: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "consumed_trace_ids": list(self.consumed_trace_ids),
+            "decision_delta": dict(self.decision_delta),
+            "boot_id": self.boot_id,
+            "applied": self.applied,
+            "fail_open_reason": self.fail_open_reason,
+        }
+
+
 @dataclass
 class RouteResult:
     """Simple routing result with model/provider/complexity fields."""
@@ -282,6 +302,7 @@ __all__ = [
     "ComplexityTier",
     "LanguageHint",
     "OrganismRouter",
+    "ReceiptConsumptionEvidence",
     "RouteResult",
     "RoutingDecision",
     "RoutingSignal",
