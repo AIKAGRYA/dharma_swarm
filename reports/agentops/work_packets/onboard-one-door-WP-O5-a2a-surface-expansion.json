@@ -200,9 +200,9 @@
     ],
     "honest_blockers": [
       "This ownership packet makes no live DS_PRESENCE, ACL, token rotation, host deployment, or production-readiness claim.",
-      "The implementation PR must land only after or with this exact ownership expansion; the dashboard remains a read model."
+      "Governance PR #949 must merge before implementation PR #947; the dashboard remains a read model."
     ],
     "rollback": "revert the organism-rewire exact surfaces, criteria and next-item; regenerate active-track projections; remove this packet",
-    "packet_digest": "3acb885ec282fe80e79b105831390ea4fea09a6cfdae4fd58a2d2202405fa3e1"
+    "packet_digest": "81678a767d597b5b4b72308d4d7a0a671fb041279cbb38d3c61c18c025ea4acb"
   }
 }
