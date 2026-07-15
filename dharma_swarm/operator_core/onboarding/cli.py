@@ -18,10 +18,11 @@ repository head/identity, never when a packet is bound and never from a
 v1/corrupt prior; hard and live checks always rerun.  Every miss carries a
 typed reason.
 
-Exit doctrine (spec §WP-O3 / O3-B11): before WP-O5, strict verdict exits are
-reachable only through ``--strict`` / ``DHARMA_ONBOARD_STRICT=1``.  The legacy
-default keeps exit 0 for everything except usage errors, but the receipt and
-JSON always carry the true verdict and true exit code.
+Exit doctrine (spec §WP-O5): strict verdict exits are the default — the process
+exit code equals the true verdict exit.  ``--no-strict`` /
+``DHARMA_ONBOARD_NO_STRICT=1`` is a deprecated one-cycle opt-out that restores
+the legacy exit-0-except-usage-errors behavior.  The receipt and JSON always
+carry the true verdict and true exit code in every mode.
 """
 
 from __future__ import annotations
@@ -105,7 +106,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--require-live", action="store_true", help="required host gaps exit 4")
     parser.add_argument("--packet", help="Session Entry Packet path to validate and bind")
     parser.add_argument("--fast", action="store_true", help="deprecated alias of the compact default")
-    parser.add_argument("--strict", action="store_true", help="strict verdict exits (pre-WP-O5 opt-in)")
+    parser.add_argument("--strict", action="store_true", help="deprecated no-op; strict verdict exits are the default (WP-O5)")
+    parser.add_argument("--no-strict", action="store_true", help="deprecated one-cycle opt-out: restore legacy exit-0-except-usage-errors verdicts")
     return parser
 
 
@@ -300,7 +302,11 @@ def assemble_and_run(argv: Sequence[str] | None = None) -> int:
         print("note: --fast is deprecated; it maps to the compact default", file=sys.stderr)
 
     repo_root = evidence.REPO_ROOT
-    strict = bool(args.strict or os.environ.get("DHARMA_ONBOARD_STRICT") == "1")
+    # WP-O5: strict verdict exits are the default. --strict is a deprecated
+    # no-op (already the default); --no-strict / DHARMA_ONBOARD_NO_STRICT=1 is
+    # the one-cycle deprecated opt-out that restores the legacy exit-0 behavior.
+    no_strict = bool(args.no_strict or os.environ.get("DHARMA_ONBOARD_NO_STRICT") == "1")
+    strict = not no_strict
 
     packet_block: dict[str, Any] = {}
     if args.packet:
@@ -409,8 +415,9 @@ def assemble_and_run(argv: Sequence[str] | None = None) -> int:
     true_exit = int(receipt_object["exit_code"])
     if strict:
         return true_exit
-    # Legacy pre-WP-O5 contract: only usage errors escape exit 0.  The verdict
-    # and true exit stay visible in the receipt and every rendered view.
+    # Deprecated --no-strict opt-out (one cycle): only usage errors escape
+    # exit 0.  The verdict and true exit stay visible in the receipt and every
+    # rendered view regardless of the process exit code.
     return true_exit if true_exit == 2 else 0
 
 
