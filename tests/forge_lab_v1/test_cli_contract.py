@@ -82,6 +82,47 @@ def test_package_and_cli_report_packet_a_version() -> None:
     assert payload["result"]["implementation_status"] == "cli_skeleton"
 
 
+def test_default_checkout_selection_survives_inaccessible_remote_path(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from dharma_swarm.forge_lab.version import _default_lab_base
+
+    remote = tmp_path / "megha-current"
+    remote.mkdir()
+    assert _default_lab_base(Path("/root"), remote) == remote
+
+    def inaccessible(_path: Path) -> bool:
+        raise PermissionError("cross-host path is inaccessible")
+
+    monkeypatch.setattr(Path, "is_dir", inaccessible)
+    assert _default_lab_base(Path("/home/runner"), remote) == Path(
+        "/home/runner/.dharma/rsi-lab/current"
+    )
+
+
+def test_launcher_exports_custom_base_as_reported_identity() -> None:
+    env = os.environ.copy()
+    env["PYTHONPATH"] = _pythonpath(env)
+    env["RSI_LAB_BASE"] = "/srv/rsi-lab/current"
+    env["RSI_LAB_REPO"] = ""
+    env["RSI_LAB_PYTHON"] = sys.executable
+    env["RSI_LAB_PYDEPS"] = "/srv/rsi-lab/current/pydeps"
+
+    result = subprocess.run(
+        [*SCRIPT_COMMAND, "version", "--json"],
+        cwd=REPO_ROOT,
+        env=env,
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["result"]["canonical_checkout"] == "/srv/rsi-lab/current/repo"
+
+
 def test_module_and_repo_script_share_the_same_version_identity() -> None:
     module_result = _invoke(MODULE_COMMAND, "version", "--json")
     script_result = _invoke(SCRIPT_COMMAND, "version", "--json")
@@ -136,9 +177,7 @@ def test_packet_a_registers_the_target_operator_command_tree() -> None:
 
 
 def test_repo_launcher_defaults_to_the_canonical_environment() -> None:
-    launcher = (REPO_ROOT / "scripts" / "forge_lab" / "rsi").read_text(
-        encoding="utf-8"
-    )
+    launcher = (REPO_ROOT / "scripts" / "forge_lab" / "rsi").read_text(encoding="utf-8")
 
     assert 'base="/root/rsi-lab/current"' in launcher
     assert 'base="${HOME}/.dharma/rsi-lab/current"' in launcher
@@ -192,7 +231,9 @@ def test_repo_launcher_defaults_to_the_canonical_environment() -> None:
         ("archive", "inspect"),
     ],
 )
-def test_registered_operations_fail_closed_until_implemented(args: tuple[str, ...]) -> None:
+def test_registered_operations_fail_closed_until_implemented(
+    args: tuple[str, ...],
+) -> None:
     result = _invoke(MODULE_COMMAND, *args)
 
     assert result.returncode != 0
