@@ -2043,9 +2043,9 @@ active_tracks:
         kind: code
         blocker: false
       - id: C1
-        what: "C1 PENDING — the Onboarding admission parity context is registered, and merged PR #920 proved its admission and macOS jobs green, but merge authority still must capture explicit post-WP-O4 required-context, parity-manifest, automerge, and merge-queue evidence proving the strict door fails closed on blocked truth. PRs #920/#926 do not close that separate semantic authority dependency."
+        what: "C1 DONE — operator=@AmitabhainArunachala; pr=898; merge_commit=dcde323a89f4db62b825f5fe214a036848c24263; evidence=live protection captured 2026-07-15 with owner_type=User, enforce_admins=true, required_status_checks.strict=true, and the exact six manifest contexts including Onboarding admission parity; parity manifest scripts/governance/ci_parity_manifest.json:38-41 records that context as regression_sensitive=true (landed by PR #898); automerge run https://github.com/AmitabhainArunachala/dharma_swarm/actions/runs/29396526878/job/87291171706 loaded the manifest-driven six-context required set including Onboarding admission parity; personal-account base-change proof captured GitHub's rejected merge_queue rule (HTTP 422 Invalid rule 'merge_queue'), the official organization-only availability boundary, strict=true, and existing merge_group declarations in tests.yml and active-track.yml without fabricating an event; negative-control PR #956 is CLOSED unmerged and https://github.com/AmitabhainArunachala/dharma_swarm/actions/runs/29396360348/job/87290656199 reports DHARMA ONBOARD — BLOCKED (exit 1) and completes with process exit 1. Full commands and outputs are sealed in reports/agentops/work_packets/onboard-one-door-WP-O10.json."
         kind: governance
-        blocker: true
+        blocker: false
       - id: D2
         what: "D2 PENDING — operator ratification of strict-by-default after WP-O4/C1 (exact record format in spec §9.2; the implementation author cannot mint it; WP-O5 preflight verifies the record is a merged ancestor)."
         kind: governance
