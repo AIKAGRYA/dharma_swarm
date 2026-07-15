@@ -2123,7 +2123,7 @@ active_tracks:
       - tests/test_darshan_site.py
     moves_vital_signs:
       - eval_coverage
-    target_closure_kind: PRODUCTION_READY
+    target_closure_kind: CLOSED_NOT_PROD
     graduation_profile: revenue_external
     claim_boundary: >-
       Admitted by operator DECREE (GOLDEN SEAL, 2026-07-12 00:36 JST; canonical

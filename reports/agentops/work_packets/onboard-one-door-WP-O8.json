@@ -1,0 +1,50 @@
+{
+  "id": "onboard-one-door-WP-O8",
+  "base_ref": "9cc3739d583d6b68a19e6cfb56ca38a89bc43e1b",
+  "branch": "cursor/darshan-issue-one-8828",
+  "worktree": ".",
+  "intent": "Admit the operator-approved Darshan Issue One production candidate: exact Darshan-owned static-site sources, deterministic zero-dependency builder, least-privilege GitHub Pages workflow, site contract tests, Darshan track ownership/criterion updates, and mechanically rendered active-track projections. No publication receipt, operator-read claim, external-audience claim, revenue claim, third-party post, or PRODUCTION_READY closure is minted in this packet.",
+  "allowed_files": [
+    ".github/workflows/darshan-pages.yml",
+    "CLAUDE.md",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "reports/agentops/work_packets/onboard-one-door-WP-O8.json",
+    "reports/darshan/site/**",
+    "tests/test_darshan_site.py"
+  ],
+  "forbidden_files": [
+    ".github/workflows/automerge.yml",
+    ".github/workflows/active-track.yml",
+    "dharma_swarm/**",
+    "docker-compose.yml",
+    "packages/**",
+    "pyproject.toml",
+    "reports/darshan/issue_one_receipt.json",
+    "scripts/runtime/**"
+  ],
+  "gates": [
+    {
+      "name": "darshan-site-contract",
+      "command": "python3 -m pytest tests/test_darshan_site.py -q",
+      "expected_exit": 0,
+      "env": {}
+    },
+    {
+      "name": "active-track-render",
+      "command": "python3 scripts/governance/render_active_track_includes.py --check",
+      "expected_exit": 0,
+      "env": {}
+    }
+  ],
+  "negative_controls": [],
+  "commit": {
+    "allowed": true,
+    "message": "feat(darshan): stage Issue One for public Pages launch"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  }
+}
