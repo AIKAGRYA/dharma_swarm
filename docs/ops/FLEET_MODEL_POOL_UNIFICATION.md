@@ -313,7 +313,34 @@ The exact `<TS>` values and unit names are recorded in this doc's §8 at apply t
 
 ## 8. Apply log
 
-(empty — Phase 1; nothing applied)
+**2026-07-15 16:03–16:05 UTC — Mac vault z.ai rotation (operator-supplied key)**
+- Backup: `~/.dharma/agent_keys.env.bak.20260715T160315Z` (0600).
+  Rollback: `cp -p ~/.dharma/agent_keys.env.bak.20260715T160315Z ~/.dharma/agent_keys.env`
+- Updated via `dkeys add --stdin` (values never in argv/history): `GLM_API_KEY`,
+  `ZAI_API_KEY`, `GLM_API_KEY_ID`, `ZAI_API_KEY_ID` (the `_ID` vars held the old
+  key's id-part — verified stale before update).
+- **Receipts**: `dkeys test` @ 16:04:33 UTC → `zai_coding HTTP 200 live` on the new
+  key (16 providers refreshed); direct completion probe through the coding endpoint
+  → HTTP 200 valid response.
+- **Fingerprint discovery (corrects §B)**: Mac canonical GLM/ZAI (old fp
+  `ac6eb6ef1b87`) and agni's z.ai key (fp `2cb7f68e4179` = Mac's
+  `AGNI_GLM_API_KEY` = agni config.yaml:668 per §A.1 fingerprint match) are **two
+  DISTINCT keys**. The transcript-exposed fragment belongs to the AGNI key.
+- **Liveness probes @ ~16:05 UTC**: old agni key → **HTTP 200 STILL ACTIVE**
+  (exposure risk remains live); old Mac canonical key → HTTP 200 STILL ACTIVE.
+  Neither has been deactivated at the z.ai console yet — deactivation sequencing is
+  the open operator action below.
+- **Daemon staleness (doctrine MODEL_KEY_ROUTING.md:151-153)**: running Mac daemons
+  (com.dharma.a2a.fable-composer-inbox-bridge, fugu-ultra-semantic-responder,
+  sab-server, cron-daemon, ai.hermes.gateway et al.) hold pre-rotation env
+  snapshots; kickstart or accept documented staleness.
+- **Open sequencing decision**: deactivating the exposed AGNI key breaks agni's
+  hermes `zai` lane (FIRST in its routing order) + the vibe_trading MCP until
+  agni's `.env`/config are updated (a D3-scoped mini-apply). Deactivating the old
+  Mac canonical key strands any consumer still on it (Mac daemons until restart;
+  possibly meghadharma's `ZHIPU_API_KEY` — fingerprint not yet compared). Safe
+  order: update agni (mini-apply, .bak'd) → restart Mac daemons → THEN deactivate
+  both old keys at the console → re-probe both return 401.
 
 ## 9. Contradictions & corrections register (doctrine vs disk — reported, not resolved)
 
@@ -463,6 +490,13 @@ entered git or this document. Because the same key value exists in 4 places on a
 rotation of the z.ai (GLM_API_KEY/ZAI_API_KEY) key**: obtain a new key → `dkeys add
 GLM_API_KEY` on the Mac → re-sync per D2 once approved → update agni `.env` +
 scrubbed config in the same apply.
+
+**CORRECTION (2026-07-15 apply log, §8)**: fingerprinting during the rotation showed
+the exposed fragment belongs to agni's own z.ai key (= Mac `AGNI_GLM_API_KEY`,
+fp `2cb7f68e4179`), which is a **different key** from Mac canonical GLM/ZAI. Mac
+canon was rotated anyway (operator supplied a new key; receipts in §8); the exposed
+AGNI key was probed **still active** and its deactivation is pending the sequencing
+decision in §8.
 
 ### A.2 meghadharma — audited 2026-07-15 15:46 UTC (read-only)
 
