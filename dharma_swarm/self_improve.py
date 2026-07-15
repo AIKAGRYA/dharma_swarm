@@ -750,6 +750,8 @@ class SelfImprovementCycle:
 async def run_self_improvement_loop(
     shutdown_event: Any,
     interval: float = SELF_IMPROVE_INTERVAL,
+    *,
+    supervisor: Any | None = None,
 ) -> None:
     """Async loop for integration into orchestrate_live.
 
@@ -758,6 +760,8 @@ async def run_self_improvement_loop(
     import asyncio
 
     while not shutdown_event.is_set():
+        if supervisor is not None:
+            supervisor.record_tick("self-improve")
         if is_enabled():
             try:
                 cycle = SelfImprovementCycle()
