@@ -77,7 +77,9 @@ def load_plan(reference: str, root: Path | None = None) -> tuple[dict[str, Any],
     try:
         plan = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise SyncError("PLAN_UNREADABLE", f"could not read plan {path}: {exc}") from exc
+        raise SyncError(
+            "PLAN_UNREADABLE", f"could not read plan {path}: {exc}"
+        ) from exc
     if not isinstance(plan, dict):
         raise SyncError("INVALID_PLAN", "plan root must be a JSON object")
     core.validate_plan(plan)
@@ -103,6 +105,34 @@ def _encode_plan(plan: dict[str, Any]) -> str:
     return base64.urlsafe_b64encode(core._canonical_json(plan)).decode("ascii")
 
 
+def _node_source() -> str:
+    """Bundle the exact stdlib-only node modules into one SSH stdin program."""
+
+    package = "dharma_swarm.forge_lab"
+    module_paths = (
+        (f"{package}.sync_identity", Path(core.__file__).with_name("sync_identity.py")),
+        (f"{package}.sync_node", Path(core.__file__).with_name("sync_node.py")),
+    )
+    lines = ["import sys", "import types"]
+    for module_name, path in module_paths:
+        source = path.read_text(encoding="utf-8")
+        lines.extend(
+            (
+                f"_module = types.ModuleType({module_name!r})",
+                f"_module.__file__ = {str(path)!r}",
+                f"_module.__package__ = {package!r}",
+                f"sys.modules[{module_name!r}] = _module",
+                f"exec(compile({source!r}, _module.__file__, 'exec'), _module.__dict__)",
+            )
+        )
+    control_path = Path(core.__file__)
+    control_source = control_path.read_text(encoding="utf-8")
+    lines.append(
+        f"exec(compile({control_source!r}, {str(control_path)!r}, 'exec'), globals())"
+    )
+    return "\n".join(lines) + "\n"
+
+
 def _ssh_node(
     action: str,
     *,
@@ -122,12 +152,14 @@ def _ssh_node(
     if plan is not None:
         assignments.append(f"RSI_SYNC_PLAN_B64={_encode_plan(plan)}")
     if request_id:
-        assignments.append(f"RSI_SYNC_REQUEST_ID={core._validate_request_id(request_id)}")
+        assignments.append(
+            f"RSI_SYNC_REQUEST_ID={core._validate_request_id(request_id)}"
+        )
     if expected_current:
         assignments.append(
             f"RSI_SYNC_EXPECTED_CURRENT={core._validate_sha(expected_current)}"
         )
-    source = Path(core.__file__).read_text(encoding="utf-8")
+    source = _node_source()
     command = [
         "ssh",
         *core.SSH_OPTIONS,
@@ -147,12 +179,16 @@ def _ssh_node(
             timeout=1200,
         )
     except (OSError, subprocess.SubprocessError) as exc:
-        raise SyncError("REMOTE_UNAVAILABLE", f"could not execute on {remote}: {exc}") from exc
+        raise SyncError(
+            "REMOTE_UNAVAILABLE", f"could not execute on {remote}: {exc}"
+        ) from exc
     try:
         envelope = json.loads(result.stdout.strip())
     except json.JSONDecodeError as exc:
         detail = (result.stderr or result.stdout).strip()[-1200:]
-        raise SyncError("REMOTE_PROTOCOL_ERROR", f"invalid response from {remote}: {detail}") from exc
+        raise SyncError(
+            "REMOTE_PROTOCOL_ERROR", f"invalid response from {remote}: {detail}"
+        ) from exc
     if result.returncode != 0 or not envelope.get("ok"):
         error = envelope.get("error", {})
         raise SyncError(
@@ -321,7 +357,9 @@ def rollback(
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         plan = core.validate_plan(manifest["plan"])
     except (OSError, KeyError, json.JSONDecodeError) as exc:
-        raise SyncError("ROLLBACK_RELEASE_MISSING", f"rollback release is unavailable: {exc}") from exc
+        raise SyncError(
+            "ROLLBACK_RELEASE_MISSING", f"rollback release is unavailable: {exc}"
+        ) from exc
     with core._file_lock(root):
         remote_before = _ssh_node("status", remote=remote).get("identity") or {}
         local_before = core._current_commit(root)

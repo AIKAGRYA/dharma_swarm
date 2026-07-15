@@ -109,7 +109,9 @@ def test_plan_digest_detects_any_manifest_tampering(tmp_path: Path) -> None:
     assert error.value.code == "PLAN_TAMPERED"
 
 
-def test_activation_is_atomic_idempotent_and_preserves_host_state(tmp_path: Path) -> None:
+def test_activation_is_atomic_idempotent_and_preserves_host_state(
+    tmp_path: Path,
+) -> None:
     root, release, plan = _make_release(tmp_path)
     (root / "bin").mkdir()
     (root / "bin" / "rsi-env").write_text("legacy env\n", encoding="utf-8")
@@ -263,9 +265,34 @@ def test_strict_ssh_and_sync_exclusion_contract_are_load_bearing() -> None:
     assert "KbdInteractiveAuthentication=no" in options
     assert "ForwardAgent=no" in options
     assert not any(
-        item in sync.CRITICAL_FILES
-        for item in ("state", "secrets", "*.db", "*.db-wal")
+        item in sync.CRITICAL_FILES for item in ("state", "secrets", "*.db", "*.db-wal")
     )
+
+
+def test_remote_node_bundle_is_self_contained(tmp_path: Path) -> None:
+    env = os.environ.copy()
+    env.update(
+        {
+            "RSI_SYNC_NODE_ACTION": "status",
+            "RSI_SYNC_ROOT": str(tmp_path / "remote-lab"),
+            "RSI_SYNC_NODE": "test-remote",
+        }
+    )
+    result = subprocess.run(
+        [sys.executable, "-I", "-"],
+        input=orchestrator._node_source(),
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    envelope = json.loads(result.stdout)
+    assert envelope["ok"] is True
+    assert envelope["result"]["node"] == "test-remote"
+    assert envelope["result"]["ready"] is False
 
 
 def test_shallow_cache_materializes_the_release_tree(

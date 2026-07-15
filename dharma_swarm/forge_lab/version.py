@@ -12,14 +12,26 @@ PACKAGE_NAME = "dharma_swarm.forge_lab"
 PACKAGE_VERSION = "0.1.0-dev"
 CLI_RESULT_SCHEMA = "forge_lab.cli_result.v1"
 IMPLEMENTATION_STATUS = "cli_skeleton"
-_DEFAULT_LAB_BASE = (
-    Path("/root/rsi-lab/current")
-    if Path("/root/rsi-lab/current").is_dir()
-    else Path.home() / ".dharma" / "rsi-lab" / "current"
+
+
+def _default_lab_base(
+    home: Path,
+    megha_base: Path = Path("/root/rsi-lab/current"),
+) -> Path:
+    """Select the host-local release root without failing on inaccessible paths."""
+
+    try:
+        if megha_base.is_dir():
+            return megha_base
+    except OSError:
+        pass
+    return home / ".dharma" / "rsi-lab" / "current"
+
+
+_DEFAULT_LAB_BASE = Path(
+    os.environ.get("RSI_LAB_BASE") or _default_lab_base(Path.home())
 )
-CANONICAL_CHECKOUT = Path(
-    os.environ.get("RSI_LAB_REPO", _DEFAULT_LAB_BASE / "repo")
-)
+CANONICAL_CHECKOUT = Path(os.environ.get("RSI_LAB_REPO") or _DEFAULT_LAB_BASE / "repo")
 SOURCE_CHECKOUT = Path(__file__).resolve().parents[2]
 
 
