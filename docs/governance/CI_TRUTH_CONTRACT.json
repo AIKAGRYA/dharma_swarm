@@ -1,6 +1,6 @@
 {
   "schema": "dharma.ci_truth_contract.v1",
-  "version": 3,
+  "version": 4,
   "description": "Machine-readable CI membrane consumed by local ACI tooling and Merge Master Mike. Required checks block merge when missing, pending, failed, cancelled, timed out, or action-required. Advisory checks are reported with local repro commands but do not block automated merge flow.",
   "required": [
     {
@@ -20,6 +20,17 @@
       "owner": "governance",
       "local_command": "make quality-ratchet-check",
       "failure_category": "quality_ratchet",
+      "autofix": "forbidden"
+    },
+    {
+      "id": "pudgala_rigor",
+      "names": [
+        "rigor",
+        "Pudgala rigor — claim/evidence binding"
+      ],
+      "owner": "sovereign-safety-tcb",
+      "local_command": "python3 scripts/governance/check_claim_evidence_binding.py",
+      "failure_category": "claim_evidence_binding",
       "autofix": "forbidden"
     },
     {
