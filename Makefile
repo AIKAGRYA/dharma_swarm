@@ -194,6 +194,7 @@ export PYTHONPYCACHEPREFIX="$${AGENTOPS_REPORT_ROOT}/cache/python-pycache"; \
 export PYTEST_ADDOPTS='-p no:cacheprovider'; \
 export RUFF_CACHE_DIR="$${AGENTOPS_REPORT_ROOT}/cache/ruff"; \
 export XDG_CACHE_HOME="$${AGENTOPS_REPORT_ROOT}/cache/xdg"; \
+export HYPOTHESIS_STORAGE_DIRECTORY="$${AGENTOPS_REPORT_ROOT}/cache/hypothesis"; \
 export DHARMA_OPS_DIR="$${AGENTOPS_REPORT_ROOT}/onboard"; \
 export AGENTOPS_PYTHON="$$agentops_python"; \
 export PYTHON="$$agentops_python"; \
@@ -633,6 +634,7 @@ agentops-report-root-check agent-build-preflight agent-build-closeout: override 
 agentops-report-root-check agent-build-preflight agent-build-closeout: override PYTEST_ADDOPTS := $(AGENTOPS_PYTEST_ADDOPTS)
 agentops-report-root-check agent-build-preflight agent-build-closeout: override RUFF_CACHE_DIR := $(AGENTOPS_CACHE_ROOT)/ruff
 agentops-report-root-check agent-build-preflight agent-build-closeout: override XDG_CACHE_HOME := $(AGENTOPS_CACHE_ROOT)/xdg
+agentops-report-root-check agent-build-preflight agent-build-closeout: override HYPOTHESIS_STORAGE_DIRECTORY := $(AGENTOPS_CACHE_ROOT)/hypothesis
 agentops-report-root-check agent-build-preflight agent-build-closeout: override DHARMA_OPS_DIR := $(AGENTOPS_REPORT_ROOT)/onboard
 agentops-report-root-check agent-build-preflight agent-build-closeout: override AGENTOPS_PYTHON := $(_AGENTOPS_PYTHON_INPUT)
 agentops-report-root-check agent-build-preflight agent-build-closeout: override PYTHON := $(_AGENTOPS_PYTHON_INPUT)
