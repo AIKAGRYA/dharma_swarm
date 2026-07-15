@@ -620,7 +620,6 @@ active_tracks:
     ttl_days: 21
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
-    target_closure_kind: PRODUCTION_READY
     graduation_profile: governance_gate
     claim_boundary: >-
       Native Codex/Copilot reviews are accepted only from trusted installed-App
