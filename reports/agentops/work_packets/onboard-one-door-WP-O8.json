@@ -1,0 +1,74 @@
+{
+  "id": "onboard-one-door-WP-O8",
+  "base_ref": "9cc3739d583d6b68a19e6cfb56ca38a89bc43e1b",
+  "branch": "cursor/onboard-c1-negative-control-189d",
+  "worktree": ".",
+  "intent": "C1 fail-closed negative control required by docs/plans/ONBOARD_ONE_DOOR_CLOSURE_SPEC_2026-07-14.md CL-2 item 5. This scratch packet deliberately forbids docs/plans/onboard-c1-negative-control.txt while the same event adds that path. Onboarding admission parity must fail nonzero and the PR must close unmerged. No production or governance change is admitted.",
+  "allowed_files": [
+    "reports/agentops/work_packets/onboard-one-door-WP-O8.json"
+  ],
+  "forbidden_files": [
+    "docs/plans/onboard-c1-negative-control.txt"
+  ],
+  "gates": [
+    {
+      "name": "c1-scratch-parser-control",
+      "command": "python3 -m pytest tests/test_agent_work_packet.py::test_session_entry_accepts_exact_wp_o2r_identity_only -q",
+      "env": {},
+      "expected_exit": 0
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "test(onboarding): exercise C1 fail-closed admission"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "negative_controls": [
+    {
+      "name": "c1-scratch-parser-negative",
+      "command": "python3 -m pytest tests/test_agent_work_packet.py::test_rejects_missing_required_fields -q",
+      "env": {},
+      "expected_exit": 0
+    }
+  ],
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.12.3",
+      "git": "2.43.0",
+      "make": "4.3"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-O8",
+    "active_track": "onboard-one-door-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "9cc3739d583d6b68a19e6cfb56ca38a89bc43e1b",
+      "details": []
+    },
+    "interface_mismatches": [
+      "C1 live branch-protection parity is unobserved because the available GitHub token returns HTTP 403 without Administration:read."
+    ],
+    "closest_existing_implementation": [
+      ".github/workflows/active-track.yml",
+      "scripts/governance/run_agent_work_packet.py",
+      "reports/agentops/work_packets/onboard-one-door-WP-O7.json"
+    ],
+    "honest_blockers": [
+      "This packet is a disposable negative-control artifact. Its admission failure is the expected evidence, not a defect to repair.",
+      "The PR must close unmerged after the Onboarding admission parity check reports the forbidden path and a nonzero result."
+    ],
+    "rollback": "close the scratch PR unmerged and delete cursor/onboard-c1-negative-control-189d; no commit from this branch may enter main",
+    "packet_digest": "026a6d5c2c9a137a4474fc8034dab0b30278e93237a241ad6bd81b2f6147e160"
+  }
+}
