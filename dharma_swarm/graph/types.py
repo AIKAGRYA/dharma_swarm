@@ -14,6 +14,7 @@ reverse; this module imports neither.
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Final, Literal, Mapping
 
@@ -134,6 +135,6 @@ class RunCheckpoint:
             graph_id=self.graph_id,
             superstep=self.superstep,
             state_digest=self.state_digest,
-            channels=self.channels,
-            versions_seen=self.versions_seen,
+            channels=copy.deepcopy(self.channels),
+            versions_seen=copy.deepcopy(self.versions_seen),
         )

@@ -14,7 +14,6 @@ import logging
 import os
 import asyncio
 from contextlib import asynccontextmanager, suppress
-from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
@@ -59,10 +58,17 @@ def _clear_operator_pid(pid: int | None = None) -> None:
 
 
 def _log_auth_mode() -> None:
-    if _get_api_key() is None:
+    api_key = _get_api_key()
+    if api_key is None:
         logger.warning(
             "Dashboard API bearer auth is disabled because no auth secret is configured. "
-            "All API routes are open in dev mode."
+            "HTTP API routes and direct WebSocket callers are open in dev mode; "
+            "browser WebSockets remain Origin-gated."
+        )
+    elif not api_key.strip():
+        logger.error(
+            "DASHBOARD_API_KEY is set but blank; dashboard HTTP and WebSocket "
+            "auth are fail-closed"
         )
     else:
         logger.info("Bearer token auth enabled for /api/* routes.")
@@ -80,6 +86,7 @@ def get_swarm():
     """
     if "swarm" not in _state:
         from dharma_swarm.swarm import SwarmManager
+
         _state["swarm"] = SwarmManager()
         if os.environ.get("DHARMA_ORGANISM_ROOT") == "1":
             try:
@@ -98,7 +105,9 @@ def get_swarm():
                 # failure so get_organism() callers can diagnose why it is None.
                 _state.pop("organism", None)
                 _state["organism_init_error"] = f"{type(exc).__name__}: {exc}"
-                logger.warning("Organism composition root init failed (non-fatal): %s", exc)
+                logger.warning(
+                    "Organism composition root init failed (non-fatal): %s", exc
+                )
     return _state["swarm"]
 
 
@@ -121,6 +130,7 @@ def get_trace_store():
     """Get or create TraceStore singleton."""
     if "traces" not in _state:
         from dharma_swarm.traces import TraceStore
+
         _state["traces"] = TraceStore()
     return _state["traces"]
 
@@ -129,6 +139,7 @@ def get_monitor():
     """Get or create SystemMonitor singleton."""
     if "monitor" not in _state:
         from dharma_swarm.monitor import SystemMonitor
+
         _state["monitor"] = SystemMonitor(trace_store=get_trace_store())
     return _state["monitor"]
 
@@ -202,6 +213,7 @@ def _initialize_agent_directory(swarm: Any) -> None:
 
 # ── Lifespan ──────────────────────────────────────────────────────
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize subsystems on startup, cleanup on shutdown."""
@@ -212,7 +224,10 @@ async def lifespan(app: FastAPI):
     # Normalize dkeys/external env aliases before any provider resolution.
     aliased = normalize_env_aliases()
     if aliased:
-        logger.info("env alias normalization applied for %d configured credential(s)", len(aliased))
+        logger.info(
+            "env alias normalization applied for %d configured credential(s)",
+            len(aliased),
+        )
 
     from dharma_swarm.ontology_runtime import get_shared_registry
 
@@ -248,7 +263,9 @@ async def lifespan(app: FastAPI):
         _initialize_boardstore_shadow(swarm)
     except Exception as exc:
         _state["boardstore_shadow_error"] = type(exc).__name__
-        logger.warning("BoardStore shadow init failed; TaskBoard remains canonical: %s", exc)
+        logger.warning(
+            "BoardStore shadow init failed; TaskBoard remains canonical: %s", exc
+        )
 
     try:
         _initialize_node_gateway()
@@ -262,7 +279,9 @@ async def lifespan(app: FastAPI):
         _initialize_agent_directory(swarm)
     except Exception as exc:
         _state["agent_directory_error"] = type(exc).__name__
-        logger.warning("AgentDirectory init failed; existing registries remain active: %s", exc)
+        logger.warning(
+            "AgentDirectory init failed; existing registries remain active: %s", exc
+        )
 
     _log_auth_mode()
     logger.info("DHARMA COMMAND API ready on port 8420")
@@ -309,6 +328,11 @@ _AUTH_FAILURE_RESPONSE = {
     "detail": "Invalid or missing API credential. Configure dashboard bearer auth and pass an Authorization header.",
 }
 
+_AUTH_CONFIGURATION_FAILURE_RESPONSE = {
+    "error": "auth_misconfigured",
+    "detail": "DASHBOARD_API_KEY is set but blank; unset it for loopback dev mode or configure a nonblank secret.",
+}
+
 
 class BearerAuthMiddleware(BaseHTTPMiddleware):
     """Enforce Bearer token auth on /api/* routes.
@@ -325,6 +349,14 @@ class BearerAuthMiddleware(BaseHTTPMiddleware):
         if api_key is None:
             return await call_next(request)
 
+        # A blank configured secret is neither dev mode nor a credential. Fail
+        # closed so `Authorization: Bearer ` cannot authenticate accidentally.
+        if not api_key.strip():
+            return JSONResponse(
+                status_code=503,
+                content=_AUTH_CONFIGURATION_FAILURE_RESPONSE,
+            )
+
         path = request.url.path.rstrip("/") or "/"
         method = request.method.upper()
 
@@ -336,13 +368,6 @@ class BearerAuthMiddleware(BaseHTTPMiddleware):
         needs_auth = path.startswith("/api")
         if not needs_auth:
             return await call_next(request)
-
-        # Allow WebSocket upgrade requests with token in query params
-        if request.headers.get("upgrade", "").lower() == "websocket":
-            token = request.query_params.get("token", "")
-            if token and hmac.compare_digest(token, api_key):
-                return await call_next(request)
-            return JSONResponse(status_code=401, content=_AUTH_FAILURE_RESPONSE)
 
         # Extract and validate Bearer token
         auth_header = request.headers.get("authorization", "")
@@ -390,9 +415,13 @@ app.add_middleware(
 
 # ── Register Routers ─────────────────────────────────────────────
 
+
 def _register_routers(api_app: FastAPI) -> None:
     from api.routers.health import router as health_router
-    from api.routers.agents import router as agents_router
+    from api.routers.agents import (
+        router as agents_router,
+        ws_router as agents_ws_router,
+    )
     from api.routers.evolution import router as evolution_router
     from api.routers.ontology import router as ontology_router
     from api.routers.lineage import router as lineage_router
@@ -416,6 +445,7 @@ def _register_routers(api_app: FastAPI) -> None:
     api_app.include_router(runtime_router)
     api_app.include_router(health_router)
     api_app.include_router(agents_router)
+    api_app.include_router(agents_ws_router)
     api_app.include_router(evolution_router)
     api_app.include_router(ontology_router)
     api_app.include_router(lineage_router)
@@ -447,6 +477,7 @@ _register_routers(app)
 
 
 # ── Root ──────────────────────────────────────────────────────────
+
 
 @app.get("/")
 async def root():

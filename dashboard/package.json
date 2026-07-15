@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:ws": "tsc --pretty false --target ES2017 --lib dom,dom.iterable,esnext --module commonjs --moduleResolution node --skipLibCheck --strict --types node --esModuleInterop --outDir /tmp/dharma-dashboard-ws-test --noEmit false --incremental false src/lib/ws.ts src/lib/ws.test.ts src/lib/wsSession.ts src/lib/wsSession.test.ts src/lib/dashboardProxy.ts src/lib/dashboardProxy.test.ts && node --test /tmp/dharma-dashboard-ws-test/ws.test.js /tmp/dharma-dashboard-ws-test/wsSession.test.js /tmp/dharma-dashboard-ws-test/dashboardProxy.test.js",
     "test:visual": "playwright test",
     "test:visual:ui": "playwright test --ui",
     "test:visual:update": "playwright test --update-snapshots",

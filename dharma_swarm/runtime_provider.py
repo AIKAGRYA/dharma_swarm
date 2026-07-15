@@ -7,11 +7,13 @@ ModelRouter policy and provider implementations unchanged.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import os
 import shutil
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping
+from urllib.parse import urlsplit, urlunsplit
 
 from dharma_swarm.api_keys import (
     ANTHROPIC_API_KEY_ENV,
@@ -47,6 +49,10 @@ from dharma_swarm.api_keys import (
     env_value,
     normalize_env_aliases,
 )
+from dharma_swarm.model_hierarchy import (
+    CANONICAL_SEED_ORDER,
+    default_model,
+)
 from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
 from dharma_swarm.ollama_config import (
     build_ollama_headers,
@@ -73,10 +79,6 @@ CHUTES_BASE_URL = "https://api.chutes.ai/v1"
 ZHIPU_BASE_URL = "https://api.z.ai/api/coding/paas/v4"
 KIMI_BASE_URL = "https://api.moonshot.ai/v1"
 MOONSHOT_BASE_URL = "https://api.moonshot.ai/v1"
-from dharma_swarm.model_hierarchy import (
-    CANONICAL_SEED_ORDER,
-    default_model,
-)
 
 # Default models — sourced from model_hierarchy.py (the single source of truth)
 DEFAULT_CLAUDE_MODEL = default_model(ProviderType.ANTHROPIC)
@@ -169,6 +171,140 @@ class RuntimeProviderConfig:
     metadata: dict[str, Any] | None = None
 
 
+def _canonical_transport_base_url(base_url: str | None) -> str:
+    """Return a secret-free, path-sensitive network-endpoint identity.
+
+    URL paths can themselves carry credentials or opaque tenant identifiers, so
+    the identity never emits a raw path.  A full SHA-256 token preserves the
+    distinction between otherwise-identical endpoints without treating query
+    strings, fragments, or userinfo as transport identity.
+    """
+    raw_url = str(base_url or "").strip()
+    if not raw_url:
+        return ""
+
+    try:
+        parsed = urlsplit(
+            raw_url if "://" in raw_url or raw_url.startswith("//") else f"//{raw_url}"
+        )
+        hostname = parsed.hostname
+        port = parsed.port
+    except ValueError:
+        return ""
+    if not parsed.netloc or not hostname:
+        return ""
+
+    normalized_host = hostname.lower()
+    if ":" in normalized_host:
+        normalized_host = f"[{normalized_host}]"
+    scheme = parsed.scheme.lower()
+    if port is not None and not (
+        (scheme == "https" and port == 443)
+        or (scheme == "http" and port == 80)
+    ):
+        normalized_host = f"{normalized_host}:{port}"
+    normalized_path = parsed.path.rstrip("/")
+    path_digest = hashlib.sha256(normalized_path.encode("utf-8")).hexdigest()
+    path_token = f"/.path-sha256-{path_digest}"
+    return urlunsplit((scheme, normalized_host, path_token, "", ""))
+
+
+def runtime_provider_transport_identity(
+    config: RuntimeProviderConfig | None = None,
+    *,
+    logical_provider: ProviderType | None = None,
+    provider_instance: Any | None = None,
+) -> str:
+    """Return a secret-free identity for one physical dispatch transport.
+
+    Logical provider labels remain authoritative for policy and provenance.
+    This identity exists only to prevent a fallback chain from treating two
+    aliases of the same executable transport as independent attempts. Unknown
+    provider implementations fail open to their logical lane rather than being
+    collapsed speculatively.
+    """
+    runtime_config = config or getattr(provider_instance, "runtime_config", None)
+    provider = (
+        getattr(runtime_config, "provider", None)
+        or logical_provider
+    )
+    transport_mode = str(
+        getattr(runtime_config, "transport_mode", "") or ""
+    ).strip()
+    instance_command = str(
+        getattr(provider_instance, "_cli_command", "") or ""
+    ).strip()
+
+    command = ""
+    if transport_mode == "claude_code" or provider == ProviderType.CLAUDE_CODE:
+        command = "claude"
+    elif transport_mode == "codex" or provider == ProviderType.CODEX:
+        command = "codex"
+    elif instance_command:
+        command = instance_command
+
+    if command:
+        endpoint = str(
+            getattr(runtime_config, "binary_path", "")
+            or getattr(provider_instance, "_resolved_command", "")
+            or command
+        )
+        if Path(endpoint).is_absolute() or "/" in endpoint:
+            endpoint = str(Path(endpoint).expanduser().resolve())
+        return f"cli:{command}:{endpoint}"
+
+    base_url = _canonical_transport_base_url(
+        getattr(runtime_config, "base_url", None)
+    )
+    if base_url:
+        # A concrete endpoint is the authority for physical-transport
+        # independence.  Logical aliases that hit it are one attempt, even if
+        # they select different models or pricing labels.
+        return f"provider:{base_url}"
+    if provider is None:
+        return "provider:unknown"
+    # Missing endpoint information is insufficient evidence of shared
+    # transport, so fail open to the logical provider rather than collapsing.
+    return f"provider:{provider.value}"
+
+
+def deduplicate_runtime_provider_configs(
+    configs: Iterable[RuntimeProviderConfig],
+) -> list[RuntimeProviderConfig]:
+    """Keep the first logical lane for each physical transport.
+
+    When aliases collapse, the retained immutable config records all logical
+    labels plus the canonical transport identity in metadata. No credentials
+    participate in or are emitted by the identity.
+    """
+    deduplicated: list[RuntimeProviderConfig] = []
+    indices: dict[str, int] = {}
+    for config in configs:
+        identity = runtime_provider_transport_identity(config)
+        existing_index = indices.get(identity)
+        if existing_index is None:
+            indices[identity] = len(deduplicated)
+            deduplicated.append(config)
+            continue
+
+        retained = deduplicated[existing_index]
+        metadata = dict(retained.metadata or {})
+        aliases = list(
+            metadata.get("logical_provider_aliases")
+            or [retained.provider.value]
+        )
+        if config.provider.value not in aliases:
+            aliases.append(config.provider.value)
+        metadata.update(
+            {
+                "physical_transport_identity": identity,
+                "logical_provider_aliases": aliases,
+            }
+        )
+        deduplicated[existing_index] = replace(retained, metadata=metadata)
+    return deduplicated
+
+
 def _env_value(env: Mapping[str, str], key: str) -> str | None:
     return env_value(key, env)
 
@@ -210,14 +346,22 @@ def resolve_runtime_provider_config(
     timeout = int(timeout_seconds or DEFAULT_PROVIDER_TIMEOUT_SECONDS)
     cwd = str(Path(working_dir or os.getcwd()))
 
-    # Route Anthropic/Claude to the Max subscription (claude_code CLI), not the
-    # metered API. The Max plan is flat-fee + effectively unlimited; the API key is
-    # last-resort. Escape hatch: DHARMA_FORCE_ANTHROPIC_API=1 forces the raw API.
-    # (operator: "anthropic needs to route to max plans", 2026-06-06)
-    if provider == ProviderType.ANTHROPIC and not _env_value(env_map, "DHARMA_FORCE_ANTHROPIC_API"):
-        provider = ProviderType.CLAUDE_CODE
-
     if provider == ProviderType.ANTHROPIC:
+        # Preserve the requested logical provider identity even when the
+        # default transport is the flat-fee Claude Code CLI.  Callers can now
+        # distinguish two logical lanes while the factory selects transport.
+        if not _env_value(env_map, "DHARMA_FORCE_ANTHROPIC_API"):
+            binary = _resolve_cli_binary("claude")
+            return RuntimeProviderConfig(
+                provider=provider,
+                default_model=model or DEFAULT_CLAUDE_MODEL,
+                transport_mode="claude_code",
+                working_dir=cwd,
+                timeout_seconds=timeout,
+                binary_path=binary,
+                available=bool(binary),
+                source="binary",
+            )
         token = api_key or _env_value(env_map, ANTHROPIC_API_KEY_ENV)
         return RuntimeProviderConfig(
             provider=provider,
@@ -547,6 +691,11 @@ def create_runtime_provider(config: RuntimeProviderConfig) -> Any:
     from dharma_swarm.moonshot_provider import MoonshotProvider
 
     if config.provider == ProviderType.ANTHROPIC:
+        if config.transport_mode == "claude_code":
+            kwargs = {"timeout": config.timeout_seconds or DEFAULT_PROVIDER_TIMEOUT_SECONDS}
+            if config.working_dir is not None:
+                kwargs["working_dir"] = config.working_dir
+            return ClaudeCodeProvider(**kwargs)
         kwargs: dict[str, Any] = {}
         if config.api_key is not None:
             kwargs["api_key"] = config.api_key
@@ -598,6 +747,8 @@ def create_runtime_provider(config: RuntimeProviderConfig) -> Any:
         kwargs = {}
         if config.api_key is not None:
             kwargs["api_key"] = config.api_key
+        if config.base_url is not None:
+            kwargs["base_url"] = config.base_url
         return GroqProvider(**kwargs)
     if config.provider == ProviderType.CEREBRAS:
         kwargs = {}
@@ -723,7 +874,7 @@ def preferred_runtime_provider_configs(
         )
         if cfg.available:
             configs.append(cfg)
-    return configs
+    return deduplicate_runtime_provider_configs(configs)
 
 
 async def complete_via_preferred_runtime_providers(
@@ -820,6 +971,7 @@ __all__ = [
     "PREFERRED_LOW_COST_RUNTIME_PROVIDERS",
     "PREFERRED_LOW_COST_WITH_ANTHROPIC_RUNTIME_PROVIDERS",
     "RuntimeProviderConfig",
+    "deduplicate_runtime_provider_configs",
     "SILICONFLOW_BASE_URL",
     "TOGETHER_BASE_URL",
     "ZHIPU_BASE_URL",
@@ -828,4 +980,5 @@ __all__ = [
     "create_runtime_provider",
     "preferred_runtime_provider_configs",
     "resolve_runtime_provider_config",
+    "runtime_provider_transport_identity",
 ]

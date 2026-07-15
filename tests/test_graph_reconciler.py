@@ -10,7 +10,9 @@ import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from uuid import uuid4
 
+import aiosqlite
 import pytest
 
 from dharma_swarm.graph.reconciler import (
@@ -20,6 +22,7 @@ from dharma_swarm.graph.reconciler import (
     GraphReconciler,
     ReconcileReport,
 )
+from dharma_swarm.graph.receipt_authority import has_runtime_completion
 from dharma_swarm.runtime_state import RuntimeStateStore
 
 NOW = datetime(2026, 7, 5, 12, 0, 0, tzinfo=timezone.utc)
@@ -42,6 +45,7 @@ def _insert_run(
     receipt_json: str | None = None,
     metadata: dict | None = None,
     quarantined_at: str | None = None,
+    assigned_to: str = "agent-1",
 ) -> None:
     with sqlite3.connect(store.db_path) as db:
         try:
@@ -52,11 +56,12 @@ def _insert_run(
         db.execute(
             "INSERT INTO delegation_runs (run_id, task_id, claim_id, assigned_to,"
             " status, started_at, metadata_json, receipt_json, quarantined_at)"
-            " VALUES (?, ?, ?, 'agent-1', ?, ?, ?, ?, ?)",
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 run_id,
                 task_id,
                 claim_id,
+                assigned_to,
                 status,
                 (NOW - timedelta(minutes=10)).isoformat(),
                 json.dumps(metadata or {}),
@@ -79,15 +84,17 @@ def _insert_claim(
     stale_after: str | None = None,
     recovered_at: str | None = None,
     retry_count: int = 0,
+    agent_id: str = "agent-1",
 ) -> None:
     with sqlite3.connect(store.db_path) as db:
         db.execute(
             "INSERT INTO task_claims (claim_id, task_id, agent_id, status,"
             " claimed_at, acked_at, heartbeat_at, stale_after, recovered_at,"
-            " retry_count) VALUES (?, ?, 'agent-1', ?, ?, ?, ?, ?, ?, ?)",
+            " retry_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 claim_id,
                 task_id,
+                agent_id,
                 status,
                 claimed_at or (NOW - timedelta(minutes=10)).isoformat(),
                 acked_at,
@@ -98,6 +105,54 @@ def _insert_claim(
             ),
         )
         db.commit()
+
+
+def _bound_receipt(
+    store: RuntimeStateStore,
+    *,
+    run_id: str,
+    claim_id: str,
+    task_id: str = "task-1",
+    status: str = "ok",
+    error_source: str = "none",
+    agent_id: str | None = "agent-1",
+) -> str:
+    receipt_id = str(uuid4())
+    side_effect_key = f"fixture:{task_id}:{receipt_id}"
+    idempotency_key = f"fixture:{receipt_id}"
+    receipt = {
+        "receipt_id": receipt_id,
+        "task_id": task_id,
+        "claim_id": claim_id,
+        "agent_id": agent_id,
+        "status": status,
+        "error_source": error_source,
+        "attributes": {
+            "run_id": run_id,
+            "idempotency_key": idempotency_key,
+            "side_effect_key": side_effect_key,
+        },
+    }
+    record_status = "completed" if status == "ok" else "failed"
+    with sqlite3.connect(store.db_path) as db:
+        db.execute(
+            "INSERT INTO idempotency_records (idempotency_key, side_effect_key,"
+            " run_id, task_id, status, result_receipt_id, metadata_json, created_at,"
+            " updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                idempotency_key,
+                side_effect_key,
+                run_id,
+                task_id,
+                record_status,
+                receipt_id,
+                json.dumps({"receipt": receipt}),
+                NOW.isoformat(),
+                NOW.isoformat(),
+            ),
+        )
+        db.commit()
+    return json.dumps(receipt)
 
 
 def _get_run(store: RuntimeStateStore, run_id: str) -> sqlite3.Row:
@@ -182,14 +237,18 @@ async def test_retry_exhausted_orphan_quarantined(runtime):
 
 
 # ---------------------------------------------------------------------------
-# Torn window: receipt is ground truth
+# Torn window: bound receipt + runtime completion are ground truth
 # ---------------------------------------------------------------------------
 
 
 async def test_torn_window_completes_run_and_claim_from_receipt(runtime):
-    receipt = json.dumps({"status": "ok", "task_id": "task-1"})
+    receipt = _bound_receipt(runtime, run_id="run-torn", claim_id="claim-torn")
     _insert_run(
-        runtime, "run-torn", status="running", claim_id="claim-torn", receipt_json=receipt
+        runtime,
+        "run-torn",
+        status="running",
+        claim_id="claim-torn",
+        receipt_json=receipt,
     )
     _insert_claim(
         runtime,
@@ -211,7 +270,13 @@ async def test_torn_window_completes_run_and_claim_from_receipt(runtime):
 
 
 async def test_torn_window_failed_receipt_marks_failed(runtime):
-    receipt = json.dumps({"status": "error", "error_source": "provider"})
+    receipt = _bound_receipt(
+        runtime,
+        run_id="run-tf",
+        claim_id="claim-tf",
+        status="failed",
+        error_source="provider",
+    )
     _insert_run(
         runtime, "run-tf", status="running", claim_id="claim-tf", receipt_json=receipt
     )
@@ -231,6 +296,340 @@ async def test_torn_window_failed_receipt_marks_failed(runtime):
     claim = _get_claim(runtime, "claim-tf")
     assert claim["status"] == "failed"
     assert claim["recovered_at"] == NOW.isoformat()
+
+
+async def test_status_only_receipt_cannot_promote_run(runtime):
+    receipt = json.dumps(
+        {
+            "receipt_id": str(uuid4()),
+            "status": "ok",
+            "task_id": "task-1",
+            "attributes": {"side_effect_key": "fixture:unbound"},
+        }
+    )
+    _insert_run(
+        runtime,
+        "run-status-only",
+        status="running",
+        claim_id="claim-status-only",
+        receipt_json=receipt,
+    )
+    _insert_claim(
+        runtime,
+        "claim-status-only",
+        status="running",
+        acked_at=(NOW - timedelta(minutes=9)).isoformat(),
+    )
+
+    report = await GraphReconciler(runtime).reconcile(now=NOW)
+
+    assert report.completed_from_receipt == []
+    assert report.requeued_runs == ["run-status-only"]
+    assert _get_run(runtime, "run-status-only")["status"] == "failed"
+
+
+async def test_completion_for_different_retry_cannot_promote_stale_run(runtime):
+    """A task-level match is not authority when two retries share a task."""
+    receipt_id = str(uuid4())
+    side_effect_key = f"fixture:task-1:{receipt_id}"
+    receipt = {
+        "receipt_id": receipt_id,
+        "task_id": "task-1",
+        "claim_id": "claim-current",
+        "status": "ok",
+        "error_source": "none",
+        "attributes": {
+            "run_id": "run-current",
+            "idempotency_key": f"fixture:{receipt_id}",
+            "side_effect_key": side_effect_key,
+        },
+    }
+    with sqlite3.connect(runtime.db_path) as db:
+        db.execute(
+            "INSERT INTO idempotency_records (idempotency_key, side_effect_key,"
+            " run_id, task_id, status, result_receipt_id, metadata_json, created_at,"
+            " updated_at) VALUES (?, ?, ?, ?, 'completed', ?, ?, ?, ?)",
+            (
+                f"fixture:{receipt_id}",
+                side_effect_key,
+                "run-current",
+                "task-1",
+                receipt_id,
+                json.dumps({"receipt": receipt}),
+                NOW.isoformat(),
+                NOW.isoformat(),
+            ),
+        )
+        db.commit()
+    _insert_run(
+        runtime,
+        "run-stale",
+        status="running",
+        claim_id="claim-stale",
+        receipt_json=json.dumps(receipt),
+    )
+    _insert_claim(
+        runtime,
+        "claim-stale",
+        status="running",
+        acked_at=(NOW - timedelta(minutes=9)).isoformat(),
+    )
+
+    report = await GraphReconciler(runtime).reconcile(now=NOW)
+
+    assert report.completed_from_receipt == []
+    assert report.requeued_runs == ["run-stale"]
+    assert _get_run(runtime, "run-stale")["status"] == "failed"
+
+
+async def test_declared_idempotency_key_must_match_completion_row(runtime):
+    receipt_id = str(uuid4())
+    side_effect_key = f"fixture:task-1:{receipt_id}"
+    receipt = {
+        "receipt_id": receipt_id,
+        "task_id": "task-1",
+        "claim_id": "claim-key-mismatch",
+        "status": "ok",
+        "error_source": "none",
+        "attributes": {
+            "run_id": "run-key-mismatch",
+            "idempotency_key": "fixture:declared-key",
+            "side_effect_key": side_effect_key,
+        },
+    }
+    with sqlite3.connect(runtime.db_path) as db:
+        db.execute(
+            "INSERT INTO idempotency_records (idempotency_key, side_effect_key,"
+            " run_id, task_id, status, result_receipt_id, metadata_json, created_at,"
+            " updated_at) VALUES ('fixture:database-key', ?, ?, 'task-1',"
+            " 'completed', ?, ?, ?, ?)",
+            (
+                side_effect_key,
+                "run-key-mismatch",
+                receipt_id,
+                json.dumps({"receipt": receipt}),
+                NOW.isoformat(),
+                NOW.isoformat(),
+            ),
+        )
+        db.commit()
+    _insert_run(
+        runtime,
+        "run-key-mismatch",
+        claim_id="claim-key-mismatch",
+        receipt_json=json.dumps(receipt),
+    )
+    _insert_claim(runtime, "claim-key-mismatch", acked_at=NOW.isoformat())
+
+    report = await GraphReconciler(runtime).reconcile(now=NOW)
+
+    assert report.completed_from_receipt == []
+    assert report.requeued_runs == ["run-key-mismatch"]
+
+
+async def test_completion_cannot_promote_claim_owned_by_different_task(runtime):
+    """A claim ID cannot confer authority across its durable task boundary."""
+    receipt = _bound_receipt(
+        runtime,
+        run_id="run-task-one",
+        claim_id="claim-cross-task",
+        task_id="task-one",
+    )
+    _insert_run(
+        runtime,
+        "run-task-one",
+        task_id="task-one",
+        claim_id="claim-cross-task",
+        receipt_json=receipt,
+    )
+    _insert_claim(
+        runtime,
+        "claim-cross-task",
+        task_id="task-two",
+        status="running",
+        acked_at=(NOW - timedelta(minutes=9)).isoformat(),
+    )
+
+    report = await GraphReconciler(runtime).reconcile(now=NOW)
+
+    assert report.completed_from_receipt == []
+    assert report.requeued_runs == ["run-task-one"]
+    assert _get_run(runtime, "run-task-one")["status"] == "failed"
+    claim = _get_claim(runtime, "claim-cross-task")
+    assert claim["task_id"] == "task-two"
+    assert claim["status"] == "running"
+
+
+async def test_agentless_receipt_cannot_promote_canonical_run(runtime):
+    """Regression: the old helper false-greened this fully bound receipt."""
+    receipt = _bound_receipt(
+        runtime,
+        run_id="run-agentless",
+        claim_id="claim-agentless",
+        agent_id=None,
+    )
+    _insert_run(
+        runtime,
+        "run-agentless",
+        claim_id="claim-agentless",
+        receipt_json=receipt,
+    )
+    _insert_claim(runtime, "claim-agentless", acked_at=NOW.isoformat())
+
+    report = await GraphReconciler(runtime).reconcile(now=NOW)
+
+    assert report.completed_from_receipt == []
+    assert report.requeued_runs == ["run-agentless"]
+    assert _get_run(runtime, "run-agentless")["status"] == "failed"
+
+
+async def test_receipt_agent_must_match_run_and_claim_agents(runtime):
+    receipt = _bound_receipt(
+        runtime,
+        run_id="run-receipt-agent",
+        claim_id="claim-receipt-agent",
+        agent_id="agent-forged",
+    )
+    _insert_run(
+        runtime,
+        "run-receipt-agent",
+        claim_id="claim-receipt-agent",
+        receipt_json=receipt,
+        assigned_to="agent-owner",
+    )
+    _insert_claim(
+        runtime,
+        "claim-receipt-agent",
+        agent_id="agent-owner",
+        acked_at=NOW.isoformat(),
+    )
+
+    report = await GraphReconciler(runtime).reconcile(now=NOW)
+
+    assert report.completed_from_receipt == []
+    assert report.requeued_runs == ["run-receipt-agent"]
+
+
+async def test_cross_agent_claim_is_not_promoted_or_recovered_for_run(runtime):
+    """A run must not mutate a real claim owned by a different agent."""
+    receipt = _bound_receipt(
+        runtime,
+        run_id="run-cross-agent",
+        claim_id="claim-cross-agent",
+        agent_id="agent-run",
+    )
+    _insert_run(
+        runtime,
+        "run-cross-agent",
+        claim_id="claim-cross-agent",
+        receipt_json=receipt,
+        assigned_to="agent-run",
+    )
+    _insert_claim(
+        runtime,
+        "claim-cross-agent",
+        agent_id="agent-claim",
+        acked_at=NOW.isoformat(),
+    )
+
+    report = await GraphReconciler(runtime).reconcile(now=NOW)
+
+    assert report.completed_from_receipt == []
+    assert report.requeued_runs == ["run-cross-agent"]
+    assert report.recovered_claims == []
+    claim = _get_claim(runtime, "claim-cross-agent")
+    assert claim["agent_id"] == "agent-claim"
+    assert claim["status"] == "running"
+    assert claim["recovered_at"] is None
+
+
+async def test_cross_agent_run_does_not_recover_claim_matching_receipt(runtime):
+    """The durable run assignee is an equal member of the authority triple."""
+    receipt = _bound_receipt(
+        runtime,
+        run_id="run-other-assignee",
+        claim_id="claim-matching-receipt",
+        agent_id="agent-claim",
+    )
+    _insert_run(
+        runtime,
+        "run-other-assignee",
+        claim_id="claim-matching-receipt",
+        receipt_json=receipt,
+        assigned_to="agent-run",
+    )
+    _insert_claim(
+        runtime,
+        "claim-matching-receipt",
+        agent_id="agent-claim",
+        acked_at=NOW.isoformat(),
+    )
+
+    report = await GraphReconciler(runtime).reconcile(now=NOW)
+
+    assert report.completed_from_receipt == []
+    assert report.requeued_runs == ["run-other-assignee"]
+    assert report.recovered_claims == []
+    claim = _get_claim(runtime, "claim-matching-receipt")
+    assert claim["status"] == "running"
+    assert claim["recovered_at"] is None
+
+
+async def test_agentless_receipt_remains_compatible_when_schema_has_no_agent_fields():
+    """Legacy schemas can bind every authority dimension they can express."""
+    receipt_id = str(uuid4())
+    receipt = {
+        "receipt_id": receipt_id,
+        "task_id": "legacy-task",
+        "claim_id": "legacy-claim",
+        "status": "ok",
+        "attributes": {
+            "run_id": "legacy-run",
+            "idempotency_key": "legacy-key",
+            "side_effect_key": "legacy-effect",
+        },
+    }
+    async with aiosqlite.connect(":memory:") as db:
+        db.row_factory = aiosqlite.Row
+        await db.execute(
+            "CREATE TABLE task_claims (claim_id TEXT PRIMARY KEY, task_id TEXT)"
+        )
+        await db.execute(
+            "CREATE TABLE delegation_runs (run_id TEXT PRIMARY KEY, task_id TEXT,"
+            " claim_id TEXT)"
+        )
+        await db.execute(
+            "CREATE TABLE idempotency_records (idempotency_key TEXT,"
+            " side_effect_key TEXT, run_id TEXT, task_id TEXT, status TEXT,"
+            " result_receipt_id TEXT, metadata_json TEXT)"
+        )
+        await db.execute(
+            "INSERT INTO task_claims VALUES ('legacy-claim', 'legacy-task')"
+        )
+        await db.execute(
+            "INSERT INTO delegation_runs VALUES"
+            " ('legacy-run', 'legacy-task', 'legacy-claim')"
+        )
+        await db.execute(
+            "INSERT INTO idempotency_records VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                "legacy-key",
+                "legacy-effect",
+                "legacy-run",
+                "legacy-task",
+                "completed",
+                receipt_id,
+                json.dumps({"receipt": receipt}),
+            ),
+        )
+
+        assert await has_runtime_completion(
+            db,
+            run_id="legacy-run",
+            task_id="legacy-task",
+            claim_id="legacy-claim",
+            receipt=receipt,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -300,7 +699,7 @@ async def test_stale_only_settles_expired_claim_run(runtime):
 
 
 async def test_stale_only_still_completes_from_receipt(runtime):
-    receipt = json.dumps({"status": "ok"})
+    receipt = _bound_receipt(runtime, run_id="run-sr", claim_id="claim-sr")
     _insert_run(
         runtime, "run-sr", status="running", claim_id="claim-sr", receipt_json=receipt
     )
@@ -386,13 +785,16 @@ async def test_requeued_run_requeues_task_on_board(runtime):
 
 async def test_terminal_reconciliations_settle_task_board(runtime):
     board = _StubBoard()
+    receipt = _bound_receipt(
+        runtime, run_id="run-rc", claim_id="claim-rc", task_id="task-rc"
+    )
     _insert_run(
         runtime,
         "run-rc",
         status="running",
         claim_id="claim-rc",
         task_id="task-rc",
-        receipt_json=json.dumps({"status": "ok"}),
+        receipt_json=receipt,
     )
     _insert_claim(runtime, "claim-rc", status="running", task_id="task-rc")
     _insert_run(
@@ -496,9 +898,9 @@ def test_init_reconciles_before_stale_reaper_source_order():
     from dharma_swarm.swarm import SwarmManager
 
     src = inspect.getsource(SwarmManager.init)
-    assert src.index("reconcile_graph_runs") < src.index(
-        "_reap_stale_running_tasks"
-    ), "boot reconcile must run before the stale-task reaper"
+    assert src.index("reconcile_graph_runs") < src.index("_reap_stale_running_tasks"), (
+        "boot reconcile must run before the stale-task reaper"
+    )
 
 
 async def test_boot_sequence_receipted_crash_task_ends_completed(
@@ -531,7 +933,9 @@ async def test_boot_sequence_receipted_crash_task_ends_completed(
         status="running",
         claim_id="claim-order",
         task_id=task.id,
-        receipt_json=json.dumps({"status": "ok"}),
+        receipt_json=_bound_receipt(
+            runtime, run_id="run-order", claim_id="claim-order", task_id=task.id
+        ),
     )
     _insert_claim(runtime, "claim-order", status="running", task_id=task.id)
 

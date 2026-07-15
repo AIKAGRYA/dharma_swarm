@@ -122,6 +122,21 @@ def test_dialogue_provider_refuses_agentic_owner_without_safe_override(tmp_path)
         holon_bridge.get_holon_dialogue_provider(h, env={})
 
 
+def test_dialogue_provider_checks_anthropic_transport_before_factory(tmp_path, monkeypatch):
+    from dharma_swarm import runtime_provider
+
+    root = _make_agent(tmp_path, provider="anthropic")
+    h = load_holon("opus_composer", agents_root=root)
+    monkeypatch.setattr(runtime_provider, "_resolve_cli_binary", lambda _name: "/fixture/claude")
+
+    def fail_if_created(_config):
+        pytest.fail("unsafe subprocess provider was instantiated before the dialogue gate")
+
+    monkeypatch.setattr(runtime_provider, "create_runtime_provider", fail_if_created)
+    with pytest.raises(HolonDialogueProviderError, match="claude_code.*unsafe"):
+        holon_bridge.get_holon_dialogue_provider(h, env={})
+
+
 def test_dialogue_provider_safe_override_resolves_runtime_provider(tmp_path, monkeypatch):
     from dharma_swarm import runtime_provider
     from dharma_swarm.models import ProviderType

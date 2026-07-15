@@ -11,7 +11,6 @@ non-blocking I/O.
 
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
@@ -19,6 +18,7 @@ from typing import Literal
 import aiofiles
 from pydantic import BaseModel, Field
 
+from dharma_swarm._stigmergy_lock import local_mutation_guard, path_write_lock
 from dharma_swarm.models import _new_id, _utc_now
 
 # ---------------------------------------------------------------------------
@@ -41,7 +41,6 @@ STIGMERGY_CHANNELS: list[str] = [
 
 # Marks above this salience are visible across all channels
 CROSS_CHANNEL_SALIENCE_THRESHOLD: float = 0.8
-
 
 class StigmergicMark(BaseModel):
     """A single mark left by an agent on the stigmergic lattice."""
@@ -102,17 +101,21 @@ class StigmergyStore:
     All public methods (except ``density``) are async, backed by
     ``aiofiles`` so the event loop never blocks.
 
-    Thread-safety: an ``asyncio.Lock`` serializes all mutations
-    (``leave_mark``, ``decay``, ``access_decay``) so concurrent
-    coroutines cannot interleave reads and writes — preventing
-    silent mark loss during decay rewrites.
+    Mutation safety: a path-keyed ``asyncio.Lock`` serializes store instances in
+    one event loop, while a sidecar advisory file lock serializes cooperating
+    processes on one local filesystem (``leave_mark``, access accounting,
+    ``decay``, ``access_decay``). This prevents a local append from being
+    overwritten by a concurrent rewrite. It is not a distributed lock and does
+    not claim correctness across event loops or for filesystems with
+    non-coherent ``flock``.
     """
 
     def __init__(self, base_path: Path | None = None) -> None:
         self.base_path: Path = base_path or _DEFAULT_BASE
         self._marks_file: Path = self.base_path / "marks.jsonl"
         self._archive_file: Path = self.base_path / "archive.jsonl"
-        self._write_lock: asyncio.Lock = asyncio.Lock()
+        self._mutation_lock_file: Path = self.base_path / "marks.lock"
+        self._write_lock = path_write_lock(self._marks_file)
 
     # -- write ---------------------------------------------------------------
 
@@ -161,7 +164,7 @@ class StigmergyStore:
 
         self.base_path.mkdir(parents=True, exist_ok=True)
         line = mark.model_dump_json() + "\n"
-        async with self._write_lock:
+        async with local_mutation_guard(self._write_lock, self._mutation_lock_file):
             async with aiofiles.open(self._marks_file, "a") as f:
                 await f.write(line)
         return mark.id
@@ -304,7 +307,7 @@ class StigmergyStore:
         if not mark_ids:
             return
 
-        async with self._write_lock:
+        async with local_mutation_guard(self._write_lock, self._mutation_lock_file):
             persisted = await self._load_marks()
             touched = False
             for mark in persisted:
@@ -331,16 +334,24 @@ class StigmergyStore:
 
         Returns the count of archived marks.
 
-        The write lock prevents concurrent ``leave_mark`` calls from
-        appending between the read and the rewrite — which would
-        silently lose the new mark.
+        The local advisory mutation lock prevents cooperating writers from
+        appending between the authoritative read and rewrite. Distributed
+        filesystems require a separate lock service and are outside this store's
+        guarantee.
         """
-        async with self._write_lock:
+        # Preflight outside the shared mutation lock.  The authoritative read
+        # happens again under the lock, so an append by another instance in
+        # this window is retained rather than overwritten.
+        preliminary = await self._load_marks()
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+        if not any(mark.timestamp < cutoff for mark in preliminary):
+            return 0
+
+        async with local_mutation_guard(self._write_lock, self._mutation_lock_file):
             marks = await self._load_marks()
             if not marks:
                 return 0
 
-            cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
             keep: list[StigmergicMark] = []
             archive: list[StigmergicMark] = []
 
@@ -370,7 +381,7 @@ class StigmergyStore:
 
     async def access_decay(self, decay_factor: float = 0.95) -> int:
         """Decay marks based on access count -- unused marks fade faster."""
-        async with self._write_lock:
+        async with local_mutation_guard(self._write_lock, self._mutation_lock_file):
             marks = await self._load_marks()
             if not marks:
                 return 0

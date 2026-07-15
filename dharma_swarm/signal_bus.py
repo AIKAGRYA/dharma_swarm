@@ -48,6 +48,47 @@ SIGNAL_ECC_INSTINCT = "ECC_INSTINCT_SIGNAL"
 SIGNAL_OUTCOME_RECORDED = "OUTCOME_RECORDED"
 SIGNAL_VALUE_EVENT_RECORDED = "VALUE_EVENT_RECORDED"
 
+_SNAPSHOT_MAX_DEPTH = 8
+
+
+def _bounded_payload_snapshot(value: Any, *, depth: int = 0) -> Any:
+    """Copy mutable builtin containers without copying opaque runtime handles.
+
+    Signal payloads historically accept arbitrary Python objects, including
+    locks and provider handles that reject ``deepcopy``. We therefore isolate
+    dict/list/set/bytearray container mutations through eight nested levels and
+    retain opaque leaves by identity. At the depth boundary containers receive
+    a shallow copy, making the limit explicit rather than invoking user-defined
+    copy hooks or rejecting a previously legal event.
+    """
+    at_boundary = depth >= _SNAPSHOT_MAX_DEPTH
+    if isinstance(value, dict):
+        if at_boundary:
+            return dict(value)
+        return {
+            key: _bounded_payload_snapshot(item, depth=depth + 1)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        if at_boundary:
+            return list(value)
+        return [_bounded_payload_snapshot(item, depth=depth + 1) for item in value]
+    if isinstance(value, tuple):
+        if at_boundary:
+            return tuple(item for item in value)
+        return tuple(_bounded_payload_snapshot(item, depth=depth + 1) for item in value)
+    if isinstance(value, set):
+        if at_boundary:
+            return set(value)
+        return {_bounded_payload_snapshot(item, depth=depth + 1) for item in value}
+    if isinstance(value, bytearray):
+        return value.copy()
+    return value
+
+
+def _snapshot_event(event: dict[str, Any]) -> dict[str, Any]:
+    return _bounded_payload_snapshot(event)
+
 
 class SignalBus:
     """Simple in-process event bus for inter-loop signaling.
@@ -110,11 +151,12 @@ class SignalBus:
 
             bus.emit({"type": "ANOMALY_DETECTED", "severity": "high"})
         """
-        self._events.append((time.monotonic(), event))
-        event_type = event.get("type", "")
+        queued_event = _snapshot_event(event)
+        self._events.append((time.monotonic(), queued_event))
+        event_type = queued_event.get("type", "")
         for cb in self._subscribers.get(event_type, []):
             try:
-                cb(event)
+                cb(_snapshot_event(queued_event))
             except Exception:
                 logging.getLogger(__name__).debug(
                     "SignalBus subscriber error for %s", event_type,
@@ -170,7 +212,7 @@ class SignalBus:
         cutoff = now - self.ttl_seconds
 
         return [
-            event
+            _snapshot_event(event)
             for ts, event in self._events
             if ts >= cutoff
             and (event_types is None or event.get("type", "") in event_types)
@@ -216,7 +258,7 @@ class SignalBus:
 
         # Sort newest-first, return at most n
         matches.sort(key=lambda t: t[0], reverse=True)
-        return [event for _, event in matches[:n]]
+        return [_snapshot_event(event) for _, event in matches[:n]]
 
     # Module-level singleton
     _instance: SignalBus | None = None

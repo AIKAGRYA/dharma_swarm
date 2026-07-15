@@ -116,6 +116,9 @@ async def test_first_call_executes_and_completes_record(store):
     record = await store.get_idempotency_record(CLAIM_KEY, KEY)
     assert record is not None and record.status == "completed"
     assert record.result_receipt_id == str(receipt.receipt_id)
+    assert receipt.attributes["idempotency_key"] == record.idempotency_key == CLAIM_KEY
+    assert receipt.attributes["dispatch_idempotency_key"] == _identity().idempotency_key
+    assert receipt.attributes["run_id"] == record.run_id
     # The receipt is memoized in the record so a replay can return it.
     assert record.metadata["receipt"]["receipt_id"] == str(receipt.receipt_id)
 
@@ -497,14 +500,23 @@ async def test_fallback_receipt_requires_matching_side_effect_key(store):
     await store.try_begin_idempotent_side_effect(claim, KEY, metadata={})
     await store.complete_idempotent_side_effect(claim, KEY, status="completed")
     # ...and a delegation_runs receipt that does NOT name our side_effect_key.
-    foreign = EvidenceReceipt(task_id=TASK_ID, agent_id="someone-else", status="ok")
+    foreign = EvidenceReceipt(
+        task_id=TASK_ID,
+        agent_id="someone-else",
+        status="ok",
+        attributes={
+            "run_id": identity.run_id,
+            "idempotency_key": CLAIM_KEY,
+            "side_effect_key": "invoke_agent:foreign-task:someone-else",
+        },
+    )
     await store.init_db()
     with sqlite3.connect(store.db_path) as db:
         db.execute(
             "INSERT INTO delegation_runs (run_id, task_id, assigned_to, status,"
-            " started_at, receipt_json) VALUES ('run-x', ?, 'someone-else',"
+            " started_at, receipt_json) VALUES (?, ?, 'someone-else',"
             " 'completed', '2026-07-05T00:00:00+00:00', ?)",
-            (TASK_ID, _json.dumps({**foreign.to_dict(), "attributes": None}, default=str)),
+            (identity.run_id, TASK_ID, _json.dumps(foreign.to_dict(), default=str)),
         )
         db.commit()
 
@@ -555,7 +567,13 @@ def test_receipt_round_trips_through_dict():
 async def test_persist_evidence_receipt_fail_open_and_success(store, caplog, tmp_path):
     import logging
 
-    receipt = EvidenceReceipt(task_id=TASK_ID, agent_id=AGENT_ID, status="ok")
+    receipt = EvidenceReceipt(
+        task_id=TASK_ID,
+        claim_id="claim-a",
+        agent_id=AGENT_ID,
+        status="ok",
+        attributes={"run_id": "run-a"},
+    )
     failed_chain = tmp_path / "failed-chain.jsonl"
     # No delegation_runs row yet: persist_receipt raises on 0-row match; the
     # helper fails open with a loud warning, never breaking dispatch.
@@ -575,8 +593,9 @@ async def test_persist_evidence_receipt_fail_open_and_success(store, caplog, tmp
 
     with sqlite3.connect(store.db_path) as db:
         db.execute(
-            "INSERT INTO delegation_runs (run_id, task_id, assigned_to, status,"
-            " started_at) VALUES ('run-a', ?, ?, 'running', '2026-07-05T00:00:00+00:00')",
+            "INSERT INTO delegation_runs (run_id, task_id, claim_id, assigned_to,"
+            " status, started_at) VALUES ('run-a', ?, 'claim-a', ?, 'running',"
+            " '2026-07-05T00:00:00+00:00')",
             (TASK_ID, AGENT_ID),
         )
         db.commit()

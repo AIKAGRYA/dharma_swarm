@@ -308,6 +308,7 @@ class CompiledGraph:
             pending.sort(
                 key=lambda write: (write.channel, write.node_id, write.task_seq)
             )
+            state.validate_writes(pending, superstep)  # Pure pre-journal validation.
             pending_task_id = f"{run_id}:{superstep}"
             run_persistence.journal(
                 [(write.channel, write.value) for write in pending],

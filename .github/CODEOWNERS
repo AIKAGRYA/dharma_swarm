@@ -37,6 +37,7 @@
 # and verify coverage with --check (wired in .github/workflows/hermetic.yml).
 /dharma_swarm/models.py                 @AmitabhainArunachala
 /dharma_swarm/stigmergy.py              @AmitabhainArunachala
+/dharma_swarm/_stigmergy_lock.py        @AmitabhainArunachala
 /dharma_swarm/correlation_context.py    @AmitabhainArunachala
 /dharma_swarm/daemon_config.py          @AmitabhainArunachala
 /dharma_swarm/runtime_contract.py       @AmitabhainArunachala
@@ -71,6 +72,7 @@
 /dharma_swarm/metrics.py                @AmitabhainArunachala
 /dharma_swarm/moonshot_provider.py      @AmitabhainArunachala
 /dharma_swarm/provider_policy.py        @AmitabhainArunachala
+/dharma_swarm/provider_transport.py     @AmitabhainArunachala
 /dharma_swarm/router_v1.py              @AmitabhainArunachala
 /dharma_swarm/runtime_provider.py       @AmitabhainArunachala
 /dharma_swarm/semantic_gravity.py       @AmitabhainArunachala
