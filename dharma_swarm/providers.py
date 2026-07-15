@@ -1259,8 +1259,17 @@ class GroqProvider(LLMProvider):
         max_context_tokens=131_072, provider_family="groq",
     )
 
-    def __init__(self, api_key: str | None = None) -> None:
+    def __init__(
+        self,
+        api_key: str | None = None,
+        base_url: str | None = None,
+    ) -> None:
         self._api_key = api_key or os.environ.get(GROQ_API_KEY_ENV)
+        self._base_url = (
+            base_url
+            or os.environ.get("GROQ_BASE_URL")
+            or "https://api.groq.com/openai/v1"
+        ).rstrip("/")
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -1274,7 +1283,7 @@ class GroqProvider(LLMProvider):
             raise ImportError("pip install openai") from exc
         self._client = AsyncOpenAI(
             api_key=self._api_key,
-            base_url="https://api.groq.com/openai/v1",
+            base_url=self._base_url,
         )
         return self._client
 
@@ -2309,14 +2318,28 @@ class ModelRouter:
         *,
         available_provider_types: list[ProviderType] | None = None,
     ) -> ProviderRouteDecision:
+        if available_provider_types is not None and not available_provider_types:
+            raise RuntimeError("No available providers after routing filter")
+        authorized_providers = (
+            list(self._providers)
+            if available_provider_types is None
+            else available_provider_types
+        )
         available = [
             provider
-            for provider in (available_provider_types or list(self._providers.keys()))
+            for provider in authorized_providers
             if provider in self._providers and self._provider_instance_available(provider)
         ]
-        return self._policy_router.route(
+        available, transport_aliases = self._deduplicate_physical_provider_chain(
+            available
+        )
+        decision = self._policy_router.route(
             route_request,
             available_providers=available,
+        )
+        return self._decision_with_transport_provenance(
+            decision,
+            transport_aliases,
         )
 
     @staticmethod
@@ -2394,7 +2417,65 @@ class ModelRouter:
         *,
         available_provider_types: list[ProviderType] | None = None,
     ) -> list[ProviderType]:
-        available = set(available_provider_types or self._providers.keys())
+        chain, _aliases = self._provider_chain_with_transport_provenance(
+            decision,
+            available_provider_types=available_provider_types,
+        )
+        return chain
+
+    def _provider_transport_identity(self, provider_type: ProviderType) -> str:
+        from dharma_swarm.runtime_provider import runtime_provider_transport_identity
+
+        provider_instance = self._providers[provider_type]
+        return runtime_provider_transport_identity(
+            getattr(provider_instance, "runtime_config", None),
+            logical_provider=provider_type,
+            provider_instance=provider_instance,
+        )
+
+    def _deduplicate_physical_provider_chain(
+        self,
+        chain: list[ProviderType],
+        *,
+        preferred_logical_lanes: list[ProviderType] | None = None,
+    ) -> tuple[list[ProviderType], list[tuple[ProviderType, ProviderType, str]]]:
+        """Keep one logical lane per physical transport, with provenance."""
+        preferred_by_identity: dict[str, ProviderType] = {}
+        for provider in preferred_logical_lanes or []:
+            preferred_by_identity.setdefault(
+                self._provider_transport_identity(provider),
+                provider,
+            )
+
+        deduplicated: list[ProviderType] = []
+        retained_by_identity: dict[str, ProviderType] = {}
+        aliases: list[tuple[ProviderType, ProviderType, str]] = []
+        for provider in chain:
+            identity = self._provider_transport_identity(provider)
+            preferred = preferred_by_identity.get(identity)
+            if preferred is not None and provider != preferred:
+                aliases.append((provider, preferred, identity))
+                continue
+            retained = retained_by_identity.get(identity)
+            if retained is not None:
+                aliases.append((provider, retained, identity))
+                continue
+            retained_by_identity[identity] = provider
+            deduplicated.append(provider)
+        return deduplicated, aliases
+
+    def _provider_chain_with_transport_provenance(
+        self,
+        decision: ProviderRouteDecision,
+        *,
+        available_provider_types: list[ProviderType] | None = None,
+        live_provider: KeyLivenessProvider | None = None,
+    ) -> tuple[list[ProviderType], list[tuple[ProviderType, ProviderType, str]]]:
+        available = (
+            set(self._providers)
+            if available_provider_types is None
+            else set(available_provider_types)
+        )
         chain: list[ProviderType] = []
         for provider in [decision.selected_provider, *decision.fallback_providers]:
             if (
@@ -2404,9 +2485,43 @@ class ModelRouter:
                 and provider not in chain
             ):
                 chain.append(provider)
-        return self._prune_dead_key_providers(
+        live_chain = self._prune_dead_key_providers(
             chain,
-            live_provider=self._key_liveness_provider,
+            live_provider=live_provider or self._key_liveness_provider,
+        )
+        return self._deduplicate_physical_provider_chain(live_chain)
+
+    @staticmethod
+    def _decision_with_transport_provenance(
+        decision: ProviderRouteDecision,
+        aliases: list[tuple[ProviderType, ProviderType, str]],
+    ) -> ProviderRouteDecision:
+        if not aliases:
+            return decision
+
+        dropped = {alias for alias, _retained, _identity in aliases}
+        fallbacks: list[ProviderType] = []
+        fallback_hints: list[str] = []
+        for index, provider in enumerate(decision.fallback_providers):
+            if provider in dropped:
+                continue
+            fallbacks.append(provider)
+            if index < len(decision.fallback_model_hints):
+                fallback_hints.append(decision.fallback_model_hints[index])
+
+        reasons = list(decision.reasons)
+        for alias, retained, identity in aliases:
+            reason = (
+                "physical_transport_dedup="
+                f"{alias.value}->{retained.value}@{identity}"
+            )
+            if reason not in reasons:
+                reasons.append(reason)
+        return replace(
+            decision,
+            fallback_providers=fallbacks,
+            fallback_model_hints=fallback_hints,
+            reasons=reasons,
         )
 
     @staticmethod
@@ -2728,11 +2843,24 @@ class ModelRouter:
         chain: list[ProviderType],
         *,
         model_hints: dict[ProviderType, str | None],
+        available_provider_types: list[ProviderType] | None = None,
+        live_provider: KeyLivenessProvider | None = None,
     ) -> tuple[list[ProviderType], bool]:
+        authorized_providers = (
+            set(self._providers)
+            if available_provider_types is None
+            else set(available_provider_types)
+        )
         if (
             self._canary_percent <= 0
             or self._canary_provider is None
             or self._canary_provider not in self._providers
+            or self._canary_provider not in authorized_providers
+            or not self._provider_instance_available(self._canary_provider)
+            or self._provider_key_is_verifiably_dead(
+                self._canary_provider,
+                live_provider=live_provider,
+            )
         ):
             return (chain, False)
         if random.random() * 100.0 >= self._canary_percent:
@@ -2742,6 +2870,30 @@ class ModelRouter:
         if self._canary_model_hint:
             model_hints[canary_provider] = self._canary_model_hint
         return (reordered, True)
+
+    def _provider_key_is_verifiably_dead(
+        self,
+        provider: ProviderType,
+        *,
+        live_provider: KeyLivenessProvider | None = None,
+    ) -> bool:
+        """Return true only when the configured oracle positively excludes a key.
+
+        Unknown, stale, or failing liveness evidence remains fail-open.  A
+        concrete live-provider set is authoritative for optional canary
+        insertion, however: a canary omitted from that set cannot be restored
+        after the primary chain has pruned it.
+        """
+        try:
+            oracle = live_provider or self._key_liveness_provider or live_providers
+            live = oracle()
+        except Exception:
+            logger.warning(
+                "key_oracle raised while checking canary; skipping dead-key proof",
+                exc_info=True,
+            )
+            return False
+        return live is not None and provider.value not in live
 
     @staticmethod
     def _reward_key(provider: ProviderType, model: str) -> str:
@@ -2982,20 +3134,44 @@ class ModelRouter:
             enriched_request,
             available_provider_types=available_provider_types,
         )
-        chain = self._provider_chain(
+        try:
+            key_liveness_oracle = self._key_liveness_provider or live_providers
+            key_liveness_snapshot = key_liveness_oracle()
+        except Exception:
+            logger.warning(
+                "key_oracle raised; keeping unfiltered request chain",
+                exc_info=True,
+            )
+            key_liveness_snapshot = None
+
+        def request_key_liveness() -> set[str] | None:
+            return key_liveness_snapshot
+
+        chain, transport_aliases = self._provider_chain_with_transport_provenance(
             decision,
             available_provider_types=available_provider_types,
+            live_provider=request_key_liveness,
         )
         if not chain:
             # Routing filter found nothing — fall back to any registered provider
-            fallback_set = set(available_provider_types or self._providers.keys())
+            fallback_set = (
+                set(self._providers)
+                if available_provider_types is None
+                else set(available_provider_types)
+            )
             chain = [
                 p
                 for p in self._providers
                 if p in fallback_set and self._provider_instance_available(p)
             ]
+            chain, fallback_aliases = self._deduplicate_physical_provider_chain(chain)
+            transport_aliases.extend(fallback_aliases)
         if not chain:
             raise RuntimeError("No available providers after routing filter")
+        decision = self._decision_with_transport_provenance(
+            decision,
+            transport_aliases,
+        )
         task_signature = build_task_signature(
             action_name=enriched_request.action_name,
             context=enriched_request.context,
@@ -3052,10 +3228,23 @@ class ModelRouter:
                 chain,
                 model_hints=model_hints,
             )
+        pre_canary_chain = list(chain)
         chain, canary_applied = self._apply_canary(
             chain,
             model_hints=model_hints,
+            available_provider_types=available_provider_types,
+            live_provider=request_key_liveness,
         )
+        chain, canary_aliases = self._deduplicate_physical_provider_chain(
+            chain,
+            preferred_logical_lanes=pre_canary_chain,
+        )
+        if canary_aliases:
+            decision = self._decision_with_transport_provenance(
+                decision,
+                canary_aliases,
+            )
+            canary_applied = False
         if affinity_applied:
             decision = replace(
                 decision,

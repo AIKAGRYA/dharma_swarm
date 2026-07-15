@@ -48,10 +48,30 @@ Open:
 - Dashboard: `http://localhost:3420/dashboard`
 - API docs: `http://localhost:8420/docs`
 
-The browser dashboard now defaults to same-origin API calls. In normal use, the
-UI talks to relative `/api/...` paths on port `3420`, and Next proxies those to
-the FastAPI backend on `8420`. Keep `NEXT_PUBLIC_API_URL` unset unless you
-intentionally want the browser to bypass that proxy.
+The browser dashboard now defaults to same-origin API and WebSocket calls. In
+normal use, the UI talks to relative `/api/...` and `/ws/...` paths on port
+`3420`, and Next proxies both to the FastAPI backend on `8420`. Keep
+`NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_WS_URL` unset unless you intentionally
+want the browser to bypass that proxy.
+
+When `DASHBOARD_API_KEY` is configured, the runtime Next server exchanges it
+for a five-minute, HttpOnly, same-site WebSocket session cookie. The shared key
+is never compiled into browser JavaScript or placed in a URL. Browser Origins
+default to the local development/operator ports and can be replaced with the
+comma-separated `DASHBOARD_WS_ORIGINS` setting.
+
+This browser exchange deliberately trusts only an exact same-origin request on
+`localhost`, `127.0.0.1`, or `::1`; it is a single-user loopback boundary, not
+remote user authentication. Do not expose or tunnel the Next server as an
+authenticated multi-user control plane. Remote/non-browser callers must use a
+separately protected gateway or present the configured bearer directly.
+
+When `DASHBOARD_API_KEY` is unset, the operator runs in explicit development
+mode: HTTP API routes and headerless native WebSocket callers are open, while
+browser WebSockets are still restricted by the Origin allowlist. A blank or
+whitespace-only configured value is an invalid configuration and fails closed;
+unset the variable deliberately for local development. Do not expose dev mode
+beyond the loopback host.
 
 ## Durable local runtime
 

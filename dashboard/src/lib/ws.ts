@@ -11,6 +11,20 @@
 import { wsBaseUrl } from "./api";
 import type { WsEvent } from "./types";
 
+async function prepareDashboardWebSocketSession(): Promise<boolean> {
+  if (typeof window === "undefined") return true;
+  try {
+    const response = await fetch("/dharma-internal/ws-auth", {
+      method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -32,6 +46,8 @@ export interface DharmaSocketOptions {
   baseDelay?: number;
   /** Maximum delay between retries in ms (default 30000). */
   maxDelay?: number;
+  /** Override the same-origin session bootstrap (primarily for tests). */
+  sessionBootstrap?: () => Promise<boolean>;
 }
 
 // ---------------------------------------------------------------------------
@@ -40,10 +56,12 @@ export interface DharmaSocketOptions {
 
 export class DharmaSocket {
   private ws: WebSocket | null = null;
+  private generation = 0;
   private retries = 0;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private intentionallyClosed = false;
   private readonly url: string;
+  private readonly sessionBootstrap: () => Promise<boolean>;
   private readonly opts: Required<
     Pick<DharmaSocketOptions, "maxRetries" | "baseDelay" | "maxDelay">
   > &
@@ -53,6 +71,8 @@ export class DharmaSocket {
     const base = wsBaseUrl();
     const ch = channel.startsWith("/") ? channel : `/${channel}`;
     this.url = `${base}/ws${ch}`;
+    this.sessionBootstrap =
+      options.sessionBootstrap ?? prepareDashboardWebSocketSession;
     this.opts = {
       maxRetries: 10,
       baseDelay: 1000,
@@ -64,17 +84,28 @@ export class DharmaSocket {
 
   /** Open the WebSocket connection. */
   connect(): void {
+    const generation = ++this.generation;
     this.intentionallyClosed = false;
-    this._open();
+    this._clearTimer();
+    const previous = this.ws;
+    this.ws = null;
+    if (previous) {
+      previous.close(1000, "client_reconnect");
+      this.opts.onClose?.(1000, "client_reconnect");
+    }
+    this._open(generation);
   }
 
   /** Gracefully close and stop reconnecting. */
   close(): void {
+    this.generation += 1;
     this.intentionallyClosed = true;
     this._clearTimer();
-    if (this.ws) {
-      this.ws.close(1000, "client_close");
-      this.ws = null;
+    const current = this.ws;
+    this.ws = null;
+    if (current) {
+      current.close(1000, "client_close");
+      this.opts.onClose?.(1000, "client_close");
     }
   }
 
@@ -98,20 +129,35 @@ export class DharmaSocket {
   // Internals
   // -------------------------------------------------------------------------
 
-  private _open(): void {
+  private _open(generation: number): void {
+    void this._openAfterSessionBootstrap(generation);
+  }
+
+  private async _openAfterSessionBootstrap(generation: number): Promise<void> {
+    if (!(await this.sessionBootstrap())) {
+      if (generation === this.generation && !this.intentionallyClosed) {
+        this._scheduleReconnect(generation);
+      }
+      return;
+    }
+    if (generation !== this.generation || this.intentionallyClosed) return;
+    let socket: WebSocket;
     try {
-      this.ws = new WebSocket(this.url);
+      socket = new WebSocket(this.url);
+      this.ws = socket;
     } catch {
-      this._scheduleReconnect();
+      this._scheduleReconnect(generation);
       return;
     }
 
-    this.ws.onopen = () => {
+    socket.onopen = () => {
+      if (generation !== this.generation || this.ws !== socket) return;
       this.retries = 0;
       this.opts.onOpen?.();
     };
 
-    this.ws.onmessage = (raw: MessageEvent) => {
+    socket.onmessage = (raw: MessageEvent) => {
+      if (generation !== this.generation || this.ws !== socket) return;
       try {
         const parsed: WsEvent = JSON.parse(String(raw.data));
         this.opts.onMessage?.(parsed);
@@ -120,19 +166,23 @@ export class DharmaSocket {
       }
     };
 
-    this.ws.onclose = (ev: CloseEvent) => {
+    socket.onclose = (ev: CloseEvent) => {
+      if (generation !== this.generation || this.ws !== socket) return;
+      this.ws = null;
       this.opts.onClose?.(ev.code, ev.reason);
       if (!this.intentionallyClosed) {
-        this._scheduleReconnect();
+        this._scheduleReconnect(generation);
       }
     };
 
-    this.ws.onerror = (ev: Event) => {
+    socket.onerror = (ev: Event) => {
+      if (generation !== this.generation || this.ws !== socket) return;
       this.opts.onError?.(ev);
     };
   }
 
-  private _scheduleReconnect(): void {
+  private _scheduleReconnect(generation: number): void {
+    if (generation !== this.generation || this.intentionallyClosed) return;
     const { maxRetries, baseDelay, maxDelay } = this.opts;
 
     if (maxRetries > 0 && this.retries >= maxRetries) {
@@ -144,7 +194,11 @@ export class DharmaSocket {
     this.retries += 1;
 
     this._clearTimer();
-    this.timer = setTimeout(() => this._open(), delay);
+    this.timer = setTimeout(() => {
+      if (generation === this.generation && !this.intentionallyClosed) {
+        this._open(generation);
+      }
+    }, delay);
   }
 
   private _clearTimer(): void {

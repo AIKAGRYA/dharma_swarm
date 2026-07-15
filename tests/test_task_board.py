@@ -1,5 +1,7 @@
 """Tests for dharma_swarm.task_board."""
 
+import sqlite3
+
 import pytest
 
 import dharma_swarm.task_board as task_board_mod
@@ -138,6 +140,71 @@ async def test_get_ready_tasks(board):
     ready = await board.get_ready_tasks()
     ready_ids = [t.id for t in ready]
     assert t2.id in ready_ids
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("terminal_status", [TaskStatus.FAILED, TaskStatus.CANCELLED])
+async def test_failed_or_cancelled_dependency_never_makes_child_ready(
+    board,
+    terminal_status,
+):
+    parent = await board.create("Terminal prerequisite")
+    child = await board.create("Must remain blocked", depends_on=[parent.id])
+
+    if terminal_status == TaskStatus.FAILED:
+        await board.assign(parent.id, "fixture-agent")
+        await board.start(parent.id)
+        await board.fail(parent.id, error="fixture failure")
+    else:
+        await board.cancel(parent.id)
+
+    ready_ids = {task.id for task in await board.get_ready_tasks()}
+    assert child.id not in ready_ids
+
+
+@pytest.mark.asyncio
+async def test_missing_dependency_is_rejected_without_persisting_child(board):
+    with pytest.raises(TaskBoardError, match="missing dependency"):
+        await board.create("Invalid child", depends_on=["missing-parent"])
+
+    assert await board.get_by_title("Invalid child") is None
+
+
+@pytest.mark.asyncio
+async def test_batch_and_add_dependency_reject_missing_tasks(board):
+    child = await board.create("Existing child")
+
+    with pytest.raises(TaskBoardError, match="missing dependency"):
+        await board.create_batch(
+            [{"title": "Invalid batch child", "depends_on": ["missing-parent"]}]
+        )
+    with pytest.raises(TaskBoardError, match="missing dependency"):
+        await board.add_dependency(child.id, "missing-parent")
+    with pytest.raises(TaskBoardError, match="missing task"):
+        await board.add_dependency("missing-child", child.id)
+
+
+@pytest.mark.asyncio
+async def test_task_board_connections_enforce_foreign_keys(board):
+    async with board._open() as db:
+        row = await (await db.execute("PRAGMA foreign_keys")).fetchone()
+    assert row == (1,)
+
+
+@pytest.mark.asyncio
+async def test_legacy_dangling_dependency_keeps_child_blocked(board):
+    child = await board.create("Legacy dangling child")
+
+    # Simulate a pre-enforcement database row using a raw SQLite connection,
+    # whose foreign-key checks are disabled by default.
+    with sqlite3.connect(board._db_path) as db:
+        db.execute(
+            "INSERT INTO task_dependencies (task_id, depends_on_id) VALUES (?, ?)",
+            (child.id, "missing-parent"),
+        )
+
+    ready_ids = {task.id for task in await board.get_ready_tasks()}
+    assert child.id not in ready_ids
 
 
 @pytest.mark.asyncio

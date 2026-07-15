@@ -16,6 +16,7 @@ import pytest
 
 from dharma_swarm.graph.channels import (
     AppendChannel,
+    ChannelWrite,
     ChannelWriteConflictError,
     LastValueChannel,
     UnknownChannelError,
@@ -104,6 +105,19 @@ class BrokenOrderEffects(SimulatedEffects):
         if self.mode == "duplicated":
             return ordered + ordered[:1]
         return ordered[:-1] + ["__ghost__"]
+
+
+class CommitCountingChannel(LastValueChannel):
+    total_commits = 0
+
+    def commit(self, writes: Sequence[ChannelWrite], superstep: int) -> bool:
+        type(self).total_commits += 1
+        return super().commit(writes, superstep)
+
+
+class NonDeepcopyableChannel(LastValueChannel):
+    def __deepcopy__(self, memo):
+        raise TypeError("channel runtime handle is not deepcopyable")
 
 
 # -- compile validation -------------------------------------------------
@@ -251,6 +265,38 @@ async def test_start_node_end_runs_with_frozen_superstep_numbering():
     assert [(e.node_id, e.superstep) for e in result.events] == [(START, 0), ("a", 1)]
     assert result.supersteps == 1
     assert result.state_digest.startswith("sha256:")
+
+
+async def test_scheduler_commits_custom_channel_once_per_barrier():
+    CommitCountingChannel.total_commits = 0
+    compiled = (
+        GraphBuilder("single-commit")
+        .add_channel("x", CommitCountingChannel)
+        .add_node("a", _write(x=2))
+        .add_edge(START, "a")
+        .add_edge("a", END)
+        .compile()
+    )
+
+    result = await compiled.invoke({"x": 1}, graph_run_id="run-single-commit")
+
+    assert result.state == {"x": 2}
+    assert CommitCountingChannel.total_commits == 2  # seed + node barrier
+
+
+async def test_scheduler_preflight_does_not_deepcopy_channel_runtime_state():
+    compiled = (
+        GraphBuilder("non-deepcopyable-channel")
+        .add_channel("x", NonDeepcopyableChannel)
+        .add_node("a", _write(x=2))
+        .add_edge(START, "a")
+        .add_edge("a", END)
+        .compile()
+    )
+
+    result = await compiled.invoke({"x": 1}, graph_run_id="run-nondeepcopy")
+
+    assert result.state == {"x": 2}
 
 
 async def test_sequential_nodes_deterministic_state():

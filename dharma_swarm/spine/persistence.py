@@ -48,7 +48,7 @@ async def ensure_receipt_column(db: AsyncDB) -> None:
 
 
 async def persist_receipt(receipt: EvidenceReceipt, db: AsyncDB) -> None:
-    """Write receipt JSON to the delegation_runs row for this task.
+    """Project receipt JSON onto its exact delegation run.
 
     Surface split (do not conflate): receipt_json is the ORCHESTRATOR-surface
     witness column (GATE-1 watches it). The A2A surface persists canonically
@@ -56,20 +56,61 @@ async def persist_receipt(receipt: EvidenceReceipt, db: AsyncDB) -> None:
     an empty blob on an A2A row is success, not failure (see
     tests/test_spine_persistence_invariant.py invariant 7).
 
-    Raises RuntimeError when the UPDATE matches zero rows: a 0-row write
-    committing silently would leave the operator's witness count flat with no
-    diagnostic — indistinguishable from "gate not yet attempted". Callers'
-    fail-open handlers turn this into a visible warning.
+    ``task_id`` is deliberately insufficient because retries share it. The
+    runtime-owned ``attributes.run_id`` is mandatory. When the store exposes
+    the canonical ``claim_id`` and ``assigned_to`` columns, those authority
+    bindings are mandatory too; compatibility schemas that predate those
+    columns retain task/run scoping. Exactly one fully bound row must match.
+    Callers' fail-open handlers turn any projection failure into a visible
+    warning.
     """
-    receipt_json = json.dumps(receipt.to_dict(), default=str)
-    cur = await db.execute(
-        "UPDATE delegation_runs SET receipt_json = ? WHERE task_id = ?",
-        (receipt_json, receipt.task_id),
-    )
-    await db.commit()
-    rowcount = getattr(cur, "rowcount", None)
-    if rowcount == 0:
+    run_id = str(receipt.attributes.get("run_id", "") or "").strip()
+    if not run_id:
         raise RuntimeError(
-            f"persist_receipt: no delegation_runs row matched task_id="
-            f"{receipt.task_id!r} — receipt produced but NOT persisted"
+            "persist_receipt: missing receipt.attributes.run_id — refusing "
+            "task-scoped projection"
         )
+    columns_cur = await db.execute("PRAGMA table_info(delegation_runs)")
+    columns = {str(row[1]) for row in await columns_cur.fetchall()}
+    if not {"task_id", "run_id", "receipt_json"} <= columns:
+        raise RuntimeError(
+            "persist_receipt: delegation_runs lacks task/run/receipt columns"
+        )
+
+    predicates = ["task_id = ?", "run_id = ?"]
+    identity: list[str] = [receipt.task_id, run_id]
+    if "claim_id" in columns:
+        claim_id = str(receipt.claim_id or "").strip()
+        if not claim_id:
+            raise RuntimeError(
+                "persist_receipt: authoritative claim_id is missing"
+            )
+        predicates.append("claim_id = ?")
+        identity.append(claim_id)
+    if "assigned_to" in columns:
+        agent_id = str(receipt.agent_id or "").strip()
+        if not agent_id:
+            raise RuntimeError(
+                "persist_receipt: authoritative agent_id is missing"
+            )
+        predicates.append("assigned_to = ?")
+        identity.append(agent_id)
+
+    receipt_json = json.dumps(receipt.to_dict(), default=str)
+    authority_clause = " AND ".join(predicates)
+    cur = await db.execute(
+        "UPDATE delegation_runs SET receipt_json = ?"
+        f" WHERE {authority_clause}"
+        " AND 1 = (SELECT COUNT(*) FROM delegation_runs"
+        f" WHERE {authority_clause})",
+        (receipt_json, *identity, *identity),
+    )
+    rowcount = getattr(cur, "rowcount", None)
+    if rowcount != 1:
+        raise RuntimeError(
+            "persist_receipt: expected exactly one authoritative delegation_runs "
+            "row for "
+            f"task_id={receipt.task_id!r}, run_id={run_id!r}; matched "
+            f"{rowcount!r} — receipt produced but NOT persisted"
+        )
+    await db.commit()

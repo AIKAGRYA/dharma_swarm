@@ -4,6 +4,8 @@ import builtins
 import importlib
 import sys
 
+from fastapi.testclient import TestClient
+
 
 class TestOrganismCompositionRoot:
     """DHARMA_ORGANISM_ROOT gates the Organism composition root in get_swarm().
@@ -55,9 +57,7 @@ class TestOrganismCompositionRoot:
         api_main, organism_mod = self._fresh(monkeypatch)
         monkeypatch.setenv("DHARMA_ORGANISM_ROOT", "1")
         # Isolate organism state writes from the ambient ~/.dharma
-        monkeypatch.setattr(
-            organism_mod, "dharma_state_dir", lambda *args: tmp_path
-        )
+        monkeypatch.setattr(organism_mod, "dharma_state_dir", lambda *args: tmp_path)
 
         from dharma_swarm.swarm import SwarmManager
 
@@ -115,3 +115,30 @@ def test_api_main_imports_without_api_keys(monkeypatch) -> None:
     module = importlib.import_module("api.main")
 
     assert module.app.title == "DHARMA COMMAND"
+
+
+def test_api_main_registers_dashboard_websocket_routes() -> None:
+    import api.main as api_main
+
+    websocket_paths = {
+        route.path
+        for route in api_main.app.routes
+        if type(route).__name__ == "APIWebSocketRoute"
+    }
+
+    assert "/ws/agents" in websocket_paths
+    assert "/api/ws/agents" in websocket_paths
+    assert "/ws/chat/session/{session_id}" in websocket_paths
+
+
+def test_api_main_fails_closed_for_blank_configured_key(monkeypatch) -> None:
+    import api.main as api_main
+
+    monkeypatch.setenv("DASHBOARD_API_KEY", "   ")
+    response = TestClient(api_main.app).get(
+        "/api/chat/status",
+        headers={"Authorization": "Bearer "},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["error"] == "auth_misconfigured"

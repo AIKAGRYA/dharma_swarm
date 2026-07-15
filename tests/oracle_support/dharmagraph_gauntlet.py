@@ -1905,7 +1905,7 @@ def _finalize_rows(capabilities: dict[str, Any]) -> None:
         if statuses and all(status == "pass" for status in statuses):
             row["points"] = 2
             row["verdict"] = "FULLY_PROVEN"
-        elif any(status in {"pass", "partial"} for status in statuses):
+        elif any(status == "pass" for status in statuses):
             row["points"] = 1
             row["verdict"] = "PARTIALLY_PROVEN"
         else:

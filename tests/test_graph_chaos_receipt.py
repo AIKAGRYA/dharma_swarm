@@ -59,6 +59,7 @@ def _identity(task_id: str, mint: str) -> ExecutionIdentity:
         task_id=task_id,
         agent_id=AGENT,
         run_id=f"run-{task_id}-{mint}",
+        claim_id=f"claim-{task_id}-{mint}",
         idempotency_key=f"idem-{task_id}-{mint}",
     )
 
@@ -199,8 +200,13 @@ async def _chaos_scenario(seed: int, db_path: Path) -> list[tuple]:
     # but the crash hit before run/claim bookkeeping completed. Produce the
     # receipt through the real wrapped invoker (provider call #1 for this
     # task), persist it, then leave run/claim in-flight.
-    _insert_run(store, "run-torn", "task-torn", claim_id="claim-torn")
-    _insert_claim(store, "claim-torn", "task-torn", acked=True)
+    _insert_run(
+        store,
+        "run-task-torn-boot1",
+        "task-torn",
+        claim_id="claim-task-torn-boot1",
+    )
+    _insert_claim(store, "claim-task-torn-boot1", "task-torn", acked=True)
     _, torn_receipt = await _dispatch(store, effects, torn_inner, "task-torn", "boot1")
     assert await persist_evidence_receipt(
         torn_receipt,
@@ -241,8 +247,10 @@ async def _chaos_scenario(seed: int, db_path: Path) -> list[tuple]:
     assert _row(store, "task_claims", "claim_id", "claim-q")["recovered_at"]
     trace.append(("run-q", "quarantined", QUARANTINE_REASON))
 
-    torn_run = _row(store, "delegation_runs", "run_id", "run-torn")
-    torn_claim = _row(store, "task_claims", "claim_id", "claim-torn")
+    torn_run = _row(store, "delegation_runs", "run_id", "run-task-torn-boot1")
+    torn_claim = _row(
+        store, "task_claims", "claim_id", "claim-task-torn-boot1"
+    )
     assert torn_run["status"] == "completed", "receipt is ground truth"
     assert torn_claim["recovered_at"] and torn_claim["status"] == "completed"
     trace.append(("run-torn", torn_run["status"], "receipt_settled"))
@@ -257,7 +265,12 @@ async def _chaos_scenario(seed: int, db_path: Path) -> list[tuple]:
     assert retry_invoker.memo_hit is False
     assert retry_receipt.status == "ok"
     assert dropoff_inner.calls == 1, "retry must execute the provider exactly once"
-    _insert_run(store, "run-dropoff-2", "task-dropoff", claim_id="claim-dropoff-2")
+    _insert_run(
+        store,
+        "run-task-dropoff-boot2",
+        "task-dropoff",
+        claim_id="claim-task-dropoff-boot2",
+    )
     assert await persist_evidence_receipt(
         retry_receipt,
         store,
