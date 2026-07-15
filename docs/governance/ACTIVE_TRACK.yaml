@@ -1312,7 +1312,7 @@ active_tracks:
     name: Sovereign Safety TCB — fail-closed evolution, graded anti-slop, verified kernel, self-gating portfolio
     status: ACTIVE
     opened_at: "2026-07-07"
-    verified_at: "2026-07-07"
+    verified_at: "2026-07-15"
     ttl_days: 21
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
@@ -1344,15 +1344,16 @@ active_tracks:
     moves_vital_signs:
       - quality_gates
       - security_guardrails
-    target_closure_kind: CLOSED_NOT_PROD
+    target_closure_kind: SUBSTRATE_TRUSTED
+    graduation_profile: governance_gate
     claim_boundary: |
       The gate MACHINERY is landed and CI-enforced (each completion criterion
       is independently re-run by a pull_request-triggered GitHub Actions
-      workflow the PR author cannot forge). Two ratchets remain deliberately
-      un-flipped and are NOT claimed closed: (a) the AI-M1 hygiene pattern is
-      stage=advisory (docs/governance/hygiene/patterns/AI-M1.yaml) so the
-      graded-binding gate reports but does not yet block merges; (b) the
-      PR-001 fail-closed evolution guarantee is proven at unit level, but the
+      workflow the PR author cannot forge). AI-M1 is operator-promoted to
+      stage=enforced and the `rigor` context is present in both required-check
+      manifests, so undergraded claims fail the trusted-CI gate and Mike's CI
+      membrane. The PR-001 fail-closed evolution guarantee is proven at unit
+      level, but the
       live-host observation (DHARMA_EVOLUTION_SHADOW default + read-only
       source mount denying live-checkout mutation on the daemon host) is an
       operator observation still owned by organism-rewire D4. Completion
@@ -1453,7 +1454,7 @@ active_tracks:
 
     next_items:
       - id: 1
-        what: "(operator) Ratify this track; then decide the AI-M1 flip: promote docs/governance/hygiene/patterns/AI-M1.yaml stage advisory->enforced via scripts/governance/hygiene/promote.py (turns the graded-binding gate's teeth on with no code change) and/or mark pudgala-rigor a required status check in branch protection."
+        what: "DONE 2026-07-15: operator promoted AI-M1 advisory->enforced through scripts/governance/hygiene/promote.py and added `rigor` to CI_TRUTH_CONTRACT plus ci_parity_manifest. Live branch-protection mutation remains an Administration:write operator action and is never inferred from tracked manifests."
         kind: governance
         blocker: false
       - id: 2

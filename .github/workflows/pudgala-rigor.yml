@@ -13,13 +13,10 @@
 #   (docs/governance/hygiene/patterns/AI-M1.yaml, promoted via
 #   scripts/governance/hygiene/promote.py — fail-safe: missing/malformed reads
 #   as advisory).
-#   Stage 0 (now): AI-M1 stage=advisory — exits 0, reports each active track's
-#     strongest evidence grade vs its required floor. Informational check-run;
-#     never blocks. Surfaces the rigor signal without breaking every PR.
-#   Stage 1+: promote AI-M1 to stage=enforced (and/or mark this a required
-#     status check in branch protection). Then a PR that drops a track below
-#     its floor fails this check, and Mike's CI-green gate blocks it. No edit
-#     to this file is needed for the flip.
+#   Stage 1 (operator-promoted 2026-07-15): AI-M1 stage=enforced. A PR that
+#     drops a track below its evidence floor fails this check, and Mike's
+#     CI-green gate blocks it. The required-check manifests now include the
+#     `rigor` context; live branch protection remains an operator/API action.
 name: Pudgala rigor — claim/evidence binding
 
 on:

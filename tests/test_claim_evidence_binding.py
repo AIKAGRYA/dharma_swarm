@@ -93,8 +93,27 @@ def test_resolve_enforcement_precedence(tmp_path: Path) -> None:
     pattern.write_text(json.dumps({"stage": "enforced"}), encoding="utf-8")
     assert binding_stage(pattern) == "enforced"
     assert binding_stage(tmp_path / "missing.json") == "advisory"
-    # The shipped AI-M1 pattern is advisory today, so the bare gate stays advisory.
-    assert binding_stage() == "advisory"
+    # The operator-promoted AI-M1 pattern makes the bare trusted-CI gate blocking.
+    assert binding_stage() == "enforced"
+
+
+def test_pudgala_rigor_is_in_both_required_check_manifests() -> None:
+    truth = json.loads(
+        (REPO_ROOT / "docs/governance/CI_TRUTH_CONTRACT.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    parity = json.loads(
+        (REPO_ROOT / "scripts/governance/ci_parity_manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    required_ids = {row["id"] for row in truth["required"]}
+    required_contexts = {row["context"] for row in parity["required_contexts"]}
+
+    assert "pudgala_rigor" in required_ids
+    assert "rigor" in required_contexts
 
 
 def test_receipt_command_line_records_actual_flags() -> None:
