@@ -30,6 +30,7 @@ import {
   FailureMessage,
   SurfaceMessage,
 } from "./A2ANodeMessages";
+import { A2ANodeCompose } from "./A2ANodeCompose";
 import styles from "./A2ANodeShell.module.css";
 
 const truthPresentation: Record<
@@ -386,6 +387,7 @@ export function StreamPanel({
         title="The conversation between systems"
         detail="Trace events and A2A evidence share one chronology. Malformed records remain visible as unknown evidence."
       />
+      <A2ANodeCompose />
       <div className="space-y-2">
         {traceFailure ? <FailureMessage failure={traceFailure} /> : null}
         {a2aFailure ? <FailureMessage failure={a2aFailure} /> : null}

@@ -5,6 +5,19 @@ import {
   resolveProxyTarget,
 } from "../../../../../components/a2a-node/a2aNodeProxy.mjs";
 import { evaluateOperatorIngress } from "../../../../../components/a2a-node/a2aNodeIngressAuth.mjs";
+import { sendCoordinator } from "../../../../../components/a2a-node/a2aNodeSendOperation.mjs";
+import {
+  getPacketStatus,
+  resolveReceiptStaleAfterMs,
+  SendReceiptStoreError,
+} from "../../../../../components/a2a-node/a2aNodeSendReceiptStore.mjs";
+import {
+  assertExactSendPath,
+  assertSendPacketId,
+  readSendRequest,
+  resolveGatewayConfig,
+  SendRequestError,
+} from "../../../../../components/a2a-node/a2aNodeSendServer.mjs";
 
 const DEFAULT_BACKEND_BASE_URL = "http://127.0.0.1:8420";
 const BASIC_CHALLENGE =
@@ -26,9 +39,10 @@ function errorResponse(
   message: string,
   status: number,
   additionalHeaders: Record<string, string> = {},
+  additionalError: Record<string, unknown> = {},
 ): Response {
   return Response.json(
-    { error: { kind, status, message } },
+    { error: { ...additionalError, kind, status, message } },
     {
       status,
       headers: {
@@ -96,12 +110,15 @@ function safeUpstreamMessage(
   }
 }
 
-function operatorIngressError(request: Request): Response | null {
+function operatorIngressError(
+  request: Request,
+  requireConfiguredAuth = false,
+): Response | null {
   const ingress = evaluateOperatorIngress({
     authorization: request.headers.get("Authorization"),
     operatorUser: process.env.A2A_NODE_OPERATOR_USER,
     operatorPassword: process.env.A2A_NODE_OPERATOR_PASSWORD,
-    nodeEnv: process.env.NODE_ENV,
+    nodeEnv: requireConfiguredAuth ? "production" : process.env.NODE_ENV,
   });
   if (ingress.state === "misconfigured") {
     return errorResponse(
@@ -128,10 +145,90 @@ function rejectMethod(request: Request): Response {
   );
 }
 
+function isSendStatusPath(path: string[]): boolean {
+  return (
+    path.length === 4 &&
+    path[0] === "a2a" &&
+    path[1] === "send" &&
+    path[2] === "status"
+  );
+}
+
+async function sendPacketStatus(
+  request: Request,
+  path: string[],
+): Promise<Response> {
+  const ingressError = operatorIngressError(request, true);
+  if (ingressError) return ingressError;
+  if (new URL(request.url).searchParams.size > 0) {
+    return errorResponse(
+      "policy",
+      "Send status query parameters are not allowed",
+      400,
+    );
+  }
+  let packetId: string;
+  try {
+    packetId = assertSendPacketId(path[3]);
+  } catch (error) {
+    if (error instanceof SendRequestError) {
+      return errorResponse(error.kind, error.message, error.status);
+    }
+    return errorResponse("contract", "packet_id must be a UUID", 400);
+  }
+  const receiptDir = process.env.A2A_NODE_SEND_RECEIPT_DIR;
+  if (!receiptDir) {
+    return errorResponse(
+      "configuration",
+      "Send receipt cache is unavailable",
+      503,
+    );
+  }
+  let packetStatus;
+  try {
+    packetStatus = await getPacketStatus(receiptDir, packetId, {
+      staleAfterMs: resolveReceiptStaleAfterMs(
+        process.env.A2A_NODE_SEND_STALE_AFTER_MS,
+      ),
+    });
+  } catch {
+    return errorResponse(
+      "configuration",
+      "Send receipt cache is unavailable",
+      503,
+    );
+  }
+  if (packetStatus.state === "missing") {
+    return errorResponse(
+      "contract",
+      "Send packet status was not found",
+      404,
+    );
+  }
+  return Response.json(
+    {
+      packet_id: packetStatus.packet_id,
+      target: packetStatus.target,
+      status: packetStatus.status,
+      ...(packetStatus.state === "stored"
+        ? { receipt: packetStatus.receipt }
+        : {}),
+    },
+    {
+      status: 200,
+      headers: { "Cache-Control": "no-store" },
+    },
+  );
+}
+
 export async function GET(
   request: Request,
   context: ProxyRouteContext,
 ): Promise<Response> {
+  const { path } = await context.params;
+  if (isSendStatusPath(path)) {
+    return sendPacketStatus(request, path);
+  }
   const ingressError = operatorIngressError(request);
   if (ingressError) {
     return ingressError;
@@ -139,7 +236,6 @@ export async function GET(
 
   let target: URL;
   try {
-    const { path } = await context.params;
     const baseUrl =
       process.env.DHARMA_API_INTERNAL_URL?.trim() ||
       DEFAULT_BACKEND_BASE_URL;
@@ -256,8 +352,100 @@ export async function GET(
   });
 }
 
+export async function POST(
+  request: Request,
+  context: ProxyRouteContext,
+): Promise<Response> {
+  const { path: candidatePath } = await context.params;
+  if (candidatePath[0] !== "a2a") {
+    return rejectMethod(request);
+  }
+  const ingressError = operatorIngressError(request, true);
+  if (ingressError) {
+    return ingressError;
+  }
+
+  let target: URL;
+  let token: string;
+  let receiptDir: string;
+  let staleAfterMs: number;
+  let input: Awaited<ReturnType<typeof readSendRequest>>;
+  try {
+    const { path } = await context.params;
+    assertExactSendPath(path, new URL(request.url).searchParams);
+    const gateway = resolveGatewayConfig(
+      process.env.A2A_GATEWAY_URL,
+      process.env.A2A_GATEWAY_TOKEN,
+      process.env.NODE_ENV,
+      process.env.A2A_NODE_SEND_RECEIPT_DIR,
+    );
+    target = gateway.target;
+    token = gateway.token;
+    receiptDir = gateway.receiptDir;
+    staleAfterMs = resolveReceiptStaleAfterMs(
+      process.env.A2A_NODE_SEND_STALE_AFTER_MS,
+    );
+    input = await readSendRequest(request);
+  } catch (error) {
+    if (error instanceof SendRequestError) {
+      return errorResponse(error.kind, error.message, error.status);
+    }
+    if (error instanceof SendReceiptStoreError) {
+      return errorResponse(
+        "configuration",
+        "Send receipt cache configuration is invalid",
+        503,
+      );
+    }
+    return errorResponse(
+      "contract",
+      "Send request could not be processed",
+      400,
+    );
+  }
+
+  let execution: Awaited<ReturnType<typeof sendCoordinator.execute>>;
+  try {
+    execution = await sendCoordinator.execute({
+      input,
+      target,
+      token,
+      receiptDir,
+      staleAfterMs,
+    });
+  } catch {
+    return errorResponse(
+      "upstream",
+      "Mailbox send outcome is unknown",
+      502,
+      {},
+      { outcome: "UNKNOWN", packet_id: input.packet_id },
+    );
+  }
+
+  if (execution.state === "stored") {
+    return Response.json(execution.result, {
+      status: 200,
+      headers: { "Cache-Control": "no-store" },
+    });
+  }
+  return errorResponse(
+    execution.error.kind,
+    execution.error.message,
+    execution.error.status,
+    {},
+    {
+      ...(execution.error.outcome
+        ? { outcome: execution.error.outcome }
+        : {}),
+      ...(execution.error.packet_id
+        ? { packet_id: execution.error.packet_id }
+        : {}),
+    },
+  );
+}
+
 export const HEAD = rejectMethod;
-export const POST = rejectMethod;
 export const PUT = rejectMethod;
 export const PATCH = rejectMethod;
 export const DELETE = rejectMethod;

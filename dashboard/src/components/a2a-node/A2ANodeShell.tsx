@@ -323,7 +323,7 @@ export function A2ANodeShell() {
                     A2A Operator Node
                   </p>
                   <span className="rounded-full border border-sumi-700/35 px-1.5 py-0.5 font-mono text-xs uppercase tracking-wider text-kitsurubami/80">
-                    read only
+                    bounded send
                   </span>
                 </div>
                 <p id="a2a-node-summary" className="mt-0.5 truncate font-mono text-xs uppercase tracking-[0.16em] text-kitsurubami/75">
