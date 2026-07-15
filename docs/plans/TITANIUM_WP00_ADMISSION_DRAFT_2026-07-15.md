@@ -13,8 +13,10 @@ WP-00 execution starts warm.
 
 WP-00's seven required steps (spec:152-162):
 
-1. Move the shippable `company-builder-parity-2026-07` track per portfolio policy —
-   **operator decision, see §Operator Decisions D-T1 below.**
+1. Free a WIP slot for Titanium — **operator resolved D-T1 (2026-07-15): graduate
+   `onboard-one-door-2026-07`, NOT move company-builder. See §Operator Decisions
+   D-T1 and the Critical-path section below.** This is the same act that clears the
+   Titanium gate, so it unifies the WIP-room and gate dependencies.
 2. Capture the dynamic campaign baseline from clean current `origin/main` (spec:61-78) —
    fresh commands, not copied numbers. Drift already observed (tracks 9→11, DocOps
    counts moved; `TITANIUM_PREP_2026-07-15.md` §2 "Baseline drift").
@@ -159,23 +161,34 @@ owner until M6-1 lands (spec:145; `ACTIVE_TRACK.yaml:2025-2028`).
 These are external prerequisites (spec:1411-1422). An unavailable prerequisite
 blocks only its dependent packet; it never justifies weakening evidence (spec:1422).
 
-### D-T1 — Move the shippable `company-builder-parity-2026-07` track (spec:156, spec:1413)
+### D-T1 — WIP room for Titanium (spec:156, spec:1413) — **RESOLVED 2026-07-15**
 
-- **What:** `company-builder-parity-2026-07` (TAM) is the portfolio's shippable
-  revenue track (`serves: revenue-external-humans-served`,
-  `ACTIVE_TRACK.yaml` company-builder entry; spec baseline recorded it as the sole
-  shippable track, spec:93). Portfolio policy requires it to be moved per the
-  shippable-track policy before WP-00 admission adds the hardening track.
-- **Why it needs you:** track lifecycle moves (ship/close/relocate) and WIP-ceiling
-  decisions are operator acts, not agent acts (CLAUDE.md portfolio model;
-  spec:1413). The WIP ceiling is at max (11 active); admitting the hardening track
-  without relieving pressure would breach the WIP law.
-- **Decision requested:** ratify the move/close/relocation of
-  `company-builder-parity-2026-07` (or explicitly waive the WIP ceiling for the
-  admission), and confirm the target lifecycle state.
-- **Blocks:** WP-00 step 1 (spec:156), and therefore all of Phase 0.
+- **Operator decision (2026-07-15):** the WIP slot for Titanium comes from
+  **graduating `onboard-one-door-2026-07`** ("the make onboard hardening"), **not**
+  from moving `company-builder-parity-2026-07`. Company-builder stays as-is.
+- **Why this supersedes spec:156:** the operator holds portfolio authority
+  (CLAUDE.md portfolio model). This is the cleaner path because graduating
+  onboard-one-door is *already* the Titanium gate condition
+  (`ACTIVE_TRACK.yaml` 1864-1866, 1909-1912): when onboard-one-door closes,
+  the same act (a) frees the WIP slot **and** (b) clears the C1/proof gate.
+  One graduation resolves both the WIP ceiling and the gate.
+- **Revenue spine stays covered:** `revenue-external-humans-served` remains covered
+  by `darshan-publication-2026-07` (and company-builder), so nothing is orphaned.
+- **What this makes the real work:** graduating onboard-one-door requires closing its
+  six open blocker items (`ACTIVE_TRACK.yaml` 2013-2036) in dependency order —
+  C1 → D2 → WP-O5; (WP-O5 + M6-1) → WP-O6 → TERMINAL-PROOF. See the critical-path
+  note below.
+- **Superseded:** the WP-00 draft's `completion_criteria` and admission steps stand,
+  but WP-00 step 1 is now "graduate onboard-one-door," not "move company-builder."
 
-### D-T2 — Extend `organism-rewire-2026-07` ownership to the Go-trigger seam (spec:195-203, spec:1420-adjacent)
+### D-T2 — Extend `organism-rewire-2026-07` ownership to the Go-trigger seam (spec:195-203) — **RATIFIED 2026-07-15**
+
+- **Operator decision (2026-07-15): RATIFIED.** Grant `organism-rewire-2026-07` the
+  seven Go-seam files exactly as listed below. Enactment is a one-line-per-file
+  addition to that track's `owned_surfaces` in `docs/governance/ACTIVE_TRACK.yaml`
+  (a governance-surface edit; lands via the organism-rewire owner or the WP-00
+  admission bundle, since the Titanium lane does not own the ledger file).
+
 
 - **What:** WP-0C2 (version-aware Go capability) must edit the Go bridge seam, which
   is `organism-rewire`-adjacent but not yet in its `owned_surfaces`. Spec:195-203
@@ -210,3 +223,26 @@ Not new asks — flagged so they are not forgotten when the gate clears:
   TIT-010 is confirmed live (`TITANIUM_PREP_2026-07-15.md` §2) — if the service is
   reachable beyond loopback, containment happens immediately, not after the stack.
 - Nominate the independent WP-0I reviewer after every packet merges (spec:1420).
+
+---
+
+## Critical path to Titanium (post-D-T1, unified 2026-07-15)
+
+Per D-T1, one graduation unblocks everything: **close `onboard-one-door-2026-07`'s
+six open items → it graduates → WIP slot frees + Titanium gate clears → WP-00
+admits.** Dependency order (`ACTIVE_TRACK.yaml` 1909-1912): **C1 → D2 → WP-O5;
+(WP-O5 + M6-1) → WP-O6 → TERMINAL-PROOF.**
+
+| Item | Kind | Who closes it | Status / what it needs |
+|---|---|---|---|
+| **C1** | governance | merge authority (Mike/operator) + this seat can assemble the hermetic evidence | Capture post-WP-O4 required-context + parity-manifest + automerge + merge-queue evidence proving the strict door fails closed. Live branch-protection leg needs **Administration:read** (operator, spec:1416) — until provisioned it is NEEDS_HOST. `ACTIVE_TRACK.yaml:2013-2016` |
+| **D2** | governance | **operator only** | Author the strict-by-default ratification record (spec §9.2 format). Cannot be minted by any agent. Depends on C1. `:2017-2020` |
+| **WP-O5** | code | onboard-one-door owner | Promote strict verdict exits to default, one `--no-strict` deprecation cycle. After C1 + merged D2. `:2021-2024` |
+| **M6-1** | governance | **DharmaGraph owner** | Land the exact mutmut/`pyproject.toml` config under its packet (or an explicit transfer). Coordination item. `:2025-2028` |
+| **WP-O6** | code | onboard-one-door owner | Terminal-envelope proof (perf/replay/concurrency/mutation/exit-matrix/no-write-no-network). After WP-O5 + M6-1. `:2029-2032` |
+| **TERMINAL-PROOF** | governance | **this seat (fable_claude_code) qualifies** — authored none of WP-O1..O6 | Decorrelated verifier runs §13 on a sterile clone and merges the proof. Runs LAST, after WP-O6 merges. `:2033-2036` |
+
+**Only-you items (front of chain):** provision **Administration:read** (unblocks C1's
+live leg) and author the **D2** ratification record (after C1). **Coordination:**
+M6-1 needs the DharmaGraph owner. **This seat can drive:** C1 hermetic-evidence
+assembly now (read-only), and the TERMINAL-PROOF verification once WP-O6 merges.
