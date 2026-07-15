@@ -142,7 +142,7 @@ def test_launcher_cannot_be_shadowed_by_the_callers_working_directory(
     env["RSI_LAB_BASE"] = str(REPO_ROOT.parent)
     env["RSI_LAB_REPO"] = str(REPO_ROOT)
     env["RSI_LAB_PYTHON"] = sys.executable
-    env["RSI_LAB_PYDEPS"] = str(tmp_path / "pydeps")
+    env["RSI_LAB_PYDEPS"] = str(REPO_ROOT.parent / "pydeps")
 
     result = subprocess.run(
         [*SCRIPT_COMMAND, "version", "--json"],
