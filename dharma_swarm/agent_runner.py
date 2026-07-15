@@ -2835,6 +2835,14 @@ class AgentRunner:
             "trace_id": metadata.get("trace_id"),
             "stop_reason": response.stop_reason if response else None,
         }
+        try:
+            evidence = getattr(
+                self._provider, "last_receipt_consumption_evidence", None
+            )
+            if evidence is not None:
+                feedback_metadata["loop1_consumption"] = evidence.to_dict()
+        except Exception:
+            logger.debug("Loop 1 consumption evidence unavailable", exc_info=True)
         if not success:
             feedback_metadata["error"] = result_text[:240]
         try:
