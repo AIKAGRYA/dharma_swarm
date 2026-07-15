@@ -1952,6 +1952,19 @@ class KimiCodeProvider(LLMProvider):
         )
         return self._client
 
+    async def close(self) -> None:
+        """Close and forget the loop-bound AsyncOpenAI client."""
+        client = self._client
+        if client is None:
+            return
+        self._client = None
+        close = getattr(client, "close", None) or getattr(client, "aclose", None)
+        if not callable(close):
+            return
+        result = close()
+        if inspect.isawaitable(result):
+            await result
+
     @staticmethod
     def _build_messages(msgs: list[dict[str, str]], system: str) -> list[dict[str, str]]:
         out: list[dict[str, str]] = []
