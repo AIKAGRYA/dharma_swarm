@@ -39,6 +39,13 @@ openai metered (429), qwen (no creds). Per MODEL_KEY_ROUTING.md:154-158, only a
 completion through the runtime's own provider class counts as a "lane works" receipt —
 these dkeys statuses are probe results, cited as such.
 
+**UPDATE 2026-07-15 16:17 UTC (§8 apply log)**: three of those failures were dkeys
+PROBER artifacts, now fixed: ollama_cloud probed a retired endpoint (`/api/chat` →
+410); openrouter probed a delisted free model (404 misread as auth-fail — the key is
+VALID, adjudicated via completion probe + `GET /api/v1/key` 200); anthropic's 400 is
+"credit balance is too low" = **valid key, zero credits**, now classified `$ funds=0`.
+Post-fix truth: **11 live · 3 valid-no-funds · 0 auth-fail · 1 no-key**.
+
 **ProviderType coverage gap** (design-relevant): `dharma_swarm/models.py:117-138` has
 no `DEEPSEEK` or `MINIMAX` provider, while dkeys tracks live `deepseek`/`minimax` keys
 and agni's hermes routes a `deepseek` lane. The renderer (D3) must therefore treat
@@ -224,9 +231,9 @@ parity is green. openclaw npm-deploys are untouched (out of scope).
 
 Physics: the Mac's Anthropic lane IS the Max plan via the `claude` CLI
 (`runtime_provider.py:213-218,308-318`) — keychain OAuth + interactive login, unusable
-headless. Additional fact: the metered `ANTHROPIC_API_KEY` in the vault currently
-probes **HTTP 400** (dkeys, 2026-07-14) — the "just use the API key" fallback is not
-live today either.
+headless. Additional fact: the metered `ANTHROPIC_API_KEY` in the vault is **valid but
+has ZERO credits** ("credit balance is too low", adjudicated 2026-07-15 §8) — the
+"just use the API key" fallback needs funding, not fixing.
 
 Ground truth from the audit: **no VPS routes to real Anthropic today.** agni's
 hermes `anthropic` lane actually points at `https://api.kimi.com/coding` (§A.1/A.4);
@@ -341,6 +348,23 @@ The exact `<TS>` values and unit names are recorded in this doc's §8 at apply t
   possibly meghadharma's `ZHIPU_API_KEY` — fingerprint not yet compared). Safe
   order: update agni (mini-apply, .bak'd) → restart Mac daemons → THEN deactivate
   both old keys at the console → re-probe both return 401.
+  **Operator ruling 2026-07-16: key-exposure risk accepted ("not worried about the
+  key being hacked at all") — old keys stay active; no deactivation, no daemon
+  churn. Item closed unless reopened.**
+
+**2026-07-15 16:16–16:17 UTC — Mac dkeys prober repair (smoothness sweep)**
+- Backup: `~/.dharma/bin/dkeys.bak.20260715T161631Z`.
+  Rollback: `cp -p ~/.dharma/bin/dkeys.bak.20260715T161631Z ~/.dharma/bin/dkeys`
+- Fixes: ollama_cloud probe `https://ollama.com/api/chat`+`glm-5:cloud` (endpoint
+  retired, 410) → `https://ollama.com/v1/chat/completions`+`glm-5.2`; openrouter
+  probe delisted-free-model POST (404→✗) → `GET /api/v1/key` (engine gained a
+  3-line GET path); classifier learned "credit balance is too low" → `$ funds=0`
+  (anthropic was misrendered ✗ auth-fail).
+- **Receipt**: `dkeys test` @ 16:17:03 UTC → 11 live · 3 valid-no-funds ·
+  **0 auth-fail** (was 9/2/3). key_oracle (`dharma_swarm/key_oracle.py`) now feeds
+  routing the truth — the TIER_FREE head lane (OLLAMA) is no longer falsely dead.
+- Reminder: `~/.dharma/bin/dkeys` still has no git home (§9 item 2) — this patch
+  widens that gap; land `scripts/dkeys.py` in the implementation PR.
 
 ## 9. Contradictions & corrections register (doctrine vs disk — reported, not resolved)
 
@@ -358,9 +382,12 @@ The exact `<TS>` values and unit names are recorded in this doc's §8 at apply t
 5. **"meghadharma closest to canon" is only shape-deep**: it has the vault path and a
    dharma_swarm clone, but its vault name-set diverges from the Mac in both directions
    and its hermes routes to Nous by default with no provider_routing block (§A.2).
-6. **Mac lane probe failures**: `ANTHROPIC_API_KEY` HTTP 400, `OPENROUTER_API_KEY`
-   HTTP 404 (dkeys 2026-07-14) — two lanes doctrine treats as available are not
-   probing live on the hub itself (§1). Re-test before any profile ships them.
+6. **Mac lane probe failures — RESOLVED 2026-07-15 as prober rot** (§1 update, §8):
+   `OPENROUTER_API_KEY` is valid (probe model was delisted → 404), `OLLAMA_API_KEY`
+   is live (probe endpoint retired → 410), `ANTHROPIC_API_KEY` is valid with ZERO
+   CREDITS (400 credit-balance error, now `$ funds=0`). Lesson for the fleet design:
+   probe endpoints/models rot — the parity harness must version its probe set and
+   distinguish auth-fail from probe-rot.
 7. **agni already holds a full-vault push (Jul 8) that nothing reads** (§A.1) — the
    de-facto key scope on agni exceeds both its hermes wiring and any D2 proposal;
    reconciliation is part of implementation, not optional cleanup.
@@ -477,6 +504,36 @@ receipts — live receipts land in §8 during implementation.
 
 meghadharma: zero inline secrets found in hermes config or its 3 baks (§A.2) —
 nothing to scrub there.
+
+### A.6 Fleet smoothness sweep — 2026-07-15 16:13–16:17 UTC (live lane probes per box)
+
+Probes ran ON each box with that box's own keys (status codes only; python via SSH):
+
+| Lane | Mac | agni | meghadharma | rushabdev |
+|---|---|---|---|---|
+| z.ai coding | ✓200 (rotated key) | ✓200 (own key, fp 2cb7f68e) | ✓200 (own key, fp **d2cd585ace8c** — a THIRD distinct z.ai key) | ✗ `GLM_API_KEY` **EMPTY** in .env |
+| openrouter | ✓200 valid | ✓200 | ✓200 | auth ✓200, but completions 402 — **account credits exhausted 07-14** |
+| ollama cloud | ✓200 | dead at gateway runtime (§A.4) | n/a | ✓200; `last_status: ok` |
+| kimi | ✓200 | ✗**401 both auth schemes** (key rejected — contradicts §A.4 "CREDENTIALED"; live probe wins) | n/a | n/a |
+| openai | oauth ✓ / metered 429 | ✓200 | n/a | oauth **exhausted until 2026-07-19 22:36 UTC** — auto-degraded gpt-5.6-sol→gpt-5.5, functioning |
+| anthropic metered | $ funds=0 | (name repurposed → kimi) | key present, unprobed | name in trading vault only |
+
+Service truth: rushabdev = 0 failed units, all 10 dharma units + both gateways active.
+agni = gateway/telegram/openclaw healthy; but 'A2A Journal Summary' hermes cron
+dead-stalled every 2h on config drift (unpinned job vs global default change
+zai→openai-api; fix = in-agent `cronjob action=update job_id=fbfae3b26e3b` — the
+`hermes cron edit` CLI has no provider/model flags), AGNI Health Monitor cron in
+alert state (exit 1 every 15m), codex-claude-sync + codex-maint units failed (exit 1).
+meghadharma = **dharma-swarm container unhealthy ×39** (health API on :7433 hangs;
+process alive; restart is the remedy — DENIED by session policy pending operator
+approval), litestream still crash-looping (destination NEVER configured anywhere
+on-box: all three LITESTREAM_* env names present with **length 0**; needs an
+S3-compatible target + creds = operator decision), dharmic-quant-cron "unhealthy" is
+a mis-copied healthcheck (curls :8080 which belongs to the web container),
+hermes-on-megha Discord adapter looping `PrivilegedIntentsRequired` ×154/6h (Discord
+dev-portal toggle needed) and Firecrawl tools erroring (no FIRECRAWL key on that box;
+rushabdev has one — divergence), loopback-binding compose fix STILL uncommitted.
+Disks: agni 82%, rushabdev 85% (~2G reclaimable in .npm/.cache), megha 30%.
 
 ## Appendix B — Security events during this audit
 
