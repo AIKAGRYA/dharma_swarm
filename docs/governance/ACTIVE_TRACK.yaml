@@ -616,10 +616,19 @@ active_tracks:
     name: Merge Master Mike — D4 persistent always-on merge agent
     status: ACTIVE
     opened_at: "2026-06-24"
-    verified_at: "2026-06-24"
+    verified_at: "2026-07-15"
     ttl_days: 21
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
+    target_closure_kind: PRODUCTION_READY
+    graduation_profile: governance_gate
+    claim_boundary: >-
+      Native Codex/Copilot reviews are accepted only from trusted installed-App
+      identities; unattended human-PR merge is authorized only after every
+      existing deterministic gate is clean. Claude remains an optional
+      deep/backup lane with no new credential. This policy and its hermetic
+      behavior are landed; PRODUCTION_READY is not claimed until a live cloud
+      canary and a ship_safe Final Boss manifest are attached.
     complements:
       - runtime-truth-reconciliation-2026-06
     owned_surfaces:
@@ -628,6 +637,8 @@ active_tracks:
       - .github/workflows/automerge.yml
       - .github/workflows/codex-mention-router.yml
       - .github/workflows/merge-master-mike-backlog.yml
+      - tests/test_merge_master_mike_daemon.py
+      - tests/test_pr_merge_control.py
       - tests/test_pr_merge_control_github_reviews.py
     moves_vital_signs:
       - quality_gates
@@ -728,16 +739,16 @@ active_tracks:
       - Do not accept a "review" from an untrusted login as a receipt; only trusted installed reviewer-App logins.
       - Do not create a new merge authority or receipt store; extend pr_merge_control and the existing workflows.
 
-    # DECISIONS pending operator ratification before gate behavior changes (PR thread):
-    #   D1 accept native GitHub reviews as receipts (Codex App, Copilot) — proposed: yes
-    #   D2 always-on cloud required reviewers = codex,copilot; claude = deep/backup lane — proposed: yes
-    #   D3 unattended human-PR auto-merge when the quorum is clean — NEEDS operator decision
-    #   D4 provision a CI credential for the cloud Claude reviewer Action — NEEDS operator action
+    # OPERATOR RATIFICATION 2026-07-15 (Five-Outcome Production Graduation Campaign):
+    #   D1 YES — trusted native GitHub reviews may satisfy receipts.
+    #   D2 YES — required cloud quorum is codex,copilot; claude is deep/backup.
+    #   D3 YES — unattended human-PR merge only when every existing gate is clean.
+    #   D4 DEFERRED — no new Claude CI credential; the optional backup lane stays off.
     next_items:
       - id: 1
-        what: "Slice 1 (blocker): bridge native GitHub reviews -> Mike receipts in the pr_merge_control gate (Codex App = codex, Copilot = copilot), trusted-login-gated and ADDITIVE (never removes a check). + tests."
+        what: "DONE: Slice 1 bridges native GitHub reviews -> Mike receipts in the pr_merge_control gate (Codex App = codex, Copilot = copilot), trusted-login-gated and ADDITIVE; landed commit and behavioral criteria below."
         kind: code
-        blocker: true
+        blocker: false
         # Underclaim probe (2026-07-03): the bridge + its test file already
         # exist on main (criteria github_review_receipt_bridge and
         # github_review_bridge_tested both pass) — this item looks shipped but
@@ -745,21 +756,21 @@ active_tracks:
         # WARN track-underclaim until the owner reconciles it.
         evidence_criterion: github_review_bridge_tested
       - id: 2
-        what: "Slice 2: auto-enroll every non-draft PR into the automerge/Mike evaluate lane (not only bot-pr / automerge-labeled)."
+        what: "DONE: Slice 2 auto-enrolls every non-draft PR into the Mike evaluate lane via mike-watch without waiving reviewer receipts."
         kind: code
         blocker: false
       - id: 3
-        what: "Slice 3 (operator-gated): cloud Claude reviewer GitHub Action that runs run-agent and posts a claude receipt on PR open/sync (needs an ANTHROPIC API credential as a repo secret — decision D4)."
+        what: "DEFERRED by operator decision D4: no cloud Claude credential; Claude remains an optional deep/backup reviewer and is not part of the required cloud quorum."
         kind: code
         blocker: false
       - id: 4
-        what: "Slice 4: Mike cloud heartbeat (scheduled wake / living-agent receipt) so D4 presence is continuous and machine-independent; keep the Mac daemon as an optional local mirror."
+        what: "DONE: merge-master-mike-backlog.yml carries an hourly packet-only, merge-off cloud heartbeat with codex,copilot native-review parity; the Mac daemon remains an optional mirror."
         kind: code
         blocker: false
       - id: 5
-        what: "Operator ratification of decisions D1-D4 before any merge-authority behavior changes."
+        what: "RATIFIED 2026-07-15: D1/D2/D3 approved under the fail-closed claim boundary above; D4 explicitly deferred without weakening the required cloud quorum."
         kind: governance
-        blocker: true
+        blocker: false
 
   - id: organism-rewire-2026-07
     name: Organism Rewire — dormant organs to production, spine standing-on, external gradients
