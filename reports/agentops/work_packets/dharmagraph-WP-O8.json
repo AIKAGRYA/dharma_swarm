@@ -193,10 +193,10 @@
     "honest_blockers": [
       "This branch resolves only the DharmaGraph-owned configuration prerequisite. The onboard-one-door M6-1 ledger item remains open until this PR merges and a separate onboarding governance record cites its merge commit.",
       "No WP-O6 implementation, mutation-score claim, or parity-score improvement is included; the full mutation run remains part of WP-O6. The resealed parity evidence preserves the observed 52.00/100 score and 34 open gaps.",
-      "Before closeout, the builder receipt must be regenerated in this implementation lane and a separate non-author agent seat must emit the judge receipt, reconcile the stable digest, and replay the gauntlet. Agreement may preserve NOT_FINISHED evidence but cannot promote the score.",
-      "The fresh judge signature has Candidate[source_review] status only. It does not become ratified authority merely because an agent can compute it; M6 remains unmergeable until a separate operator-reviewed source-ratification commit is an ancestor."
+      "The builder receipt was regenerated in this implementation lane. A separate non-author judge (codex-independent-m6-1-20260716-7f4c1a92) emitted the judge receipt: reconciliation MATCH, stable digest a3a8c4e7be2bb03a096b6f9217145ec5068aae77c62f015d9929d6426cfdd174, score 52.00/100, 34 gaps, verdict NOT_FINISHED.",
+      "The fresh judge signature fe8d9625bd3a7a86628fd27606b2e7c83a13b21af71cb60c80d245eb3a1e7384 has Candidate[source_review] status only. It does not become ratified authority merely because an agent can compute it; M6 remains unmergeable until a separate operator-reviewed source-ratification commit is an ancestor."
     ],
     "rollback": "revert the pyproject.toml mutmut widening, resealed builder/judge/matrix evidence, and this packet together; reopen M6-1 explicitly",
-    "packet_digest": "c4f20c63b413378cf1844914cf0f610a2a2bdd2e2371e1673d3949278296e40f"
+    "packet_digest": "6d45163c0c042417a2f33d24824bb4aba0bbc213a88321ef264bff6e4a356b9e"
   }
 }

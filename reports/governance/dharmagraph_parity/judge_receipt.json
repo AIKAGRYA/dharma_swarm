@@ -10030,25 +10030,25 @@
               ],
               "command_or_probe": "time both arms for 5 iterations",
               "dharma": {
-                "median_seconds": 0.009099334012717009,
+                "median_seconds": 0.010170834022574127,
                 "samples_seconds": [
-                  0.009766416973434389,
-                  0.009253332973457873,
-                  0.009042958030477166,
-                  0.009099334012717009,
-                  0.008724416024051607
+                  0.010829417034983635,
+                  0.010170834022574127,
+                  0.0107406250317581,
+                  0.009932666027452797,
+                  0.009556000004522502
                 ]
               },
               "id": "performance:seeded_checkpoint_resume_fork",
               "kind": "wall_clock_performance",
               "langgraph": {
-                "median_seconds": 0.0027849579928442836,
+                "median_seconds": 0.0033479579724371433,
                 "samples_seconds": [
-                  0.0028009579982608557,
-                  0.0026310410466976464,
-                  0.0028118750196881592,
-                  0.00255237496457994,
-                  0.0027849579928442836
+                  0.0036150419618934393,
+                  0.0033479579724371433,
+                  0.003605791018344462,
+                  0.003231208014767617,
+                  0.003235124982893467
                 ]
               },
               "outcome": "measured_semantics_parity"
@@ -10140,25 +10140,25 @@
               ],
               "command_or_probe": "time both arms for 5 iterations",
               "dharma": {
-                "median_seconds": 0.00036862498382106423,
+                "median_seconds": 0.0005202079773880541,
                 "samples_seconds": [
-                  0.000622958003077656,
-                  0.00039350002771243453,
-                  0.0003310000174678862,
-                  0.00036862498382106423,
-                  0.00032454199390485883
+                  0.0006984579958952963,
+                  0.0005997080006636679,
+                  0.0004201250267215073,
+                  0.0005202079773880541,
+                  0.0004347500507719815
                 ]
               },
               "id": "performance:seeded_linear_reducer_chain",
               "kind": "wall_clock_performance",
               "langgraph": {
-                "median_seconds": 0.0016348340432159603,
+                "median_seconds": 0.0024206670350395143,
                 "samples_seconds": [
-                  0.0018670840072445571,
-                  0.0016348340432159603,
-                  0.0017684160266071558,
-                  0.0015871250070631504,
-                  0.0015704580000601709
+                  0.002262790978420526,
+                  0.003104915958829224,
+                  0.002475875022355467,
+                  0.002215875021647662,
+                  0.0024206670350395143
                 ]
               },
               "outcome": "measured_semantics_parity"
@@ -10199,9 +10199,9 @@
               ],
               "command_or_probe": "compute Dharma median / LangGraph median",
               "dharma": {
-                "seeded_checkpoint_resume_fork": 3.2673146367367067,
-                "seeded_linear_reducer_chain": 0.2254815926734217,
-                "seeded_send_map_reduce": 0.2830362489060845
+                "seeded_checkpoint_resume_fork": 3.0379216544257504,
+                "seeded_linear_reducer_chain": 0.21490273955813274,
+                "seeded_send_map_reduce": 0.307840929133124
               },
               "id": "performance:overhead-ratios",
               "kind": "wall_clock_performance",
@@ -10246,25 +10246,25 @@
               ],
               "command_or_probe": "time both arms for 5 iterations",
               "dharma": {
-                "median_seconds": 0.0003133330028504133,
+                "median_seconds": 0.0005303329671733081,
                 "samples_seconds": [
-                  0.00031795899849385023,
-                  0.0003347909660078585,
-                  0.0002780419890768826,
-                  0.0003133330028504133,
-                  0.00029670802177861333
+                  0.0007306250045076013,
+                  0.00038583303103223443,
+                  0.000378625001758337,
+                  0.008430082991253585,
+                  0.0005303329671733081
                 ]
               },
               "id": "performance:seeded_send_map_reduce",
               "kind": "wall_clock_performance",
               "langgraph": {
-                "median_seconds": 0.0011070419568568468,
+                "median_seconds": 0.0017227500211447477,
                 "samples_seconds": [
-                  0.0011645830236375332,
-                  0.0010946249822154641,
-                  0.0010833749547600746,
-                  0.0014300420298241079,
-                  0.0011070419568568468
+                  0.0020999579573981464,
+                  0.0015149160171858966,
+                  0.0017227500211447477,
+                  0.0016915830201469362,
+                  0.0019338750280439854
                 ]
               },
               "outcome": "measured_semantics_parity"
@@ -11244,7 +11244,7 @@
       "supply_eta_risk"
     ]
   },
-  "digest": "80baf1feb9563f958b4ca5d74207610b8e8713a299976e00beb97c7974434c93",
+  "digest": "f473285fd17c78a506a9781f8ac2a073314c46ec6bafc72c9fa1aeff1210dd55",
   "environment": {
     "langgraph_checkpoint_sqlite_version": "3.1.0",
     "langgraph_checkpoint_version": "4.1.1",
@@ -11529,12 +11529,12 @@
   ],
   "judge": {
     "attestation": "I independently re-ran the committed gauntlet and compared the mechanical grade to the builder receipt.",
-    "builder_receipt_digest": "9783f9cbce333d8eabb27964ee2cd402051ec2828d0e27cc68d0217505af5917",
-    "builder_stable_digest": "e865481c9ea8ee0350a50aafdaa1b0bfd5b143a31ceea6da65e9bf5dd40952b7",
+    "builder_receipt_digest": "411fb0624f493a3913846d2fb035b17076861c5cf7b0e014cf5c333093789187",
+    "builder_stable_digest": "a3a8c4e7be2bb03a096b6f9217145ec5068aae77c62f015d9929d6426cfdd174",
     "discrepancy_is_finding": false,
-    "judge_id": "codex-judge-3d40063d8",
+    "judge_id": "codex-independent-m6-1-20260716-7f4c1a92",
     "reconciliation": "MATCH",
-    "signature": "72198603d0178b5bf86221552fd920049ded646ac4f020191532b2d80a5c8566"
+    "signature": "fe8d9625bd3a7a86628fd27606b2e7c83a13b21af71cb60c80d245eb3a1e7384"
   },
   "non_gating_drift_check": {
     "behavioral_execution_against_latest": false,
@@ -11551,7 +11551,7 @@
       "version": "1.2.8"
     }
   },
-  "observed_at": "2026-07-15T17:52:39Z",
+  "observed_at": "2026-07-15T23:58:20Z",
   "performance": {
     "clock": "time.perf_counter",
     "environment_metadata": {
@@ -11566,83 +11566,83 @@
     "workloads": {
       "seeded_checkpoint_resume_fork": {
         "dharma": {
-          "median_seconds": 0.009099334012717009,
+          "median_seconds": 0.010170834022574127,
           "samples_seconds": [
-            0.009766416973434389,
-            0.009253332973457873,
-            0.009042958030477166,
-            0.009099334012717009,
-            0.008724416024051607
+            0.010829417034983635,
+            0.010170834022574127,
+            0.0107406250317581,
+            0.009932666027452797,
+            0.009556000004522502
           ]
         },
-        "dharma_median_seconds": 0.009099334012717009,
+        "dharma_median_seconds": 0.010170834022574127,
         "iterations": 5,
         "langgraph": {
-          "median_seconds": 0.0027849579928442836,
+          "median_seconds": 0.0033479579724371433,
           "samples_seconds": [
-            0.0028009579982608557,
-            0.0026310410466976464,
-            0.0028118750196881592,
-            0.00255237496457994,
-            0.0027849579928442836
+            0.0036150419618934393,
+            0.0033479579724371433,
+            0.003605791018344462,
+            0.003231208014767617,
+            0.003235124982893467
           ]
         },
-        "langgraph_median_seconds": 0.0027849579928442836,
-        "overhead_ratio_dharma_to_langgraph": 3.2673146367367067,
+        "langgraph_median_seconds": 0.0033479579724371433,
+        "overhead_ratio_dharma_to_langgraph": 3.0379216544257504,
         "semantic_parity_all_iterations": true
       },
       "seeded_linear_reducer_chain": {
         "dharma": {
-          "median_seconds": 0.00036862498382106423,
+          "median_seconds": 0.0005202079773880541,
           "samples_seconds": [
-            0.000622958003077656,
-            0.00039350002771243453,
-            0.0003310000174678862,
-            0.00036862498382106423,
-            0.00032454199390485883
+            0.0006984579958952963,
+            0.0005997080006636679,
+            0.0004201250267215073,
+            0.0005202079773880541,
+            0.0004347500507719815
           ]
         },
-        "dharma_median_seconds": 0.00036862498382106423,
+        "dharma_median_seconds": 0.0005202079773880541,
         "iterations": 5,
         "langgraph": {
-          "median_seconds": 0.0016348340432159603,
+          "median_seconds": 0.0024206670350395143,
           "samples_seconds": [
-            0.0018670840072445571,
-            0.0016348340432159603,
-            0.0017684160266071558,
-            0.0015871250070631504,
-            0.0015704580000601709
+            0.002262790978420526,
+            0.003104915958829224,
+            0.002475875022355467,
+            0.002215875021647662,
+            0.0024206670350395143
           ]
         },
-        "langgraph_median_seconds": 0.0016348340432159603,
-        "overhead_ratio_dharma_to_langgraph": 0.2254815926734217,
+        "langgraph_median_seconds": 0.0024206670350395143,
+        "overhead_ratio_dharma_to_langgraph": 0.21490273955813274,
         "semantic_parity_all_iterations": true
       },
       "seeded_send_map_reduce": {
         "dharma": {
-          "median_seconds": 0.0003133330028504133,
+          "median_seconds": 0.0005303329671733081,
           "samples_seconds": [
-            0.00031795899849385023,
-            0.0003347909660078585,
-            0.0002780419890768826,
-            0.0003133330028504133,
-            0.00029670802177861333
+            0.0007306250045076013,
+            0.00038583303103223443,
+            0.000378625001758337,
+            0.008430082991253585,
+            0.0005303329671733081
           ]
         },
-        "dharma_median_seconds": 0.0003133330028504133,
+        "dharma_median_seconds": 0.0005303329671733081,
         "iterations": 5,
         "langgraph": {
-          "median_seconds": 0.0011070419568568468,
+          "median_seconds": 0.0017227500211447477,
           "samples_seconds": [
-            0.0011645830236375332,
-            0.0010946249822154641,
-            0.0010833749547600746,
-            0.0014300420298241079,
-            0.0011070419568568468
+            0.0020999579573981464,
+            0.0015149160171858966,
+            0.0017227500211447477,
+            0.0016915830201469362,
+            0.0019338750280439854
           ]
         },
-        "langgraph_median_seconds": 0.0011070419568568468,
-        "overhead_ratio_dharma_to_langgraph": 0.2830362489060845,
+        "langgraph_median_seconds": 0.0017227500211447477,
+        "overhead_ratio_dharma_to_langgraph": 0.307840929133124,
         "semantic_parity_all_iterations": true
       }
     }
@@ -16419,7 +16419,7 @@
   "role": "judge",
   "rubric": {
     "base_rubric_commit_sha": "6965d38dc8df4bc487e97465ed2f08ffa8274e31",
-    "head_sha": "3d40063d815b2f89b39e48fdb214cf5a3bc52491",
+    "head_sha": "6ab1ab40af3e5ef42244c3f631f6244eff1d9274",
     "rubric_blob_digest": "44ba1f42550563b3f2b5e167b80440250228e4b3d045a2654c9e8b62c87d2338",
     "rubric_commit_sha": "9fe56ce57deba94c2f0bdee03028145a2ae7b2cc",
     "rubric_predates_head": true,
@@ -16432,7 +16432,7 @@
     "possible": "100.00"
   },
   "shas": {
-    "dharma_git_sha": "3d40063d815b2f89b39e48fdb214cf5a3bc52491",
+    "dharma_git_sha": "6ab1ab40af3e5ef42244c3f631f6244eff1d9274",
     "langgraph_git_sha": "054a6f3d8b48d022a4881af3ba3dc0ddc3ac0690",
     "rubric_commit_sha": "9fe56ce57deba94c2f0bdee03028145a2ae7b2cc"
   },
@@ -16599,7 +16599,7 @@
     },
     {
       "path": "pyproject.toml",
-      "sha256": "71a54eaa86072392062158936a17a5557bd6684f1c3f7a5e637dee98886af713"
+      "sha256": "f9c33422778df45f657bf4b0737c5eea7401ce77faf4b50d93821b2d70fcbc7d"
     },
     {
       "path": "scripts/governance/dharmagraph_parity_gauntlet.py",
@@ -16642,7 +16642,7 @@
       "sha256": "7c5a84fce68c1aee7a23124d286c60abb460516822861b97924bd42402e2c369"
     }
   ],
-  "source_tree_digest": "da3654adb536efcdca4ab98baeab79be875a66d7194d2f985e5eda59731b8913",
+  "source_tree_digest": "6feba7276eb2f7f90eb1b81cc2cc4fe4fb35d120e8175d3978af3c11cbc511ae",
   "stable_core": {
     "capabilities": [
       {
@@ -17388,7 +17388,7 @@
     "schema": "dharma_swarm.dharmagraph_parity_receipt.stable.v1",
     "score": "52.00",
     "seed": 20260711,
-    "source_tree_digest": "da3654adb536efcdca4ab98baeab79be875a66d7194d2f985e5eda59731b8913",
+    "source_tree_digest": "6feba7276eb2f7f90eb1b81cc2cc4fe4fb35d120e8175d3978af3c11cbc511ae",
     "target": {
       "checkpoint_distribution": "langgraph-checkpoint==4.1.1",
       "distribution": "langgraph",
@@ -17405,6 +17405,6 @@
     },
     "weight_denominator": 100
   },
-  "stable_digest": "e865481c9ea8ee0350a50aafdaa1b0bfd5b143a31ceea6da65e9bf5dd40952b7",
+  "stable_digest": "a3a8c4e7be2bb03a096b6f9217145ec5068aae77c62f015d9929d6426cfdd174",
   "verdict": "NOT_FINISHED"
 }
