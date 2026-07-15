@@ -22,8 +22,8 @@ name: pr-dedupe
 #   merge value — their data is a projection already rendered from owners
 #   (`make onboard`, reports/governance/**) — so this pass CLOSES every such
 #   snapshot PR outright (not keep-newest) with a governance comment + branch
-#   cleanup. The match is conservative: same-repo owner AND an automation marker
-#   AND a known snapshot intent (title phrase or headRef lane).
+#   cleanup. The match is conservative: same-repo owner AND a known snapshot
+#   intent, plus either an automation marker or a declared snapshot-only branch.
 #
 #   Pass 2 — duplicate consolidation: groups remaining open PRs by normalized
 #   title (lowercased, whitespace collapsed, timestamps stripped) and, for
@@ -82,24 +82,33 @@ jobs:
             > /tmp/open_prs.json
 
           # A snapshot-report PR is a pure status projection that should never
-          # have been a PR. Match conservatively: same-repo owner AND an
-          # automation marker in the title AND a known snapshot intent (either
-          # the title phrase or the headRef lane the external generator uses).
-          jq -c '
+          # have been a PR. The external Oz lane historically omitted
+          # [automated] while using the dedicated chore/ops-report-* branch, so
+          # accept either a title marker or that declared snapshot-only branch.
+          # The same-repo-owner check remains mandatory because this workflow
+          # runs with pull_request_target write credentials.
+          SNAPSHOT_FILTER="$(cat <<'JQ'
             def trusted($owner): ((.headRepositoryOwner.login // "") == $owner);
             def snapshot_intent:
               ((.title // "") | ascii_downcase) as $t
               | ((.headRefName // "") | ascii_downcase) as $h
-              | ($t | test("\\[automated\\]|\\[auto\\]"))
+              | (
+                  ($t | test("\\[automated\\]|\\[auto\\]"))
+                  or ($h | test("^chore/ops-report-"))
+                )
                 and (
                   ($t | test("pr lifecycle \\+ spine adoption ops report"))
+                  or ($t | test("(^|[^a-z])ops report([^a-z]|$)"))
                   or ($t | test("refresh spine adoption metric"))
                   or ($h | test("pr-lifecycle-spine"))
                   or ($h | test("spine-adoption-metric"))
                 );
             [ .[] | select(trusted($repo_owner)) | select(snapshot_intent) ]
             | sort_by(.number) | .[]
-          ' --arg repo_owner "$repo_owner" /tmp/open_prs.json > /tmp/snapshot_prs.jsonl || true
+          JQ
+          )"
+          jq -c "$SNAPSHOT_FILTER" --arg repo_owner "$repo_owner" \
+            /tmp/open_prs.json > /tmp/snapshot_prs.jsonl || true
 
           closed_count=0
           summary="## Ephemeral Snapshot-Report PR Cleanup\n\n"
