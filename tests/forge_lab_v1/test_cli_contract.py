@@ -101,13 +101,16 @@ def test_default_checkout_selection_survives_inaccessible_remote_path(
     )
 
 
-def test_launcher_exports_custom_base_as_reported_identity() -> None:
+def test_launcher_exports_custom_base_as_reported_identity(tmp_path: Path) -> None:
+    base = tmp_path / "current"
+    base.mkdir()
+    (base / "repo").symlink_to(REPO_ROOT, target_is_directory=True)
     env = os.environ.copy()
     env["PYTHONPATH"] = _pythonpath(env)
-    env["RSI_LAB_BASE"] = "/srv/rsi-lab/current"
+    env["RSI_LAB_BASE"] = str(base)
     env["RSI_LAB_REPO"] = ""
     env["RSI_LAB_PYTHON"] = sys.executable
-    env["RSI_LAB_PYDEPS"] = "/srv/rsi-lab/current/pydeps"
+    env["RSI_LAB_PYDEPS"] = str(base / "pydeps")
 
     result = subprocess.run(
         [*SCRIPT_COMMAND, "version", "--json"],
@@ -120,7 +123,41 @@ def test_launcher_exports_custom_base_as_reported_identity() -> None:
 
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
-    assert payload["result"]["canonical_checkout"] == "/srv/rsi-lab/current/repo"
+    assert payload["result"]["canonical_checkout"] == str(base / "repo")
+
+
+def test_launcher_cannot_be_shadowed_by_the_callers_working_directory(
+    tmp_path: Path,
+) -> None:
+    shadow = tmp_path / "shadow"
+    rogue = shadow / "dharma_swarm" / "forge_lab"
+    rogue.mkdir(parents=True)
+    (shadow / "dharma_swarm" / "__init__.py").write_text("", encoding="utf-8")
+    (rogue / "__init__.py").write_text("", encoding="utf-8")
+    (rogue / "__main__.py").write_text(
+        'print("{\\"rogue\\": true}")\n', encoding="utf-8"
+    )
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(shadow)
+    env["RSI_LAB_BASE"] = str(REPO_ROOT.parent)
+    env["RSI_LAB_REPO"] = str(REPO_ROOT)
+    env["RSI_LAB_PYTHON"] = sys.executable
+    env["RSI_LAB_PYDEPS"] = str(tmp_path / "pydeps")
+
+    result = subprocess.run(
+        [*SCRIPT_COMMAND, "version", "--json"],
+        cwd=shadow,
+        env=env,
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload.get("rogue") is not True
+    assert payload["schema"] == "forge_lab.cli_result.v1"
+    assert payload["result"]["source_checkout"] == str(REPO_ROOT)
 
 
 def test_module_and_repo_script_share_the_same_version_identity() -> None:

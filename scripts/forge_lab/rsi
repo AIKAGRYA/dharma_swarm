@@ -18,9 +18,14 @@ if [[ ! -x "${python}" ]]; then
     printf 'rsi: canonical Python is not executable: %s\n' "${python}" >&2
     exit 2
 fi
+if [[ ! -d "${repo}/dharma_swarm/forge_lab" ]]; then
+    printf 'rsi: canonical checkout is not readable: %s\n' "${repo}" >&2
+    exit 2
+fi
 
 export PYTHONDONTWRITEBYTECODE=1
 export RSI_LAB_BASE="${base}"
 export RSI_LAB_REPO="${repo}"
 export PYTHONPATH="${repo}:${pydeps}${PYTHONPATH:+:${PYTHONPATH}}"
+cd "${repo}"
 exec "${python}" -m dharma_swarm.forge_lab "$@"
