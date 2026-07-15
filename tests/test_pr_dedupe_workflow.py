@@ -9,6 +9,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "pr-dedupe.yml"
 DOCOPS_RECONCILE = REPO_ROOT / ".github" / "workflows" / "docops-reconcile-main.yml"
+ACTIVE_TRACK_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "active-track.yml"
 
 
 def _snapshot_filter() -> str:
@@ -107,3 +108,13 @@ def test_docops_reconcile_skips_remote_byte_identical_refresh() -> None:
     assert "Canonical DocOps bytes already match the open rolling PR" in text
     assert text.index(remote_compare) < text.index("git commit")
     assert text.index(remote_compare) < text.index('git push --force origin')
+
+
+def test_active_track_pr_gate_installs_executable_criterion_dependencies() -> None:
+    text = ACTIVE_TRACK_WORKFLOW.read_text(encoding="utf-8")
+    gate_setup = text.split(
+        "- name: Evaluate ACTIVE_TRACK.yaml against tree", 1
+    )[0]
+
+    assert 'python3 -m pip install -e ".[dev]"' in gate_setup
+    assert "python3 -m pip install pyyaml" not in gate_setup
