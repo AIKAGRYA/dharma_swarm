@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 from functools import lru_cache
 from pathlib import Path
@@ -11,7 +12,14 @@ PACKAGE_NAME = "dharma_swarm.forge_lab"
 PACKAGE_VERSION = "0.1.0-dev"
 CLI_RESULT_SCHEMA = "forge_lab.cli_result.v1"
 IMPLEMENTATION_STATUS = "cli_skeleton"
-CANONICAL_CHECKOUT = Path("/root/rsi-lab/current/repo")
+_DEFAULT_LAB_BASE = (
+    Path("/root/rsi-lab/current")
+    if Path("/root/rsi-lab/current").is_dir()
+    else Path.home() / ".dharma" / "rsi-lab" / "current"
+)
+CANONICAL_CHECKOUT = Path(
+    os.environ.get("RSI_LAB_REPO", _DEFAULT_LAB_BASE / "repo")
+)
 SOURCE_CHECKOUT = Path(__file__).resolve().parents[2]
 
 

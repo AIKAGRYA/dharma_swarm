@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Keep the repo-owned development launcher pinned to the canonical Forge Lab
-# environment. Each location remains overridable for an isolated checkout.
-base="${RSI_LAB_BASE:-/root/rsi-lab/current}"
+# Keep every launcher pinned to the host's immutable current release. The Mac
+# and Meghadharma intentionally use different runtime roots but identical code.
+if [[ -n "${RSI_LAB_BASE:-}" ]]; then
+    base="${RSI_LAB_BASE}"
+elif [[ -d /root/rsi-lab/current ]]; then
+    base="/root/rsi-lab/current"
+else
+    base="${HOME}/.dharma/rsi-lab/current"
+fi
 repo="${RSI_LAB_REPO:-${base}/repo}"
 python="${RSI_LAB_PYTHON:-${base}/.venv/bin/python}"
 pydeps="${RSI_LAB_PYDEPS:-${base}/pydeps}"
@@ -13,5 +19,6 @@ if [[ ! -x "${python}" ]]; then
     exit 2
 fi
 
+export PYTHONDONTWRITEBYTECODE=1
 export PYTHONPATH="${repo}:${pydeps}${PYTHONPATH:+:${PYTHONPATH}}"
 exec "${python}" -m dharma_swarm.forge_lab "$@"

@@ -4,6 +4,10 @@ This runbook records the Packet A checkout decision for MeghaDharma. It is an
 operational projection of `specs/FORGE_LAB_V0_1_0_SPEC.md`; the specification
 remains authoritative if this runbook drifts.
 
+The cross-host release and drift contract is defined in
+[`RSI_LAB_SYNC.md`](RSI_LAB_SYNC.md). Use `rsi sync`; never copy an active
+checkout or mutable state between hosts.
+
 ## Canonical roots
 
 Use the stable logical paths below in commands, manifests, receipts, and
@@ -17,6 +21,11 @@ the `current` symlink.
 | Durable isolated state | `/root/rsi-lab/current/state` |
 | Python environment | `/root/rsi-lab/current/.venv` |
 | Supplemental Python dependencies | `/root/rsi-lab/current/pydeps` |
+
+`/root/rsi-lab/current` is an atomic symlink to an immutable full-SHA release.
+Its `state`, `.venv`, `pydeps`, and optional `secrets` entries are symlinks to
+stable host-owned anchors outside the checkout. A code release switch therefore
+does not move or copy any database, WAL, archive, credential, or provider key.
 
 New Forge Lab v0.1 work, validation, installation, and campaign commands start
 from `/root/rsi-lab/current/repo` and use the other roots in that table.
