@@ -67,8 +67,8 @@ def _log_auth_mode() -> None:
         )
     elif not api_key.strip():
         logger.error(
-            "%s is set but blank; dashboard HTTP and WebSocket auth are fail-closed",
-            DASHBOARD_API_KEY_ENV,
+            "DASHBOARD_API_KEY is set but blank; dashboard HTTP and WebSocket "
+            "auth are fail-closed"
         )
     else:
         logger.info("Bearer token auth enabled for /api/* routes.")

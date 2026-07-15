@@ -146,8 +146,8 @@ async def authenticate_dashboard_websocket(
     if expected is not None:
         if not expected.strip():
             logger.error(
-                "%s is set but blank; dashboard WebSocket auth is fail-closed",
-                DASHBOARD_API_KEY_ENV,
+                "DASHBOARD_API_KEY is set but blank; dashboard WebSocket auth "
+                "is fail-closed"
             )
             await websocket.close(code=1011, reason="dashboard auth misconfigured")
             return DashboardWebSocketAuth(authorized=False)

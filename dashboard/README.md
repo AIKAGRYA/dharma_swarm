@@ -1,14 +1,14 @@
 # DHARMA COMMAND Dashboard
 
-This directory is the canonical base for the newer web operator UI.
+This directory contains the newer web operator UI.
 
 It is not a consumer product site. It is the browser control surface for
 `dharma_swarm`.
 
-## Canonical stance
+## Operator stance
 
 - TUI is the primary operator cockpit.
-- This dashboard is the canonical web operator surface.
+- This dashboard is the web operator surface.
 - `SwarmLens` remains a legacy/alternate web surface in
   `dharma_swarm/swarmlens_app.py`.
 - The richer operator-shell reference snapshot is commit `6b1ad1b`.
@@ -98,7 +98,7 @@ These launch agents call the repo-owned runner scripts:
 - `run_operator.sh`
 - `scripts/run_dashboard_ui.sh`
 
-That keeps one canonical startup path for the product shell, the local GUI, and
+That keeps one startup path for the product shell, the local GUI, and
 future packaging work.
 
 ## Runtime surface
