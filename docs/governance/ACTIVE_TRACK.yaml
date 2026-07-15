@@ -1344,7 +1344,7 @@ active_tracks:
     moves_vital_signs:
       - quality_gates
       - security_guardrails
-    target_closure_kind: SUBSTRATE_TRUSTED
+    target_closure_kind: CLOSED_NOT_PROD
     graduation_profile: governance_gate
     claim_boundary: |
       The gate MACHINERY is landed and CI-enforced (each completion criterion

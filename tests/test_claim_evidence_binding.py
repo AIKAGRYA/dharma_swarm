@@ -111,9 +111,13 @@ def test_pudgala_rigor_is_in_both_required_check_manifests() -> None:
 
     required_ids = {row["id"] for row in truth["required"]}
     required_contexts = {row["context"] for row in parity["required_contexts"]}
+    workflow = (
+        REPO_ROOT / ".github/workflows/pudgala-rigor.yml"
+    ).read_text(encoding="utf-8")
 
     assert "pudgala_rigor" in required_ids
     assert "rigor" in required_contexts
+    assert 'python3 -m pip install -e ".[dev]"' in workflow
 
 
 def test_receipt_command_line_records_actual_flags() -> None:
