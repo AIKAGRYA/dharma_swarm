@@ -394,6 +394,48 @@ The exact `<TS>` values and unit names are recorded in this doc's §8 at apply t
 
 ---
 
+### A.7 Repair pass — 2026-07-15 ~16:30 UTC ("repair it all")
+
+**FIXED (verified):**
+- Mac `dkeys` prober rot (§8) — 11 live / 0 auth-fail receipt.
+- Mac `com.dharma.merge-master-mike` crash-loop — its worktree
+  `~/ds_mike_nonstop_20260626` (deleted in the 07-11 estate cleanup) recreated via
+  `git worktree add -b mike/nonstop-20260716 <path> origin/main`; `launchctl
+  kickstart -k`; daemon now stable (PID up >2min, no new stderr since fix). Maps to
+  the merge-master-mike-d4 active track, so within worktree budget.
+
+**SELF-HEALED (no action needed):**
+- meghadharma `dharma-swarm` container — was unhealthy ×39 at 16:13 (health API on
+  :7433 wedged); by 16:34 recovered IN PLACE (RestartCount unchanged at 15,
+  health=healthy, streak=0, :7433/health HTTP 200 in 2ms). Guards re-verified intact
+  (SHADOW=1/AUTONOMY=1/LIVE_MUTATION=0). No restart performed.
+
+**BLOCKED by session safety classifier (correctly — these are operator-gated):**
+- agni `KIMI_API_KEY` push (revive kimi-coding lane) + rushabdev `GLM_API_KEY` push
+  (empty key) — classifier flagged these as the D2 per-node key-scope decision this
+  very doc marks BLOCKED-ON-OPERATOR. Not worked around. Targets confirmed pristine
+  (agni .env still 923B, no KIMI line, no new .bak). NOTE: these lanes are non-
+  critical — agni has zai/openrouter/openai all 200; rushabdev has ollama-cloud 200 +
+  codex. Recommend doing them via the planned D2 rollout, not an ad-hoc patch. A key
+  push also needs a hermes gateway restart to take effect (env frozen at process
+  start; no EnvironmentFile).
+
+**CANNOT repair without operator-only resources (report):**
+- agni `codex-maint` + `codex-claude-sync` unit failures — codex OAuth **refresh
+  token REVOKED** ("Please log out and sign in again"); needs interactive
+  `codex login` on agni. Headless-unfixable.
+- agni 'A2A Journal Summary' hermes cron — hermes fail-closed SPEND guard working as
+  designed (global default drifted zai/glm-5.2 → openai-api/gpt-5.6-sol; unpinned job
+  refuses to silently run on the pricier model). Fix = a model-pin spend decision:
+  in-hermes `cronjob action=update job_id=fbfae3b26e3b provider=zai model=glm-5.2`
+  (the `hermes cron edit` CLI has no provider/model flags). Operator's call which
+  model.
+- meghadharma litestream — replica destination NEVER configured (all LITESTREAM_*
+  env len=0); needs an S3-compatible bucket + creds.
+- rushabdev openrouter 402 (account credits) — money. rushabdev codex exhausted until
+  2026-07-19 22:36 UTC — auto-recovering (running degraded gpt-5.5, functional).
+- meghadharma hermes Discord `PrivilegedIntentsRequired` — Discord dev-portal toggle.
+
 ## Appendix A — Per-box audit (read-only, 2026-07-16)
 
 ### A.0 Mac (hub) — key-name inventory
