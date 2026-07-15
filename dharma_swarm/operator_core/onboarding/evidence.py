@@ -45,14 +45,29 @@ CONTRACT_SOURCES = (
 _PROJECTION_STALE_MINUTES = 24 * 60
 
 
-def _git(*args: str, cwd: Path = REPO_ROOT) -> str:
+def _git_probe(*args: str, cwd: Path = REPO_ROOT) -> tuple[str, str]:
+    """One read-only Git observation: ``(stdout, typed_error)``.
+
+    ``typed_error`` is ``""`` on success; a nonzero exit, timeout, or OSError
+    yields a non-empty typed string so callers can distinguish "empty output"
+    from "probe failed" (O3R-B1)."""
+    command = "git " + " ".join(args)
     try:
         proc = subprocess.run(
             ["git", *args], cwd=cwd, capture_output=True, text=True, timeout=30,
         )
-    except (OSError, subprocess.TimeoutExpired):
-        return ""
-    return proc.stdout.strip() if proc.returncode == 0 else ""
+    except subprocess.TimeoutExpired:
+        return "", f"timeout after 30s: {command}"
+    except OSError as exc:
+        return "", f"{type(exc).__name__}: {command}"
+    if proc.returncode != 0:
+        return "", f"exit {proc.returncode}: {command}"
+    return proc.stdout.strip(), ""
+
+
+def _git(*args: str, cwd: Path = REPO_ROOT) -> str:
+    output, _error = _git_probe(*args, cwd=cwd)
+    return output
 
 
 def _sha256_file(path: Path) -> str:
@@ -78,28 +93,52 @@ def repo_identity() -> dict[str, str]:
     }
 
 
-def repo_live_state(base_ref: str = "origin/main") -> dict[str, Any]:
-    """Volatile repository state for the live partition."""
-    status = _git("status", "--porcelain")
+def observe_repo_live_state(
+    base_ref: str = "origin/main",
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """Volatile repository state plus typed probe errors (O3R-B1).
+
+    Returns ``(state, errors)`` where ``state`` keeps the exact five-key
+    ``live_delta.repo_state`` shape the v2 receipt validates, and ``errors``
+    maps probe name (``status``, ``ahead_behind``) to a typed error string.
+    A failed status probe reports ``dirty=True`` fail-closed — the state is
+    not provably clean; the caller owns turning errors into conditions."""
+    errors: dict[str, str] = {}
+    status, error = _git_probe("status", "--porcelain")
+    if error:
+        errors["status"] = error
     conflicted = any(
         line[:2] in {"DD", "AU", "UD", "UA", "DU", "AA", "UU"}
         for line in status.splitlines()
     )
     ahead = behind = 0
-    counts = _git("rev-list", "--left-right", "--count", f"{base_ref}...HEAD")
-    if counts:
+    counts, error = _git_probe(
+        "rev-list", "--left-right", "--count", f"{base_ref}...HEAD"
+    )
+    if error:
+        errors["ahead_behind"] = error
+    else:
         left, _, right = counts.partition("\t")
         try:
             behind, ahead = int(left), int(right)
         except ValueError:
             ahead = behind = 0
+            errors["ahead_behind"] = (
+                f"malformed output: git rev-list --left-right --count {base_ref}...HEAD"
+            )
     return {
         "base": base_ref,
-        "dirty": bool(status),
+        "dirty": bool(status) or "status" in errors,
         "conflicted": conflicted,
         "ahead": ahead,
         "behind": behind,
-    }
+    }, errors
+
+
+def repo_live_state(base_ref: str = "origin/main") -> dict[str, Any]:
+    """Volatile repository state for the live partition."""
+    state, _errors = observe_repo_live_state(base_ref)
+    return state
 
 
 def toolchain_versions() -> dict[str, str]:
@@ -153,13 +192,18 @@ def _load_yaml_tracks(path: Path) -> list[dict[str, Any]]:
 
 
 def _scrape_tracks(path: Path) -> list[dict[str, Any]]:
-    """Dependency-light fallback: track ids only, no nested detail."""
+    """Dependency-light fallback: TOP-LEVEL track ids only, no nested detail.
+
+    Only ``- id:`` items at the indent of the first list item directly under
+    ``active_tracks:`` are tracks; deeper ``- id:`` rows (next_items,
+    prerequisites, completion_criteria) are not (O3R-B3)."""
     try:
         text = path.read_text(encoding="utf-8")
     except OSError:
         return []
     rows: list[dict[str, Any]] = []
     in_active = False
+    item_indent: int | None = None
     for line in text.splitlines():
         if line.startswith("active_tracks:"):
             in_active = True
@@ -167,7 +211,12 @@ def _scrape_tracks(path: Path) -> list[dict[str, Any]]:
         if in_active and line and not line[0].isspace():
             break
         stripped = line.strip()
-        if in_active and stripped.startswith("- id:"):
+        if not in_active or not stripped.startswith("- id:"):
+            continue
+        indent = len(line) - len(line.lstrip())
+        if item_indent is None:
+            item_indent = indent
+        if indent == item_indent:
             rows.append({"id": stripped.split(":", 1)[1].strip().strip("'\"")})
     return rows
 
@@ -276,6 +325,7 @@ __all__ = [
     "REQUIRED_READING",
     "collect_stable_core",
     "contract_sources",
+    "observe_repo_live_state",
     "orientation_static",
     "portfolio_snapshot",
     "projection_freshness",

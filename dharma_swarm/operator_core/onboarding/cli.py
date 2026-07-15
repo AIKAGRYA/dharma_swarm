@@ -4,10 +4,19 @@ Orchestration only: parse flags, drive collection (``evidence``), policy
 (``readiness``), persistence (``receipt``), and rendering (``render``).
 No admission rule lives here.
 
-Writer doctrine (spec §3.3): the on-disk receipt stays **v1** until the D3
-fleet-reader inventory is recorded; ``WRITER_SCHEMA_DEFAULT`` is the one flag
-that flips after D3.  The v2 condition object is always assembled and is what
-``--json`` emits, whatever the on-disk schema (spec §2.2).
+Writer doctrine (spec §3.3): the operator D3 record merged (PR #941, every
+fleet seat classified), so ``WRITER_SCHEMA_DEFAULT`` — the one
+source-controlled flag — is now **v2**.  An ambient ``DHARMA_ONBOARD_WRITER``
+that differs from that source-controlled default is denied and typed, never
+honored (spec §6 WP-O3R, O3R-B2).  The v2 condition object is always
+assembled and is what ``--json`` emits, whatever the on-disk schema
+(spec §2.2).
+
+Cache doctrine (spec §3.2): the stable core is reused only on a full
+input-manifest key match with validated stable digest and unchanged
+repository head/identity, never when a packet is bound and never from a
+v1/corrupt prior; hard and live checks always rerun.  Every miss carries a
+typed reason.
 
 Exit doctrine (spec §WP-O3 / O3-B11): before WP-O5, strict verdict exits are
 reachable only through ``--strict`` / ``DHARMA_ONBOARD_STRICT=1``.  The legacy
@@ -33,13 +42,15 @@ from .receipt import (
     compute_delta,
     compute_stable_digest,
     load_receipt,
-    receipt_path,
+    receipt_transaction,
     section_fingerprints,
     write_receipt,
 )
 
-# Flipped to "v2" only after the operator records D3 (spec §3.3 step 4).
-WRITER_SCHEMA_DEFAULT = "v1"
+# Flipped to "v2" under the merged operator D3 record (PR #941; spec §3.3
+# step 4).  This constant is the sole writer seam — ambient overrides that
+# differ from it are denied and typed (O3R-B2).
+WRITER_SCHEMA_DEFAULT = "v2"
 
 _MANIFEST_CATEGORIES: dict[str, list[str]] = {
     "entry_implementation": [
@@ -63,6 +74,12 @@ _MANIFEST_CATEGORIES: dict[str, list[str]] = {
         "docs/governance/ACTIVE_TRACK.yaml",
         "ACTIVE_SURFACE_MANIFEST.yaml",
         "docs/state/BROKEN_REGISTER.md",
+        # Static orientation surfaces: their existence feeds stable_core, so
+        # their appearance/disappearance must invalidate reuse (spec §3.2).
+        "foundations/THE_ORGANISM.md",
+        "docs/vision_maps/NORTH_STAR.md",
+        "docs/MEGAFILE_INDEX.md",
+        "INTERFACE_MISMATCH_MAP.md",
     ],
     "dependency_contract": [
         "pyproject.toml",
@@ -129,20 +146,41 @@ def _collect_conditions(
     orientation: Mapping[str, Any],
     *,
     net: bool,
+    probe_errors: Mapping[str, str] | None = None,
 ) -> list[readiness.Condition]:
     conditions: list[readiness.Condition] = []
-    conditions.append(readiness.Condition(
-        id="repo_clean",
-        state="pass" if not live_state.get("dirty") else "fail",
-        condition_class="blocking",
-        reason="" if not live_state.get("dirty") else "working tree is dirty",
-    ))
-    conditions.append(readiness.Condition(
-        id="repo_unconflicted",
-        state="pass" if not live_state.get("conflicted") else "fail",
-        condition_class="blocking",
-        reason="" if not live_state.get("conflicted") else "merge conflicts present",
-    ))
+    errors = {str(k): str(v) for k, v in dict(probe_errors or {}).items() if v}
+    if "status" in errors:
+        # O3R-B1: an unobservable working tree is typed, never a false clean.
+        for condition_id in ("repo_clean", "repo_unconflicted"):
+            conditions.append(readiness.Condition(
+                id=condition_id,
+                state="not_observed",
+                condition_class="blocking",
+                reason="git status probe failed; state not observed",
+            ))
+    else:
+        conditions.append(readiness.Condition(
+            id="repo_clean",
+            state="pass" if not live_state.get("dirty") else "fail",
+            condition_class="blocking",
+            reason="" if not live_state.get("dirty") else "working tree is dirty",
+        ))
+        conditions.append(readiness.Condition(
+            id="repo_unconflicted",
+            state="pass" if not live_state.get("conflicted") else "fail",
+            condition_class="blocking",
+            reason="" if not live_state.get("conflicted") else "merge conflicts present",
+        ))
+    if errors:
+        conditions.append(readiness.Condition(
+            id="git_state_observed",
+            state="fail",
+            condition_class="config",
+            reason="; ".join(
+                f"{name}: {message}" for name, message in sorted(errors.items())
+            )[:200],
+        ))
     for tool in ("git", "make"):
         present = bool(toolchain.get(tool))
         conditions.append(readiness.Condition(
@@ -181,6 +219,52 @@ def _collect_conditions(
             reason="non-admission PR context deferred to a later WP-O3 slice",
         ))
     return conditions
+
+
+def _evaluate_reuse(
+    previous: Mapping[str, Any] | None,
+    *,
+    prior_corrupt: bool,
+    key: str,
+    fresh_core: Mapping[str, Any],
+    packet_bound: bool,
+) -> tuple[dict[str, Any] | None, list[str]]:
+    """Spec §3.2 reuse decision: ``(reused stable core | None, typed misses)``.
+
+    A hit requires ALL of: an intact v2 prior, a full input-manifest key
+    match, a validated stable digest, unchanged repository head and identity,
+    and no bound packet.  Anything else is a typed miss; corrupt or poisoned
+    priors can never seed the stable core.
+    """
+    reasons: list[str] = []
+    if packet_bound:
+        reasons.append("packet_bound")
+    if prior_corrupt:
+        reasons.append("prior_corrupt")
+        return None, reasons
+    if previous is None:
+        reasons.append("no_prior_receipt")
+        return None, reasons
+    if previous.get("schema") != RECEIPT_SCHEMA_V2:
+        reasons.append("prior_not_v2")
+        return None, reasons
+    if reasons:
+        return None, reasons
+    prior_cache = previous.get("cache")
+    if not isinstance(prior_cache, Mapping) or prior_cache.get("key") != key:
+        return None, ["manifest_changed"]
+    prior_core = previous.get("stable_core")
+    if not isinstance(prior_core, dict) or previous.get(
+        "stable_digest"
+    ) != compute_stable_digest(prior_core):
+        return None, ["stable_digest_mismatch"]
+    fresh_repo = fresh_core.get("repository", {})
+    prior_repo = prior_core.get("repository", {})
+    if prior_repo.get("head") != fresh_repo.get("head"):
+        return None, ["head_changed"]
+    if prior_repo.get("identity") != fresh_repo.get("identity"):
+        return None, ["identity_changed"]
+    return prior_core, []
 
 
 def _legacy_v1_payload(now: str, stable_core: Mapping[str, Any]) -> dict[str, Any]:
@@ -224,12 +308,12 @@ def assemble_and_run(argv: Sequence[str] | None = None) -> int:
         conditions.extend(packet_conditions)
 
     stable_core = evidence.collect_stable_core(packet=packet_block or None)
-    live_state = evidence.repo_live_state()
+    live_state, probe_errors = evidence.observe_repo_live_state()
     toolchain = evidence.toolchain_versions()
     freshness = evidence.projection_freshness()
     conditions.extend(_collect_conditions(
         live_state, toolchain, freshness, stable_core.get("orientation", {}),
-        net=bool(args.net),
+        net=bool(args.net), probe_errors=probe_errors,
     ))
 
     manifest = build_input_manifest(repo_root, _MANIFEST_CATEGORIES)
@@ -238,28 +322,61 @@ def assemble_and_run(argv: Sequence[str] | None = None) -> int:
     # Receipt persistence is an admission requirement, evaluated before policy.
     now = _utc_now()
     previous: dict[str, Any] | None = None
+    prior_corrupt = False
+    cache_hit = False
+    miss_reasons: list[str] = ["no_prior_receipt"]
     persistence_condition: readiness.Condition
-    writer_schema = os.environ.get("DHARMA_ONBOARD_WRITER", WRITER_SCHEMA_DEFAULT)
+    # Sole-writer doctrine (O3R-B2): the on-disk schema comes only from the
+    # source-controlled default; a differing ambient override is denied and
+    # typed instead of honored.
+    writer_schema = WRITER_SCHEMA_DEFAULT
+    ambient_writer = os.environ.get("DHARMA_ONBOARD_WRITER")
+    if ambient_writer is not None and ambient_writer != WRITER_SCHEMA_DEFAULT:
+        conditions.append(readiness.Condition(
+            id="writer_override_denied",
+            state="fail",
+            condition_class="config",
+            reason=(
+                f"ambient DHARMA_ONBOARD_WRITER={ambient_writer!r} is denied; "
+                f"the writer flips only through the source-controlled default "
+                f"and stays {WRITER_SCHEMA_DEFAULT!r}"
+            ),
+        ))
     try:
-        target = receipt_path(repo_root)
-        if target.exists():
-            try:
-                previous = load_receipt(target).payload
-            except Exception:
-                conditions.append(readiness.Condition(
-                    id="prior_receipt_corrupt", state="fail",
-                    condition_class="blocking",
-                    reason="existing receipt failed validation; not trusted, not replaced silently",
-                ))
-        if writer_schema == "v2":
-            draft = _assemble_v2(
-                now, stable_core, live_state, conditions, manifest, key,
-                freshness, previous, toolchain=toolchain,
-                require_live=bool(args.require_live),
+        # Spec §3.2 concurrency row: the prior read, the reuse decision, and
+        # the replace must share one lock span, or a concurrent run's replace
+        # makes this run's decision stale (PR #942 review finding).
+        with receipt_transaction(repo_root) as target:
+            if target.exists():
+                try:
+                    previous = load_receipt(target).payload
+                except Exception:
+                    prior_corrupt = True
+                    conditions.append(readiness.Condition(
+                        id="prior_receipt_corrupt", state="fail",
+                        condition_class="blocking",
+                        reason="existing receipt failed validation; not trusted, not replaced silently",
+                    ))
+            reused_core, miss_reasons = _evaluate_reuse(
+                previous, prior_corrupt=prior_corrupt, key=key,
+                fresh_core=stable_core, packet_bound=bool(args.packet),
             )
-            write_receipt(draft, repo_root=repo_root)
-        else:
-            write_receipt(_legacy_v1_payload(now, stable_core), repo_root=repo_root)
+            cache_hit = reused_core is not None
+            if cache_hit:
+                stable_core = reused_core
+            if writer_schema == "v2":
+                draft = _assemble_v2(
+                    now, stable_core, live_state, conditions, manifest, key,
+                    freshness, previous, toolchain=toolchain,
+                    require_live=bool(args.require_live),
+                    cache_hit=cache_hit, miss_reasons=miss_reasons,
+                )
+                write_receipt(draft, repo_root=repo_root, presumed_locked=True)
+            else:
+                write_receipt(
+                    _legacy_v1_payload(now, stable_core),
+                    repo_root=repo_root, presumed_locked=True,
+                )
         persistence_condition = readiness.Condition(
             id="receipt_persisted", state="pass", condition_class="info",
         )
@@ -279,6 +396,7 @@ def assemble_and_run(argv: Sequence[str] | None = None) -> int:
         now, stable_core, live_state, conditions, manifest, key,
         freshness, previous, toolchain=toolchain,
         require_live=bool(args.require_live),
+        cache_hit=cache_hit, miss_reasons=miss_reasons,
     )
 
     if args.json:
@@ -308,6 +426,8 @@ def _assemble_v2(
     *,
     toolchain: Mapping[str, str],
     require_live: bool,
+    cache_hit: bool = False,
+    miss_reasons: Sequence[str] | None = None,
 ) -> dict[str, Any]:
     outcome = readiness.evaluate(conditions, require_live=require_live)
     condition_rows = [c.as_dict() for c in outcome.conditions]
@@ -328,11 +448,8 @@ def _assemble_v2(
         },
         "cache": {
             "key": key,
-            # Groundwork only: manifest/key/fingerprints are real, but no
-            # static-section reuse happens until the §3.2 adversarial matrix
-            # is fully in place.  hit stays honestly false.
-            "hit": False,
-            "miss_reasons": ["section_reuse_not_yet_enabled"],
+            "hit": cache_hit,
+            "miss_reasons": list(miss_reasons or []),
             "input_manifest": dict(manifest),
             "section_fingerprints": section_fingerprints(manifest),
         },
