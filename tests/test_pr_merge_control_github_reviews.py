@@ -44,6 +44,25 @@ def test_automerge_workflow_has_no_advisory_check_exemption():
     assert "--argjson req" in workflow
 
 
+def test_backlog_workflow_is_scheduled_and_matches_cloud_review_quorum():
+    repo_root = Path(__file__).resolve().parents[1]
+    workflow = (
+        repo_root / ".github/workflows/merge-master-mike-backlog.yml"
+    ).read_text(encoding="utf-8")
+
+    assert "schedule:" in workflow
+    assert 'default: codex,copilot' in workflow
+    assert 'REQUIRED_REVIEWERS: ${{ inputs.required_reviewers || \'codex,copilot\' }}' in workflow
+    assert 'DHARMA_PR_ACCEPT_GITHUB_REVIEWS: "true"' in workflow
+    for fallback in (
+        "inputs.mode || 'packet-only'",
+        "inputs.max_prs || '5'",
+        "inputs.limit || '100'",
+        "inputs.merge_mode || 'off'",
+    ):
+        assert fallback in workflow
+
+
 def test_codex_commented_review_counts_as_clean_receipt():
     status = github_review_status("codex", [_review("chatgpt-codex-connector[bot]", "COMMENTED")])
     assert status is not None
