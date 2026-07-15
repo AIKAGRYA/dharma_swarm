@@ -1,6 +1,6 @@
 {
   "id": "onboard-one-door-WP-O9",
-  "base_ref": "9cc3739d583d6b68a19e6cfb56ca38a89bc43e1b",
+  "base_ref": "22656486f009d3be937b4c25204c7c8a21033ca8",
   "branch": "codex/pr958-onboard-wp-o9-20260715",
   "worktree": ".",
   "intent": "Repair the blocking ACTIVE_TRACK PR gate after CL-1 raised onboard-one-door to a pytest-backed 20/20 baseline. The job currently installs only PyYAML, so criteria cannot execute and the checker falsely reports regressions against generated/status. Install the project dev environment from an external git archive and confine checker caches outside the checkout before evaluation.",
@@ -150,7 +150,7 @@
   "negative_controls": [
     {
       "name": "wp-o9-base-uses-pyyaml-only",
-      "command": "python3 -c \"import subprocess; r=subprocess.run(['git','show','9cc3739d583d6b68a19e6cfb56ca38a89bc43e1b:.github/workflows/active-track.yml'],capture_output=True,text=True); raise SystemExit(0 if r.returncode == 0 and 'python3 -m pip install pyyaml' in r.stdout and 'dharma-active-track-bootstrap/package-source' not in r.stdout else 9)\"",
+      "command": "python3 -c \"import subprocess; r=subprocess.run(['git','show','22656486f009d3be937b4c25204c7c8a21033ca8:.github/workflows/active-track.yml'],capture_output=True,text=True); raise SystemExit(0 if r.returncode == 0 and 'python3 -m pip install pyyaml' in r.stdout and 'dharma-active-track-bootstrap/package-source' not in r.stdout else 9)\"",
       "env": {},
       "expected_exit": 0
     }
@@ -174,7 +174,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "9cc3739d583d6b68a19e6cfb56ca38a89bc43e1b",
+      "checked_at_sha": "22656486f009d3be937b4c25204c7c8a21033ca8",
       "details": []
     },
     "interface_mismatches": [
@@ -190,6 +190,6 @@
       "C1 live branch-protection and merge-group evidence remain operator-gated; this packet repairs checker execution only and does not close C1."
     ],
     "rollback": "revert the active-track job bootstrap, its CI contract test, and this packet together; the blocking checker then returns to PyYAML-only unverified criteria",
-    "packet_digest": "e38b7c2fda5ed5ae355eeb9fa4596fe6f7247138ddef5b0ba55e90b745d7d131"
+    "packet_digest": "e2c00989b0cf0c213fc808e84a2b5aabd0c7911a86537966dbf865607a101db5"
   }
 }
