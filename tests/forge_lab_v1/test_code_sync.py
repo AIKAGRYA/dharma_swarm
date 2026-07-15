@@ -14,6 +14,26 @@ from dharma_swarm.forge_lab import sync_control as sync
 from dharma_swarm.forge_lab import sync_orchestrator as orchestrator
 
 
+@pytest.fixture(autouse=True)
+def _isolate_host_campaign_process_probes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Keep temp-root activation tests independent of host tmux/process state."""
+
+    real_run = subprocess.run
+
+    def isolated_run(
+        command: list[str], *args: object, **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        if command[:2] == ["tmux", "list-sessions"]:
+            return subprocess.CompletedProcess(command, 1, "", "")
+        if command[:3] == ["ps", "-eo", "pid=,args="]:
+            return subprocess.CompletedProcess(command, 0, "", "")
+        return real_run(command, *args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", isolated_run)
+
+
 def _git(repo: Path, *args: str) -> str:
     result = subprocess.run(
         ["git", "-C", str(repo), *args],
