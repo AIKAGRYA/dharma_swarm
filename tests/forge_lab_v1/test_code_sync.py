@@ -80,7 +80,10 @@ def _make_release(tmp_path: Path) -> tuple[Path, Path, dict[str, object]]:
     (state / "do-not-copy.txt").write_text("host-owned", encoding="utf-8")
     runtime = root / "runtime"
     runtime.mkdir()
-    os.symlink(str(Path(sys.executable).resolve().parents[1]), runtime / ".venv")
+    fixture_venv = root / "fixture-venv"
+    (fixture_venv / "bin").mkdir(parents=True)
+    os.symlink(str(Path(sys.executable).resolve()), fixture_venv / "bin" / "python")
+    os.symlink(str(fixture_venv), runtime / ".venv")
     (runtime / "pydeps").mkdir()
     sync._ensure_release_links(release, root)
     sync._atomic_json(
@@ -287,7 +290,7 @@ def test_shallow_cache_materializes_the_release_tree(
         plan,
         target_root,
         node="test",
-        local_venv=Path(sys.executable).resolve().parents[1],
+        local_venv=source_release.parents[1] / "fixture-venv",
     )
 
     checkout = Path(result["release"]) / "repo"
