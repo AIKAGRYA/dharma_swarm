@@ -78,24 +78,27 @@ filterwarnings = [
 ]
 
 [tool.mutmut]
-# S6 mutation gate (Pudgala Autopoiesis Protostar P3-09). Scoped to the kernel's load-bearing
-# surface so one run is tractable; widen paths_to_mutate as the gate is adopted.
-# The runner is the kernel's own fast test file, so mutants are scored against
-# meaningful assertions (a trivially-true test lets mutants survive -> low score
-# -> the gate blocks). Produce the report with `make mutation-test`.
+# S6 mutation gate (Pudgala Autopoiesis Protostar P3-09). Scoped to the
+# kernel receipt and the onboarding readiness policy so one run remains
+# tractable while both load-bearing decision surfaces are mutation-graded.
+# Produce the report with `make mutation-test`.
 # paths_to_mutate MUST be a TOML array: mutmut's pyproject reader iterates the
 # value directly, so a bare string is walked character by character and the "/"
-# character makes mutmut walk the whole filesystem root. A single-element array
-# is the one shape mutmut reads correctly here.
-paths_to_mutate = ["dharma_swarm/spine/receipt.py"]
-runner = "python -m pytest -x -q tests/test_claim_evidence_binding.py"
+# character makes mutmut walk the whole filesystem root.
+paths_to_mutate = [
+    "dharma_swarm/spine/receipt.py",
+    "dharma_swarm/operator_core/onboarding/readiness.py",
+]
+runner = "python -m pytest -x -q tests/test_claim_evidence_binding.py tests/test_onboarding_readiness.py tests/properties/test_onboarding_readiness_properties.py"
 # tests_dir drives mutmut's test selection and must be a TOML array (same
-# character-iteration hazard as paths_to_mutate). Point it at the single fast
-# kernel test file so the mutant score is graded against meaningful assertions
-# and one run stays tractable.
-tests_dir = ["tests/test_claim_evidence_binding.py"]
+# character-iteration hazard as paths_to_mutate).
+tests_dir = [
+    "tests/test_claim_evidence_binding.py",
+    "tests/test_onboarding_readiness.py",
+    "tests/properties/test_onboarding_readiness_properties.py",
+]
 # mutmut runs the suite from inside the copied `mutants/` tree, so the rest of
 # the package and the governance scripts the runner imports (memory_kernel,
-# check_track_status) must be copied alongside the single mutated module. Only
-# receipt.py (paths_to_mutate) is instrumented; these are copied clean.
+# check_track_status) must be copied alongside the instrumented modules. Only
+# paths_to_mutate entries are instrumented; these support paths are copied clean.
 also_copy = ["dharma_swarm", "scripts", "docs/governance"]
