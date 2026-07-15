@@ -36,6 +36,7 @@
     "tests/test_loop1_consumption_check.py",
     "tests/test_loop_supervisor_tristate.py",
     "tests/test_pr_dedupe_workflow.py",
+    "tests/test_pr_merge_control.py",
     "tests/test_pr_merge_control_github_reviews.py"
   ],
   "forbidden_files": [

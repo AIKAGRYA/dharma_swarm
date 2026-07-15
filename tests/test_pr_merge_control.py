@@ -16,6 +16,7 @@ def _ci_required_success_rollup():
             "conclusion": "SUCCESS",
         },
         {"name": "Coherence Delta PR body", "status": "COMPLETED", "conclusion": "SUCCESS"},
+        {"name": "rigor", "status": "COMPLETED", "conclusion": "SUCCESS"},
         {
             "name": "Onboarding macOS 3.81 compatibility",
             "status": "COMPLETED",
