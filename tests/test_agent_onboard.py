@@ -272,3 +272,7 @@ def test_scrape_tracks_matches_top_level_declarations(tmp_path: Path) -> None:
     scraped = [row["id"] for row in evidence._scrape_tracks(real)]
     assert scraped == declared
     assert len(scraped) == len(set(scraped))
+
+
+# CL-2 fail-closed probe marker (deliberate owned-surface change without a Session Entry Packet;
+# per docs/plans/ONBOARD_ONE_DOOR_CLOSURE_SPEC_2026-07-14.md CL-2 evidence item 5 — PR closes unmerged)
