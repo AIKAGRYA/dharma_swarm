@@ -1,9 +1,9 @@
 {
   "id": "arena-live-controls-WP-O20",
-  "base_ref": "d6c56f260fd75ba29feebd40a4115bbfd92c9e3e",
+  "base_ref": "145e0b7bbec68ff9de32c8533729ce7a9f63d210",
   "branch": "codex/arena-live-controls-closeout-20260716",
   "worktree": ".",
-  "intent": "Add the missing opt-in Arena live-measurement entrypoint. It constructs Taskpack, LiveWorkerPool, the exact public-specialty roster, OrchestrationGenome, and ArenaRunner as one fail-closed path; stages every artifact outside the repository; requires complete unique live receipts for every roster-seat/task pair; verifies best_single_full_budget, exact best_single_parity_budget, the shared parity ledger, and seeded significance against both baselines before publishing any candidate status; and labels every result measurement-candidate-only with capability_claim=false. No provider call, live benchmark result, capability claim, ACTIVE_TRACK edit, generated projection edit, or production-routing weight is admitted.",
+  "intent": "Add the missing opt-in Arena live-measurement entrypoint. It constructs Taskpack, LiveWorkerPool, the exact public-specialty roster, OrchestrationGenome, and ArenaRunner as one fail-closed path; stages every artifact outside the repository; requires complete unique live receipts for every roster-seat/task pair; verifies best_single_full_budget, exact best_single_parity_budget, the shared parity ledger, and seeded significance against both baselines before publishing any candidate status; binds every non-self output byte-for-byte in a stable sha256 manifest and revalidates it before atomic publication; and labels every result measurement-candidate-only with capability_claim=false and promotion_authorized=false. No provider call, live benchmark result, capability claim, ACTIVE_TRACK edit, generated projection edit, or production-routing weight is admitted.",
   "allowed_files": [
     "dharma_swarm/coordination/arena/measure.py",
     "reports/agentops/work_packets/arena-live-controls-WP-O20.json",
@@ -193,11 +193,11 @@
   "negative_controls": [
     {
       "name": "arena-live-entrypoint-absent-at-base",
-      "command": "python3 -c \"import subprocess; base='d6c56f260fd75ba29feebd40a4115bbfd92c9e3e'; r=subprocess.run(['git','cat-file','-e',base+':dharma_swarm/coordination/arena/measure.py']); raise SystemExit(0 if r.returncode!=0 else 9)\"",
+      "command": "python3 -c \"import subprocess; base='145e0b7bbec68ff9de32c8533729ce7a9f63d210'; r=subprocess.run(['git','cat-file','-e',base+':dharma_swarm/coordination/arena/measure.py']); raise SystemExit(0 if r.returncode!=0 else 9)\"",
       "argv": [
         "python3",
         "-c",
-        "import subprocess; base='d6c56f260fd75ba29feebd40a4115bbfd92c9e3e'; r=subprocess.run(['git','cat-file','-e',base+':dharma_swarm/coordination/arena/measure.py']); raise SystemExit(0 if r.returncode!=0 else 9)"
+        "import subprocess; base='145e0b7bbec68ff9de32c8533729ce7a9f63d210'; r=subprocess.run(['git','cat-file','-e',base+':dharma_swarm/coordination/arena/measure.py']); raise SystemExit(0 if r.returncode!=0 else 9)"
       ],
       "env": {},
       "expected_exit": 0
@@ -230,7 +230,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "d6c56f260fd75ba29feebd40a4115bbfd92c9e3e",
+      "checked_at_sha": "145e0b7bbec68ff9de32c8533729ce7a9f63d210",
       "details": []
     },
     "interface_mismatches": [
@@ -250,6 +250,6 @@
       "Any main movement before merge invalidates the packet base, collision record, digest, and preflight binding."
     ],
     "rollback": "revert measure.py, the added no-network parity-control tests, and this packet together; do not alter ArenaRunner controls, ACTIVE_TRACK, generated projections, or production routing",
-    "packet_digest": "6ad1f0cf31052a327cf75fe84150cc79b107de73e5662a676fc0669f4db1270b"
+    "packet_digest": "6648e298fc994940cd125e73d5a49e2f6fd22e409a59938977d18aba9fe672c5"
   }
 }
