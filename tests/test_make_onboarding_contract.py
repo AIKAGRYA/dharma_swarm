@@ -207,8 +207,9 @@ def test_preflight_single_evaluation_and_exact_base() -> None:
     assert "$(_AGENTOPS_RESOLVE_PYTHON)" in root_check
     assert '"$$agentops_python"' in root_check
     assert '--validate-report-root "$${AGENTOPS_REPORT_ROOT}"' in root_check
-    assert root_check.count("--validate-report-child") == 2
+    assert root_check.count("--validate-report-child") == 3
     assert "--validate-report-child cache" in root_check
+    assert "--validate-report-child cache/hypothesis" in root_check
     assert "--validate-report-child onboard" in root_check
     assert "--packet" not in root_check
 
@@ -265,6 +266,7 @@ def test_make_admission_recipes_use_external_report_root(tmp_path: Path) -> None
         "PYTEST_ADDOPTS := $(AGENTOPS_PYTEST_ADDOPTS)",
         "RUFF_CACHE_DIR := $(AGENTOPS_CACHE_ROOT)/ruff",
         "XDG_CACHE_HOME := $(AGENTOPS_CACHE_ROOT)/xdg",
+        "HYPOTHESIS_STORAGE_DIRECTORY := $(AGENTOPS_CACHE_ROOT)/hypothesis",
     ):
         assert (
             "agentops-report-root-check agent-build-preflight "
@@ -291,6 +293,7 @@ def test_make_admission_recipes_use_external_report_root(tmp_path: Path) -> None
     assert "define _AGENTOPS_EXPORT_ENV" in MAKEFILE
     for shell_export in (
         "export PYTHONDONTWRITEBYTECODE=1",
+        'export HYPOTHESIS_STORAGE_DIRECTORY="$${AGENTOPS_REPORT_ROOT}/cache/hypothesis"',
         'export DHARMA_OPS_DIR="$${AGENTOPS_REPORT_ROOT}/onboard"',
         'export AGENTOPS_PYTHON="$$agentops_python"',
         'export REPO_PYTHON="PYTHONPATH=. $$agentops_python"',
@@ -413,6 +416,47 @@ def test_make_admission_recipes_use_external_report_root(tmp_path: Path) -> None
         "resolving the Make admission report root changed ordinary or ignored "
         "source-tree status"
     )
+
+
+def test_make_report_root_rejects_hypothesis_cache_symlink(
+    tmp_path: Path,
+) -> None:
+    """The Hypothesis leaf is validated before verifier collection can write."""
+    checkout = tmp_path / "clean-checkout"
+    _copy_tracked_checkout(checkout)
+    # Use the canonical POSIX report anchor. On macOS, pytest's tmp_path lives
+    # under the Darwin account-temp root, whose getconf probe can be denied by
+    # a constrained local runner before the leaf under test is inspected.
+    report_root = Path("/tmp") / f"dharma-wp-o8-{os.getpid()}-{tmp_path.name}"
+    shutil.rmtree(report_root, ignore_errors=True)
+    cache_root = report_root / "cache"
+    cache_root.mkdir(parents=True)
+    (cache_root / "hypothesis").symlink_to(checkout, target_is_directory=True)
+    before = _tree_snapshot(checkout)
+
+    try:
+        result = subprocess.run(
+            [
+                "make",
+                "-s",
+                "agentops-report-root-check",
+                f"AGENTOPS_REPORT_ROOT={report_root}",
+                f"AGENTOPS_PYTHON={sys.executable}",
+            ],
+            cwd=checkout,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+
+        assert result.returncode != 0, result.stdout
+        assert any(
+            token in result.stderr
+            for token in ("symlink", "escapes", "inside repository", "external")
+        ), result.stderr
+        assert _tree_snapshot(checkout) == before
+    finally:
+        shutil.rmtree(report_root, ignore_errors=True)
 
 
 @pytest.mark.parametrize("source_variable", ["AGENTOPS_REPORT_ROOT", "DHARMA_OPS_DIR"])
