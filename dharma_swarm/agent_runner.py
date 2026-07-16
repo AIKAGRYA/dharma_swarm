@@ -161,6 +161,38 @@ def _parse_tool_calls_from_text(
         except _json.JSONDecodeError:
             continue
 
+    if results:
+        return results
+
+    # Pattern 4: <function=name><parameter=key>value</parameter>...</function>
+    # This is the Claude/Anthropic-style XML tool-call dialect. It is NOT
+    # recognised by Patterns 1-3, so when a provider emits this format the
+    # raw XML was being stored verbatim as the task result — producing the
+    # "113 of 122 tasks with fake tool_call results" pathology documented in
+    # NIKKI 2026-07-16 KAGAMI/HI. Parsing it here lets the local tool loop
+    # actually execute the call and return a real result.
+    for fn_match in _re.finditer(
+        r"<function=(\w+)([^>]*?)>(.*?)</function>",
+        text,
+        _re.DOTALL,
+    ):
+        fn_name = fn_match.group(1)
+        if known_tools and fn_name not in known_tools:
+            continue
+        body = fn_match.group(3)
+        params: dict[str, Any] = {}
+        for pm in _re.finditer(
+            r"<parameter=([^>]+)>(.*?)</parameter>",
+            body,
+            _re.DOTALL,
+        ):
+            params[pm.group(1).strip()] = pm.group(2).strip()
+        results.append({
+            "id": f"text_{_uuid.uuid4().hex[:8]}",
+            "name": fn_name,
+            "arguments": _json.dumps(params),
+        })
+
     return results
 _TRUE_VALUES = {"1", "true", "yes", "on"}
 _FALSE_VALUES = {"0", "false", "no", "off"}
