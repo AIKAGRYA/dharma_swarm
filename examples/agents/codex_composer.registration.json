@@ -1,0 +1,123 @@
+{
+  "$schema": "dharma_external_agent_registration_manifest.v1",
+  "schema_version": "dharma_external_agent_registration_manifest.v1",
+  "agent_uid": "codex_composer",
+  "callsign": "codex_composer",
+  "display_name": "Codex Composer",
+  "harness": "codex_cli_persistent_replica",
+  "model_identity": "openai/codex-runtime-selected",
+  "department": "coordination",
+  "role": "lead_orchestrator_candidate",
+  "squad_id": "persistent_agents",
+  "team_id": "dharma_swarm",
+  "endpoint": "git://inter_agent/codex_composer/inbound",
+  "mailbox": "git://inter_agent/codex_composer/inbound",
+  "authority": "external_worker_evidence_only",
+  "autonomy_policy": {
+    "mode": "read_only_until_execution_lease",
+    "requires_approval": true,
+    "can_approve_prs": false,
+    "can_write_source": false,
+    "can_mutate_meta_dharma": false,
+    "can_mutate_telos": false,
+    "can_mutate_dharma_kernel": false,
+    "can_mutate_dgm_protected": false,
+    "can_author_context_bundles": false,
+    "explicit_task_assignment_required": true
+  },
+  "workspace_policy": {
+    "sandbox_root": "~/.dharma/external_agents/codex_composer",
+    "repo_writes_allowed": false,
+    "canonical_dharma_dir_writes_allowed": false
+  },
+  "memory_namespace": "agent:codex_composer",
+  "trace_identity": "trace:codex_composer",
+  "status": "registered",
+  "registration_source": "operator_request_2026_07_16_three_vps_persistent_identity",
+  "capabilities": [
+    "read_only_orientation",
+    "task_triage",
+    "implementation_planning",
+    "code_review",
+    "test_execution",
+    "governance_navigation",
+    "evidence_synthesis",
+    "a2a_correspondence",
+    "receipt_generation"
+  ],
+  "metadata": {
+    "operator": "AmitabhainArunachala/Dhyana",
+    "title": "@CODEX_COMPOSER",
+    "operating_title": "Codex Composer",
+    "provider": "openai",
+    "canonical_agent_card": "examples/agents/codex_composer.agent-card.json",
+    "continuity_memory": "examples/agents/codex_composer.memory.json",
+    "identity_invariant": {
+      "schema_version": "dharma_identity_invariant.v1",
+      "agent_uid": "codex_composer",
+      "serial": "AGT-CODEX_COMPOSER",
+      "memory_namespace": "agent:codex_composer",
+      "trace_identity": "trace:codex_composer",
+      "authority_floor": "external_worker_evidence_only",
+      "created_at": "2026-05-22T14:35:26.058385+00:00",
+      "digest": "sha256:47079c5f0971a1a1ebeaa10b80790602d8bee6d0576746da04ee0347c24f76e8"
+    },
+    "replica_contract": {
+      "schema": "dharma.a2a.codex_composer_replica.v1",
+      "logical_nats_identity": "codex_composer",
+      "transport_principals": {
+        "agni": "codex_composer_agni",
+        "rushabdev": "codex_composer_rushabdev",
+        "meghadharma": "codex_composer_primary"
+      },
+      "canonical_presence_subject": "dharma.agent.codex_composer.presence",
+      "replica_subject_pattern": "dharma.a2a.codex_composer.replica.<instance_id>.heartbeat",
+      "canonical_presence_instance": "meghadharma",
+      "semantic_consumer_enabled": false,
+      "execution_lease_required": true,
+      "replicas": [
+        {
+          "instance_id": "agni",
+          "role": "delivery_relay",
+          "host": "agni-openclaw",
+          "transport_principal": "codex_composer_agni",
+          "transport": "wss_tls"
+        },
+        {
+          "instance_id": "rushabdev",
+          "role": "hot_standby",
+          "host": "openclaw23onubuntu-s-2vcpu-4gb-120gb-intel-sgp1-01",
+          "transport_principal": "codex_composer_rushabdev",
+          "transport": "wss_tls"
+        },
+        {
+          "instance_id": "meghadharma",
+          "role": "orientation_primary",
+          "host": "meghadharma-cloud",
+          "transport_principal": "codex_composer_primary",
+          "transport": "nats_loopback"
+        }
+      ]
+    },
+    "transport_subjects": {
+      "inbound": null,
+      "ack": null,
+      "reply": null,
+      "presence": "dharma.agent.codex_composer.presence",
+      "replica_heartbeats": "dharma.a2a.codex_composer.replica.>",
+      "legacy_agni_compatibility": "dharma.a2a.codex",
+      "fleet_cc": "dharma.a2a.fleet"
+    },
+    "git_seat": "inter_agent/codex_composer/",
+    "legacy_git_seat": "inter_agent/codex/",
+    "summon_phrase": "@CODEX_COMPOSER",
+    "summon_aliases": [
+      "@codex-composer",
+      "@codex_composer",
+      "@codex"
+    ],
+    "summon_contract": "Assume the codex_composer identity, verify the installed AgentCard and continuity-memory digests, run read-only orientation, and report evidence modality. Replica presence never grants task authority. Do not consume semantic work, write source, approve, merge, expose secrets, or mutate protected state without a separate valid operator-issued ExecutionLease.",
+    "automatic_authority_inheritance": false
+  },
+  "notes": "Canonical repo registration for one durable codex_composer identity represented by three host-local replicas. The replicas share AgentUID, card bytes, continuity-memory bytes, and logical NATS identity, but use broker-enforced per-instance transport principals. ReplicaPresence<AgentUID,InstanceID,CardDigest,MemoryDigest> does not imply ExecutionLease<AgentUID,Scope,Expiry>. Only Meghadharma's primary principal may publish the canonical fleet-presence record; all three publish only their exact instance heartbeat subject. AGNI remains a compatibility/task hub while Meghadharma is the measured fleet-presence hub, so no completed transport migration is claimed."
+}

@@ -1,0 +1,41 @@
+[Unit]
+Description=Dharma Codex Composer persistent replica
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/dharma-codex-composer/repo
+EnvironmentFile=/etc/dharma/codex-composer-replica.env
+EnvironmentFile=/etc/dharma/codex-composer-nats.secret
+ExecStart=/opt/dharma-codex-composer/.venv/bin/python -B /opt/dharma-codex-composer/codex_composer_replica.py
+Restart=always
+RestartSec=5
+TimeoutStopSec=20
+KillMode=process
+UMask=0077
+CapabilityBoundingSet=CAP_SETUID CAP_SETGID
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/dharma-codex-composer /var/lib/codex-composer-seat /tmp
+PrivateTmp=false
+PrivateDevices=true
+ProtectProc=invisible
+ProcSubset=pid
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+LockPersonality=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+RemoveIPC=true
+
+[Install]
+WantedBy=multi-user.target
