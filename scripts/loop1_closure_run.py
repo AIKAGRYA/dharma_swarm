@@ -20,18 +20,18 @@ Usage:
     # Check what is dispatchable first (NEVER assume 'no provider'):
     #   python3 -c "from dharma_swarm.key_oracle import dispatchable_now; print(dispatchable_now())"
 
-    # Throwaway smoke/load run (sandbox tempdir — NOT witnessed by make orient):
+    # Throwaway smoke/load run (sandbox tempdir — NOT witnessed by make organism-status):
     .venv/bin/python scripts/loop1_closure_run.py --tasks 3
     .venv/bin/python scripts/loop1_closure_run.py --tasks 100 --agents 3 \
         --timeout-per-task 240 --report reports/loop_closure/run.json
 
-    # Real closure run (writes to the canonical runtime.db make orient reads,
+    # Real closure run (writes to the canonical runtime.db make organism-status reads,
     # so a green run flips loop1_live). Use any provider returned by
     # key_oracle.dispatchable_now(); on this host that is usually local Ollama:
     .venv/bin/python scripts/loop1_closure_run.py --canonical \
         --provider ollama --model llama3.2:latest --tasks 3 \
         --report reports/loop_closure/cybernetics_codex/$(date -u +%F)_loop1_ollama_fresh_spine_dispatch.json
-    # then: make orient   →   "Loop 1 (provider chain + dispatch): LIVE"
+    # then: make organism-status   →   "Loop 1 (provider chain + dispatch): LIVE"
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ from dharma_swarm import api_keys as _api_keys
 
 _api_keys.bootstrap_runtime_env()
 
-from dharma_swarm.models import AgentRole, ProviderType, TaskPriority, TaskStatus
+from dharma_swarm.models import AgentRole, ProviderType, TaskPriority, TaskStatus  # noqa: E402
 
 TERMINAL = {TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED}
 
@@ -81,10 +81,10 @@ def _task_spec(index: int) -> tuple[str, str]:
 
 
 def _canonical_state_dir() -> Path:
-    """The state dir whose runtime.db `make orient` actually reads, sourced
+    """The state dir whose runtime.db `make organism-status` actually reads, sourced
     ONLY from the owner (runtime_state.DEFAULT_RUNTIME_DB), never a hardcoded
     ~/.dharma literal. SwarmManager(state_dir=X) writes to X/state/runtime.db;
-    orient reads DEFAULT_RUNTIME_DB, so the canonical state_dir is its
+    organism-status reads DEFAULT_RUNTIME_DB, so the canonical state_dir is its
     grandparent. If the owner is unimportable there is no canonical path to
     speak of — surface that rather than guessing one."""
     from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB
@@ -94,8 +94,8 @@ def _canonical_state_dir() -> Path:
 
 def _resolve_state_dir(args: argparse.Namespace) -> tuple[str, bool]:
     """Return (state_dir, is_canonical). A closure is only WITNESSED by
-    `make orient` when its receipt lands in the canonical runtime.db. The
-    default tempdir is a sandbox orient never reads — closing there reproduces
+    `make organism-status` when its receipt lands in the canonical runtime.db. The
+    default tempdir is a sandbox organism-status never reads — closing there reproduces
     the Phase 1b "NOT CLOSED" verdict (receipt written to a lane-local DB)."""
     canonical = _canonical_state_dir()
     if args.canonical:
@@ -378,7 +378,7 @@ def main() -> int:
     parser.add_argument(
         "--canonical",
         action="store_true",
-        help="write to the canonical runtime.db that `make orient` reads, so a "
+        help="write to the canonical runtime.db that `make organism-status` reads, so a "
         "successful closure flips loop1_live. Use this for the real closure run; "
         "omit it (sandbox tempdir) for throwaway smoke/load runs.",
     )
@@ -404,10 +404,10 @@ def main() -> int:
     print(f"\nLOOP1_CLOSED={'yes' if closed else 'no'}")
     if closed and not report["canonical_state"]:
         # The exact Phase 1b footgun: a green closure in a sandbox DB that
-        # `make orient` never reads. Say so loudly — this is NOT witnessed.
+        # `make organism-status` never reads. Say so loudly — this is NOT witnessed.
         print(
             "WARNING: closed in a SANDBOX state dir — this receipt is NOT in the "
-            "canonical runtime.db, so `make orient` will still report loop1_live "
+            "canonical runtime.db, so `make organism-status` will still report loop1_live "
             "False. Re-run with --canonical to witness the closure.",
             file=sys.stderr,
         )

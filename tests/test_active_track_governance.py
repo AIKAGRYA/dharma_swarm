@@ -30,7 +30,6 @@ ONBOARD_SCRIPT = REPO_ROOT / "scripts/governance/agent_onboard.py"
 MANAGED_FILES = [
     REPO_ROOT / "CLAUDE.md",
     REPO_ROOT / "docs/governance/SOVEREIGN_MANIFEST.md",
-    REPO_ROOT / "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
 ]
 
 

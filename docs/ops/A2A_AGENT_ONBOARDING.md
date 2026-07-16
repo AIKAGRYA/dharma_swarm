@@ -1,18 +1,20 @@
-# A2A Agent Onboarding — fleet-identity join route
+# A2A Agent Registration — persistent fleet-identity route
 
 **Role:** reference / operational route. Not authority.
 **Authority owners:** `docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md` (transport
 contract), `examples/agents/*.registration.json` (each agent's canonical card),
 `dharma_swarm/a2a/agent_presence.py` (presence roster),
 `dharma_swarm/a2a/agent_card.py` (alias map + runtime card schema).
-**Rendered by:** `make agent-onboard` (`scripts/governance/a2a_agent_onboard.py`,
-read-only, includes a live drift check). If this page disagrees with that
-output, trust the output.
+**Rendered by:** `make agent-register` (`make agent-onboard` remains a
+compatibility alias; implementation:
+`scripts/governance/a2a_agent_onboard.py`). The command is read-only and
+includes a live drift check. If this page disagrees with that output, trust
+the output.
 
-`make onboard` orients a *session* (tracks, ops, axioms). This route onboards
-an *identity* — a persistent agent that other agents can address after the
-session dies. They are deliberately separate doors and must not be collapsed:
-one is per-wake, the other is once-per-identity.
+`make onboard` reports a *session's status*. This route registers an
+*identity* — a persistent agent that other agents can address after the
+session dies. Session status and identity registration are distinct
+responsibilities.
 
 ## The join sequence (six steps, in order)
 
@@ -32,7 +34,7 @@ one is per-wake, the other is once-per-identity.
    an idempotent script under `scripts/agents/` (template:
    `register_fable_claude_code.sh`) so any host can re-run it safely.
 3. **Roster** — add the uid to `REGISTERED_AGENT_UIDS` in
-   `dharma_swarm/a2a/agent_presence.py` (this is what `make orient` and the
+   `dharma_swarm/a2a/agent_presence.py` (this is what `make organism-status` and the
    repo context graph read) and, when the callsign differs from the uid, add
    the alias to `AGENT_UID_ALIASES` in `dharma_swarm/a2a/agent_card.py`.
    Extend `tests/test_agent_registry_presence.py`.
@@ -56,7 +58,7 @@ worded reply on your reply subject or in your own inbound dock.
 ## Friction map — where agents get lost (discovered 2026-07-02)
 
 These are the observed failure modes this route (and the drift check in
-`make agent-onboard`) exists to prevent. Do not collapse the underlying
+`make agent-register`) exists to prevent. Do not collapse the underlying
 systems in response to this list; each is owned by a live track or spec.
 
 1. **Six identity surfaces, no reconciler (now drift-checked).** Repo card,
@@ -65,7 +67,7 @@ systems in response to this list; each is owned by a live track or spec.
    Real drift found the day this was written: `codex_composer`,
    `fable_composer`, `hermes-m5` are rostered **ghosts** (no repo card — their
    addresses live only in unversioned Mac state); `merge_master_mike`,
-   `qwen_code` have cards but are **invisible** to `make orient` (not
+   `qwen_code` have cards but are **invisible** to `make organism-status` (not
    rostered). "fugu ultra" is the terminal case: an operator-named active
    peer with *no* surface at all, hence unaddressable.
 2. **Two subject schemes.** Legacy `dharma.a2a.<callsign>` (what the live
@@ -86,10 +88,10 @@ systems in response to this list; each is owned by a live track or spec.
    (Devin-specific NATS ops), `NATS_SUBSTRATE_MASTER_SPEC.md` (transport
    authority), a worked shell script, and per-agent maps like
    `FABLE5_ONBOARDING_MAP.md` — with no single "how does a NEW agent join"
-   page. This page + `make agent-onboard` is that single door; everything it
+   page. This page + `make agent-register` is the registration route; everything it
    states is projected from the owners above.
 
 ## Registered fleet (cards on main)
 
-Run `make agent-onboard` for the live list and drift status — do not trust a
+Run `make agent-register` for the live list and drift status — do not trust a
 prose copy here (Axiom A6: docs decay).

@@ -303,12 +303,10 @@ def _probe_preservation(ctx: ProbeContext, git_data: dict[str, Any]) -> dict[str
 
 
 def _probe_onboarding(ctx: ProbeContext) -> dict[str, Any]:
-    """Check the canonical onboarding door without mutating repo state.
+    """Check the canonical session-status command without mutating repo state.
 
-    The project defines `make onboard` as the human/agent orientation entrypoint.
-    Running it on every dashboard refresh would be too heavy and can depend on
-    local terminal affordances, so this probe verifies the target and command
-    wiring read-only and points to the evidence files it projects from.
+    Running it on every dashboard refresh would be too heavy, so this probe
+    verifies the target and command wiring and points to its contract sources.
     """
     root = ctx.repo_root
     makefile = root / "Makefile"
@@ -324,8 +322,7 @@ def _probe_onboarding(ctx: ProbeContext) -> dict[str, Any]:
     command_mentions_agent_onboard = "scripts/governance/agent_onboard.py" in target_line
     evidence_paths = [
         "scripts/governance/agent_onboard.py",
-        "reports/governance/active_track_evidence.json",
-        "reports/governance/active_track_evidence.md",
+        "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
     ]
     records = []
     for raw in evidence_paths:
@@ -336,14 +333,14 @@ def _probe_onboarding(ctx: ProbeContext) -> dict[str, Any]:
         _card(
             kind="onboarding",
             card_id="onboarding:make-onboard",
-            title="make onboard canonical orientation door",
+            title="make onboard session status",
             status=status,
             lane="Verified" if status == "wired" else "Needs Repair",
-            risk="onboarding_projection" if status == "wired" else "onboarding_entrypoint_drift",
+            risk="session_status_projection" if status == "wired" else "onboarding_entrypoint_drift",
             next_action=(
                 "keep make onboard wired to scripts/governance/agent_onboard.py"
                 if status == "wired"
-                else "repair Makefile onboard target so fresh agents have a canonical door"
+                else "repair Makefile onboard target so sessions have canonical status"
             ),
             track="unknown",
             evidence=[

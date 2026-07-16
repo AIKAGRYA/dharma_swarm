@@ -42,20 +42,15 @@ BLOCK_RE = re.compile(re.escape(START) + r"(.*?)" + re.escape(END), re.DOTALL)
 MANAGED_FILES = [
     Path("CLAUDE.md"),
     Path("docs/governance/SOVEREIGN_MANIFEST.md"),
-    Path("docs/governance/BUILD_SESSION_ENTRYPOINT.md"),
 ]
 
 
 def _render_one_track(t: dict, lines: list) -> None:
     """Render a single track's compact digest into `lines`.
 
-    Deliberately NOT the full track body: descriptions, next-items, and
-    non-goals live in ACTIVE_TRACK.yaml and are rendered live by
-    `make onboard`. The 2026-07 four-agent onboarding probe showed that a
-    full prose copy becomes a leak channel — agents answer portfolio
-    questions from the copy while claiming to answer from the gate, which
-    masks gate failure. The digest keeps only what an agent needs before
-    its first edit: identity, freshness, and surface-ownership boundaries.
+    Deliberately not the full track body: descriptions, next-items, and
+    non-goals live in ACTIVE_TRACK.yaml and its checker. The digest keeps only
+    identity, freshness, and surface-ownership boundaries.
     """
     blockers = sum(1 for it in (t.get("next_items") or []) if it.get("blocker"))
     lines.append(
@@ -103,11 +98,11 @@ def render_block(track: dict) -> str:
         f"track(s) (WIP warn {policy.get('warn_active')}, max "
         f"{policy.get('max_active')}; model: {policy.get('model')}). "
         "This stamped digest carries track identity and surface ownership, "
-        "NOT live status and NOT full track detail (descriptions, next-items, "
-        "non-goals stay in the YAML). Live state comes only from "
-        "`make onboard`; if its ACTIVE PORTFOLIO section is empty or warns, "
-        "run `python3 scripts/governance/check_track_status.py` — never "
-        "answer portfolio questions from this block or any other .md copy.",
+        "NOT runtime truth and NOT full track detail (descriptions, next-items, "
+        "non-goals stay in the YAML). Declared intent comes from "
+        "`docs/governance/ACTIVE_TRACK.yaml`; evaluate it with "
+        "`python3 scripts/governance/check_track_status.py`. Never answer "
+        "runtime or liveness questions from this block or another prose copy.",
         "",
     ]
 

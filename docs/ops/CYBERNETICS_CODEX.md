@@ -135,7 +135,7 @@ Per-build gate:
 
 ```bash
 make onboard
-make orient
+make organism-status
 .venv/bin/dgc status
 .venv/bin/dgc loop-status
 bash scripts/runtime/codex_toolbelt_status.sh

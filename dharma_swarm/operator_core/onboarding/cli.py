@@ -1,37 +1,29 @@
-"""Argument orchestration for the one-door onboarding CLI.
+"""Argument orchestration for the session-status CLI.
 
 Orchestration only: parse flags, drive collection (``evidence``), policy
 (``readiness``), persistence (``receipt``), and rendering (``render``).
 No admission rule lives here.
 
-Writer doctrine (spec §3.3): the operator D3 record merged (PR #941, every
-fleet seat classified), so ``WRITER_SCHEMA_DEFAULT`` — the one
-source-controlled flag — is now **v2**.  An ambient ``DHARMA_ONBOARD_WRITER``
-that differs from that source-controlled default is denied and typed, never
-honored (spec §6 WP-O3R, O3R-B2).  The v2 condition object is always
-assembled and is what ``--json`` emits, whatever the on-disk schema
-(spec §2.2).
+Writer doctrine: ``WRITER_SCHEMA_DEFAULT`` is the sole source-controlled
+schema choice. An ambient ``DHARMA_ONBOARD_WRITER`` that differs from it is
+denied and typed. The v2 condition object is always assembled and is what
+``--json`` emits, whatever compatible schema is written to disk.
 
-Cache doctrine (spec §3.2): the stable core is reused only on a full
+Cache doctrine: the stable core is reused only on a full
 input-manifest key match with validated stable digest and unchanged
-repository head/identity, never when a packet is bound and never from a
-v1/corrupt prior; hard and live checks always rerun.  Every miss carries a
-typed reason.
+repository head/identity, and never from a v1/corrupt prior; hard and live
+checks always rerun. Every miss carries a typed reason.
 
-Exit doctrine (spec §WP-O3 / O3-B11): before WP-O5, strict verdict exits are
-reachable only through ``--strict`` / ``DHARMA_ONBOARD_STRICT=1``.  The legacy
-default keeps exit 0 for everything except usage errors, but the receipt and
-JSON always carry the true verdict and true exit code.
+Exit doctrine: the process always returns the receipt's true typed exit code.
+``--strict`` remains an accepted compatibility no-op for older callers.
 """
 
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from . import evidence, readiness, render
@@ -47,8 +39,8 @@ from .receipt import (
     write_receipt,
 )
 
-# Flipped to "v2" under the merged operator D3 record (PR #941; spec §3.3
-# step 4).  This constant is the sole writer seam — ambient overrides that
+# Flipped to "v2" under the merged operator D3 record (PR #941). This
+# constant is the sole writer seam — ambient overrides that
 # differ from it are denied and typed (O3R-B2).
 WRITER_SCHEMA_DEFAULT = "v2"
 
@@ -75,7 +67,7 @@ _MANIFEST_CATEGORIES: dict[str, list[str]] = {
         "ACTIVE_SURFACE_MANIFEST.yaml",
         "docs/state/BROKEN_REGISTER.md",
         # Static orientation surfaces: their existence feeds stable_core, so
-        # their appearance/disappearance must invalidate reuse (spec §3.2).
+        # their appearance/disappearance must invalidate cache reuse.
         "foundations/THE_ORGANISM.md",
         "docs/vision_maps/NORTH_STAR.md",
         "docs/MEGAFILE_INDEX.md",
@@ -103,46 +95,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--net", action="store_true", help="opt-in non-admission PR context")
     parser.add_argument("--no-net", action="store_true", help="no-op alias; default is network-off")
     parser.add_argument("--require-live", action="store_true", help="required host gaps exit 4")
-    parser.add_argument("--packet", help="Session Entry Packet path to validate and bind")
     parser.add_argument("--fast", action="store_true", help="deprecated alias of the compact default")
-    parser.add_argument("--strict", action="store_true", help="strict verdict exits (pre-WP-O5 opt-in)")
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="deprecated compatibility no-op; truthful exits are always enabled",
+    )
     return parser
-
-
-def _load_packet(path_text: str) -> tuple[dict[str, Any], list[readiness.Condition]]:
-    """Validate and bind the Session Entry Packet; never a preflight substitute."""
-    from .contract import packet_digest, parse_work_packet
-
-    conditions: list[readiness.Condition] = []
-    try:
-        payload = json.loads(Path(path_text).read_text(encoding="utf-8"))
-        packet = parse_work_packet(payload)
-        digest = packet_digest(payload)
-    except (OSError, ValueError) as exc:
-        conditions.append(readiness.Condition(
-            id="packet_invalid", state="fail", condition_class="config",
-            reason=f"{type(exc).__name__}: {exc}"[:200],
-        ))
-        return {}, conditions
-    conditions.append(readiness.Condition(
-        id="packet_bound", state="pass", condition_class="info",
-        reason=f"packet {packet.id}",
-    ))
-    entry = packet.session_entry
-    return {
-        "id": packet.id,
-        "digest": digest,
-        "track": entry.active_track if entry else "",
-        "owner": entry.owner if entry else "",
-        "allowed_files": list(packet.allowed_files),
-        "forbidden_files": list(packet.forbidden_files),
-    }, conditions
 
 
 def _collect_conditions(
     live_state: Mapping[str, Any],
     toolchain: Mapping[str, str],
-    freshness: Mapping[str, Any],
     orientation: Mapping[str, Any],
     *,
     net: bool,
@@ -189,19 +153,10 @@ def _collect_conditions(
             condition_class="toolchain",
             reason="" if present else f"{tool} is not on PATH",
         ))
-    for rel, row in freshness.items():
-        if not isinstance(row, Mapping):
-            continue
-        if not row.get("present"):
-            state, reason = "fail", "generated projection missing; run its owner command"
-        elif row.get("stale"):
-            state, reason = "fail", "generated projection older than its TTL; run its owner command"
-        else:
-            state, reason = "pass", ""
-        conditions.append(readiness.Condition(
-            id="active_track_projection_fresh",
-            state=state, condition_class="blocking", reason=reason,
-        ))
+    # Generated portfolio evidence is a deep diagnostic, never a session gate.
+    # It is intentionally absent from a sterile clone and remains available in
+    # ``live_delta.projection_freshness`` for ``--deep`` without making every
+    # clean checkout BLOCKED by construction.
     register = orientation.get("broken_register", {})
     parse_ok = isinstance(register, Mapping) and "error" not in register
     conditions.append(readiness.Condition(
@@ -216,7 +171,7 @@ def _collect_conditions(
             state="skipped",
             condition_class="info",
             mandatory=False,
-            reason="non-admission PR context deferred to a later WP-O3 slice",
+            reason="network PR context is outside session-status scope",
         ))
     return conditions
 
@@ -227,18 +182,15 @@ def _evaluate_reuse(
     prior_corrupt: bool,
     key: str,
     fresh_core: Mapping[str, Any],
-    packet_bound: bool,
 ) -> tuple[dict[str, Any] | None, list[str]]:
-    """Spec §3.2 reuse decision: ``(reused stable core | None, typed misses)``.
+    """Return ``(reused stable core | None, typed cache-miss reasons)``.
 
     A hit requires ALL of: an intact v2 prior, a full input-manifest key
     match, a validated stable digest, unchanged repository head and identity,
-    and no bound packet.  Anything else is a typed miss; corrupt or poisoned
-    priors can never seed the stable core.
+    and a valid prior core. Anything else is a typed miss; corrupt or poisoned
+    priors can never seed it.
     """
     reasons: list[str] = []
-    if packet_bound:
-        reasons.append("packet_bound")
     if prior_corrupt:
         reasons.append("prior_corrupt")
         return None, reasons
@@ -300,26 +252,21 @@ def assemble_and_run(argv: Sequence[str] | None = None) -> int:
         print("note: --fast is deprecated; it maps to the compact default", file=sys.stderr)
 
     repo_root = evidence.REPO_ROOT
-    strict = bool(args.strict or os.environ.get("DHARMA_ONBOARD_STRICT") == "1")
-
-    packet_block: dict[str, Any] = {}
-    if args.packet:
-        packet_block, packet_conditions = _load_packet(args.packet)
-        conditions.extend(packet_conditions)
-
-    stable_core = evidence.collect_stable_core(packet=packet_block or None)
+    stable_core = evidence.collect_stable_core()
     live_state, probe_errors = evidence.observe_repo_live_state()
     toolchain = evidence.toolchain_versions()
     freshness = evidence.projection_freshness()
     conditions.extend(_collect_conditions(
-        live_state, toolchain, freshness, stable_core.get("orientation", {}),
+        live_state, toolchain, stable_core.get("orientation", {}),
         net=bool(args.net), probe_errors=probe_errors,
     ))
 
     manifest = build_input_manifest(repo_root, _MANIFEST_CATEGORIES)
     key = cache_key(manifest, environment_class=f"py{sys.version_info.major}.{sys.version_info.minor}")
 
-    # Receipt persistence is an admission requirement, evaluated before policy.
+    # An explicitly unsafe receipt path is a configuration error.  Failure to
+    # write the default external cache remains visible but cannot make a
+    # read-only checkout unusable as a status command.
     now = _utc_now()
     previous: dict[str, Any] | None = None
     prior_corrupt = False
@@ -343,7 +290,7 @@ def assemble_and_run(argv: Sequence[str] | None = None) -> int:
             ),
         ))
     try:
-        # Spec §3.2 concurrency row: the prior read, the reuse decision, and
+        # Cache concurrency invariant: the prior read, reuse decision, and
         # the replace must share one lock span, or a concurrent run's replace
         # makes this run's decision stale (PR #942 review finding).
         with receipt_transaction(repo_root) as target:
@@ -359,7 +306,7 @@ def assemble_and_run(argv: Sequence[str] | None = None) -> int:
                     ))
             reused_core, miss_reasons = _evaluate_reuse(
                 previous, prior_corrupt=prior_corrupt, key=key,
-                fresh_core=stable_core, packet_bound=bool(args.packet),
+                fresh_core=stable_core,
             )
             cache_hit = reused_core is not None
             if cache_hit:
@@ -387,8 +334,12 @@ def assemble_and_run(argv: Sequence[str] | None = None) -> int:
         )
     except OSError as exc:
         persistence_condition = readiness.Condition(
-            id="receipt_write_failed", state="fail", condition_class="blocking",
-            reason=f"{type(exc).__name__}: {exc}"[:200],
+            id="receipt_write_failed", state="warn", condition_class="info",
+            mandatory=False,
+            reason=(
+                "optional cache/diagnostic receipt was not written: "
+                f"{type(exc).__name__}: {exc}"
+            )[:200],
         )
     conditions.append(persistence_condition)
 
@@ -406,12 +357,7 @@ def assemble_and_run(argv: Sequence[str] | None = None) -> int:
     else:
         sys.stdout.write(render.render_compact(receipt_object))
 
-    true_exit = int(receipt_object["exit_code"])
-    if strict:
-        return true_exit
-    # Legacy pre-WP-O5 contract: only usage errors escape exit 0.  The verdict
-    # and true exit stay visible in the receipt and every rendered view.
-    return true_exit if true_exit == 2 else 0
+    return int(receipt_object["exit_code"])
 
 
 def _assemble_v2(

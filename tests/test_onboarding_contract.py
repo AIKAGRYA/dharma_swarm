@@ -123,16 +123,16 @@ def _stable_core() -> dict[str, Any]:
             "contract_digest": "3" * 64,
         },
         "packet": {
-            "id": "onboard-one-door-WP-O1",
+            "id": "session-entry-test-WP-T1",
             "digest": "4" * 64,
-            "track": "onboard-one-door-2026-07",
+            "track": "session-entry-test-track",
             "owner": "@AmitabhainArunachala",
             "allowed_files": ["tests/test_onboarding_contract.py"],
             "forbidden_files": ["pyproject.toml"],
         },
         "portfolio": {
-            "tracks": ["onboard-one-door-2026-07"],
-            "selected_track": "onboard-one-door-2026-07",
+            "tracks": ["session-entry-test-track"],
+            "selected_track": "session-entry-test-track",
             "ownership_conflicts": [],
         },
         "orientation": {
@@ -311,7 +311,8 @@ def test_receipt_v1_v2_compatibility_matrix(tmp_path: Path) -> None:
                 bad_timestamp,
             )
 
-    # D3 remains open: WP-O1 adds a reader but must not flip the sole writer.
+    # The compatibility shim keeps the legacy v1 helper isolated from the
+    # source-controlled v2 writer default.
     writer_source = (REPO_ROOT / "scripts/governance/agent_onboard.py").read_text(
         encoding="utf-8"
     )

@@ -112,18 +112,12 @@ jobs:
           name: active-track-evidence
           path: reports/governance/active_track_evidence.*
 
-  # WP-O4 (O4-B5/O4-B10): CI runs the SAME onboarding door command as local
-  # sessions (`make onboard` → scripts/governance/agent_onboard.py), fail-on-
-  # error — no continue-on-error, no weaker flags. The shared AgentOps evaluator
-  # then discovers the packet set from the explicit event range: PRs bind the
-  # declared base/head pair and merge groups bind every changed packet to the
-  # group's synthetic base/head pair. Inability to establish that mapping is a
-  # CONFIG_ERROR, never a skipped check. Pre-WP-O5 the door's legacy exit
-  # contract keeps this green except on usage/crash; when WP-O5 flips strict-
-  # by-default, this same invocation becomes the enforcing context (C1
-  # promotes it to merge-blocking separately — no merge authority claimed
-  # here).
-  onboarding-admission:
+  # CI runs the same strict-default, read-only session-status command as local
+  # sessions, then exercises the focused onboarding contracts. Edit admission
+  # remains a separate, explicitly packet-bound preflight; this status job does
+  # not discover, bind, execute, or upload work-packet evidence.
+  onboarding-status:
+    # Keep the display name stable for existing branch-protection rules.
     name: Onboarding admission parity
     if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
     runs-on: ubuntu-latest
@@ -167,40 +161,21 @@ jobs:
           git archive --format=tar HEAD | tar -xf - -C "${install_source}"
           python3 -m pip install "${install_source}[dev]"
 
-      - name: Run the one door (same command as local)
+      - name: Run session status (same command as local)
         env:
           DHARMA_OPS_DIR: ${{ runner.temp }}/dharma-agentops/onboarding
         run: |
           set -euo pipefail
           make onboard
 
-      - name: Bind onboarding packets to the event range
-        if: always()
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          EVENT_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
-          EVENT_HEAD: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+      - name: Run focused onboarding contract tests
         run: |
           set -euo pipefail
-          python3 scripts/governance/run_agent_work_packet.py \
-            --ci-event "${EVENT_NAME}" \
-            --event-base "${EVENT_BASE}" \
-            --event-head "${EVENT_HEAD}" \
-            --report-root "${RUNNER_TEMP}/dharma-agentops"
-
-      - name: Upload onboarding admission evidence
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: onboarding-admission-evidence
-          # Gate tool-cache holds disposable clean-checkout fixtures. Some
-          # tracked fixture names are valid on Linux but intentionally rejected
-          # by upload-artifact's cross-platform filename policy; they are not
-          # evidence and can also make the artifact needlessly enormous.
-          path: |
-            ${{ runner.temp }}/dharma-agentops
-            !${{ runner.temp }}/dharma-agentops/**/tool-cache/**
-          if-no-files-found: error
+          python3 -m pytest -q \
+            tests/test_agent_onboard.py \
+            tests/test_onboarding_cli.py \
+            tests/test_onboarding_readiness.py \
+            tests/test_onboarding_ci_contract.py
 
   # Stock macOS ships GNU Make 3.81, whose parser rejects target-specific
   # assignments with multiple modifiers (for example `override export`). Keep
@@ -268,12 +243,8 @@ jobs:
         with:
           python-version: "3.11"
 
-      # CL1-B3 (closure spec ONBOARD_ONE_DOOR_CLOSURE_SPEC_2026-07-14.md):
-      # this job used to install only pyyaml, so every command_passes /
-      # test_passes criterion rendered "environment lacks 'pytest'" and the
-      # published projection could never verify a pytest-backed track (it
-      # showed onboard-one-door at 0/15 forever). Install the same dev
-      # environment as tests.yml so criteria execute here. Fail-safe: a
+      # Install the same dev environment as tests.yml so pytest-backed track
+      # criteria can execute instead of rendering as unverified. Fail-safe: a
       # dev-install failure degrades to the previous minimal (pyyaml-only)
       # environment — the checker still runs --warn-only and unexecuted
       # criteria render honestly unverified — rather than killing the job

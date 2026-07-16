@@ -1,9 +1,4 @@
-"""Tests for scripts/governance/agent_onboard.py as a compact CLI shim.
-
-The public door must remain informational, always exit 0 by default, and
-delegate execution to the compact onboarding engine.  Strict verdicts and
-exit codes are reachable only through `--strict` / `DHARMA_ONBOARD_STRICT=1`.
-"""
+"""Tests for the truthful, compact session-status CLI shim."""
 
 from __future__ import annotations
 
@@ -56,14 +51,16 @@ def _run(
     )
 
 
-def test_onboard_exits_zero_and_delegates_to_compact_cli() -> None:
-    """The default public door exits 0 and renders the compact CLI output."""
+def test_onboard_returns_its_truth_and_delegates_to_compact_cli() -> None:
+    """The public command renders compact output and returns its typed truth."""
+    truth = json.loads(_run("--json").stdout)
     result = _run()
-    assert result.returncode == 0, result.stderr[-400:]
+    assert result.returncode == truth["exit_code"], result.stderr[-400:]
     assert "DHARMA ONBOARD" in result.stdout
     assert "ACTIVE PORTFOLIO" in result.stdout
     assert "LIVING AXIOMS" in result.stdout
     assert "WHAT TO DO NEXT" in result.stdout
+    assert "Authority: none" in result.stdout
 
 
 def test_loader_selects_bootstrap_mode_by_interpreter() -> None:
@@ -140,8 +137,8 @@ print(json.dumps({{
 
 def test_onboard_json_emits_machine_projection() -> None:
     result = _run("--json")
-    assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
+    assert result.returncode == payload["exit_code"], result.stderr
     assert payload["schema"] == "dharma_swarm.onboard_json.v1"
     assert payload["verdict"] in {
         "READY", "BLOCKED", "NEEDS_HOST", "CONFIG_ERROR", "TOOLCHAIN_MISSING", "USAGE_ERROR",
@@ -151,9 +148,11 @@ def test_onboard_json_emits_machine_projection() -> None:
 
 
 def test_onboard_strict_exits_true_exit_code() -> None:
-    """--strict surfaces the receipt's true exit code."""
+    """The deprecated --strict flag is a behavior-preserving no-op."""
     truth = json.loads(_run("--json").stdout)
     strict = _run("--strict")
+    default = _run()
+    assert default.returncode == truth["exit_code"]
     assert strict.returncode == truth["exit_code"]
 
 
@@ -163,8 +162,9 @@ def test_onboard_unknown_flag_exits_two() -> None:
 
 
 def test_onboard_fast_is_deprecated() -> None:
+    truth = json.loads(_run("--json").stdout)
     result = _run("--fast")
-    assert result.returncode == 0
+    assert result.returncode == truth["exit_code"]
     assert "deprecated" in result.stderr
 
 
@@ -177,7 +177,8 @@ def test_onboard_does_not_write_in_repo() -> None:
         timeout=60,
     ).stdout
     result = _run()
-    assert result.returncode == 0
+    truth = json.loads(_run("--json").stdout)
+    assert result.returncode == truth["exit_code"]
     after = subprocess.run(
         ["git", "status", "--porcelain", "--ignored=matching"],
         cwd=REPO_ROOT,
@@ -191,7 +192,9 @@ def test_onboard_does_not_write_in_repo() -> None:
 def test_receipt_is_written_to_ops_dir(tmp_path: Path) -> None:
     ops = tmp_path / "ops"
     result = _run(ops_dir=ops)
-    assert result.returncode == 0
+    truth_result = _run("--json", ops_dir=ops)
+    truth = json.loads(truth_result.stdout)
+    assert result.returncode == truth["exit_code"]
     assert (ops / "onboard_receipt.json").exists()
 
 

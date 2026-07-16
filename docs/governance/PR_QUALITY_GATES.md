@@ -295,9 +295,9 @@ Every agent or contributor must:
 
 1. **Run `make onboard`** at session start to see the current operating
    reality (active track, live ops, broken register, PR hygiene summary)
-2. **Run `make agent-build-preflight`** before implementation work when the
+2. **Run `make agent-build-preflight PACKET=<path>`** before implementation work when the
    session will edit code, docs, tests, workflows, or governance surfaces.
-3. **Run `make agent-build-closeout`** before opening any PR. This runs a
+3. **Run `make agent-build-closeout PACKET=<path>`** before opening any PR. This runs a
    no-worktree hygiene scan plus `make governance-all`. You do not need to
    hand-refresh DocOps counts — the `docops-autorefresh.yml` feeder reconciles
    them on the first CI run (see §1, "Self-healing DocOps counts").

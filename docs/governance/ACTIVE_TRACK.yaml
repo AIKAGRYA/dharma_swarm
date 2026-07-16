@@ -6,8 +6,8 @@
 #   Intent  -> ACTIVE_TRACK.yaml          (what we are working on now)   <-- this file
 #   Surface -> ACTIVE_SURFACE_MANIFEST.yaml (what exists in the codebase)
 #   State   -> docs/state/LIVE_OPS_DASHBOARD.md (+ git) (what is live now)
-# It coheres with the 5-file "live status" family rendered by `make onboard`
-# (see the `family:` block below).
+# The related owner family is declared below. No single command or Markdown
+# projection replaces those owners.
 #
 # Schema v2 — PORTFOLIO MODEL (multi-track).
 # ---------------------------------------------------------------------------
@@ -26,8 +26,8 @@
 # key get a synthesized projection = the primary (first) ACTIVE track. The
 # checker/renderer/onboard read `active_tracks`; the singular is a compat shim.
 #
-# Other governance docs (CLAUDE.md, SOVEREIGN_MANIFEST.md, BUILD_SESSION_ENTRYPOINT.md)
-# render their "current track(s)" block from this file via
+# CLAUDE.md and SOVEREIGN_MANIFEST.md render their "current track(s)" block
+# from this file via
 # scripts/governance/render_active_track_includes.py. Do not hand-write track
 # names into any other file.
 #
@@ -71,17 +71,14 @@ spine_objectives:
 # TRACK POLICY — focus as a WIP limit, not a mutex (Kanban / flow).
 # This is the `track_policy` the SOVEREIGN_MANIFEST doctrine amendment refers to
 # (min_active..max_active concurrent tracks). Concurrency is authorized, not
-# mandated: the floor is 1, the current temporary ceiling is 11, and opening beyond the floor is
+# mandated: the floor is 1, the current ceiling is 10, and opening beyond the floor is
 # operator discretion gated on non-overlap (owned_surfaces), not agent count.
 # ---------------------------------------------------------------------------
 track_policy:
   model: "1..N co-equal active tracks; typed graph; WIP-limited; surface-owned"
   min_active: 1             # floor — single-track default holds until a 2nd is opened
-  max_active: 11            # hard ceiling — focus protection; CI ERROR above this.
-                            # Raised 10->11 by operator DECREE (GOLDEN SEAL, 2026-07-12
-                            # 00:36 JST, custody grade DECREE: "I want this as an ACTIVE
-                            # TRACK, instantiated now, even if that means breaking WIP").
-                            # Restore to 10 at the next track closure.
+  max_active: 10            # hard ceiling — restored after the onboarding
+                            # hardening campaign closed on 2026-07-17.
   warn_active: 8            # soft signal — "you're spreading thin"; CI WARN above this (bumped 5->8 2026-07-07: reconcile admitted helm terminal + safety TCB with REAL behavioral gates; hyperbolic-time-chamber landed via #830)
   min_active_grace_days: 7  # advisory: how long an empty portfolio is tolerable (empty warns immediately; not auto-enforced)
   min_active_grace_enforced: false  # explicit tombstone: grace is advisory, NOT auto-failed by CI (downstream JSON consumers read this directly)
@@ -89,8 +86,9 @@ track_policy:
   surface_overlap: warn     # two ACTIVE tracks sharing an owned surface => WARN (coordinate)
 
 # ---------------------------------------------------------------------------
-# LIVE-STATUS FAMILY — the 5-file family `make onboard` reads to render live
-# status. This Intent layer must stay coherent with these owners.
+# RELATED OWNER FAMILY — distinct owners for declared intent, surfaces,
+# runtime state, known breakage, and doctrine. `make onboard` reports bounded
+# session status; `make organism-status` provides the deeper projection.
 # ---------------------------------------------------------------------------
 family:
   intent: docs/governance/ACTIVE_TRACK.yaml
@@ -396,7 +394,7 @@ active_tracks:
           - command_to_replay
           - tests_run
       # WP-LC campaign criteria (spec docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md §7.1)
-      # — deliberately RED until their packets land (#864 WP-O1R precedent).
+      # — deliberately RED until their packets land.
       - id: loop_supervisor_tristate_honest
         kind: command_passes
         command: ["python3", "-m", "pytest", "tests/test_loop_supervisor_tristate.py", "-q"]
@@ -429,7 +427,7 @@ active_tracks:
         kind: governance
         blocker: true
       - id: 4
-        what: "WP-LC0 admission record (this merge): LOOP-1 CLOSED_LIVE campaign admitted; spec docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md is the detail authority (WP-LC0..LC5). Operator decision register 2026-07-11: D-LC2 consumption wire RATIFIED (bounded ModelRouter feedback extension — reorder-only, demotion cap, delegation_runs-receipts-only, fail-open to default order); D-LC3 one redeploy + one restart AUTHORIZED (date open; item 8 precondition); D-LC1 resolved by the 2026-07-03 execution; D-LC5 dharmagraph sign-off route PRE-APPROVED as fallback. Managed-block regeneration touches docs/governance/BUILD_SESSION_ENTRYPOINT.md as a packet-scoped shared-surface exception (rendered bytes only, no ownership claim — the #859 .gitignore pattern)."
+        what: "WP-LC0 admission record: LOOP-1 CLOSED_LIVE campaign admitted; spec docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md is the detail authority (WP-LC0..LC5). Operator decision register 2026-07-11: D-LC2 consumption wire RATIFIED (bounded ModelRouter feedback extension — reorder-only, demotion cap, delegation_runs-receipts-only, fail-open to default order); D-LC3 one redeploy + one restart AUTHORIZED (date open; item 8 precondition); D-LC1 resolved by the 2026-07-03 execution; D-LC5 dharmagraph sign-off route PRE-APPROVED as fallback. Session-entry update 2026-07-17: managed projections no longer touch BUILD_SESSION_ENTRYPOINT.md and require no onboarding shared-surface exception."
         kind: governance
         blocker: false
       - id: 5
@@ -448,10 +446,6 @@ active_tracks:
         what: "needs-owner -> organism-rewire-2026-07 (docker-compose.yml owner): commit the loopback binding (127.0.0.1:7433:7433) to main BEFORE any WP-LC2 redeploy — origin/main docker-compose.yml world-binds 7433:7433 and the daemon host's closure of that exposure is an uncommitted local patch (2026-07-09 forensics), so a clean redeploy silently reopens it. Hard precondition for executing D-LC3."
         kind: ops
         blocker: true
-      - id: 9
-        what: "needs-owner -> onboard-one-door-2026-07 (post-WP-O1R): generalize the Session Entry work_packet identity grammar (contract.py admits only WP-O<N>) so loop-closure-WP-LC<N> packets validate; until then WP-LC packets run in procedural compliance mode per spec §4 (all steps executed and receipted, deterministic rejection recorded as honest_blockers). D-LC4 approved 2026-07-11."
-        kind: governance
-        blocker: false
       - id: 10
         what: "WP-LC5 — the closure claim: one atomic governance PR carrying the fresh ON-HOST cybernetics_codex audit + the §7.2 criteria transition (closed_live 0->1, harness_proven 11->10, verdict map loop 1 -> CLOSED_LIVE) + claim_boundary 'CLOSED_LIVE 1/13; HARNESS_PROVEN 10/13; BLOCKED 2/13'. Anti-gaming: host-binding requires_keys on all three receipts, audit inputs chained to the operator-executed host_session receipt, NON-AUTHOR MERGE required, bot-PR/automerge label forbidden. Ship veto (any HARNESS_PROVEN blocks live-ship) stays — Loop-1 closure is not a track live-ship claim."
         kind: governance
@@ -1227,7 +1221,7 @@ active_tracks:
         kind: code
         blocker: false
       - id: 49
-        what: "Cross-lane coordination (council P1, onboard-one-door surfaces): parity_gauntlet_check_passes fake-fails on any checkout without the repo venv (run_python_with_repo_env.sh falls back to bare python3 = macOS 3.9; active-track CI installs only pyyaml so the published generated/status baseline will record the criterion FAILED — split-brain vs full-venv machines). Fix belongs in check_track_status.check_command_passes (export DHARMA_PYTHON=sys.executable; wrapper already honors it) and/or the active-track.yml env — coordinate with the onboard-one-door lane; do not edit their surfaces from this lane."
+        what: "Cross-surface coordination (council P1, session-entry/checker surfaces): parity_gauntlet_check_passes fake-fails on any checkout without the repo venv (run_python_with_repo_env.sh falls back to bare python3 = macOS 3.9; active-track CI installs only pyyaml so the published generated/status baseline will record the criterion FAILED — split-brain vs full-venv machines). Fix belongs in check_track_status.check_command_passes (export DHARMA_PYTHON=sys.executable; wrapper already honors it) and/or the active-track.yml environment; coordinate with the current surface owner before editing."
         kind: code
         blocker: false
 
@@ -1808,334 +1802,6 @@ active_tracks:
       - "No new truth store: authority is projection_only; every cell cites an existing owner (lane_F world dossier, VENTURE_CELL_PORTFOLIO.yaml, swarm-genome organ table) or a public URL."
       - Do not weaken any gate/ratchet/One-Wire boundary; do not touch sibling-track surfaces except through their own next-items.
 
-  - id: onboard-one-door-2026-07
-    name: One-door onboarding — strict, fast, deterministic session admission
-    status: ACTIVE
-    opened_at: "2026-07-10"
-    verified_at: "2026-07-14"
-    ttl_days: 30
-    owner: "@AmitabhainArunachala"
-    serves: substrate-nativeness
-    complements:
-      - sovereign-safety-tcb-2026-07
-      - merge-master-mike-d4-2026-06
-    owned_surfaces:
-      - AGENTS.md
-      - Makefile
-      - .github/workflows/structure.yml
-      - .github/workflows/active-track.yml
-      - docs/governance/ANTI_SLOP_RULES.md
-      - docs/governance/AGENTOPS.md
-      - docs/governance/BUILD_SESSION_ENTRYPOINT.md
-      - scripts/docops/check_docops_integrity.py
-      - scripts/governance/agent_onboard.py
-      - scripts/governance/orientation_graph.py
-      - scripts/governance/trust_gate_status.py
-      - scripts/governance/repo_status.py
-      - scripts/governance/run_agent_work_packet.py
-      - scripts/governance/check_track_status.py
-      - dharma_swarm/operator_core/onboarding/**
-      - dharma_swarm/operator_core/control_surface.py
-      - dharma_swarm/operator_core/control_surface_models.py
-      - dharma_swarm/operator_core/operator_coherence/git_governance.py
-      - tests/test_agent_onboard.py
-      - tests/test_orientation_graph.py
-      - tests/test_trust_gate_status.py
-      - tests/test_repo_status.py
-      - tests/test_control_surface.py
-      - tests/test_operator_coherence_cockpit.py
-      - tests/test_agent_work_packet.py
-      - tests/test_active_track_governance.py
-      - tests/test_track_portfolio.py
-      - tests/test_docops_integrity.py
-      - tests/test_make_onboarding_contract.py
-      - tests/test_onboarding_*.py
-      - tests/properties/test_onboarding_readiness_properties.py
-      - reports/agentops/work_packets/onboard-one-door-WP-O*.json
-    moves_vital_signs:
-      - quality_gates
-      - context_efficiency
-    description: >
-      Operator decision D1 resolved 2026-07-10: standalone track (the tenth,
-      at the max_active hard ceiling — an explicit WIP decision, not automatic
-      admission). Executes docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md
-      (merged PR #855: measured rewrite + adversarial refinement): make onboard
-      becomes the sole strict session-admission door — typed verdicts and exit
-      codes (0 READY / 1 BLOCKED / 2 usage / 3 CONFIG_ERROR / 4 NEEDS_HOST /
-      5 TOOLCHAIN_MISSING), receipt v2 with versioned loader, receipt-backed
-      warm cache with stored input-manifest invalidation, previous-run delta,
-      one canonical broken-register parser absorbing all six divergent
-      consumers, typed needs_host gap codes, mandatory Session Entry Packet
-      with default-deny scope enforcement, AGENTS.md custody repair, compact
-      40-70-line render, and warm<1s/cold<5s targets. At admission, the bold
-      **FIXED** misparse was live (17 open-like rendered vs 9 canonical), and
-      root AGENTS.md was registered canon but absent on disk and gitignored;
-      those are historical baselines, not current-state claims. The recovery
-      chronology below records their landed repairs. Work proceeds only
-      through the
-      spec's admitted sequence WP-O1, WP-O1R-B0, WP-O1R, WP-O2..WP-O4,
-      the separately merged WP-O4-B0 authority bootstrap, exact corrective
-      WP-O4R, the separately merged WP-O2-B3 truth-ledger authority
-      bootstrap, exact corrective WP-O2R, the authority-only WP-O16-B0 and
-      exact WP-O16 C1 consumer-alignment pair, and then WP-O5..WP-O6;
-      the spec (§6-§13) is the detail authority — this entry is the admission
-      record, not a second spec.
-      Titanium vNext (PR #854 plan) baseline capture and WP-00 stay blocked
-      until this track's implementation, merge-blocking CI admission (C1),
-      and independent clean-room proof have merged.
-      RECOVERY CHRONOLOGY VERIFIED 2026-07-14: WP-O2's canonical parser and
-      replay/diagnostic repairs merged through PRs #907/#911; the public compact
-      door and macOS Python 3.9 compatibility merged through #913/#916; and the
-      WP-O4 committed-range/CI envelope plus stock GNU Make 3.81 macOS admission
-      repair merged through #912/#918/#920. PR #924 granted the exact WP-O4R
-      identity and surface authority; PR #926 then closed only that corrective
-      AgentOps self-invalidation envelope. PR #929 separately granted exact
-      WP-O2R identity and its packet-scoped shared-surface authority; the
-      implementation candidate remains distinct below. At exact main c631a492
-      in the current operator PyYAML environment, the public door first failed
-      closed because its separately owned generated-status projection was
-      absent; after materializing the exact c631a492 four-file derived artifact,
-      make onboard returned READY without a hidden refresh. That is an
-      environment-scoped witness, not a universal fresh-clone claim.
-      Dependency-free `_scrape_tracks` is Proven at c631a492 to return 247 rows
-      and 196 unique ids instead of the 11 top-level declarations; its claim to
-      represent the top-level portfolio is therefore Refuted at that revision.
-      This exact candidate tree re-derives 252 rows/201 unique ids versus the
-      same 11 top-level declarations, so the claim remains Refuted here; other
-      revisions and seats remain Unobserved until run. Reproduce with
-      `/usr/bin/python3 -I -S scripts/governance/agent_onboard.py`.
-      D3 remains open because no canonical receipt-reader seat manifest yet
-      binds the declared fleet filesystem substrates. At the bounded read-only
-      observation recorded for this candidate, the operator Mac's only
-      discovered external reader (`~/.dharma/scripts/daily_pulse.py`, SHA-256
-      `e4956ab39248dd6224be227047d04d1853a07039c6930d68582769fa520e0e03`) is
-      Proven compatible with v1, v2, and unknown-schema fail-closed behavior;
-      local Warp state and three reachable persistent remote hosts (AGNI,
-      Rushabdev, and Meghadharma) are Refuted as external readers within the
-      declared code/config/cron/systemd/open-handle sweep scope. Devin, Fable
-      Claude Code, Perplexity Computer, and the three named Oz environments
-      remain Unobserved because no D3-safe noninteractive filesystem route is
-      available from the operator seat; Git, NATS, and operator relay do not
-      prove remote filesystem contents. No separate remote-Warp filesystem
-      substrate is declared beyond the local Warp seat and named Oz
-      environments, so that identity must be normalized or explicitly added
-      before closure. `WRITER_SCHEMA_DEFAULT` therefore remains v1, and the
-      current ambient `DHARMA_ONBOARD_WRITER=v2` bypass remains a pre-D3 WP-O3
-      safety repair. The remaining work is a DAG: after a separately merged
-      exact-identity authority bootstrap, the pre-D3 residual WP-O3 safety
-      slice (typed Git observations, ambient-writer denial, and fallback
-      parsing) can proceed independently of D3. C1 revalidation also requires
-      every merge-authority consumer, including the manual Merge Master Mike
-      path through CI_TRUTH_CONTRACT.json, to classify Onboarding admission
-      parity as required. The packet-scoped WP-O16-B0/WP-O16 pair grants and
-      uses only the exact five-file implementation exception in the closure
-      spec; it transfers no ownership and closes no blocker by itself. D3
-      gates only public v2 writer/cache-delta activation; C1 gates D2 and then
-      WP-O5; WP-O5 plus M6-1 gate WP-O6, which gates independent terminal
-      proof. Titanium remains blocked until that proof merges.
-    prerequisites:
-      - id: onboard_spec_on_main
-        kind: file_exists
-        file: docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md
-      - id: onboard_spec_admission_gate_declared
-        kind: file_contains
-        file: docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md
-        pattern: "D1 in §9 must be resolved"
-    completion_criteria:
-      - id: wp_o1_contract_entry_packet_custody
-        kind: command_passes
-        command: ["python3", "-m", "pytest", "tests/test_onboarding_contract.py", "tests/test_agent_work_packet.py", "tests/test_docops_integrity.py", "-q"]
-      - id: wp_o1r_exact_identifier_bridge
-        kind: command_passes
-        command: ["python3", "-m", "pytest", "tests/test_agent_work_packet.py", "-q", "-k", "session_entry_accepts_exact_wp_o1r_identity_only"]
-      - id: wp_o1r_interpreter_routed_live_guard
-        kind: command_passes
-        command: ["python3", "-m", "pytest", "tests/test_agent_work_packet.py", "-q", "-k", "gate_command_normalization_rejects_live_targets_without_blocking_safe_commands"]
-      - id: wp_o1r_git_global_alias_guard
-        kind: command_passes
-        command: ["python3", "-m", "pytest", "tests/test_agent_work_packet.py", "-q", "-k", "gate_rejects_git_global_options_and_aliases"]
-      - id: wp_o1r_private_subordinate_lexical_helper
-        kind: command_passes
-        command: ["python3", "-m", "pytest", "tests/test_agent_work_packet.py", "-q", "-k", "wp_o1r_lexical_helper_remains_private_and_subordinate"]
-      - id: wp_o1r_direct_git_inherited_env_guard
-        kind: command_passes
-        command: ["python3", "-m", "pytest", "tests/test_agent_work_packet.py", "-q", "-k", "direct_git_gate_strips_inherited_git_environment"]
-      - id: wp_o2_single_parser_six_consumers
-        kind: command_passes
-        command: ["python3", "-m", "pytest", "tests/test_onboarding_broken_register.py", "tests/test_agent_onboard.py", "tests/test_orientation_graph.py", "tests/test_trust_gate_status.py", "tests/test_repo_status.py", "tests/test_control_surface.py", "tests/test_operator_coherence_cockpit.py", "-q"]
-      - id: wp_o2r_exact_identifier_bridge
-        kind: command_passes
-        command: ["python3", "-m", "pytest", "tests/test_agent_work_packet.py::test_session_entry_accepts_exact_wp_o2r_identity_only", "-q"]
-      - id: wp_o3r_exact_identifier_bridge
-        kind: command_passes
-        command: ["python3", "-m", "pytest", "tests/test_agent_work_packet.py::test_session_entry_accepts_exact_wp_o3r_identity_only", "-q"]
-      - id: wp_o3_cli_readiness_cache_delta
-        kind: command_passes
-        command: ["python3", "-m", "pytest", "tests/test_onboarding_cli.py", "tests/test_onboarding_readiness.py", "tests/test_onboarding_cache.py", "tests/test_agent_onboard.py", "-q"]
-      # timeout_s raised from the 120 s default (closure spec CL1-B4): the
-      # batch's honest full runtime was witnessed at 152 s on 2026-07-14, so
-      # the default deadline recorded a timeout instead of the batch's real
-      # result. Raising the deadline is the truthful fix; trimming tests to
-      # fit the deadline would be a weakened check.
-      - id: wp_o4_make_agentops_ci_parity
-        kind: command_passes
-        timeout_s: 360
-        command: ["python3", "-m", "pytest", "tests/test_make_onboarding_contract.py", "tests/test_onboarding_ci_contract.py", "tests/test_agent_work_packet.py", "tests/test_orientation_graph.py", "-q"]
-      - id: wp_o4_positive_gate_command_allowlist
-        kind: command_passes
-        command: ["python3", "-m", "pytest", "tests/test_agent_work_packet.py", "-q", "-k", "positive_gate_command_family_allowlist_rejects_transitive_routes"]
-      - id: wp_o4r_exact_identifier_bridge
-        kind: command_passes
-        command: ["python3", "-m", "pytest", "tests/test_agent_work_packet.py::test_session_entry_accepts_exact_wp_o4r_identity_only", "-q"]
-      - id: wp_o6_readiness_property_battery
-        kind: command_passes
-        command: ["python3", "-m", "pytest", "tests/properties/test_onboarding_readiness_properties.py", "-q"]
-      # REALITY-RESET behavioral criterion (2026-07-12; strengthened after a
-      # Codex review on PR #902). The command_passes criteria above prove the WP
-      # unit tests are GREEN; they do NOT prove the BEHAVIOR landed. This one
-      # proves the public make-onboard door actually delegates to the compact
-      # engine. It is BEHAVIORAL, not a substring check: a substring like
-      # "onboarding import" both false-PASSES a dead/commented import and
-      # false-FAILS a valid direct-module shim (import ...onboarding.cli),
-      # constraining WP-O3's import style instead of measuring the door. Instead
-      # this runs the acceptance test that invokes the door and asserts it enters
-      # the compact CLI. It is pinned to an EXACT nodeid, NOT -k: pytest -k exits 0
-      # by deselection when the test is merely absent (a false pass), whereas a
-      # missing nodeid errors (exit 4). PR #913 landed the module-level
-      # `test_door_delegates_to_compact_engine` and the public compact-door
-      # delegation, so this exact criterion is now GREEN. It proves that behavior
-      # only; residual WP-O3 cache reuse, typed Git-probe, and writer-promotion
-      # obligations remain separately open. Evidence, not prose, holds that
-      # distinction.
-      - id: wp_o3_door_delegates_to_compact_engine
-        kind: command_passes
-        command: ["python3", "-m", "pytest", "tests/test_make_onboarding_contract.py::test_door_delegates_to_compact_engine", "-q"]
-      # CL-1 evidence-grade ratchet (2026-07-14, closure spec
-      # docs/plans/ONBOARD_ONE_DOOR_CLOSURE_SPEC_2026-07-14.md CL1-B1/CL1-B2).
-      # Every criterion above is command_passes, which is not a RIGOROUS kind
-      # and grades S0 in the evidence ladder — so even at all-green this track
-      # carried the "no rigorous evidence" and "S0 < required S2" ship blocks.
-      # The three commit_on_main criteria bind the landed WP waves to git
-      # history (S2, verifiable in any environment with git — including the
-      # dependency-light publish-status job). The two test_passes criteria bind
-      # the load-bearing batteries to executed pytest targets (S3, honestly
-      # downgraded to S2 because no independent oracle_source is declared).
-      # Additive only: no existing criterion was removed or weakened.
-      - id: wp_o2_wave_landed_on_main
-        kind: commit_on_main
-        commit: "e90809c8fbda63b40a4bef15c6ad5d4396090eb6"
-      - id: wp_o3_activation_landed_on_main
-        kind: commit_on_main
-        commit: "895e891be5cac3676fe546ca862ccd4e22efe9f5"
-      - id: wp_o4_wave_landed_on_main
-        kind: commit_on_main
-        commit: "414f4c096bbb63061279b58e780b27765b3d99ae"
-      - id: broken_register_parser_battery_executes
-        kind: test_passes
-        test: tests/test_onboarding_broken_register.py
-      - id: door_delegation_behavior_executes
-        kind: test_passes
-        test: tests/test_make_onboarding_contract.py::test_door_delegates_to_compact_engine
-    next_items:
-      - id: WP-O2
-        what: "DONE 2026-07-13 — PRs #907/#911 merged the canonical boundary parser, restored the 23-key public control-surface mapping and packet replay, and added adversarial coverage for pre-section entries, OPEN SOURCE NOTES, heading prose, CLOSED/FIXED equivalence, and outside-lifecycle diagnostics."
-        kind: code
-        blocker: false
-      - id: D3
-        what: "D3 RESOLVED (operator classification 2026-07-14; merging this record is the ratification act) — every declared fleet seat is classified and no external reader requires a v2 upgrade. Persistent substrates: the operator Mac's sole discovered external reader (~/.dharma/scripts/daily_pulse.py; sha256=e4956ab39248dd6224be227047d04d1853a07039c6930d68582769fa520e0e03) is Proven compatible with v1, v2, and unknown-schema fail-closed behavior; AGNI, Rushabdev, and Meghadharma are Refuted as readers within the recorded root/service-account/code/config/cron/systemd/open-handle sweep scope. Ephemeral sandboxed seats: Fable Claude Code and Perplexity Computer are Refuted by direct bounded sweeps (issue #940, seats 1-2 — on the latter the receipt path does not exist at all); Devin and Oz environments dharma-spine-ops, dharma-swarm-dev, and dharma-dashboard are the same ephemeral-sandbox substrate class with no persistent filesystem, so an external reader could exist there only if shipped in the image or repository — the repository ships only the onboarding package's own versioned loader, and both empirically swept class members are clean, so they are Refuted structurally per the operator's substrate confirmation (issue #940, structural-classification comment). Remote-Warp is normalized to the named Oz environments; no separate filesystem substrate is declared. This record keeps WRITER_SCHEMA_DEFAULT=v1: per spec §3.3 step 4 the v2 flip happens only through the source-controlled seam under a subsequent post-D3 WP-O3 activation packet that proves unchanged-input cache reuse/delta behavior, and the ambient DHARMA_ONBOARD_WRITER bypass is already denied (PR #937)."
-        kind: governance
-        blocker: false
-      - id: WP-O3
-        what: "WP-O3 IMPLEMENTATION DONE 2026-07-14 — the node's full implementation chain merged: PR #913 (public compact-door delegation), #916 (stock macOS Python 3.9 execution), #936/#937 (pre-D3 safety slice: constrained fallback scraper, typed CONFIG_ERROR Git probes, ambient-writer denial), and after the operator D3 record (PR #941), PR #942 landed the activation — WRITER_SCHEMA_DEFAULT is v2 under sole source-controlled authority and unchanged-input stable-core reuse is live with typed miss reasons, fail-closed poisoned/v1/corrupt priors, head/identity invalidators, and lock-serialized read-decide-write (receipt_transaction). Remaining verification for this node (performance budgets, mutation strength, full O3-B4/O3-B5 adversarial matrix under the terminal envelope) belongs to WP-O6 and is tracked there."
-        kind: code
-        blocker: false
-      - id: WP-O3R
-        what: "DONE 2026-07-14 — PR #937 merged the WP-O3R pre-D3 safety slice under the PR #936 WP-O3-B0 authority (merge commit 3656bc6cab142a7037632e671a5d07e61f24dbfd): nonzero/timeout/OSError/malformed Git probes now surface a typed git_state_observed config condition with repo_clean/repo_unconflicted not_observed (CONFIG_ERROR, never a false clean/0/READY); an ambient DHARMA_ONBOARD_WRITER differing from the source-controlled WRITER_SCHEMA_DEFAULT is denied via the typed writer_override_denied condition while the on-disk receipt stays v1; and the dependency-free _scrape_tracks fallback is indent-constrained to the top-level active_tracks declarations, proven equal to the PyYAML parse. The v2 receipt schema is unchanged, so the recorded D3 reader-compatibility evidence stands. No writer flip, cache/delta activation, or strict-default change was included."
-        kind: code
-        blocker: false
-      - id: A3
-        what: "DONE 2026-07-12 — PR #895 repaired NEXT_BUILD_RUN_PROMPT so make orient no longer orders tracked-context regeneration."
-        kind: governance
-        blocker: false
-      - id: WP-O4
-        what: "DONE 2026-07-13 — PR #912 merged committed-range plus working/staged/untracked closeout, packet-swap rejection, external-only reports, PR packet discovery, merge-group binding, and the fail-closed command-family allowlist; PR #918 restored those admission semantics on stock macOS GNU Make 3.81, and PR #920 bound Darwin temp authority to getconf while proving the named admission/macOS CI jobs green. C1 remains a separate merge-authority dependency."
-        kind: code
-        blocker: false
-      - id: WP-O4R
-        what: "DONE 2026-07-14 — PR #924 separately granted the exact WP-O4R identity and collision-free surface authority; PR #926 then closed the exact corrective AgentOps self-invalidation envelope: Hypothesis storage is external, active-track report output is relocatable, dependency bootstrap suppresses source bytecode, and bare Python criteria resolve through the current interpreter. Exact-head Linux AgentOps, full CI, independent review, and the terminal six-lane council passed. This does not close C1, WP-O6 syscall confinement, or One-Door."
-        kind: code
-        blocker: false
-      - id: C1
-        what: "C1 PENDING — the Onboarding admission parity context is registered, and merged PR #920 proved its admission and macOS jobs green, but merge authority still must capture explicit post-WP-O4 required-context, parity-manifest, every merge-authority consumer, base-change sensitivity, and fail-closed refusal evidence. The manual Merge Master Mike path consumes CI_TRUTH_CONTRACT.json, whose required set does not yet include Onboarding admission parity; therefore hosted branch protection/automerge evidence alone cannot close C1. Tracked contract/manifest edits are Candidate[required-context-set], not Authority[live-branch-protection]; WP-O16-B0 and WP-O16 leave C1 pending until fresh host evidence and consumer parity are revalidated."
-        kind: governance
-        blocker: true
-      - id: 16-B0
-        what: "WP-O16-B0 PENDING — authority-only bootstrap under Session Entry identity WP-O16: grant a one-time packet-scoped implementation exception for exactly CI_TRUTH_CONTRACT.json, tests/test_ci_truth.py, tests/test_onboarding_ci_contract.py, tests/test_pr_merge_control.py, and the future canonical onboard-one-door-WP-O16.json packet. This B0 edits only the closure spec, this track entry, managed authority projections, DocOps auto counts, and its own packet; it changes no CI consumer and closes no blocker."
-        kind: governance
-        blocker: false
-      - id: 16
-        what: "WP-O16 PENDING — only after WP-O16-B0 merges, bind a fresh exact-main packet and make the existing CI-truth/manual Merge Master Mike consumer classify Onboarding admission parity as required, with the exact three admitted test surfaces proving missing/pending/non-passing states block. The result is Candidate[required-context-set], never Authority[live-branch-protection]. No workflow, parity-manifest, runtime, branch-protection, or ownership edit; merge does not close C1 until fresh host evidence and consumer parity satisfy the full CL-2 record."
-        kind: governance
-        blocker: false
-      - id: D2
-        what: "D2 PENDING — operator ratification of strict-by-default after WP-O4/C1 (exact record format in spec §9.2; the implementation author cannot mint it; WP-O5 preflight verifies the record is a merged ancestor)."
-        kind: governance
-        blocker: true
-      - id: WP-O5
-        what: "WP-O5 PENDING — after C1 and a separately merged operator-authored D2 record, promote strict verdict exits to the default while retaining one truthful --no-strict deprecation cycle; no automatic or author-minted promotion."
-        kind: code
-        blocker: true
-      - id: M6-1
-        what: "M6-1 PENDING — before WP-O6 may touch pyproject.toml, the active DharmaGraph owner must land the exact mutmut configuration under its own packet or an explicit governance transfer must merge; warning-only overlap is insufficient."
-        kind: governance
-        blocker: true
-      - id: WP-O6
-        what: "WP-O6 PENDING — after WP-O5 and M6-1, prove performance/line budgets, deterministic replay, concurrency/crash safety, mutation strength, exact exit matrices, and fresh-clone no-write/no-network behavior under the spec's terminal envelope."
-        kind: code
-        blocker: true
-      - id: TERMINAL-PROOF
-        what: "TERMINAL PROOF PENDING — a decorrelated verifier who authored none of WP-O1..WP-O6 must acquire a sterile fresh clone, bind the exact final candidate, run §13 independently, and merge that proof before the track can close or Titanium WP-00 can qualify its baseline."
-        kind: governance
-        blocker: true
-      - id: WP-O2R
-        what: "WP-O2R CANDIDATE — PR #929 separately merged the exact identity and packet-scoped authority. This implementation, within the admitted nine-file allowed envelope, reconciles post-#926/#929 history, managed projections, canonical broken-register counts/status labels, the synthetic stale-header diagnostic, and explicitly bounded host-local evidence; its exact Git delta is seven paths because CLAUDE.md and BUILD_SESSION_ENTRYPOINT.md were already correct at c631a492. blocker=false records that this exact candidate has no remaining implementation dependency; Git/GitHub, not this prospective ledger text, remains authority for whether PR #928 has entered main. No parser/runtime/database/scheduler change, strict promotion, One-Door closure, or Titanium claim is admitted."
-        kind: governance
-        blocker: false
-      - id: 1
-        what: "WP-O1 — contract module, versioned receipt loader, portable Session Entry Packet, root AGENTS.md custody repair incl. .gitignore carve-out (spec §6 WP-O1: allowed files, failing-first tests O1-B1..B13, expected exits). AMENDED 2026-07-10 after a WP-O1 agent correctly stopped on the envelope conflict: .gitignore is admitted to the WP-O1 packet as a packet-scoped shared-surface exception (single edit: drop the /AGENTS.md ignore line) WITHOUT owned_surfaces claim, and the root pointer bytes are now pinned in the spec (O1-B13 asserts byte equality)."
-        kind: code
-        blocker: false
-      - id: 1R-B0
-        what: "WP-O1R-B0 — one-time, separately reviewed exact-identifier bootstrap admitted by spec §6 WP-O1R: contract.py plus its existing AgentOps test file only; accept literal WP-O1R without arbitrary suffixes, then merge before creating or validating the real WP-O1R packet. No live-command implementation or later-WP edit in this bootstrap."
-        kind: code
-        blocker: false
-      - id: 1R
-        what: "WP-O1R — after the separately merged exact-identifier bootstrap and module-budget/environment admission amendment, remediate both admitted Session Entry direct-command lexical P1s through contract.py plus exactly one private subordinate _command_lexical.py helper, and close inherited GIT_* execution control in run_agent_work_packet.py, under the exact §6 WP-O1R envelope: interpreter/path-routed live targets plus direct Git global-option/config/alias/env/direct-executable/argument-shape bypasses. The dependency is one-way: the stdlib-only helper returns lexical values/booleans and only mechanically evaluates exact shapes using grammar constants passed by contract.py; it defines no allowlist of its own. contract.py retains _parse_command, grammar ownership, final admission decisions/AgentOpsError, the direct-Git environment builder, and sole parser/public policy ownership. The runner calls that builder before normal execution and before negative-control env -i argv encoding, strips inherited GIT_* controls case-insensitively, then sets exactly GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM=1, and GIT_OPTIONAL_LOCKS=0. The helper is not exported and may not become a second direct-command lexical engine or owner. Extraction is mandatory so contract.py and the helper stay <=500 lines and modules_over_500_lines stays <=207. Preserve only the exact admitted read-only Git command shapes. This closes admitted direct-Git children, not trusted-host runner-internal Git calls or O4/O6 PATH/syscall/network boundaries. External/tracked filename, packet id, and work_packet identity are all onboard-one-door-WP-O1R / WP-O1R as specified. Must merge before WP-O2; WP-O2 and later packets remain untouched."
-        kind: code
-        blocker: false
-      - id: 4R-B0
-        what: "DONE 2026-07-14 JST — PR #924 merged the one-time WP-O4-B0 authority bootstrap under the already-admitted WP-O4 Session Entry identity: literal WP-O4R only, its canonical packet identity, and the three exact collision-free ownership paths required by the corrective repair. It granted authority only; the implementation merged separately in PR #926."
-        kind: governance
-        blocker: false
-      - id: 2R-B3
-        what: "DONE 2026-07-14 JST — PR #929 merged the one-time WP-O2-B3 truth-ledger authority bootstrap under the already-admitted WP-O2 Session Entry identity: literal WP-O2R only, its canonical packet identity, and exact collision-free packet-scoped authority for docs/state/BROKEN_REGISTER.md and INTERFACE_MISMATCH_MAP.md without broad owned_surfaces. It granted authority only; no WP-O2R ledger reconciliation or host-state mutation was included."
-        kind: governance
-        blocker: false
-      - id: 3A-1
-        what: "DONE 2026-07-14 — PR #942 merged the WP-O3-A1 post-D3 activation packet under the merged D3 record (PR #941): v2 writer default through the sole source-controlled seam, honest unchanged-input stable-core reuse (typed misses; poisoned/v1/corrupt priors fail closed; head/identity invalidators; static orientation surfaces joined the input manifest), and the review-found reuse/write race closed by receipt_transaction lock-serialization with a permanent failing-first regression test."
-        kind: code
-        blocker: false
-      - id: 3R-B0
-        what: "DONE 2026-07-14 — PR #936 merged the one-time WP-O3-B0 exact-identifier authority bootstrap (merge commit 5ba5fa7d27f3e964c465cce8fbbbe7386b1bb9f1) under the already-admitted WP-O3 Session Entry identity: literal WP-O3R only, bound injectively to canonical packet id onboard-one-door-WP-O3R, with the named identity regression and the blocked WP-O3R corrective node recorded in the canonical spec and this ledger. It granted authority only; the implementation merged separately in PR #937."
-        kind: governance
-        blocker: false
-    non_goals:
-      - No gate weakening, no new truth store, receipt store, digest primitive, or parser family — reuse stable_digest/utc_now (memory_kernel.write_receipts), the ledger --check replay contract, and the needs_host vocabulary chain (spec §2.4, §3.1).
-      - No Titanium, production, CLOSED_LIVE, broad merge-authority, or branch-protection work under this track (C1 belongs to its owners); the sole exception is the exact authority-only WP-O16-B0 plus five-path WP-O16 CI-truth classification pair in the closure spec, with no ownership transfer.
-      - No strict-default promotion without the merged operator-authored D2 record (spec §9.2).
-      - No active sibling-track surface edit; pyproject.toml stays forbidden until M6-1 resolves with the DharmaGraph owner (spec §9.6).
-      - No performance target met by removing or deferring a required validation (spec WP-O6 kill criterion).
-
   - id: darshan-publication-2026-07
     name: Darshan — publication venture cell (multi-disciplinary voice of clear seeing)
     status: ACTIVE
@@ -2238,6 +1904,30 @@ active_tracks:
       - No geopolitical piece publishes without register tags and a steelman of the criticized parties — citation-or-silence applies doubly to charged topics.
 
 closed_tracks:
+  - id: onboard-one-door-2026-07
+    name: Onboarding hardening — retained session-status slice
+    status: SHIPPED
+    closure_kind: VERIFIED_SLICE
+    opened_at: "2026-07-10"
+    closed_at: "2026-07-17"
+    closed_by: "operator-directed scope reset"
+    serves: substrate-nativeness
+    evidence:
+      - "dharma_swarm/operator_core/onboarding/ - retained modular evidence, readiness, receipt, and render implementation"
+      - "tests/test_onboarding_cli.py, tests/test_onboarding_readiness.py, tests/test_make_onboarding_contract.py - executable session-status contract"
+      - "docs/governance/BUILD_SESSION_ENTRYPOINT.md - canonical command and authority boundary"
+    notes: |
+      Closed by subtraction after the useful session-status behavior was
+      separated from edit admission, closeout, CI, and persistent A2A identity
+      registration. This VERIFIED_SLICE claim covers only the read-only,
+      truthful `make onboard` session-status surface and its focused tests.
+      Edit authority remains
+      `make agent-build-preflight PACKET=<path>`; closeout and CI remain
+      independent. This closure makes no production-readiness,
+      merge-authority, deployment, or whole-organism orientation claim.
+      The One-Door campaign name and WP-O packet namespace are retired from
+      current authority; their history remains available in Git.
+
   - id: runtime-truth-spine-adoption-2026-06
     name: Runtime Truth Spine — Adoption (god objects flow through invoke_agent)
     status: SHIPPED

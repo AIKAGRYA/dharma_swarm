@@ -265,7 +265,8 @@ def main() -> None:
             print(f"   - {w}")
 
     print("\n" + "=" * 60)
-    print("  Run `make onboard` for full operating reality")
+    print("  Run `make onboard` for session status")
+    print("  Run `make organism-status` for whole-organism orientation")
     print("  Run `make status` for this quick snapshot")
     print("=" * 60)
 

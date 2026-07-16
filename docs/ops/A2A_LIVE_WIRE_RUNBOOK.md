@@ -102,7 +102,7 @@ The existing item from organism-rewire D1 / DharmaGraph ops: run the compose
 canonical-lane consumption is live. Nothing new to build; this runbook just
 records it as the fourth wire.
 
-**Verify:** `make orient` on the droplet shows Loop-1 LIVE; a message sent in
+**Verify:** `make organism-status` on the droplet shows Loop-1 LIVE; a message sent in
 step 2 gets CONSUMED (acked), not just stored.
 
 ## Step 5 — Merge PR #842 (+ this branch's gateway commits)

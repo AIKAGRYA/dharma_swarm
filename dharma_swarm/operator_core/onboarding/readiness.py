@@ -1,9 +1,8 @@
-"""Selected-scope admission policy: condition set, precedence, verdict, exit.
+"""Session-status policy: condition set, precedence, verdict, and exit.
 
 Policy only — no collection, no rendering, no I/O.  Evidence collection lives
 in ``evidence.py``; this module turns a lossless set of observed conditions
-into exactly one scalar verdict/exit while retaining every secondary state
-(spec §2.3: the winning scalar exit never deletes secondary states).
+into exactly one scalar verdict/exit while retaining every secondary state.
 """
 
 from __future__ import annotations
@@ -36,7 +35,7 @@ EXIT_BY_VERDICT = {
     VERDICT_TOOLCHAIN_MISSING: 5,
 }
 
-# Fixed scalar precedence (spec §2.3):
+# Fixed scalar-verdict precedence:
 #   usage(2) > CONFIG_ERROR(3) > TOOLCHAIN_MISSING(5) > BLOCKED(1) > NEEDS_HOST(4)
 _PRECEDENCE = (
     VERDICT_USAGE_ERROR,
@@ -115,7 +114,7 @@ def _verdict_triggers(condition: Condition) -> str | None:
     if condition.condition_class == "toolchain" and condition.state == "fail":
         return VERDICT_TOOLCHAIN_MISSING
     # A mandatory check that is anything but a clean pass can never READY
-    # (spec §2.3: mandatory warn/skip/unavailable cannot produce READY).
+    # Mandatory warn/skip/unavailable conditions cannot produce READY.
     if condition.mandatory and condition.state in _NONPASS_MANDATORY_STATES:
         return VERDICT_BLOCKED
     return None
@@ -130,7 +129,7 @@ def evaluate(
 
     ``require_live`` maps required host gaps to exit 4; without it a host gap
     is typed (verdict ``NEEDS_HOST``) but exits 0, matching the run-level
-    precedent (spec §2.3, exit table).
+    scalar-verdict precedent defined by ``_PRECEDENCE``.
     """
     ordered = tuple(sorted(conditions, key=lambda c: c.id))
     seen: dict[str, Condition] = {}

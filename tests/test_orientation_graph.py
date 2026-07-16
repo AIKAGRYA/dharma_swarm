@@ -59,7 +59,7 @@ def _copy_tracked_checkout(destination: Path) -> None:
             "-C",
             str(destination),
             "-c",
-            "user.name=WP-O4 test",
+            "user.name=Orientation Graph Test",
             "-c",
             "user.email=wp-o4-test@example.invalid",
             "commit",
@@ -197,7 +197,7 @@ def test_explicit_context_refresh_writes_only_two_paths(tmp_path):
             "-C",
             str(checkout),
             "-c",
-            "user.name=WP-O4 test",
+            "user.name=Orientation Graph Test",
             "-c",
             "user.email=wp-o4-test@example.invalid",
             "commit",
@@ -354,14 +354,17 @@ def test_measure_orientation_under_target():
     assert receipt["edge_count"] > 0
 
 
-def test_measure_cli_writes_receipt():
+def test_measure_cli_writes_receipt(tmp_path: Path):
+    state_dir = tmp_path / "state"
     result = subprocess.run(
         [sys.executable, str(SCRIPT), "--measure"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
+        env={**os.environ, "DHARMA_STATE_DIR": str(state_dir)},
     )
     assert result.returncode == 0
     payload = json.loads(result.stdout)
     assert payload["event"] == "orientation_timing"
     assert payload["meets_target"] is True
+    assert (state_dir / "ops/orientation_timing_receipt.json").exists()

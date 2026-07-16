@@ -1,6 +1,6 @@
 {
   "schema": "dharma.ci_truth_contract.v1",
-  "version": 3,
+  "version": 4,
   "description": "Machine-readable CI membrane consumed by local ACI tooling and Merge Master Mike. Required checks block merge when missing, pending, failed, cancelled, timed out, or action-required. Advisory checks are reported with local repro commands but do not block automated merge flow.",
   "required": [
     {
@@ -29,6 +29,14 @@
       "local_command": "python3 scripts/governance/check_pr_coherence_delta.py",
       "failure_category": "pr_body_contract",
       "autofix": "limited"
+    },
+    {
+      "id": "onboarding_session_status",
+      "names": ["Onboarding admission parity"],
+      "owner": "onboarding",
+      "local_command": "make onboard && python3 -m pytest -q tests/test_agent_onboard.py tests/test_onboarding_cli.py tests/test_onboarding_readiness.py tests/test_onboarding_ci_contract.py",
+      "failure_category": "session_status",
+      "autofix": "manual"
     },
     {
       "id": "onboarding_macos_compatibility",

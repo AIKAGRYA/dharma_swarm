@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agentops-report-root-check agent-build-preflight agent-build-closeout spine-check onboard onboarding-macos-compatibility orient status a2a-status a2a-up a2a-send go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test slop-ratchet slop-baseline
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agentops-report-root-check agent-build-preflight agent-build-closeout spine-check onboard onboarding-macos-compatibility organism-status orient agent-register agent-onboard status a2a-status a2a-up a2a-send go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test slop-ratchet slop-baseline
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently. Freeze a
@@ -55,6 +55,11 @@ $(error PACKET must not contain Make expansion syntax)
 endif
 override PACKET := $(_AGENTOPS_PACKET_INPUT)
 export PACKET
+ifneq ($(filter agent-build-preflight agent-build-closeout,$(MAKECMDGOALS)),)
+ifeq ($(strip $(PACKET)),)
+$(error PACKET=<path> is required for exact edit admission and closeout)
+endif
+endif
 
 # AgentOps must bootstrap outside the checkout.  Keep this interpreter
 # independent from the repository-oriented PYTHON default above: merely
@@ -261,12 +266,14 @@ help:
 	@echo "  make memory-kernel-knowledgeops-bridge-smoke Smoke KnowledgeOps to MemoryKernel promotion bridge"
 	@echo "  make memory-kernel-full-power-preflight Run M2-M5 governed live preflight"
 	@echo "  make operator-prod-smoke Run fast read-only operator production smoke"
-	@echo "  make onboard      Render current operating reality (active track, live ops, broken register, axioms)"
+	@echo "  make onboard      Show truthful read-only session status; nonzero means not ready"
 	@echo "  make onboarding-macos-compatibility  Reproduce the required GNU Make 3.81 + Darwin proof"
-	@echo "  make orient       Render the whole organism at once (identity, organs, tracks, custody, liveness)"
-	@echo "  make agent-onboard Fleet-identity join route + identity-surface drift check (new A2A agents)"
-	@echo "  make agent-build-preflight Run onboarding + hygiene integrity before agent work"
-	@echo "  make agent-build-closeout Run hygiene scan + full governance bundle after agent work"
+	@echo "  make organism-status Render the whole-organism projection (runtime, agents, liveness)"
+	@echo "  make orient       Compatibility alias for make organism-status"
+	@echo "  make agent-register Check persistent A2A identity registration route and drift"
+	@echo "  make agent-onboard Compatibility alias for make agent-register"
+	@echo "  make agent-build-preflight PACKET=<path>  Admit one exact packet and baseline"
+	@echo "  make agent-build-closeout PACKET=<path>  Verify that packet's scope and gates"
 	@echo "  make status       Quick cross-agent state snapshot (PRs, stale, hotlist, track)"
 	@echo "  make a2a-status   Connect to the AGNI hub: Devin identity + live fleet roster + inbox state"
 	@echo "  make a2a-up       Run the persistent Devin A2A agent (registers on fleet, drains inbox)"
@@ -343,7 +350,7 @@ verifier-selfcheck:
 	@$(VENV_PYTHON) -m pytest tests/ --collect-only -q >/tmp/dharma-collect-check.log 2>&1 \
 		|| (echo "COLLECTION BROKEN:"; tail -20 /tmp/dharma-collect-check.log; exit 1)
 	@tail -1 /tmp/dharma-collect-check.log
-	@echo "[4/4] onboard door"
+	@echo "[4/4] session status"
 	@$(MAKE) -s onboard >/dev/null 2>&1 && echo "onboard: OK"
 	@echo "verifier-selfcheck: ALL GATES FUNCTIONAL"
 
@@ -614,9 +621,9 @@ claim-evidence:
 mutation-test:
 	$(REPO_PYTHON) scripts/governance/run_mutation_score.py --threshold $(MUTATION_THRESHOLD)
 
-# Packet-aware preflight (WP-O4 / O4-B2): verifier-selfcheck reaches the
-# onboarding door exactly once; do not also list onboard as a direct
-# prerequisite. When PACKET is provided, the shared AgentOps evaluator records
+# Packet-aware preflight: verifier-selfcheck reaches session status exactly
+# once; do not also list onboard as a direct
+# prerequisite. The shared AgentOps evaluator records
 # a digest-bound admission receipt outside the checkout and requires the exact
 # clean baseline (HEAD == base_ref) before any implementation edit.
 # Target-specific exports flow through the validation prerequisite and every
@@ -654,23 +661,19 @@ agent-build-preflight: agentops-report-root-check
 	@$(_AGENTOPS_RESOLVE_PYTHON); \
 	$(_AGENTOPS_EXPORT_ENV); \
 	$(MAKE) -s hygiene-check MAKEOVERRIDES= AGENTOPS_PYTHON="$$agentops_python" PYTHON="$$agentops_python" VENV_PYTHON="$$agentops_python" PYTEST="$$agentops_python -m pytest" REPO_PYTHON="PYTHONPATH=. $$agentops_python"
-ifdef PACKET
 	@$(_AGENTOPS_RESOLVE_PYTHON); \
 	$(_AGENTOPS_EXPORT_ENV); \
 	"$$agentops_python" scripts/governance/run_agent_work_packet.py --packet "$${PACKET}" --preflight --report-root "$${AGENTOPS_REPORT_ROOT}"
-endif
-	@printf "\nAgent build preflight complete. Use the task route from make onboard; close out with: make agent-build-closeout\n"
+	@printf "\nAgent build preflight complete. Close out the same packet with: make agent-build-closeout PACKET=<path>\n"
 
 # Closeout keeps the established hygiene + governance bundle and, for a packet
 # run, invokes the same evaluator in descendant-aware closeout mode exactly
 # once. Its report root is explicit and external; the evaluator checks the
 # preflight digest plus committed/working/staged/untracked scope union.
 agent-build-closeout: agentops-report-root-check
-ifdef PACKET
 	@$(_AGENTOPS_RESOLVE_PYTHON); \
 	$(_AGENTOPS_EXPORT_ENV); \
 	"$$agentops_python" scripts/governance/run_agent_work_packet.py --packet "$${PACKET}" --closeout --report-root "$${AGENTOPS_REPORT_ROOT}"
-endif
 	@$(_AGENTOPS_RESOLVE_PYTHON); \
 	$(_AGENTOPS_EXPORT_ENV); \
 	"$$agentops_python" scripts/governance/hygiene/scan.py --output /tmp/dharma-hygiene-audit.txt
@@ -685,13 +688,14 @@ endif
 spine-check:
 	$(PYTHON) -m scripts.uplift_guards.check_spine_ownership
 
-# Single-door onboarding: prints the current operating reality from existing
-# owners (ACTIVE_TRACK.yaml, LIVE_OPS_DASHBOARD.md, BROKEN_REGISTER.md,
-# ACTIVE_SURFACE_MANIFEST.yaml). Always exits 0 pre-WP-O5 except usage
-# errors (exit 2). Documented flags forward via ARGS (spec §2.1), e.g.
-# `make onboard ARGS=--json`. Run this before any build session.
+# Session status: renders authoritative read-only evidence. A nonzero Make
+# result means the session is not ready; a zero result is status, not edit
+# authorization. GNU Make reports any failed recipe as exit 2; the displayed
+# verdict and direct Python CLI retain the exact typed code. Exact edit
+# admission belongs to agent-build-preflight. Documented flags forward via
+# ARGS, e.g. `make onboard ARGS=--json`.
 onboard:
-	$(PYTHON) scripts/governance/agent_onboard.py $(ARGS)
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) scripts/governance/agent_onboard.py $(ARGS)
 
 # Full local reproducer for the required macOS compatibility context. Invoke
 # this target through stock /usr/bin/make so a parser regression fails before
@@ -711,22 +715,29 @@ onboarding-macos-compatibility:
 		tests/test_agent_work_packet.py::test_darwin_report_anchor_rejects_environment_minted_temp_root \
 		tests/test_agent_work_packet.py::test_private_report_anchor_enforces_owner_mode_and_symlink_boundaries
 
-# Whole-system orientation: identity, tracks, lanes, agents, receipts, A2A,
+# Whole-organism status: identity, tracks, lanes, agents, receipts, A2A,
 # body state, and broken register. Deep, mutation-free projection — it
-# regenerates NOTHING (WP-O4 / spec §2.1). The tracked context artifacts are
+# regenerates NOTHING. The tracked context artifacts are
 # refreshed only by their explicit owner command:
 #   $(PYTHON) scripts/governance/orientation_graph.py --write-context
-orient: override PYTHONDONTWRITEBYTECODE := 1
-orient:
+organism-status: override PYTHONDONTWRITEBYTECODE := 1
+organism-status:
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) scripts/governance/orientation_graph.py
 
-# Fleet-identity onboarding: the join route for a NEW persistent A2A agent
+# Compatibility name retained for existing callers.
+orient: organism-status
+
+# Fleet-identity registration: the join route for a NEW persistent A2A agent
 # (card, runtime registration, roster, git seat, announcement, presence) plus
 # a drift check across the identity surfaces. Read-only; always exits 0.
-# `make onboard` orients a session; this onboards an identity.
+# `make onboard` reports session status; this checks identity registration.
 # See docs/ops/A2A_AGENT_ONBOARDING.md.
-agent-onboard:
-	$(PYTHON) scripts/governance/a2a_agent_onboard.py $(ARGS)
+agent-register: override PYTHONDONTWRITEBYTECODE := 1
+agent-register:
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) scripts/governance/a2a_agent_onboard.py $(ARGS)
+
+# Compatibility name retained for existing callers.
+agent-onboard: agent-register
 
 # Quick cross-agent state snapshot: active track, open PRs, stale items,
 # broken register, hotlist. Any agent on any platform can run this.

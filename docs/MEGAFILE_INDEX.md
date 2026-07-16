@@ -8,15 +8,21 @@ This file is the **stable shape** for dharma_swarm onboarding. Only this file is
 
 ## How To Use This File
 
-The single door into the current operating reality is the onboarding command:
+Start with the current session:
 
 ```bash
 make onboard
 ```
 
-It surfaces the active track, live ops, broken register, and depth pointers. Run that first. **Then** use this index as a depth reference — it reserves the 10 onboarding-megafile slots so future agents find them. Where status is **CANONICAL**, read the file. Where **STUB**, read the pointed-to substrate. Where **STALE / CONTESTED / MISSING**, read with the marked caveat.
+`make onboard` is read-only session status. For the deeper whole-organism
+projection, run `make organism-status`; before editing, bind the exact task
+with `make agent-build-preflight PACKET=<path>`. **Then** use this index as a
+depth reference — it reserves the 10 onboarding-megafile slots so future agents
+find them. Where status is **CANONICAL**, read the file. Where **STUB**, read the
+pointed-to substrate. Where **STALE / CONTESTED / MISSING**, read with the marked
+caveat.
 
-If you are doing work that should be captured, ask: "which slot does this belong to?" Append there. Do not create parallel artifacts. Do not create a new megafile to track convergence — the onboarding command already does that.
+If you are doing work that should be captured, ask: "which slot does this belong to?" Append there. Do not create parallel artifacts or a new megafile to track convergence; use the named owner and the existing status commands.
 
 ---
 

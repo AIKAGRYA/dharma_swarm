@@ -1,11 +1,4 @@
-"""WP-O3 cache groundwork: manifest invalidators, key stability, fail-closed
-paths, and the honest no-reuse posture of this packet slice.
-
-Covers the groundwork half of O3-B4 (every declared invalidator changes the
-key; same bytes with different mtimes/inodes do not) and the path/adversarial
-subset of O3-B5 that exists before section reuse is enabled (direct/symlink
-``DHARMA_OPS_DIR`` escapes, corrupt prior receipts, cache-hit honesty).
-"""
+"""Session-status cache invalidation, safe paths, and fail-closed reuse."""
 
 from __future__ import annotations
 
@@ -67,7 +60,7 @@ def test_absent_input_is_itself_an_invalidator(tmp_path: Path) -> None:
 
 
 def test_same_bytes_different_mtime_keeps_stable_key(tmp_path: Path) -> None:
-    """O3-B6/§3.2: identity is content-derived, never mtime/inode-derived."""
+    """Cache identity is content-derived, never mtime/inode-derived."""
     target = tmp_path / "doc.md"
     target.write_text("stable bytes")
     categories = {"instruction_custody": ["doc.md"]}
@@ -149,9 +142,11 @@ def _run_in_process(
     monkeypatch.setenv("DHARMA_OPS_DIR", str(ops))
     monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", "1")
     monkeypatch.delenv("DHARMA_ONBOARD_WRITER", raising=False)
-    assert cli.assemble_and_run(["--json"]) == 0
-    capsys.readouterr()
-    return load_receipt(ops / "onboard_receipt.json").payload
+    exit_code = cli.assemble_and_run(["--json"])
+    rendered = json.loads(capsys.readouterr().out)
+    payload = load_receipt(ops / "onboard_receipt.json").payload
+    assert exit_code == rendered["exit_code"]
+    return payload
 
 
 def test_unchanged_input_run_reuses_stable_core(
@@ -173,7 +168,7 @@ def test_unchanged_input_run_reuses_stable_core(
     assert second["cache"]["miss_reasons"] == []
     assert second["stable_core"] == first["stable_core"]
     assert second["stable_core"] == evidence.collect_stable_core()
-    # Hard/live checks always rerun on a hit (spec §3.2).  The on-disk draft
+    # Hard/live checks always rerun on a hit. The on-disk draft
     # is written before its own persistence condition can exist, so assert
     # the recomputed live conditions, not receipt_persisted.
     live_ids = {row["id"] for row in second["live_delta"]["conditions"]}
@@ -185,7 +180,7 @@ def test_reuse_misses_are_typed_and_fail_closed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Every reuse miss carries a typed reason; poisoned or version-skewed
-    priors can never seed the stable core (spec §3.2 adversarial rows)."""
+    corrupt priors can never seed the stable core."""
     from dharma_swarm.operator_core.onboarding import cli
     from dharma_swarm.operator_core.onboarding.receipt import compute_stable_digest
 
@@ -229,7 +224,7 @@ def test_reuse_misses_are_typed_and_fail_closed(
 def test_reuse_decision_is_serialized_under_receipt_lock(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Spec §3.2 concurrency row: the prior-receipt read and the reuse
+    """Cache concurrency invariant: the prior-receipt read and the reuse
     decision must happen under the same sidecar lock as the replace.  A
     writer that decides from a prior read outside the lock persists stale
     cache metadata when the prior changes while it waits (the Greptile/T-Rex
@@ -271,7 +266,8 @@ def test_reuse_decision_is_serialized_under_receipt_lock(
         receipt_file.write_text(json.dumps(tampered), encoding="utf-8")
         fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
     stdout, stderr = proc.communicate(timeout=120)
-    assert proc.returncode == 0, stderr
+    truth = json.loads(stdout)
+    assert proc.returncode == truth["exit_code"], stderr
 
     final = load_receipt(receipt_file).payload
     assert final["cache"]["hit"] is False

@@ -1,9 +1,4 @@
-"""WP-O3 readiness policy: lossless precedence, nonpass states, host scope.
-
-Covers O3-B2 (exit precedence retains all simultaneous conditions), O3-B3
-(mandatory warn/skip/unavailable never counts pass), and the policy half of
-O3-B7 (host scope: required live gaps exit 4; non-required stay typed exit 0).
-"""
+"""Session readiness policy: lossless precedence, nonpass states, host scope."""
 
 from __future__ import annotations
 
@@ -98,6 +93,22 @@ def test_optional_warn_stays_warn_and_does_not_block() -> None:
     assert warn.state == "warn"  # never silently counted as pass
 
 
+def test_generated_projection_is_diagnostic_not_a_session_gate() -> None:
+    """A sterile clone has no generated projection and must still be usable."""
+    from dharma_swarm.operator_core.onboarding import cli
+
+    conditions = cli._collect_conditions(
+        {"dirty": False, "conflicted": False},
+        {"git": "git version test", "make": "GNU Make test"},
+        {"broken_register": {"total": 0, "open_like": 0, "closed_like": 0}},
+        net=False,
+    )
+    outcome = evaluate(conditions)
+    assert outcome.verdict == "READY"
+    assert outcome.exit_code == 0
+    assert "active_track_projection_fresh" not in outcome.condition_ids()
+
+
 # --- O3-B7 (policy half): host scope mapping ---------------------------------
 
 def test_required_live_host_gap_exits_four() -> None:
@@ -159,7 +170,6 @@ def test_git_probe_failures_are_typed_config_error(
     conditions = cli._collect_conditions(
         live_state,
         {"git": "git version test", "make": "GNU Make test"},
-        {},
         {"broken_register": {"total": 0, "open_like": 0, "closed_like": 0, "unknown": 0}},
         net=False,
         probe_errors=probe_errors,

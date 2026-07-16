@@ -451,6 +451,11 @@ Make every future agent (human or AI) land in the same operating reality with on
 - **docs/AGENTS.md** — no pre-flight pointer. **Added "Before Anything Else" section.**
 
 ### What was added
+
+> Historical inventory from the 2026-05 audit. Current command semantics are
+> owned by `BUILD_SESSION_ENTRYPOINT.md`: `make onboard` is truthful read-only
+> session status, and packet-bound preflight owns edit admission.
+
 - **`scripts/governance/agent_onboard.py`** (extended): single door. Renders branch/HEAD/origin-main divergence, active track + acceptance criteria, live-ops snapshot with staleness warning, surface manifest health, broken-register summary, living axioms, recent track activity, decay-watch list, enforcement commands, depth pointers. Always exits 0; never hard-gates.
 - **`scripts/governance/check_track_status.py`** (preserved from prior pass): writes `reports/governance/active_track_evidence.json`.
 - **`scripts/governance/render_active_track_includes.py`** (preserved): renders the managed `<!-- ACTIVE_TRACK:START -->`/`END` blocks in `CLAUDE.md`, `SOVEREIGN_MANIFEST.md`, `BUILD_SESSION_ENTRYPOINT.md` so the track name lives in one place.
