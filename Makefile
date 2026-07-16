@@ -645,7 +645,7 @@ agentops-report-root-check agent-build-preflight agent-build-closeout: override 
 agentops-report-root-check:
 	@$(_AGENTOPS_RESOLVE_PYTHON); \
 	$(_AGENTOPS_EXPORT_ENV); \
-	"$$agentops_python" scripts/governance/run_agent_work_packet.py --validate-report-root "$${AGENTOPS_REPORT_ROOT}" --validate-report-child cache --validate-report-child onboard
+	"$$agentops_python" scripts/governance/run_agent_work_packet.py --validate-report-root "$${AGENTOPS_REPORT_ROOT}" --validate-report-child cache --validate-report-child cache/hypothesis --validate-report-child onboard
 
 agent-build-preflight: agentops-report-root-check
 	@$(_AGENTOPS_RESOLVE_PYTHON); \
