@@ -113,6 +113,7 @@
     "tests/test_loop1_consumption.py",
     "tests/test_loop1_consumption_check.py",
     "tests/test_loop_supervisor_tristate.py",
+    "tests/test_merge_master_mike_daemon.py",
     "tests/test_onboarding_ci_contract.py",
     "tests/test_orchestration_genome.py",
     "tests/test_orchestrator_v1.py",
@@ -230,6 +231,6 @@
       "Mechanically re-minted 2026-07-16 by the operator session after main moved past the original base d6c56f260fd7 (PRs #982/#984/#943/#985 merged); scope, intent, gates, and the five-path exception are unchanged from the Merge Master Mike-authored original in PR #981. Any further main movement before merge invalidates this base binding again."
     ],
     "rollback": "revert the CL-2 all-consumer requirement, exact WP-O16 implementation exception, pending non-closure B0/WP-O16 ledger items, managed authority projections, DocOps auto counts, and this WP-O16-B0 packet together; do not alter any CI consumer",
-    "packet_digest": "c92d81d7d7074b9147ce2d221804f3b2fb1b966201d958914cf9cb91176e99fe"
+    "packet_digest": "e20340bcad0c7e7dd7e4ba6d988070f9208f3e051e0b72115ce6a607620fb377"
   }
 }
