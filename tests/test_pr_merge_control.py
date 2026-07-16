@@ -21,6 +21,11 @@ def _ci_required_success_rollup():
             "status": "COMPLETED",
             "conclusion": "SUCCESS",
         },
+        {
+            "name": "Onboarding admission parity",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+        },
         {"name": "gitleaks", "status": "COMPLETED", "conclusion": "SUCCESS"},
         {"name": "pytest (3.11)", "status": "COMPLETED", "conclusion": "SUCCESS"},
         {"name": "pytest (3.12)", "status": "COMPLETED", "conclusion": "SUCCESS"},
@@ -1007,6 +1012,110 @@ def test_gate_blocks_missing_required_ci_truth(tmp_path, monkeypatch):
     assert gate["decision"] == "BLOCKED"
     assert gate["ci_truth"]["verdict"] == "FAIL"
     assert "required CI docops_integrity is MISSING; run `make docops-integrity`" in gate["blockers"]
+
+
+@pytest.mark.parametrize(
+    ("github_status", "conclusion", "expected_status"),
+    [
+        (None, None, "MISSING"),
+        ("IN_PROGRESS", "", "PENDING"),
+        ("COMPLETED", "FAILURE", "FAIL"),
+    ],
+)
+def test_gate_blocks_nonpassing_onboarding_admission_parity(
+    tmp_path,
+    monkeypatch,
+    github_status,
+    conclusion,
+    expected_status,
+):
+    """The manual Mike path treats the onboarding context as merge-blocking."""
+    out_dir = tmp_path / "packet"
+    out_dir.mkdir()
+    prc.write_json(out_dir / "FACTS.json", {"risk": {"level": "LOW"}})
+    _write_approve_review(out_dir, "codex")
+    _write_approve_review(out_dir, "claude")
+
+    contract = prc.load_ci_truth_contract()
+    if not any(
+        "Onboarding admission parity" in entry.get("names", [])
+        for entry in contract["required"]
+    ):
+        contract = {
+            **contract,
+            "required": [
+                *contract["required"],
+                {
+                    "id": "onboarding_admission_parity",
+                    "names": ["Onboarding admission parity"],
+                    "owner": "onboarding",
+                    "local_command": (
+                        "make agent-build-closeout PACKET=<changed-work-packet>"
+                    ),
+                    "failure_category": "agentops_admission",
+                    "autofix": "forbidden",
+                },
+            ],
+        }
+    monkeypatch.setattr(prc, "load_ci_truth_contract", lambda _path: contract)
+
+    rollup = [
+        item
+        for item in _ci_required_success_rollup()
+        if item["name"] != "Onboarding admission parity"
+    ]
+    if github_status is not None:
+        rollup.append(
+            {
+                "name": "Onboarding admission parity",
+                "status": github_status,
+                "conclusion": conclusion,
+            }
+        )
+    body = """
+- Organ touched: `tests/test_pr_merge_control.py` (Mike-owned consumer proof).
+- Declared-vs-actual gap closed: manual merge authority blocks nonpassing onboarding admission.
+- Proof that re-reads the map: candidate CI truth contract is evaluated by build_gate.
+- New drift introduced: contract promotion remains in the separate WP-O16 packet.
+"""
+    monkeypatch.setattr(
+        prc,
+        "fetch_pr_view",
+        lambda _pr: {
+            "isDraft": False,
+            "mergeable": "MERGEABLE",
+            "reviewDecision": "APPROVED",
+            "statusCheckRollup": rollup,
+            "body": body,
+        },
+    )
+    monkeypatch.setattr(
+        prc,
+        "fetch_review_threads",
+        lambda _pr, _repo: {"ok": True, "unresolved_count": 0},
+    )
+    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
+
+    gate = prc.build_gate(
+        argparse.Namespace(
+            pr=12,
+            packet_dir=str(out_dir),
+            state_root=str(tmp_path),
+            allow_pending=False,
+            human_approved=False,
+            allow_backup_reviewer=False,
+            backup_reviewers="backup_opus",
+            backup_reviewer_reason="",
+        )
+    )
+
+    blocker = (
+        f"required CI onboarding_admission_parity is {expected_status}; "
+        "run `make agent-build-closeout PACKET=<changed-work-packet>`"
+    )
+    assert gate["decision"] == "BLOCKED"
+    assert gate["ci_truth"]["verdict"] == "FAIL"
+    assert blocker in gate["blockers"]
 
 
 def test_gate_accepts_named_backup_reviewer_when_claude_unavailable(tmp_path, monkeypatch):
