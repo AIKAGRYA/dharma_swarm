@@ -1,6 +1,6 @@
 {
   "id": "dharmagraph-WP-O8",
-  "base_ref": "5311baee84059f8dcf5b7d11972303fb5b7ed677",
+  "base_ref": "5e0e42549a1e3f8123704d0c11b5fc6be2f8c5f0",
   "branch": "codex/dharmagraph-m6-1-20260716",
   "worktree": ".",
   "intent": "Resolve onboard-one-door M6-1 through the active DharmaGraph owner's surface. Widen the existing [tool.mutmut] configuration from the kernel receipt alone to include dharma_swarm/operator_core/onboarding/readiness.py and its readiness/property batteries, then truthfully reseal the parity builder, independent judge, and rendered matrix because pyproject.toml is an explicit relevant source in the differential oracle. No onboarding runtime, ledger state, workflow, ownership transfer, or parity-score improvement is admitted.",
@@ -147,7 +147,7 @@
   "negative_controls": [
     {
       "name": "m6-base-lacks-readiness-target",
-      "command": "python3 -c \"import subprocess; r=subprocess.run(['git','show','5311baee84059f8dcf5b7d11972303fb5b7ed677:pyproject.toml'],capture_output=True,text=True); raise SystemExit(0 if r.returncode == 0 and 'dharma_swarm/operator_core/onboarding/readiness.py' not in r.stdout else 9)\"",
+      "command": "python3 -c \"import subprocess; r=subprocess.run(['git','show','5e0e42549a1e3f8123704d0c11b5fc6be2f8c5f0:pyproject.toml'],capture_output=True,text=True); raise SystemExit(0 if r.returncode == 0 and 'dharma_swarm/operator_core/onboarding/readiness.py' not in r.stdout else 9)\"",
       "env": {},
       "expected_exit": 0
     }
@@ -171,7 +171,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "5311baee84059f8dcf5b7d11972303fb5b7ed677",
+      "checked_at_sha": "5e0e42549a1e3f8123704d0c11b5fc6be2f8c5f0",
       "details": []
     },
     "interface_mismatches": [
@@ -197,6 +197,6 @@
       "The fresh judge signature fe8d9625bd3a7a86628fd27606b2e7c83a13b21af71cb60c80d245eb3a1e7384 has Candidate[source_review] status only. It does not become ratified authority merely because an agent can compute it; M6 remains unmergeable until a separate operator-reviewed source-ratification commit is an ancestor."
     ],
     "rollback": "revert the pyproject.toml mutmut widening, resealed builder/judge/matrix evidence, and this packet together; reopen M6-1 explicitly",
-    "packet_digest": "6d45163c0c042417a2f33d24824bb4aba0bbc213a88321ef264bff6e4a356b9e"
+    "packet_digest": "cae95b85ba3673c6b33a55c75f766ff21dfd3e7fbd7825d6e9095b3a23a504e9"
   }
 }
