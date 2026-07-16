@@ -1,7 +1,7 @@
 {
   "id": "onboard-one-door-WP-O8",
-  "base_ref": "9cc3739d583d6b68a19e6cfb56ca38a89bc43e1b",
-  "branch": "cursor/onboard-preflight-cache-hardening-189d",
+  "base_ref": "5311baee84059f8dcf5b7d11972303fb5b7ed677",
+  "branch": "codex/pr958-onboard-wp-o8-20260715",
   "worktree": ".",
   "intent": "Correct the WP-O4R admission cache boundary discovered while executing M6-1: verifier-selfcheck imports Hypothesis during collection, but AgentOps externalizes only pytest, ruff, XDG, and bytecode caches. Export HYPOTHESIS_STORAGE_DIRECTORY under AGENTOPS_CACHE_ROOT so make agent-build-preflight remains exact-clean. This packet changes only Makefile, its existing contract test, and this packet.",
   "allowed_files": [
@@ -149,7 +149,7 @@
   "negative_controls": [
     {
       "name": "wp-o8-base-preflight-reproduces-cache-leak",
-      "command": "python3 -c \"import subprocess; r=subprocess.run(['git','show','9cc3739d583d6b68a19e6cfb56ca38a89bc43e1b:Makefile'],capture_output=True,text=True); raise SystemExit(0 if r.returncode == 0 and 'HYPOTHESIS_STORAGE_DIRECTORY' not in r.stdout else 9)\"",
+      "command": "python3 -c \"import subprocess; r=subprocess.run(['git','show','5311baee84059f8dcf5b7d11972303fb5b7ed677:Makefile'],capture_output=True,text=True); raise SystemExit(0 if r.returncode == 0 and 'HYPOTHESIS_STORAGE_DIRECTORY' not in r.stdout else 9)\"",
       "env": {},
       "expected_exit": 0
     }
@@ -157,9 +157,9 @@
   "session_entry": {
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
-      "python": "3.12.3",
-      "git": "2.43.0",
-      "make": "4.3"
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
     },
     "authority_precedence": [
       "executable",
@@ -173,7 +173,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "9cc3739d583d6b68a19e6cfb56ca38a89bc43e1b",
+      "checked_at_sha": "5311baee84059f8dcf5b7d11972303fb5b7ed677",
       "details": []
     },
     "interface_mismatches": [
@@ -185,10 +185,10 @@
       "tests/test_make_onboarding_contract.py::test_make_admission_recipes_use_external_report_root"
     ],
     "honest_blockers": [
-      "At unmodified base 9cc3739d, make agent-build-preflight reaches all four verifier checks and then fails exact-clean because .hypothesis/constants were created in the checkout. That failing preflight is the defect reproduction, so this corrective packet cannot claim a passing pre-edit preflight.",
+      "At unmodified base 5311baee, make agent-build-preflight reaches all four verifier checks and then fails exact-clean because .hypothesis/constants are created in the checkout. That failing preflight is the defect reproduction, so this corrective packet cannot claim a passing pre-edit preflight.",
       "The two venv sitecustomize tests remain environment-sensitive on Debian system Python and are adjudicated by the required hosted CI contexts; this change does not alter them."
     ],
     "rollback": "revert the Makefile Hypothesis cache export, its regression assertion, and this packet together; preflight exact-clean then reproduces the ignored-write failure",
-    "packet_digest": "f91679176fa58f1a70b18ce019b3488ddf55137436af1c150460c13566cb11ca"
+    "packet_digest": "d624a31db616d4b4a272c9f864cea1ac136a394ef90dca5eb129ea8ed9f9348f"
   }
 }
