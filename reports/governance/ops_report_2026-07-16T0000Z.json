@@ -1,0 +1,162 @@
+{
+  "report_type": "ops_and_pr_lifecycle_report",
+  "generated_at": "2026-07-16T00:00:51Z",
+  "repo": "AmitabhainArunachala/dharma_swarm",
+  "onboard_state": {
+    "status": "READY",
+    "sha": "5311baee84059f8dcf5b7d11972303fb5b7ed677",
+    "track": "onboard-one-door-2026-07",
+    "conditions_all_pass": true
+  },
+  "mission_1_spine_adoption": {
+    "adoption_pct": 93.8,
+    "target_pct": 95.0,
+    "gap_pp": 1.2,
+    "total_surfaces": 16,
+    "joined_count": 13,
+    "joined_pct": 81.2,
+    "adapter_ready_count": 2,
+    "missing_count": 0,
+    "quarantine_count": 0,
+    "legacy_count": 1,
+    "audit_sha": "5311baee84059f8dcf5b7d11972303fb5b7ed677",
+    "status_vs_committed": "CHANGED (audit_sha + line ref updated) — committed to branch oz/governance/spine-adoption-metric-refresh (main is branch-protected)",
+    "non_joined_surfaces": [
+      {
+        "id": "self_modification_loop",
+        "label": "Self-modification propose/gate/apply/verify loop",
+        "status": "adapter-ready",
+        "files": ["dharma_swarm/diff_applier.py", "dharma_swarm/evolution.py", "dharma_swarm/self_improve.py"],
+        "missing_joined_patterns": [
+          {
+            "key": "begin_idempotent",
+            "description": "apply path is idempotency-gated",
+            "regex": "try_begin_idempotent_side_effect"
+          }
+        ]
+      },
+      {
+        "id": "mcp_tool_access",
+        "label": "MCP/tool access boundary",
+        "status": "adapter-ready",
+        "files": ["dharma_swarm/mcp_server.py", "dharma_swarm/dharma_context_mcp.py"],
+        "missing_joined_patterns": [
+          {
+            "key": "identity_import",
+            "description": "MCP tools receive execution identity",
+            "regex": "ExecutionIdentity"
+          },
+          {
+            "key": "runtime_store",
+            "description": "MCP tools write to runtime ledger",
+            "regex": "RuntimeStateStore"
+          },
+          {
+            "key": "side_effect_receipt",
+            "description": "MCP side effects emit receipts",
+            "regex": "record_side_effect"
+          }
+        ]
+      },
+      {
+        "id": "legacy_no_identity_escape_hatch",
+        "label": "Legacy no-identity escape hatch",
+        "status": "legacy",
+        "files": ["dharma_swarm/runtime_state.py", "tests/test_runtime_state_invariants.py"],
+        "missing_joined_patterns": []
+      }
+    ],
+    "saturation_path_to_95pct": "Join self_modification_loop (add try_begin_idempotent_side_effect to diff_applier.py) + join mcp_tool_access (wire ExecutionIdentity + RuntimeStateStore + record_side_effect into mcp_server.py/dharma_context_mcp.py) + retire legacy_no_identity_escape_hatch. Note: joining both adapter-ready surfaces leaves 15/16=93.8%; removing legacy surface from denominator or retiring escape hatch is required to cross 95%.",
+    "spine_pr_comment": "Commented on PR #975 (most recent open spine ops-report PR) with full surface breakdown and saturation path.",
+    "spine_pr_comment_url": "https://github.com/AmitabhainArunachala/dharma_swarm/pull/975#issuecomment-4986496605"
+  },
+  "mission_2_pr_lifecycle": {
+    "total_open_before": 25,
+    "total_open_after": 25,
+    "auto_closed_count": 0,
+    "auto_closed_prs": [],
+    "conflicting_prs": [
+      {
+        "number": 972,
+        "title": "feat(forge-lab): canonical exact-code RSI lab releases",
+        "created_at": "2026-07-15T15:52:06Z",
+        "age_days": 0.3,
+        "action": "monitor — 6.7 days until auto-close eligibility"
+      },
+      {
+        "number": 967,
+        "title": "feat(governance): consolidate five-outcome production campaign",
+        "created_at": "2026-07-15T09:46:13Z",
+        "age_days": 0.6,
+        "action": "monitor — 6.4 days until auto-close eligibility"
+      },
+      {
+        "number": 955,
+        "title": "fix(governance): suppress automated PR refresh churn",
+        "created_at": "2026-07-15T06:42:51Z",
+        "age_days": 0.7,
+        "action": "monitor — 6.3 days until auto-close eligibility"
+      },
+      {
+        "number": 947,
+        "title": "[impact-checked] Add durable A2A presence and operator node",
+        "created_at": "2026-07-14T15:49:21Z",
+        "age_days": 1.3,
+        "action": "monitor — 5.7 days until auto-close eligibility"
+      },
+      {
+        "number": 932,
+        "title": "docs(onboarding): make One-Door closure state machine executable [impact-checked]",
+        "created_at": "2026-07-14T03:01:26Z",
+        "age_days": 1.9,
+        "action": "monitor — 5.1 days until auto-close eligibility"
+      }
+    ],
+    "duplicate_ops_reports_flagged": [
+      {
+        "number": 968,
+        "title": "chore(governance): ops report 2026-07-15T1204Z — spine 93.8% stable, PR lifecycle",
+        "superseded_by": 975,
+        "advisory_comment_posted": true
+      },
+      {
+        "number": 953,
+        "title": "chore(governance): ops report 2026-07-15T0600Z — spine 93.8% stable, PR lifecycle",
+        "superseded_by": 975,
+        "advisory_comment_posted": true
+      },
+      {
+        "number": 950,
+        "title": "chore(governance): ops report 2026-07-15 — spine 93.8% + PR lifecycle",
+        "superseded_by": 975,
+        "advisory_comment_posted": true
+      }
+    ],
+    "green_and_ready_prs": [
+      {"number": 976, "title": "test(dharmagraph): stage One-Door M6-1 mutation scope"},
+      {"number": 975, "title": "chore(governance): ops report 2026-07-15T1800Z — spine 93.8% stable, PR lifecycle"},
+      {"number": 973, "title": "ops: Fleet Model Pool Unification — Phase 1 design + D1–D6 operator register"},
+      {"number": 969, "title": "fix(onboarding): externalize Hypothesis admission cache (WP-O8)"},
+      {"number": 965, "title": "feat(darshan): stage Issue One for public Pages launch"},
+      {"number": 964, "title": "feat(safety): enforce AI-M1 evidence binding"},
+      {"number": 962, "title": "feat(mike): prepare cloud merge agent for production"},
+      {"number": 960, "title": "feat(loop-closure): add disjoint consumption verifier"},
+      {"number": 959, "title": "feat(loop-closure): consume receipts in provider routing"},
+      {"number": 957, "title": "feat(loop-closure): make loop supervision four-state honest"},
+      {"number": 954, "title": "feat(onboarding): WP-O5 — strict verdict exits become the default"},
+      {"number": 952, "title": "onboard-one-door graduation: consolidated status, #946 audit, and operator punch-list"},
+      {"number": 949, "title": "[impact-checked] Govern durable A2A operator slice"},
+      {"number": 943, "title": "chore(docops): reconcile generated counts"},
+      {"number": 930, "title": "feat(chamber): add exact-scope proof membrane v0"},
+      {"number": 904, "title": "feat(holon): authority-scoped remote fast path [impact-checked]"},
+      {"number": 886, "title": "docs: Planetary Intelligence Commons — vision braid, field map, Causal Action Receipt IR spec, wedge roadmap (SEED)"}
+    ],
+    "recommended_actions": [
+      "Operator: review and merge green-and-ready PRs at discretion — 17 are MERGEABLE and non-duplicate",
+      "Consider closing duplicate ops-report PRs #950, #953, #968 to reduce queue noise (#975 is the authoritative 2026-07-15 report)",
+      "CONFLICTING PRs #932, #947, #955, #967, #972 need author rebase — none qualify for auto-close yet (all <2 days old)",
+      "Spine saturation: wire mcp_tool_access and self_modification_loop to reach 15 joined surfaces, then retire legacy escape hatch to cross 95% threshold"
+    ]
+  },
+  "authority_note": "Evidence-only report. Operator holds sole merge authority. No PRs merged or approved by this agent."
+}
