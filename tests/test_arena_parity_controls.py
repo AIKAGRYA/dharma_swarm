@@ -13,6 +13,7 @@ Covers the surfaces added on weaver/arena-parity-controls:
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -187,11 +188,19 @@ def test_live_entrypoint_constructs_full_controlled_run_without_network(
     assert receipt["schema"] == LIVE_MEASUREMENT_SCHEMA
     assert receipt["capability_claim"] is False
     assert receipt["claim_boundary"] == CLAIM_BOUNDARY
+    assert receipt["promotion_authorized"] is False
     assert receipt["expected_live_pairs"] == receipt["observed_live_pairs"] == 72
     assert len(receipt["digest_sha256"]) == 64
+    manifest = receipt["artifact_sha256"]
+    assert set(manifest) == set(receipt["output_files"]) - {
+        "live_measurement_receipt.json"
+    }
+    for name, digest in manifest.items():
+        assert digest == hashlib.sha256((output / name).read_bytes()).hexdigest()
     run = json.loads((output / "arena_run.json").read_text(encoding="utf-8"))
     assert run["capability_claim"] is False
     assert run["live_controls_verified"] is True
+    assert run["promotion_authorized"] is False
     assert run["parity_control"]["verified"] is True
     assert (
         run["parity_control"]["candidate_total_calls"]
@@ -205,9 +214,50 @@ def test_live_entrypoint_constructs_full_controlled_run_without_network(
         (output / "live_worker_receipts.json").read_text(encoding="utf-8")
     )
     assert len(live_receipts["responses"]) == 72
+    scorecard = json.loads((output / "scorecard.json").read_text(encoding="utf-8"))
+    assert scorecard["promotion_authorized"] is False
+    assert scorecard["claim_boundary"] == CLAIM_BOUNDARY
     packet = (output / "decision_packet.md").read_text(encoding="utf-8")
     assert packet.startswith(
-        "> **Claim boundary:** live measurement candidate only; `capability_claim=false`."
+        "> **Claim boundary:** live measurement candidate only; "
+        "`capability_claim=false`; `promotion_authorized=false`."
+    )
+    assert "does not authorize MAP-Elites insertion" in packet
+
+
+def test_live_entrypoint_denies_promotion_even_for_positive_runner_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    from dharma_swarm.coordination.arena import measure
+
+    class PositiveStateArenaRunner(ArenaRunner):
+        def run(self, candidate, output_dir=None):  # type: ignore[override]
+            result = super().run(candidate, output_dir=output_dir)
+            result["closeout_state"] = "positive_lift_candidate"
+            decision_path = Path(output_dir) / "decision_packet.md"
+            decision_path.write_text(
+                decision_path.read_text(encoding="utf-8")
+                + "\nEligible for MAP-Elites promotion.\n",
+                encoding="utf-8",
+            )
+            return result
+
+    monkeypatch.setenv("DHARMA_ARENA_LIVE", "1")
+    monkeypatch.setattr(measure, "ArenaRunner", PositiveStateArenaRunner)
+    output = tmp_path / "positive-state"
+    result = run_live_measurement(
+        models_by_family=_LIVE_MODELS,
+        output_dir=output,
+        timeout=3.0,
+        transport=_metered_transport,
+    )
+
+    assert result["run"]["closeout_state"] == "positive_lift_candidate"
+    assert result["run"]["promotion_authorized"] is False
+    assert result["receipt"]["promotion_authorized"] is False
+    packet = (output / "decision_packet.md").read_text(encoding="utf-8")
+    assert packet.index("does not authorize MAP-Elites insertion") < packet.index(
+        "Eligible for MAP-Elites promotion."
     )
 
 
@@ -315,6 +365,32 @@ def test_live_entrypoint_refuses_publish_when_output_appears_mid_run(
     assert output.is_dir()
     assert not list(output.iterdir())
     assert not list(tmp_path.glob(".contended-run.staging-*"))
+
+
+def test_live_entrypoint_withholds_output_when_manifested_artifact_is_tampered(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    from dharma_swarm.coordination.arena import measure
+
+    original_manifest = measure._artifact_manifest
+
+    def manifest_then_tamper(staging: Path):
+        manifest = original_manifest(staging)
+        (staging / "scorecard.json").write_text("{}\n", encoding="utf-8")
+        return manifest
+
+    monkeypatch.setenv("DHARMA_ARENA_LIVE", "1")
+    monkeypatch.setattr(measure, "_artifact_manifest", manifest_then_tamper)
+    output = tmp_path / "tampered-artifact"
+    with pytest.raises(LiveMeasurementError, match="artifact digest mismatch"):
+        run_live_measurement(
+            models_by_family=_LIVE_MODELS,
+            output_dir=output,
+            timeout=3.0,
+            transport=_metered_transport,
+        )
+    assert not output.exists()
+    assert not list(tmp_path.glob(".tampered-artifact.staging-*"))
 
 
 def test_live_entrypoint_withholds_candidate_when_control_receipt_is_incomplete(
