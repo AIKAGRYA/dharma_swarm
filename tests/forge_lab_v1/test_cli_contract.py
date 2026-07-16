@@ -13,7 +13,7 @@ import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PYDEPS_ROOT = Path("/root/rsi-lab/current/pydeps")
+PYDEPS_ROOT = REPO_ROOT.parent / "pydeps"
 MODULE_COMMAND = (sys.executable, "-m", "dharma_swarm.forge_lab")
 SCRIPT_COMMAND = (str(REPO_ROOT / "scripts" / "forge_lab" / "rsi"),)
 
