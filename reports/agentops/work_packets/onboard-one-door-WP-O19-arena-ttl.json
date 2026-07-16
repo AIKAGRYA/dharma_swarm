@@ -1,5 +1,5 @@
 {
-  "id": "onboard-one-door-WP-O-arena-ttl-2026-07-16",
+  "id": "onboard-one-door-WP-O19-arena-ttl",
   "base_ref": "5e0e42549a1e3f8123704d0c11b5fc6be2f8c5f0",
   "branch": "claude/game-plan-discussion-9jj8gm",
   "worktree": ".",
@@ -9,7 +9,7 @@
     "docs/governance/ACTIVE_TRACK.yaml",
     "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
     "docs/governance/SOVEREIGN_MANIFEST.md",
-    "reports/agentops/work_packets/onboard-one-door-WP-O-arena-ttl-2026-07-16.json"
+    "reports/agentops/work_packets/onboard-one-door-WP-O19-arena-ttl.json"
   ],
   "forbidden_files": [
     ".github/workflows/automerge.yml",
@@ -129,7 +129,14 @@
       "timeout_seconds": 420
     }
   ],
-  "negative_controls": [],
+  "negative_controls": [
+    {
+      "name": "arena-verified-at-stale-at-base-control",
+      "command": "python3 -c \"import subprocess; r=subprocess.run(['git','show','5e0e42549a1e3f8123704d0c11b5fc6be2f8c5f0:docs/governance/ACTIVE_TRACK.yaml'],capture_output=True,text=True); out=r.stdout; old='verified_at: '+chr(34)+'2026-06-23'+chr(34); new='verified_at: '+chr(34)+'2026-07-16'+chr(34); raise SystemExit(0 if r.returncode==0 and old in out and new not in out else 9)\"",
+      "env": {},
+      "expected_exit": 0
+    }
+  ],
   "commit": {
     "allowed": true,
     "message": "governance(arena): re-verify orchestration-arena-v1, bump verified_at past TTL"
@@ -152,7 +159,7 @@
       "git",
       "owner_files"
     ],
-    "work_packet": "WP-O-arena-ttl-2026-07-16",
+    "work_packet": "WP-O19",
     "active_track": "onboard-one-door-2026-07",
     "owner": "@AmitabhainArunachala",
     "collision": {
@@ -173,6 +180,6 @@
       "Any main movement before merge invalidates this packet base, its collision record, digest, and CI event binding."
     ],
     "rollback": "revert the verified_at bump, the three re-rendered digest blocks, and this packet together as one envelope",
-    "packet_digest": "a751f2fbbe32a7f38025e3d34d1124c301f123a07eb38486ba9df5f4a5a3b45a"
+    "packet_digest": "606251bc4b9ed7e5b2079bffdd797dedad8270953e31034713267b126584a4d4"
   }
 }
