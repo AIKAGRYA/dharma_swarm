@@ -1,7 +1,7 @@
 {
   "id": "onboard-one-door-WP-O16-B0",
-  "base_ref": "d6c56f260fd75ba29feebd40a4115bbfd92c9e3e",
-  "branch": "governance/onboard-c1-ci-truth-bootstrap-20260716",
+  "base_ref": "010d814ecd13229609379e6df7747e390f1a8577",
+  "branch": "claude/onboard-c1-bootstrap-9jj8gm",
   "worktree": ".",
   "intent": "Bootstrap only the C1-to-CI-truth authority boundary: require every merge-authority consumer, including the manual Merge Master Mike path, to classify Onboarding admission parity as required; grant the future WP-O16 implementation a one-time packet-scoped exception for exactly the CI truth contract, three named tests, and its own canonical packet; add B0 and WP-O16 as pending non-closure ledger items; and regenerate only the managed authority projections and DocOps auto inventory. This packet changes no CI consumer, workflow, parity manifest, runtime, test, branch protection, C1 state, operator decision, or Titanium state and transfers no owned surface.",
   "allowed_files": [
@@ -184,7 +184,7 @@
   "negative_controls": [
     {
       "name": "wp-o16-base-authority-absence-control",
-      "command": "python3 -c \"import json,subprocess; base='d6c56f260fd75ba29feebd40a4115bbfd92c9e3e'; spec=subprocess.check_output(['git','show',f'{base}:docs/plans/ONBOARD_ONE_DOOR_CLOSURE_SPEC_2026-07-14.md'],text=True); track=subprocess.check_output(['git','show',f'{base}:docs/governance/ACTIVE_TRACK.yaml'],text=True); contract=json.loads(subprocess.check_output(['git','show',f'{base}:docs/governance/CI_TRUTH_CONTRACT.json'],text=True)); required={name for row in contract['required'] for name in row['names']}; raise SystemExit(0 if 'WP-O16' not in spec and 'WP-O16' not in track and 'Onboarding admission parity' not in required else 9)\"",
+      "command": "python3 -c \"import json,subprocess; base='010d814ecd13229609379e6df7747e390f1a8577'; spec=subprocess.check_output(['git','show',f'{base}:docs/plans/ONBOARD_ONE_DOOR_CLOSURE_SPEC_2026-07-14.md'],text=True); track=subprocess.check_output(['git','show',f'{base}:docs/governance/ACTIVE_TRACK.yaml'],text=True); contract=json.loads(subprocess.check_output(['git','show',f'{base}:docs/governance/CI_TRUTH_CONTRACT.json'],text=True)); required={name for row in contract['required'] for name in row['names']}; raise SystemExit(0 if 'WP-O16' not in spec and 'WP-O16' not in track and 'Onboarding admission parity' not in required else 9)\"",
       "expected_exit": 0,
       "env": {}
     }
@@ -208,7 +208,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "d6c56f260fd75ba29feebd40a4115bbfd92c9e3e",
+      "checked_at_sha": "010d814ecd13229609379e6df7747e390f1a8577",
       "details": []
     },
     "interface_mismatches": [
@@ -226,9 +226,10 @@
       "Tracked contract or manifest edits are Candidate[required-context-set], not Authority[live-branch-protection]; C1 remains PENDING and blocker=true after both this bootstrap and WP-O16 until fresh host evidence and consumer parity are revalidated at the final base.",
       "This bootstrap does not close D2, WP-O5, M6-1, WP-O6, terminal proof, One-Door, or admit Titanium WP-00.",
       "Exact base d6c56f260 carries seven strict DocOps manifest-count mismatches inherited from landed code, test, and documentation expansion; this packet regenerates AUTO_INVENTORY but leaves SOVEREIGN count reconciliation to the existing main reconciler, while its PR gate keeps structural DocOps checks strict and count drift advisory exactly as docops.yml does.",
-      "Any main movement before merge invalidates this packet base, collision record, digest, preflight binding, and closeout evidence."
+      "Any main movement before merge invalidates this packet base, collision record, digest, preflight binding, and closeout evidence.",
+      "Mechanically re-minted 2026-07-16 by the operator session after main moved past the original base d6c56f260fd7 (PRs #982/#984/#943/#985 merged); scope, intent, gates, and the five-path exception are unchanged from the Merge Master Mike-authored original in PR #981. Any further main movement before merge invalidates this base binding again."
     ],
     "rollback": "revert the CL-2 all-consumer requirement, exact WP-O16 implementation exception, pending non-closure B0/WP-O16 ledger items, managed authority projections, DocOps auto counts, and this WP-O16-B0 packet together; do not alter any CI consumer",
-    "packet_digest": "896a81440cef35d93a24b0fabb8917c88c770a3e8c697bc6b6cd17dfb4d8eab0"
+    "packet_digest": "c92d81d7d7074b9147ce2d221804f3b2fb1b966201d958914cf9cb91176e99fe"
   }
 }
