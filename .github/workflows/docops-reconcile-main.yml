@@ -104,6 +104,39 @@ jobs:
             echo "DocOps counts already in sync — nothing to reconcile."
             exit 0
           fi
+
+          # Tier 2 uses one rolling PR. A new main parent changes the commit
+          # identity even when the two canonical files are byte-identical to
+          # that PR's current head; do not force-push and retrigger all CI in
+          # that case.
+          BRANCH="chore/docops-autorefresh"
+          if [ "$HAS_BYPASS_TOKEN" != "true" ]; then
+            existing="$(gh pr list --repo "$GH_REPO" --head "$BRANCH" --state open \
+              --json number --jq '.[0].number // empty')"
+            if [ -n "$existing" ] \
+                && git fetch --no-tags origin "refs/heads/${BRANCH}" \
+                && git diff --quiet "FETCH_HEAD" -- \
+                  docs/docops/AUTO_INVENTORY.md \
+                  docs/governance/SOVEREIGN_MANIFEST.md; then
+              # Byte-identical canonical files are not enough on their own: if
+              # anything else ever lands on the rolling branch, skipping here
+              # would preserve those extra files indefinitely. Only skip when
+              # the rolling PR's own delta (merge-base..head) is confined to
+              # the two canonical paths; otherwise fall through and let the
+              # force-push reset the branch to a pure reconcile.
+              merge_base="$(git merge-base HEAD FETCH_HEAD || true)"
+              extra_paths="$(git diff --name-only "${merge_base:-HEAD}" FETCH_HEAD -- \
+                | grep -v -x -e 'docs/docops/AUTO_INVENTORY.md' \
+                            -e 'docs/governance/SOVEREIGN_MANIFEST.md' || true)"
+              if [ -z "$extra_paths" ]; then
+                echo "Canonical DocOps bytes already match the open rolling PR #${existing}; no refresh needed."
+                exit 0
+              fi
+              echo "Rolling PR #${existing} carries noncanonical paths; resetting via force-push:"
+              printf '%s\n' "$extra_paths"
+            fi
+          fi
+
           echo "DocOps counts drifted; committing reconcile:"
           git --no-pager diff --stat -- \
             docs/docops/AUTO_INVENTORY.md \
@@ -137,7 +170,6 @@ jobs:
           # ---- Tier 2: rolling bot PR through the normal merge gate.
           # Lane chore/docops-autorefresh is registered in bot-pr-limit.yml
           # (max 1 open); automerge.yml auto-enrolls bot-authored PRs.
-          BRANCH="chore/docops-autorefresh"
           git push --force origin "HEAD:refs/heads/${BRANCH}"
           existing="$(gh pr list --repo "$GH_REPO" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
           if [ -n "$existing" ]; then
