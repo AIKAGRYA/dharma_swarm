@@ -3,11 +3,12 @@
   "base_ref": "5311baee84059f8dcf5b7d11972303fb5b7ed677",
   "branch": "docs/five-part-closure-swarm-brief-20260716",
   "worktree": ".",
-  "intent": "Publish a dated report-only summary of the five-part Dharma and Codex skill closure, index it for durable repository discovery, and preserve the needs-revision promotion boundary.",
+  "intent": "Publish a dated summary of the five-part Dharma and Codex skill closure, index it for durable repository discovery, preserve the needs-revision promotion boundary, and keep the repository-wide cascade integration test covered under an explicit hosted-runner timeout budget.",
   "allowed_files": [
     "docs/reports/DHARMA_ANTITHESIS_FIVE_PART_CLOSURE_2026-07-16.md",
     "docs/reports/README.md",
-    "reports/agentops/work_packets/onboard-one-door-WP-O17.json"
+    "reports/agentops/work_packets/onboard-one-door-WP-O17.json",
+    "tests/test_cascade.py"
   ],
   "forbidden_files": [
     ".github/workflows/automerge.yml",
@@ -145,7 +146,7 @@
   "session_entry": {
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
-      "python": "3.13.12",
+      "python": "3.12.13",
       "git": "2.50.1",
       "make": "3.81"
     },
@@ -165,7 +166,8 @@
       "details": []
     },
     "interface_mismatches": [
-      "The five-part closure evidence is durable on the operator host but lacks one repository-native summary and discoverability pointer; this report closes that communication gap without promoting either skill."
+      "The five-part closure evidence is durable on the operator host but lacks one repository-native summary and discoverability pointer; this report closes that communication gap without promoting either skill.",
+      "Hosted Python 3.12 exercised the repository-wide cascade integration test beyond the workflow's blanket 30-second timeout twice; a test-local 90-second budget preserves the integration coverage without weakening the suite-wide default."
     ],
     "closest_existing_implementation": [
       "docs/reports/README.md",
@@ -175,7 +177,7 @@
       "Both Codex skills remain needs-revision: package validity and explicit loading do not establish implicit routing or skill-evaluation promotion.",
       "The sealed evaluation archive is operator-host evidence and is not copied into this repository report."
     ],
-    "rollback": "revert the dated report, its reports index entry, and this Session Entry Packet together",
-    "packet_digest": "07ec183667efc4496943d607b9e93d8cc668921b2a86d91c958d1ebaea85928a"
+    "rollback": "revert the dated report, its reports index entry, the cascade test-local timeout annotation, and this Session Entry Packet together",
+    "packet_digest": "ad59aa8b3065730ebc72ca65a1511a32f6cc248de96cce261f3114f9286aa3a6"
   }
 }

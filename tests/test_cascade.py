@@ -556,8 +556,9 @@ def test_product_score_empty():
 
 
 @pytest.mark.asyncio
+@pytest.mark.timeout(90)
 async def test_cascade_product_real():
-    """Full cascade run on dharma_swarm project produces meaningful scores."""
+    """Full repository cascade produces meaningful scores within a bounded budget."""
     result = await run_domain(
         "product",
         seed={"project_path": str(Path(__file__).resolve().parents[1])},
