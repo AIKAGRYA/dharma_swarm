@@ -114,7 +114,8 @@ def _collect_conditions(
 ) -> list[readiness.Condition]:
     conditions: list[readiness.Condition] = []
     errors = {str(k): str(v) for k, v in dict(probe_errors or {}).items() if v}
-    if "status" in errors:
+    status_error = errors.get("status", "")
+    if status_error:
         # O3R-B1: an unobservable working tree is typed, never a false clean.
         for condition_id in ("repo_clean", "repo_unconflicted"):
             conditions.append(readiness.Condition(
@@ -136,13 +137,34 @@ def _collect_conditions(
             condition_class="blocking",
             reason="" if not live_state.get("conflicted") else "merge conflicts present",
         ))
-    if errors:
+    # Cleanliness/conflict observation is session-critical.  Base distance is
+    # only context: detached CI checkouts and local clones legitimately lack
+    # ``origin/main``, so an unavailable ahead/behind comparison must stay
+    # visible without turning a clean, observed worktree into CONFIG_ERROR.
+    config_errors = {
+        name: message
+        for name, message in errors.items()
+        if name != "ahead_behind"
+    }
+    if config_errors:
         conditions.append(readiness.Condition(
             id="git_state_observed",
             state="fail",
             condition_class="config",
             reason="; ".join(
-                f"{name}: {message}" for name, message in sorted(errors.items())
+                f"{name}: {message}"
+                for name, message in sorted(config_errors.items())
+            )[:200],
+        ))
+    if "ahead_behind" in errors:
+        conditions.append(readiness.Condition(
+            id="git_base_distance_observed",
+            state="warn",
+            condition_class="info",
+            mandatory=False,
+            reason=(
+                "ahead/behind unavailable; worktree status remains observed: "
+                f"{errors['ahead_behind']}"
             )[:200],
         ))
     for tool in ("git", "make"):

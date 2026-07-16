@@ -102,7 +102,9 @@ def observe_repo_live_state(
     ``live_delta.repo_state`` shape the v2 receipt validates, and ``errors``
     maps probe name (``status``, ``ahead_behind``) to a typed error string.
     A failed status probe reports ``dirty=True`` fail-closed — the state is
-    not provably clean; the caller owns turning errors into conditions."""
+    not provably clean.  Ahead/behind is contextual rather than admission
+    truth, so its typed error can remain a non-blocking diagnostic when status
+    itself was observed; the caller owns turning errors into conditions."""
     errors: dict[str, str] = {}
     status, error = _git_probe("status", "--porcelain")
     if error:
