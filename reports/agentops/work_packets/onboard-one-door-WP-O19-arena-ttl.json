@@ -127,6 +127,13 @@
       "env": {},
       "expected_exit": 0,
       "timeout_seconds": 420
+    },
+    {
+      "name": "arena-reverification-batteries",
+      "command": "python3 -m pytest tests/test_arena_v1.py tests/test_arena_truth_report.py -q",
+      "env": {},
+      "expected_exit": 0,
+      "timeout_seconds": 300
     }
   ],
   "negative_controls": [
@@ -177,9 +184,10 @@
     "honest_blockers": [
       "Open draft PR #962 also edits docs/governance/ACTIVE_TRACK.yaml (merge-master-mike section) and the same three rendered digest files; the digest stamp line collides textually, so whichever lane merges second must re-run render_active_track_includes.py and revalidate on current main.",
       "This envelope deliberately leaves the merge-master-mike track-stale and track-underclaim WARNs in place: their fixes are already in-flight as a superset in PR #962 and duplicating them here would be PR churn on the same surfaces.",
-      "Any main movement before merge invalidates this packet base, its collision record, digest, and CI event binding."
+      "Any main movement before merge invalidates this packet base, its collision record, digest, and CI event binding.",
+      "The committed reports/governance/arena/arena_truth_receipt.json is dated 2026-07-05 and its arena_truth_receipt_valid criterion carries fresh_ttl_days 21, so the receipt goes stale around 2026-07-26 \u2014 inside this bump's verified_at TTL window. That produces no false-healthy window (live state comes only from the check_track_status evidence run, which will fail the criterion the day it staleness-trips, independent of verified_at), but refreshing the receipt is real upcoming work owned by the orchestration-arena lane; it cannot happen in this envelope because reports/governance/arena/** is a forbidden sibling surface here."
     ],
     "rollback": "revert the verified_at bump, the three re-rendered digest blocks, and this packet together as one envelope",
-    "packet_digest": "606251bc4b9ed7e5b2079bffdd797dedad8270953e31034713267b126584a4d4"
+    "packet_digest": "4ae5301ad4b4149e9e4f4e9a355a0038e610fac71106c5609bd81ebbe1b8812d"
   }
 }
