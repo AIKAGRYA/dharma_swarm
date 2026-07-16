@@ -205,7 +205,10 @@ touching sibling-track entries, converting an existing criterion in place
 **Owner boundary:** this is *evidence capture*, not a file grab (parent
 §9.4). `.github/workflows/automerge.yml` belongs to
 `merge-master-mike-d4-2026-06`; branch protection lives on the GitHub side
-under operator authority. This track edits only its own ledger entry.
+under operator authority. The authority-only WP-O16-B0 bootstrap and exact
+WP-O16 implementation exception below are the sole shared-surface exceptions;
+they transfer no ownership and admit no workflow, runtime, parity-manifest, or
+branch-protection edit.
 
 **Required evidence set** (each item captured with command + output, stored
 in the C1 governance PR body and, where file-shaped, under
@@ -218,8 +221,17 @@ in the C1 governance PR body and, where file-shaped, under
    `scripts/governance/ci_parity_manifest.json:5`).
 2. Parity manifest entry (already present:
    `scripts/governance/ci_parity_manifest.json:38-43`) — cite, don't re-add.
-3. An automerge run log showing the manifest-driven required set enforcing
-   the context (`.github/workflows/automerge.yml:99-120`).
+3. Merge-authority consumer congruence: every repository path that can
+   classify a PR as mergeable or authorize/refuse its merge must classify
+   `Onboarding admission parity` as **required**, never absent or advisory.
+   This includes both (a) an automerge run log showing the manifest-driven
+   required set enforcing the context (`.github/workflows/automerge.yml:99-120`)
+   and (b) the manual Merge Master Mike path, which consumes
+   `docs/governance/CI_TRUTH_CONTRACT.json` through
+   `scripts/runtime/pr_merge_control.py`. Capture the contract entry and tests
+   proving that a missing, pending, or non-passing context blocks that manual
+   path. A green hosted check is insufficient if any merge-authority consumer
+   still classifies the same context more weakly.
 4. Base-change sensitivity, using the strongest mechanism the hosting account
    can actually provide:
    - on an organization-owned repository with merge queue available, capture
@@ -240,13 +252,50 @@ in the C1 governance PR body and, where file-shaped, under
    is thereby refused. Record PR number, check-run URL, and the exact
    nonzero verdict. The PR is then closed unmerged.
 
+**WP-O16 two-step authority boundary:** the current CI truth contract does not
+yet classify `Onboarding admission parity` as required, so item 3 cannot be
+claimed complete by evidence prose. First merge the authority-only
+`onboard-one-door-WP-O16-B0` packet using Session Entry identity `WP-O16`.
+That bootstrap may edit only this closure spec, this track's
+`ACTIVE_TRACK.yaml` entry, the three mechanically rendered authority
+projections (`CLAUDE.md`, `docs/governance/BUILD_SESSION_ENTRYPOINT.md`, and
+`docs/governance/SOVEREIGN_MANIFEST.md`), the DocOps auto inventory, and its
+own canonical packet. It changes no CI consumer.
+
+After that bootstrap merges, a fresh exact-main
+`onboard-one-door-WP-O16` packet receives a one-time packet-scoped exception
+for **exactly** these implementation paths:
+
+- `docs/governance/CI_TRUTH_CONTRACT.json`
+- `tests/test_ci_truth.py`
+- `tests/test_onboarding_ci_contract.py`
+- `tests/test_pr_merge_control.py`
+- `reports/agentops/work_packets/onboard-one-door-WP-O16.json`
+
+WP-O16 may only align the existing CI-truth consumer and prove the required
+classification. It may not edit `.github/workflows/**`,
+`scripts/governance/ci_parity_manifest.json`, `scripts/runtime/**`, or any
+other file, and it acquires no `owned_surfaces` claim. Merging either B0 or
+WP-O16 closes no blocker by itself: `C1` remains `PENDING` and blocking until
+all five required evidence captures above are merged into its operator-bound
+record.
+
+The epistemic boundary is explicit: tracked contract or manifest edits are
+`Candidate[required-context-set]`, not
+`Authority[live-branch-protection]`. Only a fresh live host capture can supply
+the latter, and the candidate set cannot be promoted until every named
+consumer is revalidated against it. B0 and WP-O16 therefore leave C1 pending
+until both host authority and consumer parity are observed at the final base.
+
 **Record:** flip `next_items[C1]` to `C1 DONE — operator=<handle>;
 pr=<number>; merge_commit=<40-hex>; evidence=<the five captures>`,
 `blocker: false`, following the D3 record precedent.
 
-**Kill criterion:** if branch protection does *not* list the context, C1 is
-not closable by this track — escalate to the operator and the
-merge-authority owners; do not edit automerge or protection yourself.
+**Kill criterion:** if branch protection does *not* list the context, or any
+merge-authority consumer classifies it as absent/advisory, C1 is not closable
+by evidence prose. Escalate to the operator and the merge-authority owners;
+use only the exact WP-O16 boundary above for the known CI-truth mismatch, and
+do not edit automerge, runtime, the parity manifest, or protection yourself.
 
 ### CL-3 — D2 operator record (XS; operator-authored, cannot be delegated)
 

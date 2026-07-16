@@ -1876,7 +1876,8 @@ active_tracks:
       spec's admitted sequence WP-O1, WP-O1R-B0, WP-O1R, WP-O2..WP-O4,
       the separately merged WP-O4-B0 authority bootstrap, exact corrective
       WP-O4R, the separately merged WP-O2-B3 truth-ledger authority
-      bootstrap, exact corrective WP-O2R, and then WP-O5..WP-O6;
+      bootstrap, exact corrective WP-O2R, the authority-only WP-O16-B0 and
+      exact WP-O16 C1 consumer-alignment pair, and then WP-O5..WP-O6;
       the spec (§6-§13) is the detail authority — this entry is the admission
       record, not a second spec.
       Titanium vNext (PR #854 plan) baseline capture and WP-00 stay blocked
@@ -1923,11 +1924,15 @@ active_tracks:
       safety repair. The remaining work is a DAG: after a separately merged
       exact-identity authority bootstrap, the pre-D3 residual WP-O3 safety
       slice (typed Git observations, ambient-writer denial, and fallback
-      parsing) can proceed independently of D3; C1 revalidation can also
-      proceed now. D3 gates only public v2 writer/cache-delta activation; C1
-      gates D2 and then WP-O5; WP-O5 plus M6-1 gate WP-O6, which gates
-      independent terminal proof. Titanium remains blocked until that proof
-      merges.
+      parsing) can proceed independently of D3. C1 revalidation also requires
+      every merge-authority consumer, including the manual Merge Master Mike
+      path through CI_TRUTH_CONTRACT.json, to classify Onboarding admission
+      parity as required. The packet-scoped WP-O16-B0/WP-O16 pair grants and
+      uses only the exact five-file implementation exception in the closure
+      spec; it transfers no ownership and closes no blocker by itself. D3
+      gates only public v2 writer/cache-delta activation; C1 gates D2 and then
+      WP-O5; WP-O5 plus M6-1 gate WP-O6, which gates independent terminal
+      proof. Titanium remains blocked until that proof merges.
     prerequisites:
       - id: onboard_spec_on_main
         kind: file_exists
@@ -2061,9 +2066,17 @@ active_tracks:
         kind: code
         blocker: false
       - id: C1
-        what: "C1 PENDING — the Onboarding admission parity context is registered, and merged PR #920 proved its admission and macOS jobs green, but merge authority still must capture explicit post-WP-O4 required-context, parity-manifest, automerge, and merge-queue evidence proving the strict door fails closed on blocked truth. PRs #920/#926 do not close that separate semantic authority dependency."
+        what: "C1 PENDING — the Onboarding admission parity context is registered, and merged PR #920 proved its admission and macOS jobs green, but merge authority still must capture explicit post-WP-O4 required-context, parity-manifest, every merge-authority consumer, base-change sensitivity, and fail-closed refusal evidence. The manual Merge Master Mike path consumes CI_TRUTH_CONTRACT.json, whose required set does not yet include Onboarding admission parity; therefore hosted branch protection/automerge evidence alone cannot close C1. Tracked contract/manifest edits are Candidate[required-context-set], not Authority[live-branch-protection]; WP-O16-B0 and WP-O16 leave C1 pending until fresh host evidence and consumer parity are revalidated."
         kind: governance
         blocker: true
+      - id: 16-B0
+        what: "WP-O16-B0 PENDING — authority-only bootstrap under Session Entry identity WP-O16: grant a one-time packet-scoped implementation exception for exactly CI_TRUTH_CONTRACT.json, tests/test_ci_truth.py, tests/test_onboarding_ci_contract.py, tests/test_pr_merge_control.py, and the future canonical onboard-one-door-WP-O16.json packet. This B0 edits only the closure spec, this track entry, managed authority projections, DocOps auto counts, and its own packet; it changes no CI consumer and closes no blocker."
+        kind: governance
+        blocker: false
+      - id: 16
+        what: "WP-O16 PENDING — only after WP-O16-B0 merges, bind a fresh exact-main packet and make the existing CI-truth/manual Merge Master Mike consumer classify Onboarding admission parity as required, with the exact three admitted test surfaces proving missing/pending/non-passing states block. The result is Candidate[required-context-set], never Authority[live-branch-protection]. No workflow, parity-manifest, runtime, branch-protection, or ownership edit; merge does not close C1 until fresh host evidence and consumer parity satisfy the full CL-2 record."
+        kind: governance
+        blocker: false
       - id: D2
         what: "D2 PENDING — operator ratification of strict-by-default after WP-O4/C1 (exact record format in spec §9.2; the implementation author cannot mint it; WP-O5 preflight verifies the record is a merged ancestor)."
         kind: governance
@@ -2118,7 +2131,7 @@ active_tracks:
         blocker: false
     non_goals:
       - No gate weakening, no new truth store, receipt store, digest primitive, or parser family — reuse stable_digest/utc_now (memory_kernel.write_receipts), the ledger --check replay contract, and the needs_host vocabulary chain (spec §2.4, §3.1).
-      - No Titanium, production, CLOSED_LIVE, merge-authority, or branch-protection work under this track (C1 belongs to its owners).
+      - No Titanium, production, CLOSED_LIVE, broad merge-authority, or branch-protection work under this track (C1 belongs to its owners); the sole exception is the exact authority-only WP-O16-B0 plus five-path WP-O16 CI-truth classification pair in the closure spec, with no ownership transfer.
       - No strict-default promotion without the merged operator-authored D2 record (spec §9.2).
       - No active sibling-track surface edit; pyproject.toml stays forbidden until M6-1 resolves with the DharmaGraph owner (spec §9.6).
       - No performance target met by removing or deferring a required validation (spec WP-O6 kill criterion).
