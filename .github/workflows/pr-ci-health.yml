@@ -115,6 +115,14 @@ jobs:
               echo "PR #$pr base=$base (not main); skipping auto-rebase"
               continue
             fi
+            if [ "$head" = "chore/docops-autorefresh" ]; then
+              # The rolling DocOps reconcile lane is generated content whose
+              # branch docops-reconcile-main.yml owns; behind-main is its
+              # normal state and a GITHUB_TOKEN force-push here strands it
+              # with no CI (bot-token pushes never trigger workflows).
+              echo "PR #$pr head=$head is the rolling DocOps lane; skipping auto-rebase"
+              continue
+            fi
             echo "PR #$pr: rebasing $head onto origin/main"
             git fetch origin "$head" || { echo "  fetch failed"; continue; }
             git checkout -B "ci-rebase/$head" "origin/$head" || { echo "  checkout failed"; continue; }

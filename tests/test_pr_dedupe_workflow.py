@@ -86,6 +86,14 @@ def test_snapshot_filter_remains_fail_closed_for_untrusted_or_real_work() -> Non
             head="feature/ops-report-parser",
         ),
         _pr(
+            5,
+            # A human topic branch under the chore/ops-report- prefix must
+            # never match: the branch predicate requires the timestamped
+            # automation shape, and pass 1 deletes matched heads.
+            title="ops report parser implementation",
+            head="chore/ops-report-parser",
+        ),
+        _pr(
             3,
             title="chore(docops): reconcile generated counts",
             head="chore/docops-autorefresh",
@@ -108,6 +116,26 @@ def test_docops_reconcile_skips_remote_byte_identical_refresh() -> None:
     assert "Canonical DocOps bytes already match the open rolling PR" in text
     assert text.index(remote_compare) < text.index("git commit")
     assert text.index(remote_compare) < text.index('git push --force origin')
+
+    # The skip must be purity-gated: byte-identical canonical files alone
+    # cannot preserve noncanonical paths on the rolling branch.
+    purity_probe = 'git diff --name-only "${merge_base:-HEAD}" FETCH_HEAD --'
+    assert purity_probe in text
+    assert "carries noncanonical paths" in text
+    assert text.index(purity_probe) < text.index("no refresh needed")
+
+
+def test_pr_ci_health_rebase_excludes_docops_rolling_lane() -> None:
+    text = (
+        REPO_ROOT / ".github" / "workflows" / "pr-ci-health.yml"
+    ).read_text(encoding="utf-8")
+
+    exclusion = '[ "$head" = "chore/docops-autorefresh" ]'
+    push_command = 'git push origin "ci-rebase/$head:$head" --force-with-lease'
+    assert exclusion in text
+    assert push_command in text
+    # The exclusion must guard the force-with-lease push, not follow it.
+    assert text.index(exclusion) < text.index(push_command)
 
 
 def test_active_track_pr_gate_installs_executable_criterion_dependencies() -> None:

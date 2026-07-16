@@ -83,9 +83,12 @@ jobs:
 
           # A snapshot-report PR is a pure status projection that should never
           # have been a PR. The external Oz lane historically omitted
-          # [automated] while using the dedicated chore/ops-report-* branch, so
-          # accept either a title marker or that declared snapshot-only branch.
-          # The same-repo-owner check remains mandatory because this workflow
+          # [automated] while using the dedicated timestamped
+          # chore/ops-report-<YYYYMMDD…> branch shape, so accept either a title
+          # marker or that exact automation branch shape — never a bare
+          # chore/ops-report-* prefix, which a human topic branch (e.g.
+          # chore/ops-report-parser) could legitimately use. The
+          # same-repo-owner check remains mandatory because this workflow
           # runs with pull_request_target write credentials.
           SNAPSHOT_FILTER="$(cat <<'JQ'
             def trusted($owner): ((.headRepositoryOwner.login // "") == $owner);
@@ -94,7 +97,7 @@ jobs:
               | ((.headRefName // "") | ascii_downcase) as $h
               | (
                   ($t | test("\\[automated\\]|\\[auto\\]"))
-                  or ($h | test("^chore/ops-report-"))
+                  or ($h | test("^chore/ops-report-[0-9]{8}"))
                 )
                 and (
                   ($t | test("pr lifecycle \\+ spine adoption ops report"))

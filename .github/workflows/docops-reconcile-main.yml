@@ -118,8 +118,22 @@ jobs:
                 && git diff --quiet "FETCH_HEAD" -- \
                   docs/docops/AUTO_INVENTORY.md \
                   docs/governance/SOVEREIGN_MANIFEST.md; then
-              echo "Canonical DocOps bytes already match the open rolling PR #${existing}; no refresh needed."
-              exit 0
+              # Byte-identical canonical files are not enough on their own: if
+              # anything else ever lands on the rolling branch, skipping here
+              # would preserve those extra files indefinitely. Only skip when
+              # the rolling PR's own delta (merge-base..head) is confined to
+              # the two canonical paths; otherwise fall through and let the
+              # force-push reset the branch to a pure reconcile.
+              merge_base="$(git merge-base HEAD FETCH_HEAD || true)"
+              extra_paths="$(git diff --name-only "${merge_base:-HEAD}" FETCH_HEAD -- \
+                | grep -v -x -e 'docs/docops/AUTO_INVENTORY.md' \
+                            -e 'docs/governance/SOVEREIGN_MANIFEST.md' || true)"
+              if [ -z "$extra_paths" ]; then
+                echo "Canonical DocOps bytes already match the open rolling PR #${existing}; no refresh needed."
+                exit 0
+              fi
+              echo "Rolling PR #${existing} carries noncanonical paths; resetting via force-push:"
+              printf '%s\n' "$extra_paths"
             fi
           fi
 
