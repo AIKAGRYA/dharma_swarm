@@ -497,6 +497,42 @@ def _fail_open_key_liveness() -> set[str] | None:
 
 
 @pytest.mark.asyncio
+async def test_model_router_explicit_empty_allowlist_dispatches_nothing() -> None:
+    groq = _CountingFailingProvider()
+    anthropic = _CountingFailingProvider()
+    router = ModelRouter(
+        {
+            ProviderType.GROQ: groq,
+            ProviderType.ANTHROPIC: anthropic,
+        },
+        key_liveness_provider=_fail_open_key_liveness,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="No available providers after routing filter",
+    ):
+        await router.complete_for_task(
+            ProviderRouteRequest(
+                action_name="empty_allowlist_authority",
+                risk_score=0.05,
+                uncertainty=0.05,
+                novelty=0.05,
+                urgency=0.2,
+                expected_impact=0.1,
+            ),
+            LLMRequest(
+                model="ignored",
+                messages=[{"role": "user", "content": "do not dispatch"}],
+            ),
+            available_provider_types=[],
+        )
+
+    assert groq.calls == 0
+    assert anthropic.calls == 0
+
+
+@pytest.mark.asyncio
 async def test_model_router_complete_for_task_uses_policy_selection() -> None:
     router = ModelRouter(
         {
@@ -698,6 +734,122 @@ async def test_model_router_canary_routes_to_canary_provider() -> None:
     assert decision.selected_provider == ProviderType.ANTHROPIC
     assert "canary_applied" in decision.reasons
     assert response.content == "canary"
+
+
+@pytest.mark.asyncio
+async def test_model_router_canary_cannot_escape_explicit_groq_only_allowlist() -> None:
+    router = ModelRouter(
+        {
+            ProviderType.GROQ: _DummyProvider("groq"),
+            ProviderType.ANTHROPIC: _DummyProvider("canary"),
+        },
+        canary_percent=100.0,
+        canary_provider=ProviderType.ANTHROPIC,
+        key_liveness_provider=_fail_open_key_liveness,
+    )
+
+    decision, response = await router.complete_for_task(
+        ProviderRouteRequest(
+            action_name="groq_only_canary_authority",
+            risk_score=0.05,
+            uncertainty=0.05,
+            novelty=0.05,
+            urgency=0.2,
+            expected_impact=0.1,
+            preferred_low_cost=True,
+        ),
+        LLMRequest(
+            model="ignored",
+            messages=[{"role": "user", "content": "quick summary"}],
+        ),
+        available_provider_types=[ProviderType.GROQ],
+    )
+
+    assert decision.selected_provider == ProviderType.GROQ
+    assert "canary_applied" not in decision.reasons
+    assert response.content == "groq"
+
+
+@pytest.mark.asyncio
+async def test_model_router_canary_never_dispatches_unavailable_provider() -> None:
+    unavailable_canary = _CountingFailingProvider()
+    unavailable_canary.available = False
+    router = ModelRouter(
+        {
+            ProviderType.GROQ: _DummyProvider("groq"),
+            ProviderType.ANTHROPIC: unavailable_canary,
+        },
+        canary_percent=100.0,
+        canary_provider=ProviderType.ANTHROPIC,
+        key_liveness_provider=_fail_open_key_liveness,
+    )
+
+    decision, response = await router.complete_for_task(
+        ProviderRouteRequest(
+            action_name="unavailable_canary_authority",
+            risk_score=0.05,
+            uncertainty=0.05,
+            novelty=0.05,
+            urgency=0.2,
+            expected_impact=0.1,
+            preferred_low_cost=True,
+        ),
+        LLMRequest(
+            model="ignored",
+            messages=[{"role": "user", "content": "quick summary"}],
+        ),
+        available_provider_types=[ProviderType.GROQ, ProviderType.ANTHROPIC],
+    )
+
+    assert unavailable_canary.calls == 0
+    assert decision.selected_provider == ProviderType.GROQ
+    assert "canary_applied" not in decision.reasons
+    assert response.content == "groq"
+
+
+@pytest.mark.asyncio
+async def test_model_router_canary_never_reinserts_verifiably_dead_key() -> None:
+    dead_canary = _CountingFailingProvider()
+    oracle_results: list[set[str] | None] = [
+        {ProviderType.GROQ.value},
+        None,
+    ]
+
+    def changing_liveness_oracle() -> set[str] | None:
+        return oracle_results.pop(0)
+
+    router = ModelRouter(
+        {
+            ProviderType.GROQ: _DummyProvider("groq"),
+            ProviderType.ANTHROPIC: dead_canary,
+        },
+        canary_percent=100.0,
+        canary_provider=ProviderType.ANTHROPIC,
+        key_liveness_provider=changing_liveness_oracle,
+    )
+
+    decision, response = await router.complete_for_task(
+        ProviderRouteRequest(
+            action_name="dead_canary_authority",
+            risk_score=0.05,
+            uncertainty=0.05,
+            novelty=0.05,
+            urgency=0.2,
+            expected_impact=0.1,
+            preferred_low_cost=True,
+        ),
+        LLMRequest(
+            model="ignored",
+            messages=[{"role": "user", "content": "quick summary"}],
+        ),
+        available_provider_types=[ProviderType.GROQ, ProviderType.ANTHROPIC],
+    )
+
+    assert dead_canary.calls == 0
+    assert decision.selected_provider == ProviderType.GROQ
+    assert "canary_applied" not in decision.reasons
+    assert response.content == "groq"
+    assert oracle_results == [None]
 
 
 @pytest.mark.asyncio

@@ -95,13 +95,51 @@ class GraphState:
         proves every user-channel value digestable. Only then does phase 2
         mutate, so a failing superstep commits nothing.
         """
+        groups = self._group_writes(writes)
+        self._validate_grouped_writes(groups, superstep)
+
+        advanced: set[str] = set()
+        for name in sorted(groups):
+            channel = self.channel(name)
+            group = groups[name]
+            if channel.commit(group, superstep):
+                advanced.add(channel.name)
+        return frozenset(advanced)
+
+    def validate_writes(
+        self, writes: Sequence[ChannelWrite], superstep: int
+    ) -> None:
+        """Pure preflight for a barrier; never commits or copies channels.
+
+        Missing trigger channels are validated against an ephemeral trigger
+        instance. Their runtime registration remains part of the one real
+        :meth:`apply_writes` after the pending-write journal succeeds.
+        """
+        self._validate_grouped_writes(self._group_writes(writes), superstep)
+
+    @staticmethod
+    def _group_writes(
+        writes: Sequence[ChannelWrite],
+    ) -> dict[str, list[ChannelWrite]]:
         groups: dict[str, list[ChannelWrite]] = {}
         for write in writes:
             groups.setdefault(write.channel, []).append(write)
+        return groups
 
-        resolved: list[tuple[Channel[Any], list[ChannelWrite]]] = []
+    def _validate_grouped_writes(
+        self,
+        groups: Mapping[str, list[ChannelWrite]],
+        superstep: int,
+    ) -> None:
         for name in sorted(groups):
-            channel = self.channel(name)
+            channel = self._channels.get(name)
+            if channel is None and name.startswith(TRIGGER_PREFIX):
+                channel = TriggerChannel()
+                channel.name = name
+            elif channel is None:
+                # Preserve channel()'s typed fail-closed diagnostics without
+                # letting validation register runtime-owned channels.
+                channel = self.channel(name)
             group = groups[name]
             channel.validate(group, superstep)
             if not name.startswith(RESERVED_PREFIX):
@@ -114,13 +152,6 @@ class GraphState:
                             f"{write.node_id!r} in superstep {superstep} is not "
                             f"stably JSON-serializable: {exc}"
                         ) from exc
-            resolved.append((channel, group))
-
-        advanced: set[str] = set()
-        for channel, group in resolved:
-            if channel.commit(group, superstep):
-                advanced.add(channel.name)
-        return frozenset(advanced)
 
     @property
     def versions(self) -> dict[str, int]:

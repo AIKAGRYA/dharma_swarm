@@ -9,7 +9,7 @@ from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
 from api.models import AgentOut, ApiResponse, SpawnAgentRequest
 from api.routers._agent_aliases import alias_candidates, matches_agent_alias
-from api.ws import manager
+from api.ws import authenticate_dashboard_websocket, manager
 from dharma_swarm.ontology_agents import (
     agent_display_name,
     agent_slug,
@@ -22,6 +22,7 @@ from dharma_swarm.ontology_agents import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["agents"])
+ws_router = APIRouter(tags=["agents"])
 
 
 def _get_swarm():
@@ -598,21 +599,50 @@ async def get_agent_notes(agent_id: str) -> ApiResponse:
     return ApiResponse(data={"notes": notes})
 
 
+@ws_router.websocket("/ws/agents")
 @router.websocket("/ws/agents")
 async def ws_agents(websocket: WebSocket):
-    await manager.connect(websocket, "agents")
+    auth = await authenticate_dashboard_websocket(websocket)
+    if not auth.authorized:
+        return
+    await manager.connect(
+        websocket,
+        "agents",
+        subprotocol=auth.selected_subprotocol,
+    )
+    disconnected = asyncio.create_task(_wait_for_agent_websocket_disconnect(websocket))
     try:
-        while True:
+        while not disconnected.done():
             # Send periodic updates
             try:
                 swarm = _get_swarm()
                 agents = await swarm.list_agents()
-                await manager.send_personal(websocket, {
-                    "event": "agents_update",
-                    "agents": [_agent_to_out(a) for a in agents],
-                })
+                sent = await manager.send_personal(
+                    websocket,
+                    {
+                        "event": "agents_update",
+                        "agents": [_agent_to_out(a) for a in agents],
+                    },
+                )
+                if not sent:
+                    break
             except Exception:
                 logger.debug("Failed to send periodic agent update over WebSocket", exc_info=True)
-            await asyncio.sleep(5)
-    except WebSocketDisconnect:
+            await asyncio.wait({disconnected}, timeout=5)
+    finally:
+        if not disconnected.done():
+            disconnected.cancel()
+            try:
+                await disconnected
+            except asyncio.CancelledError:
+                pass
         await manager.disconnect(websocket, "agents")
+
+
+async def _wait_for_agent_websocket_disconnect(websocket: WebSocket) -> None:
+    """Consume ignored client frames so close notifications remain observable."""
+    while True:
+        try:
+            await websocket.receive_text()
+        except (WebSocketDisconnect, RuntimeError):
+            return

@@ -195,6 +195,18 @@ def _provider_metadata(provider: Any) -> dict[str, str]:
     }
 
 
+def _unsafe_dialogue_runtime(config: Any) -> str:
+    """Return the unsafe logical provider or physical transport, if present."""
+    provider = getattr(config, "provider", "")
+    provider_name = str(getattr(provider, "value", provider) or "")
+    transport = str(getattr(config, "transport_mode", "") or "")
+    if provider_name in UNSAFE_DIALOGUE_PROVIDER_TYPES:
+        return provider_name
+    if transport in UNSAFE_DIALOGUE_PROVIDER_TYPES:
+        return transport
+    return ""
+
+
 def get_holon_dialogue_provider(holon: RunningHolon, env: dict[str, str] | None = None) -> Any:
     """Resolve a provider for direct read-only HOLON dialogue.
 
@@ -219,6 +231,11 @@ def get_holon_dialogue_provider(holon: RunningHolon, env: dict[str, str] | None 
             )
         ptype = ProviderType(provider_type)
         config = resolve_runtime_provider_config(ptype, model=model or None, env=env)
+        unsafe_runtime = _unsafe_dialogue_runtime(config)
+        if unsafe_runtime:
+            raise HolonDialogueProviderError(
+                f"resolved dialogue transport {unsafe_runtime} is unsafe for read-only dialogue"
+            )
         if not config.available:
             raise HolonDialogueProviderError(
                 f"dialogue provider {ptype.value} is not available"
@@ -232,7 +249,14 @@ def get_holon_dialogue_provider(holon: RunningHolon, env: dict[str, str] | None 
         raise HolonDialogueProviderError(
             f"holon provider {holon.provider_type} is agentic and unsafe for read-only dialogue"
         )
-    provider = get_holon_provider(holon, env=env)
+    ptype = ProviderType(holon.provider_type)
+    config = resolve_runtime_provider_config(ptype, model=holon.model, env=env)
+    unsafe_runtime = _unsafe_dialogue_runtime(config)
+    if unsafe_runtime:
+        raise HolonDialogueProviderError(
+            f"resolved dialogue transport {unsafe_runtime} is unsafe for read-only dialogue"
+        )
+    provider = create_runtime_provider(config)
     metadata = _provider_metadata(provider)
     if metadata["provider"] in UNSAFE_DIALOGUE_PROVIDER_TYPES:
         raise HolonDialogueProviderError(

@@ -8,9 +8,7 @@ existing recovery pattern (``operator_bridge.recover_stale_tasks`` +
 ``_mirror_runtime_recovered``) down to the runtime truth-spine tables.
 
 Rules (dharmagraph-engine-2026-07, Phase 0b):
-- torn window: ``receipt_json`` present but claim non-terminal means the
-  crash hit between receipt-write and claim-completion — the receipt is
-  ground truth, so the run/claim are completed FROM the receipt;
+- torn window: a runtime-bound receipt lets the run/claim complete FROM it;
 - never-started orphans requeue with ``failure_code='claim_timeout'``;
 - started-and-died orphans with retries left requeue (mirroring
   ``orchestrator._handle_task_failure``), incrementing ``retry_count``;
@@ -35,6 +33,7 @@ import aiosqlite
 
 from dharma_swarm.loop_closure_quarantine import QUARANTINE_COLUMNS, parse_ts
 from dharma_swarm.graph.reconcile_board import settle_task_board
+from dharma_swarm.graph.receipt_authority import has_runtime_completion, claim_run_match
 from dharma_swarm.runtime_state import RuntimeStateStore
 
 __all__ = ["GraphReconciler", "ReconcileReport"]
@@ -152,7 +151,7 @@ class GraphReconciler:
             rows = await (
                 await db.execute(
                     "SELECT run_id, task_id, claim_id, status, failure_code,"
-                    " metadata_json, receipt_json FROM delegation_runs"
+                    " assigned_to, metadata_json, receipt_json FROM delegation_runs"
                     f" WHERE status IN ({placeholders}) AND {LIVE_ROW_PREDICATE}",
                     IN_FLIGHT_STATUSES,
                 )
@@ -202,13 +201,27 @@ class GraphReconciler:
         run_id = str(row["run_id"])
         claim_id = str(row["claim_id"] or "")
         claim_row = await self._fetch_claim(db, claim_id) if claim_id else None
+        if claim_row is not None and not claim_run_match(claim_row, row):
+            logger.warning(
+                "reconciler: claim %s authority does not match run %s; ignoring claim",
+                claim_id,
+                run_id,
+            )
+            claim_row = None
 
         receipt = _load_json(row["receipt_json"])
-        if receipt:
+        if receipt and await has_runtime_completion(
+            db,
+            run_id=run_id,
+            task_id=str(row["task_id"]),
+            claim_id=claim_id,
+            receipt=receipt,
+        ):
             await self._complete_from_receipt(db, row, claim_row, receipt, now)
             report.completed_from_receipt.append(run_id)
             return
-
+        if receipt:
+            logger.warning("reconciler: ignoring unbound receipt for run %s", run_id)
         if stale_only and not self._claim_is_stale(claim_row, now):
             return
 
@@ -249,11 +262,8 @@ class GraphReconciler:
         receipt: dict[str, Any],
         now: datetime,
     ) -> None:
-        """The crash hit between receipt-write and claim-completion.
-
-        The receipt is ground truth: complete the run and its claim from it.
-        """
-        receipt_ok = str(receipt.get("status", "")) in {"ok", "completed"}
+        """Complete a torn run after the caller verifies its receipt binding."""
+        receipt_ok = str(receipt.get("status", "")) == "ok"
         run_status = "completed" if receipt_ok else "failed"
         failure_code = (
             "" if receipt_ok else str(receipt.get("error_source") or "execution_error")
@@ -272,7 +282,10 @@ class GraphReconciler:
                 str(row["run_id"]),
             ),
         )
-        if claim_row is not None and str(claim_row["status"]) not in TERMINAL_CLAIM_STATUSES:
+        if (
+            claim_row is not None
+            and str(claim_row["status"]) not in TERMINAL_CLAIM_STATUSES
+        ):
             claim_metadata = _load_json(claim_row["metadata_json"])
             claim_metadata["reconciled_from_receipt"] = True
             await db.execute(
@@ -353,8 +366,8 @@ class GraphReconciler:
         return await (
             await db.execute(
                 "SELECT claim_id, task_id, status, acked_at, heartbeat_at,"
-                " claimed_at, stale_after, recovered_at, retry_count, metadata_json"
-                " FROM task_claims WHERE claim_id = ?",
+                " agent_id, claimed_at, stale_after, recovered_at, retry_count,"
+                " metadata_json FROM task_claims WHERE claim_id = ?",
                 (claim_id,),
             )
         ).fetchone()
@@ -468,9 +481,7 @@ class GraphReconciler:
             claimed_at = parse_ts(row["claimed_at"])
             stale_after = parse_ts(row["stale_after"])
             if claimed_at is not None and stale_after is not None:
-                window = max(
-                    (stale_after - claimed_at).total_seconds() / 3.0, 1.0
-                )
+                window = max((stale_after - claimed_at).total_seconds() / 3.0, 1.0)
             else:
                 window = self._default_heartbeat_window
             last = parse_ts(row["heartbeat_at"]) or claimed_at

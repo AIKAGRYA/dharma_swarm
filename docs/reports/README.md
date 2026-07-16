@@ -79,6 +79,7 @@ Keep these separate from:
 
 Current examples:
 
+- [DHARMA_ANTITHESIS_FIVE_PART_CLOSURE_2026-07-16.md](DHARMA_ANTITHESIS_FIVE_PART_CLOSURE_2026-07-16.md) — merged product closure, bounded replay evidence, and the explicit needs-revision boundary for both Codex skills.
 - [20-AGENT-DEEP-AUDIT-2026-03-29.md](/Users/dhyana/dharma_swarm/docs/reports/20-AGENT-DEEP-AUDIT-2026-03-29.md)
 - [AGENT_PROMPT_SYNTHESIS.md](/Users/dhyana/dharma_swarm/docs/reports/AGENT_PROMPT_SYNTHESIS.md)
 - [DGC_DUAL_ENGINE_REALITY_MAP_2026-03-13.md](/Users/dhyana/dharma_swarm/docs/reports/DGC_DUAL_ENGINE_REALITY_MAP_2026-03-13.md)

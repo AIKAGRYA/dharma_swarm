@@ -2,6 +2,8 @@
 
 import asyncio
 import json
+import subprocess
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -292,6 +294,152 @@ async def test_decay_does_not_lose_concurrent_marks(tmp_path: Path):
     # The 3 recent marks + 1 written during decay must all survive
     assert "written during decay" in observations
     assert len(remaining) == 4
+
+
+async def test_decay_does_not_lose_cross_instance_append(tmp_path: Path):
+    """A rewrite must retain an append made by another store instance."""
+    root = tmp_path / "stigmergy"
+    rewriter = StigmergyStore(base_path=root)
+    appender = StigmergyStore(base_path=root)
+    old = _make_mark(observation="old cross-instance mark")
+    old.timestamp = datetime.now(timezone.utc) - timedelta(days=10)
+    fresh = _make_mark(observation="cross-instance append")
+    await rewriter.leave_mark(old)
+
+    loaded = asyncio.Event()
+    resume = asyncio.Event()
+    original_load = rewriter._load_marks
+
+    async def paused_load():
+        marks = await original_load()
+        loaded.set()
+        await resume.wait()
+        return marks
+
+    rewriter._load_marks = paused_load
+    decay_task = asyncio.create_task(rewriter.decay(max_age_hours=1))
+    await loaded.wait()
+    await appender.leave_mark(fresh)
+    resume.set()
+
+    assert await decay_task == 1
+    surviving_ids = {mark.id for mark in await appender.read_marks(limit=20)}
+    assert fresh.id in surviving_ids
+
+
+async def test_decay_blocks_sibling_append_inside_rewrite_window(tmp_path: Path):
+    """Same-process stores share a path lock across the authoritative rewrite."""
+    root = tmp_path / "stigmergy"
+    rewriter = StigmergyStore(base_path=root)
+    appender = StigmergyStore(base_path=root)
+    old = _make_mark(observation="old same-process mark")
+    old.timestamp = datetime.now(timezone.utc) - timedelta(days=10)
+    fresh = _make_mark(observation="blocked same-process append")
+    await rewriter.leave_mark(old)
+
+    inside_rewrite = asyncio.Event()
+    resume_rewrite = asyncio.Event()
+    original_load = rewriter._load_marks
+    load_count = 0
+
+    async def paused_authoritative_load():
+        nonlocal load_count
+        marks = await original_load()
+        load_count += 1
+        if load_count == 2:
+            inside_rewrite.set()
+            await resume_rewrite.wait()
+        return marks
+
+    rewriter._load_marks = paused_authoritative_load
+    decay_task = asyncio.create_task(rewriter.decay(max_age_hours=1))
+    await asyncio.wait_for(inside_rewrite.wait(), timeout=2)
+
+    append_task = asyncio.create_task(appender.leave_mark(fresh))
+    await asyncio.sleep(0.05)
+    assert not append_task.done(), "sibling append entered the locked rewrite window"
+
+    resume_rewrite.set()
+    assert await asyncio.wait_for(decay_task, timeout=2) == 1
+    await asyncio.wait_for(append_task, timeout=2)
+    surviving_ids = {mark.id for mark in await appender.read_marks(limit=20)}
+    assert fresh.id in surviving_ids
+
+
+async def test_decay_does_not_lose_cross_process_append(tmp_path: Path):
+    """A local-filesystem rewrite serializes with a cooperating writer process."""
+    root = tmp_path / "stigmergy"
+    attempted = tmp_path / "child-attempted"
+    completed = tmp_path / "child-completed"
+    rewriter = StigmergyStore(base_path=root)
+    old = _make_mark(observation="old cross-process mark")
+    old.timestamp = datetime.now(timezone.utc) - timedelta(days=10)
+    await rewriter.leave_mark(old)
+
+    child_code = """
+import asyncio
+import sys
+from pathlib import Path
+from dharma_swarm.stigmergy import StigmergicMark, StigmergyStore
+
+async def main():
+    root, attempted, completed = map(Path, sys.argv[1:])
+    mark = StigmergicMark(
+        agent="child-process",
+        channel="systems",
+        file_path="fresh.py",
+        observation="fresh cross-process append",
+    )
+    attempted.write_text("attempted", encoding="utf-8")
+    await StigmergyStore(base_path=root).leave_mark(mark)
+    completed.write_text(mark.id, encoding="utf-8")
+
+asyncio.run(main())
+"""
+    original_load = rewriter._load_marks
+    load_count = 0
+    child: subprocess.Popen[str] | None = None
+
+    async def interleaved_load():
+        nonlocal child, load_count
+        marks = await original_load()
+        load_count += 1
+        if load_count == 2:
+            child = subprocess.Popen(
+                [sys.executable, "-c", child_code, str(root), str(attempted), str(completed)],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            for _ in range(200):
+                if attempted.exists():
+                    break
+                await asyncio.sleep(0.01)
+            assert attempted.exists(), "child writer never reached leave_mark"
+            # Old implementations complete here and are then overwritten. A
+            # cooperating locked writer remains blocked until decay replaces
+            # the hot file and releases the local advisory lock.
+            for _ in range(75):
+                if completed.exists():
+                    break
+                await asyncio.sleep(0.01)
+        return marks
+
+    rewriter._load_marks = interleaved_load
+    try:
+        assert await rewriter.decay(max_age_hours=1) == 1
+        assert child is not None
+        await asyncio.to_thread(child.wait, 5)
+        stdout, stderr = child.communicate()
+        assert child.returncode == 0, (stdout, stderr)
+    finally:
+        if child is not None and child.poll() is None:
+            child.terminate()
+            child.wait(timeout=5)
+
+    fresh_id = completed.read_text(encoding="utf-8")
+    surviving_ids = {mark.id for mark in await original_load()}
+    assert fresh_id in surviving_ids
 
 
 async def test_access_decay_atomic_rewrite(store: StigmergyStore):

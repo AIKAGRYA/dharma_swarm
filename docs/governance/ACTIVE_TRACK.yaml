@@ -461,7 +461,11 @@ active_tracks:
     name: Orchestration Arena v1 — frozen hermetic fitness + zero-weight orchestrator + DPI
     status: ACTIVE
     opened_at: "2026-06-23"
-    verified_at: "2026-06-23"
+    # Re-verified 2026-07-16: check_track_status full run, 12/12 completion
+    # criteria pass including live pytest greens (arena_v1_controls_tests_pass
+    # 15 passed; arena_truth_surface_tests_pass 8 passed) and a fresh, digest-
+    # intact arena_truth_receipt. Blocker next-item 2 (live-lane rules) stays open.
+    verified_at: "2026-07-16"
     ttl_days: 21
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness

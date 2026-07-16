@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import openai
 import pytest
 
 from dharma_swarm.model_hierarchy import DEFAULT_MODELS
@@ -12,9 +13,7 @@ from dharma_swarm.runtime_provider import (
     DEFAULT_OPENROUTER_MODEL,
     DEFAULT_TOGETHER_MODEL,
     FIREWORKS_BASE_URL,
-    GROQ_BASE_URL,
     KIMI_BASE_URL,
-    NVIDIA_NIM_BASE_URL,
     OPENROUTER_BASE_URL,
     SILICONFLOW_BASE_URL,
     TOGETHER_BASE_URL,
@@ -24,6 +23,7 @@ from dharma_swarm.runtime_provider import (
     create_runtime_provider,
     preferred_runtime_provider_configs,
     resolve_runtime_provider_config,
+    runtime_provider_transport_identity,
 )
 
 
@@ -153,9 +153,13 @@ def test_anthropic_routes_to_claude_code_by_default(monkeypatch) -> None:
         env={"ANTHROPIC_API_KEY": "metered-key"},
     )
 
-    assert cfg.provider == ProviderType.CLAUDE_CODE
+    assert cfg.provider == ProviderType.ANTHROPIC
+    assert cfg.transport_mode == "claude_code"
     assert cfg.api_key is None
     assert cfg.available is True
+
+    provider = create_runtime_provider(cfg)
+    assert provider.__class__.__name__ == "ClaudeCodeProvider"
 
 
 def test_anthropic_api_escape_hatch_keeps_raw_api() -> None:
@@ -209,6 +213,40 @@ def test_resolve_runtime_provider_config_for_groq_uses_env_base_and_model(monkey
     assert cfg.base_url == "https://groq.internal/openai/v1"
     assert cfg.default_model == "qwen/qwen3-32b"
     assert cfg.available is True
+
+
+def test_create_groq_provider_preserves_resolved_base_url(monkeypatch) -> None:
+    requested = (
+        "https://fixture-user:fixture-password@fixture-proxy.invalid/v1"
+        "?api_key=fixture-secret#fixture-fragment"
+    )
+    observed: dict[str, object] = {}
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            observed.update(kwargs)
+
+    cfg = resolve_runtime_provider_config(
+        ProviderType.GROQ,
+        api_key="fixture-token-not-live",
+        base_url=requested,
+        env={},
+    )
+    provider = create_runtime_provider(cfg)
+    monkeypatch.setattr(openai, "AsyncOpenAI", FakeClient)
+
+    provider._client_or_raise()
+
+    assert observed["base_url"] == requested
+    identity = runtime_provider_transport_identity(cfg)
+    assert identity == (
+        "provider:https://fixture-proxy.invalid/"
+        ".path-sha256-2d234c97703ce824eaa4d98fbd2701668ef5e63e46f1574f2ea72e7927b1f57e"
+    )
+    assert "fixture-user" not in identity
+    assert "fixture-password" not in identity
+    assert "fixture-secret" not in identity
+    assert "fixture-fragment" not in identity
 
 
 def test_resolve_runtime_provider_config_for_groq_uses_default_model(monkeypatch) -> None:
@@ -331,15 +369,21 @@ def test_preferred_runtime_provider_configs_prioritizes_ollama_nim_before_openro
     configs = preferred_runtime_provider_configs(model="test-model")
 
     providers = [cfg.provider for cfg in configs]
-    assert providers.index(ProviderType.GROQ) < providers.index(ProviderType.OPENROUTER)
-    assert providers.index(ProviderType.SILICONFLOW) < providers.index(ProviderType.OPENROUTER)
-    assert providers.index(ProviderType.TOGETHER) < providers.index(ProviderType.OPENROUTER)
-    assert providers.index(ProviderType.FIREWORKS) < providers.index(ProviderType.OPENROUTER)
+    openrouter_index = providers.index(ProviderType.OPENROUTER_FREE)
+    assert providers.index(ProviderType.GROQ) < openrouter_index
+    assert providers.index(ProviderType.SILICONFLOW) < openrouter_index
+    assert providers.index(ProviderType.TOGETHER) < openrouter_index
+    assert providers.index(ProviderType.FIREWORKS) < openrouter_index
     assert ProviderType.OPENROUTER_FREE in providers
+    assert ProviderType.OPENROUTER not in providers
     assert ProviderType.NVIDIA_NIM in providers
     assert ProviderType.OLLAMA in providers
-    assert providers.index(ProviderType.KIMI_CODE) < providers.index(ProviderType.OPENROUTER)
-    assert providers.index(ProviderType.ZHIPU) < providers.index(ProviderType.OPENROUTER)
+    retained = configs[openrouter_index]
+    assert retained.metadata is not None
+    assert retained.metadata["logical_provider_aliases"] == [
+        ProviderType.OPENROUTER_FREE.value,
+        ProviderType.OPENROUTER.value,
+    ]
 
 
 def test_preferred_runtime_provider_configs_skips_unavailable(monkeypatch) -> None:
@@ -358,7 +402,60 @@ def test_preferred_runtime_provider_configs_skips_unavailable(monkeypatch) -> No
     # Verify available providers are present (order may vary by chain config)
     assert ProviderType.OLLAMA in providers
     assert ProviderType.OPENROUTER_FREE in providers
-    assert ProviderType.OPENROUTER in providers
+    assert ProviderType.OPENROUTER not in providers
+    retained = next(
+        config
+        for config in configs
+        if config.provider == ProviderType.OPENROUTER_FREE
+    )
+    assert retained.metadata is not None
+    assert retained.metadata["logical_provider_aliases"] == [
+        ProviderType.OPENROUTER_FREE.value,
+        ProviderType.OPENROUTER.value,
+    ]
+
+
+def test_preferred_runtime_provider_configs_deduplicates_shared_claude_cli(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("DHARMA_FORCE_ANTHROPIC_API", raising=False)
+    monkeypatch.setattr(
+        "dharma_swarm.runtime_provider._resolve_cli_binary",
+        lambda name: f"/fixture/bin/{name}",
+    )
+
+    configs = preferred_runtime_provider_configs(
+        provider_order=(ProviderType.ANTHROPIC, ProviderType.CLAUDE_CODE),
+        env={},
+    )
+
+    assert [config.provider for config in configs] == [ProviderType.ANTHROPIC]
+    assert configs[0].metadata == {
+        "physical_transport_identity": "cli:claude:/fixture/bin/claude",
+        "logical_provider_aliases": ["anthropic", "claude_code"],
+    }
+
+
+def test_preferred_runtime_provider_configs_keeps_anthropic_api_and_claude_cli_distinct(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        "dharma_swarm.runtime_provider._resolve_cli_binary",
+        lambda name: f"/fixture/bin/{name}",
+    )
+
+    configs = preferred_runtime_provider_configs(
+        provider_order=(ProviderType.ANTHROPIC, ProviderType.CLAUDE_CODE),
+        env={
+            "DHARMA_FORCE_ANTHROPIC_API": "1",
+            "ANTHROPIC_API_KEY": "fixture-key-not-live",
+        },
+    )
+
+    assert [config.provider for config in configs] == [
+        ProviderType.ANTHROPIC,
+        ProviderType.CLAUDE_CODE,
+    ]
 
 
 @pytest.mark.asyncio

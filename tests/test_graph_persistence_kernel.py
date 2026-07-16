@@ -6,6 +6,8 @@ import asyncio
 import json
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier, Event
 
 import pytest
 
@@ -18,6 +20,7 @@ from dharma_swarm.graph import (
     JsonGraphSerializer,
     LastValueChannel,
 )
+from dharma_swarm.graph.types import RunCheckpoint
 
 
 def _linear_graph():
@@ -59,6 +62,203 @@ class CountingSerializer(JsonGraphSerializer):
     def loads_typed(self, data):
         self.loads_count += 1
         return super().loads_typed(data)
+
+
+def _fixture_checkpoint(suffix: str) -> RunCheckpoint:
+    return RunCheckpoint(
+        graph_run_id=f"run-{suffix}",
+        graph_id="concurrency-fixture",
+        superstep=0,
+        state_digest=suffix * 64,
+        channels={"x": {"value": suffix, "version": 1}},
+        versions_seen={},
+    )
+
+
+def test_concurrent_kernel_instances_preserve_every_checkpoint(tmp_path):
+    left = GraphPersistenceKernel(tmp_path / "kernel")
+    right = GraphPersistenceKernel(tmp_path / "kernel")
+    barrier = Barrier(2)
+
+    def put_after_barrier(kernel, suffix):
+        barrier.wait(timeout=5)
+        return kernel.put_run_checkpoint(
+            "shared-thread",
+            _fixture_checkpoint(suffix),
+            checkpoint_id=f"cp-{suffix}",
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = (
+            pool.submit(put_after_barrier, left, "a"),
+            pool.submit(put_after_barrier, right, "b"),
+        )
+        for future in futures:
+            future.result(timeout=10)
+
+    history = GraphPersistenceKernel(tmp_path / "kernel").get_state_history(
+        "shared-thread"
+    )
+    assert {record.checkpoint_id for record in history} == {"cp-a", "cp-b"}
+
+
+def test_concurrent_update_state_serializes_base_derivation_and_append(tmp_path):
+    """Two latest-state updates must compose, never become lossy siblings."""
+    root = tmp_path / "kernel"
+    seed = GraphPersistenceKernel(root)
+    seed.put_run_checkpoint(
+        "shared-thread",
+        RunCheckpoint(
+            graph_run_id="run-shared",
+            graph_id="concurrency-update-fixture",
+            superstep=0,
+            state_digest="a" * 64,
+            channels={"seed": {"value": 0, "version": 1}},
+            versions_seen={},
+        ),
+        checkpoint_id="cp-root",
+    )
+    left = GraphPersistenceKernel(root)
+    right = GraphPersistenceKernel(root)
+    stale_read_barrier = Barrier(2)
+    legacy_prelock_reads: list[str] = []
+
+    # This seam makes the old implementation deterministically read the same
+    # base before either append. The fixed implementation bypasses the
+    # pre-lock public read and resolves latest state inside the mutation lock.
+    for kernel in (left, right):
+        original = kernel.get_checkpoint_record
+
+        def synchronized_get(
+            thread_id,
+            checkpoint_id=None,
+            *,
+            original=original,
+        ):
+            record = original(thread_id, checkpoint_id)
+            legacy_prelock_reads.append(thread_id)
+            stale_read_barrier.wait(timeout=5)
+            return record
+
+        kernel.get_checkpoint_record = synchronized_get  # type: ignore[method-assign]
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = (
+            pool.submit(left.update_state, "shared-thread", {"left": 1}),
+            pool.submit(right.update_state, "shared-thread", {"right": 2}),
+        )
+        for future in futures:
+            future.result(timeout=10)
+
+    history = GraphPersistenceKernel(root).get_state_history("shared-thread")
+    assert history[-1].state == {"seed": 0, "left": 1, "right": 2}
+    assert legacy_prelock_reads == []
+    assert len(history) == 3
+    assert history[-1].parent_checkpoint_id == history[-2].checkpoint_id
+    assert history[-2].parent_checkpoint_id == "cp-root"
+
+
+def test_concurrent_processes_preserve_every_checkpoint(tmp_path):
+    program = r"""
+import sys
+import time
+from pathlib import Path
+from dharma_swarm.graph.persistence import GraphPersistenceKernel
+from dharma_swarm.graph.types import RunCheckpoint
+
+root, suffix = Path(sys.argv[1]), sys.argv[2]
+kernel = GraphPersistenceKernel(root)
+checkpoint = RunCheckpoint(
+    f"run-{suffix}", "process-fixture", 0, suffix * 64,
+    {"x": {"value": suffix, "version": 1}}, {}
+)
+(root / f"ready-{suffix}").write_text("ready", encoding="utf-8")
+deadline = time.monotonic() + 5
+while len(list(root.glob("ready-*"))) < 2:
+    if time.monotonic() >= deadline:
+        raise TimeoutError("peer process did not reach concurrent start")
+    time.sleep(0.01)
+kernel.put_run_checkpoint("shared-thread", checkpoint, checkpoint_id=f"cp-{suffix}")
+"""
+    root = tmp_path / "kernel"
+    root.mkdir()
+    processes = [
+        subprocess.Popen(
+            [sys.executable, "-c", program, str(root), suffix],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        for suffix in ("a", "b")
+    ]
+    for process in processes:
+        stdout, stderr = process.communicate(timeout=10)
+        assert process.returncode == 0, f"stdout={stdout}\nstderr={stderr}"
+
+    history = GraphPersistenceKernel(root).get_state_history("shared-thread")
+    assert {record.checkpoint_id for record in history} == {"cp-a", "cp-b"}
+
+
+def test_checkpoint_and_pending_write_mutations_share_one_lock(tmp_path):
+    left = GraphPersistenceKernel(tmp_path / "kernel")
+    right = GraphPersistenceKernel(tmp_path / "kernel")
+    write_entered = Event()
+    release_write = Event()
+    pending_started = Event()
+    original_write = left._write_thread
+
+    def paused_write(thread_id, state):
+        write_entered.set()
+        assert release_write.wait(timeout=5)
+        original_write(thread_id, state)
+
+    left._write_thread = paused_write  # type: ignore[method-assign]
+
+    def add_pending_write():
+        pending_started.set()
+        right.put_writes("shared-thread", [("x", 2)], "task-pending")
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        checkpoint_future = pool.submit(
+            left.put_run_checkpoint,
+            "shared-thread",
+            _fixture_checkpoint("a"),
+            checkpoint_id="cp-a",
+        )
+        assert write_entered.wait(timeout=5)
+        pending_future = pool.submit(add_pending_write)
+        assert pending_started.wait(timeout=5)
+        assert not pending_future.done()
+        release_write.set()
+        checkpoint_future.result(timeout=10)
+        pending_future.result(timeout=10)
+
+    reopened = GraphPersistenceKernel(tmp_path / "kernel")
+    assert [
+        record.checkpoint_id
+        for record in reopened.get_state_history("shared-thread")
+    ] == ["cp-a"]
+    assert [
+        write.task_id for write in reopened.recover_pending_writes("shared-thread")
+    ] == ["task-pending"]
+
+
+def test_fork_does_not_alias_nested_checkpoint_state():
+    parent = RunCheckpoint(
+        "parent",
+        "fork-fixture",
+        0,
+        "a" * 64,
+        {"x": {"value": 1, "version": 1}},
+        {"node": {"x": 1}},
+    )
+
+    child = parent.fork("child")
+    child.channels["x"]["value"] = 99  # type: ignore[index]
+    child.versions_seen["node"]["x"] = 99  # type: ignore[index]
+
+    assert parent.channels["x"]["value"] == 1
+    assert parent.versions_seen["node"]["x"] == 1
 
 
 def test_thread_resume_checkpoint_ids_and_lineage(tmp_path):
@@ -223,7 +423,7 @@ def test_update_time_travel_copy_prune_and_delta_history(tmp_path):
     assert kernel.get_state_history("copy") == []
 
 
-def test_pending_write_recovery_survives_failed_superstep(tmp_path):
+def test_invalid_superstep_is_rejected_before_pending_write_journal(tmp_path):
     compiled = (
         GraphBuilder("pending-recovery")
         .add_channel("x", LastValueChannel)
@@ -246,10 +446,17 @@ def test_pending_write_recovery_survives_failed_superstep(tmp_path):
             )
         )
     reopened = GraphPersistenceKernel(tmp_path / "kernel")
-    pending = reopened.recover_pending_writes("thread-pending")
-    assert [(write.task_id, write.writes) for write in pending] == [
-        ("run-pending:1", (("x", 1), ("x", 2)))
-    ]
+    assert reopened.recover_pending_writes("thread-pending") == []
+
+    with pytest.raises(Exception, match="received 2 writes|conflict|InvalidUpdate"):
+        asyncio.run(
+            compiled.invoke(
+                input=None,
+                persistence=reopened,
+                thread_id="thread-pending",
+            )
+        )
+    assert reopened.recover_pending_writes("thread-pending") == []
 
 
 def test_default_resume_replays_pending_writes_without_reexecuting_node(tmp_path):

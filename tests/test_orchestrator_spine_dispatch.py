@@ -10,6 +10,8 @@ from __future__ import annotations
 import asyncio
 import types
 
+import pytest
+
 from dharma_swarm.orchestrator import Orchestrator
 from dharma_swarm.spine.receipt import EvidenceReceipt
 
@@ -197,9 +199,12 @@ def test_spine_dispatch_persists_receipt_json_to_the_stores_db(tmp_path):
 
     db_path = tmp_path / "runtime.db"
     conn = sqlite3.connect(db_path)
-    conn.execute("CREATE TABLE delegation_runs (task_id TEXT PRIMARY KEY, status TEXT)")
     conn.execute(
-        "INSERT INTO delegation_runs (task_id, status) VALUES ('t-persist', 'running')"
+        "CREATE TABLE delegation_runs (run_id TEXT PRIMARY KEY, task_id TEXT, status TEXT)"
+    )
+    conn.execute(
+        "INSERT INTO delegation_runs (run_id, task_id, status)"
+        " VALUES ('run-xyz', 't-persist', 'running')"
     )
     conn.commit()
     conn.close()
@@ -227,6 +232,138 @@ def test_spine_dispatch_persists_receipt_json_to_the_stores_db(tmp_path):
     assert blob["receipt_id"] == str(me._last_evidence_receipt.receipt_id)
 
 
+def test_spine_dispatch_projects_receipt_to_exact_retry_only(tmp_path):
+    """Retries share task_id; receipt projection must remain run-scoped."""
+    import sqlite3
+
+    db_path = tmp_path / "runtime.db"
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        "CREATE TABLE delegation_runs (run_id TEXT PRIMARY KEY, task_id TEXT,"
+        " status TEXT, receipt_json TEXT)"
+    )
+    conn.executemany(
+        "INSERT INTO delegation_runs (run_id, task_id, status) VALUES (?, ?, 'running')",
+        (("run-old", "t-retry"), ("run-xyz", "t-retry")),
+    )
+    conn.commit()
+    conn.close()
+
+    class Runner:
+        async def run_task(self, task):
+            return "RUN_RESULT"
+
+    me = _stub_self_with_store(db_path)
+    td = _stub_td(task_id="t-retry")
+    assert (
+        asyncio.run(Orchestrator._run_task_via_spine(me, Runner(), object(), td, 5.0))
+        == "RUN_RESULT"
+    )
+
+    conn = sqlite3.connect(db_path)
+    rows = dict(
+        conn.execute(
+            "SELECT run_id, receipt_json FROM delegation_runs WHERE task_id='t-retry'"
+        ).fetchall()
+    )
+    conn.close()
+    assert rows["run-old"] is None
+    assert rows["run-xyz"]
+
+
+@pytest.mark.parametrize(
+    ("receipt_claim_id", "receipt_agent_id"),
+    (
+        ("claim-foreign", "agent-valid"),
+        ("claim-valid", "agent-foreign"),
+    ),
+)
+async def test_receipt_projection_rejects_foreign_authority_without_poisoning(
+    tmp_path, receipt_claim_id, receipt_agent_id
+):
+    """A task/run collision cannot replace its claim/agent-owned witness."""
+    import aiosqlite
+    import json
+    import sqlite3
+
+    from dharma_swarm.spine.persistence import persist_receipt
+
+    db_path = tmp_path / "runtime.db"
+    valid_witness = json.dumps({"receipt_id": "valid-authoritative-witness"})
+    with sqlite3.connect(db_path) as db:
+        db.execute(
+            "CREATE TABLE delegation_runs (run_id TEXT PRIMARY KEY, task_id TEXT,"
+            " claim_id TEXT, assigned_to TEXT, status TEXT, receipt_json TEXT)"
+        )
+        db.execute(
+            "INSERT INTO delegation_runs (run_id, task_id, claim_id, assigned_to,"
+            " status, receipt_json) VALUES (?, ?, ?, ?, 'completed', ?)",
+            ("run-xyz", "t-authority", "claim-valid", "agent-valid", valid_witness),
+        )
+
+    foreign = EvidenceReceipt(
+        task_id="t-authority",
+        claim_id=receipt_claim_id,
+        agent_id=receipt_agent_id,
+        status="ok",
+        attributes={"run_id": "run-xyz"},
+    )
+    async with aiosqlite.connect(db_path) as db:
+        with pytest.raises(RuntimeError, match="authoritative delegation_runs"):
+            await persist_receipt(foreign, db)
+
+    with sqlite3.connect(db_path) as db:
+        stored = db.execute(
+            "SELECT receipt_json FROM delegation_runs WHERE run_id = 'run-xyz'"
+        ).fetchone()
+    assert stored == (valid_witness,)
+
+
+def test_spine_dispatch_ambiguous_run_projection_writes_nothing(tmp_path, caplog):
+    """Malformed duplicate run rows fail closed without partial projection."""
+    import logging
+    import sqlite3
+
+    db_path = tmp_path / "runtime.db"
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        "CREATE TABLE delegation_runs (run_id TEXT, task_id TEXT, status TEXT,"
+        " receipt_json TEXT)"
+    )
+    conn.executemany(
+        "INSERT INTO delegation_runs (run_id, task_id, status)"
+        " VALUES ('run-xyz', 't-ambiguous', 'running')",
+        ((), ()),
+    )
+    conn.commit()
+    conn.close()
+
+    class Runner:
+        async def run_task(self, task):
+            return "RUN_RESULT"
+
+    me = _stub_self_with_store(db_path)
+    td = _stub_td(task_id="t-ambiguous")
+    with caplog.at_level(logging.WARNING):
+        assert (
+            asyncio.run(
+                Orchestrator._run_task_via_spine(me, Runner(), object(), td, 5.0)
+            )
+            == "RUN_RESULT"
+        )
+
+    conn = sqlite3.connect(db_path)
+    projections = [
+        row[0]
+        for row in conn.execute(
+            "SELECT receipt_json FROM delegation_runs WHERE task_id='t-ambiguous'"
+        )
+    ]
+    conn.close()
+    assert projections == [None, None]
+    assert any("NOT persisted" in record.message for record in caplog.records)
+
+
 def test_spine_dispatch_zero_row_persist_is_loud_not_silent(tmp_path, caplog):
     """A receipt whose task_id matches NO delegation_runs row must surface as a
     warning (persist_receipt raises; the wire's fail-open logs it) — never as a
@@ -236,7 +373,9 @@ def test_spine_dispatch_zero_row_persist_is_loud_not_silent(tmp_path, caplog):
 
     db_path = tmp_path / "runtime.db"
     conn = sqlite3.connect(db_path)
-    conn.execute("CREATE TABLE delegation_runs (task_id TEXT PRIMARY KEY, status TEXT)")
+    conn.execute(
+        "CREATE TABLE delegation_runs (run_id TEXT PRIMARY KEY, task_id TEXT, status TEXT)"
+    )
     conn.commit()
     conn.close()  # table exists, but NO row for this task
 

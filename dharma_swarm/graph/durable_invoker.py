@@ -298,8 +298,10 @@ class DurableInvoker:
 
     # -- memo sources (read-only over runtime_state-owned tables) ------------
 
-    async def _prior_receipt_from_delegation_runs(self, task_id: str) -> EvidenceReceipt | None:
-        """Fallback memo source: ``delegation_runs.receipt_json`` for this task.
+    async def _prior_receipt_from_delegation_runs(
+        self, task_id: str, run_id: str, idempotency_key: str
+    ) -> EvidenceReceipt | None:
+        """Fallback memo source for the exact completed delegation run.
 
         Trusted ONLY when the persisted receipt explicitly names OUR
         side_effect_key — a receipt with missing/malformed attributes is
@@ -309,7 +311,7 @@ class DurableInvoker:
         import aiosqlite
 
         db_path = getattr(self._store, "db_path", None)
-        if db_path is None or not task_id:
+        if db_path is None or not task_id or not run_id or not idempotency_key:
             return None
         try:
             async with aiosqlite.connect(db_path, timeout=2.0) as db:
@@ -317,9 +319,9 @@ class DurableInvoker:
                 row = await (
                     await db.execute(
                         "SELECT receipt_json FROM delegation_runs"
-                        " WHERE task_id = ? AND receipt_json IS NOT NULL"
-                        " AND receipt_json != '' ORDER BY started_at DESC LIMIT 1",
-                        (task_id,),
+                        " WHERE task_id = ? AND run_id = ?"
+                        " AND receipt_json IS NOT NULL AND receipt_json != '' LIMIT 1",
+                        (task_id, run_id),
                     )
                 ).fetchone()
         except Exception:
@@ -334,6 +336,8 @@ class DurableInvoker:
             if (
                 not isinstance(attributes, dict)
                 or str(attributes.get("side_effect_key", "")) != self._side_effect_key
+                or str(attributes.get("run_id", "")) != run_id
+                or str(attributes.get("idempotency_key", "")) != idempotency_key
             ):
                 return None
             return receipt_from_dict(blob)
@@ -341,11 +345,25 @@ class DurableInvoker:
             return None
 
     async def _memo_from_record(self, record: Any, task_id: str) -> EvidenceReceipt | None:
+        record_run_id = str(getattr(record, "run_id", "") or "")
+        record_idempotency_key = str(
+            getattr(record, "idempotency_key", "") or ""
+        )
         metadata = getattr(record, "metadata", None) or {}
         blob = metadata.get(_META_RECEIPT)
         if isinstance(blob, dict):
             try:
-                return receipt_from_dict(blob)
+                attributes = blob.get("attributes")
+                if (
+                    str(blob.get("task_id", "")) == task_id
+                    and isinstance(attributes, dict)
+                    and str(attributes.get("run_id", "")) == record_run_id
+                    and str(attributes.get("idempotency_key", ""))
+                    == record_idempotency_key
+                    and str(attributes.get("side_effect_key", ""))
+                    == self._side_effect_key
+                ):
+                    return receipt_from_dict(blob)
             except Exception:
                 self.audit_failures += 1
                 logger.warning(
@@ -353,7 +371,9 @@ class DurableInvoker:
                     " receipt metadata; trying delegation_runs fallback",
                     self._side_effect_key,
                 )
-        return await self._prior_receipt_from_delegation_runs(task_id)
+        return await self._prior_receipt_from_delegation_runs(
+            task_id, record_run_id, record_idempotency_key
+        )
 
     def _started_record_is_stale(self, record: Any) -> bool:
         """True when an in-flight record's holder is presumed dead."""
@@ -516,6 +536,23 @@ class DurableInvoker:
                 claim_token=claim_token,
             )
             raise
+
+        # The wrapper, not the provider-facing invoker, owns execution
+        # identity. Bind the receipt to the exact attempt before it can enter
+        # either the idempotency record or delegation_runs projection.
+        receipt = dataclasses.replace(
+            receipt,
+            trace_id=identity.trace_id,
+            task_id=task_id,
+            claim_id=identity.claim_id,
+            attributes={
+                **receipt.attributes,
+                "run_id": identity.run_id,
+                "idempotency_key": claim.idempotency_key,
+                "dispatch_idempotency_key": identity.idempotency_key,
+                "side_effect_key": self._side_effect_key,
+            },
+        )
 
         # 4) Complete the record; memoize the receipt (and result text) so a
         #    later replay can return them without a provider call.

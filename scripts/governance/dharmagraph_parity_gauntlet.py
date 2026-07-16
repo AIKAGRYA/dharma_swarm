@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import copy
 import hashlib
+import hmac
 import json
 import os
 import platform
@@ -45,6 +46,14 @@ REPORT_DIR = ROOT / "reports/governance/dharmagraph_parity"
 BUILDER_RECEIPT = REPORT_DIR / "builder_receipt.json"
 JUDGE_RECEIPT = REPORT_DIR / "judge_receipt.json"
 MATRIX_PATH = REPORT_DIR / "PARITY_MATRIX.md"
+# Detached promotion authority: deliberately excluded from
+# RELEVANT_SOURCE_ROOTS, because a judge signature binds the measured source
+# digest. Keeping its allowlist inside that measured source creates an
+# impossible fixed-point (ratification changes the digest it ratifies).
+JUDGE_RATIFICATIONS_PATH = (
+    ROOT / "docs/langgraph_parity/DHARMAGRAPH_JUDGE_RATIFICATIONS_V1.json"
+)
+JUDGE_RATIFICATIONS_SCHEMA = "dharma_swarm.dharmagraph_judge_ratifications.v1"
 RELEVANT_SOURCE_ROOTS = (
     "dharma_swarm/graph",
     "dharma_swarm/langgraph_parity",
@@ -463,6 +472,90 @@ def _source_tree_digest() -> tuple[str, list[dict[str, str]]]:
     return stable_digest(manifest), manifest
 
 
+def _load_judge_ratifications(
+    path: Path = JUDGE_RATIFICATIONS_PATH,
+) -> dict[str, frozenset[str]]:
+    """Load the detached exact-digest promotion authority.
+
+    This registry authorizes content-bound attestations after source review;
+    it is not cryptographic authentication of the named judge.
+    """
+    return _normalize_judge_ratifications(_load_json(path))
+
+
+def _normalize_judge_ratifications(
+    payload: Mapping[str, Any],
+) -> dict[str, frozenset[str]]:
+    if payload.get("schema") != JUDGE_RATIFICATIONS_SCHEMA:
+        raise GauntletError("judge ratification registry schema mismatch")
+    custody = payload.get("custody")
+    if (
+        not isinstance(custody, Mapping)
+        or custody.get("authority") != "source_review"
+        or custody.get("candidate_measurement") != "excluded"
+    ):
+        raise GauntletError("judge ratification registry custody is malformed")
+    raw = payload.get("ratifications")
+    if not isinstance(raw, Mapping):
+        raise GauntletError("judge ratification registry has no ratifications map")
+    normalized: dict[str, frozenset[str]] = {}
+    for raw_judge_id, raw_digests in raw.items():
+        judge_id = str(raw_judge_id).strip()
+        if (
+            not judge_id
+            or isinstance(raw_digests, (str, bytes))
+            or not isinstance(raw_digests, Sequence)
+        ):
+            raise GauntletError("judge ratification registry entry is malformed")
+        digests = frozenset(str(item) for item in raw_digests)
+        if not digests or any(
+            len(item) != 64 or any(char not in "0123456789abcdef" for char in item)
+            for item in digests
+        ):
+            raise GauntletError(
+                f"judge ratification registry has invalid digest for {judge_id!r}"
+            )
+        normalized[judge_id] = digests
+    return normalized
+
+
+def _assert_judge_trust_root_custody(
+    path: Path = JUDGE_RATIFICATIONS_PATH,
+) -> tuple[dict[str, str], dict[str, frozenset[str]]]:
+    """Return one immutable, committed authority snapshot plus its custody."""
+    try:
+        rel = path.resolve().relative_to(ROOT.resolve()).as_posix()
+    except ValueError as exc:
+        raise GauntletError("judge ratification registry escapes repository") from exc
+    if rel in _tracked_relevant_files():
+        raise GauntletError("judge ratification registry entered candidate measurement")
+    if not _git_success("ls-files", "--error-unmatch", "--", rel):
+        raise GauntletError("judge ratification registry is not source-controlled")
+    dirty = _git("status", "--porcelain", "--", rel)
+    if dirty:
+        raise GauntletError(f"judge ratification registry is dirty: {dirty}")
+    # Authorize from the committed blob, not a second worktree read. This
+    # removes the check/use window in which a local writer could swap the
+    # allowlist after custody validation.
+    blob_sha = _git("rev-parse", f"HEAD:{rel}")
+    committed = _git("cat-file", "blob", blob_sha)
+    try:
+        payload = json.loads(committed)
+    except json.JSONDecodeError as exc:
+        raise GauntletError(
+            "committed judge ratification registry is invalid JSON"
+        ) from exc
+    if not isinstance(payload, Mapping):
+        raise GauntletError("committed judge ratification registry is not an object")
+    ratifications = _normalize_judge_ratifications(payload)
+    custody = {
+        "path": rel,
+        "git_blob_sha": blob_sha,
+        "sha256": hashlib.sha256(committed.encode("utf-8")).hexdigest(),
+    }
+    return custody, ratifications
+
+
 def _assert_relevant_source_clean() -> None:
     dirty = _git("status", "--porcelain", "--", *RELEVANT_SOURCE_ROOTS)
     if dirty:
@@ -582,7 +675,7 @@ def _normalize_capability(
             2
             if all(status == "pass" for status in statuses)
             else 1
-            if any(status in {"pass", "partial"} for status in statuses)
+            if any(status == "pass" for status in statuses)
             else 0
         )
         if int(points) != mechanical_points:
@@ -639,6 +732,24 @@ def _stable_capability(row: Mapping[str, Any]) -> dict[str, Any]:
 def _receipt_digest(receipt: Mapping[str, Any]) -> str:
     return stable_digest(
         {key: value for key, value in receipt.items() if key != "digest"}
+    )
+
+
+def _judge_attestation_digest(
+    *,
+    judge_id: str,
+    judge_stable_digest: str,
+    builder_receipt_digest: str,
+    rubric_commit_sha: str,
+) -> str:
+    return stable_digest(
+        {
+            "attestation_role": "judge",
+            "judge_id": judge_id,
+            "judge_stable_digest": judge_stable_digest,
+            "builder_receipt_digest": builder_receipt_digest,
+            "rubric_commit_sha": rubric_commit_sha,
+        }
     )
 
 
@@ -898,13 +1009,11 @@ def _build_receipt(
             "reconciliation": "MATCH" if match else "DISCREPANCY",
             "discrepancy_is_finding": not match,
         }
-        receipt["judge"]["signature"] = stable_digest(
-            {
-                "judge_id": judge_id,
-                "judge_stable_digest": receipt["stable_digest"],
-                "builder_receipt_digest": builder["digest"],
-                "rubric_commit_sha": custody["rubric_commit_sha"],
-            }
+        receipt["judge"]["signature"] = _judge_attestation_digest(
+            judge_id=judge_id,
+            judge_stable_digest=receipt["stable_digest"],
+            builder_receipt_digest=builder["digest"],
+            rubric_commit_sha=custody["rubric_commit_sha"],
         )
     receipt["digest"] = _receipt_digest(receipt)
     return receipt
@@ -1068,15 +1177,48 @@ def _presentation_findings(stored: Mapping[str, Any]) -> list[str]:
     return findings
 
 
-def _judge_findings(stored: Mapping[str, Any], judge: Mapping[str, Any]) -> list[str]:
+def _judge_findings(
+    stored: Mapping[str, Any],
+    judge: Mapping[str, Any],
+    *,
+    ratifications: Mapping[str, frozenset[str]] | None = None,
+) -> list[str]:
     findings: list[str] = []
+    if stored.get("role") != "builder":
+        findings.append("stored receipt role is not builder")
+    if judge.get("role") != "judge":
+        findings.append("judge receipt role is not judge")
     try:
         _validate_receipt_digest(judge)
     except GauntletError:
         return ["judge receipt digest invalid"]
     judge_block = judge.get("judge", {})
+    if not isinstance(judge_block, Mapping):
+        return ["judge attestation block is malformed"]
+    judge_id = str(judge_block.get("judge_id", ""))
+    rubric = judge.get("rubric", {})
+    rubric_commit_sha = (
+        str(rubric.get("rubric_commit_sha", "")) if isinstance(rubric, Mapping) else ""
+    )
+    expected_signature = _judge_attestation_digest(
+        judge_id=judge_id,
+        judge_stable_digest=str(judge.get("stable_digest", "")),
+        builder_receipt_digest=str(judge_block.get("builder_receipt_digest", "")),
+        rubric_commit_sha=rubric_commit_sha,
+    )
+    signature = judge_block.get("signature")
+    if not isinstance(signature, str) or not hmac.compare_digest(
+        signature, expected_signature
+    ):
+        findings.append("judge attestation digest does not match its content")
+    authority = _load_judge_ratifications() if ratifications is None else ratifications
+    ratified = authority.get(judge_id, frozenset())
+    if not isinstance(signature, str) or signature not in ratified:
+        findings.append("judge attestation digest is not source-ratified")
     if judge_block.get("builder_receipt_digest") != stored.get("digest"):
         findings.append("judge receipt does not bind the stored builder receipt")
+    if judge_block.get("builder_stable_digest") != stored.get("stable_digest"):
+        findings.append("judge attestation does not bind the builder stable digest")
     if judge.get("stable_digest") != stored.get("stable_digest"):
         findings.append("judge stable digest diverges from builder")
     if judge_block.get("reconciliation") != "MATCH":
@@ -1100,8 +1242,17 @@ def check(args: argparse.Namespace) -> int:
     )
     findings: list[str] = []
     findings.extend(_presentation_findings(stored))
-    if JUDGE_RECEIPT.exists():
-        findings.extend(_judge_findings(stored, _load_json(JUDGE_RECEIPT)))
+    if not JUDGE_RECEIPT.exists():
+        findings.append("judge receipt is missing")
+    else:
+        _, ratifications = _assert_judge_trust_root_custody()
+        findings.extend(
+            _judge_findings(
+                stored,
+                _load_json(JUDGE_RECEIPT),
+                ratifications=ratifications,
+            )
+        )
     if replay["stable_digest"] != stored["stable_digest"]:
         findings.append("stable semantic digest changed")
     if replay["score"]["earned"] != stored["score"]["earned"]:

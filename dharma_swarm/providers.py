@@ -17,7 +17,7 @@ import random
 import shutil
 import time
 from abc import abstractmethod
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -66,6 +66,17 @@ from dharma_swarm.provider_policy import (
     ProviderRouteDecision,
     ProviderRouteRequest,
 )
+from dharma_swarm.provider_transport import (
+    KeyLivenessProvider,
+    apply_canary as apply_transport_canary,
+    decision_with_transport_provenance,
+    deduplicate_physical_provider_chain,
+    provider_chain_with_transport_provenance,
+    provider_instance_available,
+    prune_dead_key_providers,
+    response_indicates_failure,
+    route_request_with_transport_provenance,
+)
 from dharma_swarm.router_retrospective import (
     RouteOutcomeRecord,
     build_route_retrospective,
@@ -90,9 +101,6 @@ from dharma_swarm.telemetry_plane import (
 )
 
 logger = logging.getLogger(__name__)
-
-KeyLivenessProvider = Callable[[], set[str] | None]
-
 
 class LLMProvider(BaseProvider):
     """Abstract base for all LLM providers.
@@ -1247,8 +1255,17 @@ class GroqProvider(LLMProvider):
         max_context_tokens=131_072, provider_family="groq",
     )
 
-    def __init__(self, api_key: str | None = None) -> None:
+    def __init__(
+        self,
+        api_key: str | None = None,
+        base_url: str | None = None,
+    ) -> None:
         self._api_key = api_key or os.environ.get(GROQ_API_KEY_ENV)
+        self._base_url = (
+            base_url
+            or os.environ.get("GROQ_BASE_URL")
+            or "https://api.groq.com/openai/v1"
+        ).rstrip("/")
         self._client: Any = None
 
     def _client_or_raise(self) -> Any:
@@ -1262,7 +1279,7 @@ class GroqProvider(LLMProvider):
             raise ImportError("pip install openai") from exc
         self._client = AsyncOpenAI(
             api_key=self._api_key,
-            base_url="https://api.groq.com/openai/v1",
+            base_url=self._base_url,
         )
         return self._client
 
@@ -2273,12 +2290,6 @@ class ModelRouter:
                 f"Available: [{available}]"
             ) from None
 
-    def _provider_instance_available(self, provider_type: ProviderType) -> bool:
-        provider = self._providers.get(provider_type)
-        if provider is None:
-            return False
-        return bool(getattr(provider, "available", True))
-
     async def complete(
         self, provider_type: ProviderType, request: LLMRequest,
     ) -> LLMResponse:
@@ -2297,14 +2308,11 @@ class ModelRouter:
         *,
         available_provider_types: list[ProviderType] | None = None,
     ) -> ProviderRouteDecision:
-        available = [
-            provider
-            for provider in (available_provider_types or list(self._providers.keys()))
-            if provider in self._providers and self._provider_instance_available(provider)
-        ]
-        return self._policy_router.route(
+        return route_request_with_transport_provenance(
             route_request,
-            available_providers=available,
+            providers=self._providers,
+            policy_router=self._policy_router,
+            available_provider_types=available_provider_types,
         )
 
     @staticmethod
@@ -2315,66 +2323,7 @@ class ModelRouter:
 
     @staticmethod
     def _response_indicates_failure(response: LLMResponse) -> str | None:
-        body = response.content.strip().lower()
-        if not body:
-            return "empty_response"
-        if body.startswith("timeout:"):
-            return "provider_timeout"
-        if (
-            body.startswith("error:")
-            or body.startswith("error (rc=")
-            or body.startswith("error(rc=")
-        ):
-            return "provider_error"
-        # Three orthogonal failure classes (a quota exhaustion is not a
-        # circuit failure, and a rate limit is neither):
-        #   rate_limited     -- transient; back off / fall through, never fast-trip
-        #   quota_exhausted  -- permanent until operator refills; fast-trip
-        #   billing_exhausted-- permanent until operator pays/re-enables; fast-trip
-        _RATE_LIMIT_MARKERS = (
-            "rate_limit_exceeded",
-            "rate limit",
-            "too many requests",
-            "429",
-        )
-        _QUOTA_MARKERS = (
-            "insufficient_quota",
-            "you exceeded your current quota",
-        )
-        _BILLING_MARKERS = (
-            "credit balance is too low",
-            "credit balance",
-            "billing hard limit",
-            "your api key has been disabled",
-        )
-        _ACCESS_DENIED_MARKERS = (
-            "access denied",
-            "please check your network settings",
-            "403",
-            "forbidden",
-            "unauthorized",
-        )
-        is_structured_error = (
-            body.startswith("{")
-            or body.startswith("[")
-            or '"error"' in body[:1200]
-            or "'error'" in body[:1200]
-            or "error code" in body[:1200]
-        )
-        if len(body) < 300 or is_structured_error:
-            for marker in _RATE_LIMIT_MARKERS:
-                if marker in body:
-                    return "rate_limited"
-            for marker in _QUOTA_MARKERS:
-                if marker in body:
-                    return "quota_exhausted"
-            for marker in _BILLING_MARKERS:
-                if marker in body:
-                    return "billing_exhausted"
-            for marker in _ACCESS_DENIED_MARKERS:
-                if marker in body:
-                    return "access_denied"
-        return None
+        return response_indicates_failure(response)
 
     def _provider_chain(
         self,
@@ -2382,20 +2331,13 @@ class ModelRouter:
         *,
         available_provider_types: list[ProviderType] | None = None,
     ) -> list[ProviderType]:
-        available = set(available_provider_types or self._providers.keys())
-        chain: list[ProviderType] = []
-        for provider in [decision.selected_provider, *decision.fallback_providers]:
-            if (
-                provider in available
-                and provider in self._providers
-                and self._provider_instance_available(provider)
-                and provider not in chain
-            ):
-                chain.append(provider)
-        return self._prune_dead_key_providers(
-            chain,
+        chain, _aliases = provider_chain_with_transport_provenance(
+            decision,
+            providers=self._providers,
+            available_provider_types=available_provider_types,
             live_provider=self._key_liveness_provider,
         )
+        return chain
 
     @staticmethod
     def _prune_dead_key_providers(
@@ -2403,40 +2345,10 @@ class ModelRouter:
         *,
         live_provider: KeyLivenessProvider | None = None,
     ) -> list[ProviderType]:
-        """Drop providers whose key is verifiably dead before the first attempt.
-
-        FAIL-OPEN: the key oracle returns ``None`` (unknown) on a stale/missing/
-        malformed status file — in that case we keep the chain unchanged and
-        preserve today's env-presence behaviour. If pruning would EMPTY the
-        chain (every routed provider is dead-keyed), we keep the UNFILTERED
-        chain and warn loudly rather than inflict a self-made outage.
-        """
-        if not chain:
-            return chain
-        try:
-            oracle = live_provider or live_providers
-            live = oracle()
-        except Exception:  # never let the oracle take down routing
-            logger.warning("key_oracle raised; keeping unfiltered chain", exc_info=True)
-            return chain
-        if live is None:
-            # Unknown liveness -> fail open, env-presence behaviour unchanged.
-            return chain
-        filtered = [p for p in chain if p.value in live]
-        if not filtered:
-            logger.warning(
-                "key_oracle: all routed providers have dead keys (%s); "
-                "keeping UNFILTERED chain to avoid a self-inflicted outage "
-                "(run `dkeys test`).",
-                [p.value for p in chain],
-            )
-            return chain
-        if len(filtered) != len(chain):
-            pruned = [p.value for p in chain if p.value not in live]
-            logger.info(
-                "key_oracle: pruned dead-key providers from chain: %s", pruned
-            )
-        return filtered
+        return prune_dead_key_providers(
+            chain,
+            live_provider=live_provider or live_providers,
+        )
 
     @staticmethod
     def _session_id_from_context(route_request: ProviderRouteRequest) -> str | None:
@@ -2711,26 +2623,6 @@ class ModelRouter:
             "updated_at": time.monotonic(),
         }
 
-    def _apply_canary(
-        self,
-        chain: list[ProviderType],
-        *,
-        model_hints: dict[ProviderType, str | None],
-    ) -> tuple[list[ProviderType], bool]:
-        if (
-            self._canary_percent <= 0
-            or self._canary_provider is None
-            or self._canary_provider not in self._providers
-        ):
-            return (chain, False)
-        if random.random() * 100.0 >= self._canary_percent:
-            return (chain, False)
-        canary_provider = self._canary_provider
-        reordered = [canary_provider] + [item for item in chain if item != canary_provider]
-        if self._canary_model_hint:
-            model_hints[canary_provider] = self._canary_model_hint
-        return (reordered, True)
-
     @staticmethod
     def _reward_key(provider: ProviderType, model: str) -> str:
         return f"{provider.value}:{model}"
@@ -2970,20 +2862,49 @@ class ModelRouter:
             enriched_request,
             available_provider_types=available_provider_types,
         )
-        chain = self._provider_chain(
+        try:
+            key_liveness_oracle = self._key_liveness_provider or live_providers
+            key_liveness_snapshot = key_liveness_oracle()
+        except Exception:
+            logger.warning(
+                "key_oracle raised; keeping unfiltered request chain",
+                exc_info=True,
+            )
+            key_liveness_snapshot = None
+
+        def request_key_liveness() -> set[str] | None:
+            return key_liveness_snapshot
+
+        chain, transport_aliases = provider_chain_with_transport_provenance(
             decision,
+            providers=self._providers,
             available_provider_types=available_provider_types,
+            live_provider=request_key_liveness,
         )
         if not chain:
             # Routing filter found nothing — fall back to any registered provider
-            fallback_set = set(available_provider_types or self._providers.keys())
+            fallback_set = (
+                set(self._providers)
+                if available_provider_types is None
+                else set(available_provider_types)
+            )
             chain = [
                 p
                 for p in self._providers
-                if p in fallback_set and self._provider_instance_available(p)
+                if p in fallback_set
+                and provider_instance_available(self._providers, p)
             ]
+            chain, fallback_aliases = deduplicate_physical_provider_chain(
+                chain,
+                providers=self._providers,
+            )
+            transport_aliases.extend(fallback_aliases)
         if not chain:
             raise RuntimeError("No available providers after routing filter")
+        decision = decision_with_transport_provenance(
+            decision,
+            transport_aliases,
+        )
         task_signature = build_task_signature(
             action_name=enriched_request.action_name,
             context=enriched_request.context,
@@ -3040,10 +2961,28 @@ class ModelRouter:
                 chain,
                 model_hints=model_hints,
             )
-        chain, canary_applied = self._apply_canary(
+        pre_canary_chain = list(chain)
+        chain, canary_applied = apply_transport_canary(
             chain,
+            providers=self._providers,
+            canary_percent=self._canary_percent,
+            canary_provider=self._canary_provider,
+            canary_model_hint=self._canary_model_hint,
             model_hints=model_hints,
+            available_provider_types=available_provider_types,
+            live_provider=request_key_liveness,
         )
+        chain, canary_aliases = deduplicate_physical_provider_chain(
+            chain,
+            providers=self._providers,
+            preferred_logical_lanes=pre_canary_chain,
+        )
+        if canary_aliases:
+            decision = decision_with_transport_provenance(
+                decision,
+                canary_aliases,
+            )
+            canary_applied = False
         if affinity_applied:
             decision = replace(
                 decision,

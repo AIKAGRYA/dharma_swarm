@@ -26,7 +26,15 @@ def _stub_td(agent="agent-1", task_id="t-loop1"):
     return types.SimpleNamespace(
         agent_id=agent,
         task_id=task_id,
-        metadata={"execution_identity": {"trace_id": "trace-xyz", "session_id": "sess-1"}},
+        metadata={
+            "execution_identity": {
+                "trace_id": "trace-xyz",
+                "session_id": "sess-1",
+                "run_id": f"run-{task_id}",
+                "claim_id": f"claim-{task_id}",
+                "idempotency_key": f"idem-{task_id}",
+            }
+        },
         topology=types.SimpleNamespace(value="dispatch"),
     )
 
@@ -52,9 +60,12 @@ class _FakeRunner:
 def test_spine_receipt_carries_real_provider_and_model_and_persists(tmp_path):
     db_path = tmp_path / "runtime.db"
     conn = sqlite3.connect(db_path)
-    conn.execute("CREATE TABLE delegation_runs (task_id TEXT PRIMARY KEY, status TEXT)")
     conn.execute(
-        "INSERT INTO delegation_runs (task_id, status) VALUES ('t-loop1', 'running')"
+        "CREATE TABLE delegation_runs (run_id TEXT PRIMARY KEY, task_id TEXT, status TEXT)"
+    )
+    conn.execute(
+        "INSERT INTO delegation_runs (run_id, task_id, status)"
+        " VALUES ('run-t-loop1', 't-loop1', 'running')"
     )
     conn.commit()
     conn.close()
