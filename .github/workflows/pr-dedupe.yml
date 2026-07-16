@@ -97,7 +97,7 @@ jobs:
               | ((.headRefName // "") | ascii_downcase) as $h
               | (
                   ($t | test("\\[automated\\]|\\[auto\\]"))
-                  or ($h | test("^chore/ops-report-[0-9]{8}"))
+                  or ($h | test("^chore/ops-report-[0-9]{8}([t-]?[0-9]{4}z?)?$"))
                 )
                 and (
                   ($t | test("pr lifecycle \\+ spine adoption ops report"))

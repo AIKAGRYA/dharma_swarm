@@ -94,6 +94,13 @@ def test_snapshot_filter_remains_fail_closed_for_untrusted_or_real_work() -> Non
             head="chore/ops-report-parser",
         ),
         _pr(
+            6,
+            # Anchoring matters: a timestamped prefix with a human suffix is
+            # still a human branch, not the automation lane.
+            title="ops report parser implementation",
+            head="chore/ops-report-20260715-parser",
+        ),
+        _pr(
             3,
             title="chore(docops): reconcile generated counts",
             head="chore/docops-autorefresh",
