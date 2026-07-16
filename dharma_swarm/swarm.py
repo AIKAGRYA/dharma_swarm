@@ -1281,6 +1281,14 @@ class SwarmManager:
             "originating latent branch in the result."
         )
 
+    @classmethod
+    def _latent_gold_task_dedupe_key(cls, shard: Any) -> tuple[str, str, str]:
+        return (
+            cls._latent_gold_task_title(shard).strip().lower(),
+            str(getattr(shard, "turn_id", "")).strip(),
+            str(getattr(shard, "task_id", "")).strip(),
+        )
+
     async def spawn_latent_gold_tasks(
         self,
         *,
@@ -1315,16 +1323,59 @@ class SwarmManager:
             and isinstance(task.metadata.get("latent_gold_shard_id"), str)
             and str(task.metadata.get("latent_gold_shard_id")).strip()
         }
+        claimed_keys = {
+            (
+                str(task.title or "").strip().lower(),
+                str(task.metadata.get("latent_gold_source_turn_id", "")).strip(),
+                str(task.metadata.get("latent_gold_source_task_id", "")).strip(),
+            )
+            for task in existing
+            if isinstance(task.metadata, dict)
+            and str(task.metadata.get("source", "")).strip() == "swarm.latent_gold"
+            and str(task.title or "").strip()
+        }
 
         store = ConversationMemoryStore(plane_path)
-        # Run synchronous SQLite query in thread to avoid blocking event loop.
-        # Push state + salience filters into SQL (min_salience param) so we
-        # scan far fewer of the 85K+ shards.
+
+        # Run synchronous SQLite queries in thread to avoid blocking event
+        # loop.  Push state + salience filters into SQL (min_salience param)
+        # so we scan far fewer of the 85K+ shards.
         _sal = min_salience
         loop = asyncio.get_running_loop()
-        all_shards = await loop.run_in_executor(
-            None, lambda: store.latent_gold("", limit=200, min_salience=_sal)
+
+        def _fetch_latent_candidates() -> tuple[list[Any], set[str]]:
+            """Fetch shards and already-claimed shard_ids in one executor trip.
+
+            Queries the ``idea_uptake`` table for shards that already have a
+            ``follow_up_task`` record.  Once a shard has been reopened into a
+            task (even if that task later completed or failed) it should NOT be
+            re-spawned — otherwise completed/failed shards with state rolled
+            back to ``deferred`` form a degenerate attractor (cf. NIKKI
+            2026-07-16 TANE: 122 degenerate tasks/day, 0 real value).
+            """
+            shards = store.latent_gold("", limit=200, min_salience=_sal)
+            uptake_ids: set[str] = set()
+            try:
+                import sqlite3
+
+                with sqlite3.connect(str(plane_path)) as _db:
+                    cur = _db.execute(
+                        "SELECT DISTINCT shard_id FROM idea_uptake"
+                        " WHERE uptake_kind = 'follow_up_task'"
+                    )
+                    uptake_ids = {str(row[0]) for row in cur.fetchall()}
+            except Exception as exc:  # noqa: BLE001 — best-effort dedupe
+                logger.debug(
+                    "spawn_latent_gold_tasks: uptake query failed: %s", exc
+                )
+            return shards, uptake_ids
+
+        all_shards, uptake_claimed = await loop.run_in_executor(
+            None, _fetch_latent_candidates
         )
+        # Union current-task-board claims with uptake-history claims so that
+        # shards already reopened at least once are never re-spawned.
+        claimed_shards |= uptake_claimed
         candidates = [
             shard
             for shard in all_shards
@@ -1335,7 +1386,17 @@ class SwarmManager:
             return []
 
         capacity = max(0, max_pending - active)
-        planned = candidates[: max(0, min(limit, capacity))]
+        planned_limit = max(0, min(limit, capacity))
+        planned: list[Any] = []
+        planned_keys: set[tuple[str, str, str]] = set()
+        for shard in candidates:
+            if len(planned) >= planned_limit:
+                break
+            dedupe_key = self._latent_gold_task_dedupe_key(shard)
+            if dedupe_key in claimed_keys or dedupe_key in planned_keys:
+                continue
+            planned.append(shard)
+            planned_keys.add(dedupe_key)
         if not planned:
             return []
 
