@@ -1,6 +1,6 @@
 {
   "id": "onboard-one-door-WP-O8",
-  "base_ref": "5311baee84059f8dcf5b7d11972303fb5b7ed677",
+  "base_ref": "5e0e42549a1e3f8123704d0c11b5fc6be2f8c5f0",
   "branch": "codex/pr958-onboard-wp-o8-20260715",
   "worktree": ".",
   "intent": "Correct the WP-O4R admission cache boundary discovered while executing M6-1: verifier-selfcheck imports Hypothesis during collection, but AgentOps externalizes only pytest, ruff, XDG, and bytecode caches. Export HYPOTHESIS_STORAGE_DIRECTORY under AGENTOPS_CACHE_ROOT so make agent-build-preflight remains exact-clean. This packet changes only Makefile, its existing contract test, and this packet.",
@@ -149,7 +149,7 @@
   "negative_controls": [
     {
       "name": "wp-o8-base-preflight-reproduces-cache-leak",
-      "command": "python3 -c \"import subprocess; r=subprocess.run(['git','show','5311baee84059f8dcf5b7d11972303fb5b7ed677:Makefile'],capture_output=True,text=True); raise SystemExit(0 if r.returncode == 0 and 'HYPOTHESIS_STORAGE_DIRECTORY' not in r.stdout else 9)\"",
+      "command": "python3 -c \"import subprocess; r=subprocess.run(['git','show','5e0e42549a1e3f8123704d0c11b5fc6be2f8c5f0:Makefile'],capture_output=True,text=True); raise SystemExit(0 if r.returncode == 0 and 'HYPOTHESIS_STORAGE_DIRECTORY' not in r.stdout else 9)\"",
       "env": {},
       "expected_exit": 0
     }
@@ -173,7 +173,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "5311baee84059f8dcf5b7d11972303fb5b7ed677",
+      "checked_at_sha": "5e0e42549a1e3f8123704d0c11b5fc6be2f8c5f0",
       "details": []
     },
     "interface_mismatches": [
@@ -185,10 +185,10 @@
       "tests/test_make_onboarding_contract.py::test_make_admission_recipes_use_external_report_root"
     ],
     "honest_blockers": [
-      "At unmodified base 5311baee, make agent-build-preflight reaches all four verifier checks and then fails exact-clean because .hypothesis/constants are created in the checkout. That failing preflight is the defect reproduction, so this corrective packet cannot claim a passing pre-edit preflight.",
+      "At exact base 5e0e42549, Makefile and tests/test_make_onboarding_contract.py are byte-identical to the prior 5311baee reproduction base; Makefile still lacks HYPOTHESIS_STORAGE_DIRECTORY, so the reproduced exact-clean .hypothesis/constants leak remains the bound defect and this corrective packet cannot claim a passing pre-edit preflight.",
       "The two venv sitecustomize tests remain environment-sensitive on Debian system Python and are adjudicated by the required hosted CI contexts; this change does not alter them."
     ],
     "rollback": "revert the Makefile Hypothesis cache export, its regression assertion, and this packet together; preflight exact-clean then reproduces the ignored-write failure",
-    "packet_digest": "d624a31db616d4b4a272c9f864cea1ac136a394ef90dca5eb129ea8ed9f9348f"
+    "packet_digest": "0a29209669c45bad310dc57fc220f1f8863147c1231bac61849d137518b712b2"
   }
 }
