@@ -819,6 +819,26 @@ active_tracks:
       - dashboard/src/lib/a2aNodeModel.test.ts
       - tests/test_fleet_presence.py
       - tests/test_registry_hydrator.py
+      # Operator-ratified 2026-07-16: one canonical codex_composer identity
+      # represented by three host replicas. Replica liveness does not confer
+      # an ExecutionLease; only one explicitly leased semantic consumer may
+      # act for the identity at a time.
+      - examples/agents/codex_composer.registration.json
+      - examples/agents/codex_composer.agent-card.json
+      - examples/agents/codex_composer.memory.json
+      - docs/ops/CODEX_COMPOSER_THREE_VPS.md
+      - docs/ops/FLEET_FIELD_REGISTRY.yaml
+      - inter_agent/codex_composer/inbound/README.md
+      - inter_agent/fleet/2026-07-16-codex-composer-three-vps-registration.md
+      - dharma_swarm/roaming_onboarding.py
+      - scripts/runtime/codex_composer_replica.py
+      - scripts/runtime/codex_composer_seat.py
+      - deploy/systemd/dharma-codex-composer-replica.service
+      - deploy/systemd/dharma-codex-composer-replica.env.example
+      - tests/test_roaming_onboarding.py
+      - tests/test_codex_composer_registration.py
+      - tests/test_codex_composer_replica.py
+      - reports/ops/codex_composer/three_vps_20260716.json
     moves_vital_signs:
       - quality_gates
       - eval_coverage
@@ -911,7 +931,7 @@ active_tracks:
         kind: code
         blocker: true
       - id: 10
-        what: "D6b: living_agent_kernel earn-in — activate 2-3 kernels post-D1 (receipted wakes visible in presence), monitor, individually graduate to always-on."
+        what: "D6b: living_agent_kernel earn-in — activate 2-3 kernels post-D1 (receipted wakes visible in presence), monitor, individually graduate to always-on. Operator-ratified bounded first slice: one codex_composer AgentUID with identical card/memory bytes across AGNI, Rushabdev, and Meghadharma; unique ReplicaPresence instance IDs; only an explicitly leased instance may consume semantic work."
         kind: code
         blocker: false
       - id: 11
