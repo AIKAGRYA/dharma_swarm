@@ -59,6 +59,9 @@ _RUNNER_OUTPUTS = frozenset(
 _LIVE_OUTPUTS = frozenset(
     {"live_worker_receipts.json", "live_measurement_receipt.json"}
 )
+_MANIFEST_OUTPUTS = (_RUNNER_OUTPUTS | _LIVE_OUTPUTS) - {
+    "live_measurement_receipt.json"
+}
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -190,6 +193,37 @@ def _digest(payload: Mapping[str, Any]) -> str:
     return hashlib.sha256(data.encode("utf-8")).hexdigest()
 
 
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _artifact_manifest(staging: Path) -> dict[str, str]:
+    manifest: dict[str, str] = {}
+    for name in sorted(_MANIFEST_OUTPUTS):
+        path = staging / name
+        if path.is_symlink() or not path.is_file():
+            raise LiveMeasurementError(f"cannot bind missing artifact: {name}")
+        manifest[name] = _file_sha256(path)
+    return manifest
+
+
+def _validate_artifact_manifest(staging: Path, manifest: Mapping[str, str]) -> None:
+    if set(manifest) != set(_MANIFEST_OUTPUTS):
+        raise LiveMeasurementError("artifact manifest does not bind every output")
+    for name in sorted(_MANIFEST_OUTPUTS):
+        expected = manifest[name]
+        if (
+            len(expected) != 64
+            or expected.lower() != expected
+            or _file_sha256(staging / name) != expected
+        ):
+            raise LiveMeasurementError(f"artifact digest mismatch: {name}")
+
+
 def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
     path.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -254,13 +288,34 @@ def run_live_measurement(
         run["capability_claim"] = False
         run["claim_boundary"] = CLAIM_BOUNDARY
         run["live_controls_verified"] = True
+        run["promotion_authorized"] = False
         _write_json(staging / "arena_run.json", run)
         pool.write_receipts(staging / "live_worker_receipts.json")
+
+        scorecard_path = staging / "scorecard.json"
+        scorecard = json.loads(scorecard_path.read_text(encoding="utf-8"))
+        scorecard["capability_claim"] = False
+        scorecard["claim_boundary"] = CLAIM_BOUNDARY
+        scorecard["promotion_authorized"] = False
+        _write_json(scorecard_path, scorecard)
+
+        decision = (staging / "decision_packet.md").read_text(encoding="utf-8")
+        boundary = (
+            "> **Claim boundary:** live measurement candidate only; "
+            "`capability_claim=false`; `promotion_authorized=false`.\n"
+            "> This packet does not authorize MAP-Elites insertion, capability "
+            "promotion, production routing, or benchmark claims.\n\n"
+        )
+        (staging / "decision_packet.md").write_text(
+            boundary + decision, encoding="utf-8"
+        )
+        artifact_sha256 = _artifact_manifest(staging)
 
         receipt: dict[str, Any] = {
             "schema": LIVE_MEASUREMENT_SCHEMA,
             "capability_claim": False,
             "claim_boundary": CLAIM_BOUNDARY,
+            "promotion_authorized": False,
             "measurement_mode": run["measurement_mode"],
             "closeout_state": run["closeout_state"],
             "candidate_genome_id": run["candidate_genome_id"],
@@ -275,19 +330,13 @@ def run_live_measurement(
             "parity_verified": True,
             "significance_method": SIGNIFICANCE_METHOD,
             "output_files": sorted(_RUNNER_OUTPUTS | _LIVE_OUTPUTS),
+            "artifact_sha256": artifact_sha256,
         }
         receipt["digest_sha256"] = _digest(receipt)
         _write_json(staging / "live_measurement_receipt.json", receipt)
 
-        decision = (staging / "decision_packet.md").read_text(encoding="utf-8")
-        boundary = (
-            "> **Claim boundary:** live measurement candidate only; "
-            "`capability_claim=false`. No production or benchmark claim.\n\n"
-        )
-        (staging / "decision_packet.md").write_text(
-            boundary + decision, encoding="utf-8"
-        )
         _validate_staged_outputs(staging)
+        _validate_artifact_manifest(staging, artifact_sha256)
         if output.is_symlink() or output.exists():
             raise LiveMeasurementError(
                 "output_dir appeared while the measurement was running"
