@@ -21,6 +21,11 @@ def _ci_required_success_rollup():
             "status": "COMPLETED",
             "conclusion": "SUCCESS",
         },
+        {
+            "name": "Onboarding admission parity",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+        },
         {"name": "gitleaks", "status": "COMPLETED", "conclusion": "SUCCESS"},
         {"name": "pytest (3.11)", "status": "COMPLETED", "conclusion": "SUCCESS"},
         {"name": "pytest (3.12)", "status": "COMPLETED", "conclusion": "SUCCESS"},
