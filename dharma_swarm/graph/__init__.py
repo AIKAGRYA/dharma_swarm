@@ -17,9 +17,19 @@ from dharma_swarm.graph.channels import (
     BarrierMemberError,
     ChannelWriteConflictError,
     LastValueChannel,
+    ReducerChannel,
     TopicChannel,
     TriggerChannel,
     UnknownChannelError,
+)
+from dharma_swarm.graph.schema import (
+    SchemaError,
+    TypedCompiledGraph,
+    TypedStateGraph,
+    context_schema,
+    input_schema,
+    output_schema,
+    typed_state_schema,
 )
 from dharma_swarm.graph.checkpoint import DispatchCheckpoint, GraphCheckpointStore
 from dharma_swarm.graph.compiler import GraphBuilder, GraphCompileError
@@ -102,10 +112,18 @@ __all__ = [
     "MalformedDispatchOrderError",
     "NodeExecutionError",
     "NodeResultError",
+    "ReducerChannel",
+    "SchemaError",
     "Send",
     "SendTargetError",
     "SimulatedEffects",
     "START",
+    "TypedCompiledGraph",
+    "TypedStateGraph",
+    "context_schema",
+    "input_schema",
+    "output_schema",
+    "typed_state_schema",
     "SuperstepLimitError",
     "TopicChannel",
     "TriggerChannel",

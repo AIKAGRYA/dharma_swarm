@@ -28,6 +28,7 @@ __all__ = [
     "ChannelWriteConflictError",
     "EmptyChannelError",
     "LastValueChannel",
+    "ReducerChannel",
     "TopicChannel",
     "TriggerChannel",
     "UnknownChannelError",
@@ -205,6 +206,52 @@ class AppendChannel(Channel[list[Any]]):
     def restore(self, snapshot: Mapping[str, Any]) -> None:
         super().restore(snapshot)
         self._items = list(snapshot.get("items", []))
+
+
+class ReducerChannel(Channel[Any]):
+    """Generic binary-reducer channel (``Annotated[T, reducer]`` parity).
+
+    Multiple same-superstep writes are legal; each folds LEFT onto the
+    accumulator in caller-given (canonical) order. The reducer must be a
+    pure, associative binary callable — associativity is the batching
+    invariance contract: ``reduce(reduce(s, xs), ys) == reduce(s, xs+ys)``
+    (spec §3 property 5). ``empty_value`` seeds the accumulator before the
+    first fold (langgraph constructs the annotated type's default — ``[]``
+    for a list, ``0`` for an int).
+    """
+
+    def __init__(
+        self,
+        reducer: "Any",
+        empty_value: Any = None,
+    ) -> None:
+        super().__init__()
+        self._reducer = reducer
+        self._empty = empty_value
+        self._value: Any = empty_value
+
+    def validate(self, writes: Sequence[ChannelWrite], superstep: int) -> None:
+        return None
+
+    def commit(self, writes: Sequence[ChannelWrite], superstep: int) -> bool:
+        if not writes:
+            return False
+        for write in writes:
+            self._value = self._reducer(self._value, write.value)
+        self.version += 1
+        return True
+
+    def get(self) -> Any:
+        if self.is_empty:
+            raise EmptyChannelError(self.name or "<unbound>")
+        return self._value
+
+    def checkpoint(self) -> dict[str, Any]:
+        return {"version": self.version, "value": self._value}
+
+    def restore(self, snapshot: Mapping[str, Any]) -> None:
+        super().restore(snapshot)
+        self._value = snapshot.get("value", self._empty)
 
 
 class TriggerChannel(Channel[bool]):

@@ -239,3 +239,48 @@ def test_property_4_checkpoint_resume_equivalence(initial, kill_after, seed):
         assert resumed.state_digest == full.state_digest
 
     asyncio.run(run())
+
+
+@BOUNDED
+@given(
+    xs=st.lists(st.integers(min_value=-50, max_value=50), max_size=6),
+    ys=st.lists(st.integers(min_value=-50, max_value=50), max_size=6),
+    superstep=st.integers(min_value=1, max_value=5),
+)
+def test_property_5_reducer_batching_invariance(xs, ys, superstep):
+    """reduce(reduce(s, xs), ys) == reduce(s, xs + ys) for all batchings."""
+    import operator
+
+    from dharma_swarm.graph.channels import ChannelWrite, ReducerChannel
+
+    def fresh():
+        channel = ReducerChannel(operator.add, empty_value=0)
+        channel.name = "acc"
+        return channel
+
+    def writes(values, step):
+        return [ChannelWrite("n", "acc", value, i) for i, value in enumerate(values)]
+
+    split = fresh()
+    if xs:
+        split.commit(writes(xs, superstep), superstep)
+    if ys:
+        split.commit(writes(ys, superstep + 1), superstep + 1)
+    joined = fresh()
+    if xs + ys:
+        joined.commit(writes(xs + ys, superstep), superstep)
+    if xs + ys:
+        assert split.get() == joined.get()
+    # list reducer: same law over sequence concatenation
+    split_l = ReducerChannel(operator.add, empty_value=[])
+    split_l.name = "log"
+    if xs:
+        split_l.commit(writes([[v] for v in xs], superstep), superstep)
+    if ys:
+        split_l.commit(writes([[v] for v in ys], superstep + 1), superstep + 1)
+    joined_l = ReducerChannel(operator.add, empty_value=[])
+    joined_l.name = "log"
+    if xs + ys:
+        joined_l.commit(writes([[v] for v in xs + ys], superstep), superstep)
+    if xs + ys:
+        assert split_l.get() == joined_l.get() == xs + ys

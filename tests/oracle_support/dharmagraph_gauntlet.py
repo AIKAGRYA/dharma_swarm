@@ -1986,6 +1986,9 @@ def run_capability_probes(
         for name in _WORKLOAD_ARMS
     }
     _apply_workload_evidence(capabilities, row_lookup, workloads)
+    _apply_typed_schema_evidence(
+        capabilities, row_lookup, workloads["seeded_typed_schema_projection"]
+    )
     persistence_protocol = _persistence_protocol_probe(seed)
     _apply_persistence_protocol_evidence(capabilities, row_lookup, persistence_protocol)
     process_restart = _process_restart_probe(seed)
@@ -2060,3 +2063,217 @@ def run_capability_probes(
             ],
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# Pregel-core S3 (LG01): typed state/input/output/context schema workload.
+# Append-only harness extension — new seeded two-arm workload + evidence
+# applier; nothing above this section is modified by the extension.
+# ---------------------------------------------------------------------------
+
+
+class _TypedFullState(TypedDict, total=False):
+    x: int
+    log: Annotated[list[Any], operator.add]
+    secret: int
+
+
+class _TypedInputState(TypedDict, total=False):
+    x: int
+
+
+class _TypedOutputState(TypedDict, total=False):
+    x: int
+    log: Annotated[list[Any], operator.add]
+
+
+class _TypedConflictState(TypedDict, total=False):
+    y: int
+
+
+def _typed_schema_arm(arm: str, seed: int) -> dict[str, Any]:
+    rng = random.Random(_derived_seed(seed, "typed-schema"))
+    initial = rng.randint(2, 30)
+    multiplier = rng.randint(2, 5)
+    seed_mark = f"seed-{seed}"
+
+    if arm == "langgraph":
+        from dataclasses import dataclass
+
+        from langgraph.errors import InvalidUpdateError
+        from langgraph.graph import END, START, StateGraph
+        from langgraph.runtime import Runtime
+
+        @dataclass
+        class _Ctx:
+            multiplier: int
+
+        def node_a(state: _TypedFullState, runtime: Runtime[_Ctx]) -> dict[str, Any]:
+            return {
+                "x": state["x"] * runtime.context.multiplier,
+                "log": ["a"],
+                "secret": state["x"],
+            }
+
+        def node_b(state: _TypedFullState) -> dict[str, Any]:
+            return {"x": state["x"] + 1, "log": ["b"]}
+
+        builder = StateGraph(
+            _TypedFullState,
+            input_schema=_TypedInputState,
+            output_schema=_TypedOutputState,
+            context_schema=_Ctx,
+        )
+        builder.add_node("a", node_a)
+        builder.add_node("b", node_b)
+        builder.add_edge(START, "a")
+        builder.add_edge("a", "b")
+        builder.add_edge("b", END)
+        out = builder.compile().invoke(
+            {"x": initial, "log": [seed_mark]}, context=_Ctx(multiplier)
+        )
+
+        conflict = StateGraph(_TypedConflictState)
+        conflict.add_node("p", lambda state: {"y": 1})
+        conflict.add_node("q", lambda state: {"y": 2})
+        conflict.add_edge(START, "p")
+        conflict.add_edge(START, "q")
+        conflict.add_edge("p", END)
+        conflict.add_edge("q", END)
+        conflict_rejected = False
+        try:
+            conflict.compile().invoke({"y": 0})
+        except InvalidUpdateError:
+            conflict_rejected = True
+        return {
+            "projected_output": {"x": out["x"], "log": list(out["log"])},
+            "secret_hidden": "secret" not in out,
+            "input_extra_filtered": seed_mark not in out.get("log", []),
+            "context_applied": out["x"] == initial * multiplier + 1,
+            "unannotated_conflict_rejected": conflict_rejected,
+        }
+
+    from dataclasses import dataclass
+
+    from dharma_swarm.graph import (
+        END,
+        START,
+        ChannelWriteConflictError,
+        TypedStateGraph,
+    )
+    from dharma_swarm.graph.effects import SimulatedEffects
+
+    @dataclass
+    class _Ctx:
+        multiplier: int
+
+    def node_a(state: Mapping[str, Any], context: "_Ctx") -> dict[str, Any]:
+        return {
+            "x": state["x"] * context.multiplier,
+            "log": ["a"],
+            "secret": state["x"],
+        }
+
+    def node_b(state: Mapping[str, Any]) -> dict[str, Any]:
+        return {"x": state["x"] + 1, "log": ["b"]}
+
+    typed = (
+        TypedStateGraph(
+            _TypedFullState,
+            input=_TypedInputState,
+            output=_TypedOutputState,
+            context=_Ctx,
+            graph_id="gauntlet-typed-schema",
+        )
+        .add_node("a", node_a)
+        .add_node("b", node_b)
+        .add_edge(START, "a")
+        .add_edge("a", "b")
+        .add_edge("b", END)
+        .compile()
+    )
+    result = _run_awaitable(
+        typed.invoke(
+            input={"x": initial, "log": [seed_mark]},
+            context=_Ctx(multiplier),
+            effects=SimulatedEffects(seed),
+        )
+    )
+    out = dict(result.state)
+
+    conflict = (
+        TypedStateGraph(_TypedConflictState, graph_id="gauntlet-typed-conflict")
+        .add_node("p", lambda state: {"y": 1})
+        .add_node("q", lambda state: {"y": 2})
+        .add_edge(START, "p")
+        .add_edge(START, "q")
+        .add_edge("p", END)
+        .add_edge("q", END)
+        .compile()
+    )
+    conflict_rejected = False
+    try:
+        _run_awaitable(
+            conflict.invoke(input={"y": 0}, effects=SimulatedEffects(seed))
+        )
+    except ChannelWriteConflictError:
+        conflict_rejected = True
+    return {
+        "projected_output": {"x": out["x"], "log": list(out["log"])},
+        "secret_hidden": "secret" not in out,
+        "input_extra_filtered": seed_mark not in out.get("log", []),
+        "context_applied": out["x"] == initial * multiplier + 1,
+        "unannotated_conflict_rejected": conflict_rejected,
+    }
+
+
+_WORKLOAD_ARMS["seeded_typed_schema_projection"] = _typed_schema_arm
+
+
+def _apply_typed_schema_evidence(
+    capabilities: dict[str, Any],
+    row_lookup: Mapping[str, Any],
+    workload: Mapping[str, Any],
+) -> None:
+    """LG01 typed-schema facets from the seeded two-arm typed workload.
+
+    Fail-closed per the error-parity rule: a probe_error on EITHER arm keeps
+    every facet failing — identical errors are a finding, never a pass.
+    """
+    both_ran = (
+        "probe_error" not in workload["dharma"]
+        and "probe_error" not in workload["langgraph"]
+    )
+    field_by_facet = {
+        "typed_state_schema": (
+            "projected_output",
+            "unannotated_conflict_rejected",
+        ),
+        "input_schema": ("input_extra_filtered", "projected_output"),
+        "output_schema": ("secret_hidden", "projected_output"),
+        "context_schema": ("context_applied", "projected_output"),
+    }
+    row = row_lookup["LG01"]
+    for facet, fields in field_by_facet.items():
+        equal = both_ran and all(
+            workload["dharma"].get(name) == workload["langgraph"].get(name)
+            for name in fields
+        )
+        entry = capabilities["LG01"]["facets"][facet]
+        entry["status"] = "pass" if equal else "fail"
+        entry["evidence"].append(
+            _evidence(
+                kind="two_arm_differential",
+                evidence_id=f"seeded_typed_schema_projection:{facet}",
+                command_or_probe=(
+                    f"compare {'+'.join(fields)} from the typed-schema "
+                    "workload on both installed runtimes"
+                ),
+                outcome="parity" if equal else "mismatch",
+                dharma={name: workload["dharma"].get(name) for name in fields},
+                langgraph={
+                    name: workload["langgraph"].get(name) for name in fields
+                },
+                citations=_row_citations(row),
+            )
+        )
