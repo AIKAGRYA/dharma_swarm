@@ -169,7 +169,11 @@ def _validate_controls(run: Mapping[str, Any], *, per_call_cap: int) -> None:
 
 
 def _validate_live_receipts(
-    pool: LiveWorkerPool, taskpack: Taskpack, roster: Mapping[str, ModelSpec]
+    pool: LiveWorkerPool,
+    taskpack: Taskpack,
+    roster: Mapping[str, ModelSpec],
+    *,
+    per_call_cap: int,
 ) -> None:
     expected = {
         (model_id, task_id) for model_id in roster for task_id in taskpack.task_ids()
@@ -184,6 +188,18 @@ def _validate_live_receipts(
         )
     if any(int(row.get("cost") or 0) <= 0 for row in pool.call_receipts):
         raise LiveMeasurementError("live receipts contain an unmetered response")
+    for row in pool.call_receipts:
+        model_id = str(row.get("model_id") or "")
+        provider_model_id = str(row.get("provider_model_id") or "")
+        if provider_model_id != model_id:
+            raise LiveMeasurementError(
+                "live receipt provider model identity does not match its roster seat"
+            )
+        completion_tokens = int(row.get("completion_tokens") or 0)
+        if completion_tokens < 0 or completion_tokens > per_call_cap:
+            raise LiveMeasurementError(
+                "live receipt exceeds the configured completion token cap"
+            )
 
 
 def _digest(payload: Mapping[str, Any]) -> str:
@@ -283,7 +299,7 @@ def run_live_measurement(
     try:
         run = runner.run(_candidate(roster), output_dir=staging)
         _validate_controls(run, per_call_cap=per_call_cap)
-        _validate_live_receipts(pool, taskpack, roster)
+        _validate_live_receipts(pool, taskpack, roster, per_call_cap=per_call_cap)
 
         run["capability_claim"] = False
         run["claim_boundary"] = CLAIM_BOUNDARY

@@ -3,8 +3,9 @@
   "base_ref": "55cf277be0dbf3b5a74da03eb1d7243024556806",
   "branch": "codex/arena-live-controls-closeout-20260716",
   "worktree": ".",
-  "intent": "Add the missing opt-in Arena live-measurement entrypoint. It constructs Taskpack, LiveWorkerPool, the exact public-specialty roster, OrchestrationGenome, and ArenaRunner as one fail-closed path; stages every artifact outside the repository; requires complete unique live receipts for every roster-seat/task pair; verifies best_single_full_budget, exact best_single_parity_budget, the shared parity ledger, and seeded significance against both baselines before publishing any candidate status; binds every non-self output byte-for-byte in a stable sha256 manifest and revalidates it before atomic publication; and labels every result measurement-candidate-only with capability_claim=false and promotion_authorized=false. No provider call, live benchmark result, capability claim, ACTIVE_TRACK edit, generated projection edit, or production-routing weight is admitted.",
+  "intent": "Add the missing opt-in Arena live-measurement entrypoint. It constructs Taskpack, LiveWorkerPool, the exact public-specialty roster, OrchestrationGenome, and ArenaRunner as one fail-closed path; stages every artifact outside the repository; requires complete unique live receipts for every roster-seat/task pair; rejects provider-returned model identities that differ from the requested roster seat and completion-token counts above the configured per-call cap; verifies best_single_full_budget, exact best_single_parity_budget, the shared parity ledger, and seeded significance against both baselines before publishing any candidate status; binds every non-self output byte-for-byte in a stable sha256 manifest and revalidates it before atomic publication; and labels every result measurement-candidate-only with capability_claim=false and promotion_authorized=false. No provider call, live benchmark result, capability claim, ACTIVE_TRACK edit, generated projection edit, or production-routing weight is admitted.",
   "allowed_files": [
+    "dharma_swarm/coordination/arena/live_pool.py",
     "dharma_swarm/coordination/arena/measure.py",
     "reports/agentops/work_packets/arena-live-controls-WP-O20.json",
     "tests/test_arena_parity_controls.py"
@@ -179,12 +180,13 @@
     },
     {
       "name": "arena-live-controls-ruff",
-      "command": "python3 -m ruff check dharma_swarm/coordination/arena/measure.py tests/test_arena_parity_controls.py",
+      "command": "python3 -m ruff check dharma_swarm/coordination/arena/live_pool.py dharma_swarm/coordination/arena/measure.py tests/test_arena_parity_controls.py",
       "argv": [
         "python3",
         "-m",
         "ruff",
         "check",
+        "dharma_swarm/coordination/arena/live_pool.py",
         "dharma_swarm/coordination/arena/measure.py",
         "tests/test_arena_parity_controls.py"
       ],
@@ -207,7 +209,7 @@
   ],
   "commit": {
     "allowed": true,
-    "message": "feat(arena): gate opt-in live measurement with parity controls [impact-checked]"
+    "message": "fix(arena): enforce live provider identity and token caps [impact-checked]"
   },
   "approval": {
     "before_commit": false,
@@ -251,7 +253,7 @@
       "ACTIVE_TRACK blocker state and generated projections stay unchanged. A separate governance owner must evaluate merged code plus real evidence before marking next-item 2 done or closing the track.",
       "Any main movement before merge invalidates the packet base, collision record, digest, and preflight binding."
     ],
-    "rollback": "revert measure.py, the added no-network parity-control tests, and this packet together; do not alter ArenaRunner controls, ACTIVE_TRACK, generated projections, or production routing",
-    "packet_digest": "1493810f75b597ae94b080c82d001d78dc49f42f9b75251a12b155690e91b126"
+    "rollback": "revert live_pool.py, measure.py, the added no-network parity-control tests, and this packet together; do not alter ArenaRunner controls, ACTIVE_TRACK, generated projections, or production routing",
+    "packet_digest": "fd1bd6f43a2e1723ceb7748e1bb318372742a436810254e143c6d4ea39d0995d"
   }
 }
