@@ -78,5 +78,5 @@ Measured 2026-07-10 with the command in CONTEXT_SUITE_MAP.md §Re-measure.
 |---|---|---|
 | `CLAUDE.md` | 14,182 / 641 | 5,997 / 251 (−58%) |
 | `docs/AGENTS.md` | 921 / 89 | 871 / 79 |
-| `docs/governance/BUILD_SESSION_ENTRYPOINT.md` | 12,245 / 536 | 3,894 / 139 |
+| `docs/governance/BUILD_SESSION_ENTRYPOINT.md` | 12,245 / 536 | 968 / 86 (stable Session Entry Contract, 2026-07-17) |
 | `docs/governance/SOVEREIGN_MANIFEST.md` | 18,062 / 902 | ~8,560 / 448 (compact block + deduped count table) |

@@ -316,9 +316,9 @@ def load_receipt(path: Path) -> LoadedReceipt:
 
 def resolve_ops_dir(repo_root: Path, env: Mapping[str, str] | None = None) -> Path:
     """Resolve the external receipt directory, proving it is outside the
-    worktree and ``.git`` (spec §2.2).  Direct and symlink escapes into the
+    worktree and ``.git`` (the external-receipt boundary). Direct and symlink escapes into the
     repository are ``CONFIG_ERROR``.  The proof itself is owned by
-    ``contract.resolve_external_dir`` (WP-O1); this only picks the candidate."""
+    ``contract.resolve_external_dir``; this only picks the candidate."""
     from .contract import resolve_external_dir
 
     environ = os.environ if env is None else env
@@ -351,7 +351,7 @@ def _receipt_lock(target: Path) -> Iterator[None]:
 
 def build_input_manifest(repo_root: Path, relpaths: Mapping[str, list[str]]) -> dict[str, Any]:
     """Sorted content-hash manifest over the transitive inputs actually
-    consumed, grouped by spec §3.2 category.  Missing files hash as absent —
+    consumed, grouped by cache input-manifest category. Missing files hash as absent —
     presence/absence is itself an invalidator."""
     manifest: dict[str, Any] = {}
     for category in sorted(relpaths):
@@ -391,7 +391,7 @@ def compute_delta(
     current_conditions: list[dict[str, Any]],
 ) -> dict[str, Any]:
     """Stable + condition delta against the immediately previous valid,
-    applicable v2 receipt.  v1 can never seed a delta (spec §3.3/§3.4)."""
+    applicable v2 receipt. A v1 receipt can never seed a v2 delta."""
     empty = {"previous_stable_digest": "", "added": [], "resolved": [], "changed": []}
     if not previous or previous.get("schema") != RECEIPT_SCHEMA_V2:
         return empty
@@ -424,7 +424,7 @@ def receipt_transaction(
 ) -> Iterator[Path]:
     """Hold the sidecar lock across a caller's whole read→decide→write span.
 
-    Spec §3.2 concurrency row: reuse and delta decisions taken from a prior
+    Cache concurrency invariant: reuse and delta decisions taken from a prior
     receipt read outside the lock can persist stale cache metadata when a
     concurrent run replaces the prior first.  Callers that decide from the
     prior must read it inside this transaction and pass

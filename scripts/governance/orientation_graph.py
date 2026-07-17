@@ -22,7 +22,7 @@ Doctrine line that must hold (same as the reconciliation track's):
 Usage:
     python3 scripts/governance/orientation_graph.py          # human view
     python3 scripts/governance/orientation_graph.py --json   # machine packet
-    make orient                                             # deep read-only view
+    make organism-status                                   # deep read-only view
     python3 scripts/governance/orientation_graph.py --write-context
                                                             # explicit refresh
 
@@ -48,7 +48,7 @@ from typing import Any
 # This projection is read-only by default, and its explicit refresh owns only
 # the two context artifacts below.  Disable bytecode before importing any
 # repository module so a pristine checkout never gains ignored __pycache__
-# files merely by invoking either route.  `make orient` also exports the
+# files merely by invoking either route. `make organism-status` also exports the
 # interpreter-level switch so the policy applies from process start.
 sys.dont_write_bytecode = True
 
@@ -57,6 +57,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from dharma_swarm.a2a.agent_presence import list_agent_presence  # noqa: E402
+from dharma_swarm.daemon_config import dharma_state_dir  # noqa: E402
 
 
 def _load_broken_register_parser():
@@ -500,7 +501,7 @@ def query_subgraph(
 
 # ── Time-to-orientation measurement ───────────────────────────────────
 
-ORIENTATION_RECEIPT_DIR = Path.home() / ".dharma/ops"
+ORIENTATION_RECEIPT_DIR = dharma_state_dir("DHARMA_STATE_DIR") / "ops"
 ORIENTATION_RECEIPT = ORIENTATION_RECEIPT_DIR / "orientation_timing_receipt.json"
 
 
@@ -541,12 +542,22 @@ def measure_orientation(write_receipt: bool = True) -> dict[str, Any]:
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:
+    text = path.read_text(encoding="utf-8")
     try:
         import yaml  # type: ignore
+    except ImportError:
+        # Reuse the track checker's stdlib parser; do not grow a second YAML
+        # subset implementation merely to keep orientation dependency-light.
+        from scripts.governance.check_track_status import _parse_minimal_yaml
 
-        return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    except Exception:
-        return {}
+        return _parse_minimal_yaml(text)
+    try:
+        data = yaml.safe_load(text)
+    except yaml.YAMLError:
+        from scripts.governance.check_track_status import _parse_minimal_yaml
+
+        return _parse_minimal_yaml(text)
+    return data if isinstance(data, dict) else {}
 
 
 def build_identity() -> Identity:
@@ -1077,7 +1088,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Render the whole organism at once from its owners.",
         # No prefix abbreviation: `--write` must not silently resolve to
-        # `--write-context`, or the WP-O4 positive-gate allowlist (which
+        # `--write-context`, or the packet-runner positive-gate allowlist (which
         # forbids the write flag) could be bypassed by an abbreviated form.
         allow_abbrev=False,
     )

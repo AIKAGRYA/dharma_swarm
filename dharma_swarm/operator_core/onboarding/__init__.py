@@ -1,4 +1,4 @@
-"""One-door onboarding contracts shared by governance and operator surfaces."""
+"""Session-status and AgentOps packet contracts shared by governance tools."""
 
 from . import receipt
 from .contract import (

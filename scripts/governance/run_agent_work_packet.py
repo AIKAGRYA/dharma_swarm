@@ -23,7 +23,7 @@ import sysconfig
 import tempfile
 import time
 import types
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
@@ -74,36 +74,21 @@ _DARWIN_USER_TEMP_PARENT = Path("/private/var/folders")
 _MAX_GATE_TIMEOUT_SECONDS = 300
 _MAX_ADMISSION_TIMEOUT_SECONDS = 480
 _MAX_BINDING_BYTES = 1_000_000
-_ONBOARDING_TRACK_ID = "onboard-one-door-2026-07"
-_CI_PACKET_PATH = re.compile(
-    r"^reports/agentops/work_packets/onboard-one-door-WP-O[^/]*\.json$"
-)
-_ACTIVE_TRACK_PATH = "docs/governance/ACTIVE_TRACK.yaml"
 _LIVE_TRACK_STATUSES = frozenset({"ACTIVE", "SHIPPABLE"})
-
-
-@dataclass(frozen=True)
-class _CiPacketBinding:
-    """Exact packet bytes and model accepted by CI discovery."""
-
-    path: Path
-    packet: WorkPacket
-    candidate_bytes: bytes
-    candidate_sha256: str
 
 
 def _has_live_track_authority(row: Mapping[str, Any] | None) -> bool:
     return row is not None and str(row.get("status", "")).upper() in _LIVE_TRACK_STATUSES
 
 
-# --- O4-B11: positive command-family allowlist -------------------------------
-# One authoritative table (spec §WP-O4). Positive gates are admitted ONLY when
+# --- Positive command-family allowlist ---------------------------------------
+# One authoritative table. Positive gates are admitted ONLY when
 # their argv matches an enumerated family below; everything else fails closed
 # BEFORE subprocess execution. This is command-family confinement, not a
 # semantic proof about trusted code — pytest and an allowlisted repository
-# script can themselves perform I/O; WP-O6's syscall/no-network evidence is
-# the terminal oracle. Direct-Git token normalization and grammar remain
-# owned by the contract module and its private WP-O1R lexical helper; this
+# script can themselves perform I/O; syscall/no-network evidence is the
+# terminal oracle. Direct-Git token normalization and grammar remain
+# owned by the Session Entry contract module and its lexical helpers; this
 # table only decides execution admission. Negative controls are exempt: they
 # rejection and run jailed. Extending this table is a governance-reviewed
 # admission change, never a drive-by edit.
@@ -1165,394 +1150,6 @@ def _active_tracks(repo_root: Path) -> list[dict[str, Any]]:
     return _parse_active_tracks_document(text, source=str(path))
 
 
-def _active_tracks_at(repo_root: Path, commit: str) -> list[dict[str, Any]]:
-    try:
-        result = run_git(
-            ["show", f"{commit}:docs/governance/ACTIVE_TRACK.yaml"],
-            cwd=repo_root,
-            check=False,
-        )
-    except (OSError, UnicodeError) as exc:
-        raise AgentOpsError(
-            f"cannot read active-track owner config at {commit}: {exc}"
-        ) from exc
-    if result.returncode != 0:
-        detail = (result.stderr or result.stdout).strip()
-        raise AgentOpsError(
-            f"cannot read active-track owner config at {commit}: {detail}"
-        )
-    return _parse_active_tracks_document(
-        result.stdout,
-        source=f"{commit}:docs/governance/ACTIVE_TRACK.yaml",
-    )
-
-
-def _exact_event_sha(repo_root: Path, value: str, *, field: str) -> str:
-    if not re.fullmatch(r"[0-9a-f]{40}", value):
-        raise AgentOpsError(f"CI {field} must be an exact 40-character commit SHA")
-    result = run_git(
-        ["rev-parse", "--verify", f"{value}^{{commit}}"],
-        cwd=repo_root,
-        check=False,
-    )
-    resolved = result.stdout.strip()
-    if result.returncode != 0 or resolved != value:
-        raise AgentOpsError(f"CI {field} does not resolve exactly: {value}")
-    return resolved
-
-
-def _ci_track_from_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    matches = [
-        row
-        for row in rows
-        if row.get("id") == _ONBOARDING_TRACK_ID
-        and _has_live_track_authority(row)
-    ]
-    if len(matches) != 1:
-        raise AgentOpsError(
-            "CI packet discovery requires exactly one live onboarding track"
-        )
-    patterns = matches[0].get("owned_surfaces")
-    if not isinstance(patterns, list) or not patterns or not all(
-        isinstance(pattern, str) and pattern for pattern in patterns
-    ):
-        raise AgentOpsError("CI onboarding track owned_surfaces is missing or malformed")
-    return matches[0]
-
-
-def _ci_track(repo_root: Path) -> dict[str, Any]:
-    return _ci_track_from_rows(_active_tracks(repo_root))
-
-
-def _ci_authority_context(
-    base_rows: list[dict[str, Any]],
-    head_rows: list[dict[str, Any]],
-) -> tuple[dict[str, Any] | None, list[str], dict[str, list[str]]]:
-    # Status transition truth table: each ACTIVE/SHIPPABLE endpoint contributes
-    # its surfaces; the live head owns, otherwise the live base owns. This
-    # admits an authority-only transition while conservatively guarding code.
-    base_by_id = {str(row["id"]): row for row in base_rows}
-    head_by_id = {str(row["id"]): row for row in head_rows}
-    base_track = base_by_id.get(_ONBOARDING_TRACK_ID)
-    head_track = head_by_id.get(_ONBOARDING_TRACK_ID)
-    base_active = _has_live_track_authority(base_track)
-    head_active = _has_live_track_authority(head_track)
-    effective_track = head_track if head_active else base_track if base_active else None
-    owned_patterns = sorted(
-        {
-            str(value)
-            for row, active in ((base_track, base_active), (head_track, head_active))
-            if row is not None and active
-            for value in row["owned_surfaces"]
-        }
-    )
-    siblings: dict[str, list[str]] = {}
-    for track_id in sorted(set(base_by_id) | set(head_by_id)):
-        if track_id == _ONBOARDING_TRACK_ID:
-            continue
-        surfaces: set[str] = set()
-        for rows in (base_by_id, head_by_id):
-            row = rows.get(track_id)
-            if _has_live_track_authority(row):
-                assert row is not None
-                surfaces.update(str(value) for value in row["owned_surfaces"])
-        siblings[track_id] = sorted(surfaces)
-    return effective_track, owned_patterns, siblings
-
-
-def _discover_ci_packet_bindings(
-    repo_root: Path,
-    *,
-    event_name: str,
-    event_base: str,
-    event_head: str,
-) -> list[_CiPacketBinding]:
-    """Discover and retain every exact onboarding packet accepted for CI.
-
-    The returned bindings are stable-sorted and carry both the validated bytes
-    and the model parsed from those same bytes.  CI execution must consume
-    these bindings directly so packet custody cannot change between discovery
-    and evaluation.
-    """
-    root = require_repo_root(repo_root.resolve())
-    if event_name not in {"pull_request", "merge_group"}:
-        raise AgentOpsError(f"unsupported CI event for packet discovery: {event_name}")
-    base = _exact_event_sha(root, event_base, field="event base")
-    head = _exact_event_sha(root, event_head, field="event head")
-    if head_for(root) != head:
-        raise AgentOpsError("CI checkout HEAD does not match the declared event head")
-    _reject_hidden_index_flags(root)
-    _reject_local_repository_controls(root, base_ref=None)
-    working, staged, untracked = _exact_live_scope_paths(root)
-    if working or staged or untracked:
-        raise AgentOpsError("CI packet evaluation requires an exact clean event checkout")
-    diff_base = base
-    if event_name == "pull_request":
-        merge_base = run_git(["merge-base", base, head], cwd=root, check=False)
-        if merge_base.returncode != 0 or not merge_base.stdout.strip():
-            raise AgentOpsError(
-                "CI pull-request event base and head have unrelated histories"
-            )
-        diff_base = _exact_event_sha(
-            root,
-            merge_base.stdout.strip(),
-            field="pull-request merge base",
-        )
-    else:
-        ancestry = run_git(
-            ["merge-base", "--is-ancestor", base, head], cwd=root, check=False
-        )
-        if ancestry.returncode != 0:
-            raise AgentOpsError("CI event base is not an ancestor of the event head")
-
-    base_tracks = _active_tracks_at(root, diff_base)
-    head_tracks = _active_tracks_at(root, head)
-    track, owned_patterns, siblings = _ci_authority_context(
-        base_tracks, head_tracks
-    )
-
-    changed = sorted(
-        set(
-            git_nul_records(
-                root,
-                [
-                    "diff", "--no-ext-diff", "--no-textconv", "--no-renames",
-                    "--name-only", "-z", f"{diff_base}...{head}", "--",
-                ],
-            )
-        )
-    )
-    _validate_observed_git_paths(changed)
-    packet_relatives = sorted(path for path in changed if _CI_PACKET_PATH.fullmatch(path))
-    owned_changed = sorted(
-        path
-        for path in changed
-        if _CI_PACKET_PATH.fullmatch(path)
-        or (
-            path != _ACTIVE_TRACK_PATH
-            and matching_patterns(path, owned_patterns)
-        )
-    )
-    if not owned_changed:
-        return []
-    if event_name == "pull_request":
-        ancestry = run_git(
-            ["merge-base", "--is-ancestor", base, head], cwd=root, check=False
-        )
-        if ancestry.returncode != 0:
-            raise AgentOpsError("CI event base is not an ancestor of the event head")
-    if event_name == "pull_request" and len(packet_relatives) != 1:
-        raise AgentOpsError(
-            "owned-surface PR must change exactly one matching onboarding packet"
-        )
-    if event_name == "merge_group" and not packet_relatives:
-        raise AgentOpsError(
-            "owned-surface merge group must change at least one onboarding packet"
-        )
-    if packet_relatives and track is None:
-        raise AgentOpsError(
-            "CI onboarding packet changed without ACTIVE endpoint authority"
-        )
-
-    packets: list[_CiPacketBinding] = []
-    for relative in packet_relatives:
-        path = root / relative
-        if path.is_symlink() or not path.is_file():
-            raise AgentOpsError(f"CI packet must be a regular tracked file: {relative}")
-        indexed = run_git(
-            ["ls-files", "--error-unmatch", "--", relative],
-            cwd=root,
-            check=False,
-        )
-        if indexed.returncode != 0:
-            raise AgentOpsError(f"CI packet is absent from the Git index: {relative}")
-        candidate_bytes = _read_packet_bytes(path)
-        candidate_oid = git_object_id_for_bytes(root, candidate_bytes)
-        event_head_rows = git_nul_records(
-            root,
-            [
-                "--literal-pathspecs",
-                "ls-tree",
-                "-z",
-                head,
-                "--",
-                relative,
-            ],
-        )
-        event_head_metadata, separator, event_head_path = (
-            event_head_rows[0].partition("\t")
-            if len(event_head_rows) == 1
-            else ("", "", "")
-        )
-        event_head_fields = event_head_metadata.split()
-        if (
-            not separator
-            or event_head_path != relative
-            or len(event_head_fields) != 3
-            or event_head_fields[0] != "100644"
-            or event_head_fields[1] != "blob"
-            or event_head_fields[2] != candidate_oid
-        ):
-            raise AgentOpsError(
-                f"CI event-head packet snapshot is not exact: {relative}"
-            )
-        event_head_oid = event_head_fields[2]
-        packet = load_work_packet(path, content=candidate_bytes)
-        canonical = f"reports/agentops/work_packets/{packet.id}.json"
-        if canonical != relative:
-            raise AgentOpsError(
-                f"CI packet id/path custody mismatch: {relative} != {canonical}"
-            )
-        if relative not in packet.allowed_files:
-            raise AgentOpsError(
-                f"CI packet must explicitly allow its own canonical path: {relative}"
-            )
-        self_forbidden = matching_patterns(relative, packet.forbidden_files)
-        if self_forbidden:
-            raise AgentOpsError(
-                f"CI packet forbids its own canonical path: {relative}: {self_forbidden}"
-            )
-        entry = packet.session_entry
-        if entry is None:
-            raise AgentOpsError(f"CI packet lacks session_entry: {relative}")
-        _require_portable_session_worktree(packet)
-        if entry.active_track != _ONBOARDING_TRACK_ID:
-            raise AgentOpsError(f"CI packet active_track mismatch: {relative}")
-        assert track is not None
-        if entry.owner != track.get("owner"):
-            raise AgentOpsError(f"CI packet owner mismatch: {relative}")
-        packet_base = _exact_event_sha(root, packet.base_ref, field="packet base")
-        if entry.collision.checked_at_sha != packet_base:
-            raise AgentOpsError(
-                f"CI packet collision baseline does not bind packet base: {relative}"
-            )
-        if entry.collision.status != "clear" or entry.collision.details:
-            raise AgentOpsError(f"CI packet collision declaration is not clear: {relative}")
-        missing_forbidden = sorted(
-            {pattern for patterns in siblings.values() for pattern in patterns}
-            - set(packet.forbidden_files)
-        )
-        if missing_forbidden:
-            raise AgentOpsError(
-                f"CI packet forbidden_files omit sibling owned surfaces: {missing_forbidden}"
-            )
-        collisions = detect_surface_collisions(
-            allowed_patterns=packet.allowed_files,
-            sibling_patterns=siblings,
-            actual_paths=changed,
-        )
-        if collisions:
-            raise AgentOpsError(f"CI packet ownership collision: {collisions}")
-        index_flags = git_nul_records(
-            root,
-            ["--literal-pathspecs", "ls-files", "-v", "-z", "--", relative],
-        )
-        if len(index_flags) != 1 or not index_flags[0].startswith("H "):
-            raise AgentOpsError(f"CI packet has hidden or special index custody: {relative}")
-        index_rows = git_nul_records(
-            root,
-            [
-                "--literal-pathspecs", "ls-files", "--stage", "-z", "--",
-                relative,
-            ],
-        )
-        index_fields = index_rows[0].split(maxsplit=3) if len(index_rows) == 1 else []
-        if (
-            len(index_fields) != 4
-            or index_fields[0] != "100644"
-            or index_fields[2] != "0"
-            or index_fields[1] != event_head_oid
-        ):
-            raise AgentOpsError(f"CI packet index custody is not exact stage-0: {relative}")
-        if event_name == "pull_request":
-            if packet_base != base:
-                raise AgentOpsError(
-                    f"PR packet base does not bind the declared event base: {relative}"
-                )
-        else:
-            bound = run_git(
-                ["merge-base", "--is-ancestor", packet_base, base],
-                cwd=root,
-                check=False,
-            )
-            if bound.returncode != 0:
-                raise AgentOpsError(
-                    f"merge-group packet base does not bind group lineage: {relative}"
-                )
-        if _read_packet_bytes(path) != candidate_bytes:
-            raise AgentOpsError(f"CI packet changed during discovery: {relative}")
-        packets.append(
-            _CiPacketBinding(
-                path=path.resolve(),
-                packet=packet,
-                candidate_bytes=candidate_bytes,
-                candidate_sha256=hashlib.sha256(candidate_bytes).hexdigest(),
-            )
-        )
-
-    coverage: dict[str, list[str]] = {}
-    for changed_path in owned_changed:
-        claimants = [
-            binding.path.relative_to(root).as_posix()
-            for binding in packets
-            if matching_patterns(changed_path, binding.packet.allowed_files)
-            and not matching_patterns(changed_path, binding.packet.forbidden_files)
-        ]
-        coverage[changed_path] = sorted(claimants)
-    gaps = sorted(path for path, claimants in coverage.items() if not claimants)
-    overlaps = {
-        path: claimants for path, claimants in coverage.items() if len(claimants) > 1
-    }
-    if gaps:
-        raise AgentOpsError(
-            f"CI onboarding packet coverage gap; paths are not covered exactly once: {gaps}"
-        )
-    if overlaps:
-        raise AgentOpsError(
-            "CI onboarding packet coverage overlap; paths have multiple claimants: "
-            f"{overlaps}"
-        )
-    return sorted(packets, key=lambda binding: str(binding.path))
-
-
-def discover_ci_packets(
-    repo_root: Path,
-    *,
-    event_name: str,
-    event_base: str,
-    event_head: str,
-) -> list[Path]:
-    """Return stable canonical paths for packets bound to a CI event."""
-    return [
-        binding.path
-        for binding in _discover_ci_packet_bindings(
-            repo_root,
-            event_name=event_name,
-            event_base=event_base,
-            event_head=event_head,
-        )
-    ]
-
-
-def _ci_packet_binding_identity(
-    bindings: Iterable[_CiPacketBinding],
-) -> list[tuple[Path, str, bytes]]:
-    """Return an explicit exact identity without comparing parsed models."""
-    return [
-        (binding.path, binding.candidate_sha256, binding.candidate_bytes)
-        for binding in bindings
-    ]
-
-
-def _require_ci_packet_snapshots(bindings: Iterable[_CiPacketBinding]) -> None:
-    """Fail if any packet no longer matches its discovery-time snapshot."""
-    for binding in bindings:
-        if _read_packet_bytes(binding.path) != binding.candidate_bytes:
-            raise AgentOpsError(
-                f"CI packet snapshot changed after discovery: {binding.packet.id}"
-            )
-
-
 def _validate_session_envelope(
     repo_root: Path,
     packet_path: Path,
@@ -2086,7 +1683,7 @@ def run_gate(
     env = build_gate_environment(gate, inherited)
     if _is_trusted_git(gate.argv[0]):
         # The dependency-light contract strips hostile inherited Git state;
-        # the WP-O4 runner additionally requires actual object identities for
+        # the packet runner additionally requires actual object identities for
         # every direct Git gate, never repository-local replace refs or
         # implicit user/system ignore and attribute state.
         env["HOME"] = os.devnull
@@ -3390,318 +2987,6 @@ def _execute_closeout(
     return (0 if report["status"] == "passed" else 1), report
 
 
-def _scope_for_event_paths(paths: list[str], packet: WorkPacket) -> ScopeState:
-    changed = sorted(set(paths))
-    violations: list[dict[str, Any]] = []
-    for path in changed:
-        forbidden = matching_patterns(path, packet.forbidden_files)
-        allowed = matching_patterns(path, packet.allowed_files)
-        if forbidden:
-            violations.append(
-                {"path": path, "reason": "forbidden", "patterns": forbidden}
-            )
-        elif not allowed:
-            violations.append(
-                {"path": path, "reason": "outside_allowed_scope", "patterns": []}
-            )
-    return ScopeState(
-        tracked_changed_files=changed,
-        staged_files=[],
-        untracked_files=[],
-        changed_files=changed,
-        violations=violations,
-    )
-
-
-def _ci_scope_with_committed_paths(
-    repo_root: Path,
-    packet: WorkPacket,
-    committed_paths: list[str],
-) -> ScopeState:
-    """Combine assigned merge-group commits with every live worktree class."""
-    working = inspect_scope(repo_root, packet)
-    tracked = sorted(set(committed_paths + working.tracked_changed_files))
-    changed = sorted(set(tracked + working.staged_files + working.untracked_files))
-    matched = _scope_for_event_paths(changed, packet)
-    mode_violations = _changed_path_mode_violations(
-        repo_root,
-        committed_paths=committed_paths,
-        staged_paths=working.staged_files,
-        working_paths=sorted(
-            set(working.tracked_changed_files + working.untracked_files)
-        ),
-    )
-    return ScopeState(
-        tracked_changed_files=tracked,
-        staged_files=working.staged_files,
-        untracked_files=working.untracked_files,
-        changed_files=changed,
-        violations=[*matched.violations, *mode_violations],
-    )
-
-
-def _ci_summary_report(
-    source: Path,
-    *,
-    event_name: str,
-    event_base: str,
-    event_head: str,
-    status: str,
-    packets: list[str],
-    error: str | None = None,
-) -> dict[str, Any]:
-    report = {
-        "job_id": "onboarding-ci-event",
-        "base_ref": event_base,
-        "branch": "detached-event-head",
-        "worktree": ".",
-        "intent": "Bind CI onboarding admission to the declared event range.",
-        "allowed_files": [],
-        "forbidden_files": [],
-        "approval": {"before_commit": True, "before_merge": True},
-        "dry_run": False,
-        "target_head": head_for(source),
-        "scope": {
-            "tracked_changed_files": [],
-            "staged_files": [],
-            "untracked_files": [],
-            "changed_files": [],
-            "violations": [],
-            "passed": status == "passed",
-        },
-        "gates": [],
-        "negative_controls": [],
-        "commit_hash": None,
-        "commit_decision": "CI event evaluation never commits",
-        "final_git_status": git_status(source),
-        "status": status,
-        "phase": "ci-event",
-        "event_name": event_name,
-        "event_base": event_base,
-        "event_head": event_head,
-        "packets": packets,
-    }
-    if error is not None:
-        report["error"] = error
-    return report
-
-
-def execute_ci_event(
-    *,
-    source_root: Path | None = None,
-    event_name: str,
-    event_base: str,
-    event_head: str,
-    report_root: Path | None,
-) -> tuple[int, dict[str, Any]]:
-    """Run the shared evaluator for a PR or merge-group event.
-
-    CI deliberately skips only local-machine facts (declared host tool
-    versions, attached branch, and the author's external preflight record).
-    Packet parsing/digest, owner/collision/sibling/index custody, exact event
-    range, forbidden-first coverage, gates, controls, and external reports all
-    remain mandatory.
-    """
-    source = require_repo_root((source_root or Path.cwd()).resolve())
-    if report_root is None:
-        raise AgentOpsError("CI event evaluation requires an external report_root")
-    output_root = _prepare_private_report_root(report_root, repo_root=source)
-    timestamp = timestamp_slug()
-    packet_ids: list[str] = []
-    try:
-        bindings = _discover_ci_packet_bindings(
-            source,
-            event_name=event_name,
-            event_base=event_base,
-            event_head=event_head,
-        )
-        packet_ids = [binding.packet.id for binding in bindings]
-        discovered_identity = _ci_packet_binding_identity(bindings)
-
-        def require_packet_snapshots() -> None:
-            _require_ci_packet_snapshots(bindings)
-
-        def require_full_event_binding() -> None:
-            require_packet_snapshots()
-            rediscovered = _discover_ci_packet_bindings(
-                source,
-                event_name=event_name,
-                event_base=event_base,
-                event_head=event_head,
-            )
-            if _ci_packet_binding_identity(rediscovered) != discovered_identity:
-                raise AgentOpsError(
-                    "CI packet set or snapshot changed during evaluator execution"
-                )
-
-        # Close the discovery/execution boundary before deriving any scope or
-        # invoking any packet-declared command.
-        require_packet_snapshots()
-        changed = sorted(
-            set(
-                git_nul_records(
-                    source,
-                    [
-                        "diff", "--no-ext-diff", "--no-textconv", "--no-renames", "--name-only",
-                        "-z", f"{event_base}...{event_head}", "--",
-                    ],
-                )
-            )
-        )
-        _validate_observed_git_paths(changed)
-        _track, owned_patterns, _siblings = _ci_authority_context(
-            _active_tracks_at(source, event_base),
-            _active_tracks_at(source, event_head),
-        )
-        owned_changed = [
-            path
-            for path in changed
-            if _CI_PACKET_PATH.fullmatch(path)
-            or (
-                path != _ACTIVE_TRACK_PATH
-                and matching_patterns(path, owned_patterns)
-            )
-        ]
-        all_passed = True
-        deadline = time.monotonic() + _MAX_ADMISSION_TIMEOUT_SECONDS
-        for binding in bindings:
-            packet = binding.packet
-            require_packet_snapshots()
-            entry = packet.session_entry
-            assert entry is not None
-            claimed = [
-                path
-                for path in owned_changed
-                if matching_patterns(path, packet.allowed_files)
-                and not matching_patterns(path, packet.forbidden_files)
-            ]
-            forbidden_event = [
-                path
-                for path in changed
-                if matching_patterns(path, packet.forbidden_files)
-            ]
-            # A merge group may contain several disjoint packets, so a packet
-            # evaluates its exact-once claims rather than every other packet's
-            # claimed paths.  It must nevertheless retain every full-event
-            # path it explicitly forbids, even when that path sits outside the
-            # track-owned surfaces; filtering to positive claims alone would
-            # turn a forbidden change into a false pass.
-            committed_scope_paths = sorted(set(claimed + forbidden_event))
-            scope = (
-                inspect_scope(source, packet, base_ref=event_base)
-                if event_name == "pull_request"
-                else _ci_scope_with_committed_paths(
-                    source, packet, committed_scope_paths
-                )
-            )
-            report = base_report(packet, source, dry_run=False)
-            report.update(
-                {
-                    "phase": "ci-event",
-                    "event_name": event_name,
-                    "event_base": event_base,
-                    "event_head": event_head,
-                    "packet_digest": entry.packet_digest,
-                    "packet_bytes_sha256": binding.candidate_sha256,
-                    "scope": scope_to_dict(scope),
-                    "commit_decision": "CI event evaluation never commits",
-                }
-            )
-            if not scope.passed:
-                report["status"] = "failed"
-                report["final_git_status"] = git_status(source)
-                _write_phase_report(
-                    output_root,
-                    source,
-                    report,
-                    timestamp,
-                    before_json=require_packet_snapshots,
-                )
-                require_packet_snapshots()
-                all_passed = False
-                continue
-            gate_environment = _admission_gate_environment(
-                output_root, source, packet.id
-            )
-            for gate in packet.gates:
-                require_packet_snapshots()
-                admit_gate_command(gate)
-                report["gates"].append(
-                    run_gate(
-                        source,
-                        _bounded_gate(gate, deadline=deadline),
-                        base_env=gate_environment,
-                        normalize_positive_executable=True,
-                    )
-                )
-                require_packet_snapshots()
-            for control in packet.negative_controls:
-                require_packet_snapshots()
-                report["negative_controls"].append(
-                    run_negative_control(
-                        source,
-                        _bounded_gate(control, deadline=deadline),
-                        temp_root=Path(gate_environment["TMPDIR"]),
-                    )
-                )
-                require_packet_snapshots()
-            final_scope = (
-                inspect_scope(source, packet, base_ref=event_base)
-                if event_name == "pull_request"
-                else _ci_scope_with_committed_paths(
-                    source, packet, committed_scope_paths
-                )
-            )
-            report["scope"] = scope_to_dict(final_scope)
-            checks_passed = final_scope.passed and all(
-                row["passed"]
-                for key in ("gates", "negative_controls")
-                for row in report[key]
-            )
-            report["status"] = "passed" if checks_passed else "failed"
-            report["final_git_status"] = git_status(source)
-            _write_phase_report(
-                output_root,
-                source,
-                report,
-                timestamp,
-                before_json=require_packet_snapshots,
-            )
-            require_packet_snapshots()
-            all_passed = all_passed and checks_passed
-
-        require_full_event_binding()
-        summary = _ci_summary_report(
-            source,
-            event_name=event_name,
-            event_base=event_base,
-            event_head=event_head,
-            status="passed" if all_passed else "failed",
-            packets=packet_ids,
-        )
-        _write_phase_report(
-            output_root,
-            source,
-            summary,
-            timestamp,
-            before_json=require_full_event_binding,
-        )
-        require_full_event_binding()
-        return (0 if all_passed else 1), summary
-    except (AgentOpsError, json.JSONDecodeError) as exc:
-        summary = _ci_summary_report(
-            source,
-            event_name=event_name,
-            event_base=event_base,
-            event_head=event_head,
-            status="config_error",
-            packets=packet_ids,
-            error=str(exc),
-        )
-        _write_phase_report(output_root, source, summary, timestamp)
-        raise
-
-
 def execute_packet(
     packet_path: Path,
     *,
@@ -3907,11 +3192,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Evaluate base...HEAD plus working state against the preflight binding",
     )
     modes.add_argument(
-        "--ci-event",
-        choices=("pull_request", "merge_group"),
-        help="Discover and evaluate packets for a declared CI event range",
-    )
-    modes.add_argument(
         "--validate-report-root",
         type=Path,
         help="Validate one external report root without loading a packet",
@@ -3936,8 +3216,6 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Explicit external root for reports; required for Session Entry execution",
     )
-    parser.add_argument("--event-base", help="Exact CI event base commit SHA")
-    parser.add_argument("--event-head", help="Exact CI event head commit SHA")
     return parser
 
 
@@ -3949,22 +3227,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.validate_report_root is not None:
         if args.packet is not None or args.report_root is not None:
             parser.error("--validate-report-root accepts no packet or --report-root")
-        if args.event_base is not None or args.event_head is not None:
-            parser.error("--validate-report-root accepts no event range")
         if args.allow_existing_changes:
             parser.error("--validate-report-root accepts no execution flags")
-    elif args.ci_event:
-        if args.packet is not None:
-            parser.error("--ci-event discovers packets and does not accept --packet")
-        if args.event_base is None or args.event_head is None:
-            parser.error("--ci-event requires --event-base and --event-head")
-        if args.allow_existing_changes:
-            parser.error("--ci-event does not allow --allow-existing-changes")
-    else:
-        if args.packet is None:
-            parser.error("--packet is required outside CI event mode")
-        if args.event_base is not None or args.event_head is not None:
-            parser.error("--event-base/--event-head require --ci-event")
+    elif args.packet is None:
+        parser.error("--packet is required")
     try:
         if args.validate_report_root is not None:
             source = require_repo_root(Path.cwd().resolve())
@@ -3981,35 +3247,27 @@ def main(argv: list[str] | None = None) -> int:
             for child in children:
                 print(f"Validated external report child: {child}")
             return 0
-        if args.ci_event:
-            exit_code, report = execute_ci_event(
-                event_name=args.ci_event,
-                event_base=args.event_base,
-                event_head=args.event_head,
-                report_root=args.report_root,
-            )
-        else:
-            assert args.packet is not None
-            if not (args.dry_run or args.preflight or args.closeout):
-                candidate = load_work_packet(args.packet)
-                if candidate.session_entry is not None:
-                    raise AgentOpsError(
-                        "Session Entry Packet requires --inspect, --preflight, or --closeout"
-                    )
-            exit_code, report = execute_packet(
-                args.packet,
-                dry_run=args.dry_run,
-                preflight=args.preflight,
-                closeout=args.closeout,
-                allow_existing_changes=args.allow_existing_changes,
-                report_root=args.report_root,
-            )
+        assert args.packet is not None
+        if not (args.dry_run or args.preflight or args.closeout):
+            candidate = load_work_packet(args.packet)
+            if candidate.session_entry is not None:
+                raise AgentOpsError(
+                    "Session Entry Packet requires --inspect, --preflight, or --closeout"
+                )
+        exit_code, report = execute_packet(
+            args.packet,
+            dry_run=args.dry_run,
+            preflight=args.preflight,
+            closeout=args.closeout,
+            allow_existing_changes=args.allow_existing_changes,
+            report_root=args.report_root,
+        )
     except AgentOpsError as exc:
         print(f"AgentOps error: {exc}", file=sys.stderr)
-        return 3 if args.ci_event else 2
+        return 2
     except json.JSONDecodeError as exc:
         print(f"AgentOps error: invalid JSON packet: {exc}", file=sys.stderr)
-        return 3 if args.ci_event else 2
+        return 2
 
     if report is not None:
         print(f"Status: {report['status']}")

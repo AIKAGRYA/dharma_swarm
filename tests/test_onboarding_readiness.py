@@ -1,9 +1,4 @@
-"""WP-O3 readiness policy: lossless precedence, nonpass states, host scope.
-
-Covers O3-B2 (exit precedence retains all simultaneous conditions), O3-B3
-(mandatory warn/skip/unavailable never counts pass), and the policy half of
-O3-B7 (host scope: required live gaps exit 4; non-required stay typed exit 0).
-"""
+"""Session readiness policy: lossless precedence, nonpass states, host scope."""
 
 from __future__ import annotations
 
@@ -98,6 +93,22 @@ def test_optional_warn_stays_warn_and_does_not_block() -> None:
     assert warn.state == "warn"  # never silently counted as pass
 
 
+def test_generated_projection_is_diagnostic_not_a_session_gate() -> None:
+    """A sterile clone has no generated projection and must still be usable."""
+    from dharma_swarm.operator_core.onboarding import cli
+
+    conditions = cli._collect_conditions(
+        {"dirty": False, "conflicted": False},
+        {"git": "git version test", "make": "GNU Make test"},
+        {"broken_register": {"total": 0, "open_like": 0, "closed_like": 0}},
+        net=False,
+    )
+    outcome = evaluate(conditions)
+    assert outcome.verdict == "READY"
+    assert outcome.exit_code == 0
+    assert "active_track_projection_fresh" not in outcome.condition_ids()
+
+
 # --- O3-B7 (policy half): host scope mapping ---------------------------------
 
 def test_required_live_host_gap_exits_four() -> None:
@@ -143,9 +154,11 @@ def test_unknown_state_is_a_contract_error() -> None:
 def test_git_probe_failures_are_typed_config_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """O3R-B1: nonzero/timeout/OSError/malformed Git probes surface a typed
-    ``config`` condition and the verdict is CONFIG_ERROR — never a false
-    clean READY built from empty probe output."""
+    """O3R-B1: an unobservable worktree is CONFIG_ERROR, never false-clean.
+
+    The simultaneous base-distance error remains visible but is not what
+    makes the verdict blocking.
+    """
     from dharma_swarm.operator_core.onboarding import cli, evidence
 
     def broken_probe(*args: str, cwd=None) -> tuple[str, str]:
@@ -159,7 +172,6 @@ def test_git_probe_failures_are_typed_config_error(
     conditions = cli._collect_conditions(
         live_state,
         {"git": "git version test", "make": "GNU Make test"},
-        {},
         {"broken_register": {"total": 0, "open_like": 0, "closed_like": 0, "unknown": 0}},
         net=False,
         probe_errors=probe_errors,
@@ -167,6 +179,8 @@ def test_git_probe_failures_are_typed_config_error(
     by_id = {condition.id: condition for condition in conditions}
     assert by_id["git_state_observed"].state == "fail"
     assert by_id["git_state_observed"].condition_class == "config"
+    assert by_id["git_base_distance_observed"].state == "warn"
+    assert by_id["git_base_distance_observed"].mandatory is False
     assert by_id["repo_clean"].state == "not_observed"
     assert by_id["repo_unconflicted"].state == "not_observed"
 
@@ -193,6 +207,29 @@ def test_git_probe_failures_are_typed_config_error(
     state, errors = evidence.observe_repo_live_state()
     assert errors == {}
     assert state["dirty"] is False
+
+
+def test_missing_base_ref_is_visible_but_does_not_block_clean_status() -> None:
+    """A detached checkout can prove cleanliness without ``origin/main``."""
+    from dharma_swarm.operator_core.onboarding import cli
+
+    conditions = cli._collect_conditions(
+        {"dirty": False, "conflicted": False, "ahead": 0, "behind": 0},
+        {"git": "git version test", "make": "GNU Make test"},
+        {"broken_register": {}},
+        net=False,
+        probe_errors={
+            "ahead_behind": "exit 128: git rev-list origin/main...HEAD",
+        },
+    )
+    by_id = {condition.id: condition for condition in conditions}
+    assert "git_state_observed" not in by_id
+    assert by_id["git_base_distance_observed"].state == "warn"
+    assert by_id["git_base_distance_observed"].mandatory is False
+
+    outcome = evaluate(conditions)
+    assert outcome.verdict == "READY"
+    assert outcome.exit_code == 0
 
 
 def test_duplicate_condition_ids_are_rejected() -> None:

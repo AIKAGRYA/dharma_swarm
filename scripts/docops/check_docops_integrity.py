@@ -26,6 +26,8 @@ CANONICAL_ROOT_AGENTS_BYTES = (
     b"# Agent entrypoint\n"
     b"\n"
     b"Run `make onboard` before non-trivial work.\n"
+    b"It reports session status; it does not grant permission to edit.\n"
+    b"Use `make agent-build-preflight PACKET=<path>` for exact edit admission.\n"
     b"The canonical behavioral contract is `CLAUDE.md`; this file must never duplicate it.\n"
     b"Return the startup readback printed by onboarding before editing.\n"
 )

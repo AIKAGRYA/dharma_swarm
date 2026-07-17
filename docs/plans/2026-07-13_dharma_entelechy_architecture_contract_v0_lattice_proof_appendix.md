@@ -291,8 +291,9 @@ Only after multiple externally successful campaigns demonstrate:
 
 This contract should be hardened through existing owners rather than a new active track:
 
-- **Onboarding truth:** `onboard-one-door-2026-07`
-  (`docs/governance/ACTIVE_TRACK.yaml:1793-1836`).
+- **Session entry:** `docs/governance/BUILD_SESSION_ENTRYPOINT.md` plus the
+  onboarding implementation. The hardening campaign is closed; edit admission
+  remains packet-bound.
 - **Cell/runtime/ontology identity:** `organism-rewire-2026-07`
   (`docs/governance/ACTIVE_TRACK.yaml:764-805`).
 - **Durable campaign control:** `dharmagraph-engine-2026-07`

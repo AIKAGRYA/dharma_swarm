@@ -28,7 +28,9 @@ It combines a Python orchestration core, a FastAPI backend, a Next.js dashboard,
 
 ```bash
 make help              # full curated target list
-make onboard           # mandatory first command for any agent or operator
+make onboard           # read-only session status; mandatory first command
+make organism-status   # deeper read-only whole-organism orientation
+make agent-build-preflight PACKET=<path>  # exact edit admission
 make install           # pip install -e .[dev]
 make test-fast         # fast subset of pytest
 make test              # full pytest suite
@@ -64,27 +66,37 @@ The generated JSON/Markdown reports under `docs/docops/` answer:
 
 ## Before Writing Any Code
 
-One command. Run it. Read its output. That is the entire pre-flight.
+Start with session truth:
 
 ```bash
 make onboard
 # or: python3 scripts/governance/agent_onboard.py
 ```
 
-`agent_onboard.py` is the **single door** into the current operating reality. It does not own any fact — it renders the current truth from the existing owners:
+`make onboard` reports whether the current checkout and session are understood
+and ready. It is read-only status, not edit permission and not a complete model
+of the running organism.
 
-| What you need | Owner (the only place this fact lives) |
-|---|---|
-| Active build track | [`docs/governance/ACTIVE_TRACK.yaml`](docs/governance/ACTIVE_TRACK.yaml) |
-| Live runtime / merge state | [`docs/state/LIVE_OPS_DASHBOARD.md`](docs/state/LIVE_OPS_DASHBOARD.md) |
-| Declared surfaces / routers / nav | [`ACTIVE_SURFACE_MANIFEST.yaml`](ACTIVE_SURFACE_MANIFEST.yaml) |
-| Known broken / stale surfaces | [`docs/state/BROKEN_REGISTER.md`](docs/state/BROKEN_REGISTER.md) |
-| Behavioural contract | [`CLAUDE.md`](CLAUDE.md) (repo-wide), [`docs/AGENTS.md`](docs/AGENTS.md) (prose layer; root `AGENTS.md` is gitignored/local-only) |
-| Architecture / doctrine | [`docs/governance/SOVEREIGN_MANIFEST.md`](docs/governance/SOVEREIGN_MANIFEST.md), [`docs/doctrine/`](docs/doctrine/) |
-| Doc ownership map | [`docs/governance/CANONICAL_DOC_STACK.md`](docs/governance/CANONICAL_DOC_STACK.md) |
-| Anti-slop rules | [`docs/governance/ANTI_SLOP_RULES.md`](docs/governance/ANTI_SLOP_RULES.md) |
+For the deeper cross-system view, run:
 
-If any prose in any doc disagrees with `make onboard`, **trust `make onboard`**, the filesystem, and `git log`. The onboarding output is informational — it never gates merges — but it is the freshest read of reality.
+```bash
+make organism-status
+```
+
+Packet-bound preflight and closeout are required when changed paths match Merge
+Master Mike's `HOT_PATH_PATTERNS` in `scripts/runtime/pr_merge_control.py`; they
+are optional otherwise. When a packet is required or voluntarily used, bind
+the exact task and baseline before editing:
+
+```bash
+make agent-build-preflight PACKET=<path>
+```
+
+The stable boundary between session status, organism orientation, edit
+admission, closeout, CI, and persistent-agent registration is documented in
+[`BUILD_SESSION_ENTRYPOINT.md`](docs/governance/BUILD_SESSION_ENTRYPOINT.md).
+When prose disagrees with a command's live evidence or its named owner, trust
+the command and owner for their specific domain.
 
 ## First Places To Look
 

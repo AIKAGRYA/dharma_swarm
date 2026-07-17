@@ -1,15 +1,18 @@
 # CANONICAL DOC STACK
 
 **Purpose:** Define which doc owns which kind of truth, and which surfaces an
-agent reads first. This is the doc-ownership map. The single *door* into the
-current operating state is the onboarding command, not this file:
+agent reads first. This is the doc-ownership map. Start with read-only session
+status, not this file:
 
 ```bash
 make onboard
 # or: python3 scripts/governance/agent_onboard.py
 ```
 
-That command reads the owners below and renders the live truth in one screen.
+That command reports the local session verdict. Use `make organism-status` for
+the deeper whole-organism projection and `make agent-build-preflight
+PACKET=<path>` for edit admission. `BUILD_SESSION_ENTRYPOINT.md` owns the
+boundary between those commands.
 
 ---
 
@@ -21,7 +24,7 @@ Every governance fact lives in exactly one of three layers:
 |---|---|---|---|
 | **Intent** | What are we working on right now? | [`ACTIVE_TRACK.yaml`](ACTIVE_TRACK.yaml) | CI gate + TTL + managed-block render |
 | **Surface** | What exists in the codebase (routers, state dirs, nav)? | [`ACTIVE_SURFACE_MANIFEST.yaml`](../../ACTIVE_SURFACE_MANIFEST.yaml) | Manifest Health API |
-| **State** | What is live right now (HEAD, recent merges, runtime)? | [`docs/state/LIVE_OPS_DASHBOARD.md`](../state/LIVE_OPS_DASHBOARD.md) | Onboarding surfaces staleness as soft warning |
+| **State** | What is live right now (HEAD, recent merges, runtime)? | [`docs/state/LIVE_OPS_DASHBOARD.md`](../state/LIVE_OPS_DASHBOARD.md) | `make organism-status` + owner-specific probes |
 
 Everything else is **doctrine** (stable, prose-friendly: axioms, anti-slop
 rules, AGENTOPS loops, architecture). Doctrine never claims live state;
@@ -53,7 +56,8 @@ is no longer a forced first-read surface.
 
 | Kind of truth | Single owner | Who defers to it |
 |---|---|---|
-| Active build track (intent) | `ACTIVE_TRACK.yaml` | CLAUDE.md, SOVEREIGN_MANIFEST.md, BUILD_SESSION_ENTRYPOINT.md (rendered via managed blocks) |
+| Active build track (intent) | `ACTIVE_TRACK.yaml` | CLAUDE.md and SOVEREIGN_MANIFEST.md (managed digests); BUILD_SESSION_ENTRYPOINT.md links without copying |
+| Session-entry command boundaries | `docs/governance/BUILD_SESSION_ENTRYPOINT.md` | Onboarding and build-session guides |
 | Declared surfaces (routers, state dirs, nav) | `ACTIVE_SURFACE_MANIFEST.yaml` | Manifest Health API, anti-slop allowlists |
 | Live runtime / merge state | `docs/state/LIVE_OPS_DASHBOARD.md` | Daily Operating Brief, situational prose |
 | Known breakage | `docs/state/BROKEN_REGISTER.md` | INTERFACE_MISMATCH_MAP.md (parallel substrate) |
@@ -91,7 +95,8 @@ is no longer a forced first-read surface.
 | Titanium verifier README | `packages/titanium-verify/README.md` | Defers to `packages/titanium-verify/titanium_verify/tests/` and the verifier CI job for executable status |
 | Cybernetic loop closure state | `CYBERNETIC_LOOP_MAP.md` | Generated from `scripts/governance/cybernetics_codex_audit.py --json`; per-loop packets defer to it for current closure verdicts |
 | Cybernetics Codex operating protocol | `docs/agents/cybernetics_codex/PROTOCOLS.md` | Defers to Cybernetics Codex audit, `CYBERNETIC_LOOP_MAP.md`, and `reports/loop_closure/cybernetics_codex/` for live loop truth |
-| Agent onboarding (ops) | `docs/ops/AGENT_ONBOARDING.md`, `docs/ops/CODEX_TOOLBELT_ONBOARDING.md`, `docs/ops/A2A_AGENT_ONBOARDING.md`, `docs/ops/A2A_QUICKSTART.md` | — |
+| Agent onboarding (ops) | `docs/ops/AGENT_ONBOARDING.md`, `docs/ops/CODEX_TOOLBELT_ONBOARDING.md` | Defers command boundaries to BUILD_SESSION_ENTRYPOINT.md |
+| Persistent A2A agent registration | `docs/ops/A2A_AGENT_ONBOARDING.md`, `docs/ops/A2A_QUICKSTART.md` | `make agent-register` owns the live drift result |
 | Module-level what-does-what | `docs/architecture/NAVIGATION.md` | — |
 | Hermes-class holon body synthesis (reference) | `docs/architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md` | Depth-on-demand reference across repo source, `~/.dharma`, `~/.hermes`, recent work, and a dated witness; defers live state to onboarding/`docs/state/LIVE_OPS_DASHBOARD.md` and executable claims to code/tests/receipts |
 | Sovereign holon call-chain index | `docs/architecture/AGENT_HOLON_CODE_MAP.md` | Subordinate quick index; defers to `HOLON_RUNTIME_FULL_ESTATE_MAP.md` for all estate and liveness claims |

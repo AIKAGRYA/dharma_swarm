@@ -1,10 +1,10 @@
-"""Read-only evidence collection for the onboarding door.
+"""Read-only evidence collection for session status.
 
 Collection only — no policy, no rendering, no writes, no network.  Every
 function here observes the repository, toolchain, portfolio, and generated
 projections and returns typed dicts shaped for the v2 receipt's
-``stable_core`` and ``live_delta`` partitions (spec §3.1).  Deciding what the
-evidence MEANS is ``readiness.py``'s job.
+``stable_core`` and ``live_delta`` partitions. Deciding what the evidence
+means is ``readiness.py``'s job.
 """
 
 from __future__ import annotations
@@ -18,19 +18,19 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
-# The canonical max-five first-read list (docs/governance/CANONICAL_DOC_STACK.md
-# §max-five; mirrored in spec §2.5).  "onboard output" is the door itself.
+# The canonical max-five first-read list. "onboard output" is the command
+# itself; the remaining paths come from CANONICAL_DOC_STACK.md.
 REQUIRED_READING = (
     "onboard output",
     "CLAUDE.md",
-    "reports/swarm_genome/2026-06-11/SYNTHESIS.md",
+    "docs/governance/SWARM_GENOME.md",
     "docs/governance/ACTIVE_TRACK.yaml",
     "docs/governance/ANTI_SLOP_RULES.md",
 )
 
 # Instruction-custody surfaces hashed into the contract block.  These are the
 # inputs whose silent change must invalidate any cached static section
-# (spec §3.2, instruction-custody row).
+# (cache input-manifest instruction-custody category).
 CONTRACT_SOURCES = (
     "CLAUDE.md",
     "docs/governance/ACTIVE_TRACK.yaml",
@@ -102,7 +102,9 @@ def observe_repo_live_state(
     ``live_delta.repo_state`` shape the v2 receipt validates, and ``errors``
     maps probe name (``status``, ``ahead_behind``) to a typed error string.
     A failed status probe reports ``dirty=True`` fail-closed — the state is
-    not provably clean; the caller owns turning errors into conditions."""
+    not provably clean.  Ahead/behind is contextual rather than admission
+    truth, so its typed error can remain a non-blocking diagnostic when status
+    itself was observed; the caller owns turning errors into conditions."""
     errors: dict[str, str] = {}
     status, error = _git_probe("status", "--porcelain")
     if error:
@@ -196,7 +198,7 @@ def _scrape_tracks(path: Path) -> list[dict[str, Any]]:
 
     Only ``- id:`` items at the indent of the first list item directly under
     ``active_tracks:`` are tracks; deeper ``- id:`` rows (next_items,
-    prerequisites, completion_criteria) are not (O3R-B3)."""
+    prerequisites, completion_criteria) are not."""
     try:
         text = path.read_text(encoding="utf-8")
     except OSError:
@@ -221,7 +223,7 @@ def _scrape_tracks(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def portfolio_snapshot(selected_track: str = "") -> dict[str, Any]:
+def portfolio_snapshot() -> dict[str, Any]:
     """Static portfolio projection: declared track ids, never live status."""
     rows = _load_yaml_tracks(REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml")
     tracks = sorted(
@@ -229,7 +231,7 @@ def portfolio_snapshot(selected_track: str = "") -> dict[str, Any]:
     )
     return {
         "tracks": tracks,
-        "selected_track": selected_track,
+        "selected_track": "",
         "ownership_conflicts": [],
     }
 
@@ -266,11 +268,7 @@ def orientation_static() -> dict[str, Any]:
 
 
 def projection_freshness() -> dict[str, Any]:
-    """Typed freshness of generated projections.  NEVER regenerates anything.
-
-    Missing or stale generated evidence is a condition for readiness policy;
-    the door must not run any producer (spec §2.2: hidden refresh removed).
-    """
+    """Typed diagnostic freshness.  Never regenerates or gates a session."""
     rel = "reports/governance/active_track_evidence.json"
     path = REPO_ROOT / rel
     if not path.exists():
@@ -290,30 +288,19 @@ def projection_freshness() -> dict[str, Any]:
     }
 
 
-def collect_stable_core(
-    *,
-    packet: dict[str, Any] | None = None,
-    selected_track: str = "onboard-one-door-2026-07",
-) -> dict[str, Any]:
+def collect_stable_core() -> dict[str, Any]:
     """Assemble the full v2 ``stable_core`` partition."""
+    # The v2 receipt retains an empty packet object for backwards-compatible
+    # validation. Packet binding belongs exclusively to the AgentOps runner.
     packet_block = {
         "id": "", "digest": "", "track": "", "owner": "",
         "allowed_files": [], "forbidden_files": [],
     }
-    if packet:
-        packet_block.update({
-            "id": str(packet.get("id", "")),
-            "digest": str(packet.get("digest", "")),
-            "track": str(packet.get("track", "")),
-            "owner": str(packet.get("owner", "")),
-            "allowed_files": list(packet.get("allowed_files", [])),
-            "forbidden_files": list(packet.get("forbidden_files", [])),
-        })
     return {
         "repository": repo_identity(),
         "contract": contract_sources(),
         "packet": packet_block,
-        "portfolio": portfolio_snapshot(selected_track),
+        "portfolio": portfolio_snapshot(),
         "orientation": orientation_static(),
         "required_reading": list(REQUIRED_READING),
     }

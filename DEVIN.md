@@ -20,7 +20,8 @@ repo governance; this file wins on Devin operational patterns.
 ## 1. Session Start Protocol
 
 Every Devin session MUST begin in the checkout and branch assigned by its task
-or environment. Do not switch to or integrate `main` at startup. Run one door:
+or environment. Do not switch to or integrate `main` at startup. Read session
+status first:
 
 ```bash
 make onboard
@@ -28,8 +29,9 @@ make onboard
 
 Then, before task work:
 
-1. If the task requires a Session Entry Packet, follow the canonical procedure
-   in `docs/governance/AGENTOPS.md`: validate the external packet at its exact
+1. Every editing task requires a Session Entry Packet. Follow the canonical
+   procedure in `docs/governance/AGENTOPS.md` and run
+   `make agent-build-preflight PACKET="$SESSION_ENTRY_PACKET"` at its exact
    clean baseline before editing, then stay inside its default-deny envelope.
    `docs/governance/ACTIVE_TRACK.yaml` owns track and surface assignment; this
    adapter grants no additional scope.
@@ -384,6 +386,7 @@ not implicit authority to widen an assigned task.
 |---|---|
 | Onboard (first) | `make onboard` |
 | Inspect Session Entry Packet | `python3 scripts/governance/run_agent_work_packet.py --packet "$SESSION_ENTRY_PACKET" --inspect` |
+| Admit exact edit scope | `make agent-build-preflight PACKET="$SESSION_ENTRY_PACKET"` |
 | Check checkout | `git status --short --branch` |
 | Check inbound | `ls dharma_swarm/inter_agent/devin/inbound/` |
 | Run tests | `python3 -m pytest tests/ -q` |
@@ -398,7 +401,7 @@ not implicit authority to widen an assigned task.
 
 *This file is the Devin-specific operational layer. CLAUDE.md remains the
 canonical behavioral contract for all agents. `make onboard` is the first
-gate; this manual is depth-on-demand after that gate.*
+status read; exact edit admission is packet-bound and separate.*
 
 *Last updated: 2026-07-11 for the A1 Session Entry custody repair.*
 

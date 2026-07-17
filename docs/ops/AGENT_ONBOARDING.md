@@ -9,7 +9,9 @@ cd ~/dharma_swarm
 make onboard
 ```
 
-`make onboard` is read-only. It prints the live Codex/MCP toolbelt status, branch/dirty-tree state, and links to the highest-value docs.
+`make onboard` is read-only session status. It reports the current
+checkout/toolchain verdict and points to the relevant owners; it is not edit
+admission or whole-organism orientation.
 
 For Fable 5 / `fable_5_cursor`, read
 [`FABLE5_ONBOARDING_MAP.md`](FABLE5_ONBOARDING_MAP.md) only after this
@@ -17,19 +19,22 @@ command and the first-read surfaces it names. That map is an operational
 route for a specific hub-coordinator identity; it is not a new authority
 surface.
 
-For a build session, use the explicit preflight and closeout targets around
-the actual implementation work:
+Packet-bound preflight and closeout are required when changed paths match Merge
+Master Mike's `HOT_PATH_PATTERNS` in `scripts/runtime/pr_merge_control.py`; they
+are optional otherwise. A narrower lane or campaign contract may require them
+more broadly. When a packet is required or voluntarily used, use these targets
+around the actual implementation work:
 
 ```bash
-make agent-build-preflight
+make agent-build-preflight PACKET=<path>
 # make the smallest scoped change and run the task-specific test
-make agent-build-closeout
+make agent-build-closeout PACKET=<path>
 ```
 
-`make agent-build-preflight` runs onboarding plus hygiene integrity. `make
-agent-build-closeout` writes a no-worktree hygiene receipt to `/tmp` and runs
-the full governance bundle. `make onboard` alone is orientation, not proof that
-the build is clean.
+Both commands require the same exact Session Entry packet. Preflight binds the
+baseline and allowed scope; closeout verifies the resulting scope and runs the
+governance bundle. `make onboard` alone is session status, not proof that the
+build is admitted or complete.
 
 GitHub-only agents cannot see local credentials, `dkeys`, or live process environment. Do not conclude "no LLM provider is configured" from repository contents alone; that claim requires a current local `make onboard`, `dkeys list`, `python -m dharma_swarm.api_key_audit --no-agentic`, or `/api/chat/status` check from the operator machine.
 
@@ -78,7 +83,7 @@ GitNexus, Context+, Context7, Sourcebot, and the `/Users/dhyana/.local/bin/src` 
 | Current live state | [`LIVE_OPS_DASHBOARD.md`](../state/LIVE_OPS_DASHBOARD.md), [`BROKEN_REGISTER.md`](../state/BROKEN_REGISTER.md), `~/.dharma` evidence |
 | Active build track | [`ACTIVE_TRACK.yaml`](../governance/ACTIVE_TRACK.yaml), [`active_track_evidence.md`](../../reports/governance/active_track_evidence.md), current `make onboard` output |
 | Persistent agents | Check the current branch for `docs/agents/` and `docs/research/persistent_agents*/`; if absent, ask the operator for the latest packet rather than inventing L4 readiness claims. |
-| Joining the A2A fleet as a NEW persistent identity | `make agent-onboard`, [`A2A_AGENT_ONBOARDING.md`](A2A_AGENT_ONBOARDING.md), [`A2A_QUICKSTART.md`](A2A_QUICKSTART.md) |
+| Joining the A2A fleet as a NEW persistent identity | `make agent-register`, [`A2A_AGENT_ONBOARDING.md`](A2A_AGENT_ONBOARDING.md), [`A2A_QUICKSTART.md`](A2A_QUICKSTART.md) |
 | Fable 5 hub coordination | [`FABLE5_ONBOARDING_MAP.md`](FABLE5_ONBOARDING_MAP.md), `examples/agents/fable_5_cursor.registration.json`, current `make onboard` output |
 | Docs or governance edits | [`CANONICAL_DOC_STACK.md`](../governance/CANONICAL_DOC_STACK.md), [`REPO_GOVERNANCE_AUDIT.md`](../governance/REPO_GOVERNANCE_AUDIT.md) |
 | Doctrine/telos | [`OPERATIONAL_DOCTRINE.md`](../doctrine/OPERATIONAL_DOCTRINE.md), [`LIVE_ROADMAP.md`](../doctrine/LIVE_ROADMAP.md), [`SOVEREIGN_MANIFEST.md`](../governance/SOVEREIGN_MANIFEST.md) |
@@ -102,7 +107,8 @@ GitNexus, Context+, Context7, Sourcebot, and the `/Users/dhyana/.local/bin/src` 
 5. Before modifying a shared symbol, check impact/blast radius.
 6. Make the smallest scoped change.
 7. Run the relevant test or read-only status script.
-8. Run `make agent-build-closeout` before PR handoff.
+8. When a packet is required or voluntarily used, run
+   `make agent-build-closeout PACKET=<path>` before PR handoff.
 9. Update the owning doc only if the change alters durable truth.
 
 ## Handoff Prompt

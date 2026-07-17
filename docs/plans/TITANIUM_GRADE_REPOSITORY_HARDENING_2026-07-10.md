@@ -242,13 +242,14 @@ flowchart TD
 
 For every work packet:
 
-1. Run `make onboard` and record branch, SHA, dirty state, and active owner.
+1. Run `make onboard`, record branch/SHA/dirty state, then run
+   `make agent-build-preflight PACKET=<path>` for the exact packet.
 2. Read the touched module, its tests, and the relevant mismatch-map entry.
 3. Write one failing behavioral or structural contract test that kills the observed failure mode.
 4. Run only that test and capture the expected failure.
 5. Implement the smallest change that makes the test pass.
 6. Run the work-packet verification commands.
-7. Run `make agent-build-closeout`.
+7. Run `make agent-build-closeout PACKET=<path>`.
 8. Review `git diff --check`, changed-file scope, generated files, and secrets.
 9. Commit one logical change, push, and open/update a draft PR.
 10. Do not start a dependent packet until its prerequisite PR is green or the operator explicitly authorizes stacked work.
@@ -531,7 +532,7 @@ It must never print `ALL GATES FUNCTIONAL` unless all gates named by that phrase
 
 ```bash
 make verifier-selfcheck
-make agent-build-preflight
+make agent-build-preflight PACKET=<path>
 ```
 
 **Mutation check**
@@ -1118,7 +1119,7 @@ The exit gate permits no unexplained skips, stale evidence, missing tools, dirty
 Phase 0 closes only when:
 
 1. WP-00, WP-0S, and every WP-0A through WP-0I subpacket acceptance criterion pass on merged `main`;
-2. `make agent-build-closeout` is green;
+2. `make agent-build-closeout PACKET=<path>` is green;
 3. live-only checks report either a fresh live verdict on their owner host or explicit `NEEDS_HOST` elsewhere;
 4. live branch protection matches the committed required-context manifest;
 5. strict DocOps is green on `main`;

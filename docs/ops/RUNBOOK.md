@@ -172,7 +172,7 @@ Notes:
   (`python3 scripts/runtime/dispatch_dropoff_quarantine.py --before <spine-fix-ts>`
   dry-run then `--execute`), give an agent work, watch `dgc spine tail --follow`,
   then promote Loop 1 on its live owner-surface criterion.
-- **Verification from anywhere**: once up, `make orient` on any checkout pointing at
+- **Verification from anywhere**: once up, `make organism-status` on any checkout pointing at
   the same state (or the cockpit `spine.pulse` row via the web service) shows Loop-1
   LIVE; the Mac daemon can then be unloaded (`make stop`) and kept as a dev mirror.
 - **Not automated on purpose**: creating the server, the deploy key grant, and

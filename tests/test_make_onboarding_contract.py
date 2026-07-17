@@ -1,15 +1,18 @@
-"""WP-O4: the Make-level onboarding contract.
+"""Make-level session-status and edit-admission command boundaries.
 
-Covers O4-B1 (make orient is deep/read-only under a write-attempt guard;
-only the explicit owner command writes context), O4-B2 (preflight consumes
-the packet evaluator exactly once, fail-closed), O4-B7 (`make agent-onboard`
-unchanged), O4-B8 (Make forwards documented ARGS; unknown flags keep exit 2),
-and O4-B9 (admission receipts have one explicit external destination).
+Covers O4-B1 (`make organism-status` is deep/read-only under a write-attempt
+guard and `make orient` remains its compatibility alias; only the explicit
+owner command writes context), O4-B2 (preflight consumes the packet evaluator
+exactly once, fail-closed), O4-B7 (`make agent-register` owns the persistent
+identity route and `make agent-onboard` remains its compatibility alias), O4-B8
+(Make forwards documented ARGS; unknown flags keep exit 2), and O4-B9
+(admission receipts have one explicit external destination).
 """
 
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import shutil
@@ -31,13 +34,17 @@ def _no_bytecode(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _recipe(target: str) -> str:
-    match = re.search(
+    matches = re.finditer(
         rf"^{re.escape(target)}:.*\n((?:\t.*\n|ifdef .*\n|endif\n)*)",
         MAKEFILE,
         re.MULTILINE,
     )
-    assert match, f"Makefile target {target!r} not found"
-    return match.group(0)
+    for match in matches:
+        header = match.group(0).splitlines()[0]
+        if re.search(r":\s+(?:override\s+)?[A-Za-z_]\w*\s*(?::=|\+=|\?=|=)", header):
+            continue
+        return match.group(0)
+    raise AssertionError(f"Makefile target {target!r} not found")
 
 
 def _make(*args: str, timeout: int = 300) -> subprocess.CompletedProcess[str]:
@@ -98,7 +105,7 @@ def _copy_tracked_checkout(destination: Path) -> None:
             "-C",
             str(destination),
             "-c",
-            "user.name=WP-O4 test",
+            "user.name=Session Contract Test",
             "-c",
             "user.email=wp-o4-test@example.invalid",
             "commit",
@@ -136,14 +143,17 @@ def _tree_snapshot(root: Path) -> dict[str, tuple[object, ...]]:
     return snapshot
 
 
-# --- O4-B1: orient is mutation-free ------------------------------------------
+# --- O4-B1: organism status is mutation-free ---------------------------------
 
-def test_orient_recipe_never_writes_context() -> None:
-    recipe = _recipe("orient")
+def test_organism_status_owns_projection_and_orient_is_alias() -> None:
+    recipe = _recipe("organism-status")
+    alias = _recipe("orient")
+    assert "orientation_graph.py" in recipe
     assert "--write-context" not in recipe, (
-        "make orient must be a mutation-free projection; context refresh "
+        "make organism-status must be a mutation-free projection; context refresh "
         "belongs only to the explicit owner command (spec §2.1)"
     )
+    assert alias.splitlines() == ["orient: organism-status"]
 
 
 @pytest.mark.timeout(180)
@@ -160,7 +170,7 @@ def test_make_orient_attempts_no_repository_write(tmp_path: Path) -> None:
             "make",
             "-s",
             "orient",
-            f"PYTHON={sys.executable}",
+            f"PYTHON={sys.executable} -S",
             # Hostile caller values must not re-enable in-checkout bytecode.
             "PYTHONDONTWRITEBYTECODE=",
             "PYTHONPYCACHEPREFIX=.",
@@ -176,8 +186,49 @@ def test_make_orient_attempts_no_repository_write(tmp_path: Path) -> None:
         "make orient wrote or changed the pristine tracked copy, including an "
         "ignored bytecode/cache path"
     )
-    assert "orient: override PYTHONDONTWRITEBYTECODE := 1" in MAKEFILE
+    assert "organism-status: override PYTHONDONTWRITEBYTECODE := 1" in MAKEFILE
     assert "\tPYTHONDONTWRITEBYTECODE=1 $(PYTHON)" in MAKEFILE
+
+
+@pytest.mark.parametrize(
+    ("target", "extra_args"),
+    [
+        ("onboard", ["ARGS=--json"]),
+        ("agent-register", ["ARGS=--json"]),
+    ],
+)
+def test_session_and_registration_commands_are_dependency_light_and_read_only(
+    tmp_path: Path,
+    target: str,
+    extra_args: list[str],
+) -> None:
+    checkout = tmp_path / target
+    _copy_tracked_checkout(checkout)
+    before = _tree_snapshot(checkout)
+    env = os.environ.copy()
+    env["HOME"] = str(tmp_path / "home")
+    env.pop("PYTHONDONTWRITEBYTECODE", None)
+
+    result = subprocess.run(
+        [
+            "make",
+            "-s",
+            target,
+            *extra_args,
+            f"PYTHON={sys.executable} -S",
+            "PYTHONDONTWRITEBYTECODE=",
+            "PYTHONPYCACHEPREFIX=.",
+        ],
+        cwd=checkout,
+        capture_output=True,
+        text=True,
+        timeout=180,
+        env=env,
+    )
+
+    assert result.returncode == 0, result.stderr[-2000:]
+    json.loads(result.stdout)
+    assert _tree_snapshot(checkout) == before
 
 
 def test_explicit_context_refresh_command_is_documented() -> None:
@@ -186,6 +237,25 @@ def test_explicit_context_refresh_command_is_documented() -> None:
 
 
 # --- O4-B2: preflight consumes the packet evaluator --------------------------
+
+@pytest.mark.parametrize("target", ["agent-build-preflight", "agent-build-closeout"])
+def test_edit_admission_targets_require_an_exact_packet_before_prerequisites(
+    tmp_path: Path,
+    target: str,
+) -> None:
+    report_root = tmp_path / "must-not-be-created"
+    result = subprocess.run(
+        ["make", "-s", target, f"AGENTOPS_REPORT_ROOT={report_root}"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        env=os.environ.copy(),
+    )
+
+    assert result.returncode == 2
+    assert "PACKET=<path> is required" in result.stderr
+    assert not report_root.exists()
 
 def test_preflight_single_evaluation_and_exact_base() -> None:
     """The Make door delegates the exact-base decision once to preflight."""
@@ -580,6 +650,7 @@ def test_make_rejects_in_tree_report_root_before_prerequisites(
     command.extend(
         [
             "agent-build-preflight",
+            "PACKET=/tmp/unused-session-entry.json",
             f"{source_variable}={inside_root}",
         ]
     )
@@ -627,6 +698,7 @@ def test_make_rejects_cache_symlink_escape_before_prerequisites(
     command.extend(
         [
             "agent-build-preflight",
+            "PACKET=/tmp/unused-session-entry.json",
             f"AGENTOPS_REPORT_ROOT={external_root}",
             f"AGENTOPS_PYTHON={sys.executable}",
         ]
@@ -681,13 +753,19 @@ def test_make_agentops_bootstrap_never_executes_repo_venv_sitecustomize(
         / "site-packages"
     )
     site_packages.mkdir(parents=True, exist_ok=True)
-    sitecustomize = site_packages / "sitecustomize.py"
-    sitecustomize.write_text(
+    witness = site_packages / "wp_o4_repo_venv_witness.py"
+    witness.write_text(
         "import os\n"
         "from pathlib import Path\n"
         "marker = os.environ.get('WP_O4_BOOTSTRAP_MARKER')\n"
         "if marker:\n"
         "    Path(marker).write_text('repo venv executed', encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    # A .pth import is deterministic even when the host Python distribution
+    # already supplies its own ``sitecustomize`` module.
+    (site_packages / "wp_o4_repo_venv_witness.pth").write_text(
+        "import wp_o4_repo_venv_witness\n",
         encoding="utf-8",
     )
     marker = tmp_path / "repo-venv-executed"
@@ -789,13 +867,17 @@ def test_make_agentops_bootstrap_preserves_external_venv_dependencies(
         encoding="utf-8",
     )
     marker = tmp_path / "external-venv-dependency-imported"
-    (site_packages / "sitecustomize.py").write_text(
+    (site_packages / "wp_o4_external_venv_witness.py").write_text(
         "import os\n"
         "from pathlib import Path\n"
         "from wp_o4_venv_only_dependency import VALUE\n"
         "marker = os.environ.get('WP_O4_VENV_DEPENDENCY_MARKER')\n"
         "if marker:\n"
         "    Path(marker).write_text(VALUE, encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    (site_packages / "wp_o4_external_venv_witness.pth").write_text(
+        "import wp_o4_external_venv_witness\n",
         encoding="utf-8",
     )
     env = os.environ.copy()
@@ -895,11 +977,13 @@ def test_make_rejects_repo_local_agentops_python_before_execution(
     assert not marker.exists()
 
 
-# --- O4-B7: the A2A identity target is untouched ------------------------------
+# --- O4-B7: the A2A identity target has a precise canonical name --------------
 
-def test_a2a_identity_target_command_is_unchanged() -> None:
-    recipe = _recipe("agent-onboard")
+def test_agent_register_owns_identity_route_and_agent_onboard_is_alias() -> None:
+    recipe = _recipe("agent-register")
+    alias = _recipe("agent-onboard")
     assert "a2a_agent_onboard.py $(ARGS)" in recipe
+    assert alias.splitlines() == ["agent-onboard: agent-register"]
 
 
 # --- O4-B8: ARGS forwarding and usage exits -----------------------------------
@@ -918,10 +1002,45 @@ def test_make_forwards_onboard_args_and_usage_exit() -> None:
 def test_door_delegates_to_compact_engine(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The public make-onboard door must invoke the compact CLI engine."""
+    """The Make door renders and propagates the compact engine's readiness."""
     monkeypatch.setenv("DHARMA_OPS_DIR", str(tmp_path / "ops"))
     result = _make("onboard")
-    assert result.returncode == 0, result.stderr[-2000:]
-    assert "DHARMA ONBOARD" in result.stdout, (
-        "make onboard must render the compact CLI header"
+    header = re.search(
+        r"^DHARMA ONBOARD — [A-Z_]+ \(exit (\d+)\)$",
+        result.stdout,
+        re.MULTILINE,
     )
+    assert header, "make onboard must render the compact CLI header and typed exit"
+    reported_exit = int(header.group(1))
+    assert (result.returncode == 0) == (reported_exit == 0), (
+        "make onboard must succeed exactly when the rendered verdict is ready"
+    )
+
+
+def test_make_reports_failure_while_direct_cli_preserves_typed_exit() -> None:
+    """GNU Make maps failed recipes to 2; JSON retains the command's type."""
+    inside = REPO_ROOT / ".invalid-onboard-receipt-root"
+    env = {**os.environ, "DHARMA_OPS_DIR": str(inside), "PYTHONDONTWRITEBYTECODE": "1"}
+    direct = subprocess.run(
+        [sys.executable, "scripts/governance/agent_onboard.py", "--json"],
+        cwd=REPO_ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    through_make = subprocess.run(
+        ["make", "-s", "onboard", "ARGS=--json", f"PYTHON={sys.executable}"],
+        cwd=REPO_ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+
+    direct_truth = json.loads(direct.stdout)
+    make_truth = json.loads(through_make.stdout)
+    assert direct.returncode == direct_truth["exit_code"] == 3
+    assert through_make.returncode == 2
+    assert make_truth["exit_code"] == 3
+    assert not inside.exists()

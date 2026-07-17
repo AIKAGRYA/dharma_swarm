@@ -10,14 +10,9 @@ from scripts.runtime import pr_merge_control as prc
 def _ci_required_success_rollup():
     return [
         {"name": "DocOps integrity gate", "status": "COMPLETED", "conclusion": "SUCCESS"},
-        {
-            "name": "Quality ratchet - repo-wide fitness function",
-            "status": "COMPLETED",
-            "conclusion": "SUCCESS",
-        },
         {"name": "Coherence Delta PR body", "status": "COMPLETED", "conclusion": "SUCCESS"},
         {
-            "name": "Onboarding macOS 3.81 compatibility",
+            "name": "Onboarding admission parity",
             "status": "COMPLETED",
             "conclusion": "SUCCESS",
         },
@@ -74,6 +69,40 @@ def test_classify_pr_uses_latest_duplicate_check_run():
     assert result["checks"]["failing"] == []
     assert result["checks"]["passing"] == ["Coherence Delta PR body"]
     assert result["checks"]["raw_total"] == 2
+    assert result["checks"]["total"] == 1
+
+
+def test_classify_pr_newest_run_wins_even_when_older_run_finishes_later():
+    """Duplicate runs are ordered by start time: an older run that completes
+    after a newer failing run must not flip the context green."""
+    pr = {
+        "number": 1,
+        "title": "overlapping rerun",
+        "isDraft": False,
+        "mergeable": "MERGEABLE",
+        "reviewDecision": "APPROVED",
+        "statusCheckRollup": [
+            {
+                "name": "pytest (3.11)",
+                "status": "COMPLETED",
+                "conclusion": "SUCCESS",
+                "startedAt": "2026-06-01T10:00:00Z",
+                "completedAt": "2026-06-01T10:10:00Z",
+            },
+            {
+                "name": "pytest (3.11)",
+                "status": "COMPLETED",
+                "conclusion": "FAILURE",
+                "startedAt": "2026-06-01T10:05:00Z",
+                "completedAt": "2026-06-01T10:06:00Z",
+            },
+        ],
+    }
+
+    result = prc.classify_pr(pr)
+
+    assert result["checks"]["failing"] == ["pytest (3.11)"]
+    assert result["checks"]["passing"] == []
     assert result["checks"]["total"] == 1
 
 
@@ -1007,6 +1036,68 @@ def test_gate_blocks_missing_required_ci_truth(tmp_path, monkeypatch):
     assert gate["decision"] == "BLOCKED"
     assert gate["ci_truth"]["verdict"] == "FAIL"
     assert "required CI docops_integrity is MISSING; run `make docops-integrity`" in gate["blockers"]
+
+
+def test_gate_reports_advisory_red_and_pending_without_granting_authority(
+    tmp_path, monkeypatch
+):
+    out_dir = tmp_path / "packet"
+    out_dir.mkdir()
+    prc.write_json(out_dir / "FACTS.json", {"risk": {"level": "LOW"}})
+    body = """
+- Organ touched: `scripts/runtime/pr_merge_control.py`
+- Declared-vs-actual gap closed: Mike consumes the exact protected CI set.
+- Proof that re-reads the map: this test keeps advisory failures visible.
+- New drift introduced: advisory checks do not silently gain merge authority.
+"""
+    rollup = _ci_required_success_rollup() + [
+        {
+            "name": "Quality ratchet - repo-wide fitness function",
+            "status": "COMPLETED",
+            "conclusion": "FAILURE",
+        },
+        {
+            "name": "Onboarding macOS 3.81 compatibility",
+            "status": "IN_PROGRESS",
+            "conclusion": "",
+        },
+    ]
+    monkeypatch.setattr(
+        prc,
+        "fetch_pr_view",
+        lambda _pr: {
+            "isDraft": False,
+            "mergeable": "MERGEABLE",
+            "reviewDecision": "APPROVED",
+            "statusCheckRollup": rollup,
+            "body": body,
+        },
+    )
+    monkeypatch.setattr(
+        prc,
+        "fetch_review_threads",
+        lambda _pr, _repo: {"ok": True, "unresolved_count": 0},
+    )
+    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
+
+    gate = prc.build_gate(
+        argparse.Namespace(
+            pr=12,
+            packet_dir=str(out_dir),
+            state_root=str(tmp_path),
+            allow_pending=False,
+            human_approved=False,
+            allow_backup_reviewer=False,
+            backup_reviewers="backup_opus",
+            backup_reviewer_reason="",
+            required_reviewers="none",
+        )
+    )
+
+    assert gate["decision"] == "MERGE_CANDIDATE"
+    assert gate["blockers"] == []
+    assert any("reported failing checks" in warning for warning in gate["warnings"])
+    assert any("reported pending checks" in warning for warning in gate["warnings"])
 
 
 def test_gate_accepts_named_backup_reviewer_when_claude_unavailable(tmp_path, monkeypatch):

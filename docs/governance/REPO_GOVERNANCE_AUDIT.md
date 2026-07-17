@@ -451,6 +451,11 @@ Make every future agent (human or AI) land in the same operating reality with on
 - **docs/AGENTS.md** — no pre-flight pointer. **Added "Before Anything Else" section.**
 
 ### What was added
+
+> Historical inventory from the 2026-05 audit. Current command semantics are
+> owned by `BUILD_SESSION_ENTRYPOINT.md`: `make onboard` is truthful read-only
+> session status, and packet-bound preflight owns edit admission.
+
 - **`scripts/governance/agent_onboard.py`** (extended): single door. Renders branch/HEAD/origin-main divergence, active track + acceptance criteria, live-ops snapshot with staleness warning, surface manifest health, broken-register summary, living axioms, recent track activity, decay-watch list, enforcement commands, depth pointers. Always exits 0; never hard-gates.
 - **`scripts/governance/check_track_status.py`** (preserved from prior pass): writes `reports/governance/active_track_evidence.json`.
 - **`scripts/governance/render_active_track_includes.py`** (preserved): renders the managed `<!-- ACTIVE_TRACK:START -->`/`END` blocks in `CLAUDE.md`, `SOVEREIGN_MANIFEST.md`, `BUILD_SESSION_ENTRYPOINT.md` so the track name lives in one place.
@@ -505,3 +510,54 @@ make onboard
 ```
 
 Every governance / doc / anti-slop surface either feeds that command, is linked from it for depth, or is explicitly historical.
+
+---
+
+## One-Door scope reset and provenance — 2026-07-17
+
+- Deprecated: 2026-07-17
+- Reason: the combined One-Door campaign was retired with six unresolved
+  blockers after session status, edit admission, closeout, CI, and persistent
+  agent registration were separated into distinct authorities.
+- Replacement: `docs/governance/BUILD_SESSION_ENTRYPOINT.md` for command
+  boundaries and closed track `onboard-session-status-2026-07` for the retained
+  verified slice.
+- Review / removal date: permanent audit pointer; source files remain
+  recoverable from immutable tree
+  `55cf277be0dbf3b5a74da03eb1d7243024556806`.
+
+The original `onboard-one-door-2026-07` track is `RETIRED`, not a verified
+closure. Its unresolved-at-retirement obligations were `C1`, `D2`, `WP-O5`,
+`M6-1`, `WP-O6`, and `TERMINAL-PROOF`. Recover the two campaign specifications
+and enumerate all 25 packet records with:
+
+```bash
+git show 55cf277be0dbf3b5a74da03eb1d7243024556806:docs/plans/ONBOARD_ONE_DOOR_HARDENING_SPEC_2026-07-10.md
+git show 55cf277be0dbf3b5a74da03eb1d7243024556806:docs/plans/ONBOARD_ONE_DOOR_CLOSURE_SPEC_2026-07-14.md
+git ls-tree -r --name-only 55cf277be0dbf3b5a74da03eb1d7243024556806 reports/agentops/work_packets | rg '^reports/agentops/work_packets/onboard-one-door-WP-O'
+git show 55cf277be0dbf3b5a74da03eb1d7243024556806:<packet-path-from-the-list>
+```
+
+Three records used the WP-O namespace for work that belonged to other tracks;
+their merged outputs remain current and must not be mistaken for retired
+One-Door implementation:
+
+- `WP-O17` → PR `#979`, merge `5e0e42549a1e3f8123704d0c11b5fc6be2f8c5f0`
+  (five-part Dharma and skill closure).
+- `WP-O19` → PR `#980`, merge `d6c56f260fd75ba29feebd40a4115bbfd92c9e3e`
+  (orchestration-arena TTL re-verification).
+- `WP-O20` → PR `#984`, merge `6000849b995b4b210d19d01a683b2c321ff0f75b`
+  (Merge Master Mike ledger reconciliation).
+
+The other 22 records are campaign packets. Git history is their archive, not
+current authority. The deleted Titanium preparation and WP-00 admission drafts
+are likewise historical planning aids:
+
+```bash
+git show 55cf277be0dbf3b5a74da03eb1d7243024556806:docs/plans/TITANIUM_PREP_2026-07-15.md
+git show 55cf277be0dbf3b5a74da03eb1d7243024556806:docs/plans/TITANIUM_WP00_ADMISSION_DRAFT_2026-07-15.md
+```
+
+Their current replacement is
+`docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md`; implementation
+still begins only through its WP-00 admission.

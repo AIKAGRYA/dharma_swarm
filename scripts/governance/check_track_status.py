@@ -2023,6 +2023,9 @@ def _lifecycle_findings(base_p: dict[str, Any], head_p: dict[str, Any]) -> list[
       1. closed_tracks is append-only — an id closed on base must stay closed.
       2. a base-closed id may not be active at head without `reopened_at`.
       3. no id may be both active and closed at head without `reopened_at`.
+      4. an active track with open blockers may not reuse its id for a
+         VERIFIED_SLICE; retirement and a distinct retained slice preserve the
+         difference between de-scoping and proof.
     """
     findings: list[Finding] = []
     base_closed = {ct.get("id") for ct in base_p.get("closed_tracks") or []
@@ -2031,6 +2034,12 @@ def _lifecycle_findings(base_p: dict[str, Any], head_p: dict[str, Any]) -> list[
                    if isinstance(ct, dict) and ct.get("id")}
     head_active = {t.get("id"): t for t in head_p.get("active_tracks") or []
                    if isinstance(t, dict) and t.get("id")}
+    base_active = {t.get("id"): t for t in base_p.get("active_tracks") or []
+                   if isinstance(t, dict) and t.get("id")}
+    head_closed_by_id = {
+        t.get("id"): t for t in head_p.get("closed_tracks") or []
+        if isinstance(t, dict) and t.get("id")
+    }
 
     for cid in sorted(base_closed):
         if cid not in head_closed:
@@ -2050,6 +2059,26 @@ def _lifecycle_findings(base_p: dict[str, Any], head_p: dict[str, Any]) -> list[
             findings.append(Finding("ERROR", f"active-closed-overlap:{tid}",
                 f"'{tid}' appears in both active_tracks and closed_tracks "
                 "without `reopened_at`."))
+
+    for tid, base_track in base_active.items():
+        open_blockers = [
+            item for item in base_track.get("next_items") or []
+            if isinstance(item, dict) and item.get("blocker") is True
+        ]
+        closed = head_closed_by_id.get(tid)
+        if (
+            open_blockers
+            and closed is not None
+            and _declared_closure_kind(closed) == "VERIFIED_SLICE"
+        ):
+            findings.append(Finding(
+                "ERROR",
+                f"verified-slice-erases-blockers:{tid}",
+                f"'{tid}' had {len(open_blockers)} open blocker(s) on the base "
+                "but reuses the same id for VERIFIED_SLICE. Retire or supersede "
+                "the original claim and record any retained verified slice "
+                "under a distinct id.",
+            ))
     return findings
 
 

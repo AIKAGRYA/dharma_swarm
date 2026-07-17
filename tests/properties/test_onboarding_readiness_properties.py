@@ -1,7 +1,6 @@
-"""Property-based tests for the onboarding readiness policy (spec §2.3).
+"""Property-based tests for the onboarding readiness policy.
 
-Laws under test, over generated condition sets (WP-O6 harness; closure spec
-CL-6 / O6-B7 obligations):
+Laws under test over generated condition sets:
 
 1.  Lossless retention: the winning scalar never deletes a condition —
     every observed condition survives into the result, unchanged.
@@ -10,7 +9,7 @@ CL-6 / O6-B7 obligations):
 3.  Usage dominance: a usage-class condition forces USAGE_ERROR/exit 2
     over everything else.
 4.  Scalar precedence: usage > config-fail > toolchain-fail > mandatory
-    nonpass (BLOCKED) > needs_host, exactly the spec §2.3 table.
+    nonpass (BLOCKED) > needs_host, exactly the scalar-verdict precedence.
 5.  Exit mapping: exit_code is EXIT_BY_VERDICT[verdict], with the one
     documented exception — NEEDS_HOST without require_live exits 0 (typed,
     never pass-like) and exits 4 under require_live.
@@ -26,8 +25,7 @@ CL-6 / O6-B7 obligations):
 
 NOTE — deliberate deviation from sibling property files: hypothesis is
 imported directly, NOT via pytest.importorskip. This file backs the
-``wp_o6_readiness_property_battery`` completion criterion
-(docs/governance/ACTIVE_TRACK.yaml), and an all-skipped run exits 0 — a
+readiness property battery, and an all-skipped run exits 0 — a
 false pass. A missing dev dependency must fail loud here, not skip quiet.
 """
 
@@ -52,7 +50,7 @@ from dharma_swarm.operator_core.onboarding.readiness import (
 )
 
 # Severity rank for the monotone-escalation law: READY is best; the rest
-# follow the spec §2.3 precedence from weakest to strongest override.
+# follow scalar-verdict precedence from weakest to strongest override.
 _SEVERITY = {
     VERDICT_READY: 0,
     VERDICT_NEEDS_HOST: 1,
