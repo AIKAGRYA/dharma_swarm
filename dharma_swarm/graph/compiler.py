@@ -156,6 +156,29 @@ class GraphBuilder:
         self._branches.append(BranchSpec(source=source, path=path, path_map=mapping))
         return self
 
+    def add_sequence(
+        self,
+        nodes: Sequence[NodeCallable | tuple[str, NodeCallable]],
+    ) -> GraphBuilder:
+        """Chain nodes with implicit edges (langgraph ``add_sequence`` parity).
+
+        Each entry is ``(name, fn)`` or a bare callable (named from
+        ``__name__``); consecutive entries get a static edge. The caller
+        still wires START to the first node and the last node onward —
+        langgraph 1.2.4 adds neither entry nor finish edges (empirical).
+        """
+        previous: str | None = None
+        for entry in nodes:
+            if isinstance(entry, tuple):
+                node_id, fn = entry
+            else:
+                node_id, fn = getattr(entry, "__name__", ""), entry
+            self.add_node(node_id, fn)
+            if previous is not None:
+                self.add_edge(previous, node_id)
+            previous = node_id
+        return self
+
     def add_channel(
         self, name: str, factory: Callable[[], Channel[Any]]
     ) -> GraphBuilder:

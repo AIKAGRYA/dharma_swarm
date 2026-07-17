@@ -1989,6 +1989,9 @@ def run_capability_probes(
     _apply_typed_schema_evidence(
         capabilities, row_lookup, workloads["seeded_typed_schema_projection"]
     )
+    _apply_sequence_evidence(
+        capabilities, row_lookup, workloads["seeded_sequence_chain"]
+    )
     persistence_protocol = _persistence_protocol_probe(seed)
     _apply_persistence_protocol_evidence(capabilities, row_lookup, persistence_protocol)
     process_restart = _process_restart_probe(seed)
@@ -2277,3 +2280,138 @@ def _apply_typed_schema_evidence(
                 citations=_row_citations(row),
             )
         )
+
+
+# ---------------------------------------------------------------------------
+# Pregel-core S4 (LG04): add_sequence chained-topology workload.
+# Append-only harness extension — new seeded two-arm workload + evidence
+# applier + surface support entry for the sequence facet.
+# ---------------------------------------------------------------------------
+
+
+class _SequenceState(TypedDict, total=False):
+    x: int
+    log: Annotated[list[Any], operator.add]
+
+
+def _sequence_arm(arm: str, seed: int) -> dict[str, Any]:
+    rng = random.Random(_derived_seed(seed, "sequence"))
+    initial = rng.randint(1, 40)
+    addend = rng.randint(2, 9)
+    multiplier = rng.randint(2, 4)
+
+    def step_one(state):
+        return {"x": state["x"] + addend, "log": ["one"]}
+
+    def step_two(state):
+        return {"x": state["x"] * multiplier, "log": ["two"]}
+
+    def step_three(state):
+        return {"x": state["x"] - addend, "log": ["three"]}
+
+    if arm == "langgraph":
+        from langgraph.graph import END, START, StateGraph
+
+        builder = StateGraph(_SequenceState)
+        builder.add_sequence(
+            [("one", step_one), ("two", step_two), ("three", step_three)]
+        )
+        builder.add_edge(START, "one")
+        out = builder.compile().invoke({"x": initial, "log": []})
+
+        bare = StateGraph(_SequenceState)
+        bare.add_sequence([step_one, step_two])
+        bare.add_edge(START, "step_one")
+        bare_out = bare.compile().invoke({"x": initial, "log": []})
+        return {
+            "chained": {"x": out["x"], "log": list(out["log"])},
+            "bare_named": {"x": bare_out["x"], "log": list(bare_out["log"])},
+        }
+
+    from dharma_swarm.graph import (
+        END,
+        START,
+        AppendChannel,
+        GraphBuilder,
+        LastValueChannel,
+    )
+    from dharma_swarm.graph.effects import SimulatedEffects
+
+    compiled = (
+        GraphBuilder("gauntlet-sequence")
+        .add_channel("x", LastValueChannel)
+        .add_channel("log", AppendChannel)
+        .add_sequence(
+            [("one", step_one), ("two", step_two), ("three", step_three)]
+        )
+        .add_edge(START, "one")
+        .add_edge("three", END)
+        .compile()
+    )
+    result = _run_awaitable(
+        compiled.invoke(
+            input={"x": initial, "log": []}, effects=SimulatedEffects(seed)
+        )
+    )
+    bare = (
+        GraphBuilder("gauntlet-sequence-bare")
+        .add_channel("x", LastValueChannel)
+        .add_channel("log", AppendChannel)
+        .add_sequence([step_one, step_two])
+        .add_edge(START, "step_one")
+        .add_edge("step_two", END)
+        .compile()
+    )
+    bare_result = _run_awaitable(
+        bare.invoke(
+            input={"x": initial, "log": []}, effects=SimulatedEffects(seed)
+        )
+    )
+    return {
+        "chained": {"x": result.state["x"], "log": list(result.state["log"])},
+        "bare_named": {
+            "x": bare_result.state["x"],
+            "log": list(bare_result.state["log"]),
+        },
+    }
+
+
+_WORKLOAD_ARMS["seeded_sequence_chain"] = _sequence_arm
+_support("LG04", ("sequence",), "dharma_swarm.graph:GraphBuilder.add_sequence")
+
+
+def _apply_sequence_evidence(
+    capabilities: dict[str, Any],
+    row_lookup: Mapping[str, Any],
+    workload: Mapping[str, Any],
+) -> None:
+    """LG04.sequence from the seeded two-arm add_sequence workload.
+
+    Fail-closed per the error-parity rule: a probe_error on either arm keeps
+    the facet failing — identical errors are a finding, never a pass.
+    """
+    both_ran = (
+        "probe_error" not in workload["dharma"]
+        and "probe_error" not in workload["langgraph"]
+    )
+    fields = ("chained", "bare_named")
+    equal = both_ran and all(
+        workload["dharma"].get(name) == workload["langgraph"].get(name)
+        for name in fields
+    )
+    entry = capabilities["LG04"]["facets"]["sequence"]
+    entry["status"] = "pass" if equal else "fail"
+    entry["evidence"].append(
+        _evidence(
+            kind="two_arm_differential",
+            evidence_id="seeded_sequence_chain:sequence",
+            command_or_probe=(
+                "compare chained+bare_named add_sequence outcomes on both "
+                "installed runtimes"
+            ),
+            outcome="parity" if equal else "mismatch",
+            dharma={name: workload["dharma"].get(name) for name in fields},
+            langgraph={name: workload["langgraph"].get(name) for name in fields},
+            citations=_row_citations(row_lookup["LG04"]),
+        )
+    )
