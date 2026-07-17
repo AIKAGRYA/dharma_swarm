@@ -2,7 +2,7 @@
 
 **Doc role (per `docs/AGENTS.md`):** `working_plan` — a bounded internal-hardening campaign, not repo-level authority. It creates no new runtime substrate or governance owner and remains subordinate to `CLAUDE.md`, `docs/governance/ACTIVE_TRACK.yaml`, and the canonical document stack.
 
-**Status:** operator-approved; WP-00 admission is reconciled in the admission PR. Phase 0 implementation begins only after that PR merges, and each implementation PR still requires its current active-track owner and normal merge gates.
+**Status:** operator-approved for repository placement. This document sequences work; implementation begins only through WP-00 governance admission, and each implementation PR still requires its current active-track owner and normal merge gates.
 
 ## Agent entrypoint
 
@@ -10,7 +10,7 @@ New agents start here:
 
 1. Run `make onboard`.
 2. Read this document's claim boundary, ownership rules, dependency graph, and Phase 0 exit gate.
-3. Confirm WP-00 is merged and still matches its immutable baseline; if admission is absent or portfolio truth has drifted, reconcile it before opening an implementation packet.
+3. Begin with WP-00; do not skip directly to an implementation packet.
 4. Work one finding, one owner, and one bounded PR at a time.
 5. Do not begin feature work, broad refactors, or live self-evolution before the independent Phase 0 clean-room proof passes on merged `main`.
 
@@ -58,7 +58,7 @@ The campaign composes existing owners and gates. It must not create a new truth 
 
 Audit baseline before this plan branch: `212df1a8c22bd2bbf731dd2308472fb9e2a2f549`.
 
-The campaign baseline is not permanently pinned to this audit SHA. WP-00 captured clean `origin/main` immediately before implementation began:
+The campaign baseline is not permanently pinned to this audit SHA. WP-00 must capture current clean `origin/main` immediately before implementation begins:
 
 ```bash
 git fetch origin
@@ -77,22 +77,7 @@ Required result:
 - the exact SHA and UTC timestamp are recorded; and
 - the baseline commands below are rerun rather than copied from this plan.
 
-The immutable WP-00 evidence record is `reports/governance/titanium/wp00_baseline.json`. It records the exact source objects and observed portfolio state; later packets must refresh operational evidence rather than mutate that record or treat it as a current truth store.
-
-### WP-00 reconciliation record
-
-| Decision or observation | WP-00 disposition |
-|---|---|
-| Clean base | `3482cdfa6a2f3330b1c6df6d332836d7f4b6c9cf` on 2026-07-17 |
-| Fresh generated status | `origin/generated/status` commit `62028cc0e9a67c861f384ef30d5447c6f65eb98a`, derived for the clean base |
-| Portfolio before admission | 10 active / 10 maximum; no spare slot |
-| Mechanically shippable track | `merge-master-mike-d4-2026-06` only, with 7/7 criteria and no pre-WP-00 blocker |
-| Mike disposition | Remains `ACTIVE`; WP-0F2 still owns Mike/automerge surfaces, so WP-00 adds that unresolved work as a blocker rather than graduating the track |
-| TAM mechanics | `company-builder-parity-2026-07` has 4/4 mechanical criteria, but its sealed outcome is `AMBER` at 45% parity |
-| TAM disposition | Retired honestly as `RETIRED`; never represented as `VERIFIED_SLICE`, shipped, parity-complete, or capability-complete |
-| Admission arithmetic | 10/10, retire TAM to 9/10, admit Titanium to 10/10 |
-| Portfolio after admission | 10 active / 10 maximum; zero mechanically shippable or immediately closable tracks because Mike now carries the WP-0F2 blocker |
-| Titanium lifecycle | `repository-titanium-hardening-2026-07` is `ACTIVE`, uses `governance_gate`, and targets `CLOSED_NOT_PROD` |
+The resulting baseline packet records tool versions, repository measurements, command exit codes, GitHub required-context visibility, live-host availability, and final worktree status. It is a CI/PR artifact, not a new committed truth store.
 
 | Measure | Baseline | Reproduction |
 |---|---:|---|
@@ -104,8 +89,8 @@ The immutable WP-00 evidence record is `reports/governance/titanium/wp00_baselin
 | Markdown lines | 290,297 | base-SHA DocOps inventory (head minus the initial 201-line plan) |
 | Modules above 500 lines | 207 at audit commit | `python3 scripts/governance/hygiene/ratchet.py --explain modules_over_500_lines` |
 | Silent exception swallows | 243 at audit commit | `python3 scripts/governance/hygiene/ratchet.py --explain silent_exception_swallows` |
-| Active tracks | 10 / 10 maximum at WP-00 base | `make onboard` |
-| Shippable active tracks | 1 (`merge-master-mike-d4-2026-06`) before its WP-0F2 blocker is recorded | `make onboard` |
+| Active tracks | 9 | `make onboard` |
+| Shippable active tracks | 1 (`company-builder-parity-2026-07`) | `make onboard` |
 
 Baseline command failures re-verified during the adversarial audit:
 
@@ -151,7 +136,7 @@ Severity rubric:
 
 ## Governance and ownership
 
-WP-00 admits a bounded campaign owner for previously unowned Phase 0 surfaces. Existing ownership remains narrower than the first revision of this specification implied:
+The campaign does not currently own implementation surfaces. Current active ownership is narrower than the first revision of this specification implied:
 
 | Active track | Surfaces relevant here that it actually owns |
 |---|---|
@@ -161,24 +146,22 @@ WP-00 admits a bounded campaign owner for previously unowned Phase 0 surfaces. E
 | `organism-rewire-2026-07` | Go tools, world radar, organism surfaces, `docker-compose.yml`, `Dockerfile.swarm` |
 | `helm-worldclass-terminal-2026-06` | `terminal/**` |
 | `loop-closure-2026-06` | `reports/loop_closure/**` and `CYBERNETIC_LOOP_MAP.md` only |
-| `repository-titanium-hardening-2026-07` | only the WP-00-admitted, previously unowned Phase 0 surfaces enumerated below |
 
-Before WP-00, the following Phase 0 surfaces had no declared owner broad enough for this campaign: `Makefile`, `Dockerfile`, hermetic/parity workflows, CI Truth/parity files, DocOps scripts/workflows/generated blocks, and uplift/scan wrappers. Their admitted ownership is now bounded by the exact list below.
+The following Phase 0 surfaces have no declared owner broad enough for this campaign: `Makefile`, `Dockerfile`, hermetic/parity workflows, CI Truth/parity files, DocOps scripts/workflows/generated blocks, and uplift/scan wrappers.
 
 ### WP-00 — Governance admission
 
 **Required before any implementation packet**
 
-1. Retire `company-builder-parity-2026-07` honestly: its 4/4 mechanics do not override the sealed `AMBER` 45% outcome, and retirement must not be represented as verification or shipment.
+1. Move the shippable `company-builder-parity-2026-07` track according to portfolio policy.
 2. Capture the dynamic campaign baseline from clean current `origin/main`.
 3. Add an operator-ratified `repository-titanium-hardening-2026-07` track for the currently unowned Phase 0 surfaces only.
 4. Keep every already-owned surface with its current owner; the new track must not claim Go, terminal, graph, organism, or Mike-owned files.
 5. Add explicit `complements` relations to the owner tracks above.
 6. Add Phase 0 acceptance criteria that execute behavioral commands, not file-existence checks.
-7. Keep `merge-master-mike-d4-2026-06` active and record WP-0F2 as a blocker because that packet still changes Mike-owned surfaces.
-8. Run `render_active_track_includes.py --check` and the track-status checker before merging admission.
+7. Run `render_active_track_includes.py --check` and the track-status checker before merging admission.
 
-WP-00-admitted new-track ownership:
+Proposed new-track ownership:
 
 - `Makefile`
 - `Dockerfile`
@@ -207,20 +190,7 @@ WP-00-admitted new-track ownership:
 - `docs/docops/AUTO_INVENTORY.md`
 - count-managed blocks in `docs/governance/SOVEREIGN_MANIFEST.md`
 - `api/main.py` and existing API-auth tests for the narrow WP-0S fail-closed containment packet only
-- `tests/test_hermetic_supply_chain.py`
 - Phase 0 contract tests introduced by this specification
-
-WP-00 also admits these exact campaign-control and dashboard projection
-surfaces. The dashboard API remains the truth source; this scope removes only
-stale client-side authority constants and does not create a new status owner:
-
-- `docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md`
-- `docs/prompts/TITANIUM_HARDENING_CAMPAIGN_EXECUTOR_2026-07-17.md`
-- `reports/governance/titanium/**`
-- `dashboard/src/lib/operatorCoherence.ts`
-- `dashboard/src/components/operator-coherence/v2/cockpitV2Model.ts`
-- `dashboard/src/components/operator-coherence/v2/CockpitV2Board.tsx`
-- `dashboard/src/components/operator-coherence/v2/cockpitV2Model.test.ts`
 
 Extend `organism-rewire-2026-07` ownership, with operator ratification, to the Go-trigger seam it already governs:
 
@@ -231,7 +201,6 @@ Extend `organism-rewire-2026-07` ownership, with operator ratification, to the G
 - `tests/test_go_world_signal_bridge.py`
 - `tests/test_go_receipt_identity_verify.py`
 - `tests/test_go_adapter_contracts.py`
-- `tests/test_world_radar_go_bridge.py`
 
 Implementation PR rules:
 
@@ -405,7 +374,7 @@ Repository CI must not depend on a live daemon receipt.
 ### WP-0S — Minimum fail-closed ingress
 
 **Findings:** TIT-010
-**Owner:** WP-00-admitted `repository-titanium-hardening-2026-07` for the narrow API containment seam; operator owns deployment containment
+**Owner:** proposed `repository-titanium-hardening-2026-07` for the narrow API containment seam; operator owns deployment containment
 **Depends on:** WP-00, WP-0A
 
 **Allowed files**
@@ -464,7 +433,7 @@ Revert the complete code-and-test packet. If rollback would re-open a reachable 
 ### WP-0A — Hermetic Python bootstrap
 
 **Findings:** TIT-004
-**Owner:** WP-00-admitted `repository-titanium-hardening-2026-07`
+**Owner:** proposed `repository-titanium-hardening-2026-07`
 **Depends on:** WP-00
 
 **Allowed files**
@@ -536,7 +505,7 @@ Revert only `Makefile`, `hermetic.yml`, `Dockerfile`, and the bootstrap contract
 ### WP-0B — Verifier truth
 
 **Findings:** TIT-001
-**Owner:** WP-00-admitted `repository-titanium-hardening-2026-07`
+**Owner:** proposed `repository-titanium-hardening-2026-07`
 **Depends on:** WP-0A
 
 **Allowed files**
@@ -581,7 +550,7 @@ Success output and executed evidence are equivalent.
 ### WP-0C1R — Semgrep finding adjudication
 
 **Findings:** TIT-004
-**Owner:** WP-00-admitted `repository-titanium-hardening-2026-07`
+**Owner:** proposed `repository-titanium-hardening-2026-07`
 **Depends on:** WP-0A
 
 **Allowed files**
@@ -627,7 +596,7 @@ The dynamic-baseline finding set is fully adjudicated and strict Semgrep is clea
 ### WP-0C1 — Required scanners and governance subprocesses fail closed
 
 **Findings:** TIT-004, TIT-005
-**Owner:** WP-00-admitted `repository-titanium-hardening-2026-07`
+**Owner:** proposed `repository-titanium-hardening-2026-07`
 **Depends on:** WP-0A, WP-0C1R
 
 **Allowed files**
@@ -741,7 +710,7 @@ One version-aware helper determines Go capability for all Go bridges and tests.
 ### WP-0D — Fast-suite determinism
 
 **Findings:** TIT-002
-**Owner:** WP-00-admitted `repository-titanium-hardening-2026-07`
+**Owner:** proposed `repository-titanium-hardening-2026-07`
 **Depends on:** WP-0A, WP-0B
 
 **Observed symptom**
@@ -798,7 +767,7 @@ Revert the isolated leak fix. If production behavior changed, restore it and kee
 ### WP-0E — Hermetic/live verification split
 
 **Findings:** TIT-009
-**Owner:** WP-00-admitted `repository-titanium-hardening-2026-07`
+**Owner:** proposed `repository-titanium-hardening-2026-07`
 **Depends on:** WP-0C1
 
 **Allowed files**
@@ -855,7 +824,7 @@ Restore target wiring only. Do not copy a live receipt into the repository to ma
 ### WP-0F1 — CI Truth and parity authority
 
 **Findings:** TIT-006, TIT-007
-**Owner:** WP-00-admitted `repository-titanium-hardening-2026-07`
+**Owner:** proposed `repository-titanium-hardening-2026-07`
 **Depends on:** WP-0A
 
 **Allowed files**
@@ -975,7 +944,7 @@ Every Mike/automerge entry path consumes the same required-check truth and fails
 ### WP-0G — Strict DocOps convergence
 
 **Findings:** TIT-008
-**Owner:** WP-00-admitted `repository-titanium-hardening-2026-07`
+**Owner:** proposed `repository-titanium-hardening-2026-07`
 **Depends on:** WP-0A; may proceed in parallel with WP-0D through WP-0F1
 
 **Allowed files**
@@ -1033,7 +1002,7 @@ Strict DocOps passes on merged `main`; a reconcile update reaches main or a chec
 ### WP-0H — Polyglot CI orchestration
 
 **Findings:** TIT-003, TIT-015
-**Owner:** WP-00-admitted `repository-titanium-hardening-2026-07`
+**Owner:** proposed `repository-titanium-hardening-2026-07`
 **Depends on:** WP-0A, WP-0C1, WP-0C2
 
 **Allowed files**
@@ -1442,20 +1411,14 @@ Ratchet baselines may tighten after an improvement. They may not be raised in th
 
 These are external prerequisites, not tasks an implementation agent may silently decide:
 
-Resolved by WP-00 operator direction:
-
-- Capacity: retire `company-builder-parity-2026-07` with its unresolved AMBER 45% outcome, then admit `repository-titanium-hardening-2026-07`; the portfolio remains 10/10.
-- Sequencing: ratify this specification as the campaign sequencing layer over existing owners.
-- Mike ownership: keep `merge-master-mike-d4-2026-06` active through WP-0F2 and add that packet as an explicit blocker.
-
-Open external prerequisites:
-
-1. Approve the six-context required-check set in WP-0F1 or provide a replacement set with rationale.
-2. Provision Administration-read access for live branch-protection parity.
-3. Confirm the DocOps reconcile credential or approve normal reviewed-PR delivery only; no credential is committed.
-4. Define the minimum human-approval rule for human-authored and bot-authored PRs.
-5. Verify the actual deployment exposure of the FastAPI web service before WP-0S. If it is reachable beyond loopback/private authenticated ingress, set the required authentication material and unpublish, firewall, or stop the service until WP-0S closes.
-6. Nominate the independent WP-0I reviewer or agent after every implementation packet is merged.
+1. Move the shippable `company-builder-parity-2026-07` track according to portfolio policy.
+2. Ratify this specification as a sequencing layer over existing owners.
+3. Approve the six-context required-check set in WP-0F1 or provide a replacement set with rationale.
+4. Provision Administration-read access for live branch-protection parity.
+5. Confirm the DocOps reconcile credential or approve normal reviewed-PR delivery only.
+6. Define the minimum human-approval rule for human-authored and bot-authored PRs.
+7. Verify the actual deployment exposure of the FastAPI web service before WP-0S. If it is reachable beyond loopback/private authenticated ingress, set the required authentication material and unpublish, firewall, or stop the service until WP-0S closes.
+8. Nominate the independent WP-0I reviewer or agent after every implementation packet is merged.
 
 An unavailable operator prerequisite blocks only its dependent packet. It does not justify weakening or fabricating the evidence.
 

@@ -1,22 +1,20 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
   DESIGN_SOURCES,
   LANE_ADMISSION_FIELDS,
   MODES,
+  PRODUCTION_READINESS_VERDICTS,
   TRUTH_TAXONOMY,
   actionToInspect,
   buildAuthorityInspect,
   buildHandoff,
   buildLaneAdmissionInspect,
-  buildTrackLifecycleReviews,
   buildTopPanels,
   cardFacetBadges,
   cardToInspect,
   classifyCardTruth,
-  deriveCheckoutAuthority,
   filterCards,
   humanKind,
   humanRisk,
@@ -93,7 +91,7 @@ function report() {
       card({ id: "live:1", kind: "live_ops_surface", title: "Dharma daemon — stale", risk: "stale_liveness_claim", lane: "Needs Repair", branch: "" }),
       card({ id: "track:1", kind: "track", title: "Runtime Truth Reconciliation", risk: "stale_claim", lane: "Needs Repair", branch: "" }),
     ],
-    track_portfolio: { active_count: 10, closed_count: 4, policy: { max_active: 10 }, tracks: [], proposed_tracks: [], broken_register: {} },
+    track_portfolio: { active_count: 11, closed_count: 4, tracks: [], proposed_tracks: [], broken_register: {} },
     rogue_work_radar: {
       cards: [],
       dirty_worktree_count: 8,
@@ -106,7 +104,7 @@ function report() {
     },
     agent_terminal_census: {},
     branch_census: { total: 207, local_only: 107, unpushed_ahead: 40, orphaned_gone: 55, stale: 87 },
-    git: { main: { branch: "main", branch_line: "## main...origin/main", head: "3482cdfa6a2f3330b1c6df6d332836d7f4b6c9cf", dirty_count: 0 } },
+    git: { main: { branch: "telos-ai-seed-v0-from-sandbox", branch_line: "## telos-ai-seed-v0-from-sandbox...origin/telos-ai-seed-v0-from-sandbox [ahead 2]" } },
     live_ops: { enabled: true, summary: { total: 17, by_status: { live: 4, stale: 2, blocked: 2, stopped: 9 } } },
     onboarding: { status: "wired", target: "make onboard" },
     runtime_receipts: { runtime_dbs: [], receipt_count: 19, recent_receipts: [] },
@@ -196,7 +194,7 @@ test("human labels and readiness tone are operator-friendly", () => {
 
 test("truth taxonomy and facet badges distinguish candidate/live/stale/local state", () => {
   assert.ok(TRUTH_TAXONOMY.some((truth) => truth.code === "DIRTY_LOCAL_CANDIDATE"));
-  assert.ok(TRUTH_TAXONOMY.some((truth) => truth.code === "CLEAN_LOCAL_MAIN"));
+  assert.ok(TRUTH_TAXONOMY.some((truth) => truth.code === "CANONICAL_ORIGIN_MAIN"));
   assert.equal(classifyCardTruth(card()).code, "LOCAL_ONLY_BRANCH");
   assert.equal(classifyCardTruth(card({ facets: { ...card().facets, local_only: false, live: true } })).code, "LIVE_RUNTIME_PROOF");
   assert.equal(classifyCardTruth(card({ facets: { ...card().facets, local_only: false, stale: true } })).code, "STALE_RECEIPT");
@@ -206,85 +204,18 @@ test("truth taxonomy and facet badges distinguish candidate/live/stale/local sta
   }
 });
 
-test("checkout authority classifies a clean local main without claiming remote canonicality", () => {
-  const authority = deriveCheckoutAuthority(report());
-  assert.equal(authority.code, "CLEAN_LOCAL_MAIN");
-  assert.equal(authority.head, "3482cdfa6a2f3330b1c6df6d332836d7f4b6c9cf");
-  assert.equal(authority.dirtyCount, 0);
-  assert.equal(authority.maxActive, 10);
-  assert.match(authority.detail, /does not independently prove origin\/main/);
-
+test("authority inspect makes canonical-vs-dirty distinction explicit", () => {
   const inspect = buildAuthorityInspect(report());
-  assert.equal(inspect.status, "10/10 active · HEAD 3482cdfa6a2f");
-  assert.match(inspect.subtitle ?? "", /CLEAN_LOCAL_MAIN/);
-  assert.match(inspect.nextAction ?? "", /verify origin\/main separately/);
+  assert.equal(inspect.status, "canonical 7/10 · local 11/—");
+  assert.match(inspect.subtitle ?? "", /CANDIDATE_HIGH_PRIORITY_NOT_CANONICAL/);
+  assert.match(inspect.risk ?? "", /Dirty local candidate/);
+  assert.ok(inspect.evidence?.some((ev) => ev.source.includes("OPERATOR_COHERENCE_COCKPIT_ADMISSION_REVIEW")));
 });
 
-test("checkout authority classifies a clean non-main branch", () => {
-  const cleanBranch = report();
-  cleanBranch.git = { main: { branch: "agent/titanium", head: "abc123", dirty_count: 0 } };
-  assert.equal(deriveCheckoutAuthority(cleanBranch).code, "CLEAN_LOCAL_BRANCH");
-});
-
-test("checkout authority classifies a dirty observation", () => {
-  const dirty = report();
-  dirty.git = { main: { branch: "main", head: "abc123", dirty_count: 3 } };
-  assert.equal(deriveCheckoutAuthority(dirty).code, "DIRTY_LOCAL_CHECKOUT");
-  assert.match(deriveCheckoutAuthority(dirty).detail, /3 local paths/);
-});
-
-test("checkout authority classifies incomplete git evidence as unavailable", () => {
-  const unavailable = report();
-  unavailable.git = { main: { branch: "main", dirty_count: 0 } };
-  assert.equal(deriveCheckoutAuthority(unavailable).code, "CHECKOUT_STATE_UNAVAILABLE");
-});
-
-test("active-track lifecycle review is live-data driven and SHIPPABLE is not production readiness", () => {
-  const liveReport = report();
-  liveReport.track_portfolio.tracks = [
-    {
-      id: "live-shippable-track",
-      name: "Live shippable track",
-      lifecycle: "active",
-      status: "shippable",
-      shippable: true,
-      evidence_present: true,
-      has_rigorous_evidence: true,
-      readiness: 100,
-    },
-    {
-      id: "live-stale-track",
-      name: "Live stale track",
-      lifecycle: "active",
-      status: "active",
-      stale: true,
-      evidence_present: true,
-      has_rigorous_evidence: true,
-    },
-    { id: "closed-history", name: "Closed history", lifecycle: "closed", status: "retired" },
-  ];
-
-  const reviews = buildTrackLifecycleReviews(liveReport);
-  assert.deepEqual(reviews.map((review) => review.trackId), ["live-shippable-track", "live-stale-track"]);
-  assert.equal(reviews[0].code, "OPERATOR_CLOSURE_REVIEW");
-  assert.match(reviews[0].detail, /not a production-readiness verdict/);
-  assert.equal(reviews[1].code, "REFRESH_STALE_EVIDENCE");
-});
-
-test("cockpit sources do not retain the stale June authority or verdict constants", () => {
-  const source = [
-    readFileSync(new URL("./cockpitV2Model.ts", import.meta.url), "utf8"),
-    readFileSync(new URL("./CockpitV2Board.tsx", import.meta.url), "utf8"),
-  ].join("\n");
-  for (const stale of [
-    "839fd25f43c76375f49e45012fe8f20a324aa74c",
-    "governance/operator-coherence-cockpit-20260623",
-    "canonicalActiveTracks",
-    "PRODUCTION_READINESS_VERDICTS",
-    "canonical baseline is 7/10",
-  ]) {
-    assert.ok(!source.includes(stale), `stale authority constant remains: ${stale}`);
-  }
+test("production readiness verdicts avoid checker-shippable closure semantics", () => {
+  assert.equal(PRODUCTION_READINESS_VERDICTS.length, 5);
+  assert.ok(PRODUCTION_READINESS_VERDICTS.some((item) => item.verdict === "SPLIT_BEFORE_CLOSE"));
+  assert.ok(PRODUCTION_READINESS_VERDICTS.some((item) => item.verdict === "KEEP_ACTIVE_PROD_HARDENING"));
 });
 
 test("lane admission contract exposes required packet fields for UI rendering", () => {

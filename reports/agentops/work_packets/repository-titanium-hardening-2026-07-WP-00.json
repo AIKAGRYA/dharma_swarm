@@ -1,6 +1,6 @@
 {
   "id": "repository-titanium-hardening-2026-07-WP-00",
-  "base_ref": "3482cdfa6a2f3330b1c6df6d332836d7f4b6c9cf",
+  "base_ref": "27ef35af1d6f8ae55c491aea5537a4db9cc34a52",
   "branch": "agent/titanium-wp00-admission",
   "worktree": ".",
   "intent": "Admit the Titanium repository-hardening campaign without implementing Phase 0: retire TAM honestly at AMBER, keep Mike active through WP-0F2, establish bounded ownership, and regenerate the canonical portfolio projections. Baseline, prompt, specification, and dashboard work follow in a second packet under the newly admitted Titanium owner.",
@@ -54,6 +54,8 @@
     "tests/test_graph_checkpoint.py",
     "tests/test_graph_reconciler.py",
     "tests/test_graph_durable_invoker.py",
+    "tests/test_graph_neutral_langgraph_oracle.py",
+    "tests/test_graph_pregel_properties.py",
     "tests/test_langgraph_differential_oracle.py",
     "docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md",
     "docs/plans/handoffs/DHARMAGRAPH_HANDOFF_DEVIN.md",
@@ -217,7 +219,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "3482cdfa6a2f3330b1c6df6d332836d7f4b6c9cf",
+      "checked_at_sha": "27ef35af1d6f8ae55c491aea5537a4db9cc34a52",
       "details": []
     },
     "interface_mismatches": [
@@ -237,7 +239,7 @@
       "Live-only proof must remain NEEDS_HOST or BLOCKED_OPERATOR until produced on its canonical owner host.",
       "Open stale governance PRs touching ACTIVE_TRACK.yaml or SOVEREIGN_MANIFEST.md must rebase and reseal after this change."
     ],
-    "rollback": "Revert this admission commit as one unit: remove the Titanium active-track entry and executor prompt/baseline, restore TAM to ACTIVE at AMBER, restore managed projections and dashboard authority rendering, and leave every implementation packet blocked.",
-    "packet_digest": "3149f6ce881bbe4de8a3a95acd78c3301a0f7127bbb66a4a83b1cefe5529fbcf"
+    "rollback": "Revert this admission commit as one unit: remove the Titanium active-track entry, restore TAM to ACTIVE at AMBER, restore the managed CLAUDE and SOVEREIGN projections, and leave every Titanium evidence or implementation packet blocked.",
+    "packet_digest": "04849db9c143b74377bc4fe316b66a0901675a3eeae869889801b7ede4e20677"
   }
 }
