@@ -1,0 +1,232 @@
+{
+  "id": "loop-closure-WP-A4A5",
+  "base_ref": "27ef35af1d6f8ae55c491aea5537a4db9cc34a52",
+  "branch": "claude/pr-993-merge-readiness-2um0pw",
+  "worktree": ".",
+  "intent": "Aliveness campaign Wave-0 PR-2 (A4+A5), loop-closure lane: the only liveness surface, ~/.dharma/ops/loop_liveness.json, is overwritten in place by orchestrate_live.py _write_loop_liveness (tmp.replace), so an unattended run leaves zero replayable uptime evidence, and no process-level boot identity exists anywhere in dharma_swarm/ (git grep boot_id at base: zero hits), making P4 restart survival unprovable (docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md P4). This packet adds: a single-mint process boot_id in dharma_swarm/spine/identity.py; a durable appender in orchestrate_live.py that writes digest-chained spine VerifiedMachineReceipt rows (boot_id, pid, running, restart_counts, abandoned) to ~/.dharma/ops/liveness_ledger.jsonl hourly and on abandonment change, reusing spine/receipt.py append_machine_receipt (one receipt format, one digest formula); a read-only replay verifier scripts/governance/liveness_ledger_check.py that exits typed needs_host(0) when the ledger is absent and 1 on broken chain or failed coverage; a live_ops_census.py dharma_daemon pattern fix so the census can match the container entrypoint python -m dharma_swarm.orchestrate_live (Dockerfile.swarm CMD) that the CLI-only pattern could never see; tests; and the loop-closure next_item admission. No scheduling changes (census cron waits on BR-004 reconciliation), no hot-loop semantics changed, evidence-append failures never propagate into the supervision loop.",
+  "allowed_files": [
+    "reports/agentops/work_packets/loop-closure-WP-A4A5.json",
+    "dharma_swarm/spine/identity.py",
+    "dharma_swarm/orchestrate_live.py",
+    "scripts/governance/liveness_ledger_check.py",
+    "scripts/runtime/live_ops_census.py",
+    "tests/test_liveness_ledger_check.py",
+    "tests/test_orchestrate_live.py",
+    "tests/test_live_ops_census.py",
+    "docs/governance/ACTIVE_TRACK.yaml"
+  ],
+  "forbidden_files": [
+    ".github/workflows/automerge.yml",
+    ".github/workflows/branch-janitor.yml",
+    ".github/workflows/codex-mention-router.yml",
+    ".github/workflows/kernel-tests.yml",
+    ".github/workflows/kernel-titanium-verify.yml",
+    ".github/workflows/langgraph-oracle.yml",
+    ".github/workflows/merge-master-mike-backlog.yml",
+    ".github/workflows/pramana-probe.yml",
+    ".github/workflows/pudgala-rigor.yml",
+    "Dockerfile.swarm",
+    "dharma_swarm/archive.py",
+    "dharma_swarm/chamber/**",
+    "dharma_swarm/checkpoint.py",
+    "dharma_swarm/coordination/**",
+    "dharma_swarm/council/**",
+    "dharma_swarm/diversity_archive.py",
+    "dharma_swarm/evolution_safety.py",
+    "dharma_swarm/graph/**",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/organism.py",
+    "dharma_swarm/strange_loop.py",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/topology_genome.py",
+    "dharma_swarm/workflow.py",
+    "dharma_swarm/world_radar/**",
+    "docker-compose.yml",
+    "docs/governance/hygiene/patterns/AI-M1.yaml",
+    "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json",
+    "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+    "docs/plans/DARSHAN_CHARTER_2026-07-12.md",
+    "docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md",
+    "docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md",
+    "docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md",
+    "docs/plans/INWARD_ASCENT_PHASE0_DOSSIER_2026-07-07.md",
+    "docs/plans/TAM_MASTER_PROMPT_2026-07-07.md",
+    "docs/plans/TAM_TRANSDIMENSIONAL_ABUNDANCE_MACHINE_2026-07-07.md",
+    "docs/plans/handoffs/DHARMAGRAPH_HANDOFF_CLAUDE.md",
+    "docs/plans/handoffs/DHARMAGRAPH_HANDOFF_DEVIN.md",
+    "docs/research/POLSIA_COFOUNDER_BLUEPRINT_GENEALOGY_2026-07-07.md",
+    "docs/vision_maps/MASTER_2026-07-07_hyperbolic_time_chamber.md",
+    "packages/telos-kernel/**",
+    "packages/titanium-verify/**",
+    "pyproject.toml",
+    "reports/darshan/**",
+    "reports/governance/arena/**",
+    "reports/governance/chamber/**",
+    "reports/governance/dharmagraph_parity/**",
+    "reports/governance/inward_ascent/**",
+    "reports/governance/tam/**",
+    "reports/tam/**",
+    "scripts/governance/arena_truth_report.py",
+    "scripts/governance/branch_janitor.py",
+    "scripts/governance/check_claim_evidence_binding.py",
+    "scripts/governance/dharmagraph_parity_gauntlet.py",
+    "scripts/governance/frontier_ledger.py",
+    "scripts/governance/hygiene/**",
+    "scripts/governance/inward_ascent_baseline.py",
+    "scripts/governance/pramana_probe.py",
+    "scripts/governance/tam_axes.py",
+    "scripts/governance/tam_ledger.py",
+    "scripts/governance/transcendence_ledger.py",
+    "scripts/governance/verify_corral_findings.py",
+    "scripts/runtime/merge_master_mike_daemon.py",
+    "scripts/runtime/pr_merge_control.py",
+    "terminal/**",
+    "tests/oracle_support/dharmagraph_gauntlet.py",
+    "tests/test_arena_truth_report.py",
+    "tests/test_arena_v1.py",
+    "tests/test_branch_janitor.py",
+    "tests/test_chamber_daily_delta.py",
+    "tests/test_chamber_gym_git_history.py",
+    "tests/test_chamber_ledger_history.py",
+    "tests/test_chamber_predictions.py",
+    "tests/test_chamber_sandbox.py",
+    "tests/test_chamber_traces.py",
+    "tests/test_checkpoint.py",
+    "tests/test_claim_evidence_binding.py",
+    "tests/test_coordination_closure_checks.py",
+    "tests/test_council_profiles.py",
+    "tests/test_dharmagraph_parity_gauntlet.py",
+    "tests/test_dpi.py",
+    "tests/test_evolution_safety.py",
+    "tests/test_graph_checkpoint.py",
+    "tests/test_graph_durable_invoker.py",
+    "tests/test_graph_neutral_langgraph_oracle.py",
+    "tests/test_graph_pregel_properties.py",
+    "tests/test_graph_reconciler.py",
+    "tests/test_langgraph_differential_oracle.py",
+    "tests/test_merge_master_mike_daemon.py",
+    "tests/test_orchestration_genome.py",
+    "tests/test_orchestrator_v1.py",
+    "tests/test_pr_merge_control.py",
+    "tests/test_pr_merge_control_github_reviews.py",
+    "tests/test_pramana.py",
+    "tests/test_pramana_probe.py",
+    "tests/test_tam_ledger.py",
+    "tests/test_topology_execution.py",
+    "tests/test_transcendence_ledger.py",
+    "tests/test_verify_corral_findings.py",
+    "tests/test_workflow.py",
+    "tools/evidence_ingestor_go/**",
+    "tools/github_ingestor_go/**",
+    "tools/world_scout_go/**",
+    "tools/world_signal_ingestor_go/**"
+  ],
+  "gates": [
+    {
+      "name": "wp-a4a5-ledger-checker-suite",
+      "command": "python3 -m pytest tests/test_liveness_ledger_check.py -q",
+      "env": {},
+      "expected_exit": 0
+    },
+    {
+      "name": "wp-a4a5-ledger-appender-chains",
+      "command": "python3 -m pytest tests/test_orchestrate_live.py::test_append_liveness_ledger_row_chains_and_carries_boot_id -q",
+      "env": {},
+      "expected_exit": 0
+    },
+    {
+      "name": "wp-a4a5-ledger-appender-absorbs-failure",
+      "command": "python3 -m pytest tests/test_orchestrate_live.py::test_append_liveness_ledger_row_failure_returns_none -q",
+      "env": {},
+      "expected_exit": 0
+    },
+    {
+      "name": "wp-a4a5-boot-id-single-mint",
+      "command": "python3 -m pytest tests/test_orchestrate_live.py::test_process_boot_id_is_stable_within_process -q",
+      "env": {},
+      "expected_exit": 0
+    },
+    {
+      "name": "wp-a4a5-census-suite",
+      "command": "python3 -m pytest tests/test_live_ops_census.py -q",
+      "env": {},
+      "expected_exit": 0
+    },
+    {
+      "name": "ruff-wp-a4a5",
+      "command": "python3 -m ruff check dharma_swarm/spine/identity.py scripts/governance/liveness_ledger_check.py scripts/runtime/live_ops_census.py tests/test_liveness_ledger_check.py",
+      "env": {},
+      "expected_exit": 0
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "wp-a4a5-base-has-no-boot-identity",
+      "command": "python3 -c \"import subprocess; r=subprocess.run(['git','grep','-l','boot_id','3482cdfa6a2f3330b1c6df6d332836d7f4b6c9cf','--','dharma_swarm/','scripts/'],capture_output=True,text=True); raise SystemExit(0 if r.returncode == 1 and not r.stdout.strip() else 9)\"",
+      "env": {},
+      "expected_exit": 0
+    },
+    {
+      "name": "wp-a4a5-base-has-no-ledger-verifier",
+      "command": "python3 -c \"import subprocess; r=subprocess.run(['git','cat-file','-e','3482cdfa6a2f3330b1c6df6d332836d7f4b6c9cf:scripts/governance/liveness_ledger_check.py'],capture_output=True); raise SystemExit(0 if r.returncode != 0 else 9)\"",
+      "env": {},
+      "expected_exit": 0
+    },
+    {
+      "name": "wp-a4a5-base-census-blind-to-container-daemon",
+      "command": "python3 -c \"import subprocess; src=subprocess.run(['git','show','3482cdfa6a2f3330b1c6df6d332836d7f4b6c9cf:scripts/runtime/live_ops_census.py'],capture_output=True,text=True).stdout; raise SystemExit(0 if src and 'orchestrate_live' not in src else 9)\"",
+      "env": {},
+      "expected_exit": 0
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "feat(loop-closure): durable liveness ledger, boot_id, replay verifier (WP-A4A5)"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.11.15",
+      "git": "2.43.0",
+      "make": "4.3"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-A4A5",
+    "active_track": "loop-closure-2026-06",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "27ef35af1d6f8ae55c491aea5537a4db9cc34a52",
+      "details": []
+    },
+    "interface_mismatches": [
+      "scripts/runtime/live_ops_census.py PROCESS_PATTERNS['dharma_daemon'] matched only the dgc_cli spelling while Dockerfile.swarm CMD boots python -m dharma_swarm.orchestrate_live, so the census reported the daemon dead on every containerized host; fixed in this packet by extending the pattern to both launch spellings (not added to INTERFACE_MISMATCH_MAP.md because it is fixed in the same change)."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/spine/receipt.py:append_machine_receipt",
+      "dharma_swarm/spine/receipt.py:_read_verified_machine_receipt_chain",
+      "dharma_swarm/orchestrate_live.py:_write_loop_liveness",
+      "scripts/runtime/github_ingestor_runner.py (typed needs_host exit discipline)",
+      "dharma_swarm/spine/identity.py:_new_id"
+    ],
+    "honest_blockers": [
+      "The host legs of A4/A5 stay open by design: >=24 chained hourly rows under one boot_id need 24h on a booted host, and the cross-restart different-boot_id proof needs the operator's single deliberate restart (WP-LC2); this packet ships only the producer, the mint, and the CI-safe verifier (needs_host on this seat).",
+      "Hourly census scheduling (the A4 secondary witness) is deliberately NOT wired: cron job config is frozen behind the BR-004 pulse-fork reconciliation (pulse.py executes handler jobs as headless LLM prompts), so scheduling before that fix would be theater.",
+      "The full tests/test_orchestrate_live.py suite cannot run as a packet gate: the admission jail interpreter lacks pytest-asyncio, so its four pre-existing async tests fail collection there (verified in the first closeout report). The packet gates pin the three synchronous tests this change adds; the full suite is adjudicated by the hosted pytest (3.11/3.12) CI contexts, mirroring the WP-O8 venv-sensitivity precedent.",
+      "The ruff gate cannot name dharma_swarm/orchestrate_live.py: its stem normalizes to a banned live-command token in the gate grammar (contract.py _BANNED_LIVE_COMMAND_TOKENS), so that file is linted by the repo-wide CI lint instead of a packet gate.",
+      "If origin/main moves past base 3482cdfa before merge, this packet must be re-minted (base_ref, collision sha, negative-control shas, digest)."
+    ],
+    "rollback": "revert the spine boot_id mint, the orchestrate_live ledger appender and its tick wiring, the replay verifier, the census pattern extension, the three test additions, the loop-closure next_item 11, and this packet together; the overwrite-in-place liveness gap and the zero-hit boot_id grep then reproduce at will.",
+    "packet_digest": "34715a82fdd0bfad443b7ee757ef71a71e712241486c7a908a8638924b65826d"
+  }
+}

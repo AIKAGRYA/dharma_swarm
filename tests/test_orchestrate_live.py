@@ -10,7 +10,6 @@ import asyncio
 import json
 import logging
 import os
-import signal
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -339,3 +338,62 @@ async def test_orchestrate_restarts_failed_task(monkeypatch, tmp_path):
     await asyncio.wait_for(mod.orchestrate(), timeout=1.0)
 
     assert calls["swarm"] == 2
+
+
+# ---------------------------------------------------------------------------
+# Durable liveness ledger (A4) + boot_id carriage (A5)
+# ---------------------------------------------------------------------------
+
+def test_append_liveness_ledger_row_chains_and_carries_boot_id(tmp_path):
+    """Rows chain tamper-evidently and every row carries the one process
+    boot_id — the overwrite-in-place loop_liveness.json snapshot could
+    never prove either property."""
+    from dharma_swarm.orchestrate_live import append_liveness_ledger_row
+    from dharma_swarm.spine.identity import process_boot_id
+    from dharma_swarm.spine.receipt import _read_verified_machine_receipt_chain
+
+    ledger = tmp_path / "liveness_ledger.jsonl"
+    first = append_liveness_ledger_row(
+        running=["swarm"], restart_counts={}, abandoned=[], path=ledger,
+    )
+    second = append_liveness_ledger_row(
+        running=["swarm", "pulse"],
+        restart_counts={"pulse": 1},
+        abandoned=["gauntlet"],
+        path=ledger,
+    )
+    assert first is not None and second is not None
+
+    rows = _read_verified_machine_receipt_chain(ledger)  # raises on tamper
+    assert len(rows) == 2
+    assert rows[1]["prev_digest"] == rows[0]["digest"]
+    assert {row["attributes"]["kind"] for row in rows} == {"loop_liveness"}
+    # A5: one process, one boot identity, minted at the single spine site.
+    assert {row["attributes"]["boot_id"] for row in rows} == {process_boot_id()}
+    assert rows[0]["attributes"]["boot_id"].startswith("boot_")
+    assert rows[1]["attributes"]["restart_counts"] == {"pulse": 1}
+    assert rows[1]["attributes"]["abandoned"] == ["gauntlet"]
+    assert rows[1]["attributes"]["pid"] == os.getpid()
+
+
+def test_append_liveness_ledger_row_failure_returns_none(tmp_path, caplog):
+    """Evidence-append failure must never propagate into the supervision
+    loop: a directory squatting on the ledger path makes every append fail,
+    and the appender absorbs it."""
+    from dharma_swarm.orchestrate_live import append_liveness_ledger_row
+
+    blocked = tmp_path / "ledger-is-a-directory"
+    blocked.mkdir()
+    with caplog.at_level(logging.WARNING, logger="dharma_swarm.orchestrate_live"):
+        result = append_liveness_ledger_row(
+            running=[], restart_counts={}, abandoned=[], path=blocked,
+        )
+    assert result is None
+    assert any("liveness ledger append failed" in r.message for r in caplog.records)
+
+
+def test_process_boot_id_is_stable_within_process():
+    from dharma_swarm.spine.identity import process_boot_id
+
+    assert process_boot_id() == process_boot_id()
+    assert process_boot_id().startswith("boot_")

@@ -12,7 +12,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import subprocess
 from collections import Counter
 from datetime import UTC, datetime
@@ -90,7 +89,10 @@ AUTHORITY_SOURCES: tuple[dict[str, str], ...] = (
 
 
 PROCESS_PATTERNS: dict[str, str] = {
-    "dharma_daemon": r"dharma_swarm\.dgc_cli orchestrate-live",
+    # Both launch spellings: the operator CLI and the container entrypoint
+    # (`python -m dharma_swarm.orchestrate_live`, Dockerfile.swarm CMD) — the
+    # CLI-only pattern reported the daemon dead on every containerized host.
+    "dharma_daemon": r"dharma_swarm\.dgc_cli orchestrate-live|dharma_swarm\.orchestrate_live",
     "dharma_cron": r"dharma_swarm\.dgc_cli cron daemon",
     "nats": r"nats-server .*local-nats\.conf",
     "nats_a2a_bridge": r"dharma_swarm\.operator_core\.nats_a2a_bridge",
