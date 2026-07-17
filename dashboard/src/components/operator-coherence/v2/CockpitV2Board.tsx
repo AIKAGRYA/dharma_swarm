@@ -15,18 +15,20 @@ import {
   asText,
   buildAuthorityInspect,
   buildLaneAdmissionInspect,
+  buildTrackLifecycleReviews,
   buildTopPanels,
-  CANDIDATE_AUTHORITY,
   DESIGN_SOURCES,
+  deriveBranchRiskProjection,
+  deriveCheckoutAuthority,
   filterCards,
   formatCount,
   humanRisk,
   LANE_ADMISSION_FIELDS,
+  metricNeedsAttention,
   MODES,
-  PRODUCTION_READINESS_VERDICTS,
-  productionVerdictToInspect,
-  productionVerdictTone,
   sourceToInspect,
+  summarizeTrackLifecycleProjection,
+  trackLifecycleReviewToInspect,
   type CockpitMode,
   type InspectItem,
 } from "./cockpitV2Model";
@@ -125,10 +127,28 @@ function V2Hero({
   onInspect: (item: InspectItem) => void;
 }) {
   const sourceErrorCount = report.source_errors.length;
-  const status = report.readiness.score >= 70 ? "STABLE" : report.readiness.score >= 40 ? "MIXED" : "DEGRADED";
+  const status = `EVIDENCE ${report.readiness.score}%`;
   const authorityInspect = buildAuthorityInspect(report);
-  const candidateBranch = report.git?.main?.branch ?? "unknown";
-  const localMax = (report.track_portfolio as { policy?: { max_active?: unknown } }).policy?.max_active;
+  const authority = deriveCheckoutAuthority(report);
+  const branchRisk = deriveBranchRiskProjection(report);
+  const authorityPalette = authority.tone === "danger"
+    ? "border-bengara/40 bg-bengara/10 hover:border-bengara/70"
+    : authority.tone === "warn"
+      ? "border-kinpaku/40 bg-kinpaku/8 hover:border-kinpaku/65"
+      : authority.tone === "ok"
+        ? "border-emerald-500/35 bg-emerald-500/8 hover:border-emerald-400/60"
+        : authority.tone === "info"
+          ? "border-aozora/35 bg-aozora/8 hover:border-aozora/60"
+          : "border-sumi-700/60 bg-sumi-900/35 hover:border-sumi-600";
+  const authorityAccent = authority.tone === "danger"
+    ? "text-bengara"
+    : authority.tone === "warn"
+      ? "text-kinpaku"
+      : authority.tone === "ok"
+        ? "text-emerald-400"
+        : authority.tone === "info"
+          ? "text-aozora"
+          : "text-sumi-500";
   return (
     <header className="rounded-md border border-sumi-800/60 bg-[linear-gradient(135deg,rgba(20,27,46,0.92),rgba(10,14,26,0.96))] p-4">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px]">
@@ -146,23 +166,23 @@ function V2Hero({
           <button
             type="button"
             onClick={() => onInspect(authorityInspect)}
-            className="mt-4 grid w-full max-w-4xl gap-3 rounded-md border border-bengara/40 bg-bengara/10 p-3 text-left text-xs hover:border-bengara/70 md:grid-cols-[minmax(0,1fr)_minmax(210px,0.45fr)]"
+            className={`mt-4 grid w-full max-w-4xl gap-3 rounded-md border p-3 text-left text-xs md:grid-cols-[minmax(0,1fr)_minmax(210px,0.45fr)] ${authorityPalette}`}
           >
             <div>
-              <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-bengara">
-                <ShieldAlert size={13} /> Candidate / not canonical
+              <div className={`flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] ${authorityAccent}`}>
+                <ShieldAlert size={13} /> {authority.label}
               </div>
               <div className="mt-1 text-sm font-semibold text-torinoko">
-                This UI is running from a dirty candidate checkout; it must not be read as canonical origin/main truth.
+                {authority.detail}
               </div>
               <div className="mt-1 text-sumi-400">
-                Local branch `{candidateBranch}` projects {report.track_portfolio.active_count}/{asText(localMax)} active tracks; canonical baseline is {CANDIDATE_AUTHORITY.canonicalActiveTracks}/{CANDIDATE_AUTHORITY.canonicalMaxActive} on `{CANDIDATE_AUTHORITY.canonicalRef}`.
+                Observed branch `{authority.branch ?? "unknown"}` projects {authority.activeCount}/{authority.maxActive ?? "?"} active tracks. Remote canonicality is not asserted by this local report.
               </div>
             </div>
-            <div className="rounded border border-bengara/30 bg-sumi-950/35 p-2 font-mono text-[10px] text-sumi-300">
-              {CANDIDATE_AUTHORITY.canonicalCommit.slice(0, 12)}
+            <div className="rounded border border-sumi-700/50 bg-sumi-950/35 p-2 font-mono text-[10px] text-sumi-300">
+              HEAD {authority.head?.slice(0, 12) ?? "unavailable"}
               <br />
-              extract: {CANDIDATE_AUTHORITY.recommendedBranch}
+              dirty paths: {authority.dirtyCount ?? "unavailable"}
             </div>
           </button>
           <div className="mt-4 flex flex-wrap gap-2 text-xs">
@@ -206,7 +226,7 @@ function V2Hero({
           </div>
           <div className="mt-4 grid grid-cols-4 gap-2 text-center text-xs">
             <MiniStat label="cards" value={report.cards.length} />
-            <MiniStat label="branches" value={report.branch_census?.total ?? 0} />
+            <MiniStat label="branches" value={branchRisk.total} />
             <MiniStat label="live" value={report.live_ops?.summary?.by_status?.live ?? 0} />
             <MiniStat label="receipts" value={report.runtime_receipts?.receipt_count ?? 0} />
           </div>
@@ -271,7 +291,6 @@ function OverviewMode({
           <LiveOpsBars report={report} />
         </V2Section>
 
-        <ProductionReadinessSection onInspect={onInspect} />
       </div>
 
       <div className="space-y-3">
@@ -301,26 +320,34 @@ function OverviewMode({
   );
 }
 
-function ProductionReadinessSection({ onInspect }: { onInspect: (item: InspectItem) => void }) {
+function TrackLifecycleReviewSection({ report, onInspect }: { report: OperatorCoherenceReport; onInspect: (item: InspectItem) => void }) {
+  const reviews = buildTrackLifecycleReviews(report);
+  const projection = summarizeTrackLifecycleProjection(report, reviews);
   return (
-    <V2Section title="Production-readiness triage" eyebrow="checker SHIPPABLE is not production close">
+    <V2Section title="Active-track lifecycle review" eyebrow="reported SHIPPABLE triggers evidence review, never production proof">
       <div className="space-y-2">
-        {PRODUCTION_READINESS_VERDICTS.map((verdict) => (
+        {reviews.map((review) => (
           <button
-            key={verdict.trackId}
+            key={review.rowKey}
             type="button"
-            onClick={() => onInspect(productionVerdictToInspect(verdict))}
+            onClick={() => onInspect(trackLifecycleReviewToInspect(review))}
             className="grid w-full grid-cols-[minmax(0,1fr)_190px] gap-3 rounded-md border border-sumi-800/55 bg-sumi-950/35 p-3 text-left text-xs hover:border-aozora/50 max-md:grid-cols-1"
           >
             <div className="min-w-0">
-              <div className="truncate font-semibold text-torinoko">{verdict.trackId}</div>
-              <div className="mt-1 line-clamp-2 text-sumi-500">{verdict.action}</div>
+              <div className="truncate font-semibold text-torinoko">{review.trackName}</div>
+              <div className="mt-1 text-[10px] text-sumi-600">{review.trackId}</div>
+              <div className="mt-1 line-clamp-2 text-sumi-500">{review.action}</div>
             </div>
-            <div className={`self-center rounded border px-2 py-1 text-center text-[10px] font-semibold uppercase tracking-[0.12em] ${productionVerdictTone(verdict.verdict) === "danger" ? "border-bengara/45 bg-bengara/10 text-bengara" : "border-kinpaku/40 bg-kinpaku/8 text-kinpaku"}`}>
-              {verdict.verdict.replaceAll("_", " ")}
+            <div className={`self-center rounded border px-2 py-1 text-center text-[10px] font-semibold uppercase tracking-[0.12em] ${review.tone === "danger" ? "border-bengara/45 bg-bengara/10 text-bengara" : review.tone === "warn" ? "border-kinpaku/40 bg-kinpaku/8 text-kinpaku" : "border-aozora/35 bg-aozora/8 text-aozora"}`}>
+              {review.code.replaceAll("_", " ")}
             </div>
           </button>
         ))}
+        {projection.code !== "TRACK_REVIEWS_AVAILABLE" ? (
+          <div className={`rounded-md border border-dashed p-6 text-center text-sm ${projection.code === "TRACK_ROWS_INCONSISTENT" || projection.code === "TRACK_SOURCE_UNAVAILABLE" ? "border-bengara/45 bg-bengara/8 text-bengara" : "border-sumi-800/70 text-sumi-600"}`}>
+            {projection.detail}
+          </div>
+        ) : null}
       </div>
     </V2Section>
   );
@@ -360,15 +387,38 @@ function LaneAdmissionSection({ onInspect }: { onInspect: (item: InspectItem) =>
 }
 
 function SourceControlBars({ report }: { report: OperatorCoherenceReport }) {
+  const branchRisk = deriveBranchRiskProjection(report);
+  const branchTotal = Math.max(
+    branchRisk.total ?? 0,
+    branchRisk.localOnly ?? 0,
+    branchRisk.unpushed ?? 0,
+    branchRisk.orphaned ?? 0,
+    1,
+  );
+  const stashScale = Math.max(report.rogue_work_radar.stash_count, branchTotal);
+  const dirtyWorktrees = report.rogue_work_radar.dirty_worktree_count;
+  const worktreeScale = Math.max(report.git?.worktrees?.length ?? 0, dirtyWorktrees, 1);
   const metrics = [
-    ["Branches", report.branch_census?.total ?? 0, 207],
-    ["Local-only", report.branch_census?.local_only ?? 0, report.branch_census?.total ?? 1],
-    ["Unpushed", report.branch_census?.unpushed_ahead ?? 0, report.branch_census?.total ?? 1],
-    ["Orphaned", report.branch_census?.orphaned_gone ?? 0, report.branch_census?.total ?? 1],
-    ["Stashes", report.rogue_work_radar.stash_count, 100],
-    ["Dirty worktrees", report.rogue_work_radar.dirty_worktree_count, 12],
+    ["Branches", branchRisk.total, branchTotal],
+    ["Local-only", branchRisk.localOnly, branchTotal],
+    ["Unpushed", branchRisk.unpushed, branchTotal],
+    ["Orphaned", branchRisk.orphaned, branchTotal],
+    ["Stashes", report.rogue_work_radar.stash_count, stashScale],
+    ["Dirty worktrees", dirtyWorktrees, worktreeScale],
   ] as const;
-  return <BarList metrics={metrics} dangerAt={0.3} />;
+  const censusNote = branchRisk.conflicts.length
+    ? `Branch census ${branchRisk.source === "unavailable" ? "unavailable" : "contradictory"}: ${branchRisk.conflicts.join("; ")}`
+    : branchRisk.source === "unavailable"
+      ? "Branch census unavailable; no branch counts were observed."
+      : null;
+  return (
+    <div className="space-y-2">
+      <BarList metrics={metrics} dangerAt={0.3} />
+      {censusNote ? (
+        <p className={`text-[10px] ${branchRisk.conflicts.length ? "text-bengara" : "text-sumi-500"}`}>{censusNote}</p>
+      ) : null}
+    </div>
+  );
 }
 
 function LiveOpsBars({ report }: { report: OperatorCoherenceReport }) {
@@ -385,12 +435,12 @@ function LiveOpsBars({ report }: { report: OperatorCoherenceReport }) {
   return <BarList metrics={metrics} dangerAt={0.12} />;
 }
 
-function BarList({ metrics, dangerAt }: { metrics: readonly (readonly [string, number, number])[]; dangerAt: number }) {
+function BarList({ metrics, dangerAt }: { metrics: readonly (readonly [string, number | null, number])[]; dangerAt: number }) {
   return (
     <div className="space-y-2">
       {metrics.map(([label, value, total]) => {
-        const pct = total > 0 ? Math.min(100, Math.round((value / total) * 100)) : 0;
-        const danger = label !== "Live" && value / Math.max(1, total) >= dangerAt;
+        const pct = value !== null && total > 0 ? Math.min(100, Math.round((value / total) * 100)) : 0;
+        const danger = value !== null && metricNeedsAttention(label, value, total, dangerAt);
         return (
           <div key={label} className="grid grid-cols-[112px_minmax(0,1fr)_76px] items-center gap-3 text-xs">
             <div className="text-sumi-400">{label}</div>
@@ -444,7 +494,7 @@ function TracksMode({ report, onInspect }: { report: OperatorCoherenceReport; on
   const tracks = report.track_portfolio.tracks ?? [];
   return (
     <div className="space-y-3">
-      <ProductionReadinessSection onInspect={onInspect} />
+      <TrackLifecycleReviewSection report={report} onInspect={onInspect} />
       <V2Section title="Track portfolio" eyebrow="ACTIVE_TRACK.yaml + active_track_evidence.json">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-xs">

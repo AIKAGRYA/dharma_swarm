@@ -66,6 +66,26 @@ export interface CoherenceAction {
   evidence: CoherenceEvidence[];
 }
 
+export interface CoherenceTrack {
+  id?: string;
+  name?: string;
+  lifecycle?: string;
+  status?: string;
+  owner?: string;
+  branch?: string;
+  pr?: string;
+  stale?: boolean;
+  readiness?: number;
+  criteria_pass_rate?: number;
+  has_rigorous_evidence?: boolean;
+  readiness_basis?: string;
+  readiness_capped?: boolean;
+  shippable?: boolean;
+  evidence_present?: boolean;
+  next_items?: unknown[];
+  [key: string]: unknown;
+}
+
 export interface OperatorCoherenceReport {
   schema_version: string;
   generated_at: string;
@@ -83,7 +103,11 @@ export interface OperatorCoherenceReport {
   track_portfolio: {
     active_count: number;
     closed_count: number;
-    tracks: Record<string, unknown>[];
+    policy?: {
+      max_active?: number;
+      [key: string]: unknown;
+    };
+    tracks: CoherenceTrack[];
     proposed_tracks: Record<string, unknown>[];
     broken_register: Record<string, unknown>;
   };
@@ -115,8 +139,12 @@ export interface OperatorCoherenceReport {
     main?: {
       branch?: string;
       branch_line?: string;
+      head?: string;
       ahead?: number;
       behind?: number;
+      dirty_count?: number;
+      tracked_dirty_count?: number;
+      untracked_count?: number;
       dirty?: boolean;
     };
     worktrees?: Record<string, unknown>[];
