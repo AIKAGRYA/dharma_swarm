@@ -192,7 +192,7 @@ flowchart TD
 
 The following matrix is imported from the source synthesis and remains subordinate to the TIT registry above.
 
-## 3. The centralization model — four spines
+## The centralization model — four spines
 
 Every audit finding collapses into **"a dangerous action was taken without passing through a chokepoint."** So we build four chokepoints and force all paths through them. This is the whole strategy.
 
@@ -220,7 +220,7 @@ Every audit finding collapses into **"a dangerous action was taken without passi
 
 ---
 
-## 4. FULL EDGE-CASE ENUMERATION (the behaviors any fix MUST cover)
+## Full edge-case enumeration (the behaviors any fix MUST cover)
 
 This is the "enumerate every behavior and edge case before planning" deliverable. Grouped by spine. Each row is a behavior the centralized fix must handle — **not** just the literal example in the audit, but the general class.
 
@@ -295,7 +295,7 @@ This is the "enumerate every behavior and edge case before planning" deliverable
 
 ---
 
-## 5. Idempotency / interaction edge cases across spines (the tricky ones)
+## Idempotency / interaction edge cases across spines (the tricky ones)
 
 - X-1 **CostGate x IdentitySpine:** a retry that is the *same intent* must not be counted as new spend (E-A4 depends on E-B1). Wire CostGate to read the intent key.
 - X-2 **IdentitySpine x timeout (X-billing):** the double-billing chain (1.2) is A x B: without B4/B5 the CostGate still sees N distinct sends. Both spines required to close it.
@@ -308,7 +308,7 @@ This is the "enumerate every behavior and edge case before planning" deliverable
 
 ## Verification notes inherited from the source synthesis
 
-## 1. Verification log (what I confirmed before trusting the audit)
+## Verification log (what I confirmed before trusting the audit)
 
 All checks run on branch `fix/tool-call-xml-dialect-parser`, canonical tree `/Users/dhyana/dharma_swarm`.
 
@@ -331,7 +331,7 @@ All checks run on branch `fix/tool-call-xml-dialect-parser`, canonical tree `/Us
 
 ---
 
-## 2. External research grounding (what SOTA says the fix shape is)
+## External research grounding (what SOTA says the fix shape is)
 
 Five independent principles from current distributed-systems / LLM-agent-ops practice, each mapping onto a pillar:
 
