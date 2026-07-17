@@ -39,15 +39,34 @@ _COST_PER_M_INPUT: dict[str, float] = {
     "claude-code": 15.00,
 }
 
+# TIT-016 (frontier-capacity telemetry honesty): an unrecognized model must NOT
+# price to $0.0. Blind-to-zero hides real frontier spend and corrupts the very
+# accounting the FrontierCapacityGate depends on. Unknown lanes are therefore
+# priced at a conservative (frontier-grade) default so usage is never silently
+# under-counted. This value is telemetry only — it never gates, downgrades, or
+# shrinks a model lane; it only makes spend visible.
+_UNKNOWN_MODEL_COST_PER_M_INPUT: float = 15.00
+
 
 def _estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
-    """Estimate USD cost based on model and token counts."""
+    """Estimate USD cost based on model and token counts.
+
+    Known models (including known *free* lanes such as Ollama Cloud tiers and
+    ``:free`` models) use their declared rate, so free frontier capacity still
+    reads as $0.0. Only *unrecognized* models fall back to a conservative
+    non-zero default so frontier spend is never silently under-counted
+    (TIT-016). This function is telemetry only and must never be used to gate,
+    downgrade, or shrink a model lane.
+    """
     model_lower = model.lower()
-    rate = 0.0
+    rate: float | None = None
     for pattern, cost in _COST_PER_M_INPUT.items():
         if pattern in model_lower:
             rate = cost
             break
+    if rate is None:
+        # Unknown/unmatched model: price conservatively, never $0.0.
+        rate = _UNKNOWN_MODEL_COST_PER_M_INPUT
     # Output tokens typically cost 3-5x input; use 3x as conservative estimate.
     input_cost = (input_tokens / 1_000_000) * rate
     output_cost = (output_tokens / 1_000_000) * rate * 3.0

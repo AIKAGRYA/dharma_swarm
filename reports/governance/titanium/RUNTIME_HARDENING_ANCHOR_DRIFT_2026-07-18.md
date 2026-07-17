@@ -80,3 +80,41 @@ git diff --check
 ```
 
 Observed result: `8 passed`; diff check passed. Ruff over the entire legacy `agent_runner.py` still reports pre-existing lint issues unrelated to this packet (`E402` import placement and an unused `mem` local), so this receipt scopes verification to the new path-confinement behavior.
+
+## Follow-up implementation receipt — TIT-016 telemetry honesty (WP-A.1, non-dilutive)
+
+Independent re-derivation (Agent 3) found WP-A / TIT-016 (severity 5, root of the
+dependency graph) untouched while WP-B/WP-C had progressed. Implemented the
+**non-dilutive half** of TIT-016 — telemetry honesty — which is safe under the
+frontier-capacity-first doctrine because it never gates, downgrades, or shrinks a
+lane:
+
+- `dharma_swarm/cost_tracker.py::_estimate_cost()` no longer prices unknown/unmatched
+  models at `$0.0`. Unknown lanes now use a conservative frontier-grade default
+  (`_UNKNOWN_MODEL_COST_PER_M_INPUT = 15.00`/M input) so frontier spend is never
+  silently under-counted.
+- Known *free* lanes (Ollama Cloud T0, `:free`) still read `$0.0` — free frontier
+  capacity remains free.
+- Verified `_estimate_cost` is telemetry-only: its sole consumers are
+  `estimated_cost_usd` metadata in `providers.py`, `cost_tracker.py`, `llm_burn.py`,
+  and `observability.py`. It is not wired into any gate/deny/downgrade control flow.
+- Added two fitness guards: (a) unknown-nonzero / known-free-zero pricing invariant,
+  (b) structural guard that `_estimate_cost` is never used as an `if` gate condition
+  on the providers path (frontier-capacity doctrine: no cost-based downgrade).
+
+Guard teeth proven: reverting to the old `rate = 0.0` default turns the TIT-016
+guard RED; restoring turns it GREEN.
+
+Verification commands:
+
+```bash
+.venv/bin/python -m pytest -q tests/test_cost_tracker.py tests/test_llm_burn.py tests/test_observability.py tests/governance/test_titanium_runtime_hardening_fitness.py
+.venv/bin/ruff check dharma_swarm/cost_tracker.py tests/test_cost_tracker.py tests/governance/test_titanium_runtime_hardening_fitness.py
+```
+
+Observed result: `65 passed` in the combined bundle; ruff clean; `git diff --check` clean.
+
+**Scope boundary:** this closes only the telemetry-honesty half of TIT-016. The
+*enforcement* half (a FrontierCapacityGate that can refuse runaway/unauthorized
+execution) remains open and must be implemented without a cost-based model-downgrade
+path, per the frontier-capacity priority.

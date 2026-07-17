@@ -37,9 +37,22 @@ class TestEstimateCost:
         output_cost = _estimate_cost("claude-sonnet-4-6", 0, 1_000_000)
         assert abs(output_cost - input_cost * 3.0) < 0.01
 
-    def test_unknown_model_zero_cost(self) -> None:
+    def test_unknown_model_priced_conservatively_nonzero(self) -> None:
+        # TIT-016 (frontier-capacity telemetry honesty): an unrecognized model
+        # must NOT price to $0.0. Blind-to-zero hides real frontier spend and
+        # corrupts accounting. Unknown lanes are priced at a conservative
+        # (high) default so frontier usage is never silently under-counted.
+        # This is telemetry only — it never gates, downgrades, or shrinks a
+        # frontier lane.
         cost = _estimate_cost("totally-unknown-model-xyz", 100_000, 50_000)
-        assert cost == 0.0
+        assert cost > 0.0
+
+    def test_known_free_model_stays_zero_cost(self) -> None:
+        # Honest telemetry keeps *known* free lanes at $0.0; only *unknown*
+        # lanes get the conservative default. This preserves frontier-capacity
+        # doctrine: free frontier capacity is still free.
+        assert _estimate_cost("kimi-k2.5", 1_000_000, 1_000_000) == 0.0
+        assert _estimate_cost("llama-3.3-70b-instruct:free", 1_000_000, 0) == 0.0
 
     def test_case_insensitive_matching(self) -> None:
         cost_lower = _estimate_cost("claude-sonnet-4-6", 1000, 0)

@@ -16,6 +16,7 @@ ORCHESTRATOR = REPO_ROOT / "dharma_swarm" / "orchestrator.py"
 RUNTIME_PLAN = REPO_ROOT / "docs" / "plans" / "TITANIUM_RUNTIME_HARDENING_WPS_2026-07-17.md"
 EXECUTOR_PROMPT = REPO_ROOT / "docs" / "prompts" / "TITANIUM_HARDENING_EXECUTOR_SPINES_2026-07-17.md"
 AUTHORITY_PLAN = REPO_ROOT / "docs" / "plans" / "TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md"
+COST_TRACKER = REPO_ROOT / "dharma_swarm" / "cost_tracker.py"
 
 
 def _source(path: Path) -> str:
@@ -105,3 +106,53 @@ def test_frontier_capacity_doctrine_forbids_cost_based_model_downgrade() -> None
     combined = "\n".join((runtime_plan, executor_prompt, authority_plan))
     for phrase in prohibited:
         assert phrase not in combined
+
+
+def test_tit016_unknown_model_is_priced_nonzero_but_known_free_stays_free() -> None:
+    """TIT-016 telemetry honesty: unknown models must not price to $0.0.
+
+    This is the non-dilutive half of the FrontierCapacityGate: honest accounting
+    of frontier spend. It never gates or downgrades a lane; it only makes spend
+    visible. Known *free* lanes must still read as $0.0 so free frontier
+    capacity is not misreported as expensive.
+
+    Imported lazily inside the test so this module stays import-light on hosts
+    whose default interpreter cannot import the runtime package.
+    """
+    from dharma_swarm.cost_tracker import _estimate_cost
+
+    # Unknown / unmatched lane: conservative non-zero price (never $0.0).
+    assert _estimate_cost("totally-unknown-model-xyz", 100_000, 50_000) > 0.0
+
+    # Known free lanes remain free.
+    assert _estimate_cost("kimi-k2.5", 1_000_000, 1_000_000) == 0.0
+    assert _estimate_cost("llama-3.3-70b-instruct:free", 1_000_000, 0) == 0.0
+
+    # The source must not reintroduce a blanket ``rate = 0.0`` default that
+    # would silently zero-price unknown frontier lanes.
+    source = _source(COST_TRACKER)
+    assert "_UNKNOWN_MODEL_COST_PER_M_INPUT" in source
+
+
+def test_estimate_cost_is_telemetry_only_never_a_gate() -> None:
+    """Frontier-capacity doctrine: ``_estimate_cost`` must not gate execution.
+
+    The cost estimate feeds telemetry/accounting only. If a future change wired
+    it into a raise/return control-flow decision on the provider path, that
+    would be a cost-based dilution of frontier capacity. Guard the providers
+    chokepoint against that regression structurally.
+    """
+    providers = _source(REPO_ROOT / "dharma_swarm" / "providers.py")
+    tree = ast.parse(providers)
+    for node in ast.walk(tree):
+        # Flag ``if _estimate_cost(...) ...:`` style gating on the provider path.
+        if isinstance(node, ast.If):
+            for sub in ast.walk(node.test):
+                if isinstance(sub, ast.Call):
+                    func = sub.func
+                    name = getattr(func, "id", None) or getattr(func, "attr", None)
+                    assert name != "_estimate_cost", (
+                        "_estimate_cost must not be used as a gate condition on the "
+                        "provider path (frontier-capacity doctrine: no cost-based "
+                        "downgrade/deny)."
+                    )
