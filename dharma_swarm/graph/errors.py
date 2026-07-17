@@ -20,7 +20,21 @@ __all__ = [
 
 
 class GraphRuntimeError(RuntimeError):
-    """Base for neutral-core execution failures (runs raise, never return failed)."""
+    """Base for neutral-core execution failures (runs raise, never return failed).
+
+    ``succeeded_*`` carry the failed superstep's surviving work: when sibling
+    tasks had already completed before the failure, the executor attaches
+    their identities and proposed writes so the scheduler can persist them as
+    pending writes. Step atomicity holds (nothing commits), yet succeeded
+    tasks never re-execute on failure resume (langgraph parity, empirical
+    2026-07-17: after a failed step, ``get_state`` shows siblings' writes and
+    resume re-runs only the failed task against the pre-step snapshot).
+    """
+
+    succeeded_tasks: tuple[tuple[str, int], ...] = ()
+    succeeded_writes: tuple = ()  # ChannelWrite instances; untyped to stay import-free
+    succeeded_pull_nodes: tuple[str, ...] = ()
+    unfinished_sends: tuple = ()  # Send packets drained but never completed
 
     def __init__(
         self,

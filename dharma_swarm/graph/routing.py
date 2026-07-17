@@ -40,6 +40,7 @@ __all__ = [
     "BranchDestinationError",
     "BranchSpec",
     "Command",
+    "ParentCommand",
     "Send",
     "SendTargetError",
     "evaluate_branch",
@@ -77,17 +78,45 @@ class Send:
     snapshot (langgraph parity: map-reduce fan-out with per-task inputs).
     N Sends to one node = N independent tasks in one superstep. Never use
     Send as a dict key or set member (unhashable by design this slice).
+
+    ``timeout`` bounds the target task's execution in seconds (langgraph
+    ``Send(..., timeout=)`` parity): an overrun cancels the task and fails
+    its superstep with a typed timeout execution error, exactly like any
+    other task failure (LG06 atomicity applies).
     """
 
     node: str
     arg: Any
+    timeout: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {"node": self.node, "arg": self.arg}
+        return {"node": self.node, "arg": self.arg, "timeout": self.timeout}
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> Send:
-        return cls(node=str(data["node"]), arg=data.get("arg"))
+        return cls(
+            node=str(data["node"]),
+            arg=data.get("arg"),
+            timeout=data.get("timeout"),
+        )
+
+
+_RESUME_UNSET: Any = object()
+
+
+class ParentCommand(Exception):
+    """A ``Command(graph=Command.PARENT)`` bubbling out of its graph run.
+
+    Raised where the command is interpreted; a subgraph wrapper
+    (``subgraph.as_node``) catches it ONE level up and returns the carried
+    command as the parent node's result. Reaching the caller uncaught means
+    the command was issued with no parent graph — langgraph 1.2.4 parity
+    (empirical: top-level ``Command.PARENT`` raises ``ParentCommand``).
+    """
+
+    def __init__(self, command: "Command") -> None:
+        super().__init__(f"Command(graph=PARENT) with no parent graph: {command!r}")
+        self.command = command
 
 
 @dataclass(frozen=True)
@@ -97,12 +126,32 @@ class Command:
     ``update`` = channel writes (same validation as a plain Mapping return);
     ``goto`` = node name(s) and/or :class:`Send` packets triggered for the
     next superstep, ADDITIVE to the node's static and branch routing.
-    ``goto=END`` entries are silently skipped (langgraph parity). No
-    ``resume``/``graph`` fields this slice.
+    ``goto=END`` entries are silently skipped (langgraph parity).
+
+    ``resume`` is INPUT-ONLY (``invoke(input=Command(resume=v))``): it
+    answers a pending :func:`dharma_swarm.graph.interrupts.interrupt` on a
+    persisted thread. A node RETURNING a resume command fails closed —
+    langgraph resumes only from the caller side. ``None`` is a legal resume
+    value, so presence is tracked against an unset sentinel.
+
+    ``graph=Command.PARENT`` addresses the command ONE level up: the node's
+    own run aborts and the parent graph applies ``update`` through ITS
+    reducers and ``goto`` to ITS nodes (langgraph parity; empirical: the
+    child's local writes never reach the parent). With no parent, the
+    bubbling :class:`ParentCommand` reaches the caller. Only the PARENT
+    sentinel is supported — arbitrary graph addressing fails closed.
     """
+
+    PARENT = "__parent__"
 
     update: Mapping[str, Any] | None = None
     goto: str | Send | Sequence[str | Send] = field(default_factory=tuple)
+    resume: Any = _RESUME_UNSET
+    graph: Any = None
+
+    @property
+    def has_resume(self) -> bool:
+        return self.resume is not _RESUME_UNSET
 
     def goto_items(self) -> tuple[str | Send, ...]:
         if isinstance(self.goto, (str, Send)):
@@ -140,7 +189,10 @@ def send_write(
             "(fail closed; langgraph WARN-drops)",
         )
     return ChannelWrite(
-        origin, TASKS_CHANNEL, Send(send.node, copy.deepcopy(send.arg)), task_seq
+        origin,
+        TASKS_CHANNEL,
+        Send(send.node, copy.deepcopy(send.arg), timeout=send.timeout),
+        task_seq,
     )
 
 
@@ -163,6 +215,26 @@ def interpret_result(
         return []
     writes: list[ChannelWrite] = []
     if isinstance(result, Command):
+        if result.has_resume:
+            raise NodeResultError(
+                f"node {node_id!r} returned Command(resume=...) in superstep "
+                f"{superstep}; resume commands are invoke-input only "
+                "(fail closed)",
+                graph_run_id=run_id,
+                superstep=superstep,
+                node_id=node_id,
+            )
+        if result.graph is not None:
+            if result.graph == Command.PARENT:
+                raise ParentCommand(result)
+            raise NodeResultError(
+                f"node {node_id!r} returned Command(graph={result.graph!r}) "
+                f"in superstep {superstep}; only Command.PARENT addressing "
+                "is supported (fail closed)",
+                graph_run_id=run_id,
+                superstep=superstep,
+                node_id=node_id,
+            )
         if result.update is not None:
             writes.extend(
                 _mapping_writes(
