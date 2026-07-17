@@ -214,3 +214,18 @@ python3 scripts/governance/dharmagraph_parity_gauntlet.py --check   # paste PASS
 ## 8. Definition of done (whole run)
 
 Branch `claude/dharmagraph-pregel-core` pushed; ONE PR, Ready for Review, all §5 body fields filled, `--check` PASS JSON pasted; terminal outcome recorded as **COMPLETE** (§1 goal block exits 0: judge receipt ≥ 58.00, LG01/LG04/LG06/LG07/LG08/LG09 all 2/2) or **STOPPED-SHORT** (§1 block exits nonzero AND every unclosed core card has an explicit STOPPED ledger entry with the unsettled question — an honest 56 with STOPPED entries is a valid terminal state, a gamed 58 is not); custody artifacts + judge ratification entry committed atomically at final head; the PROGRESS LEDGER section below reconciles with `git log`; zero commits on main; PR left UNMERGED for the operator.
+
+## PROGRESS LEDGER
+
+Append-only. One block per iteration: `slice / result / verify / learned / blocked`.
+Branch note: the remote session harness assigned `claude/dharmagraph-pregel-core-700a4x`
+(suffix added by the session infrastructure); it is this spec's
+`claude/dharmagraph-pregel-core` branch for all §2/§8 purposes.
+
+### Iteration 1 — S0 (environment, branch, ledger)
+
+- slice: S0
+- result: DONE. `pip install -e ".[dev,test-oracle]"` succeeded after two environment repairs: (a) debian-owned `cryptography` 41.0.7 blocked uninstall — resolved with `pip install --ignore-installed cryptography`; (b) the session checkout was a shallow clone, so `git log -1 -- <V1 rubric>` returned the shallow boundary and `--check` failed custody ("V1 base rubric commit does not match the V2 overlay declaration") — resolved with `git fetch --unshallow origin`. Neither repair touched the repo.
+- verify: `langgraph == 1.2.4`; `--check` on clean checkout (09b1a400a8fe = origin/main): `{"check": "PASS", "findings": [], "gaps": 34, "replay_stable_digest": "e865481c9ea8ee0350a50aafdaa1b0bfd5b143a31ceea6da65e9bf5dd40952b7", "score": "52.00/100", "stored_digest": "9783f9cbce333d8eabb27964ee2cd402051ec2828d0e27cc68d0217505af5917"}`
+- learned: baseline matches spec §1 exactly (52.00, 34 gaps). Shallow-clone custody failure is an environment gotcha for any future remote seat — unshallow before running the gauntlet.
+- blocked: nothing.
