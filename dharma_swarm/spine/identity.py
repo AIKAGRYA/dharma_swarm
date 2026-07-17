@@ -9,6 +9,8 @@ durable store layers.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+import hashlib
+import json
 from typing import Any
 from uuid import uuid4
 
@@ -23,6 +25,73 @@ def _new_id(prefix: str) -> str:
 
 def _clean(value: Any) -> str:
     return str(value or "").strip()
+
+
+def _canonical_json(value: Any) -> str:
+    try:
+        return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
+    except TypeError:
+        return str(value)
+
+
+def _intent_metadata_value(metadata: dict[str, Any], *keys: str) -> str:
+    for key in keys:
+        raw = metadata.get(key)
+        clean = _clean(raw)
+        if clean:
+            return clean
+    return ""
+
+
+def intent_idempotency_key(
+    *,
+    task_id: str,
+    agent_id: str = "",
+    session_id: str = "",
+    causation_id: str = "",
+    parent_run_id: str = "",
+    external_a2a_task_id: str = "",
+    message_id: str = "",
+    event_id: str = "",
+    artifact_id: str = "",
+    proposal_id: str = "",
+    metadata: dict[str, Any] | None = None,
+) -> str:
+    """Return a stable intent-level idempotency key.
+
+    This default intentionally excludes per-attempt identity such as
+    ``run_id``, ``claim_id``, ``trace_id``, ``agent_id``, and ``session_id``. Retries may mint fresh attempt
+    identifiers, but they must collide on the logical intent key so the runtime
+    truth spine can dedupe external effects.
+    """
+    meta = dict(metadata or {})
+    content_fingerprint = _intent_metadata_value(
+        meta,
+        "intent_key",
+        "intent_hash",
+        "task_content_hash",
+        "task_description_hash",
+        "content_hash",
+        "operation_hash",
+    )
+    origin_event = (
+        _clean(event_id)
+        or _intent_metadata_value(meta, "origin_event_id", "source_event_id", "event_id")
+    )
+    material = {
+        "task_id": _clean(task_id),
+        "content_fingerprint": content_fingerprint,
+        "origin_event_id": origin_event,
+        "external_a2a_task_id": _clean(external_a2a_task_id),
+        "message_id": _clean(message_id),
+        "artifact_id": _clean(artifact_id),
+        "proposal_id": _clean(proposal_id),
+    }
+    # Remove empty dimensions so absent optional origin fields do not create
+    # cosmetic drift while preserving any provided stable origin discriminators.
+    canonical = _canonical_json({key: value for key, value in material.items() if value})
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:32]
+    return f"idem_intent_{digest}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,7 +148,20 @@ class ExecutionIdentity:
         clean_correlation = _clean(correlation_id) or clean_trace
         clean_run = _clean(run_id) or _new_id("run")
         clean_claim = _clean(claim_id) or _new_id("claim")
-        clean_idem = _clean(idempotency_key) or f"idem_{clean_run}"
+        clean_metadata = dict(metadata or {})
+        clean_idem = _clean(idempotency_key) or intent_idempotency_key(
+            task_id=clean_task_id,
+            agent_id=agent_id,
+            session_id=session_id,
+            causation_id=causation_id,
+            parent_run_id=parent_run_id,
+            external_a2a_task_id=external_a2a_task_id,
+            message_id=message_id,
+            event_id=event_id,
+            artifact_id=artifact_id,
+            proposal_id=proposal_id,
+            metadata=clean_metadata,
+        )
         return cls(
             trace_id=clean_trace,
             correlation_id=clean_correlation,
@@ -96,7 +178,7 @@ class ExecutionIdentity:
             event_id=_clean(event_id),
             artifact_id=_clean(artifact_id),
             proposal_id=_clean(proposal_id),
-            metadata=dict(metadata or {}),
+            metadata=clean_metadata,
         )
 
     @classmethod

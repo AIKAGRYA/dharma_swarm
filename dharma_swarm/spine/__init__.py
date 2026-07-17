@@ -35,6 +35,7 @@ from dharma_swarm.spine.invoke import invoke_agent, AgentInvoker
 from dharma_swarm.spine.identity import (
     ExecutionIdentity,
     MissingExecutionIdentity,
+    intent_idempotency_key,
     require_execution_identity,
 )
 from dharma_swarm.spine.warrant import (
@@ -63,6 +64,7 @@ __all__ = [
     "attach_execution_identity",
     "identity_from_carrier",
     "identity_metadata",
+    "intent_idempotency_key",
     "invoke_agent",
     "issue_runtime_warrant",
     "AgentInvoker",

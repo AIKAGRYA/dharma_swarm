@@ -28,3 +28,21 @@ grep -R "_ATTEMPT_IDENTITY_METADATA_KEYS\|_clear_attempt_identity_metadata\|pop(
 - WP-B/TIT-020 should not blindly apply the stale “remove list entry” patch on this branch.
 - Next WP-B code step should focus on positive intent-key derivation and provider/message-bus propagation, not only deletion of the old cleanup list.
 - WP-A/TIT-016 should implement a `FrontierCapacityGate`-compatible rail name or wrapper; retaining `check_global_cost_cap()` internally is acceptable only if docs/tests prove it cannot downgrade authorized frontier lanes.
+
+
+## Follow-up implementation receipt — TIT-020 positive invariant
+
+After this drift receipt, the branch added the positive default-key fix:
+
+- `dharma_swarm/spine/identity.py::intent_idempotency_key()` now derives missing idempotency keys from stable intent/origin material.
+- `ExecutionIdentity.new()` no longer defaults to `idem_{run_id}` when `idempotency_key` is omitted.
+- The default key intentionally excludes retry/attempt fields: `run_id`, `claim_id`, `trace_id`, `agent_id`, and `session_id`.
+- Explicit caller-provided idempotency keys remain preserved for compatibility.
+
+Verification command:
+
+```bash
+.venv/bin/python -m pytest -q tests/test_runtime_state_invariants.py tests/test_runtime_state_recovery.py tests/test_spine_mapping_receipts.py tests/test_runtime_lifecycle.py::test_runtime_lifecycle_preserves_structured_row_idempotence tests/test_spine_identity.py tests/governance/test_titanium_runtime_hardening_fitness.py
+```
+
+Observed result: `19 passed`.

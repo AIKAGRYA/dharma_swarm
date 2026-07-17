@@ -185,12 +185,14 @@ async def test_runtime_lifecycle_preserves_structured_row_idempotence(tmp_path: 
     assert artifact_written.payload["provider_model_truth_source"] == "runtime_provider.actual_served"
 
     runtime_store = RuntimeStateStore(runtime_db_path)
+    identity = runtime_store.get_execution_identity_sync(run_id)
+    assert identity is not None
     claim_idem = runtime_store.get_idempotency_record_sync(
-        "idem_" + run_id,
+        identity.idempotency_key,
         completed_claim.side_effect_key,
     )
     run_idem = runtime_store.get_idempotency_record_sync(
-        "idem_" + run_id,
+        identity.idempotency_key,
         completed_run.side_effect_key,
     )
     assert claim_idem is not None
