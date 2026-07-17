@@ -8,7 +8,7 @@
     "before_commit": false,
     "before_merge": true
   },
-  "base_ref": "3482cdfa6a2f3330b1c6df6d332836d7f4b6c9cf",
+  "base_ref": "dc3840a415911c431af315626fe216ed210ae39d",
   "branch": "claude/hotfix-agentops-packet-scope",
   "commit": {
     "allowed": true,
@@ -98,6 +98,8 @@
     "tests/test_evolution_safety.py",
     "tests/test_graph_checkpoint.py",
     "tests/test_graph_durable_invoker.py",
+    "tests/test_graph_neutral_langgraph_oracle.py",
+    "tests/test_graph_pregel_properties.py",
     "tests/test_graph_reconciler.py",
     "tests/test_langgraph_differential_oracle.py",
     "tests/test_loop1_consumption.py",
@@ -150,14 +152,14 @@
       "scripts/runtime/pr_merge_control.py HOT_PATH_PATTERNS (the risk policy the gate reads at both event endpoints)"
     ],
     "collision": {
-      "checked_at_sha": "3482cdfa6a2f3330b1c6df6d332836d7f4b6c9cf",
+      "checked_at_sha": "dc3840a415911c431af315626fe216ed210ae39d",
       "details": [],
       "status": "clear"
     },
     "honest_blockers": [],
     "interface_mismatches": [],
     "owner": "@AmitabhainArunachala",
-    "packet_digest": "0a1bc3604cbcc452c0bcadb7212957fac937dcce909da9119fd108acf88d8c44",
+    "packet_digest": "3889a8753c742f653b795507379d51525d0a643e0806064c6c43bdb0e3d67b61",
     "rollback": "git revert the workflow commit and this packet commit on claude/hotfix-agentops-packet-scope; this restores the prior enforcement step, which fails CONFIG_ERROR on every enforced PR (the pre-fix state).",
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
