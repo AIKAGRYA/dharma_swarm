@@ -61,6 +61,7 @@ class _Task:
     node_id: str
     seq: int
     arg: Any = None  # PUSH input; PULL tasks read the shared snapshot
+    timeout: float | None = None  # PUSH execution bound (Send.timeout)
 
     @property
     def is_pull(self) -> bool:
@@ -110,7 +111,7 @@ class SuperstepExecutor:
             for send in tasks_channel.drain():
                 seq = seq_counter.get(send.node, 0) + 1
                 seq_counter[send.node] = seq
-                push.append(_Task(send.node, seq, send.arg))
+                push.append(_Task(send.node, seq, send.arg, send.timeout))
         return pull + push
 
     async def run_tasks(
@@ -231,9 +232,25 @@ class SuperstepExecutor:
             and remaining is not None
         ):
             node_input[graph.managed_remaining] = remaining
-        result = await self._execute_node(
-            task.node_id, node_input, run_id, superstep
-        )
+        if task.timeout is not None:
+            try:
+                async with asyncio.timeout(task.timeout):
+                    result = await self._execute_node(
+                        task.node_id, node_input, run_id, superstep
+                    )
+            except TimeoutError as exc:
+                raise NodeExecutionError(
+                    f"node {task.node_id!r} exceeded its send timeout of "
+                    f"{task.timeout}s in superstep {superstep} of run "
+                    f"{run_id!r} (langgraph Send timeout parity)",
+                    graph_run_id=run_id,
+                    superstep=superstep,
+                    node_id=task.node_id,
+                ) from exc
+        else:
+            result = await self._execute_node(
+                task.node_id, node_input, run_id, superstep
+            )
         task_writes = self._writes_from_result(
             task.node_id, result, run_id, superstep, task.seq
         )

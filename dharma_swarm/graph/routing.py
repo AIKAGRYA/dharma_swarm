@@ -77,17 +77,27 @@ class Send:
     snapshot (langgraph parity: map-reduce fan-out with per-task inputs).
     N Sends to one node = N independent tasks in one superstep. Never use
     Send as a dict key or set member (unhashable by design this slice).
+
+    ``timeout`` bounds the target task's execution in seconds (langgraph
+    ``Send(..., timeout=)`` parity): an overrun cancels the task and fails
+    its superstep with a typed timeout execution error, exactly like any
+    other task failure (LG06 atomicity applies).
     """
 
     node: str
     arg: Any
+    timeout: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {"node": self.node, "arg": self.arg}
+        return {"node": self.node, "arg": self.arg, "timeout": self.timeout}
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> Send:
-        return cls(node=str(data["node"]), arg=data.get("arg"))
+        return cls(
+            node=str(data["node"]),
+            arg=data.get("arg"),
+            timeout=data.get("timeout"),
+        )
 
 
 @dataclass(frozen=True)
@@ -140,7 +150,10 @@ def send_write(
             "(fail closed; langgraph WARN-drops)",
         )
     return ChannelWrite(
-        origin, TASKS_CHANNEL, Send(send.node, copy.deepcopy(send.arg)), task_seq
+        origin,
+        TASKS_CHANNEL,
+        Send(send.node, copy.deepcopy(send.arg), timeout=send.timeout),
+        task_seq,
     )
 
 

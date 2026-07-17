@@ -1995,6 +1995,9 @@ def run_capability_probes(
     _apply_remaining_steps_evidence(
         capabilities, row_lookup, workloads["seeded_remaining_steps"]
     )
+    _apply_send_timeout_evidence(
+        capabilities, row_lookup, workloads["seeded_send_timeout"]
+    )
     persistence_protocol = _persistence_protocol_probe(seed)
     _apply_persistence_protocol_evidence(capabilities, row_lookup, persistence_protocol)
     process_restart = _process_restart_probe(seed)
@@ -2557,5 +2560,168 @@ def _apply_remaining_steps_evidence(
             dharma={name: workload["dharma"].get(name) for name in fields},
             langgraph={name: workload["langgraph"].get(name) for name in fields},
             citations=_row_citations(row_lookup["LG09"]),
+        )
+    )
+
+
+# ---------------------------------------------------------------------------
+# Pregel-core S6 (LG07): Send timeout workload.
+# Append-only harness extension — new seeded two-arm workload + evidence
+# applier + surface support entry for the send_timeout facet.
+# ---------------------------------------------------------------------------
+
+
+class _SendTimeoutState(TypedDict, total=False):
+    marks: Annotated[list[Any], operator.add]
+    joined: int
+
+
+def _send_timeout_arm(arm: str, seed: int) -> dict[str, Any]:
+    rng = random.Random(_derived_seed(seed, "send-timeout"))
+    fan_width = rng.randint(2, 3)
+    generous = 5.0
+    tight = 0.05
+    stuck = 30.0
+
+    if arm == "langgraph":
+        from langgraph.errors import NodeTimeoutError
+        from langgraph.graph import END, START, StateGraph
+        from langgraph.types import Send as LGSendPacket
+
+        async def worker(arg: Mapping[str, Any]) -> dict[str, Any]:
+            await asyncio.sleep(arg["delay"])
+            return {"marks": [arg["mark"]]}
+
+        def build(sends):
+            builder = StateGraph(_SendTimeoutState)
+            builder.add_node("fan", lambda state: {"marks": ["fan"]})
+            builder.add_node("worker", worker)
+            builder.add_node("join", lambda state: {"joined": len(state["marks"])})
+            builder.add_edge(START, "fan")
+            builder.add_conditional_edges("fan", lambda state: sends, ["worker"])
+            builder.add_edge("worker", "join")
+            builder.add_edge("join", END)
+            return builder.compile()
+
+        completed_app = build(
+            [
+                LGSendPacket(
+                    "worker", {"delay": 0.001, "mark": f"w{i}"}, timeout=generous
+                )
+                for i in range(fan_width)
+            ]
+        )
+        completed = _run_awaitable(completed_app.ainvoke({"marks": []}))
+        timed_out = False
+        overrun_app = build(
+            [LGSendPacket("worker", {"delay": stuck, "mark": "slow"}, timeout=tight)]
+        )
+        try:
+            _run_awaitable(overrun_app.ainvoke({"marks": []}))
+        except NodeTimeoutError:
+            timed_out = True
+        return {
+            "completed": {
+                "marks": sorted(completed["marks"]),
+                "joined": completed["joined"],
+            },
+            "timed_out": timed_out,
+        }
+
+    from dharma_swarm.graph import (
+        END,
+        START,
+        AppendChannel,
+        GraphBuilder,
+        LastValueChannel,
+        NodeExecutionError,
+        Send,
+    )
+    from dharma_swarm.graph.effects import SimulatedEffects
+
+    async def worker(arg: Mapping[str, Any]) -> dict[str, Any]:
+        await asyncio.sleep(arg["delay"])
+        return {"marks": [arg["mark"]]}
+
+    def build(sends):
+        return (
+            GraphBuilder("gauntlet-send-timeout")
+            .add_channel("marks", AppendChannel)
+            .add_channel("joined", LastValueChannel)
+            .add_node("fan", lambda state: {"marks": ["fan"]})
+            .add_node("worker", worker)
+            .add_node("join", lambda state: {"joined": len(state["marks"])})
+            .add_edge(START, "fan")
+            .add_conditional_edges("fan", lambda view: sends, ["worker"])
+            .add_edge("worker", "join")
+            .add_edge("join", END)
+            .compile()
+        )
+
+    completed_app = build(
+        [
+            Send("worker", {"delay": 0.001, "mark": f"w{i}"}, timeout=generous)
+            for i in range(fan_width)
+        ]
+    )
+    completed = _run_awaitable(
+        completed_app.invoke(input={"marks": []}, effects=SimulatedEffects(seed))
+    )
+    timed_out = False
+    overrun_app = build(
+        [Send("worker", {"delay": stuck, "mark": "slow"}, timeout=tight)]
+    )
+    try:
+        _run_awaitable(
+            overrun_app.invoke(input={"marks": []}, effects=SimulatedEffects(seed))
+        )
+    except NodeExecutionError as exc:
+        timed_out = "send timeout" in str(exc)
+    return {
+        "completed": {
+            "marks": sorted(completed.state["marks"]),
+            "joined": completed.state["joined"],
+        },
+        "timed_out": timed_out,
+    }
+
+
+_WORKLOAD_ARMS["seeded_send_timeout"] = _send_timeout_arm
+_support("LG07", ("send_timeout",), "dharma_swarm.graph:Send#timeout")
+
+
+def _apply_send_timeout_evidence(
+    capabilities: dict[str, Any],
+    row_lookup: Mapping[str, Any],
+    workload: Mapping[str, Any],
+) -> None:
+    """LG07.send_timeout from the seeded two-arm Send-timeout workload.
+
+    Fail-closed per the error-parity rule: a probe_error on either arm keeps
+    the facet failing — identical errors are a finding, never a pass.
+    """
+    both_ran = (
+        "probe_error" not in workload["dharma"]
+        and "probe_error" not in workload["langgraph"]
+    )
+    fields = ("completed", "timed_out")
+    equal = both_ran and all(
+        workload["dharma"].get(name) == workload["langgraph"].get(name)
+        for name in fields
+    )
+    entry = capabilities["LG07"]["facets"]["send_timeout"]
+    entry["status"] = "pass" if equal else "fail"
+    entry["evidence"].append(
+        _evidence(
+            kind="two_arm_differential",
+            evidence_id="seeded_send_timeout:send_timeout",
+            command_or_probe=(
+                "compare within-timeout completion and overrun-timeout "
+                "failure of Send tasks on both installed runtimes"
+            ),
+            outcome="parity" if equal else "mismatch",
+            dharma={name: workload["dharma"].get(name) for name in fields},
+            langgraph={name: workload["langgraph"].get(name) for name in fields},
+            citations=_row_citations(row_lookup["LG07"]),
         )
     )
