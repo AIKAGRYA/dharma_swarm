@@ -1346,12 +1346,19 @@ active_tracks:
       - organism-rewire-2026-07
     owned_surfaces:
       - dharma_swarm/evolution_safety.py
+      - dharma_swarm/evolution_safety_runtime.py
+      - dharma_swarm/diff_applier.py
+      - dharma_swarm/promotion_gate.py
+      - dharma_swarm/sealed_packet_apply.py
+      - dharma_swarm/forge_v1/forge_v2/verify_promotion.py
       - scripts/governance/check_claim_evidence_binding.py
       - scripts/governance/pramana_probe.py
       - scripts/governance/branch_janitor.py
       - scripts/governance/verify_corral_findings.py
+      - scripts/governance/evolution_live_host_probe.py
       - scripts/governance/hygiene/**
       - docs/governance/hygiene/patterns/AI-M1.yaml
+      - reports/governance/safety/**
       - packages/telos-kernel/**
       - packages/titanium-verify/**
       - .github/workflows/pudgala-rigor.yml
@@ -1360,6 +1367,10 @@ active_tracks:
       - .github/workflows/kernel-tests.yml
       - .github/workflows/branch-janitor.yml
       - tests/test_evolution_safety.py
+      - tests/test_diff_applier.py
+      - tests/test_evolution_live_host_probe.py
+      - tests/test_mutation_rollback_receipt.py
+      - tests/test_forge_v2_promotion_door.py
       - tests/test_claim_evidence_binding.py
       - tests/test_pramana_probe.py
       - tests/test_pramana.py
@@ -1464,7 +1475,59 @@ active_tracks:
         kind: test_passes
         test: packages/telos-kernel/telos_kernel/tests/
         oracle_source: ".github/workflows/kernel-titanium-verify.yml"
-      # 5) DROPPED in the 2026-07-07 reconcile: the proposed
+      # 5-8) Deliberately PENDING P0 proof obligations. This authority bootstrap
+      #    names the future code, tests, and canonical receipts without claiming
+      #    implementation, host observation, rollback exercise, or closure.
+      - id: evolution_live_host_probe_contract_tests_pass
+        kind: test_passes
+        test: tests/test_evolution_live_host_probe.py
+        oracle_source: ".github/workflows/tests.yml"
+      - id: mutation_rollback_receipt_contract_tests_pass
+        kind: test_passes
+        test: tests/test_mutation_rollback_receipt.py
+        oracle_source: ".github/workflows/tests.yml"
+      - id: evolution_live_host_observation_receipt_valid
+        kind: receipt_valid
+        file: reports/governance/safety/evolution_live_host_observation.json
+        fresh_ttl_days: 21
+        expect_digest: true
+        keys:
+          - schema
+          - observed_at
+          - verdict
+          - code_identity
+          - deployment_identity
+          - evolution_shadow
+          - source_mount
+          - erofs_negative_write
+          - guard_refusal
+          - source_digests
+          - denial_receipt
+          - digest
+      - id: mutation_rollback_receipt_valid
+        kind: receipt_valid
+        file: reports/governance/safety/mutation_rollback_receipt.json
+        fresh_ttl_days: 21
+        expect_digest: true
+        keys:
+          - schema
+          - observed_at
+          - verdict
+          - parent_mutation_attempt_id
+          - promotion_verification_sha256
+          - operator_lease_sha256
+          - worktree_marker_sha256
+          - verifier_sha256
+          - scratch_workspace
+          - pre_apply_digests
+          - post_apply_digests
+          - final_digests
+          - applied_files
+          - forced_verifier_failure
+          - rollback_complete
+          - cleanup_complete
+          - digest
+      # 9) DROPPED in the 2026-07-07 reconcile: the proposed
       #    `final_boss_portfolio_selfgate_passes` command_passes criterion ran
       #    `python3 scripts/governance/check_track_status.py`. Because the checker
       #    executes every command_passes criterion and reads the FIXED path
@@ -1481,7 +1544,7 @@ active_tracks:
         kind: governance
         blocker: false
       - id: 2
-        what: "(blocker) PR-001 live-host edge: one canonical daemon-host observation that live-checkout mutation is denied by default (read-only source mount + DHARMA_EVOLUTION_SHADOW), with a rollback receipt. Sequenced with organism-rewire D4; keep evolution fail-closed until then."
+        what: "(blocker) PR-001 live-host edge remains PENDING after the P0 authority bootstrap: land the fail-closed evolution_live_host_observation.v1 probe and sealed-path-only mutation_rollback_receipt.v1 emitter under their dedicated contract suites, then obtain one operator-authorized canonical daemon-host observation binding code/deployment identity, read-only source mount, EROFS negative write, guard refusal, source digests, and denial receipt; and one forced-verifier-failure rollback receipt binding its parent attempt, sealed promotion/lease/marker/verifier hashes, scratch workspace, pre/post/final digests, applied files, rollback, and cleanup. Sequenced with organism-rewire D4; keep evolution fail-closed until both digest-sealed receipts pass the explicit completion criteria."
         kind: code
         blocker: true
       - id: 3
