@@ -125,13 +125,9 @@ _PROVIDER_RANK: dict[ProviderType, int] = {
 }
 _DEFAULT_RANK = 5
 
-# Provider namespaces are a type boundary: Kimi Code's exact K3 wire id is
-# ``k3`` while Moonshot/OpenRouter carry ``kimi-k3``. This explicit promotion
-# rule is the proof obligation that lets those routes share one logical entry;
-# string similarity alone is not authority to conflate models.
-_NESTED_ROUTE_LOGICAL_IDS: dict[str, str] = {
-    "k3": "kimi-k3",
-}
+# Explicit proof obligation: only this map authorizes Kimi Code ``k3`` to
+# collapse with provider-qualified ``kimi-k3``; name similarity is not authority.
+_NESTED_ROUTE_LOGICAL_IDS: dict[str, str] = {"k3": "kimi-k3"}
 
 
 def _logical_id(slot: ModelSlot) -> str:
@@ -307,10 +303,7 @@ def _required_provider_route(logical_id: str, provider: ProviderType) -> str:
 
 FORGE_KIMI_CODE_MODEL_ID = default_for_provider(ProviderType.KIMI_CODE)
 FORGE_KIMI_K3_LOGICAL_ID = "kimi-k3"
-FORGE_KIMI_K3_OPENROUTER_MODEL_ID = _required_provider_route(
-    FORGE_KIMI_K3_LOGICAL_ID,
-    ProviderType.OPENROUTER,
-)
+FORGE_KIMI_K3_OPENROUTER_MODEL_ID = _required_provider_route(FORGE_KIMI_K3_LOGICAL_ID, ProviderType.OPENROUTER)
 FORGE_NVIDIA_KIMI_MODEL_ID = _required_provider_route(K2_FLOOR_ID, ProviderType.NVIDIA_NIM)
 FORGE_NVIDIA_LLAMA_VERIFIER_MODEL_ID = _required_provider_route(
     "llama-3.3-70b-instruct",
