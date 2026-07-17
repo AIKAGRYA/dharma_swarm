@@ -46,3 +46,20 @@ Verification command:
 ```
 
 Observed result: `19 passed`.
+
+## Follow-up implementation receipt — TIT-021 message bus wedge
+
+The branch also closed the `message_bus.send` wedge class called out in WP-B/TIT-021:
+
+- `MessageBus.send()` now passes a finite `stale_after_seconds` value to the runtime idempotency begin call.
+- If an existing idempotency record prevents execution, `send()` verifies the idempotency record exists and only returns success when a completed record points to a real `messages` row.
+- Stale/started/incomplete records now fail closed with `RuntimeError` instead of returning the attempted message id as if the send happened.
+
+Verification command:
+
+```bash
+.venv/bin/python -m pytest -q tests/test_runtime_state_recovery.py tests/test_message_bus.py tests/test_runtime_truth_spine_adoption.py tests/test_runtime_truth_spine_v1.py tests/governance/test_titanium_runtime_hardening_fitness.py
+.venv/bin/ruff check dharma_swarm/message_bus.py tests/test_runtime_state_recovery.py
+```
+
+Observed result: `31 passed`; ruff passed.

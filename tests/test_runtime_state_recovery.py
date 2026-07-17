@@ -147,3 +147,70 @@ async def test_message_bus_conflicting_idempotency_key_does_not_insert_second_me
 
     assert _message_count(bus_path) == 1
     assert [message.id for message in await bus.receive("bob")] == [first_id]
+
+
+@pytest.mark.asyncio
+async def test_message_bus_started_idempotency_wedge_fails_closed_without_message_row(tmp_path: Path) -> None:
+    runtime = RuntimeStateStore(tmp_path / "runtime.db")
+    bus_path = tmp_path / "messages.db"
+    bus = MessageBus(bus_path, runtime_state=runtime, require_identity=True)
+    await bus.init_db()
+
+    identity = _identity(
+        run_id="run-message-wedge",
+        task_id="task-message-wedge",
+        idempotency_key="idem-message-wedge",
+    )
+    message = Message(
+        from_agent="alice",
+        to_agent="bob",
+        body="wedged send",
+        metadata=identity_metadata(identity, surface="message_bus"),
+    )
+    side_effect_key = f"message_bus.send:{identity.idempotency_key}"
+    operation_hash = "hash-placeholder"
+
+    assert await runtime.try_begin_idempotent_side_effect(
+        identity,
+        side_effect_key,
+        metadata={
+            "message_id": message.id,
+            "to_agent": message.to_agent,
+            "operation_hash": operation_hash,
+        },
+    )
+    stale_time = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
+    with sqlite3.connect(tmp_path / "runtime.db") as db:
+        db.execute(
+            "UPDATE idempotency_records SET updated_at = ?, metadata_json = json_set(metadata_json, '$.operation_hash', ?) WHERE idempotency_key = ? AND side_effect_key = ?",
+            (stale_time, _stable_message_operation_hash(message), identity.idempotency_key, side_effect_key),
+        )
+        db.commit()
+
+    with pytest.raises(RuntimeError, match="idempotency incomplete"):
+        await bus.send(message)
+
+    assert _message_count(bus_path) == 0
+    record = await runtime.get_idempotency_record(identity.idempotency_key, side_effect_key)
+    assert record is not None
+    assert record.status == "stale"
+
+
+def _stable_message_operation_hash(message: Message) -> str:
+    import hashlib
+    import json
+
+    return hashlib.sha256(
+        json.dumps(
+            {
+                "from_agent": message.from_agent,
+                "to_agent": message.to_agent,
+                "subject": message.subject,
+                "body": message.body,
+                "priority": message.priority.value,
+                "reply_to": message.reply_to,
+            },
+            sort_keys=True,
+            default=str,
+        ).encode("utf-8")
+    ).hexdigest()

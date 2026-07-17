@@ -123,6 +123,7 @@ class MessageBus:
 
     _BUSY_TIMEOUT_S = 30
     _LOCK_RETRY_DELAYS_S = (0.05, 0.1, 0.25, 0.5, 1.0)
+    _IDEMPOTENCY_STALE_AFTER_S = 300.0
 
     def __init__(
         self,
@@ -221,6 +222,12 @@ class MessageBus:
             ).with_updates(message_id=message.id)
         return None
 
+
+    async def _message_exists(self, message_id: str) -> bool:
+        async with self._connect() as db:
+            cursor = await db.execute("SELECT 1 FROM messages WHERE id = ?", (message_id,))
+            return await cursor.fetchone() is not None
+
     async def send(
         self,
         message: Message,
@@ -261,13 +268,30 @@ class MessageBus:
                             }
                         ),
                     },
+                    stale_after_seconds=self._IDEMPOTENCY_STALE_AFTER_S,
                 )
                 if not should_execute:
                     record = await self._runtime_state.get_idempotency_record(
                         identity.idempotency_key,
                         side_effect_key,
                     )
-                    return (record.result_receipt_id if record else "") or message.id
+                    if record is None:
+                        raise RuntimeError(
+                            "message_bus send idempotency record missing for "
+                            f"{identity.idempotency_key}:{side_effect_key}"
+                        )
+                    result_message_id = str(record.result_receipt_id or "")
+                    if record.status == "completed" and result_message_id:
+                        if await self._message_exists(result_message_id):
+                            return result_message_id
+                        raise RuntimeError(
+                            "message_bus send idempotency completed without message row: "
+                            f"{result_message_id}"
+                        )
+                    raise RuntimeError(
+                        "message_bus send idempotency incomplete; refusing silent success: "
+                        f"status={record.status} key={identity.idempotency_key}:{side_effect_key}"
+                    )
                 await self._runtime_state.record_execution_identity(
                     identity,
                     source="message_bus.send",
