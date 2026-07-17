@@ -3,19 +3,28 @@
 
 from __future__ import annotations
 
+import logging
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Protocol, Sequence
+from typing import Any, Callable, Mapping, Protocol, Sequence
 
 from dharma_swarm.graph.channels import ChannelWrite
-from dharma_swarm.graph.interrupts import RESUME_PREFIX
+from dharma_swarm.graph.errors import GraphRuntimeError
+from dharma_swarm.graph.interrupts import (
+    RESUME_PREFIX,
+    GraphInterrupted,
+    resume_channel,
+)
 from dharma_swarm.graph.persistence import (
     GraphCheckpointRecord,
     GraphPendingWrite,
     GraphPersistenceKernel,
 )
 from dharma_swarm.graph.state import GraphState
-from dharma_swarm.graph.types import RunCheckpoint
+from dharma_swarm.graph.types import TASKS_CHANNEL, RunCheckpoint
+
+
+logger = logging.getLogger(__name__)
 
 
 class ReplayTask(Protocol):
@@ -312,3 +321,97 @@ class GraphRunPersistence:
         self.parent_checkpoint_id = record.checkpoint_id
         if pending_task_id is not None:
             self.kernel.clear_pending_writes(self.thread_id, pending_task_id)
+
+
+def persist_failure_remains(
+    graph: Any,
+    error: GraphRuntimeError,
+    state: GraphState,
+    versions_seen: Mapping[str, Mapping[str, int]],
+    start_versions: Mapping[str, int],
+    run_persistence: GraphRunPersistence,
+    run_id: str,
+    superstep: int,
+    committed: int,
+    on_checkpoint: Callable[[RunCheckpoint], None] | None,
+) -> None:
+    """Failed superstep: nothing commits — but succeeded siblings survive.
+
+    ``graph`` is the CompiledGraph (duck-typed: channel_factories, triggers,
+    graph_id) — passed in to keep this module scheduler-import-free.
+
+    Their writes are journaled as pending writes (failure resume replays
+    them without re-executing the tasks) and surfaced through
+    ``on_checkpoint`` as a pending-VIEW checkpoint of the last committed
+    superstep (langgraph parity, empirical: after a failed step,
+    ``get_state`` shows succeeded siblings' writes applied while the
+    stored checkpoint stays pristine). An invalid surviving write group
+    fails closed: nothing journaled, nothing emitted, warning logged.
+    """
+    writes = list(error.succeeded_writes)
+    resume_entries: list[tuple[str, Any]] = []
+    if isinstance(error, GraphInterrupted):
+        resume_entries = [
+            (
+                resume_channel(error.node_id, error.task_seq),
+                list(error.consumed_resumes),
+            )
+        ]
+    if not writes and not resume_entries:
+        return
+    task_path = "+".join(
+        sorted(node_id for node_id, _seq in error.succeeded_tasks)
+    )
+    if writes:
+        try:
+            state.validate_writes(writes, superstep)
+        except Exception as validation_error:
+            logger.warning(
+                "dropping %d surviving writes from failed superstep %d of "
+                "run %s: %s",
+                len(writes),
+                superstep,
+                run_id,
+                validation_error,
+            )
+            writes, task_path = [], ""
+            if not resume_entries:
+                return
+    if run_persistence.pending_write is None:
+        run_persistence.journal(
+            [(write.channel, write.value) for write in writes]
+            + resume_entries,
+            f"{run_id}:{superstep}",
+            task_path=task_path,
+        )
+    if on_checkpoint is None or not writes:
+        return
+    view = GraphState(graph.channel_factories)
+    view.restore_channels(state.checkpoint_channels())
+    view.apply_writes(writes, superstep)
+    if error.unfinished_sends:
+        # Planning drained every packet from __tasks__; put the ones the
+        # failed step never completed back, so resuming from this view
+        # re-runs exactly the unfinished PUSH work (failed PULL tasks
+        # already re-fire via their unmarked trigger versions).
+        view.apply_writes(
+            [
+                ChannelWrite("__engine__", TASKS_CHANNEL, send, index)
+                for index, send in enumerate(error.unfinished_sends)
+            ],
+            superstep,
+        )
+    seen = {node: dict(v) for node, v in versions_seen.items()}
+    for node in error.succeeded_pull_nodes:
+        for name in graph.triggers[node]:
+            seen[node][name] = start_versions.get(name, 0)
+    on_checkpoint(
+        RunCheckpoint(
+            graph_run_id=run_id,
+            graph_id=graph.graph_id,
+            superstep=committed,
+            state_digest=view.digest(),
+            channels=view.checkpoint_channels(),
+            versions_seen=seen,
+        )
+    )

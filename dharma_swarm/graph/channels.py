@@ -14,6 +14,8 @@ with :class:`UnknownChannelError`.
 
 from __future__ import annotations
 
+import copy
+import json
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -230,14 +232,35 @@ class ReducerChannel(Channel[Any]):
         self._empty = empty_value
         self._value: Any = empty_value
 
+    def _fold(self, start: Any, writes: Sequence[ChannelWrite]) -> Any:
+        value = start
+        for write in writes:
+            value = self._reducer(value, write.value)
+        return value
+
     def validate(self, writes: Sequence[ChannelWrite], superstep: int) -> None:
+        """Stage the whole fold on a deep copy — a raising reducer or an
+        unserializable folded result must fail BEFORE any channel commits
+        (all-or-nothing superstep contract; commit() never validates)."""
+        if not writes:
+            return None
+        staged = self._fold(copy.deepcopy(self._value), writes)
+        try:
+            json.dumps(
+                staged, sort_keys=True, ensure_ascii=False, allow_nan=False
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"reducer on channel {writes[0].channel!r} produced a value "
+                f"that is not stably JSON-serializable in superstep "
+                f"{superstep}: {exc}"
+            ) from exc
         return None
 
     def commit(self, writes: Sequence[ChannelWrite], superstep: int) -> bool:
         if not writes:
             return False
-        for write in writes:
-            self._value = self._reducer(self._value, write.value)
+        self._value = self._fold(self._value, writes)
         self.version += 1
         return True
 

@@ -43,9 +43,15 @@ __all__ = [
 RESUME_PREFIX = "__resume__:"
 
 
-def resume_channel(node_id: str) -> str:
-    """Reserved pending-record entry name carrying a node's resume values."""
-    return f"{RESUME_PREFIX}{node_id}"
+def resume_channel(node_id: str, task_seq: int = 0) -> str:
+    """Reserved pending-record entry name carrying ONE TASK's resume values.
+
+    Keyed by the full task identity ``(node_id, task_seq)`` — N Send packets
+    to one interrupting node are N distinct interrupts, each resumed
+    independently (a node-only key would replay one resume into every
+    packet).
+    """
+    return f"{RESUME_PREFIX}{node_id}:{task_seq}"
 
 
 @dataclass(frozen=True)
@@ -83,20 +89,22 @@ class GraphInterrupted(GraphRuntimeError):
 
     interrupts: tuple[Interrupt, ...] = ()
     consumed_resumes: tuple[Any, ...] = ()
+    task_seq: int = 0
 
 
 @dataclass
 class InterruptFrame:
-    """Per-task interrupt context: identity plus recorded resume values."""
+    """Per-task interrupt context: FULL task identity plus resume values."""
 
     run_id: str
     node_id: str
+    task_seq: int = 0
     resumes: list[Any] = field(default_factory=list)
     counter: int = 0
 
     def interrupt_id(self) -> str:
         digest = hashlib.sha256(
-            f"{self.run_id}:{self.node_id}".encode("utf-8")
+            f"{self.run_id}:{self.node_id}:{self.task_seq}".encode("utf-8")
         ).hexdigest()
         return digest[:32]
 

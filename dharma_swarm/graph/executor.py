@@ -194,6 +194,7 @@ class SuperstepExecutor:
                 )
                 public.interrupts = (error.interrupt,)
                 public.consumed_resumes = error.consumed
+                public.task_seq = failed_task.seq
                 error = public
             if isinstance(error, GraphRuntimeError):
                 succeeded = [t for t in exec_order if t.identity in bundles]
@@ -205,6 +206,15 @@ class SuperstepExecutor:
                 error.succeeded_writes = tuple(writes)
                 error.succeeded_pull_nodes = tuple(
                     t.node_id for t in succeeded if t.is_pull
+                )
+                # PUSH packets that did not complete were already drained
+                # from __tasks__ at planning; they ride the error so the
+                # failure view stays resumable (failed pulls re-fire via
+                # trigger versions, failed pushes need their packets back).
+                error.unfinished_sends = tuple(
+                    Send(t.node_id, t.arg, timeout=t.timeout)
+                    for t in exec_order
+                    if not t.is_pull and t.identity not in bundles
                 )
             raise error
 
@@ -258,7 +268,10 @@ class SuperstepExecutor:
         frame = InterruptFrame(
             run_id=run_id,
             node_id=task.node_id,
-            resumes=list((resumes or {}).get(task.node_id, ())),
+            task_seq=task.seq,
+            resumes=list(
+                (resumes or {}).get(f"{task.node_id}:{task.seq}", ())
+            ),
         )
         token = push_frame(frame)
         try:
@@ -266,7 +279,11 @@ class SuperstepExecutor:
                 try:
                     async with asyncio.timeout(task.timeout):
                         result = await self._execute_node(
-                            task.node_id, node_input, run_id, superstep
+                            task.node_id,
+                            node_input,
+                            run_id,
+                            superstep,
+                            sync_in_thread=True,
                         )
                 except TimeoutError as exc:
                     raise NodeExecutionError(
@@ -346,9 +363,19 @@ class SuperstepExecutor:
         node_input: Any,
         run_id: str,
         superstep: int,
+        *,
+        sync_in_thread: bool = False,
     ) -> Mapping[str, Any] | Command | None:
         try:
-            raw = self._graph.nodes[node_id].fn(node_input)
+            fn = self._graph.nodes[node_id].fn
+            if sync_in_thread and not inspect.iscoroutinefunction(fn):
+                # Timed tasks: a sync callable would block the event loop and
+                # make the surrounding asyncio.timeout unable to expire, so
+                # it runs on a worker thread (a timed-out thread is orphaned
+                # and its result discarded — langgraph executor parity).
+                raw = await asyncio.to_thread(fn, node_input)
+            else:
+                raw = fn(node_input)
             if inspect.isawaitable(raw):
                 raw = await raw
         except asyncio.CancelledError:

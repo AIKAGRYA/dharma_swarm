@@ -32,6 +32,7 @@ from typing import (
 from dharma_swarm.graph.channels import Channel, LastValueChannel, ReducerChannel
 from dharma_swarm.graph.compiler import GraphBuilder
 from dharma_swarm.graph.scheduler import CompiledGraph
+from dharma_swarm.graph.state import state_digest
 from dharma_swarm.graph.types import GraphRunResult
 
 __all__ = [
@@ -240,7 +241,14 @@ class TypedStateGraph:
         self._remaining_field = managed_remaining_field(state)
         for name, factory in typed_state_schema(state).items():
             self._builder.add_channel(name, factory)
-        self._input_keys = input_schema(input) if input is not None else None
+        # langgraph parity (empirical): the state schema is the DEFAULT
+        # input projection — undeclared seed keys are dropped, not errors.
+        # Managed fields are never seedable, so they stay outside the set.
+        self._input_keys = (
+            input_schema(input)
+            if input is not None
+            else self._state_fields - {self._remaining_field}
+        )
         self._output_keys = output_schema(output) if output is not None else None
         self._context_type = context_schema(context) if context is not None else None
         for keys, label in (
@@ -310,7 +318,13 @@ class TypedCompiledGraph:
                 "invoke(context=...) requires a context schema declaration"
             )
         seed = input
-        if seed is not None and self.input_keys is not None:
+        if (
+            seed is not None
+            and self.input_keys is not None
+            and isinstance(seed, Mapping)
+        ):
+            # Non-mapping inputs (Command(resume=...)) bypass projection and
+            # reach the engine's own input handling unchanged.
             seed = {k: v for k, v in seed.items() if k in self.input_keys}
         token = _ACTIVE_CONTEXT.set(context)
         try:
@@ -321,5 +335,9 @@ class TypedCompiledGraph:
             projected = {
                 k: v for k, v in result.state.items() if k in self.output_keys
             }
-            result = dataclasses.replace(result, state=projected)
+            # Keep the result self-consistent: state_digest always digests
+            # the state THIS result carries (checkpoints keep the full one).
+            result = dataclasses.replace(
+                result, state=projected, state_digest=state_digest(projected)
+            )
         return result

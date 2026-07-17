@@ -53,7 +53,10 @@ from dharma_swarm.graph.errors import (
 from dharma_swarm.graph.executor import SuperstepExecutor
 from dharma_swarm.graph.interrupts import GraphInterrupted, resume_channel
 from dharma_swarm.graph.persistence import GraphPersistenceKernel
-from dharma_swarm.graph.persistence_runtime import GraphRunPersistence
+from dharma_swarm.graph.persistence_runtime import (
+    GraphRunPersistence,
+    persist_failure_remains,
+)
 from dharma_swarm.graph.routing import BranchSpec, Command
 from dharma_swarm.graph.state import GraphState
 from dharma_swarm.graph.types import (
@@ -234,6 +237,12 @@ class CompiledGraph:
             superstep = 0
             _emit_checkpoint(0, digest)
 
+        # Superstep budgets are per-INVOCATION (langgraph parity: every
+        # invoke gets its full recursion budget, including resume —
+        # pregel/_loop.py:1676-1677); absolute superstep numbering continues
+        # across resumes for checkpoint identity only.
+        invocation_base = superstep
+
         if run_persistence.pending_write is not None:
             superstep += 1
             start_versions = state.versions
@@ -272,7 +281,7 @@ class CompiledGraph:
                             start_versions,
                             run_id,
                             superstep,
-                            remaining=cap - superstep,
+                            remaining=cap - (superstep - invocation_base),
                             resumes=plan.resumes,
                         )
                     )
@@ -299,7 +308,10 @@ class CompiledGraph:
                         ]
                         + [
                             (
-                                resume_channel(suspended.node_id),
+                                resume_channel(
+                                    suspended.node_id,
+                                    suspended.task_seq,
+                                ),
                                 list(suspended.consumed_resumes),
                             )
                         ],
@@ -310,6 +322,16 @@ class CompiledGraph:
                 state.apply_writes(
                     plan.recorded_writes + live_pending, superstep
                 )
+                # Recorded siblings commit in this same barrier: emit their
+                # receipts too, matching the full-replay convention (their
+                # work is in the committed state even though only live
+                # tasks re-executed).
+                live_ids = {task.identity for task in plan.live_tasks}
+                replayed_ids = [
+                    task.identity
+                    for task in tasks
+                    if task.identity not in live_ids
+                ] + list(replayed_ids)
             digest, committed = state.digest(), superstep
             events.extend(
                 GraphRunEvent(
@@ -324,7 +346,7 @@ class CompiledGraph:
             tasks = executor.prepare_tasks(state, start_versions, versions_seen)
             if not tasks:
                 break
-            if superstep > cap:
+            if superstep - invocation_base > cap:
                 raise SuperstepLimitError(
                     f"superstep cap {cap} exceeded with tasks still ready "
                     f"{[t.identity for t in tasks]!r} in run {run_id!r}",
@@ -339,10 +361,11 @@ class CompiledGraph:
                     start_versions,
                     run_id,
                     superstep,
-                    remaining=cap - superstep,
+                    remaining=cap - (superstep - invocation_base),
                 )
             except GraphRuntimeError as error:
-                self._persist_failure_remains(
+                persist_failure_remains(
+                    self,
                     error,
                     state,
                     versions_seen,
@@ -392,81 +415,6 @@ class CompiledGraph:
             state_digest=digest,
             supersteps=committed,
             events=tuple(events),
-        )
-
-    def _persist_failure_remains(
-        self,
-        error: GraphRuntimeError,
-        state: GraphState,
-        versions_seen: Mapping[str, Mapping[str, int]],
-        start_versions: Mapping[str, int],
-        run_persistence: GraphRunPersistence,
-        run_id: str,
-        superstep: int,
-        committed: int,
-        on_checkpoint: Callable[[RunCheckpoint], None] | None,
-    ) -> None:
-        """Failed superstep: nothing commits — but succeeded siblings survive.
-
-        Their writes are journaled as pending writes (failure resume replays
-        them without re-executing the tasks) and surfaced through
-        ``on_checkpoint`` as a pending-VIEW checkpoint of the last committed
-        superstep (langgraph parity, empirical: after a failed step,
-        ``get_state`` shows succeeded siblings' writes applied while the
-        stored checkpoint stays pristine). An invalid surviving write group
-        fails closed: nothing journaled, nothing emitted, warning logged.
-        """
-        writes = list(error.succeeded_writes)
-        resume_entries: list[tuple[str, Any]] = []
-        if isinstance(error, GraphInterrupted):
-            resume_entries = [
-                (resume_channel(error.node_id), list(error.consumed_resumes))
-            ]
-        if not writes and not resume_entries:
-            return
-        task_path = "+".join(
-            sorted(node_id for node_id, _seq in error.succeeded_tasks)
-        )
-        if writes:
-            try:
-                state.validate_writes(writes, superstep)
-            except Exception as validation_error:
-                logger.warning(
-                    "dropping %d surviving writes from failed superstep %d of "
-                    "run %s: %s",
-                    len(writes),
-                    superstep,
-                    run_id,
-                    validation_error,
-                )
-                writes, task_path = [], ""
-                if not resume_entries:
-                    return
-        if run_persistence.pending_write is None:
-            run_persistence.journal(
-                [(write.channel, write.value) for write in writes]
-                + resume_entries,
-                f"{run_id}:{superstep}",
-                task_path=task_path,
-            )
-        if on_checkpoint is None or not writes:
-            return
-        view = GraphState(self.channel_factories)
-        view.restore_channels(state.checkpoint_channels())
-        view.apply_writes(writes, superstep)
-        seen = {node: dict(v) for node, v in versions_seen.items()}
-        for node in error.succeeded_pull_nodes:
-            for name in self.triggers[node]:
-                seen[node][name] = start_versions.get(name, 0)
-        on_checkpoint(
-            RunCheckpoint(
-                graph_run_id=run_id,
-                graph_id=self.graph_id,
-                superstep=committed,
-                state_digest=view.digest(),
-                channels=view.checkpoint_channels(),
-                versions_seen=seen,
-            )
         )
 
     def _validated_seed(

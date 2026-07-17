@@ -284,3 +284,204 @@ def test_property_5_reducer_batching_invariance(xs, ys, superstep):
         joined_l.commit(writes([[v] for v in xs + ys], superstep), superstep)
     if xs + ys:
         assert split_l.get() == joined_l.get() == xs + ys
+
+
+# ---------------------------------------------------------------------------
+# Review-fix regression pins (PR #1002 post-reseal round). Not properties —
+# each pins one repaired engine behavior with a single bounded scenario.
+# ---------------------------------------------------------------------------
+
+
+def test_reducer_validate_stages_fold_before_any_commit():
+    """A raising reducer must abort the barrier BEFORE any channel mutates."""
+    import operator
+
+    from dharma_swarm.graph.channels import ChannelWrite, ReducerChannel
+    from dharma_swarm.graph.state import GraphState
+
+    def explosive(acc, value):
+        raise RuntimeError("bad reducer")
+
+    state = GraphState(
+        {
+            "aaa_boom": lambda: ReducerChannel(explosive, empty_value=0),
+            "zzz_ok": lambda: ReducerChannel(operator.add, empty_value=0),
+        }
+    )
+    with pytest.raises(RuntimeError, match="bad reducer"):
+        state.apply_writes(
+            [
+                ChannelWrite("n", "aaa_boom", 1, 0),
+                ChannelWrite("n", "zzz_ok", 2, 0),
+            ],
+            1,
+        )
+    assert state.versions == {"aaa_boom": 0, "zzz_ok": 0}  # nothing committed
+
+
+def test_send_timeout_enforced_for_sync_nodes():
+    """A blocking SYNC callable under Send timeout must still time out."""
+    import time
+
+    from dharma_swarm.graph.routing import Send
+
+    def fan(state: Mapping[str, Any]):
+        return None
+
+    def blocker(arg: Mapping[str, Any]) -> dict[str, Any]:
+        time.sleep(0.7)
+        return {"out": "never"}
+
+    compiled = (
+        GraphBuilder("sync-timeout")
+        .add_channel("out", LastValueChannel)
+        .add_node("fan", fan)
+        .add_node("worker", blocker)
+        .add_edge(START, "fan")
+        .add_conditional_edges(
+            "fan",
+            lambda view: [Send("worker", {"go": 1}, timeout=0.05)],
+            ["worker"],
+        )
+        .add_edge("worker", END)
+        .compile()
+    )
+    with pytest.raises(NodeExecutionError, match="exceeded its send timeout"):
+        asyncio.run(
+            compiled.invoke(input={}, effects=SimulatedEffects(11))
+        )
+
+
+def test_remaining_steps_budget_resets_on_resume():
+    """Every invocation gets the FULL superstep budget, including resume."""
+    from typing import TypedDict
+
+    from dharma_swarm.graph.schema import RemainingSteps, TypedStateGraph
+
+    class S(TypedDict, total=False):
+        seen: Any
+        hops: int
+        remaining: RemainingSteps
+
+    observed: list[int] = []
+
+    def hop(state: Mapping[str, Any]) -> dict[str, Any]:
+        observed.append(state["remaining"])
+        return {"hops": state.get("hops", 0) + 1}
+
+    typed = (
+        TypedStateGraph(S, graph_id="remaining-reset")
+        .add_node("a", hop)
+        .add_node("b", hop)
+        .add_edge(START, "a")
+        .add_edge("a", "b")
+        .add_edge("b", END)
+        .compile()
+    )
+
+    async def run() -> None:
+        caps: dict[int, RunCheckpoint] = {}
+        await typed.invoke(
+            input={"hops": 0},
+            effects=SimulatedEffects(4),
+            superstep_cap=9,
+            on_checkpoint=lambda rc: caps.__setitem__(rc.superstep, rc),
+        )
+        assert observed == [8, 7]  # cap 9: superstep 1 sees 8, superstep 2 sees 7
+        observed.clear()
+        await typed.inner.invoke(
+            effects=SimulatedEffects(4),
+            superstep_cap=9,
+            resume_from=caps[1],
+        )
+        # Resumed invocation: b runs in absolute superstep 2 but sees the
+        # budget RESET (8), not the continued countdown (7).
+        assert observed == [8]
+
+    asyncio.run(run())
+
+
+def test_failure_view_preserves_unfinished_send_packets():
+    """Resuming from the post-failure view re-runs ONLY unfinished Sends."""
+    from dharma_swarm.graph.routing import Send
+
+    calls: dict[str, int] = {"ok": 0, "bad": 0}
+    armed = {"on": True}
+
+    def fan(state: Mapping[str, Any]):
+        return None
+
+    def worker(arg: Mapping[str, Any]) -> dict[str, Any]:
+        which = arg["which"]
+        calls[which] += 1
+        if which == "bad" and armed["on"]:
+            raise RuntimeError("seeded-send-failure")
+        return {"log": [which]}
+
+    def build():
+        return (
+            GraphBuilder("send-failure-view")
+            .add_channel("log", AppendChannel)
+            .add_node("fan", fan)
+            .add_node("worker", worker)
+            .add_edge(START, "fan")
+            .add_conditional_edges(
+                "fan",
+                lambda view: [
+                    Send("worker", {"which": "ok"}),
+                    Send("worker", {"which": "bad"}),
+                ],
+                ["worker"],
+            )
+            .add_edge("worker", END)
+            .compile()
+        )
+
+    async def run() -> None:
+        views: list[RunCheckpoint] = []
+        with pytest.raises(NodeExecutionError, match="seeded-send-failure"):
+            await build().invoke(
+                input={"log": []},
+                effects=SimulatedEffects(6),
+                on_checkpoint=views.append,
+            )
+        armed["on"] = False
+        resumed = await build().invoke(
+            effects=SimulatedEffects(6), resume_from=views[-1]
+        )
+        assert sorted(resumed.state["log"]) == ["bad", "ok"]
+        # ok-packet ran once (its write survived in the view); bad twice.
+        assert calls == {"ok": 1, "bad": 2}
+
+    asyncio.run(run())
+
+
+def test_partial_replay_emits_events_for_recorded_tasks(tmp_path):
+    """Failure-resume receipts cover recorded siblings, not just live tasks."""
+    calls = {"a": 0, "b": 0}
+    armed = {"on": True}
+    compiled = _atomicity_graph(calls, armed)
+
+    async def run() -> None:
+        kernel = GraphPersistenceKernel(Path(tmp_path) / "kernel")
+        with pytest.raises(NodeExecutionError):
+            await compiled.invoke(
+                input={"x": 3},
+                effects=SimulatedEffects(9),
+                graph_run_id="events",
+                persistence=kernel,
+                thread_id="events",
+            )
+        armed["on"] = False
+        resumed = await compiled.invoke(
+            input=None,
+            effects=SimulatedEffects(9),
+            persistence=kernel,
+            thread_id="events",
+        )
+        replay_step_nodes = sorted(
+            event.node_id for event in resumed.events if event.superstep == 1
+        )
+        assert replay_step_nodes == ["a", "b"]  # recorded a + re-executed b
+
+    asyncio.run(run())

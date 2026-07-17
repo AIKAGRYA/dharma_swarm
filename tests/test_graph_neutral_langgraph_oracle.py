@@ -543,3 +543,69 @@ async def test_failed_step_sibling_writes_survive_and_resume_parity(tmp_path):
     }
     # Succeeded task never re-executed on either arm; failed task re-ran once.
     assert lg_calls == dh_calls == {"a": 1, "b": 2}
+
+
+async def test_typed_input_schema_resume_parity(tmp_path):
+    """Command(resume=...) works through a TYPED graph with an input schema
+    on both engines, and extra seed keys are dropped, not errors."""
+    from langgraph.types import Command as LGResumeCommand
+    from langgraph.types import interrupt as lg_interrupt
+
+    from dharma_swarm.graph.interrupts import GraphInterrupted
+    from dharma_swarm.graph.interrupts import interrupt as dh_interrupt
+    from dharma_swarm.graph.routing import Command as DhCommand
+    from dharma_swarm.graph.schema import TypedStateGraph
+
+    class _TypedResumeState(TypedDict, total=False):
+        x: int
+        log: Annotated[list[Any], operator.add]
+
+    class _TypedResumeInput(TypedDict, total=False):
+        x: int
+
+    def lg_ask(state):
+        bump = lg_interrupt({"q": "bump?"})
+        return {"x": state["x"] + bump, "log": ["ask"]}
+
+    graph = StateGraph(_TypedResumeState, input_schema=_TypedResumeInput)
+    graph.add_node("ask", lg_ask)
+    graph.add_edge(LG_START, "ask")
+    graph.add_edge("ask", LG_END)
+    app = graph.compile(checkpointer=InMemorySaver())
+    config = {"configurable": {"thread_id": "typed-resume"}}
+    first = app.invoke({"x": 10, "log": ["dropped-seed"]}, config)
+    assert "__interrupt__" in first
+    lg_final = app.invoke(LGResumeCommand(resume=4), config)
+
+    def dh_ask(state):
+        bump = dh_interrupt({"q": "bump?"})
+        return {"x": state["x"] + bump, "log": ["ask"]}
+
+    typed = (
+        TypedStateGraph(
+            _TypedResumeState,
+            input=_TypedResumeInput,
+            graph_id="typed-resume",
+        )
+        .add_node("ask", dh_ask)
+        .add_edge(START, "ask")
+        .add_edge("ask", END)
+        .compile()
+    )
+    kernel = GraphPersistenceKernel(Path(tmp_path) / "kernel")
+    with pytest.raises(GraphInterrupted):
+        await typed.invoke(
+            input={"x": 10, "log": ["dropped-seed"]},
+            effects=SimulatedEffects(13),
+            graph_run_id="typed-resume",
+            persistence=kernel,
+            thread_id="typed-resume",
+        )
+    dh_final = await typed.invoke(
+        input=DhCommand(resume=4),
+        effects=SimulatedEffects(13),
+        persistence=kernel,
+        thread_id="typed-resume",
+    )
+    # Both arms: extra seed key dropped, resume value applied, one ask entry.
+    assert dict(dh_final.state) == dict(lg_final) == {"x": 14, "log": ["ask"]}

@@ -34,6 +34,7 @@ class GraphRuntimeError(RuntimeError):
     succeeded_tasks: tuple[tuple[str, int], ...] = ()
     succeeded_writes: tuple = ()  # ChannelWrite instances; untyped to stay import-free
     succeeded_pull_nodes: tuple[str, ...] = ()
+    unfinished_sends: tuple = ()  # Send packets drained but never completed
 
     def __init__(
         self,

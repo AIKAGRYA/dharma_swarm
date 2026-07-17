@@ -50,20 +50,42 @@ def as_node(
     """
 
     async def run_subgraph(state: Mapping[str, Any]) -> Any:
+        seed = dict(state)
         kwargs: dict[str, Any] = {}
         if effects_factory is not None:
             kwargs["effects"] = effects_factory()
         if superstep_cap is not None:
             kwargs["superstep_cap"] = superstep_cap
         try:
-            result = await child.invoke(input=dict(state), **kwargs)
+            result = await child.invoke(input=dict(seed), **kwargs)
         except ParentCommand as bubbled:
             command = bubbled.command
             return Command(
                 update=command.update,
                 goto=command.goto,
             )
-        return dict(result.state)
+        # Return child DELTAS, not the accumulated snapshot: a shared
+        # reducer channel would otherwise fold the parent's own seed back
+        # into itself (['entry'] seeded, child appends 'child' → returning
+        # ['entry','child'] would re-append 'entry'). Unchanged keys emit no
+        # write; a list extending its seed emits only the suffix. Non-list
+        # reducer channels whose value changed still emit the full child
+        # value — a recorded caveat for exotic reducers, not for last-value.
+        update: dict[str, Any] = {}
+        for key, value in dict(result.state).items():
+            if key in seed:
+                seeded = seed[key]
+                if value == seeded:
+                    continue
+                if (
+                    isinstance(value, list)
+                    and isinstance(seeded, list)
+                    and value[: len(seeded)] == seeded
+                ):
+                    update[key] = value[len(seeded) :]
+                    continue
+            update[key] = value
+        return update
 
     run_subgraph.__name__ = f"subgraph[{child.graph_id}]"
     return run_subgraph
