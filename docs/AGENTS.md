@@ -2,7 +2,7 @@
 
 **Scope:** AI agents (any brand) working in the prose layer — `docs/`,
 `reports/`, `specs/`, `foundations/`, `lodestones/`, root Markdown. Repo-wide
-behaviour, the onboarding gate, and its trust boundaries are
+behaviour, the onboarding status command, and its trust boundaries are
 owned by `CLAUDE.md`; this file adds only prose-layer rules. Root `/AGENTS.md`
 is the tracked minimal entrypoint; this file owns the prose-layer instructions.
 
@@ -20,7 +20,8 @@ Only these files may make repo-level authority claims:
 - `CLAUDE.md` for agent behavior.
 - `docs/governance/SOVEREIGN_MANIFEST.md` for architecture, domains, invariants, and measured repo state.
 - `docs/governance/CANONICAL_DOC_STACK.md` for document hierarchy and ownership.
-- `docs/governance/BUILD_SESSION_ENTRYPOINT.md` for current build track and read order.
+- `docs/governance/BUILD_SESSION_ENTRYPOINT.md` for the stable boundary between
+  session status, edit admission, closeout, CI, and agent registration.
 - `docs/governance/REPO_GOVERNANCE_AUDIT.md` for contradictions and staleness.
 
 All other docs must declare a narrower role: reference, plan, report, witness, archive, research, or experiment.

@@ -1,7 +1,7 @@
-"""Deterministic renderers for the onboarding door: compact, deep, JSON.
+"""Deterministic renderers for compact, deep, and JSON session status.
 
 Rendering only — no collection, no policy, no I/O.  The compact human view is
-hard-bounded to 40–70 lines (spec §2.5); ``--json`` is a deterministic machine
+hard-bounded to 40–70 lines; ``--json`` is a deterministic machine
 projection of the verdict and stable core that excludes every volatile field
 by construction, not by key-name guessing.
 """
@@ -16,12 +16,19 @@ HUMAN_MAX_LINES = 70
 
 # Fields the machine projection deliberately carries — nothing volatile:
 # no observed_at, ages, durations, host paths, cache bookkeeping, or delta
-# (spec §2.5).  The full receipt retains those as typed fields.
+# The full receipt retains volatile fields as typed data.
 _JSON_PROJECTION_KEYS = ("schema", "verdict", "exit_code", "stable_core", "conditions")
 
 
 def machine_projection(receipt: Mapping[str, Any]) -> dict[str, Any]:
     """Deterministic ``--json`` view over an assembled v2 receipt object."""
+    stable_core = dict(receipt.get("stable_core", {}))
+    # The receipt keeps these empty v2 compatibility fields, but session
+    # status deliberately exposes no packet-binding or track-selection seam.
+    stable_core.pop("packet", None)
+    portfolio = dict(stable_core.get("portfolio", {}))
+    portfolio.pop("selected_track", None)
+    stable_core["portfolio"] = portfolio
     conditions = [
         {
             "id": str(row.get("id", "")),
@@ -35,7 +42,7 @@ def machine_projection(receipt: Mapping[str, Any]) -> dict[str, Any]:
         "schema": "dharma_swarm.onboard_json.v1",
         "verdict": str(receipt.get("primary_verdict", "")),
         "exit_code": receipt.get("exit_code", 1),
-        "stable_core": receipt.get("stable_core", {}),
+        "stable_core": stable_core,
         "conditions": sorted(conditions, key=lambda row: row["id"]),
     }
     assert tuple(projection) == _JSON_PROJECTION_KEYS
@@ -59,12 +66,11 @@ def _pad_to_minimum(lines: list[str]) -> list[str]:
 
 
 def render_compact(receipt: Mapping[str, Any]) -> str:
-    """The 40–70 line human doorway (spec §2.5 layout)."""
+    """Render the bounded 40–70 line human session-status view."""
     verdict = str(receipt.get("primary_verdict", "UNKNOWN"))
     exit_code = receipt.get("exit_code", 1)
     core = receipt.get("stable_core", {})
     repo = core.get("repository", {})
-    packet = core.get("packet", {})
     live = receipt.get("live_delta", {})
     repo_state = live.get("repo_state", {})
     conditions = [row for row in live.get("conditions", []) if isinstance(row, dict)]
@@ -86,15 +92,8 @@ def render_compact(receipt: Mapping[str, Any]) -> str:
         f"{dirty}, base {repo_state.get('base', '?')} "
         f"(ahead {repo_state.get('ahead', 0)}, behind {repo_state.get('behind', 0)})"
     )
-    scope = "hermetic"
-    packet_id = packet.get("id") or "none"
-    lines.append(f"Scope:   {scope} · packet {packet_id}")
-    track = core.get("portfolio", {}).get("selected_track", "")
-    lines.append(f"Track:   {track or 'unselected'}")
-    lines.append(
-        f"Allowed: {len(packet.get('allowed_files', []))} patterns · "
-        f"Forbidden: {len(packet.get('forbidden_files', []))} patterns"
-    )
+    lines.append("View:    read-only session status")
+    lines.append("Authority: none — no edit, merge, or deploy permission")
     lines.append("")
     if failing:
         lines.append(f"Primary blocker: {failing[0].get('id')}")
@@ -120,8 +119,7 @@ def render_compact(receipt: Mapping[str, Any]) -> str:
     lines.append("ACTIVE PORTFOLIO")
     lines.append(f"Declared portfolio ({len(tracks)} track(s); live state is NOT here):")
     for track_id in tracks[:12]:
-        marker = "▶" if track_id == track else "-"
-        lines.append(f"  {marker} {track_id}")
+        lines.append(f"  - {track_id}")
     if len(tracks) > 12:
         lines.append(f"  … {len(tracks) - 12} more in ACTIVE_TRACK.yaml")
 
@@ -158,7 +156,7 @@ def render_compact(receipt: Mapping[str, Any]) -> str:
 
 
 def render_deep(receipt: Mapping[str, Any]) -> str:
-    """Detailed view over the same packet and verdict — no second policy."""
+    """Detailed view over the same session status and verdict."""
     compact = render_compact(receipt)
     live = receipt.get("live_delta", {})
     extra: list[str] = ["", "— deep —"]

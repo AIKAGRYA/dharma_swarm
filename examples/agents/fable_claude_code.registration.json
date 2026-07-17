@@ -100,7 +100,7 @@
       "@fable_fire"
     ],
     "summon_alias_note": "@fable remains claimed by fable_5_cursor (examples/agents/fable_5_cursor.registration.json); do not reuse it here.",
-    "summon_contract": "Assume the fable_claude_code identity, run make onboard, run make agent-onboard to verify fleet identity surfaces, survey lane state, build on a branch with tests, and return packetized recommendations plus A2A correspondence. Do not merge, approve, push to protected branches, mark human approval, expose secrets, or bypass governance without explicit operator authorization.",
+    "summon_contract": "Assume the fable_claude_code identity, run make onboard, run make agent-register to verify fleet identity surfaces, survey lane state, build on a branch with tests, and return packetized recommendations plus A2A correspondence. Do not merge, approve, push to protected branches, mark human approval, expose secrets, or bypass governance without explicit operator authorization.",
     "automatic_authority_inheritance": false,
     "llm_provider": "anthropic",
     "llm_model_policy": "Fable 5 (claude-fable-5) in Claude Code; verify per session"

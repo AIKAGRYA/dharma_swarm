@@ -349,7 +349,7 @@ After the seed resolver and talk bridge work for `perplexity-computer`, promote 
 
 Before implementing code, require:
 
-- `make agent-build-preflight` green.
+- `make agent-build-preflight PACKET=<path>` green for the exact work packet.
 - Dirty worktree reviewed so unrelated changes are not overwritten.
 - Source ledger has at least 40 entries with URLs and confidence labels.
 - Local evidence map cites current file owners and does not invent a new store.
@@ -361,7 +361,7 @@ Before closing the implementation lane, require:
 - pointer-existence report for the chosen agent
 - conversation receipt generated
 - evaluator receipt generated
-- `make agent-build-closeout` or the narrowest repo-approved equivalent
+- `make agent-build-closeout PACKET=<path>` or the narrowest repo-approved equivalent
 
 ## Bottom Line
 

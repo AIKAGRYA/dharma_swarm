@@ -24,7 +24,7 @@ must pass these gates before merge:
 | 9 | Intent PR limit | `bot-pr-limit.yml` | Hard-fail when an automation lane (headRef pattern) has more open PRs than its declared limit |
 | 10 | Stale PR lifecycle | `stale-pr.yml` | Warning label at 11 days (bot) / 27 days (human); auto-close at 14 / 30 |
 | 11 | Duplicate automated PR dedupe | `pr-dedupe.yml` | Auto-closes older trusted same-repo duplicates of `[automated]`/`[auto]` PRs, keeping the newest |
-| 12 | Automerge lane | `automerge.yml` | Auto-enrolls bot/automated PRs; on opt-in + all checks green + no changes-requested, dispatches MMM with `merge_when_clean` |
+| 12 | Automerge lane | `automerge.yml` | Auto-enrolls bot/automated PRs; on opt-in + the manifest-required checks green + no changes-requested, dispatches MMM with `merge_when_clean` |
 
 ### Local pre-flight
 
@@ -295,12 +295,16 @@ Every agent or contributor must:
 
 1. **Run `make onboard`** at session start to see the current operating
    reality (active track, live ops, broken register, PR hygiene summary)
-2. **Run `make agent-build-preflight`** before implementation work when the
-   session will edit code, docs, tests, workflows, or governance surfaces.
-3. **Run `make agent-build-closeout`** before opening any PR. This runs a
-   no-worktree hygiene scan plus `make governance-all`. You do not need to
-   hand-refresh DocOps counts — the `docops-autorefresh.yml` feeder reconciles
-   them on the first CI run (see §1, "Self-healing DocOps counts").
+2. **Apply the packet policy.** Packet-bound preflight and closeout are required
+   when changed paths match Merge Master Mike's `HOT_PATH_PATTERNS` in
+   `scripts/runtime/pr_merge_control.py`; they are optional otherwise. When
+   required, run `make agent-build-preflight PACKET=<path>` before
+   implementation work.
+3. **Run `make agent-build-closeout PACKET=<path>`** before opening the PR when
+   a packet is required or voluntarily used. This runs a no-worktree hygiene
+   scan plus `make governance-all`. You do not need to hand-refresh DocOps
+   counts — the `docops-autorefresh.yml` feeder reconciles them on the first CI
+   run (see §1, "Self-healing DocOps counts").
 4. **Check for existing open PRs** on the same topic before opening a new one:
    ```bash
    gh pr list --state open --search "<your topic keywords>"

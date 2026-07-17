@@ -90,7 +90,7 @@ def init_session_repo(tmp_path: Path) -> Path:
     track = repo / "docs/governance/ACTIVE_TRACK.yaml"
     track.parent.mkdir(parents=True)
     row = {
-        "id": "onboard-one-door-2026-07",
+        "id": "session-entry-test-track",
         "status": "ACTIVE",
         "owner": "@AmitabhainArunachala",
         "owned_surfaces": ["tests/**", "reports/agentops/work_packets/**"],
@@ -106,10 +106,10 @@ def init_session_repo(tmp_path: Path) -> Path:
 def session_packet(repo: Path, **overrides: object) -> dict[str, object]:
     head = run(["git", "rev-parse", "HEAD"], cwd=repo).stdout.strip()
     branch = run(["git", "branch", "--show-current"], cwd=repo).stdout.strip()
-    packet_id = "onboard-one-door-WP-O1-test"
+    packet_id = "session-entry-test-WP-T1"
     payload: dict[str, object] = {
         "id": packet_id, "base_ref": head, "branch": branch, "worktree": ".",
-        "intent": "Exercise the portable WP-O1 Session Entry contract.",
+        "intent": "Exercise the portable Session Entry contract.",
         "allowed_files": ["allowed.txt", f"reports/agentops/work_packets/{packet_id}.json"],
         "forbidden_files": ["forbidden.txt"],
         "gates": [
@@ -129,8 +129,8 @@ def session_packet(repo: Path, **overrides: object) -> dict[str, object]:
                 "git": agentops._probe_tool_version("git", repo),
             },
             "authority_precedence": ["executable", "tests", "locks", "git", "owner_files"],
-            "work_packet": "WP-O1",
-            "active_track": "onboard-one-door-2026-07",
+            "work_packet": "WP-T1",
+            "active_track": "session-entry-test-track",
             "owner": "@AmitabhainArunachala",
             "collision": {"status": "clear", "checked_at_sha": head, "details": []},
             "interface_mismatches": [],
@@ -2057,7 +2057,7 @@ def test_session_entry_truth_fields_are_cross_bound(tmp_path: Path) -> None:
     wrong_packet = session_packet(repo)
     entry = wrong_packet["session_entry"]
     assert isinstance(entry, dict)
-    entry["work_packet"] = "WP-O99"
+    entry["work_packet"] = "WP-Z99"
     with pytest.raises(agentops.AgentOpsError, match="work_packet.*packet id"):
         agentops.parse_work_packet(seal_packet(wrong_packet))
 
@@ -2088,12 +2088,14 @@ def test_session_entry_truth_fields_are_cross_bound(tmp_path: Path) -> None:
     assert exit_code == 0 and report is None
 
 
-def test_session_entry_accepts_exact_wp_o1r_identity_only(tmp_path: Path) -> None:
+def test_session_entry_work_packet_identity_is_generic_and_cross_bound(
+    tmp_path: Path,
+) -> None:
     repo = init_session_repo(tmp_path)
 
     def packet_for(work_packet: str, *, packet_id: str | None = None) -> dict[str, object]:
         payload = session_packet(repo)
-        identity = packet_id or f"onboard-one-door-{work_packet}"
+        identity = packet_id or f"session-entry-test-{work_packet}"
         payload["id"] = identity
         payload["allowed_files"] = [
             "allowed.txt",
@@ -2104,128 +2106,21 @@ def test_session_entry_accepts_exact_wp_o1r_identity_only(tmp_path: Path) -> Non
         entry["work_packet"] = work_packet
         return seal_packet(payload)
 
-    for work_packet in ("WP-O1", "WP-O10", "WP-O1R"):
+    for work_packet in (
+        "WP-T1", "WP-LC10", "WP-A2A3", "WP-T3-B0", "WP-00", "WP-0S", "WP-0C1R",
+    ):
         parsed = agentops.parse_work_packet(packet_for(work_packet))
         assert parsed.session_entry is not None
         assert parsed.session_entry.work_packet == work_packet
 
-    for rejected in ("WP-O6R", "WP-O1RR", "WP-O1R2", "WP-O1r"):
+    for rejected in ("T1", "WP-", "WP-t1", "WP-T_1", "WP--T1", "WP-T1-"):
         with pytest.raises(agentops.AgentOpsError, match="work_packet.*packet id"):
             agentops.parse_work_packet(packet_for(rejected))
 
     with pytest.raises(agentops.AgentOpsError, match="work_packet.*packet id"):
         agentops.parse_work_packet(
-            packet_for("WP-O1R", packet_id="onboard-one-door-WP-O1")
+            packet_for("WP-LC10", packet_id="session-entry-test-WP-LC1")
         )
-
-
-def test_session_entry_accepts_exact_wp_o2r_identity_only(tmp_path: Path) -> None:
-    repo = init_session_repo(tmp_path)
-
-    def packet_for(work_packet: str, *, packet_id: str | None = None) -> dict[str, object]:
-        payload = session_packet(repo)
-        identity = packet_id or f"onboard-one-door-{work_packet}"
-        payload["id"] = identity
-        payload["allowed_files"] = [
-            "allowed.txt",
-            f"reports/agentops/work_packets/{identity}.json",
-        ]
-        entry = payload["session_entry"]
-        assert isinstance(entry, dict)
-        entry["work_packet"] = work_packet
-        return seal_packet(payload)
-
-    parsed = agentops.parse_work_packet(packet_for("WP-O2R"))
-    assert parsed.session_entry is not None
-    assert parsed.session_entry.work_packet == "WP-O2R"
-
-    for rejected in ("WP-O2RR", "WP-O2R2", "WP-O2r"):
-        with pytest.raises(agentops.AgentOpsError, match="work_packet.*packet id"):
-            agentops.parse_work_packet(packet_for(rejected))
-
-    for rejected_packet_id in (
-        "onboard-one-door-WP-O2",
-        "onboard-one-door-WP-O2R-B1",
-        "other-WP-O2R",
-        "WP-O2R",
-    ):
-        with pytest.raises(agentops.AgentOpsError, match="work_packet.*packet id"):
-            agentops.parse_work_packet(
-                packet_for("WP-O2R", packet_id=rejected_packet_id)
-            )
-
-
-def test_session_entry_accepts_exact_wp_o3r_identity_only(tmp_path: Path) -> None:
-    repo = init_session_repo(tmp_path)
-
-    def packet_for(work_packet: str, *, packet_id: str | None = None) -> dict[str, object]:
-        payload = session_packet(repo)
-        identity = packet_id or f"onboard-one-door-{work_packet}"
-        payload["id"] = identity
-        payload["allowed_files"] = [
-            "allowed.txt",
-            f"reports/agentops/work_packets/{identity}.json",
-        ]
-        entry = payload["session_entry"]
-        assert isinstance(entry, dict)
-        entry["work_packet"] = work_packet
-        return seal_packet(payload)
-
-    parsed = agentops.parse_work_packet(packet_for("WP-O3R"))
-    assert parsed.session_entry is not None
-    assert parsed.session_entry.work_packet == "WP-O3R"
-
-    for rejected in ("WP-O3RR", "WP-O3R2", "WP-O3r", "WP-O5R"):
-        with pytest.raises(agentops.AgentOpsError, match="work_packet.*packet id"):
-            agentops.parse_work_packet(packet_for(rejected))
-
-    for rejected_packet_id in (
-        "onboard-one-door-WP-O3",
-        "onboard-one-door-WP-O3-B0",
-        "onboard-one-door-WP-O3R-B1",
-        "other-WP-O3R",
-        "WP-O3R",
-    ):
-        with pytest.raises(agentops.AgentOpsError, match="work_packet.*packet id"):
-            agentops.parse_work_packet(
-                packet_for("WP-O3R", packet_id=rejected_packet_id)
-            )
-
-
-def test_session_entry_accepts_exact_wp_o4r_identity_only(tmp_path: Path) -> None:
-    repo = init_session_repo(tmp_path)
-
-    def packet_for(work_packet: str, *, packet_id: str | None = None) -> dict[str, object]:
-        payload = session_packet(repo)
-        identity = packet_id or f"onboard-one-door-{work_packet}"
-        payload["id"] = identity
-        payload["allowed_files"] = [
-            "allowed.txt",
-            f"reports/agentops/work_packets/{identity}.json",
-        ]
-        entry = payload["session_entry"]
-        assert isinstance(entry, dict)
-        entry["work_packet"] = work_packet
-        return seal_packet(payload)
-
-    parsed = agentops.parse_work_packet(packet_for("WP-O4R"))
-    assert parsed.session_entry is not None
-    assert parsed.session_entry.work_packet == "WP-O4R"
-
-    for rejected in ("WP-O4RR", "WP-O4R2", "WP-O4r", "WP-O5R"):
-        with pytest.raises(agentops.AgentOpsError, match="work_packet.*packet id"):
-            agentops.parse_work_packet(packet_for(rejected))
-
-    for rejected_packet_id in (
-        "onboard-one-door-WP-O4",
-        "onboard-one-door-WP-O4R-B1",
-        "other-WP-O4R",
-        "WP-O4R",
-    ):
-        with pytest.raises(agentops.AgentOpsError, match="work_packet.*packet id"):
-            agentops.parse_work_packet(
-                packet_for("WP-O4R", packet_id=rejected_packet_id)
-            )
 
 
 def test_inspect_accepts_successor_packet_but_execution_requires_tracked_custody(
@@ -3477,62 +3372,6 @@ def test_make_admission_reports_are_external_and_read_only(
     assert (repo / "ignored-state.txt").read_bytes() == ignored_bytes
 
 
-def test_ci_event_without_packet_still_emits_external_report(tmp_path: Path) -> None:
-    repo = init_session_repo(tmp_path)
-    base = run(["git", "rev-parse", "HEAD"], cwd=repo).stdout.strip()
-    (repo / "notes.txt").write_text("unrelated event change\n", encoding="utf-8")
-    assert run(["git", "add", "notes.txt"], cwd=repo).returncode == 0
-    assert run(["git", "commit", "-m", "unrelated event"], cwd=repo).returncode == 0
-    head = run(["git", "rev-parse", "HEAD"], cwd=repo).stdout.strip()
-    before = tree_snapshot(repo)
-    report_root = tmp_path / "ci-reports"
-
-    exit_code, report = agentops.execute_ci_event(
-        source_root=repo,
-        event_name="pull_request",
-        event_base=base,
-        event_head=head,
-        report_root=report_root,
-    )
-
-    assert exit_code == 0
-    assert report["status"] == "passed"
-    assert report["packets"] == []
-    reports = list(report_root.rglob("report.json"))
-    assert len(reports) == 1
-    assert json.loads(reports[0].read_text(encoding="utf-8"))["phase"] == "ci-event"
-    assert tree_snapshot(repo) == before
-
-
-def test_ci_event_config_error_exit_three_writes_external_report(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    repo = init_session_repo(tmp_path)
-    stale_head = run(["git", "rev-parse", "HEAD"], cwd=repo).stdout.strip()
-    (repo / "notes.txt").write_text("advance checkout\n", encoding="utf-8")
-    assert run(["git", "add", "notes.txt"], cwd=repo).returncode == 0
-    assert run(["git", "commit", "-m", "advance checkout"], cwd=repo).returncode == 0
-    current_head = run(["git", "rev-parse", "HEAD"], cwd=repo).stdout.strip()
-    report_root = tmp_path / "config-error-reports"
-    monkeypatch.chdir(repo)
-
-    exit_code = agentops.main(
-        [
-            "--ci-event", "pull_request",
-            "--event-base", current_head,
-            "--event-head", stale_head,
-            "--report-root", str(report_root),
-        ]
-    )
-
-    assert exit_code == 3
-    reports = list(report_root.rglob("report.json"))
-    assert len(reports) == 1
-    payload = json.loads(reports[0].read_text(encoding="utf-8"))
-    assert payload["status"] == "config_error"
-    assert "event head" in payload["error"]
-
-
 def test_session_entry_cli_requires_explicit_admission_phase(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -3926,77 +3765,6 @@ def test_positive_gate_allowlist_rejects_abbreviated_write_context() -> None:
     agentops.admit_gate_command(ok)  # must not raise
 
 
-def test_ci_authority_transition_uses_conservative_endpoint_union() -> None:
-    def row(
-        track_id: str,
-        status: str,
-        owner: str,
-        surfaces: list[str],
-    ) -> dict[str, object]:
-        return {
-            "id": track_id,
-            "status": status,
-            "owner": owner,
-            "owned_surfaces": surfaces,
-        }
-
-    onboarding = agentops._ONBOARDING_TRACK_ID
-    cases = [
-        (
-            [row(onboarding, "ACTIVE", "base", ["old/**"])],
-            [row(onboarding, "PAUSED", "head", ["new/**"])],
-            "base",
-            ["old/**"],
-        ),
-        (
-            [row(onboarding, "PAUSED", "base", ["old/**"])],
-            [row(onboarding, "ACTIVE", "head", ["new/**"])],
-            "head",
-            ["new/**"],
-        ),
-        (
-            [row(onboarding, "ACTIVE", "base", ["old/**", "shared/**"])],
-            [row(onboarding, "ACTIVE", "head", ["new/**", "shared/**"])],
-            "head",
-            ["new/**", "old/**", "shared/**"],
-        ),
-        (
-            [row(onboarding, "ACTIVE", "base", ["old/**"])],
-            [row(onboarding, "SHIPPABLE", "head", ["new/**"])],
-            "head",
-            ["new/**", "old/**"],
-        ),
-        (
-            [row(onboarding, "SHIPPABLE", "base", ["old/**"])],
-            [row(onboarding, "PAUSED", "head", ["new/**"])],
-            "base",
-            ["old/**"],
-        ),
-        (
-            [row(onboarding, "PAUSED", "base", ["old/**"])],
-            [row(onboarding, "PAUSED", "head", ["new/**"])],
-            None,
-            [],
-        ),
-    ]
-    for base, head, expected_owner, expected_surfaces in cases:
-        effective, surfaces, _siblings = agentops._ci_authority_context(base, head)
-        assert (None if effective is None else effective["owner"]) == expected_owner
-        assert surfaces == expected_surfaces
-
-    base = [
-        row(onboarding, "ACTIVE", "base", ["owner-old/**"]),
-        row("sibling", "ACTIVE", "sibling-base", ["sibling-old/**"]),
-    ]
-    head = [
-        row(onboarding, "ACTIVE", "head", ["owner-new/**"]),
-        row("sibling", "SHIPPABLE", "sibling-head", ["sibling-new/**"]),
-    ]
-    _effective, surfaces, siblings = agentops._ci_authority_context(base, head)
-    assert surfaces == ["owner-new/**", "owner-old/**"]
-    assert siblings == {"sibling": ["sibling-new/**", "sibling-old/**"]}
-
-
 def test_gate_timeout_caps_each_gate_and_aggregate_budget(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -4017,7 +3785,7 @@ def test_gate_timeout_caps_each_gate_and_aggregate_budget(
 
 def test_owner_config_and_packet_decode_errors_are_normalized(tmp_path: Path) -> None:
     valid = {
-        "id": agentops._ONBOARDING_TRACK_ID,
+        "id": "session-entry-test-track",
         "status": "ACTIVE",
         "owner": "owner",
         "owned_surfaces": ["tests/**"],

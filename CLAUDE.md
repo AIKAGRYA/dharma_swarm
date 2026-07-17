@@ -1,27 +1,37 @@
 # dharma_swarm — Claude Code Configuration
 
-## Before Anything Else — the single remembered gate
+## Before Anything Else — establish session status
 
-If you have not run `make onboard` this session, do it now — before any non-trivial Read, Grep, or Edit. It renders the current operating reality and the code-structure tools you should reach for before grep.
+If you have not run `make onboard` this session, do it now — before any
+non-trivial Read, Grep, or Edit. It truthfully reports the current checkout and
+session verdict.
 
-`make onboard` is the only command you need to remember. Everything else
-(active track, live ops, broken register, axioms, tooling hints, depth
-pointers) is rendered from the existing owners by that command:
+`make onboard` is session status, not permission to edit and not a complete
+model of the running organism:
 
 ```bash
 make onboard
 # or: python3 scripts/governance/agent_onboard.py
 ```
 
-If this file disagrees with that output on anything live (track id, prereqs, recent commits), trust the onboarding output. This file owns behaviour; the onboarding command surfaces state.
+Use `make organism-status` for the deeper read-only whole-organism projection.
+Packet-bound preflight and closeout are required when changed paths match Merge
+Master Mike's `HOT_PATH_PATTERNS` in `scripts/runtime/pr_merge_control.py`; they
+are optional otherwise. A narrower lane or campaign contract may require them
+more broadly. Before editing work that requires a packet, bind its baseline and
+scope with `make agent-build-preflight PACKET=<path>`, then run packet-bound
+closeout afterward. This file owns behaviour;
+`docs/governance/BUILD_SESSION_ENTRYPOINT.md` owns the command boundaries.
 
-**What an onboard run does and does not prove:** it prints render results, not
-guarantees. A section that says "no evidence found — run X" means the state is
-missing until you run X; in a fresh clone the ACTIVE PORTFOLIO section is empty
-until `python3 scripts/governance/check_track_status.py` has written its
-evidence. A completed onboard run (whatever its exit code) is NOT proof that
-you saw live portfolio state — the section content is. Never fill such a gap
-from this file or any other .md; live state comes only from the commands above.
+**What an onboard run does and does not prove:** READY is evidence only about
+the local session evaluation. It is NOT proof of edit admission, whole-organism
+liveness, CI admission, merge approval, or deployment readiness. The portfolio
+shown by onboarding is declared intent from `ACTIVE_TRACK.yaml`, not runtime
+truth. Never fill a missing observation from this file or another prose copy.
+
+The packet-scope check proves committed-range packet scope only; it does not
+prove local preflight or closeout, packet gate execution, human approval, or
+merge authority.
 
 <!-- ACTIVE_TRACK:START -->
 
@@ -33,7 +43,7 @@ from this file or any other .md; live state comes only from the commands above.
                  tests/test_active_track_governance.py
      newest track verified_at in source: 2026-07-16 -->
 
-**Active portfolio — declared intent only:** 11 co-equal track(s) (WIP warn 8, max 11; model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned). This stamped digest carries track identity and surface ownership, NOT live status and NOT full track detail (descriptions, next-items, non-goals stay in the YAML). Live state comes only from `make onboard`; if its ACTIVE PORTFOLIO section is empty or warns, run `python3 scripts/governance/check_track_status.py` — never answer portfolio questions from this block or any other .md copy.
+**Active portfolio — declared intent only:** 10 co-equal track(s) (WIP warn 8, max 10; model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned). This stamped digest carries track identity and surface ownership, NOT runtime truth and NOT full track detail (descriptions, next-items, non-goals stay in the YAML). Declared intent comes from `docs/governance/ACTIVE_TRACK.yaml`; evaluate it with `python3 scripts/governance/check_track_status.py`. Never answer runtime or liveness questions from this block or another prose copy.
 
 **Spine objectives:** `substrate-nativeness`, `revenue-external-humans-served`, `research-depth` (each covered by at least one active track)
 
@@ -55,14 +65,12 @@ from this file or any other .md; live state comes only from the commands above.
   - owns: docs/vision_maps/MASTER_2026-07-07_hyperbolic_time_chamber.md, docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md, docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md, docs/plans/INWARD_ASCENT_PHASE0_DOSSIER_2026-07-07.md, scripts/governance/inward_ascent_baseline.py, scripts/governance/frontier_ledger.py, scripts/governance/transcendence_ledger.py, dharma_swarm/chamber/**, tests/test_chamber_traces.py, tests/test_chamber_gym_git_history.py, tests/test_chamber_daily_delta.py, tests/test_chamber_predictions.py, tests/test_chamber_sandbox.py, tests/test_chamber_ledger_history.py, tests/test_transcendence_ledger.py, reports/governance/inward_ascent/**, reports/governance/chamber/**
 - **`company-builder-parity-2026-07`** — TAM (Transdimensional Abundance Machine) — the live Company-Builder Parity board (ACTIVE, serves `revenue-external-humans-served`, verified 2026-07-07, open blocker items: 0)
   - owns: scripts/governance/tam_ledger.py, scripts/governance/tam_axes.py, reports/governance/tam/**, tests/test_tam_ledger.py, docs/plans/TAM_TRANSDIMENSIONAL_ABUNDANCE_MACHINE_2026-07-07.md, docs/plans/TAM_MASTER_PROMPT_2026-07-07.md, docs/research/POLSIA_COFOUNDER_BLUEPRINT_GENEALOGY_2026-07-07.md
-- **`onboard-one-door-2026-07`** — One-door onboarding — strict, fast, deterministic session admission (ACTIVE, serves `substrate-nativeness`, verified 2026-07-14, open blocker items: 6)
-  - owns: AGENTS.md, Makefile, .github/workflows/structure.yml, .github/workflows/active-track.yml, docs/governance/ANTI_SLOP_RULES.md, docs/governance/AGENTOPS.md, docs/governance/BUILD_SESSION_ENTRYPOINT.md, scripts/docops/check_docops_integrity.py, scripts/governance/agent_onboard.py, scripts/governance/orientation_graph.py, scripts/governance/trust_gate_status.py, scripts/governance/repo_status.py, scripts/governance/run_agent_work_packet.py, scripts/governance/check_track_status.py, dharma_swarm/operator_core/onboarding/**, dharma_swarm/operator_core/control_surface.py, dharma_swarm/operator_core/control_surface_models.py, dharma_swarm/operator_core/operator_coherence/git_governance.py, tests/test_agent_onboard.py, tests/test_orientation_graph.py, tests/test_trust_gate_status.py, tests/test_repo_status.py, tests/test_control_surface.py, tests/test_operator_coherence_cockpit.py, tests/test_agent_work_packet.py, tests/test_active_track_governance.py, tests/test_track_portfolio.py, tests/test_docops_integrity.py, tests/test_make_onboarding_contract.py, tests/test_onboarding_*.py, tests/properties/test_onboarding_readiness_properties.py, reports/agentops/work_packets/onboard-one-door-WP-O*.json
 - **`darshan-publication-2026-07`** — Darshan — publication venture cell (multi-disciplinary voice of clear seeing) (ACTIVE, serves `revenue-external-humans-served`, verified 2026-07-12, open blocker items: 2)
   - owns: docs/plans/DARSHAN_CHARTER_2026-07-12.md, reports/darshan/**, reports/tam/**
 
 Before editing any file, check it against the `owns:` globs above — a surface owned by a track you are not serving is off-limits except through that track's own next-items. Full track detail: `docs/governance/ACTIVE_TRACK.yaml`.
 
-**Recently closed tracks:** `runtime-truth-spine-adoption-2026-06` (SHIPPED, closed 2026-07-03) · `runtime-truth-reconciliation-2026-06` (SHIPPED, closed 2026-06-30) · `runtime-truth-nats-2026-06` (SHIPPED, closed 2026-06-30)
+**Recently closed tracks:** `onboard-one-door-2026-07` (RETIRED, closed 2026-07-17) · `onboard-session-status-2026-07` (SHIPPED, closed 2026-07-17) · `runtime-truth-spine-adoption-2026-06` (SHIPPED, closed 2026-07-03)
 
 For machine-readable status, run `python3 scripts/governance/check_track_status.py` — it writes `reports/governance/active_track_evidence.md` (untracked; derived status is not committed). CI publishes the latest copy on the `generated/status` branch: `git show origin/generated/status:reports/governance/active_track_evidence.md`.
 
@@ -233,7 +241,11 @@ Four separate registries; do not cross-pollinate formats:
 - `.warp/skills/*/SKILL.md` — Warp/Oz operator skills (janitor, verifier, roast council, session-close ledger). Each declares a hard authority boundary; never widen one to "get something done".
 - `dharma_swarm/chetana/claude_code_plugin/` — the chetana memory plugin (skill + slash commands + hooks).
 
-**Gotcha:** `.claude/*` is gitignored (only `.claude/hooks/` and `.claude/settings.json` are tracked) and so is root `/AGENTS.md` — personal `.claude/skills/`, `.claude/agents/`, and a root `AGENTS.md` never reach remote/cloud checkouts. Anything an agent must see in every checkout belongs in one of the tracked registries above or in this file, never in `.claude/` or root `AGENTS.md` (the tracked agents file is `docs/AGENTS.md`, scoped to prose-layer work).
+**Gotcha:** `.claude/*` is gitignored except for `.claude/hooks/` and
+`.claude/settings.json`; personal `.claude/skills/` and `.claude/agents/` do
+not reach remote/cloud checkouts. Root `AGENTS.md` is a tracked, deliberately
+minimal entrypoint that defers to this file. `docs/AGENTS.md` separately scopes
+prose-layer work.
 
 ## CRITICAL: Read Before Any Code Changes
 

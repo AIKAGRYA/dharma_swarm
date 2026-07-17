@@ -88,3 +88,56 @@ def test_the_actual_2026_06_incident_shape():
     slugs = {str(f) for f in _mk(BASE, head)}
     assert any("closed-track-removed:shipped-track" in s for s in slugs)
     assert any("closed-track-resurrected:shipped-track" in s for s in slugs)
+
+
+def test_verified_slice_cannot_erase_same_id_open_blockers():
+    base = _p(
+        active=[{
+            "id": "campaign",
+            "status": "ACTIVE",
+            "next_items": [
+                {"id": "proof", "blocker": True},
+                {"id": "advisory", "blocker": False},
+            ],
+        }]
+    )
+    head = _p(
+        closed=[{
+            "id": "campaign",
+            "status": "SHIPPED",
+            "closure_kind": "VERIFIED_SLICE",
+        }]
+    )
+
+    findings = _mk(base, head)
+
+    assert any(
+        "verified-slice-erases-blockers:campaign" in str(finding)
+        for finding in findings
+    )
+
+
+def test_retired_campaign_and_distinct_verified_slice_preserve_claim_types():
+    base = _p(
+        active=[{
+            "id": "campaign",
+            "status": "ACTIVE",
+            "next_items": [{"id": "proof", "blocker": True}],
+        }]
+    )
+    head = _p(
+        closed=[
+            {
+                "id": "campaign",
+                "status": "RETIRED",
+                "closure_kind": "RETIRED",
+            },
+            {
+                "id": "retained-slice",
+                "status": "SHIPPED",
+                "closure_kind": "VERIFIED_SLICE",
+            },
+        ]
+    )
+
+    assert _mk(base, head) == []

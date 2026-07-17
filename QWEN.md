@@ -20,8 +20,9 @@ is not admission. The validated packet and source owner files, not this adapter,
 
 Never pull, checkout, reset, clean, or expand scope to match prose here. If
 this adapter conflicts with the packet or an owner file, stop and follow the
-owner. `make agent-onboard` is a separate persistent A2A identity join, not a
-substitute for Session Entry.
+owner. `make agent-register` is a separate persistent A2A identity join
+(`make agent-onboard` is its compatibility alias), not a substitute for
+Session Entry.
 
 ## Depth Context After Session Entry
 

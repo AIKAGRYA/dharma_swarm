@@ -24,41 +24,40 @@ Core components:
     - NodeRegistry: central directory of fleet nodes with health monitoring
 """
 
-from dharma_swarm.a2a.agent_card import (
-    A2A_INBOX_ROUTE_ALIAS,
-    A2AInboxRoute,
-    AgentCard,
-    AgentCapability,
-    AgentSkill,
-    CardRegistry,
-    SecurityScheme,
-    a2a_inbox_subject,
-    resolve_agent_uid,
-)
-from dharma_swarm.a2a.a2a_server import (
-    A2AArtifact,
-    A2AExtension,
-    A2AMessage,
-    A2APart,
-    A2APartType,
-    A2AServer,
-    A2ATask,
-    A2ATaskStatus,
-    A2ATransitionError,
-)
-from dharma_swarm.a2a.a2a_client import A2AClient
-from dharma_swarm.a2a.a2a_bridge import A2ABridge
-from dharma_swarm.a2a.nats_transport import A2ANatsTransport, NatsTransportConfig
-from dharma_swarm.a2a.node_registry import NodeRegistry, RemoteNode
-from dharma_swarm.a2a.registry_hydrator import hydrate_from_receipts
-from dharma_swarm.a2a.agent_presence import AgentPresence, list_agent_presence
-from dharma_swarm.a2a.task_receipt import (
-    RECEIPT_SCHEMA,
-    ReceiptValidation,
-    bounce_payload,
-    validate_or_quarantine_file,
-    validate_task_receipt,
-)
+_LAZY_EXPORTS = {
+    "A2A_INBOX_ROUTE_ALIAS": "dharma_swarm.a2a.agent_card",
+    "A2AInboxRoute": "dharma_swarm.a2a.agent_card",
+    "AgentCard": "dharma_swarm.a2a.agent_card",
+    "AgentCapability": "dharma_swarm.a2a.agent_card",
+    "AgentSkill": "dharma_swarm.a2a.agent_card",
+    "CardRegistry": "dharma_swarm.a2a.agent_card",
+    "SecurityScheme": "dharma_swarm.a2a.agent_card",
+    "a2a_inbox_subject": "dharma_swarm.a2a.agent_card",
+    "resolve_agent_uid": "dharma_swarm.a2a.agent_card",
+    "A2AArtifact": "dharma_swarm.a2a.a2a_server",
+    "A2AExtension": "dharma_swarm.a2a.a2a_server",
+    "A2AMessage": "dharma_swarm.a2a.a2a_server",
+    "A2APart": "dharma_swarm.a2a.a2a_server",
+    "A2APartType": "dharma_swarm.a2a.a2a_server",
+    "A2AServer": "dharma_swarm.a2a.a2a_server",
+    "A2ATask": "dharma_swarm.a2a.a2a_server",
+    "A2ATaskStatus": "dharma_swarm.a2a.a2a_server",
+    "A2ATransitionError": "dharma_swarm.a2a.a2a_server",
+    "A2AClient": "dharma_swarm.a2a.a2a_client",
+    "A2ABridge": "dharma_swarm.a2a.a2a_bridge",
+    "A2ANatsTransport": "dharma_swarm.a2a.nats_transport",
+    "NatsTransportConfig": "dharma_swarm.a2a.nats_transport",
+    "NodeRegistry": "dharma_swarm.a2a.node_registry",
+    "RemoteNode": "dharma_swarm.a2a.node_registry",
+    "hydrate_from_receipts": "dharma_swarm.a2a.registry_hydrator",
+    "AgentPresence": "dharma_swarm.a2a.agent_presence",
+    "list_agent_presence": "dharma_swarm.a2a.agent_presence",
+    "RECEIPT_SCHEMA": "dharma_swarm.a2a.task_receipt",
+    "ReceiptValidation": "dharma_swarm.a2a.task_receipt",
+    "bounce_payload": "dharma_swarm.a2a.task_receipt",
+    "validate_or_quarantine_file": "dharma_swarm.a2a.task_receipt",
+    "validate_task_receipt": "dharma_swarm.a2a.task_receipt",
+}
 
 __all__ = [
     "AgentCard",
@@ -94,3 +93,18 @@ __all__ = [
     "validate_or_quarantine_file",
     "validate_task_receipt",
 ]
+
+
+def __getattr__(name: str):
+    module_path = _LAZY_EXPORTS.get(name)
+    if module_path is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    import importlib
+
+    value = getattr(importlib.import_module(module_path), name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    return sorted([*globals().keys(), *_LAZY_EXPORTS])

@@ -45,23 +45,14 @@ shell. This is syntactic admission, not an arbitrary-command sandbox or proof
 of transitive behavior. Session Entry packets are trusted declarative code:
 shell-control tokens and known direct shell/wrapper or mutating-Git forms are
 rejected, but an admitted interpreter or alternate client can still perform
-process, network, or filesystem I/O. The active onboarding hardening track
-owns the direct Git lexical closure in WP-O1R, the positive command-family
-allowlist in WP-O4, and terminal syscall/no-network evidence in WP-O6. Until
-those packets land, never treat gate parsing alone as proof that a command
-cannot indirectly merge, push, or invoke a shell.
-WP-O1R may place only its private lexical mechanics in
-`dharma_swarm/operator_core/onboarding/_command_lexical.py` to preserve the
-500-line module budget. The dependency is one-way: the stdlib-only helper
-splits and classifies command/Git lexemes and mechanically evaluates the
-exact shapes whose constants and ownership remain in `contract.py`; it returns
-values or booleans only and defines no allowlist constant of its own.
-`contract.py` passes its grammar constants into the inspection call and
-retains `_parse_command`, grammar ownership, every final admission decision,
-and every `AgentOpsError`. The
-helper is not exported, accepts no packet, executes no command, raises no
-admission exception, and does not create a second WP-O1R direct-command policy
-engine or owner. Before an admitted direct Git gate executes,
+process, network, or filesystem I/O. Never treat gate parsing alone as proof
+that a command cannot indirectly merge, push, invoke a shell, or use the
+network.
+
+Private lexical mechanics live in
+`dharma_swarm/operator_core/onboarding/_command_lexical.py`; public grammar and
+every final admission decision remain in `contract.py`. Before an admitted
+direct Git gate executes,
 `run_agent_work_packet.py` must use the contract-owned environment builder to
 remove inherited `GIT_*` process controls case-insensitively and then set only
 `GIT_CONFIG_GLOBAL=os.devnull`, `GIT_CONFIG_NOSYSTEM=1`, and
@@ -80,12 +71,12 @@ A new implementation packet extends—not renames—the v0 shape with
 
 ```json
 {
-  "id": "onboard-one-door-WP-O1",
+  "id": "example-track-WP-1",
   "base_ref": "<exact 40-character SHA>",
-  "branch": "codex/onboard-wp-o1-example",
+  "branch": "agent/example-wp-1",
   "worktree": ".",
-  "allowed_files": ["scripts/governance/run_agent_work_packet.py"],
-  "forbidden_files": ["docs/governance/ACTIVE_TRACK.yaml"],
+  "allowed_files": ["docs/governance/AGENTOPS.md"],
+  "forbidden_files": ["api/**", "dashboard/**"],
   "gates": [{"name": "tests", "command": "python3 -m pytest -q", "expected_exit": 0}],
   "negative_controls": [
     {"name": "outside-envelope", "command": "python3 -m pytest -q -k outside", "expected_exit": 0}
@@ -94,12 +85,12 @@ A new implementation packet extends—not renames—the v0 shape with
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {"python": "3.12", "git": "2.51"},
     "authority_precedence": ["executable", "tests", "locks", "git", "owner_files"],
-    "work_packet": "WP-O1",
-    "active_track": "onboard-one-door-2026-07",
-    "owner": "@AmitabhainArunachala",
+    "work_packet": "WP-1",
+    "active_track": "example-track-2026-07",
+    "owner": "<owner matching the selected active track>",
     "collision": {"status": "clear", "checked_at_sha": "<same exact SHA>", "details": []},
     "interface_mismatches": [],
-    "closest_existing_implementation": ["scripts/governance/run_agent_work_packet.py"],
+    "closest_existing_implementation": ["docs/governance/AGENTOPS.md"],
     "honest_blockers": [],
     "rollback": "revert the packet-scoped implementation commit",
     "packet_digest": "<stable_digest of the packet with only this field omitted>"
@@ -112,6 +103,8 @@ Angle-bracket values above are illustrative and must be replaced. Session Entry
 validation additionally requires:
 
 - an external packet path and exact packet `stable_digest` after omitting only `session_entry.packet_digest`;
+- a generic `WP-*` work-packet identifier bound injectively to the
+  track-specific packet id; no campaign prefix is privileged;
 - at least one gate, with `work_packet` bound to the packet id and every
   declared tool version freshly probed for exact equality;
 - no angle-bracket placeholder anywhere in the submitted packet;
@@ -155,7 +148,7 @@ be outside the repository, `HEAD` must equal `base_ref`, the branch must match,
 and the worktree must be clean. After inspect succeeds, copy the packet bytes
 unchanged to `reports/agentops/work_packets/<packet-id>.json`. A non-dry run
 requires that tracked-path copy to exist and be byte-identical. Committed-range
-scope enforcement is not claimed here; WP-O4 adds it to the existing matcher.
+scope enforcement is applied by packet-aware preflight and closeout.
 
 Negative controls run one at a time in disposable clones. Linux uses a chroot
 jail directly as root, through an unprivileged user namespace, or through
@@ -202,11 +195,11 @@ AgentOps v0 makes a repeatable local workflow, not an authority transfer. The
 human operator remains responsible for approving integration, interpreting
 quality, and deciding what should enter the main rollup.
 
-## Positive Gate Command Admission (WP-O4)
+## Positive Gate Command Admission
 
 Positive gates pass one fail-closed command-family allowlist before any
 subprocess execution (`scripts/governance/run_agent_work_packet.py`,
-`admit_gate_command`; O4-B11). Admitted families: the exact WP-O1R direct-Git
+`admit_gate_command`). Admitted families: the contract-owned read-only Git
 grammar, `python -m pytest …`, `python -m ruff check …`, the enumerated
 read-only governance/DocOps scripts (never with `--write-context`), and the
 enumerated Make targets with only `PACKET=`/`ARGS=` variables. Everything
@@ -215,6 +208,6 @@ else — inline interpreters (`python -c`, `node -e`), network clients
 and any gate carrying packet-supplied environment — fails closed before it
 runs. Negative controls are exempt: they exist to prove rejection and run
 jailed. This is command-family confinement, not a semantic proof (an
-allowlisted script can itself perform I/O); WP-O6's syscall/no-network
-evidence remains the terminal oracle. Extending the table is a
+allowlisted script can itself perform I/O); syscall/no-network evidence is a
+separate verification boundary. Extending the table is a
 governance-reviewed admission change.

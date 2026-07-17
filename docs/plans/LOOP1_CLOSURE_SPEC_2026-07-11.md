@@ -14,28 +14,27 @@ authorized, date open); WP-LC0 admission PR in flight.
 
 ## §0 Admission and use of this specification
 
-1. This spec is admitted the one-door way (ratified practice of #857/#859/#860/#864):
-   a **governance-only PR (WP-LC0)** that amends the existing ACTIVE track
+**Session-entry update (2026-07-17):** the One-Door hardening campaign is
+closed. Its packet prefix and shared-surface conventions have no continuing
+authority. New work follows `docs/governance/BUILD_SESSION_ENTRYPOINT.md`.
+
+1. This spec was admitted through a **governance-only PR (WP-LC0)** that amends the existing ACTIVE track
    `loop-closure-2026-06` (new `next_items` for WP-LC1..LC5, four new files added
-   to `owned_surfaces`, refreshed `verified_at`, §7.3 edges), regenerates the three
+   to `owned_surfaces`, refreshed `verified_at`, §7.3 edges), regenerates the two
    managed blocks via `python3 scripts/governance/render_active_track_includes.py`,
    runs the mechanical DocOps refresh
    `python3 scripts/docops/check_docops_integrity.py --write-manifest-counts --write-auto-sections`,
    and proves `check_track_status.py` exit 0 plus a fresh surface-collision analysis.
-2. **Declared shared-surface exception (the #859 pattern):** the managed-block
-   regeneration mechanically rewrites `docs/governance/BUILD_SESSION_ENTRYPOINT.md`,
-   an owned surface of sibling `onboard-one-door-2026-07` (ACTIVE_TRACK.yaml:1544).
-   WP-LC0 admits it as a **packet-scoped shared-surface exception WITHOUT
-   ownership claim** — rendered bytes only, produced solely by
-   `render_active_track_includes.py`, onboarding lane notified on the PR.
-   Collision analysis is "clean except this declared exception."
-   (Precedent: #859 admitted `.gitignore` to WP-O1 on exactly these terms.)
+2. There is no onboarding shared-surface exception. The renderer owns only the
+   marked blocks in `CLAUDE.md` and `docs/governance/SOVEREIGN_MANIFEST.md`;
+   `BUILD_SESSION_ENTRYPOINT.md` is a stable contract, not a portfolio render.
 3. **Never widen the envelope in flight.** A mid-implementation conflict stops
    work and returns an `[AMENDED <date>]` governance PR (#859/#860/#864 pattern).
 4. No new track is opened: the portfolio sits at the `max_active: 10` hard
    ceiling and this work belongs to an already-ACTIVE track. This entry is the
-   admission record; this spec is the detail authority. ACTIVE_TRACK.yaml and
-   all rendered blocks are never hand-edited.
+   admission record; this spec is the detail authority. Edit ACTIVE_TRACK.yaml
+   intentionally and regenerate its marked projections; never hand-edit those
+   generated blocks.
 
 ## §1 Baseline evidence (verified 2026-07-10/11; re-verified by 3 adversarial lenses)
 
@@ -163,7 +162,7 @@ provider selection** — it mutates no code, no prompt, no archive, and no confi
 file, and it extends an adaptive mechanism (`ModelRouter` routing memory /
 circuit breakers) that already exists and is already authorized.
 
-**`needs_host` vocabulary** (per the onboarding hardening spec): any predicate
+**`needs_host` vocabulary** (per the Session Entry contract): any predicate
 provable only on the daemon host is typed `needs_host` and reported as a gap,
 never as pass, until a host receipt exists.
 
@@ -178,40 +177,31 @@ never-started, disabled, and unregistered loops on every host. Env flags
 unchanged. Port 7433 loopback-bound in committed config. Ship veto still
 active. Nothing else claims anything.
 
-## §4 Packet discipline (one-door compliance)
+## §4 Packet discipline (Session Entry)
 
 Per implementation PR, one **Session Entry Packet** (AgentOps v0 +
 `dharma_swarm.session_entry.v1`), authored **externally** under `DHARMA_OPS_DIR`,
 validated with `python3 scripts/governance/run_agent_work_packet.py --packet
 "$PACKET" --inspect` at exact clean `HEAD == base_ref`, then copied
 byte-for-byte to the tracked path as the first non-code diff. Packet id MUST
-equal `loop-closure-WP-LC<N>` — `run_agent_work_packet.py:317` derives the
+equal `loop-closure-WP-LC<N>` and `session_entry.work_packet` MUST equal
+`WP-LC<N>`. `run_agent_work_packet.py` derives the
 tracked filename from `packet.id`, giving
-`reports/agentops/work_packets/loop-closure-WP-LC<N>.json` (verified
-non-colliding with the onboarding glob `onboard-one-door-WP-O*.json`,
-ACTIVE_TRACK.yaml:1566). Default-deny `allowed_files`; `forbidden_files` ⊇
+`reports/agentops/work_packets/loop-closure-WP-LC<N>.json`. Default-deny
+`allowed_files`; `forbidden_files` ⊇
 every sibling track's `owned_surfaces` + the minimum-forbidden set;
 `packet_digest` via `memory_kernel.write_receipts.stable_digest` (no other
 digest primitive); gates shlex-parsed, no shell tokens, no mutating git, **no
 live/autonomy tokens** (`orchestrate-live`, `live_swarm`, `autonomy-daemon`,
-`autonomous-daemon`) — and no interpreter-routed spelling of them once WP-O1R
-lands. Reports go only to an external `--report-root`.
+`autonomous-daemon`). Reports go only to an external `--report-root`.
 
-**Known constraint (do not work around it):** the Session Entry evaluator
-(`contract.py:287`, `re.fullmatch(r"WP-O[1-9][0-9]*", …)`) **deterministically
-rejects** `WP-LC<N>` identities at current main (`parse_work_packet` raises
-before any gate runs), and `contract.py` + `tests/test_agent_work_packet.py`
-are the **hot WP-O1R-B0/WP-O1R envelope — absolutely hands-off.** Therefore
-WP-LC packets run in **procedural compliance mode**: every §4 step executed
-and receipted manually, the deterministic rejection output recorded as the
-honest blocker in `session_entry.honest_blockers`, and WP-LC0 registers a
-`needs-owner` request to the onboarding lane for identity-grammar
-generalization **after** WP-O1R merges (§9 D-LC4). Verified: nothing on main
-validates tracked packets repo-wide, so an unvalidatable-but-well-formed
-tracked packet breaks no gate.
+The former `WP-O*`-only constraint was removed on 2026-07-17. The evaluator
+now accepts conservative generic `WP-*` identifiers bound to the packet id;
+`WP-LC<N>` is a normal validated identity, not a procedural exception.
 
-Session flow per packet: `make onboard` → clean tree → `make agent-build-preflight`
-→ implement inside the envelope → `make agent-build-closeout` before PR
+Session flow per packet: `make onboard` → clean tree →
+`make agent-build-preflight PACKET="$PACKET"` → implement inside the envelope →
+`make agent-build-closeout PACKET="$PACKET"` before PR
 (expect the stale-NATS gate may fail on non-live hosts; owned elsewhere —
 record, don't chase).
 
@@ -224,8 +214,7 @@ record, don't chase).
    One-Wire blocks on loops 12/13, and every Sovereign Safety TCB surface: untouched.
 3. Hands-off surfaces (other lanes): `dharma_swarm/coordination/arena/**`,
    `dharma_swarm/chamber/**`, `dharma_swarm/forge_lab/**` (PR #863 cards),
-   `dharma_swarm/operator_core/onboarding/contract.py` +
-   `tests/test_agent_work_packet.py` (WP-O1R), `scripts/governance/arena_truth_report.py`,
+   Session Entry evaluator/tests, `scripts/governance/arena_truth_report.py`,
    **`dharma_swarm/orchestrator.py` (dharmagraph-owned, module-budget ceiling)**.
    Re-run the open-PR collision check at each packet's authoring time.
 4. No packet gate ever launches the daemon or any live/autonomy target. Live
@@ -251,17 +240,16 @@ next_items; `owned_surfaces` += `scripts/governance/loop1_consumption_check.py`,
 `tests/test_loop_supervisor_tristate.py`, `tests/test_loop1_consumption.py`,
 `tests/test_loop1_consumption_check.py`; `verified_at` refresh; §7.3 edges)
 + this spec at `docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md` + regenerated
-managed blocks (incl. the §0.2 declared exception) + mechanical count refresh.
+managed blocks + mechanical count refresh.
 Nothing else.
-**Also records as next_items**: (a) `needs-owner` → onboarding lane:
-identity-grammar generalization post-WP-O1R (§9 D-LC4); (b) `needs-owner` →
-organism-rewire lane: commit the :7433 loopback binding to main **before any
-LC2 redeploy** (§5.7, blocker on D-LC3); (c) pre-declaration: if WP-LC3's
+**Also records as next_items**: (a) `needs-owner` → organism-rewire lane:
+commit the :7433 loopback binding to main **before any
+LC2 redeploy** (§5.7, blocker on D-LC3); (b) pre-declaration: if WP-LC3's
 non-owned seam (below) proves insufficient, a coordinated ≤2-line
 `orchestrator.py` edit will be requested via dharmagraph-owner sign-off in an
 `[AMENDED]` PR — declared now so the conflict resolves at admission, not mid-flight.
 **Gates**: `check_track_status.py` exit 0; `render --check` 0;
-`make docops-integrity` 0; collision analysis clean except the §0.2 declared exception.
+`make docops-integrity` 0; collision analysis clean.
 **Kill criterion**: operator declines the consumption-edge choice (§9 D-LC2) —
 then only WP-LC1+LC2 (honesty repairs) proceed and LC3..LC5 are struck.
 
@@ -429,8 +417,7 @@ never sufficient (§1).
 
 ### 7.1 New criteria at WP-LC0 — appended to `completion_criteria`
 **(NEVER `prerequisites` — a failed `command_passes` prerequisite is a hard CI
-ERROR/exit 1; failing completion criteria on an ACTIVE track are INFO-only,
-ratified precedent: onboard's own WP-O1R criteria are RED on main today.)**
+ERROR/exit 1; failing completion criteria on an ACTIVE track are INFO-only.)**
 ```yaml
 - id: loop_supervisor_tristate_honest
   kind: command_passes            # RED until WP-LC1
@@ -539,7 +526,7 @@ step 6's manual backup is the interim mitigation).
 | D-LC1 | Quarantine cutoff | **RESOLVED** — `2026-07-02T00:00:00Z`, already used by the 2026-07-03 execution (`a9d6f6a6b`); operator ratifies the host-delegation by merging WP-LC0 |
 | D-LC2 | The consumption/learning wire (bounded per §6 WP-LC3) | **RATIFIED** by operator, 2026-07-11 |
 | D-LC3 | One redeploy+restart of the daemon host | **AUTHORIZED** 2026-07-11; date open; **§5.7 loopback-commit precondition stands** |
-| D-LC4 | Ask onboarding lane (post-WP-O1R) for packet identity-grammar generalization | **APPROVED** — file after WP-O1R merges; until then procedural compliance mode |
+| D-LC4 | Generalize Session Entry packet identity beyond a campaign prefix | **RESOLVED 2026-07-17** — conservative generic `WP-*` grammar accepts packet-bound `WP-LC<N>` identities |
 | D-LC5 | Dharmagraph sign-off route for a ≤2-line `orchestrator.py` edit if the RoutingDecision pass-through proves insufficient | **PRE-APPROVED** as fallback |
 
 ## §10 Non-goals
@@ -548,7 +535,7 @@ No self-improvement unlock, no `DHARMA_*` flag changes, no archive/MAP-Elites
 work (organism-rewire D6), no `Organism` composition-root work (D5), no
 DarwinEngine/D4 anything, no arena/chamber/TAM edits (PR #863 lane), no track
 live-ship claim, no second router, no new digest primitive, no new receipt
-store, no edits to onboarding-owned evaluator surfaces or dharmagraph-owned
+store, no edits to Session Entry evaluator surfaces or dharmagraph-owned
 `orchestrator.py`. Loops 12/13 stay BLOCKED behind One Wire. Chamber and RSI
 compound on top of this — they are downstream consumers of closure, not part of it.
 

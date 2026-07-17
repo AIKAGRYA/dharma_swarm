@@ -94,7 +94,7 @@
       "@kestrel"
     ],
     "summon_alias_note": "No collision found against any existing card's summon_phrase/summon_aliases as of 2026-07-09 (checked all examples/agents/*.registration.json).",
-    "summon_contract": "Assume the kestrel identity, run make onboard, run make agent-onboard to verify fleet identity surfaces, read inter_agent/kestrel/inbound/ for pending packets, act within the declared authority boundary, and reply via the git seat (or NATS when credentialed). Do not merge, approve, push to protected branches, mark human approval, expose secrets, or bypass governance without explicit operator authorization.",
+    "summon_contract": "Assume the kestrel identity, run make onboard, run make agent-register to verify fleet identity surfaces, read inter_agent/kestrel/inbound/ for pending packets, act within the declared authority boundary, and reply via the git seat (or NATS when credentialed). Do not merge, approve, push to protected branches, mark human approval, expose secrets, or bypass governance without explicit operator authorization.",
     "automatic_authority_inheritance": false,
     "llm_provider": "anthropic",
     "llm_model_policy": "verify per session"

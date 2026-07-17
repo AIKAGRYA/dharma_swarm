@@ -13,7 +13,7 @@ command in the footer — the figures here are dated observations, not live clai
 |---|---|---|
 | `CLAUDE.md` | every Claude Code session (local + cloud) | harness auto-injects into system prompt |
 | `.claude/settings.json` → `.claude/hooks/session-start.sh` | cloud sessions only (`CLAUDE_CODE_REMOTE=true`) | SessionStart hook; installs `.[dev]` deps, adds no prose context |
-| `/AGENTS.md` (repo root) | **nobody in a fresh clone** — gitignored (`.gitignore:99`), local-only | tools that look for root AGENTS.md (Codex/Cursor conventions) find nothing in cloud checkouts |
+| `/AGENTS.md` (repo root) | agents/tools that honor the root convention | tracked minimal entrypoint; defers to `CLAUDE.md` and points edit work to packet preflight |
 | `DEVIN.md` | Devin sessions | Devin convention; defers to CLAUDE.md on conflicts (its own header) |
 
 Everything else below is read **on demand**, not injected.
@@ -24,7 +24,7 @@ Everything else below is read **on demand**, not injected.
 |---|---|---|---|
 | `CLAUDE.md` | all agents, always | 14.2k before / see PR for after | docops path_guards (link targets), `render_active_track_includes.py --check` (managed block), `tests/test_context_suite.py` (stamp + leak-copy assertions) |
 | `docs/AGENTS.md` | agents doing prose-layer work (docs/, reports/, specs/, foundations/, root .md) | 0.9k | docops path_guards + canonical_guard |
-| `docs/governance/BUILD_SESSION_ENTRYPOINT.md` | build sessions, after `make onboard` | 12.2k before | render `--check` (managed block), path_guards |
+| `docs/governance/BUILD_SESSION_ENTRYPOINT.md` | build sessions, after `make onboard` | short stable contract | path_guards + `tests/test_context_suite.py` |
 | `docs/governance/CANONICAL_DOC_STACK.md` | agents deciding where a truth lives | 3.6k | docops canonical_guard registry |
 | `docs/MEGAFILE_INDEX.md` | before trusting any large map | 4.7k | registered in canonical_guard |
 | `docs/architecture/NAVIGATION.md` | module lookup | 8.8k | self-flagged staleness banner; live counts via `python3 scripts/repo_xray.py` |
@@ -42,14 +42,17 @@ Everything else below is read **on demand**, not injected.
 
 ## Live-state surfaces (never answer from prose copies)
 
-Portfolio/track state is owned by `docs/governance/ACTIVE_TRACK.yaml` (intent) and
-rendered live by `make onboard`; readiness evidence comes from
-`python3 scripts/governance/check_track_status.py`. The managed `ACTIVE_TRACK:START/END`
-blocks in `CLAUDE.md`, `docs/governance/SOVEREIGN_MANIFEST.md`, and
-`docs/governance/BUILD_SESSION_ENTRYPOINT.md` are stamped projections of the YAML
+Declared portfolio/track intent is owned by `docs/governance/ACTIVE_TRACK.yaml`
+and evaluated by `python3 scripts/governance/check_track_status.py`.
+`make onboard` may display a compact session-status projection; it is not a
+runtime or liveness oracle. The managed `ACTIVE_TRACK:START/END`
+blocks in `CLAUDE.md` and `docs/governance/SOVEREIGN_MANIFEST.md` are stamped projections of the YAML
 (compact digest since 2026-07-10) — they carry ownership boundaries and pointers, not
 live status, and `render_active_track_includes.py --check` (CI: `active-track.yml`,
 plus `make docops-integrity`) fails when they drift from the YAML.
+`BUILD_SESSION_ENTRYPOINT.md` deliberately embeds no portfolio copy; it owns only
+the stable boundary between session status, edit admission, closeout, CI, and
+persistent-agent registration.
 
 ## Re-measure
 

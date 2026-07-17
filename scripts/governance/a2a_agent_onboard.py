@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """A2A fleet-identity onboarding — read-only route + drift check.
 
-`make onboard` renders the operating reality for a *session*; this renders
+`make onboard` renders read-only status for a *session*; this renders
 the join route for a *fleet identity* (a persistent A2A agent). It owns no
 facts: it projects the existing owners —
 
@@ -12,9 +12,9 @@ facts: it projects the existing owners —
 
 — and reports drift between them: a roster uid with no card is a ghost
 identity (works, but unaddressable from git); a card missing from the
-roster is invisible to `make orient`. Advisory only; always exits 0.
+roster is invisible to `make organism-status`. Advisory only; always exits 0.
 
-Run: make agent-onboard   (or: python3 scripts/governance/a2a_agent_onboard.py [--json])
+Run: make agent-register   (or: python3 scripts/governance/a2a_agent_onboard.py [--json])
 """
 from __future__ import annotations
 
@@ -22,6 +22,8 @@ import argparse
 import json
 import sys
 from pathlib import Path
+
+sys.dont_write_bytecode = True
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
@@ -135,7 +137,7 @@ def main() -> int:
     for uid in ghosts:
         print(f"  GHOST    : {uid} is in the presence roster but has no card in examples/agents/ — unaddressable from git; author its manifest")
     for uid in unrostered:
-        print(f"  INVISIBLE: {uid} has a card but is not in REGISTERED_AGENT_UIDS — make orient will not show it; add it to the roster")
+        print(f"  INVISIBLE: {uid} has a card but is not in REGISTERED_AGENT_UIDS — make organism-status will not show it; add it to the roster")
     print("=" * 72)
     return 0
 
