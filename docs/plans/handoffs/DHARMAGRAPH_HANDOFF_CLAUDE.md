@@ -6,7 +6,7 @@
 
 ```bash
 cd /home/user/dharma_swarm
-make onboard   # renders live tracks, trust check, next command — TRUST ITS OUTPUT over any doc, including this one
+make onboard   # renders live session/track state — trust it over any doc's PROSE (including this one) for live state only; owner files (docs/governance/ACTIVE_TRACK.yaml, the frozen rubric, the receipts) remain authoritative for scope, ownership, and policy (docs/AGENTS.md)
 ```
 
 Then read: `CLAUDE.md` (behavioral rules), `INTERFACE_MISMATCH_MAP.md` (check every module pair you touch), `docs/governance/BUILD_SESSION_ENTRYPOINT.md`.
@@ -102,7 +102,7 @@ git checkout -- reports/governance/dharmagraph_parity/
 
 - depends_on: S0. touches: `dharma_swarm/graph/executor.py` (new, ≤500 lines), `dharma_swarm/graph/scheduler.py` (shrink — it sits at exactly 500, zero headroom), `dharma_swarm/graph/__init__.py`.
 - Contract: move task-execution internals (`_execute` path around `scheduler.py:277-306`) into `executor.py` with NO behavior change. Every later slice depends on this headroom. Precedent: PR #914 split `scheduler.py` → `persistence_runtime.py` before sealing receipts.
-- done_when: VERIFY-SLICE green; score probe shows PARITY_MATRIX byte-identical to main.
+- done_when: VERIFY-SLICE green; score probe shows every capability row (ids, points, facet verdicts) and the total score unchanged vs main. The embedded `stable_digest` lines WILL differ — any `graph/**` edit changes `RELEVANT_SOURCE_ROOTS` (`dharmagraph_parity_gauntlet.py:57-69`) — that is expected, not a failure; compare rows and score, never whole-file bytes.
 
 ### S2 — LG06: concurrent supersteps + failure atomicity (riskiest first)
 
@@ -160,14 +160,14 @@ DHARMA_JUDGE_ID="claude-judge-$(git rev-parse --short=9 HEAD)" python3 scripts/g
 python3 -c "import json; print(json.load(open('reports/governance/dharmagraph_parity/judge_receipt.json'))['judge']['signature'])"
 # Append {judge_id: attestation digest} to docs/langgraph_parity/DHARMAGRAPH_JUDGE_RATIFICATIONS_V1.json
 # (registry is measurement-excluded by design — ratification cannot alter the evidence it authorizes)
-git add reports/governance/dharmagraph_parity/ docs/langgraph_parity/DHARMAGRAPH_JUDGE_RATIFICATIONS_V1.json
+git add reports/governance/dharmagraph_parity/ docs/langgraph_parity/DHARMAGRAPH_JUDGE_RATIFICATIONS_V1.json docs/plans/handoffs/DHARMAGRAPH_HANDOFF_CLAUDE.md   # custody artifacts + this file's S9 ledger entry, one atomic commit
 git commit -m "evidence: reseal DharmaGraph parity custody anchor at pregel-core head"
 python3 scripts/governance/dharmagraph_parity_gauntlet.py --check   # paste PASS JSON into PR body
 ```
 
 - If the judge emission fails reconciliation (`--emit --role judge` exits 1 on reconciliation != MATCH): do not retry blindly — re-emit builder first, then rerun judge once; if it still fails MATCH, STOP, commit nothing from S9, and mark the run ended with findings in the ledger and PR body.
 - If ANY commit lands after emission (CI fixes, main sync): re-emit builder then judge at the new head in the same working tree and recommit all custody artifacts atomically (precedent chain `6644d579` → `3d9bf640` → `ba5acb7e`).
-- done_when: §1 goal block exits 0; PR marked Ready for Review.
+- done_when: EITHER **COMPLETE** — the §1 goal block exits 0 — OR **STOPPED-SHORT** — the reseal is committed at the honestly achieved score AND every unclosed core card has an explicit STOPPED ledger entry naming the unsettled question. In both terminal outcomes the PR is marked Ready for Review; the S9 reseal runs at whatever score was reached.
 
 ## 5. One-PR discipline
 
@@ -196,10 +196,11 @@ python3 scripts/governance/dharmagraph_parity_gauntlet.py --check   # paste PASS
 - Editing scoring, reconciliation, custody, or trust-root logic in `scripts/governance/dharmagraph_parity_gauntlet.py`. Harness additions live ONLY in `tests/oracle_support/dharmagraph_gauntlet.py`, ONLY as new seeded two-arm workloads/probes plus their evidence appliers.
 - **Existing harness content is append-only:** existing `_WORKLOAD_ARMS` entries, seeded workload builders, compared fields, and facet mappings (`dharmagraph_gauntlet.py:1580-1720`) may not be edited, renamed, field-removed, or re-seeded. The LG06 `fail` facets close by fixing the ENGINE until existing workloads match — never by touching the workloads.
 - Any probe that special-cases outcomes: no hardcoded facet verdicts, no `if facet == X` shortcuts, no expected-output constants. Every executed probe builds the identical seeded workload on BOTH runtimes and compares canonical JSON (`_compare_workload` pattern, `dharmagraph_gauntlet.py:867`).
+- Error-parity is NOT parity: `_compare_workload` converts matching exceptions on both arms into identical `probe_error` objects that compare equal (`dharmagraph_gauntlet.py:867-883`), so a facet could "pass" without either runtime executing. Every NEW evidence applier MUST require both arms error-free before emitting a passing facet; identical errors are a FINDING to document, never a pass.
 - Test-only shims: a surface exported from `dharma_swarm.graph` that exists solely to satisfy the surface probe and is not wired into the engine's `invoke()` path is gaming. Surfaces must be load-bearing.
 - Weakening/deleting/`xfail`-ing existing tests; touching CTRL01 (the broken comparator MUST still mismatch).
 
-**File-creation boundary.** The ledger lives in THIS file (owned surface). New test files `tests/test_graph_pregel_properties.py` and additions to `tests/test_graph_neutral_langgraph_oracle.py` are declared in-scope for `dharmagraph-engine-2026-07` by this handoff — cite this section in the PR body. Create no other new file outside `dharma_swarm/graph/**`, `tests/oracle_support/dharmagraph_gauntlet.py` (append-only, per above), and `reports/governance/dharmagraph_parity/**` (S9 only).
+**File-creation boundary.** The ledger lives in THIS file (owned surface). `tests/test_graph_pregel_properties.py` and `tests/test_graph_neutral_langgraph_oracle.py` are listed in the track's `owned_surfaces` (`docs/governance/ACTIVE_TRACK.yaml`) — verify that listing before creating/editing them; ownership comes from the track file, never from this handoff. Create no other new file outside `dharma_swarm/graph/**`, `tests/oracle_support/dharmagraph_gauntlet.py` (append-only, per above), and `reports/governance/dharmagraph_parity/**` (S9 only).
 
 **Other hard limits:** no files outside track-owned surfaces (check `owns:` globs in `CLAUDE.md` / `docs/governance/ACTIVE_TRACK.yaml` — other tracks' tests, `orchestrator.py`, `swarm.py` seams are off-limits this run); no new truth stores (sqlite etc. — if unavoidable, `# spine: <role>` header per `docs/governance/ANTI_SLOP_RULES.md` Rule 2, but it should be avoidable); langgraph stays oracle-only, NEVER an engine dependency (`pyproject.toml`); runtime receipts under `~/.dharma/`, never git; no force-push, no `--no-verify`, no CI-config edits, no secrets; never edit this spec's §1 goal.
 
@@ -212,4 +213,4 @@ python3 scripts/governance/dharmagraph_parity_gauntlet.py --check   # paste PASS
 
 ## 8. Definition of done (whole run)
 
-Branch `claude/dharmagraph-pregel-core` pushed; ONE PR, Ready for Review, all §5 body fields filled, `--check` PASS JSON pasted; §1 goal block exits 0 (judge receipt ≥ 58.00, LG01/LG04/LG06/LG07/LG08/LG09 all 2/2 — or the achieved score with every shortfall logged as an explicit STOPPED entry with the unsettled question); custody artifacts + judge ratification entry committed atomically at final head; the PROGRESS LEDGER section below reconciles with `git log`; zero commits on main; PR left UNMERGED for the operator.
+Branch `claude/dharmagraph-pregel-core` pushed; ONE PR, Ready for Review, all §5 body fields filled, `--check` PASS JSON pasted; terminal outcome recorded as **COMPLETE** (§1 goal block exits 0: judge receipt ≥ 58.00, LG01/LG04/LG06/LG07/LG08/LG09 all 2/2) or **STOPPED-SHORT** (§1 block exits nonzero AND every unclosed core card has an explicit STOPPED ledger entry with the unsettled question — an honest 56 with STOPPED entries is a valid terminal state, a gamed 58 is not); custody artifacts + judge ratification entry committed atomically at final head; the PROGRESS LEDGER section below reconciles with `git log`; zero commits on main; PR left UNMERGED for the operator.

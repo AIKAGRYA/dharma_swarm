@@ -922,6 +922,8 @@ active_tracks:
       - tests/test_graph_reconciler.py
       - tests/test_graph_durable_invoker.py
       - tests/test_langgraph_differential_oracle.py
+      - tests/test_graph_neutral_langgraph_oracle.py
+      - tests/test_graph_pregel_properties.py
       - docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md
       - docs/plans/handoffs/DHARMAGRAPH_HANDOFF_DEVIN.md
       - docs/plans/handoffs/DHARMAGRAPH_HANDOFF_CLAUDE.md
