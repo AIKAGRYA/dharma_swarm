@@ -100,6 +100,9 @@ class Send:
         )
 
 
+_RESUME_UNSET: Any = object()
+
+
 @dataclass(frozen=True)
 class Command:
     """Node return value combining state writes with dynamic routing.
@@ -107,12 +110,23 @@ class Command:
     ``update`` = channel writes (same validation as a plain Mapping return);
     ``goto`` = node name(s) and/or :class:`Send` packets triggered for the
     next superstep, ADDITIVE to the node's static and branch routing.
-    ``goto=END`` entries are silently skipped (langgraph parity). No
-    ``resume``/``graph`` fields this slice.
+    ``goto=END`` entries are silently skipped (langgraph parity).
+
+    ``resume`` is INPUT-ONLY (``invoke(input=Command(resume=v))``): it
+    answers a pending :func:`dharma_swarm.graph.interrupts.interrupt` on a
+    persisted thread. A node RETURNING a resume command fails closed —
+    langgraph resumes only from the caller side. ``None`` is a legal resume
+    value, so presence is tracked against an unset sentinel. No ``graph``
+    field this slice.
     """
 
     update: Mapping[str, Any] | None = None
     goto: str | Send | Sequence[str | Send] = field(default_factory=tuple)
+    resume: Any = _RESUME_UNSET
+
+    @property
+    def has_resume(self) -> bool:
+        return self.resume is not _RESUME_UNSET
 
     def goto_items(self) -> tuple[str | Send, ...]:
         if isinstance(self.goto, (str, Send)):
@@ -176,6 +190,15 @@ def interpret_result(
         return []
     writes: list[ChannelWrite] = []
     if isinstance(result, Command):
+        if result.has_resume:
+            raise NodeResultError(
+                f"node {node_id!r} returned Command(resume=...) in superstep "
+                f"{superstep}; resume commands are invoke-input only "
+                "(fail closed)",
+                graph_run_id=run_id,
+                superstep=superstep,
+                node_id=node_id,
+            )
         if result.update is not None:
             writes.extend(
                 _mapping_writes(

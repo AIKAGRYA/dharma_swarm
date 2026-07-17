@@ -1998,6 +1998,9 @@ def run_capability_probes(
     _apply_send_timeout_evidence(
         capabilities, row_lookup, workloads["seeded_send_timeout"]
     )
+    _apply_command_resume_evidence(
+        capabilities, row_lookup, workloads["seeded_command_resume"]
+    )
     persistence_protocol = _persistence_protocol_probe(seed)
     _apply_persistence_protocol_evidence(capabilities, row_lookup, persistence_protocol)
     process_restart = _process_restart_probe(seed)
@@ -2723,5 +2726,212 @@ def _apply_send_timeout_evidence(
             dharma={name: workload["dharma"].get(name) for name in fields},
             langgraph={name: workload["langgraph"].get(name) for name in fields},
             citations=_row_citations(row_lookup["LG07"]),
+        )
+    )
+
+
+# ---------------------------------------------------------------------------
+# Pregel-core S7 (LG08a): interrupt / Command(resume=...) workload.
+# Append-only harness extension — new seeded two-arm workload + evidence
+# applier + surface support entry for the command_resume facet.
+# ---------------------------------------------------------------------------
+
+
+class _ResumeState(TypedDict, total=False):
+    x: int
+    log: Annotated[list[Any], operator.add]
+
+
+def _command_resume_arm(arm: str, seed: int) -> dict[str, Any]:
+    rng = random.Random(_derived_seed(seed, "command-resume"))
+    initial = rng.randint(1, 30)
+    first_answer = f"ans-{rng.randint(100, 999)}"
+    second_answer = f"ans-{rng.randint(100, 999)}"
+
+    if arm == "langgraph":
+        from langgraph.checkpoint.memory import InMemorySaver
+        from langgraph.graph import END, START, StateGraph
+        from langgraph.types import Command as LGResumeCommand
+        from langgraph.types import interrupt as lg_interrupt
+
+        calls = {"ask": 0}
+
+        def pre(state):
+            return {"log": ["pre"]}
+
+        def ask(state):
+            calls["ask"] += 1
+            first = lg_interrupt({"q": "first"})
+            second = lg_interrupt({"q": "second"})
+            return {"log": [f"got_{first}_{second}"], "x": state["x"] + 1}
+
+        builder = StateGraph(_ResumeState)
+        builder.add_node("pre", pre)
+        builder.add_node("ask", ask)
+        builder.add_edge(START, "pre")
+        builder.add_edge("pre", "ask")
+        builder.add_edge("ask", END)
+        app = builder.compile(checkpointer=InMemorySaver())
+        config = {"configurable": {"thread_id": f"resume-{seed}"}}
+        r1 = app.invoke({"x": initial, "log": []}, config)
+        first_payload = r1["__interrupt__"][0].value
+        first_id = r1["__interrupt__"][0].id
+        r2 = app.invoke(LGResumeCommand(resume=first_answer), config)
+        second_payload = r2["__interrupt__"][0].value
+        id_stable = r2["__interrupt__"][0].id == first_id
+        final = app.invoke(LGResumeCommand(resume=second_answer), config)
+
+        rejected = False
+        try:
+            builder.compile().invoke(LGResumeCommand(resume=first_answer))
+        except RuntimeError:
+            rejected = True
+        return {
+            "first_interrupt": first_payload,
+            "second_interrupt": second_payload,
+            "interrupt_id_stable": id_stable,
+            "final": {"x": final["x"], "log": list(final["log"])},
+            "ask_calls": calls["ask"],
+            "resume_without_checkpointer_rejected": rejected,
+        }
+
+    from dharma_swarm.graph import (
+        END,
+        START,
+        AppendChannel,
+        Command,
+        GraphBuilder,
+        GraphInterrupted,
+        GraphPersistenceKernel,
+        GraphRuntimeError,
+        LastValueChannel,
+        interrupt,
+    )
+    from dharma_swarm.graph.effects import SimulatedEffects
+
+    calls = {"ask": 0}
+
+    def pre(state):
+        return {"log": ["pre"]}
+
+    def ask(state):
+        calls["ask"] += 1
+        first = interrupt({"q": "first"})
+        second = interrupt({"q": "second"})
+        return {"log": [f"got_{first}_{second}"], "x": state["x"] + 1}
+
+    compiled = (
+        GraphBuilder("gauntlet-resume")
+        .add_channel("x", LastValueChannel)
+        .add_channel("log", AppendChannel)
+        .add_node("pre", pre)
+        .add_node("ask", ask)
+        .add_edge(START, "pre")
+        .add_edge("pre", "ask")
+        .add_edge("ask", END)
+        .compile()
+    )
+    with tempfile.TemporaryDirectory(prefix="dharmagraph-resume-") as raw:
+        kernel = GraphPersistenceKernel(Path(raw))
+        thread = f"resume-{seed}"
+        try:
+            _run_awaitable(
+                compiled.invoke(
+                    input={"x": initial, "log": []},
+                    effects=SimulatedEffects(seed),
+                    graph_run_id=thread,
+                    persistence=kernel,
+                    thread_id=thread,
+                )
+            )
+            raise AssertionError("expected first interrupt")
+        except GraphInterrupted as suspended:
+            first_payload = suspended.interrupts[0].value
+            first_id = suspended.interrupts[0].id
+        try:
+            _run_awaitable(
+                compiled.invoke(
+                    input=Command(resume=first_answer),
+                    effects=SimulatedEffects(seed),
+                    persistence=kernel,
+                    thread_id=thread,
+                )
+            )
+            raise AssertionError("expected second interrupt")
+        except GraphInterrupted as suspended:
+            second_payload = suspended.interrupts[0].value
+            id_stable = suspended.interrupts[0].id == first_id
+        final = _run_awaitable(
+            compiled.invoke(
+                input=Command(resume=second_answer),
+                effects=SimulatedEffects(seed),
+                persistence=kernel,
+                thread_id=thread,
+            )
+        )
+        rejected = False
+        try:
+            _run_awaitable(
+                compiled.invoke(
+                    input=Command(resume=first_answer),
+                    effects=SimulatedEffects(seed),
+                )
+            )
+        except GraphRuntimeError:
+            rejected = True
+    return {
+        "first_interrupt": first_payload,
+        "second_interrupt": second_payload,
+        "interrupt_id_stable": id_stable,
+        "final": {"x": final.state["x"], "log": list(final.state["log"])},
+        "ask_calls": calls["ask"],
+        "resume_without_checkpointer_rejected": rejected,
+    }
+
+
+_WORKLOAD_ARMS["seeded_command_resume"] = _command_resume_arm
+_support("LG08", ("command_resume",), "dharma_swarm.graph:Command#resume")
+
+
+def _apply_command_resume_evidence(
+    capabilities: dict[str, Any],
+    row_lookup: Mapping[str, Any],
+    workload: Mapping[str, Any],
+) -> None:
+    """LG08.command_resume from the seeded two-arm interrupt/resume workload.
+
+    Fail-closed per the error-parity rule: a probe_error on either arm keeps
+    the facet failing — identical errors are a finding, never a pass.
+    """
+    both_ran = (
+        "probe_error" not in workload["dharma"]
+        and "probe_error" not in workload["langgraph"]
+    )
+    fields = (
+        "first_interrupt",
+        "second_interrupt",
+        "interrupt_id_stable",
+        "final",
+        "ask_calls",
+        "resume_without_checkpointer_rejected",
+    )
+    equal = both_ran and all(
+        workload["dharma"].get(name) == workload["langgraph"].get(name)
+        for name in fields
+    )
+    entry = capabilities["LG08"]["facets"]["command_resume"]
+    entry["status"] = "pass" if equal else "fail"
+    entry["evidence"].append(
+        _evidence(
+            kind="two_arm_differential",
+            evidence_id="seeded_command_resume:command_resume",
+            command_or_probe=(
+                "drive interrupt -> resume -> interrupt -> resume to "
+                "completion on persisted threads of both installed runtimes"
+            ),
+            outcome="parity" if equal else "mismatch",
+            dharma={name: workload["dharma"].get(name) for name in fields},
+            langgraph={name: workload["langgraph"].get(name) for name in fields},
+            citations=_row_citations(row_lookup["LG08"]),
         )
     )

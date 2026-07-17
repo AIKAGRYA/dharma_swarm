@@ -22,6 +22,11 @@ from dharma_swarm.graph.channels import (
     TriggerChannel,
     UnknownChannelError,
 )
+from dharma_swarm.graph.interrupts import (
+    GraphInterrupted,
+    Interrupt,
+    interrupt,
+)
 from dharma_swarm.graph.schema import (
     RemainingSteps,
     SchemaError,
@@ -105,8 +110,11 @@ __all__ = [
     "GraphRunResult",
     "RunCheckpoint",
     "GraphRuntimeError",
+    "GraphInterrupted",
     "GraphTelosBridge",
     "GraphTelosBridgeResult",
+    "Interrupt",
+    "interrupt",
     "GATE_GRAPH_RECEIPT_ANCHOR",
     "LastValueChannel",
     "LiveEffects",

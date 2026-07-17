@@ -51,9 +51,10 @@ from dharma_swarm.graph.errors import (
     SuperstepLimitError,
 )
 from dharma_swarm.graph.executor import SuperstepExecutor
+from dharma_swarm.graph.interrupts import GraphInterrupted, resume_channel
 from dharma_swarm.graph.persistence import GraphPersistenceKernel
 from dharma_swarm.graph.persistence_runtime import GraphRunPersistence
-from dharma_swarm.graph.routing import BranchSpec
+from dharma_swarm.graph.routing import BranchSpec, Command
 from dharma_swarm.graph.state import GraphState
 from dharma_swarm.graph.types import (
     RESERVED_PREFIX,
@@ -127,9 +128,32 @@ class CompiledGraph:
             effects if effects is not None else LiveEffects()
         )
         executor = SuperstepExecutor(self, active_effects)
+        resume_command: Command | None = None
+        if isinstance(input, Command):
+            if not input.has_resume:
+                raise GraphRuntimeError(
+                    "Command input supports only resume this slice; pass "
+                    "update/goto commands as node returns (fail closed)",
+                    graph_run_id=graph_run_id or "",
+                )
+            if persistence is None or thread_id is None:
+                raise GraphRuntimeError(
+                    "Cannot use Command(resume=...) without a persistence "
+                    "kernel and thread_id (fail closed; langgraph parity: "
+                    "resume requires a checkpointer)",
+                    graph_run_id=graph_run_id or "",
+                )
+            resume_command = input
+            input = None
         run_persistence, resume_from = GraphRunPersistence.resolve(
             persistence, thread_id, checkpoint_id, input, resume_from
         )
+        if resume_command is not None and run_persistence.pending_write is None:
+            raise GraphRuntimeError(
+                "Command(resume=...) found no pending interrupt record on "
+                f"thread {thread_id!r} (fail closed)",
+                graph_run_id=graph_run_id or "",
+            )
         run_id = graph_run_id
         if run_id is None and resume_from is not None:
             run_id = resume_from.graph_run_id
@@ -215,27 +239,74 @@ class CompiledGraph:
             start_versions = state.versions
             tasks = executor.prepare_tasks(state, start_versions, versions_seen)
             plan = run_persistence.pending_replay_plan(tasks, run_id, superstep)
+            if resume_command is not None:
+                if len(plan.resumes) != 1:
+                    raise GraphRuntimeError(
+                        "Command(resume=...) needs exactly one interrupted "
+                        f"node in the pending record; found "
+                        f"{sorted(plan.resumes)!r} (fail closed)",
+                        graph_run_id=run_id,
+                        superstep=superstep,
+                    )
+                plan.resumes[next(iter(plan.resumes))].append(
+                    resume_command.resume
+                )
             if plan.full:
                 run_persistence.replay(
                     state, versions_seen, self.triggers, tasks, run_id, superstep
                 )
                 replayed_ids = [(task.node_id, task.seq) for task in tasks]
             else:
-                # Failure resume: succeeded tasks' recorded writes replay
-                # without re-execution; only uncovered tasks run, against
-                # the restored pre-step snapshot (langgraph parity).
+                # Failure/interrupt resume: succeeded tasks' recorded writes
+                # replay without re-execution; only uncovered tasks run,
+                # against the restored pre-step snapshot (langgraph parity).
                 for node in plan.covered_pull_nodes:
                     for name in self.triggers[node]:
                         versions_seen[node][name] = start_versions.get(name, 0)
-                live_pending, _live_nodes, replayed_ids = await executor.run_tasks(
-                    plan.live_tasks,
-                    state,
-                    versions_seen,
-                    start_versions,
-                    run_id,
-                    superstep,
-                    remaining=cap - superstep,
-                )
+                try:
+                    live_pending, _live_nodes, replayed_ids = (
+                        await executor.run_tasks(
+                            plan.live_tasks,
+                            state,
+                            versions_seen,
+                            start_versions,
+                            run_id,
+                            superstep,
+                            remaining=cap - superstep,
+                            resumes=plan.resumes,
+                        )
+                    )
+                except GraphInterrupted as suspended:
+                    # Re-interrupt during resume: replace the pending record
+                    # with prior siblings + newly succeeded work + the full
+                    # accumulated resume history, then surface the interrupt.
+                    prior = run_persistence.pending_write
+                    prior_path = prior.task_path if prior is not None else ""
+                    merged_path = "+".join(
+                        sorted(
+                            ([p for p in prior_path.split("+") if p])
+                            + [n for n, _seq in suspended.succeeded_tasks]
+                        )
+                    )
+                    run_persistence.journal_replace(
+                        [
+                            (w.channel, w.value)
+                            for w in plan.recorded_writes
+                        ]
+                        + [
+                            (w.channel, w.value)
+                            for w in suspended.succeeded_writes
+                        ]
+                        + [
+                            (
+                                resume_channel(suspended.node_id),
+                                list(suspended.consumed_resumes),
+                            )
+                        ],
+                        plan.task_id,
+                        task_path=merged_path,
+                    )
+                    raise
                 state.apply_writes(
                     plan.recorded_writes + live_pending, superstep
                 )
@@ -346,29 +417,39 @@ class CompiledGraph:
         fails closed: nothing journaled, nothing emitted, warning logged.
         """
         writes = list(error.succeeded_writes)
-        if not writes:
+        resume_entries: list[tuple[str, Any]] = []
+        if isinstance(error, GraphInterrupted):
+            resume_entries = [
+                (resume_channel(error.node_id), list(error.consumed_resumes))
+            ]
+        if not writes and not resume_entries:
             return
-        try:
-            state.validate_writes(writes, superstep)
-        except Exception as validation_error:
-            logger.warning(
-                "dropping %d surviving writes from failed superstep %d of "
-                "run %s: %s",
-                len(writes),
-                superstep,
-                run_id,
-                validation_error,
-            )
-            return
+        task_path = "+".join(
+            sorted(node_id for node_id, _seq in error.succeeded_tasks)
+        )
+        if writes:
+            try:
+                state.validate_writes(writes, superstep)
+            except Exception as validation_error:
+                logger.warning(
+                    "dropping %d surviving writes from failed superstep %d of "
+                    "run %s: %s",
+                    len(writes),
+                    superstep,
+                    run_id,
+                    validation_error,
+                )
+                writes, task_path = [], ""
+                if not resume_entries:
+                    return
         if run_persistence.pending_write is None:
             run_persistence.journal(
-                [(write.channel, write.value) for write in writes],
+                [(write.channel, write.value) for write in writes]
+                + resume_entries,
                 f"{run_id}:{superstep}",
-                task_path="+".join(
-                    sorted(node_id for node_id, _seq in error.succeeded_tasks)
-                ),
+                task_path=task_path,
             )
-        if on_checkpoint is None:
+        if on_checkpoint is None or not writes:
             return
         view = GraphState(self.channel_factories)
         view.restore_channels(state.checkpoint_channels())

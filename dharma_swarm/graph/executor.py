@@ -32,6 +32,13 @@ from dharma_swarm.graph.errors import (
     MalformedDispatchOrderError,
     NodeExecutionError,
 )
+from dharma_swarm.graph.interrupts import (
+    GraphInterrupt,
+    GraphInterrupted,
+    InterruptFrame,
+    pop_frame,
+    push_frame,
+)
 from dharma_swarm.graph.routing import (
     Command,
     Send,
@@ -124,6 +131,7 @@ class SuperstepExecutor:
         superstep: int,
         *,
         remaining: int | None = None,
+        resumes: Mapping[str, list[Any]] | None = None,
     ) -> tuple[list[ChannelWrite], list[str], list[tuple[str, int]]]:
         """Run every ready task CONCURRENTLY; return (sorted proposals, executed, ids).
 
@@ -147,7 +155,7 @@ class SuperstepExecutor:
 
         aio_tasks: dict[asyncio.Task[list[ChannelWrite]], _Task] = {
             asyncio.ensure_future(
-                self._run_one(task, state, run_id, superstep, remaining)
+                self._run_one(task, state, run_id, superstep, remaining, resumes)
             ): task
             for task in exec_order
         }
@@ -174,7 +182,19 @@ class SuperstepExecutor:
                 raise asyncio.CancelledError()
             order = {t.identity: i for i, t in enumerate(exec_order)}
             failures.sort(key=lambda pair: order[pair[0].identity])
-            error = failures[0][1]
+            failed_task, error = failures[0]
+            if isinstance(error, GraphInterrupt):
+                public = GraphInterrupted(
+                    f"node {failed_task.node_id!r} interrupted in superstep "
+                    f"{superstep} of run {run_id!r}; resume with "
+                    "Command(resume=...)",
+                    graph_run_id=run_id,
+                    superstep=superstep,
+                    node_id=failed_task.node_id,
+                )
+                public.interrupts = (error.interrupt,)
+                public.consumed_resumes = error.consumed
+                error = public
             if isinstance(error, GraphRuntimeError):
                 succeeded = [t for t in exec_order if t.identity in bundles]
                 writes = [w for t in succeeded for w in bundles[t.identity]]
@@ -213,6 +233,7 @@ class SuperstepExecutor:
         run_id: str,
         superstep: int,
         remaining: int | None = None,
+        resumes: Mapping[str, list[Any]] | None = None,
     ) -> list[ChannelWrite]:
         """One task: snapshot-isolated input, node run, write interpretation.
 
@@ -221,6 +242,8 @@ class SuperstepExecutor:
         caller's dispatch-order assembly + stable sort reproduces the exact
         pre-concurrency commit sequence. A declared managed-remaining field
         is injected into pull-task snapshots only — never committed state.
+        Every task runs under an interrupt frame carrying its recorded
+        resume values (task-scoped, call-order replay).
         """
         graph = self._graph
         node_input = (
@@ -232,25 +255,34 @@ class SuperstepExecutor:
             and remaining is not None
         ):
             node_input[graph.managed_remaining] = remaining
-        if task.timeout is not None:
-            try:
-                async with asyncio.timeout(task.timeout):
-                    result = await self._execute_node(
-                        task.node_id, node_input, run_id, superstep
-                    )
-            except TimeoutError as exc:
-                raise NodeExecutionError(
-                    f"node {task.node_id!r} exceeded its send timeout of "
-                    f"{task.timeout}s in superstep {superstep} of run "
-                    f"{run_id!r} (langgraph Send timeout parity)",
-                    graph_run_id=run_id,
-                    superstep=superstep,
-                    node_id=task.node_id,
-                ) from exc
-        else:
-            result = await self._execute_node(
-                task.node_id, node_input, run_id, superstep
-            )
+        frame = InterruptFrame(
+            run_id=run_id,
+            node_id=task.node_id,
+            resumes=list((resumes or {}).get(task.node_id, ())),
+        )
+        token = push_frame(frame)
+        try:
+            if task.timeout is not None:
+                try:
+                    async with asyncio.timeout(task.timeout):
+                        result = await self._execute_node(
+                            task.node_id, node_input, run_id, superstep
+                        )
+                except TimeoutError as exc:
+                    raise NodeExecutionError(
+                        f"node {task.node_id!r} exceeded its send timeout of "
+                        f"{task.timeout}s in superstep {superstep} of run "
+                        f"{run_id!r} (langgraph Send timeout parity)",
+                        graph_run_id=run_id,
+                        superstep=superstep,
+                        node_id=task.node_id,
+                    ) from exc
+            else:
+                result = await self._execute_node(
+                    task.node_id, node_input, run_id, superstep
+                )
+        finally:
+            pop_frame(token)
         task_writes = self._writes_from_result(
             task.node_id, result, run_id, superstep, task.seq
         )
@@ -321,6 +353,8 @@ class SuperstepExecutor:
                 raw = await raw
         except asyncio.CancelledError:
             raise
+        except GraphInterrupt:
+            raise  # control-flow signal, converted by run_tasks — never wrapped
         except Exception as exc:
             raise NodeExecutionError(
                 f"node {node_id!r} failed in superstep {superstep} of run "

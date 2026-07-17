@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping, Protocol, Sequence
 
 from dharma_swarm.graph.channels import ChannelWrite
+from dharma_swarm.graph.interrupts import RESUME_PREFIX
 from dharma_swarm.graph.persistence import (
     GraphCheckpointRecord,
     GraphPendingWrite,
@@ -46,6 +47,9 @@ class PendingReplayPlan:
     recorded_writes: list[ChannelWrite] = field(default_factory=list)
     live_tasks: list[Any] = field(default_factory=list)
     covered_pull_nodes: tuple[str, ...] = ()
+    # Recorded resume values per interrupted node (reserved __resume__:*
+    # record entries, stripped from recorded_writes before barrier apply).
+    resumes: dict[str, list[Any]] = field(default_factory=dict)
 
 
 @dataclass
@@ -161,6 +165,13 @@ class GraphRunPersistence:
             raise ValueError(
                 f"pending task {pending.task_id!r} does not match {expected_task_id!r}"
             )
+        resumes: dict[str, list[Any]] = {}
+        real_writes: list[tuple[str, Any]] = []
+        for channel, value in pending.writes:
+            if channel.startswith(RESUME_PREFIX):
+                resumes[channel[len(RESUME_PREFIX) :]] = list(value or ())
+            else:
+                real_writes.append((channel, value))
         recorded = Counter(
             pending.task_path.split("+") if pending.task_path else ()
         )
@@ -172,6 +183,11 @@ class GraphRunPersistence:
                 f"the ready set {sorted(ready)!r} (fail closed)"
             )
         if recorded == ready:
+            if resumes:
+                raise ValueError(
+                    "pending record claims full task coverage but carries "
+                    f"resume entries for {sorted(resumes)!r} (fail closed)"
+                )
             return PendingReplayPlan(task_id=pending.task_id, full=True)
         ambiguous = [
             node for node, count in recorded.items() if count != ready[node]
@@ -182,13 +198,14 @@ class GraphRunPersistence:
                 full=False,
                 recorded_writes=[],
                 live_tasks=list(tasks),
+                resumes=resumes,
             )
         return PendingReplayPlan(
             task_id=pending.task_id,
             full=False,
             recorded_writes=[
                 ChannelWrite(pending.task_path, channel, value, index)
-                for index, (channel, value) in enumerate(pending.writes)
+                for index, (channel, value) in enumerate(real_writes)
             ],
             live_tasks=[task for task in tasks if task.node_id not in recorded],
             covered_pull_nodes=tuple(
@@ -200,6 +217,7 @@ class GraphRunPersistence:
                     }
                 )
             ),
+            resumes=resumes,
         )
 
     def replay(
@@ -248,6 +266,27 @@ class GraphRunPersistence:
     ) -> None:
         if self.kernel is None or self.thread_id is None:
             return
+        self.kernel.put_writes(
+            self.thread_id,
+            writes,
+            task_id,
+            checkpoint_id=self.parent_checkpoint_id,
+            task_path=task_path,
+        )
+
+    def journal_replace(
+        self,
+        writes: Sequence[tuple[str, Any]],
+        task_id: str,
+        *,
+        task_path: str,
+    ) -> None:
+        """Replace the pending record for ``task_id`` (interrupt/resume cycles:
+        accumulated resume values and newly-succeeded siblings supersede the
+        prior record; ``put_writes`` alone would append a duplicate)."""
+        if self.kernel is None or self.thread_id is None:
+            return
+        self.kernel.clear_pending_writes(self.thread_id, task_id)
         self.kernel.put_writes(
             self.thread_id,
             writes,
