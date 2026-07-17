@@ -19,7 +19,7 @@ from dharma_swarm.provider_policy import (
     ProviderRouteRequest,
     ProviderRoutingConfig,
 )
-from dharma_swarm.providers import ModelRouter
+from dharma_swarm.providers import FrontierCapacityDenied, ModelRouter
 from dharma_swarm.resilience import RetryPolicy
 from dharma_swarm.swarm_router import SwarmRole
 from dharma_swarm.telemetry_plane import (
@@ -460,6 +460,22 @@ def test_provider_policy_swarm_plan_exposes_execution_contract() -> None:
         SwarmRole.CODER,
     )
 
+
+
+
+class _CapturingProvider:
+    def __init__(self, content: str = "ok") -> None:
+        self.content = content
+        self.calls = 0
+        self.seen_models: list[str] = []
+
+    async def complete(self, request: LLMRequest) -> LLMResponse:
+        self.calls += 1
+        self.seen_models.append(request.model)
+        return LLMResponse(content=self.content, model=request.model)
+
+    async def stream(self, request: LLMRequest):
+        yield self.content
 
 class _DummyProvider:
     def __init__(self, content: str) -> None:
@@ -907,3 +923,100 @@ async def test_model_router_learning_reorders_after_failures() -> None:
     assert failing.calls == 1
     rewards = router.reward_snapshot()
     assert any(key.startswith("anthropic:") for key in rewards)
+
+
+@pytest.mark.asyncio
+async def test_model_router_frontier_capacity_gate_preserves_authorized_model() -> None:
+    provider = _CapturingProvider("frontier")
+    router = ModelRouter(
+        {ProviderType.ANTHROPIC: provider},
+        key_liveness_provider=_fail_open_key_liveness,
+    )
+    request = LLMRequest(
+        model="claude-opus-4-6",
+        messages=[{"role": "user", "content": "use the strongest useful lane"}],
+    )
+
+    decision, response = await router.complete_for_task(
+        ProviderRouteRequest(
+            action_name="frontier_authorized",
+            risk_score=0.20,
+            uncertainty=0.20,
+            novelty=0.20,
+            urgency=0.60,
+            expected_impact=0.80,
+            requires_frontier_precision=True,
+            context={
+                "frontier_capacity_authorized": True,
+                "preserve_requested_model": True,
+            },
+        ),
+        request,
+        available_provider_types=[ProviderType.ANTHROPIC],
+    )
+
+    assert decision.selected_provider == ProviderType.ANTHROPIC
+    assert response.content == "frontier"
+    assert provider.calls == 1
+    assert provider.seen_models == ["claude-opus-4-6"]
+    assert request.model == "claude-opus-4-6"
+
+
+@pytest.mark.asyncio
+async def test_model_router_frontier_capacity_gate_refuses_explicit_unauthorized_context() -> None:
+    provider = _CapturingProvider("should-not-run")
+    router = ModelRouter(
+        {ProviderType.ANTHROPIC: provider},
+        key_liveness_provider=_fail_open_key_liveness,
+    )
+
+    with pytest.raises(FrontierCapacityDenied, match="explicitly unauthorized"):
+        await router.complete_for_task(
+            ProviderRouteRequest(
+                action_name="frontier_unauthorized",
+                risk_score=0.20,
+                uncertainty=0.20,
+                novelty=0.20,
+                urgency=0.60,
+                expected_impact=0.80,
+                requires_frontier_precision=True,
+                context={"frontier_capacity_authorized": False},
+            ),
+            LLMRequest(
+                model="claude-opus-4-6",
+                messages=[{"role": "user", "content": "blocked"}],
+            ),
+            available_provider_types=[ProviderType.ANTHROPIC],
+        )
+
+    assert provider.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_model_router_frontier_capacity_gate_refuses_runaway_marker() -> None:
+    provider = _CapturingProvider("should-not-run")
+    router = ModelRouter(
+        {ProviderType.ANTHROPIC: provider},
+        key_liveness_provider=_fail_open_key_liveness,
+    )
+
+    with pytest.raises(FrontierCapacityDenied, match="runaway_detected"):
+        await router.complete_for_task(
+            ProviderRouteRequest(
+                action_name="frontier_runaway",
+                risk_score=0.20,
+                uncertainty=0.20,
+                novelty=0.20,
+                urgency=0.60,
+                expected_impact=0.80,
+                requires_frontier_precision=True,
+                context={"runaway_detected": True},
+            ),
+            LLMRequest(
+                model="claude-opus-4-6",
+                messages=[{"role": "user", "content": "blocked"}],
+            ),
+            available_provider_types=[ProviderType.ANTHROPIC],
+        )
+
+    assert provider.calls == 0

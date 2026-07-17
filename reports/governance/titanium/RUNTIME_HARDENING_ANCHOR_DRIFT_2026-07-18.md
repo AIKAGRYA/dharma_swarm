@@ -145,3 +145,36 @@ Observed result: `28 passed`; diff check passed. Whole-file ruff on legacy
 `agent_runner.py` still reports pre-existing lint issues unrelated to this packet
 (`E402` import placement and an unused `mem` local), so this receipt scopes
 verification to the new prompt-envelope behavior.
+
+## Follow-up implementation receipt — TIT-016 provider rail (WP-A.3, non-dilutive enforcement)
+
+The branch added the first provider-path `FrontierCapacityGate` rail at
+`ModelRouter.complete_for_task()`:
+
+- `frontier_capacity_gate()` is called after policy telemetry and before entering the
+  provider dispatch loop.
+- Default behavior is allow, preserving normal authorized frontier-capacity use.
+- The rail refuses only explicit deny/runaway markers in route context:
+  `frontier_capacity_authorized=False`, `frontier_capacity_runaway`,
+  `runaway_execution`, `runaway_detected`, or `deny_frontier_capacity`.
+- The rail does **not** rewrite the provider chain, model hints, request model, or
+  prompt context. Tests prove an authorized `claude-opus-4-6` request reaches the
+  provider unchanged.
+- Added a structural fitness guard proving `ModelRouter.complete_for_task()` calls the
+  rail. Guard teeth were manually proven RED when the call was removed and GREEN when
+  restored.
+
+Verification command:
+
+```bash
+.venv/bin/python -m pytest -q tests/test_provider_policy.py tests/test_provider_failure_classes.py tests/test_model_router_telemetry.py tests/test_runtime_transport_dedup.py tests/governance/test_titanium_runtime_hardening_fitness.py
+.venv/bin/ruff check dharma_swarm/providers.py tests/test_provider_policy.py tests/governance/test_titanium_runtime_hardening_fitness.py
+git diff --check
+```
+
+Observed result: `64 passed`; ruff clean; diff check clean.
+
+**Scope boundary:** this is the first non-dilutive enforcement rail. It is not a spend
+cap or downgrade policy. Further WP-A work can add richer authorization inputs or
+rolling runaway accounting, but must preserve the invariant: authorized frontier lanes
+keep maximum useful model quality and context.

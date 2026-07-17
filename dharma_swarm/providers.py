@@ -2119,6 +2119,56 @@ class ZhipuProvider(LLMProvider):
                 yield delta.content
 
 
+
+
+class FrontierCapacityDenied(RuntimeError):
+    """Raised when the provider path lacks explicit frontier-capacity authorization.
+
+    This is an authorization/accountability rail, not a cost-minimization or
+    model-downgrade mechanism. It must never rewrite model hints, reorder the
+    provider chain, or shrink context.
+    """
+
+
+def _context_bool(value: Any) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "on", "allow", "authorized"}:
+            return True
+        if normalized in {"0", "false", "no", "off", "deny", "denied", "unauthorized"}:
+            return False
+    return None
+
+
+def frontier_capacity_gate(
+    route_request: ProviderRouteRequest,
+    request: LLMRequest,
+    *,
+    chain: list[ProviderType],
+    model_hints: dict[ProviderType, str | None],
+) -> None:
+    """Authorize frontier-capacity execution without diluting model quality.
+
+    Default is allow: normal authorized work should keep the strongest useful
+    model lane and context. The rail refuses only explicit deny/runaway markers
+    in route context, and never mutates ``chain``, ``model_hints``, or
+    ``request``.
+    """
+    context = route_request.context or {}
+    if _context_bool(context.get("frontier_capacity_authorized")) is False:
+        raise FrontierCapacityDenied("frontier capacity explicitly unauthorized")
+    for key in (
+        "frontier_capacity_runaway",
+        "runaway_execution",
+        "runaway_detected",
+        "deny_frontier_capacity",
+    ):
+        if _context_bool(context.get(key)) is True:
+            raise FrontierCapacityDenied(f"frontier capacity denied by context:{key}")
+
+
 class ModelRouter:
     """Routes LLM requests to the appropriate provider."""
 
@@ -3024,6 +3074,12 @@ class ModelRouter:
             planned_model=planned_model,
             chain=chain,
             task_signature=task_signature,
+        )
+        frontier_capacity_gate(
+            enriched_request,
+            request,
+            chain=chain,
+            model_hints=model_hints,
         )
 
         for provider_type in chain:

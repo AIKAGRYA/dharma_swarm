@@ -181,3 +181,26 @@ def test_tit017_build_prompt_has_total_frontier_prompt_envelope() -> None:
                 calls_envelope = True
                 break
     assert calls_envelope, "_build_prompt must apply the total frontier prompt envelope"
+
+
+def test_tit016_provider_path_calls_frontier_capacity_gate() -> None:
+    """TIT-016 guard: provider dispatch path must call FrontierCapacityGate."""
+    providers = _source(REPO_ROOT / "dharma_swarm" / "providers.py")
+    tree = ast.parse(providers)
+
+    assert "class FrontierCapacityDenied" in providers
+    assert "def frontier_capacity_gate" in providers
+
+    complete_for_task = next(
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "complete_for_task"
+    )
+    calls_gate = False
+    for node in ast.walk(complete_for_task):
+        if isinstance(node, ast.Call):
+            func = node.func
+            name = getattr(func, "id", None) or getattr(func, "attr", None)
+            if name == "frontier_capacity_gate":
+                calls_gate = True
+                break
+    assert calls_gate, "ModelRouter.complete_for_task must call frontier_capacity_gate before provider dispatch"
