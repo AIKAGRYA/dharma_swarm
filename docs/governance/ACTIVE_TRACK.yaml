@@ -450,6 +450,10 @@ active_tracks:
         what: "WP-LC5 — the closure claim: one atomic governance PR carrying the fresh ON-HOST cybernetics_codex audit + the §7.2 criteria transition (closed_live 0->1, harness_proven 11->10, verdict map loop 1 -> CLOSED_LIVE) + claim_boundary 'CLOSED_LIVE 1/13; HARNESS_PROVEN 10/13; BLOCKED 2/13'. Anti-gaming: host-binding requires_keys on all three receipts, audit inputs chained to the operator-executed host_session receipt, NON-AUTHOR MERGE required, bot-PR/automerge label forbidden. Ship veto (any HARNESS_PROVEN blocks live-ship) stays — Loop-1 closure is not a track live-ship claim."
         kind: governance
         blocker: false
+      - id: 11
+        what: "WP-A4A5 (aliveness campaign wave 0, admitted 2026-07-17): durable liveness evidence — orchestrate_live.py append_liveness_ledger_row writes digest-chained spine VerifiedMachineReceipt rows (boot_id, pid, running, restart_counts, abandoned) to ~/.dharma/ops/liveness_ledger.jsonl hourly and on abandonment change, closing the overwrite-in-place gap in _write_loop_liveness that left run claims unfalsifiable; single-mint process boot_id in dharma_swarm/spine/identity.py (P4 restart-survival prerequisite); read-only replay verifier scripts/governance/liveness_ledger_check.py (typed needs_host exit 0 when the ledger is absent, exit 1 on broken chain or failed coverage); live_ops_census.py dharma_daemon pattern extended to match the container entrypoint python -m dharma_swarm.orchestrate_live (Dockerfile.swarm CMD). REMAINING (host, WP-LC2 window): >=24 chained hourly rows under one boot_id after 24h, cross-restart different-boot_id proof, hourly census scheduling after the BR-004 cron reconciliation."
+        kind: code
+        blocker: false
 
   - id: orchestration-arena-v1-2026-06
     name: Orchestration Arena v1 — frozen hermetic fitness + zero-weight orchestrator + DPI

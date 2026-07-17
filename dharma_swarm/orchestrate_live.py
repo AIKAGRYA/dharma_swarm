@@ -28,6 +28,7 @@ import logging
 import os
 import signal
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, TYPE_CHECKING
@@ -47,6 +48,56 @@ from dharma_swarm.runtime_artifacts import (
 HOME = Path.home()
 STATE_DIR = HOME / ".dharma"
 LOG_DIR = STATE_DIR / "logs"
+LIVENESS_LEDGER_INTERVAL_SECONDS = 3600.0
+
+
+def append_liveness_ledger_row(
+    *,
+    running: list[str],
+    restart_counts: dict[str, int],
+    abandoned: list[str],
+    path: Path | None = None,
+) -> Any:
+    """Append one digest-chained liveness row to the durable run ledger.
+
+    The ops/loop_liveness.json snapshot is overwritten in place by
+    ``_write_loop_liveness``, so an unattended run leaves no replayable
+    uptime evidence — this ledger is the durable producer closing that gap.
+    Rows reuse the spine ``VerifiedMachineReceipt`` chain (one receipt
+    format, one digest formula) and carry the process ``boot_id`` so
+    receipts on either side of a restart are distinguishable (P4). The
+    read-only replay verifier is scripts/governance/liveness_ledger_check.py.
+    Returns the persisted receipt, or None on any failure — liveness
+    evidence must never take down the supervision loop it witnesses.
+
+    The default sink resolves from ``STATE_DIR`` at call time (like
+    ``_write_loop_liveness``), so tests that repoint ``STATE_DIR`` can never
+    leak fixture rows into the real evidence chain.
+    """
+    try:
+        from dharma_swarm.spine.identity import process_boot_id
+        from dharma_swarm.spine.receipt import (
+            VerifiedMachineReceipt,
+            append_machine_receipt,
+        )
+
+        row = VerifiedMachineReceipt(
+            generated_by="dharma_swarm.orchestrate_live.append_liveness_ledger_row",
+            attributes={
+                "kind": "loop_liveness",
+                "boot_id": process_boot_id(),
+                "pid": os.getpid(),
+                "running": sorted(running),
+                "restart_counts": dict(restart_counts),
+                "abandoned": sorted(abandoned),
+            },
+        )
+        return append_machine_receipt(
+            row, path=path or STATE_DIR / "ops" / "liveness_ledger.jsonl"
+        )
+    except Exception:
+        logger.warning("liveness ledger append failed", exc_info=True)
+        return None
 
 # Orchestrator defaults — sourced from central config (env overrides baked in)
 _ll = DEFAULT_CONFIG.live_loop
@@ -2176,6 +2227,27 @@ async def orchestrate(background: bool = False) -> None:
     _log("orchestrator", f"All {len(tasks)} systems launched ({len(tasks)} loops incl. free-grind)")
 
     abandoned_loops: set[str] = set()
+    _ledger_state: dict[str, Any] = {"last_monotonic": 0.0, "abandoned": ()}
+
+    def _tick_liveness_ledger(restart_counts: dict[str, int]) -> None:
+        """Durable ledger row: hourly, plus immediately on abandonment change."""
+        now = time.monotonic()
+        abandoned = tuple(sorted(abandoned_loops))
+        due = (
+            not _ledger_state["last_monotonic"]
+            or now - _ledger_state["last_monotonic"] >= LIVENESS_LEDGER_INTERVAL_SECONDS
+            or abandoned != _ledger_state["abandoned"]
+        )
+        if not due:
+            return
+        appended = append_liveness_ledger_row(
+            running=sorted(tasks.keys()),
+            restart_counts=restart_counts,
+            abandoned=list(abandoned),
+        )
+        if appended is not None:
+            _ledger_state["last_monotonic"] = now
+            _ledger_state["abandoned"] = abandoned
 
     def _write_loop_liveness(restart_counts: dict[str, int]) -> None:
         """Project loop liveness for read-only operator surfaces (dgc status).
@@ -2207,12 +2279,16 @@ async def orchestrate(background: bool = False) -> None:
         max_restarts = 5
         restart_counts: dict[str, int] = {}
         _write_loop_liveness(restart_counts)
+        _tick_liveness_ledger(restart_counts)
 
         while tasks and not shutdown_event.is_set():
             done, pending = await asyncio.wait(
                 list(tasks.values()), return_when=asyncio.FIRST_COMPLETED, timeout=60.0,
             )
             if not done:
+                # Steady state hits only this branch, so the hourly durable
+                # ledger row must tick here, not just on task exit events.
+                _tick_liveness_ledger(restart_counts)
                 continue  # timeout, check shutdown flag
 
             restart_queue: list[str] = []
@@ -2253,6 +2329,7 @@ async def orchestrate(background: bool = False) -> None:
                     abandoned_loops.add(name)
 
             _write_loop_liveness(restart_counts)
+            _tick_liveness_ledger(restart_counts)
 
     except asyncio.CancelledError:
         pass

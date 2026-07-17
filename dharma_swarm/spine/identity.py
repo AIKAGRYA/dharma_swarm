@@ -189,3 +189,22 @@ def require_execution_identity(
     if identity is None:
         raise MissingExecutionIdentity("ExecutionIdentity is required")
     return identity.require_for_dispatch()
+
+
+_PROCESS_BOOT_ID = ""
+
+
+def process_boot_id() -> str:
+    """Mint-once boot identity for this OS process.
+
+    ``run_id`` is minted per invocation (``_new_id`` above), so receipts on
+    either side of a process restart are indistinguishable by it; P4 restart
+    survival requires producer and consumer receipts to carry different boot
+    identities across a deliberate restart
+    (docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md, invariant P4). This is the
+    single minting site — carriers import it and never mint their own.
+    """
+    global _PROCESS_BOOT_ID
+    if not _PROCESS_BOOT_ID:
+        _PROCESS_BOOT_ID = f"boot_{uuid4().hex}"
+    return _PROCESS_BOOT_ID
