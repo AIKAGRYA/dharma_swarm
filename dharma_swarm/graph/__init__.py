@@ -49,9 +49,11 @@ from dharma_swarm.graph.persistence import (
 from dharma_swarm.graph.routing import (
     BranchDestinationError,
     Command,
+    ParentCommand,
     Send,
     SendTargetError,
 )
+from dharma_swarm.graph.subgraph import as_node
 from dharma_swarm.graph.scheduler import (
     CompiledGraph,
     GraphRuntimeError,
@@ -121,7 +123,9 @@ __all__ = [
     "MalformedDispatchOrderError",
     "NodeExecutionError",
     "NodeResultError",
+    "ParentCommand",
     "ReducerChannel",
+    "as_node",
     "RemainingSteps",
     "SchemaError",
     "Send",

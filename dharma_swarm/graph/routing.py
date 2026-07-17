@@ -40,6 +40,7 @@ __all__ = [
     "BranchDestinationError",
     "BranchSpec",
     "Command",
+    "ParentCommand",
     "Send",
     "SendTargetError",
     "evaluate_branch",
@@ -103,6 +104,21 @@ class Send:
 _RESUME_UNSET: Any = object()
 
 
+class ParentCommand(Exception):
+    """A ``Command(graph=Command.PARENT)`` bubbling out of its graph run.
+
+    Raised where the command is interpreted; a subgraph wrapper
+    (``subgraph.as_node``) catches it ONE level up and returns the carried
+    command as the parent node's result. Reaching the caller uncaught means
+    the command was issued with no parent graph — langgraph 1.2.4 parity
+    (empirical: top-level ``Command.PARENT`` raises ``ParentCommand``).
+    """
+
+    def __init__(self, command: "Command") -> None:
+        super().__init__(f"Command(graph=PARENT) with no parent graph: {command!r}")
+        self.command = command
+
+
 @dataclass(frozen=True)
 class Command:
     """Node return value combining state writes with dynamic routing.
@@ -116,13 +132,22 @@ class Command:
     answers a pending :func:`dharma_swarm.graph.interrupts.interrupt` on a
     persisted thread. A node RETURNING a resume command fails closed —
     langgraph resumes only from the caller side. ``None`` is a legal resume
-    value, so presence is tracked against an unset sentinel. No ``graph``
-    field this slice.
+    value, so presence is tracked against an unset sentinel.
+
+    ``graph=Command.PARENT`` addresses the command ONE level up: the node's
+    own run aborts and the parent graph applies ``update`` through ITS
+    reducers and ``goto`` to ITS nodes (langgraph parity; empirical: the
+    child's local writes never reach the parent). With no parent, the
+    bubbling :class:`ParentCommand` reaches the caller. Only the PARENT
+    sentinel is supported — arbitrary graph addressing fails closed.
     """
+
+    PARENT = "__parent__"
 
     update: Mapping[str, Any] | None = None
     goto: str | Send | Sequence[str | Send] = field(default_factory=tuple)
     resume: Any = _RESUME_UNSET
+    graph: Any = None
 
     @property
     def has_resume(self) -> bool:
@@ -195,6 +220,17 @@ def interpret_result(
                 f"node {node_id!r} returned Command(resume=...) in superstep "
                 f"{superstep}; resume commands are invoke-input only "
                 "(fail closed)",
+                graph_run_id=run_id,
+                superstep=superstep,
+                node_id=node_id,
+            )
+        if result.graph is not None:
+            if result.graph == Command.PARENT:
+                raise ParentCommand(result)
+            raise NodeResultError(
+                f"node {node_id!r} returned Command(graph={result.graph!r}) "
+                f"in superstep {superstep}; only Command.PARENT addressing "
+                "is supported (fail closed)",
                 graph_run_id=run_id,
                 superstep=superstep,
                 node_id=node_id,

@@ -2001,6 +2001,9 @@ def run_capability_probes(
     _apply_command_resume_evidence(
         capabilities, row_lookup, workloads["seeded_command_resume"]
     )
+    _apply_command_parent_evidence(
+        capabilities, row_lookup, workloads["seeded_command_parent"]
+    )
     persistence_protocol = _persistence_protocol_probe(seed)
     _apply_persistence_protocol_evidence(capabilities, row_lookup, persistence_protocol)
     process_restart = _process_restart_probe(seed)
@@ -2928,6 +2931,189 @@ def _apply_command_resume_evidence(
             command_or_probe=(
                 "drive interrupt -> resume -> interrupt -> resume to "
                 "completion on persisted threads of both installed runtimes"
+            ),
+            outcome="parity" if equal else "mismatch",
+            dharma={name: workload["dharma"].get(name) for name in fields},
+            langgraph={name: workload["langgraph"].get(name) for name in fields},
+            citations=_row_citations(row_lookup["LG08"]),
+        )
+    )
+
+
+# ---------------------------------------------------------------------------
+# Pregel-core S8 (LG08b): subgraph-as-node + Command.PARENT workload.
+# Append-only harness extension — new seeded two-arm workload + evidence
+# applier + surface support entry for the command_parent facet.
+# ---------------------------------------------------------------------------
+
+
+class _ParentState(TypedDict, total=False):
+    x: int
+    log: Annotated[list[Any], operator.add]
+
+
+def _command_parent_arm(arm: str, seed: int) -> dict[str, Any]:
+    rng = random.Random(_derived_seed(seed, "command-parent"))
+    magic = rng.randint(10, 99)
+
+    if arm == "langgraph":
+        from langgraph.errors import ParentCommand as LGParentCommand
+        from langgraph.graph import END, START, StateGraph
+        from langgraph.types import Command as LGParentCmd
+
+        child = StateGraph(_ParentState)
+        child.add_node("c1", lambda state: {"log": ["c1"]})
+        child.add_node(
+            "c2",
+            lambda state: LGParentCmd(
+                graph=LGParentCmd.PARENT,
+                update={"log": ["c2_parent_update"], "x": magic},
+                goto="target",
+            ),
+        )
+        child.add_edge(START, "c1")
+        child.add_edge("c1", "c2")
+        child.add_edge("c2", END)
+
+        parent = StateGraph(_ParentState)
+        parent.add_node("entry", lambda state: {"log": ["entry"]})
+        parent.add_node("sub", child.compile())
+        parent.add_node(
+            "target", lambda state: {"log": [f"target_saw_x{state['x']}"]}
+        )
+        parent.add_edge(START, "entry")
+        parent.add_edge("entry", "sub")
+        parent.add_edge("sub", END)
+        parent.add_edge("target", END)
+        out = parent.compile().invoke({"x": 0, "log": []})
+
+        solo = StateGraph(_ParentState)
+        solo.add_node(
+            "bad",
+            lambda state: LGParentCmd(
+                graph=LGParentCmd.PARENT, update={"x": 1}
+            ),
+        )
+        solo.add_edge(START, "bad")
+        solo.add_edge("bad", END)
+        orphan_rejected = False
+        try:
+            solo.compile().invoke({"x": 0, "log": []})
+        except LGParentCommand:
+            orphan_rejected = True
+        return {
+            "parent_final": {"x": out["x"], "log": list(out["log"])},
+            "no_parent_rejected": orphan_rejected,
+        }
+
+    from dharma_swarm.graph import (
+        END,
+        START,
+        AppendChannel,
+        Command,
+        GraphBuilder,
+        LastValueChannel,
+        ParentCommand,
+        as_node,
+    )
+    from dharma_swarm.graph.effects import SimulatedEffects
+
+    child = (
+        GraphBuilder("gauntlet-parent-child")
+        .add_channel("x", LastValueChannel)
+        .add_channel("log", AppendChannel)
+        .add_node("c1", lambda state: {"log": ["c1"]})
+        .add_node(
+            "c2",
+            lambda state: Command(
+                graph=Command.PARENT,
+                update={"log": ["c2_parent_update"], "x": magic},
+                goto="target",
+            ),
+        )
+        .add_edge(START, "c1")
+        .add_edge("c1", "c2")
+        .add_edge("c2", END)
+        .compile()
+    )
+    parent = (
+        GraphBuilder("gauntlet-parent")
+        .add_channel("x", LastValueChannel)
+        .add_channel("log", AppendChannel)
+        .add_node("entry", lambda state: {"log": ["entry"]})
+        .add_node(
+            "sub",
+            as_node(child, effects_factory=lambda: SimulatedEffects(seed)),
+        )
+        .add_node(
+            "target", lambda state: {"log": [f"target_saw_x{state['x']}"]}
+        )
+        .add_edge(START, "entry")
+        .add_edge("entry", "sub")
+        .add_edge("sub", END)
+        .add_edge("target", END)
+        .compile(allow_orphans=True)
+    )
+    out = _run_awaitable(
+        parent.invoke(input={"x": 0, "log": []}, effects=SimulatedEffects(seed))
+    )
+    solo = (
+        GraphBuilder("gauntlet-parent-solo")
+        .add_channel("x", LastValueChannel)
+        .add_channel("log", AppendChannel)
+        .add_node(
+            "bad",
+            lambda state: Command(graph=Command.PARENT, update={"x": 1}),
+        )
+        .add_edge(START, "bad")
+        .add_edge("bad", END)
+        .compile()
+    )
+    orphan_rejected = False
+    try:
+        _run_awaitable(
+            solo.invoke(input={"x": 0, "log": []}, effects=SimulatedEffects(seed))
+        )
+    except ParentCommand:
+        orphan_rejected = True
+    return {
+        "parent_final": {"x": out.state["x"], "log": list(out.state["log"])},
+        "no_parent_rejected": orphan_rejected,
+    }
+
+
+_WORKLOAD_ARMS["seeded_command_parent"] = _command_parent_arm
+_support("LG08", ("command_parent",), "dharma_swarm.graph:Command#graph")
+
+
+def _apply_command_parent_evidence(
+    capabilities: dict[str, Any],
+    row_lookup: Mapping[str, Any],
+    workload: Mapping[str, Any],
+) -> None:
+    """LG08.command_parent from the seeded two-arm subgraph workload.
+
+    Fail-closed per the error-parity rule: a probe_error on either arm keeps
+    the facet failing — identical errors are a finding, never a pass.
+    """
+    both_ran = (
+        "probe_error" not in workload["dharma"]
+        and "probe_error" not in workload["langgraph"]
+    )
+    fields = ("parent_final", "no_parent_rejected")
+    equal = both_ran and all(
+        workload["dharma"].get(name) == workload["langgraph"].get(name)
+        for name in fields
+    )
+    entry = capabilities["LG08"]["facets"]["command_parent"]
+    entry["status"] = "pass" if equal else "fail"
+    entry["evidence"].append(
+        _evidence(
+            kind="two_arm_differential",
+            evidence_id="seeded_command_parent:command_parent",
+            command_or_probe=(
+                "bubble Command(graph=PARENT) from a subgraph node into the "
+                "parent's reducers and routing on both installed runtimes"
             ),
             outcome="parity" if equal else "mismatch",
             dharma={name: workload["dharma"].get(name) for name in fields},
