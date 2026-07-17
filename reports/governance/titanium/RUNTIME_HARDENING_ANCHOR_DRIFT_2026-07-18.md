@@ -63,3 +63,20 @@ Verification command:
 ```
 
 Observed result: `31 passed`; ruff passed.
+
+## Follow-up implementation receipt — TIT-024 agent-runner path confinement
+
+The branch added the first WP-C/TIT-024 confinement guard for local tool paths:
+
+- `_resolve_local_tool_path()` now resolves model-supplied paths against the selected workdir and rejects final paths outside that root.
+- The guard rejects parent traversal and absolute host paths outside the workspace.
+- Relative paths and absolute paths inside the workdir still resolve normally.
+
+Verification command:
+
+```bash
+.venv/bin/python -m pytest -q tests/test_agent_runner_path_confinement.py tests/test_agent_runner.py::test_build_prompt_uses_active_memory_recall_by_default tests/test_agent_runner.py::test_build_prompt_prefers_local_state_dir_when_available tests/governance/test_titanium_runtime_hardening_fitness.py
+git diff --check
+```
+
+Observed result: `8 passed`; diff check passed. Ruff over the entire legacy `agent_runner.py` still reports pre-existing lint issues unrelated to this packet (`E402` import placement and an unused `mem` local), so this receipt scopes verification to the new path-confinement behavior.
