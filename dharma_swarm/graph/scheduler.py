@@ -93,6 +93,9 @@ class CompiledGraph:
     join_writes: Mapping[str, tuple[tuple[str, str], ...]] = field(
         default_factory=dict
     )
+    # Managed-value field name receiving the remaining superstep budget in
+    # every pull-task snapshot (schema.RemainingSteps; None = not declared).
+    managed_remaining: str | None = None
 
     async def invoke(
         self,
@@ -231,6 +234,7 @@ class CompiledGraph:
                     start_versions,
                     run_id,
                     superstep,
+                    remaining=cap - superstep,
                 )
                 state.apply_writes(
                     plan.recorded_writes + live_pending, superstep
@@ -258,7 +262,13 @@ class CompiledGraph:
                 )
             try:
                 pending, executed, event_ids = await executor.run_tasks(
-                    tasks, state, versions_seen, start_versions, run_id, superstep
+                    tasks,
+                    state,
+                    versions_seen,
+                    start_versions,
+                    run_id,
+                    superstep,
+                    remaining=cap - superstep,
                 )
             except GraphRuntimeError as error:
                 self._persist_failure_remains(

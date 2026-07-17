@@ -23,6 +23,7 @@ from dharma_swarm.graph.channels import (
     UnknownChannelError,
 )
 from dharma_swarm.graph.schema import (
+    RemainingSteps,
     SchemaError,
     TypedCompiledGraph,
     TypedStateGraph,
@@ -113,6 +114,7 @@ __all__ = [
     "NodeExecutionError",
     "NodeResultError",
     "ReducerChannel",
+    "RemainingSteps",
     "SchemaError",
     "Send",
     "SendTargetError",

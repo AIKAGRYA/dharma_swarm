@@ -121,6 +121,8 @@ class SuperstepExecutor:
         start_versions: Mapping[str, int],
         run_id: str,
         superstep: int,
+        *,
+        remaining: int | None = None,
     ) -> tuple[list[ChannelWrite], list[str], list[tuple[str, int]]]:
         """Run every ready task CONCURRENTLY; return (sorted proposals, executed, ids).
 
@@ -144,7 +146,7 @@ class SuperstepExecutor:
 
         aio_tasks: dict[asyncio.Task[list[ChannelWrite]], _Task] = {
             asyncio.ensure_future(
-                self._run_one(task, state, run_id, superstep)
+                self._run_one(task, state, run_id, superstep, remaining)
             ): task
             for task in exec_order
         }
@@ -209,18 +211,26 @@ class SuperstepExecutor:
         state: GraphState,
         run_id: str,
         superstep: int,
+        remaining: int | None = None,
     ) -> list[ChannelWrite]:
         """One task: snapshot-isolated input, node run, write interpretation.
 
         The returned bundle preserves the canonical intra-task write order
         (result writes, then static routing, then branch writes) so the
         caller's dispatch-order assembly + stable sort reproduces the exact
-        pre-concurrency commit sequence.
+        pre-concurrency commit sequence. A declared managed-remaining field
+        is injected into pull-task snapshots only — never committed state.
         """
         graph = self._graph
         node_input = (
             state.snapshot() if task.is_pull else copy.deepcopy(task.arg)
         )
+        if (
+            task.is_pull
+            and graph.managed_remaining is not None
+            and remaining is not None
+        ):
+            node_input[graph.managed_remaining] = remaining
         result = await self._execute_node(
             task.node_id, node_input, run_id, superstep
         )

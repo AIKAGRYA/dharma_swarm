@@ -261,3 +261,11 @@ Branch note: the remote session harness assigned `claude/dharmagraph-pregel-core
 - verify: workload parity True at the derived seed (chained {"x":21,...} and bare_named {"x":30,...} equal on both arms). Graph+property 164 passed; oracle 49 passed; module budget OK; ratchet OK; ruff clean. Score probe after commit.
 - learned: bare-callable naming comes from `__name__` on both runtimes, so lambdas are unusable in sequences on either arm — no deviation to record.
 - blocked: nothing.
+
+### Iteration 6 — S5 (LG09: remaining_steps managed value)
+
+- slice: S5
+- result: DONE. `schema.RemainingSteps` marker class: annotate a state field with the CLASS and every pull task observes `superstep_cap - superstep` in its input snapshot — never a channel, never written, never checkpointed; budget resets per invoke. `typed_state_schema` skips managed fields; `managed_remaining_field` (max one, fail closed) feeds `CompiledGraph.managed_remaining` via `dataclasses.replace` in `TypedStateGraph.compile` (no compiler.py change needed); scheduler passes `remaining=cap - superstep` into both `run_tasks` call sites; executor injects into pull snapshots only. Mid-slice fix in `_schema_fields`: schemas defined inside functions can't resolve the marker under `from __future__ import annotations` — NameError now retries with the marker in `localns` before failing closed; the gauntlet arms use the functional `TypedDict(...)` form for the same reason (both arms hit it, langgraph's own `_get_channels` included).
+- verify: workload parity True at the derived seed (`remaining_seen` [4,3] equal, `final_count` 2 equal, `budget_resets_per_invoke` True both). Direct smoke vs langgraph at limit 8/stop 3: sequences [7,6,5] identical. Graph+property 164 passed; oracle 49 passed; budget/ratchet/ruff OK. Note: the operator force-pushed a rebase of S0–S3 onto main@82f7f1e3 (Titanium campaign #1000) mid-S4; local S4 was rebased on top (patch-ids of S0–S3 skipped cleanly), dharmagraph track surfaces verified unchanged, onboard READY at rebased head. Score probe after commit.
+- learned: the dharma `superstep_cap` and langgraph `recursion_limit` off-by-one behaviors align exactly (limit N ⇒ first node sees N-1), so remaining = cap - superstep needed no adjustment.
+- blocked: nothing.

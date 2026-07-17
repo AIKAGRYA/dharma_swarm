@@ -35,6 +35,7 @@ from dharma_swarm.graph.scheduler import CompiledGraph
 from dharma_swarm.graph.types import GraphRunResult
 
 __all__ = [
+    "RemainingSteps",
     "SchemaError",
     "TypedCompiledGraph",
     "TypedStateGraph",
@@ -43,6 +44,18 @@ __all__ = [
     "output_schema",
     "typed_state_schema",
 ]
+
+
+class RemainingSteps:
+    """Managed-value marker: the field receives the remaining superstep budget.
+
+    Annotate a state field with this CLASS (``remaining: RemainingSteps``) and
+    every pull task observes ``superstep_cap - superstep`` in its input
+    snapshot — langgraph ``RemainingSteps`` parity (limit N ⇒ first step sees
+    N-1; empirical 1.2.4). The field is plan-time injected: it is never a
+    channel, never written, never checkpointed, and the budget resets on
+    every invoke (resume included).
+    """
 
 _ACTIVE_CONTEXT: contextvars.ContextVar[Any] = contextvars.ContextVar(
     "dharmagraph_active_context", default=None
@@ -67,6 +80,20 @@ def _schema_fields(schema: type) -> dict[str, tuple[Any, Callable[[Any, Any], An
         )
     try:
         hints = get_type_hints(schema, include_extras=True)
+    except NameError:
+        # A schema defined inside a function cannot resolve OUR marker
+        # through its module globals under `from __future__ import
+        # annotations` — retry with the marker supplied, then fail closed.
+        try:
+            hints = get_type_hints(
+                schema,
+                include_extras=True,
+                localns={"RemainingSteps": RemainingSteps},
+            )
+        except Exception as exc:
+            raise SchemaError(
+                f"cannot resolve type hints for schema {schema.__name__!r}: {exc}"
+            ) from exc
     except Exception as exc:  # unresolvable forward refs fail closed
         raise SchemaError(
             f"cannot resolve type hints for schema {schema.__name__!r}: {exc}"
@@ -115,9 +142,13 @@ def typed_state_schema(
 
     ``Annotated[T, reducer]`` -> :class:`ReducerChannel` (batching-invariant
     fold, empty value from ``T()``); every other key -> LastValueChannel.
+    Managed-value fields (:class:`RemainingSteps`) get NO channel — they are
+    plan-time injected, never state.
     """
     factories: dict[str, Callable[[], Channel[Any]]] = {}
     for name, (annotation, reducer) in _schema_fields(schema).items():
+        if annotation is RemainingSteps:
+            continue
         if reducer is not None:
             empty = _empty_value(annotation)
             factories[name] = (
@@ -126,6 +157,21 @@ def typed_state_schema(
         else:
             factories[name] = LastValueChannel
     return factories
+
+
+def managed_remaining_field(schema: type) -> str | None:
+    """The schema's :class:`RemainingSteps` field name, if declared (max one)."""
+    matches = [
+        name
+        for name, (annotation, _reducer) in _schema_fields(schema).items()
+        if annotation is RemainingSteps
+    ]
+    if len(matches) > 1:
+        raise SchemaError(
+            f"schema declares {len(matches)} RemainingSteps fields "
+            f"{sorted(matches)}; at most one is supported (fail closed)"
+        )
+    return matches[0] if matches else None
 
 
 def input_schema(schema: type) -> frozenset[str]:
@@ -191,6 +237,7 @@ class TypedStateGraph:
     ) -> None:
         self._builder = GraphBuilder(graph_id)
         self._state_fields = frozenset(_schema_fields(state))
+        self._remaining_field = managed_remaining_field(state)
         for name, factory in typed_state_schema(state).items():
             self._builder.add_channel(name, factory)
         self._input_keys = input_schema(input) if input is not None else None
@@ -222,8 +269,13 @@ class TypedStateGraph:
         return self
 
     def compile(self, **kwargs: Any) -> "TypedCompiledGraph":
+        inner = self._builder.compile(**kwargs)
+        if self._remaining_field is not None:
+            inner = dataclasses.replace(
+                inner, managed_remaining=self._remaining_field
+            )
         return TypedCompiledGraph(
-            self._builder.compile(**kwargs),
+            inner,
             input_keys=self._input_keys,
             output_keys=self._output_keys,
             context_type=self._context_type,

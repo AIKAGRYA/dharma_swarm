@@ -1992,6 +1992,9 @@ def run_capability_probes(
     _apply_sequence_evidence(
         capabilities, row_lookup, workloads["seeded_sequence_chain"]
     )
+    _apply_remaining_steps_evidence(
+        capabilities, row_lookup, workloads["seeded_remaining_steps"]
+    )
     persistence_protocol = _persistence_protocol_probe(seed)
     _apply_persistence_protocol_evidence(capabilities, row_lookup, persistence_protocol)
     process_restart = _process_restart_probe(seed)
@@ -2413,5 +2416,146 @@ def _apply_sequence_evidence(
             dharma={name: workload["dharma"].get(name) for name in fields},
             langgraph={name: workload["langgraph"].get(name) for name in fields},
             citations=_row_citations(row_lookup["LG04"]),
+        )
+    )
+
+
+# ---------------------------------------------------------------------------
+# Pregel-core S5 (LG09): managed remaining-steps workload.
+# Append-only harness extension — new seeded two-arm workload + evidence
+# applier + surface support entry for the remaining_steps facet.
+# ---------------------------------------------------------------------------
+
+
+def _remaining_steps_arm(arm: str, seed: int) -> dict[str, Any]:
+    rng = random.Random(_derived_seed(seed, "remaining-steps"))
+    limit = rng.randint(5, 9)
+    stop_at = rng.randint(2, limit - 2)
+
+    if arm == "langgraph":
+        from langgraph.graph import END, START, StateGraph
+        from langgraph.managed import RemainingSteps as _LGRemaining
+
+        # Functional TypedDict form: annotation objects are stored directly,
+        # so a function-local schema resolves under future-annotations.
+        _LGRemainState = TypedDict(
+            "_LGRemainState", {"count": int, "remaining": _LGRemaining}
+        )
+
+        def run_once() -> tuple[int, list[int]]:
+            seen: list[int] = []
+
+            def loop(state):
+                seen.append(state["remaining"])
+                return {"count": state["count"] + 1}
+
+            builder = StateGraph(_LGRemainState)
+            builder.add_node("loop", loop)
+            builder.add_edge(START, "loop")
+            builder.add_conditional_edges(
+                "loop",
+                lambda s: "stop" if s["count"] >= stop_at else "again",
+                {"again": "loop", "stop": END},
+            )
+            out = builder.compile().invoke(
+                {"count": 0}, {"recursion_limit": limit}
+            )
+            return out["count"], seen
+
+        first_count, first_seen = run_once()
+        second_count, second_seen = run_once()
+        return {
+            "final_count": first_count,
+            "remaining_seen": first_seen,
+            "budget_resets_per_invoke": first_seen == second_seen
+            and first_count == second_count,
+        }
+
+    from dharma_swarm.graph import (
+        END,
+        START,
+        RemainingSteps,
+        TypedStateGraph,
+    )
+    from dharma_swarm.graph.effects import SimulatedEffects
+
+    _DhRemainState = TypedDict(
+        "_DhRemainState", {"count": int, "remaining": RemainingSteps}
+    )
+
+    def run_once() -> tuple[int, list[int]]:
+        seen: list[int] = []
+
+        def loop(state):
+            seen.append(state["remaining"])
+            return {"count": state["count"] + 1}
+
+        typed = (
+            TypedStateGraph(_DhRemainState, graph_id="gauntlet-remaining")
+            .add_node("loop", loop)
+            .add_edge(START, "loop")
+            .add_conditional_edges(
+                "loop",
+                lambda view: "stop" if view.get("count", 0) >= stop_at else "again",
+                {"again": "loop", "stop": END},
+            )
+            .compile(allow_cycles=True)
+        )
+        result = _run_awaitable(
+            typed.invoke(
+                input={"count": 0},
+                effects=SimulatedEffects(seed),
+                superstep_cap=limit,
+            )
+        )
+        return result.state["count"], seen
+
+    first_count, first_seen = run_once()
+    second_count, second_seen = run_once()
+    return {
+        "final_count": first_count,
+        "remaining_seen": first_seen,
+        "budget_resets_per_invoke": first_seen == second_seen
+        and first_count == second_count,
+    }
+
+
+_WORKLOAD_ARMS["seeded_remaining_steps"] = _remaining_steps_arm
+_support("LG09", ("remaining_steps",), "dharma_swarm.graph:RemainingSteps")
+
+
+def _apply_remaining_steps_evidence(
+    capabilities: dict[str, Any],
+    row_lookup: Mapping[str, Any],
+    workload: Mapping[str, Any],
+) -> None:
+    """LG09.remaining_steps from the seeded two-arm managed-value workload.
+
+    Fail-closed per the error-parity rule: a probe_error on either arm keeps
+    the facet failing — identical errors are a finding, never a pass.
+    """
+    both_ran = (
+        "probe_error" not in workload["dharma"]
+        and "probe_error" not in workload["langgraph"]
+    )
+    fields = ("final_count", "remaining_seen", "budget_resets_per_invoke")
+    equal = both_ran and all(
+        workload["dharma"].get(name) == workload["langgraph"].get(name)
+        for name in fields
+    )
+    entry = capabilities["LG09"]["facets"]["remaining_steps"]
+    entry["status"] = "pass" if equal else "fail"
+    entry["evidence"].append(
+        _evidence(
+            kind="two_arm_differential",
+            evidence_id="seeded_remaining_steps:remaining_steps",
+            command_or_probe=(
+                "compare the observed remaining-step sequences and per-invoke "
+                "budget reset on both installed runtimes"
+            ),
+            outcome="parity" if equal else "mismatch",
+            dharma={name: workload["dharma"].get(name) for name in fields},
+            langgraph={name: workload["langgraph"].get(name) for name in fields},
+            citations=_row_citations(row_lookup["LG09"]),
         )
     )
