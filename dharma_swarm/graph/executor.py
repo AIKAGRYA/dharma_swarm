@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING, Any, Mapping
 from dharma_swarm.graph.channels import ChannelWrite, TopicChannel
 from dharma_swarm.graph.effects import EffectsProvider
 from dharma_swarm.graph.errors import (
+    GraphRuntimeError,
     MalformedDispatchOrderError,
     NodeExecutionError,
 )
@@ -121,38 +122,74 @@ class SuperstepExecutor:
         run_id: str,
         superstep: int,
     ) -> tuple[list[ChannelWrite], list[str], list[tuple[str, int]]]:
-        """Run every ready task and return (sorted proposals, executed, ids).
+        """Run every ready task CONCURRENTLY; return (sorted proposals, executed, ids).
 
-        Execution order is ``effects.dispatch_order`` (validated as a
-        permutation); the returned proposals are already sorted by the
-        canonical ``(channel, node_id, task_seq)`` commit key, so final
-        state is execution-order-invariant.
+        All tasks of a superstep run as concurrent asyncio tasks (langgraph
+        parity: parallel actors' execution intervals overlap). Task START
+        order is ``effects.dispatch_order`` (validated as a permutation,
+        called exactly once); write proposals are assembled in dispatch order
+        and stable-sorted by the canonical ``(channel, node_id, task_seq)``
+        commit key, so committed state is completion-order-invariant and
+        byte-identical to the former sequential execution.
+
+        On the first task failure the remaining tasks are cancelled and the
+        superstep aborts with zero commits; already-succeeded siblings'
+        identities and writes ride the raised :class:`GraphRuntimeError`
+        (``succeeded_*``) for the scheduler's pending-write persistence. A
+        node raising :class:`asyncio.CancelledError` propagates unwrapped
+        after the step drains.
         """
         graph = self._graph
         exec_order = self._validated_dispatch_order(tasks, run_id, superstep)
+
+        aio_tasks: dict[asyncio.Task[list[ChannelWrite]], _Task] = {
+            asyncio.ensure_future(
+                self._run_one(task, state, run_id, superstep)
+            ): task
+            for task in exec_order
+        }
+        done, not_done = await asyncio.wait(
+            aio_tasks, return_when=asyncio.FIRST_EXCEPTION
+        )
+        bundles: dict[tuple[str, int], list[ChannelWrite]] = {}
+        failures: list[tuple[_Task, BaseException]] = []
+        saw_cancelled = False
+        for aio in done:
+            task = aio_tasks[aio]
+            if aio.cancelled():
+                saw_cancelled = True
+            elif aio.exception() is not None:
+                failures.append((task, aio.exception()))  # type: ignore[arg-type]
+            else:
+                bundles[task.identity] = aio.result()
+        if failures or saw_cancelled:
+            for aio in not_done:
+                aio.cancel()
+            if not_done:
+                await asyncio.wait(not_done)
+            if not failures:
+                raise asyncio.CancelledError()
+            order = {t.identity: i for i, t in enumerate(exec_order)}
+            failures.sort(key=lambda pair: order[pair[0].identity])
+            error = failures[0][1]
+            if isinstance(error, GraphRuntimeError):
+                succeeded = [t for t in exec_order if t.identity in bundles]
+                writes = [w for t in succeeded for w in bundles[t.identity]]
+                writes.sort(
+                    key=lambda w: (w.channel, w.node_id, w.task_seq)
+                )
+                error.succeeded_tasks = tuple(t.identity for t in succeeded)
+                error.succeeded_writes = tuple(writes)
+                error.succeeded_pull_nodes = tuple(
+                    t.node_id for t in succeeded if t.is_pull
+                )
+            raise error
 
         pending: list[ChannelWrite] = []
         executed: list[str] = []
         event_ids: list[tuple[str, int]] = []
         for task in exec_order:
-            node_input = (
-                state.snapshot() if task.is_pull else copy.deepcopy(task.arg)
-            )
-            result = await self._execute_node(
-                task.node_id, node_input, run_id, superstep
-            )
-            task_writes = self._writes_from_result(
-                task.node_id, result, run_id, superstep, task.seq
-            )
-            pending.extend(task_writes)
-            pending.extend(self.trigger_writes(task.node_id, task_seq=task.seq))
-            if task.node_id in graph.branches:
-                view = state.own_writes_view(task_writes, superstep)
-                pending.extend(
-                    self.branch_writes(
-                        task.node_id, task.seq, view, run_id, superstep
-                    )
-                )
+            pending.extend(bundles[task.identity])
             if task.is_pull:
                 for name in graph.triggers[task.node_id]:
                     versions_seen[task.node_id][name] = start_versions.get(
@@ -165,6 +202,41 @@ class SuperstepExecutor:
             key=lambda write: (write.channel, write.node_id, write.task_seq)
         )
         return pending, executed, event_ids
+
+    async def _run_one(
+        self,
+        task: _Task,
+        state: GraphState,
+        run_id: str,
+        superstep: int,
+    ) -> list[ChannelWrite]:
+        """One task: snapshot-isolated input, node run, write interpretation.
+
+        The returned bundle preserves the canonical intra-task write order
+        (result writes, then static routing, then branch writes) so the
+        caller's dispatch-order assembly + stable sort reproduces the exact
+        pre-concurrency commit sequence.
+        """
+        graph = self._graph
+        node_input = (
+            state.snapshot() if task.is_pull else copy.deepcopy(task.arg)
+        )
+        result = await self._execute_node(
+            task.node_id, node_input, run_id, superstep
+        )
+        task_writes = self._writes_from_result(
+            task.node_id, result, run_id, superstep, task.seq
+        )
+        bundle = list(task_writes)
+        bundle.extend(self.trigger_writes(task.node_id, task_seq=task.seq))
+        if task.node_id in graph.branches:
+            view = state.own_writes_view(task_writes, superstep)
+            bundle.extend(
+                self.branch_writes(
+                    task.node_id, task.seq, view, run_id, superstep
+                )
+            )
+        return bundle
 
     def trigger_writes(
         self, node_id: str, task_seq: int = 0

@@ -439,3 +439,107 @@ async def test_bounded_cycle_reaches_condition_no_error():
     )
     dharma = await compiled.invoke(effects=SimulatedEffects(42), superstep_cap=25)
     assert dharma.state["count"] == lg_final["count"] == 3
+
+
+# ---------------------------------------------------------------------------
+# Slice S2 (Pregel core): failure atomicity + failure resume
+# ---------------------------------------------------------------------------
+
+from pathlib import Path  # noqa: E402
+
+from langgraph.checkpoint.memory import InMemorySaver  # noqa: E402
+
+from dharma_swarm.graph.persistence import GraphPersistenceKernel  # noqa: E402
+from dharma_swarm.graph.scheduler import NodeExecutionError  # noqa: E402
+from dharma_swarm.graph.types import RunCheckpoint  # noqa: E402
+
+
+class _FailState(TypedDict, total=False):
+    x: int
+    log: Annotated[list[Any], operator.add]
+
+
+def _fail_pair(calls: dict[str, int], armed: dict[str, bool]):
+    """One (a: writes, b: fails-once) graph body shared by both arms."""
+
+    def node_a(state) -> dict[str, Any]:
+        calls["a"] += 1
+        return {"x": state["x"] + 1, "log": [f"a_saw_{state['x']}"]}
+
+    def node_b(state) -> dict[str, Any]:
+        calls["b"] += 1
+        if armed["on"]:
+            raise RuntimeError("seeded-failure")
+        return {"log": [f"b_saw_{state['x']}"]}
+
+    return node_a, node_b
+
+
+async def test_failed_step_sibling_writes_survive_and_resume_parity(tmp_path):
+    """After a failed superstep both engines expose last-checkpoint state PLUS
+    the succeeded sibling's writes; resume re-runs ONLY the failed task,
+    against the PRE-step snapshot (empirical langgraph 1.2.4 semantics)."""
+    initial = 10
+
+    lg_calls, lg_armed = {"a": 0, "b": 0}, {"on": True}
+    lg_a, lg_b = _fail_pair(lg_calls, lg_armed)
+    graph = StateGraph(_FailState)
+    graph.add_node("a", lg_a)
+    graph.add_node("b", lg_b)
+    graph.add_edge(LG_START, "a")
+    graph.add_edge(LG_START, "b")
+    graph.add_edge("a", LG_END)
+    graph.add_edge("b", LG_END)
+    app = graph.compile(checkpointer=InMemorySaver())
+    config = {"configurable": {"thread_id": "fail-parity"}}
+    with pytest.raises(RuntimeError, match="seeded-failure"):
+        app.invoke({"x": initial, "log": []}, config)
+    lg_after = app.get_state(config).values
+    lg_armed["on"] = False
+    lg_resumed = app.invoke(None, config)
+
+    dh_calls, dh_armed = {"a": 0, "b": 0}, {"on": True}
+    dh_a, dh_b = _fail_pair(dh_calls, dh_armed)
+    compiled = (
+        GraphBuilder("fail-parity")
+        .add_channel("x", LastValueChannel)
+        .add_channel("log", AppendChannel)
+        .add_node("a", dh_a)
+        .add_node("b", dh_b)
+        .add_edge(START, "a")
+        .add_edge(START, "b")
+        .add_edge("a", END)
+        .add_edge("b", END)
+        .compile()
+    )
+    kernel = GraphPersistenceKernel(Path(tmp_path) / "kernel")
+    views: list[RunCheckpoint] = []
+    with pytest.raises(NodeExecutionError, match="seeded-failure"):
+        await compiled.invoke(
+            input={"x": initial, "log": []},
+            effects=SimulatedEffects(7),
+            graph_run_id="fail-parity",
+            persistence=kernel,
+            thread_id="fail-parity",
+            on_checkpoint=views.append,
+        )
+    pending_view = views[-1]
+    dh_after = {
+        "x": pending_view.channels["x"]["value"],
+        "log": list(pending_view.channels["log"]["items"]),
+    }
+    assert dh_after == lg_after == {"x": initial + 1, "log": [f"a_saw_{initial}"]}
+
+    dh_armed["on"] = False
+    dh_resumed = await compiled.invoke(
+        input=None,
+        effects=SimulatedEffects(7),
+        persistence=kernel,
+        thread_id="fail-parity",
+    )
+    assert dh_resumed.state == dict(lg_resumed) == {
+        "x": initial + 1,
+        "log": [f"a_saw_{initial}", f"b_saw_{initial}"],
+    }
+    # Succeeded task never re-executed on either arm; failed task re-ran once.
+    assert lg_calls == dh_calls == {"a": 1, "b": 2}

@@ -209,18 +209,40 @@ class CompiledGraph:
 
         if run_persistence.pending_write is not None:
             superstep += 1
-            tasks = executor.prepare_tasks(state, state.versions, versions_seen)
-            pending_task_id = run_persistence.replay(
-                state, versions_seen, self.triggers, tasks, run_id, superstep
-            )
+            start_versions = state.versions
+            tasks = executor.prepare_tasks(state, start_versions, versions_seen)
+            plan = run_persistence.pending_replay_plan(tasks, run_id, superstep)
+            if plan.full:
+                run_persistence.replay(
+                    state, versions_seen, self.triggers, tasks, run_id, superstep
+                )
+                replayed_ids = [(task.node_id, task.seq) for task in tasks]
+            else:
+                # Failure resume: succeeded tasks' recorded writes replay
+                # without re-execution; only uncovered tasks run, against
+                # the restored pre-step snapshot (langgraph parity).
+                for node in plan.covered_pull_nodes:
+                    for name in self.triggers[node]:
+                        versions_seen[node][name] = start_versions.get(name, 0)
+                live_pending, _live_nodes, replayed_ids = await executor.run_tasks(
+                    plan.live_tasks,
+                    state,
+                    versions_seen,
+                    start_versions,
+                    run_id,
+                    superstep,
+                )
+                state.apply_writes(
+                    plan.recorded_writes + live_pending, superstep
+                )
             digest, committed = state.digest(), superstep
             events.extend(
                 GraphRunEvent(
-                    run_id, self.graph_id, task.node_id, superstep, "ok", digest, task.seq
+                    run_id, self.graph_id, node_id, superstep, "ok", digest, seq
                 )
-                for task in tasks
+                for node_id, seq in replayed_ids
             )
-            _emit_checkpoint(superstep, digest, pending_task_id)
+            _emit_checkpoint(superstep, digest, plan.task_id)
         while True:
             superstep += 1
             start_versions = state.versions
@@ -234,9 +256,23 @@ class CompiledGraph:
                     graph_run_id=run_id,
                     superstep=superstep,
                 )
-            pending, executed, event_ids = await executor.run_tasks(
-                tasks, state, versions_seen, start_versions, run_id, superstep
-            )
+            try:
+                pending, executed, event_ids = await executor.run_tasks(
+                    tasks, state, versions_seen, start_versions, run_id, superstep
+                )
+            except GraphRuntimeError as error:
+                self._persist_failure_remains(
+                    error,
+                    state,
+                    versions_seen,
+                    start_versions,
+                    run_persistence,
+                    run_id,
+                    superstep,
+                    committed,
+                    on_checkpoint,
+                )
+                raise
             state.validate_writes(pending, superstep)  # Pure pre-journal validation.
             pending_task_id = f"{run_id}:{superstep}"
             run_persistence.journal(
@@ -275,6 +311,71 @@ class CompiledGraph:
             state_digest=digest,
             supersteps=committed,
             events=tuple(events),
+        )
+
+    def _persist_failure_remains(
+        self,
+        error: GraphRuntimeError,
+        state: GraphState,
+        versions_seen: Mapping[str, Mapping[str, int]],
+        start_versions: Mapping[str, int],
+        run_persistence: GraphRunPersistence,
+        run_id: str,
+        superstep: int,
+        committed: int,
+        on_checkpoint: Callable[[RunCheckpoint], None] | None,
+    ) -> None:
+        """Failed superstep: nothing commits — but succeeded siblings survive.
+
+        Their writes are journaled as pending writes (failure resume replays
+        them without re-executing the tasks) and surfaced through
+        ``on_checkpoint`` as a pending-VIEW checkpoint of the last committed
+        superstep (langgraph parity, empirical: after a failed step,
+        ``get_state`` shows succeeded siblings' writes applied while the
+        stored checkpoint stays pristine). An invalid surviving write group
+        fails closed: nothing journaled, nothing emitted, warning logged.
+        """
+        writes = list(error.succeeded_writes)
+        if not writes:
+            return
+        try:
+            state.validate_writes(writes, superstep)
+        except Exception as validation_error:
+            logger.warning(
+                "dropping %d surviving writes from failed superstep %d of "
+                "run %s: %s",
+                len(writes),
+                superstep,
+                run_id,
+                validation_error,
+            )
+            return
+        if run_persistence.pending_write is None:
+            run_persistence.journal(
+                [(write.channel, write.value) for write in writes],
+                f"{run_id}:{superstep}",
+                task_path="+".join(
+                    sorted(node_id for node_id, _seq in error.succeeded_tasks)
+                ),
+            )
+        if on_checkpoint is None:
+            return
+        view = GraphState(self.channel_factories)
+        view.restore_channels(state.checkpoint_channels())
+        view.apply_writes(writes, superstep)
+        seen = {node: dict(v) for node, v in versions_seen.items()}
+        for node in error.succeeded_pull_nodes:
+            for name in self.triggers[node]:
+                seen[node][name] = start_versions.get(name, 0)
+        on_checkpoint(
+            RunCheckpoint(
+                graph_run_id=run_id,
+                graph_id=self.graph_id,
+                superstep=committed,
+                state_digest=view.digest(),
+                channels=view.checkpoint_channels(),
+                versions_seen=seen,
+            )
         )
 
     def _validated_seed(
