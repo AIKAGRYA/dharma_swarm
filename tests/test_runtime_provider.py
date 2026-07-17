@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import asyncio
+
 import openai
-import pytest
 
 from dharma_swarm.model_hierarchy import DEFAULT_MODELS
 from dharma_swarm.models import LLMResponse, ProviderType
@@ -97,7 +98,7 @@ def test_resolve_runtime_provider_config_for_kimi_code_uses_default_model() -> N
     assert cfg.api_key == "kimi-key"
     assert cfg.base_url == KIMI_BASE_URL
     assert cfg.default_model == DEFAULT_KIMI_CODE_MODEL
-    assert cfg.default_model == "kimi-for-coding"
+    assert cfg.default_model == "k3"
     assert cfg.available is True
 
 
@@ -112,8 +113,19 @@ def test_resolve_runtime_provider_config_for_kimi_code_uses_env_base_and_alias()
 
     assert cfg.api_key == "kimi-key"
     assert cfg.base_url == "https://kimi.internal/coding/v1"
-    assert cfg.default_model == "kimi-for-coding"
+    assert cfg.default_model == "k3"
     assert cfg.available is True
+
+
+def test_kimi_code_does_not_consume_moonshot_platform_key() -> None:
+    cfg = resolve_runtime_provider_config(
+        ProviderType.KIMI_CODE,
+        env={"MOONSHOT_API_KEY": "moonshot-platform-key"},
+    )
+
+    assert cfg.api_key is None
+    assert cfg.base_url == "https://api.kimi.com/coding/v1"
+    assert cfg.available is False
 
 
 def test_create_runtime_provider_threads_timeout_to_kimi_and_zhipu() -> None:
@@ -195,9 +207,7 @@ def test_resolve_runtime_provider_config_for_codex_uses_npm_global_fallback(
 
 def test_runtime_provider_openrouter_default_model_matches_canonical_hierarchy() -> None:
     assert DEFAULT_OPENROUTER_MODEL == DEFAULT_MODELS[ProviderType.OPENROUTER]
-    # Floor-compliant default: the K2.6 floor route (bumped from the sub-floor
-    # K2.5 by the 2026-06-17 floor demarcation so no default names a sub-floor id).
-    assert DEFAULT_OPENROUTER_MODEL == "moonshotai/kimi-k2.6"
+    assert DEFAULT_OPENROUTER_MODEL == "moonshotai/kimi-k3"
 
 
 def test_resolve_runtime_provider_config_for_groq_uses_env_base_and_model(monkeypatch) -> None:
@@ -458,8 +468,7 @@ def test_preferred_runtime_provider_configs_keeps_anthropic_api_and_claude_cli_d
     ]
 
 
-@pytest.mark.asyncio
-async def test_complete_via_preferred_runtime_providers_prefers_ollama_then_nim(
+def test_complete_via_preferred_runtime_providers_prefers_ollama_then_nim(
     monkeypatch,
 ) -> None:
     calls: list[tuple[str, str]] = []
@@ -512,9 +521,11 @@ async def test_complete_via_preferred_runtime_providers_prefers_ollama_then_nim(
         _fake_create_provider,
     )
 
-    response, config = await complete_via_preferred_runtime_providers(
-        messages=[{"role": "user", "content": "hello"}],
-        openrouter_model="meta-llama/llama-3.3-70b-instruct:free",
+    response, config = asyncio.run(
+        complete_via_preferred_runtime_providers(
+            messages=[{"role": "user", "content": "hello"}],
+            openrouter_model="meta-llama/llama-3.3-70b-instruct:free",
+        )
     )
 
     assert response.content == "nvidia_nim ok"

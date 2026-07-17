@@ -59,7 +59,7 @@ def _provider_for_model(model_id: str):
         provider_type = ProviderType.ANTHROPIC
     elif mid.startswith("gemini"):
         provider_type = ProviderType.GOOGLE_AI
-    elif mid in {"kimi-for-coding", "kimi-code"} or mid.startswith("kimi_code/") or mid.startswith("kimi-code/"):
+    elif mid in {"k3", "kimi-code"} or mid.startswith("kimi_code/") or mid.startswith("kimi-code/"):
         provider_type = ProviderType.KIMI_CODE
     elif mid.startswith("glm-5.2") or mid.startswith("zai/") or mid.startswith("z-ai/"):
         provider_type = ProviderType.ZHIPU

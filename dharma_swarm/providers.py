@@ -33,7 +33,6 @@ from dharma_swarm.api_keys import (
     GROQ_API_KEY_ENV,
     KIMI_API_KEY_ENV,
     MISTRAL_API_KEY_ENV,
-    MOONSHOT_API_KEY_ENV,
     NVIDIA_NIM_API_KEY_ENV,
     OLLAMA_API_KEY_ENV,
     OPENAI_API_KEY_ENV,
@@ -1928,12 +1927,12 @@ class ChutesProvider(LLMProvider):
 
 
 class KimiCodeProvider(LLMProvider):
-    """Kimi API Platform coding lane, using its OpenAI-compatible chat endpoint."""
+    """Kimi Code subscription lane, using its OpenAI-compatible endpoint."""
 
     capabilities = ProviderCapabilities(
         supports_streaming=True, supports_tools=True,
         supports_thinking=True, supports_system_prompt=True,
-        max_context_tokens=256_000, provider_family="kimi_code",
+        max_context_tokens=1_048_576, provider_family="kimi_code",
     )
 
     def __init__(
@@ -1943,12 +1942,8 @@ class KimiCodeProvider(LLMProvider):
         default_model: str | None = None,
         timeout: float = 300.0,
     ) -> None:
-        self._api_key = (
-            api_key
-            or os.environ.get(KIMI_API_KEY_ENV)
-            or os.environ.get(MOONSHOT_API_KEY_ENV)
-        )
-        self._base_url = (base_url or "https://api.moonshot.ai/v1").rstrip("/")
+        self._api_key = api_key or os.environ.get(KIMI_API_KEY_ENV)
+        self._base_url = (base_url or "https://api.kimi.com/coding/v1").rstrip("/")
         self._default_model = default_model or canonical_default_model(ProviderType.KIMI_CODE)
         self._timeout = float(timeout)
         self._client: Any = None
@@ -1957,7 +1952,7 @@ class KimiCodeProvider(LLMProvider):
         if self._client is not None:
             return self._client
         if not self._api_key:
-            raise RuntimeError(f"{KIMI_API_KEY_ENV} or {MOONSHOT_API_KEY_ENV} not set")
+            raise RuntimeError(f"{KIMI_API_KEY_ENV} not set")
         try:
             from openai import AsyncOpenAI
         except ImportError as exc:
@@ -1985,7 +1980,7 @@ class KimiCodeProvider(LLMProvider):
             model=request.model or self._default_model,
             messages=messages,
             max_tokens=request.max_tokens,
-            # Kimi K2 coding models require this fixed temperature.
+            # Kimi Code models require this fixed temperature.
             temperature=1,
         )
         if request.tools:

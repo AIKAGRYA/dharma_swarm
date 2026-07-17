@@ -181,21 +181,21 @@ MODEL_TARGETS: tuple[ModelTarget, ...] = (
         aliases=("gpt", "gpt 5.5", "codex", "gpt-5.5"),
         pool_id="gpt-5.5",
     ),
-    # Kimi K2.6 — the operator's FLOOR model. Ollama-Cloud route ahead of the
-    # flappy OpenRouter route (the fix for the kimi flap bug).
+    # Kimi K2.6 remains an explicit floor fallback; unqualified Kimi aliases
+    # promote to K3 below.
     _projected(
         alias="kimi-k2.6",
         provider_id="ollama",
         label="Kimi K2.6 [FREE] (floor)",
-        aliases=("kimi", "moonshot", "kimi k2.6", "k2.6", "floor"),
+        aliases=("kimi k2.6", "k2.6", "floor"),
         pool_id="kimi-k2.6",
     ),
     _projected(
-        alias="kimi-k2.7",
-        provider_id="ollama",
-        label="Kimi K2.7 Code [FREE]",
-        aliases=("kimi 2.7", "kimi k2.7", "k2.7"),
-        pool_id="kimi-k2.7-code",
+        alias="kimi-k3",
+        provider_id="openrouter",
+        label="Kimi K3 (via OpenRouter)",
+        aliases=("kimi", "moonshot", "kimi 3", "kimi k3", "k3"),
+        pool_id="kimi-k3",
     ),
     _projected(
         alias="deepseek-v4-pro",
@@ -304,7 +304,7 @@ _FALLBACK_ORDER_BY_STRATEGY: dict[str, tuple[str, ...]] = {
         "opus-4.8",
         "sonnet-4.6",
         "gpt-5.5",
-        "kimi-k2.7",
+        "kimi-k3",
         "gemini-3",
     ),
 }

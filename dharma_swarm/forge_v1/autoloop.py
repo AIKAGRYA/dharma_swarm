@@ -13,7 +13,7 @@ Two coupled loops:
       not apply is never sent to Docker.
 
 Why this exists: the 2026-06-28/29 runs scored 0/0 not because the models can't
-code, but because (a) the champion/2nd models (kimi-for-coding, glm) TIMED OUT or
+code, but because (a) the then-current K2.7 Kimi lane and GLM TIMED OUT or
 TRUNCATED on the 78KB full-file context, and (b) the raw output was never saved,
 so the failure was unreadable. Probed 2026-06-29: Max-plan Claude and Codex
 models CANNOT be called nested inside a Claude Code session (they time out);
@@ -77,15 +77,14 @@ FORGE_ZHIPU_GLM_MODEL_ID = default_for_provider(ProviderType.ZHIPU)
 # and emits a clean SEARCH/REPLACE block. GLM is a REASONING model that thinks
 # in the output channel, so it needs a large output budget or it truncates before
 # emitting the block (observed: 8192 tokens -> stop_reason=length, 0 blocks).
-# kimi-for-coding REQUIRES temperature=1 and TIMES OUT on the 78KB full file, so it
-# is not in the default swarm (kept as an opt-in for windowed-context experiments).
+# Kimi K3 requires temperature=1 and now exposes a 1M-token context on the
+# membership endpoint, so the old K2.7 78KB windowing workaround is retired.
 CHAMPION = {"model": FORGE_GEMINI_FLASH_MODEL_ID, "temperature": 0.2, "max_tokens": 8192, "timeout_s": 150, "continue_rounds": 2, "family": "deepmind"}
 # The WHOLE callable, decorrelated swarm. Each member's wall is recoded around:
 #  - gemini: fine (1M ctx, clean format).
 #  - direct GLM: reasoning model — narrates the fix then ends the turn without the
 #    block; the finish-the-block continuation (continue_rounds) pushes it to emit.
-#  - moonshotai/kimi-k2.6 via NVIDIA NIM: decorrelated moonshot family, avoids the
-#    kimi-for-coding endpoint that times out on the 78KB file.
+#  - moonshotai/kimi-k2.6 via NVIDIA NIM: decorrelated Moonshot-family fallback.
 SWARM = [
     {"model": FORGE_GEMINI_FLASH_MODEL_ID, "temperature": 0.2, "max_tokens": 8192, "timeout_s": 150, "continue_rounds": 2, "family": "deepmind"},
     {"model": FORGE_ZHIPU_GLM_MODEL_ID, "temperature": 0.2, "max_tokens": 16000, "timeout_s": 240, "continue_rounds": 3, "family": "zai"},
@@ -114,16 +113,9 @@ def spec_for(model_id: str, temperature: float | None = None) -> dict:
     elif model_id == FORGE_NVIDIA_KIMI_MODEL_ID:
         s.update(max_tokens=8192, timeout_s=480, continue_rounds=3)
     elif model_id == FORGE_KIMI_CODE_MODEL_ID:
-        # The PAID Moonshot coding endpoint (kimi-for-coding -> k2.7). Powerful
-        # coding specialist, but its endpoint HANGS on the full 78KB file (times
-        # out at 600s, 0 tokens — input-size wall, not funds). So feed it a
-        # windowed slice located by keyword density. Endpoint forces temp=1.
-        # Endpoint hangs above ~13KB prompt (works 35-58s below) — built for
-        # interactive Claude-Code use, not batch. Small target files (most of
-        # SWE-bench) pass through whole; only oversized files (django base.py 78KB)
-        # get an ~11KB keyword window (proven to respond). Fail fast on the hang.
-        s.update(temperature=1.0, max_tokens=8192, timeout_s=150, continue_rounds=2,
-                 window_chars=11000)
+        # First-party Kimi Code K3. The endpoint forces temp=1 and supports the
+        # full benchmark context, so do not carry forward the K2.7 window cap.
+        s.update(temperature=1.0, max_tokens=8192, timeout_s=300, continue_rounds=2)
     if temperature is not None:
         s["temperature"] = temperature
     return s
@@ -135,9 +127,8 @@ def propose(inst: dict, ctx: dict, spec: dict):
     model can't kill a multi-model run (matters for parallel proposals)."""
     from dharma_swarm.forge_v1.run_real import Proposal
     t0 = time.time()
-    # Small-context endpoints (kimi-for-coding hangs on the 78KB file) get a
-    # windowed view located by bug-report keyword density; edits still apply
-    # against the full file. window_chars=0/None -> full file.
+    # Explicit small-context endpoints may request a windowed view; K3 does not.
+    # Edits still apply against the full file. window_chars=0/None -> full file.
     window_chars = spec.get("window_chars")
     prompt_ctx = None
     if window_chars:

@@ -115,6 +115,7 @@ _PROVIDER_RANK: dict[ProviderType, int] = {
     ProviderType.OPENAI: 1,
     ProviderType.CODEX: 1,
     ProviderType.KIMI_CODE: 2,
+    ProviderType.MOONSHOT: 2,
     ProviderType.OLLAMA: 2,
     ProviderType.NVIDIA_NIM: 3,
     ProviderType.GROQ: 4,
@@ -124,7 +125,13 @@ _PROVIDER_RANK: dict[ProviderType, int] = {
 }
 _DEFAULT_RANK = 5
 
-_NESTED_ROUTE_LOGICAL_IDS: dict[str, str] = {}
+# Provider namespaces are a type boundary: Kimi Code's exact K3 wire id is
+# ``k3`` while Moonshot/OpenRouter carry ``kimi-k3``. This explicit promotion
+# rule is the proof obligation that lets those routes share one logical entry;
+# string similarity alone is not authority to conflate models.
+_NESTED_ROUTE_LOGICAL_IDS: dict[str, str] = {
+    "k3": "kimi-k3",
+}
 
 
 def _logical_id(slot: ModelSlot) -> str:
@@ -299,10 +306,10 @@ def _required_provider_route(logical_id: str, provider: ProviderType) -> str:
 
 
 FORGE_KIMI_CODE_MODEL_ID = default_for_provider(ProviderType.KIMI_CODE)
-FORGE_KIMI_27_CODE_LOGICAL_ID = "kimi-k2.7-code"
-FORGE_KIMI_27_CODE_CLOUD_MODEL_ID = _required_provider_route(
-    FORGE_KIMI_27_CODE_LOGICAL_ID,
-    ProviderType.OLLAMA,
+FORGE_KIMI_K3_LOGICAL_ID = "kimi-k3"
+FORGE_KIMI_K3_OPENROUTER_MODEL_ID = _required_provider_route(
+    FORGE_KIMI_K3_LOGICAL_ID,
+    ProviderType.OPENROUTER,
 )
 FORGE_NVIDIA_KIMI_MODEL_ID = _required_provider_route(K2_FLOOR_ID, ProviderType.NVIDIA_NIM)
 FORGE_NVIDIA_LLAMA_VERIFIER_MODEL_ID = _required_provider_route(
@@ -461,14 +468,14 @@ def strong_vendor_model_ids() -> tuple[str, ...]:
 
 def forge_high_slot_model_ids() -> tuple[str, ...]:
     ids = [default_for_provider(ProviderType.ZHIPU)]
-    for entry_id in ("kimi-k2.7-code", "deepseek-v4-pro", "minimax-m3", "qwen3-coder:480b-cloud", "kimi-for-coding"):
+    for entry_id in ("kimi-k3", "deepseek-v4-pro", "minimax-m3", "qwen3-coder:480b-cloud"):
         entry = get_entry(entry_id)
         if entry is not None and not entry.below_floor:
             ids.extend(route.model_id for route in entry.routes)
     return tuple(dict.fromkeys(model_id for model_id in ids if model_id))
 
 def forge_default_high_slot_verifier_id() -> str:
-    entry = get_entry("kimi-k2.7-code")
+    entry = get_entry("kimi-k3")
     return entry.routes[0].model_id if entry is not None and entry.routes else default_for_provider(ProviderType.KIMI_CODE)
 
 
@@ -485,8 +492,8 @@ __all__ = [
     "entry_for_model_id",
     "default_for_provider",
     "FORGE_KIMI_CODE_MODEL_ID",
-    "FORGE_KIMI_27_CODE_LOGICAL_ID",
-    "FORGE_KIMI_27_CODE_CLOUD_MODEL_ID",
+    "FORGE_KIMI_K3_LOGICAL_ID",
+    "FORGE_KIMI_K3_OPENROUTER_MODEL_ID",
     "FORGE_NVIDIA_KIMI_MODEL_ID",
     "FORGE_NVIDIA_LLAMA_VERIFIER_MODEL_ID",
     "live_routes",
