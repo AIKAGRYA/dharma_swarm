@@ -145,6 +145,11 @@ at least one finding. Governance admission and reconciliation packets such as
 WP-00 and WP-00B instead declare an exact control boundary and explicit
 non-claims; they do not fabricate a finding closure.
 
+The registry below is current-state truth, not a frozen copy of the original
+audit. When an intervening PR narrows a finding without closing its complete
+exit condition, the row records both the landed improvement and the residual
+obligation.
+
 Severity rubric:
 
 - **5 — Critical:** remotely exploitable, corrupts canonical state, or can duplicate irreversible external effects.
@@ -160,8 +165,8 @@ Severity rubric:
 | TIT-003 | 3 | Go capability is inferred from executable presence, not required version | `tools/*/go.mod`, `tests/test_go_evidence_ingestor_bridge.py`, `tests/test_github_ingestor_runner.py`, sibling Go bridges | Go 1.22 host with modules declaring 1.26 |
 | TIT-004 | 4 | missing Semgrep can exit zero in a required-looking local target | `scripts/governance/run_semgrep_with_ca.sh` | remove Semgrep from `PATH` and run strict target |
 | TIT-005 | 4 | uplift subprocess can block indefinitely on inherited stdin | `scripts/uplift_guards/shakti_warrant_guard.py` | run `make uplift-guards` with open non-TTY stdin |
-| TIT-006 | 4 | duplicate top-level JSON key silently drops pytest/gitleaks classifications | `docs/governance/CI_TRUTH_CONTRACT.json` | `json.load` and inspect advisory IDs |
-| TIT-007 | 4 | CI Truth, parity manifest, automerge, and branch protection do not share one required set | three CI owner surfaces | `check_ci_parity.py --live` plus manifest diff |
+| TIT-006 | 4 | PR #993 removed the observed duplicate `advisory` key, but the generic CI Truth JSON loader still accepts a future duplicate top-level key; recurrence prevention remains open | `scripts/runtime/ci_truth.py`, `docs/governance/CI_TRUTH_CONTRACT.json` | inject a duplicate top-level key and require configuration rejection |
+| TIT-007 | 4 | PR #993 aligned CI Truth, parity, Mike/automerge, and live protection on the transitional legacy six; final-set ratification, the onboarding-name/packet-scope decision, continuously authenticated live parity, and final consumer proof remain open | CI Truth/parity owners plus Merge Master Mike | exact-set comparison, `check_ci_parity.py --live`, and final-set consumer tests |
 | TIT-008 | 4 | strict DocOps is red while PR count drift is advisory and the rolling repair PR can lose checks | DocOps scripts/workflows | `make docops-integrity`; inspect latest reconcile PR head checks |
 | TIT-009 | 3 | hermetic governance depends on live NATS freshness | `Makefile:nats-substrate-contract` | run on a clean clone without daemon state |
 | TIT-010 | 5 | production-shaped API opens mutations when no key is configured; GraphQL/WS bypass bearer scope | `api/main.py`, `Dockerfile` | protected/unprotected TestClient matrix |
@@ -425,14 +430,14 @@ This precedes runtime hardening because the adversarial audit found that the mea
 
 - `verifier-selfcheck` reported `ALL GATES FUNCTIONAL` while `make test-fast` was broken;
 - missing Semgrep was treated as a successful skip;
-- CI required-check definitions disagreed;
-- a duplicate JSON key silently removed pytest and gitleaks classifications;
+- CI required-check definitions disagreed before #993; final-set ratification and authenticated live parity remain open;
+- a duplicate JSON key silently removed pytest and gitleaks classifications before #993; duplicate-key rejection remains open;
 - strict DocOps was red while the PR check was green;
 - Go presence was mistaken for Go compatibility;
 - `uplift-guards` could wait indefinitely on stdin; and
 - repository verification and live-host readiness were mixed together.
 
-Until these are corrected, later green results remain provisional.
+Until the remaining items are corrected and the landed repairs are continuously proved, later green results remain provisional.
 
 ## Phase 0 — Verification truth
 
@@ -476,9 +481,9 @@ Repository CI must not depend on a live daemon receipt.
 
 ### 0.4 Unify CI authority
 
-- Remove duplicate JSON keys.
-- Establish one required-check manifest consumed by CI Truth, automerge, Merge Master Mike, and parity checks.
-- Verify the manifest against actual branch protection.
+- Reject duplicate JSON keys before decoding; preserve #993's one-manifest binding across CI Truth, automerge, Merge Master Mike, and parity checks.
+- Ratify and migrate the final required-check set.
+- Make authenticated comparison between the manifest and actual branch protection continuous.
 - Reject reviews bound to stale heads.
 - Ensure manual Mike dispatch cannot proceed when required checks are absent.
 - Decide and enforce the human-review policy explicitly.
@@ -971,29 +976,48 @@ Restore target wiring only. Do not copy a live receipt into the repository to ma
 
 The committed parity manifest is the sole expected-context list. Live branch protection remains the enforcement owner and is compared against that manifest with Administration-read access.
 
-The proposed required set is:
+PR #993 established exact current-state coherence for this transitional set:
 
 - `pytest (3.11)`
 - `pytest (3.12)`
 - `gitleaks`
 - `DocOps integrity gate`
 - `Coherence Delta PR body`
-- `Quality ratchet - repo-wide fitness function`
+- `Onboarding admission parity`
 
-The operator approves or replaces this set before implementation. A change updates branch protection and all consumers in one ordered rollout.
+That is a truthful partial result, not WP-0F1 closure. The workflow also emits
+the accurately named `Onboarding session status` and the risk-sensitive
+`AgentOps packet scope`, but neither currently has live merge authority.
+
+Two unratified final-set candidates are now explicit:
+
+1. The original Titanium proposal: the five common contexts above plus
+   `Quality ratchet - repo-wide fitness function`.
+2. PR #993's phase-two migration intent: the five common contexts above plus
+   `Onboarding session status` and `AgentOps packet scope`, retiring the legacy
+   onboarding compatibility context only after both new producers are observed
+   green, in the ordered migration below.
+
+The operator approves one candidate, combines them, or provides a replacement
+with rationale before WP-0F1 implementation. WP-00B makes no required-check
+policy choice. No currently protected context is removed merely because a
+different proposal exists. The approved change updates branch protection and
+all consumers in one ordered rollout.
 
 **Required implementation**
 
-1. Merge duplicate `advisory` arrays and reject future duplicate JSON keys.
-2. Make CI Truth consume or validate against the parity manifest.
+1. **Landed in PR #993:** merge the duplicate `advisory` arrays. **Open:** reject future duplicate JSON keys before decoding can erase evidence.
+2. **Landed in PR #993:** require CI Truth to bind to and validate against the parity manifest for the current six.
 3. Replace phantom local commands with real Make targets or correct commands.
 4. Make live parity mandatory for WP-0F1 closure; structural-only parity remains visibly incomplete.
+5. Ratify the final required set, ensure every chosen context is produced on PR and merge-group heads, then migrate protection and all consumers without a false-green interval.
 
 **Tests**
 
 - Committed contract contains pytest and gitleaks after JSON parsing.
 - A duplicate top-level key raises configuration error.
-- Manifest and CI Truth required names are identical.
+- Manifest and CI Truth required names are identical for both the transitional state and the ratified final state.
+- Every ratified final context is produced on pull-request and merge-group heads before protection changes.
 - Every CI Truth local command resolves to a real command surface.
 - Missing live protection data cannot produce a full-parity verdict.
 
@@ -1006,7 +1030,11 @@ python3 scripts/governance/check_ci_parity.py --live
 
 **Operator prerequisite**
 
-Provision Administration-read access and approve the required set. Without both, WP-0F1 remains open.
+Approve the final required set and provision bounded Administration-read access
+to the hosted live-parity lane. Operator credentials already prove
+point-in-time equality for the current legacy six; that does not establish
+continuous hosted proof or ratify the final set. Without both, WP-0F1 remains
+open.
 
 **Rollout and rollback order**
 
@@ -1032,6 +1060,11 @@ Committed expected contexts, CI Truth, producing workflows, and live branch prot
 **Owner:** `merge-master-mike-d4-2026-06`
 **Depends on:** WP-0F1
 
+PR #993 already made automerge load the parity manifest and made Mike consume
+CI Truth for the transitional six. Preserve that landed foundation. It is
+partial evidence, not WP-0F2 closure, until the ratified final set is exercised
+through every automerge, manual Mike, and workflow-dispatch entry path.
+
 **Allowed files**
 
 - `scripts/runtime/pr_merge_control.py`
@@ -1042,8 +1075,8 @@ Committed expected contexts, CI Truth, producing workflows, and live branch prot
 
 **Required implementation**
 
-1. Make automerge load or verify the required set from the canonical manifest rather than carry a private list.
-2. Make absent required checks blockers in manual Mike and workflow-dispatch paths.
+1. Preserve PR #993's manifest-derived automerge set; never reintroduce a private list.
+2. Make absent required checks blockers in manual Mike and workflow-dispatch paths for the ratified final set.
 3. Keep stale-head trusted reviews invalid.
 4. Preserve the narrow `bot-pr` reviewer waiver; it cannot waive CI, conflicts, changes-requested, or blocking threads.
 5. Encode the operator-approved human-review policy without giving Mike approval authority.
@@ -1553,8 +1586,8 @@ Resolved by WP-00 operator direction:
 
 Open external prerequisites:
 
-1. Approve the six-context required-check set in WP-0F1 or provide a replacement set with rationale.
-2. Provision Administration-read access for live branch-protection parity.
+1. Approve the WP-0F1 final required-check set with rationale. Current main is coherent on the transitional legacy six; the original Titanium six and PR #993 phase-two seven remain candidates, not authority.
+2. Provision bounded Administration-read access to the hosted live-parity lane; operator CLI access already proves point-in-time parity.
 3. Confirm the DocOps reconcile credential or approve normal reviewed-PR delivery only; no credential is committed.
 4. Define the minimum human-approval rule for human-authored and bot-authored PRs.
 5. Verify the actual deployment exposure of the FastAPI web service before WP-0S. If it is reachable beyond loopback/private authenticated ingress, set the required authentication material and unpublish, firewall, or stop the service until WP-0S closes.

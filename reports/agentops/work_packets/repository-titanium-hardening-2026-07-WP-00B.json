@@ -1,6 +1,6 @@
 {
   "id": "repository-titanium-hardening-2026-07-WP-00B",
-  "base_ref": "82f7f1e318f663c59c4fccf5ed62d70a8dcc0f89",
+  "base_ref": "1d45916d338c106a1e379d928b979f78c17ca489",
   "branch": "codex/titanium-wp00b-20260717",
   "worktree": ".",
   "intent": "Complete the owner-bound WP-00B evidence and projection slice after Titanium admission: reconcile PR #1000 into the canonical specification, capture an immutable clean-main baseline, add the resumable campaign executor prompt, and replace stale hardcoded dashboard authority/readiness claims with live report-derived projections. The collided unowned prompt index is explicitly excluded.",
@@ -173,7 +173,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "82f7f1e318f663c59c4fccf5ed62d70a8dcc0f89",
+      "checked_at_sha": "1d45916d338c106a1e379d928b979f78c17ca489",
       "details": []
     },
     "interface_mismatches": [
@@ -192,11 +192,11 @@
       "No Phase 0 implementation packet may begin until this complete WP-00B PR is independently reviewed and human-merged to origin/main.",
       "docs/prompts/README.md indexing is deferred because the path is unowned by Titanium and overlaps draft PR #972.",
       "Strict DocOps count projections remain stale on merged main; generated projection repair is outside this bounded packet.",
-      "WP-0F1 still requires operator-approved required-check truth and authenticated Administration-read access.",
+      "WP-0F1 still requires operator approval of the final required-check set and bounded Administration-read access for continuous hosted parity; operator credentials already prove point-in-time parity for the transitional legacy six.",
       "Live deployment, credentials, canonical hosts, and independent WP-0I reviewer evidence remain typed external prerequisites.",
       "Semgrep, gitleaks, Go, and repository pytest dependencies were absent during the clean-main baseline; missing tooling is evidence, never a pass."
     ],
     "rollback": "Revert this owner-bound eight-file WP-00B commit as one unit. The admitted Titanium track remains active, but its baseline/spec/prompt/dashboard evidence slice must be treated as incomplete until a corrected packet lands.",
-    "packet_digest": "33061714dd7eff685c3ed715ae99178121ebf82cb3ad3e19012bdab62e47c4c8"
+    "packet_digest": "12002e6c587bc09b5f55b564b7ee0c0a578b0a7543b255d70e07dfda161cd9ae"
   }
 }
