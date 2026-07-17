@@ -229,7 +229,7 @@ Every audit finding collapses into **"a dangerous action was taken without passi
 This is the "enumerate every behavior and edge case before planning" deliverable. Grouped by spine. Each row is a behavior the centralized fix must handle — **not** just the literal example in the audit, but the general class.
 
 ### Spine A — FrontierCapacityGate (compute metabolism)
-- E-A1 Frontier capacity rail must sit on the **synchronous send path** and be able to **refuse runaway/unauthorized execution** (raise/deny), not just log; it must not be used as an automatic downgrade-to-cheaper-model policy.
+- E-A1 Frontier capacity rail must sit on the **synchronous send path** and be able to **refuse runaway/unauthorized execution** (raise/deny), not just log; it must not be used as an automatic model-quality downgrade policy.
 - E-A2 Unknown/unpriced model -> **conservative non-zero telemetry price**, never `$0.0` (`cost_tracker.py:23-55`). Blind-to-zero is dishonest accounting; it is not a reason to avoid the best frontier lane.
 - E-A3 `cap <= 0` must **NOT** silently mean unbounded. It must mean *error/deny absent an explicit high-capacity authorization override*. Authorized high-capacity frontier work is allowed; accidental unlimited loops are not. (Current `holon_budget_guard` and `merge_master_mike` both treat `cap<=0` as opt-out — the exact silent-disable footgun.)
 - E-A4 Rolling-window accounting: 24h sum must survive process restart (persisted, not in-memory) and must not double-count retries as separate spend when they are the same intent.
