@@ -433,8 +433,12 @@ export function deriveCheckoutAuthority(report: OperatorCoherenceReport): Checko
   };
   const branch = normalizeObservation(main?.branch);
   const head = normalizeObservation(main?.head);
-  const upstreamObserved = typeof main?.branch_line === "string" && main.branch_line.includes("...");
-  const upstreamGone = typeof main?.branch_line === "string" && main.branch_line.toLowerCase().includes("[gone]");
+  const branchLine = typeof main?.branch_line === "string" ? main.branch_line.trim() : "";
+  const branchLineBranch = branchLine.startsWith("## ")
+    ? normalizeObservation(branchLine.slice(3).split("...", 1)[0].split(" [", 1)[0])
+    : null;
+  const upstreamObserved = branchLine.includes("...");
+  const upstreamGone = branchLine.toLowerCase().includes("[gone]");
   const observedDirtyTotal = observedNonNegativeCount(main?.dirty_count);
   const trackedDirtyCount = observedNonNegativeCount(main?.tracked_dirty_count);
   const untrackedCount = observedNonNegativeCount(main?.untracked_count);
@@ -504,6 +508,14 @@ export function deriveCheckoutAuthority(report: OperatorCoherenceReport): Checko
   }
   if (!branch) {
     return unavailable("Branch evidence is missing or carries an unavailable sentinel; no clean-checkout authority claim is safe.");
+  }
+  if (branchLine && !branchLineBranch) {
+    return unavailable("The observed branch status line is malformed or unavailable; no clean-checkout authority claim is safe.");
+  }
+  if (branchLineBranch && branchLineBranch !== branch) {
+    return unavailable(
+      `Branch evidence is contradictory (branch=${branch} but branch status reports ${branchLineBranch}); no clean-checkout authority claim is safe.`,
+    );
   }
   if (branch === "main") {
     if (upstreamGone) {
@@ -606,6 +618,7 @@ export function buildLaneAdmissionInspect(): InspectItem {
 }
 
 export function buildTrackLifecycleReviews(report: OperatorCoherenceReport): TrackLifecycleReviewDatum[] {
+  if (hasSourceError(report, "docs/governance/ACTIVE_TRACK.yaml")) return [];
   const activeTracks = report.track_portfolio.tracks.filter((track) => track.lifecycle === "active");
   const observedIds = activeTracks.map((track) => (
     typeof track.id === "string" && track.id.trim() ? track.id.trim() : null

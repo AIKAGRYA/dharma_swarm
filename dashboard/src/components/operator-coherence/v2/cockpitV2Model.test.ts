@@ -335,6 +335,23 @@ test("checkout authority fails closed when branch-line and numeric divergence di
   assert.match(authority.detail, /contradicts the observed branch status/);
 });
 
+test("checkout authority fails closed when branch field and branch status disagree", () => {
+  const contradictory = report();
+  contradictory.git = {
+    main: {
+      branch: "main",
+      branch_line: "## feature/titanium...origin/feature/titanium",
+      head: "abc123",
+      dirty_count: 0,
+      ahead: 0,
+      behind: 0,
+    },
+  };
+  const authority = deriveCheckoutAuthority(contradictory);
+  assert.equal(authority.code, "CHECKOUT_STATE_UNAVAILABLE");
+  assert.match(authority.detail, /branch=main but branch status reports feature\/titanium/);
+});
+
 test("checkout authority fails closed when the git.status probe reports a source error", () => {
   const probeFailure = report();
   probeFailure.source_errors = [{ source: "git.status", error: "probe failed" }];
@@ -460,9 +477,24 @@ test("active-track lifecycle projection exposes missing rows and missing identit
   assert.equal(summarizeTrackLifecycleProjection(noActive).code, "NO_ACTIVE_TRACKS");
 
   const sourceFailure = report();
-  sourceFailure.track_portfolio.active_count = 0;
+  sourceFailure.track_portfolio.active_count = 1;
+  sourceFailure.track_portfolio.tracks = [
+    {
+      id: "residual-shippable-row",
+      name: "Residual shippable row",
+      lifecycle: "active",
+      status: "shippable",
+      shippable: true,
+      evidence_present: true,
+      has_rigorous_evidence: true,
+    },
+  ];
   sourceFailure.source_errors = [{ source: "docs/governance/ACTIVE_TRACK.yaml", error: "probe failed" }];
-  assert.equal(summarizeTrackLifecycleProjection(sourceFailure).code, "TRACK_SOURCE_UNAVAILABLE");
+  const sourceFailureReviews = buildTrackLifecycleReviews(sourceFailure);
+  assert.deepEqual(sourceFailureReviews, []);
+  const sourceFailureSummary = summarizeTrackLifecycleProjection(sourceFailure, sourceFailureReviews);
+  assert.equal(sourceFailureSummary.code, "TRACK_SOURCE_UNAVAILABLE");
+  assert.equal(sourceFailureSummary.renderedReviewCount, 0);
 
   const missingIds = report();
   missingIds.track_portfolio.active_count = 2;
