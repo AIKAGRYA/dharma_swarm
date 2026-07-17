@@ -335,6 +335,18 @@ test("checkout authority fails closed when branch-line and numeric divergence di
   assert.match(authority.detail, /contradicts the observed branch status/);
 });
 
+test("checkout authority fails closed when the git.status probe reports a source error", () => {
+  const probeFailure = report();
+  probeFailure.source_errors = [{ source: "git.status", error: "probe failed" }];
+  const authority = deriveCheckoutAuthority(probeFailure);
+  assert.equal(authority.code, "CHECKOUT_STATE_UNAVAILABLE");
+  assert.notEqual(authority.code, "CLEAN_LOCAL_MAIN");
+  assert.match(authority.detail, /git\.status probe failed/);
+
+  const sameEvidenceWithoutError = report();
+  assert.equal(deriveCheckoutAuthority(sameEvidenceWithoutError).code, "CLEAN_LOCAL_MAIN");
+});
+
 test("branch-risk projection uses producer fallbacks for partial census reports", () => {
   const partial = report();
   partial.branch_census = { total: 207 };
@@ -414,6 +426,27 @@ test("active-track lifecycle review is live-data driven and SHIPPABLE is not pro
   assert.doesNotMatch(reviews[0].detail, /completion criteria pass/);
   assert.equal(reviews[0].reportedShippable, true);
   assert.equal(reviews[1].code, "REFRESH_STALE_EVIDENCE");
+});
+
+test("track lifecycle review only honors boolean-true SHIPPABLE evidence", () => {
+  const stringShippable = report();
+  stringShippable.track_portfolio.active_count = 1;
+  stringShippable.track_portfolio.tracks = [
+    {
+      id: "string-shippable-track",
+      name: "String shippable track",
+      lifecycle: "active",
+      status: "active",
+      shippable: "false" as unknown as boolean,
+      evidence_present: true,
+      has_rigorous_evidence: true,
+    },
+  ];
+  const reviews = buildTrackLifecycleReviews(stringShippable);
+  assert.equal(reviews.length, 1);
+  assert.notEqual(reviews[0].code, "OPERATOR_CLOSURE_REVIEW");
+  assert.equal(reviews[0].code, "CONTINUE_ACTIVE_WORK");
+  assert.equal(reviews[0].reportedShippable, false);
 });
 
 test("active-track lifecycle projection exposes missing rows and missing identities", () => {

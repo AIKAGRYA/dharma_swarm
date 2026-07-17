@@ -476,6 +476,11 @@ export function deriveCheckoutAuthority(report: OperatorCoherenceReport): Checko
     tone: "muted",
   });
 
+  if (hasSourceError(report, "git.status")) {
+    return unavailable(
+      "git.status probe failed; no checkout authority claim is safe.",
+    );
+  }
   if (!head) {
     return unavailable("HEAD evidence is missing or carries an unavailable sentinel; no checkout authority claim is safe.");
   }
@@ -618,7 +623,7 @@ export function buildTrackLifecycleReviews(report: OperatorCoherenceReport): Tra
         ? observedId
         : `${trackId}::row-${index + 1}`;
       const trackName = observedName ?? observedId ?? `Unidentified active track row ${index + 1}`;
-      const shared = { rowKey, trackId, trackName, reportedShippable: Boolean(track.shippable), raw: track };
+      const shared = { rowKey, trackId, trackName, reportedShippable: track.shippable === true, raw: track };
       if (!observedId) {
         return {
           ...shared,
@@ -666,7 +671,7 @@ export function buildTrackLifecycleReviews(report: OperatorCoherenceReport): Tra
           tone: "warn",
         };
       }
-      if (track.shippable) {
+      if (track.shippable === true) {
         return {
           ...shared,
           code: "OPERATOR_CLOSURE_REVIEW",

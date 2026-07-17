@@ -406,7 +406,19 @@ function SourceControlBars({ report }: { report: OperatorCoherenceReport }) {
     ["Stashes", report.rogue_work_radar.stash_count, stashScale],
     ["Dirty worktrees", dirtyWorktrees, worktreeScale],
   ] as const;
-  return <BarList metrics={metrics} dangerAt={0.3} />;
+  const censusNote = branchRisk.conflicts.length
+    ? `Branch census ${branchRisk.source === "unavailable" ? "unavailable" : "contradictory"}: ${branchRisk.conflicts.join("; ")}`
+    : branchRisk.source === "unavailable"
+      ? "Branch census unavailable; no branch counts were observed."
+      : null;
+  return (
+    <div className="space-y-2">
+      <BarList metrics={metrics} dangerAt={0.3} />
+      {censusNote ? (
+        <p className={`text-[10px] ${branchRisk.conflicts.length ? "text-bengara" : "text-sumi-500"}`}>{censusNote}</p>
+      ) : null}
+    </div>
+  );
 }
 
 function LiveOpsBars({ report }: { report: OperatorCoherenceReport }) {
