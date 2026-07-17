@@ -17,7 +17,10 @@ Anti-corruption properties (mirrors the fixture pool's boundary):
   * Budget parity instrumentation: every call carries the SAME per-call token
     cap (``per_call_cap`` -> Ollama ``num_predict``) and the measured token
     spend (prompt_eval_count + eval_count) becomes ``WorkerResponse.cost``, so
-    the runner's parity ledger reports real measured tokens.
+    the runner's parity ledger reports real measured tokens. Provider-reported
+    completion tokens must stay within that cap.
+  * Roster identity is fail-closed: the model identity returned by the provider
+    must exactly match the requested seat and is bound into every call receipt.
   * Determinism/replayability: temperature is 0.0 and every unique
     ``(model_id, task_id)`` response is cached and recorded. Repeat dispatches
     (self-MoA, the parity control's resamples) replay the cached sample —
@@ -60,7 +63,9 @@ class LiveDispatchError(RuntimeError):
     """A live worker call failed. The run must fail closed — never fall back."""
 
 
-def _urllib_transport(url: str, payload: dict[str, Any], timeout: float) -> dict[str, Any]:
+def _urllib_transport(
+    url: str, payload: dict[str, Any], timeout: float
+) -> dict[str, Any]:
     """Default HTTP transport (stdlib-only, injectable for tests)."""
     req = urllib.request.Request(
         url,
@@ -90,7 +95,7 @@ def clean_answer(raw: str) -> str:
     lowered = text.lower()
     for prefix in ("the answer is", "answer:", "answer is"):
         if lowered.startswith(prefix):
-            text = text[len(prefix):].strip(" :")
+            text = text[len(prefix) :].strip(" :")
             break
     if text.endswith("."):
         text = text[:-1].strip()
@@ -152,7 +157,12 @@ class LiveWorkerPool:
         t0 = time.time()
         try:
             data = self._transport(f"{self.base_url}/api/chat", payload, self.timeout)
-        except (urllib.error.URLError, urllib.error.HTTPError, OSError, TimeoutError) as exc:
+        except (
+            urllib.error.URLError,
+            urllib.error.HTTPError,
+            OSError,
+            TimeoutError,
+        ) as exc:
             raise LiveDispatchError(
                 f"live dispatch failed for model={model_id!r} task={task_id!r}: {exc}"
             ) from exc
@@ -162,8 +172,21 @@ class LiveWorkerPool:
             # Thinking models may put output in "thinking" with empty content.
             raw = str(message.get("thinking") or "").strip()
         answer = clean_answer(raw)
+        provider_model_id = str(data.get("model") or "").strip()
+        if provider_model_id != model_id:
+            disclosed = provider_model_id or "<missing>"
+            raise LiveDispatchError(
+                "provider model identity mismatch for "
+                f"requested={model_id!r} returned={disclosed!r} task={task_id!r}"
+            )
         prompt_tokens = int(data.get("prompt_eval_count") or 0)
         completion_tokens = int(data.get("eval_count") or 0)
+        if completion_tokens < 0 or completion_tokens > self.per_call_cap:
+            raise LiveDispatchError(
+                "provider completion token cap violated for "
+                f"model={model_id!r} task={task_id!r}: "
+                f"observed={completion_tokens} cap={self.per_call_cap}"
+            )
         cost = prompt_tokens + completion_tokens
         if cost <= 0:
             # A zero-token "success" is not a measurement — refuse it.
@@ -177,6 +200,7 @@ class LiveWorkerPool:
         self.call_receipts.append(
             {
                 "model_id": model_id,
+                "provider_model_id": provider_model_id,
                 "task_id": task_id,
                 "raw_answer": raw,
                 "answer": answer,

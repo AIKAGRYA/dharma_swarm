@@ -121,7 +121,10 @@ def test_live_pool_transport_error_fails_closed_no_fallback():
 
 def test_live_pool_zero_token_success_is_refused():
     def hollow_transport(url: str, payload: dict[str, Any], timeout: float):
-        return {"message": {"content": "4"}}  # no token accounting
+        return {
+            "model": payload["model"],
+            "message": {"content": "4"},
+        }  # no token accounting
 
     pool = LiveWorkerPool(_PUBLIC, transport=hollow_transport)
     with pytest.raises(LiveDispatchError):
@@ -134,6 +137,7 @@ def test_live_pool_caches_and_bills_parity_honestly():
     def counting_transport(url: str, payload: dict[str, Any], timeout: float):
         calls["n"] += 1
         return {
+            "model": payload["model"],
             "message": {"content": "4"},
             "prompt_eval_count": 7,
             "eval_count": 1,
@@ -144,6 +148,37 @@ def test_live_pool_caches_and_bills_parity_honestly():
     second = pool.dispatch("m", "t1")
     assert calls["n"] == 1, "temperature-0 resample replays the cached draw"
     assert first.cost == second.cost == 8, "each dispatch still bills its budget"
+    assert pool.call_receipts[0]["provider_model_id"] == "m"
+
+
+def test_live_pool_refuses_provider_model_identity_mismatch():
+    def fallback_transport(url: str, payload: dict[str, Any], timeout: float):
+        return {
+            "model": "silent-fallback-model",
+            "message": {"content": "4"},
+            "prompt_eval_count": 7,
+            "eval_count": 1,
+        }
+
+    pool = LiveWorkerPool(_PUBLIC, transport=fallback_transport)
+    with pytest.raises(LiveDispatchError, match="model identity mismatch"):
+        pool.dispatch("requested-model", "t1")
+    assert pool.call_receipts == []
+
+
+def test_live_pool_refuses_completion_tokens_over_cap():
+    def over_budget_transport(url: str, payload: dict[str, Any], timeout: float):
+        return {
+            "model": payload["model"],
+            "message": {"content": "4"},
+            "prompt_eval_count": 7,
+            "eval_count": 2,
+        }
+
+    pool = LiveWorkerPool(_PUBLIC, per_call_cap=1, transport=over_budget_transport)
+    with pytest.raises(LiveDispatchError, match="token cap violated"):
+        pool.dispatch("m", "t1")
+    assert pool.call_receipts == []
 
 
 def test_replay_pool_rejects_unexpected_schema():
@@ -165,6 +200,7 @@ def _metered_transport(url: str, payload: dict[str, Any], timeout: float):
     assert payload["options"] == {"temperature": 0.0, "num_predict": 64}
     assert timeout == 3.0
     return {
+        "model": payload["model"],
         "message": {"content": "measured-wrong-answer"},
         "prompt_eval_count": 7,
         "eval_count": 1,
@@ -339,6 +375,38 @@ def test_live_entrypoint_removes_partial_output_on_dispatch_failure(
         )
     assert not output.exists()
     assert not list(tmp_path.glob(".failed-run.staging-*"))
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ({"model": "silent-fallback-model"}, "model identity mismatch"),
+        ({"eval_count": 65}, "token cap violated"),
+    ],
+)
+def test_live_entrypoint_withholds_output_on_provider_control_violation(
+    mutation: dict[str, Any],
+    message: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("DHARMA_ARENA_LIVE", "1")
+    output = tmp_path / "provider-control-violation"
+
+    def violating_transport(url: str, payload: dict[str, Any], timeout: float):
+        response = _metered_transport(url, payload, timeout)
+        response.update(mutation)
+        return response
+
+    with pytest.raises(LiveDispatchError, match=message):
+        run_live_measurement(
+            models_by_family=_LIVE_MODELS,
+            output_dir=output,
+            timeout=3.0,
+            transport=violating_transport,
+        )
+    assert not output.exists()
+    assert not list(tmp_path.glob(".provider-control-violation.staging-*"))
 
 
 def test_live_entrypoint_refuses_publish_when_output_appears_mid_run(
