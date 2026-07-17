@@ -1,6 +1,6 @@
 {
   "id": "loop-closure-WP-A4A5",
-  "base_ref": "3482cdfa6a2f3330b1c6df6d332836d7f4b6c9cf",
+  "base_ref": "27ef35af1d6f8ae55c491aea5537a4db9cc34a52",
   "branch": "claude/pr-993-merge-readiness-2um0pw",
   "worktree": ".",
   "intent": "Aliveness campaign Wave-0 PR-2 (A4+A5), loop-closure lane: the only liveness surface, ~/.dharma/ops/loop_liveness.json, is overwritten in place by orchestrate_live.py _write_loop_liveness (tmp.replace), so an unattended run leaves zero replayable uptime evidence, and no process-level boot identity exists anywhere in dharma_swarm/ (git grep boot_id at base: zero hits), making P4 restart survival unprovable (docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md P4). This packet adds: a single-mint process boot_id in dharma_swarm/spine/identity.py; a durable appender in orchestrate_live.py that writes digest-chained spine VerifiedMachineReceipt rows (boot_id, pid, running, restart_counts, abandoned) to ~/.dharma/ops/liveness_ledger.jsonl hourly and on abandonment change, reusing spine/receipt.py append_machine_receipt (one receipt format, one digest formula); a read-only replay verifier scripts/governance/liveness_ledger_check.py that exits typed needs_host(0) when the ledger is absent and 1 on broken chain or failed coverage; a live_ops_census.py dharma_daemon pattern fix so the census can match the container entrypoint python -m dharma_swarm.orchestrate_live (Dockerfile.swarm CMD) that the CLI-only pattern could never see; tests; and the loop-closure next_item admission. No scheduling changes (census cron waits on BR-004 reconciliation), no hot-loop semantics changed, evidence-append failures never propagate into the supervision loop.",
@@ -100,6 +100,8 @@
     "tests/test_evolution_safety.py",
     "tests/test_graph_checkpoint.py",
     "tests/test_graph_durable_invoker.py",
+    "tests/test_graph_neutral_langgraph_oracle.py",
+    "tests/test_graph_pregel_properties.py",
     "tests/test_graph_reconciler.py",
     "tests/test_langgraph_differential_oracle.py",
     "tests/test_merge_master_mike_daemon.py",
@@ -204,7 +206,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "3482cdfa6a2f3330b1c6df6d332836d7f4b6c9cf",
+      "checked_at_sha": "27ef35af1d6f8ae55c491aea5537a4db9cc34a52",
       "details": []
     },
     "interface_mismatches": [
@@ -225,6 +227,6 @@
       "If origin/main moves past base 3482cdfa before merge, this packet must be re-minted (base_ref, collision sha, negative-control shas, digest)."
     ],
     "rollback": "revert the spine boot_id mint, the orchestrate_live ledger appender and its tick wiring, the replay verifier, the census pattern extension, the three test additions, the loop-closure next_item 11, and this packet together; the overwrite-in-place liveness gap and the zero-hit boot_id grep then reproduce at will.",
-    "packet_digest": "357caa281c7a5ff830f288bf306a99f4ca993fc56f80ff576e88a8f3a524df2a"
+    "packet_digest": "34715a82fdd0bfad443b7ee757ef71a71e712241486c7a908a8638924b65826d"
   }
 }
