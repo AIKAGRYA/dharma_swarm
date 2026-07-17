@@ -77,8 +77,8 @@ spine_objectives:
 track_policy:
   model: "1..N co-equal active tracks; typed graph; WIP-limited; surface-owned"
   min_active: 1             # floor — single-track default holds until a 2nd is opened
-  max_active: 10            # hard ceiling — restored after the onboarding
-                            # hardening campaign closed on 2026-07-17.
+  max_active: 10            # hard ceiling — TAM retired and Titanium was
+                            # admitted one-for-one on 2026-07-17.
   warn_active: 8            # soft signal — "you're spreading thin"; CI WARN above this (bumped 5->8 2026-07-07: reconcile admitted helm terminal + safety TCB with REAL behavioral gates; hyperbolic-time-chamber landed via #830)
   min_active_grace_days: 7  # advisory: how long an empty portfolio is tolerable (empty warns immediately; not auto-enforced)
   min_active_grace_enforced: false  # explicit tombstone: grace is advisory, NOT auto-failed by CI (downstream JSON consumers read this directly)
@@ -463,7 +463,7 @@ active_tracks:
     # criteria pass including live pytest greens (arena_v1_controls_tests_pass
     # 15 passed; arena_truth_surface_tests_pass 8 passed) and a fresh, digest-
     # intact arena_truth_receipt. Blocker next-item 2 (live-lane rules) stays open.
-    verified_at: "2026-07-16"
+    verified_at: "2026-07-17"
     ttl_days: 21
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
@@ -628,15 +628,19 @@ active_tracks:
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
     graduation_profile: governance_gate
+    target_closure_kind: VERIFIED_SLICE
     claim_boundary: >-
       Native Codex/Copilot reviews are accepted only from trusted installed-App
       identities; unattended human-PR merge is authorized only after every
       existing deterministic gate is clean. Claude remains an optional
       deep/backup lane with no new credential. This policy and its hermetic
       behavior are landed; PRODUCTION_READY is not claimed until a live cloud
-      canary and a ship_safe Final Boss manifest are attached.
+      canary and a ship_safe Final Boss manifest are attached. The current 7/7
+      criteria prove the landed D4 slice only; they do not cover Titanium
+      WP-0F2 required-check authority convergence, so Mike remains active.
     complements:
       - runtime-truth-reconciliation-2026-06
+      - repository-titanium-hardening-2026-07
     owned_surfaces:
       - scripts/runtime/pr_merge_control.py
       - scripts/runtime/merge_master_mike_daemon.py
@@ -776,6 +780,10 @@ active_tracks:
         what: "DONE 2026-07-16: operator ratification of D1/D2/D3 (D4 explicitly DEFERRED) recorded durably on the PR #962 thread under the fail-closed claim boundary above; no gate check was weakened."
         kind: governance
         blocker: false
+      - id: titanium-wp-0f2
+        what: "Titanium WP-0F2 blocker: after WP-0F1 establishes the canonical required-check manifest, make automerge, manual Mike, and workflow-dispatch consumers use that one authority; fail closed on absent, failed, pending, cancelled, or action-required checks; preserve stale-head rejection, unresolved-thread and CHANGES_REQUESTED blocks, plus the narrow bot-PR waiver. Keep Mike active until the merged-main behavioral tests pass."
+        kind: code
+        blocker: true
 
   - id: organism-rewire-2026-07
     name: Organism Rewire — dormant organs to production, spine standing-on, external gradients
@@ -795,6 +803,14 @@ active_tracks:
       - tools/github_ingestor_go/**
       - tools/evidence_ingestor_go/**
       - dharma_swarm/world_radar/**
+      - scripts/runtime/github_ingestor_runner.py
+      - tests/test_github_ingestor_runner.py
+      - tests/test_go_evidence_ingestor_bridge.py
+      - tests/test_go_github_ingestor_bridge.py
+      - tests/test_go_world_signal_bridge.py
+      - tests/test_go_receipt_identity_verify.py
+      - tests/test_go_adapter_contracts.py
+      - tests/test_world_radar_go_bridge.py
       - dharma_swarm/organism.py
       - dharma_swarm/strange_loop.py
       - dharma_swarm/diversity_archive.py
@@ -1684,129 +1700,199 @@ active_tracks:
       - No credentials committed; feed keys and hosts are operator-provisioned.
       - Files <500 lines; sibling track surfaces untouched except via their own next-items (world_radar/** called through public functions only).
 
-  - id: company-builder-parity-2026-07
-    name: TAM (Transdimensional Abundance Machine) — the live Company-Builder Parity board
+  - id: repository-titanium-hardening-2026-07
+    name: Titanium-grade repository hardening — truthful verification and clean-room closure
     status: ACTIVE
-    opened_at: "2026-07-07"
-    verified_at: "2026-07-07"
-    ttl_days: 30
+    opened_at: "2026-07-17"
+    verified_at: "2026-07-17"
+    ttl_days: 21
     owner: "@AmitabhainArunachala"
-    serves: revenue-external-humans-served
+    serves: substrate-nativeness
+    graduation_profile: governance_gate
+    target_closure_kind: CLOSED_NOT_PROD
+    claim_boundary: >-
+      WP-00 admits the bounded Phase 0 ownership and execution graph from the
+      integrated Titanium specification. Passing criteria may establish only
+      truthful repository verification and an independent clean-room
+      CLOSED_NOT_PROD result. They do not prove production liveness, complete
+      security, deployment readiness, Phase 1-7 completion, or authority over
+      Mike, Go, terminal, graph, organism, Safety TCB, or Loop Closure surfaces.
     complements:
+      - merge-master-mike-d4-2026-06
+      - sovereign-safety-tcb-2026-07
+      - dharmagraph-engine-2026-07
       - organism-rewire-2026-07
-      - hyperbolic-time-chamber-2026-07
+      - helm-worldclass-terminal-2026-06
+      - loop-closure-2026-06
     owned_surfaces:
-      - scripts/governance/tam_ledger.py
-      - scripts/governance/tam_axes.py
-      - reports/governance/tam/**
-      - tests/test_tam_ledger.py
-      - docs/plans/TAM_TRANSDIMENSIONAL_ABUNDANCE_MACHINE_2026-07-07.md
-      - docs/plans/TAM_MASTER_PROMPT_2026-07-07.md
-      - docs/research/POLSIA_COFOUNDER_BLUEPRINT_GENEALOGY_2026-07-07.md
+      - Makefile
+      - Dockerfile
+      - .github/workflows/hermetic.yml
+      - .github/workflows/tests.yml
+      - .github/workflows/ci-parity.yml
+      - .github/workflows/docops.yml
+      - .github/workflows/docops-reconcile-main.yml
+      - .github/workflows/pr-dedupe.yml
+      - .github/workflows/bot-pr-limit.yml
+      - .github/workflows/a2a-agni-live-contact.yml
+      - docs/governance/CI_TRUTH_CONTRACT.json
+      - scripts/governance/ci_parity_manifest.json
+      - scripts/governance/check_ci_parity.py
+      - scripts/runtime/ci_truth.py
+      - scripts/governance/run_semgrep_with_ca.sh
+      - scripts/uplift_guards/shakti_warrant_guard.py
+      - scripts/uplift_guards/run_pre_commit.py
+      - scripts/governance/check_shakti_warrant.py
+      - scripts/governance/check_nats_substrate_contract.py
+      - scripts/governance/check_nats_live_production_evidence.py
+      - scripts/governance/run_nats_live_production_matrix.py
+      - scripts/docops/**
+      - dharma_swarm/build_engine.py
+      - dharma_swarm/autonomous_agent.py
+      - docs/docops/AUTO_INVENTORY.md
+      - api/main.py
+      - tests/test_api_auth.py
+      - tests/test_verify_api.py
+      - tests/test_bootstrap_contract.py
+      - tests/test_verifier_selfcheck_contract.py
+      - tests/test_semgrep_wrapper.py
+      - tests/test_uplift_guard_subprocess.py
+      - tests/test_fast_suite_isolation.py
+      - tests/test_nats_verification_split.py
+      - tests/test_nats_substrate_contract.py
+      - tests/test_nats_live_production_evidence.py
+      - tests/test_nats_live_contact.py
+      - tests/governance/test_ci_parity_guard.py
+      - tests/test_ci_truth.py
+      - tests/test_docops_integrity.py
+      - tests/test_docops_reconcile_workflow.py
+      - tests/test_pr_dedupe_workflow.py
+      - tests/test_polyglot_ci_contract.py
+      - tests/test_hermetic_supply_chain.py
+      - docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md
+      - docs/prompts/TITANIUM_HARDENING_CAMPAIGN_EXECUTOR_2026-07-17.md
+      - reports/governance/titanium/**
+      - dashboard/src/lib/operatorCoherence.ts
+      - dashboard/src/components/operator-coherence/v2/cockpitV2Model.ts
+      - dashboard/src/components/operator-coherence/v2/CockpitV2Board.tsx
+      - dashboard/src/components/operator-coherence/v2/cockpitV2Model.test.ts
     moves_vital_signs:
-      - eval_coverage
       - quality_gates
+      - eval_coverage
+      - security_guardrails
+      - tool_coverage
 
     description: |
-      Operator-instructed 2026-07-07 (master prompt, preserved at
-      docs/plans/TAM_MASTER_PROMPT_2026-07-07.md; naming resolved by
-      operator: TAM = Transdimensional Abundance Machine — the organ name
-      carries the telos, the headline number stays plain). ONE always
-      re-runnable instrument answering: "How close are we to being a
-      verifiably BETTER Polsia / cofounder.co — as a single percentage and a
-      per-capability board?" scripts/governance/tam_ledger.py renders
-      reports/governance/tam/ (digest-stamped tam_receipt.json + the
-      COMPANY_BUILDER_PARITY.md board + tam_history.jsonl velocity chain);
-      --check fails non-zero unless the committed surface replays exactly.
+      Operator-authorized 2026-07-17 admission for the integrated repository
+      hardening campaign. The campaign makes verification truthful on a clean
+      clone before new feature work or live self-evolution. It composes current
+      owners through bounded, stacked work packets and never transfers their
+      surfaces into a catch-all lane.
 
-      This is the FIRST track serving revenue-external-humans-served
-      (previously an uncovered spine objective) and lands the sequencing
-      called by organism-rewire-2026-07 next-item 8 ("Next track after this
-      one lands MUST serve revenue-external-humans-served"). Built as an
-      arena_truth_report.py sibling (the chamber Frontier Ledger landed on
-      main via PR #830 only mid-build-session; consolidation onto the
-      chamber ledger helpers is queued, not assumed).
-
-      Scope is measurement only — afferent (competitor PUBLIC data + our own
-      honest status owners). Efferent-closed: no outreach, no publishing, no
-      benchmarking claims. authority: projection_only — it owns no fact.
-      Honesty is the product: every competitor number carries a source URL
-      and a verification label (NORTH_STAR §5 source-pending rule); every
-      "ours" cell traces to a repo owner; unmeasured renders UNKNOWN, never
-      a flattering guess; UNMEASURED rows stay in the denominator so not
-      measuring can never inflate the headline; AHEAD requires a RUNS-grade
-      organ AND a cited structural exceed-vector. The honest-ARR axis
-      (receipted revenue no incumbent publishes third-party-verifiably) is
-      the headline differentiator.
-
-      First honest render (2026-07-07): parity_pct = 35.0 [RED], lanes
-      Behind 6 / At parity 2 / Ahead 1 / No-equivalent 2 / Unmeasured 1.
-      That sparse, mostly-behind board IS the day-one truth.
-
-    prerequisites:
-      - id: tam_ledger_exists
-        kind: file_exists
-        file: scripts/governance/tam_ledger.py
-      - id: tam_axes_exist
-        kind: file_exists
-        file: scripts/governance/tam_axes.py
+      Portfolio arithmetic is explicit: TAM retires honestly at AMBER 45%
+      (10/10 -> 9/10), then this track is admitted (9/10 -> 10/10). Mike
+      remains active because WP-0F2 changes Mike-owned consumers after WP-0F1.
+      WP-00 changes governance, evidence, and projections only; it implements
+      none of the Phase 0 packets.
 
     completion_criteria:
-      - id: tam_tests_pass
-        kind: test_passes
-        test: tests/test_tam_ledger.py
-      - id: tam_receipt_valid
-        kind: receipt_valid
-        file: reports/governance/tam/tam_receipt.json
-        expect_digest: true
-        fresh_ttl_days: 30
-        requires_keys:
-          - schema
-          - generated_at
-          - authority
-          - baseline
-          - parity_pct
-          - verdict
-          - lane_counts
-          - headline_differentiator
-          - rows
-      - id: tam_history_chain_valid
-        kind: receipt_valid
-        file: reports/governance/tam/tam_history.jsonl
-        expect_chain: true
-        requires_keys:
-          - schema
-          - generated_at
-          - parity_pct
-          - receipt_digest
-      - id: tam_check_replays
+      - id: titanium_bootstrap_contract_passes
         kind: command_passes
-        command: ["python3", "scripts/governance/tam_ledger.py", "--check"]
+        command: ["python3", "-m", "pytest", "tests/test_bootstrap_contract.py", "-q"]
+      - id: titanium_verifier_truth_contracts_pass
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/test_verifier_selfcheck_contract.py", "tests/test_fast_suite_isolation.py", "tests/test_semgrep_wrapper.py", "tests/test_uplift_guard_subprocess.py", "-q"]
+      - id: titanium_ingress_contracts_pass
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/test_api_auth.py", "tests/test_verify_api.py", "-q"]
+      - id: titanium_hermetic_live_split_contracts_pass
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/test_nats_verification_split.py", "tests/test_nats_substrate_contract.py", "tests/test_nats_live_production_evidence.py", "-q"]
+      - id: titanium_ci_authority_contracts_pass
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/governance/test_ci_parity_guard.py", "tests/test_ci_truth.py", "-q"]
+      - id: titanium_docops_contracts_pass
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/test_docops_integrity.py", "tests/test_docops_reconcile_workflow.py", "tests/test_pr_dedupe_workflow.py", "-q"]
+      - id: titanium_polyglot_contract_passes
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/test_polyglot_ci_contract.py", "tests/test_hermetic_supply_chain.py", "-q"]
+      - id: titanium_independent_clean_room_receipt_valid
+        kind: receipt_valid
+        file: reports/governance/titanium/phase0_clean_room_receipt.json
+        expect_digest: true
+        requires_keys:
+          - schema
+          - observed_at
+          - reviewed_main_sha
+          - reviewer
+          - environment
+          - command_results
+          - live_prerequisites
+          - final_worktree_clean
+          - verdict
 
     next_items:
-      - id: 1
-        what: "Operator ratification of the track home (standalone company-builder-parity-2026-07 vs folding into another lane — one-line change either way) and of the day-one axis set / scoring weights (Behind 0 / At 1 / Ahead 1.5; UNMEASURED in denominator)."
+      - id: WP-0S
+        what: "Minimum fail-closed ingress: production-shaped startup and every enabled mutation transport reject missing or invalid authentication; operator records CONTAINED, PRIVATE_ONLY, or NOT_DEPLOYED."
+        kind: code
+        blocker: true
+      - id: WP-0A
+        what: "Hermetic Python bootstrap from the frozen lock with a pinned uv version and clean-clone contract proof."
+        kind: code
+        blocker: true
+      - id: WP-0B
+        what: "Verifier truth: required behavioral gates execute and missing tools, skips, timeouts, or malformed configuration cannot report green."
+        kind: code
+        blocker: true
+      - id: WP-0C1R
+        what: "Adjudicate Semgrep findings before changing scanner policy; every finding receives an owner-safe typed disposition."
         kind: governance
-        blocker: false
-      - id: 2
-        what: "DONE 2026-07-07: competitor facts refreshed from the adversarially-verified blueprint/genealogy dossier (docs/research/POLSIA_COFOUNDER_BLUEPRINT_GENEALOGY_2026-07-07.md — 100-agent deep research, 20 confirmed / 5 refuted claims). The zilla.so 4.4x ARR-gap framing was REFUTED and retired from all axis rows (replaced by 36kr's ~2.2x headline-vs-recurring decomposition + no-independent-audit finding); Polsia's engine is now citable via its own GitHub dump (Claude-CLI subprocesses on Celery Beat — commodity assembly, production parity unproven), flipping internal_architecture from UNMEASURED to measured. Second render: parity 35.0 -> 45.0 [AMBER], first velocity point on tam_history.jsonl (+10.0 pts — measurement improvement, not capability growth; annotated on the row)."
-        kind: research
-        blocker: false
-      - id: 3
-        what: "Consolidation audit vs the chamber Frontier Ledger (PR #830 landed scripts/governance/frontier_ledger.py + dharma_swarm/chamber/ledger_rows.py/ledger_history.py mid-session, after this instrument was built on the arena_truth_report.py contract): if the chamber ledger_history/comparator helpers are importable without touching chamber-owned surfaces, absorb them and delete the local equivalents; else record why two siblings stay."
+        blocker: true
+      - id: WP-0C1
+        what: "Required scanners and governance subprocesses fail closed, receive closed stdin, and have finite timeouts."
         kind: code
-        blocker: false
-      - id: 4
-        what: "Optional dashboard wiring: a KanbanLane[] producer feeding the existing CoherenceKanban.tsx from the tam_receipt.json lanes; until then the COMPANY_BUILDER_PARITY.md table IS the board (governance receipt stays the source of truth)."
+        blocker: true
+      - id: WP-0C2
+        what: "CROSS-OWNER organism-rewire packet: version-aware Go capability and the governed Go-trigger seam; no Titanium ownership transfer."
         kind: code
-        blocker: false
+        blocker: true
+      - id: WP-0D
+        what: "Fast-suite determinism: reproduce the suite-context timeout, kill the failure mode, and pass two consecutive runs."
+        kind: code
+        blocker: true
+      - id: WP-0E
+        what: "Split hermetic repository verification from live-host NATS evidence without promoting NEEDS_HOST to PASS."
+        kind: code
+        blocker: true
+      - id: WP-0F1
+        what: "Establish one required-check manifest and prove committed CI Truth/parity agrees with live branch protection; Administration-read access and operator approval remain explicit gates."
+        kind: governance
+        blocker: true
+      - id: WP-0F2
+        what: "CROSS-OWNER Mike packet: every automerge, manual Mike, and workflow-dispatch entry path consumes WP-0F1 required-check truth and fails closed on absent or non-success checks."
+        kind: code
+        blocker: true
+      - id: WP-0G
+        what: "Strict DocOps convergence on main, including generated blocks and repair-PR check preservation."
+        kind: code
+        blocker: true
+      - id: WP-0H
+        what: "Polyglot orchestration: required Python, Go, dashboard, and terminal lanes run on declared pinned toolchains."
+        kind: code
+        blocker: true
+      - id: WP-0I
+        what: "Independent fresh non-shallow clone proof on merged main; implementation author may not be the sole reviewer and unavailable live evidence remains typed."
+        kind: governance
+        blocker: true
 
     non_goals:
-      - No efferent action — no outreach, no publishing, no external benchmarking claims (chamber doctrine; measurement only).
-      - Do not overload TAM = Total Addressable Market (foundations/FIVE_FOURTEEN_A.md:49) and do not write into the Darshan-owned reports/tam/ — this machine's surface is reports/governance/tam/ only.
-      - No new digest/receipt/chain primitives — reuse stable_digest/utc_now (memory_kernel.write_receipts), verdict_for/parse_cell_statuses (trust_gate_status.py), and the arena_truth_report.py surface contract.
-      - "No new truth store: authority is projection_only; every cell cites an existing owner (lane_F world dossier, VENTURE_CELL_PORTFOLIO.yaml, swarm-genome organ table) or a public URL."
-      - Do not weaken any gate/ratchet/One-Wire boundary; do not touch sibling-track surfaces except through their own next-items.
+      - No Phase 1-7 implementation before the Phase 0 exit gate passes independently on merged main.
+      - No new truth store, receipt primitive, policy engine, test framework, or catch-all module.
+      - No ownership transfer from Mike, Safety TCB, DharmaGraph, Organism, Terminal, or Loop Closure.
+      - No production, liveness, complete-security, deployment, or full-campaign claim from a hermetic or fixture-only result.
+      - No missing tool, skipped required test, stale receipt, NEEDS_HOST, or BLOCKED_OPERATOR result may be promoted to PASS.
+      - No operator credential, live branch-protection decision, deployment change, reviewer nomination, or external action is silently assumed.
 
   - id: darshan-publication-2026-07
     name: Darshan — publication venture cell (multi-disciplinary voice of clear seeing)
@@ -1910,6 +1996,33 @@ active_tracks:
       - No geopolitical piece publishes without register tags and a steelman of the criticized parties — citation-or-silence applies doubly to charged topics.
 
 closed_tracks:
+  - id: company-builder-parity-2026-07
+    name: TAM (Transdimensional Abundance Machine) — Company-Builder Parity board
+    status: RETIRED
+    closure_kind: RETIRED
+    opened_at: "2026-07-07"
+    closed_at: "2026-07-17"
+    closed_by: "operator-directed Titanium focus reset"
+    retired_from_sha: "3482cdfa6a2f3330b1c6df6d332836d7f4b6c9cf"
+    serves: revenue-external-humans-served
+    unresolved_at_retirement:
+      - outcome-parity-amber-45
+      - axis-weight-ratification
+      - frontier-ledger-consolidation
+      - optional-dashboard-wiring
+    evidence:
+      - "reports/governance/tam/tam_receipt.json — sealed outcome remains AMBER at 45.0% parity."
+      - "reports/governance/tam/tam_history.jsonl — measurement history is retained without promoting capability growth."
+      - "scripts/governance/tam_ledger.py --check — deterministic instrument replay was green at retirement."
+      - "generated/status — the base-tree projection showed 4/4 mechanical criteria while the outcome veto correctly blocked shippability."
+    notes: |
+      Retired by explicit operator focus reset to admit the Titanium campaign.
+      The TAM instrument and evidence remain useful, but green mechanical replay
+      does not override its sealed AMBER 45.0 outcome. This is not a parity,
+      capability, VERIFIED_SLICE, or production claim. Darshan remains the
+      active revenue-spine track; the unresolved TAM obligations are preserved
+      above for any future independently admitted continuation.
+
   - id: onboard-one-door-2026-07
     name: One-Door onboarding hardening campaign
     status: RETIRED
