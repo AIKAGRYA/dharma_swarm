@@ -1,0 +1,274 @@
+"""Per-superstep task execution for the DharmaGraph scheduler.
+
+Pure extraction of the task-execution internals out of ``scheduler.py``
+(dharmagraph-engine-2026-07, Pregel-core S1): the ready-set builder, node
+runner, write interpretation, routing writes, and dispatch-order validation
+live here so the scheduler owns only run-lifecycle concerns (seeding,
+resume, barrier commit, checkpoint emission). Behavior is unchanged by
+construction: the scheduler calls these methods in the same order with the
+same inputs as the pre-extraction inline code.
+
+Superstep protocol (unchanged): PULL (trigger) and PUSH (Send) tasks run
+against deep-copied inputs; returns are write PROPOSALS buffered and
+returned in canonical ``(channel, node_id, task_seq)`` order for the
+scheduler's validate-all-then-commit barrier apply.
+
+claim_mode: candidate / test_only. Not wired into production dispatch.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import copy
+import inspect
+from collections import Counter
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Mapping
+
+from dharma_swarm.graph.channels import ChannelWrite, TopicChannel
+from dharma_swarm.graph.effects import EffectsProvider
+from dharma_swarm.graph.errors import (
+    MalformedDispatchOrderError,
+    NodeExecutionError,
+)
+from dharma_swarm.graph.routing import (
+    Command,
+    Send,
+    evaluate_branch,
+    interpret_result,
+    send_write,
+)
+from dharma_swarm.graph.state import GraphState
+from dharma_swarm.graph.types import END, TASKS_CHANNEL, trigger_channel
+
+if TYPE_CHECKING:
+    from dharma_swarm.graph.scheduler import CompiledGraph
+
+__all__ = ["SuperstepExecutor"]
+
+
+@dataclass(frozen=True)
+class _Task:
+    """One unit of execution: a PULL (trigger-driven) or PUSH (Send) task.
+
+    Identity ``(node_id, seq)`` is unique within a superstep: PULL = seq 0
+    (Slice A behavior, unchanged trace), PUSH = 1..N in canonical drain
+    order. Identity enters BOTH the dispatch-order permutation check and the
+    commit sort key, so same-node task writes never tie.
+    """
+
+    node_id: str
+    seq: int
+    arg: Any = None  # PUSH input; PULL tasks read the shared snapshot
+
+    @property
+    def is_pull(self) -> bool:
+        return self.seq == 0
+
+    @property
+    def identity(self) -> tuple[str, int]:
+        return (self.node_id, self.seq)
+
+
+class SuperstepExecutor:
+    """Executes one superstep's ready set and returns sorted write proposals.
+
+    Owns no state of its own beyond the compiled topology and the effects
+    provider; all mutation (``versions_seen`` bookkeeping excepted, which is
+    part of the execution contract) stays with the scheduler's commit path.
+    """
+
+    def __init__(self, graph: "CompiledGraph", effects: EffectsProvider) -> None:
+        self._graph = graph
+        self._effects = effects
+
+    def prepare_tasks(
+        self,
+        state: GraphState,
+        start_versions: Mapping[str, int],
+        versions_seen: Mapping[str, Mapping[str, int]],
+    ) -> list[_Task]:
+        """Ready set = PULL tasks ∪ PUSH tasks (langgraph parity).
+
+        A node with a fired trigger AND N pending Sends runs N+1 times this
+        superstep: once on the shared snapshot, N times on Send args.
+        """
+        graph = self._graph
+        pull = [
+            _Task(node_id, 0)
+            for node_id in graph.canonical_order
+            if any(
+                start_versions.get(name, 0) > versions_seen[node_id].get(name, 0)
+                for name in graph.triggers[node_id]
+            )
+        ]
+        tasks_channel = state.channel(TASKS_CHANNEL)
+        push: list[_Task] = []
+        if isinstance(tasks_channel, TopicChannel):
+            seq_counter: dict[str, int] = {}
+            for send in tasks_channel.drain():
+                seq = seq_counter.get(send.node, 0) + 1
+                seq_counter[send.node] = seq
+                push.append(_Task(send.node, seq, send.arg))
+        return pull + push
+
+    async def run_tasks(
+        self,
+        tasks: list[_Task],
+        state: GraphState,
+        versions_seen: dict[str, dict[str, int]],
+        start_versions: Mapping[str, int],
+        run_id: str,
+        superstep: int,
+    ) -> tuple[list[ChannelWrite], list[str], list[tuple[str, int]]]:
+        """Run every ready task and return (sorted proposals, executed, ids).
+
+        Execution order is ``effects.dispatch_order`` (validated as a
+        permutation); the returned proposals are already sorted by the
+        canonical ``(channel, node_id, task_seq)`` commit key, so final
+        state is execution-order-invariant.
+        """
+        graph = self._graph
+        exec_order = self._validated_dispatch_order(tasks, run_id, superstep)
+
+        pending: list[ChannelWrite] = []
+        executed: list[str] = []
+        event_ids: list[tuple[str, int]] = []
+        for task in exec_order:
+            node_input = (
+                state.snapshot() if task.is_pull else copy.deepcopy(task.arg)
+            )
+            result = await self._execute_node(
+                task.node_id, node_input, run_id, superstep
+            )
+            task_writes = self._writes_from_result(
+                task.node_id, result, run_id, superstep, task.seq
+            )
+            pending.extend(task_writes)
+            pending.extend(self.trigger_writes(task.node_id, task_seq=task.seq))
+            if task.node_id in graph.branches:
+                view = state.own_writes_view(task_writes, superstep)
+                pending.extend(
+                    self.branch_writes(
+                        task.node_id, task.seq, view, run_id, superstep
+                    )
+                )
+            if task.is_pull:
+                for name in graph.triggers[task.node_id]:
+                    versions_seen[task.node_id][name] = start_versions.get(
+                        name, 0
+                    )
+            executed.append(task.node_id)
+            event_ids.append(task.identity)
+
+        pending.sort(
+            key=lambda write: (write.channel, write.node_id, write.task_seq)
+        )
+        return pending, executed, event_ids
+
+    def trigger_writes(
+        self, node_id: str, task_seq: int = 0
+    ) -> list[ChannelWrite]:
+        """Static routing: plain-edge triggers + this node's barrier-join writes."""
+        graph = self._graph
+        writes = [
+            ChannelWrite(node_id, trigger_channel(target), True, task_seq)
+            for target in graph.successors.get(node_id, ())
+            if target != END
+        ]
+        writes.extend(
+            ChannelWrite(node_id, join_name, member, task_seq)
+            for join_name, member in graph.join_writes.get(node_id, ())
+        )
+        return writes
+
+    def branch_writes(
+        self,
+        node_id: str,
+        task_seq: int,
+        view: Mapping[str, Any],
+        run_id: str,
+        superstep: int,
+    ) -> list[ChannelWrite]:
+        """Evaluate the node's conditional edge; pure, pre-commit, atomic."""
+        graph = self._graph
+        spec = graph.branches[node_id]
+        writes: list[ChannelWrite] = []
+        for destination in evaluate_branch(spec, view):
+            if isinstance(destination, Send):
+                writes.append(
+                    send_write(node_id, destination, task_seq, graph.nodes)
+                )
+            elif destination == END:
+                continue
+            else:
+                writes.append(
+                    ChannelWrite(
+                        node_id, trigger_channel(destination), True, task_seq
+                    )
+                )
+        return writes
+
+    async def _execute_node(
+        self,
+        node_id: str,
+        node_input: Any,
+        run_id: str,
+        superstep: int,
+    ) -> Mapping[str, Any] | Command | None:
+        try:
+            raw = self._graph.nodes[node_id].fn(node_input)
+            if inspect.isawaitable(raw):
+                raw = await raw
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            raise NodeExecutionError(
+                f"node {node_id!r} failed in superstep {superstep} of run "
+                f"{run_id!r}: {type(exc).__name__}: {exc}",
+                graph_run_id=run_id,
+                superstep=superstep,
+                node_id=node_id,
+            ) from exc
+        return raw
+
+    def _writes_from_result(
+        self,
+        node_id: str,
+        result: Mapping[str, Any] | Command | None,
+        run_id: str,
+        superstep: int,
+        task_seq: int,
+    ) -> list[ChannelWrite]:
+        return interpret_result(
+            node_id,
+            result,
+            run_id=run_id,
+            superstep=superstep,
+            task_seq=task_seq,
+            known_nodes=self._graph.nodes,
+        )
+
+    def _validated_dispatch_order(
+        self,
+        tasks: list[_Task],
+        run_id: str,
+        superstep: int,
+    ) -> list[_Task]:
+        identities = [task.identity for task in tasks]
+        proposed = self._effects.dispatch_order(identities)
+        try:
+            is_permutation = Counter(proposed) == Counter(identities)
+        except TypeError:
+            is_permutation = False
+        if not is_permutation:
+            raise MalformedDispatchOrderError(
+                f"effects.dispatch_order returned {proposed!r}, which is not a "
+                f"permutation of the ready task set {identities!r} (superstep "
+                f"{superstep} of run {run_id!r}); refusing to execute "
+                "(fail closed)",
+                graph_run_id=run_id,
+                superstep=superstep,
+            )
+        by_identity = {task.identity: task for task in tasks}
+        return [by_identity[identity] for identity in proposed]

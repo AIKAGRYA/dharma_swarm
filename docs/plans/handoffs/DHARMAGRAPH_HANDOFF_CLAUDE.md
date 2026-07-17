@@ -229,3 +229,11 @@ Branch note: the remote session harness assigned `claude/dharmagraph-pregel-core
 - verify: `langgraph == 1.2.4`; `--check` on clean checkout (09b1a400a8fe = origin/main): `{"check": "PASS", "findings": [], "gaps": 34, "replay_stable_digest": "e865481c9ea8ee0350a50aafdaa1b0bfd5b143a31ceea6da65e9bf5dd40952b7", "score": "52.00/100", "stored_digest": "9783f9cbce333d8eabb27964ee2cd402051ec2828d0e27cc68d0217505af5917"}`
 - learned: baseline matches spec §1 exactly (52.00, 34 gaps). Shallow-clone custody failure is an environment gotcha for any future remote seat — unshallow before running the gauntlet.
 - blocked: nothing.
+
+### Iteration 2 — S1 (extract graph/executor.py, pure refactor)
+
+- slice: S1
+- result: DONE. `dharma_swarm/graph/executor.py` (new, 274 lines): `_Task`, `SuperstepExecutor` with `prepare_tasks` / `run_tasks` / `trigger_writes` / `branch_writes` and private `_execute_node` / `_writes_from_result` / `_validated_dispatch_order`, all moved verbatim from `scheduler.py` (attribute access rebound via `self._graph`). `scheduler.py` 500 → 297 lines; invoke() now constructs one `SuperstepExecutor` and delegates; commit barrier, seeding, resume, checkpoints stay put. No behavior change by construction.
+- verify: graph suites 159 passed; oracle+gauntlet suites 48 passed; ruff clean; module budget OK; hygiene ratchet OK. Full `tests/` sweep (30s timeout, no fail-fast): 13764 passed, 8 failed — ALL environmental in this container, pre-existing on the clean tree at 09b1a400a8fe: 6× `test_docker_sandbox.py` + 2× `test_evolution_safety.py` (no docker daemon here), plus 2× `test_chamber_gym_git_history.py` (fixture-repo scoring; fails identically with S1 changes stashed). `make test-fast` additionally flakes on `tests/conformance/test_repo_ratchet_holds.py` — pytest-timeout kill >10s under full-suite load; passes in 7s isolated; CI's own budget is 30s.
+- learned: nothing outside `scheduler.py` referenced the moved internals (grep-verified), so the extraction is invisible to every consumer. Score probe deferred to just after this commit (clean-tree requirement).
+- blocked: nothing.
