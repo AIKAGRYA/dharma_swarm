@@ -45,6 +45,70 @@ export interface TruthBadgeDatum {
   tone: TruthTone;
 }
 
+export type CheckoutAuthorityCode =
+  | "CLEAN_LOCAL_MAIN"
+  | "DIVERGED_LOCAL_MAIN"
+  | "CLEAN_LOCAL_BRANCH"
+  | "DIRTY_LOCAL_CHECKOUT"
+  | "CHECKOUT_STATE_UNAVAILABLE";
+
+export interface CheckoutAuthorityDatum {
+  code: CheckoutAuthorityCode;
+  label: string;
+  detail: string;
+  tone: TruthTone;
+  branch: string | null;
+  head: string | null;
+  dirtyCount: number | null;
+  ahead: number | null;
+  behind: number | null;
+  activeCount: number;
+  maxActive: number | null;
+}
+
+export type TrackLifecycleReviewCode =
+  | "TRACK_ID_UNAVAILABLE"
+  | "TRACK_ID_DUPLICATE"
+  | "REFRESH_STALE_EVIDENCE"
+  | "ADD_COMPLETION_EVIDENCE"
+  | "STRENGTHEN_EVIDENCE"
+  | "OPERATOR_CLOSURE_REVIEW"
+  | "CONTINUE_ACTIVE_WORK";
+
+export interface TrackLifecycleReviewDatum {
+  rowKey: string;
+  trackId: string;
+  trackName: string;
+  code: TrackLifecycleReviewCode;
+  action: string;
+  detail: string;
+  tone: CockpitPanelDatum["tone"];
+  reportedShippable: boolean;
+  raw: OperatorCoherenceReport["track_portfolio"]["tracks"][number];
+}
+
+export interface BranchRiskProjection {
+  total: number | null;
+  localOnly: number | null;
+  unpushed: number | null;
+  orphaned: number | null;
+  source: "branch_census" | "rogue_work_radar" | "mixed" | "contradictory" | "unavailable";
+  conflicts: string[];
+}
+
+export type TrackLifecycleProjectionCode =
+  | "TRACK_REVIEWS_AVAILABLE"
+  | "TRACK_ROWS_INCONSISTENT"
+  | "TRACK_SOURCE_UNAVAILABLE"
+  | "NO_ACTIVE_TRACKS";
+
+export interface TrackLifecycleProjectionSummary {
+  code: TrackLifecycleProjectionCode;
+  declaredActiveCount: number;
+  renderedReviewCount: number;
+  detail: string;
+}
+
 export const MODES: { id: CockpitMode; label: string; hint: string }[] = [
   { id: "overview", label: "Overview", hint: "morning check" },
   { id: "triage", label: "Triage", hint: "needs action" },
@@ -56,20 +120,8 @@ export const MODES: { id: CockpitMode; label: string; hint: string }[] = [
   { id: "design", label: "Design Sources", hint: "Desktop canon" },
 ];
 
-export const CANDIDATE_AUTHORITY = {
-  status: "CANDIDATE_HIGH_PRIORITY_NOT_CANONICAL",
-  canonicalRef: "origin/main",
-  canonicalCommit: "839fd25f43c76375f49e45012fe8f20a324aa74c",
-  canonicalSubject: "[codex] governance: refresh active track and fitness properties [impact-checked] (#647)",
-  canonicalActiveTracks: 7,
-  canonicalMaxActive: 10,
-  recommendedBranch: "governance/operator-coherence-cockpit-20260623",
-  admissionReviewPath: "reports/governance/lane_admission/OPERATOR_COHERENCE_COCKPIT_ADMISSION_REVIEW_2026-06-23.json",
-  closeoutPath: "reports/governance/prod_readiness/PROD_READINESS_FINAL_CLOSEOUT_2026-06-23.json",
-} as const;
-
 export const TRUTH_TAXONOMY: TruthBadgeDatum[] = [
-  { code: "CANONICAL_ORIGIN_MAIN", label: "Canonical", detail: "Confirmed origin/main baseline, not local candidate state.", tone: "ok" },
+  { code: "CLEAN_LOCAL_MAIN", label: "Clean local main", detail: "The observed local main checkout is clean; remote canonicality is not proven here.", tone: "ok" },
   { code: "CLEAN_RECONCILIATION_WORKTREE", label: "Clean worktree", detail: "Reconciliation checkout with no dirty local projection.", tone: "ok" },
   { code: "DIRTY_LOCAL_CANDIDATE", label: "Dirty candidate", detail: "Local checkout or worktree state that must not be treated as canonical.", tone: "danger" },
   { code: "OPEN_PR_REMOTE", label: "Open PR/remote", detail: "Remote-backed review surface; confirm CI before promotion.", tone: "info" },
@@ -81,34 +133,6 @@ export const TRUTH_TAXONOMY: TruthBadgeDatum[] = [
   { code: "UNAVAILABLE_UNCERTAIN", label: "Uncertain", detail: "Required source or proof is unavailable.", tone: "muted" },
   { code: "INFERRED", label: "Inferred", detail: "UI classification inferred from facets; verify source before acting.", tone: "info" },
 ];
-
-export const PRODUCTION_READINESS_VERDICTS = [
-  {
-    trackId: "runtime-truth-reconciliation-2026-06",
-    verdict: "CLOSE_READY_WITH_FOLLOWUP",
-    action: "Candidate closure only after dependency-honest operator rendering and fresh runtime DB receipt snapshot.",
-  },
-  {
-    trackId: "runtime-truth-nats-2026-06",
-    verdict: "KEEP_ACTIVE_PROD_HARDENING",
-    action: "Keep active until live NATS/JetStream ack proof and owned-surface reconciliation exist.",
-  },
-  {
-    trackId: "truth-graph-platform-2026-06",
-    verdict: "KEEP_ACTIVE_PROD_HARDENING",
-    action: "Keep active until fresh NATS/presence proof and dependency-honest make orient exist.",
-  },
-  {
-    trackId: "composer-holon-spine-longrun-2026-06",
-    verdict: "SPLIT_BEFORE_CLOSE",
-    action: "Split Build A readiness from standing composer / Holon L4 production proof before closure.",
-  },
-  {
-    trackId: "provider-routing-consolidation-2026-06",
-    verdict: "CLOSE_READY_WITH_FOLLOWUP",
-    action: "Candidate closure only after live-provider canary / egress proof is recorded or explicitly environment-gated.",
-  },
-] as const;
 
 export const LANE_ADMISSION_FIELDS = [
   "lane_id",
@@ -241,15 +265,84 @@ export function asText(value: unknown): string {
 }
 
 export function formatCount(value: unknown): string {
-  const n = typeof value === "number" ? value : Number(value ?? 0);
-  if (!Number.isFinite(n)) return "0";
+  if (value == null || value === "") return "—";
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return "—";
   return new Intl.NumberFormat("en-US").format(n);
+}
+
+function observedNonNegativeCount(...candidates: unknown[]): number | null {
+  for (const value of candidates) {
+    if (typeof value === "number" && Number.isFinite(value) && value >= 0) return value;
+  }
+  return null;
+}
+
+function hasSourceError(report: OperatorCoherenceReport, source: string): boolean {
+  return report.source_errors.some((error) => error.source === source);
+}
+
+export function deriveBranchRiskProjection(report: OperatorCoherenceReport): BranchRiskProjection {
+  if (hasSourceError(report, "git.for_each_ref")) {
+    return {
+      total: null,
+      localOnly: null,
+      unpushed: null,
+      orphaned: null,
+      source: "unavailable",
+      conflicts: ["git.for_each_ref probe failed"],
+    };
+  }
+  const census = report.branch_census;
+  const radar = report.rogue_work_radar;
+  const censusValues = [census?.total, census?.local_only, census?.unpushed_ahead, census?.orphaned_gone];
+  const fallbackValues = [
+    radar.local_branch_total,
+    radar.local_only_branch_count,
+    radar.unpushed_branch_count,
+    radar.orphaned_branch_count,
+  ];
+  const usedCensus = censusValues.some((value) => observedNonNegativeCount(value) !== null);
+  const usedFallback = censusValues.some(
+    (value, index) => observedNonNegativeCount(value) === null && observedNonNegativeCount(fallbackValues[index]) !== null,
+  );
+  const conflicts: string[] = [];
+  const resolve = (label: string, primary: unknown, fallback: unknown): number | null => {
+    const primaryCount = observedNonNegativeCount(primary);
+    const fallbackCount = observedNonNegativeCount(fallback);
+    if (primaryCount !== null && fallbackCount !== null && primaryCount !== fallbackCount) {
+      conflicts.push(`${label}: branch_census=${primaryCount}, rogue_work_radar=${fallbackCount}`);
+      return null;
+    }
+    return primaryCount ?? fallbackCount;
+  };
+  return {
+    total: resolve("total", census?.total, radar.local_branch_total),
+    localOnly: resolve("local_only", census?.local_only, radar.local_only_branch_count),
+    unpushed: resolve("unpushed", census?.unpushed_ahead, radar.unpushed_branch_count),
+    orphaned: resolve("orphaned", census?.orphaned_gone, radar.orphaned_branch_count),
+    source: conflicts.length
+      ? "contradictory"
+      : usedCensus && usedFallback
+      ? "mixed"
+      : usedCensus
+        ? "branch_census"
+        : usedFallback || fallbackValues.some((value) => observedNonNegativeCount(value) !== null)
+          ? "rogue_work_radar"
+          : "unavailable",
+    conflicts,
+  };
 }
 
 export function readinessTone(score: number): CockpitPanelDatum["tone"] {
   if (score >= 70) return "ok";
   if (score >= 40) return "warn";
   return "danger";
+}
+
+export function metricNeedsAttention(label: string, value: number, total: number, dangerAt: number): boolean {
+  if (label === "Live" || label === "Branches") return false;
+  return value / Math.max(1, total) >= dangerAt;
 }
 
 export function cardTone(card: CoherenceCard): CockpitPanelDatum["tone"] {
@@ -325,35 +418,165 @@ export function sourceToInspect(source: (typeof DESIGN_SOURCES)[number]): Inspec
   };
 }
 
+export function deriveCheckoutAuthority(report: OperatorCoherenceReport): CheckoutAuthorityDatum {
+  const main = report.git?.main;
+  const normalizeObservation = (value: unknown): string | null => {
+    if (typeof value !== "string" || !value.trim()) return null;
+    const normalized = value.trim();
+    const lower = normalized.toLowerCase();
+    if (
+      ["unknown", "unavailable", "n/a", "none", "null", "head", "(no branch)", "detached"].includes(lower)
+      || lower.startsWith("head (")
+      || lower.includes("no branch")
+    ) return null;
+    return normalized;
+  };
+  const branch = normalizeObservation(main?.branch);
+  const head = normalizeObservation(main?.head);
+  const upstreamObserved = typeof main?.branch_line === "string" && main.branch_line.includes("...");
+  const upstreamGone = typeof main?.branch_line === "string" && main.branch_line.toLowerCase().includes("[gone]");
+  const observedDirtyTotal = observedNonNegativeCount(main?.dirty_count);
+  const trackedDirtyCount = observedNonNegativeCount(main?.tracked_dirty_count);
+  const untrackedCount = observedNonNegativeCount(main?.untracked_count);
+  const componentDirtyTotal = trackedDirtyCount !== null && untrackedCount !== null
+    ? trackedDirtyCount + untrackedCount
+    : null;
+  const dirtyCount = observedDirtyTotal ?? componentDirtyTotal;
+  const dirtyFlag = typeof main?.dirty === "boolean" ? main.dirty : null;
+  const dirtyContradictions: string[] = [];
+  if (observedDirtyTotal !== null && componentDirtyTotal !== null && observedDirtyTotal !== componentDirtyTotal) {
+    dirtyContradictions.push(`dirty_count=${observedDirtyTotal} but tracked+untracked=${componentDirtyTotal}`);
+  }
+  if (dirtyCount !== null && dirtyFlag !== null && dirtyFlag !== (dirtyCount > 0)) {
+    dirtyContradictions.push(`dirty=${dirtyFlag} but numeric dirty total=${dirtyCount}`);
+  }
+  if (observedDirtyTotal !== null && trackedDirtyCount !== null && trackedDirtyCount > observedDirtyTotal) {
+    dirtyContradictions.push(`tracked_dirty_count=${trackedDirtyCount} exceeds dirty_count=${observedDirtyTotal}`);
+  }
+  if (observedDirtyTotal !== null && untrackedCount !== null && untrackedCount > observedDirtyTotal) {
+    dirtyContradictions.push(`untracked_count=${untrackedCount} exceeds dirty_count=${observedDirtyTotal}`);
+  }
+  const ahead = observedNonNegativeCount(main?.ahead);
+  const behind = observedNonNegativeCount(main?.behind);
+  const maxActive = observedNonNegativeCount(report.track_portfolio.policy?.max_active);
+  const shared = {
+    branch,
+    head,
+    dirtyCount,
+    ahead,
+    behind,
+    activeCount: report.track_portfolio.active_count,
+    maxActive,
+  };
+  const unavailable = (detail: string): CheckoutAuthorityDatum => ({
+    ...shared,
+    code: "CHECKOUT_STATE_UNAVAILABLE",
+    label: "Checkout state unavailable",
+    detail,
+    tone: "muted",
+  });
+
+  if (!head) {
+    return unavailable("HEAD evidence is missing or carries an unavailable sentinel; no checkout authority claim is safe.");
+  }
+  if (dirtyContradictions.length) {
+    return unavailable(`Dirty-state evidence is contradictory (${dirtyContradictions.join("; ")}); no clean-checkout authority claim is safe.`);
+  }
+  if (dirtyCount === null) {
+    const knownDirtySignal = dirtyFlag === true || (trackedDirtyCount ?? 0) > 0 || (untrackedCount ?? 0) > 0;
+    return unavailable(knownDirtySignal
+      ? "Dirty-state evidence indicates local changes, but an exact reconciled dirty count is unavailable; no clean-checkout authority claim is safe."
+      : "Dirty-count evidence is missing or carries an unavailable sentinel; no checkout authority claim is safe.");
+  }
+  if (dirtyCount > 0) {
+    return {
+      ...shared,
+      code: "DIRTY_LOCAL_CHECKOUT",
+      label: "Dirty local checkout",
+      detail: `${dirtyCount} local path${dirtyCount === 1 ? "" : "s"} differ from HEAD; preserve or extract them before promotion.`,
+      tone: "danger",
+    };
+  }
+  if (!branch) {
+    return unavailable("Branch evidence is missing or carries an unavailable sentinel; no clean-checkout authority claim is safe.");
+  }
+  if (branch === "main") {
+    if (upstreamGone) {
+      return unavailable("The observed upstream for local main is gone; alignment is not established.");
+    }
+    if (!upstreamObserved) {
+      return unavailable("The local main checkout is clean, but no upstream relation is present in the observed branch status; alignment is not established.");
+    }
+    if (ahead === null || behind === null) {
+      return unavailable("The local main checkout is clean, but ahead/behind evidence is unavailable; upstream alignment is not established.");
+    }
+    const branchLineAhead = Number(main?.branch_line?.match(/\bahead\s+(\d+)/i)?.[1] ?? 0);
+    const branchLineBehind = Number(main?.branch_line?.match(/\bbehind\s+(\d+)/i)?.[1] ?? 0);
+    if (ahead !== branchLineAhead || behind !== branchLineBehind) {
+      return unavailable(
+        `Numeric ahead/behind evidence (${ahead}/${behind}) contradicts the observed branch status (${branchLineAhead}/${branchLineBehind}); alignment is not established.`,
+      );
+    }
+    if (ahead > 0 || behind > 0) {
+      return {
+        ...shared,
+        code: "DIVERGED_LOCAL_MAIN",
+        label: "Diverged local main",
+        detail: `The observed local main is ahead ${ahead} and behind ${behind}; reconcile it before any clean-main promotion claim.`,
+        tone: "warn",
+      };
+    }
+    return {
+      ...shared,
+      code: "CLEAN_LOCAL_MAIN",
+      label: "Clean local main",
+      detail: "The observed local main is clean and reports no ahead/behind divergence. This does not prove remote freshness; verify the fetched origin/main identity separately.",
+      tone: "ok",
+    };
+  }
+  return {
+    ...shared,
+    code: "CLEAN_LOCAL_BRANCH",
+    label: "Clean local branch",
+    detail: "The observed branch checkout is clean. Review its upstream and diff before any promotion or canonical claim.",
+    tone: "info",
+  };
+}
+
 export function buildAuthorityInspect(report: OperatorCoherenceReport): InspectItem {
-  const localMax = (report.track_portfolio as { policy?: { max_active?: unknown } }).policy?.max_active;
-  const candidateBranch = report.git?.main?.branch ?? "unknown local branch";
+  const authority = deriveCheckoutAuthority(report);
+  const shortHead = authority.head?.slice(0, 12) ?? "unknown";
+  const branch = authority.branch ?? "unknown";
+  const portfolio = `${authority.activeCount}/${authority.maxActive ?? "?"} active`;
+  const nextAction = authority.code === "DIRTY_LOCAL_CHECKOUT"
+    ? "Preserve or extract local changes, then refresh the report before promotion."
+    : authority.code === "DIVERGED_LOCAL_MAIN"
+      ? "Reconcile local main with its fetched upstream, then refresh the report."
+      : authority.code === "CLEAN_LOCAL_MAIN"
+        ? "Treat this as aligned local-main evidence only; verify fetched origin/main freshness separately before a canonical claim."
+        : authority.code === "CLEAN_LOCAL_BRANCH"
+          ? "Review upstream, ahead/behind state, and branch diff before promotion."
+          : "Restore complete git observation and refresh the report before acting on checkout authority.";
   return {
     type: "panel",
-    title: "Canonical vs dirty candidate authority",
-    subtitle: `${CANDIDATE_AUTHORITY.status} · ${candidateBranch}`,
-    status: `canonical ${CANDIDATE_AUTHORITY.canonicalActiveTracks}/${CANDIDATE_AUTHORITY.canonicalMaxActive} · local ${report.track_portfolio.active_count}/${asText(localMax)}`,
-    risk: "Dirty local candidate projection must not be treated as origin/main truth",
-    nextAction: `Extract candidate into ${CANDIDATE_AUTHORITY.recommendedBranch} only with operator approval; do not raw-merge dirty checkout.`,
+    title: "Observed checkout authority",
+    subtitle: `${authority.code} · ${branch}`,
+    status: `${portfolio} · HEAD ${shortHead}`,
+    risk: authority.detail,
+    nextAction,
     evidence: [
-      {
-        kind: "admission_review",
-        source: CANDIDATE_AUTHORITY.admissionReviewPath,
-        path: CANDIDATE_AUTHORITY.admissionReviewPath,
-        detail: `${CANDIDATE_AUTHORITY.canonicalRef} @ ${CANDIDATE_AUTHORITY.canonicalCommit}`,
-      },
       {
         kind: "git",
         source: "report.git.main",
-        detail: report.git?.main?.branch_line ?? candidateBranch,
+        detail: `${report.git?.main?.branch_line ?? branch}; head=${shortHead}; dirty_count=${authority.dirtyCount ?? "unknown"}; ahead=${authority.ahead ?? "unknown"}; behind=${authority.behind ?? "unknown"}`,
       },
       {
         kind: "track_portfolio",
-        source: "reports/governance/operator_coherence_cockpit.json",
-        detail: `local projection active_count=${report.track_portfolio.active_count}, max_active=${asText(localMax)}`,
+        source: "report.track_portfolio",
+        detail: `active_count=${authority.activeCount}, max_active=${authority.maxActive ?? "unknown"}`,
       },
     ],
-    raw: { candidate_authority: CANDIDATE_AUTHORITY, local_git: report.git?.main, local_track_portfolio: report.track_portfolio },
+    raw: { checkout_authority: authority, local_git: report.git?.main, track_portfolio: report.track_portfolio },
   };
 }
 
@@ -377,29 +600,145 @@ export function buildLaneAdmissionInspect(): InspectItem {
   };
 }
 
-export function productionVerdictTone(verdict: string): CockpitPanelDatum["tone"] {
-  if (verdict === "KEEP_ACTIVE_PROD_HARDENING" || verdict === "SPLIT_BEFORE_CLOSE") return "danger";
-  if (verdict === "CLOSE_READY_WITH_FOLLOWUP") return "warn";
-  return "info";
+export function buildTrackLifecycleReviews(report: OperatorCoherenceReport): TrackLifecycleReviewDatum[] {
+  const activeTracks = report.track_portfolio.tracks.filter((track) => track.lifecycle === "active");
+  const observedIds = activeTracks.map((track) => (
+    typeof track.id === "string" && track.id.trim() ? track.id.trim() : null
+  ));
+  const idCounts = observedIds.reduce<Map<string, number>>((counts, trackId) => {
+    if (trackId) counts.set(trackId, (counts.get(trackId) ?? 0) + 1);
+    return counts;
+  }, new Map());
+  return activeTracks
+    .map((track, index) => {
+      const observedId = observedIds[index];
+      const observedName = typeof track.name === "string" && track.name.trim() ? track.name.trim() : null;
+      const trackId = observedId ?? `unidentified-active-row-${index + 1}`;
+      const rowKey = observedId && idCounts.get(observedId) === 1
+        ? observedId
+        : `${trackId}::row-${index + 1}`;
+      const trackName = observedName ?? observedId ?? `Unidentified active track row ${index + 1}`;
+      const shared = { rowKey, trackId, trackName, reportedShippable: Boolean(track.shippable), raw: track };
+      if (!observedId) {
+        return {
+          ...shared,
+          code: "TRACK_ID_UNAVAILABLE",
+          action: "Restore the canonical track identifier before lifecycle review or promotion.",
+          detail: "The report emitted an active lifecycle row without a track ID; the row cannot be bound to portfolio authority.",
+          tone: "danger",
+        };
+      }
+      if ((idCounts.get(observedId) ?? 0) > 1) {
+        return {
+          ...shared,
+          code: "TRACK_ID_DUPLICATE",
+          action: "Repair duplicate track identifiers before lifecycle review or promotion.",
+          detail: `The report emitted ${idCounts.get(observedId)} active lifecycle rows with ID ${observedId}; none can be bound uniquely to portfolio authority.`,
+          tone: "danger",
+        };
+      }
+      if (track.stale) {
+        return {
+          ...shared,
+          code: "REFRESH_STALE_EVIDENCE",
+          action: "Refresh the expired evidence and re-run lifecycle checks before considering closure.",
+          detail: "The active track's verification window is stale.",
+          tone: "danger",
+        };
+      }
+      if (!track.evidence_present) {
+        return {
+          ...shared,
+          code: "ADD_COMPLETION_EVIDENCE",
+          action: "Attach completion evidence that exercises the declared criteria.",
+          detail: "The active-track declaration has no matching generated evidence row.",
+          tone: "danger",
+        };
+      }
+      if (!track.has_rigorous_evidence) {
+        return {
+          ...shared,
+          code: "STRENGTHEN_EVIDENCE",
+          action: "Replace existence-only signals with behavioral proof before lifecycle promotion.",
+          detail: track.readiness_capped
+            ? "Displayed readiness is capped because the evidence is not rigorous."
+            : "Evidence exists, but it is not classified as rigorous behavioral proof.",
+          tone: "warn",
+        };
+      }
+      if (track.shippable) {
+        return {
+          ...shared,
+          code: "OPERATOR_CLOSURE_REVIEW",
+          action: "Review closure kind, claim boundary, unresolved obligations, and any explicit production proof before closing.",
+          detail: "The live report marks this active track SHIPPABLE. That may reflect declared lifecycle state or generated checks; independently verify completion evidence before closure. It is not production proof.",
+          tone: "info",
+        };
+      }
+      return {
+        ...shared,
+        code: "CONTINUE_ACTIVE_WORK",
+        action: "Continue the declared next items and keep evidence current.",
+        detail: `Active lifecycle status: ${asText(track.status)}; checker readiness ${asText(track.readiness)}%.`,
+        tone: "info",
+      };
+    });
 }
 
-export function productionVerdictToInspect(verdict: (typeof PRODUCTION_READINESS_VERDICTS)[number]): InspectItem {
+export function summarizeTrackLifecycleProjection(
+  report: OperatorCoherenceReport,
+  reviews: TrackLifecycleReviewDatum[] = buildTrackLifecycleReviews(report),
+): TrackLifecycleProjectionSummary {
+  const declaredActiveCount = observedNonNegativeCount(report.track_portfolio.active_count) ?? 0;
+  const renderedReviewCount = reviews.length;
+  if (hasSourceError(report, "docs/governance/ACTIVE_TRACK.yaml")) {
+    return {
+      code: "TRACK_SOURCE_UNAVAILABLE",
+      declaredActiveCount,
+      renderedReviewCount,
+      detail: "The ACTIVE_TRACK governance probe failed; lifecycle rows and active counts are unavailable and must not be treated as an empty portfolio.",
+    };
+  }
+  if (declaredActiveCount === 0 && renderedReviewCount === 0) {
+    return {
+      code: "NO_ACTIVE_TRACKS",
+      declaredActiveCount,
+      renderedReviewCount,
+      detail: "No active tracks are present in the live portfolio projection.",
+    };
+  }
+  if (declaredActiveCount !== renderedReviewCount) {
+    return {
+      code: "TRACK_ROWS_INCONSISTENT",
+      declaredActiveCount,
+      renderedReviewCount,
+      detail: `Lifecycle rows are incomplete or contradictory: the portfolio declares ${declaredActiveCount} active track${declaredActiveCount === 1 ? "" : "s"}, but ${renderedReviewCount} active row${renderedReviewCount === 1 ? " is" : "s are"} available. Refresh the report before lifecycle claims.`,
+    };
+  }
+  return {
+    code: "TRACK_REVIEWS_AVAILABLE",
+    declaredActiveCount,
+    renderedReviewCount,
+    detail: `${renderedReviewCount} active lifecycle review row${renderedReviewCount === 1 ? "" : "s"} available.`,
+  };
+}
+
+export function trackLifecycleReviewToInspect(review: TrackLifecycleReviewDatum): InspectItem {
   return {
     type: "track",
-    title: verdict.trackId,
-    subtitle: "Production readiness verdict; not checker SHIPPABLE",
-    status: verdict.verdict,
-    risk: verdict.verdict === "KEEP_ACTIVE_PROD_HARDENING" ? "Keep active until live production proof exists" : "Do not close without follow-up proof",
-    nextAction: verdict.action,
+    title: review.trackName,
+    subtitle: `${review.trackId} · active-track lifecycle review`,
+    status: review.code,
+    risk: review.detail,
+    nextAction: review.action,
     evidence: [
       {
-        kind: "prod_readiness",
-        source: "reports/governance/prod_readiness/PROD_READINESS_FINAL_CLOSEOUT_2026-06-23.json",
-        path: "reports/governance/prod_readiness/PROD_READINESS_FINAL_CLOSEOUT_2026-06-23.json",
-        detail: verdict.verdict,
+        kind: "track_lifecycle",
+        source: "report.track_portfolio.tracks",
+        detail: `${review.code}; reported_shippable=${review.reportedShippable}`,
       },
     ],
-    raw: verdict,
+    raw: review.raw,
   };
 }
 
@@ -470,6 +809,7 @@ export function buildTopPanels(report: OperatorCoherenceReport): CockpitPanelDat
   const runtimeTotal = report.live_ops?.summary?.total ?? 0;
   const receiptCount = report.runtime_receipts?.receipt_count ?? 0;
   const sourceControl = report.readiness.categories.source_control_coherence;
+  const branchRisk = deriveBranchRiskProjection(report);
   const runtime = report.readiness.categories.runtime_telemetry_liveness;
   const preservation = report.readiness.categories.preservation_safety;
   const needsDecision = report.kanban.find((lane) => lane.lane === "Needs Decision")?.count ?? 0;
@@ -478,16 +818,17 @@ export function buildTopPanels(report: OperatorCoherenceReport): CockpitPanelDat
   return [
     {
       id: "readiness",
-      eyebrow: "System verdict",
-      title: "Prod readiness",
+      eyebrow: "Heuristic projection",
+      title: "Evidence coherence",
       value: `${report.readiness.score}%`,
-      detail: report.readiness.interpretation,
+      detail: `Heuristic evidence score · ${report.readiness.interpretation}`,
       tone: readinessTone(report.readiness.score),
       inspect: {
         type: "panel",
-        title: "Prod readiness",
-        subtitle: "Weighted score from 8 evidence categories",
+        title: "Evidence coherence",
+        subtitle: "Weighted heuristic from 8 evidence categories; not a production-readiness verdict",
         status: String(report.readiness.score),
+        risk: "This score is a projection, not production proof.",
         evidence: Object.entries(report.readiness.categories).map(([source, item]) => ({
           kind: "score",
           source,
@@ -500,9 +841,9 @@ export function buildTopPanels(report: OperatorCoherenceReport): CockpitPanelDat
       id: "source-control",
       eyebrow: "Git coherence",
       title: "Source control",
-      value: `${sourceControl?.score ?? 0}%`,
-      detail: `${report.branch_census?.total ?? 0} branches · ${report.rogue_work_radar.stash_count} stashes`,
-      tone: readinessTone(sourceControl?.score ?? 0),
+      value: sourceControl ? `${sourceControl.score}%` : "—",
+      detail: `${formatCount(branchRisk.total)} branches · ${report.rogue_work_radar.stash_count} stashes · ${branchRisk.source.replaceAll("_", " ")}${branchRisk.conflicts.length ? ` · ${branchRisk.conflicts.join("; ")}` : ""}`,
+      tone: sourceControl ? readinessTone(sourceControl.score) : "muted",
       inspect: {
         type: "panel",
         title: "Source control radar",

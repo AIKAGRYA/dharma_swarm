@@ -1,0 +1,468 @@
+{
+  "schema_version": "titanium-wp00b-baseline/v1",
+  "authority": "immutable_evidence_only",
+  "campaign_id": "repository-titanium-hardening-2026-07",
+  "work_packet": "WP-00B",
+  "capture_window_utc": {
+    "started_at": "2026-07-17T11:57:06Z",
+    "ended_at": "2026-07-17T13:43:52Z",
+    "precision": "Named command and artifact capture contexts; not a claim that every fact was observed at one instant."
+  },
+  "claim_boundary": "One-time clean merged-main repository and admission snapshot. This record does not prove live branch protection, deployment containment, credentials, production readiness, Phase 0 implementation completion, or any CLOSED_LIVE claim.",
+  "execution_contexts": {
+    "clean_main_pre_edit": {
+      "observed_at_utc": "2026-07-17T11:57:06Z",
+      "worktree": "/workspace/scratch/8b78ffdcca60/dharma_swarm",
+      "branch": "main",
+      "head_sha": "82f7f1e318f663c59c4fccf5ed62d70a8dcc0f89",
+      "worktree_status": "clean",
+      "environment": "Clean host before external AgentOps dependency bootstrap."
+    },
+    "github_audit": {
+      "observed_through_utc": "2026-07-17T12:00:37Z",
+      "repository": "AmitabhainArunachala/dharma_swarm",
+      "head_sha": "82f7f1e318f663c59c4fccf5ed62d70a8dcc0f89",
+      "environment": "Authenticated GitHub connector reads; branch-protection endpoint unavailable."
+    },
+    "wp00b_preflight": {
+      "report_written_at_utc": "2026-07-17T12:40:12Z",
+      "worktree": "/workspace/scratch/8b78ffdcca60/dharma_swarm_titanium_wp00b",
+      "branch": "codex/titanium-wp00b-20260717",
+      "head_sha": "82f7f1e318f663c59c4fccf5ed62d70a8dcc0f89",
+      "worktree_status": "packet-admitted clean scope before implementation edits",
+      "environment": "External Python environment and external AgentOps report root; repository virtualenv not created."
+    },
+    "wp00b_external_verification": {
+      "last_focused_recheck_at_utc": "2026-07-17T13:42:25Z",
+      "dashboard_validation_completed_at_utc": "2026-07-17T13:43:52Z",
+      "worktree": "/workspace/scratch/8b78ffdcca60/dharma_swarm_titanium_wp00b",
+      "branch": "codex/titanium-wp00b-20260717",
+      "head_sha": "82f7f1e318f663c59c4fccf5ed62d70a8dcc0f89",
+      "worktree_status": "implementation edits present",
+      "environment": "Node/npm checks executed outside the AgentOps packet gate allowlist."
+    },
+    "clean_main_final_recheck": {
+      "observed_at_utc": "2026-07-17T12:48:34Z",
+      "worktree": "/workspace/scratch/8b78ffdcca60/dharma_swarm",
+      "branch": "main",
+      "head_sha": "82f7f1e318f663c59c4fccf5ed62d70a8dcc0f89",
+      "worktree_status": "clean"
+    }
+  },
+  "admission": {
+    "context": "github_audit",
+    "pull_request": 1000,
+    "delivery": "admission_only",
+    "base_sha": "09b1a400a8fec8a6e2824bd3ff75a4e77eceb457",
+    "head_sha": "7fe7a517c414f7780dcc2c404c1d78da7a0b4738",
+    "squash_merge_sha": "82f7f1e318f663c59c4fccf5ed62d70a8dcc0f89",
+    "final_changed_files": [
+      "CLAUDE.md",
+      "docs/governance/ACTIVE_TRACK.yaml",
+      "docs/governance/SOVEREIGN_MANIFEST.md",
+      "reports/agentops/work_packets/repository-titanium-hardening-2026-07-WP-00.json"
+    ],
+    "final_head_workflow_runs": {
+      "total": 29,
+      "success": 29
+    },
+    "classic_commit_status_contexts": 0,
+    "approval_reviews_observed": 0,
+    "carried_review_requirements": [
+      "Remint WP-00B alone from the actual merged base with one exact Session Entry packet.",
+      "Treat producer branch sentinel value unknown as unavailable, never as a clean local branch."
+    ]
+  },
+  "repository_state": {
+    "context": "clean_main_pre_edit",
+    "repository": "AmitabhainArunachala/dharma_swarm",
+    "branch": "main",
+    "head_sha": "82f7f1e318f663c59c4fccf5ed62d70a8dcc0f89",
+    "local_origin_main_sha": "82f7f1e318f663c59c4fccf5ed62d70a8dcc0f89",
+    "fetched_remote_main_sha": "82f7f1e318f663c59c4fccf5ed62d70a8dcc0f89",
+    "ahead": 0,
+    "behind": 0,
+    "shallow": false,
+    "clean": true,
+    "commit_authored_at": "2026-07-17T20:19:49+09:00",
+    "commit_committed_at_utc": "2026-07-17T11:19:49Z",
+    "commit_subject": "governance: admit Titanium hardening campaign (WP-00) (#1000)"
+  },
+  "source_objects": [
+    {
+      "path": "CLAUDE.md",
+      "ref": "82f7f1e318f663c59c4fccf5ed62d70a8dcc0f89",
+      "git_object": "05a9fc17fb3ea6e49c92700f062169a371e81976"
+    },
+    {
+      "path": "docs/governance/ACTIVE_TRACK.yaml",
+      "ref": "82f7f1e318f663c59c4fccf5ed62d70a8dcc0f89",
+      "git_object": "640ccc437a3367710e1b1bb9d0b7fadd4e061ddf"
+    },
+    {
+      "path": "docs/governance/SOVEREIGN_MANIFEST.md",
+      "ref": "82f7f1e318f663c59c4fccf5ed62d70a8dcc0f89",
+      "git_object": "cb14636a10994fb7c5c8e5b0b6cc0e9a1144e0d1"
+    },
+    {
+      "path": "reports/agentops/work_packets/repository-titanium-hardening-2026-07-WP-00.json",
+      "ref": "82f7f1e318f663c59c4fccf5ed62d70a8dcc0f89",
+      "git_object": "3c798717775134fd8d1d4e336819f124d9059f9d"
+    },
+    {
+      "path": "docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md",
+      "ref": "82f7f1e318f663c59c4fccf5ed62d70a8dcc0f89",
+      "git_object": "e99308ad7e63fa692203d0fc69a2496f9ac1ae70"
+    },
+    {
+      "path": "reports/governance/active_track_evidence.json",
+      "ref": "f6721aa27b4a608cbb9fb3eb5565fba596a45113",
+      "git_object": "093bffb1ad76f8b0d23f2f29cde18e0fd4e0d295"
+    }
+  ],
+  "environment": {
+    "os": "Linux",
+    "kernel": "6.12.47",
+    "architecture": "x86_64",
+    "timezone": "Asia/Singapore",
+    "tools": {
+      "python": {
+        "version": "3.12.13",
+        "status": "present"
+      },
+      "git_path": {
+        "version": "2.51.1",
+        "status": "present"
+      },
+      "git_agentops_probe": {
+        "version": "2.43.0",
+        "status": "present"
+      },
+      "make": {
+        "version": "4.3",
+        "status": "present"
+      },
+      "node": {
+        "version": "24.14.0",
+        "status": "present"
+      },
+      "npm": {
+        "version": "11.9.0",
+        "status": "present"
+      },
+      "uv": {
+        "version": "0.9.25",
+        "status": "present"
+      },
+      "go": {
+        "status": "absent"
+      },
+      "bun": {
+        "status": "absent"
+      },
+      "semgrep": {
+        "status": "absent"
+      },
+      "gitleaks": {
+        "status": "absent"
+      }
+    }
+  },
+  "measurements": {
+    "dharma_python_modules": 1018,
+    "python_test_files": 905,
+    "test_definition_occurrences": 13540,
+    "python_loc": 363935,
+    "markdown_files": 1434,
+    "markdown_lines": 300159,
+    "modules_over_500_lines": 207,
+    "silent_exception_swallows": 241,
+    "pytest_collected_prebootstrap": null,
+    "pytest_collected_agentops_environment": 13818
+  },
+  "portfolio": {
+    "active": 10,
+    "max_active": 10,
+    "spare_slots": 0,
+    "mechanically_shippable": 0,
+    "titanium": {
+      "id": "repository-titanium-hardening-2026-07",
+      "status": "ACTIVE",
+      "completion": {
+        "passed": 0,
+        "total": 8
+      },
+      "baseline_interpretation": "UNVERIFIED because pytest was absent before dependency bootstrap"
+    },
+    "mike": {
+      "id": "merge-master-mike-d4-2026-06",
+      "status": "ACTIVE",
+      "blocker": "WP-0F2 remains owner work"
+    },
+    "tam": {
+      "id": "company-builder-parity-2026-07",
+      "status": "RETIRED",
+      "sealed_verdict": "AMBER",
+      "parity_pct": 45
+    }
+  },
+  "generated_state": {
+    "context": "clean_main_pre_edit",
+    "ref": "origin/generated/status",
+    "commit": "f6721aa27b4a608cbb9fb3eb5565fba596a45113",
+    "derived_from_sha": "82f7f1e318f663c59c4fccf5ed62d70a8dcc0f89",
+    "generated_at_utc": "2026-07-17T11:21:09+00:00",
+    "evidence_path": "reports/governance/active_track_evidence.json",
+    "evidence_git_object": "093bffb1ad76f8b0d23f2f29cde18e0fd4e0d295"
+  },
+  "command_results": [
+    {
+      "argv": "make onboard",
+      "context": "clean_main_pre_edit",
+      "exit_code": 0,
+      "classification": "PASS",
+      "summary": "READY; exact main alignment and 10/10 portfolio observed; optional external receipt-write warning preserved."
+    },
+    {
+      "argv": "python3 scripts/docops/check_docops_integrity.py",
+      "context": "clean_main_pre_edit",
+      "exit_code": 1,
+      "classification": "FAIL",
+      "summary": "SOVEREIGN counts and AUTO_INVENTORY are stale."
+    },
+    {
+      "argv": "make docops-integrity",
+      "context": "clean_main_pre_edit",
+      "exit_code": 2,
+      "classification": "FAIL",
+      "summary": "Strict DocOps propagates the same count and generated-content drift."
+    },
+    {
+      "argv": "python3 scripts/governance/hygiene/ratchet.py --explain modules_over_500_lines",
+      "context": "clean_main_pre_edit",
+      "exit_code": 0,
+      "classification": "PASS",
+      "summary": "Measured 207 modules above 500 lines; measurement only."
+    },
+    {
+      "argv": "python3 scripts/governance/hygiene/ratchet.py --explain silent_exception_swallows",
+      "context": "clean_main_pre_edit",
+      "exit_code": 0,
+      "classification": "PASS",
+      "summary": "Measured 241 silent exception swallows; measurement only."
+    },
+    {
+      "argv": ".venv/bin/python -m pytest --collect-only -q",
+      "context": "clean_main_pre_edit",
+      "exit_code": 127,
+      "classification": "FAIL",
+      "summary": "Repository virtualenv absent on the clean host."
+    },
+    {
+      "argv": "make test-fast",
+      "context": "clean_main_pre_edit",
+      "exit_code": 2,
+      "classification": "FAIL",
+      "summary": "System Python has no pytest."
+    },
+    {
+      "argv": "make test",
+      "context": "clean_main_pre_edit",
+      "exit_code": 2,
+      "classification": "FAIL",
+      "summary": "System Python has no pytest."
+    },
+    {
+      "argv": "make go-ci",
+      "context": "clean_main_pre_edit",
+      "exit_code": 2,
+      "classification": "FAIL",
+      "summary": "Go toolchain absent."
+    },
+    {
+      "argv": "make governance-all",
+      "context": "clean_main_pre_edit",
+      "exit_code": 2,
+      "classification": "FAIL",
+      "summary": "Semgrep advisory skip was followed by required gitleaks absence."
+    },
+    {
+      "argv": "make nats-substrate-contract",
+      "context": "clean_main_pre_edit",
+      "exit_code": 2,
+      "classification": "FAIL",
+      "summary": "Python dependency unavailable and live NATS evidence stale."
+    },
+    {
+      "argv": "make uplift-guards",
+      "context": "clean_main_pre_edit",
+      "exit_code": 2,
+      "classification": "FAIL",
+      "summary": "aiofiles unavailable on the clean host; other guard results do not promote the bundle."
+    },
+    {
+      "argv": "python3 scripts/governance/render_active_track_includes.py --check",
+      "context": "clean_main_pre_edit",
+      "exit_code": 0,
+      "classification": "PASS",
+      "summary": "Canonical active-track includes match their generator."
+    },
+    {
+      "argv": "python3 scripts/governance/check_track_status.py --reports-dir /tmp/titanium-bootstrap-track-status",
+      "context": "clean_main_pre_edit",
+      "exit_code": 0,
+      "classification": "PASS_WITH_UNVERIFIED_TRACKS",
+      "summary": "Portfolio evaluation completed; Titanium criteria remained 0/8 because pytest was unavailable."
+    },
+    {
+      "argv": "PATH=/workspace/scratch/8b78ffdcca60/agentops-venv-copy/bin:/usr/local/bin:/usr/bin:/bin make agent-build-preflight PACKET=/workspace/scratch/8b78ffdcca60/repository-titanium-hardening-2026-07-WP-00B.external.json AGENTOPS_PYTHON=/workspace/scratch/8b78ffdcca60/agentops-venv-copy/bin/python AGENTOPS_REPORT_ROOT=/tmp/dharma-agentops-wp00b",
+      "context": "wp00b_preflight",
+      "exit_code": 0,
+      "classification": "PASS",
+      "summary": "Exact filesystem admission bound to the clean base after external dev dependency bootstrap; 13,818 tests collected."
+    }
+  ],
+  "github_visibility": {
+    "context": "github_audit",
+    "connector_repository_permission": "admin",
+    "live_branch_protection": {
+      "classification": "BLOCKED_OPERATOR",
+      "reason": "The authenticated connector exposes no branch-protection read endpoint and local gh is unavailable."
+    },
+    "declared_required_contexts": [
+      "Python 3.11",
+      "Python 3.12",
+      "gitleaks",
+      "DocOps",
+      "Coherence Delta",
+      "Onboarding admission parity"
+    ],
+    "required_context_ratification": {
+      "classification": "BLOCKED_OPERATOR",
+      "reason": "Operator has not ratified or replaced the six-context set."
+    }
+  },
+  "collision_reconciliation": {
+    "context": "github_audit",
+    "omitted_path": "docs/prompts/README.md",
+    "reason": "As observed through 2026-07-17T12:00:37Z, the path was unowned by Titanium and changed by draft PR #972.",
+    "generated_projection_collision": "As observed through 2026-07-17T12:00:37Z, open PR #987 changed generated AUTO_INVENTORY.md and SOVEREIGN_MANIFEST.md; WP-00B does not touch those surfaces.",
+    "operator_decision": "Authorized eight-file WP-00B; preserve omitted index and DocOps projection drift as blockers."
+  },
+  "external_prerequisites": [
+    {
+      "item": "live credentials and authorization",
+      "classification": "BLOCKED_OPERATOR"
+    },
+    {
+      "item": "canonical owner-host execution",
+      "classification": "NEEDS_HOST"
+    },
+    {
+      "item": "branch-protection Administration-read visibility",
+      "classification": "BLOCKED_OPERATOR"
+    },
+    {
+      "item": "deployment exposure and containment decision",
+      "classification": "BLOCKED_OPERATOR"
+    },
+    {
+      "item": "DocOps credential and delivery decision",
+      "classification": "BLOCKED_OPERATOR"
+    },
+    {
+      "item": "minimum human approval policy",
+      "classification": "BLOCKED_OPERATOR"
+    },
+    {
+      "item": "independent WP-0I reviewer",
+      "classification": "BLOCKED_OPERATOR"
+    }
+  ],
+  "honest_blockers": [
+    "WP-00B is not closed until required CI, independent review, human merge, and merged-main reverification complete.",
+    "As observed through 2026-07-17T12:00:37Z, docs/prompts/README.md indexing remained deferred behind ownership and PR #972 coordination; refresh that collision before acting.",
+    "Strict DocOps count projections remain red on merged main and are outside this packet.",
+    "Required-check ratification and live branch-protection visibility remain BLOCKED_OPERATOR.",
+    "Deployment, credential, canonical-host, and independent-review prerequisites remain unproved."
+  ],
+  "packet_preflight": {
+    "context": "wp00b_preflight",
+    "branch": "codex/titanium-wp00b-20260717",
+    "base_sha": "82f7f1e318f663c59c4fccf5ed62d70a8dcc0f89",
+    "packet_digest": "33061714dd7eff685c3ed715ae99178121ebf82cb3ad3e19012bdab62e47c4c8",
+    "packet_bytes_sha256": "25c7db257f803da484bf1b393b2629a8a938f72f9118440bcf508c302ba4c804",
+    "status": "passed",
+    "clean_scope": true,
+    "external_verification": {
+      "context": "wp00b_external_verification",
+      "why_external": "AgentOps packet gate commands are allowlisted and do not admit Node or npm commands.",
+      "candidate_binding": {
+        "classification": "precommit_evidence_non_closing_until_immutable_pr_head_rerun",
+        "binding": "Git blob IDs for the exact dashboard candidate content exercised by the external checks.",
+        "invalidation": "Any change to one of these blobs invalidates the external results; closing evidence requires the same commands on the immutable PR head.",
+        "git_blobs": {
+          "dashboard/src/lib/operatorCoherence.ts": "a176b8739b0d6c8de3850ef67852521f827ac3f1",
+          "dashboard/src/components/operator-coherence/v2/cockpitV2Model.ts": "2f30249773f25ad01ac5c73829c378efe4b2b1b8",
+          "dashboard/src/components/operator-coherence/v2/CockpitV2Board.tsx": "0d29e5d6b0778860f04e2bbb8b2f55cc05bd3af4",
+          "dashboard/src/components/operator-coherence/v2/cockpitV2Model.test.ts": "348c275e17ec2077ddfdf891fc6ed1d6afc8db29"
+        }
+      },
+      "reproducible_mutation_control": {
+        "id": "remove-unknown-branch-sentinel",
+        "executed_at_utc": "2026-07-17T13:42:25Z",
+        "mutation": "Copy the bound model, board, and test files to /tmp/wp00b-dashboard-mutation-control, then remove only the literal unknown entry from normalizeObservation's unavailable-sentinel array.",
+        "argv": "node --experimental-strip-types --test /tmp/wp00b-dashboard-mutation-control/cockpitV2Model.test.ts",
+        "expected_exit": 1,
+        "observed_exit": 1,
+        "tests": 24,
+        "passed": 23,
+        "failed": 1,
+        "diagnostic_failure": "checkout authority treats producer sentinel values as unavailable: mutated code returned CLEAN_LOCAL_BRANCH instead of CHECKOUT_STATE_UNAVAILABLE",
+        "original_model_git_blob": "2f30249773f25ad01ac5c73829c378efe4b2b1b8",
+        "mutated_model_git_blob": "89db00707d52c34816d42feddee3ead5ea682785",
+        "mutated_model_sha256": "7c5f87aabc6b061475bca60d4a8aeca8333641633b870518916babd1f07e2093",
+        "test_git_blob": "348c275e17ec2077ddfdf891fc6ed1d6afc8db29",
+        "test_sha256": "f28407203bfb0f3ec6eaa07df1017721ca873ea66a0f52edce73f7f199bc49c0"
+      },
+      "focused_green": {
+        "argv": "node --experimental-strip-types --test dashboard/src/components/operator-coherence/v2/cockpitV2Model.test.ts",
+        "exit_code": 0,
+        "tests": 24,
+        "passed": 24,
+        "failed": 0
+      },
+      "dashboard_negative_cases": {
+        "classification": "external_behavioral_negative_cases",
+        "formal_packet_control_boundary": "The packet's renderer invalid-flag control exercises harness fail-closed behavior only; it is not dashboard regression proof.",
+        "covered": [
+          "unavailable branch sentinels cannot become clean authority",
+          "contradictory branch-line and numeric divergence cannot become clean main",
+          "branch-probe failures and duplicated-count contradictions render unavailable",
+          "partial branch census uses consistent observed producer fallbacks instead of invented zeroes",
+          "dirty totals, component counts, and boolean signals must reconcile before clean authority",
+          "governance-source failures and missing active-track lifecycle rows render unavailable",
+          "missing or duplicated track IDs cannot create duplicate row identities"
+        ]
+      },
+      "dashboard_lint": {
+        "argv": "npm --prefix dashboard run lint",
+        "exit_code": 0,
+        "errors": 0,
+        "pre_existing_warnings": 19
+      },
+      "dashboard_build": {
+        "argv": "NEXT_TURBOPACK_EXPERIMENTAL_USE_SYSTEM_TLS_CERTS=1 npm --prefix dashboard run build",
+        "exit_code": 0,
+        "summary": "Next.js 16.1.6 build, TypeScript validation, and 32-page static generation passed after enabling system TLS certificates for Google Fonts."
+      }
+    }
+  },
+  "final_baseline_worktree_status": {
+    "context": "clean_main_final_recheck",
+    "checked_at_utc": "2026-07-17T12:48:34Z",
+    "branch": "main",
+    "status": "clean",
+    "head_sha": "82f7f1e318f663c59c4fccf5ed62d70a8dcc0f89"
+  }
+}
