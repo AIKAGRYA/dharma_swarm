@@ -37,12 +37,13 @@ NON-NEGOTIABLE CAMPAIGN RULES
 - No receipt may say ok after swallowing an error. Receipts are append-only or
   versioned; replacement requires an explicit finding-specific rationale.
 - cap<=0, hours<=0, max_cycles=None, max_cycle_tokens=0, and unknown model price=$0
-  are all banned as silent-unbounded defaults unless the assigned packet explicitly
-  implements a reviewed override mechanism.
+  are all banned as silent-unbounded defaults. This is not a cost-minimization rule:
+  authorized frontier-capacity work should preserve the strongest useful model lane and context envelope.
 
 SPINE MODEL TO APPLY TO THE ASSIGNED PACKET
-- Spine A / CostGate: any path spending LLM money must pass through an enforced cost
-  gate and prompt-size ceiling with a fitness test.
+- Spine A / FrontierCapacityGate: any path using frontier-model capacity must pass through
+  authorization/accountability rails and a prompt-size envelope with a fitness test; the rail
+  must not automatically downgrade model quality or useful context solely to save cost.
 - Spine B / IdentitySpine: any path mutating external or durable state must have a
   retry-stable intent key and ambiguous-outcome handling with a fitness test.
 - Spine C / EffectGate: any LLM-authored shell/file/diff effect must be sandboxed,

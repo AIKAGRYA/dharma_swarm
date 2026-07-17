@@ -6,12 +6,16 @@
 
 ## Campaign boundary
 
-This document converts the five-pillar runtime audit into Titanium-governed planning. It keeps the better spine model (CostGate, IdentitySpine, EffectGate, ConcurrencySpine, FitnessCI) while preserving the Titanium campaign contract:
+This document converts the five-pillar runtime audit into Titanium-governed planning. It keeps the better spine model (FrontierCapacityGate, IdentitySpine, EffectGate, ConcurrencySpine, FitnessCI) while preserving the Titanium campaign contract:
 
 - one implementation PR still closes or narrows one finding ID unless the authority doc is amended;
 - each PR declares one owner, allowed files, adjacent surfaces not touched, test-before-code, rollback, and reproduction command;
 - this companion can group related findings for sequencing, but a multi-finding WP must be split into sub-packets (for example `WP-A.1`, `WP-A.2`) before implementation if it would violate the authority contract;
 - no evolution daemon, thinkodynamic director, or live self-evolution loop may run until WP-A and WP-D have merged and their fitness tests are green.
+
+### Frontier-capacity priority
+
+Frontier model capacity is the primary resource this campaign is protecting and intentionally enabling. WP-A is not a cost-minimization program. Its rails exist to prevent runaway loops, duplicate/ambiguous external calls, silent zero-priced telemetry, and context bloat from corrupting receipts or burning capacity accidentally. They must not downgrade frontier model choice, shrink useful context, or block high-quality frontier lanes solely to save money. If authorization is present and the task warrants frontier reasoning, the implementation should preserve maximum useful model quality and context.
 
 ## Runtime finding registry extension
 
@@ -19,9 +23,9 @@ The authority rows are in `docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-0
 
 | ID | Severity | Runtime theme | Primary spine | Planning packet |
 |---|---:|---|---|---|
-| TIT-016 | 5 | global LLM cost gate absent | Spine A — CostGate | WP-A |
-| TIT-017 | 4 | total prompt-token ceiling absent | Spine A — CostGate | WP-A |
-| TIT-018 | 5 | unbounded/accelerating autonomous loops | Spine A — CostGate | WP-D |
+| TIT-016 | 5 | frontier-capacity rail absent | Spine A — FrontierCapacityGate | WP-A |
+| TIT-017 | 4 | total prompt-token ceiling absent | Spine A — FrontierCapacityGate | WP-A |
+| TIT-018 | 5 | unbounded/accelerating autonomous loops | Spine A — FrontierCapacityGate | WP-D |
 | TIT-019 | 4 | timeout/fallback/repair/requeue call multiplication | Spine B + A | WP-B / WP-A |
 | TIT-020 | 5 | retry-stable intent idempotency absent | Spine B — IdentitySpine | WP-B |
 | TIT-021 | 4 | message/NATS retries wedge or duplicate work | Spine B + D | WP-B / WP-E |
@@ -37,7 +41,7 @@ The authority rows are in `docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-0
 
 ```mermaid
 flowchart TD
-  WP00[WP-00 governance admission / Phase 0 gates] --> WPA[WP-A CostGate + prompt ceiling]
+  WP00[WP-00 governance admission / Phase 0 gates] --> WPA[WP-A FrontierCapacityGate + prompt ceiling]
   WP00 --> WPE[WP-E Event-loop hygiene + queue/NATS safety]
   WP00 --> WPF[WP-F Retention everywhere]
   WP00 --> WPHprep[WP-H prep: receipt path inventory only]
@@ -57,7 +61,7 @@ flowchart TD
 
 | Spine | Runtime packets | Existing primitives to wire | Primary TIT IDs |
 |---|---|---|---|
-| Spine A — CostGate | WP-A + WP-D | `providers.py` `_estimate_cost`, `holon_budget_guard.check_cost_cap`, `cost_tracker.log_cost`, `router_v1._estimate_tokens`, `codex_overnight.py` wall-clock pattern | TIT-016, TIT-017, TIT-018, TIT-019 |
+| Spine A — FrontierCapacityGate | WP-A + WP-D | `providers.py` `_estimate_cost`, `holon_budget_guard.check_cost_cap`, `cost_tracker.log_cost`, `router_v1._estimate_tokens`, `codex_overnight.py` wall-clock pattern | TIT-016, TIT-017, TIT-018, TIT-019 |
 | Spine B — IdentitySpine | WP-B + WP-H | `spine/identity.py`, `_ATTEMPT_IDENTITY_METADATA_KEYS`, `message_bus`, receipts, provider headers | TIT-019, TIT-020, TIT-021, TIT-022 |
 | Spine C — EffectGate | WP-C + WP-G | `SandboxManager.create_async(prefer_docker=True)`, `TelosGatekeeper`, `diff_applier.rollback`, `checkpoint.py` atomic write | TIT-023, TIT-024, TIT-025 |
 | Spine D — ConcurrencySpine | WP-E | `file_lock.AsyncFileLock`, `asyncio.to_thread`, JetStream topology checks | TIT-021, TIT-026, TIT-027 |
@@ -65,19 +69,19 @@ flowchart TD
 
 ## Work packets
 
-### WP-A — CostGate and prompt ceiling
+### WP-A — FrontierCapacityGate and prompt ceiling
 
 **Findings:** TIT-016, TIT-017; preparatory coupling to TIT-019.
 
-**Purpose:** Add one enforced cost/spend chokepoint before external provider calls and one total token ceiling at prompt assembly.
+**Purpose:** Add one frontier-capacity authorization and accountability chokepoint before external provider calls, plus one total token ceiling at prompt assembly, without creating a cost-based model downgrade path.
 
 **Required behavior:**
 
-- `check_global_cost_cap()` is called at the `providers.py` chain chokepoint before external completion.
-- `cap <= 0` is not silent-unbounded; unbounded requires explicit override.
-- unknown models price conservatively, not `$0.0`.
+- a centrally named frontier-capacity rail (initial implementation may wrap/rename `check_global_cost_cap()`) is called at the `providers.py` chain chokepoint before external completion.
+- `cap <= 0` is not a silent-unbounded footgun; explicit high-capacity authorization is separate from accidental unbounded execution.
+- unknown models are not priced as `$0.0`; telemetry remains honest even when the chosen lane is an expensive frontier model.
 - `_build_prompt` has a total prompt-token ceiling after assembly, reusing `router_v1._estimate_tokens` or an equivalent central estimator.
-- oversized dispatch prompt either head/tail truncates within budget or hard-fails with an honest receipt.
+- oversized dispatch prompt either preserves useful head/tail context within the configured frontier-capacity envelope or hard-fails with an honest receipt; it must not silently shrink context for cost savings.
 - fitness tests go red if the provider gate or `_build_prompt` ceiling is removed.
 
 **Candidate implementation PR split:** WP-A.1 (TIT-016 provider gate) then WP-A.2 (TIT-017 prompt ceiling).
@@ -198,7 +202,7 @@ Every audit finding collapses into **"a dangerous action was taken without passi
 
 ```
           +---------------------------------------------------------+
-          |  ANY path that spends money  -->  SPINE A: CostGate      |
+          |  ANY path that uses frontier capacity  -->  SPINE A: FrontierCapacityGate      |
           |  ANY path that mutates state -->  SPINE B: IdentitySpine |
           |  ANY LLM-authored effect     -->  SPINE C: EffectGate    |
           |  ANY shared-file / loop I/O  -->  SPINE D: ConcurrencySpine|
@@ -210,7 +214,7 @@ Every audit finding collapses into **"a dangerous action was taken without passi
 
 | Spine | Chokepoint location | Existing primitive to wire | Kills findings |
 |---|---|---|---|
-| **A — CostGate** | `providers.py` chain-executor, where `_estimate_cost` already runs (`:2528`) **+** `agent_runner.py:1227` `_build_prompt` (token ceiling) | `holon_budget_guard.check_cost_cap` + `cost_tracker.log_cost` + `router_v1._estimate_tokens` | 3.1–3.8, 2.4, doctrine's phantom $3/day cap |
+| **A — FrontierCapacityGate** | `providers.py` chain-executor, where `_estimate_cost` already runs (`:2528`) **+** `agent_runner.py:1227` `_build_prompt` (token ceiling) | `holon_budget_guard.check_cost_cap` + `cost_tracker.log_cost` + `router_v1._estimate_tokens` | 3.1–3.8, 2.4, doctrine's phantom $3/day cap |
 | **B — IdentitySpine** | task creation + `providers.py` HTTP send | `spine/identity.py`, `message_bus`, receipts | 1.1–1.8 |
 | **C — EffectGate** | `agent_runner` tool loop + `diff_applier.apply` | `SandboxManager.create_async`, `TelosGatekeeper`, `diff_applier.rollback`, `checkpoint.py:225` atomic write | 5.1–5.6, 2.2/2.5 (unscanned re-injection) |
 | **D — ConcurrencySpine** | `a2a_task_lifecycle` queue ops + every `async def` doing I/O | `file_lock.AsyncFileLock`, `asyncio.to_thread`, `create_subprocess_exec` | 4.1–4.6 |
@@ -224,10 +228,10 @@ Every audit finding collapses into **"a dangerous action was taken without passi
 
 This is the "enumerate every behavior and edge case before planning" deliverable. Grouped by spine. Each row is a behavior the centralized fix must handle — **not** just the literal example in the audit, but the general class.
 
-### Spine A — CostGate (compute metabolism)
-- E-A1 Cost gate must sit on the **synchronous send path** and be able to **refuse** (raise/deny), not just log.
-- E-A2 Unknown/unpriced model -> **conservative non-zero default price**, never `$0.0` (`cost_tracker.py:23-55`). Blind-to-zero is the same as no gate.
-- E-A3 `cap <= 0` must **NOT** silently mean unbounded. It must mean *error/deny absent an explicit `DHARMA_ALLOW_UNBOUNDED=1` env override*. (Current `holon_budget_guard` and `merge_master_mike` both treat `cap<=0` as opt-out — the exact silent-disable footgun.)
+### Spine A — FrontierCapacityGate (compute metabolism)
+- E-A1 Frontier capacity rail must sit on the **synchronous send path** and be able to **refuse runaway/unauthorized execution** (raise/deny), not just log; it must not be used as an automatic downgrade-to-cheaper-model policy.
+- E-A2 Unknown/unpriced model -> **conservative non-zero telemetry price**, never `$0.0` (`cost_tracker.py:23-55`). Blind-to-zero is dishonest accounting; it is not a reason to avoid the best frontier lane.
+- E-A3 `cap <= 0` must **NOT** silently mean unbounded. It must mean *error/deny absent an explicit high-capacity authorization override*. Authorized high-capacity frontier work is allowed; accidental unlimited loops are not. (Current `holon_budget_guard` and `merge_master_mike` both treat `cap<=0` as opt-out — the exact silent-disable footgun.)
 - E-A4 Rolling-window accounting: 24h sum must survive process restart (persisted, not in-memory) and must not double-count retries as separate spend when they are the same intent.
 - E-A5 Loop re-entry with **zero sleep** must be capped (<=3 consecutive) regardless of model output (`thinkodynamic_director.py:5080`).
 - E-A6 `hours <= 0` / `max_cycles = None` / `max_cycle_tokens = 0` must **not** mean "forever/disabled." Adopt `codex_overnight.py:611` wall-clock pattern fleet-wide; `-1` = explicit unbounded, `0` = error.
@@ -237,7 +241,7 @@ This is the "enumerate every behavior and edge case before planning" deliverable
 - E-A10 Provider fallback multiplication: total upstream attempts across the whole chain must be capped (not `retries x providers x repair x requeue`); add a token-bucket per provider for 429 storms.
 - E-A11 Heartbeat/pulse must default to the **non-LLM deterministic** path; agentic pulse opt-in only (`pulse.py`).
 - E-A12 A2A inbound packets must **not** convert 1:1 into LLM calls with no daily quota (`fugu_ultra_semantic_responder.py:896`).
-- E-A13 **Total prompt-token ceiling at the single build chokepoint** (`agent_runner.py:1227` `_build_prompt`, called at `:2405`). Every current cap is *per-fragment*; `task.description` is fully unbounded and fan-out pipelines feed one agent's output into the next task's description (finding 2.4). One enforcement point at the end of `_build_prompt`: estimate total tokens (reuse `router_v1.py:81 _estimate_tokens`), truncate head+tail to a budget, and **hard-fail with a receipt above a ceiling** — so a megabyte description cannot pay full input-token cost per dispatch × retries silently. This is a CostGate concern because it is unbounded spend at a prompt chokepoint, not a fragment-formatting concern.
+- E-A13 **Total prompt-token ceiling at the single build chokepoint** (`agent_runner.py:1227` `_build_prompt`, called at `:2405`). Every current cap is *per-fragment*; `task.description` is fully unbounded and fan-out pipelines feed one agent's output into the next task's description (finding 2.4). One enforcement point at the end of `_build_prompt`: estimate total tokens (reuse `router_v1.py:81 _estimate_tokens`), preserve useful head+tail context inside an explicit frontier-capacity envelope, and **hard-fail with a receipt above a ceiling** — so a megabyte description cannot silently bloat every dispatch × retry. This is a FrontierCapacityGate concern because it is unbounded spend at a prompt chokepoint, not a fragment-formatting concern.
 
 ### Spine B — IdentitySpine (idempotency & state boundedness)
 - E-B1 Idempotency key derived **at origin of intent**: `sha256(task_id + canonical(content) + origin_event_id)`; created at task creation.
@@ -283,7 +287,7 @@ This is the "enumerate every behavior and edge case before planning" deliverable
 - E-D12 Delete dead zero-sleep loop awaiting a wiring mistake (`orchestrate_live.py:1215` `_run_recognition_loop_UNUSED`).
 
 ### Spine E — FitnessCI + Retention (systemic drift)
-- E-E1 Executable fitness test: **"the cost gate exists and is called"** (grep/AST-assert `check_global_cost_cap` wired at the providers chokepoint). If absent -> CI red.
+- E-E1 Executable fitness test: **"the frontier capacity rail exists and is called"** (grep/AST-assert the central rail, whether named `check_global_cost_cap()` or renamed, is wired at the providers chokepoint). If absent -> CI red.
 - E-E2 Fitness test: idempotency key **not** in the attempt-wipe list.
 - E-E3 Fitness test: no `create_subprocess_shell` reachable from agent tool loop; no `LocalSandbox` hardcode.
 - E-E4 Fitness test: doctrine<->code reconciliation — if `CLAUDE.md` claims a "$3/day cap," a test must assert the code path exists (else the doctrine line fails CI). No lying receipts.
@@ -297,8 +301,8 @@ This is the "enumerate every behavior and edge case before planning" deliverable
 
 ## Idempotency / interaction edge cases across spines (the tricky ones)
 
-- X-1 **CostGate x IdentitySpine:** a retry that is the *same intent* must not be counted as new spend (E-A4 depends on E-B1). Wire CostGate to read the intent key.
-- X-2 **IdentitySpine x timeout (X-billing):** the double-billing chain (1.2) is A x B: without B4/B5 the CostGate still sees N distinct sends. Both spines required to close it.
+- X-1 **FrontierCapacityGate x IdentitySpine:** a retry that is the *same intent* must not be counted as new spend (E-A4 depends on E-B1). Wire FrontierCapacityGate to read the intent key.
+- X-2 **IdentitySpine x timeout (X-billing):** the double-billing chain (1.2) is A x B: without B4/B5 the FrontierCapacityGate still sees N distinct sends. Both spines required to close it.
 - X-3 **EffectGate x ConcurrencySpine:** the sandbox deny path must not block the loop (fail-closed must be async).
 - X-4 **FitnessCI x everything:** each spine ships **with** its fitness test in the same PR, or the wiring silently rots again (the whole reason this audit exists).
 - X-5 **Retention x append-only receipts:** TTL delete must respect the append-only invariant (archive-then-delete, never in-place mutate) — the two rules must not fight.
@@ -315,7 +319,7 @@ All checks run on branch `fix/tool-call-xml-dialect-parser`, canonical tree `/Us
 | Audit claim | Verification | Result |
 |---|---|---|
 | `spend_tokens` is tracking-only | `economic_spine.py:274` docstring: "ALWAYS succeeds — tracking only, no enforcement" | OK exact |
-| No global cost cap exists | `grep check_global_cost_cap / DHARMA_DAILY_USD_CAP` -> 0 hits | OK absent |
+| No global frontier capacity rail exists | `grep check_global_cost_cap / DHARMA_DAILY_USD_CAP` -> 0 hits | OK absent |
 | `log_cost` has no production callers | only self-ref at `cost_tracker.py:71,159` | OK dead |
 | Idempotency key minted per-attempt | `spine/identity.py:82` `clean_idem = ... or f"idem_{clean_run}"`; run is random | OK exact |
 | Key wiped on retry | `orchestrator.py:56` `_ATTEMPT_IDENTITY_METADATA_KEYS` includes `idempotency_key`; popped at `:2187` | OK exact |
@@ -335,11 +339,11 @@ All checks run on branch `fix/tool-call-xml-dialect-parser`, canonical tree `/Us
 
 Five independent principles from current distributed-systems / LLM-agent-ops practice, each mapping onto a pillar:
 
-1. **Enforcement != observability.** A limit you only *record* is not a limit. Cost/rate governance must sit on the synchronous request path and be able to *refuse*, not on a telemetry sink. -> Pillar 3.
+1. **Enforcement != observability.** A limit you only *record* is not a limit. Frontier-capacity governance must sit on the synchronous request path and be able to *refuse runaway or unauthorized execution*, not sit only on a telemetry sink; it should enable deliberate use of the strongest frontier lane. -> Pillar 3.
 2. **Idempotency is keyed to the *logical operation*, not the *attempt*.** The canonical pattern (Stripe-style Idempotency-Key, AWS client request tokens) derives the key from caller intent at origin, persists the *result* against it, and returns the stored result on replay. Per-attempt keys are an anti-pattern that guarantees double-execution. -> Pillar 1.
 3. **Deny-by-default sandboxing with allowlists.** Blocklists of dangerous strings are known-broken (infinite bypasses); the working pattern is an allowlist of permitted commands + exec-not-shell + fail-closed when the strong backend is unavailable. -> Pillar 5.
 4. **Never block the event loop; the queue needs one writer protocol.** Sync calls inside `async def` are a canonical asyncio footgun; shared mutable files need exactly one locking discipline. -> Pillar 4.
-5. **Architecture fitness functions.** Drift (line-count caps, worktree caps, evidence staleness, "does the cost gate exist") should be *executable tests in CI*, not doctrine in a markdown file. The reconciliation cost of doctrine<->code decoupling otherwise lands entirely on one human. -> Systemic drift axis.
+5. **Architecture fitness functions.** Drift (line-count caps, worktree caps, evidence staleness, "does the frontier capacity rail exist") should be *executable tests in CI*, not doctrine in a markdown file. The reconciliation cost of doctrine<->code decoupling otherwise lands entirely on one human. -> Systemic drift axis.
 
 External corollary worth noting for the standing language question: the recurring failure across LLM-agent incident writeups is **budget/authority tracked as runtime receipts instead of pre-execution semantics**. That is exactly this repo's gap, and exactly the thing the house language question wants promoted into typechecker/evaluator semantics. The four spines below are the runtime prototype of those semantics.
 
