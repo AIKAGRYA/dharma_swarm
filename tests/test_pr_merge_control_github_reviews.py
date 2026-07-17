@@ -28,7 +28,7 @@ def _review(login: str, state: str, when: str = "2026-06-24T00:00:00Z", commit: 
     return {"user": {"login": login}, "state": state, "submitted_at": when, "commit_id": commit}
 
 
-def test_automerge_workflow_has_no_advisory_check_exemption():
+def test_automerge_workflow_uses_only_manifest_required_contexts_as_authority():
     repo_root = Path(__file__).resolve().parents[1]
     workflow = (repo_root / ".github/workflows/automerge.yml").read_text(encoding="utf-8")
 
@@ -42,6 +42,12 @@ def test_automerge_workflow_has_no_advisory_check_exemption():
     assert "scripts/governance/ci_parity_manifest.json" in workflow
     assert "jq -ce" in workflow
     assert "--argjson req" in workflow
+    assert "required_not_green=" in workflow
+    assert "select(.name as $name | $req | index($name))" in workflow
+    assert "sort_by(.name, .observed_at, .ordinal)" in workflow
+    assert "group_by(.name)" in workflow
+    assert "map(last | del(.observed_at, .ordinal))" in workflow
+    assert "Non-required checks remain visible but do not gain merge authority." in workflow
 
 
 def test_backlog_workflow_is_scheduled_and_matches_cloud_review_quorum():

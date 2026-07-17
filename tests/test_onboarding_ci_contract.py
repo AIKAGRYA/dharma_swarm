@@ -49,7 +49,7 @@ def _assert_workflow_onboarding_contract(job: str) -> None:
     pr_head = "github.event.pull_request.head.sha"
     group_head = "github.event.merge_group.head_sha"
 
-    assert "name: Onboarding admission parity" in job
+    assert "name: Onboarding session status" in job
     assert f"ref: ${{{{ {pr_head} || {group_head} }}}}" in job
     assert "github.sha" not in job
     assert re.search(
@@ -106,6 +106,19 @@ def test_ci_and_local_status_command_equivalence() -> None:
         "Onboarding admission parity" not in check.get("names", [])
         for check in contract["advisory"]
     )
+
+
+def test_legacy_required_context_fails_closed_on_session_status() -> None:
+    """The phase-1 bridge cannot mask a failed or cancelled real status job."""
+
+    compat = _job_block("onboarding-admission-parity-compat")
+    assert "name: Onboarding admission parity" in compat
+    assert "needs: onboarding-status" in compat
+    assert "always()" in compat
+    assert "SESSION_STATUS_RESULT: ${{ needs.onboarding-status.result }}" in compat
+    assert 'test "${SESSION_STATUS_RESULT}" = "success"' in compat
+    assert "continue-on-error" not in compat
+    assert "|| true" not in compat
 
 
 def test_ci_status_has_no_weakening_flags() -> None:
@@ -184,7 +197,7 @@ def test_active_track_gate_installs_full_dev_environment_before_evaluation() -> 
     assert job.index(install) < job.index(evaluate)
 
 
-def test_macos_compatibility_job_is_required_and_executable() -> None:
+def test_macos_compatibility_job_is_advisory_and_executable() -> None:
     job = _job_block("onboarding-macos-compatibility")
     assert "runs-on: macos-14" in job
     assert "python-version: \"3.12\"" in job
@@ -215,12 +228,12 @@ def test_macos_compatibility_job_is_required_and_executable() -> None:
         CI_TRUTH_CONTRACT.read_text(encoding="utf-8"),
         object_pairs_hook=_unique_json_object,
     )
-    required = next(
+    advisory = next(
         check
-        for check in contract["required"]
+        for check in contract["advisory"]
         if "Onboarding macOS 3.81 compatibility" in check.get("names", [])
     )
-    assert required["local_command"] == reproducer
+    assert advisory["local_command"] == reproducer
 
 
 def test_ci_runner_context_is_resolved_only_after_job_assignment() -> None:

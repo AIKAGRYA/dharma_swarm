@@ -1146,9 +1146,17 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
     if current_classification["mergeable"] != "MERGEABLE":
         blockers.append(f"mergeable={current_classification['mergeable']}")
     if current_classification["checks"]["failing"]:
-        blockers.append(f"failing checks: {', '.join(current_classification['checks']['failing'])}")
-    if current_classification["checks"]["pending"] and not args.allow_pending:
-        blockers.append(f"pending checks: {', '.join(current_classification['checks']['pending'])}")
+        warnings.append(
+            "reported failing checks: "
+            f"{', '.join(current_classification['checks']['failing'])}; "
+            "only CI Truth required contexts carry merge authority"
+        )
+    if current_classification["checks"]["pending"]:
+        warnings.append(
+            "reported pending checks: "
+            f"{', '.join(current_classification['checks']['pending'])}; "
+            "only CI Truth required contexts carry merge authority"
+        )
     if current_classification["reviewDecision"] == "CHANGES_REQUESTED":
         blockers.append("GitHub review decision is CHANGES_REQUESTED")
     if not current_coherence["ok"]:
@@ -2659,6 +2667,16 @@ def build_parser() -> argparse.ArgumentParser:
             help="Path to the CI truth contract consumed by packet and merge-gate evaluation.",
         )
 
+    def add_legacy_pending_flag(command: argparse.ArgumentParser) -> None:
+        command.add_argument(
+            "--allow-pending",
+            action="store_true",
+            help=(
+                "Deprecated compatibility flag; required CI contexts always block "
+                "while pending, and non-required contexts never carry merge authority."
+            ),
+        )
+
     queue = sub.add_parser("queue", help="Classify all open PRs")
     queue.add_argument("--limit", type=int, default=100)
     queue.set_defaults(func=cmd_queue)
@@ -2674,7 +2692,7 @@ def build_parser() -> argparse.ArgumentParser:
     fanout.add_argument("--agents", default="codex,claude", help="Comma-separated reviewer agents: codex,claude")
     fanout.add_argument("--timeout-s", type=float, default=None, help="Reviewer wall-clock timeout")
     fanout.add_argument("--kill-grace-s", type=float, default=DEFAULT_AGENT_KILL_GRACE_S)
-    fanout.add_argument("--allow-pending", action="store_true")
+    add_legacy_pending_flag(fanout)
     fanout.add_argument("--human-approved", action="store_true")
     add_reviewer_policy_flags(fanout)
     add_backup_reviewer_flags(fanout)
@@ -2707,7 +2725,7 @@ def build_parser() -> argparse.ArgumentParser:
     gate = sub.add_parser("gate", help="Run the merge gate for one PR")
     gate.add_argument("--pr", type=int, required=True)
     gate.add_argument("--packet-dir")
-    gate.add_argument("--allow-pending", action="store_true")
+    add_legacy_pending_flag(gate)
     gate.add_argument("--human-approved", action="store_true")
     add_reviewer_policy_flags(gate)
     add_backup_reviewer_flags(gate)
@@ -2717,7 +2735,7 @@ def build_parser() -> argparse.ArgumentParser:
     merge = sub.add_parser("merge", help="Dry-run or execute a gated merge")
     merge.add_argument("--pr", type=int, required=True)
     merge.add_argument("--packet-dir")
-    merge.add_argument("--allow-pending", action="store_true")
+    add_legacy_pending_flag(merge)
     merge.add_argument("--human-approved", action="store_true")
     add_reviewer_policy_flags(merge)
     add_backup_reviewer_flags(merge)

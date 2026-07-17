@@ -1905,10 +1905,36 @@ active_tracks:
 
 closed_tracks:
   - id: onboard-one-door-2026-07
-    name: Onboarding hardening — retained session-status slice
+    name: One-Door onboarding hardening campaign
+    status: RETIRED
+    closure_kind: RETIRED
+    opened_at: "2026-07-10"
+    closed_at: "2026-07-17"
+    closed_by: "operator-directed scope reset"
+    retired_from_sha: "55cf277be0dbf3b5a74da03eb1d7243024556806"
+    serves: substrate-nativeness
+    unresolved_at_retirement:
+      - C1
+      - D2
+      - WP-O5
+      - M6-1
+      - WP-O6
+      - TERMINAL-PROOF
+    evidence:
+      - "Immutable pre-reset tree 55cf277be0dbf3b5a74da03eb1d7243024556806 preserves both specifications and all 25 WP-O packet records."
+      - "docs/governance/REPO_GOVERNANCE_AUDIT.md#one-door-scope-reset-and-provenance-2026-07-17 indexes exact recovery commands and cross-track packets."
+    notes: |
+      The original campaign did not clear its six remaining blockers. It was
+      retired by explicit operator scope reset, not verified by deleting those
+      obligations. The useful session-status implementation is recorded under
+      the distinct `onboard-session-status-2026-07` verified-slice identity.
+      The One-Door name and WP-O namespace hold no current authority.
+
+  - id: onboard-session-status-2026-07
+    name: Onboarding session status — truthful read-only checkout verdict
     status: SHIPPED
     closure_kind: VERIFIED_SLICE
-    opened_at: "2026-07-10"
+    opened_at: "2026-07-17"
     closed_at: "2026-07-17"
     closed_by: "operator-directed scope reset"
     serves: substrate-nativeness
@@ -1917,16 +1943,10 @@ closed_tracks:
       - "tests/test_onboarding_cli.py, tests/test_onboarding_readiness.py, tests/test_make_onboarding_contract.py - executable session-status contract"
       - "docs/governance/BUILD_SESSION_ENTRYPOINT.md - canonical command and authority boundary"
     notes: |
-      Closed by subtraction after the useful session-status behavior was
-      separated from edit admission, closeout, CI, and persistent A2A identity
-      registration. This VERIFIED_SLICE claim covers only the read-only,
-      truthful `make onboard` session-status surface and its focused tests.
-      Edit authority remains
-      `make agent-build-preflight PACKET=<path>`; closeout and CI remain
-      independent. This closure makes no production-readiness,
-      merge-authority, deployment, or whole-organism orientation claim.
-      The One-Door campaign name and WP-O packet namespace are retired from
-      current authority; their history remains available in Git.
+      This bounded claim covers only the read-only, truthful `make onboard`
+      session-status surface and focused tests. It grants no edit, packet,
+      merge, deployment, persistent identity, or whole-organism authority.
+      Packet-bound preflight/closeout, CI, and human review remain independent.
 
   - id: runtime-truth-spine-adoption-2026-06
     name: Runtime Truth Spine — Adoption (god objects flow through invoke_agent)

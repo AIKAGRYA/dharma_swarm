@@ -19,8 +19,11 @@ command and the first-read surfaces it names. That map is an operational
 route for a specific hub-coordinator identity; it is not a new authority
 surface.
 
-For a build session, use the explicit preflight and closeout targets around
-the actual implementation work:
+Packet-bound preflight and closeout are required when changed paths match Merge
+Master Mike's `HOT_PATH_PATTERNS` in `scripts/runtime/pr_merge_control.py`; they
+are optional otherwise. A narrower lane or campaign contract may require them
+more broadly. When a packet is required or voluntarily used, use these targets
+around the actual implementation work:
 
 ```bash
 make agent-build-preflight PACKET=<path>
@@ -104,7 +107,8 @@ GitNexus, Context+, Context7, Sourcebot, and the `/Users/dhyana/.local/bin/src` 
 5. Before modifying a shared symbol, check impact/blast radius.
 6. Make the smallest scoped change.
 7. Run the relevant test or read-only status script.
-8. Run `make agent-build-closeout PACKET=<path>` before PR handoff.
+8. When a packet is required or voluntarily used, run
+   `make agent-build-closeout PACKET=<path>` before PR handoff.
 9. Update the owning doc only if the change alters durable truth.
 
 ## Handoff Prompt

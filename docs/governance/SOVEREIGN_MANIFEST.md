@@ -49,7 +49,7 @@
 
 Before editing any file, check it against the `owns:` globs above — a surface owned by a track you are not serving is off-limits except through that track's own next-items. Full track detail: `docs/governance/ACTIVE_TRACK.yaml`.
 
-**Recently closed tracks:** `onboard-one-door-2026-07` (SHIPPED, closed 2026-07-17) · `runtime-truth-spine-adoption-2026-06` (SHIPPED, closed 2026-07-03) · `runtime-truth-reconciliation-2026-06` (SHIPPED, closed 2026-06-30)
+**Recently closed tracks:** `onboard-one-door-2026-07` (RETIRED, closed 2026-07-17) · `onboard-session-status-2026-07` (SHIPPED, closed 2026-07-17) · `runtime-truth-spine-adoption-2026-06` (SHIPPED, closed 2026-07-03)
 
 For machine-readable status, run `python3 scripts/governance/check_track_status.py` — it writes `reports/governance/active_track_evidence.md` (untracked; derived status is not committed). CI publishes the latest copy on the `generated/status` branch: `git show origin/generated/status:reports/governance/active_track_evidence.md`.
 

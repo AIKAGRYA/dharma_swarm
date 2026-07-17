@@ -15,8 +15,12 @@ make onboard
 ```
 
 Use `make organism-status` for the deeper read-only whole-organism projection.
-Before editing, bind an exact baseline and scope with
-`make agent-build-preflight PACKET=<path>`. This file owns behaviour;
+Packet-bound preflight and closeout are required when changed paths match Merge
+Master Mike's `HOT_PATH_PATTERNS` in `scripts/runtime/pr_merge_control.py`; they
+are optional otherwise. A narrower lane or campaign contract may require them
+more broadly. Before editing work that requires a packet, bind its baseline and
+scope with `make agent-build-preflight PACKET=<path>`, then run packet-bound
+closeout afterward. This file owns behaviour;
 `docs/governance/BUILD_SESSION_ENTRYPOINT.md` owns the command boundaries.
 
 **What an onboard run does and does not prove:** READY is evidence only about
@@ -24,6 +28,10 @@ the local session evaluation. It is NOT proof of edit admission, whole-organism
 liveness, CI admission, merge approval, or deployment readiness. The portfolio
 shown by onboarding is declared intent from `ACTIVE_TRACK.yaml`, not runtime
 truth. Never fill a missing observation from this file or another prose copy.
+
+The packet-scope check proves committed-range packet scope only; it does not
+prove local preflight or closeout, packet gate execution, human approval, or
+merge authority.
 
 <!-- ACTIVE_TRACK:START -->
 
@@ -62,7 +70,7 @@ truth. Never fill a missing observation from this file or another prose copy.
 
 Before editing any file, check it against the `owns:` globs above — a surface owned by a track you are not serving is off-limits except through that track's own next-items. Full track detail: `docs/governance/ACTIVE_TRACK.yaml`.
 
-**Recently closed tracks:** `onboard-one-door-2026-07` (SHIPPED, closed 2026-07-17) · `runtime-truth-spine-adoption-2026-06` (SHIPPED, closed 2026-07-03) · `runtime-truth-reconciliation-2026-06` (SHIPPED, closed 2026-06-30)
+**Recently closed tracks:** `onboard-one-door-2026-07` (RETIRED, closed 2026-07-17) · `onboard-session-status-2026-07` (SHIPPED, closed 2026-07-17) · `runtime-truth-spine-adoption-2026-06` (SHIPPED, closed 2026-07-03)
 
 For machine-readable status, run `python3 scripts/governance/check_track_status.py` — it writes `reports/governance/active_track_evidence.md` (untracked; derived status is not committed). CI publishes the latest copy on the `generated/status` branch: `git show origin/generated/status:reports/governance/active_track_evidence.md`.
 

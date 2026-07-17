@@ -10,9 +10,11 @@ make onboard
 `make onboard` reports whether the current checkout and session are ready. It
 does not authorize editing and does not claim to render the whole organism.
 Use `make organism-status` for the deeper read-only cross-system projection.
-Before editing, use `make agent-build-preflight PACKET=<path>` to bind the
-exact baseline and scope. `BUILD_SESSION_ENTRYPOINT.md` owns these command
-boundaries.
+Packet-bound preflight and closeout are required when changed paths match Merge
+Master Mike's `HOT_PATH_PATTERNS` in `scripts/runtime/pr_merge_control.py`; they
+are optional otherwise. When a packet is required or voluntarily used, run
+`make agent-build-preflight PACKET=<path>` before editing to bind the exact
+baseline and scope. `BUILD_SESSION_ENTRYPOINT.md` owns these command boundaries.
 
 This README is a **depth pointer** to the governance docs you read on demand,
 not in order.

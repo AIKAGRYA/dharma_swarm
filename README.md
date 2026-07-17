@@ -83,7 +83,10 @@ For the deeper cross-system view, run:
 make organism-status
 ```
 
-Before editing, bind the exact task and baseline:
+Packet-bound preflight and closeout are required when changed paths match Merge
+Master Mike's `HOT_PATH_PATTERNS` in `scripts/runtime/pr_merge_control.py`; they
+are optional otherwise. When a packet is required or voluntarily used, bind
+the exact task and baseline before editing:
 
 ```bash
 make agent-build-preflight PACKET=<path>

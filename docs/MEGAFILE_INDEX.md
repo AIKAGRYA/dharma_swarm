@@ -15,12 +15,15 @@ make onboard
 ```
 
 `make onboard` is read-only session status. For the deeper whole-organism
-projection, run `make organism-status`; before editing, bind the exact task
-with `make agent-build-preflight PACKET=<path>`. **Then** use this index as a
-depth reference — it reserves the 10 onboarding-megafile slots so future agents
-find them. Where status is **CANONICAL**, read the file. Where **STUB**, read the
-pointed-to substrate. Where **STALE / CONTESTED / MISSING**, read with the marked
-caveat.
+projection, run `make organism-status`. Packet-bound preflight and closeout are
+required when changed paths match Merge Master Mike's `HOT_PATH_PATTERNS` in
+`scripts/runtime/pr_merge_control.py`; they are optional otherwise. When a
+packet is required or voluntarily used, bind the exact task with
+`make agent-build-preflight PACKET=<path>`. **Then** use this index as a depth
+reference — it reserves the 10 onboarding-megafile slots so future agents find
+them. Where status is **CANONICAL**, read the file. Where **STUB**, read the
+pointed-to substrate. Where **STALE / CONTESTED / MISSING**, read with the
+marked caveat.
 
 If you are doing work that should be captured, ask: "which slot does this belong to?" Append there. Do not create parallel artifacts or a new megafile to track convergence; use the named owner and the existing status commands.
 

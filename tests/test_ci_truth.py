@@ -1,3 +1,7 @@
+import json
+
+import pytest
+
 from scripts.runtime import ci_truth
 
 
@@ -109,3 +113,28 @@ def test_ci_truth_records_uncontracted_checks_as_warnings():
     assert result["verdict"] == "PASS"
     assert result["unknown_checks"] == ["surprise-check"]
     assert any("uncontracted GitHub checks observed" in warning for warning in result["warnings"])
+
+
+def test_default_ci_truth_required_set_equals_parity_manifest() -> None:
+    contract = ci_truth.load_contract()
+    manifest = ci_truth.load_json(ci_truth.DEFAULT_PARITY_MANIFEST_PATH)
+
+    assert set(ci_truth.required_context_names(contract)) == set(
+        ci_truth.manifest_required_context_names(manifest)
+    )
+
+
+def test_ci_truth_contract_fails_closed_when_required_set_drifts(tmp_path) -> None:
+    contract = json.loads(ci_truth.DEFAULT_CONTRACT_PATH.read_text(encoding="utf-8"))
+    manifest = json.loads(
+        ci_truth.DEFAULT_PARITY_MANIFEST_PATH.read_text(encoding="utf-8")
+    )
+    manifest["required_contexts"] = manifest["required_contexts"][:-1]
+    manifest_path = tmp_path / "parity.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    contract["required_contexts_manifest"] = str(manifest_path)
+    contract_path = tmp_path / "contract.json"
+    contract_path.write_text(json.dumps(contract), encoding="utf-8")
+
+    with pytest.raises(ci_truth.CITruthError, match="disagree"):
+        ci_truth.load_contract(contract_path)

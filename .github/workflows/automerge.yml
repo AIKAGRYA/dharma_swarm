@@ -240,24 +240,35 @@ jobs:
               fi
             fi
 
-            # 3. Evaluate every reporting check on the head SHA, then assert
-            #    the branch-protection required set is PRESENT and green.
+            # 3. Evaluate the manifest-declared required checks on the head SHA
+            #    and assert that exact branch-protection set is PRESENT and
+            #    green. Other reporting checks remain visible evidence but do
+            #    not acquire merge authority merely by existing.
             #    Absence is NOT green (an empty rollup used to read as "all
             #    status checks are green" — the 2026-07-04 incident).
-            echo "$view" | jq '[ .statusCheckRollup[]?
+            echo "$view" | jq '
+              [ (.statusCheckRollup // []) | to_entries[]
+                | .key as $ordinal
+                | .value
                 | {name: (.name // .context // .workflowName // "unnamed"),
+                   observed_at: (.completedAt // .startedAt // ""),
+                   ordinal: $ordinal,
                    state: (if ((.status // "COMPLETED") != "COMPLETED") then "PENDING"
                            else (((.conclusion // .state // "") | ascii_upcase)
                                  | if . == "" then "NO_CONCLUSION" else . end) end)}
-              ]' > /tmp/checks.json
+              ]
+              | sort_by(.name, .observed_at, .ordinal)
+              | group_by(.name)
+              | map(last | del(.observed_at, .ordinal))
+            ' > /tmp/checks.json
             missing_required="$(jq -r --argjson req "$REQUIRED_CHECKS_JSON" \
               '($req - [.[].name]) | join(", ")' /tmp/checks.json)"
-            not_green="$(jq -r '
-              [ .[] | select(.name | test("automerge") | not)
+            required_not_green="$(jq -r --argjson req "$REQUIRED_CHECKS_JSON" '
+              [ .[] | select(.name as $name | $req | index($name))
                 | select(.state | IN("SUCCESS","NEUTRAL","SKIPPED") | not)
               ] | map("\(.name)=\(.state)") | join(", ")' /tmp/checks.json)"
-            if [ -n "$not_green" ] || [ -n "$missing_required" ]; then
-              summary+="- #${pr}: skipped (not green: ${not_green:-none}; required not reported: ${missing_required:-none})\n"
+            if [ -n "$required_not_green" ] || [ -n "$missing_required" ]; then
+              summary+="- #${pr}: skipped (required not green: ${required_not_green:-none}; required not reported: ${missing_required:-none})\n"
               skipped=$((skipped + 1)); continue
             fi
             evaluated="$(jq -r '[.[] | "`\(.name)`=\(.state)"] | join(", ")' /tmp/checks.json)"
@@ -305,7 +316,8 @@ jobs:
           required set from \`scripts/governance/ci_parity_manifest.json\`
           \`${REQUIRED_CHECKS_JSON}\` verified present):
           ${evaluated}
-          No reporting check was exempted as advisory. No review requests changes.
+          Non-required checks remain visible but do not gain merge authority.
+          No review requests changes.
           ${demotion:+**Note:** ${demotion}}
           The automerge lane ${mode_line}.
 

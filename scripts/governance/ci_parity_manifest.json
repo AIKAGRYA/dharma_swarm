@@ -37,7 +37,7 @@
     {
       "context": "Onboarding admission parity",
       "workflow": "active-track.yml",
-      "job": "onboarding-status",
+      "job": "onboarding-admission-parity-compat",
       "regression_sensitive": true
     }
   ]

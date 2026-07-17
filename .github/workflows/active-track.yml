@@ -117,8 +117,7 @@ jobs:
   # remains a separate, explicitly packet-bound preflight; this status job does
   # not discover, bind, execute, or upload work-packet evidence.
   onboarding-status:
-    # Keep the display name stable for existing branch-protection rules.
-    name: Onboarding admission parity
+    name: Onboarding session status
     if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -176,6 +175,197 @@ jobs:
             tests/test_onboarding_cli.py \
             tests/test_onboarding_readiness.py \
             tests/test_onboarding_ci_contract.py
+
+  # Phase-1 compatibility bridge for the live branch-protection context. This
+  # job cannot pass unless the accurately named session-status job passed. Once
+  # main carries both contexts and branch protection requires the new name, the
+  # bridge can be removed without opening a false-green interval.
+  onboarding-admission-parity-compat:
+    name: Onboarding admission parity
+    needs: onboarding-status
+    if: >-
+      always() &&
+      (github.event_name == 'pull_request' || github.event_name == 'merge_group')
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require the session-status result
+        env:
+          SESSION_STATUS_RESULT: ${{ needs.onboarding-status.result }}
+        run: |
+          set -euo pipefail
+          test "${SESSION_STATUS_RESULT}" = "success"
+
+  # Phase-1 packet-scope signal. The first PR that introduces the checker
+  # cannot honestly enforce a policy that did not exist at its declared base,
+  # so that range emits an explicit bootstrap receipt. Every later PR / merge
+  # group runs the checker fail-closed against its declared event range.
+  agentops-packet-scope:
+    name: AgentOps packet scope
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout declared head with full history
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          fetch-depth: 0
+
+      # Classify the one honest bootstrap exception before installing candidate
+      # dependencies. Thus a first-introduction range cannot fail before it
+      # records why enforcement was impossible, while every base that already
+      # contains the checker proceeds to the fail-closed path below.
+      - name: Classify packet-scope enforcement boundary
+        id: packet-scope-boundary
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          CHECKER_PATH: scripts/governance/check_agentops_packet_scope.py
+          REPORT_PATH: ${{ runner.temp }}/dharma-agentops/packet-scope/report.json
+          PYTHONDONTWRITEBYTECODE: "1"
+          PYTHONPYCACHEPREFIX: ${{ runner.temp }}/dharma-agentops/packet-scope/pycache
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "${REPORT_PATH}")"
+
+          # Seed an honest failure receipt before validation. If any declared
+          # event identity is malformed or unavailable, the job fails and the
+          # always-run artifact step still has a machine-readable explanation.
+          python3 - <<'PY' > "${REPORT_PATH}"
+          import json
+          import os
+
+          report = {
+              "schema": "dharma.agentops_packet_scope.v1",
+              "status": "CONFIG_ERROR",
+              "required": None,
+              "passed": False,
+              "enforced": False,
+              "event_name": os.environ.get("EVENT_NAME", ""),
+              "event_base": os.environ.get("EVENT_BASE", ""),
+              "event_head": os.environ.get("EVENT_HEAD", ""),
+              "checker_path": os.environ.get("CHECKER_PATH", ""),
+              "claim": (
+                  "configuration failure only; no packet-scope, packet-validity, "
+                  "preflight/closeout, human-approval, or merge-authority claim"
+              ),
+              "errors": ["workflow boundary validation or enforcement did not complete"],
+          }
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+
+          case "${EVENT_NAME}" in
+            pull_request|merge_group) ;;
+            *) echo "unsupported event: ${EVENT_NAME}" >&2; exit 2 ;;
+          esac
+          [[ "${EVENT_BASE}" =~ ^[0-9a-f]{40}$ ]]
+          [[ "${EVENT_HEAD}" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse --verify "${EVENT_BASE}^{commit}")" = "${EVENT_BASE}"
+          test "$(git rev-parse --verify "${EVENT_HEAD}^{commit}")" = "${EVENT_HEAD}"
+          test "$(git rev-parse HEAD)" = "${EVENT_HEAD}"
+
+          base_checker_path="$(
+            git ls-tree -r --name-only "${EVENT_BASE}" -- "${CHECKER_PATH}"
+          )"
+          if [ -z "${base_checker_path}" ]; then
+            python3 - <<'PY' > "${REPORT_PATH}"
+          import json
+          import os
+
+          report = {
+              "schema": "dharma.agentops_packet_scope.v1",
+              "status": "BOOTSTRAP_NOT_ENFORCED",
+              "required": None,
+              "passed": True,
+              "enforced": False,
+              "event_name": os.environ["EVENT_NAME"],
+              "event_base": os.environ["EVENT_BASE"],
+              "event_head": os.environ["EVENT_HEAD"],
+              "checker_path": os.environ["CHECKER_PATH"],
+              "claim": (
+                  "bootstrap provenance only; no packet-scope, packet-validity, "
+                  "preflight/closeout, human-approval, or merge-authority claim"
+              ),
+              "reason": (
+                  "the checker is absent at the declared event base; "
+                  "enforcement begins only after the checker lands on the base branch"
+              ),
+              "errors": [],
+          }
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+            cat "${REPORT_PATH}"
+            echo "enforce=false" >> "${GITHUB_OUTPUT}"
+          else
+            test "${base_checker_path}" = "${CHECKER_PATH}"
+            git cat-file -e "${EVENT_BASE}:${CHECKER_PATH}"
+            echo "enforce=true" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Set up Python
+        if: steps.packet-scope-boundary.outputs.enforce == 'true'
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Install repository-declared checker dependencies
+        if: steps.packet-scope-boundary.outputs.enforce == 'true'
+        run: |
+          set -euo pipefail
+          install_source="${RUNNER_TEMP}/dharma-agentops-packet-scope/package-source"
+          mkdir -p "${install_source}"
+          git archive --format=tar HEAD | tar -xf - -C "${install_source}"
+          python3 -m pip install "${install_source}"
+
+      - name: Enforce declared event packet scope
+        if: steps.packet-scope-boundary.outputs.enforce == 'true'
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          CHECKER_PATH: scripts/governance/check_agentops_packet_scope.py
+          REPORT_PATH: ${{ runner.temp }}/dharma-agentops/packet-scope/report.json
+          PYTHONDONTWRITEBYTECODE: "1"
+          PYTHONPYCACHEPREFIX: ${{ runner.temp }}/dharma-agentops/packet-scope/pycache
+        run: |
+          set -euo pipefail
+          checker_report="${REPORT_PATH}.checker"
+          checker_exit=0
+          if python3 "${CHECKER_PATH}" \
+              --event-name "${EVENT_NAME}" \
+              --event-base "${EVENT_BASE}" \
+              --event-head "${EVENT_HEAD}" \
+              | tee "${checker_report}"; then
+            :
+          else
+            checker_exit="$?"
+          fi
+          test -s "${checker_report}"
+          python3 - "${checker_report}" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          report = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+          if report.get("schema") != "dharma.agentops_packet_scope.v1":
+              raise SystemExit("checker emitted an unexpected report schema")
+          if not isinstance(report.get("passed"), bool):
+              raise SystemExit("checker report lacks a boolean passed field")
+          PY
+          mv "${checker_report}" "${REPORT_PATH}"
+          if [ "${checker_exit}" -ne 0 ]; then
+            exit "${checker_exit}"
+          fi
+
+      - name: Upload AgentOps packet-scope evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: agentops-packet-scope-evidence
+          path: ${{ runner.temp }}/dharma-agentops/packet-scope/report.json
+          if-no-files-found: error
 
   # Stock macOS ships GNU Make 3.81, whose parser rejects target-specific
   # assignments with multiple modifiers (for example `override export`). Keep
