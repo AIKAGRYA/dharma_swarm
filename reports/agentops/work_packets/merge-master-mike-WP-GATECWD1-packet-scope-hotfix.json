@@ -1,7 +1,8 @@
 {
   "allowed_files": [
     ".github/workflows/active-track.yml",
-    "reports/agentops/work_packets/merge-master-mike-WP-GATECWD1-packet-scope-hotfix.json"
+    "reports/agentops/work_packets/merge-master-mike-WP-GATECWD1-packet-scope-hotfix.json",
+    "tests/governance/test_agentops_packet_scope.py"
   ],
   "approval": {
     "before_commit": false,
@@ -156,7 +157,7 @@
     "honest_blockers": [],
     "interface_mismatches": [],
     "owner": "@AmitabhainArunachala",
-    "packet_digest": "ce1f1f163d8fccbb5bf0d318208f13877c65af50e9becb07df0342887a5f6d27",
+    "packet_digest": "0a1bc3604cbcc452c0bcadb7212957fac937dcce909da9119fd108acf88d8c44",
     "rollback": "git revert the workflow commit and this packet commit on claude/hotfix-agentops-packet-scope; this restores the prior enforcement step, which fails CONFIG_ERROR on every enforced PR (the pre-fix state).",
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
