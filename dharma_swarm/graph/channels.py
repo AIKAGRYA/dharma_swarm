@@ -14,6 +14,8 @@ with :class:`UnknownChannelError`.
 
 from __future__ import annotations
 
+import copy
+import json
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -28,6 +30,7 @@ __all__ = [
     "ChannelWriteConflictError",
     "EmptyChannelError",
     "LastValueChannel",
+    "ReducerChannel",
     "TopicChannel",
     "TriggerChannel",
     "UnknownChannelError",
@@ -205,6 +208,73 @@ class AppendChannel(Channel[list[Any]]):
     def restore(self, snapshot: Mapping[str, Any]) -> None:
         super().restore(snapshot)
         self._items = list(snapshot.get("items", []))
+
+
+class ReducerChannel(Channel[Any]):
+    """Generic binary-reducer channel (``Annotated[T, reducer]`` parity).
+
+    Multiple same-superstep writes are legal; each folds LEFT onto the
+    accumulator in caller-given (canonical) order. The reducer must be a
+    pure, associative binary callable — associativity is the batching
+    invariance contract: ``reduce(reduce(s, xs), ys) == reduce(s, xs+ys)``
+    (spec §3 property 5). ``empty_value`` seeds the accumulator before the
+    first fold (langgraph constructs the annotated type's default — ``[]``
+    for a list, ``0`` for an int).
+    """
+
+    def __init__(
+        self,
+        reducer: "Any",
+        empty_value: Any = None,
+    ) -> None:
+        super().__init__()
+        self._reducer = reducer
+        self._empty = empty_value
+        self._value: Any = empty_value
+
+    def _fold(self, start: Any, writes: Sequence[ChannelWrite]) -> Any:
+        value = start
+        for write in writes:
+            value = self._reducer(value, write.value)
+        return value
+
+    def validate(self, writes: Sequence[ChannelWrite], superstep: int) -> None:
+        """Stage the whole fold on a deep copy — a raising reducer or an
+        unserializable folded result must fail BEFORE any channel commits
+        (all-or-nothing superstep contract; commit() never validates)."""
+        if not writes:
+            return None
+        staged = self._fold(copy.deepcopy(self._value), writes)
+        try:
+            json.dumps(
+                staged, sort_keys=True, ensure_ascii=False, allow_nan=False
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"reducer on channel {writes[0].channel!r} produced a value "
+                f"that is not stably JSON-serializable in superstep "
+                f"{superstep}: {exc}"
+            ) from exc
+        return None
+
+    def commit(self, writes: Sequence[ChannelWrite], superstep: int) -> bool:
+        if not writes:
+            return False
+        self._value = self._fold(self._value, writes)
+        self.version += 1
+        return True
+
+    def get(self) -> Any:
+        if self.is_empty:
+            raise EmptyChannelError(self.name or "<unbound>")
+        return self._value
+
+    def checkpoint(self) -> dict[str, Any]:
+        return {"version": self.version, "value": self._value}
+
+    def restore(self, snapshot: Mapping[str, Any]) -> None:
+        super().restore(snapshot)
+        self._value = snapshot.get("value", self._empty)
 
 
 class TriggerChannel(Channel[bool]):

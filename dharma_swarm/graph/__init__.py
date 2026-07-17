@@ -17,9 +17,25 @@ from dharma_swarm.graph.channels import (
     BarrierMemberError,
     ChannelWriteConflictError,
     LastValueChannel,
+    ReducerChannel,
     TopicChannel,
     TriggerChannel,
     UnknownChannelError,
+)
+from dharma_swarm.graph.interrupts import (
+    GraphInterrupted,
+    Interrupt,
+    interrupt,
+)
+from dharma_swarm.graph.schema import (
+    RemainingSteps,
+    SchemaError,
+    TypedCompiledGraph,
+    TypedStateGraph,
+    context_schema,
+    input_schema,
+    output_schema,
+    typed_state_schema,
 )
 from dharma_swarm.graph.checkpoint import DispatchCheckpoint, GraphCheckpointStore
 from dharma_swarm.graph.compiler import GraphBuilder, GraphCompileError
@@ -33,9 +49,11 @@ from dharma_swarm.graph.persistence import (
 from dharma_swarm.graph.routing import (
     BranchDestinationError,
     Command,
+    ParentCommand,
     Send,
     SendTargetError,
 )
+from dharma_swarm.graph.subgraph import as_node
 from dharma_swarm.graph.scheduler import (
     CompiledGraph,
     GraphRuntimeError,
@@ -94,18 +112,32 @@ __all__ = [
     "GraphRunResult",
     "RunCheckpoint",
     "GraphRuntimeError",
+    "GraphInterrupted",
     "GraphTelosBridge",
     "GraphTelosBridgeResult",
+    "Interrupt",
+    "interrupt",
     "GATE_GRAPH_RECEIPT_ANCHOR",
     "LastValueChannel",
     "LiveEffects",
     "MalformedDispatchOrderError",
     "NodeExecutionError",
     "NodeResultError",
+    "ParentCommand",
+    "ReducerChannel",
+    "as_node",
+    "RemainingSteps",
+    "SchemaError",
     "Send",
     "SendTargetError",
     "SimulatedEffects",
     "START",
+    "TypedCompiledGraph",
+    "TypedStateGraph",
+    "context_schema",
+    "input_schema",
+    "output_schema",
+    "typed_state_schema",
     "SuperstepLimitError",
     "TopicChannel",
     "TriggerChannel",

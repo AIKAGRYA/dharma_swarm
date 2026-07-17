@@ -1986,6 +1986,24 @@ def run_capability_probes(
         for name in _WORKLOAD_ARMS
     }
     _apply_workload_evidence(capabilities, row_lookup, workloads)
+    _apply_typed_schema_evidence(
+        capabilities, row_lookup, workloads["seeded_typed_schema_projection"]
+    )
+    _apply_sequence_evidence(
+        capabilities, row_lookup, workloads["seeded_sequence_chain"]
+    )
+    _apply_remaining_steps_evidence(
+        capabilities, row_lookup, workloads["seeded_remaining_steps"]
+    )
+    _apply_send_timeout_evidence(
+        capabilities, row_lookup, workloads["seeded_send_timeout"]
+    )
+    _apply_command_resume_evidence(
+        capabilities, row_lookup, workloads["seeded_command_resume"]
+    )
+    _apply_command_parent_evidence(
+        capabilities, row_lookup, workloads["seeded_command_parent"]
+    )
     persistence_protocol = _persistence_protocol_probe(seed)
     _apply_persistence_protocol_evidence(capabilities, row_lookup, persistence_protocol)
     process_restart = _process_restart_probe(seed)
@@ -2060,3 +2078,1046 @@ def run_capability_probes(
             ],
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# Pregel-core S3 (LG01): typed state/input/output/context schema workload.
+# Append-only harness extension — new seeded two-arm workload + evidence
+# applier; nothing above this section is modified by the extension.
+# ---------------------------------------------------------------------------
+
+
+class _TypedFullState(TypedDict, total=False):
+    x: int
+    log: Annotated[list[Any], operator.add]
+    secret: int
+
+
+class _TypedInputState(TypedDict, total=False):
+    x: int
+
+
+class _TypedOutputState(TypedDict, total=False):
+    x: int
+    log: Annotated[list[Any], operator.add]
+
+
+class _TypedConflictState(TypedDict, total=False):
+    y: int
+
+
+def _typed_schema_arm(arm: str, seed: int) -> dict[str, Any]:
+    rng = random.Random(_derived_seed(seed, "typed-schema"))
+    initial = rng.randint(2, 30)
+    multiplier = rng.randint(2, 5)
+    seed_mark = f"seed-{seed}"
+
+    if arm == "langgraph":
+        from dataclasses import dataclass
+
+        from langgraph.errors import InvalidUpdateError
+        from langgraph.graph import END, START, StateGraph
+        from langgraph.runtime import Runtime
+
+        @dataclass
+        class _Ctx:
+            multiplier: int
+
+        def node_a(state: _TypedFullState, runtime: Runtime[_Ctx]) -> dict[str, Any]:
+            return {
+                "x": state["x"] * runtime.context.multiplier,
+                "log": ["a"],
+                "secret": state["x"],
+            }
+
+        def node_b(state: _TypedFullState) -> dict[str, Any]:
+            return {"x": state["x"] + 1, "log": ["b"]}
+
+        builder = StateGraph(
+            _TypedFullState,
+            input_schema=_TypedInputState,
+            output_schema=_TypedOutputState,
+            context_schema=_Ctx,
+        )
+        builder.add_node("a", node_a)
+        builder.add_node("b", node_b)
+        builder.add_edge(START, "a")
+        builder.add_edge("a", "b")
+        builder.add_edge("b", END)
+        out = builder.compile().invoke(
+            {"x": initial, "log": [seed_mark]}, context=_Ctx(multiplier)
+        )
+
+        conflict = StateGraph(_TypedConflictState)
+        conflict.add_node("p", lambda state: {"y": 1})
+        conflict.add_node("q", lambda state: {"y": 2})
+        conflict.add_edge(START, "p")
+        conflict.add_edge(START, "q")
+        conflict.add_edge("p", END)
+        conflict.add_edge("q", END)
+        conflict_rejected = False
+        try:
+            conflict.compile().invoke({"y": 0})
+        except InvalidUpdateError:
+            conflict_rejected = True
+        return {
+            "projected_output": {"x": out["x"], "log": list(out["log"])},
+            "secret_hidden": "secret" not in out,
+            "input_extra_filtered": seed_mark not in out.get("log", []),
+            "context_applied": out["x"] == initial * multiplier + 1,
+            "unannotated_conflict_rejected": conflict_rejected,
+        }
+
+    from dataclasses import dataclass
+
+    from dharma_swarm.graph import (
+        END,
+        START,
+        ChannelWriteConflictError,
+        TypedStateGraph,
+    )
+    from dharma_swarm.graph.effects import SimulatedEffects
+
+    @dataclass
+    class _Ctx:
+        multiplier: int
+
+    def node_a(state: Mapping[str, Any], context: "_Ctx") -> dict[str, Any]:
+        return {
+            "x": state["x"] * context.multiplier,
+            "log": ["a"],
+            "secret": state["x"],
+        }
+
+    def node_b(state: Mapping[str, Any]) -> dict[str, Any]:
+        return {"x": state["x"] + 1, "log": ["b"]}
+
+    typed = (
+        TypedStateGraph(
+            _TypedFullState,
+            input=_TypedInputState,
+            output=_TypedOutputState,
+            context=_Ctx,
+            graph_id="gauntlet-typed-schema",
+        )
+        .add_node("a", node_a)
+        .add_node("b", node_b)
+        .add_edge(START, "a")
+        .add_edge("a", "b")
+        .add_edge("b", END)
+        .compile()
+    )
+    result = _run_awaitable(
+        typed.invoke(
+            input={"x": initial, "log": [seed_mark]},
+            context=_Ctx(multiplier),
+            effects=SimulatedEffects(seed),
+        )
+    )
+    out = dict(result.state)
+
+    conflict = (
+        TypedStateGraph(_TypedConflictState, graph_id="gauntlet-typed-conflict")
+        .add_node("p", lambda state: {"y": 1})
+        .add_node("q", lambda state: {"y": 2})
+        .add_edge(START, "p")
+        .add_edge(START, "q")
+        .add_edge("p", END)
+        .add_edge("q", END)
+        .compile()
+    )
+    conflict_rejected = False
+    try:
+        _run_awaitable(
+            conflict.invoke(input={"y": 0}, effects=SimulatedEffects(seed))
+        )
+    except ChannelWriteConflictError:
+        conflict_rejected = True
+    return {
+        "projected_output": {"x": out["x"], "log": list(out["log"])},
+        "secret_hidden": "secret" not in out,
+        "input_extra_filtered": seed_mark not in out.get("log", []),
+        "context_applied": out["x"] == initial * multiplier + 1,
+        "unannotated_conflict_rejected": conflict_rejected,
+    }
+
+
+_WORKLOAD_ARMS["seeded_typed_schema_projection"] = _typed_schema_arm
+
+
+def _apply_typed_schema_evidence(
+    capabilities: dict[str, Any],
+    row_lookup: Mapping[str, Any],
+    workload: Mapping[str, Any],
+) -> None:
+    """LG01 typed-schema facets from the seeded two-arm typed workload.
+
+    Fail-closed per the error-parity rule: a probe_error on EITHER arm keeps
+    every facet failing — identical errors are a finding, never a pass.
+    """
+    both_ran = (
+        "probe_error" not in workload["dharma"]
+        and "probe_error" not in workload["langgraph"]
+    )
+    field_by_facet = {
+        "typed_state_schema": (
+            "projected_output",
+            "unannotated_conflict_rejected",
+        ),
+        "input_schema": ("input_extra_filtered", "projected_output"),
+        "output_schema": ("secret_hidden", "projected_output"),
+        "context_schema": ("context_applied", "projected_output"),
+    }
+    row = row_lookup["LG01"]
+    for facet, fields in field_by_facet.items():
+        equal = both_ran and all(
+            workload["dharma"].get(name) == workload["langgraph"].get(name)
+            for name in fields
+        )
+        entry = capabilities["LG01"]["facets"][facet]
+        entry["status"] = "pass" if equal else "fail"
+        entry["evidence"].append(
+            _evidence(
+                kind="two_arm_differential",
+                evidence_id=f"seeded_typed_schema_projection:{facet}",
+                command_or_probe=(
+                    f"compare {'+'.join(fields)} from the typed-schema "
+                    "workload on both installed runtimes"
+                ),
+                outcome="parity" if equal else "mismatch",
+                dharma={name: workload["dharma"].get(name) for name in fields},
+                langgraph={
+                    name: workload["langgraph"].get(name) for name in fields
+                },
+                citations=_row_citations(row),
+            )
+        )
+
+
+# ---------------------------------------------------------------------------
+# Pregel-core S4 (LG04): add_sequence chained-topology workload.
+# Append-only harness extension — new seeded two-arm workload + evidence
+# applier + surface support entry for the sequence facet.
+# ---------------------------------------------------------------------------
+
+
+class _SequenceState(TypedDict, total=False):
+    x: int
+    log: Annotated[list[Any], operator.add]
+
+
+def _sequence_arm(arm: str, seed: int) -> dict[str, Any]:
+    rng = random.Random(_derived_seed(seed, "sequence"))
+    initial = rng.randint(1, 40)
+    addend = rng.randint(2, 9)
+    multiplier = rng.randint(2, 4)
+
+    def step_one(state):
+        return {"x": state["x"] + addend, "log": ["one"]}
+
+    def step_two(state):
+        return {"x": state["x"] * multiplier, "log": ["two"]}
+
+    def step_three(state):
+        return {"x": state["x"] - addend, "log": ["three"]}
+
+    if arm == "langgraph":
+        from langgraph.graph import END, START, StateGraph
+
+        builder = StateGraph(_SequenceState)
+        builder.add_sequence(
+            [("one", step_one), ("two", step_two), ("three", step_three)]
+        )
+        builder.add_edge(START, "one")
+        out = builder.compile().invoke({"x": initial, "log": []})
+
+        bare = StateGraph(_SequenceState)
+        bare.add_sequence([step_one, step_two])
+        bare.add_edge(START, "step_one")
+        bare_out = bare.compile().invoke({"x": initial, "log": []})
+        return {
+            "chained": {"x": out["x"], "log": list(out["log"])},
+            "bare_named": {"x": bare_out["x"], "log": list(bare_out["log"])},
+        }
+
+    from dharma_swarm.graph import (
+        END,
+        START,
+        AppendChannel,
+        GraphBuilder,
+        LastValueChannel,
+    )
+    from dharma_swarm.graph.effects import SimulatedEffects
+
+    compiled = (
+        GraphBuilder("gauntlet-sequence")
+        .add_channel("x", LastValueChannel)
+        .add_channel("log", AppendChannel)
+        .add_sequence(
+            [("one", step_one), ("two", step_two), ("three", step_three)]
+        )
+        .add_edge(START, "one")
+        .add_edge("three", END)
+        .compile()
+    )
+    result = _run_awaitable(
+        compiled.invoke(
+            input={"x": initial, "log": []}, effects=SimulatedEffects(seed)
+        )
+    )
+    bare = (
+        GraphBuilder("gauntlet-sequence-bare")
+        .add_channel("x", LastValueChannel)
+        .add_channel("log", AppendChannel)
+        .add_sequence([step_one, step_two])
+        .add_edge(START, "step_one")
+        .add_edge("step_two", END)
+        .compile()
+    )
+    bare_result = _run_awaitable(
+        bare.invoke(
+            input={"x": initial, "log": []}, effects=SimulatedEffects(seed)
+        )
+    )
+    return {
+        "chained": {"x": result.state["x"], "log": list(result.state["log"])},
+        "bare_named": {
+            "x": bare_result.state["x"],
+            "log": list(bare_result.state["log"]),
+        },
+    }
+
+
+_WORKLOAD_ARMS["seeded_sequence_chain"] = _sequence_arm
+_support("LG04", ("sequence",), "dharma_swarm.graph:GraphBuilder.add_sequence")
+
+
+def _apply_sequence_evidence(
+    capabilities: dict[str, Any],
+    row_lookup: Mapping[str, Any],
+    workload: Mapping[str, Any],
+) -> None:
+    """LG04.sequence from the seeded two-arm add_sequence workload.
+
+    Fail-closed per the error-parity rule: a probe_error on either arm keeps
+    the facet failing — identical errors are a finding, never a pass.
+    """
+    both_ran = (
+        "probe_error" not in workload["dharma"]
+        and "probe_error" not in workload["langgraph"]
+    )
+    fields = ("chained", "bare_named")
+    equal = both_ran and all(
+        workload["dharma"].get(name) == workload["langgraph"].get(name)
+        for name in fields
+    )
+    entry = capabilities["LG04"]["facets"]["sequence"]
+    entry["status"] = "pass" if equal else "fail"
+    entry["evidence"].append(
+        _evidence(
+            kind="two_arm_differential",
+            evidence_id="seeded_sequence_chain:sequence",
+            command_or_probe=(
+                "compare chained+bare_named add_sequence outcomes on both "
+                "installed runtimes"
+            ),
+            outcome="parity" if equal else "mismatch",
+            dharma={name: workload["dharma"].get(name) for name in fields},
+            langgraph={name: workload["langgraph"].get(name) for name in fields},
+            citations=_row_citations(row_lookup["LG04"]),
+        )
+    )
+
+
+# ---------------------------------------------------------------------------
+# Pregel-core S5 (LG09): managed remaining-steps workload.
+# Append-only harness extension — new seeded two-arm workload + evidence
+# applier + surface support entry for the remaining_steps facet.
+# ---------------------------------------------------------------------------
+
+
+def _remaining_steps_arm(arm: str, seed: int) -> dict[str, Any]:
+    rng = random.Random(_derived_seed(seed, "remaining-steps"))
+    limit = rng.randint(5, 9)
+    stop_at = rng.randint(2, limit - 2)
+
+    if arm == "langgraph":
+        from langgraph.graph import END, START, StateGraph
+        from langgraph.managed import RemainingSteps as _LGRemaining
+
+        # Functional TypedDict form: annotation objects are stored directly,
+        # so a function-local schema resolves under future-annotations.
+        _LGRemainState = TypedDict(
+            "_LGRemainState", {"count": int, "remaining": _LGRemaining}
+        )
+
+        def run_once() -> tuple[int, list[int]]:
+            seen: list[int] = []
+
+            def loop(state):
+                seen.append(state["remaining"])
+                return {"count": state["count"] + 1}
+
+            builder = StateGraph(_LGRemainState)
+            builder.add_node("loop", loop)
+            builder.add_edge(START, "loop")
+            builder.add_conditional_edges(
+                "loop",
+                lambda s: "stop" if s["count"] >= stop_at else "again",
+                {"again": "loop", "stop": END},
+            )
+            out = builder.compile().invoke(
+                {"count": 0}, {"recursion_limit": limit}
+            )
+            return out["count"], seen
+
+        first_count, first_seen = run_once()
+        second_count, second_seen = run_once()
+        return {
+            "final_count": first_count,
+            "remaining_seen": first_seen,
+            "budget_resets_per_invoke": first_seen == second_seen
+            and first_count == second_count,
+        }
+
+    from dharma_swarm.graph import (
+        END,
+        START,
+        RemainingSteps,
+        TypedStateGraph,
+    )
+    from dharma_swarm.graph.effects import SimulatedEffects
+
+    _DhRemainState = TypedDict(
+        "_DhRemainState", {"count": int, "remaining": RemainingSteps}
+    )
+
+    def run_once() -> tuple[int, list[int]]:
+        seen: list[int] = []
+
+        def loop(state):
+            seen.append(state["remaining"])
+            return {"count": state["count"] + 1}
+
+        typed = (
+            TypedStateGraph(_DhRemainState, graph_id="gauntlet-remaining")
+            .add_node("loop", loop)
+            .add_edge(START, "loop")
+            .add_conditional_edges(
+                "loop",
+                lambda view: "stop" if view.get("count", 0) >= stop_at else "again",
+                {"again": "loop", "stop": END},
+            )
+            .compile(allow_cycles=True)
+        )
+        result = _run_awaitable(
+            typed.invoke(
+                input={"count": 0},
+                effects=SimulatedEffects(seed),
+                superstep_cap=limit,
+            )
+        )
+        return result.state["count"], seen
+
+    first_count, first_seen = run_once()
+    second_count, second_seen = run_once()
+    return {
+        "final_count": first_count,
+        "remaining_seen": first_seen,
+        "budget_resets_per_invoke": first_seen == second_seen
+        and first_count == second_count,
+    }
+
+
+_WORKLOAD_ARMS["seeded_remaining_steps"] = _remaining_steps_arm
+_support("LG09", ("remaining_steps",), "dharma_swarm.graph:RemainingSteps")
+
+
+def _apply_remaining_steps_evidence(
+    capabilities: dict[str, Any],
+    row_lookup: Mapping[str, Any],
+    workload: Mapping[str, Any],
+) -> None:
+    """LG09.remaining_steps from the seeded two-arm managed-value workload.
+
+    Fail-closed per the error-parity rule: a probe_error on either arm keeps
+    the facet failing — identical errors are a finding, never a pass.
+    """
+    both_ran = (
+        "probe_error" not in workload["dharma"]
+        and "probe_error" not in workload["langgraph"]
+    )
+    fields = ("final_count", "remaining_seen", "budget_resets_per_invoke")
+    equal = both_ran and all(
+        workload["dharma"].get(name) == workload["langgraph"].get(name)
+        for name in fields
+    )
+    entry = capabilities["LG09"]["facets"]["remaining_steps"]
+    entry["status"] = "pass" if equal else "fail"
+    entry["evidence"].append(
+        _evidence(
+            kind="two_arm_differential",
+            evidence_id="seeded_remaining_steps:remaining_steps",
+            command_or_probe=(
+                "compare the observed remaining-step sequences and per-invoke "
+                "budget reset on both installed runtimes"
+            ),
+            outcome="parity" if equal else "mismatch",
+            dharma={name: workload["dharma"].get(name) for name in fields},
+            langgraph={name: workload["langgraph"].get(name) for name in fields},
+            citations=_row_citations(row_lookup["LG09"]),
+        )
+    )
+
+
+# ---------------------------------------------------------------------------
+# Pregel-core S6 (LG07): Send timeout workload.
+# Append-only harness extension — new seeded two-arm workload + evidence
+# applier + surface support entry for the send_timeout facet.
+# ---------------------------------------------------------------------------
+
+
+class _SendTimeoutState(TypedDict, total=False):
+    marks: Annotated[list[Any], operator.add]
+    joined: int
+
+
+def _send_timeout_arm(arm: str, seed: int) -> dict[str, Any]:
+    rng = random.Random(_derived_seed(seed, "send-timeout"))
+    fan_width = rng.randint(2, 3)
+    generous = 5.0
+    tight = 0.05
+    stuck = 30.0
+
+    if arm == "langgraph":
+        from langgraph.errors import NodeTimeoutError
+        from langgraph.graph import END, START, StateGraph
+        from langgraph.types import Send as LGSendPacket
+
+        async def worker(arg: Mapping[str, Any]) -> dict[str, Any]:
+            await asyncio.sleep(arg["delay"])
+            return {"marks": [arg["mark"]]}
+
+        def build(sends):
+            builder = StateGraph(_SendTimeoutState)
+            builder.add_node("fan", lambda state: {"marks": ["fan"]})
+            builder.add_node("worker", worker)
+            builder.add_node("join", lambda state: {"joined": len(state["marks"])})
+            builder.add_edge(START, "fan")
+            builder.add_conditional_edges("fan", lambda state: sends, ["worker"])
+            builder.add_edge("worker", "join")
+            builder.add_edge("join", END)
+            return builder.compile()
+
+        completed_app = build(
+            [
+                LGSendPacket(
+                    "worker", {"delay": 0.001, "mark": f"w{i}"}, timeout=generous
+                )
+                for i in range(fan_width)
+            ]
+        )
+        completed = _run_awaitable(completed_app.ainvoke({"marks": []}))
+        timed_out = False
+        overrun_app = build(
+            [LGSendPacket("worker", {"delay": stuck, "mark": "slow"}, timeout=tight)]
+        )
+        try:
+            _run_awaitable(overrun_app.ainvoke({"marks": []}))
+        except NodeTimeoutError:
+            timed_out = True
+        return {
+            "completed": {
+                "marks": sorted(completed["marks"]),
+                "joined": completed["joined"],
+            },
+            "timed_out": timed_out,
+        }
+
+    from dharma_swarm.graph import (
+        END,
+        START,
+        AppendChannel,
+        GraphBuilder,
+        LastValueChannel,
+        NodeExecutionError,
+        Send,
+    )
+    from dharma_swarm.graph.effects import SimulatedEffects
+
+    async def worker(arg: Mapping[str, Any]) -> dict[str, Any]:
+        await asyncio.sleep(arg["delay"])
+        return {"marks": [arg["mark"]]}
+
+    def build(sends):
+        return (
+            GraphBuilder("gauntlet-send-timeout")
+            .add_channel("marks", AppendChannel)
+            .add_channel("joined", LastValueChannel)
+            .add_node("fan", lambda state: {"marks": ["fan"]})
+            .add_node("worker", worker)
+            .add_node("join", lambda state: {"joined": len(state["marks"])})
+            .add_edge(START, "fan")
+            .add_conditional_edges("fan", lambda view: sends, ["worker"])
+            .add_edge("worker", "join")
+            .add_edge("join", END)
+            .compile()
+        )
+
+    completed_app = build(
+        [
+            Send("worker", {"delay": 0.001, "mark": f"w{i}"}, timeout=generous)
+            for i in range(fan_width)
+        ]
+    )
+    completed = _run_awaitable(
+        completed_app.invoke(input={"marks": []}, effects=SimulatedEffects(seed))
+    )
+    timed_out = False
+    overrun_app = build(
+        [Send("worker", {"delay": stuck, "mark": "slow"}, timeout=tight)]
+    )
+    try:
+        _run_awaitable(
+            overrun_app.invoke(input={"marks": []}, effects=SimulatedEffects(seed))
+        )
+    except NodeExecutionError as exc:
+        timed_out = "send timeout" in str(exc)
+    return {
+        "completed": {
+            "marks": sorted(completed.state["marks"]),
+            "joined": completed.state["joined"],
+        },
+        "timed_out": timed_out,
+    }
+
+
+_WORKLOAD_ARMS["seeded_send_timeout"] = _send_timeout_arm
+_support("LG07", ("send_timeout",), "dharma_swarm.graph:Send#timeout")
+
+
+def _apply_send_timeout_evidence(
+    capabilities: dict[str, Any],
+    row_lookup: Mapping[str, Any],
+    workload: Mapping[str, Any],
+) -> None:
+    """LG07.send_timeout from the seeded two-arm Send-timeout workload.
+
+    Fail-closed per the error-parity rule: a probe_error on either arm keeps
+    the facet failing — identical errors are a finding, never a pass.
+    """
+    both_ran = (
+        "probe_error" not in workload["dharma"]
+        and "probe_error" not in workload["langgraph"]
+    )
+    fields = ("completed", "timed_out")
+    equal = both_ran and all(
+        workload["dharma"].get(name) == workload["langgraph"].get(name)
+        for name in fields
+    )
+    entry = capabilities["LG07"]["facets"]["send_timeout"]
+    entry["status"] = "pass" if equal else "fail"
+    entry["evidence"].append(
+        _evidence(
+            kind="two_arm_differential",
+            evidence_id="seeded_send_timeout:send_timeout",
+            command_or_probe=(
+                "compare within-timeout completion and overrun-timeout "
+                "failure of Send tasks on both installed runtimes"
+            ),
+            outcome="parity" if equal else "mismatch",
+            dharma={name: workload["dharma"].get(name) for name in fields},
+            langgraph={name: workload["langgraph"].get(name) for name in fields},
+            citations=_row_citations(row_lookup["LG07"]),
+        )
+    )
+
+
+# ---------------------------------------------------------------------------
+# Pregel-core S7 (LG08a): interrupt / Command(resume=...) workload.
+# Append-only harness extension — new seeded two-arm workload + evidence
+# applier + surface support entry for the command_resume facet.
+# ---------------------------------------------------------------------------
+
+
+class _ResumeState(TypedDict, total=False):
+    x: int
+    log: Annotated[list[Any], operator.add]
+
+
+def _command_resume_arm(arm: str, seed: int) -> dict[str, Any]:
+    rng = random.Random(_derived_seed(seed, "command-resume"))
+    initial = rng.randint(1, 30)
+    first_answer = f"ans-{rng.randint(100, 999)}"
+    second_answer = f"ans-{rng.randint(100, 999)}"
+
+    if arm == "langgraph":
+        from langgraph.checkpoint.memory import InMemorySaver
+        from langgraph.graph import END, START, StateGraph
+        from langgraph.types import Command as LGResumeCommand
+        from langgraph.types import interrupt as lg_interrupt
+
+        calls = {"ask": 0}
+
+        def pre(state):
+            return {"log": ["pre"]}
+
+        def ask(state):
+            calls["ask"] += 1
+            first = lg_interrupt({"q": "first"})
+            second = lg_interrupt({"q": "second"})
+            return {"log": [f"got_{first}_{second}"], "x": state["x"] + 1}
+
+        builder = StateGraph(_ResumeState)
+        builder.add_node("pre", pre)
+        builder.add_node("ask", ask)
+        builder.add_edge(START, "pre")
+        builder.add_edge("pre", "ask")
+        builder.add_edge("ask", END)
+        app = builder.compile(checkpointer=InMemorySaver())
+        config = {"configurable": {"thread_id": f"resume-{seed}"}}
+        r1 = app.invoke({"x": initial, "log": []}, config)
+        first_payload = r1["__interrupt__"][0].value
+        first_id = r1["__interrupt__"][0].id
+        r2 = app.invoke(LGResumeCommand(resume=first_answer), config)
+        second_payload = r2["__interrupt__"][0].value
+        id_stable = r2["__interrupt__"][0].id == first_id
+        final = app.invoke(LGResumeCommand(resume=second_answer), config)
+
+        rejected = False
+        try:
+            builder.compile().invoke(LGResumeCommand(resume=first_answer))
+        except RuntimeError:
+            rejected = True
+        return {
+            "first_interrupt": first_payload,
+            "second_interrupt": second_payload,
+            "interrupt_id_stable": id_stable,
+            "final": {"x": final["x"], "log": list(final["log"])},
+            "ask_calls": calls["ask"],
+            "resume_without_checkpointer_rejected": rejected,
+        }
+
+    from dharma_swarm.graph import (
+        END,
+        START,
+        AppendChannel,
+        Command,
+        GraphBuilder,
+        GraphInterrupted,
+        GraphPersistenceKernel,
+        GraphRuntimeError,
+        LastValueChannel,
+        interrupt,
+    )
+    from dharma_swarm.graph.effects import SimulatedEffects
+
+    calls = {"ask": 0}
+
+    def pre(state):
+        return {"log": ["pre"]}
+
+    def ask(state):
+        calls["ask"] += 1
+        first = interrupt({"q": "first"})
+        second = interrupt({"q": "second"})
+        return {"log": [f"got_{first}_{second}"], "x": state["x"] + 1}
+
+    compiled = (
+        GraphBuilder("gauntlet-resume")
+        .add_channel("x", LastValueChannel)
+        .add_channel("log", AppendChannel)
+        .add_node("pre", pre)
+        .add_node("ask", ask)
+        .add_edge(START, "pre")
+        .add_edge("pre", "ask")
+        .add_edge("ask", END)
+        .compile()
+    )
+    with tempfile.TemporaryDirectory(prefix="dharmagraph-resume-") as raw:
+        kernel = GraphPersistenceKernel(Path(raw))
+        thread = f"resume-{seed}"
+        try:
+            _run_awaitable(
+                compiled.invoke(
+                    input={"x": initial, "log": []},
+                    effects=SimulatedEffects(seed),
+                    graph_run_id=thread,
+                    persistence=kernel,
+                    thread_id=thread,
+                )
+            )
+            raise AssertionError("expected first interrupt")
+        except GraphInterrupted as suspended:
+            first_payload = suspended.interrupts[0].value
+            first_id = suspended.interrupts[0].id
+        try:
+            _run_awaitable(
+                compiled.invoke(
+                    input=Command(resume=first_answer),
+                    effects=SimulatedEffects(seed),
+                    persistence=kernel,
+                    thread_id=thread,
+                )
+            )
+            raise AssertionError("expected second interrupt")
+        except GraphInterrupted as suspended:
+            second_payload = suspended.interrupts[0].value
+            id_stable = suspended.interrupts[0].id == first_id
+        final = _run_awaitable(
+            compiled.invoke(
+                input=Command(resume=second_answer),
+                effects=SimulatedEffects(seed),
+                persistence=kernel,
+                thread_id=thread,
+            )
+        )
+        rejected = False
+        try:
+            _run_awaitable(
+                compiled.invoke(
+                    input=Command(resume=first_answer),
+                    effects=SimulatedEffects(seed),
+                )
+            )
+        except GraphRuntimeError:
+            rejected = True
+    return {
+        "first_interrupt": first_payload,
+        "second_interrupt": second_payload,
+        "interrupt_id_stable": id_stable,
+        "final": {"x": final.state["x"], "log": list(final.state["log"])},
+        "ask_calls": calls["ask"],
+        "resume_without_checkpointer_rejected": rejected,
+    }
+
+
+_WORKLOAD_ARMS["seeded_command_resume"] = _command_resume_arm
+_support("LG08", ("command_resume",), "dharma_swarm.graph:Command#resume")
+
+
+def _apply_command_resume_evidence(
+    capabilities: dict[str, Any],
+    row_lookup: Mapping[str, Any],
+    workload: Mapping[str, Any],
+) -> None:
+    """LG08.command_resume from the seeded two-arm interrupt/resume workload.
+
+    Fail-closed per the error-parity rule: a probe_error on either arm keeps
+    the facet failing — identical errors are a finding, never a pass.
+    """
+    both_ran = (
+        "probe_error" not in workload["dharma"]
+        and "probe_error" not in workload["langgraph"]
+    )
+    fields = (
+        "first_interrupt",
+        "second_interrupt",
+        "interrupt_id_stable",
+        "final",
+        "ask_calls",
+        "resume_without_checkpointer_rejected",
+    )
+    equal = both_ran and all(
+        workload["dharma"].get(name) == workload["langgraph"].get(name)
+        for name in fields
+    )
+    entry = capabilities["LG08"]["facets"]["command_resume"]
+    entry["status"] = "pass" if equal else "fail"
+    entry["evidence"].append(
+        _evidence(
+            kind="two_arm_differential",
+            evidence_id="seeded_command_resume:command_resume",
+            command_or_probe=(
+                "drive interrupt -> resume -> interrupt -> resume to "
+                "completion on persisted threads of both installed runtimes"
+            ),
+            outcome="parity" if equal else "mismatch",
+            dharma={name: workload["dharma"].get(name) for name in fields},
+            langgraph={name: workload["langgraph"].get(name) for name in fields},
+            citations=_row_citations(row_lookup["LG08"]),
+        )
+    )
+
+
+# ---------------------------------------------------------------------------
+# Pregel-core S8 (LG08b): subgraph-as-node + Command.PARENT workload.
+# Append-only harness extension — new seeded two-arm workload + evidence
+# applier + surface support entry for the command_parent facet.
+# ---------------------------------------------------------------------------
+
+
+class _ParentState(TypedDict, total=False):
+    x: int
+    log: Annotated[list[Any], operator.add]
+
+
+def _command_parent_arm(arm: str, seed: int) -> dict[str, Any]:
+    rng = random.Random(_derived_seed(seed, "command-parent"))
+    magic = rng.randint(10, 99)
+
+    if arm == "langgraph":
+        from langgraph.errors import ParentCommand as LGParentCommand
+        from langgraph.graph import END, START, StateGraph
+        from langgraph.types import Command as LGParentCmd
+
+        child = StateGraph(_ParentState)
+        child.add_node("c1", lambda state: {"log": ["c1"]})
+        child.add_node(
+            "c2",
+            lambda state: LGParentCmd(
+                graph=LGParentCmd.PARENT,
+                update={"log": ["c2_parent_update"], "x": magic},
+                goto="target",
+            ),
+        )
+        child.add_edge(START, "c1")
+        child.add_edge("c1", "c2")
+        child.add_edge("c2", END)
+
+        parent = StateGraph(_ParentState)
+        parent.add_node("entry", lambda state: {"log": ["entry"]})
+        parent.add_node("sub", child.compile())
+        parent.add_node(
+            "target", lambda state: {"log": [f"target_saw_x{state['x']}"]}
+        )
+        parent.add_edge(START, "entry")
+        parent.add_edge("entry", "sub")
+        parent.add_edge("sub", END)
+        parent.add_edge("target", END)
+        out = parent.compile().invoke({"x": 0, "log": []})
+
+        solo = StateGraph(_ParentState)
+        solo.add_node(
+            "bad",
+            lambda state: LGParentCmd(
+                graph=LGParentCmd.PARENT, update={"x": 1}
+            ),
+        )
+        solo.add_edge(START, "bad")
+        solo.add_edge("bad", END)
+        orphan_rejected = False
+        try:
+            solo.compile().invoke({"x": 0, "log": []})
+        except LGParentCommand:
+            orphan_rejected = True
+        return {
+            "parent_final": {"x": out["x"], "log": list(out["log"])},
+            "no_parent_rejected": orphan_rejected,
+        }
+
+    from dharma_swarm.graph import (
+        END,
+        START,
+        AppendChannel,
+        Command,
+        GraphBuilder,
+        LastValueChannel,
+        ParentCommand,
+        as_node,
+    )
+    from dharma_swarm.graph.effects import SimulatedEffects
+
+    child = (
+        GraphBuilder("gauntlet-parent-child")
+        .add_channel("x", LastValueChannel)
+        .add_channel("log", AppendChannel)
+        .add_node("c1", lambda state: {"log": ["c1"]})
+        .add_node(
+            "c2",
+            lambda state: Command(
+                graph=Command.PARENT,
+                update={"log": ["c2_parent_update"], "x": magic},
+                goto="target",
+            ),
+        )
+        .add_edge(START, "c1")
+        .add_edge("c1", "c2")
+        .add_edge("c2", END)
+        .compile()
+    )
+    parent = (
+        GraphBuilder("gauntlet-parent")
+        .add_channel("x", LastValueChannel)
+        .add_channel("log", AppendChannel)
+        .add_node("entry", lambda state: {"log": ["entry"]})
+        .add_node(
+            "sub",
+            as_node(child, effects_factory=lambda: SimulatedEffects(seed)),
+        )
+        .add_node(
+            "target", lambda state: {"log": [f"target_saw_x{state['x']}"]}
+        )
+        .add_edge(START, "entry")
+        .add_edge("entry", "sub")
+        .add_edge("sub", END)
+        .add_edge("target", END)
+        .compile(allow_orphans=True)
+    )
+    out = _run_awaitable(
+        parent.invoke(input={"x": 0, "log": []}, effects=SimulatedEffects(seed))
+    )
+    solo = (
+        GraphBuilder("gauntlet-parent-solo")
+        .add_channel("x", LastValueChannel)
+        .add_channel("log", AppendChannel)
+        .add_node(
+            "bad",
+            lambda state: Command(graph=Command.PARENT, update={"x": 1}),
+        )
+        .add_edge(START, "bad")
+        .add_edge("bad", END)
+        .compile()
+    )
+    orphan_rejected = False
+    try:
+        _run_awaitable(
+            solo.invoke(input={"x": 0, "log": []}, effects=SimulatedEffects(seed))
+        )
+    except ParentCommand:
+        orphan_rejected = True
+    return {
+        "parent_final": {"x": out.state["x"], "log": list(out.state["log"])},
+        "no_parent_rejected": orphan_rejected,
+    }
+
+
+_WORKLOAD_ARMS["seeded_command_parent"] = _command_parent_arm
+_support("LG08", ("command_parent",), "dharma_swarm.graph:Command#graph")
+
+
+def _apply_command_parent_evidence(
+    capabilities: dict[str, Any],
+    row_lookup: Mapping[str, Any],
+    workload: Mapping[str, Any],
+) -> None:
+    """LG08.command_parent from the seeded two-arm subgraph workload.
+
+    Fail-closed per the error-parity rule: a probe_error on either arm keeps
+    the facet failing — identical errors are a finding, never a pass.
+    """
+    both_ran = (
+        "probe_error" not in workload["dharma"]
+        and "probe_error" not in workload["langgraph"]
+    )
+    fields = ("parent_final", "no_parent_rejected")
+    equal = both_ran and all(
+        workload["dharma"].get(name) == workload["langgraph"].get(name)
+        for name in fields
+    )
+    entry = capabilities["LG08"]["facets"]["command_parent"]
+    entry["status"] = "pass" if equal else "fail"
+    entry["evidence"].append(
+        _evidence(
+            kind="two_arm_differential",
+            evidence_id="seeded_command_parent:command_parent",
+            command_or_probe=(
+                "bubble Command(graph=PARENT) from a subgraph node into the "
+                "parent's reducers and routing on both installed runtimes"
+            ),
+            outcome="parity" if equal else "mismatch",
+            dharma={name: workload["dharma"].get(name) for name in fields},
+            langgraph={name: workload["langgraph"].get(name) for name in fields},
+            citations=_row_citations(row_lookup["LG08"]),
+        )
+    )

@@ -1,9 +1,7 @@
 {
   "capabilities": [
     {
-      "caveats": [
-        "unproven facets: typed_state_schema, input_schema, output_schema, context_schema"
-      ],
+      "caveats": [],
       "class": "core",
       "facets": {
         "context_schema": {
@@ -17,8 +15,8 @@
               ],
               "command_or_probe": "resolve dharma_swarm.graph:context_schema and langgraph.graph:StateGraph",
               "dharma": {
-                "available": false,
-                "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'context_schema'",
+                "available": true,
+                "kind": "function",
                 "path": "dharma_swarm.graph:context_schema"
               },
               "id": "surface-lg01-context_schema",
@@ -28,10 +26,42 @@
                 "kind": "type",
                 "path": "langgraph.graph:StateGraph"
               },
-              "outcome": "dharma_public_surface_missing"
+              "outcome": "related_public_surfaces_present_behavior_unproven"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/graph/state.py:130",
+                "dharma_swarm/graph/state.py:50",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "compare context_applied+projected_output from the typed-schema workload on both installed runtimes",
+              "dharma": {
+                "context_applied": true,
+                "projected_output": {
+                  "log": [
+                    "a",
+                    "b"
+                  ],
+                  "x": 7
+                }
+              },
+              "id": "seeded_typed_schema_projection:context_schema",
+              "kind": "two_arm_differential",
+              "langgraph": {
+                "context_applied": true,
+                "projected_output": {
+                  "log": [
+                    "a",
+                    "b"
+                  ],
+                  "x": 7
+                }
+              },
+              "outcome": "parity"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "input_schema": {
           "evidence": [
@@ -44,8 +74,8 @@
               ],
               "command_or_probe": "resolve dharma_swarm.graph:input_schema and langgraph.graph:StateGraph",
               "dharma": {
-                "available": false,
-                "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'input_schema'",
+                "available": true,
+                "kind": "function",
                 "path": "dharma_swarm.graph:input_schema"
               },
               "id": "surface-lg01-input_schema",
@@ -55,10 +85,42 @@
                 "kind": "type",
                 "path": "langgraph.graph:StateGraph"
               },
-              "outcome": "dharma_public_surface_missing"
+              "outcome": "related_public_surfaces_present_behavior_unproven"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/graph/state.py:130",
+                "dharma_swarm/graph/state.py:50",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "compare input_extra_filtered+projected_output from the typed-schema workload on both installed runtimes",
+              "dharma": {
+                "input_extra_filtered": true,
+                "projected_output": {
+                  "log": [
+                    "a",
+                    "b"
+                  ],
+                  "x": 7
+                }
+              },
+              "id": "seeded_typed_schema_projection:input_schema",
+              "kind": "two_arm_differential",
+              "langgraph": {
+                "input_extra_filtered": true,
+                "projected_output": {
+                  "log": [
+                    "a",
+                    "b"
+                  ],
+                  "x": 7
+                }
+              },
+              "outcome": "parity"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "output_schema": {
           "evidence": [
@@ -71,8 +133,8 @@
               ],
               "command_or_probe": "resolve dharma_swarm.graph:output_schema and langgraph.graph:StateGraph",
               "dharma": {
-                "available": false,
-                "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'output_schema'",
+                "available": true,
+                "kind": "function",
                 "path": "dharma_swarm.graph:output_schema"
               },
               "id": "surface-lg01-output_schema",
@@ -82,10 +144,42 @@
                 "kind": "type",
                 "path": "langgraph.graph:StateGraph"
               },
-              "outcome": "dharma_public_surface_missing"
+              "outcome": "related_public_surfaces_present_behavior_unproven"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/graph/state.py:130",
+                "dharma_swarm/graph/state.py:50",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "compare secret_hidden+projected_output from the typed-schema workload on both installed runtimes",
+              "dharma": {
+                "projected_output": {
+                  "log": [
+                    "a",
+                    "b"
+                  ],
+                  "x": 7
+                },
+                "secret_hidden": true
+              },
+              "id": "seeded_typed_schema_projection:output_schema",
+              "kind": "two_arm_differential",
+              "langgraph": {
+                "projected_output": {
+                  "log": [
+                    "a",
+                    "b"
+                  ],
+                  "x": 7
+                },
+                "secret_hidden": true
+              },
+              "outcome": "parity"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "partial_updates": {
           "evidence": [
@@ -159,8 +253,8 @@
               ],
               "command_or_probe": "resolve dharma_swarm.graph:typed_state_schema and langgraph.graph:StateGraph",
               "dharma": {
-                "available": false,
-                "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'typed_state_schema'",
+                "available": true,
+                "kind": "function",
                 "path": "dharma_swarm.graph:typed_state_schema"
               },
               "id": "surface-lg01-typed_state_schema",
@@ -170,17 +264,49 @@
                 "kind": "type",
                 "path": "langgraph.graph:StateGraph"
               },
-              "outcome": "dharma_public_surface_missing"
+              "outcome": "related_public_surfaces_present_behavior_unproven"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/graph/state.py:130",
+                "dharma_swarm/graph/state.py:50",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "compare projected_output+unannotated_conflict_rejected from the typed-schema workload on both installed runtimes",
+              "dharma": {
+                "projected_output": {
+                  "log": [
+                    "a",
+                    "b"
+                  ],
+                  "x": 7
+                },
+                "unannotated_conflict_rejected": true
+              },
+              "id": "seeded_typed_schema_projection:typed_state_schema",
+              "kind": "two_arm_differential",
+              "langgraph": {
+                "projected_output": {
+                  "log": [
+                    "a",
+                    "b"
+                  ],
+                  "x": 7
+                },
+                "unannotated_conflict_rejected": true
+              },
+              "outcome": "parity"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         }
       },
       "gap_card": "parity-gap-lg01-schemas",
       "id": "LG01",
       "name": "State, input, output, and context schemas with partial updates",
-      "points": 1,
-      "verdict": "PARTIALLY_PROVEN",
+      "points": 2,
+      "verdict": "FULLY_PROVEN",
       "weight": 4
     },
     {
@@ -482,9 +608,7 @@
       "weight": 1
     },
     {
-      "caveats": [
-        "unproven facets: sequence"
-      ],
+      "caveats": [],
       "class": "core",
       "facets": {
         "barrier_edges": {
@@ -520,7 +644,7 @@
               ],
               "command_or_probe": "execute seeded_barrier_parallel_overlap on both installed runtimes",
               "dharma": {
-                "parallel_actor_overlap": false,
+                "parallel_actor_overlap": true,
                 "state": {
                   "joined": 2,
                   "marks": [
@@ -738,11 +862,11 @@
                 "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
                 "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
               ],
-              "command_or_probe": "resolve dharma_swarm.graph:sequence and langgraph.graph:StateGraph",
+              "command_or_probe": "resolve dharma_swarm.graph:GraphBuilder.add_sequence and langgraph.graph:StateGraph",
               "dharma": {
-                "available": false,
-                "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'sequence'",
-                "path": "dharma_swarm.graph:sequence"
+                "available": true,
+                "kind": "function",
+                "path": "dharma_swarm.graph:GraphBuilder.add_sequence"
               },
               "id": "surface-lg04-sequence",
               "kind": "public_surface_probe",
@@ -751,10 +875,56 @@
                 "kind": "type",
                 "path": "langgraph.graph:StateGraph"
               },
-              "outcome": "dharma_public_surface_missing"
+              "outcome": "related_public_surfaces_present_behavior_unproven"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/graph/state.py:915",
+                "dharma_swarm/graph/compiler.py:108",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "compare chained+bare_named add_sequence outcomes on both installed runtimes",
+              "dharma": {
+                "bare_named": {
+                  "log": [
+                    "one",
+                    "two"
+                  ],
+                  "x": 30
+                },
+                "chained": {
+                  "log": [
+                    "one",
+                    "two",
+                    "three"
+                  ],
+                  "x": 21
+                }
+              },
+              "id": "seeded_sequence_chain:sequence",
+              "kind": "two_arm_differential",
+              "langgraph": {
+                "bare_named": {
+                  "log": [
+                    "one",
+                    "two"
+                  ],
+                  "x": 30
+                },
+                "chained": {
+                  "log": [
+                    "one",
+                    "two",
+                    "three"
+                  ],
+                  "x": 21
+                }
+              },
+              "outcome": "parity"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "static_edges": {
           "evidence": [
@@ -821,8 +991,8 @@
       "gap_card": "parity-gap-lg04-topology",
       "id": "LG04",
       "name": "Static topology, sequence, entry/finish, and ALL barrier edges",
-      "points": 1,
-      "verdict": "PARTIALLY_PROVEN",
+      "points": 2,
+      "verdict": "FULLY_PROVEN",
       "weight": 2
     },
     {
@@ -997,9 +1167,7 @@
       "weight": 1
     },
     {
-      "caveats": [
-        "unproven facets: parallel_actor_overlap, step_atomicity, sibling_failure_stops_step"
-      ],
+      "caveats": [],
       "class": "core",
       "facets": {
         "barrier_visibility": {
@@ -1035,7 +1203,7 @@
               ],
               "command_or_probe": "execute seeded_barrier_parallel_overlap on both installed runtimes",
               "dharma": {
-                "parallel_actor_overlap": false,
+                "parallel_actor_overlap": true,
                 "state": {
                   "joined": 2,
                   "marks": [
@@ -1094,7 +1262,7 @@
               ],
               "command_or_probe": "measure actor interval overlap on both runtimes",
               "dharma": {
-                "parallel_actor_overlap": false,
+                "parallel_actor_overlap": true,
                 "state": {
                   "joined": 2,
                   "marks": [
@@ -1115,10 +1283,10 @@
                   ]
                 }
               },
-              "outcome": "mismatch"
+              "outcome": "parity"
             }
           ],
-          "status": "fail"
+          "status": "pass"
         },
         "sibling_failure_stops_step": {
           "evidence": [
@@ -1153,17 +1321,17 @@
               ],
               "command_or_probe": "compare x_after_failed_step after seeded failed superstep",
               "dharma": {
-                "x_after_failed_step": 26
+                "x_after_failed_step": 27
               },
               "id": "seeded_error_atomicity:x_after_failed_step",
               "kind": "two_arm_differential",
               "langgraph": {
                 "x_after_failed_step": 27
               },
-              "outcome": "mismatch"
+              "outcome": "parity"
             }
           ],
-          "status": "fail"
+          "status": "pass"
         },
         "step_atomicity": {
           "evidence": [
@@ -1198,30 +1366,28 @@
               ],
               "command_or_probe": "compare x_after_failed_step after seeded failed superstep",
               "dharma": {
-                "x_after_failed_step": 26
+                "x_after_failed_step": 27
               },
               "id": "seeded_error_atomicity:x_after_failed_step",
               "kind": "two_arm_differential",
               "langgraph": {
                 "x_after_failed_step": 27
               },
-              "outcome": "mismatch"
+              "outcome": "parity"
             }
           ],
-          "status": "fail"
+          "status": "pass"
         }
       },
       "gap_card": "parity-gap-lg06-supersteps",
       "id": "LG06",
       "name": "Bulk-synchronous parallel supersteps and step atomicity",
-      "points": 1,
-      "verdict": "PARTIALLY_PROVEN",
+      "points": 2,
+      "verdict": "FULLY_PROVEN",
       "weight": 2
     },
     {
-      "caveats": [
-        "unproven facets: send_timeout"
-      ],
+      "caveats": [],
       "class": "core",
       "facets": {
         "custom_branch_state": {
@@ -1422,11 +1588,12 @@
                 "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
                 "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
               ],
-              "command_or_probe": "resolve dharma_swarm.graph:send_timeout and langgraph.pregel:Pregel",
+              "command_or_probe": "resolve dharma_swarm.graph:Send#timeout and langgraph.pregel:Pregel",
               "dharma": {
-                "available": false,
-                "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'send_timeout'",
-                "path": "dharma_swarm.graph:send_timeout"
+                "available": true,
+                "kind": "type",
+                "parameter": "timeout",
+                "path": "dharma_swarm.graph:Send#timeout"
               },
               "id": "surface-lg07-send_timeout",
               "kind": "public_surface_probe",
@@ -1435,23 +1602,55 @@
                 "kind": "ABCMeta",
                 "path": "langgraph.pregel:Pregel"
               },
-              "outcome": "dharma_public_surface_missing"
+              "outcome": "related_public_surfaces_present_behavior_unproven"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/types.py:664",
+                "dharma_swarm/graph/routing.py:72",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "compare within-timeout completion and overrun-timeout failure of Send tasks on both installed runtimes",
+              "dharma": {
+                "completed": {
+                  "joined": 3,
+                  "marks": [
+                    "fan",
+                    "w0",
+                    "w1"
+                  ]
+                },
+                "timed_out": true
+              },
+              "id": "seeded_send_timeout:send_timeout",
+              "kind": "two_arm_differential",
+              "langgraph": {
+                "completed": {
+                  "joined": 3,
+                  "marks": [
+                    "fan",
+                    "w0",
+                    "w1"
+                  ]
+                },
+                "timed_out": true
+              },
+              "outcome": "parity"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         }
       },
       "gap_card": "parity-gap-lg07-send",
       "id": "LG07",
       "name": "Dynamic Send fan-out and map-reduce",
-      "points": 1,
-      "verdict": "PARTIALLY_PROVEN",
+      "points": 2,
+      "verdict": "FULLY_PROVEN",
       "weight": 1
     },
     {
-      "caveats": [
-        "unproven facets: command_parent, command_resume"
-      ],
+      "caveats": [],
       "class": "core",
       "facets": {
         "command_goto": {
@@ -1573,11 +1772,12 @@
                 "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
                 "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
               ],
-              "command_or_probe": "resolve dharma_swarm.graph:command_parent and langgraph.pregel:Pregel",
+              "command_or_probe": "resolve dharma_swarm.graph:Command#graph and langgraph.pregel:Pregel",
               "dharma": {
-                "available": false,
-                "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'command_parent'",
-                "path": "dharma_swarm.graph:command_parent"
+                "available": true,
+                "kind": "type",
+                "parameter": "graph",
+                "path": "dharma_swarm.graph:Command#graph"
               },
               "id": "surface-lg08-command_parent",
               "kind": "public_surface_probe",
@@ -1586,10 +1786,44 @@
                 "kind": "ABCMeta",
                 "path": "langgraph.pregel:Pregel"
               },
-              "outcome": "dharma_public_surface_missing"
+              "outcome": "related_public_surfaces_present_behavior_unproven"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/types.py:758",
+                "dharma_swarm/graph/routing.py:93",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "bubble Command(graph=PARENT) from a subgraph node into the parent's reducers and routing on both installed runtimes",
+              "dharma": {
+                "no_parent_rejected": true,
+                "parent_final": {
+                  "log": [
+                    "entry",
+                    "c2_parent_update",
+                    "target_saw_x81"
+                  ],
+                  "x": 81
+                }
+              },
+              "id": "seeded_command_parent:command_parent",
+              "kind": "two_arm_differential",
+              "langgraph": {
+                "no_parent_rejected": true,
+                "parent_final": {
+                  "log": [
+                    "entry",
+                    "c2_parent_update",
+                    "target_saw_x81"
+                  ],
+                  "x": 81
+                }
+              },
+              "outcome": "parity"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "command_resume": {
           "evidence": [
@@ -1600,11 +1834,12 @@
                 "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
                 "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
               ],
-              "command_or_probe": "resolve dharma_swarm.graph:command_resume and langgraph.pregel:Pregel",
+              "command_or_probe": "resolve dharma_swarm.graph:Command#resume and langgraph.pregel:Pregel",
               "dharma": {
-                "available": false,
-                "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'command_resume'",
-                "path": "dharma_swarm.graph:command_resume"
+                "available": true,
+                "kind": "type",
+                "parameter": "resume",
+                "path": "dharma_swarm.graph:Command#resume"
               },
               "id": "surface-lg08-command_resume",
               "kind": "public_surface_probe",
@@ -1613,10 +1848,58 @@
                 "kind": "ABCMeta",
                 "path": "langgraph.pregel:Pregel"
               },
-              "outcome": "dharma_public_surface_missing"
+              "outcome": "related_public_surfaces_present_behavior_unproven"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/types.py:758",
+                "dharma_swarm/graph/routing.py:93",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "drive interrupt -> resume -> interrupt -> resume to completion on persisted threads of both installed runtimes",
+              "dharma": {
+                "ask_calls": 3,
+                "final": {
+                  "log": [
+                    "pre",
+                    "got_ans-875_ans-352"
+                  ],
+                  "x": 7
+                },
+                "first_interrupt": {
+                  "q": "first"
+                },
+                "interrupt_id_stable": true,
+                "resume_without_checkpointer_rejected": true,
+                "second_interrupt": {
+                  "q": "second"
+                }
+              },
+              "id": "seeded_command_resume:command_resume",
+              "kind": "two_arm_differential",
+              "langgraph": {
+                "ask_calls": 3,
+                "final": {
+                  "log": [
+                    "pre",
+                    "got_ans-875_ans-352"
+                  ],
+                  "x": 7
+                },
+                "first_interrupt": {
+                  "q": "first"
+                },
+                "interrupt_id_stable": true,
+                "resume_without_checkpointer_rejected": true,
+                "second_interrupt": {
+                  "q": "second"
+                }
+              },
+              "outcome": "parity"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "command_send": {
           "evidence": [
@@ -1732,14 +2015,12 @@
       "gap_card": "parity-gap-lg08-command",
       "id": "LG08",
       "name": "Command update, multi-target goto, parent routing, and resume",
-      "points": 1,
-      "verdict": "PARTIALLY_PROVEN",
+      "points": 2,
+      "verdict": "FULLY_PROVEN",
       "weight": 2
     },
     {
-      "caveats": [
-        "unproven facets: remaining_steps"
-      ],
+      "caveats": [],
       "class": "core",
       "facets": {
         "cycles": {
@@ -1892,11 +2173,11 @@
                 "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
                 "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
               ],
-              "command_or_probe": "resolve dharma_swarm.graph:remaining_steps and langgraph.pregel:Pregel",
+              "command_or_probe": "resolve dharma_swarm.graph:RemainingSteps and langgraph.pregel:Pregel",
               "dharma": {
-                "available": false,
-                "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'remaining_steps'",
-                "path": "dharma_swarm.graph:remaining_steps"
+                "available": true,
+                "kind": "type",
+                "path": "dharma_swarm.graph:RemainingSteps"
               },
               "id": "surface-lg09-remaining_steps",
               "kind": "public_surface_probe",
@@ -1905,17 +2186,45 @@
                 "kind": "ABCMeta",
                 "path": "langgraph.pregel:Pregel"
               },
-              "outcome": "dharma_public_surface_missing"
+              "outcome": "related_public_surfaces_present_behavior_unproven"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/errors.py:67",
+                "dharma_swarm/graph/scheduler.py:152",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "compare the observed remaining-step sequences and per-invoke budget reset on both installed runtimes",
+              "dharma": {
+                "budget_resets_per_invoke": true,
+                "final_count": 2,
+                "remaining_seen": [
+                  4,
+                  3
+                ]
+              },
+              "id": "seeded_remaining_steps:remaining_steps",
+              "kind": "two_arm_differential",
+              "langgraph": {
+                "budget_resets_per_invoke": true,
+                "final_count": 2,
+                "remaining_seen": [
+                  4,
+                  3
+                ]
+              },
+              "outcome": "parity"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         }
       },
       "gap_card": "parity-gap-lg09-cycles",
       "id": "LG09",
       "name": "Cycles, recursion caps, and managed remaining-step state",
-      "points": 1,
-      "verdict": "PARTIALLY_PROVEN",
+      "points": 2,
+      "verdict": "FULLY_PROVEN",
       "weight": 1
     },
     {
@@ -4816,7 +5125,7 @@
               "dharma": {
                 "conflict_rejected": true,
                 "exception_propagated": true,
-                "x_after_failed_step": 26
+                "x_after_failed_step": 27
               },
               "id": "seeded_error_atomicity:pending-write-recovery",
               "kind": "capability_boundary",
@@ -6011,7 +6320,7 @@
     },
     {
       "caveats": [
-        "unproven facets: sibling_cancellation, user_cancellation, error_handler, atomic_writes"
+        "unproven facets: sibling_cancellation, user_cancellation, error_handler"
       ],
       "class": "core",
       "facets": {
@@ -6048,17 +6357,17 @@
               ],
               "command_or_probe": "compare x_after_failed_step after seeded failed superstep",
               "dharma": {
-                "x_after_failed_step": 26
+                "x_after_failed_step": 27
               },
               "id": "seeded_error_atomicity:x_after_failed_step",
               "kind": "two_arm_differential",
               "langgraph": {
                 "x_after_failed_step": 27
               },
-              "outcome": "mismatch"
+              "outcome": "parity"
             }
           ],
-          "status": "fail"
+          "status": "pass"
         },
         "error_handler": {
           "evidence": [
@@ -6812,8 +7121,8 @@
               ],
               "command_or_probe": "resolve dharma_swarm.graph:context_schema and langgraph.graph:StateGraph",
               "dharma": {
-                "available": false,
-                "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'context_schema'",
+                "available": true,
+                "kind": "function",
                 "path": "dharma_swarm.graph:context_schema"
               },
               "id": "surface-lg30-context_schema",
@@ -6823,10 +7132,10 @@
                 "kind": "type",
                 "path": "langgraph.graph:StateGraph"
               },
-              "outcome": "dharma_public_surface_missing"
+              "outcome": "related_public_surfaces_present_behavior_unproven"
             }
           ],
-          "status": "missing"
+          "status": "partial"
         },
         "execution_info": {
           "evidence": [
@@ -10030,25 +10339,25 @@
               ],
               "command_or_probe": "time both arms for 5 iterations",
               "dharma": {
-                "median_seconds": 0.009099334012717009,
+                "median_seconds": 0.07327489700014667,
                 "samples_seconds": [
-                  0.009766416973434389,
-                  0.009253332973457873,
-                  0.009042958030477166,
-                  0.009099334012717009,
-                  0.008724416024051607
+                  0.09409873100003097,
+                  0.07327489700014667,
+                  0.07018511499995839,
+                  0.06814366999992671,
+                  0.08762603300010596
                 ]
               },
               "id": "performance:seeded_checkpoint_resume_fork",
               "kind": "wall_clock_performance",
               "langgraph": {
-                "median_seconds": 0.0027849579928442836,
+                "median_seconds": 0.009361773999899015,
                 "samples_seconds": [
-                  0.0028009579982608557,
-                  0.0026310410466976464,
-                  0.0028118750196881592,
-                  0.00255237496457994,
-                  0.0027849579928442836
+                  0.009361773999899015,
+                  0.008856560999902285,
+                  0.01063180400001329,
+                  0.010158525999941048,
+                  0.009121993000007933
                 ]
               },
               "outcome": "measured_semantics_parity"
@@ -10090,17 +10399,17 @@
               "command_or_probe": "record interpreter, platform, and installed LangGraph version",
               "dharma": {
                 "langgraph_version": "1.2.4",
-                "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
-                "python_executable": "/Users/dhyana/dharma_swarm/.venv/bin/python",
-                "python_version": "3.13.12"
+                "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
+                "python_executable": "/usr/local/bin/python3",
+                "python_version": "3.11.15"
               },
               "id": "performance:environment-metadata",
               "kind": "runtime_environment",
               "langgraph": {
                 "langgraph_version": "1.2.4",
-                "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
-                "python_executable": "/Users/dhyana/dharma_swarm/.venv/bin/python",
-                "python_version": "3.13.12"
+                "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
+                "python_executable": "/usr/local/bin/python3",
+                "python_version": "3.11.15"
               },
               "outcome": "recorded"
             }
@@ -10140,25 +10449,25 @@
               ],
               "command_or_probe": "time both arms for 5 iterations",
               "dharma": {
-                "median_seconds": 0.00036862498382106423,
+                "median_seconds": 0.0012462009999580914,
                 "samples_seconds": [
-                  0.000622958003077656,
-                  0.00039350002771243453,
-                  0.0003310000174678862,
-                  0.00036862498382106423,
-                  0.00032454199390485883
+                  0.0013439510000807786,
+                  0.0012462009999580914,
+                  0.000972648000015397,
+                  0.0013112619999446906,
+                  0.0010244850000162842
                 ]
               },
               "id": "performance:seeded_linear_reducer_chain",
               "kind": "wall_clock_performance",
               "langgraph": {
-                "median_seconds": 0.0016348340432159603,
+                "median_seconds": 0.004773012999976345,
                 "samples_seconds": [
-                  0.0018670840072445571,
-                  0.0016348340432159603,
-                  0.0017684160266071558,
-                  0.0015871250070631504,
-                  0.0015704580000601709
+                  0.00526238999987072,
+                  0.004773012999976345,
+                  0.004731744999844523,
+                  0.005412408999973195,
+                  0.004417453999849386
                 ]
               },
               "outcome": "measured_semantics_parity"
@@ -10199,9 +10508,9 @@
               ],
               "command_or_probe": "compute Dharma median / LangGraph median",
               "dharma": {
-                "seeded_checkpoint_resume_fork": 3.2673146367367067,
-                "seeded_linear_reducer_chain": 0.2254815926734217,
-                "seeded_send_map_reduce": 0.2830362489060845
+                "seeded_checkpoint_resume_fork": 7.827031180301627,
+                "seeded_linear_reducer_chain": 0.2610931501683041,
+                "seeded_send_map_reduce": 0.19033126783810592
               },
               "id": "performance:overhead-ratios",
               "kind": "wall_clock_performance",
@@ -10246,25 +10555,25 @@
               ],
               "command_or_probe": "time both arms for 5 iterations",
               "dharma": {
-                "median_seconds": 0.0003133330028504133,
+                "median_seconds": 0.0008181420000710204,
                 "samples_seconds": [
-                  0.00031795899849385023,
-                  0.0003347909660078585,
-                  0.0002780419890768826,
-                  0.0003133330028504133,
-                  0.00029670802177861333
+                  0.0007631030000538885,
+                  0.0009491359999174165,
+                  0.0006886910000503121,
+                  0.0008513420000326732,
+                  0.0008181420000710204
                 ]
               },
               "id": "performance:seeded_send_map_reduce",
               "kind": "wall_clock_performance",
               "langgraph": {
-                "median_seconds": 0.0011070419568568468,
+                "median_seconds": 0.004298515999835217,
                 "samples_seconds": [
-                  0.0011645830236375332,
-                  0.0010946249822154641,
-                  0.0010833749547600746,
-                  0.0014300420298241079,
-                  0.0011070419568568468
+                  0.004613018000100055,
+                  0.004006038999932571,
+                  0.004298515999835217,
+                  0.0040898009999637,
+                  0.005077206000123624
                 ]
               },
               "outcome": "measured_semantics_parity"
@@ -11244,24 +11553,16 @@
       "supply_eta_risk"
     ]
   },
-  "digest": "80baf1feb9563f958b4ca5d74207610b8e8713a299976e00beb97c7974434c93",
+  "digest": "76cf5abfcf6e669046f3d34d89503d2138faa60981c9ac997b605431aff2b0e1",
   "environment": {
     "langgraph_checkpoint_sqlite_version": "3.1.0",
     "langgraph_checkpoint_version": "4.1.1",
     "langgraph_version": "1.2.4",
-    "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
-    "python_executable": "/Users/dhyana/dharma_swarm/.venv/bin/python",
-    "python_version": "3.13.12"
+    "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
+    "python_executable": "/usr/local/bin/python3",
+    "python_version": "3.11.15"
   },
   "gaps": [
-    {
-      "capability_id": "LG01",
-      "closure_condition": "All frozen facets prove 2/2 in an independent judge rerun.",
-      "gap_card": "parity-gap-lg01-schemas",
-      "name": "State, input, output, and context schemas with partial updates",
-      "points": 1,
-      "weight": 4
-    },
     {
       "capability_id": "LG02",
       "closure_condition": "All frozen facets prove 2/2 in an independent judge rerun.",
@@ -11276,46 +11577,6 @@
       "gap_card": "parity-gap-lg03-defer",
       "name": "Deferred and finalization nodes",
       "points": 0,
-      "weight": 1
-    },
-    {
-      "capability_id": "LG04",
-      "closure_condition": "All frozen facets prove 2/2 in an independent judge rerun.",
-      "gap_card": "parity-gap-lg04-topology",
-      "name": "Static topology, sequence, entry/finish, and ALL barrier edges",
-      "points": 1,
-      "weight": 2
-    },
-    {
-      "capability_id": "LG06",
-      "closure_condition": "All frozen facets prove 2/2 in an independent judge rerun.",
-      "gap_card": "parity-gap-lg06-supersteps",
-      "name": "Bulk-synchronous parallel supersteps and step atomicity",
-      "points": 1,
-      "weight": 2
-    },
-    {
-      "capability_id": "LG07",
-      "closure_condition": "All frozen facets prove 2/2 in an independent judge rerun.",
-      "gap_card": "parity-gap-lg07-send",
-      "name": "Dynamic Send fan-out and map-reduce",
-      "points": 1,
-      "weight": 1
-    },
-    {
-      "capability_id": "LG08",
-      "closure_condition": "All frozen facets prove 2/2 in an independent judge rerun.",
-      "gap_card": "parity-gap-lg08-command",
-      "name": "Command update, multi-target goto, parent routing, and resume",
-      "points": 1,
-      "weight": 2
-    },
-    {
-      "capability_id": "LG09",
-      "closure_condition": "All frozen facets prove 2/2 in an independent judge rerun.",
-      "gap_card": "parity-gap-lg09-cycles",
-      "name": "Cycles, recursion caps, and managed remaining-step state",
-      "points": 1,
       "weight": 1
     },
     {
@@ -11529,12 +11790,12 @@
   ],
   "judge": {
     "attestation": "I independently re-ran the committed gauntlet and compared the mechanical grade to the builder receipt.",
-    "builder_receipt_digest": "9783f9cbce333d8eabb27964ee2cd402051ec2828d0e27cc68d0217505af5917",
-    "builder_stable_digest": "e865481c9ea8ee0350a50aafdaa1b0bfd5b143a31ceea6da65e9bf5dd40952b7",
+    "builder_receipt_digest": "478930a492ecf0d85c7f734a751f0d44cc35c926e7b241b30d22dff021619ee1",
+    "builder_stable_digest": "59a6a08e226be3f699d11c8af20b5409881ed0e60a6b36b407dfe1bcd0a932a0",
     "discrepancy_is_finding": false,
-    "judge_id": "codex-judge-3d40063d8",
+    "judge_id": "claude-judge-c83df531c",
     "reconciliation": "MATCH",
-    "signature": "72198603d0178b5bf86221552fd920049ded646ac4f020191532b2d80a5c8566"
+    "signature": "abfcfd4f2439b9c0a33bc511730a3dc1797a8b267c237c0a234eca5cde0da86a"
   },
   "non_gating_drift_check": {
     "behavioral_execution_against_latest": false,
@@ -11551,14 +11812,14 @@
       "version": "1.2.8"
     }
   },
-  "observed_at": "2026-07-15T17:52:39Z",
+  "observed_at": "2026-07-17T13:50:38Z",
   "performance": {
     "clock": "time.perf_counter",
     "environment_metadata": {
       "langgraph_version": "1.2.4",
-      "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
-      "python_executable": "/Users/dhyana/dharma_swarm/.venv/bin/python",
-      "python_version": "3.13.12"
+      "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
+      "python_executable": "/usr/local/bin/python3",
+      "python_version": "3.11.15"
     },
     "iterations": 5,
     "timing_decides_semantic_parity": false,
@@ -11566,83 +11827,83 @@
     "workloads": {
       "seeded_checkpoint_resume_fork": {
         "dharma": {
-          "median_seconds": 0.009099334012717009,
+          "median_seconds": 0.07327489700014667,
           "samples_seconds": [
-            0.009766416973434389,
-            0.009253332973457873,
-            0.009042958030477166,
-            0.009099334012717009,
-            0.008724416024051607
+            0.09409873100003097,
+            0.07327489700014667,
+            0.07018511499995839,
+            0.06814366999992671,
+            0.08762603300010596
           ]
         },
-        "dharma_median_seconds": 0.009099334012717009,
+        "dharma_median_seconds": 0.07327489700014667,
         "iterations": 5,
         "langgraph": {
-          "median_seconds": 0.0027849579928442836,
+          "median_seconds": 0.009361773999899015,
           "samples_seconds": [
-            0.0028009579982608557,
-            0.0026310410466976464,
-            0.0028118750196881592,
-            0.00255237496457994,
-            0.0027849579928442836
+            0.009361773999899015,
+            0.008856560999902285,
+            0.01063180400001329,
+            0.010158525999941048,
+            0.009121993000007933
           ]
         },
-        "langgraph_median_seconds": 0.0027849579928442836,
-        "overhead_ratio_dharma_to_langgraph": 3.2673146367367067,
+        "langgraph_median_seconds": 0.009361773999899015,
+        "overhead_ratio_dharma_to_langgraph": 7.827031180301627,
         "semantic_parity_all_iterations": true
       },
       "seeded_linear_reducer_chain": {
         "dharma": {
-          "median_seconds": 0.00036862498382106423,
+          "median_seconds": 0.0012462009999580914,
           "samples_seconds": [
-            0.000622958003077656,
-            0.00039350002771243453,
-            0.0003310000174678862,
-            0.00036862498382106423,
-            0.00032454199390485883
+            0.0013439510000807786,
+            0.0012462009999580914,
+            0.000972648000015397,
+            0.0013112619999446906,
+            0.0010244850000162842
           ]
         },
-        "dharma_median_seconds": 0.00036862498382106423,
+        "dharma_median_seconds": 0.0012462009999580914,
         "iterations": 5,
         "langgraph": {
-          "median_seconds": 0.0016348340432159603,
+          "median_seconds": 0.004773012999976345,
           "samples_seconds": [
-            0.0018670840072445571,
-            0.0016348340432159603,
-            0.0017684160266071558,
-            0.0015871250070631504,
-            0.0015704580000601709
+            0.00526238999987072,
+            0.004773012999976345,
+            0.004731744999844523,
+            0.005412408999973195,
+            0.004417453999849386
           ]
         },
-        "langgraph_median_seconds": 0.0016348340432159603,
-        "overhead_ratio_dharma_to_langgraph": 0.2254815926734217,
+        "langgraph_median_seconds": 0.004773012999976345,
+        "overhead_ratio_dharma_to_langgraph": 0.2610931501683041,
         "semantic_parity_all_iterations": true
       },
       "seeded_send_map_reduce": {
         "dharma": {
-          "median_seconds": 0.0003133330028504133,
+          "median_seconds": 0.0008181420000710204,
           "samples_seconds": [
-            0.00031795899849385023,
-            0.0003347909660078585,
-            0.0002780419890768826,
-            0.0003133330028504133,
-            0.00029670802177861333
+            0.0007631030000538885,
+            0.0009491359999174165,
+            0.0006886910000503121,
+            0.0008513420000326732,
+            0.0008181420000710204
           ]
         },
-        "dharma_median_seconds": 0.0003133330028504133,
+        "dharma_median_seconds": 0.0008181420000710204,
         "iterations": 5,
         "langgraph": {
-          "median_seconds": 0.0011070419568568468,
+          "median_seconds": 0.004298515999835217,
           "samples_seconds": [
-            0.0011645830236375332,
-            0.0010946249822154641,
-            0.0010833749547600746,
-            0.0014300420298241079,
-            0.0011070419568568468
+            0.004613018000100055,
+            0.004006038999932571,
+            0.004298515999835217,
+            0.0040898009999637,
+            0.005077206000123624
           ]
         },
-        "langgraph_median_seconds": 0.0011070419568568468,
-        "overhead_ratio_dharma_to_langgraph": 0.2830362489060845,
+        "langgraph_median_seconds": 0.004298515999835217,
+        "overhead_ratio_dharma_to_langgraph": 0.19033126783810592,
         "semantic_parity_all_iterations": true
       }
     }
@@ -13046,10 +13307,10 @@
         }
       },
       "surface-lg01-context_schema": {
-        "comparison_verdict": "dharma_public_surface_missing",
+        "comparison_verdict": "related_public_surfaces_present_behavior_unproven",
         "dharma": {
-          "available": false,
-          "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'context_schema'",
+          "available": true,
+          "kind": "function",
           "path": "dharma_swarm.graph:context_schema"
         },
         "id": "surface-lg01-context_schema",
@@ -13060,10 +13321,10 @@
         }
       },
       "surface-lg01-input_schema": {
-        "comparison_verdict": "dharma_public_surface_missing",
+        "comparison_verdict": "related_public_surfaces_present_behavior_unproven",
         "dharma": {
-          "available": false,
-          "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'input_schema'",
+          "available": true,
+          "kind": "function",
           "path": "dharma_swarm.graph:input_schema"
         },
         "id": "surface-lg01-input_schema",
@@ -13074,10 +13335,10 @@
         }
       },
       "surface-lg01-output_schema": {
-        "comparison_verdict": "dharma_public_surface_missing",
+        "comparison_verdict": "related_public_surfaces_present_behavior_unproven",
         "dharma": {
-          "available": false,
-          "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'output_schema'",
+          "available": true,
+          "kind": "function",
           "path": "dharma_swarm.graph:output_schema"
         },
         "id": "surface-lg01-output_schema",
@@ -13102,10 +13363,10 @@
         }
       },
       "surface-lg01-typed_state_schema": {
-        "comparison_verdict": "dharma_public_surface_missing",
+        "comparison_verdict": "related_public_surfaces_present_behavior_unproven",
         "dharma": {
-          "available": false,
-          "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'typed_state_schema'",
+          "available": true,
+          "kind": "function",
           "path": "dharma_swarm.graph:typed_state_schema"
         },
         "id": "surface-lg01-typed_state_schema",
@@ -13312,11 +13573,11 @@
         }
       },
       "surface-lg04-sequence": {
-        "comparison_verdict": "dharma_public_surface_missing",
+        "comparison_verdict": "related_public_surfaces_present_behavior_unproven",
         "dharma": {
-          "available": false,
-          "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'sequence'",
-          "path": "dharma_swarm.graph:sequence"
+          "available": true,
+          "kind": "function",
+          "path": "dharma_swarm.graph:GraphBuilder.add_sequence"
         },
         "id": "surface-lg04-sequence",
         "langgraph": {
@@ -13480,11 +13741,12 @@
         }
       },
       "surface-lg07-send_timeout": {
-        "comparison_verdict": "dharma_public_surface_missing",
+        "comparison_verdict": "related_public_surfaces_present_behavior_unproven",
         "dharma": {
-          "available": false,
-          "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'send_timeout'",
-          "path": "dharma_swarm.graph:send_timeout"
+          "available": true,
+          "kind": "type",
+          "parameter": "timeout",
+          "path": "dharma_swarm.graph:Send#timeout"
         },
         "id": "surface-lg07-send_timeout",
         "langgraph": {
@@ -13522,11 +13784,12 @@
         }
       },
       "surface-lg08-command_parent": {
-        "comparison_verdict": "dharma_public_surface_missing",
+        "comparison_verdict": "related_public_surfaces_present_behavior_unproven",
         "dharma": {
-          "available": false,
-          "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'command_parent'",
-          "path": "dharma_swarm.graph:command_parent"
+          "available": true,
+          "kind": "type",
+          "parameter": "graph",
+          "path": "dharma_swarm.graph:Command#graph"
         },
         "id": "surface-lg08-command_parent",
         "langgraph": {
@@ -13536,11 +13799,12 @@
         }
       },
       "surface-lg08-command_resume": {
-        "comparison_verdict": "dharma_public_surface_missing",
+        "comparison_verdict": "related_public_surfaces_present_behavior_unproven",
         "dharma": {
-          "available": false,
-          "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'command_resume'",
-          "path": "dharma_swarm.graph:command_resume"
+          "available": true,
+          "kind": "type",
+          "parameter": "resume",
+          "path": "dharma_swarm.graph:Command#resume"
         },
         "id": "surface-lg08-command_resume",
         "langgraph": {
@@ -13620,11 +13884,11 @@
         }
       },
       "surface-lg09-remaining_steps": {
-        "comparison_verdict": "dharma_public_surface_missing",
+        "comparison_verdict": "related_public_surfaces_present_behavior_unproven",
         "dharma": {
-          "available": false,
-          "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'remaining_steps'",
-          "path": "dharma_swarm.graph:remaining_steps"
+          "available": true,
+          "kind": "type",
+          "path": "dharma_swarm.graph:RemainingSteps"
         },
         "id": "surface-lg09-remaining_steps",
         "langgraph": {
@@ -15373,10 +15637,10 @@
         }
       },
       "surface-lg30-context_schema": {
-        "comparison_verdict": "dharma_public_surface_missing",
+        "comparison_verdict": "related_public_surfaces_present_behavior_unproven",
         "dharma": {
-          "available": false,
-          "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'context_schema'",
+          "available": true,
+          "kind": "function",
           "path": "dharma_swarm.graph:context_schema"
         },
         "id": "surface-lg30-context_schema",
@@ -16201,9 +16465,9 @@
     },
     "workloads": {
       "seeded_barrier_parallel_overlap": {
-        "comparison_verdict": "mismatch",
+        "comparison_verdict": "parity",
         "dharma": {
-          "parallel_actor_overlap": false,
+          "parallel_actor_overlap": true,
           "state": {
             "joined": 2,
             "marks": [
@@ -16290,6 +16554,74 @@
         },
         "semantic_comparison_verdict": "parity"
       },
+      "seeded_command_parent": {
+        "comparison_verdict": "parity",
+        "dharma": {
+          "no_parent_rejected": true,
+          "parent_final": {
+            "log": [
+              "entry",
+              "c2_parent_update",
+              "target_saw_x81"
+            ],
+            "x": 81
+          }
+        },
+        "id": "seeded_command_parent",
+        "langgraph": {
+          "no_parent_rejected": true,
+          "parent_final": {
+            "log": [
+              "entry",
+              "c2_parent_update",
+              "target_saw_x81"
+            ],
+            "x": 81
+          }
+        },
+        "semantic_comparison_verdict": "parity"
+      },
+      "seeded_command_resume": {
+        "comparison_verdict": "parity",
+        "dharma": {
+          "ask_calls": 3,
+          "final": {
+            "log": [
+              "pre",
+              "got_ans-875_ans-352"
+            ],
+            "x": 7
+          },
+          "first_interrupt": {
+            "q": "first"
+          },
+          "interrupt_id_stable": true,
+          "resume_without_checkpointer_rejected": true,
+          "second_interrupt": {
+            "q": "second"
+          }
+        },
+        "id": "seeded_command_resume",
+        "langgraph": {
+          "ask_calls": 3,
+          "final": {
+            "log": [
+              "pre",
+              "got_ans-875_ans-352"
+            ],
+            "x": 7
+          },
+          "first_interrupt": {
+            "q": "first"
+          },
+          "interrupt_id_stable": true,
+          "resume_without_checkpointer_rejected": true,
+          "second_interrupt": {
+            "q": "second"
+          }
+        },
+        "semantic_comparison_verdict": "parity"
+      },
       "seeded_command_routing": {
         "comparison_verdict": "parity",
         "dharma": {
@@ -16344,11 +16676,11 @@
         "semantic_comparison_verdict": "parity"
       },
       "seeded_error_atomicity": {
-        "comparison_verdict": "mismatch",
+        "comparison_verdict": "parity",
         "dharma": {
           "conflict_rejected": true,
           "exception_propagated": true,
-          "x_after_failed_step": 26
+          "x_after_failed_step": 27
         },
         "id": "seeded_error_atomicity",
         "langgraph": {
@@ -16356,7 +16688,7 @@
           "exception_propagated": true,
           "x_after_failed_step": 27
         },
-        "semantic_comparison_verdict": "mismatch"
+        "semantic_comparison_verdict": "parity"
       },
       "seeded_linear_reducer_chain": {
         "comparison_verdict": "parity",
@@ -16382,6 +16714,27 @@
             -3
           ],
           "x": -18
+        },
+        "semantic_comparison_verdict": "parity"
+      },
+      "seeded_remaining_steps": {
+        "comparison_verdict": "parity",
+        "dharma": {
+          "budget_resets_per_invoke": true,
+          "final_count": 2,
+          "remaining_seen": [
+            4,
+            3
+          ]
+        },
+        "id": "seeded_remaining_steps",
+        "langgraph": {
+          "budget_resets_per_invoke": true,
+          "final_count": 2,
+          "remaining_seen": [
+            4,
+            3
+          ]
         },
         "semantic_comparison_verdict": "parity"
       },
@@ -16413,13 +16766,110 @@
           ]
         },
         "semantic_comparison_verdict": "parity"
+      },
+      "seeded_send_timeout": {
+        "comparison_verdict": "parity",
+        "dharma": {
+          "completed": {
+            "joined": 3,
+            "marks": [
+              "fan",
+              "w0",
+              "w1"
+            ]
+          },
+          "timed_out": true
+        },
+        "id": "seeded_send_timeout",
+        "langgraph": {
+          "completed": {
+            "joined": 3,
+            "marks": [
+              "fan",
+              "w0",
+              "w1"
+            ]
+          },
+          "timed_out": true
+        },
+        "semantic_comparison_verdict": "parity"
+      },
+      "seeded_sequence_chain": {
+        "comparison_verdict": "parity",
+        "dharma": {
+          "bare_named": {
+            "log": [
+              "one",
+              "two"
+            ],
+            "x": 30
+          },
+          "chained": {
+            "log": [
+              "one",
+              "two",
+              "three"
+            ],
+            "x": 21
+          }
+        },
+        "id": "seeded_sequence_chain",
+        "langgraph": {
+          "bare_named": {
+            "log": [
+              "one",
+              "two"
+            ],
+            "x": 30
+          },
+          "chained": {
+            "log": [
+              "one",
+              "two",
+              "three"
+            ],
+            "x": 21
+          }
+        },
+        "semantic_comparison_verdict": "parity"
+      },
+      "seeded_typed_schema_projection": {
+        "comparison_verdict": "parity",
+        "dharma": {
+          "context_applied": true,
+          "input_extra_filtered": true,
+          "projected_output": {
+            "log": [
+              "a",
+              "b"
+            ],
+            "x": 7
+          },
+          "secret_hidden": true,
+          "unannotated_conflict_rejected": true
+        },
+        "id": "seeded_typed_schema_projection",
+        "langgraph": {
+          "context_applied": true,
+          "input_extra_filtered": true,
+          "projected_output": {
+            "log": [
+              "a",
+              "b"
+            ],
+            "x": 7
+          },
+          "secret_hidden": true,
+          "unannotated_conflict_rejected": true
+        },
+        "semantic_comparison_verdict": "parity"
       }
     }
   },
   "role": "judge",
   "rubric": {
     "base_rubric_commit_sha": "6965d38dc8df4bc487e97465ed2f08ffa8274e31",
-    "head_sha": "3d40063d815b2f89b39e48fdb214cf5a3bc52491",
+    "head_sha": "c83df531c32ce7c775f27ddfbc7512e1cc952db7",
     "rubric_blob_digest": "44ba1f42550563b3f2b5e167b80440250228e4b3d045a2654c9e8b62c87d2338",
     "rubric_commit_sha": "9fe56ce57deba94c2f0bdee03028145a2ae7b2cc",
     "rubric_predates_head": true,
@@ -16427,12 +16877,12 @@
   },
   "schema": "dharma_swarm.dharmagraph_parity_receipt.v1",
   "score": {
-    "display": "52.00/100",
-    "earned": "52.00",
+    "display": "58.00/100",
+    "earned": "58.00",
     "possible": "100.00"
   },
   "shas": {
-    "dharma_git_sha": "3d40063d815b2f89b39e48fdb214cf5a3bc52491",
+    "dharma_git_sha": "c83df531c32ce7c775f27ddfbc7512e1cc952db7",
     "langgraph_git_sha": "054a6f3d8b48d022a4881af3ba3dc0ddc3ac0690",
     "rubric_commit_sha": "9fe56ce57deba94c2f0bdee03028145a2ae7b2cc"
   },
@@ -16443,7 +16893,7 @@
     },
     {
       "path": "dharma_swarm/graph/__init__.py",
-      "sha256": "9f60db81402ba243b19f0d0eb59a597e6d76baae0054d8620c3bc151177e44cd"
+      "sha256": "6a4878d7273b24d99278944376325bbc7a74abf71f9f8c43536186e5c77f14a1"
     },
     {
       "path": "dharma_swarm/graph/_persistence_io.py",
@@ -16459,7 +16909,7 @@
     },
     {
       "path": "dharma_swarm/graph/channels.py",
-      "sha256": "3c9fd9799e77c52bef798baf020700edd7820fbbdaaad6fb185e0f5697bba91f"
+      "sha256": "2cec93096ebd18489ad77bb3c0fdd40bcf8392ae2281bf5b62329be21e76146e"
     },
     {
       "path": "dharma_swarm/graph/checkpoint.py",
@@ -16467,7 +16917,7 @@
     },
     {
       "path": "dharma_swarm/graph/compiler.py",
-      "sha256": "66348c6c0f44cac4ae3726569297b2cceb92417f7e1b34479e5ed85b32426fc6"
+      "sha256": "ca2df3c989f8eac6b216ad6e5752137eeaefd9d410c8195de150cef0715c4be8"
     },
     {
       "path": "dharma_swarm/graph/durable_invoker.py",
@@ -16479,7 +16929,15 @@
     },
     {
       "path": "dharma_swarm/graph/errors.py",
-      "sha256": "f76a392ae6c532933f7ee7490c3bc7f9abb36e50adbc2e8d2f40af03f8c855d3"
+      "sha256": "f6eba93e7902e562b779a31749af1b43821814ec04c7c346768a542459161b93"
+    },
+    {
+      "path": "dharma_swarm/graph/executor.py",
+      "sha256": "4b822f078a5ff6188cf8fa586b43c943bdca12c506200495a99b9852eabe676e"
+    },
+    {
+      "path": "dharma_swarm/graph/interrupts.py",
+      "sha256": "b5042c04d88e23df06c4b90c99be9a34ec421926eb5ad4c785b4a8e2e1101bfa"
     },
     {
       "path": "dharma_swarm/graph/persistence.py",
@@ -16491,7 +16949,7 @@
     },
     {
       "path": "dharma_swarm/graph/persistence_runtime.py",
-      "sha256": "4d5c69031e2ca87b8e5d7516f367af2420f019da4d5dcc2400b72724e20ac8c1"
+      "sha256": "585686cab407ee30f49bf9903c198b2f27c6c9b4f08284d08a49039415f33723"
     },
     {
       "path": "dharma_swarm/graph/receipt_authority.py",
@@ -16511,15 +16969,23 @@
     },
     {
       "path": "dharma_swarm/graph/routing.py",
-      "sha256": "571ca3958403d00d7add2c2e49c20609b71de0a284e4bd1f7dec770035a921da"
+      "sha256": "d55c1c98682bc9520bc0846146c9c268697896135ae1d872bbbc69f679794770"
     },
     {
       "path": "dharma_swarm/graph/scheduler.py",
-      "sha256": "f6c7d2eff842c9c0a7e50c1e0212fcea1969db0422a9b8b0915192db88bb95bb"
+      "sha256": "a6ba99115cc4416491d505da2ce74546182fdac15eb0d1100000447baf583f39"
+    },
+    {
+      "path": "dharma_swarm/graph/schema.py",
+      "sha256": "2fb9fd500469291e26d2a3d800227d538d0971de48e93ca0e789b2382b867a19"
     },
     {
       "path": "dharma_swarm/graph/state.py",
       "sha256": "8b115b7c4c1de01c3cc3e5417af5f70a905d44467bf6ac1201a59afedc1a08fe"
+    },
+    {
+      "path": "dharma_swarm/graph/subgraph.py",
+      "sha256": "f25c16fb4f795e9cd594ca25fc6943271319622055b2de87953e149ff6d58b63"
     },
     {
       "path": "dharma_swarm/graph/telos_bridge.py",
@@ -16611,7 +17077,7 @@
     },
     {
       "path": "tests/oracle_support/dharmagraph_gauntlet.py",
-      "sha256": "334fb8ad36232c69d0a9e2ab5a907942a72dadfbb612fdae3a6cd7cc3d8e93ee"
+      "sha256": "4818be500d8ed5a0c39d9f6e6e086e1e6458b2904c67e3e2901e7552db9673a8"
     },
     {
       "path": "tests/oracle_support/langgraph_arm.py",
@@ -16631,7 +17097,7 @@
     },
     {
       "path": "tests/test_graph_neutral_langgraph_oracle.py",
-      "sha256": "4f9d967185a1ea57a07304c52f09fe08aa0ed6b27866cdaec6cdf77ed638f28d"
+      "sha256": "d3218307140ca4a16008265da79893629d4a6bfa8eac926b6a325cb0131614ea"
     },
     {
       "path": "tests/test_langgraph_differential_oracle.py",
@@ -16642,23 +17108,21 @@
       "sha256": "7c5a84fce68c1aee7a23124d286c60abb460516822861b97924bd42402e2c369"
     }
   ],
-  "source_tree_digest": "da3654adb536efcdca4ab98baeab79be875a66d7194d2f985e5eda59731b8913",
+  "source_tree_digest": "4bb99e558c148609fa77f40c2fca0243bdff055642ee887d32f4f0c0705a8c94",
   "stable_core": {
     "capabilities": [
       {
-        "caveats": [
-          "unproven facets: typed_state_schema, input_schema, output_schema, context_schema"
-        ],
+        "caveats": [],
         "facet_statuses": {
-          "context_schema": "missing",
-          "input_schema": "missing",
-          "output_schema": "missing",
+          "context_schema": "pass",
+          "input_schema": "pass",
+          "output_schema": "pass",
           "partial_updates": "pass",
-          "typed_state_schema": "missing"
+          "typed_state_schema": "pass"
         },
         "id": "LG01",
-        "points": 1,
-        "verdict": "PARTIALLY_PROVEN",
+        "points": 2,
+        "verdict": "FULLY_PROVEN",
         "weight": 4
       },
       {
@@ -16694,20 +17158,18 @@
         "weight": 1
       },
       {
-        "caveats": [
-          "unproven facets: sequence"
-        ],
+        "caveats": [],
         "facet_statuses": {
           "barrier_edges": "pass",
           "compile_validation": "pass",
           "entry_finish": "pass",
           "nodes": "pass",
-          "sequence": "missing",
+          "sequence": "pass",
           "static_edges": "pass"
         },
         "id": "LG04",
-        "points": 1,
-        "verdict": "PARTIALLY_PROVEN",
+        "points": 2,
+        "verdict": "FULLY_PROVEN",
         "weight": 2
       },
       {
@@ -16723,65 +17185,57 @@
         "weight": 1
       },
       {
-        "caveats": [
-          "unproven facets: parallel_actor_overlap, step_atomicity, sibling_failure_stops_step"
-        ],
+        "caveats": [],
         "facet_statuses": {
           "barrier_visibility": "pass",
-          "parallel_actor_overlap": "fail",
-          "sibling_failure_stops_step": "fail",
-          "step_atomicity": "fail"
+          "parallel_actor_overlap": "pass",
+          "sibling_failure_stops_step": "pass",
+          "step_atomicity": "pass"
         },
         "id": "LG06",
-        "points": 1,
-        "verdict": "PARTIALLY_PROVEN",
+        "points": 2,
+        "verdict": "FULLY_PROVEN",
         "weight": 2
       },
       {
-        "caveats": [
-          "unproven facets: send_timeout"
-        ],
+        "caveats": [],
         "facet_statuses": {
           "custom_branch_state": "pass",
           "map_reduce": "pass",
           "send_dynamic_fanout": "pass",
-          "send_timeout": "missing"
+          "send_timeout": "pass"
         },
         "id": "LG07",
-        "points": 1,
-        "verdict": "PARTIALLY_PROVEN",
+        "points": 2,
+        "verdict": "FULLY_PROVEN",
         "weight": 1
       },
       {
-        "caveats": [
-          "unproven facets: command_parent, command_resume"
-        ],
+        "caveats": [],
         "facet_statuses": {
           "command_goto": "pass",
           "command_multi_target": "pass",
-          "command_parent": "missing",
-          "command_resume": "missing",
+          "command_parent": "pass",
+          "command_resume": "pass",
           "command_send": "pass",
           "command_update": "pass"
         },
         "id": "LG08",
-        "points": 1,
-        "verdict": "PARTIALLY_PROVEN",
+        "points": 2,
+        "verdict": "FULLY_PROVEN",
         "weight": 2
       },
       {
-        "caveats": [
-          "unproven facets: remaining_steps"
-        ],
+        "caveats": [],
         "facet_statuses": {
           "cycles": "pass",
           "limit_error": "pass",
           "recursion_limit": "pass",
-          "remaining_steps": "missing"
+          "remaining_steps": "pass"
         },
         "id": "LG09",
-        "points": 1,
-        "verdict": "PARTIALLY_PROVEN",
+        "points": 2,
+        "verdict": "FULLY_PROVEN",
         "weight": 1
       },
       {
@@ -17051,10 +17505,10 @@
       },
       {
         "caveats": [
-          "unproven facets: sibling_cancellation, user_cancellation, error_handler, atomic_writes"
+          "unproven facets: sibling_cancellation, user_cancellation, error_handler"
         ],
         "facet_statuses": {
-          "atomic_writes": "fail",
+          "atomic_writes": "pass",
           "error_handler": "missing",
           "invalid_update": "pass",
           "sibling_cancellation": "missing",
@@ -17123,7 +17577,7 @@
           "unproven facets: runnable_config, context_schema, runtime_injection, execution_info, get_runtime, get_config, get_store, stream_writer, propagation"
         ],
         "facet_statuses": {
-          "context_schema": "missing",
+          "context_schema": "partial",
           "execution_info": "missing",
           "get_config": "missing",
           "get_runtime": "missing",
@@ -17347,14 +17801,8 @@
       "must_fail": true
     },
     "gap_ids": [
-      "LG01",
       "LG02",
       "LG03",
-      "LG04",
-      "LG06",
-      "LG07",
-      "LG08",
-      "LG09",
       "LG10",
       "LG11",
       "LG12",
@@ -17386,9 +17834,9 @@
     "rubric_commit_sha": "9fe56ce57deba94c2f0bdee03028145a2ae7b2cc",
     "rubric_schema": "dharma_swarm.dharmagraph_parity_gauntlet.rubric.v2",
     "schema": "dharma_swarm.dharmagraph_parity_receipt.stable.v1",
-    "score": "52.00",
+    "score": "58.00",
     "seed": 20260711,
-    "source_tree_digest": "da3654adb536efcdca4ab98baeab79be875a66d7194d2f985e5eda59731b8913",
+    "source_tree_digest": "4bb99e558c148609fa77f40c2fca0243bdff055642ee887d32f4f0c0705a8c94",
     "target": {
       "checkpoint_distribution": "langgraph-checkpoint==4.1.1",
       "distribution": "langgraph",
@@ -17405,6 +17853,6 @@
     },
     "weight_denominator": 100
   },
-  "stable_digest": "e865481c9ea8ee0350a50aafdaa1b0bfd5b143a31ceea6da65e9bf5dd40952b7",
+  "stable_digest": "59a6a08e226be3f699d11c8af20b5409881ed0e60a6b36b407dfe1bcd0a932a0",
   "verdict": "NOT_FINISHED"
 }
