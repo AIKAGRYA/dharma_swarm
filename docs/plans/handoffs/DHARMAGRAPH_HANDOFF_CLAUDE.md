@@ -23,17 +23,17 @@ python3 scripts/governance/dharmagraph_parity_gauntlet.py --check   # must print
 python3 - <<'EOF'
 import json, sys
 r = json.load(open("reports/governance/dharmagraph_parity/judge_receipt.json"))
-rows = {g["id"]: g for g in r["stable_core"]["capabilities"]} if "capabilities" in r.get("stable_core", {}) else {}
+rows = {g.get("id"): g for g in r.get("capabilities", [])}
 core = ["LG01","LG04","LG06","LG07","LG08","LG09"]
-if not rows:
-    sys.exit(1)  # receipt shape not located == FAIL, never a pass
+if not all(c in rows for c in core):
+    sys.exit(1)  # any core row not located == FAIL, never a pass
 ok = float(r["score"]["display"].split("/")[0]) >= 58.00
-missing = [c for c in core if rows.get(c, {}).get("points") != 2]
+missing = [c for c in core if rows[c].get("points") != 2]
 sys.exit(0 if ok and not missing else 1)
 EOF
 ```
 
-You may adjust the JSON paths in this checker ONLY so that all six core rows are actually located in the receipt; the script MUST hard-fail (`sys.exit(1)`) if any of the six ids cannot be found — an empty `rows` dict is a FAIL, not a pass. Never weaken the `>= 58.00` or `points == 2` conditions.
+(Verified against the committed receipt 2026-07-17: `capabilities` is a root-level list of 41 rows keyed by `id` with integer `points`; the block exits 1 on the current 52.00 receipt with all six core rows located, and 0 on a simulated all-2/2 ≥58.00 receipt.) You may adjust the JSON paths in this checker ONLY if the receipt schema itself changes and ONLY so that all six core rows are actually located; the script MUST hard-fail (`sys.exit(1)`) if any of the six ids cannot be found. Never weaken the `>= 58.00` or `points == 2` conditions.
 
 Prerequisite mechanics: a `missing` facet closes only when (a) the Dharma public surface resolves at `dharma_swarm.graph:<facet>` or via `_DHARMA_SUPPORTED_SURFACE` (`tests/oracle_support/dharmagraph_gauntlet.py:1089-1112`) AND (b) new **executed two-arm evidence** is applied to it in `dharmagraph_gauntlet.py`. A `_DHARMA_SUPPORTED_SURFACE` entry may only target a surface introduced or wired this run AND exercised by an executed two-arm workload applied to that same facet in the same slice. The harness is inside the sealed `RELEVANT_SOURCE_ROOTS` digest (`scripts/governance/dharmagraph_parity_gauntlet.py:57-70`), so harness extension + commit + builder/judge reseal is the only closure path. The two `fail` facet clusters (LG06 step atomicity via `x_after_failed_step`, `dharmagraph_gauntlet.py:1695-1699`; barrier overlap `:1670-1686`) close by fixing engine semantics until the existing seeded workloads match.
 
