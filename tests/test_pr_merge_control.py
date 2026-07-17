@@ -72,6 +72,40 @@ def test_classify_pr_uses_latest_duplicate_check_run():
     assert result["checks"]["total"] == 1
 
 
+def test_classify_pr_newest_run_wins_even_when_older_run_finishes_later():
+    """Duplicate runs are ordered by start time: an older run that completes
+    after a newer failing run must not flip the context green."""
+    pr = {
+        "number": 1,
+        "title": "overlapping rerun",
+        "isDraft": False,
+        "mergeable": "MERGEABLE",
+        "reviewDecision": "APPROVED",
+        "statusCheckRollup": [
+            {
+                "name": "pytest (3.11)",
+                "status": "COMPLETED",
+                "conclusion": "SUCCESS",
+                "startedAt": "2026-06-01T10:00:00Z",
+                "completedAt": "2026-06-01T10:10:00Z",
+            },
+            {
+                "name": "pytest (3.11)",
+                "status": "COMPLETED",
+                "conclusion": "FAILURE",
+                "startedAt": "2026-06-01T10:05:00Z",
+                "completedAt": "2026-06-01T10:06:00Z",
+            },
+        ],
+    }
+
+    result = prc.classify_pr(pr)
+
+    assert result["checks"]["failing"] == ["pytest (3.11)"]
+    assert result["checks"]["passing"] == []
+    assert result["checks"]["total"] == 1
+
+
 def test_classify_pr_requires_packet_when_github_green():
     pr = {
         "number": 2,

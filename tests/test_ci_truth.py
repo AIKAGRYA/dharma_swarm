@@ -138,3 +138,17 @@ def test_ci_truth_contract_fails_closed_when_required_set_drifts(tmp_path) -> No
 
     with pytest.raises(ci_truth.CITruthError, match="disagree"):
         ci_truth.load_contract(contract_path)
+
+
+def test_ci_truth_contract_requires_parity_manifest_binding(tmp_path) -> None:
+    """Deleting the manifest binding must fail closed, not skip the parity check."""
+    contract = json.loads(ci_truth.DEFAULT_CONTRACT_PATH.read_text(encoding="utf-8"))
+    for absent in (None, ""):
+        contract["required_contexts_manifest"] = absent
+        if absent is None:
+            contract.pop("required_contexts_manifest")
+        contract_path = tmp_path / "contract.json"
+        contract_path.write_text(json.dumps(contract), encoding="utf-8")
+
+        with pytest.raises(ci_truth.CITruthError, match="required_contexts_manifest"):
+            ci_truth.load_contract(contract_path)

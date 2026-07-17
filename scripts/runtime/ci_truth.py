@@ -53,11 +53,15 @@ def load_contract(path: str | Path = DEFAULT_CONTRACT_PATH) -> dict[str, Any]:
             if not entry.get("local_command"):
                 raise CITruthError(f"CI truth entry {entry.get('id')} missing local_command")
     manifest_ref = contract.get("required_contexts_manifest")
-    if manifest_ref:
-        manifest_path = Path(str(manifest_ref))
-        if not manifest_path.is_absolute():
-            manifest_path = REPO_ROOT / manifest_path
-        validate_required_context_parity(contract, load_json(manifest_path))
+    if not manifest_ref:
+        raise CITruthError(
+            f"CI truth contract {path} missing required_contexts_manifest; "
+            "the parity binding to branch-protection SSOT is mandatory"
+        )
+    manifest_path = Path(str(manifest_ref))
+    if not manifest_path.is_absolute():
+        manifest_path = REPO_ROOT / manifest_path
+    validate_required_context_parity(contract, load_json(manifest_path))
     return contract
 
 

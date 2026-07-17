@@ -499,10 +499,16 @@ def test_agentops_packet_scope_workflow_has_truthful_bootstrap_and_fail_closed_e
 
     assert 'git ls-tree -r --name-only "${EVENT_BASE}" -- "${CHECKER_PATH}"' in job
     assert 'git cat-file -e "${EVENT_BASE}:${CHECKER_PATH}"' in job
-    assert 'python3 "${CHECKER_PATH}" \\' in job
+    # Enforcement code executes from the trusted event base, never the
+    # candidate head: base-pinned package install plus a base worktree for
+    # the checker and its first-party imports.
+    assert 'git archive --format=tar "${EVENT_BASE}"' in job
+    assert "git archive --format=tar HEAD" not in job
+    assert 'git worktree add --detach "${trusted_base}" "${EVENT_BASE}"' in job
+    assert '(cd "${trusted_base}" && python3 "${CHECKER_PATH}" \\' in job
     assert '--event-name "${EVENT_NAME}"' in job
     assert '--event-base "${EVENT_BASE}"' in job
-    assert '--event-head "${EVENT_HEAD}"' in job
+    assert '--event-head "${EVENT_HEAD}")' in job
     assert '| tee "${checker_report}"' in job
     assert '"status": "BOOTSTRAP_NOT_ENFORCED"' in job
     assert '"enforced": False' in job

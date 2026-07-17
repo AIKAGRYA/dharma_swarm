@@ -251,7 +251,7 @@ jobs:
                 | .key as $ordinal
                 | .value
                 | {name: (.name // .context // .workflowName // "unnamed"),
-                   observed_at: (.completedAt // .startedAt // ""),
+                   observed_at: (.startedAt // .completedAt // ""),
                    ordinal: $ordinal,
                    state: (if ((.status // "COMPLETED") != "COMPLETED") then "PENDING"
                            else (((.conclusion // .state // "") | ascii_upcase)

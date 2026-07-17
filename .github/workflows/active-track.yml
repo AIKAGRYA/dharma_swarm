@@ -310,13 +310,19 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install repository-declared checker dependencies
+      # The enforcement code (checker script, its first-party imports, and the
+      # installed package) comes from the trusted event base, never the
+      # candidate head: a PR that edits the checker must not attest its own
+      # packet scope.
+      - name: Install base-declared checker dependencies
         if: steps.packet-scope-boundary.outputs.enforce == 'true'
+        env:
+          EVENT_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: |
           set -euo pipefail
           install_source="${RUNNER_TEMP}/dharma-agentops-packet-scope/package-source"
           mkdir -p "${install_source}"
-          git archive --format=tar HEAD | tar -xf - -C "${install_source}"
+          git archive --format=tar "${EVENT_BASE}" | tar -xf - -C "${install_source}"
           python3 -m pip install "${install_source}"
 
       - name: Enforce declared event packet scope
@@ -331,12 +337,16 @@ jobs:
           PYTHONPYCACHEPREFIX: ${{ runner.temp }}/dharma-agentops/packet-scope/pycache
         run: |
           set -euo pipefail
+          # The base worktree shares the checkout's object store, so the
+          # checker's commit-pinned git reads still resolve both event SHAs.
+          trusted_base="${RUNNER_TEMP}/dharma-agentops/packet-scope/trusted-base"
+          git worktree add --detach "${trusted_base}" "${EVENT_BASE}"
           checker_report="${REPORT_PATH}.checker"
           checker_exit=0
-          if python3 "${CHECKER_PATH}" \
+          if (cd "${trusted_base}" && python3 "${CHECKER_PATH}" \
               --event-name "${EVENT_NAME}" \
               --event-base "${EVENT_BASE}" \
-              --event-head "${EVENT_HEAD}" \
+              --event-head "${EVENT_HEAD}") \
               | tee "${checker_report}"; then
             :
           else

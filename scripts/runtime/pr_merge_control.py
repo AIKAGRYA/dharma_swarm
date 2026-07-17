@@ -250,7 +250,9 @@ def check_rollup(pr: dict[str, Any]) -> dict[str, Any]:
     latest_by_name: dict[str, tuple[tuple[str, int], dict[str, Any]]] = {}
     for index, item in enumerate(rollup):
         name = str(item.get("name") or item.get("context") or item.get("workflowName") or "unnamed")
-        timestamp = str(item.get("completedAt") or item.get("startedAt") or "")
+        # startedAt identifies the newest run; an older run that finishes
+        # after a newer failing run must not win on completion time.
+        timestamp = str(item.get("startedAt") or item.get("completedAt") or "")
         current = latest_by_name.get(name)
         key = (timestamp, index)
         if current is None or key > current[0]:
