@@ -189,6 +189,7 @@ async def onboard_roaming_agent(
     card_registry = CardRegistry(cards_dir=cards_dir)
     card = AgentCard(
         name=registration.callsign,
+        agent_uid=agent_uid,
         description=registration.description
         or f"{registration.callsign} onboarded from {registration.harness}",
         capabilities=_capability_objects(registration),

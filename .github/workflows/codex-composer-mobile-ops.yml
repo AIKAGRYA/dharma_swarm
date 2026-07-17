@@ -1,0 +1,992 @@
+name: Codex Composer mobile operations
+
+# Phone-safe, bounded status and recovery for the three persistent
+# codex_composer replicas. This is an operational recovery surface only:
+# neither a successful SSH receipt nor a restarted service grants an
+# ExecutionLease or creates a semantic task inbox.
+#
+# Repository configuration:
+#   vars.CODEX_COMPOSER_MOBILE_OPS_ISSUE_NUMBER
+#   vars.CODEX_COMPOSER_MOBILE_OPS_ACTOR_IDS        comma-separated numeric IDs
+#   vars.CODEX_COMPOSER_{AGNI,RUSHABDEV,MEGHADHARMA}_SSH_HOST
+#
+# Status-only repository secrets (each key is forced to status on one host):
+#   CODEX_COMPOSER_<HOST>_STATUS_SSH_KEY
+#   CODEX_COMPOSER_<HOST>_STATUS_KNOWN_HOSTS
+#
+# Repair environments, restricted to main and protected by reviewers:
+#   codex-composer-repair-agni
+#   codex-composer-repair-rushabdev
+#   codex-composer-repair-meghadharma
+# Each environment holds a different host-forced key in:
+#   CODEX_COMPOSER_REPAIR_SSH_KEY
+#   CODEX_COMPOSER_REPAIR_KNOWN_HOSTS
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: "Read status or repair presence"
+        required: true
+        default: status
+        type: choice
+        options:
+          - status
+          - repair
+      target:
+        description: "Replica target"
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - agni
+          - rushabdev
+          - meghadharma
+  schedule:
+    - cron: "17 * * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  authorize:
+    name: Authorize and normalize request
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      accepted: ${{ steps.parse.outputs.accepted }}
+      event_name: ${{ steps.parse.outputs.event_name }}
+      issue_number: ${{ steps.parse.outputs.issue_number }}
+      operation: ${{ steps.parse.outputs.operation }}
+      target: ${{ steps.parse.outputs.target }}
+      request_id: ${{ steps.parse.outputs.request_id }}
+      run_agni: ${{ steps.parse.outputs.run_agni }}
+      run_rushabdev: ${{ steps.parse.outputs.run_rushabdev }}
+      run_meghadharma: ${{ steps.parse.outputs.run_meghadharma }}
+      reason: ${{ steps.parse.outputs.reason }}
+    steps:
+      - name: Parse event without secrets
+        id: parse
+        env:
+          EXPECTED_ISSUE_NUMBER: ${{ vars.CODEX_COMPOSER_MOBILE_OPS_ISSUE_NUMBER }}
+          ALLOWED_ACTOR_IDS: ${{ vars.CODEX_COMPOSER_MOBILE_OPS_ACTOR_IDS }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          event_name = os.environ.get("GITHUB_EVENT_NAME", "")
+          github_ref = os.environ.get("GITHUB_REF", "")
+          run_attempt = os.environ.get("GITHUB_RUN_ATTEMPT", "")
+          run_id = os.environ.get("GITHUB_RUN_ID", "")
+          event_path = Path(os.environ["GITHUB_EVENT_PATH"])
+
+          result = {
+              "accepted": "false",
+              "event_name": event_name,
+              "issue_number": "",
+              "operation": "",
+              "target": "",
+              "request_id": "",
+              "run_agni": "false",
+              "run_rushabdev": "false",
+              "run_meghadharma": "false",
+              "reason": "request_rejected",
+          }
+
+          def actor_ids(raw: str) -> set[int]:
+              if not re.fullmatch(r"\s*\d+(?:\s*,\s*\d+)*\s*", raw or ""):
+                  return set()
+              return {int(piece.strip()) for piece in raw.split(",")}
+
+          try:
+              event = json.loads(event_path.read_text(encoding="utf-8"))
+          except (OSError, ValueError):
+              event = None
+              result["reason"] = "event_json_invalid"
+
+          operation = ""
+          target = ""
+          issue_number = ""
+
+          if event is not None and github_ref != "refs/heads/main":
+              result["reason"] = "non_main_ref"
+          elif event is not None and event_name == "schedule":
+              operation = "status"
+              target = "all"
+              result["reason"] = "hourly_status"
+          elif event is not None and event_name in {"issue_comment", "workflow_dispatch"}:
+              allowed = actor_ids(os.environ.get("ALLOWED_ACTOR_IDS", ""))
+              sender = event.get("sender") if isinstance(event, dict) else None
+              sender_id = sender.get("id") if isinstance(sender, dict) else None
+              if not isinstance(sender_id, int) or sender_id not in allowed:
+                  result["reason"] = "actor_not_allowlisted"
+              elif event_name == "issue_comment":
+                  issue = event.get("issue")
+                  comment = event.get("comment")
+                  expected = os.environ.get("EXPECTED_ISSUE_NUMBER", "").strip()
+                  if not expected.isdigit():
+                      result["reason"] = "issue_configuration_invalid"
+                  elif not isinstance(issue, dict) or "pull_request" in issue:
+                      result["reason"] = "pull_request_comment_rejected"
+                  elif issue.get("number") != int(expected):
+                      result["reason"] = "wrong_issue"
+                  elif not isinstance(comment, dict) or not isinstance(comment.get("body"), str):
+                      result["reason"] = "comment_body_invalid"
+                  else:
+                      body = comment["body"]
+                      command = re.fullmatch(
+                          r"@codex-composer (status|repair|ensure-presence) "
+                          r"(all|agni|rushabdev|meghadharma)",
+                          body,
+                          flags=re.ASCII,
+                      )
+                      if (
+                          not body.isascii()
+                          or "\x00" in body
+                          or "\r" in body
+                          or "\n" in body
+                          or command is None
+                      ):
+                          result["reason"] = "command_invalid"
+                      else:
+                          requested_operation, target = command.groups()
+                          operation = (
+                              "status" if requested_operation == "status" else "repair"
+                          )
+                          issue_number = expected
+                          result["reason"] = "authorized_issue_comment"
+              else:
+                  inputs = event.get("inputs")
+                  if not isinstance(inputs, dict):
+                      result["reason"] = "dispatch_inputs_invalid"
+                  else:
+                      operation = inputs.get("operation", "")
+                      target = inputs.get("target", "")
+                      if operation not in {"status", "repair"} or target not in {
+                          "all",
+                          "agni",
+                          "rushabdev",
+                          "meghadharma",
+                      }:
+                          operation = ""
+                          target = ""
+                          result["reason"] = "dispatch_inputs_invalid"
+                      else:
+                          result["reason"] = "authorized_workflow_dispatch"
+          elif event is not None:
+              result["reason"] = "event_not_supported"
+
+          if operation == "repair" and run_attempt != "1":
+              operation = ""
+              target = ""
+              result["reason"] = "repair_rerun_rejected"
+
+          if operation and target:
+              if not re.fullmatch(r"\d+", run_id) or not re.fullmatch(r"\d+", run_attempt):
+                  result["reason"] = "run_identity_invalid"
+              else:
+                  result.update(
+                      {
+                          "accepted": "true",
+                          "issue_number": issue_number,
+                          "operation": operation,
+                          "target": target,
+                          "request_id": f"gha-{run_id}-{run_attempt}",
+                          "run_agni": str(target in {"all", "agni"}).lower(),
+                          "run_rushabdev": str(
+                              target in {"all", "rushabdev"}
+                          ).lower(),
+                          "run_meghadharma": str(
+                              target in {"all", "meghadharma"}
+                          ).lower(),
+                      }
+                  )
+
+          output = Path(os.environ["GITHUB_OUTPUT"])
+          with output.open("a", encoding="utf-8") as handle:
+              for key, value in result.items():
+                  if not re.fullmatch(r"[A-Za-z0-9_.-]*", str(value)):
+                      raise SystemExit(f"unsafe normalized output: {key}")
+                  handle.write(f"{key}={value}\n")
+
+          summary = Path(os.environ["GITHUB_STEP_SUMMARY"])
+          with summary.open("a", encoding="utf-8") as handle:
+              handle.write("## Codex Composer mobile request\n\n")
+              handle.write(f"- Accepted: `{result['accepted']}`\n")
+              handle.write(f"- Event: `{result['event_name']}`\n")
+              handle.write(f"- Operation: `{result['operation'] or 'none'}`\n")
+              handle.write(f"- Target: `{result['target'] or 'none'}`\n")
+              handle.write(f"- Decision: `{result['reason']}`\n")
+          PY
+
+  acknowledge:
+    name: Acknowledge accepted issue command
+    needs: authorize
+    if: >-
+      ${{
+        needs.authorize.outputs.accepted == 'true' &&
+        needs.authorize.outputs.event_name == 'issue_comment'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Post bounded acknowledgement
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ needs.authorize.outputs.issue_number }}
+          OPERATION: ${{ needs.authorize.outputs.operation }}
+          TARGET: ${{ needs.authorize.outputs.target }}
+          REQUEST_ID: ${{ needs.authorize.outputs.request_id }}
+        run: |
+          set -euo pipefail
+          payload="${RUNNER_TEMP}/ack.json"
+          python3 - "${payload}" <<'PY'
+          import json
+          import os
+          import sys
+
+          body = (
+              "<!-- codex-composer-mobile-ops:ack:"
+              + os.environ["REQUEST_ID"]
+              + " -->\n\n"
+              + "Codex Composer mobile request accepted.\n\n"
+              + f"- Operation: `{os.environ['OPERATION']}`\n"
+              + f"- Target: `{os.environ['TARGET']}`\n"
+              + f"- Request: `{os.environ['REQUEST_ID']}`\n"
+              + f"- Actions run: {os.environ['GITHUB_SERVER_URL']}/"
+              + f"{os.environ['GITHUB_REPOSITORY']}/actions/runs/"
+              + os.environ["GITHUB_RUN_ID"]
+              + "\n\nPresence recovery does not grant an ExecutionLease."
+          )
+          with open(sys.argv[1], "w", encoding="utf-8") as handle:
+              json.dump({"body": body}, handle, ensure_ascii=True)
+          PY
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/issues/${ISSUE_NUMBER}/comments" \
+            --input "${payload}" >/dev/null
+
+  status_agni:
+    name: Status — AGNI
+    needs: authorize
+    if: >-
+      ${{
+        needs.authorize.outputs.accepted == 'true' &&
+        needs.authorize.outputs.operation == 'status' &&
+        needs.authorize.outputs.run_agni == 'true'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      result: ${{ steps.control.outputs.result }}
+      ok: ${{ steps.control.outputs.ok }}
+    steps:
+      - name: Run forced status command
+        id: control
+        env:
+          INSTANCE_ID: agni
+          REMOTE_OPERATION: status
+          SSH_HOST: ${{ vars.CODEX_COMPOSER_AGNI_SSH_HOST }}
+          SSH_PRIVATE_KEY: ${{ secrets.CODEX_COMPOSER_AGNI_STATUS_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.CODEX_COMPOSER_AGNI_STATUS_KNOWN_HOSTS }}
+          REQUEST_BASE: ${{ needs.authorize.outputs.request_id }}
+        run: &mobile_control |
+          set -euo pipefail
+          umask 077
+          instance="${INSTANCE_ID}"
+          # REMOTE_OPERATION comes from the surrounding GitHub step env.
+          # shellcheck disable=SC2153
+          remote_operation="${REMOTE_OPERATION}"
+          request_id="${REQUEST_BASE}-${instance}"
+          key="${RUNNER_TEMP}/status-${instance}.key"
+          known_hosts="${RUNNER_TEMP}/status-${instance}.known_hosts"
+          raw="${RUNNER_TEMP}/status-${instance}.raw"
+          error_log="${RUNNER_TEMP}/status-${instance}.stderr"
+          result_path="${RUNNER_TEMP}/status-${instance}.json"
+          trap 'rm -f "${key}" "${known_hosts}" "${raw}" "${error_log}"' EXIT
+          : >"${raw}"
+          : >"${error_log}"
+          rc=78
+          if [[ -n "${SSH_HOST}" && -n "${SSH_PRIVATE_KEY}" && -n "${SSH_KNOWN_HOSTS}" ]] \
+             && [[ "${SSH_HOST}" =~ ^[A-Za-z0-9][A-Za-z0-9.-]{0,252}$ ]]; then
+            printf '%s\n' "${SSH_PRIVATE_KEY}" >"${key}"
+            printf '%s\n' "${SSH_KNOWN_HOSTS}" >"${known_hosts}"
+            unset SSH_PRIVATE_KEY SSH_KNOWN_HOSTS
+            chmod 600 "${key}" "${known_hosts}"
+            if ssh-keygen -y -f "${key}" >/dev/null 2>&1 \
+               && ssh-keygen -F "${SSH_HOST}" -f "${known_hosts}" >/dev/null 2>&1; then
+              issued="$(date -u +%s)"
+              if [[ "${remote_operation}" == "reconcile" ]]; then
+                expires="$((issued + 300))"
+                command_timeout=150
+              else
+                expires="$((issued + 120))"
+                command_timeout=50
+              fi
+              original_command="cc-mobile-v1 ${remote_operation} ${request_id} ${issued} ${expires}"
+              set +e
+              (
+                ulimit -f 64
+                timeout --signal=TERM --kill-after=5s "${command_timeout}s" \
+                  ssh -F /dev/null \
+                    -i "${key}" \
+                    -p 22 \
+                    -o BatchMode=yes \
+                    -o ControlMaster=no \
+                    -o ControlPath=none \
+                    -o IdentityAgent=none \
+                    -o IdentitiesOnly=yes \
+                    -o StrictHostKeyChecking=yes \
+                    -o "UserKnownHostsFile=${known_hosts}" \
+                    -o GlobalKnownHostsFile=/dev/null \
+                    -o PasswordAuthentication=no \
+                    -o KbdInteractiveAuthentication=no \
+                    -o PubkeyAuthentication=yes \
+                    -o RequestTTY=no \
+                    -o ClearAllForwardings=yes \
+                    -o ForwardAgent=no \
+                    -o ConnectTimeout=10 \
+                    -o ConnectionAttempts=1 \
+                    -o ServerAliveInterval=5 \
+                    -o ServerAliveCountMax=2 \
+                    -o LogLevel=ERROR \
+                    "codex-composer-mobile@${SSH_HOST}" \
+                    "${original_command}"
+              ) >"${raw}" 2>"${error_log}"
+              rc="$?"
+              set -e
+            fi
+          fi
+          unset SSH_PRIVATE_KEY SSH_KNOWN_HOSTS
+
+          python3 - "${raw}" "${result_path}" "${instance}" \
+            "${remote_operation}" "${request_id}" "${rc}" <<'PY'
+          import hashlib
+          import json
+          import math
+          import re
+          import sys
+          from datetime import datetime
+          from pathlib import Path
+
+          raw_path, result_path, instance, operation, request_id, rc_text = sys.argv[1:]
+          rc = int(rc_text)
+          result = {
+              "schema": "dharma.codex_composer.mobile_ops.workflow_result.v1",
+              "instance_id": instance,
+              "operation": operation,
+              "request_id": request_id,
+              "transport_exit": rc,
+              "accepted_remote_receipt": False,
+              "ok": False,
+              "detail_code": "transport_error" if rc != 78 else "configuration_invalid",
+          }
+
+          top_keys = {
+              "schema", "agent_uid", "instance_id", "operation", "result",
+              "action", "healthy", "observed_at", "receipt_sha256", "health",
+              "request_id", "before", "cooldown_remaining_seconds",
+          }
+          health_keys = {
+              "healthy", "reasons", "service_active", "service_enabled", "status",
+              "observed_at", "heartbeat_age_seconds", "boot_id", "sequence",
+              "seat_state",
+          }
+          result_values = {
+              "healthy_noop", "reported_unhealthy", "cooldown",
+              "systemd_action_failed", "reconciled_verified", "reconcile_unverified",
+          }
+          action_values = {"none", "start", "restart"}
+          token = re.compile(r"[a-z0-9][a-z0-9_.-]{0,95}", re.ASCII)
+          iso_timestamp = re.compile(
+              r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}"
+              r"(?:\.[0-9]{1,6})?(?:Z|[+-][0-9]{2}:[0-9]{2})",
+              re.ASCII,
+          )
+
+          def reject() -> None:
+              raise ValueError
+
+          def timestamp(value):
+              if not isinstance(value, str) or iso_timestamp.fullmatch(value) is None:
+                  reject()
+              parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+              if parsed.tzinfo is None:
+                  reject()
+              return value
+
+          def heartbeat_timestamp(value):
+              if value == "":
+                  return value
+              return timestamp(value)
+
+          def optional_number(value):
+              if value is None:
+                  return None
+              if isinstance(value, bool) or not isinstance(value, (int, float)):
+                  reject()
+              if not math.isfinite(value) or value < 0 or value > 1_000_000_000:
+                  reject()
+              return value
+
+          def health(value):
+              if not isinstance(value, dict) or set(value) != health_keys:
+                  reject()
+              reasons = value["reasons"]
+              if not isinstance(reasons, list) or len(reasons) > 16:
+                  reject()
+              if any(not isinstance(item, str) or token.fullmatch(item) is None for item in reasons):
+                  reject()
+              for field in ("healthy", "service_active", "service_enabled"):
+                  if not isinstance(value[field], bool):
+                      reject()
+              if not isinstance(value["status"], str) or token.fullmatch(value["status"]) is None:
+                  reject()
+              if not isinstance(value["seat_state"], str) or (
+                  value["seat_state"] != "" and token.fullmatch(value["seat_state"]) is None
+              ):
+                  reject()
+              boot_id = value["boot_id"]
+              if not isinstance(boot_id, str) or (
+                  boot_id != ""
+                  and re.fullmatch(r"[A-Za-z0-9_-]{1,128}", boot_id, re.ASCII) is None
+              ):
+                  reject()
+              sequence = value["sequence"]
+              if sequence is not None and (
+                  isinstance(sequence, bool)
+                  or not isinstance(sequence, int)
+                  or sequence < 0
+                  or sequence > 9_223_372_036_854_775_807
+              ):
+                  reject()
+              return {
+                  "healthy": value["healthy"],
+                  "reasons": reasons,
+                  "service_active": value["service_active"],
+                  "service_enabled": value["service_enabled"],
+                  "status": value["status"],
+                  "observed_at": heartbeat_timestamp(value["observed_at"]),
+                  "heartbeat_age_seconds": optional_number(value["heartbeat_age_seconds"]),
+                  "boot_id": boot_id,
+                  "sequence": sequence,
+                  "seat_state": value["seat_state"],
+              }
+
+          try:
+              path = Path(raw_path)
+              if not path.is_file() or path.stat().st_size > 16 * 1024:
+                  reject()
+              remote = json.loads(path.read_text(encoding="utf-8"))
+              if not isinstance(remote, dict) or not set(remote).issubset(top_keys):
+                  reject()
+              required = top_keys - {"before", "cooldown_remaining_seconds"}
+              if not required.issubset(remote):
+                  reject()
+              if remote["schema"] != "dharma.codex_composer.mobile_control.v1":
+                  reject()
+              if remote["agent_uid"] != "codex_composer":
+                  reject()
+              if remote["instance_id"] != instance or remote["operation"] != operation:
+                  reject()
+              if remote["request_id"] != request_id:
+                  reject()
+              if remote["result"] not in result_values or remote["action"] not in action_values:
+                  reject()
+              if not isinstance(remote["healthy"], bool):
+                  reject()
+              observed_health = health(remote["health"])
+              if remote["healthy"] != observed_health["healthy"]:
+                  reject()
+              if not isinstance(remote["receipt_sha256"], str) or re.fullmatch(
+                  r"[0-9a-f]{64}", remote["receipt_sha256"], re.ASCII
+              ) is None:
+                  reject()
+              digest_payload = dict(remote)
+              claimed_digest = digest_payload.pop("receipt_sha256")
+              computed_digest = hashlib.sha256(
+                  json.dumps(
+                      digest_payload,
+                      ensure_ascii=True,
+                      separators=(",", ":"),
+                      sort_keys=True,
+                  ).encode("utf-8")
+              ).hexdigest()
+              if claimed_digest != computed_digest:
+                  reject()
+              if operation == "status" and (
+                  remote["result"] not in {"healthy_noop", "reported_unhealthy"}
+                  or remote["action"] != "none"
+                  or "before" in remote
+                  or "cooldown_remaining_seconds" in remote
+              ):
+                  reject()
+              if operation == "status" and (
+                  remote["healthy"] != (remote["result"] == "healthy_noop")
+              ):
+                  reject()
+              if operation == "reconcile":
+                  if "before" not in remote:
+                      reject()
+                  reconcile_shape = {
+                      "healthy_noop": ({"none"}, True),
+                      "cooldown": ({"none"}, False),
+                      "systemd_action_failed": ({"start", "restart"}, False),
+                      "reconciled_verified": ({"start", "restart"}, True),
+                      "reconcile_unverified": ({"start", "restart"}, False),
+                  }
+                  expected_shape = reconcile_shape.get(remote["result"])
+                  if expected_shape is None or (
+                      remote["action"] not in expected_shape[0]
+                      or remote["healthy"] is not expected_shape[1]
+                  ):
+                      reject()
+                  if (remote["result"] == "cooldown") != (
+                      "cooldown_remaining_seconds" in remote
+                  ):
+                      reject()
+              sanitized = {
+                  "schema": remote["schema"],
+                  "agent_uid": remote["agent_uid"],
+                  "instance_id": remote["instance_id"],
+                  "operation": remote["operation"],
+                  "request_id": remote["request_id"],
+                  "result": remote["result"],
+                  "action": remote["action"],
+                  "healthy": remote["healthy"],
+                  "observed_at": timestamp(remote["observed_at"]),
+                  "receipt_sha256": remote["receipt_sha256"],
+                  "health": observed_health,
+              }
+              if "before" in remote:
+                  sanitized["before"] = health(remote["before"])
+              if "cooldown_remaining_seconds" in remote:
+                  sanitized["cooldown_remaining_seconds"] = optional_number(
+                      remote["cooldown_remaining_seconds"]
+                  )
+              result["accepted_remote_receipt"] = True
+              result["remote"] = sanitized
+              result["ok"] = (
+                  rc == 0
+                  and sanitized["healthy"]
+                  and sanitized["result"]
+                  in (
+                      {"healthy_noop"}
+                      if operation == "status"
+                      else {"healthy_noop", "reconciled_verified"}
+                  )
+              )
+              result["detail_code"] = (
+                  "accepted_remote_receipt" if result["ok"] else "remote_reported_unhealthy"
+              )
+          except (
+              OSError,
+              OverflowError,
+              UnicodeError,
+              ValueError,
+              TypeError,
+              json.JSONDecodeError,
+          ):
+              if rc != 78:
+                  result["detail_code"] = "invalid_remote_receipt"
+
+          compact = json.dumps(result, ensure_ascii=True, separators=(",", ":"), sort_keys=True)
+          Path(result_path).write_text(compact + "\n", encoding="utf-8")
+          PY
+
+          compact="$(tr -d '\n' <"${result_path}")"
+          ok="$(python3 -c 'import json,sys; print(str(json.load(open(sys.argv[1]))["ok"]).lower())' "${result_path}")"
+          printf 'result=%s\n' "${compact}" >>"${GITHUB_OUTPUT}"
+          printf 'ok=%s\n' "${ok}" >>"${GITHUB_OUTPUT}"
+
+  status_rushabdev:
+    name: Status — Rushabdev
+    needs: authorize
+    if: >-
+      ${{
+        needs.authorize.outputs.accepted == 'true' &&
+        needs.authorize.outputs.operation == 'status' &&
+        needs.authorize.outputs.run_rushabdev == 'true'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      result: ${{ steps.control.outputs.result }}
+      ok: ${{ steps.control.outputs.ok }}
+    steps:
+      - name: Run forced status command
+        id: control
+        env:
+          INSTANCE_ID: rushabdev
+          REMOTE_OPERATION: status
+          SSH_HOST: ${{ vars.CODEX_COMPOSER_RUSHABDEV_SSH_HOST }}
+          SSH_PRIVATE_KEY: ${{ secrets.CODEX_COMPOSER_RUSHABDEV_STATUS_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.CODEX_COMPOSER_RUSHABDEV_STATUS_KNOWN_HOSTS }}
+          REQUEST_BASE: ${{ needs.authorize.outputs.request_id }}
+        run: *mobile_control
+
+  status_meghadharma:
+    name: Status — Meghadharma
+    needs: authorize
+    if: >-
+      ${{
+        needs.authorize.outputs.accepted == 'true' &&
+        needs.authorize.outputs.operation == 'status' &&
+        needs.authorize.outputs.run_meghadharma == 'true'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      result: ${{ steps.control.outputs.result }}
+      ok: ${{ steps.control.outputs.ok }}
+    steps:
+      - name: Run forced status command
+        id: control
+        env:
+          INSTANCE_ID: meghadharma
+          REMOTE_OPERATION: status
+          SSH_HOST: ${{ vars.CODEX_COMPOSER_MEGHADHARMA_SSH_HOST }}
+          SSH_PRIVATE_KEY: ${{ secrets.CODEX_COMPOSER_MEGHADHARMA_STATUS_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.CODEX_COMPOSER_MEGHADHARMA_STATUS_KNOWN_HOSTS }}
+          REQUEST_BASE: ${{ needs.authorize.outputs.request_id }}
+        run: *mobile_control
+
+  repair_agni:
+    name: Repair presence — AGNI
+    needs: authorize
+    if: >-
+      ${{
+        needs.authorize.outputs.accepted == 'true' &&
+        needs.authorize.outputs.operation == 'repair' &&
+        needs.authorize.outputs.run_agni == 'true'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: codex-composer-repair-agni
+      cancel-in-progress: false
+    environment:
+      name: codex-composer-repair-agni
+    outputs:
+      result: ${{ steps.control.outputs.result }}
+      ok: ${{ steps.control.outputs.ok }}
+    steps:
+      - name: Run protected forced reconcile command
+        id: control
+        env:
+          INSTANCE_ID: agni
+          REMOTE_OPERATION: reconcile
+          SSH_HOST: ${{ vars.CODEX_COMPOSER_AGNI_SSH_HOST }}
+          SSH_PRIVATE_KEY: ${{ secrets.CODEX_COMPOSER_REPAIR_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.CODEX_COMPOSER_REPAIR_KNOWN_HOSTS }}
+          REQUEST_BASE: ${{ needs.authorize.outputs.request_id }}
+        run: *mobile_control
+
+  repair_rushabdev:
+    name: Repair presence — Rushabdev
+    needs: authorize
+    if: >-
+      ${{
+        needs.authorize.outputs.accepted == 'true' &&
+        needs.authorize.outputs.operation == 'repair' &&
+        needs.authorize.outputs.run_rushabdev == 'true'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: codex-composer-repair-rushabdev
+      cancel-in-progress: false
+    environment:
+      name: codex-composer-repair-rushabdev
+    outputs:
+      result: ${{ steps.control.outputs.result }}
+      ok: ${{ steps.control.outputs.ok }}
+    steps:
+      - name: Run protected forced reconcile command
+        id: control
+        env:
+          INSTANCE_ID: rushabdev
+          REMOTE_OPERATION: reconcile
+          SSH_HOST: ${{ vars.CODEX_COMPOSER_RUSHABDEV_SSH_HOST }}
+          SSH_PRIVATE_KEY: ${{ secrets.CODEX_COMPOSER_REPAIR_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.CODEX_COMPOSER_REPAIR_KNOWN_HOSTS }}
+          REQUEST_BASE: ${{ needs.authorize.outputs.request_id }}
+        run: *mobile_control
+
+  repair_meghadharma:
+    name: Repair presence — Meghadharma
+    needs: authorize
+    if: >-
+      ${{
+        needs.authorize.outputs.accepted == 'true' &&
+        needs.authorize.outputs.operation == 'repair' &&
+        needs.authorize.outputs.run_meghadharma == 'true'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: codex-composer-repair-meghadharma
+      cancel-in-progress: false
+    environment:
+      name: codex-composer-repair-meghadharma
+    outputs:
+      result: ${{ steps.control.outputs.result }}
+      ok: ${{ steps.control.outputs.ok }}
+    steps:
+      - name: Run protected forced reconcile command
+        id: control
+        env:
+          INSTANCE_ID: meghadharma
+          REMOTE_OPERATION: reconcile
+          SSH_HOST: ${{ vars.CODEX_COMPOSER_MEGHADHARMA_SSH_HOST }}
+          SSH_PRIVATE_KEY: ${{ secrets.CODEX_COMPOSER_REPAIR_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.CODEX_COMPOSER_REPAIR_KNOWN_HOSTS }}
+          REQUEST_BASE: ${{ needs.authorize.outputs.request_id }}
+        run: *mobile_control
+
+  finalize:
+    name: Publish bounded mobile-ops receipt
+    needs:
+      - authorize
+      - acknowledge
+      - status_agni
+      - status_rushabdev
+      - status_meghadharma
+      - repair_agni
+      - repair_rushabdev
+      - repair_meghadharma
+    if: >-
+      ${{
+        always() &&
+        needs.authorize.outputs.accepted == 'true'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Build sanitized aggregate receipt
+        id: aggregate
+        env:
+          EVENT_NAME_NORMALIZED: ${{ needs.authorize.outputs.event_name }}
+          ISSUE_NUMBER: ${{ needs.authorize.outputs.issue_number }}
+          REQUESTED_OPERATION: ${{ needs.authorize.outputs.operation }}
+          REQUESTED_TARGET: ${{ needs.authorize.outputs.target }}
+          REQUEST_ID: ${{ needs.authorize.outputs.request_id }}
+          RUN_AGNI: ${{ needs.authorize.outputs.run_agni }}
+          RUN_RUSHABDEV: ${{ needs.authorize.outputs.run_rushabdev }}
+          RUN_MEGHADHARMA: ${{ needs.authorize.outputs.run_meghadharma }}
+          STATUS_AGNI: ${{ needs.status_agni.outputs.result }}
+          STATUS_RUSHABDEV: ${{ needs.status_rushabdev.outputs.result }}
+          STATUS_MEGHADHARMA: ${{ needs.status_meghadharma.outputs.result }}
+          REPAIR_AGNI: ${{ needs.repair_agni.outputs.result }}
+          REPAIR_RUSHABDEV: ${{ needs.repair_rushabdev.outputs.result }}
+          REPAIR_MEGHADHARMA: ${{ needs.repair_meghadharma.outputs.result }}
+        run: |
+          set -euo pipefail
+          aggregate="${RUNNER_TEMP}/codex-composer-mobile-ops.json"
+          markdown="${RUNNER_TEMP}/codex-composer-mobile-ops.md"
+          comment="${RUNNER_TEMP}/codex-composer-mobile-ops-comment.json"
+          python3 - "${aggregate}" "${markdown}" "${comment}" <<'PY'
+          import json
+          import os
+          import re
+          import sys
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          aggregate_path, markdown_path, comment_path = map(Path, sys.argv[1:])
+          operation = os.environ["REQUESTED_OPERATION"]
+          target = os.environ["REQUESTED_TARGET"]
+          request_id = os.environ["REQUEST_ID"]
+          if operation not in {"status", "repair"}:
+              raise SystemExit("invalid normalized operation")
+          if target not in {"all", "agni", "rushabdev", "meghadharma"}:
+              raise SystemExit("invalid normalized target")
+          if re.fullmatch(r"gha-\d+-\d+", request_id, re.ASCII) is None:
+              raise SystemExit("invalid normalized request id")
+
+          selections = {
+              "agni": os.environ["RUN_AGNI"] == "true",
+              "rushabdev": os.environ["RUN_RUSHABDEV"] == "true",
+              "meghadharma": os.environ["RUN_MEGHADHARMA"] == "true",
+          }
+          source_prefix = "STATUS" if operation == "status" else "REPAIR"
+          expected_remote_operation = "status" if operation == "status" else "reconcile"
+          rows = []
+          overall_ok = True
+
+          for instance in ("agni", "rushabdev", "meghadharma"):
+              if not selections[instance]:
+                  continue
+              env_name = f"{source_prefix}_{instance.upper()}"
+              raw = os.environ.get(env_name, "")
+              if not raw or len(raw.encode("utf-8", errors="ignore")) > 20 * 1024:
+                  rows.append(
+                      {
+                          "instance_id": instance,
+                          "ok": False,
+                          "detail_code": "job_result_missing",
+                      }
+                  )
+                  overall_ok = False
+                  continue
+              try:
+                  item = json.loads(raw)
+              except (TypeError, ValueError):
+                  item = None
+              expected_request = f"{request_id}-{instance}"
+              if (
+                  not isinstance(item, dict)
+                  or item.get("schema")
+                  != "dharma.codex_composer.mobile_ops.workflow_result.v1"
+                  or item.get("instance_id") != instance
+                  or item.get("operation") != expected_remote_operation
+                  or item.get("request_id") != expected_request
+                  or not isinstance(item.get("ok"), bool)
+                  or item.get("detail_code") not in {
+                      "accepted_remote_receipt",
+                      "remote_reported_unhealthy",
+                      "transport_error",
+                      "configuration_invalid",
+                      "invalid_remote_receipt",
+                  }
+              ):
+                  rows.append(
+                      {
+                          "instance_id": instance,
+                          "ok": False,
+                          "detail_code": "job_result_invalid",
+                      }
+                  )
+                  overall_ok = False
+                  continue
+
+              row = {
+                  "instance_id": instance,
+                  "ok": item["ok"],
+                  "detail_code": item["detail_code"],
+                  "transport_exit": item.get("transport_exit"),
+                  "accepted_remote_receipt": item.get(
+                      "accepted_remote_receipt", False
+                  ),
+              }
+              remote = item.get("remote")
+              if isinstance(remote, dict):
+                  row["remote"] = {
+                      "result": remote.get("result"),
+                      "action": remote.get("action"),
+                      "healthy": remote.get("healthy"),
+                      "observed_at": remote.get("observed_at"),
+                      "receipt_sha256": remote.get("receipt_sha256"),
+                  }
+              rows.append(row)
+              overall_ok = overall_ok and item["ok"]
+
+          if not rows:
+              raise SystemExit("no selected host results")
+
+          aggregate = {
+              "schema": "dharma.codex_composer.mobile_ops.aggregate.v1",
+              "agent_uid": "codex_composer",
+              "request_id": request_id,
+              "event_name": os.environ["EVENT_NAME_NORMALIZED"],
+              "requested_operation": operation,
+              "requested_target": target,
+              "observed_at": datetime.now(timezone.utc).isoformat(),
+              "overall_ok": overall_ok,
+              "results": rows,
+              "authority": "presence_recovery_only_no_execution_lease",
+          }
+          aggregate_path.write_text(
+              json.dumps(aggregate, ensure_ascii=True, indent=2, sort_keys=True)
+              + "\n",
+              encoding="utf-8",
+          )
+
+          lines = [
+              "<!-- codex-composer-mobile-ops:result:" + request_id + " -->",
+              "",
+              "## Codex Composer mobile-ops result",
+              "",
+              f"- Operation: `{operation}`",
+              f"- Target: `{target}`",
+              f"- Request: `{request_id}`",
+              f"- Overall healthy: `{'true' if overall_ok else 'false'}`",
+              f"- Actions run: {os.environ['GITHUB_SERVER_URL']}/"
+              f"{os.environ['GITHUB_REPOSITORY']}/actions/runs/"
+              f"{os.environ['GITHUB_RUN_ID']}",
+              "",
+              "| Replica | Result | Action | Healthy | Observed | Receipt |",
+              "|---|---|---|---:|---|---|",
+          ]
+          for row in rows:
+              remote = row.get("remote") or {}
+              receipt = remote.get("receipt_sha256")
+              if isinstance(receipt, str) and re.fullmatch(r"[0-9a-f]{64}", receipt):
+                  receipt = receipt[:12]
+              else:
+                  receipt = "none"
+              lines.append(
+                  "| {instance} | {result} | {action} | {healthy} | {observed} | {receipt} |".format(
+                      instance=row["instance_id"],
+                      result=remote.get("result") or row["detail_code"],
+                      action=remote.get("action") or "none",
+                      healthy=str(remote.get("healthy", False)).lower(),
+                      observed=remote.get("observed_at") or "unobserved",
+                      receipt=receipt,
+                  )
+              )
+          lines.extend(
+              [
+                  "",
+                  "Presence or recovery evidence does not grant an ExecutionLease.",
+              ]
+          )
+          rendered = "\n".join(lines) + "\n"
+          markdown_path.write_text(rendered, encoding="utf-8")
+          comment_path.write_text(
+              json.dumps({"body": rendered}, ensure_ascii=True) + "\n",
+              encoding="utf-8",
+          )
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as handle:
+              handle.write(f"overall_ok={str(overall_ok).lower()}\n")
+          PY
+          cat "${markdown}" >>"${GITHUB_STEP_SUMMARY}"
+
+      - name: Post final result to the pinned issue
+        if: ${{ needs.authorize.outputs.event_name == 'issue_comment' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ needs.authorize.outputs.issue_number }}
+        run: |
+          set -euo pipefail
+          [[ "${ISSUE_NUMBER}" =~ ^[0-9]+$ ]]
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/issues/${ISSUE_NUMBER}/comments" \
+            --input "${RUNNER_TEMP}/codex-composer-mobile-ops-comment.json" \
+            >/dev/null
+
+      - name: Upload sanitized receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: codex-composer-mobile-ops-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/codex-composer-mobile-ops.json
+            ${{ runner.temp }}/codex-composer-mobile-ops.md
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Fail closed when a selected replica is not healthy
+        if: ${{ steps.aggregate.outputs.overall_ok != 'true' }}
+        run: exit 1

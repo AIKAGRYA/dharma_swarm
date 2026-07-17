@@ -1,0 +1,421 @@
+{
+  "$schema": "dharma.codex_composer.three_vps_deployment_receipt.v2",
+  "generated_at": "2026-07-16T10:45:00Z",
+  "status": "deployed_and_verified_presence_only_after_security_remediation",
+  "agent_uid": "codex_composer",
+  "identity_contract": {
+    "serial": "AGT-CODEX_COMPOSER",
+    "memory_namespace": "agent:codex_composer",
+    "trace_identity": "trace:codex_composer",
+    "logical_nats_identity": "codex_composer",
+    "identity_invariant_digest": "sha256:47079c5f0971a1a1ebeaa10b80790602d8bee6d0576746da04ee0347c24f76e8",
+    "replica_presence_type": "ReplicaPresence<AgentUID,InstanceID,CardDigest,MemoryDigest>",
+    "execution_authority_type": "ExecutionLease<AgentUID,Scope,Expiry>",
+    "transport_type": "TransportPrincipal<AgentUID,InstanceID,PublishCapability>",
+    "promotion_rule": "ReplicaPresence does not imply ExecutionLease",
+    "transport_rule": "One logical NATS identity is enforced by three instance-scoped broker principals; transport credentials are not agent identities."
+  },
+  "claim_boundary": {
+    "verified": [
+      "The same pinned AgentCard and curated continuity-snapshot bytes are installed on AGNI, Rushabdev, and Meghadharma.",
+      "A persistent systemd supervisor and contract-marked Codex tmux seat are active and enabled on all three hosts.",
+      "Every Codex pane runs as the dedicated unprivileged codex-composer-seat Unix user in the expected workspace.",
+      "The NATS password is absent from every observed Codex pane environment, and the seat user cannot read the root supervisor environment.",
+      "AGNI and Rushabdev connect to the Meghadharma hub with TLS 1.3 WSS; Meghadharma uses the loopback NATS listener.",
+      "All three replicas stored instance-specific heartbeats; only the primary principal stored canonical presence.",
+      "The durable fleet presence projector acknowledged canonical presence and projected codex_composer online."
+    ],
+    "not_claimed": [
+      "No semantic inbox consumer, task execution, semantic reply, source-write authority, PR approval, merge authority, or production authority is claimed.",
+      "A stored heartbeat, broker acknowledgement, tmux process, or online registry entry is not an execution lease.",
+      "The installed continuity file is a static curated snapshot, not synchronized live conversational memory.",
+      "Hot standby does not imply automatic canonical-presence failover or leader election.",
+      "No completed task-transport migration from AGNI to Meghadharma is claimed.",
+      "The live presence projector is runtime evidence; its repository source remains dependent on PR #947 or a clean successor."
+    ],
+    "semantic_consumer_enabled": false,
+    "execution_lease_active": false,
+    "advertised_live_inbox": false
+  },
+  "repository_source": {
+    "workspace_commit_at_generated_at": "d6c56f260fd75ba29feebd40a4115bbfd92c9e3e",
+    "workspace_state_at_generated_at": "clean detached checkout; the new operations document becomes available to the live seats when the implementation commit is deployed after repository closeout",
+    "workspace_promotion_target": "codex/codex-composer-three-vps-implementation-20260716",
+    "implementation_branch": "codex/codex-composer-three-vps-implementation-20260716",
+    "governance_pr": "https://github.com/AmitabhainArunachala/dharma_swarm/pull/990",
+    "presence_projector_source_dependency": "https://github.com/AmitabhainArunachala/dharma_swarm/pull/947",
+    "dependency_status_at_receipt_time": "open_conflicting_not_in_this_branch"
+  },
+  "pinned_artifacts": {
+    "agent_card": {
+      "path": "examples/agents/codex_composer.agent-card.json",
+      "sha256": "7606f919e98b153cf9e405e4045563b7d8297542034fda52678c3d4439d21824"
+    },
+    "continuity_memory": {
+      "path": "examples/agents/codex_composer.memory.json",
+      "sha256": "dc199220cd2e25e6837a156b59774bf49b13cba1d4628648dbc31c9906d70928"
+    },
+    "registration": {
+      "path": "examples/agents/codex_composer.registration.json",
+      "sha256": "abc295545da4a5ea0da5f4fd1c021b88d155c25e4fbd2ced15d80e6b2ddd334b"
+    },
+    "replica_supervisor": {
+      "path": "scripts/runtime/codex_composer_replica.py",
+      "sha256": "b1f4112deede180dbcf6040b8b19386c8ee98fd4ea4f63ad35902d41f74aba8b"
+    },
+    "seat_helper": {
+      "path": "scripts/runtime/codex_composer_seat.py",
+      "sha256": "d5bb31815db3c3a158a3335b76a40cbf63720edac90dd6232488403a2ba690a5"
+    },
+    "systemd_unit": {
+      "path": "deploy/systemd/dharma-codex-composer-replica.service",
+      "sha256": "8413cc54cc238397ce3259ff1f1d83c249f9452b4acc3902e2e8818381db9658"
+    },
+    "bundle_sha256": "ab1ec9a4f9e63ab721a787c1869bbd63dbbf84bea48f3ee75498c1b7c1b9341c"
+  },
+  "topology": {
+    "task_transport_compatibility_hub": "agni",
+    "fleet_presence_hub": "meghadharma",
+    "canonical_presence_instance": "meghadharma",
+    "canonical_presence_subject": "dharma.agent.codex_composer.presence",
+    "replica_subject_pattern": "dharma.a2a.codex_composer.replica.<instance_id>.heartbeat",
+    "automatic_failover": false
+  },
+  "transport_principals": {
+    "codex_composer_agni": {
+      "instance_id": "agni",
+      "transport": "wss_tls_1_3",
+      "publish_allow": [
+        "dharma.a2a.codex_composer.replica.agni.heartbeat"
+      ],
+      "subscribe_allow": [
+        "_INBOX.>"
+      ]
+    },
+    "codex_composer_rushabdev": {
+      "instance_id": "rushabdev",
+      "transport": "wss_tls_1_3",
+      "publish_allow": [
+        "dharma.a2a.codex_composer.replica.rushabdev.heartbeat"
+      ],
+      "subscribe_allow": [
+        "_INBOX.>"
+      ]
+    },
+    "codex_composer_primary": {
+      "instance_id": "meghadharma",
+      "transport": "nats_loopback",
+      "publish_allow": [
+        "dharma.a2a.codex_composer.replica.meghadharma.heartbeat",
+        "dharma.agent.codex_composer.presence"
+      ],
+      "subscribe_allow": [
+        "_INBOX.>"
+      ]
+    }
+  },
+  "hosts": [
+    {
+      "instance_id": "agni",
+      "hostname": "agni-openclaw",
+      "replica_role": "delivery_relay",
+      "transport_principal": "codex_composer_agni",
+      "canonical_presence_publisher": false,
+      "service": {
+        "active": true,
+        "enabled": true,
+        "active_enter_timestamp": "2026-07-16T10:43:58Z",
+        "systemd_analyze_security": "4.6 OK"
+      },
+      "seat": {
+        "unix_user": "codex-composer-seat",
+        "unix_uid": 994,
+        "tmux_session": "codex_composer",
+        "pane_command": "node",
+        "workspace": "/opt/dharma-codex-composer/repo",
+        "codex_version": "codex-cli 0.144.5",
+        "contract_sha256": "5f9e3b5b6e4e6045724fbc5bd4080037b66c4df61f88dddc069af7d22eb1059b",
+        "ready": true,
+        "nats_secret_in_pane_environment": false,
+        "seat_can_read_supervisor_environment": false
+      },
+      "observed_heartbeat": {
+        "observed_at": "2026-07-16T10:44:39.518107Z",
+        "boot_id": "c789f4e7545045f9a05fdd654729127b",
+        "local_sequence": 3,
+        "stream_sequence": 4795,
+        "message_id": "cc-agni-c789f4e75450-00000003-replica",
+        "status": "online"
+      },
+      "remediation_backup": "/root/.dharma/backups/codex_composer_three_vps/remediation_20260716T104137Z"
+    },
+    {
+      "instance_id": "rushabdev",
+      "hostname": "openclaw23onubuntu-s-2vcpu-4gb-120gb-intel-sgp1-01",
+      "replica_role": "hot_standby",
+      "transport_principal": "codex_composer_rushabdev",
+      "canonical_presence_publisher": false,
+      "service": {
+        "active": true,
+        "enabled": true,
+        "active_enter_timestamp": "2026-07-16T10:44:25Z",
+        "systemd_analyze_security": "4.6 OK"
+      },
+      "seat": {
+        "unix_user": "codex-composer-seat",
+        "unix_uid": 993,
+        "tmux_session": "codex_composer",
+        "pane_command": "node",
+        "workspace": "/opt/dharma-codex-composer/repo",
+        "codex_version": "codex-cli 0.144.5",
+        "contract_sha256": "e9941c0bf602f764125ee40438734e7c733e06d89b52fb5448138efd4f821e44",
+        "ready": true,
+        "nats_secret_in_pane_environment": false,
+        "seat_can_read_supervisor_environment": false
+      },
+      "observed_heartbeat": {
+        "observed_at": "2026-07-16T10:44:46.490769Z",
+        "boot_id": "05945a08ec45429d8e65bfdeb4515bcb",
+        "local_sequence": 2,
+        "stream_sequence": 4796,
+        "message_id": "cc-rushabdev-05945a08ec45-00000002-replica",
+        "status": "online"
+      },
+      "remediation_backup": "/root/.dharma/backups/codex_composer_three_vps/remediation_20260716T104136Z"
+    },
+    {
+      "instance_id": "meghadharma",
+      "hostname": "meghadharma-cloud",
+      "replica_role": "orientation_primary",
+      "transport_principal": "codex_composer_primary",
+      "canonical_presence_publisher": true,
+      "service": {
+        "active": true,
+        "enabled": true,
+        "active_enter_timestamp": "2026-07-16T10:44:12Z",
+        "systemd_analyze_security": "4.6 OK"
+      },
+      "seat": {
+        "unix_user": "codex-composer-seat",
+        "unix_uid": 995,
+        "tmux_session": "codex_composer",
+        "pane_command": "node",
+        "workspace": "/opt/dharma-codex-composer/repo",
+        "codex_version": "codex-cli 0.144.5",
+        "contract_sha256": "1b4d0957addd63a03f2bfc081f2ca70eb4cbe1c2048ba7c5e8cffd0aac73f986",
+        "ready": true,
+        "nats_secret_in_pane_environment": false,
+        "seat_can_read_supervisor_environment": false
+      },
+      "observed_heartbeat": {
+        "observed_at": "2026-07-16T10:44:53.509256Z",
+        "boot_id": "058c9e3b0ada40f9bad414bd04c9f0ed",
+        "local_sequence": 3,
+        "replica_stream_sequence": 4797,
+        "presence_stream_sequence": 4798,
+        "replica_message_id": "cc-meghadharma-058c9e3b0ada-00000003-replica",
+        "presence_message_id": "cc-meghadharma-058c9e3b0ada-00000003-presence",
+        "status": "online"
+      },
+      "remediation_backup": "/root/.dharma/backups/codex_composer_three_vps/remediation_20260716T104137Z"
+    }
+  ],
+  "host_secret_handling": {
+    "identity_environment_path": "/etc/dharma/codex-composer-replica.env",
+    "credential_path": "/etc/dharma/codex-composer-nats.secret",
+    "owner_uid": 0,
+    "group_gid": 0,
+    "mode": "0600",
+    "credentials_rotated_after_exposure": true,
+    "one_password_per_instance": true,
+    "secrets_embedded_in_this_receipt": false
+  },
+  "tls": {
+    "remote_url_scheme": "wss",
+    "listener_port": 9443,
+    "observed_protocol": "TLSv1.3",
+    "ca_certificate_sha256": "cd7d9d1b8ba9c3360e39528deebc2f695548753e847d20859e82b0c692c98386",
+    "server_certificate_sha256": "1ca70a097fd3688f7d14ce1c8cc62677273b3c2f1310bbc5bfbb8f6d5d44ea50",
+    "server_certificate_fingerprint_sha256": "28:3E:1A:97:52:AF:63:40:10:C0:F7:65:D4:29:DE:BB:9E:2A:8D:E8:1E:4D:4A:CB:36:1C:37:6C:82:FA:42:8C",
+    "server_certificate_not_before": "2026-07-16T10:35:13Z",
+    "server_certificate_not_after": "2028-10-18T10:35:13Z",
+    "subject_alt_names": [
+      "IP:178.128.87.170",
+      "DNS:meghadharma-cloud"
+    ],
+    "ca_private_key_committed_or_deployed_to_clients": false
+  },
+  "nats_hub": {
+    "host": "meghadharma",
+    "service_active": true,
+    "config_sha256": "cf0f2d8a5382e9a5eeeef60d4ca955572166682e38cdd74564d8e8a41c78b0d6",
+    "config_backup": "/etc/nats-server.conf.before-codex-composer-secure-20260716T103811Z",
+    "legacy_shared_codex_composer_user_present": false,
+    "monitoring_listener": "127.0.0.1:8222",
+    "client_listener": "0.0.0.0:4222, firewall source-restricted",
+    "wss_listener": "0.0.0.0:9443, firewall source-restricted",
+    "operator_workstation_public_probe": {
+      "4222": "blocked",
+      "8222": "blocked",
+      "9443": "blocked"
+    },
+    "remote_connection_observations": [
+      {
+        "name": "codex_composer/agni",
+        "type": "websocket",
+        "tls_version": "1.3",
+        "subscriptions": [
+          "_INBOX.*"
+        ]
+      },
+      {
+        "name": "codex_composer/rushabdev",
+        "type": "websocket",
+        "tls_version": "1.3",
+        "subscriptions": [
+          "_INBOX.*"
+        ]
+      },
+      {
+        "name": "codex_composer/meghadharma",
+        "type": "nats",
+        "network_scope": "loopback",
+        "subscriptions": [
+          "_INBOX.*"
+        ]
+      }
+    ],
+    "stream": {
+      "name": "DHARMA_A2A",
+      "subjects": [
+        "dharma.a2a.>",
+        "dharma.agent.>"
+      ],
+      "observed_last_sequence": 4800
+    }
+  },
+  "acl_negative_controls": [
+    {
+      "principal": "codex_composer_agni",
+      "attempted_subject": "dharma.agent.codex_composer.presence",
+      "broker_result": "Publish Violation",
+      "passed": true
+    },
+    {
+      "principal": "codex_composer_rushabdev",
+      "attempted_subject": "dharma.agent.codex_composer.presence",
+      "broker_result": "Publish Violation",
+      "passed": true
+    },
+    {
+      "principal": "codex_composer_primary",
+      "attempted_subject": "dharma.a2a.codex_composer.replica.agni.heartbeat",
+      "broker_result": "Publish Violation",
+      "passed": true
+    }
+  ],
+  "presence_projection": {
+    "projector": {
+      "durable_name": "fleet_presence_projector",
+      "filter_subject": "dharma.agent.*.presence",
+      "delivered_stream_sequence": 4799,
+      "ack_floor_stream_sequence": 4799,
+      "num_ack_pending": 0,
+      "num_pending": 0,
+      "num_redelivered": 0,
+      "push_bound": true
+    },
+    "node_registry": {
+      "path": "/var/lib/docker/volumes/dharma_command_state/_data/a2a/nodes.json",
+      "node_id": "codex_composer",
+      "status": "online",
+      "instance_id": "meghadharma",
+      "transport_principal": "codex_composer_primary",
+      "semantic_consumer_enabled": false,
+      "execution_lease_active": false,
+      "card_sha256": "7606f919e98b153cf9e405e4045563b7d8297542034fda52678c3d4439d21824",
+      "memory_sha256": "dc199220cd2e25e6837a156b59774bf49b13cba1d4628648dbc31c9906d70928"
+    },
+    "runtime_ledger": {
+      "path": "/var/lib/docker/volumes/dharma_command_state/_data/state/runtime.db",
+      "observed_side_effect_key": "fleet_presence:codex_composer:presence_fddd9cb96db53df24c3f3357b93f3f18",
+      "idempotency_status": "completed",
+      "side_effect_receipt_id": "rr_5db9cdfc52b44839",
+      "side_effect_receipt_type": "side_effect_complete",
+      "side_effect_status": "completed",
+      "observed_at": "2026-07-16T10:44:53.635003Z"
+    },
+    "projector_container_health": "healthy",
+    "projector_card_sha256": "7606f919e98b153cf9e405e4045563b7d8297542034fda52678c3d4439d21824"
+  },
+  "security_remediation": {
+    "trigger": "Independent pre-commit review reproduced plaintext remote transport, public monitoring exposure, NATS-secret inheritance into two Codex panes, and acceptance of an unrelated legacy Meghadharma seat.",
+    "actions": [
+      "Stopped all three replica services.",
+      "Terminated the two newly launched secret-bearing tmux sessions.",
+      "Preserved the unrelated root-owned Meghadharma session as codex_composer_legacy_20260716 and excluded it from readiness.",
+      "Removed the shared broker user, generated three instance-scoped principals, and rotated every password.",
+      "Added TLS-protected WSS for remote replicas and installed a pinned private CA certificate.",
+      "Bound NATS monitoring to loopback and restricted broker/WSS firewall ingress to the two known remote hosts.",
+      "Created a dedicated unprivileged seat user on every host and copied only the minimum Codex authentication/configuration needed by that user.",
+      "Added a deterministic tmux contract marker and workspace verification.",
+      "Reduced systemd-analyze exposure from 8.9 EXPOSED to 4.6 OK."
+    ],
+    "test_artifact_cleanup": {
+      "deleted_stream_sequence": 4739,
+      "reason": "An intentionally unauthorized/shape-negative canonical probe was stored by the authorized primary during ACL testing and rejected by the projector.",
+      "post_cleanup_projector_ack_pending": 0,
+      "post_cleanup_projector_redelivered": 0
+    },
+    "result": "closed_for_this_deployment_scope"
+  },
+  "restart_resilience": {
+    "tested_instance": "rushabdev",
+    "before": {
+      "boot_id": "c65a9027e64049bdb86c623a8e564642",
+      "stream_sequence": 4786,
+      "seat_contract_sha256": "e9941c0bf602f764125ee40438734e7c733e06d89b52fb5448138efd4f821e44"
+    },
+    "after": {
+      "boot_id": "05945a08ec45429d8e65bfdeb4515bcb",
+      "stream_sequence": 4791,
+      "status": "online",
+      "seat_ready": true,
+      "seat_contract_sha256": "e9941c0bf602f764125ee40438734e7c733e06d89b52fb5448138efd4f821e44"
+    },
+    "result": "passed"
+  },
+  "repository_verification": {
+    "focused_pytest": {
+      "command": "python -m pytest tests/test_roaming_onboarding.py tests/test_codex_composer_registration.py tests/test_codex_composer_replica.py tests/test_fleet_field_registry.py -q",
+      "result": "28 passed"
+    },
+    "focused_ruff": {
+      "result": "all checks passed"
+    },
+    "fleet_field_registry_check": {
+      "command": "python3 scripts/runtime/fleet_field_registry.py --check",
+      "result": "OK; codex_composer is intentionally not inserted until that schema supports a truthful secondary hub lane"
+    },
+    "module_line_budget": [
+      {
+        "path": "scripts/runtime/codex_composer_replica.py",
+        "physical_lines": 447,
+        "maximum": 500,
+        "result": "passed"
+      },
+      {
+        "path": "scripts/runtime/codex_composer_seat.py",
+        "physical_lines": 266,
+        "maximum": 500,
+        "result": "passed"
+      }
+    ]
+  },
+  "rollback": {
+    "host": "Disable the supervisor; explicitly stop the unprivileged tmux seat if required; restore the remediation backup; retain or separately archive bounded receipt generations.",
+    "hub": "Restore /etc/nats-server.conf.before-codex-composer-secure-20260716T103811Z only with an explicit decision about the security regression it would reintroduce; validate before restart.",
+    "projection": "Restore any prior card from backup, restart dharma-command-backend, and confirm projector health.",
+    "repository": "Revert only the bounded implementation after its governance precursor and source dependencies are resolved."
+  }
+}

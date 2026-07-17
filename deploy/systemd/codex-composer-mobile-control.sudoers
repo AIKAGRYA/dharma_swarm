@@ -1,0 +1,14 @@
+# Install as /etc/sudoers.d/codex-composer-mobile-control with mode 0440.
+# SSH keys for this account must each use `restrict` plus an exact forced
+# command.  This file grants no shell, arbitrary unit, or arbitrary argument.
+Defaults:codex-composer-mobile use_pty
+Defaults:codex-composer-mobile secure_path=/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin
+# The root gate validates the command OpenSSH replaced with the per-key forced
+# command. Preserve this one server-populated value; no other caller input is
+# admitted through sudo's environment.
+Defaults:codex-composer-mobile env_keep += "SSH_ORIGINAL_COMMAND"
+
+Cmnd_Alias CODEX_COMPOSER_STATUS = /usr/local/sbin/codex-composer-mobile-control ssh-gate status
+Cmnd_Alias CODEX_COMPOSER_RECONCILE = /usr/local/sbin/codex-composer-mobile-control ssh-gate reconcile
+
+codex-composer-mobile ALL=(root) NOPASSWD: CODEX_COMPOSER_STATUS, CODEX_COMPOSER_RECONCILE

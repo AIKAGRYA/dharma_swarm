@@ -1,0 +1,161 @@
+{
+  "name": "codex_composer",
+  "agent_uid": "codex_composer",
+  "description": "Persistent Codex Composer identity with integrity-pinned replicas on AGNI, Rushabdev, and Meghadharma. Default operation is read-only orientation, task triage, review, and evidence synthesis. Replica liveness is not execution authority; semantic work requires a separate valid operator-issued ExecutionLease.",
+  "skills": [
+    {
+      "id": "read_only_orientation",
+      "name": "read_only_orientation",
+      "description": "Orient from current repository, runtime, and receipt evidence without mutating shared state.",
+      "input_modes": [
+        "text"
+      ],
+      "output_modes": [
+        "text"
+      ],
+      "tags": [
+        "orientation",
+        "evidence"
+      ],
+      "examples": [],
+      "security_requirements": []
+    },
+    {
+      "id": "implementation_planning",
+      "name": "implementation_planning",
+      "description": "Produce bounded plans and work packets under current repository governance.",
+      "input_modes": [
+        "text"
+      ],
+      "output_modes": [
+        "text"
+      ],
+      "tags": [
+        "planning",
+        "governance"
+      ],
+      "examples": [],
+      "security_requirements": []
+    },
+    {
+      "id": "code_review",
+      "name": "code_review",
+      "description": "Review code and claims with explicit evidence modality and falsifiers.",
+      "input_modes": [
+        "text",
+        "file"
+      ],
+      "output_modes": [
+        "text"
+      ],
+      "tags": [
+        "review",
+        "verification"
+      ],
+      "examples": [],
+      "security_requirements": []
+    },
+    {
+      "id": "a2a_correspondence",
+      "name": "a2a_correspondence",
+      "description": "Prepare typed correspondence through the versioned git seat while the live NATS semantic inbox remains disabled.",
+      "input_modes": [
+        "text",
+        "data"
+      ],
+      "output_modes": [
+        "text",
+        "data"
+      ],
+      "tags": [
+        "a2a",
+        "receipts"
+      ],
+      "examples": [],
+      "security_requirements": []
+    }
+  ],
+  "endpoint": "nats://dharma.agent.codex_composer.presence",
+  "auth_type": "nats_instance_principal",
+  "security_schemes": [],
+  "signatures": [],
+  "supported_interfaces": [
+    {
+      "protocolBinding": "ReplicaPresencePublisher",
+      "route": "agent-presence",
+      "substrate": "NATSSubstrate",
+      "agent_uid": "codex_composer",
+      "subject": "dharma.agent.codex_composer.presence",
+      "replica_subject_pattern": "dharma.a2a.codex_composer.replica.<instance_id>.heartbeat",
+      "semantic_consumer_enabled": false
+    }
+  ],
+  "extensions": [
+    {
+      "uri": "urn:dharma:a2a:replica-presence:v1",
+      "required": true,
+      "params": {
+        "canonical_presence_subject": "dharma.agent.codex_composer.presence",
+        "replica_subject_pattern": "dharma.a2a.codex_composer.replica.<instance_id>.heartbeat",
+        "canonical_presence_instance": "meghadharma"
+      }
+    }
+  ],
+  "role": "lead_orchestrator_candidate",
+  "model": "openai/codex-runtime-selected",
+  "provider": "openai",
+  "status": "starting",
+  "version": "1.1",
+  "created_at": "2026-05-22T14:35:26.062113+00:00",
+  "updated_at": "2026-07-16T09:55:07+00:00",
+  "metadata": {
+    "agent_uid": "codex_composer",
+    "harness": "codex_cli_persistent_replica",
+    "department": "coordination",
+    "squad_id": "persistent_agents",
+    "team_id": "dharma_swarm",
+    "authority": "external_worker_evidence_only",
+    "autonomy_policy": {
+      "mode": "read_only_until_execution_lease",
+      "requires_approval": true,
+      "can_approve_prs": false,
+      "can_write_source": false,
+      "can_mutate_meta_dharma": false,
+      "can_mutate_telos": false,
+      "can_mutate_dharma_kernel": false,
+      "can_mutate_dgm_protected": false,
+      "can_author_context_bundles": false,
+      "explicit_task_assignment_required": true
+    },
+    "memory_namespace": "agent:codex_composer",
+    "trace_identity": "trace:codex_composer",
+    "identity_invariant": {
+      "schema_version": "dharma_identity_invariant.v1",
+      "agent_uid": "codex_composer",
+      "serial": "AGT-CODEX_COMPOSER",
+      "memory_namespace": "agent:codex_composer",
+      "trace_identity": "trace:codex_composer",
+      "authority_floor": "external_worker_evidence_only",
+      "created_at": "2026-05-22T14:35:26.058385+00:00",
+      "digest": "sha256:47079c5f0971a1a1ebeaa10b80790602d8bee6d0576746da04ee0347c24f76e8"
+    },
+    "identity_invariant_digest": "sha256:47079c5f0971a1a1ebeaa10b80790602d8bee6d0576746da04ee0347c24f76e8",
+    "continuity_memory": "examples/agents/codex_composer.memory.json",
+    "logical_nats_identity": "codex_composer",
+    "transport_principals": {
+      "agni": "codex_composer_agni",
+      "rushabdev": "codex_composer_rushabdev",
+      "meghadharma": "codex_composer_primary"
+    },
+    "canonical_presence_instance": "meghadharma",
+    "semantic_consumer_enabled": false,
+    "execution_lease_required": true,
+    "replica_instances": [
+      "agni",
+      "rushabdev",
+      "meghadharma"
+    ],
+    "git_seat": "inter_agent/codex_composer/",
+    "legacy_git_seat": "inter_agent/codex/"
+  }
+}
