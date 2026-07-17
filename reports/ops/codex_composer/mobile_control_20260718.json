@@ -1,6 +1,6 @@
 {
   "$schema": "dharma.codex_composer.mobile_control_deployment_observation.v1",
-  "generated_at": "2026-07-17T19:41:59Z",
+  "generated_at": "2026-07-17T20:04:39Z",
   "status": "host_layer_deployed_github_configured_workflow_awaiting_default_branch",
   "agent_uid": "codex_composer",
   "evidence_modality": {
@@ -20,6 +20,7 @@
       "All three root helpers returned healthy_noop with a fresh identity-bound heartbeat and ready codex_composer seat.",
       "Each host accepted only its two unique forced-command keys and the expected status or reconcile operation.",
       "The exact workflow SSH and receipt-validation block accepted healthy status and healthy reconcile receipts from all three live hosts.",
+      "A controlled stop of the Rushabdev hot-standby supervisor was recovered through its forced reconcile key as reconciled_verified/action=start; the service returned active with a new boot_id.",
       "The GitHub control issue, numeric actor variable, host variables, status secrets, and three reviewer-protected main-only repair environments exist."
     ],
     "not_yet_observed": [
@@ -128,8 +129,14 @@
       "status_key_fingerprint": "SHA256:kuTfSUL8smU99Q5AqGDEtWevO+BPuBABcCkqW9RkKfs",
       "reconcile_key_fingerprint": "SHA256:FWlYIPJ40HMJDOGEXvQHkq+pWiwV4wyUiSSqdCVOQdY",
       "status_result": "healthy_noop",
-      "reconcile_result": "healthy_noop",
-      "reconcile_action": "none"
+      "reconcile_result": "reconciled_verified",
+      "reconcile_action": "start",
+      "controlled_resilience_probe": {
+        "service_stopped_intentionally": true,
+        "service_recovered": true,
+        "boot_id_changed": true,
+        "observed_at": "2026-07-17T20:04:39Z"
+      }
     },
     {
       "instance_id": "meghadharma",
