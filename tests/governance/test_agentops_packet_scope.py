@@ -499,13 +499,18 @@ def test_agentops_packet_scope_workflow_has_truthful_bootstrap_and_fail_closed_e
 
     assert 'git ls-tree -r --name-only "${EVENT_BASE}" -- "${CHECKER_PATH}"' in job
     assert 'git cat-file -e "${EVENT_BASE}:${CHECKER_PATH}"' in job
-    # Enforcement code executes from the trusted event base, never the
-    # candidate head: base-pinned package install plus a base worktree for
-    # the checker and its first-party imports.
+    # Enforcement CODE comes from the trusted event base (script executed from
+    # the base worktree, first-party imports from the base-installed package,
+    # -I blocking cwd/script-dir shadowing) while it RUNS against the head
+    # checkout, whose git HEAD equals the declared event head — the checker's
+    # own evaluate() asserts exactly that and takes repo_root from cwd. The
+    # old base-cwd invocation made base != head an unconditional CONFIG_ERROR
+    # on every enforced PR and must never return.
     assert 'git archive --format=tar "${EVENT_BASE}"' in job
     assert "git archive --format=tar HEAD" not in job
     assert 'git worktree add --detach "${trusted_base}" "${EVENT_BASE}"' in job
-    assert '(cd "${trusted_base}" && python3 "${CHECKER_PATH}" \\' in job
+    assert '(python3 -I "${trusted_base}/${CHECKER_PATH}" \\' in job
+    assert 'cd "${trusted_base}"' not in job
     assert '--event-name "${EVENT_NAME}"' in job
     assert '--event-base "${EVENT_BASE}"' in job
     assert '--event-head "${EVENT_HEAD}")' in job

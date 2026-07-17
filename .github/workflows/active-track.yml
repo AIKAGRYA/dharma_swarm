@@ -337,13 +337,20 @@ jobs:
           PYTHONPYCACHEPREFIX: ${{ runner.temp }}/dharma-agentops/packet-scope/pycache
         run: |
           set -euo pipefail
-          # The base worktree shares the checkout's object store, so the
-          # checker's commit-pinned git reads still resolve both event SHAs.
+          # The checker CODE still comes from the trusted event base: the script
+          # file is executed from the base worktree, and its first-party imports
+          # resolve to the base-installed package (-I keeps the head checkout's
+          # dharma_swarm/ tree, the script directory, and PYTHON* env vars off
+          # sys.path). It RUNS against the head checkout, whose git HEAD equals
+          # the declared event head — the checker itself asserts exactly that
+          # (check_agentops_packet_scope.py evaluate(): checked-out HEAD must
+          # equal the declared event head, and main() takes repo_root from cwd).
+          # Both pinned event SHAs resolve from this checkout's full history.
           trusted_base="${RUNNER_TEMP}/dharma-agentops/packet-scope/trusted-base"
           git worktree add --detach "${trusted_base}" "${EVENT_BASE}"
           checker_report="${REPORT_PATH}.checker"
           checker_exit=0
-          if (cd "${trusted_base}" && python3 "${CHECKER_PATH}" \
+          if (python3 -I "${trusted_base}/${CHECKER_PATH}" \
               --event-name "${EVENT_NAME}" \
               --event-base "${EVENT_BASE}" \
               --event-head "${EVENT_HEAD}") \
