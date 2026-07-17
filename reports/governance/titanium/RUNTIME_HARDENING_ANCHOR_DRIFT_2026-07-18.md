@@ -118,3 +118,30 @@ Observed result: `65 passed` in the combined bundle; ruff clean; `git diff --che
 *enforcement* half (a FrontierCapacityGate that can refuse runaway/unauthorized
 execution) remains open and must be implemented without a cost-based model-downgrade
 path, per the frontier-capacity priority.
+
+
+## Follow-up implementation receipt — TIT-017 prompt envelope (WP-A.2, frontier-preserving)
+
+The branch added the first TIT-017 prompt-envelope implementation at the production
+`agent_runner._build_prompt()` chokepoint:
+
+- `_apply_frontier_prompt_envelope()` bounds the final assembled user prompt, not just
+  individual fragments.
+- The default envelope is intentionally high (`64_000` approximate prompt tokens) so
+  normal large frontier-context prompts are preserved and not diluted.
+- Explicit lower envelopes preserve useful head/tail context and insert a visible
+  `[TRUNCATED: ...]` marker instead of silently shrinking context.
+- Added a structural fitness guard proving `_build_prompt()` calls the total envelope;
+  the guard was manually proven RED when the call was removed and GREEN when restored.
+
+Verification command:
+
+```bash
+.venv/bin/python -m pytest -q tests/test_agent_runner.py::test_build_prompt_default_frontier_envelope_preserves_large_useful_context tests/test_agent_runner.py::test_build_prompt_explicit_frontier_envelope_preserves_head_and_tail tests/test_agent_runner.py::test_build_prompt_uses_active_memory_recall_by_default tests/test_agent_runner.py::test_build_prompt_prefers_local_state_dir_when_available tests/test_cost_tracker.py tests/governance/test_titanium_runtime_hardening_fitness.py
+git diff --check
+```
+
+Observed result: `28 passed`; diff check passed. Whole-file ruff on legacy
+`agent_runner.py` still reports pre-existing lint issues unrelated to this packet
+(`E402` import placement and an unused `mem` local), so this receipt scopes
+verification to the new prompt-envelope behavior.

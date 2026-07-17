@@ -1157,6 +1157,59 @@ def _resolve_config_ontology_path(
     return state_dir / "ontology.db"
 
 
+_PROMPT_TOKEN_CHAR_RATIO = 4
+_DEFAULT_FRONTIER_PROMPT_TOKEN_ENVELOPE = 64_000
+_MIN_FRONTIER_PROMPT_TOKEN_ENVELOPE = 2_000
+
+
+def _estimate_prompt_tokens(text: str) -> int:
+    # Deliberately dependency-free and conservative enough for a prompt envelope.
+    return max(1, (len(text) + _PROMPT_TOKEN_CHAR_RATIO - 1) // _PROMPT_TOKEN_CHAR_RATIO)
+
+
+def _frontier_prompt_token_envelope(metadata: dict[str, Any]) -> int:
+    raw = (
+        metadata.get("frontier_prompt_token_envelope")
+        or metadata.get("prompt_token_envelope")
+        or os.getenv("DHARMA_FRONTIER_PROMPT_TOKEN_ENVELOPE")
+        or ""
+    )
+    try:
+        value = int(raw) if str(raw).strip() else _DEFAULT_FRONTIER_PROMPT_TOKEN_ENVELOPE
+    except (TypeError, ValueError):
+        value = _DEFAULT_FRONTIER_PROMPT_TOKEN_ENVELOPE
+    return max(_MIN_FRONTIER_PROMPT_TOKEN_ENVELOPE, value)
+
+
+def _head_tail_preserve(text: str, *, max_chars: int) -> str:
+    if len(text) <= max_chars:
+        return text
+    marker = (
+        "\n\n[TRUNCATED: prompt exceeded explicit frontier-capacity envelope; "
+        "preserved head/tail context.]\n\n"
+    )
+    if max_chars <= len(marker) + 64:
+        return text[:max_chars]
+    remaining = max_chars - len(marker)
+    head_chars = max(1, int(remaining * 0.68))
+    tail_chars = max(1, remaining - head_chars)
+    return text[:head_chars].rstrip() + marker + text[-tail_chars:].lstrip()
+
+
+def _apply_frontier_prompt_envelope(content: str, *, metadata: dict[str, Any]) -> str:
+    """Bound total prompt size without cost-based model/context dilution.
+
+    The default envelope is intentionally high to preserve useful frontier-model
+    context. The guard exists to prevent accidental megabyte fan-out and to make
+    any compression explicit in the prompt itself.
+    """
+    envelope_tokens = _frontier_prompt_token_envelope(metadata)
+    if _estimate_prompt_tokens(content) <= envelope_tokens:
+        return content
+    max_chars = envelope_tokens * _PROMPT_TOKEN_CHAR_RATIO
+    return _head_tail_preserve(content, max_chars=max_chars)
+
+
 def _build_prompt(
     task: Task,
     config: AgentConfig,
@@ -1281,9 +1334,13 @@ def _build_prompt(
 
     if plan_context:
         user_parts.append(f"\n\n{plan_context}")
+    user_content = _apply_frontier_prompt_envelope(
+        "\n".join(user_parts),
+        metadata=metadata,
+    )
     return LLMRequest(
         model=config.model,
-        messages=[{"role": "user", "content": "\n".join(user_parts)}],
+        messages=[{"role": "user", "content": user_content}],
         system=system,
         max_tokens=8192,
     )

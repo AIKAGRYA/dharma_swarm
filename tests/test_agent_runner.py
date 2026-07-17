@@ -751,3 +751,36 @@ async def test_pool_remove_dead():
     await pool.remove_dead()
     agents = await pool.list_agents()
     assert len(agents) == 0
+
+
+def test_build_prompt_default_frontier_envelope_preserves_large_useful_context(config, monkeypatch):
+    monkeypatch.setattr("dharma_swarm.context.read_memory_context", lambda **_: "", raising=True)
+    monkeypatch.setattr("dharma_swarm.context.read_latent_gold_context", lambda **_: "", raising=True)
+    description = "frontier-context " * 5000
+    task = Task(title="Large useful prompt", description=description)
+
+    request = _build_prompt(task, config)
+    content = request.messages[0]["content"]
+
+    assert "frontier-context" in content
+    assert "[TRUNCATED:" not in content
+    assert len(content) > len(description)
+
+
+def test_build_prompt_explicit_frontier_envelope_preserves_head_and_tail(config, monkeypatch):
+    monkeypatch.setattr("dharma_swarm.context.read_memory_context", lambda **_: "", raising=True)
+    monkeypatch.setattr("dharma_swarm.context.read_latent_gold_context", lambda **_: "", raising=True)
+    description = "HEAD_SENTINEL\n" + ("middle filler " * 2000) + "\nTAIL_SENTINEL"
+    task = Task(
+        title="Oversized prompt",
+        description=description,
+        metadata={"frontier_prompt_token_envelope": 2000},
+    )
+
+    request = _build_prompt(task, config)
+    content = request.messages[0]["content"]
+
+    assert "HEAD_SENTINEL" in content
+    assert "TAIL_SENTINEL" in content
+    assert "[TRUNCATED: prompt exceeded explicit frontier-capacity envelope" in content
+    assert len(content) <= 2000 * 4

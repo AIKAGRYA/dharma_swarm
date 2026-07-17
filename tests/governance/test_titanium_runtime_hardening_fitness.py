@@ -156,3 +156,28 @@ def test_estimate_cost_is_telemetry_only_never_a_gate() -> None:
                         "provider path (frontier-capacity doctrine: no cost-based "
                         "downgrade/deny)."
                     )
+
+
+def test_tit017_build_prompt_has_total_frontier_prompt_envelope() -> None:
+    """TIT-017 guard: _build_prompt must pass final user content through envelope."""
+    agent_runner = REPO_ROOT / "dharma_swarm" / "agent_runner.py"
+    source = _source(agent_runner)
+    tree = ast.parse(source)
+
+    assert "_DEFAULT_FRONTIER_PROMPT_TOKEN_ENVELOPE" in source
+    assert "_apply_frontier_prompt_envelope" in source
+    assert "frontier-capacity envelope" in source
+
+    build_prompt = next(
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef) and node.name == "_build_prompt"
+    )
+    calls_envelope = False
+    for node in ast.walk(build_prompt):
+        if isinstance(node, ast.Call):
+            func = node.func
+            name = getattr(func, "id", None) or getattr(func, "attr", None)
+            if name == "_apply_frontier_prompt_envelope":
+                calls_envelope = True
+                break
+    assert calls_envelope, "_build_prompt must apply the total frontier prompt envelope"
