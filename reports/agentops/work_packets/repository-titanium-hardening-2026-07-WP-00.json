@@ -1,6 +1,6 @@
 {
   "id": "repository-titanium-hardening-2026-07-WP-00",
-  "base_ref": "27ef35af1d6f8ae55c491aea5537a4db9cc34a52",
+  "base_ref": "09b1a400a8fec8a6e2824bd3ff75a4e77eceb457",
   "branch": "agent/titanium-wp00-admission",
   "worktree": ".",
   "intent": "Admit the Titanium repository-hardening campaign without implementing Phase 0: retire TAM honestly at AMBER, keep Mike active through WP-0F2, establish bounded ownership, and regenerate the canonical portfolio projections. Baseline, prompt, specification, and dashboard work follow in a second packet under the newly admitted Titanium owner.",
@@ -219,7 +219,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "27ef35af1d6f8ae55c491aea5537a4db9cc34a52",
+      "checked_at_sha": "09b1a400a8fec8a6e2824bd3ff75a4e77eceb457",
       "details": []
     },
     "interface_mismatches": [
@@ -240,6 +240,6 @@
       "Open stale governance PRs touching ACTIVE_TRACK.yaml or SOVEREIGN_MANIFEST.md must rebase and reseal after this change."
     ],
     "rollback": "Revert this admission commit as one unit: remove the Titanium active-track entry, restore TAM to ACTIVE at AMBER, restore the managed CLAUDE and SOVEREIGN projections, and leave every Titanium evidence or implementation packet blocked.",
-    "packet_digest": "04849db9c143b74377bc4fe316b66a0901675a3eeae869889801b7ede4e20677"
+    "packet_digest": "8dbb69cd55271d4496cef665b21406ef64739829be95bee06f4750e1a9212b35"
   }
 }
