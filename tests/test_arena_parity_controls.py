@@ -29,11 +29,14 @@ from dharma_swarm.coordination.arena.live_pool import (
 )
 from dharma_swarm.coordination.arena.measure import (
     CLAIM_BOUNDARY,
+    LIVE_CLOSEOUT_STATE,
     LIVE_MEASUREMENT_SCHEMA,
     LiveMeasurementError,
     run_live_measurement,
 )
+from dharma_swarm.coordination.arena.runner import CLOSEOUT_STATES
 from dharma_swarm.coordination.genome import OrchestrationGenome
+from dharma_swarm.council import TraceVerificationRequest
 
 
 def _router_genome() -> OrchestrationGenome:
@@ -151,10 +154,14 @@ def test_live_pool_caches_and_bills_parity_honestly():
     assert pool.call_receipts[0]["provider_model_id"] == "m"
 
 
-def test_live_pool_refuses_provider_model_identity_mismatch():
+@pytest.mark.parametrize(
+    "returned_model",
+    ["silent-fallback-model", "requested-model ", 7, True, None],
+)
+def test_live_pool_refuses_provider_model_identity_mismatch(returned_model: Any):
     def fallback_transport(url: str, payload: dict[str, Any], timeout: float):
         return {
-            "model": "silent-fallback-model",
+            "model": returned_model,
             "message": {"content": "4"},
             "prompt_eval_count": 7,
             "eval_count": 1,
@@ -181,10 +188,71 @@ def test_live_pool_refuses_completion_tokens_over_cap():
     assert pool.call_receipts == []
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("prompt_eval_count", -1),
+        ("eval_count", -1),
+        ("prompt_eval_count", "7"),
+        ("eval_count", True),
+    ],
+)
+def test_live_pool_refuses_invalid_provider_token_accounting(field: str, value: Any):
+    def malformed_transport(url: str, payload: dict[str, Any], timeout: float):
+        response = {
+            "model": payload["model"],
+            "message": {"content": "4"},
+            "prompt_eval_count": 7,
+            "eval_count": 1,
+        }
+        response[field] = value
+        return response
+
+    pool = LiveWorkerPool(_PUBLIC, transport=malformed_transport)
+    with pytest.raises(LiveDispatchError, match="token accounting invalid"):
+        pool.dispatch("m", "t1")
+    assert pool.call_receipts == []
+
+
 def test_replay_pool_rejects_unexpected_schema():
     with pytest.raises(LiveDispatchError):
         RecordedReplayPool({"schema": "not-the-schema"})
     assert RECORDED_SCHEMA == "orchestration_arena_v1_live_receipts.v1"
+
+
+def _valid_recorded_payload() -> dict[str, Any]:
+    pool = LiveWorkerPool(_PUBLIC, timeout=3.0, transport=_metered_transport)
+    pool.dispatch("m", "t1")
+    return pool.receipts_payload()
+
+
+def test_replay_pool_accepts_exact_live_receipt():
+    payload = _valid_recorded_payload()
+    replay = RecordedReplayPool(payload)
+    response = replay.dispatch("m", "t1")
+    assert response.answer == payload["responses"][0]["answer"]
+    assert response.cost == 8
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("prompt_tokens", -1, "prompt token accounting"),
+        ("completion_tokens", -1, "completion token accounting"),
+        ("prompt_tokens", "7", "prompt token accounting"),
+        ("completion_tokens", True, "completion token accounting"),
+        ("cost", -1, "inconsistent token cost"),
+        ("cost", 9, "inconsistent token cost"),
+        ("provider_model_id", "fallback", "provider identity mismatch"),
+    ],
+)
+def test_replay_pool_rejects_forged_accounting(
+    field: str, value: Any, message: str
+):
+    payload = _valid_recorded_payload()
+    payload["responses"][0][field] = value
+    with pytest.raises(LiveDispatchError, match=message):
+        RecordedReplayPool(payload)
 
 
 # ------------------------------------------------ live entrypoint (no network)
@@ -224,6 +292,8 @@ def test_live_entrypoint_constructs_full_controlled_run_without_network(
     assert receipt["schema"] == LIVE_MEASUREMENT_SCHEMA
     assert receipt["capability_claim"] is False
     assert receipt["claim_boundary"] == CLAIM_BOUNDARY
+    assert receipt["closeout_state"] == LIVE_CLOSEOUT_STATE
+    assert receipt["control_outcome"] == result["run"]["control_outcome"]
     assert receipt["promotion_authorized"] is False
     assert receipt["expected_live_pairs"] == receipt["observed_live_pairs"] == 72
     assert len(receipt["digest_sha256"]) == 64
@@ -235,6 +305,12 @@ def test_live_entrypoint_constructs_full_controlled_run_without_network(
         assert digest == hashlib.sha256((output / name).read_bytes()).hexdigest()
     run = json.loads((output / "arena_run.json").read_text(encoding="utf-8"))
     assert run["capability_claim"] is False
+    assert run["closeout_state"] == LIVE_CLOSEOUT_STATE
+    assert run["closeout_state"] in CLOSEOUT_STATES
+    assert run["promotion_claim_authority"]["authority"] == "evidence_only"
+    assert run["promotion_claim_authority"]["promotion_authorized"] is False
+    assert "authority" not in run["promotion_claim"]
+    assert "promotion_authorized" not in run["promotion_claim"]
     assert run["live_controls_verified"] is True
     assert run["promotion_authorized"] is False
     assert run["parity_control"]["verified"] is True
@@ -251,14 +327,43 @@ def test_live_entrypoint_constructs_full_controlled_run_without_network(
     )
     assert len(live_receipts["responses"]) == 72
     scorecard = json.loads((output / "scorecard.json").read_text(encoding="utf-8"))
+    assert scorecard["closeout_state"] == LIVE_CLOSEOUT_STATE
+    assert scorecard["control_outcome"] == run["control_outcome"]
     assert scorecard["promotion_authorized"] is False
     assert scorecard["claim_boundary"] == CLAIM_BOUNDARY
+    routes = [
+        json.loads(line)
+        for line in (output / "route_receipts.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    traces = [
+        json.loads(line)
+        for line in (output / "trace_receipts.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    council_receipt = json.loads(
+        (output / "council_receipts.jsonl").read_text(encoding="utf-8").strip()
+    )
+    replayed_inputs_hash = TraceVerificationRequest(
+        genome_id=run["candidate_genome_id"],
+        route_receipts=[row for row in routes if row["arm"] == "candidate"],
+        trace_receipts=[row for row in traces if row["arm"] == "candidate"],
+        scorecard=scorecard["candidate"],
+        promotion_claim=run["promotion_claim"],
+        untrusted=run["contaminated"],
+        contamination_findings=(),
+    ).inputs_hash()
+    assert replayed_inputs_hash == council_receipt["inputs_hash"]
+    assert replayed_inputs_hash == run["_council_receipt"]["inputs_hash"]
     packet = (output / "decision_packet.md").read_text(encoding="utf-8")
     assert packet.startswith(
         "> **Claim boundary:** live measurement candidate only; "
         "`capability_claim=false`; `promotion_authorized=false`."
     )
     assert "does not authorize MAP-Elites insertion" in packet
+    assert "Eligible for MAP-Elites promotion" not in packet
 
 
 def test_live_entrypoint_denies_promotion_even_for_positive_runner_state(
@@ -288,13 +393,15 @@ def test_live_entrypoint_denies_promotion_even_for_positive_runner_state(
         transport=_metered_transport,
     )
 
-    assert result["run"]["closeout_state"] == "positive_lift_candidate"
+    assert result["run"]["control_outcome"] == "positive_lift_candidate"
+    assert result["run"]["closeout_state"] == LIVE_CLOSEOUT_STATE
     assert result["run"]["promotion_authorized"] is False
+    assert result["receipt"]["control_outcome"] == "positive_lift_candidate"
+    assert result["receipt"]["closeout_state"] == LIVE_CLOSEOUT_STATE
     assert result["receipt"]["promotion_authorized"] is False
     packet = (output / "decision_packet.md").read_text(encoding="utf-8")
-    assert packet.index("does not authorize MAP-Elites insertion") < packet.index(
-        "Eligible for MAP-Elites promotion."
-    )
+    assert "Eligible for MAP-Elites promotion" not in packet
+    assert "grants no MAP-Elites insertion or promotion authority" in packet
 
 
 def test_live_entrypoint_requires_explicit_opt_in_before_transport(

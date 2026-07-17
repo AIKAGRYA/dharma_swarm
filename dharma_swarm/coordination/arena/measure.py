@@ -25,13 +25,14 @@ from dharma_swarm.coordination.arena.live_pool import (
     LiveWorkerPool,
     Transport,
 )
-from dharma_swarm.coordination.arena.runner import ArenaRunner
+from dharma_swarm.coordination.arena.runner import CLOSEOUT_STATES, ArenaRunner
 from dharma_swarm.coordination.arena.taskpack import TaskFamily, Taskpack
 from dharma_swarm.coordination.genome import OrchestrationGenome
 from dharma_swarm.ollama_config import OLLAMA_LOCAL_BASE_URL
 
 LIVE_MEASUREMENT_SCHEMA = "orchestration_arena_v1_live_measurement.v1"
 CLAIM_BOUNDARY = "measurement_candidate_only"
+LIVE_CLOSEOUT_STATE = "blocked_with_evidence"
 LIVE_OPT_IN_ENV = "DHARMA_ARENA_LIVE"
 SIGNIFICANCE_METHOD = "paired_seeded_bootstrap_percentile"
 
@@ -186,8 +187,6 @@ def _validate_live_receipts(
         raise LiveMeasurementError(
             "live receipts do not cover every roster-seat/task pair exactly once"
         )
-    if any(int(row.get("cost") or 0) <= 0 for row in pool.call_receipts):
-        raise LiveMeasurementError("live receipts contain an unmetered response")
     for row in pool.call_receipts:
         model_id = str(row.get("model_id") or "")
         provider_model_id = str(row.get("provider_model_id") or "")
@@ -195,10 +194,28 @@ def _validate_live_receipts(
             raise LiveMeasurementError(
                 "live receipt provider model identity does not match its roster seat"
             )
-        completion_tokens = int(row.get("completion_tokens") or 0)
-        if completion_tokens < 0 or completion_tokens > per_call_cap:
+        prompt_tokens = row.get("prompt_tokens")
+        completion_tokens = row.get("completion_tokens")
+        if type(prompt_tokens) is not int or prompt_tokens < 0:
+            raise LiveMeasurementError(
+                "live receipt prompt token count is not a non-negative integer"
+            )
+        if type(completion_tokens) is not int or completion_tokens < 0:
+            raise LiveMeasurementError(
+                "live receipt completion token count is not a non-negative integer"
+            )
+        if completion_tokens > per_call_cap:
             raise LiveMeasurementError(
                 "live receipt exceeds the configured completion token cap"
+            )
+        cost = row.get("cost")
+        if (
+            type(cost) is not int
+            or cost <= 0
+            or cost != prompt_tokens + completion_tokens
+        ):
+            raise LiveMeasurementError(
+                "live receipt cost does not equal its non-zero token accounting"
             )
 
 
@@ -243,6 +260,22 @@ def _validate_artifact_manifest(staging: Path, manifest: Mapping[str, str]) -> N
 def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
     path.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+
+def _render_measurement_decision(control_outcome: str) -> str:
+    """Render an authority-safe decision surface without runner promotion text."""
+    return (
+        "> **Claim boundary:** live measurement candidate only; "
+        "`capability_claim=false`; `promotion_authorized=false`.\n"
+        "> This packet does not authorize MAP-Elites insertion, capability "
+        "promotion, production routing, or benchmark claims.\n\n"
+        "## Measurement state\n\n"
+        f"- control_outcome: `{control_outcome}` (evidence only)\n"
+        f"- closeout_state: `{LIVE_CLOSEOUT_STATE}`\n"
+        f"- claim_boundary: `{CLAIM_BOUNDARY}`\n"
+        "- this artifact grants no MAP-Elites insertion or promotion authority\n"
+        "- promotion requires a separate governance decision over real evidence\n"
     )
 
 
@@ -301,6 +334,18 @@ def run_live_measurement(
         _validate_controls(run, per_call_cap=per_call_cap)
         _validate_live_receipts(pool, taskpack, roster, per_call_cap=per_call_cap)
 
+        control_outcome = str(run.get("closeout_state") or "")
+        if control_outcome not in CLOSEOUT_STATES:
+            raise LiveMeasurementError("runner returned an unknown control outcome")
+        promotion_claim = run.get("promotion_claim")
+        if not isinstance(promotion_claim, dict):
+            raise LiveMeasurementError("runner returned no structured control claim")
+        run["promotion_claim_authority"] = {
+            "authority": "evidence_only",
+            "promotion_authorized": False,
+        }
+        run["control_outcome"] = control_outcome
+        run["closeout_state"] = LIVE_CLOSEOUT_STATE
         run["capability_claim"] = False
         run["claim_boundary"] = CLAIM_BOUNDARY
         run["live_controls_verified"] = True
@@ -312,18 +357,13 @@ def run_live_measurement(
         scorecard = json.loads(scorecard_path.read_text(encoding="utf-8"))
         scorecard["capability_claim"] = False
         scorecard["claim_boundary"] = CLAIM_BOUNDARY
+        scorecard["control_outcome"] = control_outcome
+        scorecard["closeout_state"] = LIVE_CLOSEOUT_STATE
         scorecard["promotion_authorized"] = False
         _write_json(scorecard_path, scorecard)
 
-        decision = (staging / "decision_packet.md").read_text(encoding="utf-8")
-        boundary = (
-            "> **Claim boundary:** live measurement candidate only; "
-            "`capability_claim=false`; `promotion_authorized=false`.\n"
-            "> This packet does not authorize MAP-Elites insertion, capability "
-            "promotion, production routing, or benchmark claims.\n\n"
-        )
         (staging / "decision_packet.md").write_text(
-            boundary + decision, encoding="utf-8"
+            _render_measurement_decision(control_outcome), encoding="utf-8"
         )
         artifact_sha256 = _artifact_manifest(staging)
 
@@ -333,6 +373,7 @@ def run_live_measurement(
             "claim_boundary": CLAIM_BOUNDARY,
             "promotion_authorized": False,
             "measurement_mode": run["measurement_mode"],
+            "control_outcome": control_outcome,
             "closeout_state": run["closeout_state"],
             "candidate_genome_id": run["candidate_genome_id"],
             "task_manifest_hash": run["task_manifest_hash"],
@@ -415,6 +456,7 @@ if __name__ == "__main__":
 
 __all__ = [
     "CLAIM_BOUNDARY",
+    "LIVE_CLOSEOUT_STATE",
     "LIVE_MEASUREMENT_SCHEMA",
     "LIVE_OPT_IN_ENV",
     "LiveMeasurementError",

@@ -63,6 +63,24 @@ class LiveDispatchError(RuntimeError):
     """A live worker call failed. The run must fail closed — never fall back."""
 
 
+def _provider_token_count(
+    data: dict[str, Any],
+    field: str,
+    *,
+    model_id: str,
+    task_id: str,
+) -> int:
+    """Return one provider count without accepting coercive or negative values."""
+    value = data.get(field)
+    if type(value) is not int or value < 0:
+        raise LiveDispatchError(
+            "provider token accounting invalid for "
+            f"model={model_id!r} task={task_id!r}: "
+            f"{field}={value!r} must be a non-negative integer"
+        )
+    return value
+
+
 def _urllib_transport(
     url: str, payload: dict[str, Any], timeout: float
 ) -> dict[str, Any]:
@@ -172,16 +190,30 @@ class LiveWorkerPool:
             # Thinking models may put output in "thinking" with empty content.
             raw = str(message.get("thinking") or "").strip()
         answer = clean_answer(raw)
-        provider_model_id = str(data.get("model") or "").strip()
-        if provider_model_id != model_id:
-            disclosed = provider_model_id or "<missing>"
+        provider_model_id = data.get("model")
+        if (
+            type(provider_model_id) is not str
+            or not provider_model_id
+            or provider_model_id != model_id
+        ):
             raise LiveDispatchError(
                 "provider model identity mismatch for "
-                f"requested={model_id!r} returned={disclosed!r} task={task_id!r}"
+                f"requested={model_id!r} returned={provider_model_id!r} "
+                f"task={task_id!r}; expected an exact non-empty string"
             )
-        prompt_tokens = int(data.get("prompt_eval_count") or 0)
-        completion_tokens = int(data.get("eval_count") or 0)
-        if completion_tokens < 0 or completion_tokens > self.per_call_cap:
+        prompt_tokens = _provider_token_count(
+            data,
+            "prompt_eval_count",
+            model_id=model_id,
+            task_id=task_id,
+        )
+        completion_tokens = _provider_token_count(
+            data,
+            "eval_count",
+            model_id=model_id,
+            task_id=task_id,
+        )
+        if completion_tokens > self.per_call_cap:
             raise LiveDispatchError(
                 "provider completion token cap violated for "
                 f"model={model_id!r} task={task_id!r}: "
@@ -239,15 +271,75 @@ class RecordedReplayPool:
             raise LiveDispatchError(
                 f"unexpected receipts schema: {payload.get('schema')!r}"
             )
-        self.per_call_cap = int(payload.get("per_call_cap") or 0)
+        per_call_cap = payload.get("per_call_cap")
+        if type(per_call_cap) is not int or per_call_cap <= 0:
+            raise LiveDispatchError(
+                "recorded per_call_cap must be a positive integer"
+            )
+        self.per_call_cap = per_call_cap
+        rows = payload.get("responses")
+        if not isinstance(rows, list):
+            raise LiveDispatchError("recorded responses must be a list")
         self._responses: dict[tuple[str, str], WorkerResponse] = {}
-        for row in payload.get("responses", []):
-            key = (str(row["model_id"]), str(row["task_id"]))
+        for index, row in enumerate(rows):
+            if not isinstance(row, dict):
+                raise LiveDispatchError(
+                    f"recorded response {index} must be an object"
+                )
+            model_id = row.get("model_id")
+            provider_model_id = row.get("provider_model_id")
+            task_id = row.get("task_id")
+            answer = row.get("answer")
+            if not isinstance(model_id, str) or not model_id:
+                raise LiveDispatchError(
+                    f"recorded response {index} has no model identity"
+                )
+            if provider_model_id != model_id:
+                raise LiveDispatchError(
+                    f"recorded response {index} has a provider identity mismatch"
+                )
+            if not isinstance(task_id, str) or not task_id:
+                raise LiveDispatchError(
+                    f"recorded response {index} has no task identity"
+                )
+            if not isinstance(answer, str):
+                raise LiveDispatchError(
+                    f"recorded response {index} has a non-string answer"
+                )
+            prompt_tokens = row.get("prompt_tokens")
+            completion_tokens = row.get("completion_tokens")
+            cost = row.get("cost")
+            if type(prompt_tokens) is not int or prompt_tokens < 0:
+                raise LiveDispatchError(
+                    f"recorded response {index} has invalid prompt token accounting"
+                )
+            if type(completion_tokens) is not int or completion_tokens < 0:
+                raise LiveDispatchError(
+                    f"recorded response {index} has invalid completion token accounting"
+                )
+            if completion_tokens > self.per_call_cap:
+                raise LiveDispatchError(
+                    f"recorded response {index} exceeds the completion token cap"
+                )
+            if (
+                type(cost) is not int
+                or cost <= 0
+                or cost != prompt_tokens + completion_tokens
+            ):
+                raise LiveDispatchError(
+                    f"recorded response {index} has inconsistent token cost"
+                )
+            key = (model_id, task_id)
+            if key in self._responses:
+                raise LiveDispatchError(
+                    f"duplicate recorded response for model={model_id!r} "
+                    f"task={task_id!r}"
+                )
             self._responses[key] = WorkerResponse(
                 model_id=key[0],
                 task_id=key[1],
-                answer=str(row["answer"]),
-                cost=int(row["cost"]),
+                answer=answer,
+                cost=cost,
             )
 
     @classmethod
