@@ -1,0 +1,164 @@
+{
+  "schema_version": "titanium-wp00-baseline/v1",
+  "authority": "immutable_evidence_only",
+  "campaign_id": "repository-titanium-hardening-2026-07",
+  "work_packet": "WP-00",
+  "observed_at_utc": "2026-07-17T05:51:19Z",
+  "claim_boundary": "Governance reconciliation on the exact clean base only. This record does not prove live branch protection, deployment containment, credentials, production readiness, or completion of any Phase 0 implementation packet.",
+  "base": {
+    "ref": "origin/main",
+    "sha": "3482cdfa6a2f3330b1c6df6d332836d7f4b6c9cf",
+    "worktree_clean": true,
+    "clone_shallow": false,
+    "local_main_equal_to_origin_main": true
+  },
+  "toolchain": {
+    "git": "2.43.0",
+    "python": "3.12.13"
+  },
+  "authority_sources": [
+    {
+      "path": "CLAUDE.md",
+      "ref": "3482cdfa6a2f3330b1c6df6d332836d7f4b6c9cf",
+      "git_object": "a72f9c3584861a937e22cc9d12ba17578bf4b923"
+    },
+    {
+      "path": "docs/governance/ACTIVE_TRACK.yaml",
+      "ref": "3482cdfa6a2f3330b1c6df6d332836d7f4b6c9cf",
+      "git_object": "b605498c1f19e8184ba1b1b73f75e6e7c54d8334"
+    },
+    {
+      "path": "docs/governance/SOVEREIGN_MANIFEST.md",
+      "ref": "3482cdfa6a2f3330b1c6df6d332836d7f4b6c9cf",
+      "git_object": "bb18eeb54831f4cf638d59a39a16b34df34fc5f7"
+    },
+    {
+      "path": "docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md",
+      "ref": "3482cdfa6a2f3330b1c6df6d332836d7f4b6c9cf",
+      "git_object": "e99308ad7e63fa692203d0fc69a2496f9ac1ae70"
+    },
+    {
+      "path": "reports/governance/tam/tam_receipt.json",
+      "ref": "3482cdfa6a2f3330b1c6df6d332836d7f4b6c9cf",
+      "git_object": "c96b7802988d2e306932caf29a76f405ff0f62b9"
+    },
+    {
+      "path": "reports/governance/tam/tam_history.jsonl",
+      "ref": "3482cdfa6a2f3330b1c6df6d332836d7f4b6c9cf",
+      "git_object": "0fe29edfff9e2eb564553d2b3110393bda62cdef"
+    },
+    {
+      "path": "reports/governance/track_portfolio.json",
+      "ref": "62028cc0e9a67c861f384ef30d5447c6f65eb98a",
+      "git_object": "8cee337fdb3228a53ba7d956af6883781840faae"
+    }
+  ],
+  "generated_status": {
+    "ref": "origin/generated/status",
+    "commit": "62028cc0e9a67c861f384ef30d5447c6f65eb98a",
+    "derived_from_sha": "3482cdfa6a2f3330b1c6df6d332836d7f4b6c9cf",
+    "generated_at_utc": "2026-07-17T05:51:19Z",
+    "report_path": "reports/governance/track_portfolio.json",
+    "report_git_object": "8cee337fdb3228a53ba7d956af6883781840faae"
+  },
+  "portfolio_before_admission": {
+    "active": 10,
+    "max_active": 10,
+    "spare_slots": 0,
+    "mechanically_shippable": 1,
+    "mechanically_shippable_ids": [
+      "merge-master-mike-d4-2026-06"
+    ]
+  },
+  "track_reconciliation": {
+    "merge-master-mike-d4-2026-06": {
+      "pre_wp00_status": "ACTIVE",
+      "pre_wp00_mechanically_shippable": true,
+      "pre_wp00_criteria": {
+        "passed": 7,
+        "total": 7
+      },
+      "wp00_disposition": "REMAIN_ACTIVE",
+      "reason": "WP-0F2 still owns changes to Mike and automerge surfaces. The bounded D4 slice is landed, but graduating the owner before WP-0F2 would create an ownership hole.",
+      "new_blocker": "WP-0F2 must make every Mike/automerge entry path consume the canonical required-check manifest and fail closed on absent, failed, pending, cancelled, or action-required checks while preserving stale-head, review-thread, changes-requested, and narrow bot-PR rules.",
+      "immediately_closable_after_wp00": false
+    },
+    "company-builder-parity-2026-07": {
+      "pre_wp00_status": "ACTIVE",
+      "pre_wp00_mechanically_shippable": false,
+      "pre_wp00_criteria": {
+        "passed": 4,
+        "total": 4
+      },
+      "sealed_outcome": {
+        "verdict": "AMBER",
+        "parity_pct": 45.0,
+        "receipt_path": "reports/governance/tam/tam_receipt.json"
+      },
+      "wp00_disposition": "RETIRED",
+      "closure_kind": "RETIRED",
+      "prohibited_claims": [
+        "VERIFIED_SLICE",
+        "shipped",
+        "parity-complete",
+        "capability-complete"
+      ],
+      "unresolved_obligations": [
+        "outcome-parity-amber-45",
+        "axis-weight-ratification",
+        "frontier-ledger-consolidation",
+        "optional-dashboard-wiring"
+      ]
+    }
+  },
+  "admission": {
+    "capacity_sequence": [
+      {
+        "event": "base",
+        "active": 10,
+        "max_active": 10
+      },
+      {
+        "event": "retire_company_builder_parity_2026_07",
+        "active": 9,
+        "max_active": 10
+      },
+      {
+        "event": "admit_repository_titanium_hardening_2026_07",
+        "active": 10,
+        "max_active": 10
+      }
+    ],
+    "new_track": {
+      "id": "repository-titanium-hardening-2026-07",
+      "status": "ACTIVE",
+      "graduation_profile": "governance_gate",
+      "target_closure_kind": "CLOSED_NOT_PROD",
+      "claim_boundary": "Phase 0 repository hardening only; no production, liveness, full-security, Phase 1+, or sibling-owner completion claim."
+    },
+    "portfolio_after_admission": {
+      "active": 10,
+      "max_active": 10,
+      "spare_slots": 0,
+      "mechanically_shippable": 0,
+      "immediately_closable": 0,
+      "reason": "Mike receives the unresolved WP-0F2 blocker; TAM is retired rather than shipped."
+    }
+  },
+  "operator_decisions": {
+    "resolved": [
+      "Retire TAM honestly to free one active-track slot.",
+      "Admit repository-titanium-hardening-2026-07 into that slot.",
+      "Keep merge-master-mike-d4-2026-06 active through WP-0F2.",
+      "Ratify the integrated execution specification as a sequencing layer over existing owners."
+    ],
+    "open": [
+      "Approve or replace the WP-0F1 required-check set.",
+      "Provision Administration-read visibility for live branch-protection parity.",
+      "Confirm the DocOps reconcile credential path or authorize reviewed-PR-only delivery.",
+      "Define the minimum human-review rule for human- and bot-authored pull requests.",
+      "Verify deployment exposure and required authentication before WP-0S.",
+      "Nominate an independent WP-0I reviewer after implementation packets merge."
+    ]
+  }
+}
