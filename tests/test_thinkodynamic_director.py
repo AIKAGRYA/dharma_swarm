@@ -1070,6 +1070,43 @@ async def test_run_loop_uses_configured_worker_concurrency(
     assert recorded["max_concurrent"] == 5
 
 
+@pytest.mark.asyncio
+async def test_run_loop_caps_consecutive_rapid_ascent_reentries(
+    director: ThinkodynamicDirector,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """TIT-018: fast successful cycles may not spin forever with zero sleep."""
+    cycle_count = 0
+
+    async def _always_rapid_cycle(*, delegate=True, model="sonnet"):
+        nonlocal cycle_count
+        cycle_count += 1
+        return {
+            "cycle_id": f"cycle-{cycle_count}",
+            "delegated": False,
+            "rapid_ascent": True,
+            "cycle_elapsed_min": 0.1,
+        }
+
+    class _SleepReached(RuntimeError):
+        pass
+
+    sleeps: list[int] = []
+
+    async def _record_sleep(seconds):
+        sleeps.append(seconds)
+        raise _SleepReached
+
+    director.run_cycle = _always_rapid_cycle  # type: ignore[assignment]
+    monkeypatch.setattr("dharma_swarm.thinkodynamic_director.asyncio.sleep", _record_sleep)
+
+    with pytest.raises(_SleepReached):
+        await director.run_loop(hours=1, poll_seconds=7, delegate=False)
+
+    assert cycle_count == 4
+    assert sleeps == [7]
+
+
 # ------------------------------------------------------------------
 # Mission-driven task decomposition (Gap #1 fix)
 # ------------------------------------------------------------------

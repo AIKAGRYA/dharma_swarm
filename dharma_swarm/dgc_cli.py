@@ -687,16 +687,16 @@ def _build_parser() -> argparse.ArgumentParser:
     p_eauto.add_argument("--context", default="", help="Focus area or context for the LLM")
     p_eauto.add_argument("--single-model", action="store_true", help="Use only --model instead of full roster")
     p_eauto.add_argument("--shadow", action="store_true", default=True, help="Dry-run: generate proposals but don't apply diffs")
-    p_eauto.add_argument("--token-budget", type=int, default=0, help="Max tokens per session (0=unlimited)")
+    p_eauto.add_argument("--token-budget", type=int, default=0, help="Max tokens per session (0=high default rail, -1=explicit unbounded)")
 
     p_edaemon = evolve_sub.add_parser("daemon", help="Run continuous autonomous evolution")
     p_edaemon.add_argument("--interval", type=float, default=1800.0, help="Seconds between cycles (default: 30min)")
     p_edaemon.add_argument("--threshold", type=float, default=0.6, help="Min fitness to auto-commit")
     p_edaemon.add_argument("--model", default="")
-    p_edaemon.add_argument("--cycles", type=int, default=None, help="Max cycles (default: infinite)")
+    p_edaemon.add_argument("--cycles", type=int, default=None, help="Max cycles (default: bounded rail, -1=explicit unbounded)")
     p_edaemon.add_argument("--single-model", action="store_true", help="Use only --model instead of full roster")
     p_edaemon.add_argument("--shadow", action="store_true", default=True, help="Dry-run: generate proposals but don't apply diffs")
-    p_edaemon.add_argument("--token-budget", type=int, default=0, help="Max tokens per session (0=unlimited)")
+    p_edaemon.add_argument("--token-budget", type=int, default=0, help="Max tokens per session (0=high default rail, -1=explicit unbounded)")
 
     # -- dharma --
     p_dharma = sub.add_parser("dharma", help="Dharma subsystem commands")

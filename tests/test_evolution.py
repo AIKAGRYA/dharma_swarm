@@ -12,6 +12,7 @@ from dharma_swarm.convergence import ConvergenceConfig
 from dharma_swarm.evolution import (
     CycleResult,
     DarwinEngine,
+    DEFAULT_DARWIN_MAX_CYCLE_TOKENS,
     EvolutionPlan,
     EvolutionStatus,
     Proposal,
@@ -411,6 +412,13 @@ def test_cycle_result_defaults():
 # ---------------------------------------------------------------------------
 # DarwinEngine -- init
 # ---------------------------------------------------------------------------
+
+
+def test_darwin_engine_default_token_budget_is_finite(engine_paths):
+    """TIT-018: constructor default must not disable the token rail."""
+    eng = DarwinEngine(**engine_paths)
+
+    assert eng._max_cycle_tokens == DEFAULT_DARWIN_MAX_CYCLE_TOKENS
 
 
 async def test_engine_init(engine):

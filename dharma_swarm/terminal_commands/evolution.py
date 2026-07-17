@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
+from dharma_swarm.evolution import (
+    _normalize_darwin_daemon_max_cycles,
+    _normalize_darwin_max_cycle_tokens,
+)
 from dharma_swarm.terminal_commands._helpers import (
     _get_swarm,
     _run,
@@ -108,6 +111,8 @@ def cmd_evolve_auto(
     token_budget: int = 0,
 ) -> None:
     """LLM-powered autonomous evolution cycle."""
+    normalized_token_budget = _normalize_darwin_max_cycle_tokens(token_budget)
+
     async def _auto():
         from dharma_swarm.models import ProviderType
 
@@ -134,10 +139,11 @@ def cmd_evolve_auto(
         # Fallback provider (OpenRouter)
         provider = swarm._router.get_provider(ProviderType.OPENROUTER)
 
-        # Token budget
-        if token_budget > 0:
-            swarm._engine._max_cycle_tokens = token_budget
-            print(f"Token budget: {token_budget:,}")
+        swarm._engine._max_cycle_tokens = normalized_token_budget
+        if normalized_token_budget > 0:
+            print(f"Token budget: {normalized_token_budget:,}")
+        else:
+            print("Token budget: explicit unbounded")
 
         # Multi-model mode (default) vs single-model
         use_router = not single_model
@@ -186,6 +192,9 @@ def cmd_evolve_daemon(
     token_budget: int = 0,
 ) -> None:
     """Run continuous autonomous evolution daemon."""
+    display_cycles = _normalize_darwin_daemon_max_cycles(cycles)
+    normalized_token_budget = _normalize_darwin_max_cycle_tokens(token_budget)
+
     async def _daemon():
         swarm = await _get_swarm()
         if swarm._engine is None:
@@ -198,9 +207,7 @@ def cmd_evolve_daemon(
         provider = swarm._router.get_provider(ProviderType.OPENROUTER)
         use_router = not single_model
 
-        # Token budget
-        if token_budget > 0:
-            swarm._engine._max_cycle_tokens = token_budget
+        swarm._engine._max_cycle_tokens = normalized_token_budget
 
         print(f"Darwin daemon starting{' [SHADOW]' if shadow else ''}")
         if use_router:
@@ -211,9 +218,11 @@ def cmd_evolve_daemon(
             print(f"  Model:     {model}")
         print(f"  Interval:  {interval:.0f}s ({interval/60:.0f}min)")
         print(f"  Threshold: {threshold}")
-        print(f"  Cycles:    {'infinite' if cycles is None else cycles}")
-        if token_budget > 0:
-            print(f"  Token cap: {token_budget:,}")
+        print(f"  Cycles:    {'infinite' if display_cycles is None else display_cycles}")
+        if normalized_token_budget > 0:
+            print(f"  Token cap: {normalized_token_budget:,}")
+        else:
+            print("  Token cap: explicit unbounded")
         print(f"  Ctrl+C to stop\n")
 
         try:

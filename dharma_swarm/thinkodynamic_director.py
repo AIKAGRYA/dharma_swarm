@@ -9,8 +9,8 @@ Three altitudes, one loop:
                 What's running, stalled, missing, ripe? What COULD exist?
 
   GROUND      Compile workflows dynamically, delegate to real agents,
-              monitor execution. When work finishes fast — NO STALLING —
-              immediately ascend back to summit for the next vision.
+              monitor execution. When work finishes fast, a bounded rapid
+              ascent can immediately return to summit for the next vision.
 
 The director cycle: VISION → SENSE → PROPOSE → COMPILE → DELEGATE →
 MONITOR → ASCEND → LOG. Dead ends and human-needed items are logged
@@ -52,6 +52,26 @@ from dharma_swarm.task_board import TaskBoard
 from dharma_swarm import model_pool as _model_pool
 
 logger = logging.getLogger(__name__)
+
+# TIT-018: the director can use large frontier models, but autonomous loop
+# metabolism must be bounded by default.  ``-1`` is the explicit unbounded
+# operator sentinel; ``0``/negative values do not silently mean "forever".
+DEFAULT_DIRECTOR_HOURS = 8.0
+_MAX_RAPID_ASCENT_REENTRIES = 3
+
+
+def _normalize_director_hours(hours: float | None) -> float | None:
+    """Normalize director loop hours under the TIT-018 bounded-default rule."""
+    if hours is None:
+        return DEFAULT_DIRECTOR_HOURS
+    value = float(hours)
+    if value == -1.0:
+        return None
+    if value <= 0.0:
+        raise ValueError(
+            "thinkodynamic director hours must be positive; use -1 for explicit unbounded mode."
+        )
+    return value
 
 
 # ---------------------------------------------------------------------------
@@ -4997,21 +5017,27 @@ class ThinkodynamicDirector:
     async def run_loop(
         self,
         *,
-        hours: float = 0.0,
+        hours: float = DEFAULT_DIRECTOR_HOURS,
         poll_seconds: int = 300,
         delegate: bool = True,
         once: bool = False,
         model: str = "sonnet",
     ) -> list[dict[str, Any]]:
-        """Main director loop with instant-ascension behavior.
+        """Main director loop with bounded instant-ascension behavior.
 
         When a cycle completes with ``rapid_ascent=True``, the loop
-        immediately re-enters at summit altitude — NO STALLING, no
-        waiting for poll_seconds.  The director keeps thinking at the
-        highest level until work takes real time.
+        can immediately re-enter at summit altitude for a small number of
+        consecutive cycles.  After that, TIT-018 forces a sleep before more
+        frontier-capacity work so a fast/shallow loop cannot accelerate forever.
         """
-        end_at = time.time() + (hours * 3600.0) if hours > 0 else None
+        normalized_hours = _normalize_director_hours(hours)
+        end_at = (
+            time.time() + (normalized_hours * 3600.0)
+            if normalized_hours is not None
+            else None
+        )
         snapshots: deque[dict[str, Any]] = deque(maxlen=200)
+        rapid_ascent_reentries = 0
         while True:
             snapshot = await self.run_cycle(delegate=delegate, model=model)
             snapshots.append(snapshot)
@@ -5087,13 +5113,24 @@ class ThinkodynamicDirector:
             # INSTANT ASCENSION: if work resolved fast, skip the poll delay
             # and immediately re-enter at summit altitude
             if snapshot.get("rapid_ascent"):
+                rapid_ascent_reentries += 1
+                if rapid_ascent_reentries <= _MAX_RAPID_ASCENT_REENTRIES:
+                    _append_text(
+                        self.log_dir / "director.log",
+                        f"[{_utc_ts()}] RAPID_ASCENT cycle={snapshot['cycle_id']} "
+                        f"elapsed={snapshot['cycle_elapsed_min']:.1f}min — "
+                        f"immediately re-entering summit "
+                        f"({rapid_ascent_reentries}/{_MAX_RAPID_ASCENT_REENTRIES})",
+                    )
+                    continue  # bounded no-sleep re-entry, straight back to vision
                 _append_text(
                     self.log_dir / "director.log",
-                    f"[{_utc_ts()}] RAPID_ASCENT cycle={snapshot['cycle_id']} "
-                    f"elapsed={snapshot['cycle_elapsed_min']:.1f}min — "
-                    f"immediately re-entering summit",
+                    f"[{_utc_ts()}] RAPID_ASCENT_LIMIT cycle={snapshot['cycle_id']} "
+                    f"limit={_MAX_RAPID_ASCENT_REENTRIES} — sleeping before re-entry",
                 )
-                continue  # no sleep, straight back to vision
+                rapid_ascent_reentries = 0
+            else:
+                rapid_ascent_reentries = 0
 
             await asyncio.sleep(max(1, poll_seconds))
         return list(snapshots)
@@ -5108,7 +5145,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
         description="Sense the repo, select a mission, and delegate workflow tasks.",
     )
     parser.add_argument("--once", action="store_true", help="Run a single cycle and exit.")
-    parser.add_argument("--hours", type=float, default=0.0, help="Wall-clock hours to run.")
+    parser.add_argument(
+        "--hours",
+        type=float,
+        default=DEFAULT_DIRECTOR_HOURS,
+        help=(
+            "Wall-clock hours to run. Must be positive; use -1 for explicit "
+            "unbounded operator mode."
+        ),
+    )
     parser.add_argument(
         "--poll-seconds",
         type=int,

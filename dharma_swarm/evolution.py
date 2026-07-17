@@ -69,6 +69,52 @@ from dharma_swarm.ucb_selector import UCBConfig, UCBParentSelector
 
 logger = logging.getLogger(__name__)
 
+# TIT-018: autonomous evolution defaults must be bounded by construction.
+# These are deliberately high "frontier-capacity" rails, not cost-minimizing
+# downgrades: they preserve useful large-model work while preventing accidental
+# forever/disabled metabolism.  ``-1`` remains the explicit unbounded sentinel
+# for operator-run experiments; ``0``/``None`` no longer mean "forever".
+DEFAULT_DARWIN_DAEMON_MAX_CYCLES = 24
+DEFAULT_DARWIN_MAX_CYCLE_TOKENS = 2_000_000
+
+
+def _normalize_darwin_daemon_max_cycles(max_cycles: int | None) -> int | None:
+    """Return a bounded daemon cycle count.
+
+    ``None`` historically meant "run forever"; TIT-018 makes that unsafe
+    default impossible.  Use ``-1`` only when the operator explicitly wants an
+    unbounded daemon.
+    """
+    if max_cycles is None:
+        return DEFAULT_DARWIN_DAEMON_MAX_CYCLES
+    value = int(max_cycles)
+    if value == -1:
+        return None
+    if value <= 0:
+        raise ValueError(
+            "Darwin daemon max_cycles must be positive; use -1 for explicit unbounded mode."
+        )
+    return value
+
+
+def _normalize_darwin_max_cycle_tokens(max_cycle_tokens: int) -> int:
+    """Return a finite high-capacity token rail for Darwin sessions.
+
+    Internally ``0`` still means "disabled" for the low-level budget check, so
+    only the explicit ``-1`` sentinel maps to ``0``.  Caller-supplied ``0`` gets
+    the high default rail instead of silently disabling accounting.
+    """
+    value = int(max_cycle_tokens)
+    if value == -1:
+        return 0
+    if value < -1:
+        raise ValueError(
+            "Darwin max_cycle_tokens must be positive, 0 for the default rail, or -1 for explicit unbounded mode."
+        )
+    if value == 0:
+        return DEFAULT_DARWIN_MAX_CYCLE_TOKENS
+    return value
+
 
 # ---------------------------------------------------------------------------
 # Enums
@@ -372,7 +418,7 @@ class DarwinEngine:
         self._router_drift_thresholds = router_drift_thresholds or DriftGuardThresholds()
         self._completed_cycles = 0
         self._adaptive_strategy = "explore"
-        self._max_cycle_tokens = max(0, int(max_cycle_tokens))
+        self._max_cycle_tokens = _normalize_darwin_max_cycle_tokens(max_cycle_tokens)
         self._session_tokens_used = 0
         # Mutation budget: max mutations per day (prevents runaway self-modification)
         self._daily_mutation_budget = 5
@@ -3544,7 +3590,8 @@ class DarwinEngine:
             model: Fallback model for proposal generation.
             interval: Seconds between cycles.
             fitness_threshold: Minimum fitness to auto-commit.
-            max_cycles: Stop after N cycles (None = run forever).
+            max_cycles: Stop after N cycles. ``None`` uses the bounded default;
+                ``-1`` is the explicit unbounded sentinel.
             router: Optional ModelRouter for multi-model roster selection.
             shadow: If True, do not apply diffs or commit. False requires a
                 Forge verify_promotion packet with live_apply_allowed=True.
@@ -3555,6 +3602,7 @@ class DarwinEngine:
             from dharma_swarm.models import ProviderType as _PT
             model = _dm(_PT.OPENROUTER)
 
+        max_cycles = _normalize_darwin_daemon_max_cycles(max_cycles)
         src = source_dir or (Path.home() / "dharma_swarm" / "dharma_swarm")
         cycle_count = 0
         context_parts: list[str] = []

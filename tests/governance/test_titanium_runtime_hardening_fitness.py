@@ -10,6 +10,8 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+import pytest
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ORCHESTRATOR = REPO_ROOT / "dharma_swarm" / "orchestrator.py"
@@ -204,3 +206,39 @@ def test_tit016_provider_path_calls_frontier_capacity_gate() -> None:
                 calls_gate = True
                 break
     assert calls_gate, "ModelRouter.complete_for_task must call frontier_capacity_gate before provider dispatch"
+
+
+def test_tit018_autonomous_loop_bounds_fail_closed() -> None:
+    """TIT-018 guard: dangerous loop defaults must be bounded, not infinite.
+
+    This is a frontier-capacity-preserving rail: high-capacity models remain
+    usable, but autonomous metabolism cannot silently interpret ``0``/``None``
+    as "run forever" and cannot spin indefinitely through no-sleep rapid ascent.
+    """
+    from dharma_swarm.evolution import (
+        DEFAULT_DARWIN_DAEMON_MAX_CYCLES,
+        DEFAULT_DARWIN_MAX_CYCLE_TOKENS,
+        _normalize_darwin_daemon_max_cycles,
+        _normalize_darwin_max_cycle_tokens,
+    )
+    from dharma_swarm.thinkodynamic_director import (
+        _MAX_RAPID_ASCENT_REENTRIES,
+        _normalize_director_hours,
+    )
+
+    with pytest.raises(ValueError):
+        _normalize_director_hours(0)
+    with pytest.raises(ValueError):
+        _normalize_director_hours(-0.5)
+    assert _normalize_director_hours(-1) is None
+    assert _MAX_RAPID_ASCENT_REENTRIES == 3
+
+    assert _normalize_darwin_daemon_max_cycles(None) == DEFAULT_DARWIN_DAEMON_MAX_CYCLES
+    with pytest.raises(ValueError):
+        _normalize_darwin_daemon_max_cycles(0)
+    assert _normalize_darwin_daemon_max_cycles(-1) is None
+
+    assert _normalize_darwin_max_cycle_tokens(0) == DEFAULT_DARWIN_MAX_CYCLE_TOKENS
+    assert _normalize_darwin_max_cycle_tokens(-1) == 0
+    with pytest.raises(ValueError):
+        _normalize_darwin_max_cycle_tokens(-2)

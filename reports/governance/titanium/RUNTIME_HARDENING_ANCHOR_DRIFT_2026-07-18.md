@@ -178,3 +178,43 @@ Observed result: `64 passed`; ruff clean; diff check clean.
 cap or downgrade policy. Further WP-A work can add richer authorization inputs or
 rolling runaway accounting, but must preserve the invariant: authorized frontier lanes
 keep maximum useful model quality and context.
+
+## Follow-up implementation receipt — TIT-018 bounded autonomous metabolism (WP-D.1)
+
+The branch added the first WP-D/TIT-018 loop-bound implementation without diluting
+frontier model capacity:
+
+- `thinkodynamic_director` no longer treats `--hours 0` / `hours <= 0` as forever.
+  The CLI default is a bounded 8 hours; `-1` is the explicit unbounded operator
+  sentinel.
+- Consecutive no-sleep rapid-ascent re-entry is capped at 3. A fourth consecutive
+  rapid cycle must sleep before re-entry, preventing fast/shallow cycles from
+  accelerating indefinitely.
+- `DarwinEngine` no longer treats constructor `max_cycle_tokens=0` as a disabled
+  token rail. The default is a high frontier-capacity rail (`2,000,000` tokens),
+  preserving large model use while keeping runaway metabolism countable.
+- `DarwinEngine.daemon_loop(max_cycles=None)` now normalizes to a bounded default
+  (`24` cycles). `-1` remains the explicit unbounded operator sentinel; `0` fails
+  closed.
+- `dgc evolve auto/daemon` help text and command wrappers now reflect the new
+  sentinel semantics: `0` = high default rail, `-1` = explicit unbounded.
+
+Guard teeth proven: before implementation, the new TIT-018 guard failed with missing
+normalizers/constants. After implementation it passes, and the behavior-level rapid
+ascent test proves the fourth consecutive fast cycle reaches sleep instead of another
+zero-sleep re-entry.
+
+Verification command:
+
+```bash
+.venv/bin/python -m pytest -q tests/governance/test_titanium_runtime_hardening_fitness.py tests/test_thinkodynamic_director.py tests/test_thinkodynamic_director_provider_fallback.py tests/test_evolution.py::test_darwin_engine_default_token_budget_is_finite tests/test_dgc_cli.py::test_dgc_cli_module_imports tests/test_dgc_cli.py::test_dgc_cli_main_bootstraps_env_before_dispatch
+.venv/bin/ruff check dharma_swarm/evolution.py dharma_swarm/terminal_commands/evolution.py tests/governance/test_titanium_runtime_hardening_fitness.py --select F823,F401
+git diff --check
+```
+
+Observed result: `63 passed` for the focused Thinkodynamic/provider-fallback/Evolution/DGC CLI/Titanium bundle; F823/F401 ruff subset clean on touched high-signal files; diff check clean.
+
+**Scope boundary:** this is WP-D.1, not full TIT-018 closure. Remaining WP-D surfaces
+still include delegation-depth/per-cycle attempt ceilings, Free Evolution Grind
+stagnation backoff and pre-generation budget checks, daily counter date reset, and
+deterministic pulse default.
