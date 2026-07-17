@@ -1,0 +1,100 @@
+# Ops Agent Lifecycle Report — 2026-07-17T18:00Z
+
+## Mission 1: Spine Adoption Tracking
+
+**Run at:** 2026-07-17T18:01Z  
+**Audit SHA:** `1d45916d338c106a1e379d928b979f78c17ca489`
+
+### Adoption Summary
+
+| Metric | Value |
+|--------|-------|
+| adoption_pct | **93.8%** |
+| Target | 95.0% |
+| Gap | −1.2 pp |
+| joined | 13 / 16 |
+| adapter-ready | 2 / 16 |
+| legacy | 1 / 16 |
+| missing | 0 / 16 |
+| quarantine | 0 / 16 |
+
+### Status Changes This Cycle
+None. All surface statuses unchanged from previous run. Only the `audit_sha` and line offsets in `runtime_state.py` changed.
+
+### Metric Update
+- Previous `audit_sha`: `9b67ed5baa8d707a0da02ca48d993efcdd02d8ed`
+- New `audit_sha`: `1d45916d338c106a1e379d928b979f78c17ca489`
+- Updated: `reports/governance/spine_adoption_metric.json`
+- Branch: `ops/spine-adoption-metric-refresh-20260717T1802`
+- PR: https://github.com/AmitabhainArunachala/dharma_swarm/pull/1010
+
+### Top Saturation Targets (non-joined surfaces)
+
+1. **`self_modification_loop`** (adapter-ready) — `dharma_swarm/diff_applier.py` missing `try_begin_idempotent_side_effect`. One pattern away from full join.
+2. **`mcp_tool_access`** (adapter-ready) — `mcp_server.py` / `dharma_context_mcp.py` need `ExecutionIdentity` import, `RuntimeStateStore` write, and `record_side_effect` receipt call (3 missing patterns).
+3. **`legacy_no_identity_escape_hatch`** (legacy) — Intentional; has invariant test coverage; not a remediation target.
+
+### Path to 95%
+Joining either `self_modification_loop` or `mcp_tool_access` would reach 100% (16/16), comfortably above the 95% target.
+
+### Spine PR Comment
+Posted on PR #1010 (most recent open spine PR): https://github.com/AmitabhainArunachala/dharma_swarm/pull/1010#issuecomment-5006064868
+
+---
+
+## Mission 2: PR Lifecycle
+
+**Session start open PR count:** 17  
+**Session end open PR count:** 18 (includes new #1010 from this session)  
+**Current time:** 2026-07-17T18:01Z  
+**7-day cutoff:** 2026-07-10T18:01Z
+
+### Auto-Close Results
+**PRs auto-closed: 0**
+
+Conflicting PRs scanned:
+
+| PR | Title | Created | Age | Eligible for auto-close? |
+|----|-------|---------|-----|--------------------------|
+| #1007 | governance(keel): bare-metal architecture audit | 2026-07-17T17:20Z | < 1h | ❌ too new |
+| #996 | governance(safety): admit live-host and rollback proof surfaces | 2026-07-17T01:43Z | ~16h | ❌ too new |
+| #995 | test(mike): prepare C1 onboarding required-context proof | 2026-07-17T01:18Z | ~17h | ❌ too new |
+| #972 | feat(forge-lab): canonical exact-code RSI lab releases | 2026-07-15T15:52Z | ~2d | ❌ too new |
+| #949 | [impact-checked] Govern durable A2A operator slice | 2026-07-14T23:31Z | ~3d | ❌ too new |
+| #947 | [impact-checked] Add durable A2A presence and operator node | 2026-07-14T15:49Z | ~3d | ❌ too new |
+
+No CONFLICTING PR is older than 7 days. None auto-closed.
+
+### Duplicate Auto-Grounding PRs
+**Open duplicate auto-grounding PRs: 0**
+
+All historical auto-grounding PRs (e.g. #413/#419/#421 targeting PR #409, #415/#417 targeting PR #406) are already MERGED. No open duplicates to flag.
+
+### Green-and-Ready PRs (MERGEABLE, operator action available)
+
+| PR | Title | Created | Files | +/− |
+|----|-------|---------|-------|-----|
+| #1008 | feat(models): promote Kimi K3 routes | 2026-07-17 | 21 | +371/−128 |
+| #1006 | docs(plans): DharmaGraph Ascent master spec (C1–C5) | 2026-07-17 | 1 | +337/−0 |
+| #1005 | governance: bind Titanium WP-00B executor and dashboard truth | 2026-07-17 | 8 | +2399/−252 |
+| #1004 | docs(plans): THE KEEL v7.1 — verification lattice doctrine | 2026-07-17 | 1 | +451/−0 |
+| #1003 | chore(governance): ops agent lifecycle report [automated] | 2026-07-17 | 1 | +97/−0 |
+| #992 | [impact-checked] Make Codex Composer persistent across three VPS replicas | 2026-07-16 | 16 | +2588/−45 |
+| #990 | [impact-checked] Govern Codex Composer three-VPS identity slice | 2026-07-16 | 5 | +244/−4 |
+| #987 | chore(docops): reconcile generated counts | 2026-07-16 | 2 | +6/−6 |
+| #983 | feat(arena): gate opt-in live measurement with parity controls | 2026-07-16 | 4 | +1390/−12 |
+| #930 | feat(chamber): add exact-scope proof membrane v0 | 2026-07-13 | 31 | +6902/−0 |
+| #904 | feat(holon): authority-scoped remote fast path [impact-checked] | 2026-07-12 | 30 | +4160/−316 |
+
+11 PRs are green-and-ready and awaiting operator merge decision.
+
+### Recommended Actions for Operator
+
+1. **Review #1007, #996, #995** — CONFLICTING but recent; authors should rebase. Flag for follow-up if still conflicting after 7 days.
+2. **Review #972** — CONFLICTING, 2 days old. Large (72 files, +9682). Should rebase; auto-close eligible 2026-07-22.
+3. **Review #949, #947** — CONFLICTING, 3 days old. Durable A2A presence pair. Authors should coordinate rebase. Auto-close eligible 2026-07-21.
+4. **Spine gaps** — Assign `self_modification_loop` idempotency gate or `mcp_tool_access` identity wiring to close the 1.2 pp gap to 95% target.
+
+---
+
+*Report generated by Oz ops agent. Operator holds sole merge authority. No source code modified.*
