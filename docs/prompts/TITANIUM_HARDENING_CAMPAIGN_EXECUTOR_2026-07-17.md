@@ -53,7 +53,7 @@ operator action.
 
 ### 1. Authority and non-authority
 
-This prompt is non-authoritative. It is a reusable operating aid and stores no
+This prompt is non-governing. It is a reusable operating aid and stores no
 mutable campaign state. Never treat its examples, packet order, remembered
 counts, or prior-session summaries as current truth.
 
@@ -63,7 +63,7 @@ order:
 1. Executable behavior and failure-sensitive tests.
 2. Dependency locks and machine-readable manifests.
 3. Exact Git state and current remote/PR evidence.
-4. `CLAUDE.md` and the canonical document stack it references.
+4. `CLAUDE.md` and the registered document stack it references.
 5. `docs/governance/ACTIVE_TRACK.yaml` for active work, declared ownership,
    complements, blockers, and portfolio capacity.
 6. `docs/governance/BUILD_SESSION_ENTRYPOINT.md` for the boundary between
@@ -105,7 +105,7 @@ live artifacts never mean `PASS`. Do not infer production readiness from
 ### 3. Ratified admission decisions (historical; verify current state)
 
 These bullets describe the WP-00/WP-00B admission sequence. They are not
-mutable current state. Reconcile each one against canonical Git, portfolio,
+mutable current state. Reconcile each one against current Git, portfolio,
 and PR evidence before any implementation work:
 
 - Retire `company-builder-parity-2026-07` as `RETIRED`, not as shipped,
@@ -114,7 +114,7 @@ and PR evidence before any implementation work:
   outcome remained `AMBER` at 45 percent parity.
 - Keep `merge-master-mike-d4-2026-06` active through WP-0F2. Its landed D4
   slice may be complete, but the track still owns the Mike/automerge consumers
-  that must adopt the canonical required-check authority. Do not graduate it
+  that must adopt the governing required-check authority. Do not graduate it
   before WP-0F2 is merged and independently verified.
 - Historical admission arithmetic was: 10/10 active, retire TAM to reach
   9/10, then admit `repository-titanium-hardening-2026-07` to return to 10/10.
@@ -129,7 +129,7 @@ and PR evidence before any implementation work:
   were excluded. After WP-00B merges, recheck ownership and PR state rather
   than treating that collision as current forever.
 
-If canonical state already reflects a decision, verify it rather than replaying
+If governing state already reflects a decision, verify it rather than replaying
 the edit. If current main contradicts a decision, stop implementation, identify
 the exact conflict, and prepare the smallest governance correction under the
 correct owner.
@@ -152,7 +152,7 @@ starting the next packet:
    threads through the authenticated GitHub connector or available GitHub
    tooling.
 6. Recompute active-track count, maximum capacity, blockers, shippability,
-   ownership collisions, and generated-projection drift from canonical files
+   ownership collisions, and generated-projection drift from governing files
    and current commands.
 7. Determine the earliest incomplete packet whose prerequisites are actually
    satisfied. Never select work from memory alone.
@@ -171,7 +171,7 @@ blocked and continue every safe local step.
 ### 5. Campaign control state machine
 
 Operate each packet through this state machine. Persist no state in this prompt;
-derive the current state from git, canonical governance, the PR, and evidence.
+derive the current state from git, governing repository documents, the PR, and evidence.
 
 `RECONCILE -> ADMIT -> PREFLIGHT -> RED_PROOF -> IMPLEMENT -> VERIFY -> CLOSEOUT -> REVIEW -> INTEGRATE -> REBASE -> NEXT_PACKET`
 
@@ -204,7 +204,7 @@ unresolved required review, failed negative controls, scope drift, or dirty
 closeout remains incomplete.
 
 WP-00B has one ratified governance-bootstrap boundary that must not be copied
-to implementation packets. Invoke canonical `make agent-build-closeout`, but
+to implementation packets. Invoke repository-defined `make agent-build-closeout`, but
 distinguish its AgentOps packet-evaluator report from its later full-repository
 `governance-all` tail. WP-00B may advance to draft review only when the packet
 report itself says `status: passed`, the exact eight-file scope and external
@@ -349,10 +349,10 @@ connector capability.
 ### 11. Dashboard and projection propagation
 
 Every governance or lifecycle change must be reflected everywhere derived from
-the canonical source. For each packet, identify and verify:
+the governing source. For each packet, identify and verify:
 
 - `ACTIVE_TRACK.yaml` as portfolio/ownership authority;
-- canonical generators and their checked-in projections;
+- registered generators and their checked-in projections;
 - `make onboard` and track-status output;
 - operator-coherence API/model/dashboard views;
 - documentation indexes or generated blocks owned by the change; and
@@ -360,15 +360,15 @@ the canonical source. For each packet, identify and verify:
 
 Remove hard-coded branch names, SHAs, counts, candidate states, and historical
 readiness verdicts from live dashboard paths when they can disagree with
-canonical data. Derive displayed active count and maximum from the current
+governing data. Derive displayed active count and maximum from the current
 report. Distinguish clean aligned main, diverged main, clean non-main candidate,
 dirty checkout, and unavailable or sentinel git evidence without claiming that
-a local clean branch is remote canonical truth. A `SHIPPABLE` track is a lifecycle candidate, not a production
+a local clean branch is remote repository truth. A `SHIPPABLE` track is a lifecycle candidate, not a production
 readiness assertion.
 
 Do not rewrite explicitly historical documents merely to match current counts.
 Add contract tests that fail when stale constants or lifecycle classifications
-return. Run the canonical renderer in write mode when source truth changes,
+return. Run the registered renderer in write mode when source truth changes,
 then run its check mode and inspect the generated diff.
 
 ### 12. Phase 0 execution
@@ -447,7 +447,7 @@ negative-control coverage.
   SBOM, reproducible least-privilege images, executable examples, and a safe
   no-key local quickstart without marketing inflation.
 
-At every phase boundary, update current canonical plans/track criteria through
+At every phase boundary, update current governing plans/track criteria through
 review, run projections, obtain independent evidence, and state what remains
 unproved. Never copy deferred-phase prose into an unbounded implementation PR.
 
@@ -458,7 +458,7 @@ Stop the current edit and report a precise blocker when any of these occurs:
 - authority files conflict in a way that materially changes scope or owner;
 - the selected track is absent, inactive, over capacity, or lacks the surface;
 - preflight or the AgentOps packet-evaluator closeout fails;
-- a canonical closeout target fails, except for WP-00B's exact, recorded
+- a repository-defined closeout target fails, except for WP-00B's exact, recorded
   governance-bootstrap tail boundary above;
 - the worktree contains overlapping user changes that cannot be preserved;
 - a required file falls outside the packet or belongs to another owner;
@@ -508,7 +508,7 @@ next-command: <one exact command or connector action>
 ```
 
 The next session must rerun the anti-drift bootstrap and validate every capsule
-field against current canonical and remote state. The capsule accelerates
+field against current governing and remote state. The capsule accelerates
 orientation; it never grants authority.
 
 ### 16. Terminal condition
@@ -520,7 +520,7 @@ independently demonstrated on merged main:
 
 1. an independent engineer can clone and bootstrap without private state;
 2. every required verification lane succeeds without unexplained skips;
-3. every durable state transition has one canonical owner;
+3. every durable state transition has one governing owner;
 4. crash, recovery, migration, and restore behavior are reproducible;
 5. every externally reachable boundary is secure by default;
 6. every production claim traces to reachable behavior and a
@@ -528,9 +528,9 @@ independently demonstrated on merged main:
 7. a bounded contribution can be made without modifying an unrelated god
    module.
 
-Require final canonical projections, portfolio status, CI/review evidence,
+Require final governing projections, portfolio status, CI/review evidence,
 security and recovery evidence, clean-clone proof, and a clean worktree. Close
-or retire the Titanium track only according to canonical lifecycle policy and
+or retire the Titanium track only according to governing lifecycle policy and
 with explicit unresolved obligations preserved. Never promote
 `CLOSED_NOT_PROD` to `CLOSED_LIVE` by interpretation.
 
@@ -539,7 +539,7 @@ with explicit unresolved obligations preserved. Never promote
 Begin immediately with the mandatory anti-drift bootstrap. Confirm that
 admission-only PR #1000 is merged. If WP-00B is absent or incomplete, reconcile
 it first; otherwise select the earliest dependency-ready packet from current
-canonical and GitHub state. Never replay WP-00B merely because this prompt
+governing repository and GitHub state. Never replay WP-00B merely because this prompt
 names it. Continue autonomously through the earliest admissible packet, using
 parallel owner-safe agents where useful.
 Do not ask for confirmation unless a stop condition requires new authority or
