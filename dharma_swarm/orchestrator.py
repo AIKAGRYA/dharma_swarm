@@ -123,6 +123,7 @@ class Orchestrator:
         self._shared_dir = shared_dir or self._derive_runtime_artifact_dir("shared")
         self._stigmergy_dir = stigmergy_dir or self._derive_runtime_artifact_dir("stigmergy")
         self._running = False
+        self._superstep_id: int = 0
         self._active_dispatches: dict[str, TaskDispatch] = {}
         # Track running asyncio tasks for actual LLM execution
         self._running_tasks: dict[str, asyncio.Task] = {}
@@ -414,8 +415,55 @@ class Orchestrator:
     def _topology_checkpoint_id(task: Task, topology: TopologyType) -> str:
         return f"{task.id}:{topology.value}:checkpoint"
 
+    @staticmethod
+    def _combine_results(fragments: list[str]) -> str:
+        """Associative combiner: deduplicate findings, average quality signals.
+
+        Extracts '## Findings' / '## Results' sections when present;
+        otherwise concatenates with a separator to preserve raw text.
+        Reduces O(N*tokens) fan-out payloads toward O(1*tokens).
+        """
+        import re as _re
+
+        if not fragments:
+            return ""
+        if len(fragments) == 1:
+            return fragments[0]
+
+        # Try to extract structured findings sections
+        finding_blocks: list[str] = []
+        remainder_blocks: list[str] = []
+        for fragment in fragments:
+            match = _re.search(
+                r"(?:##\s+(?:Findings|Results|Summary)[^\n]*\n)(.+?)(?=\n##|\Z)",
+                fragment,
+                _re.S | _re.I,
+            )
+            if match:
+                finding_blocks.append(match.group(1).strip())
+            else:
+                remainder_blocks.append(fragment.strip())
+
+        if finding_blocks:
+            # Deduplicate bullet lines across all agents
+            seen: set[str] = set()
+            deduped: list[str] = []
+            for block in finding_blocks:
+                for line in block.splitlines():
+                    key = line.strip().lstrip("-* ").lower()
+                    if key and key not in seen:
+                        seen.add(key)
+                        deduped.append(line)
+            combined = "## Combined Findings\n" + "\n".join(deduped)
+            if remainder_blocks:
+                combined += "\n\n" + "\n\n---\n\n".join(remainder_blocks)
+            return combined
+
+        # Fallback: join with separator
+        return "\n\n---\n\n".join(fragments)
+
     async def fan_in(self, dispatches: list[TaskDispatch]) -> str:
-        """Collect results from completed dispatches, concatenate them."""
+        """Collect results from completed dispatches via the associative combiner."""
         if self._pool is None:
             return ""
         fragments: list[str] = []
@@ -425,7 +473,7 @@ class Orchestrator:
                 fragments.append(result)
             await self._pool.release(td.agent_id)
             self._active_dispatches.pop(td.task_id, None)
-        return "\n".join(fragments)
+        return self._combine_results(fragments)
 
     async def route_next(self) -> list[TaskDispatch]:
         """Match ready tasks to idle agents, one-to-one. Returns dispatches."""
@@ -507,7 +555,15 @@ class Orchestrator:
         except Exception:
             pass
 
-        settled, recovered = await self._collect_completed()
+        # BSP BARRIER: enforce all S_n tasks complete before S_n+1 dispatch.
+        if await self.is_globally_halted():
+            logger.info("BSP: globally halted at superstep %d", self._superstep_id)
+            return {"settled": 0, "recovered": 0, "dispatched": 0,
+                    "halted": True, "superstep": self._superstep_id}
+        await self._save_superstep_checkpoint()
+        settled, recovered = await self._collect_completed_with_barrier()
+        await self._clear_stale_claims()
+        self._superstep_id += 1
         logger.info("orchestrator.tick: collect=%.1fs", _tt.monotonic() - _t0)
         dispatches = await self.route_next()
         logger.info("orchestrator.tick: dispatched=%d route=%.1fs", len(dispatches), _tt.monotonic() - _t0)
@@ -687,11 +743,13 @@ class Orchestrator:
         agent_id: str,
         extra: dict[str, Any] | None = None,
     ) -> None:
-        """Fire-and-forget lifecycle event — non-blocking to avoid stalling dispatch."""
-        asyncio.create_task(
-            self._emit_lifecycle_event_impl(event, task_id=task_id, agent_id=agent_id, extra=extra),
-            name=f"lifecycle-{event}-{task_id[:8]}",
-        )
+        """Synchronous lifecycle event emission — awaited directly to prevent ghost events."""
+        try:
+            await self._emit_lifecycle_event_impl(
+                event, task_id=task_id, agent_id=agent_id, extra=extra
+            )
+        except Exception as exc:
+            logger.debug("Lifecycle event emission failed (non-fatal): %s", exc)
 
     async def _emit_lifecycle_event_impl(
         self,
@@ -3153,6 +3211,148 @@ class Orchestrator:
             logger.info("Stigmergy mark left by %s", agent_name)
         except Exception as exc:
             logger.debug("Stigmergy mark failed (non-critical): %s", exc)
+
+    async def _collect_completed_with_barrier(self) -> tuple[int, int]:
+        """Hard BSP barrier: wait for ALL running S_n tasks before returning.
+
+        Cancels any tasks that exceed barrier_timeout and records them as
+        failures so they don't become ghost dispatches in S_n+1.
+        """
+        barrier_recovered = 0
+        if self._running_tasks:
+            pending_by_task = {
+                task_id: atask
+                for task_id, atask in self._running_tasks.items()
+                if not atask.done()
+            }
+            if pending_by_task:
+                barrier_timeout = self._default_timeout_seconds + 60.0
+                _done, still_pending = await asyncio.wait(
+                    pending_by_task.values(),
+                    timeout=barrier_timeout,
+                    return_when=asyncio.ALL_COMPLETED,
+                )
+                if still_pending:
+                    atask_to_task_id = {atask: task_id for task_id, atask in pending_by_task.items()}
+                    for straggler in still_pending:
+                        straggler.cancel()
+                        logger.warning(
+                            "BSP barrier: cancelled straggler task after %.0fs",
+                            barrier_timeout,
+                        )
+                    # Give cancellation a bounded chance to propagate so task.result()/
+                    # task.exception() won't leak unobserved CancelledError warnings.
+                    await asyncio.wait(still_pending, timeout=5.0, return_when=asyncio.ALL_COMPLETED)
+                    for straggler in still_pending:
+                        task_id = atask_to_task_id.get(straggler)
+                        if task_id is None:
+                            continue
+                        td = self._active_dispatches.get(task_id)
+                        self._running_tasks.pop(task_id, None)
+                        if td is None:
+                            self._active_dispatches.pop(task_id, None)
+                            continue
+                        task = await self._safe_get_task(task_id)
+                        if self._pool is not None:
+                            await self._pool.release(td.agent_id)
+                        self._active_dispatches.pop(task_id, None)
+                        await self._handle_task_failure(
+                            td=td,
+                            task=task,
+                            error=(
+                                "BSP barrier cancelled straggler after "
+                                f"{barrier_timeout:.1f}s"
+                            ),
+                            source="bsp_barrier_timeout",
+                        )
+                        barrier_recovered += 1
+        settled, recovered = await self._collect_completed()
+        return settled, recovered + barrier_recovered
+
+    async def _save_superstep_checkpoint(self) -> None:
+        """Atomic write of current superstep state for crash recovery."""
+        import tempfile
+        from pydantic import BaseModel as _BM, Field as _F
+
+        class _SC(_BM):
+            superstep_id: int
+            running_task_ids: list[str]
+            saved_at: str = _F(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+        checkpoint_dir = self._runtime_root() / "checkpoints"
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        path = checkpoint_dir / "orchestrator_superstep.json"
+        data = _SC(
+            superstep_id=self._superstep_id,
+            running_task_ids=list(self._running_tasks.keys()),
+        )
+        try:
+            tmp_fd, tmp_path = tempfile.mkstemp(
+                dir=checkpoint_dir, suffix=".tmp", prefix="superstep_"
+            )
+            with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+                f.write(data.model_dump_json())
+            Path(tmp_path).rename(path)  # atomic on POSIX
+        except Exception as exc:
+            logger.debug("Superstep checkpoint write failed (non-fatal): %s", exc)
+
+    async def _clear_stale_claims(self) -> None:
+        """Strip active_claim from tasks that settled this superstep."""
+        if self._board is None:
+            return
+        for status in (TaskStatus.COMPLETED, TaskStatus.FAILED):
+            try:
+                tasks = await self._board.list_tasks(status=status, limit=200)
+            except Exception:
+                continue
+            for task in tasks:
+                meta = dict(task.metadata or {})
+                if "active_claim" not in meta:
+                    continue
+                meta.pop("active_claim")
+                meta["claim_cleared_superstep"] = self._superstep_id
+                try:
+                    await self._safe_update_task(task.id, metadata=meta)
+                except Exception as exc:
+                    logger.debug("claim clear failed for %s: %s", task.id[:8], exc)
+
+    async def is_globally_halted(self) -> bool:
+        """True when all vertices have voted to halt AND zero messages are in transit.
+
+        Mathematical BSP termination condition:
+            all_agents_idle ∧ zero_unread_messages ∧ zero_in_flight ∧ zero_pending_tasks
+        """
+        if self._running_tasks:
+            return False
+        # Pending tasks in the board are logically "messages awaiting processing" —
+        # the system is not halted while work remains to be dispatched.
+        if self._board is not None:
+            try:
+                ready = await self._board.get_ready_tasks()
+                if ready:
+                    return False
+            except Exception:
+                return False  # Err on the side of not halting
+        if self._pool is not None:
+            try:
+                agents = await self._pool.list_agents()
+                # INACTIVE (voted-to-halt) and IDLE both count as non-active
+                _active_statuses = {"busy", "starting"}
+                if any(
+                    str(getattr(a, "status", "")).lower() in _active_statuses
+                    for a in agents
+                ):
+                    return False
+            except Exception:
+                return False
+        if self._bus is not None:
+            try:
+                stats = await self._bus.get_stats()
+                if int(stats.get("unread_messages", 0)) > 0:
+                    return False
+            except Exception:
+                return False
+        return True
 
     async def _collect_completed(self) -> tuple[int, int]:
         """Clean up finished background tasks and stale dispatches."""

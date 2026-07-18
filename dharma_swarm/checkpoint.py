@@ -323,7 +323,7 @@ class SuperstepCheckpoint(BaseModel):
             return None
 
     def save(self, path: Path) -> None:
-        """Atomic write via tmp+rename (crash-safe on POSIX)."""
+        """Atomic write via tmp+rename with durable file contents."""
         import tempfile
 
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -333,17 +333,19 @@ class SuperstepCheckpoint(BaseModel):
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as f:
                 f.write(self.model_dump_json())
+                f.write("\n")
                 f.flush()
                 os.fsync(f.fileno())
-            Path(tmp).rename(path)
-            # The rename itself is not durable until the directory entry is
-            # synced; without this a power loss can keep the bytes but lose
-            # the publication.
-            dir_fd = os.open(path.parent, os.O_RDONLY)
+            os.replace(tmp, path)
             try:
-                os.fsync(dir_fd)
-            finally:
-                os.close(dir_fd)
+                dir_fd = os.open(path.parent, os.O_RDONLY)
+            except OSError:
+                dir_fd = None
+            if dir_fd is not None:
+                try:
+                    os.fsync(dir_fd)
+                finally:
+                    os.close(dir_fd)
         except Exception:
             try:
                 Path(tmp).unlink(missing_ok=True)

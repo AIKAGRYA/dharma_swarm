@@ -194,15 +194,16 @@ class MessageBus:
                 await db.execute(idx)
             await db.commit()
             # Backward-compat migration: add superstep_visible if not present.
+            # Only duplicate-column is benign.  Any other migration failure must
+            # fail closed: receive() depends on this column and would otherwise
+            # start failing later under normal traffic.
             try:
                 await db.execute(
                     "ALTER TABLE messages ADD COLUMN "
                     "superstep_visible INTEGER NOT NULL DEFAULT 0"
                 )
                 await db.commit()
-            except aiosqlite.OperationalError as exc:
-                # Only the duplicate-column case is benign; any other ALTER
-                # failure leaves receive() querying a missing column.
+            except sqlite3.OperationalError as exc:
                 if "duplicate column name" not in str(exc).lower():
                     raise
                 logger.debug("superstep_visible column already exists — skipping migration")
@@ -413,6 +414,7 @@ class MessageBus:
                     metadata={
                         "message_id": message.id,
                         "to_agent": message.to_agent,
+                        "deliver_at_superstep": deliver_at_superstep,
                         "operation_hash": _stable_operation_hash(
                             {
                                 "from_agent": message.from_agent,
@@ -442,7 +444,10 @@ class MessageBus:
                 identity,
                 side_effect_key,
                 result_receipt_id=message_id,
-                metadata={"message_id": message_id},
+                metadata={
+                    "message_id": message_id,
+                    "deliver_at_superstep": deliver_at_superstep,
+                },
             )
         return message_id
 
