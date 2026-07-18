@@ -147,7 +147,7 @@
   "intent": "Prevent scheduled pr-ci-health from force-rebasing any PR that changes a Session Entry packet; packet-bound branches must preserve their merge-base/digest identity until an owner-authorized append-only reseal.",
   "negative_controls": [
     {
-      "command": "python3 -c \"from pathlib import Path; import sys; p=Path('.github/workflows/pr-ci-health.yml'); text=p.read_text(); p.write_text(text.replace('SESSION_ENTRY_PACKET_PREFIX=', 'REMOVED_SESSION_ENTRY_PACKET_PREFIX=', 1)); sys.exit(2 if 'SESSION_ENTRY_PACKET_PREFIX=' not in p.read_text() else 0)\"",
+      "command": "python3 -c \"from pathlib import Path; import sys; p=Path('.github/workflows/pr-ci-health.yml'); text=p.read_text(); p.write_text(text.replace('SESSION_ENTRY_PACKET_PREFIX=', 'DISABLED_PREFIX=', 1)); sys.exit(2 if 'SESSION_ENTRY_PACKET_PREFIX=' not in p.read_text() else 0)\"",
       "expected_exit": 2,
       "name": "removing-session-entry-prefix-breaks-guard",
       "timeout_seconds": 120
@@ -177,7 +177,8 @@
     "honest_blockers": [
       "This PR only prevents future rewrites; already-rebased packet branches require owner-bound reseal.",
       "No merge authority is granted; PR 1036 remains quarantined until this guard is operator-accepted.",
-      "Initial closeout positive gates and scope passed, but the negative-control argv lost nested quotes and exited 1 on SyntaxError; this packet-only append fixes the control and preserves that failed report externally."
+      "Initial closeout positive gates and scope passed, but the negative-control argv lost nested quotes and exited 1 on SyntaxError; this packet-only append fixes the control and preserves that failed report externally.",
+      "Second closeout parsed the control but the mutant name still contained the searched marker substring, so it exited 0 instead of 2; this packet-only append uses DISABLED_PREFIX and preserves that failed report externally."
     ],
     "interface_mismatches": [
       "PR 1036 and predecessor 1033 were force-rebased by pr-ci-health after packet sealing, invalidating base_ref, digest evidence, PR claims and CI authority."
@@ -186,7 +187,7 @@
       "Workflow auto-rebases all behind-main PRs with force-with-lease, including merge-base-bound Session Entry packets."
     ],
     "owner": "@AmitabhainArunachala",
-    "packet_digest": "dc2d967403533f5fa383ce368625b87704ce5731f7be041506fa28ae21217888",
+    "packet_digest": "963008c080b416c125ffa189ed4a6f70aa71ca6ec127b4bab9944c2cf38156fe",
     "rollback": "Revert the workflow/test/doc/packet commit. This restores legacy hourly auto-rebase behavior; no existing PR branch is rewritten by the revert itself.",
     "schema": "dharma_swarm.session_entry.v1",
     "selected_tracks": [
