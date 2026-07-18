@@ -147,3 +147,29 @@ async def test_message_bus_conflicting_idempotency_key_does_not_insert_second_me
 
     assert _message_count(bus_path) == 1
     assert [message.id for message in await bus.receive("bob")] == [first_id]
+
+
+@pytest.mark.asyncio
+async def test_message_bus_staged_retry_returns_same_receipt(tmp_path: Path) -> None:
+    """Retrying send_staged() with the same identity must return the recorded
+    receipt instead of re-inserting and hitting the messages.id primary key."""
+    runtime = RuntimeStateStore(tmp_path / "runtime.db")
+    bus_path = tmp_path / "messages.db"
+    bus = MessageBus(bus_path, runtime_state=runtime, require_identity=True)
+    await bus.init_db()
+
+    identity = _identity(
+        run_id="run-staged-retry",
+        task_id="task-staged-retry",
+        idempotency_key="idem-staged-retry",
+    )
+    metadata = identity_metadata(identity, surface="message_bus")
+    message = Message(from_agent="alice", to_agent="bob", body="staged", metadata=metadata)
+
+    first_id = await bus.send_staged(message, deliver_at_superstep=2)
+    retry_id = await bus.send_staged(message, deliver_at_superstep=2)
+
+    assert retry_id == first_id
+    assert _message_count(bus_path) == 1
+    assert await bus.receive("bob", current_superstep=1) == []
+    assert [m.id for m in await bus.receive("bob", current_superstep=2)] == [first_id]

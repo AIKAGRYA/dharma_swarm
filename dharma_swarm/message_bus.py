@@ -199,7 +199,12 @@ class MessageBus:
                     "ALTER TABLE messages ADD COLUMN "
                     "superstep_visible INTEGER NOT NULL DEFAULT 0"
                 )
-            except Exception:
+                await db.commit()
+            except aiosqlite.OperationalError as exc:
+                # Only the duplicate-column case is benign; any other ALTER
+                # failure leaves receive() querying a missing column.
+                if "duplicate column name" not in str(exc).lower():
+                    raise
                 logger.debug("superstep_visible column already exists — skipping migration")
 
     def _resolve_message_identity(
@@ -331,12 +336,45 @@ class MessageBus:
             require_identity=effective_require,
             execution_identity=execution_identity,
         )
+        side_effect_key = ""
         if identity is not None:
             metadata = {
                 **dict(message.metadata or {}),
                 **identity_metadata(identity, surface="message_bus"),
             }
             message = message.model_copy(update={"metadata": metadata})
+            if self._runtime_state is not None:
+                side_effect_key = f"message_bus.send_staged:{identity.idempotency_key}"
+                should_execute = await self._runtime_state.try_begin_idempotent_side_effect(
+                    identity,
+                    side_effect_key,
+                    metadata={
+                        "message_id": message.id,
+                        "to_agent": message.to_agent,
+                        "operation_hash": _stable_operation_hash(
+                            {
+                                "from_agent": message.from_agent,
+                                "to_agent": message.to_agent,
+                                "subject": message.subject,
+                                "body": message.body,
+                                "priority": message.priority.value,
+                                "reply_to": message.reply_to,
+                                "deliver_at_superstep": deliver_at_superstep,
+                            }
+                        ),
+                    },
+                )
+                if not should_execute:
+                    record = await self._runtime_state.get_idempotency_record(
+                        identity.idempotency_key,
+                        side_effect_key,
+                    )
+                    return (record.result_receipt_id if record else "") or message.id
+                await self._runtime_state.record_execution_identity(
+                    identity,
+                    source="message_bus.send_staged",
+                    metadata={"surface": "message_bus"},
+                )
 
         async def _send_staged() -> str:
             async with self._connect() as db:
@@ -356,7 +394,15 @@ class MessageBus:
                 await db.commit()
             return message.id
 
-        return await self._run_with_lock_retry(_send_staged)
+        message_id = await self._run_with_lock_retry(_send_staged)
+        if identity is not None and self._runtime_state is not None:
+            await self._runtime_state.complete_idempotent_side_effect(
+                identity,
+                side_effect_key,
+                result_receipt_id=message_id,
+                metadata={"message_id": message_id},
+            )
+        return message_id
 
     async def receive(
         self,

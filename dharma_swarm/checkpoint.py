@@ -333,6 +333,8 @@ class SuperstepCheckpoint(BaseModel):
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as f:
                 f.write(self.model_dump_json())
+                f.flush()
+                os.fsync(f.fileno())
             Path(tmp).rename(path)
         except Exception:
             try:
