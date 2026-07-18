@@ -2,7 +2,7 @@
 title: Full-Spectrum Autonomous Push Executor
 path: docs/prompts/FULL_SPECTRUM_PUSH_EXECUTOR_2026-07-18.md
 slug: full-spectrum-push-executor-2026-07-18
-doc_type: reusable_prompt
+doc_type: working_plan
 status: active
 summary: Single-session controller prompt that converts the maximum amount of currently evidence-ready work into bounded, independently reviewable draft PRs in one long autonomous push, without touching merge authority.
 source:
@@ -124,8 +124,10 @@ under the correct owner.
 ### 4. Work streams — priority order, isolated branches
 
 Run streams in this order of commitment, but interleave freely while waiting
-on CI. Each stream gets its own branch from fresh `origin/main` and its own
-draft PR. A stream failing never cancels the others.
+on CI. Each stream **that produces file changes** gets its own branch from
+fresh `origin/main` and its own draft PR; Stream B acts only on existing PRs
+(retarget/review/comment) and Stream D is report-only — neither opens a
+branch or PR. A stream failing never cancels the others.
 
 **Already-done check (mandatory, per stream, before any work):** if the
 stream's objective is already satisfied on merged `origin/main` (or the
@@ -135,7 +137,14 @@ the commit/PR citation in the final report and do NOT re-execute it. A
 duplicate or conflicting packet for finished work is a governance violation,
 never throughput.
 
-#### Stream A1 — unblock PR #983 (arena live measurement)
+#### Stream A1 — unblock PR #983 (arena live measurement) [historical — expect DONE_UPSTREAM]
+
+Status update (2026-07-18, post-seed): PR #983 merged at 04:45 UTC with the
+roster fix and whitespace regression test on main
+(`dharma_swarm/coordination/arena/measure.py:105-109`,
+`tests/test_arena_parity_controls.py:453-470`). The §4 already-done check
+should resolve this stream to `DONE_UPSTREAM`; the original seed is retained
+below only as the historical derivation.
 
 Seed observation (re-verify): Greptile/T-Rex confirmed that
 `_validated_roster` in `dharma_swarm/coordination/arena/measure.py:98-100`
@@ -158,7 +167,11 @@ check, weakening the exact-seat guarantee; all other checks green.
 
 #### Stream A2 — unblock PR #1008 (Kimi K3 routes)
 
-Seed observation (re-verify): 5 Ruff F401 unused imports — four in
+Seed observation (re-verify; derivation: Greptile/T-Rex targeted Ruff run
+recorded in PR #1008's review body at reviewed commit `d596d70`; reproduce
+with `python3 -m ruff check dharma_swarm/forge_v1/autoloop.py
+tests/test_evolution_roster.py` on that PR's head): 5 Ruff F401 unused
+imports — four in
 `dharma_swarm/forge_v1/autoloop.py` (`re`, `ThreadPoolExecutor`,
 `_read_files_from_image`, `_target_paths_from_gold`), one in
 `tests/test_evolution_roster.py` (`_ENV_KEYS_FOR_PROVIDER`).
