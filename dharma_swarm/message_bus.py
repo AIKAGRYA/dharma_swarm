@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import sqlite3
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -20,6 +21,8 @@ from pathlib import Path
 from typing import Any
 
 import aiosqlite
+
+logger = logging.getLogger(__name__)
 
 from dharma_swarm.models import (
     Message,
@@ -36,7 +39,8 @@ CREATE TABLE IF NOT EXISTS messages (
     id TEXT PRIMARY KEY, from_agent TEXT NOT NULL, to_agent TEXT NOT NULL,
     subject TEXT, body TEXT NOT NULL, priority TEXT DEFAULT 'normal',
     status TEXT DEFAULT 'unread', created_at TEXT NOT NULL,
-    read_at TEXT, reply_to TEXT, metadata TEXT DEFAULT '{}'
+    read_at TEXT, reply_to TEXT, metadata TEXT DEFAULT '{}',
+    superstep_visible INTEGER NOT NULL DEFAULT 0
 )"""
 
 _HEARTBEATS_DDL = """
@@ -189,6 +193,14 @@ class MessageBus:
             for idx in _INDEXES:
                 await db.execute(idx)
             await db.commit()
+            # Backward-compat migration: add superstep_visible if not present.
+            try:
+                await db.execute(
+                    "ALTER TABLE messages ADD COLUMN "
+                    "superstep_visible INTEGER NOT NULL DEFAULT 0"
+                )
+            except Exception:
+                logger.debug("superstep_visible column already exists — skipping migration")
 
     def _resolve_message_identity(
         self,
@@ -298,15 +310,73 @@ class MessageBus:
             )
         return message_id
 
+    async def send_staged(
+        self,
+        message: Message,
+        *,
+        deliver_at_superstep: int = 0,
+        execution_identity: ExecutionIdentity | None = None,
+        require_identity: bool | None = None,
+    ) -> str:
+        """Insert a message that becomes visible at `deliver_at_superstep`.
+
+        Messages sent with deliver_at_superstep=N are invisible to `receive()`
+        until current_superstep >= N, enforcing BSP send-buffer isolation.
+        deliver_at_superstep=0 (default) means immediately visible — same
+        semantics as `send()` for callers that don't participate in BSP.
+        """
+        effective_require = self._require_identity if require_identity is None else require_identity
+        identity = self._resolve_message_identity(
+            message,
+            require_identity=effective_require,
+            execution_identity=execution_identity,
+        )
+        if identity is not None:
+            metadata = {
+                **dict(message.metadata or {}),
+                **identity_metadata(identity, surface="message_bus"),
+            }
+            message = message.model_copy(update={"metadata": metadata})
+
+        async def _send_staged() -> str:
+            async with self._connect() as db:
+                await db.execute(
+                    "INSERT INTO messages "
+                    "(id, from_agent, to_agent, subject, body, priority, status, "
+                    "created_at, reply_to, metadata, superstep_visible)"
+                    " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                    (
+                        message.id, message.from_agent, message.to_agent,
+                        message.subject, message.body, message.priority.value,
+                        message.status.value, message.created_at.isoformat(),
+                        message.reply_to, json.dumps(message.metadata),
+                        deliver_at_superstep,
+                    ),
+                )
+                await db.commit()
+            return message.id
+
+        return await self._run_with_lock_retry(_send_staged)
+
     async def receive(
-        self, agent_id: str, status: str = "unread", limit: int = 50,
+        self,
+        agent_id: str,
+        status: str = "unread",
+        limit: int = 50,
+        *,
+        current_superstep: int = 0,
     ) -> list[Message]:
-        """Fetch messages for an agent, ordered by priority then time."""
+        """Fetch messages for an agent visible at `current_superstep`.
+
+        Defaults to current_superstep=0 (all immediately-visible messages)
+        so existing callers that don't pass the argument are unaffected.
+        """
         async with self._connect(row_factory=aiosqlite.Row) as db:
             query = ("SELECT id, from_agent, to_agent, subject, body, priority,"
                      " status, created_at, read_at, reply_to, metadata"
-                     " FROM messages WHERE to_agent = ?")
-            params: list[Any] = [agent_id]
+                     " FROM messages WHERE to_agent = ?"
+                     " AND superstep_visible <= ?")
+            params: list[Any] = [agent_id, current_superstep]
             if status:
                 query += " AND status = ?"
                 params.append(status)
