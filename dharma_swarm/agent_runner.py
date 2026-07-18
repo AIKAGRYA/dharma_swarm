@@ -1206,7 +1206,7 @@ def _trim_context_to_budget(
     _DROP_HEADERS = [
         r"^## Recent Fitness Feedback.*?(?=\n## |\Z)",
         r"^## Latent Gold.*?(?=\n## |\Z)",
-        r"^## Stigmergy Context.*?(?=\n## |\Z)",
+        r"^## Stigmergy Recall.*?(?=\n## |\Z)",
         r"^## Memory Recall.*?(?=\n## |\Z)",
         r"^## Runtime Context Bundle.*?(?=\n## |\Z)",
     ]
@@ -2808,7 +2808,17 @@ class AgentRunner:
         try:
             messages = await self._message_bus.receive(self.agent_id, limit=1)
         except Exception:
-            messages = []
+            # A bus failure is not an empty inbox: the agent may still have
+            # unread work, so stay reactivatable instead of voting to halt.
+            logger.warning(
+                "Message bus receive failed for agent %s at superstep boundary;"
+                " staying IDLE instead of voting to halt",
+                self._config.name,
+                exc_info=True,
+            )
+            async with self._lock:
+                self._state.status = AgentStatus.IDLE
+            return
         async with self._lock:
             if messages:
                 self._state.status = AgentStatus.IDLE
