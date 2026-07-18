@@ -25,6 +25,16 @@ def test_resolve_alias_and_model_id() -> None:
     assert resolve_model_target("claude-opus-4.8") is not None
     # gpt-5.5 floor lane resolvable.
     assert resolve_model_target("gpt-5.5") is not None
+    kimi = resolve_model_target("kimi")
+    assert kimi is not None
+    assert kimi.alias == "kimi-k3"
+    assert kimi.provider_id == "kimi_code"
+    assert kimi.model_id == "k3"
+    assert [provider.value for provider in kimi.pool_providers] == [
+        "kimi_code",
+        "moonshot",
+        "openrouter",
+    ]
     # minimax now resolves to the FLOOR M3, not the sub-floor M2.7.
     minimax = resolve_model_target("minimax")
     assert minimax is not None
@@ -32,7 +42,7 @@ def test_resolve_alias_and_model_id() -> None:
     # No picker target ever resolves ONTO a sub-floor model_id — the grunt
     # path is unreachable from the picker. (Fuzzy alias matches may land on a
     # nearby FLOOR target, but never on a sub-floor model_id.)
-    for probe in ("kimi-k2.5", "glm-5", "deepseek-v3.2", "minimax-m2.7"):
+    for probe in ("kimi-k2.5", "kimi-k2.7", "glm-5", "deepseek-v3.2", "minimax-m2.7"):
         hit = resolve_model_target(probe)
         if hit is not None:
             assert hit.model_id not in (
@@ -89,3 +99,17 @@ def test_picker_main_list_is_floor_only() -> None:
             assert not entry.below_floor, (
                 f"picker target {t.alias!r} leaks sub-floor entry {entry.id!r}"
             )
+
+
+def test_kimi_k3_alias_prefers_first_party_route() -> None:
+    kimi = resolve_model_target("k3")
+
+    assert kimi is not None
+    assert kimi.alias == "kimi-k3"
+    assert kimi.provider_id == "kimi_code"
+    assert kimi.model_id == "k3"
+    assert [provider.value for provider in kimi.pool_providers] == [
+        "kimi_code",
+        "moonshot",
+        "openrouter",
+    ]

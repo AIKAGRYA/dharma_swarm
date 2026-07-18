@@ -47,7 +47,7 @@ def _prefix_provider(model_id: str):
         return ProviderType.ANTHROPIC
     if mid.startswith("glm-5.2") or mid.startswith("zai/") or mid.startswith("z-ai/"):
         return ProviderType.ZHIPU
-    if mid in {"kimi-for-coding", "kimi-code"} or mid.startswith("kimi_code/") or mid.startswith("kimi-code/"):
+    if mid in {"k3", "kimi-code"} or mid.startswith("kimi_code/") or mid.startswith("kimi-code/"):
         return ProviderType.KIMI_CODE
     if mid.startswith("nvidia/") or mid.startswith("meta/") or "llama" in mid:
         return ProviderType.NVIDIA_NIM

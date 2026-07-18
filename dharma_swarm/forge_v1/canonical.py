@@ -54,21 +54,22 @@ from dharma_swarm.forge_v1.run_real import (  # noqa: E402
     parse_full_files,
 )
 from dharma_swarm.model_pool import (  # noqa: E402
-    FORGE_KIMI_27_CODE_CLOUD_MODEL_ID,
-    FORGE_KIMI_27_CODE_LOGICAL_ID,
     FORGE_KIMI_CODE_MODEL_ID,
+    FORGE_KIMI_K3_LOGICAL_ID,
+    FORGE_KIMI_K3_OPENROUTER_MODEL_ID,
 )
 
 RUN_ROOT = dharma_state_dir() / "forge_v1" / "canonical"
 LEDGER = dharma_state_dir() / "forge_v1" / "FORGE_BUILD_LEDGER.md"
 
-# Models whose endpoints HANG on big prompts -> feed a windowed slice (see ledger I-3).
-WINDOW_MODELS = {
+# K3 has a 1M-token Kimi Code context window, so it no longer inherits the old
+# K2.7 windowing workaround. It still requires temperature=1 on Kimi endpoints.
+WINDOW_MODELS: frozenset[str] = frozenset()
+KIMI_TEMP1 = {
     FORGE_KIMI_CODE_MODEL_ID,
-    FORGE_KIMI_27_CODE_LOGICAL_ID,
-    FORGE_KIMI_27_CODE_CLOUD_MODEL_ID,
+    FORGE_KIMI_K3_LOGICAL_ID,
+    FORGE_KIMI_K3_OPENROUTER_MODEL_ID,
 }
-KIMI_TEMP1 = WINDOW_MODELS
 
 
 # --------------------------------------------------------------------------- #
@@ -464,7 +465,7 @@ def run_canonical(instance_ids: list[str], *, strategy: str = "explore", roster_
     return manifest
 
 
-from dharma_swarm.forge_v1.canonical_report import _agg, _finalize, _write_packet  # noqa: E402
+from dharma_swarm.forge_v1.canonical_report import _finalize, _write_packet  # noqa: E402
 
 
 def main(argv=None) -> int:
