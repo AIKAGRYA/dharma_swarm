@@ -190,7 +190,7 @@ class MoonshotProvider(LLMProvider):
             raise RuntimeError(f"{MOONSHOT_API_KEY_ENV} not set")
 
         payload = {
-            "model": request.model or "kimi-k2.7-code",
+            "model": request.model or "kimi-k3",
             "messages": request.messages,
             "temperature": request.temperature,
             "max_tokens": request.max_tokens,

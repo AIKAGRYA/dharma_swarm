@@ -77,7 +77,7 @@ CHUTES_BASE_URL = "https://api.chutes.ai/v1"
 # endpoint can reject coding-plan keys as out of funds even when coding quota is
 # live, so this default is intentionally the coding endpoint.
 ZHIPU_BASE_URL = "https://api.z.ai/api/coding/paas/v4"
-KIMI_BASE_URL = "https://api.moonshot.ai/v1"
+KIMI_BASE_URL = "https://api.kimi.com/coding/v1"
 MOONSHOT_BASE_URL = "https://api.moonshot.ai/v1"
 
 # Default models — sourced from model_hierarchy.py (the single source of truth)
@@ -625,15 +625,12 @@ def resolve_runtime_provider_config(
         )
 
     if provider == ProviderType.KIMI_CODE:
-        token = (
-            api_key
-            or _env_value(env_map, KIMI_API_KEY_ENV)
-            or _env_value(env_map, MOONSHOT_API_KEY_ENV)
-        )
+        # Kimi Code subscription keys and Moonshot Platform keys are distinct
+        # authorities. Never silently send a Moonshot key to the coding API.
+        token = api_key or _env_value(env_map, KIMI_API_KEY_ENV)
         resolved_base = (
             base_url
             or _env_value(env_map, KIMI_BASE_URL_ENV)
-            or _env_value(env_map, MOONSHOT_BASE_URL_ENV)
             or KIMI_BASE_URL
         ).rstrip("/")
         return RuntimeProviderConfig(

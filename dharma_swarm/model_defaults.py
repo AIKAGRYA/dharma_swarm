@@ -59,19 +59,16 @@ _PROVIDER_DEFAULTS: dict[ProviderType, str] = {
     # z.ai / Zhipu direct — first-party GLM lane (not routed via OpenRouter).
     # glm-5.2 is the current frontier GLM (mid-2026).
     ProviderType.ZHIPU: "glm-5.2",
-    # Kimi Code membership lane. The provider docs expose this stable model id
-    # and map it server-side to the current K2.x Code generation.
-    ProviderType.KIMI_CODE: "kimi-for-coding",
-    # Moonshot global OpenAI-compatible lane. Kimi K2.7 Code is the stable
-    # non-highspeed default; highspeed is intentionally opt-in because it can
-    # have separate capacity/entitlement constraints.
-    ProviderType.MOONSHOT: "kimi-k2.7-code",
+    # Kimi Code membership lane. K3 is exposed as the short provider-specific
+    # id ``k3`` on https://api.kimi.com/coding/v1.
+    ProviderType.KIMI_CODE: "k3",
+    # Moonshot global OpenAI-compatible lane uses its own model namespace.
+    ProviderType.MOONSHOT: "kimi-k3",
     ProviderType.OPENROUTER_FREE: "meta-llama/llama-3.3-70b-instruct:free",
     # Paid / subscription tier
-    # FLOOR-compliant: the K2.6 floor route (not the superseded sub-floor K2.5).
-    # OpenRouter is a DEAD aggregator anyway — this only fixes the empty-model
-    # default so it can never name a sub-floor id.
-    ProviderType.OPENROUTER: "moonshotai/kimi-k2.6",
+    # K3 on OpenRouter uses the fully-qualified vendor namespace. OpenRouter is
+    # still a secondary aggregator route behind the first-party Kimi providers.
+    ProviderType.OPENROUTER: "moonshotai/kimi-k3",
     ProviderType.OPENAI: "gpt-5",
     ProviderType.ANTHROPIC: "claude-opus-4-6",
     ProviderType.CLAUDE_CODE: "claude-opus-4-6",

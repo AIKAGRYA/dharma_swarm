@@ -67,7 +67,7 @@ Kimi Code:
 - Key: `KIMI_API_KEY`
 - Alias accepted: `MOONSHOT_KIMI_API_KEY`
 - Base URL: `https://api.kimi.com/coding/v1`
-- Model ID: `kimi-for-coding`
+- Model ID: `k3`
 - Provider class: `KimiCodeProvider`
 - Note: Kimi Code forces `temperature=1`; the provider normalizes this.
 
@@ -120,7 +120,7 @@ Autoloop matrix:
 ```bash
 PYTHONPATH=$PWD DOCKER_CONTEXT=colima-forge-swebench python -m dharma_swarm.forge_v1.autoloop matrix \
   --instances django__django-12209,sympy__sympy-22914 \
-  --models kimi-for-coding,moonshotai/kimi-k2.6,glm-5.2,gemini-2.5-flash \
+  --models k3,moonshotai/kimi-k3,glm-5.2,gemini-2.5-flash \
   --label smoke
 ```
 
@@ -129,7 +129,7 @@ Verifier-role first slice:
 ```bash
 PYTHONPATH=$PWD DOCKER_CONTEXT=colima-forge-swebench python -m dharma_swarm.forge_v1.forge_v2.runner \
   --instances django__django-12209,sympy__sympy-22914 \
-  --generator glm-5.2 --verifier moonshotai/kimi-k2.6 \
+  --generator glm-5.2 --verifier k3 \
   --replicates 1 --budget 60000 --label smoke
 ```
 

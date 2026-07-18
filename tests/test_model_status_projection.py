@@ -66,7 +66,7 @@ def test_floor_status_projection_uses_dkeys_rows_without_live_calls(
     projected_ids = {model.id for model in projection.models}
     assert len(projection.models) == len(expected_floor_ids)
     assert projected_ids == expected_floor_ids
-    assert {"kimi-for-coding", "glm-5.2"} <= projected_ids
+    assert {"kimi-k3", "glm-5.2"} <= projected_ids
     assert all(model.lane == "floor" for model in projection.models)
     by_id = {model.id: model for model in projection.models}
     assert by_id["claude-opus-4.8"].available is True

@@ -51,7 +51,7 @@ def test_top10_status_returns_canonical_floor_projection(
     payload_ids = {row["id"] for row in payload}
     assert len(payload) == len(expected_floor_ids)
     assert payload_ids == expected_floor_ids
-    assert {"kimi-for-coding", "glm-5.2"} <= payload_ids
+    assert {"kimi-k3", "glm-5.2"} <= payload_ids
     assert {row["lane"] for row in payload} == {"floor"}
     kimi = next(row for row in payload if row["id"] == "kimi-k2.6")
     assert kimi["available"] is True
