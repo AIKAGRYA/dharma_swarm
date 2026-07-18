@@ -37,6 +37,33 @@ DASHBOARD_API_KEY_ENV = "DASHBOARD_API_KEY"
 FRED_API_KEY_ENV = "FRED_API_KEY"
 FINNHUB_API_KEY_ENV = "FINNHUB_API_KEY"
 
+# Dashboard API ingress mode (WP-0S, TIT-010). Explicit production values
+# select production-shaped fail-closed enforcement; explicit local values
+# select the loopback-bound development lane; anything else is ambiguous and
+# the ingress layer must pick the safer behavior.
+DASHBOARD_API_MODE_ENV = "DHARMA_API_MODE"
+API_MODE_PRODUCTION = "production"
+API_MODE_LOCAL_DEV = "local-development"
+API_MODE_AMBIGUOUS = "ambiguous"
+_API_MODE_PRODUCTION_VALUES = frozenset({"production", "production-shaped", "prod"})
+_API_MODE_LOCAL_DEV_VALUES = frozenset({"local-development", "local-dev", "dev"})
+
+
+def dashboard_api_mode(env: Mapping[str, str] | None = None) -> str:
+    """Resolve the declared dashboard API ingress mode.
+
+    Returns API_MODE_PRODUCTION, API_MODE_LOCAL_DEV, or API_MODE_AMBIGUOUS.
+    Unset, blank, and unrecognized values are ambiguous by design so the
+    consumer cannot mistake a typo for an explicit mode selection.
+    """
+    source = os.environ if env is None else env
+    raw = str(source.get(DASHBOARD_API_MODE_ENV, "") or "").strip().lower()
+    if raw in _API_MODE_PRODUCTION_VALUES:
+        return API_MODE_PRODUCTION
+    if raw in _API_MODE_LOCAL_DEV_VALUES:
+        return API_MODE_LOCAL_DEV
+    return API_MODE_AMBIGUOUS
+
 # Search backends
 EXA_API_KEY_ENV = "EXA_API_KEY"
 BRAVE_API_KEY_ENV = "BRAVE_API_KEY"
@@ -402,6 +429,11 @@ def provider_available(provider: str, env: Mapping[str, str] | None = None) -> b
 __all__ = [
     "ALL_API_KEY_ENV_KEYS",
     "ANTHROPIC_API_KEY_ENV",
+    "API_MODE_AMBIGUOUS",
+    "API_MODE_LOCAL_DEV",
+    "API_MODE_PRODUCTION",
+    "DASHBOARD_API_MODE_ENV",
+    "dashboard_api_mode",
     "apply_env_assignment",
     "bootstrap_runtime_env",
     "CEREBRAS_API_KEY_ENV",
