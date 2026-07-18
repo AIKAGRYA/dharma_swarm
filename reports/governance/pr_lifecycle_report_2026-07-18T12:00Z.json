@@ -1,0 +1,140 @@
+{
+  "report_type": "pr_lifecycle",
+  "generated_at": "2026-07-18T12:00:22Z",
+  "audit_sha": "35b11a30f69d35712b82f70ff581959f5619f2e3",
+  "summary": {
+    "total_open_before": 22,
+    "auto_closed": 0,
+    "total_open_after": 22,
+    "conflicting_prs": 1,
+    "green_and_ready_non_draft": 4,
+    "green_ci_draft_only": 0
+  },
+  "auto_close_scan": {
+    "criteria": "mergeable=CONFLICTING AND age > 7 days",
+    "eligible": [],
+    "near_threshold": [],
+    "conflicting_not_yet_eligible": [
+      {
+        "number": 947,
+        "title": "[impact-checked] Add durable A2A presence and operator node",
+        "mergeable": "CONFLICTING",
+        "created_at": "2026-07-14T15:49:21Z",
+        "age_hours": 92.2,
+        "auto_close_eligible_at": "2026-07-21T15:49Z",
+        "note": "3.8 days old. Not yet at 7-day threshold. Rebase recommended. Will be eligible for auto-close on 2026-07-21T15:49Z."
+      }
+    ]
+  },
+  "duplicate_auto_grounding_scan": {
+    "duplicates_found": [],
+    "note": "No duplicate auto-grounding PRs targeting the same PR number found across 22 open PRs. PR #1023 (ops lifecycle report 2026-07-18T06:00Z) is a prior automated run from the same date; this report covers the 12:00Z run independently."
+  },
+  "green_and_ready": [
+    {
+      "number": 1034,
+      "title": "governance(graph): Antithesis v0 Phase A — seam ledger, bypass ratchet baseline 148",
+      "mergeable": "MERGEABLE",
+      "created_at": "2026-07-18T10:22:45Z",
+      "additions": 2747,
+      "deletions": 0,
+      "changed_files": 4
+    },
+    {
+      "number": 1029,
+      "title": "feat(go): WP-0C2 version-aware Go capability helper (TIT-003)",
+      "mergeable": "MERGEABLE",
+      "created_at": "2026-07-18T08:53:16Z",
+      "additions": 479,
+      "deletions": 51,
+      "changed_files": 11
+    },
+    {
+      "number": 1013,
+      "title": "feat(ops): bounded mobile recovery for Codex Composer",
+      "mergeable": "MERGEABLE",
+      "created_at": "2026-07-17T20:02:35Z",
+      "additions": 5629,
+      "deletions": 48,
+      "changed_files": 25
+    },
+    {
+      "number": 987,
+      "title": "chore(docops): reconcile generated counts",
+      "mergeable": "MERGEABLE",
+      "created_at": "2026-07-16T06:44:10Z",
+      "additions": 11,
+      "deletions": 11,
+      "changed_files": 2
+    }
+  ],
+  "unknown_status_prs": {
+    "count": 17,
+    "note": "17 PRs show mergeable=UNKNOWN — GitHub CI checks still pending or unresolved. Operator should review CI status directly."
+  },
+  "recommended_actions": [
+    {
+      "priority": 1,
+      "pr": 987,
+      "action": "MERGEABLE + minimal change (11+/11-). Low-risk docops reconcile — operator can merge when ready.",
+      "owner": "operator"
+    },
+    {
+      "priority": 2,
+      "pr": 1029,
+      "action": "MERGEABLE, WP-0C2 Go capability helper (TIT-003). Operator can review and merge.",
+      "owner": "operator"
+    },
+    {
+      "priority": 3,
+      "pr": 1034,
+      "action": "MERGEABLE, Antithesis v0 Phase A seam ledger + bypass ratchet baseline. Large addition (2747 lines). Operator review recommended before merge.",
+      "owner": "operator"
+    },
+    {
+      "priority": 4,
+      "pr": 1013,
+      "action": "MERGEABLE, bounded mobile recovery for Codex Composer. 5629 additions. Operator review recommended.",
+      "owner": "operator"
+    },
+    {
+      "priority": 5,
+      "pr": 947,
+      "action": "CONFLICTING — 3.8 days old. Rebase recommended now to avoid auto-close on 2026-07-21T15:49Z.",
+      "owner": "operator"
+    }
+  ],
+  "spine_adoption_snapshot": {
+    "adoption_pct": 93.8,
+    "target_pct": 95.0,
+    "gap_pp": 1.2,
+    "joined_count": 13,
+    "adapter_ready_count": 2,
+    "missing_count": 0,
+    "quarantine_count": 0,
+    "legacy_count": 1,
+    "total_surfaces": 16,
+    "status_unchanged_from_committed": true,
+    "top_saturation_targets": [
+      {
+        "id": "self_modification_loop",
+        "status": "adapter-ready",
+        "missing_pattern": "try_begin_idempotent_side_effect in dharma_swarm/diff_applier.py"
+      },
+      {
+        "id": "mcp_tool_access",
+        "status": "adapter-ready",
+        "missing_patterns": [
+          "ExecutionIdentity import",
+          "RuntimeStateStore write",
+          "record_side_effect receipts"
+        ]
+      },
+      {
+        "id": "legacy_no_identity_escape_hatch",
+        "status": "legacy",
+        "note": "Tracked and tested. Retire when legacy_no_identity_allowed callers are lifted."
+      }
+    ]
+  }
+}
