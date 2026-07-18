@@ -28,7 +28,7 @@ from tests.antithesis_support.seam_ledger import (
 
 # Phase A baseline (2026-07-18, tree at PR #1030 merge). Phase B PRs lower
 # this in the same PR that mediates a bypass family; it never goes up.
-BYPASS_BASELINE = 148
+BYPASS_BASELINE = 232
 
 CATEGORIES = {
     "time",
@@ -63,7 +63,7 @@ def test_committed_ledger_matches_tree():
 
 def test_ledger_schema():
     ledger = build_ledger()
-    assert ledger["schema_version"] == 1
+    assert ledger["schema_version"] == 2
     assert ledger["workload"]["roots"] == ["dharma_swarm.graph"]
     assert ledger["modules"], "empty import closure"
     for module in ledger["modules"]:
@@ -113,11 +113,79 @@ def test_detector_sees_known_seam_sites():
 def test_bypass_count_ratchets_down_only():
     ledger = build_ledger()
     bypass_total = ledger["summary"]["bypass_total"]
-    assert bypass_total <= BYPASS_BASELINE, (
-        f"bypass count rose from {BYPASS_BASELINE} to {bypass_total}: a new "
-        "unmediated effect entered the workload's reach. Route it through "
-        "EffectsProvider (dharma_swarm/graph/effects.py) or record the "
-        "ownership blocker — never raise this baseline."
+    assert bypass_total == BYPASS_BASELINE, (
+        f"bypass count is {bypass_total}, stored baseline is {BYPASS_BASELINE}. "
+        "Higher: a new unmediated effect entered the workload's reach — route "
+        "it through EffectsProvider (dharma_swarm/graph/effects.py) or record "
+        "the ownership blocker; never raise this baseline. Lower: a seam was "
+        "mediated — lower BYPASS_BASELINE in the SAME PR so the ratchet holds "
+        "with no slack (Codex review 2026-07-18)."
     )
     committed = json.loads(LEDGER_PATH.read_text(encoding="utf-8"))
     assert committed["summary"]["bypass_total"] == bypass_total
+
+
+# --- Codex review round (2026-07-18) — one regression test per finding ---
+
+
+def test_package_init_relative_imports_resolve_to_package():
+    """`from .artifacts import X` in dharma_swarm/engine/__init__.py must
+    resolve to dharma_swarm.engine.artifacts, not dharma_swarm.artifacts."""
+    import ast
+
+    from tests.antithesis_support.seam_ledger import _ImportCollector
+
+    tree = ast.parse("from .artifacts import ExecutionArtifact\n")
+    collector = _ImportCollector("dharma_swarm.engine", is_package=True)
+    collector.visit(tree)
+    assert "dharma_swarm.engine.artifacts" in collector.imports
+    assert "dharma_swarm.artifacts" not in collector.imports
+
+    # A plain module keeps the original semantics.
+    collector = _ImportCollector("dharma_swarm.graph.executor", is_package=False)
+    collector.visit(ast.parse("from .effects import EffectsProvider\n"))
+    assert "dharma_swarm.graph.effects" in collector.imports
+
+
+def test_closure_includes_package_siblings_and_repo_local_packages():
+    """The committed closure must include the surfaces the Codex review
+    proved reachable: engine package siblings and telos_kernel."""
+    ledger = build_ledger()
+    modules = {m["module"] for m in ledger["modules"]}
+    assert "dharma_swarm.engine.artifacts" in modules
+    assert any(m.startswith("telos_kernel") for m in modules), sorted(modules)[:5]
+
+
+def test_scanner_resolves_import_aliases():
+    from tests.antithesis_support.effect_scan import scan_source
+
+    sites = scan_source(
+        "import time as clock\n"
+        "import random as rng\n"
+        "from uuid import uuid4 as make_id\n"
+        "def f():\n"
+        "    a = clock.time()\n"
+        "    b = rng.random()\n"
+        "    return make_id(), a, b\n",
+        "dharma_swarm/graph/_alias_probe.py",
+    )
+    symbols = {(s["symbol"], s["category"]) for s in sites}
+    assert ("time.time", "time") in symbols, symbols
+    assert ("random.random", "rng") in symbols, symbols
+    assert ("uuid.uuid4", "rng") in symbols, symbols
+
+
+def test_scanner_counts_network_call_sites():
+    from tests.antithesis_support.effect_scan import scan_source
+
+    sites = scan_source(
+        "import requests\n"
+        "import httpx\n"
+        "def f(url):\n"
+        "    requests.get(url)\n"
+        "    return httpx.AsyncClient()\n",
+        "dharma_swarm/graph/_network_probe.py",
+    )
+    network = [s for s in sites if s["category"] == "network"]
+    assert len(network) == 2, sites
+    assert all(s["classification"] == "bypass" for s in network)
