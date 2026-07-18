@@ -168,7 +168,7 @@ def test_run_go_scout_plumbs_archive_flags(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(bridge.subprocess, "run", fake_run)
     # Host-independent: pretend a Go toolchain is on PATH so the toolchain-checked
     # _go_invocation() offers `go run .` even on hosts without Go installed.
-    monkeypatch.setattr(go_invoke.shutil, "which", lambda _cmd: "/usr/local/bin/go")
+    monkeypatch.setattr(go_invoke, "go_toolchain_capable", lambda *_a, **_k: True)  # WP-0C2: capability, not presence
 
     rows, error, counts = bridge._run_go_scout(
         state=state,
@@ -256,7 +256,7 @@ def test_run_go_scout_treats_partial_source_failure_as_nonfatal(monkeypatch, tmp
     monkeypatch.setattr(bridge.subprocess, "run", fake_run)
     # Host-independent: pretend a Go toolchain is on PATH so the toolchain-checked
     # _go_invocation() offers `go run .` even on hosts without Go installed.
-    monkeypatch.setattr(go_invoke.shutil, "which", lambda _cmd: "/usr/local/bin/go")
+    monkeypatch.setattr(go_invoke, "go_toolchain_capable", lambda *_a, **_k: True)  # WP-0C2: capability, not presence
 
     rows, error, counts = bridge._run_go_scout(
         state=state,
@@ -422,7 +422,7 @@ def test_run_go_ingestor_projects_current_run_receipts(monkeypatch, tmp_path: Pa
     monkeypatch.setattr(bridge.subprocess, "run", fake_run)
     # Host-independent: pretend a Go toolchain is on PATH so the toolchain-checked
     # _go_invocation() offers `go run .` even on hosts without Go installed.
-    monkeypatch.setattr(go_invoke.shutil, "which", lambda _cmd: "/usr/local/bin/go")
+    monkeypatch.setattr(go_invoke, "go_toolchain_capable", lambda *_a, **_k: True)  # WP-0C2: capability, not presence
 
     rows, error, invocation_mode = bridge._run_go_ingestor(
         input_path=input_path,
@@ -487,7 +487,7 @@ def test_go_invocation_prefers_prebuilt_binary(monkeypatch, tmp_path: Path) -> N
     module_dir.mkdir()
 
     # No binary + toolchain on PATH -> `go run .` (host-independent via patch).
-    monkeypatch.setattr(go_invoke.shutil, "which", lambda _cmd: "/usr/local/bin/go")
+    monkeypatch.setattr(go_invoke, "go_toolchain_capable", lambda *_a, **_k: True)  # WP-0C2: capability, not presence
     cmd, mode = bridge._go_invocation(module_dir)
     assert cmd == ["go", "run", "."]
     assert mode == "go_run"
@@ -600,7 +600,7 @@ def test_run_go_scout_surfaces_structured_source_errors_and_mode(
     monkeypatch.setattr(bridge.subprocess, "run", fake_run)
     # Host-independent: pretend a Go toolchain is on PATH so the toolchain-checked
     # _go_invocation() offers `go run .` even on hosts without Go installed.
-    monkeypatch.setattr(go_invoke.shutil, "which", lambda _cmd: "/usr/local/bin/go")
+    monkeypatch.setattr(go_invoke, "go_toolchain_capable", lambda *_a, **_k: True)  # WP-0C2: capability, not presence
 
     rows, error, counts = bridge._run_go_scout(
         state=tmp_path / ".dharma",

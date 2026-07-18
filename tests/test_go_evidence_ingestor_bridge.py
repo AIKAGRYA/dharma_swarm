@@ -7,11 +7,12 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
+
+from dharma_swarm.world_radar.go_invoke import go_toolchain_capable
 
 from dharma_swarm.operator_core.closure_v0 import (
     WorkPacket,
@@ -59,8 +60,8 @@ def _empty_bundle() -> OperatingFactBundle:
 
 
 def _run_go_ingestor(input_name: str, output_path: Path, source_url: str) -> None:
-    if shutil.which("go") is None:
-        pytest.skip("Go toolchain is not installed")
+    if not go_toolchain_capable(GO_MODULE):
+        pytest.skip("no Go toolchain satisfying evidence_ingestor_go/go.mod")
     env = dict(os.environ)
     env["GOCACHE"] = "/tmp/dharma-swarm-go-build"
     env["GOMODCACHE"] = "/tmp/dharma-swarm-go-mod"

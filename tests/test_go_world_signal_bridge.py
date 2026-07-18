@@ -8,11 +8,12 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
+
+from dharma_swarm.world_radar.go_invoke import go_toolchain_capable
 
 from dharma_swarm.operator_core.control_surface import _go_world_receipt_summary_rows
 from dharma_swarm.operator_core.world_radar.receipt_bridge import (
@@ -36,8 +37,8 @@ def _run_ingestor(
     *,
     expect_rejected: bool = False,
 ) -> None:
-    if shutil.which("go") is None:
-        pytest.skip("Go toolchain is not installed")
+    if not go_toolchain_capable(GO_MODULE):
+        pytest.skip("no Go toolchain satisfying world_signal_ingestor_go/go.mod")
     fixture_raw = json.loads((FIXTURE_DIR / fixture_name).read_text(encoding="utf-8"))
     payload_path = output_path.parent / (fixture_name + ".payload")
     payload_path.parent.mkdir(parents=True, exist_ok=True)

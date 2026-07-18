@@ -15,11 +15,12 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
+
+from dharma_swarm.world_radar.go_invoke import go_toolchain_capable
 
 from dharma_swarm.operator_core.go_evidence_bridge import (
     GoEvidenceBridgeError,
@@ -232,8 +233,8 @@ func main() {
 
 
 def test_go_regenerates_identical_golden_vectors(tmp_path: Path) -> None:
-    if shutil.which("go") is None:
-        pytest.skip("Go toolchain is not installed")
+    if not go_toolchain_capable(GO_SDK_DIR):
+        pytest.skip("no Go toolchain satisfying go_sdk/go.mod")
 
     cases = "\n".join(
         "\t\t{%s, %s, %s, %s, %s},"

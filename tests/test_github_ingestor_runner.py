@@ -8,11 +8,12 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import shutil
 import sys
 from pathlib import Path
 
 import pytest
+
+from dharma_swarm.world_radar.go_invoke import go_toolchain_capable
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_DIR = REPO_ROOT / "tests" / "fixtures" / "go_github_ingestor"
@@ -28,8 +29,13 @@ _spec.loader.exec_module(runner)
 
 
 def _require_go_host() -> None:
-    if not (MODULE_DIR / MODULE_DIR.name).is_file() and shutil.which("go") is None:
-        pytest.skip("neither prebuilt github_ingestor_go binary nor Go toolchain")
+    if not (MODULE_DIR / MODULE_DIR.name).is_file() and not go_toolchain_capable(
+        MODULE_DIR
+    ):
+        pytest.skip(
+            "neither prebuilt github_ingestor_go binary nor a Go toolchain "
+            "satisfying the module's go.mod directive"
+        )
 
 
 def _drop_envelope(inbox: Path, name: str, envelope: dict) -> Path:
@@ -104,7 +110,9 @@ def test_runner_reports_needs_host_without_binary_or_toolchain(
     )
     fake_module = tmp_path / "github_ingestor_go"
     fake_module.mkdir()
-    monkeypatch.setattr(runner.shutil, "which", lambda _name: None)
+    # No monkeypatch needed: the module has no go.mod, and the version-aware
+    # capability helper fails closed on an unreadable directive (WP-0C2),
+    # regardless of any toolchain on the host.
 
     summary = runner.process_inbox(
         inbox_dir=inbox,
@@ -137,7 +145,8 @@ def test_runner_reports_needs_host_when_binary_not_executable(
     stale_binary = fake_module / fake_module.name
     stale_binary.write_text("not a real executable\n", encoding="utf-8")
     stale_binary.chmod(0o644)
-    monkeypatch.setattr(runner.shutil, "which", lambda _name: None)
+    # No go.mod in the fake module: the version-aware capability helper fails
+    # closed (WP-0C2), so no toolchain monkeypatch is required.
 
     summary = runner.process_inbox(
         inbox_dir=inbox,
