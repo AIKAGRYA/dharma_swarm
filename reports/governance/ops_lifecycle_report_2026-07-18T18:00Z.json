@@ -1,0 +1,139 @@
+{
+  "generated_at": "2026-07-18T18:00:13Z",
+  "audit_sha": "1021b9cc60156b725e291904674e09e91ee97e69",
+  "report_type": "ops_agent_lifecycle",
+
+  "mission_1_spine_adoption": {
+    "adoption_pct": 93.8,
+    "target_pct": 95.0,
+    "gap_pct": 1.2,
+    "previous_committed_pct": 93.8,
+    "pct_changed": false,
+    "committed_json_updated": false,
+    "total_surfaces": 16,
+    "status_counts": {
+      "joined": 13,
+      "adapter_ready": 2,
+      "legacy": 1,
+      "missing": 0,
+      "quarantine": 0
+    },
+    "joined_or_adapter_ready_count": 15,
+    "joined_or_adapter_ready_percent": 93.8,
+    "non_joined_surfaces": [
+      "self_modification_loop",
+      "mcp_tool_access",
+      "legacy_no_identity_escape_hatch"
+    ],
+    "top_saturation_targets": [
+      {
+        "id": "self_modification_loop",
+        "status": "adapter-ready",
+        "category": "self-modification",
+        "files": ["dharma_swarm/diff_applier.py", "dharma_swarm/evolution.py", "dharma_swarm/self_improve.py"],
+        "missing_patterns": ["try_begin_idempotent_side_effect (apply path)"],
+        "recommended_action": "Wrap the diff apply entrypoint in a runtime idempotency gate (try_begin_idempotent_side_effect). One-surface fix brings adoption to 100%."
+      },
+      {
+        "id": "mcp_tool_access",
+        "status": "adapter-ready",
+        "category": "tool",
+        "files": ["dharma_swarm/mcp_server.py", "dharma_swarm/dharma_context_mcp.py"],
+        "missing_patterns": ["ExecutionIdentity import", "RuntimeStateStore write", "record_side_effect receipt"],
+        "recommended_action": "Thread ExecutionIdentity and RuntimeStateStore into MCP tool handlers; emit record_side_effect receipt on every tool call."
+      },
+      {
+        "id": "legacy_no_identity_escape_hatch",
+        "status": "legacy",
+        "category": "legacy",
+        "missing_patterns": [],
+        "recommended_action": "Stable; legacy flag is explicit and covered by invariant tests. No action required."
+      }
+    ],
+    "open_spine_prs": [],
+    "comment_posted": {
+      "pr": 1010,
+      "note": "Commented on most recent spine metric PR (closed); no open spine PR exists",
+      "url": "https://github.com/AmitabhainArunachala/dharma_swarm/pull/1010#issuecomment-5012336118"
+    }
+  },
+
+  "mission_2_pr_lifecycle": {
+    "cutoff_for_auto_close": "2026-07-11T18:00:13Z",
+    "total_open_before": 17,
+    "total_open_after": 17,
+    "auto_closed": [],
+    "duplicate_autogrounding_flags": [],
+    "conflicting_prs": [
+      {
+        "number": 1007,
+        "title": "governance(keel): bare-metal architecture audit as the KEEL companion findings ledger",
+        "created_at": "2026-07-17T17:20:24Z",
+        "age_days": 1.0,
+        "auto_close_eligible": false,
+        "reason": "Only ~1 day old, well under 7-day threshold"
+      },
+      {
+        "number": 996,
+        "title": "governance(safety): admit live-host and rollback proof surfaces",
+        "created_at": "2026-07-17T01:43:11Z",
+        "age_days": 1.7,
+        "auto_close_eligible": false,
+        "reason": "~40 hours old, under 7-day threshold"
+      },
+      {
+        "number": 995,
+        "title": "test(mike): prepare C1 onboarding required-context proof",
+        "created_at": "2026-07-17T01:18:37Z",
+        "age_days": 1.7,
+        "auto_close_eligible": false,
+        "reason": "~41 hours old, under 7-day threshold"
+      },
+      {
+        "number": 972,
+        "title": "feat(forge-lab): canonical exact-code RSI lab releases",
+        "created_at": "2026-07-15T15:52:06Z",
+        "age_days": 3.1,
+        "auto_close_eligible": false,
+        "reason": "~74 hours old, under 7-day threshold"
+      },
+      {
+        "number": 949,
+        "title": "[impact-checked] Govern durable A2A operator slice",
+        "created_at": "2026-07-14T23:31:10Z",
+        "age_days": 3.8,
+        "auto_close_eligible": false,
+        "reason": "~90 hours old, under 7-day threshold"
+      },
+      {
+        "number": 947,
+        "title": "[impact-checked] Add durable A2A presence and operator node",
+        "created_at": "2026-07-14T15:49:21Z",
+        "age_days": 4.1,
+        "auto_close_eligible": false,
+        "reason": "~98 hours old, under 7-day threshold"
+      }
+    ],
+    "green_and_ready_prs": [
+      {"number": 1037, "title": "docs: strategy pack — Token Treasury v0 goal spec + Arjuna Customer Discovery Stream"},
+      {"number": 1035, "title": "chore(governance): ops agent lifecycle report 2026-07-18T12:00Z [automated]"},
+      {"number": 1025, "title": "docs(architecture): NATS/A2A whole-system update specification 2026-07-18"},
+      {"number": 1024, "title": "feat(agents): register grok_build as Meghaforge display identity"},
+      {"number": 1013, "title": "feat(ops): bounded mobile recovery for Codex Composer"},
+      {"number": 1011, "title": "governance: admit current Codex Composer recovery slice"},
+      {"number": 1006, "title": "docs(plans): DharmaGraph Ascent master spec (C1–C5)"},
+      {"number": 1004, "title": "docs(plans): THE KEEL v7.1 — verification lattice doctrine (single-file, review-refined)"},
+      {"number": 987, "title": "chore(docops): reconcile generated counts"},
+      {"number": 930, "title": "feat(chamber): add exact-scope proof membrane v0"},
+      {"number": 904, "title": "feat(holon): authority-scoped remote fast path [impact-checked]"}
+    ],
+    "green_and_ready_count": 11,
+    "recommended_actions": [
+      "CONFLICTING #1007 (governance/keel, ~24h): Monitor; rebase if it ages past 7 days without operator review.",
+      "CONFLICTING #996 & #995 (governance/safety + test/mike, ~40-41h): Both target overlapping governance surfaces. Recommend operator review order; rebase whichever lands second.",
+      "CONFLICTING #972 (forge-lab, ~74h): Large 72-file change. Recommend rebase before it hits the 7-day window on 2026-07-22.",
+      "CONFLICTING #947 & #949 (durable A2A, ~4 days): Related A2A PRs. Recommend landing in dependency order (#947 first) and rebasing #949 against it before 2026-07-21.",
+      "GREEN queue has 11 ready PRs including 2 large feature PRs (#1013: +5629 lines, #904: +4160 lines). Operator review bandwidth may be the bottleneck."
+    ]
+  }
+}
