@@ -10,7 +10,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Python deps first (cache layer)
 COPY pyproject.toml README.md ./
 COPY dharma_swarm/__init__.py dharma_swarm/
-RUN pip install --no-cache-dir -e ".[dev]" 2>/dev/null || pip install --no-cache-dir -e . || true
+# WP-0C2 (TIT-003): dependency-install failure fails the image build. The
+# previous fallback chain (2>/dev/null || ... || true) could boot the
+# Go-integrated daemon on an invalid Python environment.
+RUN pip install --no-cache-dir -e ".[dev]"
 
 # Full source
 COPY dharma_swarm/ /app/dharma_swarm/

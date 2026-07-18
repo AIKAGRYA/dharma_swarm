@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import os
+import re
 import shutil
 import subprocess
 from typing import Any
@@ -27,23 +28,97 @@ from dharma_swarm.world_radar.io_utils import (
 )
 
 
+def _version_tuple(major: str, minor: str, patch: str | None) -> tuple[int, int, int]:
+    # A missing patch component is a .0 floor: `go 1.26` means 1.26.0, which is
+    # satisfied by any 1.26.x toolchain.
+    return int(major), int(minor), int(patch) if patch is not None else 0
+
+
+def go_module_directive(module_dir: Path) -> tuple[int, int, int] | None:
+    """Parse the ``go X.Y[.Z]`` directive from ``module_dir/go.mod``.
+
+    Returns a full ``(major, minor, patch)`` tuple (patch defaults to 0 when
+    the directive omits it — Go treats ``go 1.26`` as the ``1.26.0`` minimum).
+    Returns ``None`` when the file is unreadable or carries no directive —
+    callers must treat ``None`` as fail-closed (WP-0C2, TIT-003: an
+    unreadable ``go.mod`` never authorizes execution).
+    """
+    try:
+        text = (module_dir / "go.mod").read_text(encoding="utf-8")
+    except OSError:
+        return None
+    match = re.search(r"^go (\d+)\.(\d+)(?:\.(\d+))?", text, re.MULTILINE)
+    if match is None:
+        return None
+    return _version_tuple(match.group(1), match.group(2), match.group(3))
+
+
+def installed_go_version(go_bin: str | None = None) -> tuple[int, int, int] | None:
+    """Return the installed Go toolchain's ``(major, minor, patch)``, or None.
+
+    ``None`` covers every failure mode — no binary on PATH, the binary not
+    executing, a NON-ZERO exit from ``go version`` (a broken shim can still
+    emit a parseable banner), or malformed output — so consumers fail closed
+    (WP-0C2, TIT-003: presence is not capability). The patch component is
+    preserved so a ``go 1.26.1`` module is not treated as satisfied by a
+    ``go1.26.0`` host.
+    """
+    binary = go_bin if go_bin is not None else shutil.which("go")
+    if binary is None:
+        return None
+    try:
+        proc = subprocess.run(
+            [binary, "version"], text=True, capture_output=True,
+            check=False, timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if proc.returncode != 0:
+        return None
+    match = re.search(r"go(\d+)\.(\d+)(?:\.(\d+))?", proc.stdout or "")
+    if match is None:
+        return None
+    return _version_tuple(match.group(1), match.group(2), match.group(3))
+
+
+def go_toolchain_capable(module_dir: Path, go_bin: str | None = None) -> bool:
+    """One version-aware Go capability answer for every Go bridge (WP-0C2).
+
+    True only when an installed toolchain's version satisfies the module's
+    exact ``go`` directive. Any unreadable input — missing toolchain,
+    malformed ``go version`` output, unreadable ``go.mod`` — is False
+    (fail closed). Promoted from the version check previously private to
+    tests/test_go_adapter_contracts.py so tests and production share one
+    oracle (TIT-003: Go presence was mistaken for Go compatibility).
+    """
+    required = go_module_directive(module_dir)
+    if required is None:
+        return False
+    installed = installed_go_version(go_bin)
+    if installed is None:
+        return False
+    return installed >= required
+
+
 def _go_invocation(module_dir: Path) -> tuple[list[str], str]:
     """Prefer a prebuilt module binary (see `make go-build`); fall back to `go run .`.
 
     The binary convention matches plain ``go build`` output: the module dir
     name inside the module dir (e.g. ``tools/world_scout_go/world_scout_go``).
     Returns the argv prefix and the invocation mode ("binary", "go_run", or
-    "needs_host"). Toolchain-checked (organism-rewire item 3): ``go run .`` is
-    only offered when a Go toolchain is actually on PATH; with neither a
-    prebuilt binary nor a toolchain the mode is ``needs_host`` with an empty
-    argv, and callers must NOT invoke — they return a structured per-source
-    error (see :func:`_needs_host_error`) instead of letting the subprocess
-    raise ``FileNotFoundError``.
+    "needs_host"). Version-aware (WP-0C2, TIT-003): ``go run .`` is offered
+    only when :func:`go_toolchain_capable` confirms the installed toolchain
+    satisfies the module's ``go.mod`` directive — a present-but-incompatible
+    toolchain is ``needs_host``, not an execution attempt. A prebuilt binary
+    works without any toolchain. With neither, the mode is ``needs_host``
+    with an empty argv, and callers must NOT invoke — they return a
+    structured per-source error (see :func:`_needs_host_error`) instead of
+    letting the subprocess raise ``FileNotFoundError``.
     """
     binary = module_dir / module_dir.name
     if binary.is_file() and os.access(binary, os.X_OK):
         return [str(binary)], "binary"
-    if shutil.which("go") is not None:
+    if go_toolchain_capable(module_dir):
         return ["go", "run", "."], "go_run"
     return [], "needs_host"
 
@@ -51,8 +126,9 @@ def _go_invocation(module_dir: Path) -> tuple[list[str], str]:
 def _needs_host_error(module_name: str) -> str:
     """Structured needs-host message naming the missing prerequisite + fix."""
     return (
-        f"no prebuilt {module_name} binary and no Go toolchain on PATH — "
-        "run `make go-build` (or install Go) on this host"
+        f"no prebuilt {module_name} binary and no Go toolchain satisfying the "
+        "module's go.mod directive — run `make go-build` (or install a "
+        "compatible Go) on this host"
     )
 
 

@@ -30,7 +30,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import shutil
 import subprocess
 import sys
 import time
@@ -41,6 +40,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from dharma_swarm.daemon_config import dharma_state_dir  # noqa: E402
 from dharma_swarm.world_radar.go_bridge import _go_invocation  # noqa: E402
+from dharma_swarm.world_radar.go_invoke import go_toolchain_capable  # noqa: E402
 
 MODULE_DIR = REPO_ROOT / "tools" / "github_ingestor_go"
 SUPPORTED_EVENT_TYPES = (
@@ -69,7 +69,12 @@ def _host_ready(module_dir: Path) -> bool:
     binary = module_dir / module_dir.name
     if binary.is_file() and os.access(binary, os.X_OK):
         return True
-    return shutil.which("go") is not None
+    # Version-aware (WP-0C2, TIT-003): a Go toolchain that does not satisfy
+    # the module's go.mod directive is needs_host, never an execution attempt
+    # — attempting `go run .` with an incompatible toolchain would fail and
+    # push queued envelopes to failed/ instead of leaving them for a capable
+    # host.
+    return go_toolchain_capable(module_dir)
 
 
 def process_inbox(
