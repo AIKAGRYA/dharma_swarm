@@ -446,6 +446,51 @@ def test_live_entrypoint_rejects_incomplete_or_ambiguous_roster(
         )
 
 
+@pytest.mark.parametrize(
+    "padded_seat",
+    ["llama3 ", " llama3", "\tllama3", "llama3\n"],
+)
+def test_live_entrypoint_rejects_whitespace_padded_seat_without_normalizing(
+    padded_seat: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """A padded seat id must fail closed, never be silently measured as its
+    stripped form (exact-seat guarantee)."""
+    monkeypatch.setenv("DHARMA_ARENA_LIVE", "1")
+    roster = dict(_LIVE_MODELS)
+    roster["math"] = padded_seat
+    called = False
+
+    def transport(url: str, payload: dict[str, Any], timeout: float):
+        nonlocal called
+        called = True
+        return _metered_transport(url, payload, timeout)
+
+    with pytest.raises(LiveMeasurementError, match="exact operator-supplied"):
+        run_live_measurement(
+            models_by_family=roster,
+            output_dir=tmp_path / "not-created",
+            timeout=3.0,
+            transport=transport,
+        )
+    assert called is False
+
+
+def test_live_entrypoint_rejects_non_string_seat(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Non-string seat ids must fail closed instead of being coerced by str()."""
+    monkeypatch.setenv("DHARMA_ARENA_LIVE", "1")
+    roster: dict[str, Any] = dict(_LIVE_MODELS)
+    roster["code"] = 42
+    with pytest.raises(LiveMeasurementError, match="non-empty strings"):
+        run_live_measurement(
+            models_by_family=roster,
+            output_dir=tmp_path / "not-created",
+            timeout=3.0,
+            transport=_metered_transport,
+        )
+
+
 def test_live_entrypoint_refuses_repository_output(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("DHARMA_ARENA_LIVE", "1")
     inside_repo = Path(__file__).resolve().parent / ".forbidden-arena-live-output"

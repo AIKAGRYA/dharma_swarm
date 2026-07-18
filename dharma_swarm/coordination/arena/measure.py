@@ -95,16 +95,26 @@ def _validated_roster(models_by_family: Mapping[str, str]) -> dict[str, ModelSpe
         raise LiveMeasurementError(
             "live roster must name exactly math, code, and logic"
         )
-    normalized = {family: str(models_by_family[family]).strip() for family in _FAMILIES}
-    if any(not model_id for model_id in normalized.values()):
-        raise LiveMeasurementError("live roster model ids must be non-empty")
-    if len(set(normalized.values())) != len(_FAMILIES):
+    seats: dict[str, str] = {}
+    for family in _FAMILIES:
+        model_id = models_by_family[family]
+        if not isinstance(model_id, str) or not model_id:
+            raise LiveMeasurementError(
+                "live roster model ids must be non-empty strings"
+            )
+        if model_id != model_id.strip():
+            raise LiveMeasurementError(
+                f"live roster {family} seat must be the exact operator-supplied "
+                "model id (no surrounding whitespace)"
+            )
+        seats[family] = model_id
+    if len(set(seats.values())) != len(_FAMILIES):
         raise LiveMeasurementError(
             "live roster requires one distinct seat per task family"
         )
     return {
         model_id: ModelSpec(model_id=model_id, specialty=family)
-        for family, model_id in normalized.items()
+        for family, model_id in seats.items()
     }
 
 
