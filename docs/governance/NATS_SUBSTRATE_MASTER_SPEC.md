@@ -30,6 +30,81 @@ The system split is:
 - Filesystem and SQLite buses: compatibility mirrors and audit trails during
   migration, not live-contact authority.
 
+## Universal Agent Runtime Cell (invariant)
+
+Every identity — Grok/Meghaforge, rushabdev, AGNI Hermes, a cloud seat, or a
+future external/SAB participant — is an instance of one reusable **Universal
+Agent Runtime Cell**. Display names, models, hosts, and temporary sessions are
+mutable attributes. They are never routing identity.
+
+A cell has ten components:
+
+1. stable `agent_uid`;
+2. canonical inbox subject;
+3. unique durable consumer;
+4. identity-scoped credential principal;
+5. delivery runtime / drain;
+6. declared semantic executor mode;
+7. idempotent effect boundary;
+8. correlated receipt lifecycle;
+9. large-artifact lane;
+10. projection-only observability.
+
+**Readiness** is the minimum proven tier across those components. Component
+statuses `unknown`, `unprobed`, `declared`, `absent`, and
+`runtime_observed_uncommitted` are non-proof: any required non-proof component
+makes aggregate readiness `unknown`. Delivery drain alone caps at
+`HANDLER_ACKED`. A proven semantic executor may claim tiers above
+`HANDLER_ACKED` only when contiguous semantic/effect evidence is bound and
+proven. No declared semantic executor means no semantic/effect completion claim
+(`PROCESSED`, `EFFECT_COMMITTED`, or `DOMAIN_RECEIPTED`). Unknown must stay
+explicitly unknown — never painted green.
+
+**Uniqueness law:** one `agent_uid`, one canonical inbox subject, one worker
+durable, and one credential principal per identity. Distinct UIDs must not
+share non-null canonical subjects or worker durables. Observers never drain
+worker durables.
+
+**Semantic executor declaration:** every cell declares a mode
+(`always_on` | `event_driven` | `manual_seat` | `none` | `unknown`). The mode
+is part of readiness, not optional prose.
+
+**Lifecycle order (do not collapse):**
+
+```text
+publish accepted → delivered → handler acked → semantic replied → effect receipted
+```
+
+Mapped to ack tiers: `PUBLISH_ACCEPTED` → `DELIVERED_TO_CONSUMER` →
+`HANDLER_ACKED` → `PROCESSED` / semantic reply → `EFFECT_COMMITTED` /
+`DOMAIN_RECEIPTED`. A delivery bridge that acks the inbox may claim at most
+`HANDLER_ACKED`. It must not claim the target model understood or effected work.
+
+**Large artifacts:** messages carry object references and content hashes (SHA),
+not inline large payloads. JetStream Object Store (or an equivalent
+content-addressed store) owns blobs; the envelope owns the reference.
+
+**One logical writable authority:** after migration gates close, one logical
+writable task/message authority per subject family. Dual-hub reconciliation
+must distinguish **source** (compatibility / historical rendezvous) from
+**candidate** (observed, not yet cut over). Observation is not cutover.
+Migration requires dual-read parity, scoped credentials, durables repointed
+with pending-zero on the retired writer, rollback drill, field-registry and
+card updates in git, and explicit operator ACCEPT.
+
+**Stable UID across mutation:** renaming a display name, moving a host, or
+changing a model does not mint a new routing identity. The stable `agent_uid`
+(and its subject/durable/principal bindings) is preserved through those
+changes unless an operator explicitly retires the identity.
+
+**Reference implementation is not architecture authority:** a working agent
+stack (including Meghaforge/`grok_build`) is evidence and a pattern source
+only. It must not define a private transport stack that becomes a new
+authority, and it must not special-case Grok in doctrine owned by this file.
+Connect-time live topology remains owned by
+`docs/ops/FLEET_FIELD_REGISTRY.yaml` (schema v2+); this file owns the
+invariant.
+
 ## Layer Boundaries
 
 NATS owns delivery, durable consumers, replay, acknowledgements, and internal
@@ -107,13 +182,27 @@ probe (six seats, receipts in `inter_agent/`) confirmed unanimously that no
 | `DS_TASKS` / `DS_DLQ` streams | `DHARMA_A2A` stream | AGNI hub (`wss://157.245.193.15:8443`, plain `nats://157.245.193.15:4222`) |
 | `dharma.agent.<uid>.inbox` subjects | legacy `dharma.a2a.<callsign>` subjects | AGNI hub |
 | clustered internal broker | second unbridged broker `DHARMA_FLEET` | operator Mac `127.0.0.1:4222`, often offline |
+| single hub prose | multiple unbridged authorities | AGNI (source_compatibility), Mac-local (local_operator), Meghadharma (candidate_reference / runtime_observed_uncommitted) |
 
-The per-agent live routing truth (actual lane, subjects, credential env-var
-names, last verified send/receive) is owned by
-`docs/ops/FLEET_FIELD_REGISTRY.yaml` (`python3
-scripts/runtime/fleet_field_registry.py`), refreshed by probe receipts.
-Migration from the live topology to this spec's target topology happens
-through that registry's `decisions` block, not by silently editing this table.
+**Ownership split (do not collapse):**
+- **Cards** (`examples/agents/*.registration.json`) own declared identity
+  addresses.
+- **Roster** (`dharma_swarm/a2a/agent_presence.py::REGISTERED_AGENT_UIDS`) owns
+  registered membership.
+- **Live/runtime state** is owned by Live Ops, runtime probes, and receipts.
+- **FFR** (`docs/ops/FLEET_FIELD_REGISTRY.yaml` schema
+  `dharma_fleet_field_registry.v2`, reader
+  `python3 scripts/runtime/fleet_field_registry.py`) is a probe-bound
+  connect-time projection of lanes, route fields
+  (`declared_route` / `observed_effective_route` / `target_route`), credential
+  env-var *names*, last verified send/receive, and runtime-cell readiness
+  ceilings. FFR owns neither declared card addresses nor universal live state.
+  Authorities in FFR are probe-bound records, not aspirational doctrine.
+  Migration from the live topology to this spec's target topology happens
+  through FFR `decisions` and operator ACCEPT, not by silently editing this
+  table or promoting a reference agent host to architecture authority.
+  Non-proof component statuses keep aggregate readiness `unknown`; delivery
+  alone caps at `HANDLER_ACKED`.
 
 ## Durable Consumer Contract
 
@@ -193,12 +282,17 @@ The system must name which ack tier it has proven:
   sequence metadata.
 - `DELIVERED_TO_CONSUMER`: a durable consumer saw the message.
 - `HANDLER_ACKED`: the target handler acknowledged completion of the message
-  handling step.
-- `DOMAIN_RECEIPTED`: a typed Dharma receipt exists for the intended domain
-  effect.
+  handling step (delivery/runtime drain only when no semantic executor runs).
+- `PROCESSED`: a declared semantic executor interpreted the payload (not
+  merely stored or acked it).
+- `EFFECT_COMMITTED` / `DOMAIN_RECEIPTED`: a typed Dharma receipt exists for
+  the intended domain effect.
 
-Operator hot contact requires `HANDLER_ACKED` or `DOMAIN_RECEIPTED` within the
+Operator hot contact requires `HANDLER_ACKED` or stronger within the
 configured timeout. `PUBLISH_ACCEPTED` alone is not live human-usable contact.
+Collaboration claims require `PROCESSED` or stronger. Production effect claims
+require `EFFECT_COMMITTED` / `DOMAIN_RECEIPTED`. Delivery drain without a
+semantic executor must never be rendered as semantic completion.
 
 ## Replay And Poison Message Policy
 

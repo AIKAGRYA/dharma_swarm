@@ -1,0 +1,147 @@
+{
+  "schema": "dharma_agentops.predecessor_failure_receipt.v1",
+  "created_at": "2026-07-18T12:00:00Z",
+  "pr": 1033,
+  "branch": "agent/global-a2a-runtime-cell-20260718",
+  "repair_start_head": "77845105cda770d6217ad1708ace00d3a8bee179",
+  "merge_base": "f89dd63318a91e119a77e11cf9f35c78b4dc3fc1",
+  "runs": [
+    {
+      "source_path": "/root/.dharma/agentops-global-a2a/reports/agentops/organism-rewire-WP-A2AGLOBAL1-runtime-cell/20260718T090626820699Z/report.json",
+      "source_sha256": "eac5fc71ebdeb8d9656f1285fcd8d94401c42a268ea4751321cfbc7cd044dfb5",
+      "timestamp": "2026-07-18T09:06:26.820699Z",
+      "packet_id": "organism-rewire-WP-A2AGLOBAL1-runtime-cell",
+      "packet_digest": "03e4ade63c7a93ac0a511be0a4fb9b7981cbcb7deadaf0bad80b95c07c56b2fe",
+      "packet_bytes_sha256": "1d1c58e965514404bc8e71bbd7bb51923813b1874103c1032878f8885574b18f",
+      "target_head": "fff22f191d64367abfc81a6761782ae8c50e8819",
+      "base_ref": "f89dd63318a91e119a77e11cf9f35c78b4dc3fc1",
+      "branch": "agent/global-a2a-runtime-cell-20260718",
+      "status": "failed",
+      "phase": "closeout",
+      "command_exit": null,
+      "primary_failure": "generated .pytest_cache paths outside allowed packet scope (closeout scope violations)",
+      "failed_gates": [],
+      "negative_controls": [],
+      "scope_summary": {
+        "passed": false,
+        "violation_reasons": [
+          "outside_allowed_scope"
+        ],
+        "pytest_cache_paths_outside_scope": 5
+      }
+    },
+    {
+      "source_path": "/root/.dharma/agentops-global-a2a/reports/agentops/organism-rewire-WP-A2AGLOBAL1-runtime-cell/20260718T091113664738Z/report.json",
+      "source_sha256": "69fab298ff34dab1f6bc49374179d66b13ec3899fac536cefcbaa2b1cdf9dc49",
+      "timestamp": "2026-07-18T09:11:13.664738Z",
+      "packet_id": "organism-rewire-WP-A2AGLOBAL1-runtime-cell",
+      "packet_digest": "03e4ade63c7a93ac0a511be0a4fb9b7981cbcb7deadaf0bad80b95c07c56b2fe",
+      "packet_bytes_sha256": "1d1c58e965514404bc8e71bbd7bb51923813b1874103c1032878f8885574b18f",
+      "target_head": "fff22f191d64367abfc81a6761782ae8c50e8819",
+      "base_ref": "f89dd63318a91e119a77e11cf9f35c78b4dc3fc1",
+      "branch": "agent/global-a2a-runtime-cell-20260718",
+      "status": "failed",
+      "phase": "closeout",
+      "command_exit": 2,
+      "primary_failure": "strict clean-main DocOps generated counts failed (docops-integrity exit 2); negative control false-green via pytest dependency (exit 1 expected 1 because pytest missing, not validator rejection)",
+      "failed_gates": [
+        {
+          "name": "docops-integrity",
+          "exit_code": 2,
+          "expected_exit": 0
+        }
+      ],
+      "negative_controls": [
+        {
+          "name": "registry-secret-policy-removal-fails",
+          "exit_code": 1,
+          "expected_exit": 1,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "source_path": "/root/.dharma/agentops-global-a2a-repair/reports/agentops/organism-rewire-WP-A2AGLOBAL1R-closeout-repair/20260718T092921856458Z/report.json",
+      "source_sha256": "9db239e1b42c84170b7e1be31d38faa24921bfd2686a254ee91d7c4a19413294",
+      "timestamp": "2026-07-18T09:29:21.856458Z",
+      "packet_id": "organism-rewire-WP-A2AGLOBAL1R-closeout-repair",
+      "packet_digest": "6f2199b18134be86d91219e206f1a5da87e4754324fb9ca07baff78c0d759403",
+      "packet_bytes_sha256": "3de80bdc155ed7d4b2c358756545a3c01f0904d16ed05b9d7541088ce5897410",
+      "target_head": "7f8da7e4cc07f33f24dabe5ee9a803a4cffc252a",
+      "base_ref": "fff22f191d64367abfc81a6761782ae8c50e8819",
+      "branch": "agent/global-a2a-runtime-cell-20260718",
+      "status": "failed",
+      "phase": "closeout",
+      "command_exit": 1,
+      "primary_failure": "negative control exited before validator because jailed Python lacked YAML (ModuleNotFoundError: yaml; exit 1 expected 2)",
+      "failed_gates": [],
+      "negative_controls": [
+        {
+          "name": "registry-validator-rejects-secret-policy-removal",
+          "exit_code": 1,
+          "expected_exit": 2,
+          "passed": false
+        }
+      ]
+    },
+    {
+      "source_path": "/root/.dharma/agentops-global-a2a-repair2/reports/agentops/organism-rewire-WP-A2AGLOBAL1R2-negative-control/20260718T095520082896Z/report.json",
+      "source_sha256": "5334a3f964b2bac452f41dd13da1a101445b7f341ff248139948284e2289143e",
+      "timestamp": "2026-07-18T09:55:20.082896Z",
+      "packet_id": "organism-rewire-WP-A2AGLOBAL1R2-negative-control",
+      "packet_digest": "f295bdcf3c41d8391754f1458f30344613408d878f7f1f6c55eed73e466fce9a",
+      "packet_bytes_sha256": "059b69b5fbe72e53479bd94128b54e03bb23ac3ed45dbe8e4e729468794c836b",
+      "target_head": "77845105cda770d6217ad1708ace00d3a8bee179",
+      "base_ref": "7f8da7e4cc07f33f24dabe5ee9a803a4cffc252a",
+      "branch": "agent/global-a2a-runtime-cell-20260718",
+      "status": "passed",
+      "phase": "closeout",
+      "command_exit": 0,
+      "primary_failure": null,
+      "failed_gates": [],
+      "negative_controls": [
+        {
+          "name": "registry-validator-rejects-unsafe-policy-in-memory",
+          "exit_code": 2,
+          "expected_exit": 2,
+          "passed": true
+        }
+      ],
+      "notes": "dependency-free in-memory unsafe-secret-policy control exit 2/expected 2; focused gates and scope passed"
+    }
+  ],
+  "superseded_by": {
+    "packet_id": "organism-rewire-WP-A2AGLOBAL1-final",
+    "packet_digest": "cdfd55da8b079d3fa335dee8d78500823b6a0a506d5e39e1dd9a3884c8afbcef",
+    "packet_bytes_sha256": "db4dbda04a389e8e96862d8a94629c9767004eb47317d11be19ed70cfa5adc20",
+    "tracked_packet_path": "reports/agentops/work_packets/organism-rewire-WP-A2AGLOBAL1-final.json",
+    "external_packet_path": "/root/.dharma/packets/organism-rewire-WP-A2AGLOBAL1-final.json"
+  },
+  "superseded_packet_definitions": [
+    "reports/agentops/work_packets/organism-rewire-WP-A2AGLOBAL1-runtime-cell.json",
+    "reports/agentops/work_packets/organism-rewire-WP-A2AGLOBAL1R-closeout-repair.json",
+    "reports/agentops/work_packets/organism-rewire-WP-A2AGLOBAL1R2-negative-control.json"
+  ],
+  "tool_versions": {
+    "git": "2.43.0",
+    "make": "4.3",
+    "python": "3.12.3"
+  },
+  "environment": {
+    "interpreter": "/root/.dharma/venvs/dharma-swarm-agentops-py312/bin/python",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "note": "no secrets; external agentops report digests only"
+  },
+  "notes": [
+    "Predecessor packet definitions deleted from PR diff; failures preserved here only.",
+    "Truthful lineage: run1 pytest_cache scope; run2 DocOps counts + false-green pytest NC; run3 jailed Python missing YAML; run4 dependency-free in-memory NC exit 2/2.",
+    "Final closeout receipt is NOT fabricated; Hermes runs it after repair.",
+    "No secret values, credentials, or auth-bearing URLs included."
+  ],
+  "replacement_branch": "agent/global-a2a-runtime-cell-final-20260718",
+  "replacement_base": "84bdc6dc1e2e791f0f7bcd7ae441d977d8ceb294",
+  "superseded_remote_pr": {
+    "pr": 1033,
+    "reason": "remote branch externally force-rebased during governed local repair; preserved as superseded evidence"
+  }
+}

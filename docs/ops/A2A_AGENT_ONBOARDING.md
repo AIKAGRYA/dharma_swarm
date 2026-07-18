@@ -1,10 +1,18 @@
 # A2A Agent Registration — persistent fleet-identity route
 
 **Role:** reference / operational route. Not authority.
-**Authority owners:** `docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md` (transport
-contract), `examples/agents/*.registration.json` (each agent's canonical card),
-`dharma_swarm/a2a/agent_presence.py` (presence roster),
-`dharma_swarm/a2a/agent_card.py` (alias map + runtime card schema).
+**Authority owners (precise split):**
+- **Cards** — `examples/agents/*.registration.json` own declared identity
+  addresses (mailbox/endpoint → declared route).
+- **Roster** — `dharma_swarm/a2a/agent_presence.py::REGISTERED_AGENT_UIDS` owns
+  registered roster membership.
+- **Live/runtime state** — Live Ops, runtime probes, and receipts own what is
+  actually running.
+- **FFR** — `docs/ops/FLEET_FIELD_REGISTRY.yaml` is a probe-bound connect-time
+  projection only; it owns neither declared card addresses nor universal live
+  state. Reader: `python3 scripts/runtime/fleet_field_registry.py`.
+- Transport contract: `docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md`.
+- Alias map + runtime card schema: `dharma_swarm/a2a/agent_card.py`.
 **Rendered by:** `make agent-register` (`make agent-onboard` remains a
 compatibility alias; implementation:
 `scripts/governance/a2a_agent_onboard.py`). The command is read-only and

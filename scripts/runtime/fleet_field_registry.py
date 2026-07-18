@@ -1,161 +1,137 @@
 #!/usr/bin/env python3
-"""Fleet field registry reader — the one secret-free routing command.
+"""Fleet field registry reader — secret-free multi-authority runtime-cell view.
 
-Prints, for every probed agent identity: uid, canonical lane, live-on-hub
-status, credential env-var NAMES, listen subject(s), and last verified
-send/receive — sourced from docs/ops/FLEET_FIELD_REGISTRY.yaml (schema
-dharma_fleet_field_registry.v1), which is refreshed by probe receipts.
+Prints uid, transport tier, semantic/effect ceiling, and readiness for every
+registered agent from docs/ops/FLEET_FIELD_REGISTRY.yaml (schema v2).
 
 Usage:
-    python3 scripts/runtime/fleet_field_registry.py            # print the field table
-    python3 scripts/runtime/fleet_field_registry.py --check    # validate (exit 2 on failure)
-    python3 scripts/runtime/fleet_field_registry.py --json     # machine-readable dump
+    python3 scripts/runtime/fleet_field_registry.py            # field table
+    python3 scripts/runtime/fleet_field_registry.py --check    # validate (exit 2)
+    python3 scripts/runtime/fleet_field_registry.py --json     # machine dump
 
---check enforces the registry contract: required fields per agent, the
-env-var-names-only secret policy (a credential VALUE in the registry is a
-governance violation), and that every probe_receipt path exists in the repo.
+All modes validate first (including --json). No network calls; never prints
+secret values. Schema/validation live in fleet_field_registry_contract.py.
 """
 from __future__ import annotations
 
 import json
-import re
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-REGISTRY_PATH = REPO_ROOT / "docs/ops/FLEET_FIELD_REGISTRY.yaml"
-SCHEMA = "dharma_fleet_field_registry.v1"
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
-REQUIRED_AGENT_FIELDS = (
-    "agent_uid",
-    "runtime",
-    "lanes_available",
-    "primary_lane",
-    "live_on_hub",
-    "credential_env_names",
-    "listen_subjects",
-    "publish_subjects",
-    "git_seat",
-    "last_verified_send",
-    "last_verified_receive",
-    "probe_receipt",
+from scripts.runtime.fleet_field_registry_contract import (  # noqa: E402
+    SCHEMA_V2,
+    RegistryError,
+    load_registry_data,
+    validate_registry,
 )
-KNOWN_LANES = {
-    "agni_hub_wss",
-    "agni_hub_nats",
-    "local_nats_4222",
-    "git_seat",
-    "operator_relay",
-    "none",
-}
-ENV_NAME_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
-# Values that would indicate a leaked credential rather than a name/reference.
-SECRET_VALUE_RE = re.compile(
-    r"(password|passwd|token|secret|api[_-]?key)\s*[:=]\s*\S", re.IGNORECASE
-)
+
+REGISTRY_PATH = REPO_ROOT / "docs/ops/FLEET_FIELD_REGISTRY.yaml"
+
+# Re-export contract surface for tests and negative controls.
+validate = validate_registry
 
 
 def load_registry(path: Path = REGISTRY_PATH) -> dict:
-    import yaml
-
-    with path.open(encoding="utf-8") as handle:
-        data = yaml.safe_load(handle)
-    if not isinstance(data, dict):
-        raise ValueError("registry did not parse to a mapping")
-    return data
-
-
-def validate(data: dict, *, repo_root: Path = REPO_ROOT) -> list[str]:
-    """Return a list of violations; empty means the registry is valid."""
-    errors: list[str] = []
-    if data.get("schema") != SCHEMA:
-        errors.append(f"schema must be {SCHEMA!r}, got {data.get('schema')!r}")
-    if data.get("secret_policy") != "env_var_names_only":
-        errors.append("secret_policy must be 'env_var_names_only'")
-
-    agents = data.get("agents")
-    if not isinstance(agents, list) or not agents:
-        return errors + ["agents must be a non-empty list"]
-
-    seen_uids: set[str] = set()
-    for index, agent in enumerate(agents):
-        if not isinstance(agent, dict):
-            errors.append(f"agents[{index}]: entry is not a mapping ({type(agent).__name__})")
-            continue
-        uid = str(agent.get("agent_uid", "<missing uid>"))
-        if uid in seen_uids:
-            errors.append(f"{uid}: duplicate agent_uid")
-        seen_uids.add(uid)
-        for field in REQUIRED_AGENT_FIELDS:
-            if field not in agent:
-                errors.append(f"{uid}: missing required field {field!r}")
-        for lane in agent.get("lanes_available", []) or []:
-            if lane not in KNOWN_LANES:
-                errors.append(f"{uid}: unknown lane {lane!r}")
-        primary = agent.get("primary_lane")
-        if primary is not None and primary not in KNOWN_LANES:
-            errors.append(f"{uid}: unknown primary_lane {primary!r}")
-        for name in agent.get("credential_env_names", []) or []:
-            if not ENV_NAME_RE.match(str(name)):
-                errors.append(
-                    f"{uid}: credential_env_names entry {name!r} is not an "
-                    "ALL_CAPS env var name (values are forbidden here)"
-                )
-        receipt = agent.get("probe_receipt")
-        if receipt and not (repo_root / str(receipt)).exists():
-            errors.append(f"{uid}: probe_receipt path does not exist: {receipt}")
-
-    # Whole-document secret scan: no key/value pair may carry a literal secret.
-    def scan(node: object, trail: str) -> None:
-        if isinstance(node, dict):
-            for key, value in node.items():
-                scan(value, f"{trail}.{key}")
-        elif isinstance(node, list):
-            for index, item in enumerate(node):
-                scan(item, f"{trail}[{index}]")
-        elif isinstance(node, str) and SECRET_VALUE_RE.search(node):
-            errors.append(f"possible secret value at {trail}: {node[:40]!r}...")
-
-    scan(data, "$")
-    return errors
+    return load_registry_data(path)
 
 
 def render_table(data: dict) -> str:
-    rows = [("AGENT", "PRIMARY LANE", "LIVE", "LISTEN", "LAST SEND")]
-    for agent in data.get("agents", []):
-        listen = (agent.get("listen_subjects") or ["-"])[0]
+    """Render multi-authority + per-agent transport/semantic ceilings honestly."""
+    authorities = data.get("authorities") or []
+    if isinstance(authorities, list) and authorities:
+        auth_bits = []
+        for auth in authorities:
+            if not isinstance(auth, dict):
+                continue
+            auth_bits.append(
+                f"{auth.get('authority_id', '?')}[{auth.get('role', '?')}/"
+                f"{auth.get('evidence_status', '?')}]"
+            )
+        auth_line = "authorities: " + ", ".join(auth_bits)
+    else:
+        hub = data.get("hub") or {}
+        auth_line = f"hub {hub.get('name', '?')} stream {hub.get('live_stream', '?')}"
+
+    rows = [("AGENT", "TRANSPORT", "SEM/EFFECT", "READINESS", "SEM-MODE", "OBS-SUBJECT")]
+    for agent in data.get("agents", []) or []:
+        if not isinstance(agent, dict):
+            continue
+        obs = agent.get("observed_effective_route")
+        obs_subject = "-"
+        if isinstance(obs, dict):
+            if obs.get("collision_ref"):
+                obs_subject = f"quarantined:{obs.get('collision_ref')}"
+            elif obs.get("inbox_subject") is not None:
+                obs_subject = str(obs.get("inbox_subject"))
         rows.append(
             (
                 str(agent.get("agent_uid", "?")),
-                str(agent.get("primary_lane", "?")),
-                "YES" if agent.get("live_on_hub") else "no",
-                str(listen)[:44],
-                str(agent.get("last_verified_send", "?"))[:40],
+                str(agent.get("transport_contact_tier", "unknown")),
+                str(agent.get("semantic_effect_ceiling", "unknown")),
+                str(agent.get("readiness_ceiling", "unknown")),
+                str(agent.get("semantic_executor_mode", "unknown")),
+                obs_subject[:40],
             )
         )
     widths = [max(len(row[col]) for row in rows) for col in range(len(rows[0]))]
-    lines = ["  ".join(cell.ljust(widths[i]) for i, cell in enumerate(row)) for row in rows]
-    hub = data.get("hub", {})
+    lines = [
+        "  ".join(cell.ljust(widths[i]) for i, cell in enumerate(row)) for row in rows
+    ]
     header = (
-        f"Fleet field registry (updated {data.get('updated', '?')}) — "
-        f"hub {hub.get('name', '?')} stream {hub.get('live_stream', '?')}\n"
+        f"Fleet field registry v2 (updated {data.get('updated', '?')}) — {auth_line}\n"
+        "Tiers are fail-closed; unknown is not green; non-proof components ⇒ readiness unknown.\n"
+        "declared_route ≠ observed_effective_route ≠ target_route.\n"
     )
+    n_coll = len(data.get("routing_collisions") or [])
     footer = (
-        f"\n{len(data.get('unprobed_identities', []) or [])} known identities unprobed; "
-        "full detail: docs/ops/FLEET_FIELD_REGISTRY.yaml"
+        f"\n{len(data.get('agents') or [])} runtime-cell projections; "
+        f"{n_coll} routing_collisions; full detail: docs/ops/FLEET_FIELD_REGISTRY.yaml"
     )
     return header + "\n".join(lines) + footer
 
 
+def _emit_errors(errors: list[str]) -> None:
+    for error in errors:
+        print(f"[registry-check] {error}", file=sys.stderr)
+
+
 def main(argv: list[str]) -> int:
-    data = load_registry()
+    try:
+        data = load_registry()
+    except RegistryError as exc:
+        print(f"[registry-check] {exc}", file=sys.stderr)
+        return 2
+    except Exception as exc:  # pragma: no cover — last-resort controlled exit
+        print(
+            f"[registry-check] registry load failure: {type(exc).__name__}",
+            file=sys.stderr,
+        )
+        return 2
+
+    # Validate before every output mode, including --json and default table.
+    try:
+        errors = validate_registry(data, repo_root=REPO_ROOT)
+    except Exception as exc:
+        print(
+            f"[registry-check] validation failure: {type(exc).__name__}",
+            file=sys.stderr,
+        )
+        return 2
+
+    if errors:
+        _emit_errors(errors)
+        return 2
+
     if "--check" in argv:
-        errors = validate(data)
-        if errors:
-            for error in errors:
-                print(f"[registry-check] {error}", file=sys.stderr)
-            return 2
-        print(f"[registry-check] OK — {len(data['agents'])} probed agents, secret policy holds")
+        n_auth = len(data.get("authorities") or [])
+        print(
+            f"[registry-check] OK — schema {SCHEMA_V2}, "
+            f"{len(data['agents'])} agents, {n_auth} authorities, secret policy holds"
+        )
         return 0
     if "--json" in argv:
         print(json.dumps(data, indent=2, default=str))

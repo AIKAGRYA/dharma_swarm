@@ -77,6 +77,10 @@ is no longer a forced first-read surface.
 | Vibe-code antipattern catalogue (54 patterns × 12 clusters, scan-backed) | `docs/governance/VIBE_CODE_HYGIENE.md` + `scripts/governance/vibe_code_scan.sh` + `reports/governance/vibe_code_baseline_2026-06-07.txt` | `ANTI_SLOP_RULES.md` (companion); signals promote into enforced rules via PR |
 | Semantic Commons agent identity and naming ontology | `docs/ontology/SEMANTIC_COMMONS.md` | A2A cards, contact registries, `docs/ontology/semantic_objects.yaml`, `docs/ontology/semantic_aliases.yaml`, runtime resolver names |
 | Internal live transport decision | `docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md` | A2A docs, runtime plans, onboarding output, Live Ops Cockpit |
+| A2A declared identity addresses (card) | `examples/agents/*.registration.json` | Onboarding, FFR declared_route projection, drift checks |
+| A2A registered roster membership | `dharma_swarm/a2a/agent_presence.py::REGISTERED_AGENT_UIDS` | Organism status, presence projection, FFR expected-UID union |
+| A2A live/runtime state | Live Ops / runtime probes / receipts | Dashboard, operator triage; never owned by FFR prose |
+| A2A fleet field connect-time projection | `docs/ops/FLEET_FIELD_REGISTRY.yaml` (schema v2) + `scripts/runtime/fleet_field_registry.py` | Probe-bound projection only; owns neither declared card addresses nor universal live state |
 | Always-on A2A spine implementation plan | `docs/architecture/A2A_ALWAYS_ON_SPINE_MASTER_PLAN.md` | Defers to `docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md`, `ACTIVE_TRACK.yaml`, `RuntimeStateStore`, and `A2ANatsTransport` for executable truth |
 | LangGraph parity local acceptance contract | `docs/langgraph_parity/LANGGRAPH_PARITY_CONTRACT.md` | parity benchmark, readiness report, future adapter work |
 | LangGraph parity operator runbook | `docs/langgraph_parity/OPERATOR_RUNBOOK.md` | benchmark/readiness commands and human verification flow |
