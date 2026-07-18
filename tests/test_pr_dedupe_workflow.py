@@ -157,9 +157,32 @@ def test_pr_ci_health_never_rebases_session_entry_packet_branches() -> None:
     assert "git rebase origin/main" not in text
     assert 'git push origin "ci-rebase/$head:$head"' not in text
     assert "gh api --paginate" not in text
+    assert "SESSION_ENTRY_PACKET_PREFIX" not in text
     # Invocation carries identity binding flags.
     assert "--expected-base" in text
     assert "--expected-head" in text
+
+
+def test_pr_ci_health_docops_exclusion_before_helper() -> None:
+    """DocOps rolling-lane exclusion must precede helper invocation."""
+    text = PR_CI_HEALTH.read_text(encoding="utf-8")
+    step = text.split("- name: Rebase conflict-free behind-main branches", 1)[1]
+    exclusion = '[ "$head" = "chore/docops-autorefresh" ]'
+    helper = "python3 scripts/governance/pr_ci_safe_rebase.py"
+    assert exclusion in step and helper in step
+    assert step.index(exclusion) < step.index(helper)
+
+
+def test_pr_ci_health_delegates_to_helper_no_direct_pr_head_mutation() -> None:
+    """Mirror helper-owned mutation surface (moved from helper unit tests)."""
+    text = PR_CI_HEALTH.read_text(encoding="utf-8")
+    assert "scripts/governance/pr_ci_safe_rebase.py" in text
+    assert 'git fetch origin "$head"' not in text
+    assert 'git checkout -B "ci-rebase/$head"' not in text
+    assert "git rebase origin/main" not in text
+    assert 'git push origin "ci-rebase/$head:$head"' not in text
+    assert "gh api --paginate" not in text
+    assert "SESSION_ENTRY_PACKET_PREFIX" not in text
 
 
 def test_active_track_pr_gate_installs_executable_criterion_dependencies() -> None:

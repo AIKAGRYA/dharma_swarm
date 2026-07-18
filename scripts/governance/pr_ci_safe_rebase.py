@@ -437,12 +437,11 @@ def safe_rebase(
 def packet_guard_selftest() -> int:
     """Dependency-free page-two guard proof for AgentOps negative controls."""
     calls: list[list[str]] = []
-    meta = {"base": {"ref": "main"},
-        "head": {"ref": "selftest", "sha": "a" * 40, "repo": {"full_name": "self/test"}},
-        "changed_files": 101,
-    }
+    meta = {"base": {"ref": "main"}, "head": {"ref": "selftest", "sha": "a" * 40,
+            "repo": {"full_name": "self/test"}}, "changed_files": 101}
     page1 = [{"filename": f"src/f{i}.py"} for i in range(100)]
-    page2 = [{"filename": "reports/agentops/work_packets/selftest.json"}]
+    page2 = [{"filename": "docs/moved.json",
+             "previous_filename": "reports/agentops/work_packets/selftest.json"}]
 
     def runner(argv: list[str]) -> CmdResult:
         calls.append(list(argv))

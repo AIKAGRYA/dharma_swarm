@@ -5,7 +5,8 @@
     "docs/governance/PR_QUALITY_GATES.md",
     "reports/agentops/work_packets/titanium-hardening-WP-PRCI1-session-entry-guard.json",
     "scripts/governance/pr_ci_safe_rebase.py",
-    "tests/test_pr_ci_safe_rebase.py"
+    "tests/test_pr_ci_safe_rebase.py",
+    "tests/test_pr_ci_safe_rebase_mutations.py"
   ],
   "approval": {
     "before_commit": false,
@@ -133,7 +134,7 @@
   ],
   "gates": [
     {
-      "command": "python3 -m pytest tests/test_pr_dedupe_workflow.py tests/test_pr_ci_safe_rebase.py -q",
+      "command": "python3 -m pytest tests/test_pr_dedupe_workflow.py tests/test_pr_ci_safe_rebase.py tests/test_pr_ci_safe_rebase_mutations.py -q",
       "expected_exit": 0,
       "name": "pr-ci-health-session-entry-guard",
       "timeout_seconds": 180
@@ -171,7 +172,8 @@
       "tests/test_pr_dedupe_workflow.py",
       "scripts/governance/check_agentops_packet_scope.py",
       "scripts/governance/pr_ci_safe_rebase.py",
-      "tests/test_pr_ci_safe_rebase.py"
+      "tests/test_pr_ci_safe_rebase.py",
+      "tests/test_pr_ci_safe_rebase_mutations.py"
     ],
     "collision": {
       "checked_at_sha": "944dc89565edc9262574947abe8d93598f7bbaf3",
@@ -186,7 +188,9 @@
       "Independent review of PR 1038 at e5f10c74 failed 54/100: current guard misses previous_filename/capped-file-list cases and exact same-repo/head-SHA race binding.",
       "The workflow string-presence regression and self-certifying negative control are replaced by an executable helper, behavioral command-trace tests, and a mutation that runs the packet-page test.",
       "Local closeout reports remain self-reported; externally authoritative evidence is the GitHub AgentOps packet-scope check plus review/CI handles, and PR prose must not overclaim local artifacts.",
-      "Behavioral closeout at 1ba2bc99 had a false-positive negative control: the jail's python3 lacked pytest, so ModuleNotFoundError produced expected exit 1. The control now mutates PACKET_PREFIX and runs a dependency-free built-in page-two/no-git selftest."
+      "Behavioral closeout at 1ba2bc99 had a false-positive negative control: the jail's python3 lacked pytest, so ModuleNotFoundError produced expected exit 1. The control now mutates PACKET_PREFIX and runs a dependency-free built-in page-two/no-git selftest.",
+      "Independent review of PR 1039 at 506147eb scored 88/100: production simulations passed, but seven critical executable guard mutants survived the behavioral suite because unexpected downstream metadata calls became generic accepted skips.",
+      "Current-head CI run 29653776294 is red only on Python 3.12 test_custom_task_dispatch timeout (1 failed, 13909 passed, 71 skipped, 9 deselected, 16 xfailed); causality is unproven and fresh all-green CI remains required."
     ],
     "interface_mismatches": [
       "PR 1036 and predecessor 1033 were force-rebased by pr-ci-health after packet sealing, invalidating base_ref, digest evidence, PR claims and CI authority."
@@ -195,7 +199,7 @@
       "Workflow auto-rebases all behind-main PRs with force-with-lease, including merge-base-bound Session Entry packets."
     ],
     "owner": "@AmitabhainArunachala",
-    "packet_digest": "7d3b07595bf7503e05454b996316ce1dd29089b29b44f760af8db511f4843b41",
+    "packet_digest": "2832a4ca111dbf86ea2bebe60f706f6c186e42528d7088f004b3896b54665870",
     "rebind_history": [
       {
         "from_base": "c82e15a850638eba63d1cc5908d6f849ed20854c",
