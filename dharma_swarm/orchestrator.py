@@ -3218,22 +3218,56 @@ class Orchestrator:
         Cancels any tasks that exceed barrier_timeout and records them as
         failures so they don't become ghost dispatches in S_n+1.
         """
+        barrier_recovered = 0
         if self._running_tasks:
-            pending = [t for t in self._running_tasks.values() if not t.done()]
-            if pending:
+            pending_by_task = {
+                task_id: atask
+                for task_id, atask in self._running_tasks.items()
+                if not atask.done()
+            }
+            if pending_by_task:
                 barrier_timeout = self._default_timeout_seconds + 60.0
                 _done, still_pending = await asyncio.wait(
-                    pending,
+                    pending_by_task.values(),
                     timeout=barrier_timeout,
                     return_when=asyncio.ALL_COMPLETED,
                 )
-                for straggler in still_pending:
-                    straggler.cancel()
-                    logger.warning(
-                        "BSP barrier: cancelled straggler task after %.0fs",
-                        barrier_timeout,
-                    )
-        return await self._collect_completed()
+                if still_pending:
+                    atask_to_task_id = {atask: task_id for task_id, atask in pending_by_task.items()}
+                    for straggler in still_pending:
+                        straggler.cancel()
+                        logger.warning(
+                            "BSP barrier: cancelled straggler task after %.0fs",
+                            barrier_timeout,
+                        )
+                    # Give cancellation a bounded chance to propagate so task.result()/
+                    # task.exception() won't leak unobserved CancelledError warnings.
+                    await asyncio.wait(still_pending, timeout=5.0, return_when=asyncio.ALL_COMPLETED)
+                    for straggler in still_pending:
+                        task_id = atask_to_task_id.get(straggler)
+                        if task_id is None:
+                            continue
+                        td = self._active_dispatches.get(task_id)
+                        self._running_tasks.pop(task_id, None)
+                        if td is None:
+                            self._active_dispatches.pop(task_id, None)
+                            continue
+                        task = await self._safe_get_task(task_id)
+                        if self._pool is not None:
+                            await self._pool.release(td.agent_id)
+                        self._active_dispatches.pop(task_id, None)
+                        await self._handle_task_failure(
+                            td=td,
+                            task=task,
+                            error=(
+                                "BSP barrier cancelled straggler after "
+                                f"{barrier_timeout:.1f}s"
+                            ),
+                            source="bsp_barrier_timeout",
+                        )
+                        barrier_recovered += 1
+        settled, recovered = await self._collect_completed()
+        return settled, recovered + barrier_recovered
 
     async def _save_superstep_checkpoint(self) -> None:
         """Atomic write of current superstep state for crash recovery."""
