@@ -373,18 +373,29 @@ lint-blockers:
 # The watchmen-watcher: verifies the verification gates themselves work.
 # Born 2026-06-12 after syntax-check, test-fast, and suite collection were
 # all found broken simultaneously with nothing noticing.
+# WP-0B (TIT-001): a bounded behavioral sentinel runs real assertions so the
+# success banner and the executed evidence are equivalent; the banner names
+# exactly the gates that ran, nothing broader. VERIFIER_SENTINEL is
+# overridable so the meta-contract test can substitute a failing sentinel
+# and prove this target goes red.
+VERIFIER_SENTINEL ?= tests/test_telos_gates.py
+
 verifier-selfcheck:
-	@echo "[1/4] syntax-check"
+	@echo "[1/5] syntax-check"
 	@$(MAKE) -s syntax-check
-	@echo "[2/4] lint-blockers (F821)"
+	@echo "[2/5] lint-blockers (F821)"
 	@$(MAKE) -s lint-blockers
-	@echo "[3/4] test collection"
+	@echo "[3/5] test collection"
 	@$(VENV_PYTHON) -m pytest tests/ --collect-only -q >/tmp/dharma-collect-check.log 2>&1 \
 		|| (echo "COLLECTION BROKEN:"; tail -20 /tmp/dharma-collect-check.log; exit 1)
 	@tail -1 /tmp/dharma-collect-check.log
-	@echo "[4/4] session status"
+	@echo "[4/5] session status"
 	@$(MAKE) -s onboard >/dev/null 2>&1 && echo "onboard: OK"
-	@echo "verifier-selfcheck: ALL GATES FUNCTIONAL"
+	@echo "[5/5] behavioral sentinel ($(VERIFIER_SENTINEL))"
+	@$(VENV_PYTHON) -m pytest -p timeout $(VERIFIER_SENTINEL) -q --timeout=120 >/tmp/dharma-sentinel-check.log 2>&1 \
+		|| (echo "BEHAVIORAL SENTINEL FAILED:"; tail -20 /tmp/dharma-sentinel-check.log; exit 1)
+	@tail -1 /tmp/dharma-sentinel-check.log
+	@echo "verifier-selfcheck: OK (syntax, F821, collection, onboarding, behavioral sentinel)"
 
 gh-auth:
 	gh auth login
