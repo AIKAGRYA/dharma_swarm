@@ -34,6 +34,7 @@ class TaskPriority(str, Enum):
 
 class AgentStatus(str, Enum):
     IDLE = "idle"
+    INACTIVE = "inactive"  # BSP Vote-to-Halt: no inbox messages, vertex halted
     BUSY = "busy"
     STARTING = "starting"
     STOPPING = "stopping"

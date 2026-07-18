@@ -1157,6 +1157,76 @@ def _resolve_config_ontology_path(
     return state_dir / "ontology.db"
 
 
+_MAX_PROMPT_TOKENS: int = int(os.environ.get("DHARMA_MAX_PROMPT_TOKENS", "12000"))
+
+
+def _estimate_prompt_tokens(request: LLMRequest) -> int:
+    """Rough token count for a full LLMRequest (system + all message content).
+
+    Uses the 3.8 chars/token heuristic — same as _estimate_requested_tokens.
+    """
+    parts = [request.system or ""]
+    for msg in request.messages:
+        content = msg.get("content", "")
+        if isinstance(content, str):
+            parts.append(content)
+        elif isinstance(content, list):  # multi-modal blocks
+            for block in content:
+                if isinstance(block, dict):
+                    parts.append(str(block.get("text", "")))
+    text = "\n".join(parts)
+    return max(int(len(text) / 3.8), 64)
+
+
+def _trim_context_to_budget(
+    request: LLMRequest,
+    max_tokens: int = _MAX_PROMPT_TOKENS,
+) -> LLMRequest:
+    """Drop lower-priority context sections until the prompt fits the token budget.
+
+    Priority (highest to lowest — drop from the bottom up):
+      1. Task title + description (never dropped)
+      2. Runtime Context Bundle
+      3. Memory Recall
+      4. Latent Gold          <- dropped first
+      5. Recent Fitness Feedback <- dropped second
+      6. Stigmergy marks / anything else injected below task
+
+    Returns a new LLMRequest; never mutates the original.
+    """
+    if _estimate_prompt_tokens(request) <= max_tokens:
+        return request  # already fits
+
+    if not request.messages:
+        return request
+
+    import re as _re
+
+    # Sections to strip, ordered from least to most important
+    _DROP_HEADERS = [
+        r"^## Recent Fitness Feedback.*?(?=\n## |\Z)",
+        r"^## Latent Gold.*?(?=\n## |\Z)",
+        r"^## Stigmergy Context.*?(?=\n## |\Z)",
+        r"^## Memory Recall.*?(?=\n## |\Z)",
+        r"^## Runtime Context Bundle.*?(?=\n## |\Z)",
+    ]
+
+    content = request.messages[0].get("content", "") if request.messages else ""
+    if not isinstance(content, str):
+        return request  # multi-modal; skip trimming
+
+    trimmed = content
+    for pattern in _DROP_HEADERS:
+        if _estimate_prompt_tokens(
+            request.model_copy(update={"messages": [{"role": "user", "content": trimmed}]})
+        ) <= max_tokens:
+            break
+        trimmed = _re.sub(pattern, "", trimmed, flags=_re.S | _re.M).strip()
+
+    new_messages = [{**request.messages[0], "content": trimmed}, *request.messages[1:]]
+    return request.model_copy(update={"messages": new_messages})
+
+
 def _build_prompt(
     task: Task,
     config: AgentConfig,
@@ -2200,6 +2270,14 @@ class AgentRunner:
                 )
             request = _build_prompt(task, self._config, plan_context=plan_context)
             await _inject_stigmergy_context(request, task, self._config)
+            # Token budget gate: trim lower-priority context sections if over ceiling.
+            _tok = _estimate_prompt_tokens(request)
+            if _tok > _MAX_PROMPT_TOKENS:
+                logger.debug(
+                    "Prompt for task %s is ~%d tokens (ceiling %d); trimming context",
+                    task.id[:8], _tok, _MAX_PROMPT_TOKENS,
+                )
+                request = _trim_context_to_budget(request, _MAX_PROMPT_TOKENS)
             self._record_conversation_turn(
                 task,
                 role="user",
@@ -2441,8 +2519,8 @@ class AgentRunner:
                 self._state.turns_used += 1
                 self._state.tasks_completed += 1
                 self._state.current_task = None
-                self._state.status = AgentStatus.IDLE
                 self._state.last_heartbeat = _utc_now()
+            await self._post_task_lifecycle(task)
 
             await _leave_task_mark(
                 agent_name=self._config.name,
@@ -2704,9 +2782,9 @@ class AgentRunner:
                 logger.debug("Telic seam recording failed", exc_info=True)
 
             async with self._lock:
-                self._state.status = AgentStatus.IDLE
                 self._state.current_task = None
                 self._state.error = str(exc)
+            await self._post_task_lifecycle(task)
             # Close outer task span (failure)
             try:
                 _task_tracer.end(_task_span, success=False, error=str(exc)[:200])
@@ -2716,6 +2794,30 @@ class AgentRunner:
                 "Agent %s failed task %s", self._config.name, task.id
             )
             raise
+
+    async def _post_task_lifecycle(self, task: Task) -> None:
+        """Implement BSP Vote-to-Halt after task completion.
+
+        If the agent's inbox is empty: transition to INACTIVE (voted-to-halt).
+        If messages are waiting: stay IDLE so the orchestrator can re-activate.
+        """
+        if self._message_bus is None:
+            async with self._lock:
+                self._state.status = AgentStatus.IDLE
+            return
+        try:
+            messages = await self._message_bus.receive(self.agent_id, limit=1)
+        except Exception:
+            messages = []
+        async with self._lock:
+            if messages:
+                self._state.status = AgentStatus.IDLE
+            else:
+                self._state.status = AgentStatus.INACTIVE
+                logger.debug(
+                    "Agent %s voted to halt (INACTIVE) at superstep boundary",
+                    self._config.name,
+                )
 
     # -- worker delegation --------------------------------------------------
 
