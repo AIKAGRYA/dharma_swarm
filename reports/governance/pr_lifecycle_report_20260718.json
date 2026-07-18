@@ -1,0 +1,204 @@
+{
+  "report_type": "pr_lifecycle",
+  "generated_at": "2026-07-18T00:00Z",
+  "audit_sha": "a47c110ca38155390b04a7d85654d0a1840b0cce",
+  "summary": {
+    "total_open_before": 16,
+    "auto_closed": 0,
+    "total_open_after": 16,
+    "conflicting_prs": 6,
+    "green_and_ready_count": 10,
+    "near_auto_close_threshold": 0
+  },
+  "auto_close_scan": {
+    "criteria": "mergeable=CONFLICTING AND age > 7 days",
+    "eligible": [],
+    "near_threshold": [],
+    "conflicting_not_yet_eligible": [
+      {
+        "number": 947,
+        "title": "[impact-checked] Add durable A2A presence and operator node",
+        "mergeable": "CONFLICTING",
+        "created_at": "2026-07-14T15:49:21Z",
+        "age_hours": 80.2,
+        "note": "3.34 days old. Eligible for auto-close on 2026-07-21T15:49Z if not rebased."
+      },
+      {
+        "number": 949,
+        "title": "[impact-checked] Govern durable A2A operator slice",
+        "mergeable": "CONFLICTING",
+        "created_at": "2026-07-14T23:31:10Z",
+        "age_hours": 72.5,
+        "note": "3.02 days old. Eligible for auto-close on 2026-07-21T23:31Z if not rebased."
+      },
+      {
+        "number": 972,
+        "title": "feat(forge-lab): canonical exact-code RSI lab releases",
+        "mergeable": "CONFLICTING",
+        "created_at": "2026-07-15T15:52:06Z",
+        "age_hours": 56.1,
+        "note": "2.34 days old. Eligible for auto-close on 2026-07-22T15:52Z if not rebased."
+      },
+      {
+        "number": 995,
+        "title": "test(mike): prepare C1 onboarding required-context proof",
+        "mergeable": "CONFLICTING",
+        "created_at": "2026-07-17T01:18:37Z",
+        "age_hours": 22.7,
+        "note": "0.95 days old. Eligible for auto-close on 2026-07-24T01:18Z if not rebased."
+      },
+      {
+        "number": 996,
+        "title": "governance(safety): admit live-host and rollback proof surfaces",
+        "mergeable": "CONFLICTING",
+        "created_at": "2026-07-17T01:43:11Z",
+        "age_hours": 22.3,
+        "note": "0.93 days old. Eligible for auto-close on 2026-07-24T01:43Z if not rebased."
+      },
+      {
+        "number": 1007,
+        "title": "governance(keel): bare-metal architecture audit as the KEEL companion findings ledger",
+        "mergeable": "CONFLICTING",
+        "created_at": "2026-07-17T17:20:24Z",
+        "age_hours": 6.7,
+        "note": "0.28 days old. Eligible for auto-close on 2026-07-24T17:20Z if not rebased."
+      }
+    ]
+  },
+  "duplicate_auto_grounding_scan": {
+    "duplicates_found": [],
+    "candidates_reviewed": [
+      {
+        "prs": [947, 949],
+        "note": "Both touch A2A operator topic with [impact-checked] prefix, but scope is distinct: #947 adds durable A2A presence+node, #949 governs operator slice. Not duplicates."
+      },
+      {
+        "prs": [1011, 1013],
+        "note": "Both reference Codex Composer recovery, but #1011 is governance admission slice and #1013 is bounded mobile recovery feature. Not duplicates targeting the same PR."
+      }
+    ],
+    "verdict": "No duplicate auto-grounding PRs targeting the same PR number found."
+  },
+  "green_and_ready_prs": [
+    {
+      "number": 1013,
+      "title": "feat(ops): bounded mobile recovery for Codex Composer",
+      "mergeable": "MERGEABLE",
+      "created_at": "2026-07-17T20:02:35Z",
+      "age_hours": 4.0
+    },
+    {
+      "number": 1011,
+      "title": "governance: admit current Codex Composer recovery slice",
+      "mergeable": "MERGEABLE",
+      "created_at": "2026-07-17T18:16:28Z",
+      "age_hours": 5.7
+    },
+    {
+      "number": 1008,
+      "title": "feat(models): promote Kimi K3 routes",
+      "mergeable": "MERGEABLE",
+      "created_at": "2026-07-17T17:41:51Z",
+      "age_hours": 6.3
+    },
+    {
+      "number": 1006,
+      "title": "docs(plans): DharmaGraph Ascent master spec (C1-C5)",
+      "mergeable": "MERGEABLE",
+      "created_at": "2026-07-17T16:59:30Z",
+      "age_hours": 7.0
+    },
+    {
+      "number": 1004,
+      "title": "docs(plans): THE KEEL v7.1 — verification lattice doctrine (single-file, review-refined)",
+      "mergeable": "MERGEABLE",
+      "created_at": "2026-07-17T13:17:06Z",
+      "age_hours": 10.7
+    },
+    {
+      "number": 1003,
+      "title": "chore(governance): ops agent lifecycle report 2026-07-17T12:00Z [automated]",
+      "mergeable": "MERGEABLE",
+      "created_at": "2026-07-17T12:04:50Z",
+      "age_hours": 11.9
+    },
+    {
+      "number": 987,
+      "title": "chore(docops): reconcile generated counts",
+      "mergeable": "MERGEABLE",
+      "created_at": "2026-07-16T06:44:10Z",
+      "age_hours": 41.3
+    },
+    {
+      "number": 983,
+      "title": "feat(arena): gate opt-in live measurement with parity controls",
+      "mergeable": "MERGEABLE",
+      "created_at": "2026-07-16T03:27:17Z",
+      "age_hours": 44.6
+    },
+    {
+      "number": 930,
+      "title": "feat(chamber): add exact-scope proof membrane v0",
+      "mergeable": "MERGEABLE",
+      "created_at": "2026-07-13T23:50:28Z",
+      "age_hours": 96.2
+    },
+    {
+      "number": 904,
+      "title": "feat(holon): authority-scoped remote fast path [impact-checked]",
+      "mergeable": "MERGEABLE",
+      "created_at": "2026-07-12T15:40:29Z",
+      "age_hours": 128.3
+    }
+  ],
+  "recommended_actions": [
+    {
+      "priority": 1,
+      "pr": 947,
+      "action": "REBASE NEEDED: CONFLICTING 3.34 days old. Auto-close eligible 2026-07-21T15:49Z. Durable A2A presence — high-impact, rebase against main and reopen.",
+      "owner": "operator"
+    },
+    {
+      "priority": 2,
+      "pr": 949,
+      "action": "REBASE NEEDED: CONFLICTING 3.02 days old. Auto-close eligible 2026-07-21T23:31Z. A2A operator governance slice — rebase against main.",
+      "owner": "operator"
+    },
+    {
+      "priority": 3,
+      "pr": 972,
+      "action": "REBASE NEEDED: CONFLICTING 2.34 days old. forge-lab RSI lab releases — spine-touching PR (spine adoption comment posted). Rebase against main.",
+      "owner": "operator"
+    },
+    {
+      "priority": 4,
+      "pr": 996,
+      "action": "REBASE NEEDED: CONFLICTING 0.93 days old. Safety governance admit — rebase against main.",
+      "owner": "operator"
+    },
+    {
+      "priority": 5,
+      "pr": 995,
+      "action": "REBASE NEEDED: CONFLICTING 0.95 days old. C1 onboarding proof — rebase against main.",
+      "owner": "operator"
+    },
+    {
+      "priority": 6,
+      "pr": 1007,
+      "action": "REBASE NEEDED: CONFLICTING 0.28 days old (fresh). KEEL companion findings ledger — rebase against main before it ages.",
+      "owner": "operator"
+    },
+    {
+      "priority": 7,
+      "pr": 904,
+      "action": "GREEN — 5.35 days old, mergeable. Holon authority-scoped remote fast path. Review and merge when ready.",
+      "owner": "operator"
+    },
+    {
+      "priority": 8,
+      "pr": 930,
+      "action": "GREEN — 4.01 days old, mergeable. Exact-scope proof membrane v0. Review and merge when ready.",
+      "owner": "operator"
+    }
+  ]
+}
