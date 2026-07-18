@@ -1,6 +1,6 @@
 {
  "id": "d3-sweep-WP-D3INT-main-integration-2026-07-18",
- "base_ref": "1e806bdc272cc61f983f42dd7577e58b39781a25",
+ "base_ref": "135a18300c5e4be9fce641e901adc046b837e653",
  "branch": "codex/d3-sweep-main-integration-20260718",
  "worktree": ".",
  "intent": "Integrate the hardened d3-sweep-20260714 BSP work into main: superstep message escrow with idempotent, crash-resumable staged sends (message_bus + message_bus_bsp), durable SuperstepCheckpoint (flush+fsync file and directory), hard superstep barrier with straggler settlement (orchestrator_bsp), stale-claim cleanup (swarm), and the full regression-test battery. Adds the measured-coupling CODEOWNERS entry for dharma_swarm/traces.py required by the blast-radius gate on this diff.",
@@ -215,7 +215,7 @@
   "owner": "@AmitabhainArunachala",
   "collision": {
    "status": "clear",
-   "checked_at_sha": "1e806bdc272cc61f983f42dd7577e58b39781a25",
+   "checked_at_sha": "135a18300c5e4be9fce641e901adc046b837e653",
    "details": []
   },
   "interface_mismatches": [
@@ -232,6 +232,6 @@
    "Collision context: feeder PRs #1015 #1016 #1017 #1020 merged before this packet was bound; open-PR sweep 2026-07-18 found no open PR carrying these surfaces."
   ],
   "rollback": "Revert the integration merge as one unit (all six source files, five test files, CODEOWNERS line, and this packet); no state migration in this packet.",
-  "packet_digest": "6886a9e3473574c2dc22d77a9232e7f8188a253b85c9d941718d38eb58d5de67"
+  "packet_digest": "cc24ac1dc86520b26958d0ca2c1d8fe1e65804b575289a29032a36b8204ad40e"
  }
 }
