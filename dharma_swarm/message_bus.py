@@ -202,6 +202,7 @@ class MessageBus:
                     "ALTER TABLE messages ADD COLUMN "
                     "superstep_visible INTEGER NOT NULL DEFAULT 0"
                 )
+                await db.commit()
             except sqlite3.OperationalError as exc:
                 if "duplicate column name" not in str(exc).lower():
                     raise
@@ -238,6 +239,50 @@ class MessageBus:
             ).with_updates(message_id=message.id)
         return None
 
+    async def _message_row_exists(self, message_id: str) -> bool:
+        async with self._connect() as db:
+            cursor = await db.execute(
+                "SELECT 1 FROM messages WHERE id = ?", (message_id,)
+            )
+            return (await cursor.fetchone()) is not None
+
+    async def _resume_unfinished_send(
+        self,
+        identity: ExecutionIdentity,
+        side_effect_key: str,
+        message: Message,
+        insert: Any,
+    ) -> str:
+        """Finish a retry whose prior attempt began the side effect but died.
+
+        An idempotency record with an empty receipt means the prior attempt
+        crashed between begin and complete — the INSERT may or may not have
+        happened. Never fabricate a receipt: verify the row, resume the
+        insert if it is missing, then complete the record.
+        """
+        record = await self._runtime_state.get_idempotency_record(
+            identity.idempotency_key,
+            side_effect_key,
+        )
+        receipt = record.result_receipt_id if record else ""
+        if receipt:
+            return receipt
+        if not await self._message_row_exists(message.id):
+            try:
+                await self._run_with_lock_retry(insert)
+            except aiosqlite.IntegrityError:
+                logger.debug(
+                    "message %s inserted by a concurrent retry — treating as delivered",
+                    message.id,
+                )
+        await self._runtime_state.complete_idempotent_side_effect(
+            identity,
+            side_effect_key,
+            result_receipt_id=message.id,
+            metadata={"message_id": message.id, "resumed": True},
+        )
+        return message.id
+
     async def send(
         self,
         message: Message,
@@ -253,6 +298,21 @@ class MessageBus:
             execution_identity=execution_identity,
         )
         side_effect_key = ""
+
+        async def _send() -> str:
+            async with self._connect() as db:
+                await db.execute(
+                    "INSERT INTO messages (id, from_agent, to_agent, subject, body,"
+                    " priority, status, created_at, reply_to, metadata)"
+                    " VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    (message.id, message.from_agent, message.to_agent,
+                     message.subject, message.body, message.priority.value,
+                     message.status.value, message.created_at.isoformat(),
+                     message.reply_to, json.dumps(message.metadata)),
+                )
+                await db.commit()
+            return message.id
+
         if identity is not None:
             metadata = {
                 **dict(message.metadata or {}),
@@ -280,30 +340,14 @@ class MessageBus:
                     },
                 )
                 if not should_execute:
-                    record = await self._runtime_state.get_idempotency_record(
-                        identity.idempotency_key,
-                        side_effect_key,
+                    return await self._resume_unfinished_send(
+                        identity, side_effect_key, message, _send
                     )
-                    return (record.result_receipt_id if record else "") or message.id
                 await self._runtime_state.record_execution_identity(
                     identity,
                     source="message_bus.send",
                     metadata={"surface": "message_bus"},
                 )
-
-        async def _send() -> str:
-            async with self._connect() as db:
-                await db.execute(
-                    "INSERT INTO messages (id, from_agent, to_agent, subject, body,"
-                    " priority, status, created_at, reply_to, metadata)"
-                    " VALUES (?,?,?,?,?,?,?,?,?,?)",
-                    (message.id, message.from_agent, message.to_agent,
-                     message.subject, message.body, message.priority.value,
-                     message.status.value, message.created_at.isoformat(),
-                     message.reply_to, json.dumps(message.metadata)),
-                )
-                await db.commit()
-            return message.id
 
         message_id = await self._run_with_lock_retry(_send)
         if identity is not None and self._runtime_state is not None:
@@ -337,6 +381,25 @@ class MessageBus:
             execution_identity=execution_identity,
         )
         side_effect_key = ""
+
+        async def _send_staged() -> str:
+            async with self._connect() as db:
+                await db.execute(
+                    "INSERT INTO messages "
+                    "(id, from_agent, to_agent, subject, body, priority, status, "
+                    "created_at, reply_to, metadata, superstep_visible)"
+                    " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                    (
+                        message.id, message.from_agent, message.to_agent,
+                        message.subject, message.body, message.priority.value,
+                        message.status.value, message.created_at.isoformat(),
+                        message.reply_to, json.dumps(message.metadata),
+                        deliver_at_superstep,
+                    ),
+                )
+                await db.commit()
+            return message.id
+
         if identity is not None:
             metadata = {
                 **dict(message.metadata or {}),
@@ -366,34 +429,14 @@ class MessageBus:
                     },
                 )
                 if not should_execute:
-                    record = await self._runtime_state.get_idempotency_record(
-                        identity.idempotency_key,
-                        side_effect_key,
+                    return await self._resume_unfinished_send(
+                        identity, side_effect_key, message, _send_staged
                     )
-                    return (record.result_receipt_id if record else "") or message.id
                 await self._runtime_state.record_execution_identity(
                     identity,
                     source="message_bus.send_staged",
                     metadata={"surface": "message_bus"},
                 )
-
-        async def _send_staged() -> str:
-            async with self._connect() as db:
-                await db.execute(
-                    "INSERT INTO messages "
-                    "(id, from_agent, to_agent, subject, body, priority, status, "
-                    "created_at, reply_to, metadata, superstep_visible)"
-                    " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                    (
-                        message.id, message.from_agent, message.to_agent,
-                        message.subject, message.body, message.priority.value,
-                        message.status.value, message.created_at.isoformat(),
-                        message.reply_to, json.dumps(message.metadata),
-                        deliver_at_superstep,
-                    ),
-                )
-                await db.commit()
-            return message.id
 
         message_id = await self._run_with_lock_retry(_send_staged)
         if identity is not None and self._runtime_state is not None:
