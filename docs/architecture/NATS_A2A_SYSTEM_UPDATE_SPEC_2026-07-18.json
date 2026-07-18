@@ -1,0 +1,472 @@
+{
+  "schema": "dharma.nats_a2a.system_update_spec.v1",
+  "document_id": "NATS_A2A_SYSTEM_UPDATE_SPEC_2026-07-18",
+  "status": "draft_specification",
+  "spec_only": true,
+  "migration_authorized": false,
+  "date": "2026-07-18",
+  "task_id": "grok-build-nats-a2a-system-spec-20260718",
+  "lease_id": "grok-build-nats-a2a-system-spec-20260718:1:grok_build",
+  "stable_identity": "grok_build",
+  "display_identity": "Meghaforge",
+  "receipt_class": "semantic_reply",
+  "reply_subject": "dharma.a2a.rushabdev.reply.grok-build-nats-a2a-system-spec-20260718",
+  "markdown_path": "docs/architecture/NATS_A2A_SYSTEM_UPDATE_SPEC_2026-07-18.md",
+  "json_path": "docs/architecture/NATS_A2A_SYSTEM_UPDATE_SPEC_2026-07-18.json",
+  "base_sha": "135a18300c5e4be9fce641e901adc046b837e653",
+  "probe_window_utc": {
+    "start": "2026-07-18T07:30:44Z",
+    "end": "2026-07-18T07:32:24Z"
+  },
+  "executive_verdict": {
+    "summary": "Multi-homed NATS/A2A estate with split grammar, incomplete semantic runtime coverage, and no proven AGNI↔Meghadharma cutover; target DS_* not live.",
+    "target_state": "One logical writable coordination fabric with unique agent identity tuples, separated lifecycle states, Object Store large artifacts, external gateway edge, and projection-only dashboards."
+  },
+  "authority_by_plane": [
+    {
+      "plane": "github",
+      "owns": ["grammar", "specs", "registration_cards", "ops_registries", "ci_gates"],
+      "does_not_own": ["live_delivery", "stream_sequences", "kv_revisions"]
+    },
+    {
+      "plane": "nats_jetstream",
+      "owns": ["publish", "durable_consumers", "redelivery", "pub_ack", "retained_messages"],
+      "does_not_own": ["semantic_meaning", "git_truth", "dashboard_authority"],
+      "live_authorities": ["agni", "meghadharma"]
+    },
+    {
+      "plane": "jetstream_kv",
+      "owns": ["board_keys", "leases", "presence_snapshots", "shared_projections"],
+      "live": {"hub": "meghadharma", "bucket": "FLEET_STATE"}
+    },
+    {
+      "plane": "jetstream_object_store",
+      "owns": ["large_artifacts", "content_addressed_blobs"],
+      "live": {"hub": "meghadharma", "bucket": "FLEET_ARTIFACTS"}
+    },
+    {
+      "plane": "dashboards",
+      "owns": ["read_only_projection"],
+      "does_not_own": ["worker_durables", "task_authority"]
+    },
+    {
+      "plane": "filesystem_docks",
+      "owns": ["mirrors", "offline_evidence"],
+      "does_not_own": ["live_contact_proof"]
+    },
+    {
+      "plane": "https_mailbox_gateway",
+      "owns": ["external_edge_without_broad_nats_creds"],
+      "code_path": "dharma_swarm/a2a/mailbox_gateway.py"
+    }
+  ],
+  "one_logical_bus": {
+    "source_compatibility_transport": {
+      "name": "agni",
+      "stream": "DHARMA_A2A",
+      "role": "source_until_stage_a_gates_close",
+      "rationale": "Historical fleet cards/registry WSS rendezvous; SAB dispatch sequences still AGNI-facing."
+    },
+    "candidate_durable_hub": {
+      "name": "meghadharma",
+      "stream": "DHARMA_A2A",
+      "kv": "FLEET_STATE",
+      "object_store": "FLEET_ARTIFACTS",
+      "role": "candidate_cutover_and_governed_state",
+      "rationale": "Hosts KV/object, presence projector, Meghaforge always-on semantic stack, multi-node composer heartbeats."
+    },
+    "retirement_requires": [
+      "dual_read_parity_report",
+      "durables_repointed_pending_zero_on_retired_writer",
+      "rollback_drill_passed",
+      "field_registry_and_cards_updated_in_git",
+      "operator_explicit_accept"
+    ]
+  },
+  "live_topology_sanitized": {
+    "meghadharma": {
+      "host": "meghadharma-cloud",
+      "nats_server_version": "2.10.9",
+      "listen": "0.0.0.0:4222",
+      "monitoring": "127.0.0.1:8222",
+      "websocket_tls": "0.0.0.0:9443",
+      "auth_required": true,
+      "cluster_routes": 0,
+      "gateways": 0,
+      "streams": [
+        {
+          "name": "DHARMA_A2A",
+          "subjects": ["dharma.a2a.>", "dharma.agent.>"],
+          "retention": "limits",
+          "storage": "file",
+          "max_age_ns": 0,
+          "num_replicas": 1,
+          "duplicate_window_ns": 120000000000,
+          "messages_approx": 44813,
+          "last_seq_approx": 44814,
+          "consumers": [
+            {
+              "name": "fleet_presence_projector",
+              "filter_subject": "dharma.agent.*.presence",
+              "ack_policy": "explicit",
+              "max_deliver": -1,
+              "deliver_policy": "all",
+              "push_bound": true
+            },
+            {
+              "name": "grok_build_inbox",
+              "filter_subject": "dharma.agent.grok_build.inbox",
+              "ack_policy": "explicit",
+              "max_deliver": -1,
+              "deliver_policy": "all"
+            },
+            {
+              "name": "grok_build_legacy_inbox",
+              "filter_subject": "dharma.a2a.grok-build",
+              "ack_policy": "explicit",
+              "max_deliver": -1,
+              "deliver_policy": "all"
+            },
+            {
+              "name": "rushabdev_v2_inbox",
+              "filter_subject": "dharma.a2a.rushabdev",
+              "ack_policy": "explicit",
+              "max_deliver": 5,
+              "deliver_policy": "new"
+            },
+            {
+              "name": "fugu_ultra_inbox",
+              "filter_subject": "dharma.agent.fugu_ultra.inbox",
+              "ack_policy": "explicit",
+              "max_deliver": -1,
+              "deliver_policy": "all"
+            }
+          ]
+        },
+        {
+          "name": "KV_FLEET_STATE",
+          "bucket": "FLEET_STATE",
+          "subjects": ["$KV.FLEET_STATE.>"],
+          "history": 16,
+          "deny_delete": true,
+          "messages_approx": 32,
+          "last_seq_approx": 287
+        },
+        {
+          "name": "OBJ_FLEET_ARTIFACTS",
+          "bucket": "FLEET_ARTIFACTS",
+          "subjects": ["$O.FLEET_ARTIFACTS.C.>", "$O.FLEET_ARTIFACTS.M.>"],
+          "messages_approx": 14,
+          "last_seq_approx": 16
+        }
+      ],
+      "ds_star_streams_present": false,
+      "users_sanitized": [
+        "rushabdev_hermes",
+        "a2a_gateway",
+        "hermes",
+        "codex_rsi_lab_manager",
+        "codex_composer_agni",
+        "codex_composer_rushabdev",
+        "codex_composer_primary",
+        "dharma_command",
+        "grok_build",
+        "fugu_ultra"
+      ],
+      "superuser_class_users": ["rushabdev_hermes", "a2a_gateway"],
+      "systemd_units_active": [
+        "nats-server.service",
+        "grok-build-inbox.service",
+        "grok-build-semantic.service",
+        "grok-build-leader.service",
+        "grok-build-gateway.service",
+        "grok-build-tmux.service",
+        "dharma-fleet-status-projector.service",
+        "dharma-meghadharma-hermes-bridge.service"
+      ],
+      "grok_credential_env_names": [
+        "NATS_URL",
+        "NATS_USER",
+        "NATS_PASSWORD",
+        "NATS_STREAM",
+        "AGENT_UID",
+        "CALLSIGN",
+        "CANONICAL_SUBJECT",
+        "LEGACY_SUBJECT",
+        "DURABLE",
+        "LEGACY_DURABLE",
+        "INBOX_DIR"
+      ]
+    },
+    "agni": {
+      "declared_wss": "wss://157.245.193.15:8443",
+      "declared_nats": "nats://157.245.193.15:4222",
+      "tcp_probe_from_meghadharma": {
+        "wss_8443": "reachable",
+        "nats_4222": "timeout"
+      },
+      "authenticated_stream_inventory": "unknown_this_session",
+      "declared_stream": "DHARMA_A2A"
+    },
+    "mac_local_hub": {
+      "status": "not_on_probe_host",
+      "declared_stream": "DHARMA_FLEET",
+      "historically": "unbridged_often_offline"
+    }
+  },
+  "mismatch_ledger": [
+    {"id": "M1", "severity": "P0", "area": "stream_grammar", "summary": "DS_* target not live; DHARMA_A2A broad capture is live"},
+    {"id": "M2", "severity": "P0", "area": "dual_authorities", "summary": "AGNI and Meghadharma both host DHARMA_A2A unbridged"},
+    {"id": "M3", "severity": "P0", "area": "registry_staleness", "summary": "FLEET_FIELD_REGISTRY lags 2026-07-18 wire facts"},
+    {"id": "M4", "severity": "P1", "area": "rushabdev_subject", "summary": "Registry collision note vs rushabdev_v2_inbox on dharma.a2a.rushabdev"},
+    {"id": "M5", "severity": "P0", "area": "envelope_grammar", "summary": "Live send/semantic envelopes vs dharma.nats.envelope.v1"},
+    {"id": "M6", "severity": "P1", "area": "transport_owner", "summary": "A2ANatsTransport defaults DS_TASKS; production always-on path is compat scripts"},
+    {"id": "M7", "severity": "P0", "area": "ack_honesty", "summary": "HANDLER_ACK may not imply semantic or effect"},
+    {"id": "M8", "severity": "P1", "area": "filesystem_mirrors", "summary": "Docks still used as primary for some seats"},
+    {"id": "M9", "severity": "P0", "area": "superuser_principals", "summary": "rushabdev_hermes and a2a_gateway allow >"},
+    {"id": "M10", "severity": "P1", "area": "object_store_acl", "summary": "FLEET_ARTIFACTS exists; agent principals lack Object Store grants"},
+    {"id": "M11", "severity": "P1", "area": "wildcard_overlap", "summary": "Creating DS_* without narrowing will conflict"},
+    {"id": "M12", "severity": "P1", "area": "identity_surfaces", "summary": "Multiple identity surfaces without continuous reconciler"},
+    {"id": "M13", "severity": "P1", "area": "dashboard_truth", "summary": "Risk of local projection detachment / false-green"},
+    {"id": "M14", "severity": "P1", "area": "external_gateway_deploy", "summary": "Gateway code shipped; operator deploy incomplete"},
+    {"id": "M15", "severity": "P0", "area": "credential_rotation", "summary": "Historical exposure requires rotation; values never in git"},
+    {"id": "M16", "severity": "P1", "area": "default_stream_split", "summary": "a2a_topology defaults compat; transport defaults target"},
+    {"id": "M17", "severity": "P1", "area": "max_deliver", "summary": "Several durables use max_deliver -1"},
+    {"id": "M18", "severity": "P2", "area": "max_age", "summary": "DHARMA_A2A max_age 0 unbounded retention risk"}
+  ],
+  "identity_grammar": {
+    "planes": [
+      "agent_uid",
+      "display_name",
+      "callsign_alias",
+      "canonical_subject",
+      "legacy_subject",
+      "durable",
+      "credential_principal",
+      "signing_key",
+      "host_model_shell_embodiment"
+    ],
+    "canonical_inbox_subject_template": "dharma.agent.<agent_uid>.inbox",
+    "legacy_subject_template": "dharma.a2a.<callsign>",
+    "durable_template": "<agent_uid>_inbox",
+    "laws": [
+      "unique_uid_subject_durable_credential_semantic_runtime",
+      "no_shared_worker_filter_across_uids",
+      "observers_never_drain_worker_durables",
+      "sender_from_authn_principal_not_payload"
+    ]
+  },
+  "envelopes": {
+    "target": {
+      "schema": "dharma.nats.envelope.v1",
+      "task_payload_schema": "dharma.a2a.nats_task.v1",
+      "dlq_payload_schema": "dharma.nats.dlq_failure.v1",
+      "nats_msg_id_header": "message_id"
+    },
+    "compatibility": [
+      "dharma.a2a.send.v1",
+      "dharma.a2a.semantic_message.v1",
+      "dharma.a2a.domain_receipt.v1",
+      "a2a_gateway_message.v1"
+    ]
+  },
+  "lifecycle_states": [
+    "QUEUED",
+    "LEASED",
+    "STORED",
+    "HANDLER_ACKED",
+    "PROCESSED",
+    "EFFECT_COMMITTED",
+    "COMPLETED"
+  ],
+  "terminal_failure_states": ["FAILED", "REJECTED", "EXPIRED", "DLQ"],
+  "ack_tier_ladder": [
+    "PUBLISH_ACCEPTED",
+    "DELIVERED_TO_CONSUMER",
+    "HANDLER_ACKED",
+    "PROCESSED",
+    "EFFECT_COMMITTED",
+    "DOMAIN_RECEIPTED"
+  ],
+  "idempotency": {
+    "broker_dedup": "Nats-Msg-Id == message_id within stream duplicate_window",
+    "effect_exactly_once": "runtime_state.IdempotencyRecord (idempotency_key, side_effect_key)",
+    "max_deliver_default_workers": 5,
+    "dlq_subject_template": "dharma.dlq.{stream}.{consumer}"
+  },
+  "semantic_worker_modes": ["always_on", "event_driven", "manual_seat", "none"],
+  "meghaforge_reference_stack": {
+    "inbox_drain": "grok-build-inbox.service",
+    "semantic_worker": "grok-build-semantic.service",
+    "leader": "grok-build-leader.service",
+    "gateway": "grok-build-gateway.service",
+    "canonical_subject": "dharma.agent.grok_build.inbox",
+    "legacy_subject": "dharma.a2a.grok-build",
+    "durables": ["grok_build_inbox", "grok_build_legacy_inbox"]
+  },
+  "external_onboarding": {
+    "must_not_receive_broad_nats_creds": true,
+    "paths": ["git_seat", "https_mailbox_gateway", "optional_scoped_nats_user"],
+    "gateway_endpoints": [
+      "POST /a2a/mailbox/send",
+      "GET /a2a/mailbox/inbox",
+      "GET /a2a/mailbox/whoami"
+    ]
+  },
+  "artifact_transfer": {
+    "inline_large_files": false,
+    "store": "FLEET_ARTIFACTS",
+    "required_fields": ["object", "sha256", "size_bytes", "uploaded_by", "retention_class"],
+    "starter_limits": {
+      "max_object_bytes": 104857600,
+      "task_retention_days": 30,
+      "evidence_retention_days": 90,
+      "ephemeral_retention_days": 7
+    }
+  },
+  "security": {
+    "no_raw_credentials_in_git_or_spec": true,
+    "sender_identity_source": "authenticated_credential_or_signature",
+    "reply_routing": "authenticated_identity_plus_validated_correlation",
+    "card_jws_enforcement": "required_at_gateway_and_node_gateway_production",
+    "rotation_required_for_historical_exposure": true
+  },
+  "stage_a_migration": {
+    "name": "compatibility_converge_without_grammar_change",
+    "preserve": ["subjects", "packet_ids", "handler_ack_semantics", "message_id"],
+    "steps": [
+      "snapshot_both_hubs",
+      "freeze_inventory_in_git",
+      "mint_scoped_credentials",
+      "governed_mirror_with_dedupe",
+      "parity_checks",
+      "repoint_publishers_one_at_a_time",
+      "repoint_consumers_one_at_a_time",
+      "bounded_dual_run",
+      "rollback_drill",
+      "retire_source_writer_after_gates"
+    ]
+  },
+  "stage_b_activation": {
+    "name": "canonical_grammar",
+    "precondition": "stage_a_complete_or_operator_exception_for_pilot",
+    "create_streams": ["DS_FLEET", "DS_AGENT_INBOX", "DS_TASKS", "DS_RECEIPTS", "DS_OPERATOR", "DS_DLQ"],
+    "requires_subject_narrowing_before_overlap": true,
+    "envelope": "dharma.nats.envelope.v1"
+  },
+  "dashboard_contract": {
+    "sources": ["FLEET_STATE", "FLEET_ARTIFACTS_metadata", "receipt_projections", "observer_jetstream_metrics"],
+    "forbidden": [
+      "drain_worker_durables",
+      "green_from_pending_zero_alone",
+      "green_from_filesystem_alone",
+      "green_from_publish_or_handler_ack_when_semantic_required"
+    ]
+  },
+  "slos_initial": {
+    "publish_accept_p99_ms": 500,
+    "handler_ack_p95_s": 5,
+    "semantic_reply_simple_p95_s": 60,
+    "lost_reply_rate_max": 0.01
+  },
+  "work_packages": [
+    {"id": "WP-0", "title": "Refresh FLEET_FIELD_REGISTRY from 2026-07-18 probes", "depends": [], "effort_days": 0.5, "priority": "P0"},
+    {"id": "WP-1", "title": "Dual-hub inventory and parity harness", "depends": ["WP-0"], "effort_days": 2, "priority": "P0"},
+    {"id": "WP-2", "title": "Scoped credential matrix and superuser reduction plan", "depends": ["WP-1"], "effort_days": 1, "priority": "P0"},
+    {"id": "WP-3", "title": "AGNI to Meghadharma mirror with dedupe", "depends": ["WP-1", "WP-2"], "effort_days": 5, "priority": "P0"},
+    {"id": "WP-4", "title": "Lifecycle receipt schema and projector", "depends": ["WP-0"], "effort_days": 2, "priority": "P0"},
+    {"id": "WP-5", "title": "Semantic runtime declarations and always-on template", "depends": ["WP-4"], "effort_days": 3, "priority": "P1"},
+    {"id": "WP-6", "title": "Production A2ANatsTransport caller or honest demotion", "depends": ["WP-4"], "effort_days": 2, "priority": "P1"},
+    {"id": "WP-7", "title": "Mailbox gateway deploy and sandbox allowlists", "depends": ["WP-2"], "effort_days": 1, "priority": "P1"},
+    {"id": "WP-8", "title": "Object Store gateway upload download lane", "depends": ["WP-2"], "effort_days": 3, "priority": "P1"},
+    {"id": "WP-9", "title": "Dashboard bind to KV object receipt truth", "depends": ["WP-4"], "effort_days": 2, "priority": "P1"},
+    {"id": "WP-10", "title": "Stage-A cutover per agent", "depends": ["WP-3", "WP-4", "WP-5"], "effort_days": 10, "priority": "P0"},
+    {"id": "WP-11", "title": "Stage-B DS_* activation", "depends": ["WP-10"], "effort_days": 5, "priority": "P1"},
+    {"id": "WP-12", "title": "Credential rotation post-exposure", "depends": [], "effort_days": 1, "priority": "P0", "operator_only": true},
+    {"id": "WP-13", "title": "Adversarial test suite hermetic plus optional live matrix", "depends": ["WP-4", "WP-5", "WP-6"], "effort_days": 3, "priority": "P1"}
+  ],
+  "first_three_work_packages": ["WP-0", "WP-1", "WP-4"],
+  "top_findings": [
+    {"rank": 1, "severity": "P0", "id": "M2", "summary": "Dual unbridged DHARMA_A2A authorities"},
+    {"rank": 2, "severity": "P0", "id": "M1", "summary": "DS_* and envelope v1 not live"},
+    {"rank": 3, "severity": "P0", "id": "M3", "summary": "Field registry stale vs wire"},
+    {"rank": 4, "severity": "P0", "id": "M9_M15", "summary": "Superuser principals and credential rotation debt"},
+    {"rank": 5, "severity": "P1", "id": "M7_M10", "summary": "Semantic discontinuity and Object Store lane gap"}
+  ],
+  "operator_decisions_open": [
+    {"id": "OD-1", "topic": "final_writable_hub", "default_if_undecided": "meghadharma_candidate_agni_source_during_stage_a"},
+    {"id": "OD-2", "topic": "superuser_retirement_date"},
+    {"id": "OD-3", "topic": "credential_rotation_window"},
+    {"id": "OD-4", "topic": "mac_hub_fate"},
+    {"id": "OD-5", "topic": "stage_b_subject_narrowing_strategy", "default_if_undecided": "shrink_wildcards_first"},
+    {"id": "OD-6", "topic": "gateway_public_hostname_tls"},
+    {"id": "OD-7", "topic": "track_ownership_nats_transport"},
+    {"id": "OD-8", "topic": "object_store_limits_retention"}
+  ],
+  "stop_conditions": [
+    "third_transport_authority",
+    "second_writer_without_fencing",
+    "identity_collapse_or_shared_durables",
+    "credential_disclosure",
+    "ack_as_semantic_completion_in_ui",
+    "flag_day_broker_identity_grammar_schema",
+    "production_mutation_without_snapshot_rollback_drain",
+    "overlapping_stream_subjects_without_narrowing_plan"
+  ],
+  "priorities": {
+    "hours_24": ["land_spec_draft_pr", "WP-0_registry_refresh_separate_pr", "schedule_WP-12_rotation", "establish_agni_inventory_access"],
+    "days_7": ["WP-1", "WP-4", "WP-7_if_operator", "WP-5", "WP-9_start"],
+    "days_30": ["WP-3", "WP-10", "WP-8", "WP-6", "WP-11_pilot", "WP-13"]
+  },
+  "external_patterns_cited": [
+    {
+      "domain": "nats_jetstream",
+      "url": "https://docs.nats.io/nats-concepts/jetstream",
+      "takeaway": "Streams, durable consumers, explicit ack, redelivery, message-id dedup"
+    },
+    {
+      "domain": "a2a_agent_cards",
+      "url": "https://a2a-protocol.org/latest/specification/",
+      "takeaway": "Agent Card discovery and task lifecycle as interop edge, not internal truth alone"
+    },
+    {
+      "domain": "durable_workflow_idempotency",
+      "url": "https://temporal.io/blog/idempotency-and-durable-execution",
+      "takeaway": "At-least-once delivery requires idempotent side effects and clear effect boundaries"
+    }
+  ],
+  "inspected_vs_inaccessible": {
+    "inspected": [
+      "meghadharma_nats_monitoring_jsz_varz_connz",
+      "meghadharma_nats_server_conf_sanitized",
+      "meghadharma_systemd_a2a_units",
+      "grok_build_durables_and_heartbeats",
+      "repo_required_docs_and_a2a_code",
+      "sab_ignition_workstream_map_remote",
+      "tcp_agni_wss_and_nats_from_meghadharma"
+    ],
+    "inaccessible_or_unknown": [
+      "agni_authenticated_stream_consumer_inventory",
+      "mac_local_hub_liveness",
+      "command_node_authenticated_fleet_payloads",
+      "object_store_acl_matrix_complete"
+    ]
+  },
+  "non_actions_performed": {
+    "live_migration": false,
+    "credential_rotation": false,
+    "service_restart": false,
+    "stable_uid_rename": false,
+    "deploy": false
+  },
+  "citations_repo": {
+    "master_spec": "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
+    "field_registry": "docs/ops/FLEET_FIELD_REGISTRY.yaml",
+    "topology": "scripts/runtime/a2a_topology.py",
+    "nats_transport": "dharma_swarm/a2a/nats_transport.py",
+    "envelope_support": "dharma_swarm/a2a/nats_transport_support.py",
+    "a2a_send": "scripts/runtime/a2a_send.py",
+    "mailbox_gateway": "dharma_swarm/a2a/mailbox_gateway.py",
+    "always_on_plan": "docs/architecture/A2A_ALWAYS_ON_SPINE_MASTER_PLAN.md"
+  }
+}
