@@ -1,3 +1,7 @@
+# NON-HERMETIC LEGACY LANE (WP-0A / TIT-004): this image installs from
+# requirements-ginko.txt and live index resolution, not the frozen uv.lock
+# closure. It must not be cited as hermetic evidence. The hermetic dependency
+# path is `make bootstrap` (Makefile) and .github/workflows/hermetic.yml.
 FROM python:3.12-slim
 
 WORKDIR /app
@@ -16,7 +20,9 @@ RUN pip install --no-cache-dir -r requirements-ginko.txt
 COPY dharma_swarm/ /app/dharma_swarm/
 COPY api/ /app/api/
 COPY pyproject.toml README.md ./
-RUN pip install --no-cache-dir -e . 2>/dev/null || pip install --no-cache-dir .
+# A dependency-resolution failure must fail the image build; the previous
+# editable-install fallback chain suppressed the first install's stderr.
+RUN pip install --no-cache-dir .
 
 # Create data directories
 RUN mkdir -p /root/.dharma/ginko/agents \
