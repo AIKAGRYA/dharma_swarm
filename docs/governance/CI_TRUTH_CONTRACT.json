@@ -157,7 +157,7 @@
       "id": "dashboard",
       "names": ["dashboard"],
       "owner": "frontend",
-      "local_command": "make frontend-check",
+      "local_command": "npm --prefix dashboard ci --legacy-peer-deps && npm --prefix dashboard run lint -- --quiet && npm --prefix dashboard run build",
       "failure_category": "frontend_build",
       "autofix": "manual"
     },
