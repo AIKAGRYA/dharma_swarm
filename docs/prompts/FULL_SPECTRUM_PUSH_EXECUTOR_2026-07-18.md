@@ -92,8 +92,10 @@ under the correct owner.
   `file:line` citation or a runnable command with its observed exit status.
 - **Typed verdicts, used literally** (`PASS` / `FAIL` / `NEEDS_HOST` /
   `BLOCKED_OPERATOR` / `HARNESS_PROVEN` / `CLOSED_NOT_PROD`), per the claim
-  boundary in `docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md:46-56`.
-  Missing tools, skips, and stale evidence never mean `PASS`.
+  boundary in `docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md:46-56`,
+  plus this prompt's own `DONE_UPSTREAM` (stream objective already satisfied
+  on merged main — see §4's already-done check; not a spec claim-boundary
+  verdict). Missing tools, skips, and stale evidence never mean `PASS`.
 - **Tests before commit.** Run the focused suite for every touched surface
   and `make test-fast` before each commit; a red result blocks that stream's
   PR, not the whole push.
