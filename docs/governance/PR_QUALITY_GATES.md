@@ -351,7 +351,22 @@ An hourly cron workflow provides automated triage and healing:
 |--------|-------------|
 | **Report** | Classifies all open PRs into categories and updates a tracking issue |
 | **Re-run** | Re-triggers failed runs caused by transient infra (umbrella status flakes) |
-| **Rebase** | Force-rebases conflict-free behind-main branches onto `origin/main` |
+| **Rebase** | Force-rebases conflict-free behind-main branches onto `origin/main`, except packet-bound branches |
+
+### Session Entry branch preservation
+
+The rebase action must never rewrite a PR whose changed-file set contains a
+Session Entry packet under `reports/agentops/work_packets/*.json`. Those packets
+bind `base_ref`, collision evidence, packet digest, and closeout receipts to a
+specific merge base; an automated rebase makes all four claims stale even when
+the resulting source tree is byte-identical. `pr-ci-health.yml` therefore reads
+the complete paginated PR file list before any checkout or push and skips the PR
+when a packet is present. File-list inspection is fail-closed: an API failure
+also skips the rebase. Branch names and draft status are not safety signals.
+
+A packet-bound PR may remain behind `main`. If rebinding is required, its owner
+must append a governed reseal commit and rerun packet scope/preflight/closeout;
+the hourly backstop has no authority to rewrite that history.
 
 Categories: `green`, `behind_main`, `merge_conflict`, `docops_drift`,
 `coherence_delta`, `fourfold_warrant`, `transient_infra`, `real_test_lint`.

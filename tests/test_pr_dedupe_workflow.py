@@ -10,6 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "pr-dedupe.yml"
 DOCOPS_RECONCILE = REPO_ROOT / ".github" / "workflows" / "docops-reconcile-main.yml"
 ACTIVE_TRACK_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "active-track.yml"
+PR_CI_HEALTH = REPO_ROOT / ".github" / "workflows" / "pr-ci-health.yml"
 
 
 def _snapshot_filter() -> str:
@@ -133,9 +134,7 @@ def test_docops_reconcile_skips_remote_byte_identical_refresh() -> None:
 
 
 def test_pr_ci_health_rebase_excludes_docops_rolling_lane() -> None:
-    text = (
-        REPO_ROOT / ".github" / "workflows" / "pr-ci-health.yml"
-    ).read_text(encoding="utf-8")
+    text = PR_CI_HEALTH.read_text(encoding="utf-8")
 
     exclusion = '[ "$head" = "chore/docops-autorefresh" ]'
     push_command = 'git push origin "ci-rebase/$head:$head" --force-with-lease'
@@ -143,6 +142,21 @@ def test_pr_ci_health_rebase_excludes_docops_rolling_lane() -> None:
     assert push_command in text
     # The exclusion must guard the force-with-lease push, not follow it.
     assert text.index(exclusion) < text.index(push_command)
+
+
+def test_pr_ci_health_never_rebases_session_entry_packet_branches() -> None:
+    text = PR_CI_HEALTH.read_text(encoding="utf-8")
+    prefix = 'SESSION_ENTRY_PACKET_PREFIX="reports/agentops/work_packets/"'
+    file_query = 'gh api --paginate "repos/$REPO/pulls/$pr/files?per_page=100"'
+    guarded_skip = "changes a Session Entry packet; skipping auto-rebase"
+    inspection_failure = "could not inspect changed files; skipping auto-rebase"
+    push_command = 'git push origin "ci-rebase/$head:$head" --force-with-lease'
+
+    for required in (prefix, file_query, guarded_skip, inspection_failure, push_command):
+        assert required in text
+    assert text.index(prefix) < text.index(file_query) < text.index(push_command)
+    assert text.index(guarded_skip) < text.index(push_command)
+    assert text.index(inspection_failure) < text.index(push_command)
 
 
 def test_active_track_pr_gate_installs_executable_criterion_dependencies() -> None:

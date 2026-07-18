@@ -12,7 +12,8 @@ name: pr-ci-health
 #                transient infra flakes (e.g. the CodeQL default-setup umbrella
 #                status that completes in seconds while `codeql / python` passes).
 #   3. rebase  — rebase conflict-free behind-main PR branches onto origin/main
-#                and push with --force-with-lease.
+#                and push with --force-with-lease, except Session Entry packet
+#                branches whose merge-base binding must remain stable.
 #
 # The heavier, judgement-bearing fixes (Coherence-Delta body fields, Fourfold
 # Shakti Warrant causes, real test/lint failures) are handled by the agent
@@ -107,6 +108,7 @@ jobs:
           git config user.name "pr-ci-health-bot"
           git config user.email "pr-ci-health-bot@users.noreply.github.com"
           git fetch origin main
+          SESSION_ENTRY_PACKET_PREFIX="reports/agentops/work_packets/"
           mapfile -t prs < <(jq -r '.[] | select(.categories | index("behind_main")) | select(.mergeable_state == "behind") | "\(.number)\t\(.head)\t\(.base)"' triage.json)
           for line in "${prs[@]:-}"; do
             [ -z "$line" ] && continue
@@ -121,6 +123,18 @@ jobs:
               # normal state and a GITHUB_TOKEN force-push here strands it
               # with no CI (bot-token pushes never trigger workflows).
               echo "PR #$pr head=$head is the rolling DocOps lane; skipping auto-rebase"
+              continue
+            fi
+            packet_paths="$(
+              gh api --paginate "repos/$REPO/pulls/$pr/files?per_page=100" \
+                --jq ".[] | select(.filename | startswith(\"$SESSION_ENTRY_PACKET_PREFIX\") and endswith(\".json\")) | .filename"
+            )" || {
+              echo "PR #$pr: could not inspect changed files; skipping auto-rebase"
+              continue
+            }
+            if [ -n "$packet_paths" ]; then
+              echo "PR #$pr changes a Session Entry packet; skipping auto-rebase"
+              printf '  %s\n' "$packet_paths"
               continue
             fi
             echo "PR #$pr: rebasing $head onto origin/main"
