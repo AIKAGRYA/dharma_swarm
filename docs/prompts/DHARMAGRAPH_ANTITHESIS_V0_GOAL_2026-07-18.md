@@ -63,7 +63,7 @@ The goal is DONE when all five hold on merged `origin/main`, each proven by
 a runnable command recorded in the final report:
 
 1. **Replay proof:** two arms of a bounded graph workload, run with the same
-   seed through `SimulatedEffects`, produce **byte-identical canonicalized
+   seed through `SimulatedEffects`, produce **byte-identical normalized
    receipts** — and a CI job runs this on every PR touching graph surfaces.
 2. **Discrimination proof:** one injected code mutation and one injected
    fault are each **detected** by the harness (non-identical receipts or
@@ -204,10 +204,10 @@ ownership conflict instead of editing around it.
 **Entry:** Phase B exit on merged main (zero in-reach bypasses).
 **Scope:** one replay driver (suggested home:
 `tests/oracle_support/` + a thin `dharma_swarm/graph/` entry if needed) and
-one canonicalizer that renders a run's receipts/checkpoints into a stable
+one normalizer that renders a run's receipts/checkpoints into a stable
 byte form (sorted keys, normalized paths, no wall-clock, no PIDs).
 **Work:** run the workload twice with the same seed through
-`SimulatedEffects`; SHA-256 the canonicalized receipt streams; assert
+`SimulatedEffects`; SHA-256 the normalized receipt streams; assert
 equality. Then run with a different seed and assert **inequality** (proves
 the seed is load-bearing, not ignored).
 **Exit gate:** `python3 -m pytest tests/test_graph_replay_determinism.py -q`
