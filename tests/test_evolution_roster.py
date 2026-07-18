@@ -11,7 +11,6 @@ from dharma_swarm.evolution_roster import (
     EVOLUTION_ROSTER,
     ModelSlot,
     ModelTier,
-    _ENV_KEYS_FOR_PROVIDER,
     _STRATEGY_PROFILES,
     _provider_has_key,
     get_available_roster,
