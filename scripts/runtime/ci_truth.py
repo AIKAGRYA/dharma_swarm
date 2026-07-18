@@ -28,9 +28,27 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Fail closed on duplicate keys in any JSON object (WP-0F1, TIT-006).
+
+    Plain ``json.loads`` keeps the last duplicate silently, which once erased
+    the pytest and gitleaks classifications from this very contract; a
+    duplicate key is configuration corruption, never a merge strategy.
+    """
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise CITruthError(f"duplicate JSON key {key!r} in CI truth configuration")
+        result[key] = value
+    return result
+
+
 def load_json(path: str | Path) -> Any:
     try:
-        return json.loads(Path(path).read_text(encoding="utf-8"))
+        return json.loads(
+            Path(path).read_text(encoding="utf-8"),
+            object_pairs_hook=_reject_duplicate_keys,
+        )
     except OSError as exc:
         raise CITruthError(f"could not read JSON file {path}: {exc}") from exc
     except json.JSONDecodeError as exc:
