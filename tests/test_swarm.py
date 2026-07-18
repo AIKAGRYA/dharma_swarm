@@ -3,6 +3,7 @@
 import asyncio
 import os
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -529,6 +530,165 @@ async def test_spawn_latent_gold_tasks_reopens_orphaned_branches(swarm):
         min_salience=0.0,
     )
     assert second == []
+
+
+@pytest.mark.asyncio
+async def test_spawn_latent_gold_tasks_dedupes_identical_title_and_source_turn(
+    swarm,
+    monkeypatch,
+):
+    store = ConversationMemoryStore(swarm.state_dir / "db" / "memory_plane.db")
+    store.record_turn(
+        session_id="sess-latent-dedupe",
+        task_id="task-source",
+        role="user",
+        content="Seed the memory plane so latent-gold task spawning can run.",
+        turn_index=1,
+    )
+
+    duplicate_a = SimpleNamespace(
+        shard_id="shd-duplicate-a",
+        state="orphaned",
+        salience=0.97,
+        shard_kind="insight",
+        text="[idea:orphaned] insight | salience=1.00 | 2026-07-15 09:21Z | [retrieval",
+        task_id="task-source",
+        turn_id="turn-shared",
+    )
+    duplicate_b = SimpleNamespace(
+        shard_id="shd-duplicate-b",
+        state="orphaned",
+        salience=0.96,
+        shard_kind="insight",
+        text="[idea:orphaned] insight | salience=1.00 | 2026-07-15 09:21Z | [retrieval",
+        task_id="task-source",
+        turn_id="turn-shared",
+    )
+
+    def fake_latent_gold(self, query: str, *, limit: int = 200, min_salience: float = 0.72):
+        return [duplicate_a, duplicate_b]
+
+    monkeypatch.setattr(ConversationMemoryStore, "latent_gold", fake_latent_gold)
+
+    created = await swarm.spawn_latent_gold_tasks(
+        limit=2,
+        max_pending=100,
+        min_salience=0.0,
+    )
+
+    assert len(created) == 1
+    assert created[0].metadata["latent_gold_source_turn_id"] == "turn-shared"
+
+    second = await swarm.spawn_latent_gold_tasks(
+        limit=2,
+        max_pending=100,
+        min_salience=0.0,
+    )
+    assert second == []
+
+
+@pytest.mark.asyncio
+async def test_spawn_latent_gold_tasks_dedupes_against_uptake_history(
+    swarm,
+    monkeypatch,
+):
+    """Regression for the degenerate attractor (NIKKI 2026-07-16 TANE).
+
+    A shard that has already been reopened into a follow-up task — but whose
+    state was later rolled back to 'orphaned'/'deferred' — must NOT be
+    re-spawned, even though it re-appears as a latent_gold() candidate.
+    The guard at swarm.py spawn_latent_gold_tasks unions claimed_shards with
+    uptake_claimed from idea_uptake WHERE uptake_kind='follow_up_task'.
+    Without that guard this test fails (a task is re-spawned), so it pins the
+    exact fix landed in commit 3b907124f.
+    """
+    import sqlite3
+
+    plane = swarm.state_dir / "db" / "memory_plane.db"
+    store = ConversationMemoryStore(plane)
+    store.record_turn(
+        session_id="sess-uptake-dedupe",
+        task_id="task-source-uptake",
+        role="user",
+        content="Seed the memory plane so latent-gold task spawning can run.",
+        turn_index=1,
+    )
+
+    # Insert a shard directly (production INSERT shape) so that
+    # record_follow_up_task can attach an idea_uptake row to it.
+    shard_id = "shd_uptake_dedupe_probe"
+    with sqlite3.connect(str(plane)) as _db:
+        _db.execute(
+            "INSERT OR REPLACE INTO idea_shards"
+            " (shard_id, turn_id, session_id, task_id, shard_kind, state, text,"
+            " salience, novelty, flow_score, source_span, metadata_json, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                shard_id,
+                "sess-uptake-dedupe-turn-1",
+                "sess-uptake-dedupe",
+                "task-source-uptake",
+                "proposal",
+                "orphaned",
+                "[idea:orphaned] proposal | salience=1.00 | 2026-07-16 00:00Z",
+                0.99,
+                0.5,
+                0.5,
+                "probe shard for uptake dedupe test",
+                "{}",
+                "2026-07-16T00:00:00Z",
+            ),
+        )
+        _db.commit()
+
+    # Record a follow-up task uptake (sets state -> 'reopened', inserts uptake row).
+    recorded = store.record_follow_up_task(
+        shard_id=shard_id,
+        follow_up_task_id="task-previously-spawned",
+        title="Reopen latent branch: previously handled",
+    )
+    assert recorded is True
+
+    # Simulate the degenerate rollback: the bug that re-exposes the shard.
+    with sqlite3.connect(str(plane)) as _db:
+        _db.execute(
+            "UPDATE idea_shards SET state = 'orphaned' WHERE shard_id = ?",
+            (shard_id,),
+        )
+        _db.commit()
+        # Sanity: uptake row exists even though state rolled back.
+        n = _db.execute(
+            "SELECT COUNT(*) FROM idea_uptake"
+            " WHERE shard_id = ? AND uptake_kind = 'follow_up_task'",
+            (shard_id,),
+        ).fetchone()[0]
+    assert n == 1, "uptake row missing after record_follow_up_task"
+
+    degenerate = SimpleNamespace(
+        shard_id=shard_id,
+        state="orphaned",
+        salience=0.99,
+        shard_kind="proposal",
+        text="[idea:orphaned] proposal | salience=1.00 | 2026-07-16 00:00Z",
+        task_id="task-source-uptake",
+        turn_id="sess-uptake-dedupe-turn-1",
+    )
+
+    def fake_latent_gold(self, query: str, *, limit: int = 200, min_salience: float = 0.72):
+        return [degenerate]
+
+    monkeypatch.setattr(ConversationMemoryStore, "latent_gold", fake_latent_gold)
+
+    # With the uptake-history guard in place, NO task is spawned.
+    created = await swarm.spawn_latent_gold_tasks(
+        limit=2,
+        max_pending=100,
+        min_salience=0.0,
+    )
+    assert created == [], (
+        "spawn_latent_gold_tasks re-spawned a shard already in idea_uptake"
+        " follow_up_task history — the degenerate attractor is not guarded"
+    )
 
 
 @pytest.mark.asyncio
