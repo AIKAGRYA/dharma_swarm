@@ -351,22 +351,50 @@ An hourly cron workflow provides automated triage and healing:
 |--------|-------------|
 | **Report** | Classifies all open PRs into categories and updates a tracking issue |
 | **Re-run** | Re-triggers failed runs caused by transient infra (umbrella status flakes) |
-| **Rebase** | Force-rebases conflict-free behind-main branches onto `origin/main`, except packet-bound branches |
+| **Rebase** | Force-rebases conflict-free behind-main branches onto `origin/main` via `pr_ci_safe_rebase.py`, except packet-bound / non-same-repo / race-failed PRs |
 
 ### Session Entry branch preservation
 
 The rebase action must never rewrite a PR whose changed-file set contains a
-Session Entry packet under `reports/agentops/work_packets/*.json`. Those packets
-bind `base_ref`, collision evidence, packet digest, and closeout receipts to a
-specific merge base; an automated rebase makes all four claims stale even when
-the resulting source tree is byte-identical. `pr-ci-health.yml` therefore reads
-the complete paginated PR file list before any checkout or push and skips the PR
-when a packet is present. File-list inspection is fail-closed: an API failure
-also skips the rebase. Branch names and draft status are not safety signals.
+Session Entry packet under `reports/agentops/work_packets/*.json` (current
+`.filename` or rename-away `.previous_filename`). Those packets bind `base_ref`,
+collision evidence, and packet digest to a specific merge base; an automated
+rebase makes those claims stale even when the resulting source tree is
+byte-identical.
 
-A packet-bound PR may remain behind `main`. If rebinding is required, its owner
-must append a governed reseal commit and rerun packet scope/preflight/closeout;
-the hourly backstop has no authority to rewrite that history.
+`pr-ci-health.yml` delegates each candidate to
+`scripts/governance/pr_ci_safe_rebase.py` **before** any PR-head
+fetch/checkout/rebase/push. The helper is fail-closed and claims only:
+
+1. **Count-bound explicit page enumeration** — `?per_page=100&page=N` raw JSON
+   arrays; total entries must equal metadata `.changed_files`. Because the
+   endpoint hard-caps at 3000, `changed_files >= 3000` skips (equality is
+   ambiguous). When the expected final page is full
+   (`changed_files % 100 == 0`, including zero), one sentinel next page must
+   return a valid empty JSON array; API failure, malformed JSON, or a
+   nonempty sentinel skips. A short final page is proved by its length plus
+   exact metadata count.
+2. **Current and previous filenames** — both `.filename` and
+   `.previous_filename` are checked for the packet prefix + `.json` suffix.
+3. **Same-repo / head-SHA / race / lease / restore binding** — head must be
+   same-repo; inspected `head.sha` is re-checked after enumeration and before
+   push; fetch uses `refs/pull/<n>/head`; push uses explicit
+   `--force-with-lease=refs/heads/<ref>:<inspected_sha>`. A valid 40-hex
+   restore target (`--restore-to` or `$GITHUB_SHA`) is required before any
+   PR-head mutation; restore checkout failures surface as local `ERROR` and
+   never retain a `REBASED` success.
+4. **API / malformed / count failures skip** — API errors, malformed JSON,
+   malformed entries, count mismatch, premature empty pages, sentinel
+   failures, missing restore target, or head movement print `SKIP PR #N: …`
+   and perform no rewrite.
+5. **Owner append-only reseal required** — a packet-bound PR may remain behind
+   `main`; only the owner may append a governed reseal and rerun packet
+   scope/preflight/closeout. The hourly backstop has no authority to rewrite
+   that history.
+
+Branch names and draft status are not safety signals. Local AgentOps closeout
+reports are self-reported evidence only; GitHub packet-scope/CI handles are the
+external authority.
 
 Categories: `green`, `behind_main`, `merge_conflict`, `docops_drift`,
 `coherence_delta`, `fourfold_warrant`, `transient_infra`, `real_test_lint`.

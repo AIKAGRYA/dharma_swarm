@@ -3,7 +3,9 @@
     ".github/workflows/pr-ci-health.yml",
     "tests/test_pr_dedupe_workflow.py",
     "docs/governance/PR_QUALITY_GATES.md",
-    "reports/agentops/work_packets/titanium-hardening-WP-PRCI1-session-entry-guard.json"
+    "reports/agentops/work_packets/titanium-hardening-WP-PRCI1-session-entry-guard.json",
+    "scripts/governance/pr_ci_safe_rebase.py",
+    "tests/test_pr_ci_safe_rebase.py"
   ],
   "approval": {
     "before_commit": false,
@@ -131,7 +133,7 @@
   ],
   "gates": [
     {
-      "command": "python3 -m pytest tests/test_pr_dedupe_workflow.py -q",
+      "command": "python3 -m pytest tests/test_pr_dedupe_workflow.py tests/test_pr_ci_safe_rebase.py -q",
       "expected_exit": 0,
       "name": "pr-ci-health-session-entry-guard",
       "timeout_seconds": 180
@@ -147,10 +149,10 @@
   "intent": "Prevent scheduled pr-ci-health from force-rebasing any PR that changes a Session Entry packet; packet-bound branches must preserve their merge-base/digest identity until an owner-authorized append-only reseal.",
   "negative_controls": [
     {
-      "command": "python3 -c \"from pathlib import Path; import sys; p=Path('.github/workflows/pr-ci-health.yml'); text=p.read_text(); p.write_text(text.replace('SESSION_ENTRY_PACKET_PREFIX=', 'DISABLED_PREFIX=', 1)); sys.exit(2 if 'SESSION_ENTRY_PACKET_PREFIX=' not in p.read_text() else 0)\"",
-      "expected_exit": 2,
-      "name": "removing-session-entry-prefix-breaks-guard",
-      "timeout_seconds": 120
+      "command": "python3 -c \"from pathlib import Path; import pytest,sys; p=Path('scripts/governance/pr_ci_safe_rebase.py'); t=p.read_text(); old='PACKET_PREFIX = \\\"reports/agentops/work_packets/\\\"'; new='PACKET_PREFIX = \\\"reports/agentops/unprotected/\\\"'; assert old in t; p.write_text(t.replace(old,new,1)); sys.exit(pytest.main(['tests/test_pr_ci_safe_rebase.py::test_packet_on_page_two_skips_before_git','-q']))\"",
+      "expected_exit": 1,
+      "name": "packet-prefix-mutation-breaks-behavioral-guard",
+      "timeout_seconds": 180
     }
   ],
   "session_entry": {
@@ -167,7 +169,9 @@
     "closest_existing_implementation": [
       ".github/workflows/pr-ci-health.yml",
       "tests/test_pr_dedupe_workflow.py",
-      "scripts/governance/check_agentops_packet_scope.py"
+      "scripts/governance/check_agentops_packet_scope.py",
+      "scripts/governance/pr_ci_safe_rebase.py",
+      "tests/test_pr_ci_safe_rebase.py"
     ],
     "collision": {
       "checked_at_sha": "944dc89565edc9262574947abe8d93598f7bbaf3",
@@ -178,7 +182,10 @@
       "This PR only prevents future rewrites; already-rebased packet branches require owner-bound reseal.",
       "No merge authority is granted; PR 1036 remains quarantined until this guard is operator-accepted.",
       "Initial closeout positive gates and scope passed, but the negative-control argv lost nested quotes and exited 1 on SyntaxError; this packet-only append fixes the control and preserves that failed report externally.",
-      "Second closeout parsed the control but the mutant name still contained the searched marker substring, so it exited 0 instead of 2; this packet-only append uses DISABLED_PREFIX and preserves that failed report externally."
+      "Second closeout parsed the control but the mutant name still contained the searched marker substring, so it exited 0 instead of 2; this packet-only append uses DISABLED_PREFIX and preserves that failed report externally.",
+      "Independent review of PR 1038 at e5f10c74 failed 54/100: current guard misses previous_filename/capped-file-list cases and exact same-repo/head-SHA race binding.",
+      "The workflow string-presence regression and self-certifying negative control are replaced by an executable helper, behavioral command-trace tests, and a mutation that runs the packet-page test.",
+      "Local closeout reports remain self-reported; externally authoritative evidence is the GitHub AgentOps packet-scope check plus review/CI handles, and PR prose must not overclaim local artifacts."
     ],
     "interface_mismatches": [
       "PR 1036 and predecessor 1033 were force-rebased by pr-ci-health after packet sealing, invalidating base_ref, digest evidence, PR claims and CI authority."
@@ -187,7 +194,7 @@
       "Workflow auto-rebases all behind-main PRs with force-with-lease, including merge-base-bound Session Entry packets."
     ],
     "owner": "@AmitabhainArunachala",
-    "packet_digest": "bbdb91f7daf82b495b093c4c9b4a84b6a6f99f8830a10e6b010f1da80d883742",
+    "packet_digest": "e895e423df1a15d63341650042ecc463a4fb7727c64bc2bf95cefdee8d4bae01",
     "rebind_history": [
       {
         "from_base": "c82e15a850638eba63d1cc5908d6f849ed20854c",

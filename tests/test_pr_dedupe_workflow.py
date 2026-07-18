@@ -135,28 +135,31 @@ def test_docops_reconcile_skips_remote_byte_identical_refresh() -> None:
 
 def test_pr_ci_health_rebase_excludes_docops_rolling_lane() -> None:
     text = PR_CI_HEALTH.read_text(encoding="utf-8")
+    rebase_step = text.split("- name: Rebase conflict-free behind-main branches", 1)[1]
 
     exclusion = '[ "$head" = "chore/docops-autorefresh" ]'
-    push_command = 'git push origin "ci-rebase/$head:$head" --force-with-lease'
-    assert exclusion in text
-    assert push_command in text
-    # The exclusion must guard the force-with-lease push, not follow it.
-    assert text.index(exclusion) < text.index(push_command)
+    helper_invoke = "python3 scripts/governance/pr_ci_safe_rebase.py"
+    assert exclusion in rebase_step
+    assert helper_invoke in rebase_step
+    # DocOps rolling-lane exclusion remains before helper invocation.
+    assert rebase_step.index(exclusion) < rebase_step.index(helper_invoke)
 
 
 def test_pr_ci_health_never_rebases_session_entry_packet_branches() -> None:
+    """Workflow delegates to fail-closed helper; no inline PR-head mutation."""
     text = PR_CI_HEALTH.read_text(encoding="utf-8")
-    prefix = 'SESSION_ENTRY_PACKET_PREFIX="reports/agentops/work_packets/"'
-    file_query = 'gh api --paginate "repos/$REPO/pulls/$pr/files?per_page=100"'
-    guarded_skip = "changes a Session Entry packet; skipping auto-rebase"
-    inspection_failure = "could not inspect changed files; skipping auto-rebase"
-    push_command = 'git push origin "ci-rebase/$head:$head" --force-with-lease'
-
-    for required in (prefix, file_query, guarded_skip, inspection_failure, push_command):
-        assert required in text
-    assert text.index(prefix) < text.index(file_query) < text.index(push_command)
-    assert text.index(guarded_skip) < text.index(push_command)
-    assert text.index(inspection_failure) < text.index(push_command)
+    helper = "scripts/governance/pr_ci_safe_rebase.py"
+    assert helper in text
+    assert "pr_ci_safe_rebase.py" in text
+    # Helper owns all PR-head mutation; workflow must not do it inline.
+    assert 'git fetch origin "$head"' not in text
+    assert 'git checkout -B "ci-rebase/$head"' not in text
+    assert "git rebase origin/main" not in text
+    assert 'git push origin "ci-rebase/$head:$head"' not in text
+    assert "gh api --paginate" not in text
+    # Invocation carries identity binding flags.
+    assert "--expected-base" in text
+    assert "--expected-head" in text
 
 
 def test_active_track_pr_gate_installs_executable_criterion_dependencies() -> None:
