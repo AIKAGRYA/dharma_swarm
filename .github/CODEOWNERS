@@ -38,6 +38,7 @@
 /dharma_swarm/models.py                 @AmitabhainArunachala
 /dharma_swarm/stigmergy.py              @AmitabhainArunachala
 /dharma_swarm/_stigmergy_lock.py        @AmitabhainArunachala
+/dharma_swarm/traces.py                 @AmitabhainArunachala
 /dharma_swarm/correlation_context.py    @AmitabhainArunachala
 /dharma_swarm/daemon_config.py          @AmitabhainArunachala
 /dharma_swarm/runtime_contract.py       @AmitabhainArunachala
