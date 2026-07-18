@@ -496,3 +496,4 @@ def test_packet_prefix_constant_used_for_detection() -> None:
     assert mod.is_protected_path(PACKET)
     assert not mod.is_protected_path("reports/agentops/unprotected/example.json")
     assert not mod.is_protected_path("reports/agentops/work_packets/example.txt")
+    assert mod.packet_guard_selftest() == 0

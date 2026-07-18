@@ -434,7 +434,42 @@ def safe_rebase(
     return exit_code, message
 
 
+def packet_guard_selftest() -> int:
+    """Dependency-free page-two guard proof for AgentOps negative controls."""
+    calls: list[list[str]] = []
+    meta = {"base": {"ref": "main"},
+        "head": {"ref": "selftest", "sha": "a" * 40, "repo": {"full_name": "self/test"}},
+        "changed_files": 101,
+    }
+    page1 = [{"filename": f"src/f{i}.py"} for i in range(100)]
+    page2 = [{"filename": "reports/agentops/work_packets/selftest.json"}]
+
+    def runner(argv: list[str]) -> CmdResult:
+        calls.append(list(argv))
+        target = argv[2] if len(argv) > 2 else ""
+        if argv[:2] == ["gh", "api"] and target.endswith("/pulls/1"):
+            return CmdResult(stdout=json.dumps(meta))
+        if argv[:2] == ["gh", "api"] and "&page=1" in target:
+            return CmdResult(stdout=json.dumps(page1))
+        if argv[:2] == ["gh", "api"] and "&page=2" in target:
+            return CmdResult(stdout=json.dumps(page2))
+        return CmdResult(returncode=1, stderr="unexpected selftest command")
+
+    code, message = safe_rebase(
+        repo="self/test", pr=1, expected_base="main", expected_head="selftest",
+        runner=runner, restore_to="f" * 40,
+    )
+    passed = code == 0 and "Session Entry packet" in message and not any(
+        argv and argv[0] == "git" for argv in calls
+    )
+    print("packet-guard-selftest: " + ("PASS" if passed else f"FAIL: {message}"))
+    return 0 if passed else 1
+
+
 def main(argv: list[str] | None = None) -> int:
+    effective_argv = sys.argv[1:] if argv is None else argv
+    if effective_argv == ["--selftest-packet-guard"]:
+        return packet_guard_selftest()
     parser = argparse.ArgumentParser(
         description="Fail-closed same-repo PR rebase with Session Entry guard",
     )
@@ -447,7 +482,7 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="git checkout target after work (default: $GITHUB_SHA)",
     )
-    args = parser.parse_args(argv)
+    args = parser.parse_args(effective_argv)
 
     code, message = safe_rebase(
         repo=args.repo,
