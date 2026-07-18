@@ -1,6 +1,6 @@
 {
   "id": "titanium-WP-0A-hermetic-bootstrap",
-  "base_ref": "a47c110ca38155390b04a7d85654d0a1840b0cce",
+  "base_ref": "e22ffe5db6884a3d315291ba5fb252e8fe80d8b5",
   "branch": "claude/dharma-swarm-full-spectrum-push-c2btw6",
   "worktree": ".",
   "intent": "WP-0A (TIT-004): hermetic Python bootstrap. Add a pinned-uv bootstrap Make target (uv lock --check then uv sync --frozen --extra dev), delegate install to the frozen path, resolve .venv tools explicitly in verification targets, label the Dockerfile's live-resolution lane as non-hermetic legacy with dependency failure propagation, and add a bootstrap contract test that fails on regression. pyproject.toml and uv.lock are read-only inputs.",
@@ -179,7 +179,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "a47c110ca38155390b04a7d85654d0a1840b0cce",
+      "checked_at_sha": "e22ffe5db6884a3d315291ba5fb252e8fe80d8b5",
       "details": []
     },
     "interface_mismatches": [
@@ -196,6 +196,6 @@
       "This packet verifies the frozen bootstrap path on this host; the clean-container claim is CI evidence, not local evidence."
     ],
     "rollback": "Revert Makefile, .github/workflows/hermetic.yml, Dockerfile, tests/test_bootstrap_contract.py, and reports/agentops/work_packets/titanium-WP-0A-hermetic-bootstrap.json together; no state migration in this packet.",
-    "packet_digest": "39fa02b5d7dd806d239be1f0e83704346a9d66e996276521ac46a80c102e7404"
+    "packet_digest": "c3727fb51fa4176fc17138545dcc006ccca9a3b5cf626f20d79971365351d056"
   }
 }
