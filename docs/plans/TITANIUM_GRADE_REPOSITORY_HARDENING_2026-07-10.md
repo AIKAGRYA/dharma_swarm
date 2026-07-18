@@ -175,7 +175,7 @@ Severity rubric:
 | TIT-013 | 4 | critical behavior remains concentrated in god modules and silent catches | hygiene ratchet | module/silent-swallow counters |
 | TIT-014 | 4 | untrusted proof/scorer paths still execute shell/native code without a complete jail | `sealed_packet_apply.py`, chamber sandbox | adversarial escape suite |
 | TIT-015 | 3 | terminal behavior is not continuously verified in current CI and Bun is absent on clean agents | `terminal/`, active-track criterion | Bun clean-clone test |
-| TIT-016 | 4 | unpinned local dependency bootstrap: `make install` was unpinned editable pip and the Dockerfile swallowed dependency-install failure (split from TIT-004 on 2026-07-18 so Semgrep absence and bootstrap pinning carry distinct IDs; WP-0A and PR #1019 cited TIT-004 pre-split) | `Makefile`, `Dockerfile` | closed by WP-0A (PR #1019, merged `6b1c5438`); residual: clean-container proof and the Docker dependency-failure negative control remain host evidence (`NEEDS_HOST` recorded in #1019) |
+| TIT-016 | 4 | unpinned local dependency bootstrap: `make install` was unpinned editable pip and the Dockerfile swallowed dependency-install failure (split from TIT-004 on 2026-07-18 so Semgrep absence and bootstrap pinning carry distinct IDs; WP-0A and PR #1019 cited TIT-004 pre-split) | `Makefile`, `Dockerfile` | narrowed by WP-0A (PR #1019, merged `6b1c5438`), NOT closed: the Docker dependency-failure negative control is `NEEDS_HOST` and the clean-container claim is CI/host evidence (`reports/agentops/work_packets/titanium-WP-0A-hermetic-bootstrap.json` honest blockers); the residual obligation closes only with that host evidence, inside the WP-0I clean-room proof |
 
 ## Governance and ownership
 
@@ -338,17 +338,21 @@ Implementation PR rules:
 - One PR may touch only one active owner's surfaces.
 - A cross-owner dependency is represented by stacked PR ordering, not mixed ownership in one diff.
 - Expanding an allowed-file list requires an approved specification amendment before editing.
-- Every work packet's allowed-file list implicitly includes that packet's own
-  runner-required canonical AgentOps path
-  `reports/agentops/work_packets/<packet-id>.json`, added byte-identically to
-  the external preflight copy during the work (never before preflight).
+- Within this campaign only: every Titanium work packet's allowed-file list
+  implicitly includes that packet's own runner-required canonical AgentOps
+  path `reports/agentops/work_packets/<packet-id>.json`, added byte-identically
+  to the external preflight copy during the work (never before preflight).
   Ratified 2026-07-18 from PR #1019's recorded deviation:
   `scripts/governance/run_agent_work_packet.py` admits an edit only when the
   tracked canonical packet path appears in `allowed_files`, so WP-0A
   necessarily shipped
   `reports/agentops/work_packets/titanium-WP-0A-hermetic-bootstrap.json`
   alongside its four spec-listed files. This clause admits only the packet's
-  own canonical path and no other unlisted file.
+  own canonical path and no other unlisted file. It restates observed runner
+  behavior for Titanium packet authoring; it claims no authority over the
+  canonical Session Entry/AgentOps boundary for non-Titanium packets (per
+  `docs/AGENTS.md`, this document is a `working_plan`, not repo-level
+  governance).
 
 ## Campaign dependency graph
 
@@ -1232,7 +1236,7 @@ Go, dashboard, and terminal run on their declared toolchains in the required CI 
 
 ### WP-0I — Independent clean-room proof
 
-**Findings:** TIT-001 through TIT-010, TIT-015
+**Findings:** TIT-001 through TIT-010, TIT-015, TIT-016
 **Owner:** independent reviewer or agent; the implementation author may not serve as the sole reviewer
 **Depends on:** WP-00B, WP-0S, and every WP-0A through WP-0H packet merged to `main`
 
