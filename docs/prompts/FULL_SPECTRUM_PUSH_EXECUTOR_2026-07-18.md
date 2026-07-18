@@ -204,13 +204,14 @@ Authority: `docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md:567-637
 Finding: TIT-004. Depends on WP-00B (merged — verify per §3.5).
 
 **First check whether WP-0A already merged** (`git log origin/main --oneline
---grep "WP-0A"` plus the spec's status line). If it did, this stream is
-`DONE_UPSTREAM`; re-scope Stream C to the next dependency-ready Phase 0
-packet per the spec's campaign dependency graph
-(`TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md:341-368` — WP-0A's direct
-dependents are WP-0S, WP-0B, WP-0C1R, WP-0C2, WP-0F1, WP-0G, WP-0H), executed
-under the same packet discipline, or record `BLOCKED_OPERATOR` if packet
-selection needs the operator. If WP-0A has NOT merged, execute it exactly as
+--grep "WP-0A"` plus the spec's status line). If it did, record Stream C as
+`DONE_UPSTREAM` and close it — per §4, no re-execution and no substitute
+packet inside this stream: the successor Phase 0 packets (WP-0S, WP-0B,
+WP-0C1R, WP-0C2, WP-0F1, WP-0G, WP-0H per the dependency graph,
+`TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md:341-368`) each carry
+allowed-file boundaries this prompt does not declare, so naming one is a
+next-push recommendation in the final report for the operator to authorize,
+never an in-push execution. If WP-0A has NOT merged, execute it exactly as
 specified, summarized here with the spec as tiebreaker:
 
 - **Allowed files only:** `Makefile`, `.github/workflows/hermetic.yml`,
