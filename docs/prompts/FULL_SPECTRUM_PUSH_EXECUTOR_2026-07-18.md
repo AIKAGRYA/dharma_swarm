@@ -260,9 +260,9 @@ merged work (cite the merged commit).
 
 - Branch every stream from fresh `origin/main`; keep worktrees within the
   budget law in `CLAUDE.md` (streams may share one worktree sequentially).
-- Order of first commit: A2 (smallest) → A1 → C → B → D. Interleave while CI
-  runs; never block the session sleeping on CI — check back between stream
-  work.
+- Order of first commit follows §4's listed priority order (A1 → A2 → B →
+  C → D). Interleave while CI runs; never block the session sleeping on CI —
+  check back between stream work.
 - If context compaction occurs mid-push, rerun §3 before the next edit.
 
 ### 6. Stop conditions (report, do not improvise)
