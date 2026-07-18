@@ -1665,6 +1665,10 @@ class SwarmManager:
             if age < age_limit:
                 continue
             try:
+                _reap_meta = dict(task.metadata or {})
+                _reap_meta.pop("active_claim", None)
+                _reap_meta["reaped_at"] = datetime.now(timezone.utc).isoformat()
+                _reap_meta["reap_reason"] = "stuck_running_daemon_recovery"
                 await self._task_board.update_task(
                     task.id,
                     status=TaskStatus.FAILED,
@@ -1672,6 +1676,7 @@ class SwarmManager:
                         f"Reaped: task was stuck in RUNNING for {age.total_seconds()/3600:.1f}h "
                         f"(daemon crash recovery). Agent {task.assigned_to or 'unknown'} is dead."
                     ),
+                    metadata=_reap_meta,
                 )
                 reaped += 1
                 logger.info(
