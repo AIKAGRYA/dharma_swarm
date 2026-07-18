@@ -1,6 +1,6 @@
 {
   "id": "titanium-WP-0A-hermetic-bootstrap",
-  "base_ref": "e22ffe5db6884a3d315291ba5fb252e8fe80d8b5",
+  "base_ref": "a24dbd68b6256e5a0b1bd13388df4c7029d2f2f9",
   "branch": "claude/dharma-swarm-full-spectrum-push-c2btw6",
   "worktree": ".",
   "intent": "WP-0A (TIT-004): hermetic Python bootstrap. Add a pinned-uv bootstrap Make target (uv lock --check then uv sync --frozen --extra dev), delegate install to the frozen path, resolve .venv tools explicitly in verification targets, label the Dockerfile's live-resolution lane as non-hermetic legacy with dependency failure propagation, and add a bootstrap contract test that fails on regression. pyproject.toml and uv.lock are read-only inputs.",
@@ -179,7 +179,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "e22ffe5db6884a3d315291ba5fb252e8fe80d8b5",
+      "checked_at_sha": "a24dbd68b6256e5a0b1bd13388df4c7029d2f2f9",
       "details": []
     },
     "interface_mismatches": [
@@ -197,6 +197,6 @@
       "Packet gates and controls run under the runner-admitted system python3 (scripts/governance/run_agent_work_packet.py:121-130 admits only bare python3/sys.executable, never .venv/bin/python), and tests/conftest.py references dharma_swarm modules, so gate execution assumes repo dependencies importable by system python3 \u2014 CI installs them; a clean host that only ran make bootstrap has them in .venv only."
     ],
     "rollback": "Revert Makefile, .github/workflows/hermetic.yml, Dockerfile, tests/test_bootstrap_contract.py, and reports/agentops/work_packets/titanium-WP-0A-hermetic-bootstrap.json together; no state migration in this packet.",
-    "packet_digest": "318a8fc3ef929f01c1570ed8ca29aa84e79edbcd4b1b6498fa75ec1ed037c705"
+    "packet_digest": "f0159f7fa6ebd2ac35dcc75477caf60c78b9f8098aa575b7012d7b1e7ff9bcbc"
   }
 }
