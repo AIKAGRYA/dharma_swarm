@@ -163,7 +163,7 @@ Severity rubric:
 | TIT-001 | 4 | `verifier-selfcheck` claims all gates are functional without executing behavioral gates | `Makefile:verifier-selfcheck` | compare target body with `make test-fast` result |
 | TIT-002 | 4 | fast suite deterministically times out only in suite context | `Makefile:test-fast`, `tests/test_build_engine.py` | `make test-fast`; then run the failing test alone |
 | TIT-003 | 3 | Go capability is inferred from executable presence, not required version | `tools/*/go.mod`, `tests/test_go_evidence_ingestor_bridge.py`, `tests/test_github_ingestor_runner.py`, sibling Go bridges | Go 1.22 host with modules declaring 1.26 |
-| TIT-004 | 4 | missing Semgrep can exit zero in a required-looking local target | `scripts/governance/run_semgrep_with_ca.sh` | remove Semgrep from `PATH` and run strict target |
+| TIT-004 | 4 | missing Semgrep can exit zero in a required-looking local target (bootstrap-pinning component split to TIT-016 on 2026-07-18; PR #1019 cited TIT-004 pre-split) | `scripts/governance/run_semgrep_with_ca.sh` | remove Semgrep from `PATH` and run strict target |
 | TIT-005 | 4 | uplift subprocess can block indefinitely on inherited stdin | `scripts/uplift_guards/shakti_warrant_guard.py` | run `make uplift-guards` with open non-TTY stdin |
 | TIT-006 | 4 | PR #993 removed the observed duplicate `advisory` key, but the generic CI Truth JSON loader still accepts a future duplicate top-level key; recurrence prevention remains open | `scripts/runtime/ci_truth.py`, `docs/governance/CI_TRUTH_CONTRACT.json` | inject a duplicate top-level key and require configuration rejection |
 | TIT-007 | 4 | PR #993 aligned CI Truth, parity, Mike/automerge, and live protection on the transitional legacy six; final-set ratification, the onboarding-name/packet-scope decision, continuously authenticated live parity, and final consumer proof remain open | CI Truth/parity owners plus Merge Master Mike | exact-set comparison, `check_ci_parity.py --live`, and final-set consumer tests |
@@ -175,6 +175,7 @@ Severity rubric:
 | TIT-013 | 4 | critical behavior remains concentrated in god modules and silent catches | hygiene ratchet | module/silent-swallow counters |
 | TIT-014 | 4 | untrusted proof/scorer paths still execute shell/native code without a complete jail | `sealed_packet_apply.py`, chamber sandbox | adversarial escape suite |
 | TIT-015 | 3 | terminal behavior is not continuously verified in current CI and Bun is absent on clean agents | `terminal/`, active-track criterion | Bun clean-clone test |
+| TIT-016 | 4 | unpinned local dependency bootstrap: `make install` was unpinned editable pip and the Dockerfile swallowed dependency-install failure (split from TIT-004 on 2026-07-18 so Semgrep absence and bootstrap pinning carry distinct IDs; WP-0A and PR #1019 cited TIT-004 pre-split) | `Makefile`, `Dockerfile` | closed by WP-0A (PR #1019, merged `6b1c5438`); residual: clean-container proof and the Docker dependency-failure negative control remain host evidence (`NEEDS_HOST` recorded in #1019) |
 
 ## Governance and ownership
 
@@ -337,6 +338,17 @@ Implementation PR rules:
 - One PR may touch only one active owner's surfaces.
 - A cross-owner dependency is represented by stacked PR ordering, not mixed ownership in one diff.
 - Expanding an allowed-file list requires an approved specification amendment before editing.
+- Every work packet's allowed-file list implicitly includes that packet's own
+  runner-required canonical AgentOps path
+  `reports/agentops/work_packets/<packet-id>.json`, added byte-identically to
+  the external preflight copy during the work (never before preflight).
+  Ratified 2026-07-18 from PR #1019's recorded deviation:
+  `scripts/governance/run_agent_work_packet.py` admits an edit only when the
+  tracked canonical packet path appears in `allowed_files`, so WP-0A
+  necessarily shipped
+  `reports/agentops/work_packets/titanium-WP-0A-hermetic-bootstrap.json`
+  alongside its four spec-listed files. This clause admits only the packet's
+  own canonical path and no other unlisted file.
 
 ## Campaign dependency graph
 
@@ -566,7 +578,7 @@ Revert the complete code-and-test packet. If rollback would re-open a reachable 
 
 ### WP-0A — Hermetic Python bootstrap
 
-**Findings:** TIT-004
+**Findings:** TIT-016 (split from TIT-004 on 2026-07-18; the merged PR #1019 cited TIT-004 pre-split)
 **Owner:** WP-00-admitted `repository-titanium-hardening-2026-07`
 **Depends on:** WP-00B
 
