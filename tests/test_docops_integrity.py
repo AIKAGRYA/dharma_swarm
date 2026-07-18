@@ -426,3 +426,29 @@ def test_agents_pointer_bytes_canonical_and_gitignore_carveout_scoped() -> None:
     """Pointer bytes are pinned and the file remains visible to Git."""
     assert (REPO_ROOT / "AGENTS.md").read_bytes() == CANONICAL_AGENTS_POINTER
     assert b"/AGENTS.md\n" not in (REPO_ROOT / ".gitignore").read_bytes()
+
+
+def test_count_writers_are_byte_idempotent() -> None:
+    """WP-0G: two consecutive writer runs produce byte-identical managed
+    surfaces — regeneration must converge, not oscillate."""
+    import subprocess
+    import sys
+
+    repo_root = Path(__file__).resolve().parents[1]
+    targets = [
+        repo_root / "docs" / "docops" / "AUTO_INVENTORY.md",
+        repo_root / "docs" / "governance" / "SOVEREIGN_MANIFEST.md",
+    ]
+    subprocess.run(
+        [sys.executable, "scripts/docops/check_docops_integrity.py",
+         "--write-auto-sections", "--write-manifest-counts"],
+        cwd=repo_root, capture_output=True, check=False, timeout=300,
+    )
+    first = [t.read_bytes() for t in targets]
+    subprocess.run(
+        [sys.executable, "scripts/docops/check_docops_integrity.py",
+         "--write-auto-sections", "--write-manifest-counts"],
+        cwd=repo_root, capture_output=True, check=False, timeout=300,
+    )
+    second = [t.read_bytes() for t in targets]
+    assert first == second, "count writers must converge in one pass"
