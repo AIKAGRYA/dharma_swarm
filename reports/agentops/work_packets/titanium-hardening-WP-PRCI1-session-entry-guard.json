@@ -9,7 +9,7 @@
     "before_commit": false,
     "before_merge": true
   },
-  "base_ref": "c82e15a850638eba63d1cc5908d6f849ed20854c",
+  "base_ref": "944dc89565edc9262574947abe8d93598f7bbaf3",
   "branch": "titanium/pr-ci-health-session-entry-guard-20260718",
   "commit": {
     "allowed": false,
@@ -155,7 +155,7 @@
   ],
   "session_entry": {
     "active_track": "repository-titanium-hardening-2026-07",
-    "active_track_checked_at_sha": "c82e15a850638eba63d1cc5908d6f849ed20854c",
+    "active_track_checked_at_sha": "944dc89565edc9262574947abe8d93598f7bbaf3",
     "agent_identity": "hermes-main",
     "authority_precedence": [
       "executable",
@@ -170,7 +170,7 @@
       "scripts/governance/check_agentops_packet_scope.py"
     ],
     "collision": {
-      "checked_at_sha": "c82e15a850638eba63d1cc5908d6f849ed20854c",
+      "checked_at_sha": "944dc89565edc9262574947abe8d93598f7bbaf3",
       "details": [],
       "status": "clear"
     },
@@ -187,7 +187,14 @@
       "Workflow auto-rebases all behind-main PRs with force-with-lease, including merge-base-bound Session Entry packets."
     ],
     "owner": "@AmitabhainArunachala",
-    "packet_digest": "963008c080b416c125ffa189ed4a6f70aa71ca6ec127b4bab9944c2cf38156fe",
+    "packet_digest": "bbdb91f7daf82b495b093c4c9b4a84b6a6f99f8830a10e6b010f1da80d883742",
+    "rebind_history": [
+      {
+        "from_base": "c82e15a850638eba63d1cc5908d6f849ed20854c",
+        "reason": "main advanced before opening the guard PR; normal merge plus append-only packet reseal avoids immediate eligibility for the legacy hourly force-rebase workflow",
+        "to_base": "944dc89565edc9262574947abe8d93598f7bbaf3"
+      }
+    ],
     "rollback": "Revert the workflow/test/doc/packet commit. This restores legacy hourly auto-rebase behavior; no existing PR branch is rewritten by the revert itself.",
     "schema": "dharma_swarm.session_entry.v1",
     "selected_tracks": [
