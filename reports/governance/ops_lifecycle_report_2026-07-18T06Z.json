@@ -1,0 +1,221 @@
+{
+  "report_type": "ops_lifecycle",
+  "generated_at": "2026-07-18T06:00:58Z",
+  "audit_sha": "6b1c5438e0fe541ad89ea4aab8f1559528d07a86",
+  "missions": ["spine_adoption_tracking", "pr_lifecycle"],
+
+  "spine_adoption": {
+    "adoption_pct": 93.8,
+    "target_pct": 95.0,
+    "gap_to_target_pct": 1.2,
+    "total_surfaces": 16,
+    "joined_count": 13,
+    "adapter_ready_count": 2,
+    "joined_or_adapter_ready_count": 15,
+    "missing_count": 0,
+    "quarantine_count": 0,
+    "legacy_count": 1,
+    "adoption_pct_changed_from_committed": false,
+    "committed_adoption_pct": 93.8,
+    "json_content_changed": true,
+    "change_note": "audit_sha updated to current HEAD; runtime_state.py line numbers shifted +12 (lines 1197→1209, 3781→3814, 1042→1054). adoption_pct unchanged at 93.8% — no commit/push triggered per mission rules.",
+    "non_joined_surface_ids": [
+      "self_modification_loop",
+      "mcp_tool_access",
+      "legacy_no_identity_escape_hatch"
+    ],
+    "top_saturation_targets": [
+      {
+        "id": "self_modification_loop",
+        "status": "adapter-ready",
+        "label": "Self-modification propose/gate/apply/verify loop",
+        "files": [
+          "dharma_swarm/diff_applier.py",
+          "dharma_swarm/evolution.py",
+          "dharma_swarm/self_improve.py"
+        ],
+        "missing_joined_patterns": [
+          {
+            "key": "begin_idempotent",
+            "description": "apply path is idempotency-gated",
+            "action": "Add try_begin_idempotent_side_effect call in diff_applier.py apply path"
+          }
+        ],
+        "blocker_count_to_joined": 1
+      },
+      {
+        "id": "mcp_tool_access",
+        "status": "adapter-ready",
+        "label": "MCP/tool access boundary",
+        "files": [
+          "dharma_swarm/mcp_server.py",
+          "dharma_swarm/dharma_context_mcp.py"
+        ],
+        "missing_joined_patterns": [
+          {
+            "key": "identity_import",
+            "description": "MCP tools receive execution identity",
+            "action": "Import and thread ExecutionIdentity through MCP tool handlers"
+          },
+          {
+            "key": "runtime_store",
+            "description": "MCP tools write to runtime ledger",
+            "action": "Accept RuntimeStateStore in MCP server init"
+          },
+          {
+            "key": "side_effect_receipt",
+            "description": "MCP side effects emit receipts",
+            "action": "Add record_side_effect receipts for MCP tool invocations"
+          }
+        ],
+        "blocker_count_to_joined": 3
+      },
+      {
+        "id": "legacy_no_identity_escape_hatch",
+        "status": "legacy",
+        "label": "Legacy no-identity escape hatch",
+        "note": "Intentionally legacy. Explicit bypass flag with invariant test coverage. No action needed to reach 95% — joining this surface is not required for target.",
+        "blocker_count_to_joined": 0
+      }
+    ],
+    "path_to_95_pct": {
+      "required_surfaces_to_join": 1,
+      "note": "Joining either self_modification_loop OR mcp_tool_access (both currently adapter-ready) would bring adoption to 100% of non-legacy surfaces (15/15). The legacy surface is intentional and excluded from the join target. Current score of 93.8% counts legacy as non-joined; promoting one adapter-ready surface to joined closes the gap.",
+      "cheapest_next_step": "Add try_begin_idempotent_side_effect to diff_applier.py apply path — single pattern, single file."
+    },
+    "open_spine_prs": {
+      "count": 0,
+      "note": "No open spine-titled PRs found at report time. Most recent spine PRs (#1010, #994, #986) are CLOSED. PR comment step skipped — no open target."
+    }
+  },
+
+  "pr_lifecycle": {
+    "total_open_before": 18,
+    "auto_closed": 0,
+    "total_open_after": 18,
+    "green_and_ready_count": 12,
+    "conflicting_count": 6,
+    "auto_close_scan": {
+      "criteria": "mergeable=CONFLICTING AND age > 7 days (168h)",
+      "eligible": [],
+      "conflicting_not_yet_eligible": [
+        {
+          "number": 947,
+          "title": "[impact-checked] Add durable A2A presence and operator node",
+          "mergeable": "CONFLICTING",
+          "created_at": "2026-07-14T15:49:21Z",
+          "age_hours": 86.2,
+          "hours_to_threshold": 81.8,
+          "note": "~3.6 days old. Eligible ~2026-07-21T15:49Z. Rebase recommended."
+        },
+        {
+          "number": 949,
+          "title": "[impact-checked] Govern durable A2A operator slice",
+          "mergeable": "CONFLICTING",
+          "created_at": "2026-07-14T23:31:10Z",
+          "age_hours": 78.5,
+          "hours_to_threshold": 89.5,
+          "note": "~3.3 days old. Eligible ~2026-07-21T23:31Z. Rebase recommended."
+        },
+        {
+          "number": 972,
+          "title": "feat(forge-lab): canonical exact-code RSI lab releases",
+          "mergeable": "CONFLICTING",
+          "created_at": "2026-07-15T15:52:06Z",
+          "age_hours": 62.1,
+          "hours_to_threshold": 105.9,
+          "note": "~2.6 days old. Eligible ~2026-07-22T15:52Z. Rebase recommended."
+        },
+        {
+          "number": 995,
+          "title": "test(mike): prepare C1 onboarding required-context proof",
+          "mergeable": "CONFLICTING",
+          "created_at": "2026-07-17T01:18:37Z",
+          "age_hours": 28.7,
+          "hours_to_threshold": 139.3,
+          "note": "~1.2 days old. Eligible ~2026-07-24T01:18Z."
+        },
+        {
+          "number": 996,
+          "title": "governance(safety): admit live-host and rollback proof surfaces",
+          "mergeable": "CONFLICTING",
+          "created_at": "2026-07-17T01:43:11Z",
+          "age_hours": 28.3,
+          "hours_to_threshold": 139.7,
+          "note": "~1.2 days old. Eligible ~2026-07-24T01:43Z."
+        },
+        {
+          "number": 1007,
+          "title": "governance(keel): bare-metal architecture audit as the KEEL companion findings ledger",
+          "mergeable": "CONFLICTING",
+          "created_at": "2026-07-17T17:20:24Z",
+          "age_hours": 12.7,
+          "hours_to_threshold": 155.3,
+          "note": "~0.5 days old. Eligible ~2026-07-24T17:20Z."
+        }
+      ]
+    },
+    "duplicate_auto_grounding_scan": {
+      "duplicates_found": [],
+      "note": "No duplicate auto-grounding PRs targeting the same topic detected. PR #1014 ('chore(governance): ops agent lifecycle report 2026-07-18T00:00Z') is a prior ops run from 6h earlier this session; this report is the subsequent cycle and does not conflict."
+    },
+    "green_and_ready_prs": [
+      {"number": 1022, "title": "docs(titanium): ratify canonical packet path; split TIT-004 → TIT-004 + TIT-016", "created_at": "2026-07-18T05:58:35Z", "changedFiles": 1},
+      {"number": 1021, "title": "feat(bsp): integrate d3 sweep hardening into main", "created_at": "2026-07-18T04:17:49Z", "changedFiles": 8},
+      {"number": 1018, "title": "docs(prompts): full-spectrum autonomous push executor prompt", "created_at": "2026-07-18T02:53:13Z", "changedFiles": 1},
+      {"number": 1014, "title": "chore(governance): ops agent lifecycle report 2026-07-18T00:00Z [automated]", "created_at": "2026-07-18T00:05:08Z", "changedFiles": 1},
+      {"number": 1013, "title": "feat(ops): bounded mobile recovery for Codex Composer", "created_at": "2026-07-17T20:02:35Z", "changedFiles": 25},
+      {"number": 1011, "title": "governance: admit current Codex Composer recovery slice", "created_at": "2026-07-17T18:16:28Z", "changedFiles": 4},
+      {"number": 1008, "title": "feat(models): promote Kimi K3 routes [impact-checked]", "created_at": "2026-07-17T17:41:51Z", "changedFiles": 21},
+      {"number": 1006, "title": "docs(plans): DharmaGraph Ascent master spec (C1–C5)", "created_at": "2026-07-17T16:59:30Z", "changedFiles": 1},
+      {"number": 1004, "title": "docs(plans): THE KEEL v7.1 — verification lattice doctrine (single-file, review-refined)", "created_at": "2026-07-17T13:17:06Z", "changedFiles": 1},
+      {"number": 987,  "title": "chore(docops): reconcile generated counts", "created_at": "2026-07-16T06:44:10Z", "changedFiles": 2},
+      {"number": 930,  "title": "feat(chamber): add exact-scope proof membrane v0", "created_at": "2026-07-13T23:50:28Z", "changedFiles": 31},
+      {"number": 904,  "title": "feat(holon): authority-scoped remote fast path [impact-checked]", "created_at": "2026-07-12T15:40:29Z", "changedFiles": 30}
+    ],
+    "recommended_actions": [
+      {
+        "priority": 1,
+        "pr": 947,
+        "action": "REBASE SOON: CONFLICTING, ~3.6 days old. Approaches 7-day auto-close threshold ~2026-07-21. Largest PR in conflict zone (14,004 additions, 53 files — durable A2A presence/operator node).",
+        "owner": "operator"
+      },
+      {
+        "priority": 2,
+        "pr": 949,
+        "action": "REBASE SOON: CONFLICTING, ~3.3 days old. Companion to #947 (A2A operator slice). Rebase together with #947.",
+        "owner": "operator"
+      },
+      {
+        "priority": 3,
+        "pr": 972,
+        "action": "Rebase recommended: CONFLICTING, ~2.6 days old. Forge-lab RSI lab (9,682 additions, 72 files). Large surface area — resolve conflicts promptly.",
+        "owner": "operator"
+      },
+      {
+        "priority": 4,
+        "pr": 996,
+        "action": "Investigate conflict: governance(safety) live-host and rollback proof surfaces. CONFLICTING. Rebase or close.",
+        "owner": "operator"
+      },
+      {
+        "priority": 5,
+        "pr": 995,
+        "action": "Investigate conflict: test(mike) C1 onboarding context proof. CONFLICTING + mike-watch label. Rebase needed before Mike gate evaluation.",
+        "owner": "operator"
+      },
+      {
+        "priority": 6,
+        "pr": 904,
+        "action": "Review: #904 (feat(holon)) is MERGEABLE, 6 days old, 30 changed files. Oldest green-and-ready. Operator should merge or acknowledge.",
+        "owner": "operator"
+      },
+      {
+        "priority": 7,
+        "pr": 930,
+        "action": "Review: #930 (feat(chamber)) is MERGEABLE, 5 days old, 31 changed files. Second-oldest green-and-ready.",
+        "owner": "operator"
+      }
+    ]
+  }
+}
