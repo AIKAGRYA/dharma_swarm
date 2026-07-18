@@ -1,4 +1,4 @@
-"""Mutation matrix: 18 executable bypass mutants must be killed by tests.
+"""Mutation matrix: 19 executable bypass mutants must be killed by tests.
 
 Each mutant keeps safety diagnostic strings but disables the executable check
 (`if False and ...`). Isolated temp trees run targeted behavioral pytest and
