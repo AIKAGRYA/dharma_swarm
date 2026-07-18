@@ -70,6 +70,11 @@ _BRIDGE_PROVIDER_ROUTES: dict[str, tuple[ProviderType, ...]] = {
     "codex": (ProviderType.CODEX,),
     "ollama": (ProviderType.OLLAMA,),
     "openrouter": (ProviderType.OPENROUTER,),
+    "kimi_code": (
+        ProviderType.KIMI_CODE,
+        ProviderType.MOONSHOT,
+        ProviderType.OPENROUTER,
+    ),
     "openai": (ProviderType.OPENAI,),
 }
 
@@ -181,21 +186,21 @@ MODEL_TARGETS: tuple[ModelTarget, ...] = (
         aliases=("gpt", "gpt 5.5", "codex", "gpt-5.5"),
         pool_id="gpt-5.5",
     ),
-    # Kimi K2.6 — the operator's FLOOR model. Ollama-Cloud route ahead of the
-    # flappy OpenRouter route (the fix for the kimi flap bug).
+    # Kimi K2.6 remains an explicit floor fallback; unqualified Kimi aliases
+    # promote to K3 below.
     _projected(
         alias="kimi-k2.6",
         provider_id="ollama",
         label="Kimi K2.6 [FREE] (floor)",
-        aliases=("kimi", "moonshot", "kimi k2.6", "k2.6", "floor"),
+        aliases=("kimi k2.6", "k2.6", "floor"),
         pool_id="kimi-k2.6",
     ),
     _projected(
-        alias="kimi-k2.7",
-        provider_id="ollama",
-        label="Kimi K2.7 Code [FREE]",
-        aliases=("kimi 2.7", "kimi k2.7", "k2.7"),
-        pool_id="kimi-k2.7-code",
+        alias="kimi-k3",
+        provider_id="kimi_code",
+        label="Kimi K3 (first-party Kimi; Moonshot/OpenRouter fallback)",
+        aliases=("kimi", "moonshot", "kimi 3", "kimi k3", "k3"),
+        pool_id="kimi-k3",
     ),
     _projected(
         alias="deepseek-v4-pro",
@@ -259,15 +264,23 @@ def _validate_targets() -> None:
                 f"{entry.id!r}; the picker's main list is FLOOR-ONLY — sub-floor "
                 f"models are reachable only via the explicit grunt opt-in"
             )
-        for provider in t.pool_providers:
-            pool_id = _pool_id_for_model(t.model_id)
-            if pool_id is None:
-                continue  # operator-pinned lane the pool does not know
-            expected = _pool_model_id(pool_id, provider)
-            if expected is not None and expected != t.model_id:
+        pool_id = _pool_id_for_model(t.model_id)
+        if pool_id is None:
+            continue  # operator-pinned lane the pool does not know
+        primary_provider = t.pool_providers[0]
+        primary_expected = _pool_model_id(pool_id, primary_provider)
+        if primary_expected is not None and primary_expected != t.model_id:
+            raise AssertionError(
+                f"model_routing target {t.alias!r} model_id {t.model_id!r} "
+                f"does not match primary pool route {primary_expected!r} "
+                f"for {primary_provider.value}"
+            )
+        for provider in t.pool_providers[1:]:
+            if _pool_model_id(pool_id, provider) is None:
                 raise AssertionError(
-                    f"model_routing target {t.alias!r} model_id {t.model_id!r} "
-                    f"does not match pool route {expected!r} for {provider.value}"
+                    f"model_routing target {t.alias!r} declares fallback "
+                    f"provider {provider.value!r}, but pool entry {pool_id!r} "
+                    "has no such route"
                 )
 
 
@@ -304,7 +317,7 @@ _FALLBACK_ORDER_BY_STRATEGY: dict[str, tuple[str, ...]] = {
         "opus-4.8",
         "sonnet-4.6",
         "gpt-5.5",
-        "kimi-k2.7",
+        "kimi-k3",
         "gemini-3",
     ),
 }

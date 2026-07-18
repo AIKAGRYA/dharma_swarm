@@ -375,27 +375,39 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         256_000,
         "Floor model via NVIDIA NIM hosted catalog (paced secondary route)",
     ),
+    # Kimi K3 uses different wire ids on each provider. These three typed
+    # (provider, model_id) routes collapse to one logical ``kimi-k3`` entry in
+    # model_pool; the first-party Kimi Code membership route is preferred.
     ModelSlot(
         ProviderType.KIMI_CODE,
-        "kimi-for-coding",
-        "Kimi Code (stable latest)",
+        "k3",
+        "Kimi K3 (Kimi Code)",
+        ModelTier.STRONG,
+        ("code", "reasoning", "long_context", "synthesis"),
+        1_048_576,
+        "Floor — direct Kimi Code membership API",
+    ),
+    ModelSlot(
+        ProviderType.MOONSHOT,
+        "kimi-k3",
+        "Kimi K3 (Moonshot)",
         ModelTier.STRONG,
         ("code", "reasoning", "long_context", "synthesis"),
         256_000,
-        "Floor — direct Kimi Code membership API; stable id maps to latest K2.x Code",
+        "Floor — direct Moonshot Platform route with endpoint-specific key",
+    ),
+    ModelSlot(
+        ProviderType.OPENROUTER,
+        "moonshotai/kimi-k3",
+        "Kimi K3 (OpenRouter)",
+        ModelTier.STRONG,
+        ("code", "reasoning", "long_context", "synthesis"),
+        256_000,
+        "Floor — secondary OpenRouter aggregator route",
     ),
     # ── NEW floor frontier (>= K2.6) — Ollama-Cloud lanes, keyless ─────
-    # The K2.6 floor the roster must SERVE. Live providers first: each rides
-    # the Ollama-Cloud keyless route ahead of any paid aggregator.
-    ModelSlot(
-        ProviderType.OLLAMA,
-        "kimi-k2.7-code:cloud",
-        "Kimi K2.7 Code (Ollama Cloud)",
-        ModelTier.STRONG,
-        ("reasoning", "long_context", "code", "synthesis"),
-        256_000,
-        "Floor — next K2 generation, long-context coder lane via Ollama Cloud",
-    ),
+    # The K2.6 floor the roster must SERVE. K3 is intentionally absent from
+    # Ollama until that provider publishes a real K3 model id.
     ModelSlot(
         ProviderType.OLLAMA,
         "deepseek-v4-pro:cloud",
@@ -584,6 +596,7 @@ _ENV_KEYS_FOR_PROVIDER: dict[ProviderType, str] = {
         # not a subscription lane — gate it on its API key, not keyless.
         ProviderType.SAMBANOVA,
         ProviderType.KIMI_CODE,
+        ProviderType.MOONSHOT,
         ProviderType.ZHIPU,
     )
 }

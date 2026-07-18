@@ -11,7 +11,6 @@ from dharma_swarm.evolution_roster import (
     EVOLUTION_ROSTER,
     ModelSlot,
     ModelTier,
-    _ENV_KEYS_FOR_PROVIDER,
     _STRATEGY_PROFILES,
     _provider_has_key,
     get_available_roster,
@@ -49,7 +48,7 @@ class TestRosterData:
 
     def test_model_ids_not_empty(self):
         for slot in EVOLUTION_ROSTER:
-            assert len(slot.model_id) > 3, f"Empty model_id for {slot.display_name}"
+            assert slot.model_id.strip(), f"Empty model_id for {slot.display_name}"
 
     def test_display_names_not_empty(self):
         for slot in EVOLUTION_ROSTER:
@@ -125,6 +124,13 @@ class TestProviderHasKey:
         monkeypatch.setenv("MOONSHOT_KIMI_API_KEY", "test-key")
         assert _provider_has_key(ProviderType.KIMI_CODE) is True
 
+    def test_moonshot_requires_its_own_platform_key(self, monkeypatch):
+        _clear_key_and_aliases(monkeypatch, "MOONSHOT_API_KEY")
+        monkeypatch.setenv("KIMI_API_KEY", "kimi-code-key")
+        assert _provider_has_key(ProviderType.MOONSHOT) is False
+        monkeypatch.setenv("MOONSHOT_API_KEY", "moonshot-platform-key")
+        assert _provider_has_key(ProviderType.MOONSHOT) is True
+
     def test_zhipu_requires_key(self, monkeypatch):
         _clear_key_and_aliases(monkeypatch, "ZHIPU_API_KEY")
         assert _provider_has_key(ProviderType.ZHIPU) is False
@@ -162,6 +168,7 @@ class TestGetAvailableRoster:
             "SAMBANOVA_API_KEY",
             "FIREWORKS_API_KEY",
             "KIMI_API_KEY",
+            "MOONSHOT_API_KEY",
             "ZHIPU_API_KEY",
         ):
             _clear_key_and_aliases(monkeypatch, env_key)
@@ -178,6 +185,7 @@ class TestGetAvailableRoster:
         assert ProviderType.OPENROUTER not in providers
         assert ProviderType.SAMBANOVA not in providers
         assert ProviderType.KIMI_CODE not in providers
+        assert ProviderType.MOONSHOT not in providers
         assert ProviderType.ZHIPU not in providers
 
     def test_openrouter_gives_models(self, monkeypatch):
