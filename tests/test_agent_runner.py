@@ -756,7 +756,7 @@ async def test_pool_remove_dead():
 # === BSP Vote-to-Halt and token budget gate (PR #1016) ===
 
 
-def _oversized_request(section_header: str) -> "LLMRequest":
+def _oversized_request(section_header: str):
     from dharma_swarm.models import LLMRequest
 
     filler = "pheromone trail observation " * 4000
