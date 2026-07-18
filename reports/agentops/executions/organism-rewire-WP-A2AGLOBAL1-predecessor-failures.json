@@ -112,8 +112,8 @@
   ],
   "superseded_by": {
     "packet_id": "organism-rewire-WP-A2AGLOBAL1-final",
-    "packet_digest": "cdfd55da8b079d3fa335dee8d78500823b6a0a506d5e39e1dd9a3884c8afbcef",
-    "packet_bytes_sha256": "db4dbda04a389e8e96862d8a94629c9767004eb47317d11be19ed70cfa5adc20",
+    "packet_digest": "167543ca2e79edb62750f1a964cf19269af25c10e210d4bf930422a38f6f85f4",
+    "packet_bytes_sha256": "8fe506a61c4b8f77441a2158b13d3b1fe94ab32984e8db9b3732118cb6504636",
     "tracked_packet_path": "reports/agentops/work_packets/organism-rewire-WP-A2AGLOBAL1-final.json",
     "external_packet_path": "/root/.dharma/packets/organism-rewire-WP-A2AGLOBAL1-final.json"
   },
@@ -139,9 +139,10 @@
     "No secret values, credentials, or auth-bearing URLs included."
   ],
   "replacement_branch": "agent/global-a2a-runtime-cell-final-20260718",
-  "replacement_base": "84bdc6dc1e2e791f0f7bcd7ae441d977d8ceb294",
+  "replacement_base": "c82e15a850638eba63d1cc5908d6f849ed20854c",
   "superseded_remote_pr": {
     "pr": 1033,
     "reason": "remote branch externally force-rebased during governed local repair; preserved as superseded evidence"
-  }
+  },
+  "automation_rebase_head": "8ad763c24cdf9c7282edb84c10807edebcf2ba67"
 }

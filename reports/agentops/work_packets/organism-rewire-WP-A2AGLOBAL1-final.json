@@ -17,7 +17,7 @@
     "before_commit": false,
     "before_merge": true
   },
-  "base_ref": "84bdc6dc1e2e791f0f7bcd7ae441d977d8ceb294",
+  "base_ref": "c82e15a850638eba63d1cc5908d6f849ed20854c",
   "branch": "agent/global-a2a-runtime-cell-final-20260718",
   "commit": {
     "allowed": false,
@@ -182,7 +182,7 @@
     }
   ],
   "id": "organism-rewire-WP-A2AGLOBAL1-final",
-  "intent": "Repair PR 1033 fail-closed under one merge-base-bound Session Entry packet: make Universal Agent Runtime Cell validation complete, secret-safe, card/roster-owned for declarations, probe-bound for observed effective routes, collision-aware, receipt-confined and malformed-input-safe; replace three packet definitions with this one and preserve predecessor failures as a hash-bound execution-history receipt.",
+  "intent": "Reseal and finish the universal runtime-cell registry on PR 1036 after scheduled pr-ci-health force-rebased the packet-bound branch: preserve the verified global contract, close remaining alias/grammar/quarantine/type/symlink gaps, and keep one merge-base-bound Session Entry packet.",
   "negative_controls": [
     {
       "command": "python3 -c \"import pathlib,sys; from scripts.runtime import fleet_field_registry_contract as c; data={\\\"schema\\\":c.SCHEMA_V2,\\\"secret_policy\\\":\\\"env_var_names_only\\\",\\\"password\\\":\\\"not-a-real-secret-value\\\",\\\"authorities\\\":[],\\\"runtime_cell_contract\\\":{},\\\"agents\\\":[]}; errors=c.validate_registry(data,repo_root=pathlib.Path(\\\".\\\")); sys.exit(2 if any(\\\"secret-bearing key\\\" in e for e in errors) and all(\\\"not-a-real-secret-value\\\" not in e for e in errors) else 0)\"",
@@ -208,7 +208,7 @@
       "PR 1033 head 77845105 and independent review 44/100"
     ],
     "collision": {
-      "checked_at_sha": "84bdc6dc1e2e791f0f7bcd7ae441d977d8ceb294",
+      "checked_at_sha": "c82e15a850638eba63d1cc5908d6f849ed20854c",
       "details": [],
       "status": "clear"
     },
@@ -219,7 +219,8 @@
       "Generated DocOps counts remain Titanium-owned; PR workflows use counts advisory while non-count checks stay strict.",
       "No broker migration, credential rotation, service restart, dashboard deployment or cutover is authorized.",
       "Predecessor execution-history receipt must contain all four source-report hashes and may not remain an empty schema shell.",
-      "PR 1033 remains superseded evidence until the replacement draft PR is opened; no history rewrite is authorized."
+      "PR 1033 remains superseded evidence until the replacement draft PR is opened; no history rewrite is authorized.",
+      "PR 1036 remains closed while the separate pr-ci-health Session Entry exclusion is prepared; reopening before that invariant is protected risks another forced rebase."
     ],
     "interface_mismatches": [
       "PR 1033 currently changes three Session Entry packets although pull-request scope permits exactly one.",
@@ -230,10 +231,12 @@
       "Single validation module was compressed below 500 lines by introducing Ruff E701/E702 density; split into formatted contract and validation modules instead.",
       "The single adversarial test module only met 500 lines through E401/E702 compression; split registry/CLI tests from adversarial validation tests so both remain formatted and under budget.",
       "Final gate must execute both split test modules, not only the original registry test module.",
-      "PR 1033 remote branch was externally force-rebased during local repair, invalidating its merge-base packet binding; this replacement branch starts from current main and preserves the verified net result without force-push."
+      "PR 1033 remote branch was externally force-rebased during local repair, invalidating its merge-base packet binding; this replacement branch starts from current main and preserves the verified net result without force-push.",
+      "Scheduled pr-ci-health force-rebased PR 1036 from base 84bdc6dc to c82e15a8 without resealing the Session Entry packet.",
+      "FFR must reject simultaneous hermes and hermes-m5 owners, uppercase/noncanonical UIDs, quarantined credential principals, non-string route values, non-boolean live_on_hub, and all symlink receipts."
     ],
     "owner": "@AmitabhainArunachala",
-    "packet_digest": "cdfd55da8b079d3fa335dee8d78500823b6a0a506d5e39e1dd9a3884c8afbcef",
+    "packet_digest": "167543ca2e79edb62750f1a964cf19269af25c10e210d4bf930422a38f6f85f4",
     "rollback": "Revert the single replacement-branch implementation commit. The superseded PR 1033 and all external AgentOps receipts remain preserved; live brokers and services are untouched.",
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {

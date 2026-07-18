@@ -1,5 +1,6 @@
 """Adversarial validation tests for fleet field registry v2."""
 from __future__ import annotations
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,7 @@ from scripts.runtime.fleet_field_registry_contract import (  # noqa: E402
     SCHEMA_V2,
     validate_registry,
 )
+from scripts.runtime.fleet_field_registry_validation import _validate_receipt_path  # noqa: E402
 TRACKED = (
     "inter_agent/fable_claude_code/inbound/2026-07-09-hermes-agni-probe-reply.md"
 )
@@ -448,3 +450,35 @@ def test_secret_shapes_never_reach_error_text(planted):
     errors = _v(data)
     assert errors
     _no_leak(errors, planted, "MIIEowIBAAKCAQEA")
+def test_hermes_alias_cannot_create_second_identity_owner():
+    data = _reg()
+    data["agents"].extend([_agent("hermes"), _agent("hermes-m5")])
+    assert _has(_v(data), "hermes", "second identity")
+def test_uppercase_uid_rejected_by_canonical_grammar():
+    data = _reg()
+    data["agents"].append(_agent("UppercaseUID"))
+    assert _has(_v(data), "UID grammar")
+def test_quarantined_route_requires_null_credential_principal():
+    data = _reg()
+    data["routing_collisions"] = [{"collision_id": "shared", "subject": "dharma.a2a.shared", "agents": ["alice", "bob"]}]
+    data["agents"][0]["observed_effective_route"] = _obs(None, None, "must-be-null", "agni", collision_ref="shared")
+    assert _has(_v(data), "credential_principal", "null")
+@pytest.mark.parametrize("field", ["inbox_subject", "durable_consumer", "credential_principal"])
+def test_route_scalars_must_be_strings_or_null(field):
+    data = _reg()
+    data["agents"][0]["declared_route"][field] = 123
+    if field in {"inbox_subject", "durable_consumer"}:
+        data["agents"][0][{"inbox_subject": "canonical_inbox_subject", "durable_consumer": "durable_consumer"}[field]] = "123"
+    assert _has(_v(data), "declared_route", field, "string")
+def test_live_on_hub_requires_boolean():
+    data = _reg()
+    data["agents"][0]["live_on_hub"] = "false"
+    assert _has(_v(data), "live_on_hub", "boolean")
+def test_tracked_in_repo_symlink_receipt_is_rejected(tmp_path):
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    (tmp_path / "target.md").write_text("tracked target", encoding="utf-8")
+    (tmp_path / "receipt.md").symlink_to("target.md")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "target.md", "receipt.md"], check=True)
+    errors: list[str] = []
+    assert _validate_receipt_path("agent", "receipt.md", repo_root=tmp_path, errors=errors) is None
+    assert _has(errors, "probe_receipt", "symlink")

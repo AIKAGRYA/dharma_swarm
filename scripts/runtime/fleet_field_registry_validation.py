@@ -93,6 +93,9 @@ def _validate_receipt_path(label, receipt, *, repo_root, errors, field="probe_re
         errors.append(f"{label}: {field} path traversal or backslash rejected")
         return None
     cand = repo_root / receipt
+    if cand.is_symlink():
+        errors.append(f"{label}: {field} symlink rejected")
+        return None
     try:
         full = cand.resolve()
         full.relative_to(repo_root.resolve())
@@ -173,10 +176,12 @@ def _validate_route_block(label, route, *, route_label, errors):
     for key in ROUTE_KEYS:
         if key not in route:
             errors.append(f"{label}: {route_label} missing {key}")
-    if _claiming(route.get("inbox_subject")):
-        _validate_subject(str(route["inbox_subject"]).strip(), errors, label=f"{label}:{route_label}.inbox_subject")
-    if _claiming(route.get("durable_consumer")):
-        _validate_durable(str(route["durable_consumer"]).strip(), errors, label=f"{label}:{route_label}.durable_consumer")
+        elif route[key] is not None and not isinstance(route[key], str):
+            errors.append(f"{label}: {route_label}.{key} must be a string or null")
+    if isinstance(route.get("inbox_subject"), str) and _claiming(route["inbox_subject"]):
+        _validate_subject(route["inbox_subject"].strip(), errors, label=f"{label}:{route_label}.inbox_subject")
+    if isinstance(route.get("durable_consumer"), str) and _claiming(route["durable_consumer"]):
+        _validate_durable(route["durable_consumer"].strip(), errors, label=f"{label}:{route_label}.durable_consumer")
 def _validate_agent_cell(label, agent, errors):
     statuses = {}
     cell = agent.get("runtime_cell")
@@ -367,6 +372,8 @@ def validate_registry(data, *, repo_root):
         for field in REQUIRED_AGENT_FIELDS:
             if field not in agent:
                 errors.append(f"{label}: missing required field {field}")
+        if not isinstance(agent.get("live_on_hub"), bool):
+            errors.append(f"{label}: live_on_hub must be boolean")
         identity_source = str(agent.get("identity_source") or "")
         if identity_source and identity_source not in IDENTITY_SOURCES:
             errors.append(f"{label}: unknown identity_source")
@@ -466,7 +473,7 @@ def validate_registry(data, *, repo_root):
             if coll_ref is not None and str(coll_ref) not in collision_ids:
                 errors.append(f"{label}: observed_effective_route.collision_ref not present in routing_collisions")
             if coll_ref is not None:
-                for key in ("inbox_subject", "durable_consumer"):
+                for key in ROUTE_KEYS:
                     if _claiming(obs.get(key)):
                         errors.append(f"{label}: observed_effective_route.{key} must be null when quarantined by collision_ref")
             for field, bucket in (("inbox_subject", seen_subjects), ("durable_consumer", seen_durables), ("credential_principal", seen_principals)):
@@ -485,5 +492,7 @@ def validate_registry(data, *, repo_root):
         errors.append(f"missing runtime-cell projection for expected identity {missing!r} (union of registration cards + REGISTERED_AGENT_UIDS)")
     if "codex" in present and "codex_composer" in present:
         errors.append("codex must not appear as a second identity when codex_composer is present")
+    if "hermes" in present and "hermes-m5" in present:
+        errors.append("hermes must not appear as a second identity when hermes-m5 is present")
     _scan_secrets(data, "$", errors)
     return errors

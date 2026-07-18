@@ -122,7 +122,7 @@ ENV_NAME_FIELDS = frozenset(
     {"credential_env_names", "env_var_name", "env_var_names", "credential_env_name"}
 )
 ENV_NAME_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
-UID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,127}$")
+UID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,127}$")
 DURABLE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,127}$")
 SUBJECT_TOKEN_RE = re.compile(r"^[A-Za-z0-9_=@,-]+$")
 SECRET_KEY_EXACT = frozenset(
