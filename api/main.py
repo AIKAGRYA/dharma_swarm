@@ -20,10 +20,15 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
 
-from dharma_swarm.api_keys import DASHBOARD_API_KEY_ENV, normalize_env_aliases
+from dharma_swarm.api_keys import (
+    API_MODE_LOCAL_DEV,
+    API_MODE_PRODUCTION,
+    DASHBOARD_API_KEY_ENV,
+    DASHBOARD_API_MODE_ENV,
+    dashboard_api_mode,
+    normalize_env_aliases,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -59,11 +64,14 @@ def _clear_operator_pid(pid: int | None = None) -> None:
 
 def _log_auth_mode() -> None:
     api_key = _get_api_key()
+    mode = dashboard_api_mode()
     if api_key is None:
         logger.warning(
-            "Dashboard API bearer auth is disabled because no auth secret is configured. "
-            "HTTP API routes and direct WebSocket callers are open in dev mode; "
-            "browser WebSockets remain Origin-gated."
+            "Dashboard API bearer auth is disabled because no auth secret is "
+            "configured (mode=%s). The keyless lane serves loopback clients "
+            "only; non-loopback requests are refused. Set DASHBOARD_API_KEY "
+            "or select DHARMA_API_MODE=production for full fail-closed mode.",
+            mode,
         )
     elif not api_key.strip():
         logger.error(
@@ -71,7 +79,11 @@ def _log_auth_mode() -> None:
             "auth are fail-closed"
         )
     else:
-        logger.info("Bearer token auth enabled for /api/* routes.")
+        logger.info(
+            "Dashboard API authentication is enforced on every non-gateway "
+            "transport (mode=%s).",
+            mode,
+        )
 
 
 def get_swarm():
@@ -217,6 +229,16 @@ def _initialize_agent_directory(swarm: Any) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize subsystems on startup, cleanup on shutdown."""
+    # WP-0S (TIT-010): production-shaped startup is refused outright when the
+    # required authentication material is absent or blank.
+    if dashboard_api_mode() == API_MODE_PRODUCTION and not (_get_api_key() or "").strip():
+        raise RuntimeError(
+            "Refusing production-shaped startup: DASHBOARD_API_KEY is absent or "
+            f"blank ({DASHBOARD_API_MODE_ENV}="
+            f"{os.environ.get(DASHBOARD_API_MODE_ENV, '')!r}). Configure the key "
+            f"or select {DASHBOARD_API_MODE_ENV}={API_MODE_LOCAL_DEV} for the "
+            "loopback-bound development lane."
+        )
     logger.info("DHARMA COMMAND API starting...")
     operator_pid = os.getpid()
     _publish_operator_pid(operator_pid)
@@ -333,52 +355,163 @@ _AUTH_CONFIGURATION_FAILURE_RESPONSE = {
     "detail": "DASHBOARD_API_KEY is set but blank; unset it for loopback dev mode or configure a nonblank secret.",
 }
 
+_PRODUCTION_KEYLESS_RESPONSE = {
+    "error": "auth_misconfigured",
+    "detail": "Production-shaped mode requires DASHBOARD_API_KEY; every non-public ingress is fail-closed until it is configured.",
+}
 
-class BearerAuthMiddleware(BaseHTTPMiddleware):
-    """Enforce Bearer token auth on /api/* routes.
+_WEBHOOK_MATERIAL_FAILURE_RESPONSE = {
+    "error": "webhook_verification_unavailable",
+    "detail": "Production-shaped mode refuses the webhook transport while DHARMA_VERIFY_WEBHOOK_SECRET is absent; the signature check cannot fail closed without it.",
+}
 
-    Skips auth entirely when DASHBOARD_API_KEY is not configured (dev mode).
-    Skips auth for routes listed in _PUBLIC_ROUTES.
-    Uses hmac.compare_digest for constant-time token comparison.
+# Webhook verification material; source of truth for the env name is
+# dharma_swarm/verify/github_app.py (VerifyWebhookHandler webhook_secret
+# fallback), which returns success for any payload when the secret is unset.
+_VERIFY_WEBHOOK_SECRET_ENV = "DHARMA_VERIFY_WEBHOOK_SECRET"
+_WEBHOOK_ROUTE = ("POST", "/api/verify/webhook")
+
+# Transports that own their authorization decision end-to-end: the A2A
+# gateway (dharma_swarm/a2a/node_gateway.py) enforces X-A2A-Key on every
+# mutating route and rejects remote callers when no keys are configured.
+_GATEWAY_PATH_PREFIXES = ("/a2a", "/tasks", "/skills", "/.well-known")
+_GATEWAY_EXACT_PATHS = frozenset({"/health"})
+
+# The fixed in-process peer name Starlette's TestClient presents. A real
+# socket peer can only ever present a network address, never this literal, so
+# admitting it cannot admit a network caller — it keeps the documented
+# local/test flow working keyless without opening any reachable surface.
+_IN_PROCESS_CLIENT_HOST = "testclient"
+
+# Real loopback addresses. A same-host reverse proxy presents EVERY remote
+# caller to the ASGI server as one of these, so a loopback peer is not proof
+# of local access. Trusting it for the keyless lane therefore requires an
+# explicit operator opt-in, mirroring the A2A gateway's A2A_ALLOW_LOCAL_NOAUTH
+# guard (dharma_swarm/a2a/node_gateway.py) which refuses to treat a
+# proxy-local peer as trusted without the same explicit signal.
+_LOOPBACK_ADDRESSES = frozenset({"127.0.0.1", "::1", "localhost"})
+_ALLOW_LOOPBACK_NOAUTH_ENV = "DHARMA_API_ALLOW_LOCAL_NOAUTH"
+
+
+def _is_gateway_path(path: str) -> bool:
+    if path in _GATEWAY_EXACT_PATHS:
+        return True
+    return any(
+        path == prefix or path.startswith(prefix + "/")
+        for prefix in _GATEWAY_PATH_PREFIXES
+    )
+
+
+def _client_is_loopback(scope) -> bool:
+    """Whether the keyless lane may admit this peer. Fail closed by default.
+
+    - Unknown peer (scope["client"] omitted by an adapter): refused.
+    - The in-process TestClient sentinel: admitted (never a network caller).
+    - A real loopback address: refused UNLESS the operator explicitly sets
+      DHARMA_API_ALLOW_LOCAL_NOAUTH=1, because a same-host reverse proxy
+      presents every remote caller as loopback (Greptile/Codex P1, #1026).
+    - Anything else: refused.
+    """
+    client = scope.get("client")
+    host = client[0] if client else None
+    if host is None:
+        return False
+    if host == _IN_PROCESS_CLIENT_HOST:
+        return True
+    if host in _LOOPBACK_ADDRESSES:
+        return os.environ.get(_ALLOW_LOOPBACK_NOAUTH_ENV) == "1"
+    return False
+
+
+def _bearer_authorized(scope, api_key: str) -> bool:
+    auth_header = ""
+    for name, value in scope.get("headers", []):
+        if name == b"authorization":
+            auth_header = value.decode("latin-1")
+            break
+    if not auth_header.startswith("Bearer "):
+        return False
+    return hmac.compare_digest(auth_header[7:], api_key)
+
+
+def _ingress_decision(scope) -> tuple[int, dict[str, Any]] | None:
+    """One fail-closed authorization decision for HTTP and WebSocket ingress.
+
+    Returns None to admit the request, or ``(status, payload)`` to refuse it.
+    Classification (WP-0S, TIT-010):
+
+    - ``_PUBLIC_ROUTES`` are open, except the webhook transport in
+      production-shaped mode without its verification material;
+    - gateway paths keep their own fail-closed X-A2A-Key authority;
+    - everything else — REST under any prefix, /holon, /graphql, and both
+      WebSocket routers — is authenticated ingress behind one decision.
+
+    Credentialed WebSocket handshakes are admitted here and validated
+    fail-closed at the route by api.ws.authenticate_dashboard_websocket,
+    which owns the subprotocol/cookie credential formats.
+    """
+    is_ws = scope["type"] == "websocket"
+    path = (scope.get("path") or "/").rstrip("/") or "/"
+    method = "GET" if is_ws else str(scope.get("method", "GET")).upper()
+    mode = dashboard_api_mode()
+
+    if not is_ws and (method, path) in _PUBLIC_ROUTES:
+        if (
+            (method, path) == _WEBHOOK_ROUTE
+            and mode == API_MODE_PRODUCTION
+            and not os.environ.get(_VERIFY_WEBHOOK_SECRET_ENV, "").strip()
+        ):
+            return 503, _WEBHOOK_MATERIAL_FAILURE_RESPONSE
+        return None
+    if _is_gateway_path(path):
+        return None
+
+    api_key = _get_api_key()
+    if api_key is None:
+        if mode == API_MODE_PRODUCTION:
+            return 503, _PRODUCTION_KEYLESS_RESPONSE
+        # Ambiguous or explicit local-development mode: the keyless escape
+        # hatch is loopback-bound — the safer selection for an ambiguous
+        # deployment, and the documented boundary for the explicit dev lane.
+        if _client_is_loopback(scope):
+            return None
+        return 401, _AUTH_FAILURE_RESPONSE
+    if not api_key.strip():
+        # A blank configured secret is neither dev mode nor a credential.
+        return 503, _AUTH_CONFIGURATION_FAILURE_RESPONSE
+    if is_ws:
+        return None
+    if _bearer_authorized(scope, api_key):
+        return None
+    return 401, _AUTH_FAILURE_RESPONSE
+
+
+class IngressAuthMiddleware:
+    """Pure-ASGI ingress gate for HTTP and WebSocket scopes.
+
+    BaseHTTPMiddleware structurally never runs on ``websocket`` scope, which
+    left the WS handshake outside the middleware decision (TIT-010); this
+    class applies ``_ingress_decision`` to both transports at the ASGI layer.
     """
 
-    async def dispatch(self, request: Request, call_next):
-        api_key = _get_api_key()
+    def __init__(self, app) -> None:
+        self.app = app
 
-        # Dev mode: no key configured, everything open
-        if api_key is None:
-            return await call_next(request)
-
-        # A blank configured secret is neither dev mode nor a credential. Fail
-        # closed so `Authorization: Bearer ` cannot authenticate accidentally.
-        if not api_key.strip():
-            return JSONResponse(
-                status_code=503,
-                content=_AUTH_CONFIGURATION_FAILURE_RESPONSE,
-            )
-
-        path = request.url.path.rstrip("/") or "/"
-        method = request.method.upper()
-
-        # Public routes are always open
-        if (method, path) in _PUBLIC_ROUTES:
-            return await call_next(request)
-
-        # Only gate /api/* routes
-        needs_auth = path.startswith("/api")
-        if not needs_auth:
-            return await call_next(request)
-
-        # Extract and validate Bearer token
-        auth_header = request.headers.get("authorization", "")
-        if not auth_header.startswith("Bearer "):
-            return JSONResponse(status_code=401, content=_AUTH_FAILURE_RESPONSE)
-
-        token = auth_header[7:]  # strip "Bearer "
-        if not hmac.compare_digest(token, api_key):
-            return JSONResponse(status_code=401, content=_AUTH_FAILURE_RESPONSE)
-
-        return await call_next(request)
+    async def __call__(self, scope, receive, send):
+        if scope["type"] not in ("http", "websocket"):
+            await self.app(scope, receive, send)
+            return
+        decision = _ingress_decision(scope)
+        if decision is None:
+            await self.app(scope, receive, send)
+            return
+        if scope["type"] == "websocket":
+            await receive()  # consume websocket.connect
+            await send({"type": "websocket.close", "code": 4401})
+            return
+        status_code, payload = decision
+        response = JSONResponse(status_code=status_code, content=payload)
+        await response(scope, receive, send)
 
 
 # ── App ───────────────────────────────────────────────────────────
@@ -392,7 +525,7 @@ app = FastAPI(
 
 # Auth middleware must be added BEFORE CORS so unauthenticated requests
 # are rejected before CORS headers are applied.
-app.add_middleware(BearerAuthMiddleware)
+app.add_middleware(IngressAuthMiddleware)
 
 # CORS for Next.js dev server — explicit origins, not wildcard
 _ALLOWED_ORIGINS = [
