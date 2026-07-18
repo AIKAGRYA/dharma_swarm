@@ -34,6 +34,31 @@ async def send_staged_impl(
         execution_identity=execution_identity,
     )
     side_effect_key = ""
+
+    async def _send_staged() -> str:
+        async with bus._connect() as db:
+            await db.execute(
+                "INSERT INTO messages "
+                "(id, from_agent, to_agent, subject, body, priority, status, "
+                "created_at, reply_to, metadata, superstep_visible)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    message.id,
+                    message.from_agent,
+                    message.to_agent,
+                    message.subject,
+                    message.body,
+                    message.priority.value,
+                    message.status.value,
+                    message.created_at.isoformat(),
+                    message.reply_to,
+                    json.dumps(message.metadata),
+                    deliver_at_superstep,
+                ),
+            )
+            await db.commit()
+        return message.id
+
     if identity is not None:
         metadata = {
             **dict(message.metadata or {}),
@@ -63,40 +88,16 @@ async def send_staged_impl(
                 },
             )
             if not should_execute:
-                record = await bus._runtime_state.get_idempotency_record(
-                    identity.idempotency_key,
-                    side_effect_key,
+                # An unfinished prior attempt must be resumed, never reported
+                # as delivered with a fabricated receipt.
+                return await bus._resume_unfinished_send(
+                    identity, side_effect_key, message, _send_staged
                 )
-                return (record.result_receipt_id if record else "") or message.id
             await bus._runtime_state.record_execution_identity(
                 identity,
                 source="message_bus.send_staged",
                 metadata={"surface": "message_bus"},
             )
-
-    async def _send_staged() -> str:
-        async with bus._connect() as db:
-            await db.execute(
-                "INSERT INTO messages "
-                "(id, from_agent, to_agent, subject, body, priority, status, "
-                "created_at, reply_to, metadata, superstep_visible)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                (
-                    message.id,
-                    message.from_agent,
-                    message.to_agent,
-                    message.subject,
-                    message.body,
-                    message.priority.value,
-                    message.status.value,
-                    message.created_at.isoformat(),
-                    message.reply_to,
-                    json.dumps(message.metadata),
-                    deliver_at_superstep,
-                ),
-            )
-            await db.commit()
-        return message.id
 
     message_id = await bus._run_with_lock_retry(_send_staged)
     if identity is not None and bus._runtime_state is not None:
