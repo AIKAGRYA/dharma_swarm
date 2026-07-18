@@ -1,6 +1,6 @@
 """Seam ledger schema + ratchet tests — DharmaGraph Antithesis v0, Phase A.
 
-Guards three properties of ``tests/oracle_support/seam_ledger.py`` and its
+Guards three properties of ``tests/antithesis_support/seam_ledger.py`` and its
 committed artifact ``reports/governance/dharmagraph_parity/seam_ledger.json``:
 
 1. Determinism — two generations on the same tree are byte-identical, and
@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import json
 
-from tests.oracle_support.seam_ledger import (
+from tests.antithesis_support.seam_ledger import (
     LEDGER_PATH,
     REPO_ROOT,
     build_ledger,
@@ -51,12 +51,12 @@ def test_ledger_regenerates_byte_identically():
 def test_committed_ledger_matches_tree():
     assert LEDGER_PATH.is_file(), (
         "seam_ledger.json missing; run "
-        "python3 tests/oracle_support/seam_ledger.py --write"
+        "python3 tests/antithesis_support/seam_ledger.py --write"
     )
     committed = LEDGER_PATH.read_text(encoding="utf-8")
     assert committed == render_ledger(), (
         "committed seam_ledger.json is stale relative to the tree; "
-        "regenerate with python3 tests/oracle_support/seam_ledger.py --write "
+        "regenerate with python3 tests/antithesis_support/seam_ledger.py --write "
         "and commit it in the same PR as the code change"
     )
 

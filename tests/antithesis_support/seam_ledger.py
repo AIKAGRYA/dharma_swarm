@@ -436,7 +436,7 @@ def build_ledger() -> dict[str, object]:
         )
     return {
         "schema_version": SCHEMA_VERSION,
-        "generator": "tests/oracle_support/seam_ledger.py",
+        "generator": "tests/antithesis_support/seam_ledger.py",
         "spec": "docs/prompts/DHARMAGRAPH_ANTITHESIS_V0_GOAL_2026-07-18.md",
         "workload": {
             "description": WORKLOAD_DESCRIPTION,

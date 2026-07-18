@@ -1561,7 +1561,7 @@
       "symbol": "datetime.now"
     }
   ],
-  "generator": "tests/oracle_support/seam_ledger.py",
+  "generator": "tests/antithesis_support/seam_ledger.py",
   "modules": [
     {
       "custody": "outside_track",
