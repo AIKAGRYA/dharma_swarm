@@ -1,13 +1,8 @@
-# dharma_fleet_field_registry.v1
+# dharma_fleet_field_registry.v2
 #
-# THE machine-readable connect-time source of truth for the A2A fleet field:
-# for each agent identity, the lane it ACTUALLY uses, the broker, the
-# credential ENV VAR NAMES (never values), the subjects it drains and writes,
-# and the last VERIFIED send/receive. Refreshed by probe receipts
-# (inter_agent/<uid>/outbound + inter_agent/fable_claude_code/inbound probe
-# replies), never by aspiration. Requested independently by two fleet agents
-# in the 2026-07-09 field probe ("one secret-free live routing manifest";
-# "refresh it by probe receipts instead of relying on aspirational docs").
+# THE machine-readable connect-time source of truth for the A2A fleet field.
+# Schema v2 adds multi-authority topology and a Universal Agent Runtime Cell
+# projection per identity. Refreshed by probe receipts, never by aspiration.
 #
 # Read it:      python3 scripts/runtime/fleet_field_registry.py
 # Validate it:  python3 scripts/runtime/fleet_field_registry.py --check
@@ -16,17 +11,71 @@
 # governance violation; --check enforces the shape.
 #
 # Relationship to other docs:
-#   docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md  = TARGET contract (DS_* topology)
-#   this file                                      = LIVE field (what runs today)
+#   docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md  = TARGET contract + runtime-cell invariant
+#   this file                                      = LIVE / probe-bound field (what runs today)
+#   docs/architecture/A2A_ALWAYS_ON_SPINE_MASTER_PLAN.md = phased implementation sequencing
 #   docs/ops/A2A_QUICKSTART.md                     = how to connect, step by step
 #   docs/ops/A2A_AGENT_ONBOARDING.md               = how a NEW identity joins
+#
+# Honesty rules (v2):
+#   - unknown / unprobed stay explicit; never render as green
+#   - delivery drain alone caps at HANDLER_ACKED
+#   - no semantic executor ⇒ no semantic/effect completion claim
+#   - reference/runtime-observed-uncommitted evidence is not committed-live cutover truth
+#   - display names, models, hosts, sessions are mutable attributes — not routing identity
 
-schema: dharma_fleet_field_registry.v1
-updated: "2026-07-14"
-refreshed_by: field_probe_2026_07_09
+schema: dharma_fleet_field_registry.v2
+updated: "2026-07-18"
+refreshed_by: field_probe_2026_07_09_plus_v2_runtime_cell_projection
 probe_synthesis: inter_agent/fleet/2026-07-09-field-probe-synthesis.md
 secret_policy: env_var_names_only
 
+# ---------------------------------------------------------------------------
+# AUTHORITIES — distinct NATS/JetStream (or local) authorities. Not aspirational.
+# evidence_status must not promote uncommitted session observations to cutover.
+# ---------------------------------------------------------------------------
+authorities:
+  - authority_id: agni
+    role: source_compatibility
+    evidence_status: probe_backed_2026_07_09
+    broker_urls:
+      wss: wss://157.245.193.15:8443
+      nats: nats://157.245.193.15:4222
+    live_stream: DHARMA_A2A
+    ca_pem_path: dharma_swarm/a2a/nats/agni-ws-ca.pem
+    target_topology_note: >-
+      The DS_* stream topology in NATS_SUBSTRATE_MASTER_SPEC.md is the TARGET
+      contract. The 2026-07-09 field probe confirmed (unanimously, six seats)
+      that no DS_* stream runs live anywhere; all AGNI live traffic is on DHARMA_A2A.
+    authenticated_inventory: unknown  # AGNI authenticated stream/consumer inventory inaccessible from 2026-07-18 Meghaforge session
+    notes:
+      - Compatibility/source authority for historical fleet cards and WSS rendezvous.
+      - Not the sole logical writable authority after a gated cutover; see FFR-D5.
+
+  - authority_id: mac_local
+    role: local_operator
+    evidence_status: probe_backed_2026_07_09
+    broker_urls:
+      nats: nats://127.0.0.1:4222
+    live_stream: DHARMA_FLEET
+    status: operator-Mac only; unbridged from AGNI; often offline
+    notes:
+      - Distinct from AGNI and Meghadharma; no proven mirror.
+
+  - authority_id: meghadharma
+    role: candidate_reference
+    evidence_status: runtime_observed_uncommitted
+    broker_urls:
+      nats: unknown  # host-local listen observed; public URL not committed as live doctrine
+    live_stream: DHARMA_A2A
+    kv_bucket: FLEET_STATE  # runtime-observed uncommitted; not cutover truth
+    object_store_bucket: FLEET_ARTIFACTS  # runtime-observed uncommitted
+    notes:
+      - Candidate/reference durable hub from 2026-07-18 Meghaforge host probes.
+      - MUST NOT be promoted to cutover/live canonical truth merely because one session observed it.
+      - Gated recommendation only — see FFR-D5. Requires parity, credentials, rollback, operator ACCEPT.
+
+# Backward-compatible singular hub projection (AGNI source). Prefer `authorities`.
 hub:
   name: agni
   broker_urls:
@@ -35,14 +84,40 @@ hub:
   live_stream: DHARMA_A2A
   ca_pem_path: dharma_swarm/a2a/nats/agni-ws-ca.pem
   target_topology_note: >-
-    The DS_* stream topology in NATS_SUBSTRATE_MASTER_SPEC.md is the TARGET
-    contract. The 2026-07-09 field probe confirmed (unanimously, six seats)
-    that no DS_* stream runs live anywhere; all live traffic is on DHARMA_A2A.
+    Prefer authorities[] in v2. This hub block remains as a compatibility
+    projection of the AGNI source_compatibility authority.
   secondary_broker:
     name: mac_local
     url: nats://127.0.0.1:4222
     stream: DHARMA_FLEET
     status: operator-Mac only; unbridged from AGNI; often offline
+
+# ---------------------------------------------------------------------------
+# Universal Agent Runtime Cell — top-level contract (doctrine details live in
+# NATS_SUBSTRATE_MASTER_SPEC.md; this block is the registry-shape binding).
+# ---------------------------------------------------------------------------
+runtime_cell_contract:
+  components:
+    - agent_uid
+    - canonical_inbox_subject
+    - durable_consumer
+    - credential_principal
+    - delivery_runtime
+    - semantic_executor_mode
+    - idempotent_effect_boundary
+    - receipt_lifecycle
+    - large_artifact_lane
+    - observability_projection
+  delivery_drain_ceiling: HANDLER_ACKED
+  readiness_rule: minimum_proven_tier_across_components
+  identity_law: >-
+    Display names, models, hosts, and temporary sessions are mutable attributes.
+    Routing identity is stable agent_uid + unique canonical inbox + unique durable
+    + identity-scoped credential principal.
+  reference_implementation_law: >-
+    A reference agent stack (including Meghaforge/grok_build) is evidence and a
+    pattern source only; it is not architecture authority and must not mint a
+    private transport stack that becomes a new authority.
 
 decisions:
   - id: FFR-D1
@@ -57,6 +132,7 @@ decisions:
       (permission violations from two independent live nodes), so the live
       fleet can only broadcast — agents cannot DM each other.
     status: RATIFIED_NOT_APPLIED   # hub config change is an operator action on the AGNI VPS
+
   - id: FFR-D2
     date: "2026-07-09"
     decision: one subject per identity (resolve dharma.a2a.hermes collision)
@@ -64,8 +140,11 @@ decisions:
       AGNI Hermes and rushabdev BOTH drain dharma.a2a.hermes with durable
       consumers — two identities on one subject either compete for messages
       or double-process. rushabdev gets its own subject (dharma.a2a.rushabdev)
-      once hub ACLs are reworked under FFR-D1.
+      once hub ACLs are reworked under FFR-D1. v2 registry refuses duplicate
+      non-null canonical_inbox_subject claims across distinct UIDs; the shared
+      listen is recorded in listen_subjects/blockers, not as two equal canonical claims.
     status: OPEN
+
   - id: FFR-D3
     date: "2026-07-09"
     decision: this registry supersedes scattered routing prose
@@ -76,21 +155,56 @@ decisions:
       operator decision recorded in `decisions`.
     status: ACTIVE
 
+  - id: FFR-D4
+    date: "2026-07-18"
+    decision: every identity is a Universal Agent Runtime Cell instance
+    detail: >-
+      All identities — Grok/Meghaforge, rushabdev, AGNI Hermes, cloud seats,
+      future external/SAB participants — are instances of the same runtime-cell
+      contract. No agent-specific transport stack may become a new authority.
+      Readiness is the minimum proven tier across the ten cell components;
+      delivery drain alone caps at HANDLER_ACKED; unknown stays unknown.
+    status: ACTIVE
+
+  - id: FFR-D5
+    date: "2026-07-18"
+    decision: gated recommendation for one logical writable authority
+    detail: >-
+      GATED RECOMMENDATION (not live cutover): after dual-authority inventory
+      parity, scoped credentials, rollback drill, field-registry/card updates,
+      and explicit operator ACCEPT, converge on one logical writable task/message
+      authority per subject family. AGNI remains source_compatibility until those
+      gates close. Meghadharma is candidate_reference only under
+      runtime_observed_uncommitted evidence — observation is not cutover.
+    status: RECOMMENDED_NOT_APPLIED
+
 # ---------------------------------------------------------------------------
-# PROBED AGENTS — every entry below is backed by a 2026-07-09 probe receipt.
-# lanes: agni_hub_wss | agni_hub_nats | local_nats_4222 | git_seat | operator_relay | none
+# AGENTS — every probed entry below preserves 2026-07-09 probe-backed facts.
+# Component statuses use: unknown | unprobed | declared | probed | absent |
+# runtime_observed_uncommitted. Do not infer green.
+# lanes: agni_hub_wss | agni_hub_nats | local_nats_4222 | meghadharma_nats |
+#        git_seat | operator_relay | none
 # ---------------------------------------------------------------------------
 agents:
   - agent_uid: hermes
     display_name: AGNI Hermes (hub-resident semantic bridge)
     runtime: AGNI hub VPS (157.245.193.15); hermes_remote_a2a_bridge.py + codex_composer_agni_bridge.py as systemd services
     registered_card: none
+    evidence_status: probe_backed_2026_07_09
+    authority_id: agni
     lanes_available: [local_nats_4222]
     primary_lane: local_nats_4222
     live_on_hub: true
     credential_env_names: []          # local to the broker host; no remote creds needed
+    credential_principal: local_hub_resident  # declared shape only; not a secret
     listen_subjects: [dharma.a2a.hermes]
     publish_subjects: ["dharma.a2a.hermes.reply.>", "dharma.a2a.hermes.ack.>", dharma.a2a.fleet]
+    canonical_inbox_subject: dharma.a2a.hermes
+    durable_consumer: unknown  # AGNI authenticated consumer inventory inaccessible 2026-07-18
+    semantic_executor_mode: always_on  # bridge pair is a live semantic path on the hub host
+    transport_contact_tier: HANDLER_ACKED
+    semantic_effect_ceiling: HANDLER_ACKED  # no fleet-wide DOMAIN_RECEIPTED proof in probe receipts
+    readiness_ceiling: unknown  # durable_consumer unknown forces fail-closed unknown
     git_seat: inter_agent/hermes/
     last_verified_send: "2026-07-09T00:27Z (SAB flywheel reply)"
     last_verified_receive: "2026-07-09T00:24Z (SAB flywheel packet)"
@@ -98,39 +212,93 @@ agents:
       - hub ACL blocks publish to peer subjects (FFR-D1); only fleet broadcast works
       - bridge sessions are stateless (no session resume); each packet starts blind
       - no dharma_swarm checkout on the host (no git seat access)
+      - AGNI durable consumer name not inventory-proven from this session
     probe_receipt: inter_agent/fable_claude_code/inbound/2026-07-09-hermes-agni-probe-reply.md
+    runtime_cell:
+      transport_contact_tier: HANDLER_ACKED
+      semantic_effect_ceiling: HANDLER_ACKED
+      readiness_ceiling: unknown
+      components:
+        agent_uid: {status: probed, value: hermes}
+        canonical_inbox_subject: {status: probed, value: dharma.a2a.hermes}
+        durable_consumer: {status: unknown, note: AGNI authenticated inventory inaccessible}
+        credential_principal: {status: declared, value: local_hub_resident}
+        delivery_runtime: {status: probed, value: hermes_remote_a2a_bridge}
+        semantic_executor_mode: {status: probed, value: always_on}
+        idempotent_effect_boundary: {status: unknown}
+        receipt_lifecycle: {status: declared, note: partial HANDLER_ACKED evidence only}
+        large_artifact_lane: {status: absent}
+        observability_projection: {status: unprobed}
 
   - agent_uid: rushabdev
     display_name: rushabdev (Hermes revenue/operator node)
     runtime: openclaw23 VPS (DigitalOcean SGP1); Telegram gateway + local bridge daemon
     registered_card: none in repo (local card /root/.dharma/a2a/cards/rushabdev.json on its host)
+    evidence_status: probe_backed_2026_07_09
+    authority_id: agni
     lanes_available: [agni_hub_nats, git_seat, operator_relay]
     primary_lane: agni_hub_nats     # plain NATS to 157.245.193.15:4222
     live_on_hub: true
     credential_env_names: [NATS_URL, NATS_USER, NATS_PASSWORD, NATS_STREAM, NATS_SUBJECT, NATS_CONSUMER]
+    credential_principal: unknown  # env names known; principal mapping not probe-bound
+    # Actual 2026-07-09 drain collided on dharma.a2a.hermes (FFR-D2). Canonical claim is the
+    # intended unique subject — not a second ownership claim on hermes' subject.
     listen_subjects: [dharma.a2a.hermes, "dharma.a2a.hermes.reply.>", "dharma.a2a.hermes.ack.>"]
     publish_subjects: [dharma.a2a.hermes, dharma.a2a.fleet]
+    canonical_inbox_subject: dharma.a2a.rushabdev
+    durable_consumer: unknown
+    semantic_executor_mode: event_driven
+    transport_contact_tier: HANDLER_ACKED
+    semantic_effect_ceiling: HANDLER_ACKED
+    readiness_ceiling: unknown
     git_seat: inter_agent/rushabdev/
     last_verified_send: "2026-07-09T00:26Z via dharma.a2a.hermes"
     last_verified_receive: "2026-07-09T00:24Z via dharma.a2a.hermes"
     blockers:
-      - shares dharma.a2a.hermes with AGNI Hermes (FFR-D2 collision)
+      - shares dharma.a2a.hermes drain with AGNI Hermes (FFR-D2 collision); canonical subject declared not applied
       - hub ACL blocked publish to dharma.a2a.fable_claude_code (verified live; FFR-D1)
       - git-seat pushes are DELAYED, not absent — its probe-reply commit 750b360f stranded
         locally at probe time, then landed as branch rushabdev/a2a-field-probe-2026-07-09
         (~3h later); treat the seat's git lane as slow-but-working
     probe_receipt: inter_agent/fable_claude_code/inbound/2026-07-09-rushabdev-probe-reply.md
+    runtime_cell:
+      transport_contact_tier: HANDLER_ACKED
+      semantic_effect_ceiling: HANDLER_ACKED
+      readiness_ceiling: unknown
+      components:
+        agent_uid: {status: probed, value: rushabdev}
+        canonical_inbox_subject:
+          status: declared
+          value: dharma.a2a.rushabdev
+          note: FFR-D2 OPEN; live drain still collides on dharma.a2a.hermes
+        durable_consumer: {status: unknown}
+        credential_principal: {status: unknown, note: env var names known only}
+        delivery_runtime: {status: probed, value: local_bridge_daemon}
+        semantic_executor_mode: {status: declared, value: event_driven}
+        idempotent_effect_boundary: {status: unknown}
+        receipt_lifecycle: {status: declared, note: partial HANDLER_ACKED evidence only}
+        large_artifact_lane: {status: absent}
+        observability_projection: {status: unprobed}
 
   - agent_uid: devin-roaming-2987d222
     display_name: Devin (Cognition AI)
     runtime: Devin cloud VM
     registered_card: examples/agents/devin.registration.json
+    evidence_status: probe_backed_2026_07_09
+    authority_id: agni
     lanes_available: [git_seat, operator_relay]   # holds hub creds but WSS egress is blocked from the VM
     primary_lane: operator_relay
     live_on_hub: false
     credential_env_names: [DEVIN_NATS_URL, DEVIN_NATS_USER, DEVIN_NATS_PW]
+    credential_principal: unknown
     listen_subjects: [dharma.a2a.devin, "dharma.a2a.devin.>", dharma.agent.devin-roaming-2987d222.inbox]
     publish_subjects: ["dharma.a2a.<peer>", "dharma.agent.<peer-uid>.inbox", dharma.a2a.fleet]
+    canonical_inbox_subject: dharma.agent.devin-roaming-2987d222.inbox
+    durable_consumer: unknown
+    semantic_executor_mode: manual_seat
+    transport_contact_tier: unknown
+    semantic_effect_ceiling: unknown
+    readiness_ceiling: unknown
     git_seat: inter_agent/devin/
     last_verified_send: never (live NATS); git seat verified 2026-07-09 (branch devin/2026-07-09-fleet-probe)
     last_verified_receive: never (live NATS)
@@ -139,17 +307,41 @@ agents:
       - devin_a2a_agent.py pull-subscribes ONLY the exact subject dharma.a2a.devin — the
         reply/ack wildcard and the dharma.agent.<uid>.inbox route are never drained
     probe_receipt: inter_agent/devin/outbound/2026-07-09-devin-probe-reply.md
+    runtime_cell:
+      transport_contact_tier: unknown
+      semantic_effect_ceiling: unknown
+      readiness_ceiling: unknown
+      components:
+        agent_uid: {status: probed, value: devin-roaming-2987d222}
+        canonical_inbox_subject: {status: declared, value: dharma.agent.devin-roaming-2987d222.inbox}
+        durable_consumer: {status: unknown}
+        credential_principal: {status: unknown}
+        delivery_runtime: {status: absent, note: live NATS drain never verified}
+        semantic_executor_mode: {status: declared, value: manual_seat}
+        idempotent_effect_boundary: {status: unknown}
+        receipt_lifecycle: {status: unprobed}
+        large_artifact_lane: {status: absent}
+        observability_projection: {status: unprobed}
 
   - agent_uid: fable_claude_code
     display_name: Fable 5 (Claude Code)
     runtime: Claude Code cloud sandbox sessions (ephemeral; durable presence = card + git seat + pushed branches)
     registered_card: examples/agents/fable_claude_code.registration.json
+    evidence_status: probe_backed_2026_07_09
+    authority_id: agni
     lanes_available: [git_seat, operator_relay]
     primary_lane: git_seat
     live_on_hub: false
     credential_env_names: []          # sandbox holds no NATS creds; egress to hub blocked (direct timeout + proxy reset, verified 2026-07-09)
+    credential_principal: absent
     listen_subjects: [inter_agent/fable_claude_code/inbound/ (drained on wake)]
     publish_subjects: [inter_agent/<peer>/inbound/ (via pushed branches), dharma.a2a.fable_claude_code (aspirational)]
+    canonical_inbox_subject: null  # no live NATS canonical inbox proven
+    durable_consumer: null
+    semantic_executor_mode: manual_seat
+    transport_contact_tier: unknown
+    semantic_effect_ceiling: unknown
+    readiness_ceiling: unknown
     git_seat: inter_agent/fable_claude_code/
     last_verified_send: "2026-07-09 (this registry + probe synthesis, pushed branch)"
     last_verified_receive: "2026-07-09 (Devin probe reply into inbound/, branch devin/2026-07-09-fleet-probe)"
@@ -157,17 +349,41 @@ agents:
       - sandbox egress proxy blocks the hub; git seat IS the connection, not a fallback
       - a2a_doctor.py crashed on missing aiohttp before reporting honestly (fixed 2026-07-09)
     probe_receipt: inter_agent/fable_claude_code/inbound/2026-07-09-fable-claude-code-self-probe.md
+    runtime_cell:
+      transport_contact_tier: unknown
+      semantic_effect_ceiling: unknown
+      readiness_ceiling: unknown
+      components:
+        agent_uid: {status: probed, value: fable_claude_code}
+        canonical_inbox_subject: {status: absent, note: git seat only; no NATS canonical proven}
+        durable_consumer: {status: absent}
+        credential_principal: {status: absent}
+        delivery_runtime: {status: declared, value: git_seat_on_wake}
+        semantic_executor_mode: {status: declared, value: manual_seat}
+        idempotent_effect_boundary: {status: unknown}
+        receipt_lifecycle: {status: declared, note: git dock receipts only}
+        large_artifact_lane: {status: absent}
+        observability_projection: {status: unprobed}
 
   - agent_uid: codex
     display_name: Codex (meghadharma seat)
     runtime: meghadharma host via Terminus terminal (gpt-5.5 xhigh)
     registered_card: none for this seat (codex_composer has separate identity)
+    evidence_status: probe_backed_2026_07_09
+    authority_id: meghadharma
     lanes_available: [operator_relay]
     primary_lane: operator_relay
     live_on_hub: false
     credential_env_names: []
+    credential_principal: absent
     listen_subjects: []
     publish_subjects: []
+    canonical_inbox_subject: null
+    durable_consumer: null
+    semantic_executor_mode: manual_seat
+    transport_contact_tier: unknown
+    semantic_effect_ceiling: unknown
+    readiness_ceiling: unknown
     git_seat: inter_agent/codex/    # exists, but operator has ruled A2A-through-git out for this seat
     last_verified_send: never
     last_verified_receive: "2026-07-09 (probe prompt via operator relay)"
@@ -175,17 +391,41 @@ agents:
       - no local NATS listener on 127.0.0.1:4222; no persistent daemon or mailbox drain
       - OpenClaw gateway is origin/device-auth protected and unproven as a send path
     probe_receipt: inter_agent/fable_claude_code/inbound/2026-07-09-codex-meghadharma-probe-reply.md
+    runtime_cell:
+      transport_contact_tier: unknown
+      semantic_effect_ceiling: unknown
+      readiness_ceiling: unknown
+      components:
+        agent_uid: {status: probed, value: codex}
+        canonical_inbox_subject: {status: absent}
+        durable_consumer: {status: absent}
+        credential_principal: {status: absent}
+        delivery_runtime: {status: absent}
+        semantic_executor_mode: {status: declared, value: manual_seat}
+        idempotent_effect_boundary: {status: unknown}
+        receipt_lifecycle: {status: unprobed}
+        large_artifact_lane: {status: unknown}
+        observability_projection: {status: unprobed}
 
   - agent_uid: perplexity-computer
     display_name: Perplexity Computer (Stage-1 evidence-only seat)
     runtime: Perplexity Computer cloud sandbox (ephemeral per thread; no daemon)
     registered_card: examples/agents/perplexity-computer.registration.json
+    evidence_status: probe_backed_2026_07_09
+    authority_id: agni
     lanes_available: [git_seat, operator_relay]
     primary_lane: operator_relay
     live_on_hub: false
     credential_env_names: []          # no fleet-issued NATS creds; ACL record is Issue #407
+    credential_principal: absent
     listen_subjects: [inter_agent/perplexity-computer/inbound/ (drained on wake), roaming_mailbox/tasks/]
     publish_subjects: [inter_agent/<peer>/inbound/ (file-mirror), dharma.a2a.perplexity-computer (aspirational)]
+    canonical_inbox_subject: null
+    durable_consumer: null
+    semantic_executor_mode: manual_seat
+    transport_contact_tier: unknown
+    semantic_effect_ceiling: unknown
+    readiness_ceiling: unknown
     git_seat: inter_agent/perplexity-computer/
     last_verified_send: "2026-07-09T11:41+09:00 (probe reply via operator relay)"
     last_verified_receive: "2026-07-09T11:37+09:00 (probe prompt via operator relay)"
@@ -194,6 +434,21 @@ agents:
       - a2a_send.py fails from non-daemon seats — sqlite3.OperationalError readonly database at runtime_state.py:2666
       - naming drift perplexity vs perplexity-computer (resolved by this registry + card: uid is perplexity-computer)
     probe_receipt: inter_agent/fable_claude_code/inbound/2026-07-09-perplexity-computer-probe-reply.md
+    runtime_cell:
+      transport_contact_tier: unknown
+      semantic_effect_ceiling: unknown
+      readiness_ceiling: unknown
+      components:
+        agent_uid: {status: probed, value: perplexity-computer}
+        canonical_inbox_subject: {status: absent}
+        durable_consumer: {status: absent}
+        credential_principal: {status: absent}
+        delivery_runtime: {status: declared, value: git_seat_and_operator_relay}
+        semantic_executor_mode: {status: declared, value: manual_seat}
+        idempotent_effect_boundary: {status: unknown}
+        receipt_lifecycle: {status: declared, note: operator-relay receipts only}
+        large_artifact_lane: {status: absent}
+        observability_projection: {status: unprobed}
 
   - agent_uid: fable_composer
     display_name: Fable 5 (Composer)
@@ -202,16 +457,25 @@ agents:
       woken 2026-07-14 by operator-directed Claude Code cloud session — cross-harness
       wakes drain the git dock only and must disclose their harness in packets
     registered_card: examples/agents/fable_composer.registration.json
+    evidence_status: probe_backed_2026_07_09
+    authority_id: mac_local
     lanes_available: [git_seat]
     primary_lane: git_seat
     live_on_hub: false
     credential_env_names: []
+    credential_principal: absent
     listen_subjects:
       - inter_agent/fable_composer/inbound/ (drained 2026-07-14; 3 packets answered)
       - dharma.a2a.fable_composer (registered in scripts/runtime/a2a_doctor.py; no verified drain)
     publish_subjects:
       - inter_agent/<peer>/inbound/ (via pushed branches)
       - dharma.a2a.fable_composer.reply.> (aspirational)
+    canonical_inbox_subject: null
+    durable_consumer: null
+    semantic_executor_mode: manual_seat
+    transport_contact_tier: unknown
+    semantic_effect_ceiling: unknown
+    readiness_ceiling: unknown
     git_seat: inter_agent/fable_composer/
     last_verified_send: 2026-07-14 (wiring ack + contact/relay reply, pushed branch)
     last_verified_receive: 2026-07-14 (drained 2026-07-02T0500Z, 2026-07-02T0520Z, 2026-07-09 packets)
@@ -220,6 +484,66 @@ agents:
       - Mac runtime state (~/.dharma/agents/fable_composer/) unreachable from cloud wakes —
         hill-climb status and fugu relay still owe an operator-Mac session
     probe_receipt: inter_agent/fable_claude_code/inbound/2026-07-09-fable_composer-wiring-ack.md
+    runtime_cell:
+      transport_contact_tier: unknown
+      semantic_effect_ceiling: unknown
+      readiness_ceiling: unknown
+      components:
+        agent_uid: {status: probed, value: fable_composer}
+        canonical_inbox_subject: {status: absent, note: NATS subject registered but never verified}
+        durable_consumer: {status: absent}
+        credential_principal: {status: absent}
+        delivery_runtime: {status: declared, value: git_dock_on_wake}
+        semantic_executor_mode: {status: declared, value: manual_seat}
+        idempotent_effect_boundary: {status: unknown}
+        receipt_lifecycle: {status: declared, note: git dock receipts}
+        large_artifact_lane: {status: absent}
+        observability_projection: {status: unprobed}
+
+  # Reference instance only — runtime_observed_uncommitted. Not committed-live cutover truth.
+  # Stable UID/subject/durable from host stack observation; must not mint a private authority.
+  - agent_uid: grok_build
+    display_name: Meghaforge (grok_build) — reference runtime-cell instance
+    runtime: meghadharma-cloud always-on stack (inbox + semantic + leader + gateway units); reference implementation only
+    registered_card: none committed in this packet
+    evidence_status: runtime_observed_uncommitted
+    authority_id: meghadharma
+    lanes_available: [meghadharma_nats, git_seat]
+    primary_lane: meghadharma_nats
+    live_on_hub: false  # not on AGNI hub; host-local observation only
+    credential_env_names: []  # principal name known; no env values recorded here
+    credential_principal: grok_build
+    listen_subjects: [dharma.agent.grok_build.inbox, dharma.a2a.grok-build]
+    publish_subjects: [dharma.a2a.fleet]
+    canonical_inbox_subject: dharma.agent.grok_build.inbox
+    durable_consumer: grok_build_inbox
+    semantic_executor_mode: always_on
+    transport_contact_tier: HANDLER_ACKED  # host stack observed; uncommitted
+    semantic_effect_ceiling: HANDLER_ACKED  # do not overclaim DOMAIN_RECEIPTED from uncommitted evidence
+    readiness_ceiling: HANDLER_ACKED
+    git_seat: none committed
+    last_verified_send: runtime_observed_uncommitted (2026-07-18 Meghaforge session)
+    last_verified_receive: runtime_observed_uncommitted (2026-07-18 Meghaforge session)
+    blockers:
+      - evidence is runtime_observed_uncommitted — not a committed-live registry promotion
+      - AGNI authenticated inventory was inaccessible; dual-hub parity not proven
+      - reference implementation is not architecture authority (FFR-D4)
+    # no committed probe_receipt path — honest uncommitted evidence_status
+    runtime_cell:
+      transport_contact_tier: HANDLER_ACKED
+      semantic_effect_ceiling: HANDLER_ACKED
+      readiness_ceiling: HANDLER_ACKED
+      components:
+        agent_uid: {status: runtime_observed_uncommitted, value: grok_build}
+        canonical_inbox_subject: {status: runtime_observed_uncommitted, value: dharma.agent.grok_build.inbox}
+        durable_consumer: {status: runtime_observed_uncommitted, value: grok_build_inbox}
+        credential_principal: {status: runtime_observed_uncommitted, value: grok_build}
+        delivery_runtime: {status: runtime_observed_uncommitted, value: grok-build-inbox.service}
+        semantic_executor_mode: {status: runtime_observed_uncommitted, value: always_on}
+        idempotent_effect_boundary: {status: unknown}
+        receipt_lifecycle: {status: runtime_observed_uncommitted, note: correlated host receipts uncommitted}
+        large_artifact_lane: {status: runtime_observed_uncommitted, note: FLEET_ARTIFACTS observed on meghadharma only}
+        observability_projection: {status: declared, value: projection_only}
 
 # Known identities NOT probed on 2026-07-09 — do not treat as live without a receipt.
 unprobed_identities:
@@ -246,3 +570,5 @@ deferred_fixes:
     scripts/ops/mint_a2a_gateway_token.py; per-agent bearer tokens, publish-to-peer,
     own-inbox drain). REMAINING — operator deploys it on the droplet + issues tokens;
     docs/ops/A2A_LIVE_WIRE_RUNBOOK.md steps 2-3
+  - dual-authority inventory/parity harness (WP-1) before any cutover recommendation is applied
+  - AGNI authenticated stream/consumer inventory remains unknown from the 2026-07-18 session

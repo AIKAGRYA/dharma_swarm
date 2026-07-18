@@ -100,9 +100,47 @@ The transport contract is more important than the UI. A beautiful voice loop on 
    - use for long-running, human-interruptible workflows after A2A transport truth is stable
    - map LangGraph thread/checkpoint semantics to local `ExecutionIdentity` and runtime receipts
 
+## Universal Runtime Cell — reusable work packages
+
+The NATS master spec owns the **Universal Agent Runtime Cell** invariant
+(`docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md`). This plan sequences
+fleet-wide adoption of that cell. Every identity is a cell instance; no
+agent-specific transport stack may become a new authority.
+
+**Evidence / pattern sources only (do not merge wholesale as architecture):**
+
+- Draft PRs #947 / #949 — operator-node-specific and dirty; may supply
+  patterns (inbox drain, domain reply, gateway edges) but are not cutover
+  vehicles.
+- Meghaforge / `grok_build` host stack — reference implementation proving
+  durable inbox + semantic worker + leader + gateway can cohere on one
+  identity. Not architecture authority; not a special-case Grok path.
+- PR #1025 dated NATS/A2A system update spec — parallel evidence; unique
+  content is reconciled into existing owners (this plan + NATS master +
+  FFR v2), not force-pushed into canonicity.
+
+### Work packages (global, reusable)
+
+| WP | Title | Outcome | Depends |
+|---|---|---|---|
+| **WP-0** | Registry v2 / probe refresh | `FLEET_FIELD_REGISTRY.yaml` schema v2 with multi-authority records, per-agent runtime-cell projections, fail-closed readiness ceilings; reader + tests green | — |
+| **WP-1** | Dual-authority inventory / parity harness | Hermetic (+ optional live) inventory of AGNI, Mac-local, and Meghadharma streams/consumers/subjects; parity report; no silent third authority | WP-0 |
+| **WP-2** | Lifecycle receipt projector | Projector that records publish → delivered → handler acked → semantic replied → effect receipted without collapsing tiers; unknown stays unknown | WP-0 |
+| **WP-3** | Reusable runtime-cell service template | One template (inbox drain + optional semantic executor + leader/lease + gateway edge) parameterized by `agent_uid` / subject / durable / principal / mode — not a Grok-only unit file | WP-2 |
+| **WP-4** | Scoped credential and artifact gateway | Per-identity principals (env-var names only in git); Object Store / large-artifact upload-download by reference + SHA; external seats via mailbox gateway, not broad NATS creds | WP-1 |
+| **WP-5** | Operator dashboard projection | Read-only projection of KV / object / receipt truth; never drains worker durables; never paints unknown green | WP-2 |
+| **WP-6** | One-agent canary then fleet cutover | Canary one cell on the gated writable authority; then fleet cutover with rollback drill, registry/card updates, and operator ACCEPT. Not live until gates close | WP-1, WP-2, WP-3, WP-4 |
+
+**Stop conditions for all WPs:** no broker migration, credential rotation,
+service restart, or cutover without operator ACCEPT; no special-casing a
+single vendor identity into doctrine; no merging stale/dirty PRs as the
+substrate.
+
 ## Hard Gaps
 
 - No proven local-fleet to AGNI mirror.
+- Multiple unbridged authorities (AGNI source, Mac-local, Meghadharma candidate); one logical writable authority is a gated recommendation only.
+- Runtime-cell readiness is partially unknown for most seats (durables, principals, semantic/effect ceilings).
 - No enforced Agent Card signature verification.
 - `NodeGateway.init_gateway()` is not proven live in the API lifespan.
 - `NodeRegistry` has stored `api_key` material in cleartext in local state; never commit or print it.
@@ -122,6 +160,11 @@ A future PR may claim "always-on speaking A2A" only when all of this is true:
 - Local and AGNI broker status are reported separately.
 - Agent Card signatures or an equivalent trust gate are enforced.
 - A final boss/eval gate can replay the evidence without depending on prose.
+- Every live identity is admitted as a Universal Agent Runtime Cell with unique
+  uid/subject/durable/principal, declared semantic mode, and an honest
+  readiness ceiling (delivery alone ≤ `HANDLER_ACKED`).
+- One logical writable authority is proven only after WP-6 gates and operator
+  ACCEPT — never by prose promotion of a reference host.
 
 ## Upstream References Checked
 
