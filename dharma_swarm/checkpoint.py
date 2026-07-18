@@ -336,6 +336,14 @@ class SuperstepCheckpoint(BaseModel):
                 f.flush()
                 os.fsync(f.fileno())
             Path(tmp).rename(path)
+            # The rename itself is not durable until the directory entry is
+            # synced; without this a power loss can keep the bytes but lose
+            # the publication.
+            dir_fd = os.open(path.parent, os.O_RDONLY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
         except Exception:
             try:
                 Path(tmp).unlink(missing_ok=True)

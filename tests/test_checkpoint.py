@@ -294,7 +294,10 @@ def test_superstep_checkpoint_save_fsyncs_before_rename(tmp_path, monkeypatch):
     target = tmp_path / "superstep.json"
     checkpoint.save(target)
 
-    assert synced_fds, "save() must fsync the temp file before renaming it"
+    assert len(synced_fds) >= 2, (
+        "save() must fsync the temp file before renaming it and the parent"
+        " directory after the rename"
+    )
     loaded = SuperstepCheckpoint.load(target)
     assert loaded is not None
     assert loaded.superstep_id == 3

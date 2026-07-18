@@ -173,3 +173,76 @@ async def test_message_bus_staged_retry_returns_same_receipt(tmp_path: Path) -> 
     assert _message_count(bus_path) == 1
     assert await bus.receive("bob", current_superstep=1) == []
     assert [m.id for m in await bus.receive("bob", current_superstep=2)] == [first_id]
+
+
+@pytest.mark.asyncio
+async def test_message_bus_staged_retry_resumes_insert_after_crash_before_write(tmp_path: Path) -> None:
+    """A retry after a crash between begin and INSERT must write the row,
+    not fabricate a receipt for a message that was never persisted."""
+    runtime = RuntimeStateStore(tmp_path / "runtime.db")
+    bus_path = tmp_path / "messages.db"
+    bus = MessageBus(bus_path, runtime_state=runtime, require_identity=True)
+    await bus.init_db()
+
+    identity = _identity(
+        run_id="run-staged-crash-insert",
+        task_id="task-staged-crash-insert",
+        idempotency_key="idem-staged-crash-insert",
+    )
+    metadata = identity_metadata(identity, surface="message_bus")
+    message = Message(from_agent="alice", to_agent="bob", body="staged", metadata=metadata)
+
+    original_retry = bus._run_with_lock_retry
+
+    async def _crash_before_insert(fn):
+        raise RuntimeError("crash before insert")
+
+    bus._run_with_lock_retry = _crash_before_insert  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError, match="crash before insert"):
+        await bus.send_staged(message, deliver_at_superstep=2)
+    bus._run_with_lock_retry = original_retry  # type: ignore[method-assign]
+    assert _message_count(bus_path) == 0
+
+    retry_id = await bus.send_staged(message, deliver_at_superstep=2)
+
+    assert retry_id == message.id
+    assert _message_count(bus_path) == 1
+    assert [m.id for m in await bus.receive("bob", current_superstep=2)] == [message.id]
+
+
+@pytest.mark.asyncio
+async def test_message_bus_staged_retry_completes_after_crash_before_completion(tmp_path: Path) -> None:
+    """A retry after a crash between INSERT and completion must return the
+    receipt for the already-written row without inserting a duplicate."""
+    runtime = RuntimeStateStore(tmp_path / "runtime.db")
+    bus_path = tmp_path / "messages.db"
+    bus = MessageBus(bus_path, runtime_state=runtime, require_identity=True)
+    await bus.init_db()
+
+    identity = _identity(
+        run_id="run-staged-crash-complete",
+        task_id="task-staged-crash-complete",
+        idempotency_key="idem-staged-crash-complete",
+    )
+    metadata = identity_metadata(identity, surface="message_bus")
+    message = Message(from_agent="alice", to_agent="bob", body="staged", metadata=metadata)
+
+    original_complete = runtime.complete_idempotent_side_effect
+    crashed = {"done": False}
+
+    async def _crash_once(*args, **kwargs):
+        if not crashed["done"]:
+            crashed["done"] = True
+            raise RuntimeError("crash before completion")
+        return await original_complete(*args, **kwargs)
+
+    runtime.complete_idempotent_side_effect = _crash_once  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError, match="crash before completion"):
+        await bus.send_staged(message, deliver_at_superstep=1)
+    assert _message_count(bus_path) == 1
+
+    retry_id = await bus.send_staged(message, deliver_at_superstep=1)
+
+    assert retry_id == message.id
+    assert _message_count(bus_path) == 1
+    assert [m.id for m in await bus.receive("bob", current_superstep=1)] == [message.id]
