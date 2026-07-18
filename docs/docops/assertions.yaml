@@ -223,6 +223,7 @@
       "docs/architecture/HOLON_RUNTIME_FULL_ESTATE_MAP.md",
       "docs/architecture/PERSISTENT_AGENT_DESCRIPTOR.md",
       "docs/architecture/A2A_ALWAYS_ON_SPINE_MASTER_PLAN.md",
+      "docs/architecture/NATS_A2A_SYSTEM_UPDATE_SPEC_2026-07-18.md",
       "docs/architecture/MODEL_ROUTING_CANON.md",
       "docs/architecture/README.md",
       "docs/architecture/SWARM_BOARDSTORE_SPEC.md",
