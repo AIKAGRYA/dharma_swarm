@@ -125,6 +125,14 @@ Run streams in this order of commitment, but interleave freely while waiting
 on CI. Each stream gets its own branch from fresh `origin/main` and its own
 draft PR. A stream failing never cancels the others.
 
+**Already-done check (mandatory, per stream, before any work):** if the
+stream's objective is already satisfied on merged `origin/main` (or the
+stream's declared base) — the target PR merged, the packet's changes landed,
+the defect no longer reproduces — record the stream as `DONE_UPSTREAM` with
+the commit/PR citation in the final report and do NOT re-execute it. A
+duplicate or conflicting packet for finished work is a governance violation,
+never throughput.
+
 #### Stream A1 — unblock PR #983 (arena live measurement)
 
 Seed observation (re-verify): Greptile/T-Rex confirmed that
@@ -178,8 +186,16 @@ at `a47c110` when observed.
 #### Stream C — Titanium WP-0A: hermetic Python bootstrap (the centerpiece)
 
 Authority: `docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md:567-637`.
-Finding: TIT-004. Depends on WP-00B (merged — verify per §3.5). This is the
-first dependency-ready Phase 0 implementation packet; execute it exactly as
+Finding: TIT-004. Depends on WP-00B (merged — verify per §3.5).
+
+**First check whether WP-0A already merged** (`git log origin/main --oneline
+--grep "WP-0A"` plus the spec's status line). If it did, this stream is
+`DONE_UPSTREAM`; re-scope Stream C to the next dependency-ready Phase 0
+packet per the spec's campaign dependency graph
+(`TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md:341-368` — WP-0A's direct
+dependents are WP-0S, WP-0B, WP-0C1R, WP-0C2, WP-0F1, WP-0G, WP-0H), executed
+under the same packet discipline, or record `BLOCKED_OPERATOR` if packet
+selection needs the operator. If WP-0A has NOT merged, execute it exactly as
 specified, summarized here with the spec as tiebreaker:
 
 - **Allowed files only:** `Makefile`, `.github/workflows/hermetic.yml`,
