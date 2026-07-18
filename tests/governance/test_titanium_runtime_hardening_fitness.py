@@ -242,3 +242,22 @@ def test_tit018_autonomous_loop_bounds_fail_closed() -> None:
     assert _normalize_darwin_max_cycle_tokens(-1) == 0
     with pytest.raises(ValueError):
         _normalize_darwin_max_cycle_tokens(-2)
+
+
+def test_tit018_delegation_recursion_is_bounded() -> None:
+    """TIT-018 / E-A7 guard: delegation recursion and per-cycle task attempts
+    must be finite so a run of *successful* cycles cannot prolong spend forever.
+
+    Frontier-capacity preserving: this bounds recursion depth and per-invocation
+    task count. It does not downgrade models or shrink useful context.
+    """
+    from dharma_swarm.thinkodynamic_director import (
+        _MAX_DELEGATION_DEPTH,
+        _MAX_TASKS_PER_WORKER_CYCLE,
+    )
+
+    # Depth cap must refuse at >= 3 (root=0, child=1, grandchild=2, refuse at 3).
+    assert _MAX_DELEGATION_DEPTH == 3
+    # Per-cycle attempted-task ceiling must be a finite positive bound.
+    assert isinstance(_MAX_TASKS_PER_WORKER_CYCLE, int)
+    assert _MAX_TASKS_PER_WORKER_CYCLE > 0

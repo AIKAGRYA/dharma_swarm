@@ -59,6 +59,18 @@ logger = logging.getLogger(__name__)
 DEFAULT_DIRECTOR_HOURS = 8.0
 _MAX_RAPID_ASCENT_REENTRIES = 3
 
+# TIT-018 / E-A7: delegation recursion and per-cycle attempted-task metabolism
+# must be finite.  These are frontier-capacity rails, not model downgrades:
+# a run of *successful* self-delegating cycles must still terminate so success
+# cannot prolong spend forever.
+#   - ``_MAX_DELEGATION_DEPTH``: a task at depth >= this refuses to mint children
+#     (root=0 -> child=1 -> grandchild=2 -> refuse at 3).
+#   - ``_MAX_TASKS_PER_WORKER_CYCLE``: hard ceiling on tasks a single
+#     ``execute_pending_tasks`` invocation may attempt, regardless of how many
+#     children successful tasks mint.
+_MAX_DELEGATION_DEPTH = 3
+_MAX_TASKS_PER_WORKER_CYCLE = 60
+
 
 def _normalize_director_hours(hours: float | None) -> float | None:
     """Normalize director loop hours under the TIT-018 bounded-default rule."""
@@ -3997,6 +4009,22 @@ class ThinkodynamicDirector:
         if not delegations:
             return []
 
+        # TIT-018 / E-A7: refuse to recurse past the delegation depth cap so a
+        # chain of successful tasks cannot spawn descendants without bound.
+        try:
+            parent_depth = int(parent_task.metadata.get("director_delegation_depth", 0) or 0)
+        except (TypeError, ValueError):
+            parent_depth = 0
+        if parent_depth >= _MAX_DELEGATION_DEPTH:
+            logger.info(
+                "Worker loop: delegation depth cap (%d) reached for task '%s' — "
+                "refusing to mint children",
+                _MAX_DELEGATION_DEPTH,
+                parent_task.title,
+            )
+            return []
+        child_depth = parent_depth + 1
+
         existing = await self.list_director_tasks(limit=800)
         existing_titles = {
             (
@@ -4048,6 +4076,7 @@ class ThinkodynamicDirector:
                 "director_preferred_backends": preferred_backends,
                 "available_provider_types": provider_allowlist,
                 "director_parent_task_id": parent_task.id,
+                "director_delegation_depth": child_depth,
             }
             created_task = await self._task_board.create(
                 title=title,
@@ -4512,7 +4541,16 @@ class ThinkodynamicDirector:
                 break
 
             pending.sort(key=lambda task: priority_order.get(task.priority.value, 99))
-            batch = pending[:max_concurrent]
+            # TIT-018 / E-A7: cap total attempted tasks per invocation so a run
+            # of successful, self-delegating cycles cannot prolong spend forever.
+            remaining_budget = _MAX_TASKS_PER_WORKER_CYCLE - len(attempted_ids)
+            if remaining_budget <= 0:
+                logger.info(
+                    "Worker loop: per-cycle task ceiling (%d) reached — stopping",
+                    _MAX_TASKS_PER_WORKER_CYCLE,
+                )
+                break
+            batch = pending[: min(max_concurrent, remaining_budget)]
             attempted_ids.update(task.id for task in batch)
             wave_results = await asyncio.gather(*[_execute_one(task) for task in batch])
             any_blocked_or_failed = False

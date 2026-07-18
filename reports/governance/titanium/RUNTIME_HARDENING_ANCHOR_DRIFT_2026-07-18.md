@@ -218,3 +218,44 @@ Observed result: `63 passed` for the focused Thinkodynamic/provider-fallback/Evo
 still include delegation-depth/per-cycle attempt ceilings, Free Evolution Grind
 stagnation backoff and pre-generation budget checks, daily counter date reset, and
 deterministic pulse default.
+
+## Follow-up implementation receipt — TIT-018 delegation recursion bounds (WP-D.2)
+
+The branch added the second WP-D/TIT-018 loop-bound implementation for the dynamic
+delegation path in `thinkodynamic_director`:
+
+- Added a finite delegation-depth cap: root tasks run at depth 0; children at depth 1;
+  grandchildren at depth 2; tasks at depth >= 3 refuse to mint further children.
+- Added a finite per-worker-cycle attempted-task ceiling so a single
+  `execute_pending_tasks()` invocation terminates even if every task succeeds and
+  produces more trusted dynamic delegations.
+- Child tasks now persist `director_delegation_depth` metadata, making recursion depth
+  countable and auditable in the task board.
+- This preserves frontier model capacity: no model choice, provider chain, or useful
+  prompt context is downgraded. The rail only bounds autonomous recursion and task
+  attempts.
+
+Guard teeth proven:
+
+- Before implementation, the new tests failed because `_MAX_DELEGATION_DEPTH` and
+  `_MAX_TASKS_PER_WORKER_CYCLE` did not exist.
+- Temporarily setting `_MAX_DELEGATION_DEPTH = 999` turned the governance guard RED.
+- Temporarily disabling the parent-depth guard let a capped-depth task spawn a child and
+  turned the behavior test RED.
+
+Verification command:
+
+```bash
+.venv/bin/python -m pytest -q tests/governance/test_titanium_runtime_hardening_fitness.py tests/test_thinkodynamic_director.py tests/test_thinkodynamic_director_provider_fallback.py tests/test_evolution.py::test_darwin_engine_default_token_budget_is_finite
+.venv/bin/ruff check dharma_swarm/thinkodynamic_director.py tests/governance/test_titanium_runtime_hardening_fitness.py tests/test_thinkodynamic_director.py --select F401,F811,F821,F823
+git diff --check
+```
+
+Observed result: `64 passed`; scoped ruff clean; diff check clean. The pytest bundle
+emitted a legacy unraisable subprocess warning after completion in provider-fallback
+coverage, but exited 0.
+
+**Scope boundary:** this closes E-A7 for `thinkodynamic_director` dynamic delegation.
+Remaining WP-D surfaces still include Free Evolution Grind stagnation backoff and
+pre-generation budget checks, daily counter date reset, and deterministic pulse
+default.

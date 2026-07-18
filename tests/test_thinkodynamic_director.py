@@ -1107,6 +1107,102 @@ async def test_run_loop_caps_consecutive_rapid_ascent_reentries(
     assert sleeps == [7]
 
 
+@pytest.mark.asyncio
+async def test_execute_pending_tasks_bounds_per_cycle_attempts(
+    director: ThinkodynamicDirector,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """TIT-018 / E-A7: a run of successful, self-delegating cycles must stop.
+
+    Every executed task succeeds and mints new children, so the legacy loop
+    (break only on empty/failure) would run forever. The per-cycle attempted-task
+    ceiling must terminate it.
+    """
+    from dharma_swarm import thinkodynamic_director as tdmod
+
+    monkeypatch.setattr(tdmod, "_MAX_TASKS_PER_WORKER_CYCLE", 5)
+    await director.init()
+    primary = director.choose_primary(director.build_opportunities(director.rank_file_signals()))
+    workflow = director.plan_workflow(primary, cycle_id="ceiling-cycle")
+    await director.enqueue_workflow(workflow)
+
+    async def _self_delegating_spawn(task_plan, wf, *, model="sonnet", timeout=600):
+        # Trusted provider + a delegations section => each success mints children.
+        return {
+            "task_key": task_plan.key,
+            "title": task_plan.title,
+            "success": True,
+            "output_length": 64,
+            "output": (
+                f"Completed: {task_plan.title}\n\n"
+                "## Delegations\n"
+                "- Follow-up build slice one\n"
+                "- Follow-up build slice two\n"
+            ),
+            "blocked": False,
+            "rapid": True,
+            "provider": "claude-cli",
+        }
+
+    director.spawn_agent = _self_delegating_spawn  # type: ignore[assignment]
+
+    results = await director.execute_pending_tasks(max_concurrent=2)
+
+    # Without a ceiling this loop never returns. With it, attempts are bounded.
+    assert len(results) <= 5
+    assert len(results) >= 1
+
+
+@pytest.mark.asyncio
+async def test_execute_pending_tasks_refuses_delegation_past_depth_cap(
+    director: ThinkodynamicDirector,
+) -> None:
+    """TIT-018 / E-A7: children beyond the delegation depth cap must not spawn
+    grandchildren, even on success with a trusted provider."""
+    from dharma_swarm.models import TaskPriority
+    from dharma_swarm.thinkodynamic_director import _MAX_DELEGATION_DEPTH
+
+    await director.init()
+
+    # Seed one task already at the depth cap.
+    deep_task = await director._task_board.create(
+        title="Deep delegated slice",
+        description="Already at the delegation depth cap.",
+        priority=TaskPriority.NORMAL,
+        created_by="thinkodynamic_director",
+        metadata={
+            "source": "thinkodynamic_director",
+            "director_cycle_id": "depth-cycle",
+            "director_workflow_id": "wf-depth",
+            "director_delegation_depth": _MAX_DELEGATION_DEPTH,
+        },
+    )
+
+    async def _self_delegating_spawn(task_plan, wf, *, model="sonnet", timeout=600):
+        return {
+            "task_key": task_plan.key,
+            "title": task_plan.title,
+            "success": True,
+            "output_length": 64,
+            "output": (
+                f"Completed: {task_plan.title}\n\n"
+                "## Delegations\n"
+                "- Should not spawn a grandchild\n"
+            ),
+            "blocked": False,
+            "rapid": True,
+            "provider": "claude-cli",
+        }
+
+    director.spawn_agent = _self_delegating_spawn  # type: ignore[assignment]
+
+    results = await director.execute_pending_tasks(task_ids=[deep_task.id])
+
+    assert len(results) == 1
+    # The deep task ran but spawned no children (depth cap refused delegation).
+    assert results[0]["delegated_child_task_ids"] == []
+
+
 # ------------------------------------------------------------------
 # Mission-driven task decomposition (Gap #1 fix)
 # ------------------------------------------------------------------
