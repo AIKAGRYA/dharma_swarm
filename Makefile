@@ -22,8 +22,10 @@ MUTATION_THRESHOLD ?= 0.60
 # Test targets need the repo venv (pytest-timeout etc. live there, not in system pythons).
 VENV_PYTHON := $(if $(wildcard .venv/bin/python),.venv/bin/python,$(PYTHON))
 # Verification resolves in-venv tools explicitly after bootstrap (WP-0A):
-# a PATH ruff can differ from the locked closure's pin in uv.lock.
-RUFF := $(if $(wildcard .venv/bin/ruff),.venv/bin/ruff,ruff)
+# a PATH ruff can differ from the locked closure's pin in uv.lock. Lazily
+# expanded (=) so `make bootstrap lint-blockers` in one invocation sees the
+# .venv that bootstrap just created, not the pre-bootstrap parse-time state.
+RUFF = $(if $(wildcard .venv/bin/ruff),.venv/bin/ruff,ruff)
 # Pinned resolver for the hermetic dependency path (WP-0A / TIT-004). Keep in
 # lockstep with UV_VERSION in .github/workflows/hermetic.yml —
 # tests/test_bootstrap_contract.py enforces the match.

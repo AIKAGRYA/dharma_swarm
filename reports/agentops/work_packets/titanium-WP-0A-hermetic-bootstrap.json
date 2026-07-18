@@ -141,13 +141,13 @@
   "negative_controls": [
     {
       "name": "lock-check-removal-detected",
-      "command": "python3 -c \"import pathlib, subprocess, sys; p = pathlib.Path('Makefile'); t = p.read_text(); ('lock --check' in t) or sys.exit(3); p.write_text(t.replace('lock --check', 'lock', 1)); sys.exit(subprocess.run([sys.executable, '-m', 'pytest', 'tests/test_bootstrap_contract.py', '-q']).returncode)\"",
+      "command": "python3 -c \"import pathlib, subprocess, sys; p = pathlib.Path('Makefile'); t = p.read_text(); ('lock --check;' in t) or sys.exit(3); p.write_text(t.replace('lock --check;', 'lock;', 1)); sys.exit(subprocess.run([sys.executable, '-m', 'pytest', 'tests/test_bootstrap_contract.py', '-q']).returncode)\"",
       "expected_exit": 1,
       "timeout_seconds": 600
     },
     {
       "name": "frozen-sync-removal-detected",
-      "command": "python3 -c \"import pathlib, subprocess, sys; p = pathlib.Path('Makefile'); t = p.read_text(); ('sync --frozen' in t) or sys.exit(3); p.write_text(t.replace('sync --frozen', 'sync', 1)); sys.exit(subprocess.run([sys.executable, '-m', 'pytest', 'tests/test_bootstrap_contract.py', '-q']).returncode)\"",
+      "command": "python3 -c \"import pathlib, subprocess, sys; p = pathlib.Path('Makefile'); t = p.read_text(); ('sync --frozen --extra dev;' in t) or sys.exit(3); p.write_text(t.replace('sync --frozen --extra dev;', 'sync;', 1)); sys.exit(subprocess.run([sys.executable, '-m', 'pytest', 'tests/test_bootstrap_contract.py', '-q']).returncode)\"",
       "expected_exit": 1,
       "timeout_seconds": 600
     }
@@ -193,9 +193,10 @@
     "honest_blockers": [
       "The WP-0A spec verification battery (make bootstrap; .venv/bin/python -m pytest --collect-only -q; make install; make lint-blockers) is not admissible as packet gate commands under the runner's positive allowlist (scripts/governance/run_agent_work_packet.py:112-118 allows only make docops-integrity/hygiene-check/module-budget; :177-193 restricts python argv), so that battery is executed manually with exit codes recorded in the PR body; the packet gates carry the admissible contract-test subset.",
       "Docker daemon is not running on this host (docker info exit 1), so the Docker dependency-failure negative control from the WP-0A spec is NEEDS_HOST and is not encoded as a runnable control.",
-      "This packet verifies the frozen bootstrap path on this host; the clean-container claim is CI evidence, not local evidence."
+      "This packet verifies the frozen bootstrap path on this host; the clean-container claim is CI evidence, not local evidence.",
+      "Packet gates and controls run under the runner-admitted system python3 (scripts/governance/run_agent_work_packet.py:121-130 admits only bare python3/sys.executable, never .venv/bin/python), and tests/conftest.py references dharma_swarm modules, so gate execution assumes repo dependencies importable by system python3 \u2014 CI installs them; a clean host that only ran make bootstrap has them in .venv only."
     ],
     "rollback": "Revert Makefile, .github/workflows/hermetic.yml, Dockerfile, tests/test_bootstrap_contract.py, and reports/agentops/work_packets/titanium-WP-0A-hermetic-bootstrap.json together; no state migration in this packet.",
-    "packet_digest": "c3727fb51fa4176fc17138545dcc006ccca9a3b5cf626f20d79971365351d056"
+    "packet_digest": "318a8fc3ef929f01c1570ed8ca29aa84e79edbcd4b1b6498fa75ec1ed037c705"
   }
 }

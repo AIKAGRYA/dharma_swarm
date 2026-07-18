@@ -81,8 +81,9 @@ def test_verification_resolves_venv_tools() -> None:
     assert re.search(r"^PYTHON := .*\.venv/bin/python", _MAKEFILE, flags=re.M), (
         "PYTHON must resolve .venv/bin/python when present"
     )
-    assert re.search(r"^RUFF := .*\.venv/bin/ruff", _MAKEFILE, flags=re.M), (
-        "RUFF must resolve .venv/bin/ruff when present"
+    assert re.search(r"^RUFF = .*\.venv/bin/ruff", _MAKEFILE, flags=re.M), (
+        "RUFF must lazily resolve .venv/bin/ruff when present (recursive '=', "
+        "so a bootstrap in the same make invocation is seen)"
     )
     for target in ("lint", "lint-blockers"):
         assert "$(RUFF) check" in _recipe(target), (
