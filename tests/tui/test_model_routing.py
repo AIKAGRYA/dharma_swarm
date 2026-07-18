@@ -28,8 +28,13 @@ def test_resolve_alias_and_model_id() -> None:
     kimi = resolve_model_target("kimi")
     assert kimi is not None
     assert kimi.alias == "kimi-k3"
-    assert kimi.provider_id == "openrouter"
-    assert kimi.model_id == "moonshotai/kimi-k3"
+    assert kimi.provider_id == "kimi_code"
+    assert kimi.model_id == "k3"
+    assert [provider.value for provider in kimi.pool_providers] == [
+        "kimi_code",
+        "moonshot",
+        "openrouter",
+    ]
     # minimax now resolves to the FLOOR M3, not the sub-floor M2.7.
     minimax = resolve_model_target("minimax")
     assert minimax is not None
@@ -94,3 +99,17 @@ def test_picker_main_list_is_floor_only() -> None:
             assert not entry.below_floor, (
                 f"picker target {t.alias!r} leaks sub-floor entry {entry.id!r}"
             )
+
+
+def test_kimi_k3_alias_prefers_first_party_route() -> None:
+    kimi = resolve_model_target("k3")
+
+    assert kimi is not None
+    assert kimi.alias == "kimi-k3"
+    assert kimi.provider_id == "kimi_code"
+    assert kimi.model_id == "k3"
+    assert [provider.value for provider in kimi.pool_providers] == [
+        "kimi_code",
+        "moonshot",
+        "openrouter",
+    ]
