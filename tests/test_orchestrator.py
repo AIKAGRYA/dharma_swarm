@@ -1525,3 +1525,59 @@ def test_retry_policy_for_failure_passthrough():
     )
     assert failure_class == "execution_error"
     assert retry_count == 0
+
+
+@pytest.mark.asyncio
+async def test_bsp_barrier_cancellation_releases_agent_and_requeues(tmp_path):
+    """Stragglers cancelled by the hard barrier must not remain ghost dispatches."""
+
+    class TrackingPool(MockAgentPool):
+        def __init__(self, agents):
+            super().__init__(agents)
+            self.released: list[str] = []
+
+        async def release(self, agent_id):
+            self.released.append(agent_id)
+
+    board = MockTaskBoard()
+    board.tasks = [
+        Task(
+            id="t-straggler",
+            title="Barrier straggler",
+            metadata={"active_claim": {"claim_id": "claim-straggler"}, "max_retries": 1},
+        )
+    ]
+    pool = TrackingPool(
+        [AgentState(id="a1", name="agent-1", role=AgentRole.GENERAL, status=AgentStatus.IDLE)]
+    )
+    orch = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        ledger_dir=tmp_path,
+        session_id="sess_barrier_cancel",
+    )
+    orch._default_timeout_seconds = -60.0
+    dispatch = TaskDispatch(task_id="t-straggler", agent_id="a1")
+
+    async def never_finishes():
+        await asyncio.sleep(3600)
+
+    running = asyncio.create_task(never_finishes())
+    orch._running_tasks["t-straggler"] = running
+    orch._active_dispatches["t-straggler"] = dispatch
+
+    settled, recovered = await orch._collect_completed_with_barrier()
+
+    assert settled == 0
+    assert recovered == 1
+    assert running.cancelled()
+    assert "t-straggler" not in orch._running_tasks
+    assert "t-straggler" not in orch._active_dispatches
+    assert pool.released == ["a1"]
+    assert any(
+        task_id == "t-straggler"
+        and fields.get("status") == TaskStatus.PENDING
+        and "active_claim" not in fields.get("metadata", {})
+        and fields.get("metadata", {}).get("last_failure_source") == "bsp_barrier_timeout"
+        for task_id, fields in board.updates
+    )

@@ -298,3 +298,54 @@ async def test_send_uses_managed_connection(monkeypatch, tmp_path):
 
     assert message_id == msg.id
     assert state == {"opened": 1, "configured": 1, "inserts": 1, "commits": 1}
+
+
+class _AlterFailingConnection:
+    """Proxy that fails only the superstep_visible ALTER TABLE migration."""
+
+    def __init__(self, inner, error: Exception):
+        self._inner = inner
+        self._error = error
+
+    async def __aenter__(self):
+        self._db = await self._inner.__aenter__()
+        return self
+
+    async def __aexit__(self, *args):
+        return await self._inner.__aexit__(*args)
+
+    async def execute(self, sql, *args):
+        if sql.lstrip().startswith("ALTER TABLE messages ADD COLUMN"):
+            raise self._error
+        return await self._db.execute(sql, *args)
+
+    async def commit(self):
+        return await self._db.commit()
+
+
+@pytest.mark.asyncio
+async def test_init_db_swallows_only_duplicate_column_migration_error(tmp_path):
+    bus = MessageBus(tmp_path / "messages.db")
+    original_open = bus._open
+    error = message_bus_module.aiosqlite.OperationalError(
+        "duplicate column name: superstep_visible"
+    )
+    bus._open = lambda: _AlterFailingConnection(original_open(), error)  # type: ignore[method-assign]
+
+    await bus.init_db()  # benign duplicate-column failure must not raise
+
+    bus._open = original_open
+    msg = Message(from_agent="alice", to_agent="bob", body="post-migration")
+    await bus.send(msg)
+    assert [m.id for m in await bus.receive("bob")] == [msg.id]
+
+
+@pytest.mark.asyncio
+async def test_init_db_propagates_real_migration_failure(tmp_path):
+    bus = MessageBus(tmp_path / "messages.db")
+    original_open = bus._open
+    error = message_bus_module.aiosqlite.OperationalError("disk I/O error")
+    bus._open = lambda: _AlterFailingConnection(original_open(), error)  # type: ignore[method-assign]
+
+    with pytest.raises(message_bus_module.aiosqlite.OperationalError, match="disk I/O error"):
+        await bus.init_db()

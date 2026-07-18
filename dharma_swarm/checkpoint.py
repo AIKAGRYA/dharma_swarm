@@ -289,6 +289,72 @@ class CheckpointStore:
 
 
 # ---------------------------------------------------------------------------
+# Superstep checkpoint (BSP barrier recovery)
+# ---------------------------------------------------------------------------
+
+
+class SuperstepCheckpoint(BaseModel):
+    """Crash-recovery record written atomically at every BSP barrier.
+
+    Lets the orchestrator reconstruct which tasks were in-flight when
+    a process died, so it can reap them on restart instead of leaving
+    them stuck in RUNNING for up to 6 hours.
+    """
+
+    superstep_id: int
+    running_task_ids: list[str] = Field(default_factory=list)
+    active_dispatch_ids: list[str] = Field(default_factory=list)
+    saved_at: str = Field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
+
+    @classmethod
+    def load(cls, path: Path) -> "SuperstepCheckpoint | None":
+        """Load a previously saved checkpoint, or None if none exists."""
+        import json as _json
+
+        if not path.exists():
+            return None
+        try:
+            data = _json.loads(path.read_text(encoding="utf-8"))
+            return cls.model_validate(data)
+        except Exception as exc:
+            logger.warning("SuperstepCheckpoint load failed: %s", exc)
+            return None
+
+    def save(self, path: Path) -> None:
+        """Atomic write via tmp+rename with durable file contents."""
+        import tempfile
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(
+            dir=path.parent, suffix=".tmp", prefix="superstep_"
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(self.model_dump_json())
+                f.write("\n")
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, path)
+            try:
+                dir_fd = os.open(path.parent, os.O_RDONLY)
+            except OSError:
+                dir_fd = None
+            if dir_fd is not None:
+                try:
+                    os.fsync(dir_fd)
+                finally:
+                    os.close(dir_fd)
+        except Exception:
+            try:
+                Path(tmp).unlink(missing_ok=True)
+            except OSError:
+                pass
+            raise
+
+
+# ---------------------------------------------------------------------------
 # Filesystem interrupt transport (for CLI)
 # ---------------------------------------------------------------------------
 

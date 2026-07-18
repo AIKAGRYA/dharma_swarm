@@ -123,6 +123,7 @@ class Orchestrator:
         self._shared_dir = shared_dir or self._derive_runtime_artifact_dir("shared")
         self._stigmergy_dir = stigmergy_dir or self._derive_runtime_artifact_dir("stigmergy")
         self._running = False
+        self._superstep_id: int = 0
         self._active_dispatches: dict[str, TaskDispatch] = {}
         # Track running asyncio tasks for actual LLM execution
         self._running_tasks: dict[str, asyncio.Task] = {}
@@ -415,7 +416,6 @@ class Orchestrator:
         return f"{task.id}:{topology.value}:checkpoint"
 
     async def fan_in(self, dispatches: list[TaskDispatch]) -> str:
-        """Collect results from completed dispatches, concatenate them."""
         if self._pool is None:
             return ""
         fragments: list[str] = []
@@ -425,7 +425,7 @@ class Orchestrator:
                 fragments.append(result)
             await self._pool.release(td.agent_id)
             self._active_dispatches.pop(td.task_id, None)
-        return "\n".join(fragments)
+        return self._combine_results(fragments)
 
     async def route_next(self) -> list[TaskDispatch]:
         """Match ready tasks to idle agents, one-to-one. Returns dispatches."""
@@ -499,15 +499,19 @@ class Orchestrator:
         import time as _tt
         _t0 = _tt.monotonic()
 
-        # Snapshot completed count BEFORE this tick so we can compute delta
         _pre_completed = 0
         try:
             _pre_stats = await self._board.stats()
             _pre_completed = _pre_stats.get("completed", 0)
         except Exception:
             pass
-
-        settled, recovered = await self._collect_completed()
+        if await self.is_globally_halted():
+            logger.info("BSP: globally halted at superstep %d", self._superstep_id)
+            return {"settled": 0, "recovered": 0, "dispatched": 0, "halted": True, "superstep": self._superstep_id}
+        await self._save_superstep_checkpoint()
+        settled, recovered = await self._collect_completed_with_barrier()
+        await self._clear_stale_claims()
+        self._superstep_id += 1
         logger.info("orchestrator.tick: collect=%.1fs", _tt.monotonic() - _t0)
         dispatches = await self.route_next()
         logger.info("orchestrator.tick: dispatched=%d route=%.1fs", len(dispatches), _tt.monotonic() - _t0)
@@ -529,7 +533,6 @@ class Orchestrator:
             coordination = dict(self._last_coordination_summary)
             logger.info("orchestrator.tick: coordination cached (%.0fs ago)", _since_last_refresh)
 
-        # Compute actual completions from task board delta
         _post_completed = 0
         try:
             _post_stats = await self._board.stats()
@@ -537,9 +540,7 @@ class Orchestrator:
         except Exception:
             pass
         _board_settled = max(0, _post_completed - _pre_completed)
-        # Use the larger of asyncio-based and board-based counts
         actual_settled = max(settled, _board_settled)
-
         summary = {
             "settled": actual_settled,
             "recovered": recovered,
@@ -550,7 +551,6 @@ class Orchestrator:
             ),
         }
 
-        # Emit a tick-level runtime event when work happened
         if (settled or recovered or dispatches) and self._event_memory is not None:
             try:
                 dispatch_ids = [td.task_id for td in dispatches]
@@ -687,10 +687,9 @@ class Orchestrator:
         agent_id: str,
         extra: dict[str, Any] | None = None,
     ) -> None:
-        """Fire-and-forget lifecycle event — non-blocking to avoid stalling dispatch."""
-        asyncio.create_task(
-            self._emit_lifecycle_event_impl(event, task_id=task_id, agent_id=agent_id, extra=extra),
-            name=f"lifecycle-{event}-{task_id[:8]}",
+        """Synchronous lifecycle event emission — awaited directly to prevent ghost events."""
+        await self._emit_lifecycle_event_impl(
+            event, task_id=task_id, agent_id=agent_id, extra=extra
         )
 
     async def _emit_lifecycle_event_impl(
@@ -3208,3 +3207,9 @@ class Orchestrator:
                 source="claim_timeout",
             )
         return len(done_tasks), len(stale)
+from dharma_swarm import orchestrator_bsp as _bsp
+Orchestrator._combine_results = staticmethod(_bsp.combine_results)  # type: ignore[attr-defined]
+Orchestrator._collect_completed_with_barrier = _bsp.collect_completed_with_barrier  # type: ignore[attr-defined]
+Orchestrator._save_superstep_checkpoint = _bsp.save_superstep_checkpoint  # type: ignore[attr-defined]
+Orchestrator._clear_stale_claims = _bsp.clear_stale_claims  # type: ignore[attr-defined]
+Orchestrator.is_globally_halted = _bsp.is_globally_halted  # type: ignore[attr-defined]
