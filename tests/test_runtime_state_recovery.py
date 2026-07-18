@@ -246,3 +246,43 @@ async def test_message_bus_staged_retry_completes_after_crash_before_completion(
     assert retry_id == message.id
     assert _message_count(bus_path) == 1
     assert [m.id for m in await bus.receive("bob", current_superstep=1)] == [message.id]
+
+
+@pytest.mark.asyncio
+async def test_message_bus_staged_retry_with_regenerated_id_returns_original_row(tmp_path: Path) -> None:
+    """A retry carrying the same idempotency key but a regenerated Message id
+    must resume against the row recorded at begin time, not insert a duplicate."""
+    runtime = RuntimeStateStore(tmp_path / "runtime.db")
+    bus_path = tmp_path / "messages.db"
+    bus = MessageBus(bus_path, runtime_state=runtime, require_identity=True)
+    await bus.init_db()
+
+    identity = _identity(
+        run_id="run-staged-regen-id",
+        task_id="task-staged-regen-id",
+        idempotency_key="idem-staged-regen-id",
+    )
+    metadata = identity_metadata(identity, surface="message_bus")
+    first = Message(from_agent="alice", to_agent="bob", body="staged", metadata=metadata)
+
+    original_complete = runtime.complete_idempotent_side_effect
+    crashed = {"done": False}
+
+    async def _crash_once(*args, **kwargs):
+        if not crashed["done"]:
+            crashed["done"] = True
+            raise RuntimeError("crash before completion")
+        return await original_complete(*args, **kwargs)
+
+    runtime.complete_idempotent_side_effect = _crash_once  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError, match="crash before completion"):
+        await bus.send_staged(first, deliver_at_superstep=1)
+    assert _message_count(bus_path) == 1
+
+    retry = Message(from_agent="alice", to_agent="bob", body="staged", metadata=metadata)
+    assert retry.id != first.id
+    retry_receipt = await bus.send_staged(retry, deliver_at_superstep=1)
+
+    assert retry_receipt == first.id
+    assert _message_count(bus_path) == 1
+    assert [m.id for m in await bus.receive("bob", current_superstep=1)] == [first.id]

@@ -267,7 +267,15 @@ class MessageBus:
         receipt = record.result_receipt_id if record else ""
         if receipt:
             return receipt
-        if not await self._message_row_exists(message.id):
+        # The retry may carry a regenerated Message id; the row written by the
+        # prior attempt is the one recorded at begin time, so probe that id.
+        canonical_id = message.id
+        if record is not None and isinstance(record.metadata, dict):
+            canonical_id = str(record.metadata.get("message_id") or message.id)
+        if await self._message_row_exists(canonical_id):
+            message_id = canonical_id
+        else:
+            message_id = message.id
             try:
                 await self._run_with_lock_retry(insert)
             except aiosqlite.IntegrityError:
@@ -278,10 +286,10 @@ class MessageBus:
         await self._runtime_state.complete_idempotent_side_effect(
             identity,
             side_effect_key,
-            result_receipt_id=message.id,
-            metadata={"message_id": message.id, "resumed": True},
+            result_receipt_id=message_id,
+            metadata={"message_id": message_id, "resumed": True},
         )
-        return message.id
+        return message_id
 
     async def send(
         self,
