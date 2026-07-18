@@ -75,7 +75,7 @@ def test_usage_tokens_empty():
     assert _usage_tokens({}) == 0
 
 
-def test_pool_completion_routes_kimi_for_coding_to_kimi_code_provider(monkeypatch):
+def test_pool_completion_routes_k3_to_kimi_code_provider(monkeypatch):
     captured = {}
     provider = object()
 
@@ -103,13 +103,13 @@ def test_pool_completion_routes_kimi_for_coding_to_kimi_code_provider(monkeypatc
         fake_create,
     )
 
-    resolved_provider, wire_model = _provider_for_model("kimi-for-coding")
+    resolved_provider, wire_model = _provider_for_model("k3")
 
     assert resolved_provider is provider
     assert captured["provider_type"] == ProviderType.KIMI_CODE
-    assert captured["model"] == "kimi-for-coding"
+    assert captured["model"] == "k3"
     assert captured["timeout_seconds"] == 240
-    assert wire_model == "kimi-for-coding"
+    assert wire_model == "k3"
 
 
 def test_pool_completion_routes_glm_52_to_zhipu_provider(monkeypatch):

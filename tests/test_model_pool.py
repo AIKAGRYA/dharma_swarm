@@ -63,20 +63,13 @@ def test_pool_collapses_roster_slots_to_logical_entries():
     """The roster has 46 slots that collapse to 32 logical pool entries.
     Guards against silent regroup drift.
 
-    The floor-demarcation work (2026-06-17) added 13 slots for the K2.6-floor
-    frontier the roster must SERVE: claude-opus-4.8 + claude-sonnet-4.6
-    (CLAUDE_CODE Max-plan oauth), gpt-5.5 (CODEX + OPENAI), kimi-k2.7-code
-    (Ollama), deepseek-v4-pro (Ollama + SambaNova + Fireworks -> ONE entry via
-    casefolded logical id), glm-5.1 (Ollama), minimax-m3 (Ollama + NIM). The
-    NVIDIA pass adds K2.6 and DeepSeek V4 Pro hosted NIM routes without adding
-    logical entries. Kimi Code and direct Z.ai add two more floor slots/logical
-    entries. That is 15 new slots (31 -> 46) and 9 new logical entries
-    (23 -> 30): claude-opus-4.8,
-    claude-sonnet-4.6, gpt-5.5, kimi-k2.7-code, deepseek-v4-pro, glm-5.1,
-    minimax-m3, kimi-for-coding, glm-5.2. No sub-floor model was removed — they
-    are marked, not deleted."""
-    assert len(EVOLUTION_ROSTER) == 46
-    assert len(MODEL_POOL) == 32
+    K3 replaces two active K2.7 logical entries with one provider-typed entry:
+    Kimi Code ``k3``, Moonshot ``kimi-k3``, and OpenRouter
+    ``moonshotai/kimi-k3`` are three routes for the same model. The roster gains
+    one route overall (46 -> 47) while the pool loses one duplicate logical
+    entry (32 -> 31)."""
+    assert len(EVOLUTION_ROSTER) == 47
+    assert len(MODEL_POOL) == 31
 
 
 # --------------------------------------------------------------------------
@@ -131,6 +124,22 @@ def test_other_known_multiroute_models_also_dedup():
         assert {r.provider for r in entry.routes} == providers, entry_id
         # Single entry per logical id.
         assert len([e for e in MODEL_POOL if e.id == entry_id]) == 1
+
+
+def test_kimi_k3_provider_ids_collapse_only_by_explicit_promotion_rule():
+    """Provider-specific K3 ids form one logical model without string guessing."""
+    kimi = get_entry("kimi-k3")
+    assert kimi is not None and not kimi.below_floor
+    assert kimi.context == 1_048_576
+    assert kimi.routes[0] == Route(ProviderType.KIMI_CODE, "k3")
+    assert set(kimi.routes) == {
+        Route(ProviderType.KIMI_CODE, "k3"),
+        Route(ProviderType.MOONSHOT, "kimi-k3"),
+        Route(ProviderType.OPENROUTER, "moonshotai/kimi-k3"),
+    }
+    assert entry_for_model_id("k3") is kimi
+    assert entry_for_model_id("kimi-k3") is kimi
+    assert entry_for_model_id("moonshotai/kimi-k3") is kimi
 
 
 # --------------------------------------------------------------------------
@@ -244,7 +253,7 @@ def test_floor_and_grunt_partition_the_pool():
     assert len(floor) + len(grunt) == len(MODEL_POOL)
     assert all(not e.below_floor for e in floor)
     assert all(e.below_floor for e in grunt)
-    assert len(floor) == 14
+    assert len(floor) == 13
     assert len(grunt) == 18
 
 
@@ -292,7 +301,7 @@ def test_floor_frontier_models_present_and_above_floor():
         "claude-sonnet-4.6",
         "gpt-5.5",
         "kimi-k2.6",
-        "kimi-k2.7-code",
+        "kimi-k3",
         "deepseek-v4-pro",
         "glm-5.1",
         "minimax-m3",

@@ -55,7 +55,7 @@ TIER_FREE: tuple[ProviderType, ...] = (
 )
 
 TIER_CHEAP: tuple[ProviderType, ...] = (
-    ProviderType.KIMI_CODE,      # Kimi Code membership API (stable kimi-for-coding)
+    ProviderType.KIMI_CODE,      # Kimi Code membership API (K3)
     ProviderType.MOONSHOT,       # Kimi Open Platform / Moonshot global API
     ProviderType.ZHIPU,          # glm-5.2 direct (z.ai/Zhipu first-party lane)
     ProviderType.GOOGLE_AI,      # gemini-2.5-pro (free tier, 1M ctx)
@@ -278,8 +278,8 @@ MODEL_INTELLIGENCE: dict[ProviderType, int] = {
     ProviderType.CODEX: 70,            # GPT-5-class via subscription
     # Free / cheap frontier
     ProviderType.OLLAMA: 68,           # GLM-5 744B (cloud)
-    ProviderType.KIMI_CODE: 68,        # Kimi Code stable lane (K2.x Code)
-    ProviderType.MOONSHOT: 68,         # Kimi K2.7 Code global API
+    ProviderType.KIMI_CODE: 72,        # Kimi K3 coding membership lane
+    ProviderType.MOONSHOT: 71,         # Kimi K3 global API
     ProviderType.ZHIPU: 67,            # glm-5.2 direct (z.ai/Zhipu)
     ProviderType.GOOGLE_AI: 65,        # Gemini 2.5 Pro
     ProviderType.GROQ: 64,             # Kimi K2 1T MoE
