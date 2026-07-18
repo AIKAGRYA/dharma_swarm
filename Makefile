@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agentops-report-root-check agent-build-preflight agent-build-closeout spine-check onboard onboarding-macos-compatibility organism-status orient agent-register agent-onboard status a2a-status a2a-up a2a-send go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test slop-ratchet slop-baseline
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean bootstrap install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agentops-report-root-check agent-build-preflight agent-build-closeout spine-check onboard onboarding-macos-compatibility organism-status orient agent-register agent-onboard status a2a-status a2a-up a2a-send go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test slop-ratchet slop-baseline
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently. Freeze a
@@ -21,6 +21,15 @@ PYTEST ?= pytest
 MUTATION_THRESHOLD ?= 0.60
 # Test targets need the repo venv (pytest-timeout etc. live there, not in system pythons).
 VENV_PYTHON := $(if $(wildcard .venv/bin/python),.venv/bin/python,$(PYTHON))
+# Verification resolves in-venv tools explicitly after bootstrap (WP-0A):
+# a PATH ruff can differ from the locked closure's pin in uv.lock. Lazily
+# expanded (=) so `make bootstrap lint-blockers` in one invocation sees the
+# .venv that bootstrap just created, not the pre-bootstrap parse-time state.
+RUFF = $(if $(wildcard .venv/bin/ruff),.venv/bin/ruff,ruff)
+# Pinned resolver for the hermetic dependency path (WP-0A / TIT-004). Keep in
+# lockstep with UV_VERSION in .github/workflows/hermetic.yml —
+# tests/test_bootstrap_contract.py enforces the match.
+UV_VERSION ?= 0.11.2
 GO ?= go
 GOFMT ?= gofmt
 SEMGREP ?= scripts/governance/run_semgrep_with_ca.sh
@@ -282,8 +291,31 @@ help:
 	@echo "  make go-build     Compile the 4 Go tool mains into their module dirs (gitignored)"
 	@echo ""
 
-install:
-	pip install -e ".[dev]"
+# One documented command from fresh clone to working .venv, idempotent
+# (WP-0A / TIT-004). Reuses a base-environment uv only when it is exactly the
+# pinned version; otherwise installs the pin through the current Python's user
+# site. The dependency path is always uv lock --check (drift oracle) followed
+# by uv sync --frozen --extra dev (exact locked closure, no live resolution).
+bootstrap:
+	@set -eu; \
+	uv_bin="$$(command -v uv 2>/dev/null || :)"; \
+	if [ -z "$$uv_bin" ] || ! "$$uv_bin" --version 2>/dev/null | grep -Eq "^uv $(UV_VERSION)( |$$)"; then \
+		python3 -m pip install --user --quiet "uv==$(UV_VERSION)" || { \
+			echo "bootstrap: FAILED to install pinned uv==$(UV_VERSION) via 'python3 -m pip install --user'" >&2; \
+			echo "bootstrap: check that python3 and pip work and that the package index is reachable" >&2; \
+			exit 1; }; \
+		uv_bin="$$(python3 -m site --user-base)/bin/uv"; \
+	fi; \
+	test -x "$$uv_bin" || { echo "bootstrap: pinned uv is not executable at $$uv_bin" >&2; exit 1; }; \
+	"$$uv_bin" --version | grep -Eq "^uv $(UV_VERSION)( |$$)" || { \
+		echo "bootstrap: resolved uv is not the pinned $(UV_VERSION): $$("$$uv_bin" --version)" >&2; exit 1; }; \
+	"$$uv_bin" lock --check; \
+	"$$uv_bin" sync --frozen --extra dev; \
+	echo "bootstrap: OK (.venv synced from frozen uv.lock with uv $(UV_VERSION))"
+
+# WP-0A: install is the frozen path. The old unpinned `pip install -e ".[dev]"`
+# bypassed uv.lock and silently resolved fresh at install time.
+install: bootstrap
 
 boot:
 	@mkdir -p $(STATE_DIR)/logs
@@ -329,14 +361,14 @@ test-fast:
 	$(VENV_PYTHON) -m pytest tests/ -q --tb=line -x --timeout=10
 
 lint:
-	ruff check dharma_swarm/ --select=E,F,W --ignore=E501
+	$(RUFF) check dharma_swarm/ --select=E,F,W --ignore=E501
 
 syntax-check:
 	@$(VENV_PYTHON) -m compileall -q dharma_swarm api scripts && echo "syntax-check: OK (compileall clean)"
 
 # Undefined names are guaranteed NameErrors at runtime — always blocking.
 lint-blockers:
-	@ruff check dharma_swarm/ api/ scripts/ --select=F821 --quiet && echo "lint-blockers: OK (no undefined names)"
+	@$(RUFF) check dharma_swarm/ api/ scripts/ --select=F821 --quiet && echo "lint-blockers: OK (no undefined names)"
 
 # The watchmen-watcher: verifies the verification gates themselves work.
 # Born 2026-06-12 after syntax-check, test-fast, and suite collection were
