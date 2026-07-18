@@ -297,7 +297,7 @@ help:
 bootstrap:
 	@set -eu; \
 	uv_bin="$$(command -v uv 2>/dev/null || :)"; \
-	if [ -z "$$uv_bin" ] || ! "$$uv_bin" --version 2>/dev/null | grep -q "^uv $(UV_VERSION) "; then \
+	if [ -z "$$uv_bin" ] || ! "$$uv_bin" --version 2>/dev/null | grep -Eq "^uv $(UV_VERSION)( |$$)"; then \
 		python3 -m pip install --user --quiet "uv==$(UV_VERSION)" || { \
 			echo "bootstrap: FAILED to install pinned uv==$(UV_VERSION) via 'python3 -m pip install --user'" >&2; \
 			echo "bootstrap: check that python3 and pip work and that the package index is reachable" >&2; \
@@ -305,7 +305,7 @@ bootstrap:
 		uv_bin="$$(python3 -m site --user-base)/bin/uv"; \
 	fi; \
 	test -x "$$uv_bin" || { echo "bootstrap: pinned uv is not executable at $$uv_bin" >&2; exit 1; }; \
-	"$$uv_bin" --version | grep -q "^uv $(UV_VERSION) " || { \
+	"$$uv_bin" --version | grep -Eq "^uv $(UV_VERSION)( |$$)" || { \
 		echo "bootstrap: resolved uv is not the pinned $(UV_VERSION): $$("$$uv_bin" --version)" >&2; exit 1; }; \
 	"$$uv_bin" lock --check; \
 	"$$uv_bin" sync --frozen --extra dev; \

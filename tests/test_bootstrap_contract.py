@@ -53,8 +53,9 @@ def test_bootstrap_installs_and_confirms_exact_pinned_uv() -> None:
     assert "site --user-base" in recipe, (
         "bootstrap must resolve the user-base uv executable, not trust PATH"
     )
-    assert recipe.count('grep -q "^uv $(UV_VERSION) "') >= 1, (
-        "bootstrap must confirm the resolved uv is exactly the pinned version"
+    assert recipe.count('grep -Eq "^uv $(UV_VERSION)( |$$)"') >= 1, (
+        "bootstrap must confirm the resolved uv is exactly the pinned version "
+        "(accepting both 'uv X.Y.Z (target)' and bare 'uv X.Y.Z' output)"
     )
 
 
