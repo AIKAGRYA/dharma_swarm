@@ -42,6 +42,27 @@ _META_OPERATION_HASH = "operation_hash"
 # Cap on memoized result payloads stored in idempotency_records.metadata_json.
 _RESULT_JSON_CAP = 100_000
 
+# Receipt attributes stamped when a dispatch runs fail-open (no idempotency
+# fence). They make each unfenced consequential call COUNTABLE so the decision
+# to fail closed can be driven by measured blind-spot frequency rather than
+# guessed at (KEEL pre-1004 hardening: observe before fencing). Purely additive
+# — behaviour is unchanged; only two attributes are added to the returned
+# receipt.
+_ATTR_UNPROTECTED = "unprotected_dispatch"
+_ATTR_UNPROTECTED_REASON = "unprotected_reason"
+
+
+def _mark_unprotected(receipt: EvidenceReceipt, reason: str) -> EvidenceReceipt:
+    """Tag ``receipt`` as an unfenced (fail-open) dispatch, non-destructively."""
+    return dataclasses.replace(
+        receipt,
+        attributes={
+            **receipt.attributes,
+            _ATTR_UNPROTECTED: True,
+            _ATTR_UNPROTECTED_REASON: reason,
+        },
+    )
+
 
 def claim_idempotency_key(side_effect_key: str) -> str:
     """The deterministic idempotency key every dispatcher of a side effect
@@ -419,9 +440,10 @@ class DurableInvoker:
                 " WITHOUT idempotency (side_effect_key=%s)",
                 self._side_effect_key,
             )
-            return await self._inner(
+            receipt = await self._inner(
                 task=task, agent_id=agent_id, context_id=context_id, routing=routing
             )
+            return _mark_unprotected(receipt, "no_capable_store")
         try:
             identity = self._resolve_identity(task, agent_id)
         except MissingExecutionIdentity:
@@ -430,9 +452,10 @@ class DurableInvoker:
                 " WITHOUT idempotency (side_effect_key=%s)",
                 self._side_effect_key,
             )
-            return await self._inner(
+            receipt = await self._inner(
                 task=task, agent_id=agent_id, context_id=context_id, routing=routing
             )
+            return _mark_unprotected(receipt, "incomplete_identity")
 
         task_id = str(task.get("id", "") or identity.task_id)
         operation_hash = hashlib.sha256(
@@ -475,9 +498,10 @@ class DurableInvoker:
                 self._side_effect_key,
                 exc_info=True,
             )
-            return await self._inner(
+            receipt = await self._inner(
                 task=task, agent_id=agent_id, context_id=context_id, routing=routing
             )
+            return _mark_unprotected(receipt, "idempotency_begin_failed")
         if claim_token is None:
             try:
                 record = await self._store.get_idempotency_record(

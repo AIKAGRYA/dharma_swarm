@@ -538,6 +538,19 @@ async def test_fail_open_without_store_executes_inner():
     assert invoker.memo_hit is False
 
 
+async def test_fail_open_receipt_is_marked_unprotected():
+    """A fail-open (unfenced) dispatch must TAG its receipt so the fleet can
+    COUNT how often a consequential call runs without idempotency protection —
+    the observable prerequisite to a data-driven fail-closed decision
+    (pre-1004 hardening: observe blind spots before fencing them)."""
+    inner = StubInner()
+    invoker = wrap_invoker(inner, store=None, identity=_identity(), side_effect_key=KEY)
+    receipt = await _invoke(invoker)
+    assert inner.calls == 1
+    assert receipt.attributes.get("unprotected_dispatch") is True
+    assert receipt.attributes.get("unprotected_reason") == "no_capable_store"
+
+
 def test_graph_side_effect_key_stability_and_retry_increment():
     base = derive_graph_side_effect_key("run-1", 3, "node-a", 0)
     assert base == derive_graph_side_effect_key("run-1", 3, "node-a", 0)
