@@ -243,6 +243,74 @@ async def test_apply_and_test_rollback_on_fail(tmp_path: Path):
     assert target.read_text() == original
 
 
+def _make_insert_diff() -> str:
+    """Single-hunk diff that INSERTS a line — re-applying it un-deduplicated
+    would splice the insertion in a second time (positional hunks carry no
+    context verification), so the file itself witnesses the dedup."""
+    return (
+        "--- a/hello.py\n"
+        "+++ b/hello.py\n"
+        "@@ -1,1 +1,2 @@\n"
+        " # header\n"
+        "+added = 1\n"
+    )
+
+
+@pytest.mark.asyncio
+async def test_apply_same_diff_twice_dedupes_effect(tmp_path: Path):
+    """The consequential apply must be idempotency-gated through the runtime
+    store: re-applying the same diff is a no-op replay, not a second splice."""
+    target = tmp_path / "hello.py"
+    target.write_text("# header\n")
+    runtime = RuntimeStateStore(tmp_path / "runtime.db")
+
+    applier = DiffApplier(workspace=tmp_path, runtime_state=runtime, require_identity=True)
+    first = await applier.apply(_make_insert_diff(), execution_identity=_identity())
+    assert first.success is True
+    assert first.deduplicated is False
+    assert target.read_text().count("added = 1") == 1
+
+    second = await applier.apply(_make_insert_diff(), execution_identity=_identity())
+    assert second.success is True
+    assert second.deduplicated is True
+    assert second.files_changed == []
+    assert target.read_text().count("added = 1") == 1, "duplicate apply spliced twice"
+
+
+@pytest.mark.asyncio
+async def test_apply_same_diff_dedupes_across_reminted_identity(tmp_path: Path):
+    """A crash-requeued retry arrives with a NEW ExecutionIdentity but the same
+    diff content — the fence must still dedupe (content-addressed claim row)."""
+    target = tmp_path / "hello.py"
+    target.write_text("# header\n")
+    runtime = RuntimeStateStore(tmp_path / "runtime.db")
+
+    applier = DiffApplier(workspace=tmp_path, runtime_state=runtime, require_identity=True)
+    await applier.apply(_make_insert_diff(), execution_identity=_identity())
+    second = await applier.apply(
+        _make_insert_diff(),
+        execution_identity=_identity(run_id="run-2", idempotency_key="idem-2", claim_id="claim-2"),
+    )
+    assert second.deduplicated is True
+    assert target.read_text().count("added = 1") == 1
+
+
+@pytest.mark.asyncio
+async def test_apply_failed_attempt_is_retryable_not_deduped(tmp_path: Path):
+    """A FAILED apply must not poison the fence: the retry re-executes."""
+    runtime = RuntimeStateStore(tmp_path / "runtime.db")
+    applier = DiffApplier(workspace=tmp_path, runtime_state=runtime, require_identity=True)
+
+    first = await applier.apply(_make_insert_diff(), execution_identity=_identity())
+    assert first.success is False, "target file does not exist yet"
+
+    (tmp_path / "hello.py").write_text("# header\n")
+    second = await applier.apply(_make_insert_diff(), execution_identity=_identity())
+    assert second.success is True
+    assert second.deduplicated is False
+    assert (tmp_path / "hello.py").read_text().count("added = 1") == 1
+
+
 # ---------------------------------------------------------------------------
 # 7. Invalid diff returns error
 # ---------------------------------------------------------------------------

@@ -8,6 +8,7 @@ when the test suite passes, rolled back otherwise.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import re
 import shutil
@@ -37,6 +38,23 @@ class ApplyResult(BaseModel):
     backup_paths: dict[str, str] = {}  # original -> backup
     created_files: list[str] = []
     error: str = ""
+    # True when the idempotency fence replayed a prior completed apply of the
+    # same diff content instead of splicing it in a second time.
+    deduplicated: bool = False
+
+
+def _apply_side_effect_key(proposal_id: str, diff_text: str) -> str:
+    """Content-addressed side-effect key for one consequential diff apply."""
+    digest = hashlib.sha256(diff_text.encode("utf-8")).hexdigest()
+    return f"self_mod:apply:{proposal_id or 'adhoc'}:{digest}"
+
+
+def _fence_claim_key(side_effect_key: str) -> str:
+    """Deterministic claim idempotency key (same ``sek_`` convention as
+    graph/durable_invoker): every applier of the same diff — including a
+    crash-requeued one with a re-minted ExecutionIdentity — races on the
+    SAME (idempotency_key, side_effect_key) row."""
+    return f"sek_{hashlib.sha256(side_effect_key.encode('utf-8')).hexdigest()}"
 
 
 class ApplyTestResult(BaseModel):
@@ -246,6 +264,8 @@ class DiffApplier:
 
         effective_require = self._require_identity if require_identity is None else require_identity
         identity: ExecutionIdentity | None = None
+        fence_key = ""
+        fence_claim: ExecutionIdentity | None = None
         if not dry_run:
             try:
                 identity = require_execution_tollbooth(
@@ -263,6 +283,53 @@ class DiffApplier:
                     source="diff_applier.apply",
                     metadata={"surface": "self_modification"},
                 )
+                fence_key = _apply_side_effect_key(
+                    proposal_id or identity.proposal_id, stripped
+                )
+                fence_claim = identity.with_updates(
+                    idempotency_key=_fence_claim_key(fence_key)
+                )
+                try:
+                    begun = await self._runtime_state.try_begin_idempotent_side_effect(
+                        fence_claim,
+                        fence_key,
+                        metadata={"surface": "self_modification"},
+                    )
+                except Exception:
+                    # Fail-open (availability doctrine): the apply proceeds
+                    # unfenced, loudly — never silently blocked by the store.
+                    logger.warning(
+                        "diff_applier: idempotency begin failed for %s;"
+                        " applying WITHOUT fence",
+                        fence_key,
+                        exc_info=True,
+                    )
+                    begun, fence_claim = True, None
+                if not begun and fence_claim is not None:
+                    record = await self._runtime_state.get_idempotency_record(
+                        fence_claim.idempotency_key, fence_key
+                    )
+                    prior_status = getattr(record, "status", "") if record else ""
+                    if prior_status == "completed":
+                        self._runtime_state.record_self_mod_receipt_sync(
+                            identity,
+                            stage="apply",
+                            status="deduplicated",
+                            proposal_id=proposal_id or identity.proposal_id,
+                            payload={"side_effect_key": fence_key},
+                        )
+                        return ApplyResult(success=True, deduplicated=True)
+                    if prior_status == "started":
+                        # A live concurrent apply holds this diff; a second
+                        # positional splice would corrupt the files.
+                        return ApplyResult(
+                            success=False,
+                            error=(
+                                "duplicate apply in flight for"
+                                f" side_effect_key={fence_key}"
+                            ),
+                        )
+                    # failed / unreadable prior attempt: retry re-executes.
                 self._runtime_state.record_self_mod_receipt_sync(
                     identity,
                     stage="apply",
@@ -291,6 +358,7 @@ class DiffApplier:
                         proposal_id=proposal_id or identity.proposal_id,
                         payload={"file": patch.target_path, "error": "target_missing"},
                     )
+                await self._complete_apply_fence(fence_claim, fence_key, status="failed")
                 return ApplyResult(
                     success=False,
                     error=f"Target file does not exist: {patch.target_path}",
@@ -320,6 +388,7 @@ class DiffApplier:
                         proposal_id=proposal_id or identity.proposal_id,
                         payload={"file": patch.target_path, "error": type(exc).__name__},
                     )
+                await self._complete_apply_fence(fence_claim, fence_key, status="failed")
                 return ApplyResult(
                     success=False,
                     error=f"Failed applying patch to {patch.target_path}: {exc}",
@@ -339,12 +408,32 @@ class DiffApplier:
                 proposal_id=proposal_id or identity.proposal_id,
                 payload={"files": files_changed},
             )
+        await self._complete_apply_fence(fence_claim, fence_key, status="completed")
         return ApplyResult(
             success=True,
             files_changed=files_changed,
             backup_paths=backup_paths,
             created_files=created_files,
         )
+
+    async def _complete_apply_fence(
+        self,
+        fence_claim: ExecutionIdentity | None,
+        fence_key: str,
+        *,
+        status: str,
+    ) -> None:
+        """Resolve the apply's idempotency row, fail-open (never break apply)."""
+        if fence_claim is None or not fence_key or self._runtime_state is None:
+            return
+        try:
+            await self._runtime_state.complete_idempotent_side_effect(
+                fence_claim, fence_key, status=status
+            )
+        except Exception:
+            logger.warning(
+                "diff_applier: fence completion failed for %s", fence_key, exc_info=True
+            )
 
     async def rollback(self, result: ApplyResult) -> None:
         """Restore backups and unlink only paths created by this apply."""
