@@ -1749,6 +1749,8 @@ active_tracks:
       - scripts/docops/**
       - dharma_swarm/build_engine.py
       - dharma_swarm/autonomous_agent.py
+      - dharma_swarm/diff_applier.py
+      - dharma_swarm/sandbox.py
       - docs/docops/AUTO_INVENTORY.md
       - api/main.py
       - tests/test_api_auth.py
@@ -1758,6 +1760,8 @@ active_tracks:
       - tests/test_semgrep_wrapper.py
       - tests/test_uplift_guard_subprocess.py
       - tests/test_fast_suite_isolation.py
+      - tests/test_diff_applier.py
+      - tests/test_sandbox.py
       - tests/test_nats_verification_split.py
       - tests/test_nats_substrate_contract.py
       - tests/test_nats_live_production_evidence.py
