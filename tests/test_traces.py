@@ -291,3 +291,43 @@ async def test_empty_store_operations(store: TraceStore):
     assert await store.get_recent(5) == []
     assert await store.get_lineage("anything") == []
     assert await store.archive_old(1) == 0
+
+
+# ---------------------------------------------------------------------------
+# Front door: canonical store resolution + one-call trace write
+# ---------------------------------------------------------------------------
+
+
+class TestTraceFrontDoor:
+    """C2: one documented entry point for operational trace writes, so new
+    writers stop hand-rolling divergent TraceStore(base_path=...) locations."""
+
+    def test_canonical_store_resolves_env_override(self, tmp_path, monkeypatch):
+        from dharma_swarm.traces import canonical_trace_store
+
+        monkeypatch.setenv("DHARMA_TRACES_DIR", str(tmp_path / "custom"))
+        store = canonical_trace_store()
+        assert store.base_path == tmp_path / "custom"
+
+    def test_canonical_store_defaults_to_dharma_home(self, monkeypatch):
+        from dharma_swarm.traces import canonical_trace_store, _DEFAULT_TRACE_PATH
+
+        monkeypatch.delenv("DHARMA_TRACES_DIR", raising=False)
+        assert canonical_trace_store().base_path == _DEFAULT_TRACE_PATH
+
+    @pytest.mark.asyncio
+    async def test_record_trace_lands_in_canonical_store(self, tmp_path, monkeypatch):
+        from dharma_swarm.traces import canonical_trace_store, record_trace
+
+        monkeypatch.setenv("DHARMA_TRACES_DIR", str(tmp_path))
+        entry_id = await record_trace(
+            agent="front-door-test",
+            action="task_completed",
+            metadata={"task_id": "t-1"},
+        )
+        assert entry_id
+        entry = await canonical_trace_store().get_entry(entry_id)
+        assert entry is not None
+        assert entry.agent == "front-door-test"
+        assert entry.action == "task_completed"
+        assert entry.metadata["task_id"] == "t-1"

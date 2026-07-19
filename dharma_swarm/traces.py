@@ -197,6 +197,55 @@ class TraceStore:
         return count
 
 
+# ---------------------------------------------------------------------------
+# Front door
+# ---------------------------------------------------------------------------
+
+
+def canonical_trace_store() -> TraceStore:
+    """THE documented entry point for operational trace writes.
+
+    Resolves the single canonical location (``~/.dharma/traces``; override
+    with ``DHARMA_TRACES_DIR`` for tests and sandboxes). New writers call
+    this — or :func:`record_trace` — instead of hand-rolling
+    ``TraceStore(base_path=...)``, which is how the per-module path drift
+    (``overseeing_i.py:242``, ``ecc_eval_harness.py:442``,
+    ``claude_hooks.py:162``) accumulated.
+
+    Role map (do not merge these): this store holds operational lineage
+    ``TraceEntry`` rows; ``observability.LocalTraceStore`` is the span/cost
+    JSONL; ``chamber/traces.py`` is a deliberately DISJOINT evidence-corpus
+    format under the RSI-lab boundary contract (its docstring, lines 9-12)
+    and must not be unified into this one.
+    """
+    override = os.getenv("DHARMA_TRACES_DIR", "").strip()
+    if override:
+        return TraceStore(base_path=Path(override))
+    return TraceStore()
+
+
+async def record_trace(
+    *,
+    agent: str,
+    action: str,
+    state: str = "completed",
+    parent_id: str | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> str:
+    """Write one operational trace through the front door; returns entry id."""
+    store = canonical_trace_store()
+    await store.init()
+    return await store.log_entry(
+        TraceEntry(
+            agent=agent,
+            action=action,
+            state=state,
+            parent_id=parent_id,
+            metadata=dict(metadata or {}),
+        )
+    )
+
+
 def auto_research_trace_entry(
     *,
     agent: str,
