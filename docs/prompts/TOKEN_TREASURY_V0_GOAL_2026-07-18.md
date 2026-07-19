@@ -136,7 +136,12 @@ Anything less is a typed intermediate state, never "done".
 5. `docs/governance/BUILD_SESSION_ENTRYPOINT.md` — packet/preflight/closeout
    boundaries.
 6. `docs/plans/THE_KEEL_2026-07-17.md` §5 (loop/spend invariant), §13 (kill
-   criteria).
+   criteria) — **UNRESOLVED DEPENDENCY (Codex review 2026-07-19): this file
+   is absent from the tree** (`git cat-file -e HEAD:docs/plans/THE_KEEL_2026-07-17.md`
+   fails; Discovery Stream Open Question 1 tracks recovery). Until it is
+   recovered into the checkout, treat this rung as non-binding context, do
+   not cite its sections as authority, and record the gap in any report
+   that would have leaned on it.
 7. This prompt.
 
 ### 2. Hard rules (survive every session, override throughput)
@@ -234,8 +239,14 @@ sorted output; `--write/--check/--print` CLI).
 2. Classify each site: `metered` (through the gateway — zero at baseline),
    `bypass` (direct provider dispatch), `test-only`, `non-production`
    (docstring/example), `UNRESOLVED`.
-3. Audit telemetry truth: for each of the 18 providers, does `complete()`
-   populate `LLMResponse.usage`? Emit a per-provider table in the ledger.
+3. Audit telemetry truth: for every provider the RUNTIME can construct —
+   not just the 18 classes in `providers.py`; `runtime_provider.py` also
+   builds out-of-file providers (e.g. `MoonshotProvider` from
+   `dharma_swarm/moonshot_provider.py`, imported at
+   `runtime_provider.py:688`, returned at `:819`) — does `complete()`
+   populate `LLMResponse.usage`? Enumerate the audit set from
+   `runtime_provider.py`'s factory paths, and emit a per-provider table
+   in the ledger.
 4. Audit the spend store: which production paths pass real `cost_usd` into
    `AgentRegistry.log_task`; what `_aggregate_spend` actually sees today.
 **Exit gate:** ledger regenerates deterministically (two runs,
@@ -252,8 +263,11 @@ never the tree.
 
 **Entry:** Phase A merged AND portfolio admission resolved (see Status
 section) — otherwise record `BLOCKED_OPERATOR` and stop.
-**Scope:** one new module `dharma_swarm/llm_gateway.py` (<500 lines), its
-test file `tests/test_llm_gateway.py`, and nothing else.
+**Scope:** one new module in a subpackage — suggested
+`dharma_swarm/treasury/llm_gateway.py` (<500 lines; NOT a top-level
+`dharma_swarm/*.py` file — SOVEREIGN_MANIFEST invariant A1 "NO
+FLAT-PACKAGE GROWTH" forbids new flat modules) — its test file
+`tests/test_llm_gateway.py`, and nothing else.
 **Work:** an async entry point that wraps a resolved provider's
 `complete()`:
 1. Pre-dispatch: consult `AgentRegistry.is_budget_exceeded`
