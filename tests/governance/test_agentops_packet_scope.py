@@ -607,6 +607,97 @@ def test_pull_request_base_ref_off_ancestry_is_rejected(tmp_path: Path) -> None:
     )
 
 
+def test_unrelated_new_sibling_surface_does_not_force_packet_rebind(
+    tmp_path: Path,
+) -> None:
+    """A sibling track claiming a surface this PR never touches — added to the
+    portfolio after the packet's base_ref — must not invalidate the packet.
+    forbidden_files completeness is owed only for sibling patterns that match a
+    path this PR actually changes; the collision check grades the real changed
+    paths against live sibling ownership regardless of the packet's declaration,
+    so untouched surfaces add no safety and forced a full packet re-bind on
+    every unrelated portfolio change."""
+    repo, fork_point = _init_repo(tmp_path)
+    active_track_path = "docs/governance/ACTIVE_TRACK.yaml"
+    # main advances: a new sibling claims terminal/**, which this PR never touches.
+    two_tracks = {
+        "active_tracks": [
+            {"id": "track-a", "status": "ACTIVE", "owner": "operator",
+             "owned_surfaces": ["feature/**"]},
+            {"id": "track-s", "status": "ACTIVE", "owner": "sibling-owner",
+             "owned_surfaces": ["terminal/**"]},
+        ]
+    }
+    _write(repo, active_track_path, json.dumps(two_tracks, indent=2) + "\n")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "sibling claims unrelated surface")
+    advanced_main = _git(repo, "rev-parse", "HEAD")
+    # The PR is up to date with advanced_main; its packet was bound at the fork
+    # point when track-s did not exist, so forbidden_files omits terminal/**.
+    _git(repo, "checkout", "-b", "feature", advanced_main)
+    risky = "scripts/governance/risky.py"
+    head, packet_paths = _commit_event(
+        repo,
+        base=advanced_main,
+        changes={risky: "RISKY = True\n"},
+        packet_specs=[
+            {
+                "packet_id": "track-a-WP-1",
+                "work_packet": "WP-1",
+                "allowed": [risky],
+                "base_ref": fork_point,
+            }
+        ],
+    )
+    _git(repo, "checkout", "--detach", head)
+
+    report = _evaluate(repo, advanced_main, head)
+
+    assert report["status"] == "PASSED", report["errors"]
+    assert report["coverage"][risky] == packet_paths
+
+
+def test_touched_sibling_surface_still_requires_forbidden_declaration(
+    tmp_path: Path,
+) -> None:
+    """The completeness relaxation is a narrowing, not a removal: a sibling
+    pattern that matches a path this PR changes must still appear in
+    forbidden_files, and omitting it is an error alongside the ownership
+    collision."""
+    repo, base = _init_repo(tmp_path)
+    active_track_path = "docs/governance/ACTIVE_TRACK.yaml"
+    two_tracks = {
+        "active_tracks": [
+            {"id": "track-a", "status": "ACTIVE", "owner": "operator",
+             "owned_surfaces": ["feature/**"]},
+            {"id": "track-s", "status": "ACTIVE", "owner": "sibling-owner",
+             "owned_surfaces": ["scripts/governance/**"]},
+        ]
+    }
+    _write(repo, active_track_path, json.dumps(two_tracks, indent=2) + "\n")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "sibling claims scripts/governance")
+    sibling_base = _git(repo, "rev-parse", "HEAD")
+    risky = "scripts/governance/risky.py"
+    head, _ = _commit_event(
+        repo,
+        base=sibling_base,
+        changes={risky: "RISKY = True\n"},
+        packet_specs=[
+            {"packet_id": "track-a-WP-1", "work_packet": "WP-1", "allowed": [risky]}
+        ],
+    )
+
+    report = _evaluate(repo, sibling_base, head)
+
+    assert report["status"] == "FAILED"
+    assert any(
+        "omit sibling surfaces" in error and "scripts/governance/**" in error
+        for error in report["errors"]
+    )
+    assert any("collision" in error for error in report["errors"])
+
+
 def test_sibling_ownership_read_at_live_merge_base_not_stale_base_ref(
     tmp_path: Path,
 ) -> None:
