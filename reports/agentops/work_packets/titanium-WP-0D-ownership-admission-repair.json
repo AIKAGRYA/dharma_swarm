@@ -1,0 +1,86 @@
+{
+  "id": "titanium-WP-0D-ownership-admission-repair",
+  "base_ref": "94accf91069466caa787dfa4546a97d49b9cfa34",
+  "branch": "agent/titanium-wp0d-ownership-repair-20260719",
+  "worktree": ".",
+  "intent": "Repair the live Titanium ownership envelope before WP-0D by adding only the operator-authorized DiffApplier and LocalSandbox amendment pairs to repository-titanium-hardening-2026-07, then regenerate the two canonical ACTIVE_TRACK projections. This PR changes governance admission only and must not modify implementation behavior.",
+  "allowed_files": [
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "CLAUDE.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "reports/agentops/work_packets/titanium-WP-0D-ownership-admission-repair.json"
+  ],
+  "forbidden_files": [],
+  "gates": [
+    {
+      "name": "active-track-governance-contracts",
+      "command": "python3 -m pytest -q tests/test_active_track_governance.py tests/test_check_track_status_lifecycle.py tests/test_track_portfolio.py",
+      "expected_exit": 0,
+      "timeout_seconds": 900
+    },
+    {
+      "name": "docops-integrity",
+      "command": "make docops-integrity",
+      "expected_exit": 0,
+      "timeout_seconds": 900
+    },
+    {
+      "name": "diff-whitespace-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "renderer-invalid-flag-rejected",
+      "command": "python3 scripts/governance/render_active_track_includes.py --invalid-flag",
+      "expected_exit": 2,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "docs(governance): admit WP-0D amendment ownership"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.12.13",
+      "git": "2.43.0",
+      "make": "4.3"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-0D",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "94accf91069466caa787dfa4546a97d49b9cfa34",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The admitted WP-0D packet includes the DiffApplier and LocalSandbox two-file amendments, but live ACTIVE_TRACK ownership at base_ref omits those four paths."
+    ],
+    "closest_existing_implementation": [
+      "docs/governance/ACTIVE_TRACK.yaml",
+      "scripts/governance/render_active_track_includes.py"
+    ],
+    "honest_blockers": [
+      "Human merge of this governance-only repair is required before the preserved WP-0D implementation candidate may be rebased or published.",
+      "PR #996 remains held and must rebase after WP-0D; PR #1060 remains held on the overlapping DiffApplier pair."
+    ],
+    "rollback": "Revert the ACTIVE_TRACK ownership additions, the two generated projections, and this packet together; WP-0D returns to MATERIAL_AUTHORITY_CONFLICT and must remain unpublished.",
+    "packet_digest": "fb70a197346dc540a030788b81fddeb889deac49009275cc98ca952058b0bf52"
+  }
+}
