@@ -605,3 +605,63 @@ def test_pull_request_base_ref_off_ancestry_is_rejected(tmp_path: Path) -> None:
         "not an ancestor of pull-request merge base" in error
         for error in report["errors"]
     )
+
+
+def test_sibling_ownership_read_at_live_merge_base_not_stale_base_ref(
+    tmp_path: Path,
+) -> None:
+    """With an ancestor base_ref, sibling ownership must be read at the live
+    merge base. A sibling surface added after base_ref (present at the merge
+    base) that this PR both edits and closes must still be caught — otherwise a
+    stale base_ref launders an ownership collision (P1 review, PR #1046)."""
+    repo, fork_point = _init_repo(tmp_path)
+    active_track_path = "docs/governance/ACTIVE_TRACK.yaml"
+    # main advances: a sibling track claims scripts/governance/** after the fork.
+    two_tracks = {
+        "active_tracks": [
+            {"id": "track-a", "status": "ACTIVE", "owner": "operator",
+             "owned_surfaces": ["feature/**"]},
+            {"id": "track-s", "status": "ACTIVE", "owner": "sibling-owner",
+             "owned_surfaces": ["scripts/governance/**"]},
+        ]
+    }
+    _write(repo, active_track_path, json.dumps(two_tracks, indent=2) + "\n")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "sibling claims scripts/governance")
+    advanced_main = _git(repo, "rev-parse", "HEAD")
+    # The PR is up to date with advanced_main, edits the sibling-owned path, AND
+    # closes the sibling in the same commit — while pinning the older base_ref.
+    _git(repo, "checkout", "-b", "feature", advanced_main)
+    only_track_a = {
+        "active_tracks": [
+            {"id": "track-a", "status": "ACTIVE", "owner": "operator",
+             "owned_surfaces": ["feature/**"]},
+        ]
+    }
+    risky = "scripts/governance/risky.py"
+    head, _ = _commit_event(
+        repo,
+        base=advanced_main,
+        changes={
+            risky: "RISKY = True\n",
+            active_track_path: json.dumps(only_track_a, indent=2) + "\n",
+        },
+        packet_specs=[
+            {
+                "packet_id": "track-a-WP-1",
+                "work_packet": "WP-1",
+                "allowed": [risky, active_track_path],
+                "base_ref": fork_point,
+            }
+        ],
+    )
+    _git(repo, "checkout", "--detach", head)
+
+    report = _evaluate(repo, advanced_main, head)
+
+    assert report["status"] == "FAILED", report["errors"]
+    assert any(
+        "scripts/governance" in error
+        and ("collision" in error or "sibling surfaces" in error)
+        for error in report["errors"]
+    )
