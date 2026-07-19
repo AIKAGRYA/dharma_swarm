@@ -459,8 +459,14 @@ async def run_pulse_loop(shutdown_event: asyncio.Event, supervisor: Any | None =
     while not shutdown_event.is_set():
         _tick_loop(supervisor, "pulse")
         if daily_count >= MAX_DAILY:
+            # Tick through the capped hour in interval-sized chunks so a
+            # healthy daily-limit pause never renders as LOOP_STALL.
             _log("pulse", f"Daily limit ({MAX_DAILY}) reached")
-            await asyncio.sleep(3600)
+            idle = 0.0
+            while idle < 3600 and not shutdown_event.is_set():
+                await asyncio.sleep(min(float(PULSE_INTERVAL), 3600 - idle))
+                idle += float(PULSE_INTERVAL)
+                _tick_loop(supervisor, "pulse")
             continue
 
         try:
@@ -1085,8 +1091,19 @@ async def _run_consolidation_loop(shutdown_event: asyncio.Event, supervisor: Any
     structured contrarian debate, and modify behavioral DNA based on
     observed "loss". Mirrors sleep consolidation in the brain.
     """
-    # Wait 2 hours after boot to let other systems produce traces
-    await asyncio.sleep(7200)
+    # Wait 2 hours after boot to let other systems produce traces.  Tick
+    # through the declared delay in interval-sized chunks: with a configured
+    # DGC_CONSOLIDATION_INTERVAL below 3600 the delay exceeds 2x the loop
+    # interval and would otherwise false-alarm as LOOP_NEVER_STARTED.
+    _boot_delay_left = 7200.0
+    while _boot_delay_left > 0:
+        _tick_loop(supervisor, "consolidation")
+        _chunk = min(_boot_delay_left, CONSOLIDATION_INTERVAL / 2)
+        try:
+            await asyncio.wait_for(shutdown_event.wait(), timeout=_chunk)
+            return
+        except asyncio.TimeoutError:
+            _boot_delay_left -= _chunk
     _log("consolidation", f"Sleep cycle starting (interval={CONSOLIDATION_INTERVAL}s)")
 
     from dharma_swarm.consolidation import ConsolidationCycle
@@ -1793,14 +1810,20 @@ async def _run_health_api(shutdown_event: asyncio.Event, supervisor: Any | None 
     try:
         from dharma_swarm.swarm_health_api import run_health_api
         server_task = asyncio.ensure_future(run_health_api(shutdown_event))
+        stop_task = asyncio.ensure_future(shutdown_event.wait())
         # Supervision heartbeat: a tick asserts "server task alive", not
         # "request served" — the serve loop itself lives in swarm_health_api.
-        while not shutdown_event.is_set() and not server_task.done():
-            _tick_loop(supervisor, "health-api")
-            try:
-                await asyncio.wait_for(shutdown_event.wait(), timeout=60)
-            except asyncio.TimeoutError:
-                pass
+        # Waking on server_task completion keeps a dead server (e.g. port
+        # bind failure) from being reported alive for up to a full beat.
+        try:
+            while not shutdown_event.is_set() and not server_task.done():
+                _tick_loop(supervisor, "health-api")
+                await asyncio.wait(
+                    {server_task, stop_task}, timeout=60,
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+        finally:
+            stop_task.cancel()
         await server_task
     except Exception as exc:
         _log("health-api", f"Health API crashed: {exc}")
@@ -1899,14 +1922,20 @@ async def _run_guardian_loop(
             shutdown_event=shutdown_event,
             room_registry=room_registry,
         ))
+        stop_task = asyncio.ensure_future(shutdown_event.wait())
         # Supervision heartbeat: a tick asserts "guardian task alive", not
         # "audit cycle completed" — the crew's loop lives in guardian_crew.
-        while not shutdown_event.is_set() and not crew_task.done():
-            _tick_loop(supervisor, "guardian")
-            try:
-                await asyncio.wait_for(shutdown_event.wait(), timeout=60)
-            except asyncio.TimeoutError:
-                pass
+        # Waking on crew_task completion keeps a dead crew from being
+        # reported alive for up to a full beat.
+        try:
+            while not shutdown_event.is_set() and not crew_task.done():
+                _tick_loop(supervisor, "guardian")
+                await asyncio.wait(
+                    {crew_task, stop_task}, timeout=60,
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+        finally:
+            stop_task.cancel()
         await crew_task
     except Exception as exc:
         _log("guardian", f"Guardian loop crashed: {exc}")
