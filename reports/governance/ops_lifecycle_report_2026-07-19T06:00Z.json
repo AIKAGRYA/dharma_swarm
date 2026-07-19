@@ -1,0 +1,153 @@
+{
+  "run_timestamp": "2026-07-19T06:00Z",
+  "audit_sha": "f1237e23e674cf7664e5657561d4e23461719270",
+  "mission_1_spine_adoption": {
+    "adoption_pct": 93.8,
+    "target_pct": 95.0,
+    "gap_pp": 1.2,
+    "joined_count": 13,
+    "adapter_ready_count": 2,
+    "legacy_count": 1,
+    "missing_count": 0,
+    "quarantine_count": 0,
+    "total_surfaces": 16,
+    "status_vs_previous": "UNCHANGED (93.8% -> 93.8%)",
+    "json_committed": false,
+    "json_commit_reason": "adoption_pct unchanged from HEAD; per policy only commit on pct change",
+    "spine_comment_posted_to": "PR #1045 (https://github.com/AmitabhainArunachala/dharma_swarm/pull/1045#issuecomment-5014639988)",
+    "top_saturation_targets": [
+      {
+        "id": "self_modification_loop",
+        "status": "adapter-ready",
+        "files": [
+          "dharma_swarm/diff_applier.py",
+          "dharma_swarm/evolution.py",
+          "dharma_swarm/self_improve.py"
+        ],
+        "missing_patterns": [
+          "try_begin_idempotent_side_effect on apply path in diff_applier.py"
+        ]
+      },
+      {
+        "id": "mcp_tool_access",
+        "status": "adapter-ready",
+        "files": [
+          "dharma_swarm/mcp_server.py",
+          "dharma_swarm/dharma_context_mcp.py"
+        ],
+        "missing_patterns": [
+          "ExecutionIdentity import",
+          "RuntimeStateStore wiring",
+          "record_side_effect receipts"
+        ]
+      },
+      {
+        "id": "legacy_no_identity_escape_hatch",
+        "status": "legacy",
+        "files": [
+          "dharma_swarm/runtime_state.py",
+          "tests/test_runtime_state_invariants.py"
+        ],
+        "note": "Intentional legacy surface; invariant-covered"
+      }
+    ]
+  },
+  "mission_2_pr_lifecycle": {
+    "total_open_before": 18,
+    "total_open_after": 18,
+    "auto_closed_count": 0,
+    "auto_closed_prs": [],
+    "conflicting_prs_under_7d": [
+      {
+        "number": 1007,
+        "title": "governance(keel): bare-metal architecture audit as the KEEL companion findings ledger",
+        "created_at": "2026-07-17T17:20:24Z",
+        "age_hours": 36.7
+      },
+      {
+        "number": 996,
+        "title": "governance(safety): admit live-host and rollback proof surfaces",
+        "created_at": "2026-07-17T01:43:11Z",
+        "age_hours": 52.3
+      },
+      {
+        "number": 972,
+        "title": "feat(forge-lab): canonical exact-code RSI lab releases",
+        "created_at": "2026-07-15T15:52:06Z",
+        "age_hours": 62.1
+      },
+      {
+        "number": 949,
+        "title": "[impact-checked] Govern durable A2A operator slice",
+        "created_at": "2026-07-14T23:31:10Z",
+        "age_hours": 78.5
+      },
+      {
+        "number": 947,
+        "title": "[impact-checked] Add durable A2A presence and operator node",
+        "created_at": "2026-07-14T15:49:21Z",
+        "age_hours": 86.2
+      }
+    ],
+    "duplicate_autogrounding_prs": [],
+    "green_and_ready_prs": [
+      {
+        "number": 1050,
+        "title": "test(mike): prove manual gate fails closed on onboarding required context (WP-MIKEC1)"
+      },
+      {
+        "number": 1048,
+        "title": "feat(loop-closure): WP-LC1 4-state loop-health honesty"
+      },
+      {
+        "number": 1045,
+        "title": "chore(governance): ops agent lifecycle report 2026-07-19T00:00Z [automated]"
+      },
+      {
+        "number": 1037,
+        "title": "docs: strategy pack \u2014 Token Treasury v0 goal spec + Arjuna Customer Discovery Stream"
+      },
+      {
+        "number": 1025,
+        "title": "docs(architecture): NATS/A2A whole-system update specification 2026-07-18"
+      },
+      {
+        "number": 1024,
+        "title": "feat(agents): register grok_build as Meghaforge display identity"
+      },
+      {
+        "number": 1013,
+        "title": "feat(ops): bounded mobile recovery for Codex Composer"
+      },
+      {
+        "number": 1011,
+        "title": "governance: admit current Codex Composer recovery slice"
+      },
+      {
+        "number": 1006,
+        "title": "docs(plans): DharmaGraph Ascent master spec (C1-C5)"
+      },
+      {
+        "number": 1004,
+        "title": "docs(plans): THE KEEL v7.1 \u2014 verification lattice doctrine"
+      },
+      {
+        "number": 987,
+        "title": "chore(docops): reconcile generated counts"
+      },
+      {
+        "number": 930,
+        "title": "feat(chamber): add exact-scope proof membrane v0"
+      },
+      {
+        "number": 904,
+        "title": "feat(holon): authority-scoped remote fast path [impact-checked]"
+      }
+    ],
+    "recommended_actions": [
+      "Resolve merge conflicts on PRs #947, #949, #972, #996, #1007 \u2014 all < 7d but will cross threshold in ~5-7 days",
+      "Prioritize mcp_tool_access or self_modification_loop spine join to push adoption to 100%",
+      "PR #904 (feat(holon)) is 6.4 days old and MERGEABLE \u2014 operator review recommended before it ages out"
+    ]
+  }
+}
