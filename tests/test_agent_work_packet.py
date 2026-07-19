@@ -4310,6 +4310,81 @@ def test_negative_control_ignores_ambient_execution_injection(
     assert not (repo / "ambient-python-ran").exists()
 
 
+def test_negative_control_rejects_hollow_missing_module_collision(
+    tmp_path: Path,
+) -> None:
+    """A ``python -m <module>`` control whose module is not importable in the
+    jail must be rejected, never marked PASSED: the interpreter's bootstrap
+    failure exits 1 and would otherwise collide with the expected non-zero
+    exit without running the control at all."""
+    repo = init_repo(tmp_path)
+    external_tmp = tmp_path / "negative-tmp"
+    external_tmp.mkdir()
+    hollow = agentops.parse_gate(
+        {
+            "name": "hollow-pytest",
+            "command": "python3 -m pytest -q",
+            "expected_exit": 1,
+        },
+        0,
+        require_expected_exit=True,
+    )
+    with pytest.raises(agentops.AgentOpsError, match="not importable in the jail"):
+        agentops.run_negative_control(repo, hollow, temp_root=external_tmp)
+
+    # A genuinely-run control with an expected non-zero exit still passes.
+    genuine = agentops.parse_gate(
+        {
+            "name": "genuine-nonzero",
+            "command": 'python3 -c "raise SystemExit(1)"',
+            "expected_exit": 1,
+        },
+        0,
+        require_expected_exit=True,
+    )
+    result = agentops.run_negative_control(repo, genuine, temp_root=external_tmp)
+    assert result["passed"] is True
+
+    # A stdlib ``-m`` control passes the import probe and runs for real.
+    stdlib_control = agentops.parse_gate(
+        {
+            "name": "stdlib-module",
+            "command": "python3 -m calendar 2026 1",
+            "expected_exit": 0,
+        },
+        0,
+        require_expected_exit=True,
+    )
+    result = agentops.run_negative_control(
+        repo, stdlib_control, temp_root=external_tmp
+    )
+    assert result["passed"] is True
+
+
+def test_negative_control_rejects_unhandled_import_failure_collision(
+    tmp_path: Path,
+) -> None:
+    """A control that dies on an unhandled ``ModuleNotFoundError`` with an
+    expected non-zero exit never exercised its detection logic; reject the
+    exit-code collision instead of counting it as a caught mutation."""
+    repo = init_repo(tmp_path)
+    external_tmp = tmp_path / "negative-tmp"
+    external_tmp.mkdir()
+    gate = agentops.parse_gate(
+        {
+            "name": "unhandled-import",
+            "command": 'python3 -c "import dharma_agentops_absent_module"',
+            "expected_exit": 1,
+        },
+        0,
+        require_expected_exit=True,
+    )
+    with pytest.raises(
+        agentops.AgentOpsError, match="setup/import failure"
+    ):
+        agentops.run_negative_control(repo, gate, temp_root=external_tmp)
+
+
 @pytest.mark.parametrize("drift", ["branch", "status", "parent"])
 def test_preflight_final_revalidation_leaves_no_binding_on_drift(
     tmp_path: Path,
