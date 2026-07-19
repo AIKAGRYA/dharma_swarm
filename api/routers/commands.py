@@ -24,12 +24,27 @@ def _get_boardstore_outbox():
 
 @router.post("/commands/evolve")
 async def trigger_evolve(req: EvolveRequest) -> ApiResponse:
-    swarm = _get_swarm()
-    try:
-        result = await swarm.evolve(component=req.component, generations=req.generations)
-        return ApiResponse(data=result)
-    except Exception as e:
-        return ApiResponse(status="error", error=str(e))
+    # `Swarm.evolve` runs a single gated DarwinEngine proposal and requires
+    # change_type/description (dharma_swarm/swarm.py) — it has NO `generations`
+    # parameter. This endpoint was calling it with an argument the method never
+    # accepted, so every request raised TypeError and returned it as a generic
+    # error: a permanently-broken endpoint masquerading as a transient failure,
+    # while still constructing the swarm on each call.
+    #
+    # Wiring a live, unauthenticated HTTP trigger to gated self-evolution is a
+    # deliberate feature+authorization decision, not a hardening one. Until that
+    # is designed, report the true contract instead of leaking a signature error
+    # or driving the engine from this request.
+    del req  # request fields (component/generations) do not map to Swarm.evolve
+    return ApiResponse(
+        status="error",
+        error=(
+            "evolve is not wired via this endpoint. Swarm.evolve requires "
+            "change_type/description and runs a gated proposal; triggering it "
+            "over unauthenticated HTTP is intentionally not enabled. Use the "
+            "operator terminal 'evolve apply' path."
+        ),
+    )
 
 
 @router.post("/commands/task")
