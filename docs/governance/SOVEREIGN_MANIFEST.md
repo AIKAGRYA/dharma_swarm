@@ -178,10 +178,12 @@ append-style refreshes quadruplicated rows and broke `make docops-integrity`).
 | Markdown files | **1,440** | git ls-files \| rg '\.md$' \| wc -l (excl. AGENTS.md, reports/docops) |
 | Markdown total lines | **302,337** | wc -l across all tracked .md |
 | Test functions | **13,668 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test files | **917** | git ls-files tests \| rg '\.py$' \| wc -l |
+| Test functions | **13,714 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **12,885 (measured 2026-07-10, cloud checkout)** | python3 -m pytest tests/ --collect-only -q |
 | Collection errors | **35 (measured 2026-07-10, cloud checkout — env-dependent optional extras; 0 on the operator host 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
 | Markdown files | **1,440** | git ls-files \| rg '\.md$' \| wc -l (excl. AGENTS.md, reports/docops) |
-| Markdown total lines | **302,337** | wc -l across all tracked .md |
+| Markdown total lines | **302,380** | wc -l across all tracked .md |
 | Bridge files | **29** | find dharma_swarm -name "*bridge*.py" -type f |
 | Adapter files | **27** | find dharma_swarm -type f \| rg -i "adapter" |
 | Router files | **19** | find dharma_swarm -type f \| rg -i "rout" |
