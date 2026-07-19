@@ -32,8 +32,8 @@ from scripts.store_inventory_census import (  # noqa: E402
 
 # Baselines captured 2026-07-19 at origin/main. Lower them in the same PR that
 # consolidates a store; they must never rise.
-BASELINE_DB_NAMES = 35
-BASELINE_JSONL_NAMES = 216
+BASELINE_DB_NAMES = 33
+BASELINE_JSONL_NAMES = 213
 BASELINE_LEDGER_MODULES = 11
 BASELINE_LEDGER_CLASSES = 10
 

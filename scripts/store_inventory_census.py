@@ -41,15 +41,16 @@ from pathlib import Path
 SCHEMA_VERSION = 1
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ARTIFACT_PATH = REPO_ROOT / "reports" / "governance" / "store_inventory_census.json"
+_GENERATOR_REL = "scripts/store_inventory_census.py"
 
 # Non-test source roots. A store literal only counts if it is referenced from
 # source that ships and runs — test fixtures (tests/**) are excluded so the
 # ratchet tracks production proliferation, not test scaffolding.
 SOURCE_ROOTS = ("dharma_swarm/", "api/", "scripts/")
 
-# A tracked path is excluded from the census if any segment matches. This keeps
-# test databases (``test.db``, ``runtime_a.db``) out of the production count.
-_EXCLUDED_SEGMENTS = ("tests", "test", "_test", "conftest.py")
+# Directory segments that mark a test tree. A file under any of these is
+# excluded so test fixtures never count as production stores.
+_EXCLUDED_DIR_SEGMENTS = ("tests", "test")
 
 _DB_RE = re.compile(r"([A-Za-z0-9_][A-Za-z0-9_./-]*\.db)\b")
 _JSONL_RE = re.compile(r"([A-Za-z0-9_][A-Za-z0-9_./-]*\.jsonl)\b")
@@ -70,17 +71,42 @@ def _git_tracked() -> list[str]:
 def _is_source(path: str) -> bool:
     if not path.endswith(".py"):
         return False
+    # The census must never scan ITSELF: this generator necessarily contains
+    # store-name literals as regexes, docstrings, and examples, which would be
+    # counted as real stores (self-referential contamination).
+    if path == _GENERATOR_REL:
+        return False
     if not any(path.startswith(root) for root in SOURCE_ROOTS):
         return False
     segments = path.split("/")
-    if any(seg in _EXCLUDED_SEGMENTS for seg in segments):
+    # Exclude anything under a tests/ directory tree ...
+    if any(seg in _EXCLUDED_DIR_SEGMENTS for seg in segments):
+        return False
+    # ... AND test modules identified by filename, which live alongside source
+    # (e.g. scripts/mirror_test.py, self_optimization/test_swarm_jikoku.py).
+    # Segment-only matching missed these, leaking fixture store names such as
+    # mirror_test.db / swarm_test.jsonl into the production count.
+    base = segments[-1]
+    if base == "conftest.py" or base.startswith("test_") or base.endswith("_test.py"):
         return False
     return True
 
 
 def _name_is_test_fixture(name: str) -> bool:
     base = name.rsplit("/", 1)[-1].lower()
-    return base.startswith("test") or base in {"a.db", "b.db", "tmp.db", "sample.db"}
+    if base in {"a.db", "b.db", "tmp.db", "sample.db"}:
+        return True
+    # Match the test token precisely on the stem so real stores whose name
+    # merely CONTAINS the substring (e.g. ``burn_report_latest.jsonl``) survive,
+    # while conventional fixtures (``mirror_test.db``, ``swarm_test.jsonl``,
+    # ``runtime_a.db``) do not.
+    stem = base.rsplit(".", 1)[0]
+    return (
+        stem.startswith("test")
+        or stem.endswith("_test")
+        or "_test_" in stem
+        or bool(re.fullmatch(r"runtime_[a-z0-9]+", stem))
+    )
 
 
 def build_inventory() -> dict:
