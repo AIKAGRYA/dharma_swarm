@@ -1730,6 +1730,27 @@ def run_gate(
     }
 
 
+_PYTHON_SETUP_FAILURE = re.compile(
+    r"(?m)^(?:\S*python[\w.]*: No module named \S+"
+    r"|ModuleNotFoundError: No module named .+"
+    r"|ImportError: .+)\s*$"
+)
+
+
+def _python_module_target(argv: list[str]) -> str | None:
+    """Top-level module of a ``python -m <module>`` control, if unambiguous.
+
+    Only the plain ``python [-m] module`` spelling is recognized; any other
+    interpreter option before ``-m`` skips the probe and leaves detection to
+    the post-run setup-failure guard.
+    """
+    if len(argv) >= 3 and argv[1] == "-m":
+        top = argv[2].split(".", 1)[0]
+        if top.isidentifier():
+            return top
+    return None
+
+
 def run_negative_control(
     repo_root: Path,
     gate: GateSpec,
@@ -1817,13 +1838,60 @@ def run_negative_control(
                 "agentops",
             ]
             host_env = {"PATH": _TRUSTED_HOST_PATH}
-        return run_gate(
+        python_control = _is_trusted_python(gate.argv[0])
+        probe_module = (
+            _python_module_target(control_gate.argv) if python_control else None
+        )
+        if probe_module is not None:
+            # A `python -m <module>` control whose module is missing in the
+            # jail exits 1 from the interpreter bootstrap without running at
+            # all; that collides with an expected non-zero exit and would be
+            # recorded as a hollow PASS. Prove the module imports under the
+            # identical confinement before trusting the control's exit code.
+            probe = replace(
+                control_gate,
+                name=f"{gate.name}::import-probe",
+                command=f"import probe for module {probe_module}",
+                argv=[control_gate.argv[0], "-c", f"import {probe_module}"],
+                expected_exit=0,
+                env={},
+            )
+            probe_result = run_gate(
+                fixture,
+                probe,
+                base_env=host_env,
+                preexec_fn=preexec_fn,
+                argv_prefix=argv_prefix,
+            )
+            if not probe_result["passed"]:
+                raise AgentOpsError(
+                    f"negative control {gate.name!r} depends on module "
+                    f"{probe_module!r} which is not importable in the jail; "
+                    "a missing-tool exit would collide with the expected "
+                    f"exit {gate.expected_exit} and pass without running "
+                    f"(probe output: {probe_result['output'].strip()!r})"
+                )
+        result = run_gate(
             fixture,
             replace(control_gate, env={}),
             base_env=host_env,
             preexec_fn=preexec_fn,
             argv_prefix=argv_prefix,
         )
+        if (
+            python_control
+            and result["passed"]
+            and gate.expected_exit != 0
+            and _PYTHON_SETUP_FAILURE.search(result["output"])
+        ):
+            raise AgentOpsError(
+                f"negative control {gate.name!r} exited {result['exit_code']} "
+                "on a setup/import failure instead of running its detection "
+                "logic; refusing to count the exit-code collision as PASSED. "
+                "Map setup failures to a distinct exit code (see the "
+                "WP-SCOPEBASE2 reference control)"
+            )
+        return result
 
 
 def timestamp_slug(now: datetime | None = None) -> str:
