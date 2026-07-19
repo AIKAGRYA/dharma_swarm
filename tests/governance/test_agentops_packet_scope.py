@@ -531,3 +531,77 @@ def test_agentops_packet_scope_workflow_has_truthful_bootstrap_and_fail_closed_e
     assert "if-no-files-found: error" in job
     assert "continue-on-error" not in job
     assert "|| true" not in job
+
+
+def test_pull_request_base_ref_may_be_ancestor_of_rebased_merge_base(
+    tmp_path: Path,
+) -> None:
+    """A PR brought up to date with an advanced main keeps its original
+    provenance floor: base_ref need only be an ancestor of the live merge base,
+    not byte-equal to it. This ends the per-merge packet re-bind churn."""
+    repo, fork_point = _init_repo(tmp_path)
+    # main advances past the packet's authored base with an unrelated commit.
+    _write(repo, "docs/advance.md", "main moved forward\n")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "advance main")
+    advanced_main = _git(repo, "rev-parse", "HEAD")
+    # The PR is brought up to date so its parent is the advanced main, while the
+    # packet still declares the older fork point as base_ref (stale but an
+    # ancestor of the live merge base).
+    _git(repo, "checkout", "-b", "feature", advanced_main)
+    risky = "scripts/governance/risky.py"
+    head, packet_paths = _commit_event(
+        repo,
+        base=advanced_main,
+        changes={risky: "RISKY = True\n"},
+        packet_specs=[
+            {
+                "packet_id": "track-a-WP-1",
+                "work_packet": "WP-1",
+                "allowed": [risky],
+                "base_ref": fork_point,
+            }
+        ],
+    )
+    _git(repo, "checkout", "--detach", head)
+
+    report = _evaluate(repo, advanced_main, head)
+
+    assert report["diff_base"] == advanced_main
+    assert report["status"] == "PASSED", report["errors"]
+    assert report["coverage"][risky] == packet_paths
+
+
+def test_pull_request_base_ref_off_ancestry_is_rejected(tmp_path: Path) -> None:
+    """The ancestor floor still binds: a base_ref that is not an ancestor of the
+    live merge base is rejected. The relaxation is a floor, not a removed check."""
+    repo, fork_point = _init_repo(tmp_path)
+    # A divergent commit that never enters the PR's history.
+    _git(repo, "checkout", "-b", "divergent", fork_point)
+    _write(repo, "docs/divergent.md", "off the ancestry line\n")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "divergent commit")
+    off_ancestry = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "main")
+    risky = "scripts/governance/risky.py"
+    head, _ = _commit_event(
+        repo,
+        base=fork_point,
+        changes={risky: "RISKY = True\n"},
+        packet_specs=[
+            {
+                "packet_id": "track-a-WP-1",
+                "work_packet": "WP-1",
+                "allowed": [risky],
+                "base_ref": off_ancestry,
+            }
+        ],
+    )
+
+    report = _evaluate(repo, fork_point, head)
+
+    assert report["status"] == "FAILED"
+    assert any(
+        "not an ancestor of pull-request merge base" in error
+        for error in report["errors"]
+    )
