@@ -330,9 +330,22 @@ def _load_binding(
         errors.append(f"{path}: base_ref does not resolve exactly")
         return None, errors
     if event_name == "pull_request":
-        if packet.base_ref != diff_base:
+        # base_ref need only be an ANCESTOR of the live merge base, not equal to
+        # it. When main advances and the PR is brought up to date, the merge
+        # base moves forward while the packet's provenance floor is unchanged;
+        # requiring byte-equality forced a full packet re-bind (base_ref +
+        # collision.checked_at_sha + digest) on every such advance. The scope
+        # diff already runs against the live merge base (diff_base..head above),
+        # so an ancestor floor preserves containment while ending that churn.
+        # Mirrors the merge_group ancestor check below.
+        ancestry = _git(
+            repo_root,
+            ["merge-base", "--is-ancestor", packet.base_ref, diff_base],
+            check=False,
+        )
+        if ancestry.returncode != 0:
             errors.append(
-                f"{path}: base_ref must equal pull-request merge base {diff_base}"
+                f"{path}: base_ref is not an ancestor of pull-request merge base {diff_base}"
             )
     else:
         ancestry = _git(
@@ -347,7 +360,13 @@ def _load_binding(
     errors.extend(
         _validate_track_binding(
             binding,
-            base_rows=_track_rows(repo_root, packet.base_ref),
+            # Read the base endpoint of sibling ownership at the LIVE merge base,
+            # not at packet.base_ref. base_ref may be an ancestor of the merge
+            # base; a sibling surface added between base_ref and the merge base
+            # (and removed by this PR at head) would otherwise be absent from
+            # both endpoints, letting an ownership collision through (P1 review
+            # on PR #1046, 2026-07-19). diff_base is the conservative base.
+            base_rows=_track_rows(repo_root, diff_base),
             head_rows=_track_rows(repo_root, event_head),
             changed_paths=changed_paths,
         )
