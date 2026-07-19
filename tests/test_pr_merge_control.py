@@ -1038,6 +1038,102 @@ def test_gate_blocks_missing_required_ci_truth(tmp_path, monkeypatch):
     assert "required CI docops_integrity is MISSING; run `make docops-integrity`" in gate["blockers"]
 
 
+@pytest.mark.parametrize(
+    ("github_status", "conclusion", "expected_status"),
+    [
+        (None, None, "MISSING"),
+        ("IN_PROGRESS", "", "PENDING"),
+        ("COMPLETED", "FAILURE", "FAIL"),
+    ],
+)
+def test_gate_blocks_nonpassing_onboarding_admission_parity(
+    tmp_path,
+    monkeypatch,
+    github_status,
+    conclusion,
+    expected_status,
+):
+    """WP-0F2 consumer proof: the manual Mike path fails closed on the
+    onboarding required context straight from the live CI truth contract —
+    no candidate-contract shim. Contract v5 requires the context as
+    onboarding_session_status; the assertion reads the entry's id and
+    local_command from the contract itself so a rename fails loudly here."""
+    out_dir = tmp_path / "packet"
+    out_dir.mkdir()
+    prc.write_json(out_dir / "FACTS.json", {"risk": {"level": "LOW"}})
+    _write_approve_review(out_dir, "codex")
+    _write_approve_review(out_dir, "claude")
+
+    contract = prc.load_ci_truth_contract()
+    onboarding_entries = [
+        entry
+        for entry in contract["required"]
+        if "Onboarding admission parity" in entry.get("names", [])
+    ]
+    assert len(onboarding_entries) == 1, (
+        "CI truth contract must require the onboarding admission context"
+    )
+    entry_id = onboarding_entries[0]["id"]
+    local_command = onboarding_entries[0].get("local_command", "")
+
+    rollup = [
+        item
+        for item in _ci_required_success_rollup()
+        if item["name"] != "Onboarding admission parity"
+    ]
+    if github_status is not None:
+        rollup.append(
+            {
+                "name": "Onboarding admission parity",
+                "status": github_status,
+                "conclusion": conclusion,
+            }
+        )
+    body = """
+- Organ touched: `tests/test_pr_merge_control.py` (Mike-owned consumer proof).
+- Declared-vs-actual gap closed: manual merge authority blocks nonpassing onboarding admission.
+- Proof that re-reads the map: the live CI truth contract is evaluated by build_gate.
+- New drift introduced: none; the gate only gets stricter.
+"""
+    monkeypatch.setattr(
+        prc,
+        "fetch_pr_view",
+        lambda _pr: {
+            "isDraft": False,
+            "mergeable": "MERGEABLE",
+            "reviewDecision": "APPROVED",
+            "statusCheckRollup": rollup,
+            "body": body,
+        },
+    )
+    monkeypatch.setattr(
+        prc,
+        "fetch_review_threads",
+        lambda _pr, _repo: {"ok": True, "unresolved_count": 0},
+    )
+    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
+
+    gate = prc.build_gate(
+        argparse.Namespace(
+            pr=12,
+            packet_dir=str(out_dir),
+            state_root=str(tmp_path),
+            allow_pending=False,
+            human_approved=False,
+            allow_backup_reviewer=False,
+            backup_reviewers="backup_opus",
+            backup_reviewer_reason="",
+        )
+    )
+
+    blocker = (
+        f"required CI {entry_id} is {expected_status}; run `{local_command}`"
+    )
+    assert gate["decision"] == "BLOCKED"
+    assert gate["ci_truth"]["verdict"] == "FAIL"
+    assert blocker in gate["blockers"]
+
+
 def test_gate_reports_advisory_red_and_pending_without_granting_authority(
     tmp_path, monkeypatch
 ):
