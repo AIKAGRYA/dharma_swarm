@@ -1025,8 +1025,8 @@
       "classification": "mediated",
       "col": 31,
       "file": "dharma_swarm/graph/durable_invoker.py",
-      "id": "dharma_swarm/graph/durable_invoker.py:620:31",
-      "line": 620,
+      "id": "dharma_swarm/graph/durable_invoker.py:624:31",
+      "line": 624,
       "scope": "runtime",
       "symbol": "self._effects.now"
     },

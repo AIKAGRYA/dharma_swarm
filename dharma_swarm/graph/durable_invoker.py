@@ -599,6 +599,10 @@ class DurableInvoker:
             metadata=complete_metadata,
             claim_token=claim_token,
         )
+        if claim_token is None:
+            # Begin lost the claim AND the record was unrecoverable: the
+            # provider ran with no fence and the completion above was refused.
+            return _mark_unprotected(receipt, "begin_lost_unreclaimed")
         return receipt
 
     async def _reclaim_or_lose(
