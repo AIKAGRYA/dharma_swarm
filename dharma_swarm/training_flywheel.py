@@ -261,7 +261,10 @@ def _run_readiness_check(state: FlywheelState) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-async def run_training_flywheel_loop(shutdown_event: asyncio.Event) -> None:
+async def run_training_flywheel_loop(
+    shutdown_event: asyncio.Event,
+    supervisor: Any | None = None,
+) -> None:
     """The training flywheel async loop.
 
     Runs three sub-cycles at different cadences:
@@ -284,6 +287,8 @@ async def run_training_flywheel_loop(shutdown_event: asyncio.Event) -> None:
     tick = 0
 
     while not shutdown_event.is_set():
+        if supervisor is not None:
+            supervisor.record_tick("flywheel")
         tick += 1
         now = time.time()
 
