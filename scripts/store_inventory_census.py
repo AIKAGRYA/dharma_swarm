@@ -14,8 +14,13 @@ and every consolidation shows up as a falling number.
 Method (honest limits)
 ----------------------
 This is a LEXICAL census, not a live-writer trace. It scans tracked ``*.py``
-files under the non-test source roots for ``*.db`` / ``*.jsonl`` name literals
-and ``class *Ledger`` declarations. It deliberately does NOT resolve
+files under the non-test source roots for SQLite name literals
+(``*.db`` / ``*.sqlite`` / ``*.sqlite3``) and ``*.jsonl`` literals **inside
+string quotes** (so an attribute access like ``args.db`` is never matched), and
+for ``class *Ledger`` declarations (including a class literally named
+``Ledger``). Exclusion is by FILE only (test trees + test-named modules via
+``_is_source``) — never by store NAME, so a production store named e.g.
+``lattice_test.db`` is still counted. It deliberately does NOT resolve
 path-builder variables (most live DBs open via a resolver function, e.g.
 ``root / "state" / "runtime.db"``), so a name that only ever appears as a
 resolver output is counted once by its literal. The committed artifact records
@@ -46,15 +51,22 @@ _GENERATOR_REL = "scripts/store_inventory_census.py"
 # Non-test source roots. A store literal only counts if it is referenced from
 # source that ships and runs — test fixtures (tests/**) are excluded so the
 # ratchet tracks production proliferation, not test scaffolding.
-SOURCE_ROOTS = ("dharma_swarm/", "api/", "scripts/")
+SOURCE_ROOTS = ("dharma_swarm/", "api/", "scripts/", "tools/")
 
 # Directory segments that mark a test tree. A file under any of these is
 # excluded so test fixtures never count as production stores.
 _EXCLUDED_DIR_SEGMENTS = ("tests", "test")
 
-_DB_RE = re.compile(r"([A-Za-z0-9_][A-Za-z0-9_./-]*\.db)\b")
-_JSONL_RE = re.compile(r"([A-Za-z0-9_][A-Za-z0-9_./-]*\.jsonl)\b")
-_LEDGER_CLASS_RE = re.compile(r"^\s*class\s+([A-Za-z_][A-Za-z0-9_]*Ledger)\b", re.MULTILINE)
+# Store names are matched ONLY inside string literals, so an attribute access
+# such as ``args.db`` in CLI code is never mistaken for a database. Both common
+# SQLite suffixes count (.db / .sqlite / .sqlite3). Exclusion is by FILE (see
+# _is_source) — never by store NAME, so a production store named e.g.
+# ``lattice_test.db`` is still counted.
+_DB_RE = re.compile(r"""['"]([^'"\s]*?[A-Za-z0-9_]\.(?:db|sqlite|sqlite3))['"]""")
+_JSONL_RE = re.compile(r"""['"]([^'"\s]*?[A-Za-z0-9_]\.jsonl)['"]""")
+# ``\w*Ledger`` matches a class literally named ``Ledger`` (zero leading
+# characters) as well as ``SessionLedger`` etc.
+_LEDGER_CLASS_RE = re.compile(r"^\s*class\s+(\w*Ledger)\b", re.MULTILINE)
 
 
 def _git_tracked() -> list[str]:
@@ -92,23 +104,6 @@ def _is_source(path: str) -> bool:
     return True
 
 
-def _name_is_test_fixture(name: str) -> bool:
-    base = name.rsplit("/", 1)[-1].lower()
-    if base in {"a.db", "b.db", "tmp.db", "sample.db"}:
-        return True
-    # Match the test token precisely on the stem so real stores whose name
-    # merely CONTAINS the substring (e.g. ``burn_report_latest.jsonl``) survive,
-    # while conventional fixtures (``mirror_test.db``, ``swarm_test.jsonl``,
-    # ``runtime_a.db``) do not.
-    stem = base.rsplit(".", 1)[0]
-    return (
-        stem.startswith("test")
-        or stem.endswith("_test")
-        or "_test_" in stem
-        or bool(re.fullmatch(r"runtime_[a-z0-9]+", stem))
-    )
-
-
 def build_inventory() -> dict:
     """Return the deterministic store inventory as a plain dict."""
     db_names: set[str] = set()
@@ -122,15 +117,13 @@ def build_inventory() -> dict:
         text = (REPO_ROOT / rel).read_text(encoding="utf-8", errors="replace")
         # Normalize to the BASENAME: two literals that differ only by path
         # prefix (``state/runtime.db`` vs ``DHARMA_STATE_DIR/runtime.db``)
-        # name the same logical store and must count once.
+        # name the same logical store and must count once. Exclusion is by
+        # FILE only (a store referenced from non-test source is real, whatever
+        # it is named), so no name-based filtering happens here.
         for match in _DB_RE.findall(text):
-            base = match.rsplit("/", 1)[-1]
-            if not _name_is_test_fixture(base):
-                db_names.add(base)
+            db_names.add(match.rsplit("/", 1)[-1])
         for match in _JSONL_RE.findall(text):
-            base = match.rsplit("/", 1)[-1]
-            if not _name_is_test_fixture(base):
-                jsonl_names.add(base)
+            jsonl_names.add(match.rsplit("/", 1)[-1])
         if rel.endswith("_ledger.py"):
             ledger_modules.add(rel)
         for cls in _LEDGER_CLASS_RE.findall(text):

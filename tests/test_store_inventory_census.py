@@ -16,7 +16,6 @@ consolidation shows up as a falling number.
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
@@ -30,12 +29,15 @@ from scripts.store_inventory_census import (  # noqa: E402
     render_inventory,
 )
 
-# Baselines captured 2026-07-19 at origin/main. Lower them in the same PR that
-# consolidates a store; they must never rise.
-BASELINE_DB_NAMES = 33
-BASELINE_JSONL_NAMES = 213
+# Exact committed baselines (2026-07-19 at origin/main). The ratchet is EXACT,
+# not `<=`: any count change — up or down — must edit these in the same PR, so
+# a consolidation that removes a store cannot leave stale headroom for a later
+# PR to silently re-grow into. Consolidation LOWERS a baseline; a genuinely new
+# store must be justified in review before RAISING one.
+BASELINE_DB_NAMES = 39
+BASELINE_JSONL_NAMES = 215
 BASELINE_LEDGER_MODULES = 11
-BASELINE_LEDGER_CLASSES = 10
+BASELINE_LEDGER_CLASSES = 11
 
 
 def test_census_renders_deterministically():
@@ -54,24 +56,24 @@ def test_committed_artifact_matches_tree():
     )
 
 
-def test_store_counts_only_ratchet_down():
+def test_store_counts_match_exact_baseline():
     summary = build_inventory()["summary"]
-    assert summary["distinct_db_names"] <= BASELINE_DB_NAMES, (
-        f"distinct SQLite databases rose to {summary['distinct_db_names']} "
-        f"(baseline {BASELINE_DB_NAMES}); a new store must be justified and the "
-        "baseline lowered deliberately, never raised"
+    assert summary["distinct_db_names"] == BASELINE_DB_NAMES, (
+        f"distinct SQLite databases is {summary['distinct_db_names']} but the "
+        f"exact baseline is {BASELINE_DB_NAMES}; update the baseline in this PR "
+        "(lower it for a consolidation; raising it needs a justified new store)"
     )
-    assert summary["distinct_jsonl_names"] <= BASELINE_JSONL_NAMES, (
-        f"distinct JSONL targets rose to {summary['distinct_jsonl_names']} "
-        f"(baseline {BASELINE_JSONL_NAMES})"
+    assert summary["distinct_jsonl_names"] == BASELINE_JSONL_NAMES, (
+        f"distinct JSONL targets is {summary['distinct_jsonl_names']} "
+        f"(exact baseline {BASELINE_JSONL_NAMES})"
     )
-    assert summary["ledger_modules"] <= BASELINE_LEDGER_MODULES, (
-        f"ledger modules rose to {summary['ledger_modules']} "
-        f"(baseline {BASELINE_LEDGER_MODULES})"
+    assert summary["ledger_modules"] == BASELINE_LEDGER_MODULES, (
+        f"ledger modules is {summary['ledger_modules']} "
+        f"(exact baseline {BASELINE_LEDGER_MODULES})"
     )
-    assert summary["ledger_classes"] <= BASELINE_LEDGER_CLASSES, (
-        f"ledger classes rose to {summary['ledger_classes']} "
-        f"(baseline {BASELINE_LEDGER_CLASSES})"
+    assert summary["ledger_classes"] == BASELINE_LEDGER_CLASSES, (
+        f"ledger classes is {summary['ledger_classes']} "
+        f"(exact baseline {BASELINE_LEDGER_CLASSES})"
     )
 
 
