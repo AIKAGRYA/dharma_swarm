@@ -330,9 +330,22 @@ def _load_binding(
         errors.append(f"{path}: base_ref does not resolve exactly")
         return None, errors
     if event_name == "pull_request":
-        if packet.base_ref != diff_base:
+        # base_ref need only be an ANCESTOR of the live merge base, not equal to
+        # it. When main advances and the PR is brought up to date, the merge
+        # base moves forward while the packet's provenance floor is unchanged;
+        # requiring byte-equality forced a full packet re-bind (base_ref +
+        # collision.checked_at_sha + digest) on every such advance. The scope
+        # diff already runs against the live merge base (diff_base..head above),
+        # so an ancestor floor preserves containment while ending that churn.
+        # Mirrors the merge_group ancestor check below.
+        ancestry = _git(
+            repo_root,
+            ["merge-base", "--is-ancestor", packet.base_ref, diff_base],
+            check=False,
+        )
+        if ancestry.returncode != 0:
             errors.append(
-                f"{path}: base_ref must equal pull-request merge base {diff_base}"
+                f"{path}: base_ref is not an ancestor of pull-request merge base {diff_base}"
             )
     else:
         ancestry = _git(
