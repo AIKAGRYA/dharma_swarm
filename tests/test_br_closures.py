@@ -363,6 +363,96 @@ class TestStoreSync:
         assert r2.skipped_existing == 1
 
 
+    def _create_value_event(self, registry: "OntologyRegistry") -> object:
+        obj, errors = registry.create_object(
+            "ValueEvent",
+            properties={
+                "outcome_id": "out-001",
+                "agent_id": "agent-test",
+                "task_id": "task-123",
+                "composite_value": 0.8,
+                "value_kind": "task",
+            },
+            created_by="test",
+        )
+        assert not errors and obj is not None
+        return obj
+
+    def test_sync_materializes_value_events(self, tmp_path: Path) -> None:
+        """store_sync.py:4-5 names ValueEvents in the self-model; the
+        projection must cover them, not only Outcomes."""
+        from dharma_swarm.ontology import OntologyRegistry
+        from dharma_swarm.engine.store_sync import sync_value_events_to_artifacts
+
+        ont_path = tmp_path / "ontology.db"
+        registry = OntologyRegistry.create_dharma_registry()
+        obj = self._create_value_event(registry)
+        self._persist_ontology(ont_path, registry)
+
+        rt_path = tmp_path / "state" / "runtime.db"
+        result = sync_value_events_to_artifacts(
+            ontology_db_path=ont_path, runtime_db_path=rt_path
+        )
+        assert result.value_events_scanned == 1
+        assert result.artifacts_created == 1
+
+        db = sqlite3.connect(str(rt_path))
+        row = db.execute(
+            "SELECT artifact_kind, task_id, metadata_json FROM artifact_records"
+            " WHERE artifact_id = ?",
+            (f"ont-ve-{obj.id}",),
+        ).fetchone()
+        db.close()
+        assert row is not None
+        assert row[0] == "value_event"
+        assert row[1] == "task-123"
+        meta = json.loads(row[2])
+        assert meta["outcome_id"] == "out-001"
+        assert meta["composite_value"] == 0.8
+
+    def test_sync_value_events_idempotent(self, tmp_path: Path) -> None:
+        """Re-running the projection is a no-op: exactly-once materialization."""
+        from dharma_swarm.ontology import OntologyRegistry
+        from dharma_swarm.engine.store_sync import sync_value_events_to_artifacts
+
+        ont_path = tmp_path / "ontology.db"
+        registry = OntologyRegistry.create_dharma_registry()
+        self._create_value_event(registry)
+        self._persist_ontology(ont_path, registry)
+
+        rt_path = tmp_path / "state" / "runtime.db"
+        r1 = sync_value_events_to_artifacts(ontology_db_path=ont_path, runtime_db_path=rt_path)
+        r2 = sync_value_events_to_artifacts(ontology_db_path=ont_path, runtime_db_path=rt_path)
+        assert r1.artifacts_created == 1
+        assert r2.artifacts_created == 0
+        assert r2.skipped_existing == 1
+
+    def test_sync_all_covers_both_object_types(self, tmp_path: Path) -> None:
+        """sync_all() runs every projection pass: >=2 object types."""
+        from dharma_swarm.ontology import OntologyRegistry
+        from dharma_swarm.engine.store_sync import sync_all
+
+        registry = OntologyRegistry.create_dharma_registry()
+        registry.create_object(
+            "Outcome",
+            properties={
+                "proposal_id": "prop-003",
+                "task_id": "task-789",
+                "agent_id": "agent-test",
+                "success": True,
+                "result_summary": "both types",
+            },
+            created_by="test",
+        )
+        self._create_value_event(registry)
+        self._persist_ontology(tmp_path / "ontology.db", registry)
+
+        result = sync_all(state_dir=tmp_path)
+        assert result.outcomes_scanned == 1
+        assert result.value_events_scanned == 1
+        assert result.artifacts_created == 2
+
+
 # ---------------------------------------------------------------------------
 # BR-008: VentureCell ontology ↔ fractal room polymorphism
 # ---------------------------------------------------------------------------
