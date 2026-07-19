@@ -267,8 +267,18 @@ def _validate_track_binding(
         }
         if surfaces:
             sibling_patterns[track_id] = sorted(surfaces)
+    # forbidden_files completeness is owed only for sibling patterns that match
+    # a path this event actually changes. Safety for touched surfaces comes from
+    # detect_surface_collisions below, which grades the real changed paths
+    # against live sibling ownership regardless of the packet's declaration;
+    # requiring every live sibling surface forced a full packet re-bind
+    # (forbidden_files + digest) whenever an unrelated sibling surface entered
+    # the portfolio after the packet's base_ref (campaign item 2b).
     required_forbidden = {
-        pattern for patterns in sibling_patterns.values() for pattern in patterns
+        pattern
+        for patterns in sibling_patterns.values()
+        for pattern in patterns
+        if any(matching_patterns(path, [pattern]) for path in changed_paths)
     }
     missing = sorted(required_forbidden - set(packet.forbidden_files))
     if missing:
