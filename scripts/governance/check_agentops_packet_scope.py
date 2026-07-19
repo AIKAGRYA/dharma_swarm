@@ -360,7 +360,13 @@ def _load_binding(
     errors.extend(
         _validate_track_binding(
             binding,
-            base_rows=_track_rows(repo_root, packet.base_ref),
+            # Read the base endpoint of sibling ownership at the LIVE merge base,
+            # not at packet.base_ref. base_ref may be an ancestor of the merge
+            # base; a sibling surface added between base_ref and the merge base
+            # (and removed by this PR at head) would otherwise be absent from
+            # both endpoints, letting an ownership collision through (P1 review
+            # on PR #1046, 2026-07-19). diff_base is the conservative base.
+            base_rows=_track_rows(repo_root, diff_base),
             head_rows=_track_rows(repo_root, event_head),
             changed_paths=changed_paths,
         )
