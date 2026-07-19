@@ -1210,10 +1210,24 @@ def _validate_session_envelope(
         for row in _active_tracks(repo_root)
         if row.get("id") != entry.active_track
     }
-    missing = sorted({p for patterns in siblings.values() for p in patterns} - set(packet.forbidden_files))
+    live_scope = inspect_scope(repo_root, packet, base_ref=scope_base_ref)
+    # forbidden_files completeness is owed only for sibling patterns that match
+    # a path this session actually changes, mirroring the CI checker
+    # (check_agentops_packet_scope._validate_track_binding). Ownership safety
+    # for touched paths stays with detect_surface_collisions below, which
+    # grades the real paths against live sibling ownership regardless of the
+    # packet's declaration; demanding the full sibling union forced a packet
+    # re-bind whenever an unrelated surface entered the portfolio after
+    # base_ref (campaign item 2b follow-up, Codex P2 on #1052).
+    required_forbidden = {
+        pattern
+        for patterns in siblings.values()
+        for pattern in patterns
+        if any(matching_patterns(path, [pattern]) for path in live_scope.changed_files)
+    }
+    missing = sorted(required_forbidden - set(packet.forbidden_files))
     if missing:
         raise AgentOpsError(f"forbidden_files omit sibling owned surfaces: {missing}")
-    live_scope = inspect_scope(repo_root, packet, base_ref=scope_base_ref)
     actual = sorted(
         set(
             git_nul_records(repo_root, ["ls-files", "-z"])

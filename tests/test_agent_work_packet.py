@@ -166,6 +166,22 @@ def stage_path(repo: Path, path: Path) -> None:
     assert run(["git", "add", "--", relative], cwd=repo).returncode == 0
 
 
+def add_sibling_track(repo: Path, *, surfaces: list[str]) -> None:
+    track = repo / "docs/governance/ACTIVE_TRACK.yaml"
+    document = json.loads(track.read_text(encoding="utf-8"))
+    document["active_tracks"].append(
+        {
+            "id": "session-entry-sibling-track",
+            "status": "ACTIVE",
+            "owner": "@sibling-owner",
+            "owned_surfaces": surfaces,
+        }
+    )
+    track.write_text(json.dumps(document), encoding="utf-8")
+    stage_path(repo, track)
+    assert run(["git", "commit", "-m", "add sibling track"], cwd=repo).returncode == 0
+
+
 def tree_snapshot(root: Path) -> dict[str, str]:
     return {
         path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
@@ -2417,6 +2433,50 @@ def test_session_envelope_rejects_custody_free_execution_mode(tmp_path: Path) ->
             packet,
             inspect=False,
             require_tracked_copy=False,
+        )
+
+
+def test_session_envelope_ignores_untouched_sibling_surfaces(tmp_path: Path) -> None:
+    repo = init_session_repo(tmp_path)
+    add_sibling_track(repo, surfaces=["terminal/**"])
+    payload = seal_packet(session_packet(repo))
+    assert "terminal/**" not in payload["forbidden_files"]
+    external = write_external_packet(tmp_path, payload)
+    packet = agentops.load_work_packet(external)
+
+    state = agentops._validate_session_envelope(
+        repo,
+        external,
+        packet,
+        inspect=True,
+        require_tracked_copy=False,
+    )
+    assert state == "absent"
+
+
+def test_session_envelope_touched_sibling_surface_still_requires_declaration(
+    tmp_path: Path,
+) -> None:
+    repo = init_session_repo(tmp_path)
+    add_sibling_track(repo, surfaces=["terminal/**"])
+    payload = seal_packet(session_packet(repo))
+    external = write_external_packet(tmp_path, payload)
+    tracked = tracked_packet_path(repo, payload)
+    tracked.parent.mkdir(parents=True)
+    tracked.write_bytes(external.read_bytes())
+    stage_path(repo, tracked)
+    touched = repo / "terminal/app.ts"
+    touched.parent.mkdir()
+    touched.write_text("export {}\n", encoding="utf-8")
+
+    packet = agentops.load_work_packet(external)
+    with pytest.raises(agentops.AgentOpsError, match="omit sibling owned surfaces"):
+        agentops._validate_session_envelope(
+            repo,
+            external,
+            packet,
+            inspect=False,
+            require_tracked_copy=True,
         )
 
 
