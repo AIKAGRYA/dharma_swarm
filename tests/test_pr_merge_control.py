@@ -1,9 +1,12 @@
 import argparse
 import asyncio
+import json
 import sys
 import time
+from pathlib import Path
 
 import pytest
+import yaml
 from scripts.runtime import pr_merge_control as prc
 
 
@@ -1132,6 +1135,245 @@ def test_gate_blocks_nonpassing_onboarding_admission_parity(
     assert gate["decision"] == "BLOCKED"
     assert gate["ci_truth"]["verdict"] == "FAIL"
     assert blocker in gate["blockers"]
+
+
+_WORKFLOWS_ROOT = Path(__file__).resolve().parents[1]
+_AUTOMERGE_WORKFLOW = _WORKFLOWS_ROOT / ".github" / "workflows" / "automerge.yml"
+_PARITY_MANIFEST = _WORKFLOWS_ROOT / "scripts" / "governance" / "ci_parity_manifest.json"
+
+# The plan's exhaustive fail-closed states for a required check
+# (docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md:1100-1103):
+# absent, pending, failed, cancelled, timed out, action required.
+_NONSUCCESS_REQUIRED_STATES = [
+    (None, None, "MISSING"),
+    ("IN_PROGRESS", "", "PENDING"),
+    ("COMPLETED", "FAILURE", "FAIL"),
+    ("COMPLETED", "CANCELLED", "FAIL"),
+    ("COMPLETED", "TIMED_OUT", "FAIL"),
+    ("COMPLETED", "ACTION_REQUIRED", "FAIL"),
+]
+
+
+def _contract_success_rollup(contract):
+    return [
+        {"name": entry["names"][0], "status": "COMPLETED", "conclusion": "SUCCESS"}
+        for entry in contract["required"]
+    ]
+
+
+def _build_gate_for_rollup(base_dir, monkeypatch, rollup):
+    out_dir = base_dir / "packet"
+    out_dir.mkdir(parents=True)
+    prc.write_json(out_dir / "FACTS.json", {"risk": {"level": "LOW"}})
+    _write_approve_review(out_dir, "codex")
+    _write_approve_review(out_dir, "claude")
+    body = """
+- Organ touched: `tests/test_pr_merge_control.py` (Mike-owned consumer proof).
+- Declared-vs-actual gap closed: every entry path consumes one required-check truth.
+- Proof that re-reads the map: the live CI truth contract is evaluated by build_gate.
+- New drift introduced: none; the gate only gets stricter.
+"""
+    monkeypatch.setattr(
+        prc,
+        "fetch_pr_view",
+        lambda _pr: {
+            "isDraft": False,
+            "mergeable": "MERGEABLE",
+            "reviewDecision": "APPROVED",
+            "statusCheckRollup": rollup,
+            "body": body,
+        },
+    )
+    monkeypatch.setattr(
+        prc,
+        "fetch_review_threads",
+        lambda _pr, _repo: {"ok": True, "unresolved_count": 0},
+    )
+    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
+    return prc.build_gate(
+        argparse.Namespace(
+            pr=12,
+            packet_dir=str(out_dir),
+            state_root=str(base_dir),
+            allow_pending=False,
+            human_approved=False,
+            allow_backup_reviewer=False,
+            backup_reviewers="backup_opus",
+            backup_reviewer_reason="",
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    ("github_status", "conclusion", "expected_status"), _NONSUCCESS_REQUIRED_STATES
+)
+def test_gate_blocks_every_required_entry_on_every_nonsuccess_state(
+    tmp_path,
+    monkeypatch,
+    github_status,
+    conclusion,
+    expected_status,
+):
+    """WP-0F2 consumer proof, set-agnostic: the manual Mike path fails closed
+    for EVERY required entry the live CI truth contract declares, on every
+    fail-closed state the Titanium plan enumerates (plan :1100-1103). The
+    entries are read from the contract at runtime, so ratifying a different
+    final set (WP-0F1) is exercised by this exact test without edits."""
+    contract = prc.load_ci_truth_contract()
+    assert contract["required"], "CI truth contract must declare required entries"
+    for index, entry in enumerate(contract["required"]):
+        rollup = [
+            item
+            for item in _contract_success_rollup(contract)
+            if item["name"] != entry["names"][0]
+        ]
+        if github_status is not None:
+            rollup.append(
+                {
+                    "name": entry["names"][0],
+                    "status": github_status,
+                    "conclusion": conclusion,
+                }
+            )
+        gate = _build_gate_for_rollup(tmp_path / f"case{index}", monkeypatch, rollup)
+        blocker = (
+            f"required CI {entry['id']} is {expected_status}; "
+            f"run `{entry.get('local_command', '')}`"
+        )
+        assert gate["decision"] == "BLOCKED", entry["id"]
+        assert gate["ci_truth"]["verdict"] == "FAIL", entry["id"]
+        assert blocker in gate["blockers"], entry["id"]
+
+
+def test_automerge_and_mike_share_one_required_check_authority():
+    """WP-0F2 single-truth proof (plan :1092-1094): automerge derives its
+    required set solely from ci_parity_manifest.json, Mike's gate from the CI
+    truth contract, and the two are the same canonical set. Parity is already
+    fail-closed at contract load (ci_truth.py:114-127); asserting the equality
+    here makes divergence fail loudly inside Mike's own suite, and asserting
+    no manifest context appears literally in automerge.yml keeps a private
+    context list from ever coming back."""
+    contract = prc.load_ci_truth_contract()
+    manifest = json.loads(_PARITY_MANIFEST.read_text(encoding="utf-8"))
+    manifest_contexts = sorted(
+        str(entry["context"]) for entry in manifest["required_contexts"]
+    )
+    canonical = sorted(str(entry["names"][0]) for entry in contract["required"])
+    assert manifest_contexts == canonical
+    text = _AUTOMERGE_WORKFLOW.read_text(encoding="utf-8")
+    assert "scripts/governance/ci_parity_manifest.json" in text
+    assert "steps.required_contexts.outputs.required_checks" in text
+    for context in manifest_contexts:
+        assert context not in text, (
+            f"automerge.yml must not hardcode required context {context!r}"
+        )
+
+
+def _automerge_required_check_skips(rollup, required_contexts):
+    """Python mirror of automerge.yml's step-3 jq evaluation: normalize each
+    rollup item (PENDING when incomplete, else uppercase conclusion or
+    NO_CONCLUSION), keep the latest entry per name, then skip when any
+    required context is missing or outside the green set
+    {SUCCESS, NEUTRAL, SKIPPED}."""
+    normalized = {}
+    for ordinal, item in enumerate(rollup):
+        name = str(
+            item.get("name") or item.get("context") or item.get("workflowName") or "unnamed"
+        )
+        observed = str(item.get("startedAt") or item.get("completedAt") or "")
+        if str(item.get("status") or "COMPLETED") != "COMPLETED":
+            state = "PENDING"
+        else:
+            state = str(item.get("conclusion") or item.get("state") or "").upper()
+            state = state or "NO_CONCLUSION"
+        key = (observed, ordinal)
+        current = normalized.get(name)
+        if current is None or key > current[0]:
+            normalized[name] = (key, state)
+    states = {name: state for name, (_, state) in normalized.items()}
+    missing = [context for context in required_contexts if context not in states]
+    not_green = [
+        context
+        for context in required_contexts
+        if context in states and states[context] not in {"SUCCESS", "NEUTRAL", "SKIPPED"}
+    ]
+    return bool(missing or not_green)
+
+
+def test_automerge_skip_matches_mike_fail_on_every_nonsuccess_state():
+    """WP-0F2 same-verdict proof (plan :1106): for every required context and
+    every fail-closed state, the manifest-driven automerge path skips AND the
+    contract-driven CI truth verdict is FAIL — the two entry paths cannot
+    disagree in the fail direction."""
+    contract = prc.load_ci_truth_contract()
+    required_contexts = [str(entry["names"][0]) for entry in contract["required"]]
+    for entry in contract["required"]:
+        for github_status, conclusion, _expected in _NONSUCCESS_REQUIRED_STATES:
+            rollup = [
+                item
+                for item in _contract_success_rollup(contract)
+                if item["name"] != entry["names"][0]
+            ]
+            if github_status is not None:
+                rollup.append(
+                    {
+                        "name": entry["names"][0],
+                        "status": github_status,
+                        "conclusion": conclusion,
+                    }
+                )
+            assert _automerge_required_check_skips(rollup, required_contexts), (
+                entry["id"],
+                conclusion,
+            )
+            verdict = prc.evaluate_ci_rollup(rollup, contract)["verdict"]
+            assert verdict == "FAIL", (entry["id"], conclusion)
+
+
+def test_workflow_dispatch_event_and_schedule_paths_share_one_gate_job():
+    """WP-0F2 entry-path proof (plan :1106): manual workflow_dispatch, PR
+    events, check_suite, review events, and the scheduled sweep all enter the
+    single `evaluate` job, whose manifest-load and candidate-evaluation steps
+    carry no event-conditional `if`, so every path traverses the identical
+    required-check evaluation."""
+    workflow = yaml.safe_load(_AUTOMERGE_WORKFLOW.read_text(encoding="utf-8"))
+    triggers = workflow.get("on") or workflow.get(True)
+    assert {
+        "pull_request",
+        "check_suite",
+        "pull_request_review",
+        "schedule",
+        "workflow_dispatch",
+    } <= set(triggers)
+    jobs = workflow["jobs"]
+    assert list(jobs) == ["evaluate"]
+    steps = {step.get("name"): step for step in jobs["evaluate"]["steps"]}
+    required_step = steps["Load manifest-driven required contexts"]
+    evaluate_step = steps["Evaluate candidates and dispatch Mike"]
+    assert "if" not in required_step
+    assert "if" not in evaluate_step
+    event_pr = jobs["evaluate"]["env"]["EVENT_PR"]
+    assert "github.event.pull_request.number" in event_pr
+    assert "github.event.inputs.pr" in event_pr
+
+
+def test_bot_pr_waiver_cannot_bypass_required_check_evaluation():
+    """WP-0F2 waiver-scope proof (plan :1097): `bot-pr` waives reviewer
+    receipts only. Lexical confinement over automerge.yml's evaluate script:
+    the required-check block (step-3 comment through the step-4 comment)
+    gates on missing_required / required_not_green with an unconditional
+    skip, and contains no bot-pr, mike-watch, or merge_when_clean branch
+    that could exempt a labeled PR from it."""
+    workflow = yaml.safe_load(_AUTOMERGE_WORKFLOW.read_text(encoding="utf-8"))
+    steps = {step.get("name"): step for step in workflow["jobs"]["evaluate"]["steps"]}
+    script = steps["Evaluate candidates and dispatch Mike"]["run"]
+    block = script[script.index("# 3.") : script.index("# 4.")]
+    assert "missing_required" in block
+    assert "required_not_green" in block
+    assert "continue" in block
+    assert "bot-pr" not in block
+    assert "mike-watch" not in block
+    assert "merge_when_clean" not in block
 
 
 def test_gate_reports_advisory_red_and_pending_without_granting_authority(
