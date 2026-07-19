@@ -750,6 +750,7 @@ class SelfImprovementCycle:
 async def run_self_improvement_loop(
     shutdown_event: Any,
     interval: float = SELF_IMPROVE_INTERVAL,
+    supervisor: Any | None = None,
 ) -> None:
     """Async loop for integration into orchestrate_live.
 
@@ -758,6 +759,10 @@ async def run_self_improvement_loop(
     import asyncio
 
     while not shutdown_event.is_set():
+        # WP-LC1: tick BEFORE the is_enabled() skip so alive-but-
+        # intentionally-idle is visible to the loop supervisor.
+        if supervisor is not None:
+            supervisor.record_tick("self-improve")
         if is_enabled():
             try:
                 cycle = SelfImprovementCycle()
@@ -788,7 +793,7 @@ def cmd_self_improve_status() -> int:
     enabled = is_enabled()
     latest = SelfImprovementCycle.load_latest()
 
-    print(f"Self-Improvement Cycle")
+    print("Self-Improvement Cycle")
     print(f"{'=' * 45}")
     print(f"  Enabled: {enabled} (DHARMA_SELF_IMPROVE={os.environ.get('DHARMA_SELF_IMPROVE', '0')})")
 

@@ -39,6 +39,9 @@ class LoopHealth:
     last_progress_score: float | None = None
     best_progress_score: float | None = None
     stagnant_cycles: int = 0
+    registered_at: float = 0.0      # monotonic timestamp of register_loop()
+    disabled: bool = False
+    disabled_reason: str | None = None
 
     @property
     def stale_seconds(self) -> float:
@@ -52,10 +55,26 @@ class LoopHealth:
             return False  # Never ticked = not started yet
         return self.stale_seconds > (2 * self.expected_interval)
 
+    @property
+    def state(self) -> str:
+        """4-state honesty: NEVER_STARTED | RUNNING | STALLED | DISABLED.
+
+        A never-started loop is NOT healthy — before WP-LC1 it rendered OK
+        and could never alarm, which hid dead loops indefinitely.
+        """
+        if self.disabled:
+            return "DISABLED"
+        if self.last_tick == 0:
+            return "NEVER_STARTED"
+        if self.is_stalled:
+            return "STALLED"
+        return "RUNNING"
+
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         d["stale_seconds"] = round(self.stale_seconds, 1)
         d["is_stalled"] = self.is_stalled
+        d["state"] = self.state
         return d
 
 
@@ -192,8 +211,22 @@ class LoopSupervisor:
         self._loops[name] = LoopHealth(
             name=name,
             expected_interval=expected_interval,
+            registered_at=time.monotonic(),
         )
         self._error_windows[name] = _ErrorWindow()
+
+    def mark_disabled(self, name: str, reason: str) -> None:
+        """Mark a registered loop DISABLED (env-gate decidable at registration).
+
+        Disabled loops render distinctly and are exempt from stall and
+        never-started alarms.  Never tick a pre-loop-return body instead —
+        that would manufacture a permanent false STALLED.
+        """
+        health = self._loops.get(name)
+        if health is None:
+            return
+        health.disabled = True
+        health.disabled_reason = reason[:200]
 
     def record_tick(self, loop_name: str) -> None:
         """Record that a loop has ticked (healthy heartbeat)."""
@@ -323,6 +356,29 @@ class LoopSupervisor:
         alerts: list[SupervisorAlert] = []
 
         for name, health in self._loops.items():
+            # DISABLED loops are exempt from stall/never-started alarms
+            if health.disabled:
+                continue
+
+            # Never-started escalation: before WP-LC1 a loop that never ticked
+            # could never alarm (is_stalled is False at last_tick == 0), so a
+            # dead-at-boot loop stayed invisible forever.  Same alert channel
+            # as LOOP_STALL, keyed off registration age.
+            if health.last_tick == 0 and health.registered_at > 0:
+                registered_age = time.monotonic() - health.registered_at
+                if registered_age > (2 * health.expected_interval):
+                    stale_factor = registered_age / health.expected_interval
+                    intervention = _escalation_level(health.error_count, stale_factor)
+                    alerts.append(SupervisorAlert(
+                        alert_type="LOOP_NEVER_STARTED",
+                        loop_name=name,
+                        severity="critical" if intervention in ("REDUCE_SCOPE", "ALERT_DHYANA") else "warning",
+                        message=f"Loop '{name}' never started: registered {registered_age:.0f}s ago, "
+                                f"0 ticks (expected every {health.expected_interval:.0f}s)",
+                        intervention=intervention,
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                    ))
+
             # Check stalls
             if health.is_stalled:
                 stale_factor = health.stale_seconds / health.expected_interval
@@ -442,6 +498,21 @@ class LoopSupervisor:
 # CLI entry points
 # ---------------------------------------------------------------------------
 
+def _derive_legacy_state(health: dict[str, Any]) -> str:
+    """4-state fallback for state files written before WP-LC1.
+
+    Legacy dicts carry no ``state`` key; a never-started loop must still
+    never render OK/RUNNING.
+    """
+    if health.get("disabled"):
+        return "DISABLED"
+    if health.get("is_stalled"):
+        return "STALLED"
+    if not health.get("last_tick") and not health.get("tick_count"):
+        return "NEVER_STARTED"
+    return "RUNNING"
+
+
 def cmd_loop_status() -> int:
     """Print loop health status."""
     state = LoopSupervisor.load_state()
@@ -454,11 +525,11 @@ def cmd_loop_status() -> int:
 
     loops = state.get("loops", {})
     for name, health in loops.items():
-        stalled = "STALLED" if health.get("is_stalled") else "OK"
+        state_label = health.get("state") or _derive_legacy_state(health)
         stale = health.get("stale_seconds", 0)
         ticks = health.get("tick_count", 0)
         errors = health.get("error_count", 0)
-        print(f"  {name:<20} {stalled:>8}  ticks={ticks}  errors={errors}  stale={stale:.0f}s")
+        print(f"  {name:<20} {state_label:>13}  ticks={ticks}  errors={errors}  stale={stale:.0f}s")
 
     alerts = state.get("recent_alerts", [])
     if alerts:
