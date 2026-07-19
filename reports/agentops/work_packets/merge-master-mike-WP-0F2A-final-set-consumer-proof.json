@@ -1,0 +1,77 @@
+{
+  "allowed_files": [
+    "tests/test_pr_merge_control.py",
+    "reports/agentops/work_packets/merge-master-mike-WP-0F2A-final-set-consumer-proof.json"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "26ea66fd07f3fbf688b6399d34c68b9042e20686",
+  "branch": "claude/dharma-swarm-merge-coordination-elhnom",
+  "commit": {
+    "allowed": true,
+    "message": "test(mike): prove set-agnostic required-check consumption across automerge and Mike entry paths"
+  },
+  "forbidden_files": [],
+  "gates": [
+    {
+      "command": "python3 -m pytest tests/test_pr_merge_control.py -q",
+      "name": "mike-gate-tests",
+      "timeout_seconds": 1200
+    },
+    {
+      "command": "python3 -m ruff check tests/test_pr_merge_control.py",
+      "name": "touched-files-ruff",
+      "timeout_seconds": 300
+    }
+  ],
+  "id": "merge-master-mike-WP-0F2A-final-set-consumer-proof",
+  "intent": "WP-0F2 buildable remainder (TIT-007, Mike-owned surfaces; plan docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md:1092-1106): set-agnostic consumer proof that every CI-truth-contract required entry blocks Mike's gate on MISSING, PENDING, FAILURE, CANCELLED, TIMED_OUT, and ACTION_REQUIRED; that automerge.yml derives its required set solely from ci_parity_manifest.json with no private context list; that the manifest-driven automerge skip and the contract-driven Mike FAIL agree on every fail-closed state (same gate verdict, plan :1106); that workflow_dispatch, event, and schedule paths share the single evaluate job; and that bot-pr cannot bypass the required-check block. Tests bind to whatever the live contract declares, so final-set ratification (operator-gated, WP-0F1/Titanium) is exercised by these same tests without edits. Test-only; no runtime, contract, manifest, or workflow change.",
+  "negative_controls": [
+    {
+      "command": "python3 -c \"import base64; exec(base64.b64decode('aW1wb3J0IGNvcHkKaW1wb3J0IGltcG9ydGxpYi51dGlsCmltcG9ydCBzeXMKCiMgRGlzdGluY3QgZXhpdHM6IDEgdW5pcXVlbHkgbWVhbnMgIndpdGggdGhlIGNvbnRyYWN0J3MgcmVxdWlyZWQgbGlzdCBtdXRhdGVkCiMgYXdheSwgdGhlIENBTkNFTExFRCByZXF1aXJlZCBjaGVjayBubyBsb25nZXIgZmFpbHMgdGhlIENJIHRydXRoIHZlcmRpY3QiIOKAlAojIHByb3ZpbmcgdGhlIGNvbnRyYWN0IGRhdGEgaXMgdGhlIGxvYWQtYmVhcmluZyBzb3VyY2Ugb2YgZmFpbC1jbG9zZWQgYmxvY2tpbmcKIyB0aGF0IHRoZSBXUC0wRjJBIGNvbnN1bWVyIHRlc3RzIHJlbHkgb24uIFByZWNvbmRpdGlvbiBmYWlsdXJlICh1bm11dGF0ZWQKIyBjb250cmFjdCBkb2VzIG5vdCBGQUlMKSBleGl0cyAyOyBhbnkgc2V0dXAgZmFpbHVyZSBleGl0cyAzIGFuZCBjYW4gbmV2ZXIKIyBtYXNxdWVyYWRlIGFzIGEgY2F1Z2h0IG11dGF0aW9uIChkb2N0cmluZSBmcm9tICMxMDQ3LyMxMDQ5LyMxMDUzKS4KU0VUVVBfRkFJTCA9IDMKUFJFQ09ORElUSU9OX0ZBSUwgPSAyCnRyeToKICAgIHN5cy5wYXRoLmluc2VydCgwLCAiLiIpCiAgICBzcGVjID0gaW1wb3J0bGliLnV0aWwuc3BlY19mcm9tX2ZpbGVfbG9jYXRpb24oCiAgICAgICAgImNpX3RydXRoX2NvbnRyb2wiLCAic2NyaXB0cy9ydW50aW1lL2NpX3RydXRoLnB5IgogICAgKQogICAgY2kgPSBpbXBvcnRsaWIudXRpbC5tb2R1bGVfZnJvbV9zcGVjKHNwZWMpCiAgICBzeXMubW9kdWxlc1siY2lfdHJ1dGhfY29udHJvbCJdID0gY2kKICAgIHNwZWMubG9hZGVyLmV4ZWNfbW9kdWxlKGNpKQoKICAgIGNvbnRyYWN0ID0gY2kubG9hZF9jb250cmFjdCgpCiAgICBpZiBub3QgY29udHJhY3QuZ2V0KCJyZXF1aXJlZCIpOgogICAgICAgIHN5cy5leGl0KFNFVFVQX0ZBSUwpCiAgICByb2xsdXAgPSBbCiAgICAgICAgeyJuYW1lIjogZW50cnlbIm5hbWVzIl1bMF0sICJzdGF0dXMiOiAiQ09NUExFVEVEIiwgImNvbmNsdXNpb24iOiAiU1VDQ0VTUyJ9CiAgICAgICAgZm9yIGVudHJ5IGluIGNvbnRyYWN0WyJyZXF1aXJlZCJdCiAgICBdCiAgICByb2xsdXBbMF0gPSBkaWN0KHJvbGx1cFswXSwgY29uY2x1c2lvbj0iQ0FOQ0VMTEVEIikKICAgIGJlZm9yZSA9IGNpLmV2YWx1YXRlX3JvbGx1cChyb2xsdXAsIGNvbnRyYWN0KVsidmVyZGljdCJdCiAgICBpZiBiZWZvcmUgIT0gIkZBSUwiOgogICAgICAgIHN5cy5leGl0KFBSRUNPTkRJVElPTl9GQUlMKQogICAgbXV0YXRlZCA9IGNvcHkuZGVlcGNvcHkoY29udHJhY3QpCiAgICBtdXRhdGVkWyJyZXF1aXJlZCJdID0gW10KICAgIGFmdGVyID0gY2kuZXZhbHVhdGVfcm9sbHVwKHJvbGx1cCwgbXV0YXRlZClbInZlcmRpY3QiXQpleGNlcHQgU3lzdGVtRXhpdDoKICAgIHJhaXNlCmV4Y2VwdCBFeGNlcHRpb246CiAgICBzeXMuZXhpdChTRVRVUF9GQUlMKQpzeXMuZXhpdCgxIGlmIGFmdGVyICE9ICJGQUlMIiBlbHNlIDApCg=='))\"",
+      "expected_exit": 1,
+      "name": "contract-required-list-load-bearing",
+      "timeout_seconds": 600
+    }
+  ],
+  "session_entry": {
+    "active_track": "merge-master-mike-d4-2026-06",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "tests/test_pr_merge_control.py",
+      "scripts/runtime/ci_truth.py",
+      ".github/workflows/automerge.yml"
+    ],
+    "collision": {
+      "checked_at_sha": "26ea66fd07f3fbf688b6399d34c68b9042e20686",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "WP-0F2 full closure stays operator-gated on two decisions outside this packet: ratifying the FINAL required-check set (WP-0F1, Titanium-owned manifest/contract surfaces) and provisioning CI_PARITY_ADMIN_READ_TOKEN for continuously-authenticated live parity (ci-parity.yml:42,52). This packet closes the consumer-proof and same-verdict legs on Mike-owned surfaces only.",
+      "Tests are deliberately set-agnostic (they enumerate the live contract's required entries at runtime), so the ratified final set is exercised by these exact tests the moment WP-0F1 lands it \u2014 no re-edit, closing the plan's re-exercise requirement by construction.",
+      "forbidden_files is intentionally empty: no live sibling surface matches this packet's touched paths, the exact relaxation shipped in #1052/#1053 (first end-to-end consumer)."
+    ],
+    "interface_mismatches": [
+      "INTERFACE_MISMATCH_MAP.md carries no entry for the Mike merge-gate surface."
+    ],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "a40a538f9bac65d85ae7b2cd1723e840898c47e55b96c049a61c63c690b7c812",
+    "rollback": "Revert tests/test_pr_merge_control.py and this packet together; no runtime behavior changes to roll back.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.43.0",
+      "python": "3.11.15"
+    },
+    "work_packet": "WP-0F2A"
+  },
+  "worktree": "."
+}
