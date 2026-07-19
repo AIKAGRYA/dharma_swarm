@@ -1,0 +1,86 @@
+{
+  "id": "WP-FOUNDER-DIRECTION-PRECONSTITUTIONAL",
+  "base_ref": "ad2a5bb7055ae95c09438055ed1f086528a76882",
+  "branch": "agent/preconstitutional-founder-direction",
+  "worktree": ".",
+  "intent": "Record the operator's 2026-07-19 founder-intent clarification in the existing Entelechy vision synthesis as pre-constitutional direction, and protect that source record with a bounded anchor contract while explicitly preserving the current open wealth posture and granting no constitutional, runtime, merge, spending, publishing, or deployment authority.",
+  "allowed_files": [
+    "docs/plans/2026-07-13_dharma_entelechy_vision_synthesis.md",
+    "reports/agentops/work_packets/WP-FOUNDER-DIRECTION-PRECONSTITUTIONAL.json",
+    "tests/governance/test_preconstitutional_founder_direction.py"
+  ],
+  "forbidden_files": [
+    "specs/Dharma_Constitution_v0.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/governance/CANONICAL_DOC_STACK.md",
+    "CLAUDE.md",
+    ".github/**",
+    "dharma_swarm/**",
+    "api/**",
+    "dashboard/**",
+    "packages/**",
+    "scripts/**"
+  ],
+  "gates": [
+    {
+      "name": "diff-check",
+      "command": "git diff --check",
+      "timeout_seconds": 60
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "missing-direction-anchor-detected",
+      "command": "python3 -c \"import pathlib, runpy, sys; t = pathlib.Path('docs/plans/2026-07-13_dharma_entelechy_vision_synthesis.md').read_text(); anchor = '### Explicitly reserved: wealth remains open'; ns = runpy.run_path('tests/governance/test_preconstitutional_founder_direction.py'); oracle = ns.get('direction_record_violations'); callable(oracle) or sys.exit(3); not oracle(t) or sys.exit(3); mutated = t.replace(anchor, '### Explicitly reserved: wealth posture unresolved', 1); sys.exit(1 if anchor in oracle(mutated) else 0)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 60
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "docs: record pre-constitutional founder direction"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.12.13",
+      "git": "2.43.0",
+      "make": "4.3"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-FOUNDER-DIRECTION-PRECONSTITUTIONAL",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "ad2a5bb7055ae95c09438055ed1f086528a76882",
+      "details": []
+    },
+    "interface_mismatches": [],
+    "closest_existing_implementation": [
+      "docs/plans/2026-07-13_dharma_entelechy_vision_synthesis.md",
+      "docs/plans/2026-07-13_dharma_entelechy_architecture_contract_v0.md",
+      "docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md"
+    ],
+    "honest_blockers": [
+      "This record is pre-constitutional direction only; it does not amend specs/Dharma_Constitution_v0.md or create constitutional, runtime, spending, publishing, deployment, or merge authority.",
+      "By explicit operator reservation on 2026-07-19, this packet does not narrow or adjudicate the current open wealth posture or the Shakti Ginko language in docs/governance/SOVEREIGN_MANIFEST.md:101.",
+      "The Code Quality Foundry remains a direction and proving strategy; this packet implements no runtime, database, privacy, authority-lease, or long-running mission mechanism.",
+      "The repository-wide closeout bundle is independently red on both base main and this candidate: make nats-substrate-contract reports that onboard omits the canonical NATS spec path and that live NATS evidence is stale. This packet does not own those surfaces; its packet-specific AgentOps closeout is green.",
+      "PR #1004 remains a separate unmerged working plan; this packet neither corrects nor ratifies it."
+    ],
+    "rollback": "Revert docs/plans/2026-07-13_dharma_entelechy_vision_synthesis.md, tests/governance/test_preconstitutional_founder_direction.py, and reports/agentops/work_packets/WP-FOUNDER-DIRECTION-PRECONSTITUTIONAL.json together; rollback changes only the pre-constitutional source record, its anchor contract, and admission evidence.",
+    "packet_digest": "2b16f1f792e2550616c73c0fdd0364ab191139cc18f9e3177f022928c7ee6d9f"
+  }
+}

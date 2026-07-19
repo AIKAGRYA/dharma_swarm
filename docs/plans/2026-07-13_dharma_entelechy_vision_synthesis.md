@@ -2,10 +2,10 @@
 
 ## A Living Vision for Human–AI Actualization, Recursive Creation, and Civilizational Service
 
-**Status:** Operator-review draft — not ratified canon
-**Date:** 2026-07-13
-**Purpose:** Final vision synthesis before architecture hardening
-**Document role:** `report` — operator-review vision synthesis; no runtime or governance authority
+**Status:** Operator-confirmed pre-ratification direction — not constitutional canon
+**Date:** 2026-07-13; operator direction recorded 2026-07-19
+**Purpose:** Living vision synthesis and pre-constitutional direction for architecture hardening
+**Document role:** `report` — operator-confirmed source record; no runtime or governance authority
 **Subordinate to:** `docs/governance/SOVEREIGN_MANIFEST.md`, `specs/Dharma_Constitution_v0.md`, and `docs/governance/CANONICAL_DOC_STACK.md`
 **Replaces:** nothing; synthesizes the unratified vision seed in `docs/plans/2026-07-12_vision_engine_grill_SEED.md`
 
@@ -32,6 +32,254 @@ The repository anchors used here are:
   convergence: `docs/architecture/VENTURE_CELL_LIFECYCLE.md:35-70`.
 - DharmaGraph's neutral graph core remains candidate/test-only rather than
   production dispatch topology: `dharma_swarm/graph/__init__.py:1-9`.
+
+## Operator Direction Record — 2026-07-19
+
+### Custody and effect
+
+This section preserves the human operator's confirmed direction as a durable
+source record. In the operator's words, it is **pre-constitutional**: it should
+shape planning, architecture proposals, evaluation design, and the questions
+future agents bring back for ratification. It is not itself a constitutional
+amendment, founding act, capability grant, active-track mutation, financial
+lease, or proof that the described mechanisms exist.
+
+The current owner stack continues to govern. Constitutional rules belong to
+`specs/Dharma_Constitution_v0.md`, telos invariants belong to
+`docs/governance/SOVEREIGN_MANIFEST.md`, active execution belongs to
+`docs/governance/ACTIVE_TRACK.yaml`, and agent behavior belongs to `CLAUDE.md`:
+`docs/governance/CANONICAL_DOC_STACK.md:55-127`. Each proposed rule below
+becomes governing only through its owner, bounded implementation, negative
+controls, exact-head review, and human merge.
+
+This record is frozen as provenance, not as unamendable law. A later direction
+may supersede it only through a dated, explicitly operator-confirmed record
+that preserves this version in history and names the material changes. Agent
+synthesis must not be represented as the operator's own words without explicit
+confirmation.
+
+### The direction now fixed for development
+
+**Civilizational formulation.** The operator's horizon is an operative layer
+of the noosphere: a living lattice through which supramental, spiritual, and
+mental directionality can be perceived, organized, tested, and embodied in
+human affairs. That sentence is a metaphysical and civilizational commitment,
+not an empirical result. Its engineering translation is testable: a persistent
+network should carry visions and values into competing interpretations,
+bounded actions, receipts, consequences, and recursively revised human-system
+models without erasing provenance, disagreement, or human authority. Section
+11 below governs the scientific claim boundary.
+
+1. **First instance of a general form.** Dharma Entelechy is intended as the
+   first instance of a substrate ultimately usable by many people. The
+   substrate may be reproducible; the living human-system relationship must
+   preserve the person's unique history, contradictions, consent, freedom,
+   and irreducible capacity to surprise its model. The existing architecture
+   draft already requires plural potential and the right to revise or refuse
+   the system's interpretation:
+   `docs/plans/2026-07-13_dharma_entelechy_architecture_contract_v0.md:289-330`.
+
+2. **Jagat Kalyan as sustained direction.** Models should participate
+   proactively by interpreting the current mission, surfacing opportunities,
+   researching, simulating, preparing reversible work, and proposing or
+   executing actions inside separately granted authority. Proactivity is a
+   participation mode, not an authority class. A telos score, confidence,
+   consensus, or history of success does not enlarge a capability envelope;
+   consequential capabilities require the typed fields already proposed at
+   `docs/plans/2026-07-13_dharma_entelechy_architecture_contract_v0.md:247-285`.
+
+3. **Long-horizon multi-model continuity.** The target proof is coordinated
+   work across ten models and multiple providers for at least one week and up
+   to one month, without losing an admitted claim, silently changing the
+   starting mission/specification, duplicating a protected effect, or making
+   the action trail difficult to reconstruct. The existing seven-day Cell
+   proof specification supplies the proposed restart, provider-substitution,
+   effect-deduplication, approval, verification, and rapid-state-understanding
+   floor: `docs/plans/2026-07-13_dharma_entelechy_vision_synthesis.md:666-679`.
+
+4. **Triply corroborated reality claims.** A consequential factual claim is
+   eligible for operational reliance only after at least three decorrelated
+   model families independently inspect the same digest-bound, immutable
+   primary sources, code blobs, datasets, or effect receipts. Each family must
+   inspect the underlying material directly and record its own evidence
+   references; no shared model-produced summary may substitute for source
+   inspection. This is a corroboration floor, not truth by vote and not action
+   authority. Deterministic oracles, primary evidence, affected-person
+   testimony, and human judgment retain their respective authority. Surviving
+   disagreement must remain visible. The current constitutional draft requires
+   only two model families, so three-family enforcement remains a proposed
+   delta rather than current runtime truth:
+   `specs/Dharma_Constitution_v0.md:320-346,597-627`.
+
+5. **Epistemic type discipline.** Spiritual vocabulary is admissible only
+   when its operational meaning is clear and its claim class is explicit.
+   Future contracts should distinguish at least `metaphysical_commitment`,
+   `phenomenological_report`, `ethical_commitment`, `scientific_hypothesis`,
+   `empirical_result`, and `engineering_invariant`. A metaphysical or
+   contemplative claim may guide inquiry; it does not become a scientific
+   result or executable invariant without a separately receipted bridge. The
+   current Reality Debt Ledger classifies consciousness/R_V proof claims as
+   research-only rather than proven:
+   `docs/governance/REALITY_DEBT_LEDGER.md:8-13`.
+
+6. **Contradiction without flattening.** The system should seek higher-order
+   invariants and practical synthesis while retaining any irreducible
+   remainder: minority position, evidence, crux, confidence, and reopening
+   condition. A decision may proceed without manufactured consensus when
+   authority permits, but its receipt should name the unresolved dissent and
+   why proceeding was justified. Privacy-classified or unsafe raw material may
+   be represented through bounded redaction rather than permanent verbatim
+   retention.
+
+7. **Intimate memory boundary.** Raw personal and intimate content is intended
+   to remain local, encrypted at rest, excluded from generic logs and
+   distillation, and never transmitted to a remote model provider. Only a
+   minimized or redacted derivative may leave the local boundary, under
+   explicit scoped and revocable consent naming the content class, provider,
+   purpose, retention period, and deletion procedure. Revocation cannot erase
+   copies already transmitted; it must stop future disclosure and trigger the
+   declared deletion procedure. Until encryption, key custody, backup/recovery,
+   minimization, redaction, export/revocation, deletion, and plaintext-negative
+   tests exist, the repository must not claim that this capability is
+   implemented. This is stricter than the current Memory Kernel production
+   bar, which requires provenance and redaction but does not yet specify
+   encryption at rest:
+   `docs/architecture/MEMORY_KERNEL_PROD_BAR.md:19-44,62-104`.
+
+8. **Trusted people as witnesses, never machine diagnosis.** With the user's
+   and observer's consent, trusted people may provide attributable,
+   contestable observations that can trigger a pause or human check-in.
+   Neither their testimony nor a model's interpretation may automatically
+   classify pathology, spiritual condition, intent, competence, or authority.
+   The epistemic contract already requires correction by affected
+   beneficiaries and independent witnesses:
+   `docs/plans/2026-07-13_dharma_entelechy_architecture_contract_v0.md:318-341`.
+
+9. **World-scale consequence without mandatory company scale.** The system
+   need not become a large company, but it is intended to produce impact,
+   capability, and economic power comparable in consequence to institutions
+   that shape the world. Revenue, influence, scientific contribution,
+   ecological benefit, and human benefit remain distinct receipt classes even
+   when they contribute to one milestone. Internal circulation is not external
+   value: `docs/governance/REALITY_DEBT_LEDGER.md:8-15`.
+
+   The first explicit economic milestone is **$10,000**. It may be reached by
+   any combination of collected revenue, grants or funding, and independently
+   verified beneficiary value, but each category and valuation method must
+   remain separate in the receipt. The milestone is evidence of traction, not
+   automatic authority or proof that the organism is self-funding.
+
+10. **Embodied freedom is a product requirement.** The organism should become
+    capable enough to create value, maintain systems, and advance ratified
+    work while allowing the human to live an embodied life rather than operate
+    a perpetual approval console. This requires advance, typed, expiring
+    leases for bounded reversible classes, threshold- and exception-based
+    notification, permanent verification, and retention of the human key at
+    irreversible boundaries. It does not mean hidden or unlimited autonomy.
+
+    Financial trust is intended to advance through proposed ceilings of
+    **$100 → $500 → $1,000 → proposed doubling** after transparent receipts,
+    sound reasoning, and demonstrated net profit. These are successive
+    ceilings, not a standing capital grant: each stage requires a fresh,
+    explicit operator lease bound to scope, amount, expiry, loss limit, and
+    revocation. At any stage, the ceiling means aggregate live exposure across
+    all agents, Cells, accounts, unsettled commitments, and concurrent leases,
+    not a per-agent or per-account allowance. This bounds entrusted capital; it
+    does not narrow the open wealth-generation search space. The current
+    trading-specific architecture uses a different ladder and is not
+    implementation evidence for this direction:
+    `docs/architecture/VENTURE_CELL_LIFECYCLE.md:100-125`.
+
+11. **Identity must not collapse into generic automation.** If the system
+    loses Hofstadterian recursive self-discovery, cybernetic self-correction,
+    or the participatory intimacy of Jagat Kalyan and becomes merely dry,
+    mechanical, or interchangeable with a generic corporate agent stack, it
+    has failed this direction even if throughput rises. The counterweight is
+    equally binding at the vision level: metaphor must terminate in legible
+    mechanisms, evidence, and changed capability. The canonical Organism
+    already rejects both empty recursion and outward work detached from inward
+    coherence: `foundations/THE_ORGANISM.md:6-16`.
+
+### Explicitly reserved: wealth remains open
+
+The operator does **not** direct this record to narrow, replace, or adjudicate
+Shakti Ginko's open-ended wealth and revenue search space. In particular, this
+packet leaves `docs/governance/SOVEREIGN_MANIFEST.md:101` untouched. This is a
+deliberate reservation, not an omission and not a factual claim about current
+economic performance.
+
+The operator confirms that the candidate prohibition set discussed in the
+founder-intent dialogue may all take absolute constitutional form. This record
+does not reconstruct their exact clauses from memory or ratify them; a future
+human-authored proposal must quote the originating record and follow the
+constitutional amendment process at
+`specs/Dharma_Constitution_v0.md:959-991`. Their exact relationship to Shakti's
+open commercial search space remains a constitutional drafting question. This
+record preserves both directions without claiming that the boundary has
+already been resolved. It grants no present spending, trading, outreach,
+publishing, credential, deployment, production-mutation, or merge authority.
+
+### The first compounding organ: Code Quality Foundry
+
+The first embodiment of this direction is a **Code Quality Foundry** that
+applies to `dharma_swarm` itself before it is offered as a general capability.
+It is not the scalar scorer currently named `QualityForge`: that implementation
+inspects only the first 500 characters for its telos check, treats `REVIEW` as
+passing, and averages dimensions into one score:
+`dharma_swarm/quality_forge.py:82-110`.
+
+The Foundry is the discipline through which multiple models transform a
+mission and specification into bounded changes, semantic tests, negative and
+mutation controls, exact receipts, adversarial reviews, and one-way quality
+ratchets. It should treat every hard floor as independently load-bearing and
+compare the swarm against a strong single-model control under an equal budget.
+Its purpose is to make the repository itself the compounding instrument that
+lifts every later Cell, Organ, product, company, and research program.
+
+The current `repository-titanium-hardening-2026-07` track is its first proving
+ground, not a reason to open an eleventh track. That track permits only truthful
+repository verification and `CLOSED_NOT_PROD`, and explicitly withholds
+production and wider-organ authority:
+`docs/governance/ACTIVE_TRACK.yaml:1703-1719`. Its bounded-packet, negative-
+control, rollback, reproduction, and independent-clean-room rules already
+provide the execution grammar:
+`docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md:29-55,1237-1308`.
+
+**Seven-day proof:** record an immutable `campaign_base_sha`, one mission/spec
+digest, and the existing Titanium finding/packet graph; reconcile
+already-merged evidence; then advance only through bounded packet merges from
+the first unfinished Phase-0 dependency. Every packet records its exact head,
+first-attempt results are preserved, and any mission/spec change requires an
+explicitly receipted campaign restart. WP-0I closes from a fresh non-shallow
+clone bound to a separately recorded `reviewed_final_main_sha`; the starting
+and final SHAs must never be conflated. The campaign must route substantive
+work through at least ten declared model/version identities spanning at least
+three model families and two providers. Every handoff records the current
+mission/spec digest, admitted-claim ledger, unresolved dissent, authority
+state, and protected-effect state. Every claim admitted at start or during the
+campaign must end as `PASS`, `FAIL`, `NEEDS_HOST`, or `BLOCKED_OPERATOR`; none
+may disappear or be promoted by prose. A preregistered comparable slice must
+also run through a strong single-model control under the same cost, token, and
+time budget. Three provider/model-diverse reviewers must inspect raw exact-head
+evidence, while the receipt states that model diversity is not independent-
+human verification.
+
+**Thirty-day proof:** only after Phase 0 closes, re-derive proposed quality
+baselines with pinned tools, structured output, exact-SHA provenance, and
+seeded negative controls. Before execution, a separately admitted packet must
+freeze the vertical entrypoint, protected effect class, seed, canonical receipt
+comparison, expected mutation and failure verdicts, restore invariant, and
+duplicate-effect bound. Acceptance requires two same-seed runs to produce
+semantically equal canonical receipts; the seeded semantic mutation and
+injected failure to fail for their named reasons; empty-host restore to
+preserve the specified semantic state; and the protected-effect count to
+remain exactly one. The exact implementation remains separately admitted
+through current owners and Titanium's phase order:
+`docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md:1331-1556`.
+
+Passing either proof establishes only its stated evidence boundary. It does not
+establish production liveness, deployment readiness, autonomous-money
+authority, publication authority, or permission to weaken a quality floor.
 
 ## 1. The North Star
 
