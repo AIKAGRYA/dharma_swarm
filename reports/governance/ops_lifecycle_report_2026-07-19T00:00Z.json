@@ -1,0 +1,111 @@
+{
+  "report_type": "ops_lifecycle_report",
+  "generated_at": "2026-07-19T00:00:22Z",
+  "audit_sha": "1021b9cc60156b725e291904674e09e91ee97e69",
+  "mission_1_spine_adoption": {
+    "adoption_pct": 93.8,
+    "target_pct": 95.0,
+    "gap_pp": 1.2,
+    "total_surfaces": 16,
+    "joined_count": 13,
+    "adapter_ready_count": 2,
+    "legacy_count": 1,
+    "missing_count": 0,
+    "quarantine_count": 0,
+    "pct_changed_from_head": false,
+    "json_committed": false,
+    "json_commit_reason": "adoption_pct unchanged at 93.8% — policy: only commit on pct change",
+    "spine_comment_target": "PR #1040 (most recent open governance PR; no open spine metric PR exists)",
+    "spine_comment_url": "https://github.com/AmitabhainArunachala/dharma_swarm/pull/1040#issuecomment-5013436789",
+    "surfaces_changed_status": [],
+    "top_saturation_targets": [
+      {
+        "id": "self_modification_loop",
+        "status": "adapter-ready",
+        "missing_patterns": ["try_begin_idempotent_side_effect on apply path"],
+        "files": ["dharma_swarm/diff_applier.py", "dharma_swarm/evolution.py", "dharma_swarm/self_improve.py"],
+        "fix_complexity": "low — single call site in diff_applier.py"
+      },
+      {
+        "id": "mcp_tool_access",
+        "status": "adapter-ready",
+        "missing_patterns": ["ExecutionIdentity import", "RuntimeStateStore write", "record_side_effect receipt"],
+        "files": ["dharma_swarm/mcp_server.py", "dharma_swarm/dharma_context_mcp.py"],
+        "fix_complexity": "medium — requires spine wiring into MCP tool handlers"
+      },
+      {
+        "id": "legacy_no_identity_escape_hatch",
+        "status": "legacy",
+        "missing_patterns": [],
+        "files": ["dharma_swarm/runtime_state.py", "tests/test_runtime_state_invariants.py"],
+        "fix_complexity": "n/a — stable legacy surface, no action required"
+      }
+    ]
+  },
+  "mission_2_pr_lifecycle": {
+    "open_prs_before": 17,
+    "auto_closed_count": 0,
+    "open_prs_after": 17,
+    "mergeable_count": 11,
+    "conflicting_count": 6,
+    "duplicate_autogrounding_detected": false,
+    "auto_closed_prs": [],
+    "conflicting_watch_list": [
+      {
+        "number": 947,
+        "title": "[impact-checked] Add durable A2A presence and operator node",
+        "created_at": "2026-07-14T15:49:21Z",
+        "age_days": 4.3,
+        "auto_close_after": "2026-07-21T15:49:21Z",
+        "branch": "cursor/durable-a2a-operator-node-8e74"
+      },
+      {
+        "number": 949,
+        "title": "[impact-checked] Govern durable A2A operator slice",
+        "created_at": "2026-07-14T23:31:10Z",
+        "age_days": 4.0,
+        "auto_close_after": "2026-07-21T23:31:10Z",
+        "branch": "cursor/a2a-governance-ownership-8e74"
+      },
+      {
+        "number": 972,
+        "title": "feat(forge-lab): canonical exact-code RSI lab releases",
+        "created_at": "2026-07-15T15:52:06Z",
+        "age_days": 3.3,
+        "auto_close_after": "2026-07-22T15:52:06Z",
+        "branch": "codex/rsi-lab-canonical-20260715"
+      },
+      {
+        "number": 995,
+        "title": "test(mike): prepare C1 onboarding required-context proof",
+        "created_at": "2026-07-17T01:18:37Z",
+        "age_days": 1.9,
+        "auto_close_after": "2026-07-24T01:18:37Z",
+        "branch": "codex/mike-c1-consumer-prep-20260716"
+      },
+      {
+        "number": 996,
+        "title": "governance(safety): admit live-host and rollback proof surfaces",
+        "created_at": "2026-07-17T01:43:11Z",
+        "age_days": 1.9,
+        "auto_close_after": "2026-07-24T01:43:11Z",
+        "branch": "agent/safety-tcb-p0-authority-20260716"
+      },
+      {
+        "number": 1007,
+        "title": "governance(keel): bare-metal architecture audit as the KEEL companion findings ledger",
+        "created_at": "2026-07-17T17:20:24Z",
+        "age_days": 1.3,
+        "auto_close_after": "2026-07-24T17:20:24Z",
+        "branch": "claude/keel-architecture-audit-20260718"
+      }
+    ],
+    "green_and_ready_prs": [1040, 1037, 1025, 1024, 1013, 1011, 1006, 1004, 987, 930, 904],
+    "recommended_actions": [
+      "URGENT: Rebase or close PR #947, #949 before 2026-07-21 (auto-close window)",
+      "WATCH: Rebase or close PR #972 before 2026-07-22 (auto-close window)",
+      "SPINE: Add try_begin_idempotent_side_effect to DiffApplier.apply_and_test to reach 95% adoption",
+      "11 green-and-ready PRs await operator merge review"
+    ]
+  }
+}
