@@ -12,7 +12,10 @@ name: pr-ci-health
 #                transient infra flakes (e.g. the CodeQL default-setup umbrella
 #                status that completes in seconds while `codeql / python` passes).
 #   3. rebase  — rebase conflict-free behind-main PR branches onto origin/main
-#                and push with --force-with-lease.
+#                via scripts/governance/pr_ci_safe_rebase.py (fail-closed:
+#                count-bound explicit file pages, current+previous filenames,
+#                same-repo/head-SHA/race/lease binding). Session Entry packet
+#                branches are skipped; owner append-only reseal is required.
 #
 # The heavier, judgement-bearing fixes (Coherence-Delta body fields, Fourfold
 # Shakti Warrant causes, real test/lint failures) are handled by the agent
@@ -106,6 +109,11 @@ jobs:
           set -uo pipefail
           git config user.name "pr-ci-health-bot"
           git config user.email "pr-ci-health-bot@users.noreply.github.com"
+          # Main fetch/config only. PR-head mutation is owned exclusively by
+          # scripts/governance/pr_ci_safe_rebase.py after fail-closed guards:
+          # explicit per_page/page file enumeration (not --paginate alone),
+          # filename + previous_filename packet checks, same-repo + head SHA
+          # race re-reads, PR-number ref fetch, and explicit force-with-lease.
           git fetch origin main
           mapfile -t prs < <(jq -r '.[] | select(.categories | index("behind_main")) | select(.mergeable_state == "behind") | "\(.number)\t\(.head)\t\(.base)"' triage.json)
           for line in "${prs[@]:-}"; do
@@ -123,14 +131,13 @@ jobs:
               echo "PR #$pr head=$head is the rolling DocOps lane; skipping auto-rebase"
               continue
             fi
-            echo "PR #$pr: rebasing $head onto origin/main"
-            git fetch origin "$head" || { echo "  fetch failed"; continue; }
-            git checkout -B "ci-rebase/$head" "origin/$head" || { echo "  checkout failed"; continue; }
-            if git rebase origin/main; then
-              git push origin "ci-rebase/$head:$head" --force-with-lease || echo "  push rejected (remote moved); leaving as-is"
-            else
-              echo "  conflict during rebase; aborting, leaving PR #$pr for human/agent"
-              git rebase --abort || true
-            fi
-            git checkout -f "$GITHUB_SHA" || true
+            # Guard + rebase + restore: never inline PR-head fetch/rebase/push.
+            python3 scripts/governance/pr_ci_safe_rebase.py \
+              --repo "$REPO" \
+              --pr "$pr" \
+              --expected-base "$base" \
+              --expected-head "$head" || {
+              echo "PR #$pr: safe-rebase helper exited nonzero; no success assumed — inspect helper output"
+              continue
+            }
           done

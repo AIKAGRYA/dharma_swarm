@@ -1,0 +1,245 @@
+{
+  "allowed_files": [
+    ".github/workflows/pr-ci-health.yml",
+    "tests/test_pr_dedupe_workflow.py",
+    "docs/governance/PR_QUALITY_GATES.md",
+    "reports/agentops/work_packets/titanium-hardening-WP-PRCI1-session-entry-guard.json",
+    "scripts/governance/pr_ci_safe_rebase.py",
+    "tests/test_pr_ci_safe_rebase.py",
+    "tests/test_pr_ci_safe_rebase_mutations.py"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "1021b9cc60156b725e291904674e09e91ee97e69",
+  "branch": "titanium/pr-ci-health-session-entry-guard-20260718",
+  "commit": {
+    "allowed": false,
+    "message": "fix(governance): preserve packet-bound PR branches [impact-checked]"
+  },
+  "forbidden_files": [
+    ".github/workflows/automerge.yml",
+    ".github/workflows/branch-janitor.yml",
+    ".github/workflows/codex-mention-router.yml",
+    ".github/workflows/kernel-tests.yml",
+    ".github/workflows/kernel-titanium-verify.yml",
+    ".github/workflows/langgraph-oracle.yml",
+    ".github/workflows/merge-master-mike-backlog.yml",
+    ".github/workflows/pramana-probe.yml",
+    ".github/workflows/pudgala-rigor.yml",
+    "CYBERNETIC_LOOP_MAP.md",
+    "Dockerfile.swarm",
+    "dharma_swarm/archive.py",
+    "dharma_swarm/chamber/**",
+    "dharma_swarm/checkpoint.py",
+    "dharma_swarm/coordination/**",
+    "dharma_swarm/council/**",
+    "dharma_swarm/diversity_archive.py",
+    "dharma_swarm/evolution_safety.py",
+    "dharma_swarm/graph/**",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/organism.py",
+    "dharma_swarm/strange_loop.py",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/topology_genome.py",
+    "dharma_swarm/workflow.py",
+    "dharma_swarm/world_radar/**",
+    "docker-compose.yml",
+    "docs/governance/hygiene/patterns/AI-M1.yaml",
+    "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json",
+    "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+    "docs/plans/DARSHAN_CHARTER_2026-07-12.md",
+    "docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md",
+    "docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md",
+    "docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md",
+    "docs/plans/INWARD_ASCENT_PHASE0_DOSSIER_2026-07-07.md",
+    "docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md",
+    "docs/plans/handoffs/DHARMAGRAPH_HANDOFF_CLAUDE.md",
+    "docs/plans/handoffs/DHARMAGRAPH_HANDOFF_DEVIN.md",
+    "docs/vision_maps/MASTER_2026-07-07_hyperbolic_time_chamber.md",
+    "packages/telos-kernel/**",
+    "packages/titanium-verify/**",
+    "pyproject.toml",
+    "reports/darshan/**",
+    "reports/governance/arena/**",
+    "reports/governance/chamber/**",
+    "reports/governance/dharmagraph_parity/**",
+    "reports/governance/inward_ascent/**",
+    "reports/loop_closure/**",
+    "reports/tam/**",
+    "scripts/governance/arena_truth_report.py",
+    "scripts/governance/branch_janitor.py",
+    "scripts/governance/check_claim_evidence_binding.py",
+    "scripts/governance/dharmagraph_parity_gauntlet.py",
+    "scripts/governance/frontier_ledger.py",
+    "scripts/governance/hygiene/**",
+    "scripts/governance/inward_ascent_baseline.py",
+    "scripts/governance/loop1_consumption_check.py",
+    "scripts/governance/pramana_probe.py",
+    "scripts/governance/transcendence_ledger.py",
+    "scripts/governance/verify_corral_findings.py",
+    "scripts/runtime/github_ingestor_runner.py",
+    "scripts/runtime/merge_master_mike_daemon.py",
+    "scripts/runtime/pr_merge_control.py",
+    "terminal/**",
+    "tests/oracle_support/dharmagraph_gauntlet.py",
+    "tests/test_arena_truth_report.py",
+    "tests/test_arena_v1.py",
+    "tests/test_branch_janitor.py",
+    "tests/test_chamber_daily_delta.py",
+    "tests/test_chamber_gym_git_history.py",
+    "tests/test_chamber_ledger_history.py",
+    "tests/test_chamber_predictions.py",
+    "tests/test_chamber_sandbox.py",
+    "tests/test_chamber_traces.py",
+    "tests/test_checkpoint.py",
+    "tests/test_claim_evidence_binding.py",
+    "tests/test_coordination_closure_checks.py",
+    "tests/test_council_profiles.py",
+    "tests/test_dharmagraph_parity_gauntlet.py",
+    "tests/test_dpi.py",
+    "tests/test_evolution_safety.py",
+    "tests/test_github_ingestor_runner.py",
+    "tests/test_go_adapter_contracts.py",
+    "tests/test_go_evidence_ingestor_bridge.py",
+    "tests/test_go_github_ingestor_bridge.py",
+    "tests/test_go_receipt_identity_verify.py",
+    "tests/test_go_world_signal_bridge.py",
+    "tests/test_graph_checkpoint.py",
+    "tests/test_graph_durable_invoker.py",
+    "tests/test_graph_neutral_langgraph_oracle.py",
+    "tests/test_graph_pregel_properties.py",
+    "tests/test_graph_reconciler.py",
+    "tests/test_langgraph_differential_oracle.py",
+    "tests/test_loop1_consumption.py",
+    "tests/test_loop1_consumption_check.py",
+    "tests/test_loop_supervisor_tristate.py",
+    "tests/test_merge_master_mike_daemon.py",
+    "tests/test_orchestration_genome.py",
+    "tests/test_orchestrator_v1.py",
+    "tests/test_pr_merge_control.py",
+    "tests/test_pr_merge_control_github_reviews.py",
+    "tests/test_pramana.py",
+    "tests/test_pramana_probe.py",
+    "tests/test_topology_execution.py",
+    "tests/test_transcendence_ledger.py",
+    "tests/test_verify_corral_findings.py",
+    "tests/test_workflow.py",
+    "tests/test_world_radar_go_bridge.py",
+    "tools/evidence_ingestor_go/**",
+    "tools/github_ingestor_go/**",
+    "tools/world_scout_go/**",
+    "tools/world_signal_ingestor_go/**"
+  ],
+  "gates": [
+    {
+      "command": "python3 -m pytest tests/test_pr_dedupe_workflow.py tests/test_pr_ci_safe_rebase.py tests/test_pr_ci_safe_rebase_mutations.py -q",
+      "expected_exit": 0,
+      "name": "pr-ci-health-session-entry-guard",
+      "timeout_seconds": 180
+    },
+    {
+      "command": "make hygiene-check",
+      "expected_exit": 0,
+      "name": "hygiene-integrity",
+      "timeout_seconds": 120
+    }
+  ],
+  "id": "titanium-hardening-WP-PRCI1-session-entry-guard",
+  "intent": "Prevent scheduled pr-ci-health from force-rebasing any PR that changes a Session Entry packet; packet-bound branches must preserve their merge-base/digest identity until an owner-authorized append-only reseal.",
+  "negative_controls": [
+    {
+      "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('scripts/governance/pr_ci_safe_rebase.py'); t=p.read_text(); old='PACKET_PREFIX = \\\"reports/agentops/work_packets/\\\"'; new='PACKET_PREFIX = \\\"reports/agentops/unprotected/\\\"'; assert old in t; p.write_text(t.replace(old,new,1)); r=subprocess.run([sys.executable,'scripts/governance/pr_ci_safe_rebase.py','--selftest-packet-guard'],check=False); sys.exit(r.returncode)\"",
+      "expected_exit": 1,
+      "name": "packet-prefix-mutation-breaks-stdlib-selftest",
+      "timeout_seconds": 120
+    }
+  ],
+  "session_entry": {
+    "active_track": "repository-titanium-hardening-2026-07",
+    "active_track_checked_at_sha": "1021b9cc60156b725e291904674e09e91ee97e69",
+    "agent_identity": "hermes-main",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      ".github/workflows/pr-ci-health.yml",
+      "tests/test_pr_dedupe_workflow.py",
+      "scripts/governance/check_agentops_packet_scope.py",
+      "scripts/governance/pr_ci_safe_rebase.py",
+      "tests/test_pr_ci_safe_rebase.py",
+      "tests/test_pr_ci_safe_rebase_mutations.py"
+    ],
+    "collision": {
+      "checked_at_sha": "1021b9cc60156b725e291904674e09e91ee97e69",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "This PR only prevents future rewrites; already-rebased packet branches require owner-bound reseal.",
+      "No merge authority is granted; PR 1036 remains quarantined until this guard is operator-accepted.",
+      "Initial closeout positive gates and scope passed, but the negative-control argv lost nested quotes and exited 1 on SyntaxError; this packet-only append fixes the control and preserves that failed report externally.",
+      "Second closeout parsed the control but the mutant name still contained the searched marker substring, so it exited 0 instead of 2; this packet-only append uses DISABLED_PREFIX and preserves that failed report externally.",
+      "Independent review of PR 1038 at e5f10c74 failed 54/100: current guard misses previous_filename/capped-file-list cases and exact same-repo/head-SHA race binding.",
+      "The workflow string-presence regression and self-certifying negative control are replaced by an executable helper, behavioral command-trace tests, and a mutation that runs the packet-page test.",
+      "Local closeout reports remain self-reported; externally authoritative evidence is the GitHub AgentOps packet-scope check plus review/CI handles, and PR prose must not overclaim local artifacts.",
+      "Behavioral closeout at 1ba2bc99 had a false-positive negative control: the jail's python3 lacked pytest, so ModuleNotFoundError produced expected exit 1. The control now mutates PACKET_PREFIX and runs a dependency-free built-in page-two/no-git selftest.",
+      "Independent review of PR 1039 at 506147eb scored 88/100: production simulations passed, but seven critical executable guard mutants survived the behavioral suite because unexpected downstream metadata calls became generic accepted skips.",
+      "Prior-head 506147eb CI run 29653776294 was red only on Python 3.12 test_custom_task_dispatch timeout (1 failed, 13909 passed, 71 skipped, 9 deselected, 16 xfailed); causality was unproven.",
+      "Head c245f5ba CI run 29655963853 is fully green: Python 3.11 and 3.12 passed; full rollup 42 success, 1 skipped, 0 failures.",
+      "Independent review of PR 1041 at c245f5ba scored 90/100: production passed 12/12 direct probes, but an expanded 26-mutant audit found 11 additional load-bearing test mutants surviving; the committed matrix must expand to 18/18 with exact diagnostics and complete traces.",
+      "Expanded test-integrity repair kills 19/19 string-retaining load-bearing mutants with complete traces and zero false kills, covering the requested 18 plus both branch-validator return-code bypass and full validation-call removal.",
+      "Independent final review of PR 1042 at c581cfa4 passed 96/100 with zero P0/P1; production passed 20/20 direct and 11/11 real-Git probes, and the committed matrix killed 19/19 load-bearing mutants.",
+      "Head c581cfa4 CI run 29658788540 is fully green on Python 3.11 and 3.12; all required checks passed with one expected skipped status publication.",
+      "Review P2 cleanup updates the mutation-matrix docstring from 18 to 19 and binds CI chronology to explicit SHAs rather than a stale current-head label.",
+      "Final acceptance recheck of PR 1043 at d8a32054 passed 100/100 with zero P0/P1/P2 after exact-head Python 3.11/3.12 CI completed green.",
+      "Protected main is strict and final branch merge-base 944dc895 was behind stable main 1021b9cc; final operator-readiness uses an append-only normal merge plus packet reseal to 1021b9cc, with no bypass, rebase, or force-push."
+    ],
+    "interface_mismatches": [
+      "PR 1036 and predecessor 1033 were force-rebased by pr-ci-health after packet sealing, invalidating base_ref, digest evidence, PR claims and CI authority."
+    ],
+    "open_broken_register_items": [
+      "Workflow auto-rebases all behind-main PRs with force-with-lease, including merge-base-bound Session Entry packets."
+    ],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "9def98511b786725c3484e9d7d9638fcadeb1b1049a18cb3638d78249a53bcec",
+    "rebind_history": [
+      {
+        "from_base": "c82e15a850638eba63d1cc5908d6f849ed20854c",
+        "reason": "main advanced before opening the guard PR; normal merge plus append-only packet reseal avoids immediate eligibility for the legacy hourly force-rebase workflow",
+        "to_base": "944dc89565edc9262574947abe8d93598f7bbaf3"
+      },
+      {
+        "actor": "titanium-hardening",
+        "new_base": "1021b9cc60156b725e291904674e09e91ee97e69",
+        "prior_base": "944dc89565edc9262574947abe8d93598f7bbaf3",
+        "reason": "Strict protected main requires an up-to-date branch for operator merge; owner-governed append-only normal merge and reseal, never rebase or force-push."
+      }
+    ],
+    "rollback": "Revert the workflow/test/doc/packet commit. This restores legacy hourly auto-rebase behavior; no existing PR branch is rewritten by the revert itself.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "selected_tracks": [
+      "repository-titanium-hardening-2026-07"
+    ],
+    "tests_intended": [
+      "tests/test_pr_dedupe_workflow.py"
+    ],
+    "tool_versions": {
+      "git": "2.43.0",
+      "make": "4.3",
+      "python": "3.12.3"
+    },
+    "work_packet": "WP-PRCI1"
+  },
+  "tool_versions": {
+    "git": "2.43.0",
+    "make": "4.3",
+    "python": "3.12.3"
+  },
+  "worktree": "."
+}
