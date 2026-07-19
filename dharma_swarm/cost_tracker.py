@@ -9,13 +9,15 @@ from __future__ import annotations
 import json
 import logging
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from dharma_swarm.daemon_config import dharma_state_dir
+from dharma_swarm.storage_schema_registry import register_schema, write_jsonl_versioned
 
 logger = logging.getLogger(__name__)
 
 _STATE_DIR = dharma_state_dir()
 _COST_LOG = _STATE_DIR / "cost_log.jsonl"
+_SCHEMA_ID = "cost_tracker.CostEntry"
 
 # Approximate cost per million tokens (input) by model pattern.
 # These are rough estimates for budgeting, not billing.
@@ -54,6 +56,7 @@ def _estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
     return round(input_cost + output_cost, 6)
 
 
+@register_schema(_SCHEMA_ID, version=1, notes="LLM call cost row, ~/.dharma/cost_log.jsonl")
 @dataclass
 class CostEntry:
     timestamp: float
@@ -90,9 +93,7 @@ def log_cost(
         tier=tier,
     )
     try:
-        _COST_LOG.parent.mkdir(parents=True, exist_ok=True)
-        with open(_COST_LOG, "a") as f:
-            f.write(json.dumps(asdict(entry)) + "\n")
+        write_jsonl_versioned(_COST_LOG, [entry], schema_id=_SCHEMA_ID, append=True)
     except Exception as exc:
         logger.warning("Failed to log cost entry: %s", exc)
     return entry
@@ -112,6 +113,10 @@ def read_cost_log(since_hours: float = 24.0) -> list[CostEntry]:
                     continue
                 try:
                     data = json.loads(line)
+                    # Mixed-generation file: strip registry markers when
+                    # present; pre-registry rows have none.
+                    data.pop("__schema_id__", None)
+                    data.pop("__schema_version__", None)
                     if data.get("timestamp", 0) >= cutoff:
                         entries.append(CostEntry(**data))
                 except (json.JSONDecodeError, TypeError):
