@@ -36,7 +36,9 @@ from scripts.store_inventory_census import (  # noqa: E402
 # store must be justified in review before RAISING one.
 BASELINE_DB_NAMES = 39
 BASELINE_JSONL_NAMES = 215
-BASELINE_LEDGER_MODULES = 11
+# 11 -> 12 (2026-07-19): episode_ledger.py — THE_KEEL §6 Episode Ledger
+# schema slice, the justified new organ this ratchet exists to make explicit.
+BASELINE_LEDGER_MODULES = 12
 BASELINE_LEDGER_CLASSES = 11
 
 
