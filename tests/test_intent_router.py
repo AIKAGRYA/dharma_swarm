@@ -171,3 +171,37 @@ class TestRouting:
         skill_name, intent = router.route("explore the ecosystem map")
         # Registry match should boost confidence
         assert intent.confidence > 0
+
+
+class TestIdempotencyKeyOrigin:
+    """ADR-009 contract: consequential intents carry an idempotency key
+    minted at ORIGIN (intent creation), propagated — never re-minted — by
+    downstream layers."""
+
+    def test_task_intent_mints_idempotency_key_at_origin(self):
+        intent = IntentRouter().analyze("fix the broken test in metrics.py")
+        assert intent.idempotency_key.startswith("intent_")
+        assert len(intent.idempotency_key) > len("intent_")
+
+    def test_intent_keys_are_unique_per_mint(self):
+        router = IntentRouter()
+        a = router.analyze("fix the broken test in metrics.py")
+        b = router.analyze("fix the broken test in metrics.py")
+        assert a.idempotency_key != b.idempotency_key, (
+            "two submissions are two intents; each mints its own key"
+        )
+
+    def test_decomposed_sub_tasks_each_carry_their_own_key(self):
+        decomposed = IntentRouter().decompose(
+            "fix the parser bug and then write tests and update the docs"
+        )
+        keys = [sub.idempotency_key for sub in decomposed.sub_tasks]
+        assert all(k.startswith("intent_") for k in keys)
+        assert len(set(keys)) == len(keys), "sub-task keys must be distinct"
+
+    def test_key_survives_serialization_round_trip(self):
+        original = IntentRouter().analyze("scan the ecosystem and map all paths")
+        rebuilt = TaskIntent.model_validate(original.model_dump())
+        assert rebuilt.idempotency_key == original.idempotency_key, (
+            "downstream layers PROPAGATE the origin key, never re-mint it"
+        )
