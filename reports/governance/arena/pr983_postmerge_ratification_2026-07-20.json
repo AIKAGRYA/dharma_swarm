@@ -1,0 +1,132 @@
+{
+  "schema": "dharma_swarm.arena_postmerge_ratification.v1",
+  "document_role": "witness",
+  "observed_at": "2026-07-20T12:13:07Z",
+  "subordinate_to": [
+    "docs/governance/CANONICAL_DOC_STACK.md",
+    "docs/governance/ACTIVE_TRACK.yaml#orchestration-arena-v1-2026-06",
+    "docs/governance/BUILD_SESSION_ENTRYPOINT.md"
+  ],
+  "subject": {
+    "pull_request": 983,
+    "pull_request_url": "https://github.com/AmitabhainArunachala/dharma_swarm/pull/983",
+    "historical_packet": "reports/agentops/work_packets/arena-live-controls-WP-O20.json"
+  },
+  "baseline": {
+    "repository": "AmitabhainArunachala/dharma_swarm",
+    "origin_main": "8965ffa93a593c760ead6a76c94c4bc489e5cf93",
+    "origin_main_commit_time": "2026-07-20T21:11:33+09:00",
+    "merge_is_ancestor_of_baseline": true,
+    "commits_after_merge": 30
+  },
+  "ratification": {
+    "scope": "post_merge_evidence_classification_only",
+    "classification": "historical_packet_digest_valid_execution_binding_invalid",
+    "historical_packet_digest": "valid",
+    "final_pr_execution_binding": "invalid",
+    "governance_authority_granted": false,
+    "retroactive_premerge_approval_granted": false,
+    "finding": "WP-O20 is retained as internally coherent historical evidence, but it is not evidence of an AgentOps packet bound to PR #983's final event base/head. This witness records that defect; it does not waive or repair it."
+  },
+  "pull_request_facts": {
+    "state": "MERGED",
+    "base_ref": "main",
+    "final_base_sha": "e22ffe5db6884a3d315291ba5fb252e8fe80d8b5",
+    "final_head_sha": "258ac62453e3f8d313792ab24a7d0757904facf7",
+    "squash_merge_sha": "a24dbd68b6256e5a0b1bd13388df4c7029d2f2f9",
+    "merged_at": "2026-07-18T04:45:05Z",
+    "merged_by": "AmitabhainArunachala",
+    "head_branch": "codex/arena-live-controls-closeout-20260716"
+  },
+  "historical_packet_integrity": {
+    "recorded_packet_digest": "8234985e9ae62669c2880b331617514b2c1e17b26752ecac3b5ac78201f922a6",
+    "computed_canonical_digest": "8234985e9ae62669c2880b331617514b2c1e17b26752ecac3b5ac78201f922a6",
+    "canonical_digest_match": true,
+    "file_bytes_sha256": "d83afac7e648951798103c1b1fd29876748557ef3017b5c6e8b1a4edc0e394f5",
+    "git_blob_sha": "dcf3d89c6dcea45887b021c996d61975253b4019",
+    "base_ref": "1d45916d338c106a1e379d928b979f78c17ca489",
+    "collision_checked_at_sha": "1d45916d338c106a1e379d928b979f78c17ca489",
+    "approval_before_merge_policy": true,
+    "immutable_in_this_ratification": true
+  },
+  "execution_binding_analysis": {
+    "required_comparison": "historical packet base/collision binding versus final pull_request event base/head",
+    "historical_packet_base_matches_final_pr_base": false,
+    "historical_packet_collision_sha_matches_final_pr_base": false,
+    "historical_packet_declares_final_pr_head": false,
+    "verdict": "INVALID",
+    "reason": "The digest authenticates the packet's own content; it does not make base_ref 1d45916d equal final event base e22ffe5d or bind the unchanged packet to final head 258ac62."
+  },
+  "github_review_evidence": {
+    "formal_review_submissions": 9,
+    "formal_review_states": {
+      "COMMENTED": 9,
+      "APPROVED": 0,
+      "CHANGES_REQUESTED": 0
+    },
+    "formal_reviews_submitted_on_final_head": 0,
+    "exact_final_head_approval_evidence": "NOT_FOUND_IN_QUERIED_GITHUB_RECORD",
+    "review_threads_total": 6,
+    "review_threads_resolved": 6,
+    "review_threads_unresolved": 0,
+    "limitation": "No exact-head GitHub approval was found. This is an evidence statement about the queried GitHub record, not proof that no off-platform human judgment occurred, and the merge action is not reclassified as explicit packet approval."
+  },
+  "github_check_evidence": {
+    "status_rollup_total": 43,
+    "status_rollup_success": 42,
+    "status_rollup_skipped": 1,
+    "status_rollup_failed_or_pending": 0,
+    "agentops_packet_scope": {
+      "job_id": 88042858672,
+      "job_url": "https://github.com/AmitabhainArunachala/dharma_swarm/actions/runs/29630447767/job/88042858672",
+      "event_base": "e22ffe5db6884a3d315291ba5fb252e8fe80d8b5",
+      "event_head": "258ac62453e3f8d313792ab24a7d0757904facf7",
+      "packet_paths": [],
+      "required": false,
+      "status": "NOT_REQUIRED",
+      "interpretation": "The successful check did not validate WP-O20 or execute its gates against the final PR event envelope."
+    }
+  },
+  "content_continuity": {
+    "final_head_squash_merge_and_current_main_blobs_match": true,
+    "paths": {
+      "dharma_swarm/coordination/arena/live_pool.py": "1f61a6f99f1f95e1df74326e12c280998cfb3fc6",
+      "dharma_swarm/coordination/arena/measure.py": "50e0de2c622211af23f62f00c208aadd56e594db",
+      "reports/agentops/work_packets/arena-live-controls-WP-O20.json": "dcf3d89c6dcea45887b021c996d61975253b4019",
+      "tests/test_arena_parity_controls.py": "f263dde4e7e73889f02afe9408775529f3da6f05"
+    },
+    "late_fix": {
+      "commit": "5aa81ed5d4630d818714eddffb583432827a4f1e",
+      "summary": "reject padded or coerced roster seat ids fail-closed",
+      "changed_scoped_paths": [
+        "dharma_swarm/coordination/arena/measure.py",
+        "tests/test_arena_parity_controls.py"
+      ],
+      "historical_packet_changed": false
+    }
+  },
+  "authority_boundary": {
+    "live_provider_invoked": false,
+    "live_benchmark_evidence_created": false,
+    "capability_claim": false,
+    "promotion_authorized": false,
+    "production_routing_authorized": false,
+    "deployment_authorized": false,
+    "active_track_mutated": false,
+    "active_track_closeout_authorized": false,
+    "separate_authority_choice_required_for": [
+      "waiving_or_repairing_the_final_event_packet_binding_defect",
+      "treating_owner_merge_as_explicit_WP-O20_approval",
+      "closing_Arena_next_item_2",
+      "any_capability_or_production_promotion"
+    ]
+  },
+  "reproduction": {
+    "packet_digest": "Remove only session_entry.packet_digest, serialize with sorted keys and compact separators, then sha256 the UTF-8 bytes.",
+    "git_continuity": "git rev-parse SHA:path for final head, squash merge, and origin_main",
+    "pull_request": "gh pr view 983 --repo AmitabhainArunachala/dharma_swarm --json baseRefOid,headRefOid,mergeCommit,mergedAt,mergedBy,state,statusCheckRollup",
+    "reviews": "gh api repos/AmitabhainArunachala/dharma_swarm/pulls/983/reviews --paginate",
+    "threads": "gh api graphql query pullRequest(number:983).reviewThreads(first:100)",
+    "packet_scope_log": "gh api repos/AmitabhainArunachala/dharma_swarm/actions/jobs/88042858672/logs"
+  }
+}

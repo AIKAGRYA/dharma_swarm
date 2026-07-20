@@ -1,0 +1,84 @@
+{
+  "id": "arena-WP-R983-postmerge-ratification-20260720",
+  "base_ref": "8965ffa93a593c760ead6a76c94c4bc489e5cf93",
+  "branch": "agent/arena-postmerge-ratification-20260720",
+  "worktree": ".",
+  "intent": "Create one Arena-owned post-merge evidence-ratification witness for PR #983. Bind the witness to current origin/main, preserve the historical arena-live-controls-WP-O20 packet byte-for-byte, distinguish its valid canonical digest from its invalid binding to the final PR event base/head envelope, record final merge/check/review facts, and preserve the no-live-provider, no-capability-claim, no-promotion, and no-retroactive-approval boundary. This packet authorizes only the new witness and its own tracked copy; it does not edit ACTIVE_TRACK, generated projections, Arena runtime/tests, Mike surfaces, or terminal surfaces.",
+  "allowed_files": [
+    "reports/governance/arena/pr983_postmerge_ratification_2026-07-20.json",
+    "reports/agentops/work_packets/arena-WP-R983-postmerge-ratification-20260720.json"
+  ],
+  "forbidden_files": [],
+  "gates": [
+    {
+      "name": "arena-current-main-regression-suite",
+      "command": "python3 -m pytest tests/test_arena_v1.py tests/test_arena_parity_controls.py tests/test_dpi.py tests/test_orchestration_genome.py tests/test_orchestrator_v1.py tests/test_council_profiles.py tests/test_coordination_closure_checks.py tests/test_arena_truth_report.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "ratification-diff-check",
+      "command": "git diff --check 8965ffa93a593c760ead6a76c94c4bc489e5cf93..HEAD",
+      "expected_exit": 0,
+      "timeout_seconds": 60
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "historical-packet-digest-valid-but-final-base-binding-invalid",
+      "command": "python3 -c \"import copy,hashlib,json,sys; p='reports/agentops/work_packets/arena-live-controls-WP-O20.json'; d=json.load(open(p,encoding='utf-8')); recorded=d['session_entry']['packet_digest']; canonical=copy.deepcopy(d); canonical['session_entry'].pop('packet_digest'); computed=hashlib.sha256(json.dumps(canonical,sort_keys=True,separators=(',',':')).encode()).hexdigest(); final_base='e22ffe5db6884a3d315291ba5fb252e8fe80d8b5'; mismatch=d['base_ref']!=final_base or d['session_entry']['collision']['checked_at_sha']!=final_base; sys.exit(3 if recorded==computed and mismatch else 7)\"",
+      "expected_exit": 3,
+      "timeout_seconds": 60
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "docs(arena): ratify PR 983 post-merge evidence boundary"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-R983",
+    "active_track": "orchestration-arena-v1-2026-06",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "8965ffa93a593c760ead6a76c94c4bc489e5cf93",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The historical WP-O20 packet remains internally digest-valid at current main, but its base_ref and collision binding are 1d45916d338c106a1e379d928b979f78c17ca489 while PR #983's final event base/head were e22ffe5db6884a3d315291ba5fb252e8fe80d8b5 and 258ac62453e3f8d313792ab24a7d0757904facf7.",
+      "PR #983's green AgentOps packet-scope job reported packet_paths=[], required=false, and status=NOT_REQUIRED, so it did not validate WP-O20 against the final PR event envelope.",
+      "GitHub records nine formal reviews, all COMMENTED, and no formal review submitted on final head 258ac62453e3f8d313792ab24a7d0757904facf7; no exact-head APPROVED evidence is present in the queried GitHub record."
+    ],
+    "closest_existing_implementation": [
+      "reports/agentops/work_packets/arena-live-controls-WP-O20.json",
+      "docs/governance/ACTIVE_TRACK.yaml",
+      "reports/governance/arena/arena_truth_receipt.json"
+    ],
+    "honest_blockers": [
+      "This is a post-merge descriptive witness, not retroactive pre-merge approval and not an authority waiver for WP-O20's final-event binding mismatch.",
+      "The queried GitHub record has no exact-final-head APPROVED review; this absence does not prove that no off-platform human judgment occurred.",
+      "No live provider is invoked and no live benchmark, production capability, production routing, deployment, promotion, or ACTIVE_TRACK closure is authorized.",
+      "If post-merge ratification is intended to grant governance authority rather than classify evidence, the Arena owner must make that separate explicit choice before merge.",
+      "This reseal is bound to origin/main 8965ffa93a593c760ead6a76c94c4bc489e5cf93; any later main movement before merge requires another rebase and reseal. This packet does not make its draft PR mergeable."
+    ],
+    "rollback": "Revert only the new PR #983 ratification witness and this WP-R983 packet; preserve historical WP-O20, Arena runtime/tests, ACTIVE_TRACK, and generated projections unchanged.",
+    "packet_digest": "c95859a9148236c797a75551625f3133dcd1f75bffa726299f876ab25af888d7"
+  }
+}
