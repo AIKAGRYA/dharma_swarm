@@ -51,8 +51,8 @@ export function paneActionsFor(
             strategy: state.routePolicy.strategy,
           },
         },
-        primary: {label: "claude opus", summary: "route to Claude Opus 4.6 genius", payload: {action_type: "model.set", provider: "claude", model: "claude-opus-4-6", strategy: "genius"}},
-        secondary: {label: "codex responsive", summary: "route to Codex 5.4 responsive", payload: {action_type: "model.set", provider: "codex", model: "gpt-5.4", strategy: "responsive"}},
+        primary: {label: "claude opus", summary: "route to Claude Opus 4.8 genius", payload: {action_type: "model.set", provider: "claude", model: "claude-opus-4.8", strategy: "genius"}},
+        secondary: {label: "codex responsive", summary: "route to GPT-5.5 responsive", payload: {action_type: "model.set", provider: "codex", model: "gpt-5.5", strategy: "responsive"}},
         tertiary: {
           label: "cost on current",
           summary: `apply cost strategy to ${modelTarget}`,
@@ -144,9 +144,17 @@ export function footerHintFor(
   if (state.uiMode.activeOverlay.kind === "paneSwitcher") {
     return compact ? "j/k choose | Enter jump | Esc close" : "j/k or ↑/↓ choose pane | Enter jump | Esc close | ^K switcher";
   }
+  if (state.uiMode.activeOverlay.kind === "modelPicker") {
+    return compact ? "j/k choose | Enter apply | Esc close" : "j/k or ↑/↓ choose route | Enter apply | Esc close";
+  }
+  if (state.uiMode.keyboardFocus === "composer") {
+    return compact
+      ? "compose | Enter send | ^J newline | Esc navigate"
+      : "composer owns keys | Enter send | ^J newline | Esc navigation";
+  }
   if (compact) {
     const actions = paneActionsFor(tabId, state, options);
-    const parts = ["Tab tabs", "Enter send", "^B side", "↑/↓ scroll"];
+    const parts = ["navigate", "Esc compose", "Tab tabs", "↑/↓ scroll"];
     if (actions.primary) {
       parts.push(`^X ${actions.primary.label}`);
     }
@@ -157,6 +165,8 @@ export function footerHintFor(
   if (tabId === "sessions") {
     parts.push("j/k or ↑/↓ select");
     parts.push("Enter refresh detail");
+    parts.push("r arm resume");
+    parts.push("f fresh");
   }
   if (tabId === "approvals") {
     parts.push("j/k or ↑/↓ select");
@@ -198,6 +208,9 @@ export function focusModeFor(activeTab: TabSpec | undefined, state: AppState): s
   if (state.uiMode.activeOverlay.kind === "modelPicker") {
     return "route selection";
   }
+  if (state.uiMode.keyboardFocus === "composer") {
+    return "compose · Esc navigate";
+  }
   if (activeTab?.kind === "sessions") {
     return "session list";
   }
@@ -213,5 +226,5 @@ export function focusModeFor(activeTab: TabSpec | undefined, state: AppState): s
   if (activeTab?.kind === "agents") {
     return "agent route selection";
   }
-  return "tab navigation";
+  return "navigate · Esc compose";
 }

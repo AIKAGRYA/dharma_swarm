@@ -73,12 +73,12 @@ export function AgentsPane({title, lines, selectedRouteIndex = 0}: Props): React
   const selected = routes[activeIndex];
 
   return (
-    <Box flexGrow={1} borderStyle="round" borderColor={THEME.pine} paddingX={1} flexDirection="column">
-      <Text color={THEME.moss} bold>{title}</Text>
+    <Box flexGrow={1} borderStyle="round" borderColor={THEME.ridge} paddingX={1} flexDirection="column">
+      <Text color={THEME.wave} bold>{title}</Text>
       <Text color={THEME.stone}>route profiles and execution posture | j/k or ↑/↓ select route</Text>
       <Box marginTop={1}>
-        <Box width="35%" flexDirection="column" borderStyle="single" borderColor={THEME.ink} paddingX={1}>
-          <Text color={THEME.parchment} bold>Routes</Text>
+        <Box width="35%" flexDirection="column" paddingX={1}>
+          <Text color={THEME.mist} bold>Routes</Text>
           <Text color={THEME.stone}>typed routing intents</Text>
           {routes.length === 0 ? (
             <Text color={THEME.stone}>No typed agent routes yet.</Text>
@@ -86,8 +86,8 @@ export function AgentsPane({title, lines, selectedRouteIndex = 0}: Props): React
             routes.slice(0, 12).map((route, index) => {
               const active = index === activeIndex;
               return (
-                <Box key={`${route.intent}-${route.provider}-${route.modelAlias}`} flexDirection="column" marginTop={1} borderStyle={active ? "round" : undefined} borderColor={active ? THEME.moss : undefined} paddingX={active ? 1 : 0}>
-                  <Text color={active ? THEME.moss : THEME.foam} bold={active}>
+                <Box key={`${route.intent}-${route.provider}-${route.modelAlias}`} flexDirection="column" marginTop={1}>
+                  <Text color={active ? THEME.wave : THEME.foam} bold={active} backgroundColor={active ? THEME.harbor : undefined}>
                     {active ? "◆ " : "• "}
                     {route.intent}
                   </Text>
@@ -99,8 +99,8 @@ export function AgentsPane({title, lines, selectedRouteIndex = 0}: Props): React
             })
           )}
         </Box>
-        <Box width="65%" marginLeft={1} flexDirection="column" borderStyle="single" borderColor={THEME.ink} paddingX={1}>
-          <Text color={THEME.wave} bold>Route brief</Text>
+        <Box width="65%" marginLeft={1} flexDirection="column" paddingX={1}>
+          <Text color={THEME.mist} bold>Route brief</Text>
           <Text color={THEME.stone}>selected route plus OpenClaw envelope</Text>
           {!selected ? (
             <Text color={THEME.stone}>No selected route.</Text>
@@ -111,7 +111,7 @@ export function AgentsPane({title, lines, selectedRouteIndex = 0}: Props): React
               <Text color={THEME.stone}>role {selected.role}</Text>
             </>
           )}
-          <Text color={THEME.parchment} bold>OpenClaw</Text>
+          <Text color={THEME.mist} bold>OpenClaw</Text>
           <Text color={THEME.stone}>present {openclaw.present} | readable {openclaw.readable}</Text>
           <Text color={THEME.stone}>agents {openclaw.agents} | providers {openclaw.providers}</Text>
         </Box>

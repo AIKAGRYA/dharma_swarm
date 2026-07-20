@@ -103,7 +103,9 @@ repos:
       - id: trailing-whitespace
         exclude: '\.md$'
       - id: end-of-file-fixer
-        exclude: '\.(md|svg|json)$'
+        # Terminal frame fixtures intentionally preserve trailing blank rows so
+        # byte-for-byte captures retain their exact 24/30/40-row geometry.
+        exclude: '(?:\.(md|svg|json)$|^terminal/tests/golden/)'
       - id: check-merge-conflict
       - id: check-added-large-files
         args: ['--maxkb=2048']

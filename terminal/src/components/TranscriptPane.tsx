@@ -13,6 +13,11 @@ type Props = {
   subtitle?: string;
   emptyState?: string;
   accentColor?: string;
+  // F-111 zen: no border, no title block — the conversation IS the screen.
+  frameless?: boolean;
+  // Claude-Code baseline: bottom-anchor the body so the newest line hugs the
+  // composer (only meaningful when the frameless box grows, i.e. the zen face).
+  bottomAnchor?: boolean;
 };
 
 function visibleWindow<T>(items: T[], scrollOffset: number, windowSize: number): T[] {
@@ -30,34 +35,50 @@ export function TranscriptPane({
   subtitle,
   emptyState = "No content yet.",
   accentColor = THEME.ink,
+  frameless = false,
+  bottomAnchor = false,
 }: Props): React.ReactElement {
   const visible = visibleWindow(lines, scrollOffset, windowSize);
+  const body =
+    visible.length === 0 ? (
+      <Text color={THEME.stone}>{emptyState}</Text>
+    ) : (
+      visible.map((line) => {
+        const formatted = formatTranscriptLine(line);
+        return (
+          <Text key={line.id} color={formatted.color} bold={formatted.bold}>
+            {formatted.prefix ? (
+              <Text color={formatted.prefix.color} bold={formatted.prefix.bold} dimColor={formatted.prefix.dimColor}>
+                {formatted.prefix.text}
+              </Text>
+            ) : null}
+            {formatted.segments.map((segment, index) => (
+              <Text key={`${line.id}-${index}`} color={segment.color} bold={segment.bold} dimColor={segment.dimColor}>
+                {segment.text}
+              </Text>
+            ))}
+          </Text>
+        );
+      })
+    );
+  if (frameless) {
+    return (
+      <Box
+        flexGrow={1}
+        flexDirection="column"
+        justifyContent={bottomAnchor ? "flex-end" : "flex-start"}
+        paddingX={1}
+      >
+        {body}
+      </Box>
+    );
+  }
   return (
-    <Box flexGrow={1} flexDirection="column" borderStyle="round" borderColor={accentColor} paddingX={1}>
+    <Box flexGrow={1} flexDirection="column" borderStyle="round" borderColor={THEME.ridge} paddingX={1}>
       <Text color={accentColor} bold>{title}</Text>
       {subtitle ? <Text color={THEME.stone}>{subtitle}</Text> : <Text color={THEME.stone}> </Text>}
       {subtitle ? <Text color={THEME.stone}> </Text> : null}
-      {visible.length === 0 ? (
-        <Text color={THEME.stone}>{emptyState}</Text>
-      ) : (
-        visible.map((line) => {
-          const formatted = formatTranscriptLine(line);
-          return (
-            <Text key={line.id} color={formatted.color} bold={formatted.bold}>
-              {formatted.prefix ? (
-                <Text color={formatted.prefix.color} bold={formatted.prefix.bold} dimColor={formatted.prefix.dimColor}>
-                  {formatted.prefix.text}
-                </Text>
-              ) : null}
-              {formatted.segments.map((segment, index) => (
-                <Text key={`${line.id}-${index}`} color={segment.color} bold={segment.bold} dimColor={segment.dimColor}>
-                  {segment.text}
-                </Text>
-              ))}
-            </Text>
-          );
-        })
-      )}
+      {body}
     </Box>
   );
 }

@@ -2272,19 +2272,19 @@ export function RepoPane({
   }));
 
   return (
-    <Box flexGrow={1} flexDirection="column" borderStyle="round" borderColor={THEME.parchment} paddingX={1}>
-      <Text color={THEME.parchment} bold>{title}</Text>
+    <Box flexGrow={1} flexDirection="column" borderStyle="round" borderColor={THEME.ridge} paddingX={1}>
+      <Text color={THEME.wave} bold>{title}</Text>
       <Text color={THEME.stone}>section focus active | j/k or ↑/↓ move between repo sections</Text>
       <Box marginTop={1}>
-        <Box width="35%" flexDirection="column" borderStyle="single" borderColor={THEME.ink} paddingX={1}>
-          <Text color={THEME.parchment} bold>Sections</Text>
+        <Box width="35%" flexDirection="column" paddingX={1}>
+          <Text color={THEME.mist} bold>Sections</Text>
           <Text color={THEME.stone}>repo posture and live risk</Text>
           {sections.map((section, index) => {
             const active = index === activeSectionIndex;
             const summaries = sectionCardSummaries(section);
             return (
-              <Box key={section.title} flexDirection="column" marginTop={1} borderStyle={active ? "round" : undefined} borderColor={active ? THEME.parchment : undefined} paddingX={active ? 1 : 0}>
-                <Text color={active ? THEME.parchment : THEME.foam} bold={active}>
+              <Box key={section.title} flexDirection="column" marginTop={1}>
+                <Text color={active ? THEME.wave : THEME.foam} bold={active} backgroundColor={active ? THEME.harbor : undefined}>
                   {active ? "▶ " : "• "}
                   {section.title}
                 </Text>
@@ -2300,8 +2300,8 @@ export function RepoPane({
             );
           })}
         </Box>
-        <Box width="65%" marginLeft={1} flexDirection="column" borderStyle="single" borderColor={THEME.ink} paddingX={1}>
-          <Text color={THEME.wave} bold>{activeSection?.title ?? "Section"}</Text>
+        <Box width="65%" marginLeft={1} flexDirection="column" paddingX={1}>
+          <Text color={THEME.mist} bold>{activeSection?.title ?? "Section"}</Text>
           <Text color={THEME.stone}>selected repo card</Text>
           {visibleRows.length === 0 ? (
             <Text color={THEME.stone}>No section detail.</Text>

@@ -1,11 +1,14 @@
 import {describe, expect, test} from "bun:test";
 
 import {extractSlashCommands, formatTranscriptLine} from "../src/transcriptFormatting";
+import path from "node:path";
+
+const REPO_ROOT = path.resolve(import.meta.dir, "..", "..");
 
 describe("extractSlashCommands", () => {
   test("finds slash commands without treating filesystem paths as commands", () => {
     expect(extractSlashCommands("run /git then /runtime")).toEqual(["/git", "/runtime"]);
-    expect(extractSlashCommands("saved to /Users/dhyana/dharma_swarm/terminal/src/app.tsx")).toEqual([]);
+    expect(extractSlashCommands(`saved to ${REPO_ROOT}/terminal/src/app.tsx`)).toEqual([]);
   });
 });
 

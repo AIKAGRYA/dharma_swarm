@@ -6,6 +6,7 @@ import asyncio
 
 import pytest
 
+from dharma_swarm import model_pool
 from dharma_swarm.model_hierarchy import DEFAULT_MODELS
 from dharma_swarm.models import ProviderType
 from dharma_swarm.tui.engine.adapters.base import CompletionRequest, ProviderConfig
@@ -79,6 +80,21 @@ def test_openrouter_adapter_defaults_to_canonical_runtime_model() -> None:
     profile = adapter.get_profile()
 
     assert profile.model_id == DEFAULT_MODELS[ProviderType.OPENROUTER]
+
+
+def test_openrouter_profiles_project_the_pool_gemini_3_route() -> None:
+    entry = model_pool.get_entry("gemini-3-pro")
+    assert entry is not None
+    expected = next(
+        route.model_id
+        for route in entry.routes
+        if route.provider is ProviderType.OPENROUTER
+    )
+
+    adapter = OpenRouterAdapter()
+
+    assert adapter.get_profile(expected).model_id == expected
+    assert expected in {profile.model_id for profile in asyncio.run(adapter.list_models())}
 
 
 @pytest.mark.asyncio

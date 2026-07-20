@@ -11,9 +11,9 @@ export function buildInitialTabs(): TabSpec[] {
       title: "Chat",
       kind: "chat",
       lines: [
-        line("boot-1", "system", "Dharma Terminal"),
-        line("boot-2", "system", "Keyboard-first operator shell. Backend bridged over stdio."),
-        line("boot-3", "assistant", "Use plain prompts or slash commands. Chat carries the conversation; the surrounding tabs expose runtime, tools, and system state."),
+        // FACE-1 zen-pure welcome: at most 2 short dim lines (thinking kind = dim).
+        line("boot-1", "thinking", "Dharma Terminal"),
+        line("boot-2", "thinking", "Type a message below · F2 opens the cockpit"),
       ],
     },
     {

@@ -3,6 +3,10 @@ import {describe, expect, test} from "bun:test";
 import {buildContextSidebarLines, buildVisibleContextSidebarLines} from "../src/components/Sidebar";
 import {workspacePayloadToPreview, workspacePreviewToLines, workspaceSnapshotToPreview} from "../src/protocol";
 import type {TabSpec, WorkspaceSnapshotPayload} from "../src/types";
+import path from "node:path";
+
+const REPO_ROOT = path.resolve(import.meta.dir, "..", "..");
+const REPO_ROOT_COMPACT = REPO_ROOT.length <= 24 ? REPO_ROOT : `${REPO_ROOT.slice(0, 23).trimEnd()}…`;
 
 describe("buildContextSidebarLines", () => {
   test("surfaces repo dependency hotspots and durable control previews", () => {
@@ -13,7 +17,7 @@ describe("buildContextSidebarLines", () => {
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           Branch: "main",
           Head: "95210b1",
           Sync: "origin/main | ahead 0 | behind 0",
@@ -145,15 +149,15 @@ describe("buildContextSidebarLines", () => {
     expect(lines.some((line) => line.startsWith("Snapshot summary topology sab_canonical_repo"))).toBe(true);
     expect(lines.some((line) => line.startsWith("Snapshot truth branch main@95210b1 | dirty staged 0 | unstaged 510"))).toBe(true);
     expect(lines.some((line) => line.startsWith("Snapshot repo risk tracking origin/main in sync | sab_canonical_repo_missi"))).toBe(true);
-    expect(lines.some((line) => line.startsWith("Snapshot focus Root /Users/dhyana/dharma_sw"))).toBe(true);
+    expect(lines.some((line) => line.startsWith(`Snapshot focus Root ${REPO_ROOT_COMPACT}`))).toBe(true);
     expect(lines.some((line) => line.startsWith("Snapshot focus ") && line.endsWith("| lead terminal/src/protocol.ts"))).toBe(true);
     expect(lines.some((line) => line.startsWith("Repo/control fresh | task terminal-repo-pane | branch main@95210b1 | tracking origin/main in sync |"))).toBe(true);
-    expect(lines.some((line) => line.startsWith("Focus /Users/dhyana/dharma_sw"))).toBe(true);
+    expect(lines.some((line) => line.startsWith(`Focus ${REPO_ROOT_COMPACT}`))).toBe(true);
     expect(lines.some((line) => line.endsWith("| terminal/src/protocol.ts"))).toBe(true);
     expect(lines.some((line) => line.startsWith("Topo pressure dharma_swarm Δ552 (510 modified, 42"))).toBe(true);
     expect(lines).toContain("Pressure preview 1 warning | dharma_swarm Δ552 (510 modified, 42 untracked)");
     expect(lines).toContain("Hotspot pressure change terminal (274) | dep dharma_swarm.models | inbound 159");
-    expect(lines).toContain("Root /Users/dhyana/dharma_swarm");
+    expect(lines).toContain(`Root ${REPO_ROOT}`);
     expect(lines).toContain("Branch main@95210b1");
     expect(lines.some((line) => line.startsWith("Branch preview tracking origin/main in sync | +0/-0 | topol"))).toBe(
       true,
@@ -280,7 +284,7 @@ describe("buildContextSidebarLines", () => {
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           Branch: "main",
           Head: "804d5d1",
           Sync: "origin/main | ahead 2 | behind 0",
@@ -339,7 +343,7 @@ describe("buildContextSidebarLines", () => {
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           Branch: "main",
           Head: "95210b1",
           Ahead: "0",
@@ -529,7 +533,7 @@ describe("buildContextSidebarLines", () => {
           kind: "repo",
           lines: [],
           preview: {
-            "Repo root": "/Users/dhyana/dharma_swarm",
+            "Repo root": REPO_ROOT,
             Branch: "main",
             Head: "804d5d1",
             "Branch status": "tracking origin/main ahead 2",
@@ -623,7 +627,7 @@ describe("buildContextSidebarLines", () => {
 
   test("surfaces repo and control preview fallbacks from transcript-only repo lines", () => {
     const repoPreview = {
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "abc123",
       Sync: "origin/main | ahead 0 | behind 0",
@@ -778,7 +782,7 @@ describe("buildContextSidebarLines", () => {
       "gpt-5.4",
       "connected",
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "95210b1",
         "Branch status": "tracking origin/main in sync",
@@ -850,7 +854,7 @@ describe("buildContextSidebarLines", () => {
       new Date("2026-04-02T12:00:00Z"),
     );
 
-    expect(lines).toContain("Root /Users/dhyana/dharma_swarm");
+    expect(lines).toContain(`Root ${REPO_ROOT}`);
     expect(lines).toContain("Branch main@95210b1");
     expect(lines.some((line) => line.startsWith("Health topology sab_canonical_repo_missing; high"))).toBe(true);
     expect(lines.some((line) => line.startsWith("Repo risk preview tracking origin/main in sync | sab_canonical_repo_missing"))).toBe(true);
@@ -868,7 +872,7 @@ describe("buildContextSidebarLines", () => {
         (line) => line.startsWith("Snapshot truth tsc=ok | cycle_acceptan") && line.includes("| cycle 2 running | next "),
       ),
     ).toBe(true);
-    expect(lines.some((line) => line.startsWith("Focus /Users/dhyana/dharma_sw"))).toBe(true);
+    expect(lines.some((line) => line.startsWith(`Focus ${REPO_ROOT_COMPACT}`))).toBe(true);
     expect(lines.some((line) => line.endsWith("| terminal/src/app.tsx"))).toBe(true);
     expect(lines.some((line) => line.startsWith("Freshness stale | cycle 2 running | updated 2026-04-01T03:44:29Z |"))).toBe(true);
     expect(lines.some((line) => line.startsWith("Pulse stale | in_progress / fail | cycle 2 running | updated 2026-04-01T03:44:29Z | veri"))).toBe(true);
@@ -892,7 +896,7 @@ describe("buildContextSidebarLines", () => {
           kind: "repo",
           lines: [],
           preview: {
-            "Repo root": "/Users/dhyana/dharma_swarm",
+            "Repo root": REPO_ROOT,
             Branch: "main",
             Head: "804d5d1",
           },
@@ -939,7 +943,7 @@ describe("buildContextSidebarLines", () => {
           kind: "repo",
           lines: [],
           preview: {
-            "Repo root": "/Users/dhyana/dharma_swarm",
+            "Repo root": REPO_ROOT,
             Branch: "main",
             Head: "804d5d1",
             "Branch status": "tracking origin/main ahead 2",
@@ -1027,7 +1031,7 @@ describe("buildContextSidebarLines", () => {
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           Branch: "main",
           Head: "95210b1",
           Sync: "origin/main | ahead 0 | behind 0",
@@ -1159,7 +1163,7 @@ describe("buildContextSidebarLines", () => {
     expect(lines.some((line) => line.startsWith("Snapshot hotspot summary dep dharma_swarm.models | inbound 159"))).toBe(true);
     expect(lines.some((line) => line.startsWith("Snapshot summary topology sab_canonical_repo"))).toBe(true);
     expect(lines.some((line) => line.startsWith("Snapshot repo risk tracking origin/main in sync | sab_canonical_repo_missi"))).toBe(true);
-    expect(lines.some((line) => line.startsWith("Snapshot focus Root /Users/dhyana/dharma_sw"))).toBe(true);
+    expect(lines.some((line) => line.startsWith(`Snapshot focus Root ${REPO_ROOT_COMPACT}`))).toBe(true);
     expect(lines.some((line) => line.startsWith("Snapshot repo/control fresh | task terminal-repo-pane"))).toBe(true);
     expect(lines.some((line) => line.startsWith("Snapshot control preview fresh | complete / pass | c…"))).toBe(true);
     expect(lines.some((line) => line.startsWith("Repo/control fresh | task terminal-repo-pane | branch main@95210b1 | tracking origin/main in sync |"))).toBe(true);
@@ -1178,7 +1182,7 @@ describe("buildContextSidebarLines", () => {
       line.startsWith("Repo/control fresh | task terminal-repo-pane | branch main@95210b1 | tracking origin/main in sync"),
     );
     const snapshotFocusIndex = lines.findIndex((line) =>
-      line.startsWith("Snapshot focus Root /Users/dhyana/dharma_sw"),
+      line.startsWith(`Snapshot focus Root ${REPO_ROOT_COMPACT}`),
     );
     const snapshotRepoControlIndex = lines.findIndex((line) =>
       line.startsWith("Snapshot repo/control fresh | task terminal-repo-pane"),
@@ -1276,7 +1280,7 @@ describe("buildContextSidebarLines", () => {
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           Branch: "main",
           Head: "804d5d1",
           Sync: "origin/main | ahead 2 | behind 0",
@@ -1382,7 +1386,7 @@ describe("buildContextSidebarLines", () => {
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           Branch: "main",
           Head: "804d5d1",
           Sync: "origin/main | ahead 2 | behind 0",
@@ -1471,7 +1475,7 @@ describe("buildContextSidebarLines", () => {
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           Branch: "main",
           Head: "804d5d1",
           Sync: "origin/main | ahead 2 | behind 0",
@@ -1571,7 +1575,7 @@ describe("buildContextSidebarLines", () => {
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           Branch: "main",
           Head: "804d5d1",
           Sync: "origin/main | ahead 2 | behind 1",
@@ -1662,7 +1666,7 @@ describe("buildContextSidebarLines", () => {
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           Branch: "main",
           Head: "804d5d1",
           Sync: "origin/main | ahead 2 | behind 0",
@@ -1765,7 +1769,7 @@ describe("buildContextSidebarLines", () => {
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           Branch: "main",
           Head: "804d5d1",
           Upstream: "origin/main",
@@ -1851,7 +1855,7 @@ describe("buildContextSidebarLines", () => {
       line.startsWith("Snapshot hotspot summary change terminal (281); dharma_swarm (93)"),
     );
     const snapshotFocusIndex = lines.findIndex((line) =>
-      line.startsWith("Snapshot focus Root /Users/dhyana/dharma_sw"),
+      line.startsWith(`Snapshot focus Root ${REPO_ROOT_COMPACT}`),
     );
     const snapshotRepoControlIndex = lines.findIndex((line) =>
       line.startsWith("Snapshot repo/control ") && line.includes("task terminal-repo-pane"),
@@ -1890,7 +1894,7 @@ describe("buildContextSidebarLines", () => {
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           Branch: "main",
           Head: "95210b1",
           "Branch status": "tracking origin/main in sync",
@@ -1979,7 +1983,7 @@ describe("buildContextSidebarLines", () => {
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           Branch: "main",
           Head: "95210b1",
           "Branch status": "tracking origin/main in sync",
@@ -2050,7 +2054,7 @@ describe("buildContextSidebarLines", () => {
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           Branch: "main",
           Head: "95210b1",
           "Branch status": "tracking origin/main in sync",
@@ -2110,7 +2114,7 @@ describe("buildContextSidebarLines", () => {
     expect(lines.some((line) => line.startsWith("Snapshot topology pressure 1 (sab_canonical_repo_missing) | dharma_swarm Δ563"))).toBe(true);
     expect(lines.some((line) => line.startsWith("Snapshot hotspot summary change terminal (274) | path terminal/src/components/Si"))).toBe(true);
     expect(lines.some((line) => line.startsWith("Snapshot summary topology sab_canonical_repo"))).toBe(true);
-    expect(lines.some((line) => line.startsWith("Snapshot focus Root /Users/dhyana/dharma_sw"))).toBe(true);
+    expect(lines.some((line) => line.startsWith(`Snapshot focus Root ${REPO_ROOT_COMPACT}`))).toBe(true);
   });
 
   test("derives visible topology warning and peer rows from repo risk preview when topology preview is absent", () => {
@@ -2121,7 +2125,7 @@ describe("buildContextSidebarLines", () => {
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           Branch: "main",
           Head: "95210b1",
           "Branch status": "tracking origin/main ahead 2",
@@ -2181,7 +2185,7 @@ describe("buildContextSidebarLines", () => {
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           "Repo/control preview":
           "stale | task terminal-repo-pane | branch main@804d5d1 | tracking origin/main ahead 2 | dirty high (656 local changes) | warn peer_branch_diverged | peer dharma_swarm (canonical_core, main...origin/main, dirty True) | peers dharma_swarm (canonical_core, main...origin/main, dirty True); dgc-core (operator_shell, detached, dirty True) | drift dharma_swarm drift main...origin/main | markers dharma_swarm drift main...origin/main; dgc-core n/a | divergence local +2/-1 | peer dharma_swarm drift main...origin/main | detached dgc-core detached | hotspot change terminal (281) | cycle 8 running | updated 2026-04-03T02:16:08Z | verify tsc=ok | cycle_acceptance=fail",
         },
@@ -2226,7 +2230,7 @@ describe("buildContextSidebarLines", () => {
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           "Repo/control preview":
             "stale | task terminal-repo-pane | branch main@804d5d1 | tracking origin/main ahead 2 | dirty high (656 local changes) | hotspot change terminal (281)",
         },
@@ -2264,7 +2268,7 @@ describe("buildContextSidebarLines", () => {
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           "Repo/control preview":
             "stale | task terminal-repo-pane | branch main@804d5d1 | ahead of origin/main by 2 | dirty high (7 local changes) | hotspot change terminal (4)",
         },
@@ -2304,7 +2308,7 @@ describe("buildContextSidebarLines", () => {
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           "Repo/control preview":
             "stale | task terminal-repo-pane | branch main@804d5d1 | main...origin/main [ahead 2, behind 1] | dirty high (7 local changes) | hotspot change terminal (4)",
         },
@@ -2342,7 +2346,7 @@ describe("buildContextSidebarLines", () => {
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           Branch: "main",
           Head: "804d5d1",
           "Branch sync preview": "main...origin/main [ahead 2]",
@@ -2383,7 +2387,7 @@ describe("buildContextSidebarLines", () => {
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           "Repo/control preview":
             "stale | task terminal-repo-pane | branch main@804d5d1 | tracking origin/main ahead 2 | warn peer_branch_diverged | peers 2 | divergence local +2/-1 | hotspot change terminal (281)",
         },
@@ -2412,7 +2416,7 @@ describe("buildContextSidebarLines", () => {
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           "Dirty pressure": "high (656 local changes)",
           "Repo risk": "topology sab_canonical_repo_missing; high (656 local changes)",
           "Repo/control preview":
@@ -2446,7 +2450,7 @@ describe("buildContextSidebarLines", () => {
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           "Dirty pressure": "high (7 local changes)",
           "Repo risk": "topology peer_branch_diverged; high (7 local changes)",
           "Repo/control preview":
@@ -2472,7 +2476,7 @@ describe("buildContextSidebarLines", () => {
 
   test("surfaces the warning-bearing peer in visible context when topology warnings point away from the first peer", () => {
     const preview = workspaceSnapshotToPreview(`# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 1 | unstaged 2 | untracked 3
 Git hotspots: terminal (4)
 Git changed paths: terminal/src/components/Sidebar.tsx
@@ -2514,7 +2518,7 @@ Git sync: origin/main | ahead 2 | behind 1
 
   test("derives dirty counts in visible context from compact repo truth previews when expanded git rows are absent", () => {
     const preview = {
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "804d5d1",
       "Branch status": "tracking origin/main ahead 2",
@@ -2556,7 +2560,7 @@ Git sync: origin/main | ahead 2 | behind 1
 
   test("derives topology warnings and hotspot rows in visible context from compact repo truth previews when expanded rows are absent", () => {
     const preview = {
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       "Branch status": "tracking origin/main ahead 2",
       Sync: "origin/main | ahead 2 | behind 0",
       Ahead: "2",
@@ -2600,7 +2604,7 @@ Git sync: origin/main | ahead 2 | behind 1
 
   test("derives branch and head labels in visible context from compact repo truth previews when explicit git rows are absent", () => {
     const preview = {
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       "Branch status": "tracking origin/main ahead 2",
       Sync: "origin/main | ahead 2 | behind 0",
       Ahead: "2",
@@ -2640,7 +2644,7 @@ Git sync: origin/main | ahead 2 | behind 1
 
   test("derives branch sync details in visible context from compact branch sync previews when expanded git sync rows are absent", () => {
     const preview = {
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "804d5d1",
       "Branch sync preview": "tracking origin/main ahead 2 | +2/-0 | topology sab_canonical_repo_missing; high (656 local changes)",
@@ -2686,7 +2690,7 @@ Git sync: origin/main | ahead 2 | behind 1
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           Branch: "main",
           Head: "804d5d1",
           "Branch status": "tracking origin/main ahead 2",
@@ -2748,7 +2752,7 @@ Git sync: origin/main | ahead 2 | behind 1
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           Branch: "main",
           Head: "804d5d1",
           "Branch status": "tracking origin/main ahead 2",
@@ -2807,7 +2811,7 @@ Git sync: origin/main | ahead 2 | behind 1
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           Branch: "main",
           Head: "804d5d1",
           "Branch status": "tracking origin/main ahead 2",
@@ -2877,7 +2881,7 @@ Git sync: origin/main | ahead 2 | behind 1
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           Branch: "m",
           Head: "1",
           "Branch status": "sync",
@@ -2938,7 +2942,7 @@ Git sync: origin/main | ahead 2 | behind 1
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           "Repo/control preview":
             "fresh | task terminal-repo-pane | branch feature/repo-pane@804d5d1 | tracking origin/main ahead 2 | warn peer_branch_diverged; sab_canonical_repo_missing | peers dharma_swarm (canonical_core, main...origin/main, dirty True); dgc-core (operator_shell, detached, dirty True) | dirty staged 112 | unstaged 545 | untracked 112 | hotspot change terminal (281) | path terminal/src/components/RepoPane.tsx | dep dharma_swarm.models | inbound 159 | db /Users/dhyana/.dharma/state/runtime.db | activity Sessions=18 Runs=2 ActiveRuns=1 | artifacts Artifacts=7 ContextBundles=1 | verify tsc=ok",
         },
@@ -2991,7 +2995,7 @@ Git sync: origin/main | ahead 2 | behind 1
         kind: "repo",
         lines: [],
         preview: {
-          "Repo root": "/Users/dhyana/dharma_swarm",
+          "Repo root": REPO_ROOT,
           "Repo truth preview":
             "branch main@804d5d1 | dirty staged 112 | unstaged 545 | untracked 112 | warn peer_branch_diverged; sab_canonical_repo_missing | hotspot change terminal (281)",
           "Branch status": "tracking origin/main [ahead 2, behind 1]",
@@ -3025,7 +3029,7 @@ Git sync: origin/main | ahead 2 | behind 1
 
   test("keeps multi-warning members in visible context rows from persisted repo/control previews", () => {
     const tabs: TabSpec[] = [
-      {id: "repo", title: "Repo", kind: "repo", lines: [], preview: {"Repo root": "/Users/dhyana/dharma_swarm"}},
+      {id: "repo", title: "Repo", kind: "repo", lines: [], preview: {"Repo root": REPO_ROOT}},
       {
         id: "control",
         title: "Control",

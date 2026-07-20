@@ -1,0 +1,24 @@
+ ◆ DHARMA  ·  Approvals  ·  F2 zen · ^K panes
+ loop unknown   verify unknown   runtime idle   approvals clear
+◂ Runtime Sessions [Approva…] Control Agents Evoluti… ▸
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ Approvals                                                                    │
+│ provisional-live | pending 0 | tracked 0                                     │
+│                                                                              │
+│  Queue                      Selected                                         │
+│  pending-first operator     decision, resolution, and runtime trace          │
+│  decisions                  No selected approval.                            │
+│  No approvals.                                                               │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ >  Navigation active · Esc returns to composer                               │
+╰──────────────────────────────────────────────────────────────────────────────╯
+ approval queue  ·  route claude:claude-opus-4.8  ·  ○ offline
