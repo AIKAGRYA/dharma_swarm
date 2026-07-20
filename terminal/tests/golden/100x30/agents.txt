@@ -1,0 +1,30 @@
+ ◆ DHARMA COMMAND POST  ·  Agents  ·  panes 15  ·  F2 zen · ^K panes
+ loop unknown   verify unknown   runtime idle   approvals clear   sessions 0
+◂ Approvals Control [Agents] Evolution Thinking Tools ▸
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Agents                                                                                           │
+│ route profiles and execution posture | j/k or ↑/↓ select route                                   │
+│                                                                                                  │
+│  Routes                            Route brief                                                   │
+│  typed routing intents             selected route plus OpenClaw envelope                         │
+│  No typed agent routes yet.        No selected route.                                            │
+│                                    OpenClaw                                                      │
+│                                    present n/a | readable n/a                                    │
+│                                    agents n/a | providers n/a                                    │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ >  Navigation active · Esc returns to composer                                                   │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+ agent route selection  ·  route claude:claude-opus-4.8  ·  ○ offline  ·  responsive  ·  awaiting_…

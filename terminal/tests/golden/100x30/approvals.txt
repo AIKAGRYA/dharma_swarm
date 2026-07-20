@@ -1,0 +1,30 @@
+ ◆ DHARMA COMMAND POST  ·  Approvals  ·  panes 15  ·  F2 zen · ^K panes
+ loop unknown   verify unknown   runtime idle   approvals clear   sessions 0
+◂ Runtime Sessions [Approvals] Control Agents Evolution ▸
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Approvals                                                                                        │
+│ provisional-live | pending 0 | tracked 0                                                         │
+│                                                                                                  │
+│  Queue                             Selected                                                      │
+│  pending-first operator decisions  decision, resolution, and runtime trace                       │
+│                                    No selected approval.                                         │
+│  No approvals.                                                                                   │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ >  Navigation active · Esc returns to composer                                                   │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+ approval queue  ·  route claude:claude-opus-4.8  ·  ○ offline  ·  responsive  ·  awaiting_bridge_…

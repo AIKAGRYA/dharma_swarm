@@ -1,0 +1,24 @@
+ ◆ DHARMA  ·  Chat  ·  F2 zen · ^K panes
+ loop unknown   verify unknown   runtime idle   approvals clear
+[Chat] Mission Repo Commands Models Ontology ▸
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ Pane Switcher                                                                │
+│ rows 1-10 of 15 | Enter jump | Esc close | j/k or arrows move                │
+│                                                                              │
+│ ▶ 1. Chat · chat                                                             │
+│ • 2. Mission · mission                                                       │
+│ • 3. Repo · repo                                                             │
+│ • 4. Commands · commands                                                     │
+│ • 5. Models · models                                                         │
+│ • 6. Ontology · ontology                                                     │
+│ • 7. Runtime · runtime                                                       │
+│ • 8. Sessions · sessions                                                     │
+│ • 9. Approvals · approvals                                                   │
+│ • 10. Control · control                                                      │
+│                                                                              │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ >  Navigation active · Esc returns to composer                               │
+╰──────────────────────────────────────────────────────────────────────────────╯
+ pane switcher  ·  route claude:claude-opus-4.8  ·  ○ offline

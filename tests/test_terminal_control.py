@@ -56,7 +56,7 @@ def test_load_terminal_control_state_reads_latest_repo_state(tmp_path: Path, mon
     assert state["next_task"] == "fix verification"
 
 
-def test_load_terminal_control_state_prefers_persisted_control_summary_preview(
+def test_load_terminal_control_state_ignores_forged_legacy_control_summary(
     tmp_path: Path, monkeypatch
 ) -> None:
     root = tmp_path / "terminal_supervisor"
@@ -95,16 +95,22 @@ def test_load_terminal_control_state_prefers_persisted_control_summary_preview(
     (state_dir / "terminal-control-summary.json").write_text(
         json.dumps(
             {
-                "run_status": "running_cycle",
+                "cycle": 99,
+                "run_status": "completed",
                 "tasks_total": 5,
                 "tasks_pending": 2,
                 "active_task_id": "task-summary",
+                "last_result_status": "complete",
+                "acceptance": "pass",
                 "verification_status": "all 2 checks passing",
                 "verification_passing": "tsc, tests",
                 "verification_failing": "none",
                 "verification_bundle": "tsc=ok | tests=ok",
+                "continue_required": False,
+                "loop_decision": "ready to stop",
                 "next_task": "stale field should be ignored by preview",
-                "preview_Loop_state": "cycle 5 running_cycle",
+                "updated_at": "2026-04-02T02:00:00Z",
+                "preview_Loop_state": "cycle 99 completed",
                 "preview_Task_progress": "3 done, 2 pending of 5",
                 "preview_Active_task": "task-preview",
                 "preview_Result_status": "in_progress",
@@ -133,27 +139,22 @@ def test_load_terminal_control_state_prefers_persisted_control_summary_preview(
 
     assert state is not None
     assert state["cycle"] == 4
-    assert state["run_status"] == "running_cycle"
-    assert state["tasks_total"] == 5
-    assert state["tasks_pending"] == 2
-    assert state["active_task_id"] == "task-preview"
-    assert state["last_result_status"] == "in_progress"
-    assert state["acceptance"] == "pass"
-    assert state["verification_summary"] == "tsc=ok | tests=ok"
-    assert state["verification_checks"] == ["tsc ok", "tests ok"]
-    assert state["verification_status"] == "all 2 checks passing"
-    assert state["loop_decision"] == "ready to stop"
-    assert state["next_task"] == "ship control preview to dashboard"
-    assert state["loop_state"] == "cycle 5 running_cycle"
-    assert state["task_progress"] == "3 done, 2 pending of 5"
-    assert state["runtime_db"] == "/tmp/runtime.db"
-    assert state["runtime_summary"] == "/tmp/runtime.db | 12 sessions | 2 runs"
-    assert state["runtime_freshness"].startswith("cycle 5 running_cycle")
-    assert state["recent_operator_actions"] == "reroute by operator (better frontier model)"
-    assert state["updated_at"] == "2026-04-02T02:00:00Z"
+    assert state["run_status"] == "running"
+    assert state["tasks_total"] == 3
+    assert state["tasks_pending"] == 1
+    assert state["active_task_id"] == "task-42"
+    assert state["last_result_status"] == "blocked"
+    assert state["acceptance"] == "fail"
+    assert state["verification_summary"] == "tsc=ok | tests=fail"
+    assert state["verification_checks"] == ["tsc ok", "tests fail"]
+    assert state["verification_status"] == "1 failing, 1/2 passing"
+    assert state["continue_required"] is True
+    assert state["loop_decision"] == "continue required"
+    assert state["next_task"] == "fix verification"
+    assert state["updated_at"] == "2026-04-02T00:00:00Z"
 
 
-def test_load_terminal_control_state_normalizes_generic_verification_preview_fields(
+def test_load_terminal_control_state_ignores_legacy_verification_preview_fields(
     tmp_path: Path, monkeypatch
 ) -> None:
     root = tmp_path / "terminal_supervisor"
@@ -208,9 +209,93 @@ def test_load_terminal_control_state_normalizes_generic_verification_preview_fie
     state = terminal_control.load_terminal_control_state(tmp_path / "repo")
 
     assert state is not None
-    assert state["verification_summary"] == "tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail"
-    assert state["verification_checks"] == ["tsc ok", "bridge_snapshots ok", "cycle_acceptance fail"]
-    assert state["verification_status"] == "1 failing, 2/3 passing"
-    assert state["verification_passing"] == "tsc, bridge_snapshots"
-    assert state["verification_failing"] == "cycle_acceptance"
-    assert state["verification_bundle"] == "tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail"
+    assert state["verification_summary"] == "tsc=ok | tests=fail"
+    assert state["verification_checks"] == ["tsc ok", "tests fail"]
+    assert state["verification_status"] == "1 failing, 1/2 passing"
+    assert state["verification_passing"] == "tsc"
+    assert state["verification_failing"] == "tests"
+    assert state["verification_bundle"] == "tsc=ok | tests=fail"
+
+
+def test_load_terminal_control_state_keeps_malformed_authority_unknown(
+    tmp_path: Path, monkeypatch
+) -> None:
+    root = tmp_path / "terminal_supervisor"
+    state_dir = root / "run-1" / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / "run.json").write_text("{malformed", encoding="utf-8")
+    (state_dir / "verification.json").write_text("[not-an-object]", encoding="utf-8")
+    (state_dir / "terminal-control-summary.json").write_text(
+        json.dumps(
+            {
+                "run_status": "completed",
+                "active_task_id": "forged-task",
+                "verification_checks": [
+                    {"name": "tsc", "ok": True},
+                    {"name": "tests", "ok": True},
+                ],
+                "verification_status": "all 2 checks passing",
+                "continue_required": False,
+                "loop_decision": "ready to stop",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(terminal_control, "DEFAULT_SUPERVISOR_ROOT", root)
+
+    state = terminal_control.load_terminal_control_state(tmp_path / "repo")
+
+    assert state is not None
+    assert state["run_status"] == "unknown"
+    assert state["active_task_id"] == ""
+    assert state["verification_checks"] == []
+    assert state["verification_status"] == "unknown"
+    assert state["continue_required"] is None
+    assert state["loop_decision"] == "unknown"
+
+
+def test_load_terminal_control_state_keeps_missing_verification_unknown(
+    tmp_path: Path, monkeypatch
+) -> None:
+    root = tmp_path / "terminal_supervisor"
+    state_dir = root / "run-1" / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / "run.json").write_text(
+        json.dumps(
+            {
+                "repo_root": str(tmp_path / "repo"),
+                "updated_at": "2026-04-02T00:00:00Z",
+                "cycle": 4,
+                "status": "completed",
+                "last_task_id": "task-42",
+                "last_continue_required": False,
+                "last_verification": {
+                    "checks": [{"name": "stale", "ok": True}],
+                    "continue_required": False,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (state_dir / "terminal-control-summary.json").write_text(
+        json.dumps(
+            {
+                "verification_status": "all 2 checks passing",
+                "continue_required": False,
+                "loop_decision": "ready to stop",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(terminal_control, "DEFAULT_SUPERVISOR_ROOT", root)
+
+    state = terminal_control.load_terminal_control_state(tmp_path / "repo")
+
+    assert state is not None
+    assert state["active_task_id"] == "task-42"
+    assert state["verification_checks"] == []
+    assert state["verification_status"] == "unknown"
+    assert state["continue_required"] is None
+    assert state["loop_decision"] == "unknown"

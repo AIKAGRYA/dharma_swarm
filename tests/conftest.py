@@ -3,6 +3,13 @@
 import os
 
 import pytest
+
+pytest_plugins = (
+    ("pytest_asyncio.plugin",)
+    if os.getenv("PYTEST_DISABLE_PLUGIN_AUTOLOAD") == "1"
+    else ()
+)
+
 try:
     from hypothesis import settings, Verbosity
 

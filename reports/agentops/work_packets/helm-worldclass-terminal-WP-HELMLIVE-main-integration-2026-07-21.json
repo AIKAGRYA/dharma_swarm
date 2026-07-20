@@ -1,0 +1,118 @@
+{
+  "id": "helm-worldclass-terminal-WP-HELMLIVE-main-integration-2026-07-21",
+  "base_ref": "8965ffa93a593c760ead6a76c94c4bc489e5cf93",
+  "branch": "codex/helm-main-integration-20260721",
+  "worktree": ".",
+  "intent": "Integrate the stranded rich Bun+Ink Helm onto current main, including typed authority, foreground-safe bridge scheduling, keyboard ownership, correlated cancellation, durable replayable session lifecycle, explicit provider continuity, compact session truth, and live compact/wide verification while retaining main's canonical model-pool substrate.",
+  "allowed_files": [
+    ".gitignore",
+    ".pre-commit-config.yaml",
+    "dharma_swarm/codex_cli.py",
+    "dharma_swarm/operator_core/adapters.py",
+    "dharma_swarm/operator_core/session_lifecycle.py",
+    "dharma_swarm/operator_core/session_payloads.py",
+    "dharma_swarm/operator_core/session_store.py",
+    "dharma_swarm/terminal_bridge.py",
+    "dharma_swarm/terminal_bridge_chat.py",
+    "dharma_swarm/terminal_bridge_session_runtime.py",
+    "dharma_swarm/terminal_bridge_session_types.py",
+    "dharma_swarm/terminal_control.py",
+    "dharma_swarm/tui/engine/adapters/claude.py",
+    "dharma_swarm/tui/engine/adapters/claude_cli.py",
+    "dharma_swarm/tui/engine/adapters/claude_process.py",
+    "dharma_swarm/tui/engine/adapters/codex.py",
+    "dharma_swarm/tui/engine/adapters/openrouter.py",
+    "dharma_swarm/tui/engine/events.py",
+    "scripts/start_terminal_tui_tmux.sh",
+    "scripts/terminal_guardian_preflight.sh",
+    "terminal/**",
+    "tests/conftest.py",
+    "tests/test_operator_core_adapters.py",
+    "tests/test_operator_core_session_views.py",
+    "tests/test_session_lifecycle.py",
+    "tests/test_terminal_bridge.py",
+    "tests/test_terminal_control.py",
+    "tests/test_model_key_routing_guard.py",
+    "tests/tui/test_claude_adapter_v11.py",
+    "tests/tui/test_canonical_events.py",
+    "tests/tui/test_codex_adapter.py",
+    "tests/tui/test_openrouter_adapter.py",
+    "reports/agentops/work_packets/helm-worldclass-terminal-WP-HELMLIVE-main-integration-2026-07-21.json"
+  ],
+  "forbidden_files": [],
+  "gates": [
+    {
+      "name": "helm-runtime-regression",
+      "command": "python3 -m pytest -q tests/test_terminal_bridge.py tests/test_session_lifecycle.py tests/test_operator_core_session_views.py tests/test_operator_core_adapters.py tests/test_terminal_control.py tests/tui/test_claude_adapter_v11.py tests/tui/test_canonical_events.py tests/tui/test_codex_adapter.py tests/tui/test_openrouter_adapter.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "helm-runtime-ruff",
+      "command": "python3 -m ruff check dharma_swarm/operator_core/adapters.py dharma_swarm/operator_core/session_lifecycle.py dharma_swarm/operator_core/session_payloads.py dharma_swarm/operator_core/session_store.py dharma_swarm/terminal_bridge.py dharma_swarm/terminal_bridge_chat.py dharma_swarm/terminal_bridge_session_runtime.py dharma_swarm/terminal_bridge_session_types.py dharma_swarm/tui/engine/adapters/claude.py dharma_swarm/tui/engine/adapters/claude_cli.py dharma_swarm/tui/engine/adapters/claude_process.py dharma_swarm/tui/engine/adapters/codex.py dharma_swarm/tui/engine/adapters/openrouter.py dharma_swarm/tui/engine/events.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "helm-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 60
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "session-finalization-state-regression-detected",
+      "command": "python3 -c \"import pathlib, subprocess, sys; p=pathlib.Path('dharma_swarm/operator_core/session_lifecycle.py'); t=p.read_text(); old='        self._finalized = True\\n'; new='        self._finalized = False\\n'; (t.count(old) == 1) or sys.exit(3); p.write_text(t.replace(old,new,1)); sys.exit(subprocess.run([sys.executable,'-m','pytest','tests/test_session_lifecycle.py::test_completed_turn_accumulates_usage_and_finalizes_once','-q']).returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "feat(helm): integrate live worldclass terminal on main"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-HELMLIVE",
+    "active_track": "helm-worldclass-terminal-2026-06",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "8965ffa93a593c760ead6a76c94c4bc489e5cf93",
+      "details": []
+    },
+    "interface_mismatches": [
+      "INTERFACE_MISMATCH_MAP.md has no open entry for the Bun terminal, stdio bridge, provider adapter, or durable-session seam at base 8965ffa93."
+    ],
+    "closest_existing_implementation": [
+      "terminal/src/app.tsx",
+      "dharma_swarm/terminal_bridge.py",
+      "dharma_swarm/operator_core/session_store.py",
+      "dharma_swarm/model_status.py",
+      "scripts/terminal_guardian_preflight.sh"
+    ],
+    "honest_blockers": [
+      "The rich Helm branch is 90 commits ahead and 824 commits behind current main; this packet ports only the exact terminal/runtime slices instead of merging unrelated branch history.",
+      "The active Helm track owns terminal/**; its necessary bridge, adapter, and session-runtime seams are currently unowned by sibling tracks and are exact-listed here rather than claimed broadly.",
+      "Main's July golden receipt explicitly left live backend/provider behavior untested; this packet requires fresh live compact, wide, cancel, resume, and restart evidence before closeout."
+    ],
+    "rollback": "Revert the packet-scoped integration commit; no database migration is introduced and durable session records remain backward-readable.",
+    "packet_digest": "7c6de5f5da5f6762f9c4f25c59904a016f57e5cbd744bcacd5e34cbfdaecfb30"
+  }
+}

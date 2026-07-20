@@ -1,0 +1,40 @@
+ ◆ DHARMA COMMAND POST  ·  Commands  ·  panes 15  ·  F2 zen · ^K panes
+ loop unknown   verify unknown   runtime idle   approvals clear   sessions 0
+◂ Mission Repo [Commands] Models Ontology Runtime ▸
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Commands                                                                                                             │
+│ Registered command graph and operational affordances.                                                                │
+│                                                                                                                      │
+│ Command graph loading...                                                                                             │
+│ Plain language should resolve into Dharma-native commands when confidence is high.                                   │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ >  Navigation active · Esc returns to composer                                                                       │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ navigate · Esc compose  ·  route claude:claude-opus-4.8  ·  ○ offline  ·  responsive  ·  awaiting_bridge_policy

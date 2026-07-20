@@ -1,5 +1,15 @@
+import {COMMAND_TAB_REGISTRY} from "./commandRegistry";
 import {freshnessToken, parseControlPulsePreview, parseRuntimeFreshness} from "./freshness";
-import {nonSelectableRouteTargets, routePolicyFromValue, selectableRouteTargets} from "./routePolicy";
+export {
+  agentRoutesPayloadFromEvent,
+  agentRoutesToLines,
+  agentRoutesToPreview,
+  modelPolicyToLines,
+  modelPolicyToPreview,
+  handshakeRouteConfigFromEvent,
+  providerRouteReceiptFromEvent,
+  routingDecisionPayloadFromEvent,
+} from "./protocol/routing";
 import type {
   ActivityEntry,
   ApprovalEntryStatus,
@@ -9,12 +19,9 @@ import type {
   CanonicalPermissionOutcome,
   CanonicalPermissionResolution,
   CanonicalEventEnvelope,
-  CanonicalRoutingDecision,
   CanonicalRuntimeSnapshot,
   CanonicalSession,
-  AgentRoutesPayload,
   OutlineItem,
-  RoutingDecisionPayload,
   RuntimeSnapshotPayload,
   SessionCatalogEntry,
   SessionCatalogPayload,
@@ -185,22 +192,6 @@ function asNumberRecord(value: unknown): Record<string, number> {
   return Object.fromEntries(
     Object.entries(value).map(([key, entry]) => [key, typeof entry === "number" ? entry : Number(entry ?? 0)]),
   );
-}
-
-function displayModelRouteLabel(value: string, provider?: string, model?: string): string {
-  const normalized = value.trim();
-  const providerId = (provider ?? "").trim().toLowerCase();
-  const modelId = (model ?? "").trim().toLowerCase();
-  if ((providerId === "claude" && modelId.includes("opus")) || normalized.toLowerCase().includes("opus")) {
-    return "Claude Opus 4.6 | high reasoning lane";
-  }
-  if ((providerId === "claude" && modelId.includes("sonnet")) || normalized.toLowerCase().includes("sonnet")) {
-    return "Claude Sonnet 4.6 | balanced lane";
-  }
-  if ((providerId === "codex" && modelId === "gpt-5.4") || normalized.toLowerCase().includes("codex 5.4")) {
-    return "Codex 5.4 | fast operator lane";
-  }
-  return normalized;
 }
 
 function parseGitLine(content: string): {
@@ -2420,66 +2411,14 @@ export function resolveEventActionType(event: Record<string, unknown>): string {
   return "";
 }
 
+// F-158: routing is table-driven through the explicit registry in commandRegistry.ts
+// so the registry-coverage test and this router can never drift apart.
 export function commandTargetTab(command: string): string {
   const normalized = normalizeCommandName(command);
-
-  if (["chat", "clear", "reset", "cancel", "paste", "copy", "copylast", "thread"].includes(normalized)) {
-    return "chat";
-  }
-
-  if (normalized === "runtime") {
-    return "runtime";
-  }
-
-  if (normalized === "git") {
-    return "repo";
-  }
-
-  if (normalized === "model" || normalized === "models") {
-    return "models";
-  }
-
-  if (["swarm", "agni", "gates", "witness", "openclaw", "hum"].includes(normalized)) {
-    return "agents";
-  }
-
-  if (["evolve", "loops", "cascade"].includes(normalized)) {
-    return "evolution";
-  }
-
-  if (
-    ["context", "foundations", "telos", "dharma", "corpus", "evidence", "moltbook"].includes(
-      normalized,
-    )
-  ) {
-    return "ontology";
-  }
-
-  if (normalized === "trishula") {
-    return "agents";
-  }
-
-  if (["sessions", "session", "notes", "memory", "archive", "darwin", "logs", "truth", "stigmergy"].includes(normalized)) {
-    return "sessions";
-  }
-
-  if (["approval", "approvals", "permission", "permissions"].includes(normalized)) {
-    return "approvals";
-  }
-
-  if (normalized === "help") {
-    return "chat";
-  }
-
-  if (["status", "dashboard"].includes(normalized)) {
-    return "control";
-  }
-
   if (!normalized) {
     return "chat";
   }
-
-  return "control";
+  return COMMAND_TAB_REGISTRY[normalized] ?? "control";
 }
 
 const VALID_TARGET_PANES = new Set([
@@ -2666,57 +2605,6 @@ function compactableRatioLabel(value: number | null): string {
   return formatPercent(value);
 }
 
-function normalizeCanonicalRoutingDecision(value: unknown): CanonicalRoutingDecision | undefined {
-  const decision = asRecord(value);
-  const routeId = stringField(decision, "route_id");
-  if (!routeId) {
-    return undefined;
-  }
-  return {
-    route_id: routeId,
-    provider_id: stringField(decision, "provider_id"),
-    model_id: stringField(decision, "model_id"),
-    strategy: stringField(decision, "strategy", "responsive"),
-    reason: stringField(decision, "reason"),
-    fallback_chain: asStringArray(decision.fallback_chain),
-    degraded: boolField(decision, "degraded"),
-    metadata: asRecord(decision.metadata),
-  };
-}
-
-export function routingDecisionPayloadFromEvent(event: Record<string, unknown>): RoutingDecisionPayload | undefined {
-  const payload = asRecord(event.payload);
-  if (stringField(payload, "domain") !== "routing_decision" || stringField(payload, "version") !== "v1") {
-    return undefined;
-  }
-  const decision = normalizeCanonicalRoutingDecision(payload.decision);
-  if (!decision) {
-    return undefined;
-  }
-  return {
-    version: "v1",
-    domain: "routing_decision",
-    decision,
-    strategies: asStringArray(payload.strategies),
-    targets: asRecordList(payload.targets),
-    fallback_targets: asRecordList(payload.fallback_targets),
-  };
-}
-
-export function agentRoutesPayloadFromEvent(event: Record<string, unknown>): AgentRoutesPayload | undefined {
-  const payload = asRecord(event.payload);
-  if (stringField(payload, "domain") !== "agent_routes" || stringField(payload, "version") !== "v1") {
-    return undefined;
-  }
-  return {
-    version: "v1",
-    domain: "agent_routes",
-    routes: asRecordList(payload.routes),
-    openclaw: asRecord(payload.openclaw),
-    subagent_capabilities: asStringArray(payload.subagent_capabilities),
-  };
-}
-
 function normalizeCanonicalSession(value: unknown): CanonicalSession | undefined {
   const session = asRecord(value);
   const sessionId = stringField(session, "session_id");
@@ -2807,6 +2695,17 @@ function sessionDetailPayloadRecord(payload: Record<string, unknown>): Record<st
   return asRecord(payload.payload);
 }
 
+function typedSessionPayloadFromEvent(
+  event: Record<string, unknown>,
+  expectedDomain: "session_catalog" | "session_detail",
+): Record<string, unknown> | undefined {
+  const payload = asRecord(event.payload);
+  if (payload.version !== "v1" || payload.domain !== expectedDomain) {
+    return undefined;
+  }
+  return payload;
+}
+
 export function sessionCatalogToLines(payload: Record<string, unknown>): TranscriptLine[] {
   const catalog = sessionCatalogPayloadRecord(payload);
   const sessions = asRecordList(catalog.sessions);
@@ -2850,13 +2749,16 @@ export function sessionCatalogToPreview(payload: Record<string, unknown>): TabPr
 }
 
 export function sessionCatalogFromEvent(event: Record<string, unknown>): SessionCatalogPayload | undefined {
-  const catalog = sessionCatalogPayloadRecord(event);
-  if (!Array.isArray(catalog.sessions)) {
+  const catalog = typedSessionPayloadFromEvent(event, "session_catalog");
+  if (!catalog || !Array.isArray(catalog.sessions)) {
     return undefined;
   }
   const sessions = catalog.sessions.map(normalizeSessionCatalogEntry).filter((entry): entry is SessionCatalogEntry => Boolean(entry));
   return {
     count: numberField(catalog, "count") ?? sessions.length,
+    returned_count: numberField(catalog, "returned_count") ?? sessions.length,
+    limit: numberField(catalog, "limit") ?? sessions.length,
+    has_more: boolField(catalog, "has_more"),
     sessions,
   };
 }
@@ -3242,7 +3144,10 @@ export function approvalPaneToPreview(approvalPane: ApprovalQueueState): TabPrev
 }
 
 export function sessionDetailFromEvent(event: Record<string, unknown>): SessionDetailPayload | undefined {
-  const detail = sessionDetailPayloadRecord(event);
+  const detail = typedSessionPayloadFromEvent(event, "session_detail");
+  if (!detail) {
+    return undefined;
+  }
   const session = normalizeCanonicalSession(detail.session);
   if (!session) {
     return undefined;
@@ -3257,6 +3162,21 @@ export function sessionDetailFromEvent(event: Record<string, unknown>): SessionD
       .filter((entry): entry is CanonicalEventEnvelope => Boolean(entry)),
     approval_history: permissionHistoryFromEvent({payload: detail.approval_history}),
   };
+}
+
+export function sessionDetailResultFromEvent(
+  event: Record<string, unknown>,
+): {requestId: string; sessionId: string; detail: SessionDetailPayload} | undefined {
+  if (stringField(event, "type") !== "session.detail.result") {
+    return undefined;
+  }
+  const requestId = stringField(event, "request_id");
+  const sessionId = stringField(event, "session_id");
+  const detail = sessionDetailFromEvent(event);
+  if (!requestId || !sessionId || !detail || detail.session.session_id !== sessionId) {
+    return undefined;
+  }
+  return {requestId, sessionId, detail};
 }
 
 function sessionStatePayload(sessionPane: SessionPaneState): Record<string, unknown> {
@@ -3284,6 +3204,9 @@ function summarizeEventEnvelope(event: CanonicalEventEnvelope): string {
     return `${stringField(payload, "tool_name", "tool")}: ${stringField(payload, "content")}`.trim();
   }
   if (event.event_type === "session_end") {
+    if (isCancelledSessionEnd({type: event.event_type, ...payload})) {
+      return "cancelled";
+    }
     return boolField(payload, "success") ? "completed" : stringField(payload, "error_message", "failed");
   }
   if (event.event_type === "session_start") {
@@ -3373,8 +3296,8 @@ export function sessionPaneToPreview(sessionPane: SessionPaneState): TabPreview 
 export function sessionBootstrapToLines(payload: Record<string, unknown>): TranscriptLine[] {
   const prompt = String(payload.prompt ?? "");
   const activeTab = String(payload.active_tab ?? "chat");
-  const selectedProvider = String(payload.selected_provider ?? "codex");
-  const selectedModel = String(payload.selected_model ?? "gpt-5.4");
+  const selectedProvider = String(payload.selected_provider ?? "claude");
+  const selectedModel = String(payload.selected_model ?? "claude-opus-4.8");
   const routingStrategy = String(payload.routing_strategy ?? "responsive");
   const intent =
     typeof payload.intent === "object" && payload.intent !== null ? (payload.intent as Record<string, unknown>) : {};
@@ -3431,7 +3354,7 @@ export function sessionBootstrapToPreview(payload: Record<string, unknown>): Tab
       : {};
   return {
     Intent: summarizeIntent(intent),
-    Route: `${String(payload.selected_provider ?? "codex")}:${String(payload.selected_model ?? "gpt-5.4")}`,
+    Route: `${String(payload.selected_provider ?? "claude")}:${String(payload.selected_model ?? "claude-opus-4.8")}`,
     Strategy: String(payload.routing_strategy ?? "responsive"),
     "Repo root": previewValue(workspacePreview, "Repo root"),
     Branch: previewValue(workspacePreview, "Branch"),
@@ -3623,182 +3546,6 @@ export function operatorSnapshotToPreview(payload: Record<string, unknown>): Tab
   };
 }
 
-export function modelPolicyToLines(payload: Record<string, unknown>): TranscriptLine[] {
-  const routePolicy = routePolicyFromValue(payload);
-  const routingPayload = routingDecisionPayloadFromEvent(payload);
-  if (routingPayload) {
-    const decision = routingPayload.decision;
-    const metadata = asRecord(decision.metadata);
-    const activeLabel = displayModelRouteLabel(
-      stringField(metadata, "active_label", decision.model_id || "unknown"),
-      decision.provider_id,
-      decision.model_id,
-    );
-    const lines = [
-      "# Model Policy",
-      `Active: ${activeLabel}`,
-      `Route: ${decision.route_id}`,
-      `Strategy: ${decision.strategy}`,
-      `Default route: ${stringField(metadata, "default_route", "unknown")}`,
-      "",
-      "## Fallback chain",
-    ];
-    if (routingPayload.fallback_targets.length === 0) {
-      lines.push("none");
-    } else {
-      for (const entry of routingPayload.fallback_targets.slice(0, 6)) {
-        lines.push(
-          `- ${stringField(entry, "label", stringField(entry, "alias", "?"))} [${stringField(entry, "provider", "?")} | ${stringField(entry, "route_state", "unknown")}]`,
-        );
-      }
-    }
-    lines.push("", "## Selectable targets");
-    const selectableTargets = selectableRouteTargets(routePolicy);
-    if (selectableTargets.length === 0) {
-      lines.push("none");
-    }
-    for (const entry of selectableTargets) {
-      lines.push(
-        `- ${entry.alias} -> ${entry.label} (${entry.provider}:${entry.model}) [${entry.routeState}]`,
-      );
-    }
-    const suppressedTargets = nonSelectableRouteTargets(routePolicy);
-    if (suppressedTargets.length > 0) {
-      lines.push("", "## Non-primary routes");
-      for (const entry of suppressedTargets) {
-        lines.push(`- ${entry.alias} -> ${entry.label} (${entry.provider}:${entry.model}) [${entry.routeState}]${entry.availabilityReason ? ` | ${entry.availabilityReason}` : ""}`);
-      }
-    }
-    return toLines("system", lines.join("\n"));
-  }
-  const policy =
-    typeof payload.policy === "object" && payload.policy !== null ? (payload.policy as Record<string, unknown>) : payload;
-  const activeLabel = displayModelRouteLabel(
-    String(policy.active_label ?? policy.selected_model ?? "unknown"),
-    String(policy.selected_provider ?? ""),
-    String(policy.selected_model ?? ""),
-  );
-  const lines = [
-    "# Model Policy",
-    `Active: ${activeLabel}`,
-    `Route: ${String(policy.selected_route ?? "unknown")}`,
-    `Strategy: ${String(policy.strategy ?? "responsive")}`,
-    `Default route: ${String(policy.default_route ?? "unknown")}`,
-    "",
-    "## Fallback chain",
-  ];
-  const chain = Array.isArray(policy.fallback_chain) ? policy.fallback_chain : [];
-  if (chain.length === 0) {
-    lines.push("none");
-  } else {
-    for (const entry of chain.slice(0, 6)) {
-      const record = typeof entry === "object" && entry !== null ? (entry as Record<string, unknown>) : {};
-      lines.push(
-        `- ${String(record.label ?? record.alias ?? "?")} [${String(record.provider ?? "?")} | ${String(record.route_state ?? "unknown")}]`,
-      );
-    }
-  }
-  lines.push("", "## Selectable targets");
-  const selectableTargets = selectableRouteTargets(routePolicy);
-  if (selectableTargets.length === 0) {
-    lines.push("none");
-  }
-  for (const entry of selectableTargets) {
-    lines.push(`- ${entry.alias} -> ${entry.label} (${entry.provider}:${entry.model}) [${entry.routeState}]`);
-  }
-  const suppressedTargets = nonSelectableRouteTargets(routePolicy);
-  if (suppressedTargets.length > 0) {
-    lines.push("", "## Non-primary routes");
-    for (const entry of suppressedTargets) {
-      lines.push(`- ${entry.alias} -> ${entry.label} (${entry.provider}:${entry.model}) [${entry.routeState}]${entry.availabilityReason ? ` | ${entry.availabilityReason}` : ""}`);
-    }
-  }
-  return toLines("system", lines.join("\n"));
-}
-
-export function modelPolicyToPreview(payload: Record<string, unknown>): TabPreview {
-  const routePolicy = routePolicyFromValue(payload);
-  const routingPayload = routingDecisionPayloadFromEvent(payload);
-  if (routingPayload) {
-    const decision = routingPayload.decision;
-    const metadata = asRecord(decision.metadata);
-    return {
-      Active: displayModelRouteLabel(
-        stringField(metadata, "active_label", decision.model_id || "unknown"),
-        decision.provider_id,
-        decision.model_id,
-      ),
-      Route: decision.route_id,
-      "Route state": routePolicy.routeState,
-      Strategy: decision.strategy,
-      "Default route": stringField(metadata, "default_route", "unknown"),
-      Fallbacks: String(routingPayload.fallback_targets.length),
-      Targets: String(selectableRouteTargets(routePolicy).length),
-      "Non-primary routes": String(nonSelectableRouteTargets(routePolicy).length),
-    };
-  }
-  const policy =
-    typeof payload.policy === "object" && payload.policy !== null ? (payload.policy as Record<string, unknown>) : payload;
-  const chain = Array.isArray(policy.fallback_chain) ? policy.fallback_chain : [];
-  const activeLabel = displayModelRouteLabel(
-    String(policy.active_label ?? policy.selected_model ?? "unknown"),
-    String(policy.selected_provider ?? ""),
-    String(policy.selected_model ?? ""),
-  );
-  return {
-    Active: activeLabel,
-    Route: String(policy.selected_route ?? "unknown"),
-    "Route state": routePolicy.routeState,
-    Strategy: String(policy.strategy ?? "responsive"),
-    "Default route": String(policy.default_route ?? "unknown"),
-    Fallbacks: String(chain.length),
-    Targets: String(selectableRouteTargets(routePolicy).length),
-    "Non-primary routes": String(nonSelectableRouteTargets(routePolicy).length),
-  };
-}
-
-export function agentRoutesToLines(payload: Record<string, unknown>): TranscriptLine[] {
-  const typedPayload = agentRoutesPayloadFromEvent(payload);
-  const routes = typedPayload ?? (
-    typeof payload.routes === "object" && payload.routes !== null ? (payload.routes as Record<string, unknown>) : payload
-  );
-  const routeItems = Array.isArray(routes.routes) ? routes.routes : [];
-  const openclaw =
-    typeof routes.openclaw === "object" && routes.openclaw !== null ? (routes.openclaw as Record<string, unknown>) : {};
-  const lines = ["# Agent Routes", "", "## Route profiles"];
-  for (const entry of routeItems) {
-    const record = typeof entry === "object" && entry !== null ? (entry as Record<string, unknown>) : {};
-    lines.push(
-      `- ${String(record.intent ?? "?")} -> ${String(record.provider ?? "?")}:${String(record.model_alias ?? "?")} | effort ${String(record.reasoning ?? "?")} | role ${String(record.role ?? "?")}`,
-    );
-  }
-  lines.push(
-    "",
-    "## OpenClaw",
-    `Present: ${String(openclaw.present ?? false)}`,
-    `Readable: ${String(openclaw.readable ?? false)}`,
-    `Agents: ${String(openclaw.agents_count ?? 0)}`,
-    `Providers: ${Array.isArray(openclaw.providers) ? openclaw.providers.map(String).join(", ") || "none" : "none"}`,
-  );
-  return toLines("system", lines.join("\n"));
-}
-
-export function agentRoutesToPreview(payload: Record<string, unknown>): TabPreview {
-  const typedPayload = agentRoutesPayloadFromEvent(payload);
-  const routes = typedPayload ?? (
-    typeof payload.routes === "object" && payload.routes !== null ? (payload.routes as Record<string, unknown>) : payload
-  );
-  const routeItems = Array.isArray(routes.routes) ? routes.routes : [];
-  const openclaw =
-    typeof routes.openclaw === "object" && routes.openclaw !== null ? (routes.openclaw as Record<string, unknown>) : {};
-  return {
-    Routes: String(routeItems.length),
-    "OpenClaw agents": String(openclaw.agents_count ?? 0),
-    Providers: Array.isArray(openclaw.providers) ? openclaw.providers.map(String).join(", ") || "none" : "none",
-    "Primary route": routeItems.length > 0 ? String((routeItems[0] as Record<string, unknown>).intent ?? "none") : "none",
-  };
-}
-
 export function evolutionSurfaceToLines(payload: Record<string, unknown>): TranscriptLine[] {
   const surface =
     typeof payload.surface === "object" && payload.surface !== null ? (payload.surface as Record<string, unknown>) : payload;
@@ -3832,6 +3579,34 @@ export function evolutionSurfaceToPreview(payload: Record<string, unknown>): Tab
     Domains: String(domains.length),
     "Entry commands": entries.map(String).join(", ") || "none",
     "Primary domain": domains.length > 0 ? String((domains[0] as Record<string, unknown>).name ?? "none") : "none",
+  };
+}
+
+export function isCancelledSessionEnd(event: Record<string, unknown>): boolean {
+  return (
+    String(event.type ?? "") === "session_end" &&
+    String(event.error_code ?? "").trim().toLowerCase() === "cancelled"
+  );
+}
+
+export function cancellationAckFromEvent(event: Record<string, unknown>): {
+  cancelled: boolean;
+  reason: string;
+  reasonLabel: string;
+  targetRequestId?: string;
+  sessionId?: string;
+} | undefined {
+  if (String(event.type ?? "") !== "session.cancelled") {
+    return undefined;
+  }
+  const cancelled = event.cancelled === true;
+  const reason = String(event.reason ?? (cancelled ? "cancel_requested" : "unknown")).trim() || "unknown";
+  return {
+    cancelled,
+    reason,
+    reasonLabel: reason.replaceAll("_", " "),
+    targetRequestId: String(event.target_request_id ?? "").trim() || undefined,
+    sessionId: String(event.session_id ?? "").trim() || undefined,
   };
 }
 
@@ -3886,6 +3661,20 @@ export function eventToTabPatch(event: Record<string, unknown>): {tabId: string;
           makeLine(
             "system",
             `session ${String(event.session_id ?? "")} via ${String(event.provider ?? "")}:${String(event.model ?? "")}`,
+          ),
+        ],
+      },
+    ];
+  }
+  const cancellationAck = cancellationAckFromEvent(event);
+  if (cancellationAck) {
+    return [
+      {
+        tabId: "runtime",
+        lines: [
+          makeLine(
+            cancellationAck.cancelled ? "system" : "error",
+            `cancellation ${cancellationAck.cancelled ? "accepted" : "rejected"}: ${cancellationAck.reasonLabel}`,
           ),
         ],
       },
@@ -3976,6 +3765,14 @@ export function eventToTabPatch(event: Record<string, unknown>): {tabId: string;
     ];
   }
   if (type === "session_end") {
+    if (isCancelledSessionEnd(event)) {
+      return [
+        {
+          tabId: "runtime",
+          lines: [makeLine("system", "session cancelled")],
+        },
+      ];
+    }
     const ok = Boolean(event.success);
     return [
       {

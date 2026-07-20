@@ -5,16 +5,23 @@ from __future__ import annotations
 from dataclasses import asdict
 from datetime import datetime, timezone
 import json
+import logging
 import secrets
 from pathlib import Path
 from typing import Any
 
 from dharma_swarm.continuity_harness import append_snapshot, verify_replay_integrity
 from dharma_swarm.session_event_bridge import SessionEventBridge
-from dharma_swarm.tui.engine.events import CanonicalEvent, CanonicalEventType, EVENT_TYPES
+from dharma_swarm.tui.engine.events import (
+    CanonicalEvent,
+    CanonicalEventType,
+    EVENT_TYPES,
+)
 
 HOME = Path.home()
 DEFAULT_ROOT = HOME / ".dharma" / "sessions"
+LEGACY_OWNER_GRACE_SECONDS = 300.0
+logger = logging.getLogger(__name__)
 
 
 def _now_iso() -> str:
@@ -24,6 +31,14 @@ def _now_iso() -> str:
 def _new_session_id() -> str:
     now = datetime.now(timezone.utc)
     return f"dgc-{now:%Y%m%d}-{now:%H%M%S}-{secrets.token_hex(2)}"
+
+
+def _pid_is_alive(pid: int) -> bool:
+    """Compatibility seam used by recovery tests and runtime injection."""
+
+    from .session_lifecycle import _pid_is_alive as check_pid
+
+    return check_pid(pid)
 
 
 def _normalize_cwd(cwd: str) -> str:
@@ -47,6 +62,7 @@ class SessionStore:
         self.root.mkdir(parents=True, exist_ok=True)
         self._index_path = self.root / "index.json"
         self._bridges: dict[str, SessionEventBridge] = {}
+        self._last_snapshot_failure: tuple[str, str, str] | None = None
         if not self._index_path.exists():
             self._index_path.write_text(json.dumps({"schema_version": 1, "sessions": []}))
 
@@ -61,6 +77,8 @@ class SessionStore:
         parent_session_id: str | None = None,
         forked_from: str | None = None,
         session_id: str | None = None,
+        runtime_owner_id: str | None = None,
+        runtime_owner_pid: int | None = None,
     ) -> str:
         sid = session_id or _new_session_id()
         sp = self.root / sid
@@ -86,6 +104,12 @@ class SessionStore:
             "status": "running",
             "parent_session_id": parent_session_id,
             "forked_from": forked_from,
+            "runtime_owner_id": str(runtime_owner_id or "").strip() or None,
+            "runtime_owner_pid": (
+                int(runtime_owner_pid)
+                if runtime_owner_pid is not None and int(runtime_owner_pid) > 0
+                else None
+            ),
         }
         (sp / "meta.json").write_text(json.dumps(meta, indent=2))
         (sp / "transcript.jsonl").touch(exist_ok=True)
@@ -289,6 +313,31 @@ class SessionStore:
         except Exception:
             pass
 
+    def recover_orphaned_sessions(
+        self,
+        *,
+        cwd: str,
+        active_owner_id: str,
+        active_owner_pid: int,
+        legacy_owner_grace_seconds: float = LEGACY_OWNER_GRACE_SECONDS,
+        now: datetime | None = None,
+    ) -> list[str]:
+        """Finalize durable turns abandoned by an earlier terminal bridge."""
+
+        # Imported lazily to keep the store/lifecycle dependency acyclic while
+        # preserving this long-standing public SessionStore entry point.
+        from .session_lifecycle import recover_orphaned_sessions
+
+        return recover_orphaned_sessions(
+            self,
+            cwd=cwd,
+            active_owner_id=active_owner_id,
+            active_owner_pid=active_owner_pid,
+            legacy_owner_grace_seconds=legacy_owner_grace_seconds,
+            now=now,
+            pid_is_alive=_pid_is_alive,
+        )
+
     def load_meta(self, session_id: str) -> dict[str, Any]:
         return json.loads((self.root / session_id / "meta.json").read_text())
 
@@ -302,6 +351,39 @@ class SessionStore:
             self._append_session_snapshot(session_id, reason="provider_session_bound", meta=meta)
         except Exception:
             pass
+
+    def update_session_route(self, session_id: str, *, provider_id: str, model_id: str) -> None:
+        """Rebind provisional session metadata to the route that actually ran."""
+
+        meta = self.load_meta(session_id)
+        meta["provider_id"] = provider_id
+        meta["model_id"] = model_id
+        meta["updated_at"] = _now_iso()
+        self._write_meta(session_id, meta)
+        self._upsert_index_entry(
+            session_id,
+            {
+                "provider_id": provider_id,
+                "model_id": model_id,
+                "updated_at": meta["updated_at"],
+            },
+        )
+        try:
+            self._append_session_snapshot(session_id, reason="route_rebound", meta=meta)
+        except Exception as exc:
+            # Metadata and the index are already durable at this boundary. A
+            # missing continuity snapshot must be visible without turning a
+            # successful provider fallback into an in-memory/durable split.
+            self._last_snapshot_failure = (
+                session_id,
+                "route_rebound",
+                type(exc).__name__,
+            )
+            logger.warning(
+                "session route rebound snapshot failed for %s (%s)",
+                session_id,
+                type(exc).__name__,
+            )
 
     def _touch_session(self, session_id: str) -> None:
         meta = self.load_meta(session_id)
@@ -370,7 +452,19 @@ class SessionStore:
         return latest_meta
 
     def verify_session_replay(self, session_id: str) -> tuple[bool, list[str]]:
-        return verify_replay_integrity(self.root / session_id / "snapshots.jsonl")
+        snapshot_ok, snapshot_issues = verify_replay_integrity(
+            self.root / session_id / "snapshots.jsonl"
+        )
+        transcript_issues = self._transcript_integrity_issues(session_id)
+        issues = [*snapshot_issues, *transcript_issues]
+        return snapshot_ok and not transcript_issues, issues
+
+    def _transcript_integrity_issues(self, session_id: str) -> list[str]:
+        """Validate replay semantics, not only snapshot checksums."""
+
+        from .session_payloads import transcript_integrity_issues
+
+        return transcript_integrity_issues(self, session_id)
 
     def _bridge_for(self, session_id: str) -> SessionEventBridge:
         bridge = self._bridges.get(session_id)

@@ -37,6 +37,7 @@ import {
   sessionCatalogToLines,
   sessionCatalogToPreview,
   sessionDetailFromEvent,
+  sessionDetailResultFromEvent,
   sessionDetailToLines,
   sessionDetailToPreview,
   sessionBootstrapToLines,
@@ -47,6 +48,9 @@ import {
   workspaceSnapshotToLines,
   workspaceSnapshotToPreview,
 } from "../src/protocol";
+import path from "node:path";
+
+const REPO_ROOT = path.resolve(import.meta.dir, "..", "..");
 
 describe("normalizeCommandName", () => {
   test("strips the slash prefix and trailing arguments", () => {
@@ -126,7 +130,12 @@ describe("typed session helpers", () => {
     const catalog = sessionCatalogFromEvent({
       type: "session.catalog.result",
       payload: {
-        count: 1,
+        version: "v1",
+        domain: "session_catalog",
+        count: 3,
+        returned_count: 1,
+        limit: 1,
+        has_more: true,
         sessions: [
           {
             session: {
@@ -149,7 +158,10 @@ describe("typed session helpers", () => {
       },
     });
 
-    expect(catalog?.count).toBe(1);
+    expect(catalog?.count).toBe(3);
+    expect(catalog?.returned_count).toBe(1);
+    expect(catalog?.limit).toBe(1);
+    expect(catalog?.has_more).toBe(true);
     expect(catalog?.sessions[0]?.session.session_id).toBe("sess-1");
     expect(catalog?.sessions[0]?.total_cost_usd).toBe(1.5);
   });
@@ -158,6 +170,8 @@ describe("typed session helpers", () => {
     const detail = sessionDetailFromEvent({
       type: "session.detail.result",
       payload: {
+        version: "v1",
+        domain: "session_detail",
         session: {
           session_id: "sess-1",
           provider_id: "codex",
@@ -198,6 +212,119 @@ describe("typed session helpers", () => {
     expect(detail?.recent_events[0]?.event_type).toBe("tool_result");
   });
 
+  test("rejects untyped or mismatched catalog payloads", () => {
+    const sessions = [
+      {
+        session: {
+          session_id: "sess-1",
+          provider_id: "codex",
+          model_id: "gpt-5.4",
+          cwd: "/repo",
+          created_at: "2026-04-01T00:00:00Z",
+          updated_at: "2026-04-01T01:00:00Z",
+          status: "completed",
+        },
+      },
+    ];
+
+    expect(sessionCatalogFromEvent({type: "session.catalog.result", payload: {sessions}})).toBeUndefined();
+    expect(
+      sessionCatalogFromEvent({
+        type: "session.catalog.result",
+        payload: {version: "v2", domain: "session_catalog", sessions},
+      }),
+    ).toBeUndefined();
+    expect(
+      sessionCatalogFromEvent({
+        type: "session.catalog.result",
+        payload: {version: "v1", domain: "session_detail", sessions},
+      }),
+    ).toBeUndefined();
+    expect(
+      sessionCatalogFromEvent({
+        type: "action.result",
+        action_type: "surface.refresh",
+        surface: "sessions",
+        payload: {version: "v1", domain: "session_catalog", sessions},
+      })?.sessions,
+    ).toHaveLength(1);
+    expect(
+      sessionCatalogFromEvent({
+        type: "session.catalog.result",
+        payload: {version: "v1", domain: "session_catalog", sessions: "not-an-array"},
+      }),
+    ).toBeUndefined();
+  });
+
+  test("rejects untyped or mismatched detail payloads", () => {
+    const session = {
+      session_id: "sess-1",
+      provider_id: "codex",
+      model_id: "gpt-5.4",
+      cwd: "/repo",
+      created_at: "2026-04-01T00:00:00Z",
+      updated_at: "2026-04-01T01:00:00Z",
+      status: "completed",
+    };
+
+    expect(sessionDetailFromEvent({type: "session.detail.result", payload: {session}})).toBeUndefined();
+    expect(
+      sessionDetailFromEvent({
+        type: "session.detail.result",
+        payload: {version: "v2", domain: "session_detail", session},
+      }),
+    ).toBeUndefined();
+    expect(
+      sessionDetailFromEvent({
+        type: "session.detail.result",
+        payload: {version: "v1", domain: "session_catalog", session},
+      }),
+    ).toBeUndefined();
+    expect(
+      sessionDetailFromEvent({
+        type: "action.result",
+        payload: {version: "v1", domain: "session_detail", session},
+      })?.session.session_id,
+    ).toBe("sess-1");
+    expect(
+      sessionDetailFromEvent({
+        type: "session.detail.result",
+        payload: {version: "v1", domain: "session_detail", session: "not-a-session"},
+      }),
+    ).toBeUndefined();
+  });
+
+  test("requires correlated request, top-level session, and payload session identifiers", () => {
+    const payload = {
+      version: "v1",
+      domain: "session_detail",
+      session: {
+        session_id: "sess-1",
+        provider_id: "codex",
+        model_id: "gpt-5.4",
+        cwd: "/repo",
+        created_at: "2026-04-01T00:00:00Z",
+        updated_at: "2026-04-01T01:00:00Z",
+        status: "completed",
+      },
+    };
+    const event = {
+      type: "session.detail.result",
+      request_id: "detail-7",
+      session_id: "sess-1",
+      payload,
+    };
+
+    expect(sessionDetailResultFromEvent(event)).toMatchObject({
+      requestId: "detail-7",
+      sessionId: "sess-1",
+      detail: {session: {session_id: "sess-1"}},
+    });
+    expect(sessionDetailResultFromEvent({...event, request_id: ""})).toBeUndefined();
+    expect(sessionDetailResultFromEvent({...event, session_id: "sess-2"})).toBeUndefined();
+    expect(sessionDetailResultFromEvent({...event, type: "action.result"})).toBeUndefined();
+  });
+
   test("renders the sessions pane from typed state", () => {
     const sessionPane = {
       catalog: {
@@ -223,6 +350,7 @@ describe("typed session helpers", () => {
         ],
       },
       selectedSessionId: "sess-1",
+      selectionProvenance: "operator_pinned" as const,
       detailsBySessionId: {
         "sess-1": {
           session: {
@@ -256,9 +384,20 @@ describe("typed session helpers", () => {
               created_at: "2026-04-01T00:30:00Z",
               payload: {tool_name: "Read", content: "ok"},
             },
+            {
+              event_id: "evt-2",
+              event_type: "session_end",
+              source: "provider",
+              audience: "all",
+              transport: "local",
+              session_id: "sess-1",
+              created_at: "2026-04-01T00:31:00Z",
+              payload: {success: false, cancelled: true, error_code: "cancelled", error_message: "cancelled by operator"},
+            },
           ],
         },
       },
+      pendingDetailRequestsBySessionId: {},
     } as const;
 
     const lines = sessionPaneToLines(sessionPane).map((line) => line.text);
@@ -268,6 +407,7 @@ describe("typed session helpers", () => {
     expect(lines).toContain("## Drilldown");
     expect(lines).toContain("# Session Detail");
     expect(lines).toContain("## Recent envelopes");
+    expect(lines).toContain("- session_end | 2026-04-01T00:31:00Z | cancelled");
     expect(preview?.Selected).toBe("sess-1");
     expect(preview?.Compaction).toBe("6 events | 33%");
   });
@@ -277,7 +417,7 @@ describe("typed session helpers", () => {
       eventToTabPatch({
         type: "session.catalog.result",
         content: "legacy prose",
-        payload: {count: 0, sessions: []},
+        payload: {version: "v1", domain: "session_catalog", count: 0, sessions: []},
       }),
     ).toEqual([]);
 
@@ -286,6 +426,8 @@ describe("typed session helpers", () => {
         type: "session.detail.result",
         content: "legacy prose",
         payload: {
+          version: "v1",
+          domain: "session_detail",
           session: {
             session_id: "sess-1",
             provider_id: "codex",
@@ -1101,7 +1243,7 @@ describe("session payload renderers", () => {
           status: "completed",
           branch_label: "main",
           summary: "stabilize terminal shell",
-          cwd: "/Users/dhyana/dharma_swarm",
+          cwd: REPO_ROOT,
         },
         replay_ok: false,
         replay_issues: ["missing usage event"],
@@ -1195,7 +1337,7 @@ describe("inferSlashCommand", () => {
   });
 
   test("ignores filesystem paths embedded in summaries", () => {
-    expect(inferSlashCommand("wrote snapshot to /Users/dhyana/dharma_swarm/state and then executed /git status")).toBe(
+    expect(inferSlashCommand(`wrote snapshot to ${REPO_ROOT}/state and then executed /git status`)).toBe(
       "/git",
     );
     expect(inferSlashCommand("log saved at /tmp/runtime.log")).toBe("");
@@ -1203,7 +1345,7 @@ describe("inferSlashCommand", () => {
 
   test("ignores leading filesystem paths before the first slash command", () => {
     expect(inferSlashCommand("/tmp/runtime.log captured before executed /runtime status")).toBe("/runtime");
-    expect(inferSlashCommand("/Users/dhyana/dharma_swarm/terminal/src/app.tsx")).toBe("");
+    expect(inferSlashCommand(`${REPO_ROOT}/terminal/src/app.tsx`)).toBe("");
   });
 });
 
@@ -1488,6 +1630,47 @@ describe("resolveCommandTargetPane", () => {
 });
 
 describe("eventToTabPatch", () => {
+  test("renders cancellation acknowledgement separately from the terminal cancelled state", () => {
+    const accepted = eventToTabPatch({
+      type: "session.cancelled",
+      request_id: "cancel-17",
+      target_request_id: "run-17",
+      cancelled: true,
+      reason: "cancel_requested",
+    });
+    const rejected = eventToTabPatch({
+      type: "session.cancelled",
+      request_id: "cancel-18",
+      target_request_id: "run-17",
+      cancelled: false,
+      reason: "already_cancelling",
+    });
+    const terminal = eventToTabPatch({
+      type: "session_end",
+      request_id: "run-17",
+      session_id: "session-17",
+      success: false,
+      cancelled: true,
+      error_code: "cancelled",
+      error_message: "cancelled by operator",
+    });
+    const failed = eventToTabPatch({
+      type: "session_end",
+      request_id: "run-18",
+      session_id: "session-18",
+      success: false,
+      error_code: "provider_error",
+      error_message: "provider unavailable",
+    });
+
+    expect(accepted).toHaveLength(1);
+    expect(accepted[0]).toMatchObject({tabId: "runtime"});
+    expect(accepted[0]?.lines[0]).toMatchObject({kind: "system", text: "cancellation accepted: cancel requested"});
+    expect(rejected[0]?.lines[0]).toMatchObject({kind: "error", text: "cancellation rejected: already cancelling"});
+    expect(terminal[0]?.lines[0]).toMatchObject({kind: "system", text: "session cancelled"});
+    expect(failed[0]?.lines[0]).toMatchObject({kind: "error", text: "session failed: provider unavailable"});
+  });
+
   test("keeps chat control command output out of the transcript", () => {
     const patches = eventToTabPatch({
       type: "command.result",
@@ -1669,7 +1852,7 @@ describe("eventToTabPatch", () => {
       type: "command.result",
       command: "/git",
       output: `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 0 | unstaged 518 | untracked 48`,
     });
 
@@ -1684,7 +1867,7 @@ Git: main@95210b1 | staged 0 | unstaged 518 | untracked 48`,
       payload: {
         version: "v1",
         domain: "workspace_snapshot",
-        repo_root: "/Users/dhyana/dharma_swarm",
+        repo_root: REPO_ROOT,
         git: {
           branch: "main",
           head: "804d5d1",
@@ -1718,7 +1901,7 @@ Git: main@95210b1 | staged 0 | unstaged 518 | untracked 48`,
         snapshot: {
           snapshot_id: "snap-1",
           created_at: "2026-04-04T00:00:00Z",
-          repo_root: "/Users/dhyana/dharma_swarm",
+          repo_root: REPO_ROOT,
           runtime_db: "/Users/dhyana/.dharma/state/runtime.db",
           health: "ok",
           bridge_status: "connected",
@@ -1751,7 +1934,7 @@ Git: main@95210b1 | staged 0 | unstaged 518 | untracked 48`,
     const patches = eventToTabPatch({
       type: "workspace.snapshot.result",
       content: `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 0 | unstaged 517 | untracked 46`,
     });
 
@@ -2125,7 +2308,7 @@ describe("sessionBootstrap helpers", () => {
         reason: "plain-language operator command",
       },
       workspace_preview: {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         "Repo risk": "sab_canonical_repo_missing",
         Dirty: "0 staged, 1 unstaged, 0 untracked",
@@ -2161,7 +2344,7 @@ describe("sessionBootstrap helpers", () => {
         reason: "explicit model-routing request",
       },
       workspace_preview: {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         "Repo risk": "stable",
         Dirty: "clean",
@@ -2178,7 +2361,7 @@ describe("sessionBootstrap helpers", () => {
     expect(preview.Intent).toContain("model switch");
     expect(preview.Route).toBe("claude:claude-sonnet-4-5");
     expect(preview.Strategy).toBe("genius");
-    expect(preview["Repo root"]).toBe("/Users/dhyana/dharma_swarm");
+    expect(preview["Repo root"]).toBe(REPO_ROOT);
     expect(preview["Runtime activity"]).toBe("Sessions=4");
     expect(preview["Repo guidance"]).toBe("loaded");
     expect(preview["Session hint"]).toBe("Active thread: terminal-v3");
@@ -2411,7 +2594,7 @@ describe("evolutionSurface helpers", () => {
 describe("workspaceSnapshotToLines", () => {
   test("renders a bounded repo summary with dirty counts, topology warnings, and hotspots", () => {
     const content = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 0 | unstaged 510 | untracked 42
 Git hotspots: terminal (274); .dharma_psmv_hyperfile_branch (142); dharma_swarm (91)
 Git changed paths: terminal/src/protocol.ts; terminal/src/components/Sidebar.tsx; terminal/tests/protocol.test.ts
@@ -2431,7 +2614,7 @@ Git sync: origin/main | ahead 0 | behind 0
     expect(lines).toEqual([
       "# Repo Snapshot",
       "## Git status",
-      "Repo root: /Users/dhyana/dharma_swarm",
+      `Repo root: ${REPO_ROOT}`,
       "Branch: main",
       "Head: 95210b1",
       "Sync: origin/main | ahead 0 | behind 0",
@@ -2490,7 +2673,7 @@ Git sync: origin/main | ahead 0 | behind 0
 describe("workspacePreviewToLines", () => {
   test("renders the same bounded repo transcript from preview fields alone", () => {
     const preview = {
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "95210b1",
       Sync: "origin/main | ahead 0 | behind 0",
@@ -2541,7 +2724,7 @@ describe("workspacePreviewToLines", () => {
     expect(workspacePreviewToLines(preview).map((line) => line.text)).toEqual([
       "# Repo Snapshot",
       "## Git status",
-      "Repo root: /Users/dhyana/dharma_swarm",
+      `Repo root: ${REPO_ROOT}`,
       "Branch: main",
       "Head: 95210b1",
       "Sync: origin/main | ahead 0 | behind 0",
@@ -2602,7 +2785,7 @@ describe("workspaceSnapshotToPreview", () => {
       payload: {
         version: "v1",
         domain: "workspace_snapshot",
-        repo_root: "/Users/dhyana/dharma_swarm",
+        repo_root: REPO_ROOT,
         git: {
           branch: "main",
           head: "95210b1",
@@ -2635,7 +2818,7 @@ describe("workspaceSnapshotToPreview", () => {
               name: "dharma_swarm",
               role: "canonical_core",
               canonical: true,
-              path: "/Users/dhyana/dharma_swarm",
+              path: REPO_ROOT,
               exists: true,
               is_git: true,
               branch: "main...origin/main",
@@ -2686,7 +2869,7 @@ describe("workspaceSnapshotToPreview", () => {
     expect(payload?.domain).toBe("workspace_snapshot");
     const preview = workspacePayloadToPreview(payload!);
 
-    expect(preview["Repo root"]).toBe("/Users/dhyana/dharma_swarm");
+    expect(preview["Repo root"]).toBe(REPO_ROOT);
     expect(preview.Branch).toBe("main");
     expect(preview["Primary changed path"]).toBe("terminal/src/protocol.ts");
     expect(preview["Topology risk"]).toBe("sab_canonical_repo_missing");
@@ -2703,7 +2886,7 @@ describe("workspaceSnapshotToPreview", () => {
       payload: {
         version: "v1",
         domain: "workspace_snapshot",
-        repo_root: "/Users/dhyana/dharma_swarm",
+        repo_root: REPO_ROOT,
         git: {
           branch: "main",
           head: "804d5d19675ddcd904153fa9642de47ce345d95d",
@@ -2736,7 +2919,7 @@ describe("workspaceSnapshotToPreview", () => {
 
   test("preserves all topology warning members in compact repo truth previews from markdown workspace snapshots", () => {
     const content = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 0 | unstaged 510 | untracked 42
 Git hotspots: terminal (274)
 Git changed paths: terminal/src/protocol.ts
@@ -2760,7 +2943,7 @@ Git sync: origin/main | ahead 0 | behind 0
       payload: {
         version: "v1",
         domain: "workspace_snapshot",
-        repo_root: "/Users/dhyana/dharma_swarm",
+        repo_root: REPO_ROOT,
         git: {
           branch: "main",
           head: "95210b1",
@@ -2785,7 +2968,7 @@ Git sync: origin/main | ahead 0 | behind 0
               name: "dharma_swarm",
               role: "canonical_core",
               canonical: true,
-              path: "/Users/dhyana/dharma_swarm",
+              path: REPO_ROOT,
               exists: true,
               is_git: true,
               branch: "main...origin/main",
@@ -2811,7 +2994,7 @@ Git sync: origin/main | ahead 0 | behind 0
 
   test("extracts explicit repo preview fields for the context sidebar", () => {
     const content = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 0 | unstaged 510 | untracked 42
 Git hotspots: terminal (274); .dharma_psmv_hyperfile_branch (142); dharma_swarm (91)
 Git changed paths: terminal/src/protocol.ts; terminal/src/components/Sidebar.tsx; terminal/tests/protocol.test.ts
@@ -2843,7 +3026,7 @@ Workflows: 1
 
     const preview = workspaceSnapshotToPreview(content);
 
-    expect(preview["Repo root"]).toBe("/Users/dhyana/dharma_swarm");
+    expect(preview["Repo root"]).toBe(REPO_ROOT);
     expect(preview.Branch).toBe("main");
     expect(preview.Head).toBe("95210b1");
     expect(preview.Sync).toBe("origin/main | ahead 0 | behind 0");
@@ -2911,7 +3094,7 @@ Workflows: 1
 
   test("shortens full commit hashes parsed from workspace snapshot text", () => {
     const content = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@804d5d19675ddcd904153fa9642de47ce345d95d | staged 0 | unstaged 1 | untracked 0
 Git hotspots: terminal (1)
 Git changed paths: terminal/src/protocol.ts
@@ -2925,7 +3108,7 @@ Git sync: origin/main | ahead 0 | behind 0`;
 
   test("keeps sync fields readable when upstream facts are unavailable", () => {
     const content = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: (detached)@95210b1 | staged 1 | unstaged 2 | untracked 3
 Git hotspots: terminal (3)
 Git changed paths: terminal/src/protocol.ts
@@ -2969,7 +3152,7 @@ Git sync: detached HEAD
 
   test("parses bracket-style git sync summaries from workspace snapshot text", () => {
     const content = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@804d5d19675ddcd904153fa9642de47ce345d95d | staged 112 | unstaged 545 | untracked 112
 Git hotspots: terminal (281); dharma_swarm (93)
 Git changed paths: terminal/src/components/RepoPane.tsx; terminal/src/components/Sidebar.tsx
@@ -2993,7 +3176,7 @@ Git sync: main...origin/main [ahead 2]
 
   test("parses diverged bracket-style git sync summaries from workspace snapshot text", () => {
     const content = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@804d5d1 | staged 4 | unstaged 5 | untracked 1
 Git hotspots: terminal (6)
 Git changed paths: terminal/src/protocol.ts
@@ -3012,7 +3195,7 @@ Git sync: feature/repo-pane...origin/main [ahead 2, behind 1]`;
 
   test("prefers the warning-bearing peer as the primary topology peer in text workspace snapshots", () => {
     const content = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 1 | unstaged 2 | untracked 3
 Git hotspots: terminal (4)
 Git changed paths: terminal/src/protocol.ts

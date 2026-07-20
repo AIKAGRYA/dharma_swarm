@@ -12,6 +12,8 @@ build/
 .env
 
 # Local runtime state (machine-specific)
+terminal/.dharma-terminal-state.json
+terminal/.dharma-terminal-preview-cache.json
 .claude-flow/
 .claude/*
 # Keep the Claude Code on the web SessionStart hook + its registration tracked.
