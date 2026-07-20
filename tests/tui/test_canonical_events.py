@@ -7,6 +7,7 @@ from dharma_swarm.tui.engine.events import (
     CanonicalEvent,
     ErrorEvent,
     PermissionDecisionEvent,
+    PermissionOutcomeEvent,
     PermissionResolutionEvent,
     RateLimitEvent,
     SCHEMA_VERSION,
@@ -25,6 +26,7 @@ from dharma_swarm.tui.engine.events import (
     ToolProgress,
     ToolResult,
     UsageReport,
+    UserPrompt,
 )
 
 
@@ -41,6 +43,7 @@ def test_event_timestamp_autopopulated() -> None:
 def test_all_event_types_instantiable() -> None:
     events = [
         SessionStart(),
+        UserPrompt(),
         SessionEnd(),
         TextDelta(),
         TextComplete(),
@@ -59,6 +62,7 @@ def test_all_event_types_instantiable() -> None:
         RateLimitEvent(),
         PermissionDecisionEvent(),
         PermissionResolutionEvent(),
+        PermissionOutcomeEvent(),
     ]
     assert all(ev.schema_version == 1 for ev in events)
     assert all(isinstance(ev.type, str) and ev.type for ev in events)
@@ -67,6 +71,7 @@ def test_all_event_types_instantiable() -> None:
 def test_event_registry_complete() -> None:
     expected = {
         "session_start",
+        "user_prompt",
         "session_end",
         "text_delta",
         "text_complete",
