@@ -271,8 +271,11 @@ class ClaudeAdapter(ProviderAdapter):
         if model:
             cmd.extend(["--model", model])
 
+        # Agent turns are untrusted until an operator/runtime authority grants
+        # more.  A missing option must therefore preserve Claude's permission
+        # checks; bypass remains available only as an explicit caller choice.
         permission_mode = str(
-            request.provider_options.get("permission_mode", "bypassPermissions")
+            request.provider_options.get("permission_mode", "default")
         )
         if permission_mode:
             cmd.extend(["--permission-mode", permission_mode])

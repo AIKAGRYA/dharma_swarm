@@ -16,6 +16,7 @@ from dharma_swarm.tui.engine.events import (
     TextDelta,
     ToolCallComplete,
     ToolResult,
+    UserPrompt,
     UsageReport,
 )
 
@@ -30,6 +31,14 @@ class OperatorCoreSessionViewTests(unittest.TestCase):
                 model_id="gpt-5.4",
                 cwd="/repo",
                 title="overnight build",
+            )
+            store.append_event(
+                session_id,
+                UserPrompt(
+                    session_id=session_id,
+                    provider_id="codex",
+                    content="read README.md",
+                ),
             )
             store.append_event(session_id, SessionStart(session_id=session_id, provider_id="codex", model="gpt-5.4"))
             store.append_event(session_id, TextDelta(session_id=session_id, provider_id="codex", content="thinking..."))
@@ -108,6 +117,9 @@ class OperatorCoreSessionViewTests(unittest.TestCase):
             self.assertEqual(catalog["version"], "v1")
             self.assertEqual(catalog["domain"], "session_catalog")
             self.assertEqual(catalog["count"], 1)
+            self.assertEqual(catalog["returned_count"], 1)
+            self.assertEqual(catalog["limit"], 20)
+            self.assertFalse(catalog["has_more"])
             self.assertTrue(catalog["sessions"][0]["replay_ok"])
             self.assertEqual(catalog["sessions"][0]["session"]["session_id"], "sess-1")
             self.assertEqual(catalog["sessions"][0]["total_turns"], 1)
@@ -119,11 +131,31 @@ class OperatorCoreSessionViewTests(unittest.TestCase):
             self.assertEqual(detail["version"], "v1")
             self.assertEqual(detail["domain"], "session_detail")
             self.assertEqual(detail["session"]["session_id"], "sess-1")
-            self.assertEqual(detail["compaction_preview"]["protected_event_types"][0], "session_start")
+            self.assertEqual(detail["compaction_preview"]["protected_event_types"][0], "user_prompt")
             self.assertEqual(detail["recent_events"][-1]["event_type"], "permission_resolution")
             self.assertIn("session_end", detail["compaction_preview"]["recent_event_types"])
             self.assertEqual(detail["approval_history"]["count"], 1)
             self.assertEqual(detail["approval_history"]["entries"][0]["status"], "approved")
+
+    def test_build_session_catalog_reports_total_separately_from_page_size(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = SessionStore(root=Path(temp_dir))
+            for index in range(3):
+                session_id = store.create_session(
+                    session_id=f"sess-{index}",
+                    provider_id="codex",
+                    model_id="gpt-5.4",
+                    cwd="/repo",
+                )
+                store.finalize_session(session_id, status="completed", total_turns=0)
+
+            catalog = build_session_catalog(store, cwd="/repo", limit=2)
+
+            self.assertEqual(catalog["count"], 3)
+            self.assertEqual(catalog["returned_count"], 2)
+            self.assertEqual(catalog["limit"], 2)
+            self.assertTrue(catalog["has_more"])
+            self.assertEqual(len(catalog["sessions"]), 2)
 
     def test_build_session_catalog_matches_normalized_cwd(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -159,9 +191,71 @@ class OperatorCoreSessionViewTests(unittest.TestCase):
             detail = build_session_detail(store, session_id)
 
             self.assertFalse(detail["replay_ok"])
-            self.assertEqual(detail["replay_issues"], ["snapshot log missing"])
+            self.assertEqual(
+                detail["replay_issues"],
+                ["snapshot log missing", "transcript_empty"],
+            )
             self.assertEqual(detail["compaction_preview"]["event_count"], 0)
             self.assertEqual(detail["recent_events"], [])
+
+    def test_replay_promotion_requires_correlated_terminal_and_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = SessionStore(root=Path(temp_dir))
+            session_id = store.create_session(
+                session_id="sess-1",
+                provider_id="primary",
+                model_id="provisional",
+                cwd="/repo",
+            )
+            self.assertEqual(
+                store.verify_session_replay(session_id),
+                (False, ["transcript_empty"]),
+            )
+
+            store.append_event(
+                session_id,
+                UserPrompt(
+                    session_id=session_id,
+                    provider_id="winner",
+                    content="keep going",
+                ),
+            )
+            store.append_event(
+                session_id,
+                SessionStart(
+                    session_id=session_id,
+                    provider_id="winner",
+                    model="actual-model",
+                ),
+            )
+            store.append_event(
+                session_id,
+                SessionEnd(
+                    session_id=session_id,
+                    provider_id="winner",
+                    success=True,
+                ),
+            )
+            store.update_session_route(
+                session_id,
+                provider_id="winner",
+                model_id="actual-model",
+            )
+
+            ok, issues = store.verify_session_replay(session_id)
+            self.assertFalse(ok)
+            self.assertEqual(
+                issues,
+                ["metadata_status_mismatch:running!=completed"],
+            )
+
+            store.finalize_session(session_id, status="completed", total_turns=1)
+            self.assertEqual(store.verify_session_replay(session_id), (True, []))
+            meta = store.load_meta(session_id)
+            self.assertEqual(
+                (meta["provider_id"], meta["model_id"]),
+                ("winner", "actual-model"),
+            )
 
 
 if __name__ == "__main__":

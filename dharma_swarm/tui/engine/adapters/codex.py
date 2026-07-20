@@ -264,9 +264,17 @@ class CodexAdapter(ProviderAdapter):
         output_path: Path,
     ) -> list[str]:
         model = request.model or self._config.default_model or "gpt-5.4"
-        cmd = dgc_codex_exec_prefix(cli_path=self._cli_path)
+        cmd = dgc_codex_exec_prefix(
+            cli_path=self._cli_path,
+            dangerous_bypass=False,
+        )
+        sandbox_mode = str(request.provider_options.get("sandbox", "read-only"))
+        if sandbox_mode not in {"read-only", "workspace-write", "danger-full-access"}:
+            sandbox_mode = "read-only"
         cmd.extend(
             [
+                "--sandbox",
+                sandbox_mode,
                 "-m",
                 model,
                 "--json",

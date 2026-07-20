@@ -9,7 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from dharma_swarm.tui.engine.events import CanonicalEvent as LegacyCanonicalEvent
-from dharma_swarm.tui.engine.events import ToolCallComplete
+from dharma_swarm.tui.engine.events import ToolCallComplete, UserPrompt
 
 from .contracts import (
     CanonicalEventEnvelope,
@@ -101,7 +101,7 @@ def event_envelope_from_legacy_event(
     return CanonicalEventEnvelope(
         event_id=f"evt-{uuid4()}",
         event_type=event_type,
-        source=EventSource.PROVIDER,
+        source=EventSource.OPERATOR if isinstance(event, UserPrompt) else EventSource.PROVIDER,
         audience=audience,
         transport=transport,
         session_id=session_id,

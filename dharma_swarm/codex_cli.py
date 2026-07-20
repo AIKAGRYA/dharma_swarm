@@ -7,7 +7,11 @@ import os
 DGC_CODEX_PROFILE_ENV = "DGC_CODEX_PROFILE"
 
 
-def dgc_codex_exec_prefix(*, cli_path: str = "codex") -> list[str]:
+def dgc_codex_exec_prefix(
+    *,
+    cli_path: str = "codex",
+    dangerous_bypass: bool = True,
+) -> list[str]:
     """Return the Codex exec prefix for DGC-owned launches.
 
     DGC runs Codex with the most permissive execution surface available.
@@ -18,5 +22,6 @@ def dgc_codex_exec_prefix(*, cli_path: str = "codex") -> list[str]:
     profile = os.environ.get(DGC_CODEX_PROFILE_ENV, "").strip()
     if profile:
         cmd.extend(["-p", profile])
-    cmd.append("--dangerously-bypass-approvals-and-sandbox")
+    if dangerous_bypass:
+        cmd.append("--dangerously-bypass-approvals-and-sandbox")
     return cmd
