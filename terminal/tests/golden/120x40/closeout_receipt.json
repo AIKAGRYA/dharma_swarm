@@ -1,0 +1,138 @@
+{
+  "schema": "dharma.terminal.golden-closeout-receipt/v1",
+  "observed_at_utc": "2026-07-20T11:39:06Z",
+  "subject": "Helm 120x40 golden-frame and compact-shell closeout",
+  "repository": {
+    "base_commit": "a2bcecb30643726e29d437db41c896dd526affc2",
+    "branch": "agent/helm-golden-frame-closeout-20260720",
+    "adapted_from": {
+      "branch": "origin/agent/magpie-seed",
+      "head": "17ff7284a1b1566f4189e88ebd4fe6d0665d1355",
+      "source_commit": "34c4c045938bfac3ef864faeb737e4a44ff5c3ff",
+      "source_blobs": {
+        "terminal/scripts/golden_capture.sh": "3db2348f0dd69a2095762b7e006faa183e3ab320",
+        "terminal/scripts/ratchet.sh": "0bc3e8494afbce88e64cf934f431077a26b1af63",
+        "terminal/tests/compactShell.test.tsx": "5983ef9b54327024d9b0771e23c05e91988559ad",
+        "terminal/tests/golden/120x40/chat.txt": "4717ea980c14804e52a50b6c8bd7c2a2a2ebb4ac"
+      }
+    }
+  },
+  "artifacts": {
+    "terminal/scripts/golden_capture.sh": {
+      "git_blob": "6b9052a19222e9df2fb8dc8eb34aec763f045b99"
+    },
+    "terminal/scripts/ratchet.sh": {
+      "git_blob": "22849421282f7e5b7396c20fc0426cd7d237ee97"
+    },
+    "terminal/tests/compactShell.test.tsx": {
+      "git_blob": "894f7e932ba2fcb78ceb4e1cc33ac978f519ab44"
+    },
+    "terminal/tests/golden/120x40/chat.txt": {
+      "git_blob": "5a574d285c971f69a50bbf255478cfa68fe8ab34",
+      "sha256": "4461e67810faf981d2608c12b850a91a8ce3edf9663b9c016a86e93c95c0f4f0",
+      "line_count": 40
+    }
+  },
+  "fixture_boundary": {
+    "kind": "offline_boot_frame",
+    "transport": "real_tmux_pty",
+    "geometry": {
+      "columns": 120,
+      "rows": 40
+    },
+    "bridge_python": "/nonexistent/dharma-terminal-golden-python",
+    "supervisor_state": "isolated temporary directory",
+    "settle_markers": [
+      "Operator Prompt",
+      "backend offline, retrying",
+      "route",
+      "keys"
+    ]
+  },
+  "claims": [
+    {
+      "id": "tmux_geometry",
+      "modality": "observed",
+      "authority": "local_process_exit_status",
+      "value": "120x40"
+    },
+    {
+      "id": "golden_frame_match",
+      "modality": "observed",
+      "authority": "local_diff_exit_status",
+      "value": true
+    },
+    {
+      "id": "compact_shell_boundary",
+      "modality": "observed",
+      "authority": "bun_test_assertions",
+      "value": "80x24 compact; width 90 compact; width 91 wide"
+    },
+    {
+      "id": "live_backend_connectivity",
+      "modality": "not_tested",
+      "authority": "none",
+      "value": null
+    },
+    {
+      "id": "live_provider_response",
+      "modality": "not_tested",
+      "authority": "none",
+      "value": null
+    },
+    {
+      "id": "credential_or_key_validity",
+      "modality": "not_tested",
+      "authority": "none",
+      "value": null
+    }
+  ],
+  "verification": {
+    "toolchain": {
+      "bun": "1.3.11",
+      "tmux": "3.6b",
+      "shellcheck": "0.11.0"
+    },
+    "checks": [
+      {
+        "command": "make onboard ARGS=--json",
+        "result": "pass",
+        "summary": "READY; 10 active tracks; 0 ownership conflicts"
+      },
+      {
+        "command": "scripts/terminal_guardian_preflight.sh",
+        "result": "pass",
+        "summary": "typecheck; 122 protocol/route-policy tests; 80x24 smoke"
+      },
+      {
+        "command": "terminal/scripts/ratchet.sh",
+        "result": "pass",
+        "summary": "typecheck; 210 focused tests; real tmux capture; zero golden diff"
+      },
+      {
+        "command": "DHARMA_PYTHON=/nonexistent/dharma-terminal-full-suite-python bun test",
+        "result": "pass",
+        "summary": "529 tests across 13 files; 2853 assertions"
+      },
+      {
+        "command": "bash -n terminal/scripts/golden_capture.sh terminal/scripts/ratchet.sh",
+        "result": "pass"
+      },
+      {
+        "command": "shellcheck terminal/scripts/golden_capture.sh terminal/scripts/ratchet.sh",
+        "result": "pass"
+      },
+      {
+        "command": "GOLDEN_SIZE=120-by-40 terminal/scripts/golden_capture.sh",
+        "result": "expected_rejection",
+        "exit_code": 2
+      },
+      {
+        "command": "GOLDEN_SESSION_NAME=<existing-session> terminal/scripts/golden_capture.sh",
+        "result": "expected_rejection",
+        "exit_code": 2,
+        "postcondition": "existing tmux session preserved"
+      }
+    ]
+  }
+}
