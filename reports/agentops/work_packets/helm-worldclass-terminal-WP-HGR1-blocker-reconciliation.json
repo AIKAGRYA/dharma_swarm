@@ -1,0 +1,90 @@
+{
+  "id": "helm-worldclass-terminal-WP-HGR1-blocker-reconciliation",
+  "base_ref": "8965ffa93a593c760ead6a76c94c4bc489e5cf93",
+  "branch": "agent/helm-track-reconcile-v2-20260720",
+  "worktree": ".",
+  "intent": "Reconcile the Helm golden-frame blocker only after PR #1073 landed on main: bind the merged golden-frame lane to executable ratchet and exact merge evidence, preserve its offline-fixture claim boundary, regenerate canonical active-track projections, and leave track closure to a later lifecycle PR.",
+  "allowed_files": [
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "CLAUDE.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "docs/governance/REPO_GOVERNANCE_AUDIT.md",
+    "reports/agentops/work_packets/helm-worldclass-terminal-WP-HGR1-blocker-reconciliation.json"
+  ],
+  "forbidden_files": [],
+  "gates": [
+    {
+      "name": "active-track-governance-contracts",
+      "command": "python3 -m pytest -q tests/test_active_track_governance.py tests/test_check_track_status_lifecycle.py tests/test_track_portfolio.py",
+      "expected_exit": 0,
+      "timeout_seconds": 900
+    },
+    {
+      "name": "docops-integrity",
+      "command": "make docops-integrity",
+      "expected_exit": 0,
+      "timeout_seconds": 900
+    },
+    {
+      "name": "diff-whitespace-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "renderer-invalid-flag-rejected",
+      "command": "python3 scripts/governance/render_active_track_includes.py --invalid-flag",
+      "expected_exit": 2,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "governance(helm): reconcile golden-frame blocker"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-HGR1",
+    "active_track": "helm-worldclass-terminal-2026-06",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "8965ffa93a593c760ead6a76c94c4bc489e5cf93",
+      "details": []
+    },
+    "interface_mismatches": [
+      "At base 8965ffa93a593c760ead6a76c94c4bc489e5cf93, ACTIVE_TRACK still calls the golden-frame lane unmerged even though PR #1073 and its five-file offline verification slice are now on main."
+    ],
+    "closest_existing_implementation": [
+      "terminal/scripts/ratchet.sh",
+      "terminal/tests/golden/120x40/closeout_receipt.json",
+      "docs/governance/ACTIVE_TRACK.yaml",
+      "scripts/governance/render_active_track_includes.py"
+    ],
+    "honest_blockers": [
+      "The merged receipt explicitly leaves live backend connectivity, live provider response, and credential validity not tested; this reconciliation must not promote those claims.",
+      "Lifecycle closure is intentionally excluded: the same-ID VERIFIED_SLICE move must occur only after this blocker-false reconciliation lands on main.",
+      "Human approval remains required before this governance-high packet may merge."
+    ],
+    "rollback": "Revert this governance-only commit to restore the Helm blocker and prior projections; PR #1073 implementation files remain landed and unchanged.",
+    "packet_digest": "fbae7952c09cda249b29ff18882e2c0eadec3c9eb8cf95cf0e0c912f4167d190"
+  }
+}

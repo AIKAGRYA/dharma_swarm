@@ -1265,7 +1265,7 @@ active_tracks:
     name: Helm — world-class operator terminal (Bun+Ink TUI)
     status: ACTIVE
     opened_at: "2026-06-15"
-    verified_at: "2026-07-07"
+    verified_at: "2026-07-20"
     ttl_days: 21
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
@@ -1276,6 +1276,13 @@ active_tracks:
     moves_vital_signs:
       - tool_coverage
       - context_efficiency
+    target_closure_kind: VERIFIED_SLICE
+    claim_boundary: >-
+      Passing criteria establish the bounded terminal implementation plus an
+      offline 120x40 boot-frame capture through a real tmux PTY, compact-shell
+      behavior, and zero golden drift. They do not establish live backend
+      connectivity, a live provider response, credential validity, production
+      uptime, or external operator use.
 
     description: |
       Stranded-track admission (2026-07-07 reconcile). The operator TUI
@@ -1285,17 +1292,16 @@ active_tracks:
       exist ONLY on magpie-seed (a false positive on main). This admits the
       LANDED core with an honest, re-runnable behavioral gate.
 
-      Claim boundary: the command_passes gate proves the operator TUI's GENERAL
-      shipped behavior (527 green), NOT the golden-frame / compact-viewport /
-      tmux-receipt verification LANE — that lane is genuinely unmerged
-      (branch-only) and remains open work below; it must NOT be gated by
-      file_exists.
+      PR #1073 subsequently landed the golden-frame / compact-viewport /
+      real-tmux verification lane. Its receipt is deliberately an offline
+      fixture claim: live backend connectivity, provider response, and
+      credential validity remain explicitly not tested.
 
     completion_criteria:
       # REAL behavioral gate (replaces the 7x file_exists rubber-stamp).
       # Verified GREEN 2026-07-07, bun 1.3.11:
       #   cd terminal && bun install --frozen-lockfile && bun test
-      #   -> 527 pass / 0 fail across 12 files, exit 0.
+      #   -> 529 pass / 0 fail across 13 files, exit 0 (reverified 2026-07-20).
       - id: terminal_tui_test_suite_passes
         kind: command_passes
         command: ["bash", "-c", "cd terminal && bun install --frozen-lockfile && bun test"]
@@ -1316,20 +1322,28 @@ active_tracks:
       - id: terminal_behavioral_suite_landed
         kind: commit_on_main
         commit: "1d8dae2943f48e5ef343e67ee7c4ed084e065ea0"
-      # NOTE: the 6 golden-frame/compact-viewport/tmux-receipt file_exists criteria
-      # from the prior gate (golden_capture.sh, ratchet.sh, tests/golden/120x40/chat.txt,
-      # compactShell.test.tsx, HELM_WORLDCLASS_LIVE_TMUX_RECEIPT.md, HELM_WORLDCLASS_CLOSEOUT.md)
-      # do NOT exist on origin/main -- they live only on agent/magpie-seed. That lane
-      # is genuinely unmerged and stays tracked by next_items; it must NOT be file_exists-gated.
+      # Exact landing evidence for the extracted lane; the executable ratchet is
+      # the behavioral proof, while PR/commit criteria bind it to main.
+      - id: terminal_golden_frame_pr_merged
+        kind: pr_merged
+        pr: 1073
+      - id: terminal_golden_frame_merge_on_main
+        kind: commit_on_main
+        commit: "8965ffa93a593c760ead6a76c94c4bc489e5cf93"
+      - id: terminal_golden_frame_ratchet_passes
+        kind: command_passes
+        command: ["terminal/scripts/ratchet.sh"]
+        timeout_s: 300
 
     next_items:
       - id: 1
-        what: "(blocker) Golden-frame verification lane (golden_capture.sh / ratchet.sh / 120x40 golden / compactShell.test.tsx + closeout+tmux receipts) is unmerged — lives only on agent/magpie-seed. This is the track's world-class differentiator and keeps it ACTIVE (not shippable). Split that branch into reviewable PRs; do NOT gate it by file_exists."
+        what: "DONE 2026-07-20: PR #1073 extracted and merged the golden-frame verification lane at main commit 8965ffa93a593c760ead6a76c94c4bc489e5cf93. terminal/scripts/ratchet.sh proves typecheck, 210 focused tests, a real 120x40 tmux capture, and zero golden diff; the closeout receipt explicitly leaves live backend, provider, and credential claims not tested."
         kind: code
-        blocker: true
+        blocker: false
+        evidence_criterion: terminal_golden_frame_ratchet_passes
 
     non_goals:
-      - Do not gate this track on the golden-frame/tmux-receipt file_exists criteria that live only on agent/magpie-seed.
+      - Do not promote the offline golden-frame/tmux fixture to a live backend, live provider, credential-validity, production-uptime, or external-use claim.
       - Do not touch surfaces owned by sibling tracks except through their own next-items.
 
   - id: sovereign-safety-tcb-2026-07
