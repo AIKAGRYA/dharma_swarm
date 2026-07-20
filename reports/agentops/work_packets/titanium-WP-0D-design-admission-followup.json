@@ -1,0 +1,117 @@
+{
+  "id": "titanium-WP-0D-design-admission-followup",
+  "base_ref": "96f057cea8b3255c9f435b026ff544755f6e8d2d",
+  "branch": "agent/titanium-wp0d-design-admission-followup-20260720",
+  "worktree": ".",
+  "intent": "Close the late post-merge design-authority gap reported on PR #1068 by aligning the canonical Titanium campaign summary and WP-0D Allowed files block with the exact DiffApplier and LocalSandbox source/test ownership pairs human-ratified in merge commit 96f057cea8b3255c9f435b026ff544755f6e8d2d. Preserve #1068 and its packet as immutable history, prove that committed range directly, regenerate only the DocOps count projections required by that plan edit, and grant no implementation or ownership-registry scope.",
+  "allowed_files": [
+    "docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md",
+    "docs/docops/AUTO_INVENTORY.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "reports/agentops/work_packets/titanium-WP-0D-design-admission-followup.json"
+  ],
+  "forbidden_files": [
+    "CLAUDE.md",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "reports/agentops/work_packets/titanium-WP-0D-ownership-admission-repair.json",
+    "reports/agentops/work_packets/titanium-WP-0D-fast-suite-process-reaping.json",
+    "Makefile",
+    "dharma_swarm/build_engine.py",
+    "dharma_swarm/autonomous_agent.py",
+    "dharma_swarm/diff_applier.py",
+    "dharma_swarm/sandbox.py",
+    "tests/test_build_engine.py",
+    "tests/test_autonomous_agent.py",
+    "tests/test_fast_suite_isolation.py",
+    "tests/test_diff_applier.py",
+    "tests/test_sandbox.py"
+  ],
+  "gates": [
+    {
+      "name": "active-track-governance-contracts",
+      "command": "python3 -m pytest -q tests/test_active_track_governance.py tests/test_check_track_status_lifecycle.py tests/test_track_portfolio.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "docops-integrity",
+      "command": "make docops-integrity",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "prior-merged-range-whitespace",
+      "command": "git diff --check 94accf91069466caa787dfa4546a97d49b9cfa34...96f057cea8b3255c9f435b026ff544755f6e8d2d",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "followup-working-tree-whitespace",
+      "command": "git diff --check HEAD",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "followup-committed-range-whitespace",
+      "command": "git diff --check 96f057cea8b3255c9f435b026ff544755f6e8d2d...HEAD",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "wp0d-plan-path-removal-detected",
+      "command": "python3 -c \"from pathlib import Path; import sys; text=Path('docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md').read_text(); start=text.find('### WP-0D — Fast-suite determinism'); end=text.find('### WP-0E — Hermetic/live verification split', start); block=text[start:end] if start >= 0 and end > start else ''; paths=('- `dharma_swarm/diff_applier.py`','- `tests/test_diff_applier.py`','- `dharma_swarm/sandbox.py`','- `tests/test_sandbox.py`'); provenance=('PR #1068','96f057cea8b3255c9f435b026ff544755f6e8d2d','gh pr view 1068 --repo AmitabhainArunachala/dharma_swarm'); baseline=all(block.count(item) == 1 for item in paths) and all(item in block for item in provenance); mutant=block.replace(paths[0], '', 1); sys.exit(3 if not baseline else 1 if not all(item in mutant for item in paths) else 0)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "docs(governance): align WP-0D design authority"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.12.13",
+      "git": "2.43.0",
+      "make": "4.3"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-0D",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "96f057cea8b3255c9f435b026ff544755f6e8d2d",
+      "details": []
+    },
+    "interface_mismatches": [
+      "PR #1068 added the DiffApplier and LocalSandbox source/test pairs to live ACTIVE_TRACK ownership, but the canonical WP-0D Allowed files block and campaign ownership summary remained stale."
+    ],
+    "closest_existing_implementation": [
+      "docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md:WP-00 admission ownership summary",
+      "docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md:WP-0D Allowed files",
+      "scripts/docops/check_docops_integrity.py:--write-auto-sections and --write-manifest-counts",
+      "reports/agentops/work_packets/titanium-WP-0D-ownership-admission-repair.json"
+    ],
+    "honest_blockers": [
+      "Human merge of this four-file governance follow-up is required before any WP-0D implementation is published.",
+      "The merged #1068 packet remains historical and is not rewritten; its worktree-only whitespace gate is not relied upon, so this packet directly checks 94accf91069466caa787dfa4546a97d49b9cfa34...96f057cea8b3255c9f435b026ff544755f6e8d2d.",
+      "Canonical make agent-build-closeout is nonzero on both base_ref and this candidate because make nats-substrate-contract reports that onboard does not render the canonical NATS spec path and that live evidence is stale; no draft publication authority is claimed without a green canonical tail or an explicit human-ratified bounded exception.",
+      "PR #1060 remains held on the overlapping DiffApplier pair, and PR #996 remains held until after WP-0D."
+    ],
+    "rollback": "Revert this plan amendment, its two generator-owned DocOps count projections, and this packet together; live ACTIVE_TRACK ownership remains historical, but WP-0D returns to MATERIAL_AUTHORITY_CONFLICT and its implementation must remain unpublished.",
+    "packet_digest": "51c09fac1de08fdd02f6326b6eaf3a0d7cb1e6c710945e48340550fdb719cd4e"
+  }
+}

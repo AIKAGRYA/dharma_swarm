@@ -241,6 +241,8 @@ WP-00 admission ownership summary:
 - `scripts/docops/**`
 - `dharma_swarm/build_engine.py` (TIT-002 only)
 - `dharma_swarm/autonomous_agent.py` (TIT-002 leaked-process investigation only)
+- `dharma_swarm/diff_applier.py` and `tests/test_diff_applier.py` (TIT-002 process-tree cleanup investigation only)
+- `dharma_swarm/sandbox.py` and `tests/test_sandbox.py` (TIT-002 process-tree cleanup investigation only)
 - `docs/docops/AUTO_INVENTORY.md`
 - `api/main.py` and existing API-auth tests for the narrow WP-0S fail-closed containment packet only
 - `tests/test_hermetic_supply_chain.py`
@@ -872,11 +874,38 @@ One version-aware helper determines Go capability for all Go bridges and tests.
 - `tests/test_build_engine.py`
 - `tests/test_autonomous_agent.py`
 - `tests/test_fast_suite_isolation.py` (new)
+- `tests/test_diff_applier.py`
+- `tests/test_sandbox.py`
 - `dharma_swarm/build_engine.py`
 - `dharma_swarm/autonomous_agent.py`
+- `dharma_swarm/diff_applier.py`
+- `dharma_swarm/sandbox.py`
 - `Makefile`
 
 Production files may change only after the minimized reproducer proves their causality. If another file owns the leak, stop and amend this specification before editing it.
+
+**Bounded design amendment (2026-07-20)**
+
+Human merge of [PR #1068](https://github.com/AmitabhainArunachala/dharma_swarm/pull/1068)
+as commit
+[`96f057cea8b3255c9f435b026ff544755f6e8d2d`](https://github.com/AmitabhainArunachala/dharma_swarm/commit/96f057cea8b3255c9f435b026ff544755f6e8d2d)
+ratified live ACTIVE_TRACK ownership for exactly the four source/test additions
+listed above. A review submitted after that merge identified that this
+canonical allowed-file block and the campaign ownership summary remained
+stale. This amendment aligns those two design declarations with the
+human-ratified ownership change; it grants no other file or implementation
+authority. The merged #1068 packet remains immutable historical evidence and
+is not rewritten by this follow-up.
+
+Reproduce the authority and the committed-range whitespace proof with:
+
+```bash
+git show --stat 96f057cea8b3255c9f435b026ff544755f6e8d2d
+gh pr view 1068 --repo AmitabhainArunachala/dharma_swarm \
+  --json state,mergedAt,mergedBy,mergeCommit,files
+git diff --check \
+  94accf91069466caa787dfa4546a97d49b9cfa34...96f057cea8b3255c9f435b026ff544755f6e8d2d
+```
 
 **Investigation protocol**
 
