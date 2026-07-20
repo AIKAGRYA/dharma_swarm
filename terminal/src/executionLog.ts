@@ -1,9 +1,11 @@
 import type {ActivityEntry, ActivityPhase, CanonicalExecutionEvent, PaneKind, TranscriptLine} from "./types";
 import {stripHelmDirectives} from "./uiIntents";
 import {
+  cancellationAckFromEvent,
   permissionDecisionFromEvent,
   permissionOutcomeFromEvent,
   permissionResolutionFromEvent,
+  isCancelledSessionEnd,
   resolveEventActionType,
   resolveEventCommand,
   resolveEventOutput,
@@ -83,7 +85,7 @@ function canonicalEvent(
   event: Record<string, unknown>,
   partial: Omit<CanonicalExecutionEvent, "id" | "raw">,
 ): CanonicalExecutionEvent {
-  const sourceId = String(event.id ?? event.tool_call_id ?? event.action_id ?? event.task_id ?? event.type ?? "event");
+  const sourceId = String(event.id ?? event.tool_call_id ?? event.action_id ?? event.task_id ?? event.request_id ?? event.type ?? "event");
   return {
     id: `${partial.kind}:${sourceId}:${String(event.created_at ?? event.timestamp ?? "")}:${String(event.content ?? event.summary ?? partial.title).slice(0, 24)}`,
     raw: event,
@@ -372,7 +374,27 @@ export function canonicalEventsFromBridgeEvent(event: Record<string, unknown>): 
     ];
   }
 
+  const cancellationAck = cancellationAckFromEvent(event);
+  if (cancellationAck) {
+    return [
+      canonicalEvent(event, {
+        sourceEventType: type,
+        kind: "status",
+        phase: "complete",
+        title: cancellationAck.cancelled ? "cancellation accepted" : "cancellation rejected",
+        summary: cancellationAck.reasonLabel,
+        detail: [
+          `Target request ${cancellationAck.targetRequestId ?? "missing"}`,
+          `Session ${cancellationAck.sessionId ?? "none"}`,
+        ],
+        timestamp: timestampFromEvent(event),
+        correlationId: cancellationAck.targetRequestId,
+      }),
+    ];
+  }
+
   if (type === "bridge.ready" || type === "handshake.result" || type === "session_end") {
+    const cancelled = isCancelledSessionEnd(event);
     return [
       canonicalEvent(event, {
         sourceEventType: type,
@@ -383,13 +405,15 @@ export function canonicalEventsFromBridgeEvent(event: Record<string, unknown>): 
             ? "bridge process ready"
             : type === "handshake.result"
               ? "bridge handshake complete"
-              : `session ${event.success === false ? "failed" : "ended"}`,
+              : cancelled
+                ? "session cancelled"
+                : `session ${event.success === false ? "failed" : "ended"}`,
         summary: type === "session_end" ? String(event.session_id ?? "").trim() || undefined : undefined,
         detail:
           type === "session_end"
             ? [
                 `Request ${String(event.request_id ?? "").trim() || "pending"}`,
-                event.success === false ? "Turn failed" : "Turn completed",
+                cancelled ? "Turn cancelled" : event.success === false ? "Turn failed" : "Turn completed",
               ]
             : undefined,
         timestamp: timestampFromEvent(event),
@@ -521,7 +545,7 @@ type TraceStep = {
 type ChatTurn = {
   key: string;
   prompt: string;
-  phase: ActivityPhase;
+  phase: ActivityPhase | "cancelled";
   steps: TraceStep[];
   assistant?: string;
   assistantTimestamp?: string;
@@ -689,13 +713,20 @@ function projectChatTurns(events: CanonicalExecutionEvent[]): ChatTurn[] {
         continue;
       }
     }
-    if (event.kind === "status" && /session (failed|ended)/i.test(event.title)) {
-      activeTurn.phase = /failed/i.test(event.title) || event.phase === "failed" ? "failed" : activeTurn.phase === "failed" ? "failed" : "complete";
+    if (event.sourceEventType === "session_end") {
+      const cancelled = isCancelledSessionEnd(event.raw ?? {});
+      activeTurn.phase = cancelled
+        ? "cancelled"
+        : event.raw?.success === false || event.phase === "failed"
+          ? "failed"
+          : activeTurn.phase === "failed"
+            ? "failed"
+            : "complete";
       // F-173: a turn that ends without any response-bearing content (assistant text
       // or a command/intent answer) never renders as a bare complete — it carries an
       // explicit no-response marker and the failed glyph instead.
       const hasResponse = Boolean(activeTurn.assistant) || activeTurn.steps.some((step) => step.kind === "command");
-      if (!hasResponse) {
+      if (!cancelled && !hasResponse) {
         activeTurn.endedWithoutResponse = true;
         activeTurn.phase = "failed";
       }
@@ -733,6 +764,9 @@ function turnSummaryText(turn: ChatTurn, route: string, expanded: boolean): stri
   }
   if (turn.phase === "failed") {
     return `✖ failed · ${route} · ${hint}`;
+  }
+  if (turn.phase === "cancelled") {
+    return `⊘ cancelled · ${route} · ${hint}`;
   }
   const seconds = turnDurationSeconds(turn);
   return `✓ ${seconds === undefined ? "done" : `${seconds}s`} · ${route} · ${hint}`;

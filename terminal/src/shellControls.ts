@@ -144,9 +144,17 @@ export function footerHintFor(
   if (state.uiMode.activeOverlay.kind === "paneSwitcher") {
     return compact ? "j/k choose | Enter jump | Esc close" : "j/k or ↑/↓ choose pane | Enter jump | Esc close | ^K switcher";
   }
+  if (state.uiMode.activeOverlay.kind === "modelPicker") {
+    return compact ? "j/k choose | Enter apply | Esc close" : "j/k or ↑/↓ choose route | Enter apply | Esc close";
+  }
+  if (state.uiMode.keyboardFocus === "composer") {
+    return compact
+      ? "compose | Enter send | ^J newline | Esc navigate"
+      : "composer owns keys | Enter send | ^J newline | Esc navigation";
+  }
   if (compact) {
     const actions = paneActionsFor(tabId, state, options);
-    const parts = ["Tab tabs", "Enter send", "^B side", "↑/↓ scroll"];
+    const parts = ["navigate", "Esc compose", "Tab tabs", "↑/↓ scroll"];
     if (actions.primary) {
       parts.push(`^X ${actions.primary.label}`);
     }
@@ -157,6 +165,8 @@ export function footerHintFor(
   if (tabId === "sessions") {
     parts.push("j/k or ↑/↓ select");
     parts.push("Enter refresh detail");
+    parts.push("r arm resume");
+    parts.push("f fresh");
   }
   if (tabId === "approvals") {
     parts.push("j/k or ↑/↓ select");
@@ -198,6 +208,9 @@ export function focusModeFor(activeTab: TabSpec | undefined, state: AppState): s
   if (state.uiMode.activeOverlay.kind === "modelPicker") {
     return "route selection";
   }
+  if (state.uiMode.keyboardFocus === "composer") {
+    return "compose · Esc navigate";
+  }
   if (activeTab?.kind === "sessions") {
     return "session list";
   }
@@ -213,7 +226,5 @@ export function focusModeFor(activeTab: TabSpec | undefined, state: AppState): s
   if (activeTab?.kind === "agents") {
     return "agent route selection";
   }
-  // Design truth #6: the user-facing "tab navigation mode" concept is dead —
-  // printable keys always reach the composer; chords navigate.
-  return "compose";
+  return "navigate · Esc compose";
 }

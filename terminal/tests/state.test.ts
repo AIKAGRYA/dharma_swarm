@@ -1,13 +1,250 @@
 import {describe, expect, test} from "bun:test";
 
 import {initialState, reduceApp} from "../src/state";
-import type {AppState} from "../src/types";
+import type {AppState, SessionCatalogPayload, SessionDetailPayload} from "../src/types";
 
 function reduce(state: AppState, actions: Parameters<typeof reduceApp>[1][]): AppState {
   return actions.reduce((current, action) => reduceApp(current, action), state);
 }
 
+function sessionCatalog(...sessions: Array<{id: string; updatedAt?: string}>): SessionCatalogPayload {
+  return {
+    count: sessions.length,
+    sessions: sessions.map(({id, updatedAt = "2026-07-21T00:00:00Z"}) => ({
+      session: {
+        session_id: id,
+        provider_id: "claude",
+        model_id: "claude-opus-4-8",
+        cwd: "/repo",
+        created_at: "2026-07-21T00:00:00Z",
+        updated_at: updatedAt,
+        status: "completed",
+      },
+      replay_ok: true,
+      replay_issues: [],
+      total_turns: 1,
+      total_cost_usd: 0,
+    })),
+  };
+}
+
+function sessionDetail(id: string, updatedAt = "2026-07-21T00:00:00Z"): SessionDetailPayload {
+  return {
+    session: {
+      session_id: id,
+      provider_id: "claude",
+      model_id: "claude-opus-4-8",
+      cwd: "/repo",
+      created_at: "2026-07-21T00:00:00Z",
+      updated_at: updatedAt,
+      status: "completed",
+    },
+    replay_ok: true,
+    replay_issues: [],
+    compaction_preview: {
+      event_count: 0,
+      by_type: {},
+      compactable_ratio: 0,
+      protected_event_types: [],
+      recent_event_types: [],
+    },
+    recent_events: [],
+  };
+}
+
 describe("reduceApp UI state", () => {
+  test("keeps a correlated detail response cached without jumping away from an operator selection", () => {
+    const catalogued = reduceApp(initialState, {
+      type: "session.catalog.set",
+      catalog: sessionCatalog({id: "session-a"}, {id: "session-b"}),
+    });
+    const requested = reduce(catalogued, [
+      {type: "session.detail.requested", requestId: "a-1", sessionId: "session-a"},
+      {type: "session.select", sessionId: "session-b"},
+    ]);
+    const continuityBefore = requested.sessionContinuity;
+
+    const received = reduceApp(requested, {
+      type: "session.detail.received",
+      requestId: "a-1",
+      sessionId: "session-a",
+      detail: sessionDetail("session-a"),
+    });
+
+    expect(received.sessionPane.selectedSessionId).toBe("session-b");
+    expect(received.sessionPane.selectionProvenance).toBe("operator_pinned");
+    expect(received.sessionPane.detailsBySessionId["session-a"]?.session.session_id).toBe("session-a");
+    expect(received.sessionContinuity).toBe(continuityBefore);
+  });
+
+  test("accepts only the latest owned detail request and clears only its correlated failure", () => {
+    const catalogued = reduceApp(initialState, {
+      type: "session.catalog.set",
+      catalog: sessionCatalog({id: "session-a"}),
+    });
+    const requestedTwice = reduce(catalogued, [
+      {type: "session.detail.requested", requestId: "a-1", sessionId: "session-a"},
+      {type: "session.detail.requested", requestId: "a-2", sessionId: "session-a"},
+    ]);
+
+    expect(
+      reduceApp(requestedTwice, {
+        type: "session.detail.received",
+        requestId: "a-1",
+        sessionId: "session-a",
+        detail: sessionDetail("session-a"),
+      }),
+    ).toBe(requestedTwice);
+    expect(
+      reduceApp(requestedTwice, {
+        type: "session.detail.received",
+        requestId: "a-2",
+        sessionId: "session-b",
+        detail: sessionDetail("session-a"),
+      }),
+    ).toBe(requestedTwice);
+    expect(reduceApp(requestedTwice, {type: "session.detail.failed", requestId: "a-1"})).toBe(requestedTwice);
+
+    const failed = reduceApp(requestedTwice, {type: "session.detail.failed", requestId: "a-2"});
+    expect(failed.sessionPane.pendingDetailRequestsBySessionId).toEqual({});
+    expect(
+      reduceApp(failed, {
+        type: "session.detail.received",
+        requestId: "a-2",
+        sessionId: "session-a",
+        detail: sessionDetail("session-a"),
+      }),
+    ).toBe(failed);
+
+    const requestedAgain = reduceApp(failed, {
+      type: "session.detail.requested",
+      requestId: "a-3",
+      sessionId: "session-a",
+    });
+    const accepted = reduceApp(requestedAgain, {
+      type: "session.detail.received",
+      requestId: "a-3",
+      sessionId: "session-a",
+      detail: sessionDetail("session-a"),
+    });
+    expect(accepted.sessionPane.detailsBySessionId["session-a"]).toBeDefined();
+    expect(accepted.sessionPane.pendingDetailRequestsBySessionId).toEqual({});
+  });
+
+  test("follows a new catalog head until pinned and prunes removed or outdated detail", () => {
+    let state = reduceApp(initialState, {
+      type: "session.catalog.set",
+      catalog: sessionCatalog({id: "session-a"}, {id: "session-b"}),
+    });
+    expect(state.sessionPane.selectedSessionId).toBe("session-a");
+    expect(state.sessionPane.selectionProvenance).toBe("follow_latest");
+
+    state = reduce(state, [
+      {type: "session.detail.requested", requestId: "a-1", sessionId: "session-a"},
+      {
+        type: "session.detail.received",
+        requestId: "a-1",
+        sessionId: "session-a",
+        detail: sessionDetail("session-a"),
+      },
+      {type: "session.detail.requested", requestId: "b-1", sessionId: "session-b"},
+      {
+        type: "session.detail.received",
+        requestId: "b-1",
+        sessionId: "session-b",
+        detail: sessionDetail("session-b"),
+      },
+      {
+        type: "session.catalog.set",
+        catalog: sessionCatalog({id: "session-c"}, {id: "session-a"}, {id: "session-b"}),
+      },
+    ]);
+    expect(state.sessionPane.selectedSessionId).toBe("session-c");
+
+    state = reduce(state, [
+      {type: "session.select", sessionId: "session-a"},
+      {
+        type: "session.catalog.set",
+        catalog: sessionCatalog({id: "session-d"}, {id: "session-a"}, {id: "session-b"}),
+      },
+    ]);
+    expect(state.sessionPane.selectedSessionId).toBe("session-a");
+    expect(state.sessionPane.selectionProvenance).toBe("operator_pinned");
+
+    state = reduceApp(state, {
+      type: "session.catalog.set",
+      catalog: sessionCatalog(
+        {id: "session-d"},
+        {id: "session-a", updatedAt: "2026-07-21T01:00:00Z"},
+      ),
+    });
+    expect(state.sessionPane.selectedSessionId).toBe("session-a");
+    expect(state.sessionPane.detailsBySessionId["session-a"]).toBeUndefined();
+    expect(state.sessionPane.detailsBySessionId["session-b"]).toBeUndefined();
+
+    state = reduceApp(state, {
+      type: "session.catalog.set",
+      catalog: sessionCatalog({id: "session-d"}),
+    });
+    expect(state.sessionPane.selectedSessionId).toBe("session-d");
+    expect(state.sessionPane.selectionProvenance).toBe("follow_latest");
+  });
+
+  test("correlates active-turn cancellation and ignores stale terminal events", () => {
+    const running = reduceApp(initialState, {type: "turn.start", requestId: "turn-7"});
+    expect(running.activeTurn).toEqual({phase: "running", requestId: "turn-7"});
+
+    const acknowledged = reduceApp(running, {
+      type: "turn.ack",
+      requestId: "turn-7",
+      sessionId: "session-7",
+    });
+    const cancelling = reduceApp(acknowledged, {
+      type: "turn.cancel.request",
+      requestId: "turn-7",
+      cancelRequestId: "cancel-8",
+    });
+    expect(cancelling.activeTurn).toEqual({
+      phase: "cancelling",
+      requestId: "turn-7",
+      cancelRequestId: "cancel-8",
+      sessionId: "session-7",
+    });
+
+    expect(reduceApp(cancelling, {type: "turn.finish", requestId: "stale-turn"})).toBe(cancelling);
+    expect(
+      reduceApp(cancelling, {
+        type: "turn.cancel.rejected",
+        requestId: "turn-7",
+        cancelRequestId: "stale-cancel",
+      }),
+    ).toBe(cancelling);
+
+    const rejected = reduceApp(cancelling, {
+      type: "turn.cancel.rejected",
+      requestId: "turn-7",
+      cancelRequestId: "cancel-8",
+    });
+    expect(rejected.activeTurn).toEqual({phase: "running", requestId: "turn-7", sessionId: "session-7"});
+    expect(reduceApp(rejected, {type: "turn.finish", requestId: "turn-7"}).activeTurn).toEqual({phase: "idle"});
+  });
+
+  test("keeps keyboard ownership separate from tabs and overlays", () => {
+    expect(initialState.uiMode.keyboardFocus).toBe("composer");
+
+    const navigating = reduceApp(initialState, {type: "ui.focus.toggle"});
+    expect(navigating.uiMode.keyboardFocus).toBe("navigation");
+
+    const changedTab = reduceApp(navigating, {type: "tab.activate", tabId: "repo"});
+    expect(changedTab.uiMode.activeTabId).toBe("repo");
+    expect(changedTab.uiMode.keyboardFocus).toBe("navigation");
+
+    const overlaid = reduceApp(changedTab, {type: "paneSwitcher.open"});
+    const closed = reduceApp(overlaid, {type: "paneSwitcher.close"});
+    expect(closed.uiMode.keyboardFocus).toBe("navigation");
+    expect(reduceApp(closed, {type: "ui.focus.set", focus: "composer"}).uiMode.keyboardFocus).toBe("composer");
+  });
+
   test("opens and closes the route picker without changing the active tab", () => {
     const state = reduce(initialState, [
       {type: "tab.activate", tabId: "tools"},

@@ -37,6 +37,7 @@ import {
   sessionCatalogToLines,
   sessionCatalogToPreview,
   sessionDetailFromEvent,
+  sessionDetailResultFromEvent,
   sessionDetailToLines,
   sessionDetailToPreview,
   sessionBootstrapToLines,
@@ -129,7 +130,12 @@ describe("typed session helpers", () => {
     const catalog = sessionCatalogFromEvent({
       type: "session.catalog.result",
       payload: {
-        count: 1,
+        version: "v1",
+        domain: "session_catalog",
+        count: 3,
+        returned_count: 1,
+        limit: 1,
+        has_more: true,
         sessions: [
           {
             session: {
@@ -152,7 +158,10 @@ describe("typed session helpers", () => {
       },
     });
 
-    expect(catalog?.count).toBe(1);
+    expect(catalog?.count).toBe(3);
+    expect(catalog?.returned_count).toBe(1);
+    expect(catalog?.limit).toBe(1);
+    expect(catalog?.has_more).toBe(true);
     expect(catalog?.sessions[0]?.session.session_id).toBe("sess-1");
     expect(catalog?.sessions[0]?.total_cost_usd).toBe(1.5);
   });
@@ -161,6 +170,8 @@ describe("typed session helpers", () => {
     const detail = sessionDetailFromEvent({
       type: "session.detail.result",
       payload: {
+        version: "v1",
+        domain: "session_detail",
         session: {
           session_id: "sess-1",
           provider_id: "codex",
@@ -201,6 +212,119 @@ describe("typed session helpers", () => {
     expect(detail?.recent_events[0]?.event_type).toBe("tool_result");
   });
 
+  test("rejects untyped or mismatched catalog payloads", () => {
+    const sessions = [
+      {
+        session: {
+          session_id: "sess-1",
+          provider_id: "codex",
+          model_id: "gpt-5.4",
+          cwd: "/repo",
+          created_at: "2026-04-01T00:00:00Z",
+          updated_at: "2026-04-01T01:00:00Z",
+          status: "completed",
+        },
+      },
+    ];
+
+    expect(sessionCatalogFromEvent({type: "session.catalog.result", payload: {sessions}})).toBeUndefined();
+    expect(
+      sessionCatalogFromEvent({
+        type: "session.catalog.result",
+        payload: {version: "v2", domain: "session_catalog", sessions},
+      }),
+    ).toBeUndefined();
+    expect(
+      sessionCatalogFromEvent({
+        type: "session.catalog.result",
+        payload: {version: "v1", domain: "session_detail", sessions},
+      }),
+    ).toBeUndefined();
+    expect(
+      sessionCatalogFromEvent({
+        type: "action.result",
+        action_type: "surface.refresh",
+        surface: "sessions",
+        payload: {version: "v1", domain: "session_catalog", sessions},
+      })?.sessions,
+    ).toHaveLength(1);
+    expect(
+      sessionCatalogFromEvent({
+        type: "session.catalog.result",
+        payload: {version: "v1", domain: "session_catalog", sessions: "not-an-array"},
+      }),
+    ).toBeUndefined();
+  });
+
+  test("rejects untyped or mismatched detail payloads", () => {
+    const session = {
+      session_id: "sess-1",
+      provider_id: "codex",
+      model_id: "gpt-5.4",
+      cwd: "/repo",
+      created_at: "2026-04-01T00:00:00Z",
+      updated_at: "2026-04-01T01:00:00Z",
+      status: "completed",
+    };
+
+    expect(sessionDetailFromEvent({type: "session.detail.result", payload: {session}})).toBeUndefined();
+    expect(
+      sessionDetailFromEvent({
+        type: "session.detail.result",
+        payload: {version: "v2", domain: "session_detail", session},
+      }),
+    ).toBeUndefined();
+    expect(
+      sessionDetailFromEvent({
+        type: "session.detail.result",
+        payload: {version: "v1", domain: "session_catalog", session},
+      }),
+    ).toBeUndefined();
+    expect(
+      sessionDetailFromEvent({
+        type: "action.result",
+        payload: {version: "v1", domain: "session_detail", session},
+      })?.session.session_id,
+    ).toBe("sess-1");
+    expect(
+      sessionDetailFromEvent({
+        type: "session.detail.result",
+        payload: {version: "v1", domain: "session_detail", session: "not-a-session"},
+      }),
+    ).toBeUndefined();
+  });
+
+  test("requires correlated request, top-level session, and payload session identifiers", () => {
+    const payload = {
+      version: "v1",
+      domain: "session_detail",
+      session: {
+        session_id: "sess-1",
+        provider_id: "codex",
+        model_id: "gpt-5.4",
+        cwd: "/repo",
+        created_at: "2026-04-01T00:00:00Z",
+        updated_at: "2026-04-01T01:00:00Z",
+        status: "completed",
+      },
+    };
+    const event = {
+      type: "session.detail.result",
+      request_id: "detail-7",
+      session_id: "sess-1",
+      payload,
+    };
+
+    expect(sessionDetailResultFromEvent(event)).toMatchObject({
+      requestId: "detail-7",
+      sessionId: "sess-1",
+      detail: {session: {session_id: "sess-1"}},
+    });
+    expect(sessionDetailResultFromEvent({...event, request_id: ""})).toBeUndefined();
+    expect(sessionDetailResultFromEvent({...event, session_id: "sess-2"})).toBeUndefined();
+    expect(sessionDetailResultFromEvent({...event, type: "action.result"})).toBeUndefined();
+  });
+
   test("renders the sessions pane from typed state", () => {
     const sessionPane = {
       catalog: {
@@ -226,6 +350,7 @@ describe("typed session helpers", () => {
         ],
       },
       selectedSessionId: "sess-1",
+      selectionProvenance: "operator_pinned" as const,
       detailsBySessionId: {
         "sess-1": {
           session: {
@@ -259,9 +384,20 @@ describe("typed session helpers", () => {
               created_at: "2026-04-01T00:30:00Z",
               payload: {tool_name: "Read", content: "ok"},
             },
+            {
+              event_id: "evt-2",
+              event_type: "session_end",
+              source: "provider",
+              audience: "all",
+              transport: "local",
+              session_id: "sess-1",
+              created_at: "2026-04-01T00:31:00Z",
+              payload: {success: false, cancelled: true, error_code: "cancelled", error_message: "cancelled by operator"},
+            },
           ],
         },
       },
+      pendingDetailRequestsBySessionId: {},
     } as const;
 
     const lines = sessionPaneToLines(sessionPane).map((line) => line.text);
@@ -271,6 +407,7 @@ describe("typed session helpers", () => {
     expect(lines).toContain("## Drilldown");
     expect(lines).toContain("# Session Detail");
     expect(lines).toContain("## Recent envelopes");
+    expect(lines).toContain("- session_end | 2026-04-01T00:31:00Z | cancelled");
     expect(preview?.Selected).toBe("sess-1");
     expect(preview?.Compaction).toBe("6 events | 33%");
   });
@@ -280,7 +417,7 @@ describe("typed session helpers", () => {
       eventToTabPatch({
         type: "session.catalog.result",
         content: "legacy prose",
-        payload: {count: 0, sessions: []},
+        payload: {version: "v1", domain: "session_catalog", count: 0, sessions: []},
       }),
     ).toEqual([]);
 
@@ -289,6 +426,8 @@ describe("typed session helpers", () => {
         type: "session.detail.result",
         content: "legacy prose",
         payload: {
+          version: "v1",
+          domain: "session_detail",
           session: {
             session_id: "sess-1",
             provider_id: "codex",
@@ -1491,6 +1630,47 @@ describe("resolveCommandTargetPane", () => {
 });
 
 describe("eventToTabPatch", () => {
+  test("renders cancellation acknowledgement separately from the terminal cancelled state", () => {
+    const accepted = eventToTabPatch({
+      type: "session.cancelled",
+      request_id: "cancel-17",
+      target_request_id: "run-17",
+      cancelled: true,
+      reason: "cancel_requested",
+    });
+    const rejected = eventToTabPatch({
+      type: "session.cancelled",
+      request_id: "cancel-18",
+      target_request_id: "run-17",
+      cancelled: false,
+      reason: "already_cancelling",
+    });
+    const terminal = eventToTabPatch({
+      type: "session_end",
+      request_id: "run-17",
+      session_id: "session-17",
+      success: false,
+      cancelled: true,
+      error_code: "cancelled",
+      error_message: "cancelled by operator",
+    });
+    const failed = eventToTabPatch({
+      type: "session_end",
+      request_id: "run-18",
+      session_id: "session-18",
+      success: false,
+      error_code: "provider_error",
+      error_message: "provider unavailable",
+    });
+
+    expect(accepted).toHaveLength(1);
+    expect(accepted[0]).toMatchObject({tabId: "runtime"});
+    expect(accepted[0]?.lines[0]).toMatchObject({kind: "system", text: "cancellation accepted: cancel requested"});
+    expect(rejected[0]?.lines[0]).toMatchObject({kind: "error", text: "cancellation rejected: already cancelling"});
+    expect(terminal[0]?.lines[0]).toMatchObject({kind: "system", text: "session cancelled"});
+    expect(failed[0]?.lines[0]).toMatchObject({kind: "error", text: "session failed: provider unavailable"});
+  });
+
   test("keeps chat control command output out of the transcript", () => {
     const patches = eventToTabPatch({
       type: "command.result",

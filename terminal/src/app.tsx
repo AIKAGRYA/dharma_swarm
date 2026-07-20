@@ -37,6 +37,12 @@ import {parseControlPulsePreview, parseRuntimeFreshness} from "./freshness.ts";
 import {routeLabel, routePolicyFromValue, routeSummary, selectableRouteTargets} from "./routePolicy.ts";
 import {THEME} from "./theme.ts";
 import {manuscriptLines, scrollStatusLine} from "./scrollFace.ts";
+import {isPlainReturn, normalizeComposerInput} from "./inputPolicy.ts";
+import {
+  continuityStateFromSession,
+  messagesForNextTurn,
+  sessionResumeEligibility,
+} from "./sessionContinuity.ts";
 import {focusModeFor, paneActionsFor, type PaneAction} from "./shellControls.ts";
 import {
   buildVerificationSummaryRows,
@@ -79,7 +85,7 @@ import {
   runtimeSnapshotToLines,
   runtimeSnapshotToPreview,
   sessionCatalogFromEvent,
-  sessionDetailFromEvent,
+  sessionDetailResultFromEvent,
   sessionPaneToLines,
   sessionPaneToPreview,
   sessionBootstrapToLines,
@@ -89,8 +95,14 @@ import {
   workspaceSnapshotPayloadFromEvent,
   workspaceSnapshotToPreview,
 } from "./protocol.ts";
+import {
+  nextSessionPaneAfterCatalog,
+  nextSessionPaneAfterDetailResult,
+} from "./sessionPaneState.ts";
 import {initialState, reduceApp} from "./state.ts";
-import type {AppAction, AppState, ApprovalQueueEntry, ApprovalQueueState, CanonicalPermissionDecision, CanonicalPermissionOutcome, CanonicalPermissionResolution, RouteTarget, RuntimeSnapshotPayload, SessionCatalogPayload, SessionDetailPayload, SessionPaneState, SurfaceAuthorityState, TabPreview, TabSpec, TranscriptLine, WorkspaceSnapshotPayload} from "./types.ts";
+import type {ActiveTurnState, AppAction, AppState, ApprovalQueueEntry, ApprovalQueueState, CanonicalPermissionDecision, CanonicalPermissionOutcome, CanonicalPermissionResolution, RouteTarget, RuntimeSnapshotPayload, SessionPaneState, SurfaceAuthorityState, TabPreview, TabSpec, TranscriptLine, WorkspaceSnapshotPayload} from "./types.ts";
+
+export {continuityStateFromSession} from "./sessionContinuity.ts";
 
 const SNAPSHOT_REFRESH_INTERVAL_MS = 15000;
 const SESSION_CATALOG_LIMIT = 12;
@@ -106,6 +118,25 @@ type PendingCommandStream = {
   tabId: string;
   lastCompletedText?: string;
 };
+
+export type TurnCancellationDecision =
+  | {kind: "idle"}
+  | {kind: "request"; requestId: string}
+  | {kind: "already_requested"; requestId: string; cancelRequestId: string};
+
+export function decideTurnCancellation(activeTurn: ActiveTurnState): TurnCancellationDecision {
+  if (activeTurn.phase === "idle") {
+    return {kind: "idle"};
+  }
+  if (activeTurn.phase === "cancelling") {
+    return {
+      kind: "already_requested",
+      requestId: activeTurn.requestId,
+      cancelRequestId: activeTurn.cancelRequestId,
+    };
+  }
+  return {kind: "request", requestId: activeTurn.requestId};
+}
 
 const shellControlOptions = {
   sessionCatalogLimit: SESSION_CATALOG_LIMIT,
@@ -126,12 +157,28 @@ function ensureRuntimeTabs(stateTabs: TabSpec[]): TabSpec[] {
   return [...stateTabs, ...missing];
 }
 
+function sendBackgroundRequest(
+  bridge: DharmaBridge,
+  type: string,
+  payload?: Record<string, unknown>,
+): string {
+  const backgroundCapable = bridge as DharmaBridge & {
+    sendBackground?: (requestType: string, requestPayload?: Record<string, unknown>) => string;
+  };
+  if (typeof backgroundCapable.sendBackground === "function") {
+    return payload === undefined
+      ? backgroundCapable.sendBackground(type)
+      : backgroundCapable.sendBackground(type, payload);
+  }
+  return payload === undefined ? bridge.send(type) : bridge.send(type, payload);
+}
+
 function requestLiveSnapshots(bridge: DharmaBridge, provider: string, model: string, strategy: string): void {
-  bridge.send("workspace.snapshot");
-  bridge.send("runtime.snapshot");
-  bridge.send("model.policy", {provider, model, strategy});
-  bridge.send("agent.routes");
-  bridge.send("evolution.surface");
+  sendBackgroundRequest(bridge, "workspace.snapshot");
+  sendBackgroundRequest(bridge, "runtime.snapshot");
+  sendBackgroundRequest(bridge, "model.policy", {provider, model, strategy});
+  sendBackgroundRequest(bridge, "agent.routes");
+  sendBackgroundRequest(bridge, "evolution.surface");
 }
 
 function queueAppActions(dispatch: React.Dispatch<AppAction>, actions: AppAction[]): void {
@@ -400,34 +447,51 @@ function preservePreviewFields(
 }
 
 function rawWorkspacePayloadRecord(event: Record<string, unknown>): Record<string, unknown> | undefined {
-  const directRecord =
-    typeof event.domain === "string" && event.domain === "workspace_snapshot" ? event : undefined;
-  if (directRecord) {
-    return directRecord;
+  const pending: unknown[] = [event, event.workspace_payload];
+  const visited = new Set<object>();
+  while (pending.length > 0) {
+    const candidate = pending.shift();
+    if (typeof candidate !== "object" || candidate === null || visited.has(candidate)) {
+      continue;
+    }
+    visited.add(candidate);
+    const record = candidate as Record<string, unknown>;
+    if (record.version === "v1" && record.domain === "workspace_snapshot") {
+      return record;
+    }
+    pending.push(record.payload, record.result, record.workspace_payload);
   }
-  const payload = event.payload;
-  if (typeof payload !== "object" || payload === null) {
-    return undefined;
-  }
-  return typeof (payload as {domain?: unknown}).domain === "string" &&
-    String((payload as {domain?: unknown}).domain) === "workspace_snapshot"
-    ? (payload as Record<string, unknown>)
-    : undefined;
+  return undefined;
 }
 
 function workspaceEventHasAuthoritativeTopology(event: Record<string, unknown>): boolean {
   const rawPayload = rawWorkspacePayloadRecord(event);
-  if (rawPayload) {
-    return Object.hasOwn(rawPayload, "topology");
-  }
-  const content = String(event.content ?? "");
-  return /^##\s+Topology\b/m.test(content);
+  return Boolean(workspaceSnapshotPayloadFromEvent(event) && rawPayload && Object.hasOwn(rawPayload, "topology"));
 }
 
 function workspaceEventHasAuthoritativeHotspotDetail(event: Record<string, unknown>): boolean {
   const rawPayload = rawWorkspacePayloadRecord(event);
-  if (rawPayload) {
-    return Object.hasOwn(rawPayload, "largest_python_files") || Object.hasOwn(rawPayload, "most_imported_modules");
+  return Boolean(
+    workspaceSnapshotPayloadFromEvent(event) &&
+      rawPayload &&
+      (Object.hasOwn(rawPayload, "largest_python_files") || Object.hasOwn(rawPayload, "most_imported_modules")),
+  );
+}
+
+function workspaceEventHasAuthoritativeRepoSignal(event: Record<string, unknown>): boolean {
+  return workspaceEventHasAuthoritativeTopology(event) && workspaceEventHasAuthoritativeHotspotDetail(event);
+}
+
+function workspaceEventHasTopologyDisplaySignal(event: Record<string, unknown>): boolean {
+  if (workspaceEventHasAuthoritativeTopology(event)) {
+    return true;
+  }
+  return /^##\s+Topology\b/m.test(String(event.content ?? ""));
+}
+
+function workspaceEventHasHotspotDisplaySignal(event: Record<string, unknown>): boolean {
+  if (workspaceEventHasAuthoritativeHotspotDetail(event)) {
+    return true;
   }
   const content = String(event.content ?? "");
   const hasHotspotSummary = /^Git hotspots:\s*(?!none\b).+/im.test(content);
@@ -438,16 +502,12 @@ function workspaceEventHasAuthoritativeHotspotDetail(event: Record<string, unkno
   return hasHotspotSummary && hasChangedPathDetail && hasHotspotDetailSection;
 }
 
-function workspaceEventHasAuthoritativeRepoSignal(event: Record<string, unknown>): boolean {
-  return workspaceEventHasAuthoritativeTopology(event) && workspaceEventHasAuthoritativeHotspotDetail(event);
-}
-
 function preserveDeferredRepoPreview(nextPreview: TabPreview, livePreview: TabPreview | undefined, event: Record<string, unknown>): TabPreview {
   let mergedPreview = nextPreview;
-  if (!workspaceEventHasAuthoritativeTopology(event)) {
+  if (!workspaceEventHasTopologyDisplaySignal(event)) {
     mergedPreview = preservePreviewFields(mergedPreview, livePreview, DEFERRED_REPO_TOPOLOGY_PREVIEW_FIELDS);
   }
-  if (!workspaceEventHasAuthoritativeHotspotDetail(event)) {
+  if (!workspaceEventHasHotspotDisplaySignal(event)) {
     mergedPreview = preservePreviewFields(mergedPreview, livePreview, DEFERRED_REPO_HOTSPOT_PREVIEW_FIELDS);
   }
   return mergedPreview;
@@ -620,55 +680,6 @@ export function buildOperatorSummaryItems(state: AppState): Array<{label: string
   ];
 }
 
-type ConversationMessage = {
-  role: "user" | "assistant";
-  content: string;
-};
-
-const MAX_CONVERSATION_MESSAGES = 24;
-
-function normalizeConversationLine(line: TranscriptLine): ConversationMessage | undefined {
-  if (line.kind === "user") {
-    const content = line.text.replace(/^>\s*/, "").trim();
-    return content ? {role: "user", content} : undefined;
-  }
-  if (line.kind === "assistant") {
-    const content = line.text.trim();
-    return content ? {role: "assistant", content} : undefined;
-  }
-  return undefined;
-}
-
-function buildConversationMessages(chatLines: TranscriptLine[], submittedPrompt: string): ConversationMessage[] {
-  const firstUserIndex = chatLines.findIndex((line) => line.kind === "user");
-  const relevantLines = firstUserIndex >= 0 ? chatLines.slice(firstUserIndex) : [];
-  const collapsed: ConversationMessage[] = [];
-
-  for (const line of relevantLines) {
-    const normalized = normalizeConversationLine(line);
-    if (!normalized) {
-      continue;
-    }
-    const previous = collapsed[collapsed.length - 1];
-    if (previous && previous.role === normalized.role) {
-      previous.content = `${previous.content}\n${normalized.content}`.trim();
-    } else {
-      collapsed.push({...normalized});
-    }
-  }
-
-  const prompt = submittedPrompt.trim();
-  if (prompt) {
-    const previous = collapsed[collapsed.length - 1];
-    if (previous?.role === "user" && previous.content === prompt) {
-      return collapsed.slice(-MAX_CONVERSATION_MESSAGES);
-    }
-    collapsed.push({role: "user", content: prompt});
-  }
-
-  return collapsed.slice(-MAX_CONVERSATION_MESSAGES);
-}
-
 function isDuplicateCompletedAssistantPatch(state: AppState, event: Record<string, unknown>): boolean {
   if (String(event.type ?? "") !== "text_complete") {
     return false;
@@ -691,48 +702,6 @@ function isDuplicateCompletedAssistantPatch(state: AppState, event: Record<strin
   return false;
 }
 
-function boundedContinuityMessages(state: AppState, submittedPrompt: string): Array<{role: "user" | "assistant" | "system"; content: string}> {
-  const selectedSessionId = state.sessionPane.selectedSessionId;
-  const selectedDetail = selectedSessionId ? state.sessionPane.detailsBySessionId[selectedSessionId] : undefined;
-
-  if (selectedDetail) {
-    const history: Array<{role: "user" | "assistant" | "system"; content: string}> = [];
-    for (const envelope of selectedDetail.recent_events) {
-      const payload = envelope.payload ?? {};
-      if (envelope.event_type === "text_complete" || envelope.event_type === "text_delta") {
-        const content = String(payload.content ?? "").trim();
-        if (content) {
-          history.push({role: "assistant", content});
-        }
-        continue;
-      }
-      if (envelope.event_type === "session_start") {
-        const content = String(payload.prompt ?? "").trim();
-        if (content) {
-          history.push({role: "user", content});
-        }
-      }
-    }
-    const prompt = submittedPrompt.trim();
-    if (prompt) {
-      history.push({role: "user", content: prompt});
-    }
-    return history.slice(-MAX_CONVERSATION_MESSAGES);
-  }
-
-  const chatLines = state.tabs.find((tab) => tab.id === "chat")?.lines ?? [];
-  return buildConversationMessages(chatLines, submittedPrompt);
-}
-
-function providerResumeSessionId(detail: SessionDetailPayload | undefined): string | undefined {
-  const metadata = detail?.session.metadata;
-  if (!metadata || typeof metadata !== "object") {
-    return undefined;
-  }
-  const value = (metadata as Record<string, unknown>).provider_session_id;
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
-}
-
 function displayedTranscriptLinesForTab(activeTab: TabSpec | undefined, state: AppState): TranscriptLine[] {
   if (activeTab?.kind !== "chat") {
     return activeTab?.lines ?? [];
@@ -740,50 +709,6 @@ function displayedTranscriptLinesForTab(activeTab: TabSpec | undefined, state: A
   const firstUserIndex = activeTab.lines.findIndex((line) => line.kind === "user");
   const chatPreludeLines = firstUserIndex >= 0 ? activeTab.lines.slice(0, firstUserIndex) : activeTab.lines;
   return [...chatPreludeLines, ...state.chatTraceLines];
-}
-
-export function continuityStateFromSession(state: AppState, detail: SessionDetailPayload | undefined): AppState["sessionContinuity"] {
-  if (!detail) {
-    return {
-      ...state.sessionContinuity,
-      activeSessionId: undefined,
-      resumeSessionId: undefined,
-      activeRouteId: state.routePolicy.routeId,
-      continuityMode: "fresh",
-      boundedHistory: [],
-      compactionPolicy: {
-        eventCount: 0,
-        compactableRatio: 0,
-        protectedEventTypes: [],
-        recentEventTypes: [],
-      },
-      compactedSummary: undefined,
-    };
-  }
-
-  const boundedHistory = boundedContinuityMessages(state, "").slice(-state.sessionContinuity.historyLimit).map((entry) => ({
-    ...entry,
-    source: "session_detail" as const,
-  }));
-  const resumableProviderSessionId = providerResumeSessionId(detail);
-  const sameProviderAsActiveRoute = detail.session.provider_id === state.routePolicy.provider;
-  const canResumeProviderSession = detail.replay_ok && sameProviderAsActiveRoute && Boolean(resumableProviderSessionId);
-
-  return {
-    ...state.sessionContinuity,
-    activeSessionId: detail.session.session_id,
-    resumeSessionId: canResumeProviderSession ? resumableProviderSessionId : undefined,
-    activeRouteId: `${detail.session.provider_id}:${detail.session.model_id}`,
-    continuityMode: canResumeProviderSession ? "resume" : "fresh",
-    boundedHistory,
-    compactionPolicy: {
-      eventCount: detail.compaction_preview.event_count,
-      compactableRatio: detail.compaction_preview.compactable_ratio,
-      protectedEventTypes: detail.compaction_preview.protected_event_types,
-      recentEventTypes: detail.compaction_preview.recent_event_types,
-    },
-    compactedSummary: detail.session.summary ?? undefined,
-  };
 }
 
 export function missingAuthoritativeSurfaces(authoritative: SurfaceAuthorityState): Array<keyof SurfaceAuthorityState> {
@@ -815,10 +740,10 @@ export function authoritativeResyncStatus(authoritative: SurfaceAuthorityState):
 }
 
 function requestAuthoritativeResync(bridge: DharmaBridge, provider: string, model: string, strategy: string): void {
-  bridge.send("status");
-  bridge.send("command.graph");
-  bridge.send("command.registry");
-  bridge.send("ontology.snapshot");
+  sendBackgroundRequest(bridge, "status");
+  sendBackgroundRequest(bridge, "command.graph");
+  sendBackgroundRequest(bridge, "command.registry");
+  sendBackgroundRequest(bridge, "ontology.snapshot");
   requestSessionCatalog(bridge);
   requestPermissionHistory(bridge);
   requestLiveSnapshots(bridge, provider, model, strategy);
@@ -833,11 +758,11 @@ export function requestMissingAuthoritativeSurfaces(
 ): void {
   for (const surface of missingAuthoritativeSurfaces(authoritative)) {
     if (surface === "repo") {
-      bridge.send("workspace.snapshot");
+      sendBackgroundRequest(bridge, "workspace.snapshot");
       continue;
     }
     if (surface === "control") {
-      bridge.send("runtime.snapshot");
+      sendBackgroundRequest(bridge, "runtime.snapshot");
       continue;
     }
     if (surface === "sessions") {
@@ -849,52 +774,40 @@ export function requestMissingAuthoritativeSurfaces(
       continue;
     }
     if (surface === "models") {
-      bridge.send("model.policy", {provider, model, strategy});
+      sendBackgroundRequest(bridge, "model.policy", {provider, model, strategy});
       continue;
     }
     if (surface === "agents") {
-      bridge.send("agent.routes");
+      sendBackgroundRequest(bridge, "agent.routes");
     }
   }
 }
 
 function requestSessionCatalog(bridge: DharmaBridge): void {
-  bridge.send("session.catalog", {limit: SESSION_CATALOG_LIMIT});
+  const payload = {limit: SESSION_CATALOG_LIMIT};
+  sendBackgroundRequest(bridge, "session.catalog", payload);
 }
 
 function requestPermissionHistory(bridge: DharmaBridge): void {
-  bridge.send("permission.history", {limit: 50});
+  const payload = {limit: 50};
+  sendBackgroundRequest(bridge, "permission.history", payload);
 }
 
-function requestSessionDetail(bridge: DharmaBridge, sessionId: string | undefined): void {
+function requestSessionDetail(
+  bridge: DharmaBridge,
+  dispatch: React.Dispatch<AppAction>,
+  sessionId: string | undefined,
+  background = false,
+): string | undefined {
   if (!sessionId) {
-    return;
+    return undefined;
   }
-  bridge.send("session.detail", {session_id: sessionId, transcript_limit: SESSION_TRANSCRIPT_LIMIT});
-}
-
-function nextSessionPaneAfterCatalog(current: SessionPaneState, catalog: SessionCatalogPayload): SessionPaneState {
-  const selectedSessionId =
-    current.selectedSessionId && catalog.sessions.some((entry) => entry.session.session_id === current.selectedSessionId)
-      ? current.selectedSessionId
-      : catalog.sessions[0]?.session.session_id;
-  return {
-    catalog,
-    selectedSessionId,
-    detailsBySessionId: current.detailsBySessionId,
-  };
-}
-
-function nextSessionPaneAfterDetail(current: SessionPaneState, detail: SessionDetailPayload): SessionPaneState {
-  const catalog = current.catalog;
-  return {
-    catalog,
-    selectedSessionId: detail.session.session_id,
-    detailsBySessionId: {
-      ...current.detailsBySessionId,
-      [detail.session.session_id]: detail,
-    },
-  };
+  const payload = {session_id: sessionId, transcript_limit: SESSION_TRANSCRIPT_LIMIT};
+  const requestId = background
+    ? sendBackgroundRequest(bridge, "session.detail", payload)
+    : bridge.send("session.detail", payload);
+  dispatch({type: "session.detail.requested", requestId, sessionId});
+  return requestId;
 }
 
 function nextApprovalPaneAfterDecision(
@@ -1026,11 +939,20 @@ function approvalResolveAction(entry: ApprovalQueueEntry, resolution: CanonicalP
   };
 }
 
+type PendingBootstrap = {
+  prompt: string;
+  provider: string;
+  model: string;
+  messages: Array<{role: "user" | "assistant" | "system"; content: string}>;
+  resumeSessionId?: string;
+  cancelled?: boolean;
+};
+
 type BridgeHandlerDeps = {
   dispatch: React.Dispatch<AppAction>;
   getState: () => AppState;
   bridge: DharmaBridge;
-  pendingBootstraps: React.MutableRefObject<Record<string, {prompt: string; provider: string; model: string; messages: Array<{role: "user" | "assistant" | "system"; content: string}>; resumeSessionId?: string}>>;
+  pendingBootstraps: React.MutableRefObject<Record<string, PendingBootstrap>>;
   pendingCommandStream?: React.MutableRefObject<PendingCommandStream | null>;
   requestHandshake?: (reason: "initial" | "reconnect" | "probe") => void;
   resetHandshakeBackoff?: () => void;
@@ -1656,12 +1578,18 @@ export function createBridgeEventHandler({
   const reconnectingCodes = new Set(["bridge_exit", "bridge_spawn_error", "bridge_send_failed", "bridge_stdin_unavailable"]);
   let malformedBridgeEvents = 0;
   const apply = (actions: AppAction[]): void => queueAppActions(dispatch, actions);
+  const startSession = (payload: Record<string, unknown>): string => {
+    const requestId = bridge.send("session.start", payload);
+    apply([{type: "turn.start", requestId}]);
+    return requestId;
+  };
 
   function requestReconnect(status: string, offline = false): void {
     awaitingAuthoritativeResync = true;
     resyncPending = false;
     apply([
       {type: "surface.truth.reset"},
+      {type: "turn.reset"},
       {type: "bridge.status", status: offline ? "offline" : "degraded"},
       {type: "status.set", value: status},
     ]);
@@ -1694,6 +1622,40 @@ export function createBridgeEventHandler({
     if (canonicalEvents.length > 0) {
       apply([{type: "execution.events.ingest", events: canonicalEvents}]);
     }
+    if (eventType === "session.ack") {
+      const requestId = String(typed.request_id ?? "");
+      if (requestId) {
+        apply([{
+          type: "turn.ack",
+          requestId,
+          sessionId: String(typed.session_id ?? "") || undefined,
+        }]);
+      }
+    }
+    if (eventType === "session.cancelled") {
+      const cancelRequestId = String(typed.request_id ?? "");
+      const targetRequestId = String(typed.target_request_id ?? "");
+      const cancelled = typed.cancelled === true;
+      const reason = String(typed.reason ?? (cancelled ? "cancel_requested" : "rejected"));
+      const actions: AppAction[] = [{
+        type: "status.set",
+        value: cancelled ? "cancellation accepted" : `cancellation rejected: ${reason}`,
+      }];
+      if (!cancelled && cancelRequestId && targetRequestId) {
+        actions.unshift({
+          type: "turn.cancel.rejected",
+          requestId: targetRequestId,
+          cancelRequestId,
+        });
+      }
+      apply(actions);
+    }
+    if (eventType === "session_end") {
+      const requestId = String(typed.request_id ?? "");
+      if (requestId) {
+        apply([{type: "turn.finish", requestId}]);
+      }
+    }
     // Agent-action channel: the chat agent drives the Helm by emitting
     // ⟦helm:…⟧ directives in its reply. Parse them off the completed assistant
     // text and execute each (the sentinel itself is stripped from the display).
@@ -1720,6 +1682,12 @@ export function createBridgeEventHandler({
     if (eventType === "bridge.error" || eventType === "error") {
       const code = String(typed.code ?? "");
       const message = String(typed.message ?? typed.code ?? "bridge error");
+      if (code === "session_detail_failed") {
+        const requestId = String(typed.request_id ?? "").trim();
+        if (requestId) {
+          apply([{type: "session.detail.failed", requestId}]);
+        }
+      }
       if (reconnectingCodes.has(code)) {
         malformedBridgeEvents = 0;
         requestReconnect(code === "bridge_exit" ? "bridge exited, reconnecting" : "backend offline, retrying", code !== "bridge_exit");
@@ -1903,42 +1871,76 @@ export function createBridgeEventHandler({
           resyncPending = !authoritativeResyncComplete(nextAuthority);
         }
         const nextSessionPane = nextSessionPaneAfterCatalog(state.sessionPane, catalog);
-        apply([
-          {type: "session.catalog.set", catalog, selectedSessionId: nextSessionPane.selectedSessionId},
+        const catalogActions: AppAction[] = [
+          {type: "session.catalog.set", catalog},
           {
           type: "tab.replace",
           tabId: "sessions",
           lines: sessionPaneToLines(nextSessionPane),
           preview: sessionPaneToPreview(nextSessionPane),
           },
-        ]);
+        ];
+        const previousSelectedDetail = state.sessionPane.selectedSessionId
+          ? state.sessionPane.detailsBySessionId[state.sessionPane.selectedSessionId]
+          : undefined;
+        const nextSelectedDetail = nextSessionPane.selectedSessionId
+          ? nextSessionPane.detailsBySessionId[nextSessionPane.selectedSessionId]
+          : undefined;
+        if (
+          nextSessionPane.selectedSessionId !== state.sessionPane.selectedSessionId ||
+          (previousSelectedDetail !== undefined && nextSelectedDetail === undefined)
+        ) {
+          catalogActions.push({
+            type: "session.continuity.set",
+            continuity: continuityStateFromSession(state, nextSelectedDetail),
+          });
+        }
+        apply(catalogActions);
         if (
           nextSessionPane.selectedSessionId &&
           !nextSessionPane.detailsBySessionId[nextSessionPane.selectedSessionId]
         ) {
-          requestSessionDetail(bridge, nextSessionPane.selectedSessionId);
-        } else {
-          const selectedDetail = nextSessionPane.selectedSessionId
-            ? nextSessionPane.detailsBySessionId[nextSessionPane.selectedSessionId]
-            : undefined;
-          apply([{type: "session.continuity.set", continuity: continuityStateFromSession(state, selectedDetail)}]);
+          requestSessionDetail(bridge, dispatch, nextSessionPane.selectedSessionId, true);
         }
       }
     }
     if (eventType === "session.detail.result") {
-      const detail = sessionDetailFromEvent(typed);
-      if (detail) {
-        const nextSessionPane = nextSessionPaneAfterDetail(state.sessionPane, detail);
-        apply([
-          {type: "session.detail.set", detail},
-          {type: "session.continuity.set", continuity: continuityStateFromSession(state, detail)},
+      const result = sessionDetailResultFromEvent(typed);
+      if (result) {
+        const nextSessionPane = nextSessionPaneAfterDetailResult(
+          state.sessionPane,
+          result.requestId,
+          result.sessionId,
+          result.detail,
+        );
+        if (!nextSessionPane) {
+          return;
+        }
+        const detail = result.detail;
+        const detailActions: AppAction[] = [
+          {
+            type: "session.detail.received",
+            requestId: result.requestId,
+            sessionId: result.sessionId,
+            detail,
+          },
           {
           type: "tab.replace",
           tabId: "sessions",
           lines: sessionPaneToLines(nextSessionPane),
           preview: sessionPaneToPreview(nextSessionPane),
           },
-        ]);
+        ];
+        if (nextSessionPane.selectedSessionId === detail.session.session_id) {
+          const preserveExplicitResume =
+            state.sessionContinuity.continuityMode === "resume" &&
+            state.sessionContinuity.activeSessionId === detail.session.session_id;
+          detailActions.splice(1, 0, {
+            type: "session.continuity.set",
+            continuity: continuityStateFromSession(state, detail, preserveExplicitResume ? "resume" : "view"),
+          });
+        }
+        apply(detailActions);
       }
     }
     if (eventType === "command.graph.result") {
@@ -1996,7 +1998,7 @@ export function createBridgeEventHandler({
     }
     if (eventType === "runtime.snapshot.result") {
       const typedPayload = runtimeSnapshotPayloadFromEvent(typed);
-      const runtimeIsAuthoritative = typedPayload ? runtimePayloadHasAuthoritativeControlSignal(typedPayload) : true;
+      const runtimeIsAuthoritative = typedPayload ? runtimePayloadHasAuthoritativeControlSignal(typedPayload) : false;
       if (runtimeIsAuthoritative) {
         apply([{type: "surface.truth.mark", surface: "control"}]);
       }
@@ -2008,7 +2010,10 @@ export function createBridgeEventHandler({
       const supervisor = loadSupervisorControlState();
       const content = String(typed.content ?? "");
       const preview = typedPayload ? runtimePayloadToPreview(typedPayload, supervisor) : runtimeSnapshotToPreview(content, supervisor);
-      const effectivePreview = runtimeIsAuthoritative ? preview : preserveDeferredControlPreview(preview, state.liveControlPreview);
+      const effectivePreview =
+        typedPayload && !runtimeIsAuthoritative
+          ? preserveDeferredControlPreview(preview, state.liveControlPreview)
+          : preview;
       const synchronizedRepoPreview = synchronizeRepoControlPreviews(state.liveRepoPreview, effectivePreview);
       if (synchronizedRepoPreview) {
         persistRepoPreview(synchronizedRepoPreview);
@@ -2115,6 +2120,15 @@ export function createBridgeEventHandler({
       const selectedStrategy = String(typed.routing_strategy ?? state.routePolicy.strategy ?? "responsive");
       dispatch({type: "bridge.config", provider: selectedProvider, model: selectedModel, strategy: selectedStrategy});
 
+      // Ctrl-C can arrive before bootstrap returns. That is a real cancelled
+      // turn boundary: consume the informational bootstrap result, but never
+      // launch the provider or auto-execute an inferred intent afterward.
+      if (pending?.cancelled) {
+        delete pendingBootstraps.current[requestId];
+        dispatch({type: "status.set", value: "cancelled before provider start"});
+        return;
+      }
+
       const intent = typed.intent as Record<string, unknown> | undefined;
       if (intent && String(intent.kind ?? "") === "command" && Boolean(intent.auto_execute)) {
         const command = `/${String(intent.command ?? "")}`;
@@ -2157,7 +2171,7 @@ export function createBridgeEventHandler({
         bridge.send("agent.routes");
         dispatch({type: "status.set", value: "agent routing surface ready"});
         if (pending) {
-          bridge.send("session.start", {
+          startSession({
             provider: selectedProvider,
             model: selectedModel,
             prompt: pending.prompt,
@@ -2172,7 +2186,7 @@ export function createBridgeEventHandler({
         bridge.send("evolution.surface");
         dispatch({type: "status.set", value: "evolution surface ready"});
         if (pending) {
-          bridge.send("session.start", {
+          startSession({
             provider: selectedProvider,
             model: selectedModel,
             prompt: pending.prompt,
@@ -2183,7 +2197,7 @@ export function createBridgeEventHandler({
           });
         }
       } else if (pending) {
-        bridge.send("session.start", {
+        startSession({
           provider: selectedProvider,
           model: selectedModel,
           prompt: pending.prompt,
@@ -2236,7 +2250,12 @@ export function createBridgeEventHandler({
       surfaceRefreshActions.forEach((action) => dispatch(action));
       if (actionType === "surface.refresh") {
         const surface = String(typed.surface ?? "").trim().toLowerCase();
-        if (surface === "repo" || surface === "workspace") {
+        const workspaceIsAuthoritative = workspaceEventHasAuthoritativeRepoSignal(typed);
+        const runtimePayload = runtimeSnapshotPayloadFromEvent(typed);
+        const runtimeIsAuthoritative = Boolean(
+          runtimePayload && runtimePayloadHasAuthoritativeControlSignal(runtimePayload),
+        );
+        if ((surface === "repo" || surface === "workspace") && workspaceIsAuthoritative) {
           dispatch({type: "surface.truth.mark", surface: "repo"});
           if (resyncPending && state.bridgeStatus === "connected") {
             const nextAuthority = markAuthoritativeSurface(state.authoritativeSurfaces, "repo");
@@ -2244,7 +2263,7 @@ export function createBridgeEventHandler({
             resyncPending = !authoritativeResyncComplete(nextAuthority);
           }
         }
-        if (surface === "control" || surface === "runtime") {
+        if ((surface === "control" || surface === "runtime") && runtimeIsAuthoritative) {
           dispatch({type: "surface.truth.mark", surface: "control"});
           if (resyncPending && state.bridgeStatus === "connected") {
             const nextAuthority = markAuthoritativeSurface(state.authoritativeSurfaces, "control");
@@ -2410,9 +2429,16 @@ export function surfaceRefreshActionsForBridgeEvent(
   if (surface === "sessions" || surface === "session") {
     const catalog = sessionCatalogFromEvent(typed);
     if (catalog) {
-      const nextSessionPane = nextSessionPaneAfterCatalog(sessionPane ?? {detailsBySessionId: {}} as SessionPaneState, catalog);
+      const nextSessionPane = nextSessionPaneAfterCatalog(
+        sessionPane ?? {
+          selectionProvenance: "follow_latest",
+          detailsBySessionId: {},
+          pendingDetailRequestsBySessionId: {},
+        },
+        catalog,
+      );
       return [
-        {type: "session.catalog.set", catalog, selectedSessionId: nextSessionPane.selectedSessionId},
+        {type: "session.catalog.set", catalog},
         {
           type: "tab.replace",
           tabId: "sessions",
@@ -2563,7 +2589,9 @@ export function App(): React.ReactElement {
     scrollMaxOffsetForTab(activeTab, state, paneWindowSize),
   );
   const stateRef = useRef(state);
-  const pendingBootstraps = useRef<Record<string, {prompt: string; provider: string; model: string; messages: Array<{role: "user" | "assistant" | "system"; content: string}>; resumeSessionId?: string}>>({});
+  const cancellationRequestRef = useRef<{requestId: string; cancelRequestId: string} | null>(null);
+  const pendingBootstraps = useRef<Record<string, PendingBootstrap>>({});
+  const bootstrapCancellationGuardRef = useRef(0);
   // F-157: prompts submitted while the bridge is offline wait here; the connect
   // effect below drains the queue — every entry is dispatched or marked failed.
   const queuedOfflinePrompts = useRef<Array<{
@@ -2681,6 +2709,12 @@ export function App(): React.ReactElement {
     stateRef.current = state;
   }, [state]);
 
+  useEffect(() => {
+    if (state.activeTurn.phase !== "cancelling") {
+      cancellationRequestRef.current = null;
+    }
+  }, [state.activeTurn]);
+
   // F-157: bridge connect drains the offline prompt queue — each queued turn is
   // dispatched (session.bootstrap) or marked failed; no third silent state.
   // F-158: queued offline slash commands drain the same way via command.run.
@@ -2745,11 +2779,20 @@ export function App(): React.ReactElement {
   }, [bridge, state.bridgeStatus]);
 
   useEffect(() => {
-    const selectedDetail = state.sessionPane.selectedSessionId
-      ? state.sessionPane.detailsBySessionId[state.sessionPane.selectedSessionId]
-      : undefined;
-    const nextContinuity = continuityStateFromSession(state, selectedDetail);
     const current = state.sessionContinuity;
+    if (current.continuityMode !== "resume") {
+      return;
+    }
+    const selectedSessionId = state.sessionPane.selectedSessionId;
+    const selectedDetail = selectedSessionId
+      ? state.sessionPane.detailsBySessionId[selectedSessionId]
+      : undefined;
+    const preserveResume = Boolean(selectedSessionId && selectedSessionId === current.activeSessionId);
+    const nextContinuity = continuityStateFromSession(
+      state,
+      selectedDetail,
+      preserveResume ? "resume" : "view",
+    );
     if (
       current.activeSessionId === nextContinuity.activeSessionId &&
       current.resumeSessionId === nextContinuity.resumeSessionId &&
@@ -2762,7 +2805,13 @@ export function App(): React.ReactElement {
       return;
     }
     dispatch({type: "session.continuity.set", continuity: nextContinuity});
-  }, [state.sessionPane.selectedSessionId, state.sessionPane.detailsBySessionId, state.routePolicy.routeId]);
+  }, [
+    state.sessionContinuity.continuityMode,
+    state.sessionContinuity.activeSessionId,
+    state.sessionPane.selectedSessionId,
+    state.sessionPane.detailsBySessionId,
+    state.routePolicy.routeId,
+  ]);
 
   useEffect(() => {
     if (persistTimeoutRef.current) {
@@ -2886,12 +2935,96 @@ export function App(): React.ReactElement {
     return null;
   }
 
+  function requestActiveTurnCancellation(source: "command" | "shortcut"): TurnCancellationDecision["kind"] {
+    const decision = decideTurnCancellation(stateRef.current.activeTurn);
+    if (decision.kind === "idle") {
+      const pendingEntry = Object.entries(pendingBootstraps.current)
+        .reverse()
+        .find(([, pending]) => !pending.cancelled);
+      if (pendingEntry) {
+        const [requestId, pending] = pendingEntry;
+        pending.cancelled = true;
+        bootstrapCancellationGuardRef.current = Date.now();
+        queueAppActions(dispatch, [
+          {
+            type: "execution.events.ingest",
+            events: canonicalEventsFromBridgeEvent({
+              type: "session_end",
+              request_id: requestId,
+              provider_id: pending.provider,
+              success: false,
+              cancelled: true,
+              error_code: "cancelled",
+              error_message: "cancelled before provider start",
+            }),
+          },
+          {type: "tab.activate", tabId: "chat"},
+          {type: "status.set", value: "cancelled before provider start"},
+        ]);
+        return "request";
+      }
+      if (
+        Object.values(pendingBootstraps.current).some((pending) => pending.cancelled) ||
+        Date.now() - bootstrapCancellationGuardRef.current < 2_000
+      ) {
+        dispatch({type: "status.set", value: "cancellation already requested"});
+        return "already_requested";
+      }
+      if (source === "command") {
+        queueAppActions(dispatch, [
+          {
+            type: "execution.events.ingest",
+            events: [
+              userPromptExecutionEvent("/cancel"),
+              localCommandResultExecutionEvent("/cancel", "no active turn to cancel"),
+            ],
+          },
+          {type: "tab.activate", tabId: "chat"},
+        ]);
+      }
+      dispatch({type: "status.set", value: "no active turn to cancel"});
+      return decision.kind;
+    }
+    if (decision.kind === "already_requested") {
+      dispatch({type: "status.set", value: "cancellation already requested"});
+      return decision.kind;
+    }
+    if (cancellationRequestRef.current?.requestId === decision.requestId) {
+      dispatch({type: "status.set", value: "cancellation already requested"});
+      return "already_requested";
+    }
+    try {
+      const cancelRequestId = bridge.send("session.cancel", {target_request_id: decision.requestId});
+      cancellationRequestRef.current = {requestId: decision.requestId, cancelRequestId};
+      queueAppActions(dispatch, [
+        {
+          type: "turn.cancel.request",
+          requestId: decision.requestId,
+          cancelRequestId,
+        },
+        {
+          type: "execution.events.ingest",
+          events: [localStatusExecutionEvent("cancellation requested", "operator", "running")],
+        },
+        {type: "status.set", value: "cancellation requested"},
+      ]);
+      return decision.kind;
+    } catch {
+      dispatch({type: "status.set", value: "cancellation request could not reach the backend"});
+      return "idle";
+    }
+  }
+
   function submitPrompt(prompt: string): void {
     const submitted = prompt.trim();
     if (!submitted) {
       return;
     }
     dispatch({type: "prompt.clear"});
+    if (submitted.toLowerCase() === "/cancel") {
+      requestActiveTurnCancellation("command");
+      return;
+    }
     const deckMatch = submitted.trim().toLowerCase().match(/^\/deck\s+([a-z0-9_-]+)$/);
     if (deckMatch) {
       // F-065: /deck <name> enters deck-focus; until decks ship (S6) it focuses
@@ -2967,6 +3100,10 @@ export function App(): React.ReactElement {
       dispatch({type: "status.set", value: "route picker ready"});
       return;
     }
+    if (!isSlashCommandPrompt(submitted) && stateRef.current.activeTurn.phase !== "idle") {
+      dispatch({type: "status.set", value: "a turn is already running; cancel it before starting another"});
+      return;
+    }
     if (isSlashCommandPrompt(submitted)) {
       const commandEchoLine: TranscriptLine = {
         id: `user-${Date.now()}`,
@@ -2999,7 +3136,7 @@ export function App(): React.ReactElement {
       markPendingCommandStream(pendingCommandStream, {command: submitted});
       bridge.send("command.run", {command: submitted});
     } else {
-      const messages = boundedContinuityMessages(state, submitted);
+      const messages = messagesForNextTurn(state, submitted);
       const userLine: TranscriptLine = {
         id: `user-${Date.now()}`,
         kind: "user",
@@ -3077,6 +3214,10 @@ export function App(): React.ReactElement {
     if (action.summary === "focus selected approval") {
       return;
     }
+    if (action.requestType === "session.detail") {
+      requestSessionDetail(bridge, dispatch, String(action.payload.session_id ?? "").trim() || undefined);
+      return;
+    }
     const commandRunEvent = commandRunEventFromPaneAction(action);
     if (commandRunEvent) {
       markPendingCommandStream(pendingCommandStream, commandRunEvent);
@@ -3085,7 +3226,11 @@ export function App(): React.ReactElement {
   }
 
   function applyModelChoice(index: number): void {
-    const choices = selectableRouteTargets(stateRef.current.routePolicy);
+    const currentState = stateRef.current;
+    const choices = selectableRouteTargets(currentState.routePolicy);
+    const returnTabId = currentState.uiMode.activeOverlay.kind === "modelPicker"
+      ? currentState.uiMode.activeOverlay.returnTabId
+      : currentState.uiMode.activeTabId;
     const clampedIndex = Math.min(Math.max(index, 0), Math.max(choices.length - 1, 0));
     const choice = choices[clampedIndex];
     if (!choice) {
@@ -3103,8 +3248,59 @@ export function App(): React.ReactElement {
     });
     queueAppActions(dispatch, [
       {type: "modelPicker.close"},
+      {type: "tab.activate", tabId: returnTabId},
       {type: "status.set", value: `requesting route -> ${choice.provider}:${choice.model}`},
     ]);
+  }
+
+  function selectSessionForInspection(sessionId: string): void {
+    const currentState = stateRef.current;
+    const detail = currentState.sessionPane.detailsBySessionId[sessionId];
+    queueAppActions(dispatch, [
+      {type: "session.select", sessionId},
+      {type: "session.continuity.set", continuity: continuityStateFromSession(currentState, detail)},
+      {type: "status.set", value: `viewing session ${sessionId} (next prompt remains fresh)`},
+    ]);
+  }
+
+  function armSelectedSessionResume(): void {
+    const currentState = stateRef.current;
+    const sessionId = currentState.sessionPane.selectedSessionId;
+    const detail = sessionId ? currentState.sessionPane.detailsBySessionId[sessionId] : undefined;
+    const eligibility = sessionResumeEligibility(currentState, detail);
+    if (!eligibility.canResume) {
+      if (eligibility.reason === "detail_unavailable" && sessionId) {
+        requestSessionDetail(bridge, dispatch, sessionId);
+        dispatch({type: "status.set", value: `loading ${sessionId}; press r again to arm resume`});
+        return;
+      }
+      const reason = {
+        detail_unavailable: "select a session first",
+        provider_unsupported: "runtime resume is currently Claude-only",
+        provider_mismatch: "selected session does not match the active provider",
+        replay_unverified: "selected transcript failed replay verification",
+        provider_session_missing: "selected session has no provider-native resume id",
+      }[eligibility.reason];
+      dispatch({type: "status.set", value: `resume unavailable: ${reason}`});
+      return;
+    }
+    if (!sessionId) {
+      dispatch({type: "status.set", value: "resume unavailable: select a session first"});
+      return;
+    }
+    queueAppActions(dispatch, [
+      {type: "session.select", sessionId},
+      {type: "session.continuity.set", continuity: continuityStateFromSession(currentState, detail, "resume")},
+    ]);
+    dispatch({type: "status.set", value: `resume armed for ${sessionId}; the next chat prompt continues it`});
+  }
+
+  function resetSessionResume(): void {
+    const currentState = stateRef.current;
+    const sessionId = currentState.sessionPane.selectedSessionId;
+    const detail = sessionId ? currentState.sessionPane.detailsBySessionId[sessionId] : undefined;
+    dispatch({type: "session.continuity.set", continuity: continuityStateFromSession(currentState, detail)});
+    dispatch({type: "status.set", value: "resume cleared; the next chat prompt starts fresh"});
   }
 
   // F-064: F2 toggles zen <-> cockpit. ink 5 blanks F-key input inside
@@ -3118,6 +3314,9 @@ export function App(): React.ReactElement {
     const onData = (data: Buffer | string): void => {
       const sequence = data.toString();
       if (sequence === "OQ" || sequence === "[12~" || sequence === "[[B") {
+        if (stateRef.current.uiMode.activeOverlay.kind !== "none") {
+          return;
+        }
         const next = stateRef.current.uiMode.layoutMode === "zen" ? "cockpit" : "zen";
         dispatch({type: "layout.mode.set", mode: next});
         dispatch({type: "status.set", value: `${next} layout — F2 toggles`});
@@ -3130,13 +3329,8 @@ export function App(): React.ReactElement {
   }, [rawStdin]);
 
   useInput((input, key) => {
-    if (key.ctrl && input === "c") {
-      bridge.close();
-      exit();
-      return;
-    }
     // The guided tour modal swallows the next keystroke to dismiss itself —
-    // any key closes it (operator word 2026-06-16), except ^C handled above.
+    // any key closes it (operator word 2026-06-16).
     if (state.uiMode.activeOverlay.kind === "tour") {
       dispatch({type: "tour.close"});
       dispatch({type: "status.set", value: "tour closed"});
@@ -3168,15 +3362,20 @@ export function App(): React.ReactElement {
         }
         return;
       }
+      return;
     }
-      if (state.uiMode.activeOverlay.kind === "modelPicker") {
-        const choices = modelChoices;
-        const maxIndex = Math.max(choices.length - 1, 0);
-        if (key.escape) {
-          dispatch({type: "modelPicker.close"});
-          dispatch({type: "status.set", value: "model picker closed"});
-          return;
-        }
+    if (state.uiMode.activeOverlay.kind === "modelPicker") {
+      const choices = modelChoices;
+      const maxIndex = Math.max(choices.length - 1, 0);
+      if (key.escape) {
+        const returnTabId = state.uiMode.activeOverlay.returnTabId;
+        queueAppActions(dispatch, [
+          {type: "modelPicker.close"},
+          {type: "tab.activate", tabId: returnTabId},
+          {type: "status.set", value: "model picker closed"},
+        ]);
+        return;
+      }
       if (input === "j" || key.downArrow) {
         dispatch({type: "modelPicker.set", index: Math.min(state.uiMode.activeOverlay.selectedIndex + 1, maxIndex)});
         return;
@@ -3196,27 +3395,69 @@ export function App(): React.ReactElement {
         }
         return;
       }
+      return;
+    }
+    if (key.ctrl && input === "c") {
+      const cancellation = decideTurnCancellation(stateRef.current.activeTurn);
+      const bootstrapPending = Object.keys(pendingBootstraps.current).length > 0;
+      const bootstrapCancellationGuarded = Date.now() - bootstrapCancellationGuardRef.current < 2_000;
+      if (cancellation.kind !== "idle" || bootstrapPending || bootstrapCancellationGuarded) {
+        requestActiveTurnCancellation("shortcut");
+        return;
+      }
+      bridge.close();
+      exit();
+      return;
+    }
+    if (key.escape) {
+      const nextFocus = state.uiMode.keyboardFocus === "composer" ? "navigation" : "composer";
+      dispatch({type: "ui.focus.set", focus: nextFocus});
+      dispatch({type: "status.set", value: `${nextFocus} focus`});
+      return;
+    }
+    if (state.uiMode.keyboardFocus === "composer") {
+      if (isPlainReturn(input, key.return)) {
+        submitPrompt(state.prompt);
+        return;
+      }
+      if (key.backspace || key.delete) {
+        dispatch({type: "prompt.backspace"});
+        return;
+      }
+      if (!key.ctrl && !key.meta) {
+        const normalized = normalizeComposerInput(input);
+        if (normalized) {
+          dispatch({type: "prompt.append", value: normalized});
+        }
+      }
+      return;
     }
     if (activeTab?.kind === "sessions") {
-      if (input === "j") {
+      if (!key.ctrl && !key.meta && input === "j") {
         const nextSessionId = stepSessionSelection(stateRef.current, 1);
         if (nextSessionId) {
-          dispatch({type: "session.select", sessionId: nextSessionId});
-          dispatch({type: "status.set", value: `session -> ${nextSessionId}`});
+          selectSessionForInspection(nextSessionId);
         }
         return;
       }
-      if (input === "k") {
+      if (!key.ctrl && !key.meta && input === "k") {
         const nextSessionId = stepSessionSelection(stateRef.current, -1);
         if (nextSessionId) {
-          dispatch({type: "session.select", sessionId: nextSessionId});
-          dispatch({type: "status.set", value: `session -> ${nextSessionId}`});
+          selectSessionForInspection(nextSessionId);
         }
+        return;
+      }
+      if (!key.ctrl && !key.meta && input === "r") {
+        armSelectedSessionResume();
+        return;
+      }
+      if (!key.ctrl && !key.meta && input === "f") {
+        resetSessionResume();
         return;
       }
       if (key.return) {
         if (state.sessionPane.selectedSessionId) {
-          requestSessionDetail(bridge, state.sessionPane.selectedSessionId);
+          requestSessionDetail(bridge, dispatch, state.sessionPane.selectedSessionId);
           dispatch({type: "status.set", value: `refresh detail ${state.sessionPane.selectedSessionId}`});
         }
         return;
@@ -3279,8 +3520,7 @@ export function App(): React.ReactElement {
     if ((key.upArrow || key.downArrow) && activeTab?.kind === "sessions") {
       const nextSessionId = stepSessionSelection(stateRef.current, key.downArrow ? 1 : -1);
       if (nextSessionId) {
-        dispatch({type: "session.select", sessionId: nextSessionId});
-        dispatch({type: "status.set", value: `session -> ${nextSessionId}`});
+        selectSessionForInspection(nextSessionId);
       }
       return;
     }
@@ -3432,17 +3672,6 @@ export function App(): React.ReactElement {
       setScrollDrawerOpen((open) => !open);
       return;
     }
-    if (key.return) {
-      submitPrompt(state.prompt);
-      return;
-    }
-    if (key.backspace || key.delete) {
-      dispatch({type: "prompt.backspace"});
-      return;
-    }
-    if (!key.ctrl && !key.meta && input && !/[\u0000-\u001f\u007f]/.test(input)) {
-      dispatch({type: "prompt.append", value: input});
-    }
   });
 
   // The guided tour is an isolated, full-screen modal box (operator word
@@ -3469,7 +3698,7 @@ export function App(): React.ReactElement {
     // bridge liveness) — transient statusLine spam ("route confirmed",
     // "sidebar ->") must never churn the zen frame.
     const zenStatus = [
-      "zen",
+      `zen/${state.uiMode.keyboardFocus}`,
       liveRouteLabel,
       state.bridgeStatus === "connected" ? "live" : state.bridgeStatus,
       "F2 cockpit · /tour",
@@ -3501,7 +3730,12 @@ export function App(): React.ReactElement {
           />
         </Box>
         <Box flexShrink={0} flexDirection="column" width={zenWidth}>
-          <Composer prompt={state.prompt} compact={compactShell} width={zenWidth} />
+          <Composer
+            prompt={state.prompt}
+            focused={state.uiMode.keyboardFocus === "composer"}
+            compact={compactShell}
+            width={zenWidth}
+          />
           <Box paddingX={1}>
             <Text dimColor wrap="truncate-end">{zenStatus}</Text>
           </Box>
@@ -3524,13 +3758,13 @@ export function App(): React.ReactElement {
     // Manuscript measure: a touch under the zen clamp — the column is the
     // identity of this face, so it earns gutters at wide terminals.
     const scrollMeasure = Math.min(terminalWidth, 84);
-    const scrollStatus = scrollStatusLine({
+    const scrollStatus = `${state.uiMode.keyboardFocus} · ${scrollStatusLine({
       drawerOpen: scrollDrawerOpen,
       routeLabel: liveRouteLabel,
       bridgeStatus: state.bridgeStatus,
       routeState: state.routePolicy.routeState,
       strategy: state.routePolicy.strategy,
-    });
+    })}`;
     return (
       <Box flexDirection="column" height={terminalHeight} alignItems="center">
         <Box flexShrink={0} flexDirection="column" width={scrollMeasure}>
@@ -3543,7 +3777,12 @@ export function App(): React.ReactElement {
             emptyState={transcriptMeta.emptyState}
             accentColor={transcriptMeta.accentColor}
           />
-          <Composer prompt={state.prompt} compact={compactShell} width={scrollMeasure} />
+          <Composer
+            prompt={state.prompt}
+            focused={state.uiMode.keyboardFocus === "composer"}
+            compact={compactShell}
+            width={scrollMeasure}
+          />
           <Box paddingX={1}>
             <Text dimColor wrap="truncate-end">{scrollStatus}</Text>
           </Box>
@@ -3661,7 +3900,11 @@ export function App(): React.ReactElement {
         ) : activeTab?.kind === "approvals" ? (
           <ApprovalsPane title={activeTab.title} approvalPane={state.approvalPane} />
         ) : activeTab?.kind === "sessions" ? (
-          <SessionsPane title={activeTab.title} sessionPane={state.sessionPane} />
+          <SessionsPane
+            title={activeTab.title}
+            sessionPane={state.sessionPane}
+            sessionContinuity={state.sessionContinuity}
+          />
         ) : activeTab?.kind === "agents" ? (
           <AgentsPane
             title={activeTab.title}
@@ -3706,7 +3949,12 @@ export function App(): React.ReactElement {
         ) : null}
       </Box>
       <Box flexDirection="column" flexShrink={0}>
-        <Composer prompt={state.prompt} compact={compactShell} width={terminalWidth} />
+        <Composer
+          prompt={state.prompt}
+          focused={state.uiMode.keyboardFocus === "composer"}
+          compact={compactShell}
+          width={terminalWidth}
+        />
         {/* F-110: exactly ONE status row at every size — the single source
             (F-164) for mode, route, gate state, and provider summary. */}
         <StatusFooter

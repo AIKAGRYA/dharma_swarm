@@ -9,6 +9,7 @@ import {
   loadSupervisorRepoPreview,
   saveSupervisorControlSummary,
   saveSupervisorRepoPreview,
+  terminalPreviewCachePath,
 } from "../src/persistence";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "..", "..");
@@ -18,6 +19,7 @@ const TEMP_DIRS: string[] = [];
 afterEach(() => {
   delete process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR;
   delete process.env.DHARMA_TERMINAL_STATE_DIR;
+  delete process.env.DHARMA_TERMINAL_PREVIEW_CACHE_PATH;
   while (TEMP_DIRS.length > 0) {
     rmSync(TEMP_DIRS.pop() ?? "", {force: true, recursive: true});
   }
@@ -26,6 +28,7 @@ afterEach(() => {
 function makeStateDir(): string {
   const root = mkdtempSync(path.join(os.tmpdir(), "dharma-terminal-"));
   TEMP_DIRS.push(root);
+  process.env.DHARMA_TERMINAL_PREVIEW_CACHE_PATH = path.join(root, "display-cache.json");
   const stateDir = path.join(root, "state");
   mkdirSync(stateDir, {recursive: true});
   writeFileSync(
@@ -70,6 +73,23 @@ function makeStateDir(): string {
   return stateDir;
 }
 
+function writePreviewCacheFixture(stateDir: string, payload: Record<string, unknown>): void {
+  writeFileSync(
+    terminalPreviewCachePath(),
+    JSON.stringify(
+      {
+        ...payload,
+        version: 1,
+        authority: "display_only",
+        repo_root: REPO_ROOT,
+        source_state_dir: stateDir,
+      },
+      null,
+      2,
+    ),
+  );
+}
+
 describe("supervisor control persistence", () => {
   test("loads loop and verification state from the explicit durable state dir", () => {
     const stateDir = makeStateDir();
@@ -94,7 +114,7 @@ describe("supervisor control persistence", () => {
     ]);
   });
 
-  test("loads explicit verification detail rows from durable state when check arrays are absent", () => {
+  test("does not promote free-form verification detail when structured checks are absent", () => {
     const stateDir = makeStateDir();
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
     writeFileSync(
@@ -116,15 +136,16 @@ describe("supervisor control persistence", () => {
     const summary = loadSupervisorControlState();
 
     expect(summary).not.toBeNull();
-    expect(summary?.verificationSummary).toBe("ok");
+    expect(summary?.verificationSummary).toBe("unknown");
     expect(summary?.verificationChecks).toEqual([]);
-    expect(summary?.verificationStatus).toBe("1 failing, 2/3 passing");
-    expect(summary?.verificationPassing).toBe("tsc, bridge_snapshots");
-    expect(summary?.verificationFailing).toBe("cycle_acceptance");
-    expect(summary?.verificationBundle).toBe("tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail");
+    expect(summary?.verificationStatus).toBe("unknown");
+    expect(summary?.verificationPassing).toBe("unknown");
+    expect(summary?.verificationFailing).toBe("unknown");
+    expect(summary?.verificationBundle).toBe("unknown");
+    expect(summary?.continueRequired).toBe(true);
   });
 
-  test("hydrates runtime freshness and pulse previews from detailed verification bundle when checks are absent", () => {
+  test("keeps runtime freshness fail-closed when verification checks are absent", () => {
     const stateDir = makeStateDir();
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
     writeFileSync(
@@ -144,16 +165,18 @@ describe("supervisor control persistence", () => {
     );
 
     expect(loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-01T04:00:00Z"))).toMatchObject({
-      "Verification summary": "tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail",
-      "Verification bundle": "tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail",
+      "Verification summary": "unknown",
+      "Verification bundle": "unknown",
+      "Verification status": "unknown",
+      "Loop decision": "continue required",
       "Runtime freshness":
-        "cycle 3 running | updated 2026-03-31T22:46:35.466340+00:00 | verify tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail",
+        "cycle 3 running | updated 2026-03-31T22:46:35.466340+00:00 | verify unknown",
       "Control pulse preview":
-        "fresh | in_progress / pass | cycle 3 running | updated 2026-03-31T22:46:35.466340+00:00 | verify tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail",
+        "fresh | in_progress / pass | cycle 3 running | updated 2026-03-31T22:46:35.466340+00:00 | verify unknown",
     });
   });
 
-  test("hydrates a concrete verification bundle from passing and failing rows when the durable summary stays generic", () => {
+  test("does not infer a verification bundle from free-form passing and failing rows", () => {
     const stateDir = makeStateDir();
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
     writeFileSync(
@@ -172,31 +195,39 @@ describe("supervisor control persistence", () => {
     );
 
     expect(loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-01T04:00:00Z"))).toMatchObject({
-      "Verification summary": "tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail",
-      "Verification status": "1 failing, 2/3 passing",
-      "Verification passing": "tsc, bridge_snapshots",
-      "Verification failing": "cycle_acceptance",
-      "Verification bundle": "tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail",
-      "Verification checks": "tsc ok; bridge_snapshots ok; cycle_acceptance fail",
+      "Verification summary": "unknown",
+      "Verification status": "unknown",
+      "Verification passing": "unknown",
+      "Verification failing": "unknown",
+      "Verification bundle": "unknown",
+      "Verification checks": "none",
+      "Loop decision": "continue required",
       "Runtime freshness":
-        "cycle 3 running | updated 2026-03-31T22:46:35.466340+00:00 | verify tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail",
+        "cycle 3 running | updated 2026-03-31T22:46:35.466340+00:00 | verify unknown",
       "Control pulse preview":
-        "fresh | in_progress / pass | cycle 3 running | updated 2026-03-31T22:46:35.466340+00:00 | verify tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail",
+        "fresh | in_progress / pass | cycle 3 running | updated 2026-03-31T22:46:35.466340+00:00 | verify unknown",
     });
   });
 
-  test("writes a compact operator control summary back into durable state", () => {
+  test("writes only a display cache and leaves supervisor authority byte-identical", () => {
     const stateDir = makeStateDir();
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
     const summary = loadSupervisorControlState();
+    const runPath = path.join(stateDir, "run.json");
+    const verificationPath = path.join(stateDir, "verification.json");
+    const runBefore = readFileSync(runPath);
+    const verificationBefore = readFileSync(verificationPath);
 
     expect(summary).not.toBeNull();
     saveSupervisorControlSummary(summary!);
 
-    const outputPath = path.join(stateDir, "terminal-control-summary.json");
+    const outputPath = terminalPreviewCachePath();
     expect(existsSync(outputPath)).toBe(true);
 
     const payload = JSON.parse(readFileSync(outputPath, "utf8")) as Record<string, unknown>;
+    expect(payload.authority).toBe("display_only");
+    expect(payload.source_state_dir).toBe(stateDir);
+    expect(payload.repo_root).toBe(REPO_ROOT);
     expect(payload.verification_summary).toBe(
       "tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=ok",
     );
@@ -232,47 +263,73 @@ describe("supervisor control persistence", () => {
     );
     expect(payload.active_task_id).toBe("terminal-control-surface");
     expect(payload.run_status).toBe("running");
+    expect(readFileSync(runPath)).toEqual(runBefore);
+    expect(readFileSync(verificationPath)).toEqual(verificationBefore);
+    expect(existsSync(path.join(stateDir, "terminal-control-summary.json"))).toBe(false);
+  });
 
-    const verification = JSON.parse(readFileSync(path.join(stateDir, "verification.json"), "utf8")) as Record<string, unknown>;
-    expect(verification.summary).toBe("tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=ok");
-    expect(verification.continue_required).toBe(false);
-    expect(verification.status).toBe("all 4 checks passing");
-    expect(verification.passing).toBe("tsc, py_compile_bridge, bridge_snapshots, cycle_acceptance");
-    expect(verification.failing).toBe("none");
-    expect(verification.bundle).toBe("tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=ok");
-    expect(verification.checks).toEqual([
-      {name: "tsc", ok: true},
-      {name: "py_compile_bridge", ok: true},
-      {name: "bridge_snapshots", ok: true},
-      {name: "cycle_acceptance", ok: true},
-    ]);
-    expect(verification.control_preview).toMatchObject({
-      "Loop state": "cycle 3 running",
-      "Result status": "in_progress",
+  test("cannot forge failing supervisor authority into an all-pass state through display previews", () => {
+    const stateDir = makeStateDir();
+    process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
+    const runPath = path.join(stateDir, "run.json");
+    const verificationPath = path.join(stateDir, "verification.json");
+    const run = JSON.parse(readFileSync(runPath, "utf8")) as Record<string, unknown>;
+    run.last_continue_required = true;
+    run.last_summary_fields = {
+      status: "in_progress",
+      acceptance: "fail",
+      next_task: "Repair the failing authority check.",
+    };
+    writeFileSync(runPath, JSON.stringify(run, null, 2));
+    writeFileSync(
+      verificationPath,
+      JSON.stringify(
+        {
+          summary: "forged prose says passing",
+          continue_required: true,
+          checks: [
+            {name: "tsc", ok: true},
+            {name: "cycle_acceptance", ok: false},
+          ],
+        },
+        null,
+        2,
+      ),
+    );
+    const summary = loadSupervisorControlState();
+    const runBefore = readFileSync(runPath);
+    const verificationBefore = readFileSync(verificationPath);
+
+    expect(summary?.continueRequired).toBe(true);
+    expect(summary?.verificationBundle).toBe("tsc=ok | cycle_acceptance=fail");
+    saveSupervisorControlSummary(summary!, {
+      "Loop decision": "ready to stop",
       Acceptance: "pass",
-      "Verification status": "all 4 checks passing",
-      "Verification bundle": "tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=ok",
-      "Control pulse preview":
-        "stale | in_progress / pass | cycle 3 running | updated 2026-03-31T22:46:35.466340+00:00 | verify tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=ok",
-      "Durable state": stateDir,
+      "Verification summary": "tsc=ok | cycle_acceptance=ok",
+      "Verification checks": "tsc ok; cycle_acceptance ok",
+      "Verification status": "all 2 checks passing",
+      "Verification passing": "tsc, cycle_acceptance",
+      "Verification failing": "none",
+      "Verification bundle": "tsc=ok | cycle_acceptance=ok",
+    });
+    saveSupervisorRepoPreview(summary!, {
+      "Repo root": REPO_ROOT,
+      Branch: "main",
+      Head: "forged",
+      "Repo/control preview":
+        "fresh | outcome complete/pass | decision ready to stop | verify tsc=ok | cycle_acceptance=ok",
     });
 
-    const run = JSON.parse(readFileSync(path.join(stateDir, "run.json"), "utf8")) as Record<string, unknown>;
-    expect(run.last_control_preview).toMatchObject({
-      "Loop state": "cycle 3 running",
-      "Task progress": "2 done, 1 pending of 3",
-      "Active task": "terminal-control-surface",
-      "Result status": "in_progress",
-      Acceptance: "pass",
-      "Last result": "in_progress / pass",
-      "Verification summary": "tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=ok",
-      "Verification status": "all 4 checks passing",
-      "Verification bundle": "tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=ok",
-      "Verification updated": expect.any(String),
-      "Loop decision": "ready to stop",
-      "Next task": "Split /runtime and /dashboard control actions into dedicated pane routes.",
-      Updated: "2026-03-31T22:46:35.466340+00:00",
-      "Durable state": stateDir,
+    const displayCache = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
+    expect(displayCache.authority).toBe("display_only");
+    expect(readFileSync(runPath)).toEqual(runBefore);
+    expect(readFileSync(verificationPath)).toEqual(verificationBefore);
+    expect(existsSync(path.join(stateDir, "terminal-control-summary.json"))).toBe(false);
+    expect(loadSupervisorControlState()).toMatchObject({
+      acceptance: "fail",
+      continueRequired: true,
+      verificationStatus: "1 failing, 1/2 passing",
+      verificationBundle: "tsc=ok | cycle_acceptance=fail",
     });
   });
 
@@ -280,6 +337,8 @@ describe("supervisor control persistence", () => {
     const stateDir = makeStateDir();
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
     const summary = loadSupervisorControlState();
+    const verificationPath = path.join(stateDir, "verification.json");
+    const verificationBefore = readFileSync(verificationPath);
 
     expect(summary).not.toBeNull();
     saveSupervisorControlSummary(summary!, {
@@ -291,15 +350,11 @@ describe("supervisor control persistence", () => {
       "Durable state": "/tmp/alt-durable",
     });
 
-    const payload = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
+    const payload = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
     expect(payload.preview_Durable_state).toBe("/tmp/alt-durable");
     expect(payload.preview_Verification_receipt).toBe("/tmp/alt-durable/verification.json");
 
-    const verification = JSON.parse(readFileSync(path.join(stateDir, "verification.json"), "utf8")) as Record<string, unknown>;
-    expect((verification.control_preview as Record<string, unknown>)["Durable state"]).toBe("/tmp/alt-durable");
-    expect((verification.control_preview as Record<string, unknown>)["Verification receipt"]).toBe(
-      "/tmp/alt-durable/verification.json",
-    );
+    expect(readFileSync(verificationPath)).toEqual(verificationBefore);
 
     expect(loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-01T04:00:00Z"))).toMatchObject({
       "Durable state": "/tmp/alt-durable",
@@ -307,7 +362,7 @@ describe("supervisor control persistence", () => {
     });
   });
 
-  test("mirrors normalized verification detail back into verification.json without dropping existing check metadata", () => {
+  test("normalizes display verification without mutating supervisor check metadata", () => {
     const stateDir = makeStateDir();
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
     writeFileSync(
@@ -328,6 +383,10 @@ describe("supervisor control persistence", () => {
       ),
     );
     const summary = loadSupervisorControlState();
+    const runPath = path.join(stateDir, "run.json");
+    const verificationPath = path.join(stateDir, "verification.json");
+    const runBefore = readFileSync(runPath);
+    const verificationBefore = readFileSync(verificationPath);
 
     expect(summary).not.toBeNull();
     saveSupervisorControlSummary(summary!, {
@@ -339,41 +398,17 @@ describe("supervisor control persistence", () => {
       "Verification bundle": "ok",
     });
 
-    const verification = JSON.parse(readFileSync(path.join(stateDir, "verification.json"), "utf8")) as Record<string, unknown>;
-    expect(verification.summary).toBe("tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=fail");
-    expect(verification.continue_required).toBe(false);
-    expect(verification.status).toBe("1 failing, 3/4 passing");
-    expect(verification.passing).toBe("tsc, py_compile_bridge, bridge_snapshots");
-    expect(verification.failing).toBe("cycle_acceptance");
-    expect(verification.bundle).toBe("tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=fail");
-    expect(verification.checks).toEqual([
-      {name: "tsc", ok: true, rc: 0, preview: ""},
-      {name: "py_compile_bridge", ok: true, rc: 0, preview: ""},
-      {name: "bridge_snapshots", ok: true, rc: 0, preview: "ready"},
-      {name: "cycle_acceptance", ok: false, rc: 0, preview: "old"},
-    ]);
-
-    const run = JSON.parse(readFileSync(path.join(stateDir, "run.json"), "utf8")) as Record<string, unknown>;
-    expect(run.last_continue_required).toBe(false);
-    expect(run.last_verification).toEqual({
-      ts: expect.any(String),
-      updated_at: "2026-03-31T22:46:35.466340+00:00",
-      summary: "tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=fail",
-      continue_required: false,
-      status: "1 failing, 3/4 passing",
-      passing: "tsc, py_compile_bridge, bridge_snapshots",
-      failing: "cycle_acceptance",
-      bundle: "tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=fail",
-      checks: [
-        {name: "tsc", ok: true},
-        {name: "py_compile_bridge", ok: true},
-        {name: "bridge_snapshots", ok: true},
-        {name: "cycle_acceptance", ok: false},
-      ],
-    });
+    const display = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
+    expect(display.authority).toBe("display_only");
+    expect(display.verification_summary).toBe(
+      "tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=fail",
+    );
+    expect(display.verification_status).toBe("1 failing, 3/4 passing");
+    expect(readFileSync(runPath)).toEqual(runBefore);
+    expect(readFileSync(verificationPath)).toEqual(verificationBefore);
   });
 
-  test("loads loop and verification preview from run.json when summary files are missing after persistence", () => {
+  test("does not promote removed display cache fields when verification authority is missing", () => {
     const stateDir = makeStateDir();
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
     const summary = loadSupervisorControlState();
@@ -396,31 +431,20 @@ describe("supervisor control persistence", () => {
     });
 
     rmSync(path.join(stateDir, "verification.json"), {force: true});
-    rmSync(path.join(stateDir, "terminal-control-summary.json"), {force: true});
+    rmSync(terminalPreviewCachePath(), {force: true});
 
-    expect(loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-01T04:00:00Z"))).toMatchObject({
-      "Runtime DB": "/Users/dhyana/.dharma/state/runtime.db",
-      "Session state": "18 sessions | 0 claims | 0 active claims | 0 acked claims",
-      "Run state": "0 runs | 0 active runs",
-      "Context state": "7 artifacts | 2 promoted facts | 1 context bundles | 3 operator actions",
-      "Runtime activity": "Sessions=18  Claims=0  ActiveClaims=0  AckedClaims=0  Runs=0  ActiveRuns=0",
-      "Artifact state": "Artifacts=7  PromotedFacts=2  ContextBundles=1  OperatorActions=3",
-      "Recent operator actions": "reroute by operator (better frontier model)",
+    const preview = loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-01T04:00:00Z"));
+    expect(preview).toMatchObject({
       "Loop state": "cycle 3 running",
-      "Verification summary": "tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail",
-      "Verification status": "1 failing, 2/3 passing",
-      "Verification passing": "tsc, bridge_snapshots",
-      "Verification failing": "cycle_acceptance",
-      "Verification bundle": "tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail",
-      "Runtime summary":
-        "/Users/dhyana/.dharma/state/runtime.db | 18 sessions | 0 claims | 0 active claims | 0 acked claims | 0 runs | 0 active runs | 7 artifacts | 2 promoted facts | 1 context bundles | 3 operator actions",
-      Updated: "2026-03-31T22:46:35.466340+00:00",
-      "Control pulse preview":
-        "stale | in_progress / pass | cycle 3 running | updated 2026-03-31T22:46:35.466340+00:00 | verify tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail",
+      "Verification summary": "unknown",
+      "Verification status": "unknown",
+      "Verification bundle": "unknown",
     });
+    expect(preview?.["Runtime DB"]).toBeUndefined();
+    expect(preview?.["Session state"]).toBeUndefined();
   });
 
-  test("prefers the persisted verification updated_at from run.json over the write timestamp when verification.json is missing", () => {
+  test("ignores stale run.last_verification when verification.json is missing", () => {
     const stateDir = makeStateDir();
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
     const run = JSON.parse(readFileSync(path.join(stateDir, "run.json"), "utf8")) as Record<string, unknown>;
@@ -445,17 +469,14 @@ describe("supervisor control persistence", () => {
     const summary = loadSupervisorControlState();
     const preview = loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-03T04:00:00Z"));
 
-    expect(summary?.verificationUpdatedAt).toBe("2026-04-03T02:00:00Z");
-    expect(preview?.["Verification updated"]).toBe("2026-04-03T02:00:00Z");
-    expect(preview?.["Runtime freshness"]).toBe(
-      "cycle 3 running | updated 2026-03-31T22:46:35.466340+00:00 | verify tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail",
-    );
-    expect(preview?.["Control pulse preview"]).toBe(
-      "stale | in_progress / pass | cycle 3 running | updated 2026-03-31T22:46:35.466340+00:00 | verify tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail",
-    );
+    expect(summary?.verificationUpdatedAt).toBe("");
+    expect(summary?.verificationChecks).toEqual([]);
+    expect(summary?.verificationStatus).toBe("unknown");
+    expect(preview?.["Verification status"]).toBe("unknown");
+    expect(preview?.["Verification bundle"]).toBe("unknown");
   });
 
-  test("hydrates control preview from verification receipt when run preview only has generic placeholders", () => {
+  test("uses structured verification authority after the display cache is removed", () => {
     const stateDir = makeStateDir();
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
     const summary = loadSupervisorControlState();
@@ -494,19 +515,17 @@ describe("supervisor control persistence", () => {
       continue_required: false,
     };
     writeFileSync(path.join(stateDir, "run.json"), JSON.stringify(run, null, 2));
-    rmSync(path.join(stateDir, "terminal-control-summary.json"), {force: true});
+    rmSync(terminalPreviewCachePath(), {force: true});
 
     expect(loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-01T04:00:00Z"))).toMatchObject({
       "Loop state": "cycle 3 running",
-      "Result status": "in_progress",
-      Acceptance: "pass",
-      "Verification status": "1 failing, 2/3 passing",
-      "Verification passing": "tsc, bridge_snapshots",
-      "Verification failing": "cycle_acceptance",
-      "Verification bundle": "tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail",
-      "Control pulse preview":
-        "stale | in_progress / pass | cycle 3 running | updated 2026-03-31T22:46:35.466340+00:00 | verify tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail",
-      "Next task": "Refresh pane-ready verification receipts.",
+      "Result status": "unknown",
+      Acceptance: "unknown",
+      "Verification status": "all 4 checks passing",
+      "Verification passing": "tsc, py_compile_bridge, bridge_snapshots, cycle_acceptance",
+      "Verification failing": "none",
+      "Verification bundle": "tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=ok",
+      "Next task": "none",
       "Durable state": stateDir,
     });
   });
@@ -652,19 +671,12 @@ describe("supervisor control persistence", () => {
   test("derives the runtime summary fallback for older stored control previews", () => {
     const stateDir = makeStateDir();
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
-    writeFileSync(
-      path.join(stateDir, "terminal-control-summary.json"),
-      JSON.stringify(
-        {
-          preview_Runtime_DB: "/Users/dhyana/.dharma/state/runtime.db",
-          preview_Session_state: "18 sessions | 0 claims | 0 active claims | 0 acked claims",
-          preview_Run_state: "0 runs | 0 active runs",
-          preview_Context_state: "7 artifacts | 2 promoted facts | 1 context bundles | 3 operator actions",
-        },
-        null,
-        2,
-      ),
-    );
+    writePreviewCacheFixture(stateDir, {
+      preview_Runtime_DB: "/Users/dhyana/.dharma/state/runtime.db",
+      preview_Session_state: "18 sessions | 0 claims | 0 active claims | 0 acked claims",
+      preview_Run_state: "0 runs | 0 active runs",
+      preview_Context_state: "7 artifacts | 2 promoted facts | 1 context bundles | 3 operator actions",
+    });
 
     expect(loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-01T04:00:00Z"))?.["Runtime summary"]).toBe(
       "/Users/dhyana/.dharma/state/runtime.db | 18 sessions | 0 claims | 0 active claims | 0 acked claims | 0 runs | 0 active runs | 7 artifacts | 2 promoted facts | 1 context bundles | 3 operator actions",
@@ -710,7 +722,7 @@ describe("supervisor control persistence", () => {
       "Verification bundle": "tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail",
     });
 
-    const payload = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
+    const payload = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
     expect(payload.verification_summary).toBe("tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail");
     expect(payload.verification_checks).toEqual(["tsc ok", "bridge_snapshots ok", "cycle_acceptance fail"]);
     expect(payload.verification_bundle).toEqual([
@@ -739,7 +751,7 @@ describe("supervisor control persistence", () => {
       "Next task": "Split /runtime and /dashboard control actions into dedicated pane routes.",
     });
 
-    const payload = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
+    const payload = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
     expect(payload.preview_Control_truth_preview).toBe(
       "tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=ok | cycle 3 running | next Split /runtime and /dashboard control actions into dedicated pane routes.",
     );
@@ -760,7 +772,7 @@ describe("supervisor control persistence", () => {
       "Verification bundle": "ok",
     });
 
-    const payload = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
+    const payload = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
     expect(payload.verification_summary).toBe("tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail");
     expect(payload.verification_status).toBe("1 failing, 2/3 passing");
     expect(payload.verification_passing).toBe("tsc, bridge_snapshots");
@@ -772,10 +784,12 @@ describe("supervisor control persistence", () => {
     expect(payload.preview_Verification_bundle).toBe("tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail");
   });
 
-  test("promotes an explicit verification bundle into durable summary fields when checks are absent", () => {
+  test("promotes an explicit verification bundle only inside the display cache", () => {
     const stateDir = makeStateDir();
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
     const summary = loadSupervisorControlState();
+    const verificationPath = path.join(stateDir, "verification.json");
+    const verificationBefore = readFileSync(verificationPath);
 
     expect(summary).not.toBeNull();
     saveSupervisorControlSummary(summary!, {
@@ -783,7 +797,7 @@ describe("supervisor control persistence", () => {
       "Verification bundle": "tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail",
     });
 
-    const payload = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
+    const payload = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
     expect(payload.verification_summary).toBe("tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail");
     expect(payload.verification_checks).toEqual(["tsc ok", "bridge_snapshots ok", "cycle_acceptance fail"]);
     expect(payload.verification_status).toBe("1 failing, 2/3 passing");
@@ -792,19 +806,15 @@ describe("supervisor control persistence", () => {
     expect(payload.preview_Verification_summary).toBe("tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail");
     expect(payload.preview_Verification_bundle).toBe("tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail");
 
-    const verification = JSON.parse(readFileSync(path.join(stateDir, "verification.json"), "utf8")) as Record<string, unknown>;
-    expect(verification.summary).toBe("tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail");
-    expect(verification.checks).toEqual([
-      {name: "tsc", ok: true},
-      {name: "bridge_snapshots", ok: true},
-      {name: "cycle_acceptance", ok: false},
-    ]);
+    expect(readFileSync(verificationPath)).toEqual(verificationBefore);
   });
 
-  test("writes normalized control and verification receipts from a compact repo/control preview", () => {
+  test("normalizes compact repo/control text only inside the display cache", () => {
     const stateDir = makeStateDir();
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
     const summary = loadSupervisorControlState();
+    const verificationPath = path.join(stateDir, "verification.json");
+    const verificationBefore = readFileSync(verificationPath);
 
     expect(summary).not.toBeNull();
     saveSupervisorControlSummary(summary!, {
@@ -812,7 +822,7 @@ describe("supervisor control persistence", () => {
         "stale | task terminal-control-surface | progress 2 done, 1 pending of 3 | outcome in_progress/pass | decision continue required | cycle 7 waiting_for_verification | updated 2026-04-03T02:16:08Z | verify tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail | db /Users/dhyana/.dharma/state/runtime.db | activity Sessions=18 Runs=0 ActiveRuns=0 | artifacts Artifacts=7 ContextBundles=1 | next persist pane-ready verification receipts",
     });
 
-    const payload = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
+    const payload = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
     expect(payload.preview_Active_task).toBe("terminal-control-surface");
     expect(payload.preview_Task_progress).toBe("2 done, 1 pending of 3");
     expect(payload.preview_Loop_state).toBe("cycle 7 waiting_for_verification");
@@ -828,16 +838,15 @@ describe("supervisor control persistence", () => {
     expect(payload.verification_passing).toBe("tsc, bridge_snapshots");
     expect(payload.verification_failing).toBe("cycle_acceptance");
 
-    const verification = JSON.parse(readFileSync(path.join(stateDir, "verification.json"), "utf8")) as Record<string, unknown>;
-    expect(verification.summary).toBe("tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail");
-    expect(verification.status).toBe("1 failing, 2/3 passing");
-    expect(verification.bundle).toBe("tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail");
+    expect(readFileSync(verificationPath)).toEqual(verificationBefore);
   });
 
-  test("derives loop and verification detail from compact pulse fields before writing durable state", () => {
+  test("derives compact pulse display detail without writing durable state", () => {
     const stateDir = makeStateDir();
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
     const summary = loadSupervisorControlState();
+    const verificationPath = path.join(stateDir, "verification.json");
+    const verificationBefore = readFileSync(verificationPath);
 
     expect(summary).not.toBeNull();
     saveSupervisorControlSummary(summary!, {
@@ -848,7 +857,7 @@ describe("supervisor control persistence", () => {
       "Durable state": "/tmp/compact-durable",
     });
 
-    const payload = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
+    const payload = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
     expect(payload.preview_Loop_state).toBe("cycle 8 waiting_for_verification");
     expect(payload.preview_Updated).toBe("2026-04-02T00:00:00Z");
     expect(payload.preview_Last_result).toBe("complete / fail");
@@ -863,41 +872,22 @@ describe("supervisor control persistence", () => {
     expect(payload.preview_Verification_bundle).toBe("tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail");
     expect(payload.preview_Durable_state).toBe("/tmp/compact-durable");
 
-    const verification = JSON.parse(readFileSync(path.join(stateDir, "verification.json"), "utf8")) as Record<string, unknown>;
-    expect(verification.summary).toBe("tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail");
-    expect(verification.updated_at).toBe("2026-04-02T00:00:00Z");
-    expect(verification.status).toBe("1 failing, 2/3 passing");
-    expect(verification.passing).toBe("tsc, bridge_snapshots");
-    expect(verification.failing).toBe("cycle_acceptance");
-    expect(verification.bundle).toBe("tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail");
-    expect(verification.checks).toEqual([
-      {name: "tsc", ok: true},
-      {name: "bridge_snapshots", ok: true},
-      {name: "cycle_acceptance", ok: false},
-    ]);
-
+    expect(readFileSync(verificationPath)).toEqual(verificationBefore);
     const reloaded = loadSupervisorControlState();
-    expect(reloaded?.verificationUpdatedAt).toBe("2026-04-02T00:00:00Z");
+    expect(reloaded?.verificationUpdatedAt).toBe("");
   });
 
   test("normalizes stored generic verification preview fields when loading the control pane boot preview", () => {
     const stateDir = makeStateDir();
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
-    writeFileSync(
-      path.join(stateDir, "terminal-control-summary.json"),
-      JSON.stringify(
-        {
-          preview_Verification_summary: "ok",
-          preview_Verification_checks: "tsc ok; bridge_snapshots ok; cycle_acceptance fail",
-          preview_Verification_status: "passing",
-          preview_Verification_passing: "ok",
-          preview_Verification_failing: "fail",
-          preview_Verification_bundle: "ok",
-        },
-        null,
-        2,
-      ),
-    );
+    writePreviewCacheFixture(stateDir, {
+      preview_Verification_summary: "ok",
+      preview_Verification_checks: "tsc ok; bridge_snapshots ok; cycle_acceptance fail",
+      preview_Verification_status: "passing",
+      preview_Verification_passing: "ok",
+      preview_Verification_failing: "fail",
+      preview_Verification_bundle: "ok",
+    });
 
     expect(loadSupervisorControlPreview(REPO_ROOT)).toMatchObject({
       "Verification summary": "tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail",
@@ -908,7 +898,7 @@ describe("supervisor control persistence", () => {
     });
   });
 
-  test("hydrates control preview from explicit durable verification rows when summary fields stay generic", () => {
+  test("does not promote explicit durable verification prose without structured checks", () => {
     const stateDir = makeStateDir();
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
     writeFileSync(
@@ -928,12 +918,13 @@ describe("supervisor control persistence", () => {
     );
 
     expect(loadSupervisorControlPreview(REPO_ROOT)).toMatchObject({
-      "Verification summary": "tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail",
-      "Verification checks": "tsc ok; bridge_snapshots ok; cycle_acceptance fail",
-      "Verification status": "1 failing, 2/3 passing",
-      "Verification passing": "tsc, bridge_snapshots",
-      "Verification failing": "cycle_acceptance",
-      "Verification bundle": "tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail",
+      "Verification summary": "unknown",
+      "Verification checks": "none",
+      "Verification status": "unknown",
+      "Verification passing": "unknown",
+      "Verification failing": "unknown",
+      "Verification bundle": "unknown",
+      "Loop decision": "continue required",
     });
   });
 
@@ -978,17 +969,10 @@ describe("supervisor control persistence", () => {
         2,
       ),
     );
-    writeFileSync(
-      path.join(stateDir, "terminal-control-summary.json"),
-      JSON.stringify(
-        {
-          "preview_Repo/control_preview":
-            "stale | task terminal-control-surface | progress 2 done, 1 pending of 3 | outcome in_progress/pass | decision continue required | cycle 7 waiting_for_verification | updated 2026-04-03T02:16:08Z | verify tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail | db /Users/dhyana/.dharma/state/runtime.db | activity Sessions=18 Runs=0 ActiveRuns=0 | artifacts Artifacts=7 ContextBundles=1 | next persist pane-ready verification receipts",
-        },
-        null,
-        2,
-      ),
-    );
+    writePreviewCacheFixture(stateDir, {
+      "preview_Repo/control_preview":
+        "stale | task terminal-control-surface | progress 2 done, 1 pending of 3 | outcome in_progress/pass | decision continue required | cycle 7 waiting_for_verification | updated 2026-04-03T02:16:08Z | verify tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail | db /Users/dhyana/.dharma/state/runtime.db | activity Sessions=18 Runs=0 ActiveRuns=0 | artifacts Artifacts=7 ContextBundles=1 | next persist pane-ready verification receipts",
+    });
 
     expect(loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-03T04:00:00Z"))).toMatchObject({
       "Repo/control preview":
@@ -1027,7 +1011,7 @@ describe("supervisor control persistence", () => {
       "Context state": "7 artifacts | 2 promoted facts | 1 context bundles | 3 operator actions",
     });
 
-    const payload = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
+    const payload = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
     expect(payload.preview_Runtime_summary).toBe(
       "/Users/dhyana/.dharma/state/runtime.db | 18 sessions | 0 claims | 0 active claims | 0 acked claims | 0 runs | 0 active runs | 7 artifacts | 2 promoted facts | 1 context bundles | 3 operator actions",
     );
@@ -1051,7 +1035,7 @@ describe("supervisor control persistence", () => {
       "Context state": "0 artifacts | 0 promoted facts | 0 context bundles | 0 operator actions",
     });
 
-    const payload = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
+    const payload = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
     expect(payload.preview_Runtime_summary).toBe(
       "/Users/dhyana/.dharma/state/runtime.db | 20 sessions | 0 claims | 0 active claims | 0 acked claims | 0 active runs | 0 runs total | 0 artifacts | 0 promoted facts | 0 context bundles | 0 operator actions",
     );
@@ -1087,7 +1071,7 @@ describe("supervisor control persistence", () => {
       Updated: "2026-04-01T00:00:00Z",
     });
 
-    const payload = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
+    const payload = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
     expect(payload.preview_Runtime_DB).toBe("/Users/dhyana/.dharma/state/runtime.db");
     expect(payload.preview_Session_state).toBe("18 sessions | 0 claims | 0 active claims | 0 acked claims");
     expect(payload.preview_Run_state).toBe("0 runs | 0 active runs");
@@ -1107,19 +1091,12 @@ describe("supervisor control persistence", () => {
     const stateDir = makeStateDir();
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
 
-    writeFileSync(
-      path.join(stateDir, "terminal-control-summary.json"),
-      JSON.stringify(
-        {
-          preview_Runtime_DB: "/Users/dhyana/.dharma/state/runtime.db",
-          preview_Runtime_activity: "Sessions=18  Claims=0  ActiveClaims=0  AckedClaims=0  Runs=0  ActiveRuns=0",
-          preview_Artifact_state: "Artifacts=7  PromotedFacts=2  ContextBundles=1  OperatorActions=3",
-          preview_Recent_operator_actions: "reroute by operator (better frontier model)",
-        },
-        null,
-        2,
-      ),
-    );
+    writePreviewCacheFixture(stateDir, {
+      preview_Runtime_DB: "/Users/dhyana/.dharma/state/runtime.db",
+      preview_Runtime_activity: "Sessions=18  Claims=0  ActiveClaims=0  AckedClaims=0  Runs=0  ActiveRuns=0",
+      preview_Artifact_state: "Artifacts=7  PromotedFacts=2  ContextBundles=1  OperatorActions=3",
+      preview_Recent_operator_actions: "reroute by operator (better frontier model)",
+    });
 
     expect(loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-01T04:00:00Z"))).toEqual({
       "Runtime DB": "/Users/dhyana/.dharma/state/runtime.db",
@@ -1270,7 +1247,7 @@ describe("supervisor control persistence", () => {
       Inventory: "501 modules | 494 tests | 124 scripts | 239 docs | 1 workflows",
       "Language mix": ".py: 1125; .md: 511",
     });
-    const payload = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
+    const payload = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
     expect(payload["preview_Repo/control_preview"]).toBe(
       "stale | task terminal-control-surface | progress 2 done, 1 pending of 3 | outcome in_progress/pass | decision ready to stop | branch main@95210b1 | tracking origin/main in sync | sab_canonical_repo_missing | dharma_swarm (canonical_core, main...origin/main, dirty True) | dirty high (552 local changes) | warn sab_canonical_repo_missing | peer dharma_swarm (canonical_core, main...origin/main, dirty True) | peers dharma_swarm (canonical_core, main...origin/main, dirty True); dgc-core (operator_shell, n/a, dirty None) | drift dharma_swarm track main...origin/main | markers dharma_swarm track main...origin/main; dgc-core n/a | divergence local +0/-0 | peer dharma_swarm track main...origin/main | hotspot change terminal (274) | path terminal/src/protocol.ts | dep dharma_swarm.models | inbound 159 | cycle 3 running | updated 2026-03-31T22:46:35.466340+00:00 | verify tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=ok | db /Users/dhyana/.dharma/state/runtime.db | next Split /runtime and /dashboard control actions into dedicated pane routes.",
     );
@@ -1322,7 +1299,7 @@ describe("supervisor control persistence", () => {
       "change terminal (274); .dharma_psmv_hyperfile_branch (142) | files dgc_cli.py (6908 lines) | deps dharma_swarm.models | inbound 159 | paths terminal/src/protocol.ts",
     );
 
-    const payload = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
+    const payload = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
     expect(payload.preview_Topology_warning_severity).toBe("high");
     expect(payload.preview_Primary_peer_drift).toBe("dharma_swarm track main...origin/main");
     expect(payload.preview_Hotspot_summary).toBe(
@@ -1331,10 +1308,14 @@ describe("supervisor control persistence", () => {
     expect(preview?.Alerts).toBeUndefined();
   });
 
-  test("propagates repo-derived compact control preview into durable control snapshots", () => {
+  test("propagates repo-derived compact control preview only through the display cache", () => {
     const stateDir = makeStateDir();
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
     const summary = loadSupervisorControlState();
+    const runPath = path.join(stateDir, "run.json");
+    const verificationPath = path.join(stateDir, "verification.json");
+    const runBefore = readFileSync(runPath);
+    const verificationBefore = readFileSync(verificationPath);
 
     expect(summary).not.toBeNull();
     saveSupervisorControlSummary(summary!, {
@@ -1390,15 +1371,13 @@ describe("supervisor control persistence", () => {
       "Artifact state": "Artifacts=7 ContextBundles=1",
     });
 
-    const verification = JSON.parse(readFileSync(path.join(stateDir, "verification.json"), "utf8")) as Record<string, unknown>;
-    expect((verification.control_preview as Record<string, unknown>)["Repo/control preview"]).toBe(
+    const displayCache = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
+    expect(displayCache.authority).toBe("display_only");
+    expect(displayCache["preview_Repo/control_preview"]).toBe(
       "stale | task terminal-repo-pane | progress 2 done, 1 pending of 3 | outcome in_progress/pass | decision ready to stop | branch main@95210b1 | tracking origin/main in sync | sab_canonical_repo_missing | dharma_swarm (canonical_core, main...origin/main, dirty True) | dirty high (552 local changes) | warn sab_canonical_repo_missing | peer dharma_swarm (canonical_core, main...origin/main, dirty True) | peers dharma_swarm (canonical_core, main...origin/main, dirty True) | drift dharma_swarm track main...origin/main | markers dharma_swarm track main...origin/main | divergence peer dharma_swarm track main...origin/main | hotspot change terminal (274) | path terminal/src/protocol.ts | dep dharma_swarm.models | inbound 159 | cycle 3 running | updated 2026-03-31T22:46:35.466340+00:00 | verify tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=ok | db /Users/dhyana/.dharma/state/runtime.db | activity Sessions=18 Runs=0 ActiveRuns=0 | artifacts Artifacts=7 ContextBundles=1 | next Split /runtime and /dashboard control actions into dedicated pane routes.",
     );
-
-    const run = JSON.parse(readFileSync(path.join(stateDir, "run.json"), "utf8")) as Record<string, unknown>;
-    expect((run.last_control_preview as Record<string, unknown>)["Repo/control preview"]).toBe(
-      "stale | task terminal-repo-pane | progress 2 done, 1 pending of 3 | outcome in_progress/pass | decision ready to stop | branch main@95210b1 | tracking origin/main in sync | sab_canonical_repo_missing | dharma_swarm (canonical_core, main...origin/main, dirty True) | dirty high (552 local changes) | warn sab_canonical_repo_missing | peer dharma_swarm (canonical_core, main...origin/main, dirty True) | peers dharma_swarm (canonical_core, main...origin/main, dirty True) | drift dharma_swarm track main...origin/main | markers dharma_swarm track main...origin/main | divergence peer dharma_swarm track main...origin/main | hotspot change terminal (274) | path terminal/src/protocol.ts | dep dharma_swarm.models | inbound 159 | cycle 3 running | updated 2026-03-31T22:46:35.466340+00:00 | verify tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=ok | db /Users/dhyana/.dharma/state/runtime.db | activity Sessions=18 Runs=0 ActiveRuns=0 | artifacts Artifacts=7 ContextBundles=1 | next Split /runtime and /dashboard control actions into dedicated pane routes.",
-    );
+    expect(readFileSync(runPath)).toEqual(runBefore);
+    expect(readFileSync(verificationPath)).toEqual(verificationBefore);
   });
 
   test("derives missing repo preview rows from partial durable repo facts", () => {
@@ -1903,7 +1882,7 @@ describe("supervisor control persistence", () => {
     );
 
     const preview = loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-03T04:00:00Z"));
-    const summaryPayload = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
+    const summaryPayload = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
 
     expect((summaryPayload.runtime_payload as Record<string, unknown>).domain).toBe("runtime_snapshot");
     expect(preview).toMatchObject({
@@ -1930,6 +1909,8 @@ describe("supervisor control persistence", () => {
     const stateDir = makeStateDir();
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
     const summary = loadSupervisorControlState();
+    const runPath = path.join(stateDir, "run.json");
+    const runBefore = readFileSync(runPath);
 
     expect(summary).not.toBeNull();
     saveSupervisorControlSummary(summary!, {
@@ -2032,7 +2013,7 @@ describe("supervisor control persistence", () => {
     );
 
     const preview = loadSupervisorRepoPreview();
-    const summaryPayload = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
+    const summaryPayload = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
 
     expect((summaryPayload.workspace_payload as Record<string, unknown>).domain).toBe("workspace_snapshot");
     expect(preview).toMatchObject({
@@ -2059,8 +2040,7 @@ describe("supervisor control persistence", () => {
     expect(preview?.["Repo/control preview"]).toContain("branch main@804d5d1");
     expect(preview?.["Repo/control preview"]).toContain("ahead of origin/main by 2");
 
-    const runPayload = JSON.parse(readFileSync(path.join(stateDir, "run.json"), "utf8")) as Record<string, unknown>;
-    expect((runPayload.workspace_payload as Record<string, unknown>).domain).toBe("workspace_snapshot");
+    expect(readFileSync(runPath)).toEqual(runBefore);
   });
 
   test("hydrates control preview from run runtime payload when the durable summary is missing", () => {
@@ -2137,13 +2117,15 @@ describe("supervisor control persistence", () => {
       },
     );
 
-    rmSync(path.join(stateDir, "terminal-control-summary.json"), {force: true});
+    const displayCache = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
     const runPayload = JSON.parse(readFileSync(path.join(stateDir, "run.json"), "utf8")) as Record<string, unknown>;
+    runPayload.runtime_payload = displayCache.runtime_payload;
     runPayload.last_control_preview = {
       "Loop state": "cycle stale waiting",
       "Runtime DB": "/tmp/stale.db",
     };
     writeFileSync(path.join(stateDir, "run.json"), JSON.stringify(runPayload, null, 2));
+    rmSync(terminalPreviewCachePath(), {force: true});
 
     expect(loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-03T04:00:00Z"))).toMatchObject({
       "Loop state": "cycle 19 running",
@@ -2237,7 +2219,11 @@ describe("supervisor control persistence", () => {
       },
     );
 
-    rmSync(path.join(stateDir, "terminal-control-summary.json"), {force: true});
+    const displayCache = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
+    const runPayload = JSON.parse(readFileSync(path.join(stateDir, "run.json"), "utf8")) as Record<string, unknown>;
+    runPayload.workspace_payload = displayCache.workspace_payload;
+    writeFileSync(path.join(stateDir, "run.json"), JSON.stringify(runPayload, null, 2));
+    rmSync(terminalPreviewCachePath(), {force: true});
 
     expect(loadSupervisorRepoPreview(REPO_ROOT)).toMatchObject({
       "Repo root": REPO_ROOT,

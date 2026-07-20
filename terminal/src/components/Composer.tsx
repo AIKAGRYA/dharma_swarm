@@ -4,6 +4,7 @@ import {THEME} from "../theme";
 
 type Props = {
   prompt: string;
+  focused?: boolean;
   compact?: boolean;
   // Total composer width (terminal cols it spans); used to wrap + cap the text.
   width?: number;
@@ -50,12 +51,12 @@ export function wrapComposerText(text: string, width: number): string[] {
 // anchors so the newest text + cursor are always visible — the cap keeps the
 // chrome bounded so a long message can never push the conversation off-screen
 // (F-163). One sanctioned wave-accent border per the de-border law.
-export function Composer({prompt, compact = false, width = 80}: Props): React.ReactElement {
+export function Composer({prompt, focused = true, compact = false, width = 80}: Props): React.ReactElement {
   const maxLines = compact ? 4 : 6;
   // Box border (2) + paddingX (2) = 4 cols of chrome; "> " / "  " prefix = 2.
   const textWidth = Math.max(8, width - 4 - 2);
   return (
-    <Box borderStyle="round" borderColor={THEME.wave} paddingX={1} flexDirection="column">
+    <Box borderStyle="round" borderColor={focused ? THEME.wave : THEME.ridge} paddingX={1} flexDirection="column">
       {prompt ? (
         (() => {
           const lines = wrapComposerText(prompt, textWidth);
@@ -68,7 +69,7 @@ export function Composer({prompt, compact = false, width = 80}: Props): React.Re
               <Text key={index} color={THEME.foam} wrap="truncate-end">
                 <Text color={THEME.stone}>{isFirstReal ? "> " : overflow && index === 0 ? "⋮ " : "  "}</Text>
                 {line}
-                {isLast ? <Text color={THEME.foam} inverse> </Text> : null}
+                {isLast && focused ? <Text color={THEME.foam} inverse> </Text> : null}
               </Text>
             );
           });
@@ -76,8 +77,10 @@ export function Composer({prompt, compact = false, width = 80}: Props): React.Re
       ) : (
         <Box>
           <Text color={THEME.stone}>&gt; </Text>
-          <Text color={THEME.foam} inverse> </Text>
-          <Text color={THEME.stone} dimColor> Type a message · / commands · ? keys</Text>
+          {focused ? <Text color={THEME.foam} inverse> </Text> : null}
+          <Text color={THEME.stone} dimColor>
+            {focused ? " Type a message · / commands · ? keys" : " Navigation active · Esc returns to composer"}
+          </Text>
         </Box>
       )}
     </Box>

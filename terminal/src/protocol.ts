@@ -2756,6 +2756,17 @@ function sessionDetailPayloadRecord(payload: Record<string, unknown>): Record<st
   return asRecord(payload.payload);
 }
 
+function typedSessionPayloadFromEvent(
+  event: Record<string, unknown>,
+  expectedDomain: "session_catalog" | "session_detail",
+): Record<string, unknown> | undefined {
+  const payload = asRecord(event.payload);
+  if (payload.version !== "v1" || payload.domain !== expectedDomain) {
+    return undefined;
+  }
+  return payload;
+}
+
 export function sessionCatalogToLines(payload: Record<string, unknown>): TranscriptLine[] {
   const catalog = sessionCatalogPayloadRecord(payload);
   const sessions = asRecordList(catalog.sessions);
@@ -2799,13 +2810,16 @@ export function sessionCatalogToPreview(payload: Record<string, unknown>): TabPr
 }
 
 export function sessionCatalogFromEvent(event: Record<string, unknown>): SessionCatalogPayload | undefined {
-  const catalog = sessionCatalogPayloadRecord(event);
-  if (!Array.isArray(catalog.sessions)) {
+  const catalog = typedSessionPayloadFromEvent(event, "session_catalog");
+  if (!catalog || !Array.isArray(catalog.sessions)) {
     return undefined;
   }
   const sessions = catalog.sessions.map(normalizeSessionCatalogEntry).filter((entry): entry is SessionCatalogEntry => Boolean(entry));
   return {
     count: numberField(catalog, "count") ?? sessions.length,
+    returned_count: numberField(catalog, "returned_count") ?? sessions.length,
+    limit: numberField(catalog, "limit") ?? sessions.length,
+    has_more: boolField(catalog, "has_more"),
     sessions,
   };
 }
@@ -3191,7 +3205,10 @@ export function approvalPaneToPreview(approvalPane: ApprovalQueueState): TabPrev
 }
 
 export function sessionDetailFromEvent(event: Record<string, unknown>): SessionDetailPayload | undefined {
-  const detail = sessionDetailPayloadRecord(event);
+  const detail = typedSessionPayloadFromEvent(event, "session_detail");
+  if (!detail) {
+    return undefined;
+  }
   const session = normalizeCanonicalSession(detail.session);
   if (!session) {
     return undefined;
@@ -3206,6 +3223,21 @@ export function sessionDetailFromEvent(event: Record<string, unknown>): SessionD
       .filter((entry): entry is CanonicalEventEnvelope => Boolean(entry)),
     approval_history: permissionHistoryFromEvent({payload: detail.approval_history}),
   };
+}
+
+export function sessionDetailResultFromEvent(
+  event: Record<string, unknown>,
+): {requestId: string; sessionId: string; detail: SessionDetailPayload} | undefined {
+  if (stringField(event, "type") !== "session.detail.result") {
+    return undefined;
+  }
+  const requestId = stringField(event, "request_id");
+  const sessionId = stringField(event, "session_id");
+  const detail = sessionDetailFromEvent(event);
+  if (!requestId || !sessionId || !detail || detail.session.session_id !== sessionId) {
+    return undefined;
+  }
+  return {requestId, sessionId, detail};
 }
 
 function sessionStatePayload(sessionPane: SessionPaneState): Record<string, unknown> {
@@ -3233,6 +3265,9 @@ function summarizeEventEnvelope(event: CanonicalEventEnvelope): string {
     return `${stringField(payload, "tool_name", "tool")}: ${stringField(payload, "content")}`.trim();
   }
   if (event.event_type === "session_end") {
+    if (isCancelledSessionEnd({type: event.event_type, ...payload})) {
+      return "cancelled";
+    }
     return boolField(payload, "success") ? "completed" : stringField(payload, "error_message", "failed");
   }
   if (event.event_type === "session_start") {
@@ -3784,6 +3819,34 @@ export function evolutionSurfaceToPreview(payload: Record<string, unknown>): Tab
   };
 }
 
+export function isCancelledSessionEnd(event: Record<string, unknown>): boolean {
+  return (
+    String(event.type ?? "") === "session_end" &&
+    String(event.error_code ?? "").trim().toLowerCase() === "cancelled"
+  );
+}
+
+export function cancellationAckFromEvent(event: Record<string, unknown>): {
+  cancelled: boolean;
+  reason: string;
+  reasonLabel: string;
+  targetRequestId?: string;
+  sessionId?: string;
+} | undefined {
+  if (String(event.type ?? "") !== "session.cancelled") {
+    return undefined;
+  }
+  const cancelled = event.cancelled === true;
+  const reason = String(event.reason ?? (cancelled ? "cancel_requested" : "unknown")).trim() || "unknown";
+  return {
+    cancelled,
+    reason,
+    reasonLabel: reason.replaceAll("_", " "),
+    targetRequestId: String(event.target_request_id ?? "").trim() || undefined,
+    sessionId: String(event.session_id ?? "").trim() || undefined,
+  };
+}
+
 export function eventToTabPatch(event: Record<string, unknown>): {tabId: string; lines: TranscriptLine[]}[] {
   const type = String(event.type ?? "");
 
@@ -3835,6 +3898,20 @@ export function eventToTabPatch(event: Record<string, unknown>): {tabId: string;
           makeLine(
             "system",
             `session ${String(event.session_id ?? "")} via ${String(event.provider ?? "")}:${String(event.model ?? "")}`,
+          ),
+        ],
+      },
+    ];
+  }
+  const cancellationAck = cancellationAckFromEvent(event);
+  if (cancellationAck) {
+    return [
+      {
+        tabId: "runtime",
+        lines: [
+          makeLine(
+            cancellationAck.cancelled ? "system" : "error",
+            `cancellation ${cancellationAck.cancelled ? "accepted" : "rejected"}: ${cancellationAck.reasonLabel}`,
           ),
         ],
       },
@@ -3925,6 +4002,14 @@ export function eventToTabPatch(event: Record<string, unknown>): {tabId: string;
     ];
   }
   if (type === "session_end") {
+    if (isCancelledSessionEnd(event)) {
+      return [
+        {
+          tabId: "runtime",
+          lines: [makeLine("system", "session cancelled")],
+        },
+      ];
+    }
     const ok = Boolean(event.success);
     return [
       {

@@ -101,6 +101,92 @@ describe("canonicalEventsFromBridgeEvent", () => {
     expect(activityEntries.some((entry) => entry.kind === "status" && entry.title.includes("session ended"))).toBe(true);
   });
 
+  test("projects cancellation acknowledgements without terminating the turn, then renders the correlated terminal as cancelled", () => {
+    const base = [
+      userPromptExecutionEvent("run the long audit", "2026-07-21T09:00:00Z"),
+      ...canonicalEventsFromBridgeEvent({
+        type: "session.ack",
+        request_id: "run-17",
+        session_id: "session-17",
+        provider: "claude",
+        model: "claude-opus-4-8",
+        created_at: "2026-07-21T09:00:01Z",
+      }),
+    ];
+    const rejectedAck = canonicalEventsFromBridgeEvent({
+      type: "session.cancelled",
+      request_id: "cancel-16",
+      target_request_id: "run-17",
+      cancelled: false,
+      reason: "already_cancelling",
+      active_request_id: "run-17",
+      session_id: "session-17",
+      provider: "claude",
+      phase: "cancelling",
+      created_at: "2026-07-21T09:00:02Z",
+    });
+
+    expect(rejectedAck).toHaveLength(1);
+    expect(rejectedAck[0]).toMatchObject({
+      kind: "status",
+      phase: "complete",
+      title: "cancellation rejected",
+      summary: "already cancelling",
+      correlationId: "run-17",
+    });
+    const stillRunning = projectChatTraceLines([...base, ...rejectedAck]);
+    expect(stillRunning.some((line) => line.text === "… thinking · claude:claude-opus-4-8")).toBe(true);
+    expect(stillRunning.some((line) => /cancelled|failed|no response/i.test(line.text))).toBe(false);
+    expect(projectPaneLines("timeline", [...base, ...rejectedAck]).some((line) => line.text.includes("cancellation rejected | already cancelling"))).toBe(true);
+
+    const cancelledEnd = canonicalEventsFromBridgeEvent({
+      type: "session_end",
+      request_id: "run-17",
+      session_id: "session-17",
+      provider_id: "claude",
+      success: false,
+      cancelled: true,
+      error_code: "cancelled",
+      error_message: "cancelled by operator",
+      created_at: "2026-07-21T09:00:03Z",
+    });
+    const acceptedAck = canonicalEventsFromBridgeEvent({
+      type: "session.cancelled",
+      request_id: "cancel-17",
+      target_request_id: "run-17",
+      cancelled: true,
+      reason: "cancel_requested",
+      session_id: "session-17",
+      provider: "claude",
+      target_phase: "running",
+      created_at: "2026-07-21T09:00:04Z",
+    });
+    const cancelledEvents = [...base, ...cancelledEnd, ...acceptedAck];
+    const cancelledLines = projectChatTraceLines(cancelledEvents);
+
+    expect(cancelledEnd[0]).toMatchObject({
+      kind: "status",
+      phase: "complete",
+      title: "session cancelled",
+      detail: ["Request run-17", "Turn cancelled"],
+    });
+    expect(acceptedAck[0]).toMatchObject({
+      kind: "status",
+      phase: "complete",
+      title: "cancellation accepted",
+      summary: "cancel requested",
+    });
+    expect(cancelledLines.filter((line) => line.text === "⊘ cancelled · claude:claude-opus-4-8 · ^T details")).toHaveLength(1);
+    expect(cancelledLines.some((line) => /failed|no response/i.test(line.text))).toBe(false);
+
+    const timeline = projectPaneLines("timeline", cancelledEvents);
+    expect(timeline.some((line) => line.text.includes("session cancelled | session-17"))).toBe(true);
+    expect(timeline.some((line) => line.text.includes("cancellation accepted | cancel requested"))).toBe(true);
+    const activity = projectActivityEntries(cancelledEvents);
+    expect(activity.some((entry) => entry.kind === "status" && entry.title === "session cancelled")).toBe(true);
+    expect(activity.some((entry) => entry.kind === "status" && entry.title === "cancellation accepted")).toBe(true);
+  });
+
   test("F-172: completed turn renders response-first with exactly one trace summary line and zero raw id fields", () => {
     const sessionHex = "9f86d081884c7d659a2feaa0c55ad015";
     const events = [

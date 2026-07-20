@@ -20,6 +20,7 @@ import {
   buildOperatorSummaryItems,
   commandRunEventFromPaneAction,
   controlPanePreview,
+  decideTurnCancellation,
   markAuthoritativeSurface,
   missingAuthoritativeSurfaces,
   paneActionStartActions,
@@ -34,6 +35,7 @@ import {
 import {DharmaBridge} from "../src/bridge";
 import {buildRepoPaneSections, RepoPane} from "../src/components/RepoPane";
 import {buildContextSidebarLines, buildVisibleContextSidebarLines} from "../src/components/Sidebar";
+import {terminalPreviewCachePath} from "../src/persistence";
 import {
   commandTargetTab,
   eventToTabPatch,
@@ -280,7 +282,7 @@ test("operator summary normalizes running_cycle loop labels", () => {
   );
 });
 
-test("continuity only resumes with a provider-native session id for the active provider", () => {
+test("continuity remains view-only until resume is explicitly armed for a supported provider", () => {
   const state = reduceApp(initialState, {
     type: "route.policy.set",
     policy: {
@@ -291,7 +293,7 @@ test("continuity only resumes with a provider-native session id for the active p
     },
   });
 
-  const resumable = continuityStateFromSession(state, {
+  const detail = {
     session: {
       session_id: "dgc-20260404-123000-abcd",
       provider_id: "claude",
@@ -315,10 +317,17 @@ test("continuity only resumes with a provider-native session id for the active p
       recent_event_types: ["session_start", "text_complete", "session_end"],
     },
     recent_events: [],
-  });
+  };
 
+  const viewed = continuityStateFromSession(state, detail);
+  expect(viewed.continuityMode).toBe("fresh");
+  expect(viewed.resumeSessionId).toBeUndefined();
+  expect(viewed.activeSessionId).toBeUndefined();
+
+  const resumable = continuityStateFromSession(state, detail, "resume");
   expect(resumable.continuityMode).toBe("resume");
   expect(resumable.resumeSessionId).toBe("550e8400-e29b-41d4-a716-446655440000");
+  expect(resumable.activeSessionId).toBe("dgc-20260404-123000-abcd");
 
   const routeSwitched = continuityStateFromSession(
     reduceApp(state, {
@@ -330,36 +339,13 @@ test("continuity only resumes with a provider-native session id for the active p
         routeId: "ollama:deepseek-v3.2",
       },
     }),
-    {
-      session: {
-        session_id: "dgc-20260404-123000-abcd",
-        provider_id: "claude",
-        model_id: "sonnet-4.5",
-        cwd: "/repo",
-        created_at: "2026-04-04T00:00:00Z",
-        updated_at: "2026-04-04T00:10:00Z",
-        status: "completed",
-        summary: "resumable claude turn",
-        metadata: {
-          provider_session_id: "550e8400-e29b-41d4-a716-446655440000",
-        },
-      },
-      replay_ok: true,
-      replay_issues: [],
-      compaction_preview: {
-        event_count: 4,
-        by_type: {session_start: 1, text_complete: 1, session_end: 1},
-        compactable_ratio: 0,
-        protected_event_types: ["session_start", "session_end"],
-        recent_event_types: ["session_start", "text_complete", "session_end"],
-      },
-      recent_events: [],
-    },
+    detail,
+    "resume",
   );
 
   expect(routeSwitched.continuityMode).toBe("fresh");
   expect(routeSwitched.resumeSessionId).toBeUndefined();
-  expect(routeSwitched.activeSessionId).toBe("dgc-20260404-123000-abcd");
+  expect(routeSwitched.activeSessionId).toBeUndefined();
 });
 
 test("bridge handler suppresses duplicate completed assistant text after streamed text", () => {
@@ -384,6 +370,81 @@ test("bridge handler suppresses duplicate completed assistant text after streame
 
   const assistantLines = (state.tabs.find((tab) => tab.id === "chat")?.lines ?? []).filter((line) => line.kind === "assistant");
   expect(assistantLines.filter((line) => line.text === "Same assistant output")).toHaveLength(1);
+});
+
+test("active-turn cancellation decisions are explicit and deduplicate repeat requests", () => {
+  expect(decideTurnCancellation({phase: "idle"})).toEqual({kind: "idle"});
+  expect(decideTurnCancellation({phase: "running", requestId: "turn-1"})).toEqual({
+    kind: "request",
+    requestId: "turn-1",
+  });
+  expect(
+    decideTurnCancellation({phase: "cancelling", requestId: "turn-1", cancelRequestId: "cancel-2"}),
+  ).toEqual({kind: "already_requested", requestId: "turn-1", cancelRequestId: "cancel-2"});
+});
+
+test("bridge handler owns the correlated session.start lifecycle through cancellation", () => {
+  let state: AppState = createInitialAppState(initialState);
+  const sent: Array<{id: string; type: string; payload: Record<string, unknown>}> = [];
+  const bridge = {
+    send(type: string, payload: Record<string, unknown> = {}) {
+      const id = `sent-${sent.length + 1}`;
+      sent.push({id, type, payload});
+      return id;
+    },
+  } as unknown as DharmaBridge;
+  const pendingBootstraps = {
+    current: {
+      "bootstrap-1": {
+        prompt: "hold this turn",
+        provider: "claude",
+        model: "claude-opus-4-8",
+        messages: [{role: "user" as const, content: "hold this turn"}],
+      },
+    },
+  };
+  const handler = createBridgeEventHandler({
+    dispatch: (action) => {
+      state = reduceApp(state, action);
+    },
+    getState: () => state,
+    bridge,
+    pendingBootstraps,
+  });
+
+  handler({
+    type: "session.bootstrap.result",
+    request_id: "bootstrap-1",
+    selected_provider: "claude",
+    selected_model: "claude-opus-4-8",
+    routing_strategy: "responsive",
+    intent: {kind: "chat"},
+  });
+  const started = sent.find((request) => request.type === "session.start");
+  expect(started?.payload.prompt).toBe("hold this turn");
+  expect(state.activeTurn).toEqual({phase: "running", requestId: started?.id});
+
+  handler({type: "session.ack", request_id: started?.id, session_id: "session-1"});
+  expect(state.activeTurn).toEqual({phase: "running", requestId: started?.id, sessionId: "session-1"});
+
+  state = reduceApp(state, {
+    type: "turn.cancel.request",
+    requestId: started?.id ?? "",
+    cancelRequestId: "cancel-1",
+  });
+  handler({
+    type: "session.cancelled",
+    request_id: "cancel-1",
+    target_request_id: started?.id,
+    cancelled: false,
+    reason: "target_mismatch",
+  });
+  expect(state.activeTurn).toEqual({phase: "running", requestId: started?.id, sessionId: "session-1"});
+
+  handler({type: "session_end", request_id: "older-turn", success: true});
+  expect(state.activeTurn.phase).toBe("running");
+  handler({type: "session_end", request_id: started?.id, success: false, error_code: "cancelled"});
+  expect(state.activeTurn).toEqual({phase: "idle"});
 });
 
 const bootstrapWorkspacePreview: TabPreview = {
@@ -550,6 +611,7 @@ async function flushRender(): Promise<void> {
 function makeSupervisorStateDir(): string {
   const root = mkdtempSync(path.join(os.tmpdir(), "dharma-terminal-app-"));
   TEMP_DIRS.push(root);
+  process.env.DHARMA_TERMINAL_PREVIEW_CACHE_PATH = path.join(root, "display-cache.json");
   const stateDir = path.join(root, "state");
   mkdirSync(stateDir, {recursive: true});
   writeFileSync(
@@ -597,6 +659,7 @@ function makeSupervisorStateDir(): string {
 function cleanupTempDirs(): void {
   delete process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR;
   delete process.env.DHARMA_TERMINAL_STATE_DIR;
+  delete process.env.DHARMA_TERMINAL_PREVIEW_CACHE_PATH;
   if (savedTerminalStateBackup !== undefined) {
     if (savedTerminalStateBackup === null) {
       rmSync(TERMINAL_STATE_PATH, {force: true});
@@ -639,16 +702,17 @@ afterEach(() => {
 });
 
 describe("snapshotActionsForBridgeEvent", () => {
-  test("persists bootstrap runtime previews into the durable control summary", () => {
+  test("persists bootstrap runtime previews into the display-only cache", () => {
     const stateDir = makeSupervisorStateDir();
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
 
     persistControlPreview(bootstrapRuntimePreview);
 
-    const outputPath = path.join(stateDir, "terminal-control-summary.json");
+    const outputPath = terminalPreviewCachePath();
     expect(existsSync(outputPath)).toBe(true);
 
     const payload = JSON.parse(readFileSync(outputPath, "utf8")) as Record<string, unknown>;
+    expect(payload.authority).toBe("display_only");
     expect(payload.preview_Verification_summary).toBe(bootstrapRuntimePreview["Verification summary"]);
     expect(payload.preview_Verification_checks).toBe(bootstrapRuntimePreview["Verification checks"]);
     expect(payload.preview_Verification_status).toBe("1 failing, 3/4 passing");
@@ -659,16 +723,17 @@ describe("snapshotActionsForBridgeEvent", () => {
 
   });
 
-  test("persists normalized repo previews into durable state for boot hydration", () => {
+  test("persists normalized repo previews into the display-only boot cache", () => {
     const stateDir = makeSupervisorStateDir();
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
 
     persistRepoPreview(bootstrapWorkspacePreview);
 
-    const outputPath = path.join(stateDir, "terminal-control-summary.json");
+    const outputPath = terminalPreviewCachePath();
     expect(existsSync(outputPath)).toBe(true);
 
     const payload = JSON.parse(readFileSync(outputPath, "utf8")) as Record<string, unknown>;
+    expect(payload.authority).toBe("display_only");
     expect(payload.preview_Repo_root).toBe(bootstrapWorkspacePreview["Repo root"]);
     expect(payload.preview_Branch).toBe(bootstrapWorkspacePreview.Branch);
     expect(payload.preview_Topology_warnings).toBe(bootstrapWorkspacePreview["Topology warnings"]);
@@ -869,6 +934,8 @@ describe("snapshotActionsForBridgeEvent", () => {
 
     try {
       await flushRender();
+      stdin.write("\u001b");
+      await flushRender();
       stdin.write("\u0012");
       await flushRender();
 
@@ -953,6 +1020,8 @@ describe("snapshotActionsForBridgeEvent", () => {
     });
 
     try {
+      await flushRender();
+      stdin.write("\u001b");
       await flushRender();
       stdin.write("\u0014");
       await flushRender();
@@ -2058,7 +2127,9 @@ test("operator summary surfaces live loop, verification, and runtime state from 
     },
     sessionPane: {
       catalog: {count: 22, sessions: []},
+      selectionProvenance: "follow_latest",
       detailsBySessionId: {},
+      pendingDetailRequestsBySessionId: {},
     },
     liveControlPreview: {
       "Loop state": "cycle 7 waiting_for_verification",
@@ -2084,7 +2155,9 @@ test("operator summary falls back to neutral loop and runtime state when control
     liveControlPreview: undefined,
     sessionPane: {
       catalog: {count: 0, sessions: []},
+      selectionProvenance: "follow_latest",
       detailsBySessionId: {},
+      pendingDetailRequestsBySessionId: {},
     },
   };
 
@@ -2103,7 +2176,9 @@ test("operator summary preserves generic verification fallback before detailed c
     bridgeStatus: "connected",
     sessionPane: {
       catalog: {count: 3, sessions: []},
+      selectionProvenance: "follow_latest",
       detailsBySessionId: {},
+      pendingDetailRequestsBySessionId: {},
     },
     liveControlPreview: {
       "Loop state": "cycle 8 waiting_for_verification",
@@ -2128,7 +2203,9 @@ test("operator summary derives verification state from an explicit durable bundl
     bridgeStatus: "connected",
     sessionPane: {
       catalog: {count: 3, sessions: []},
+      selectionProvenance: "follow_latest",
       detailsBySessionId: {},
+      pendingDetailRequestsBySessionId: {},
     },
     liveControlPreview: {
       "Loop state": "cycle 8 waiting_for_verification",
@@ -2153,7 +2230,9 @@ test("operator summary derives verification state from passing and failing detai
     bridgeStatus: "connected",
     sessionPane: {
       catalog: {count: 4, sessions: []},
+      selectionProvenance: "follow_latest",
       detailsBySessionId: {},
+      pendingDetailRequestsBySessionId: {},
     },
     liveControlPreview: {
       "Loop state": "cycle 10 waiting_for_verification",
@@ -2180,7 +2259,9 @@ test("operator summary derives loop and verification state from compact runtime 
     bridgeStatus: "connected",
     sessionPane: {
       catalog: {count: 2, sessions: []},
+      selectionProvenance: "follow_latest",
       detailsBySessionId: {},
+      pendingDetailRequestsBySessionId: {},
     },
     liveControlPreview: {
       "Loop state": "unknown",
@@ -2222,7 +2303,9 @@ test("operator summary falls back to the persisted control preview when live con
     ),
     sessionPane: {
       catalog: {count: 5, sessions: []},
+      selectionProvenance: "follow_latest",
       detailsBySessionId: {},
+      pendingDetailRequestsBySessionId: {},
     },
   };
 
@@ -2260,7 +2343,9 @@ test("operator summary prefers non-placeholder control tab preview values over g
     ),
     sessionPane: {
       catalog: {count: 4, sessions: []},
+      selectionProvenance: "follow_latest",
       detailsBySessionId: {},
+      pendingDetailRequestsBySessionId: {},
     },
   };
 
@@ -4856,7 +4941,7 @@ Workflows: 1
     expect(sidebarAfterRefresh).toContain("Task terminal-repo-pane | 3 done, 1 pending of 4");
     expect(sidebarAfterRefresh.some((line) => line.includes("stale transcript that should disappear"))).toBe(false);
 
-    const persisted = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
+    const persisted = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
     expect(persisted.preview_Repo_root).toBe(REPO_ROOT);
     expect(persisted.preview_Branch).toBe("main");
     expect(persisted.preview_Topology_warnings).toBe("1 (sab_canonical_repo_missing)");
@@ -5017,7 +5102,7 @@ Toolchain
     expect(sidebarAfterRuntimeRefresh.some((line) => line.startsWith("Activity Sessions=23 Claims=2 Ac"))).toBe(true);
     expect(sidebarAfterRuntimeRefresh.some((line) => line.includes("stale runtime transcript that should disappear"))).toBe(false);
 
-    const persisted = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
+    const persisted = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
     expect(persisted.preview_Runtime_activity).toBe("Sessions=23  Claims=2  ActiveClaims=1  AckedClaims=1  Runs=3  ActiveRuns=1");
     expect(persisted.preview_Artifact_state).toBe("Artifacts=9  PromotedFacts=3  ContextBundles=2  OperatorActions=4");
     expect(persisted.preview_Active_task).toBe("terminal-repo-pane");
@@ -5368,7 +5453,7 @@ Toolchain
       "evolution.surface",
     ]);
 
-    const persisted = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
+    const persisted = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
     expect(persisted.preview_Verification_summary).toBe("tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=fail");
     expect(persisted.preview_Verification_bundle).toBe("tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=fail");
     expect(persisted.preview_Verification_status).toBe("1 failing, 3/4 passing");
@@ -5475,7 +5560,7 @@ Toolchain
       "evolution.surface",
     ]);
 
-    const persisted = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
+    const persisted = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
     expect(persisted.preview_Verification_summary).toBe("tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=fail");
     expect(persisted.preview_Verification_bundle).toBe("tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=fail");
     expect(persisted.preview_Verification_status).toBe("1 failing, 3/4 passing");
@@ -5575,7 +5660,7 @@ Toolchain
       "evolution.surface",
     ]);
 
-    const persisted = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
+    const persisted = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
     expect(persisted.preview_Verification_summary).toBe("tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=fail");
     expect(persisted.preview_Verification_bundle).toBe("tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=fail");
     expect(persisted.preview_Verification_status).toBe("1 failing, 3/4 passing");
@@ -7687,7 +7772,7 @@ Toolchain
     expect(state.tabs.find((tab) => tab.id === "control")?.lines.map((line) => line.text)).not.toContain("stale runtime output");
     expect(state.liveControlPreview?.["Runtime activity"]).toContain("Sessions=22");
 
-    const persisted = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
+    const persisted = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
     expect(persisted.preview_Verification_summary).toBe("tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=fail");
     expect(persisted.preview_Verification_status).toBe("1 failing, 3/4 passing");
     expect(persisted.preview_Verification_bundle).toBe("tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=fail");
@@ -8000,7 +8085,7 @@ Toolchain
       "Verification failing: cycle_acceptance",
     );
 
-    const persisted = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
+    const persisted = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
     expect(persisted.preview_Loop_state).toBe("cycle 7 waiting_for_verification");
     expect(persisted.preview_Verification_summary).toBe(
       "tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=fail",
@@ -8105,7 +8190,7 @@ Toolchain
     );
     expect(state.tabs.find((tab) => tab.id === "control")?.lines.map((line) => line.text)).not.toContain("stale runtime output");
 
-    const persisted = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
+    const persisted = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
     expect(persisted.verification_status).toBe("1 failing, 3/4 passing");
     expect(persisted.verification_summary).toBe(
       "tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=fail",
@@ -8232,7 +8317,7 @@ Toolchain
     );
     expect(controlLines).not.toContain("stale runtime output");
 
-    const persisted = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
+    const persisted = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
     expect(persisted.preview_Verification_receipt).toBe(`${stateDir}/verification.json`);
     expect(persisted.preview_Verification_failing).toBe("cycle_acceptance");
     expect(persisted.preview_Runtime_summary).toBe(
@@ -8243,11 +8328,12 @@ Toolchain
     );
   });
 
-  test("promotes compact supervisor pulse fields from runtime snapshots into live loop and verification state", () => {
+  test("displays compact supervisor pulse fields without rewriting verification authority", () => {
     const stateDir = makeSupervisorStateDir();
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
+    const verificationPath = path.join(stateDir, "verification.json");
     writeFileSync(
-      path.join(stateDir, "verification.json"),
+      verificationPath,
       JSON.stringify(
         {
           summary: "tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=ok",
@@ -8263,6 +8349,7 @@ Toolchain
         2,
       ),
     );
+    const verificationBefore = readFileSync(verificationPath);
 
     let state: AppState = {
       ...initialState,
@@ -8351,19 +8438,13 @@ Toolchain
     expect(controlLines).toContain("Verification status: 1 failing, 2/3 passing");
     expect(controlLines).not.toContain("stale runtime output");
 
-    const persisted = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
+    const persisted = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
     expect(persisted.preview_Loop_state).toBe("cycle 7 waiting_for_verification");
     expect(persisted.preview_Last_result).toBe("complete / fail");
     expect(persisted.preview_Verification_summary).toBe("tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail");
     expect(persisted.verification_status).toBe("1 failing, 2/3 passing");
 
-    const persistedVerification = JSON.parse(readFileSync(path.join(stateDir, "verification.json"), "utf8")) as Record<string, unknown>;
-    expect(persistedVerification.summary).toBe("tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail");
-    expect(persistedVerification.checks).toEqual([
-      {name: "tsc", ok: true},
-      {name: "bridge_snapshots", ok: true},
-      {name: "cycle_acceptance", ok: false},
-    ]);
+    expect(readFileSync(verificationPath)).toEqual(verificationBefore);
   });
 
   test("drops stale loop and verification fields on direct runtime snapshot events", () => {
@@ -8731,7 +8812,7 @@ Toolchain
       "/Users/dhyana/.dharma/state/runtime.db | 20 sessions | 0 claims | 0 active claims | 0 acked claims | 0 active runs | 0 runs total | 0 artifacts | 0 promoted facts | 0 context bundles | 0 operator actions",
     );
 
-    const persisted = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
+    const persisted = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
     expect(persisted.preview_Runtime_summary).toBe(
       "/Users/dhyana/.dharma/state/runtime.db | 20 sessions | 0 claims | 0 active claims | 0 acked claims | 0 active runs | 0 runs total | 0 artifacts | 0 promoted facts | 0 context bundles | 0 operator actions",
     );
@@ -8847,7 +8928,7 @@ Toolchain
     expect(controlLines).not.toContain("Loop state: cycle 4 running");
     expect(runtimeLines).toEqual(controlLines);
 
-    const persisted = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
+    const persisted = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
     expect(persisted.preview_Loop_state).toBe("cycle 7 waiting_for_verification");
     expect(persisted.preview_Task_progress).toBe("4 done, 0 pending of 4");
     expect(persisted.preview_Active_task).toBe("terminal-control-surface");
@@ -8957,6 +9038,71 @@ describe("slashCommandStartActions", () => {
 });
 
 describe("App prompt submission", () => {
+  test("immediate repeated Ctrl-C cancels bootstrap without exiting or launching a provider", async () => {
+    const sentMessages: Array<{type: string; payload: Record<string, unknown>}> = [];
+    let subjectBridge: DharmaBridge | null = null;
+    let closeCalls = 0;
+    const originalSend = DharmaBridge.prototype.send;
+    const originalSendBackground = DharmaBridge.prototype.sendBackground;
+    const originalClose = DharmaBridge.prototype.close;
+    DharmaBridge.prototype.send = function mockedSend(type: string, payload: Record<string, unknown> = {}): string {
+      sentMessages.push({type, payload});
+      if (type === "session.bootstrap") {
+        subjectBridge = this;
+      }
+      return String(sentMessages.length);
+    };
+    DharmaBridge.prototype.sendBackground = function mockedSendBackground(): string {
+      return "background";
+    };
+    DharmaBridge.prototype.close = function mockedClose(): void {
+      // Other App instances in this large renderer suite can finish deferred
+      // effect cleanup while this test is active. Only a close of the bridge
+      // that submitted this prompt is evidence that Ctrl-C exited our App.
+      if (this === subjectBridge) {
+        closeCalls += 1;
+      }
+    };
+
+    const stdout = new TestStdout();
+    const stdin = new TestStdin();
+    let rendered = "";
+    stdout.on("data", (chunk) => {
+      rendered += chunk.toString("utf8");
+    });
+    const instance = render(React.createElement(App), {
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      stdin: stdin as unknown as NodeJS.ReadStream,
+      stderr: new TestStdout() as unknown as NodeJS.WriteStream,
+      debug: true,
+      patchConsole: false,
+      exitOnCtrlC: false,
+    });
+
+    try {
+      await flushRender();
+      stdin.write("cancel during bootstrap");
+      await flushRender();
+      stdin.write("\r");
+      await flushRender();
+      stdin.write("\u0003");
+      await flushRender();
+      stdin.write("\u0003");
+      await flushRender();
+
+      expect(sentMessages.filter((message) => message.type === "session.bootstrap")).toHaveLength(1);
+      expect(sentMessages.some((message) => message.type === "session.start")).toBe(false);
+      expect(closeCalls).toBe(0);
+      expect(normalizeTerminalText(rendered)).toContain("⊘ cancelled");
+    } finally {
+      instance.unmount();
+      instance.cleanup();
+      DharmaBridge.prototype.send = originalSend;
+      DharmaBridge.prototype.sendBackground = originalSendBackground;
+      DharmaBridge.prototype.close = originalClose;
+    }
+  });
+
   test("returns a plain prompt submitted from the control pane to visible chat output", async () => {
     const sentMessages: Array<{type: string; payload: Record<string, unknown>}> = [];
     const originalSend = DharmaBridge.prototype.send;
@@ -8983,10 +9129,15 @@ describe("App prompt submission", () => {
 
     try {
       await flushRender();
-      // F-172: ^T on the chat tab toggles trace expansion, so reach control via ^Y (runtime) then ^T.
+      // Navigation chords are isolated from the composer; Esc hands the
+      // keyboard to navigation before reaching Control via ^Y then ^T.
+      stdin.write("\u001b");
+      await flushRender();
       stdin.write("\u0019");
       await flushRender();
       stdin.write("\u0014");
+      await flushRender();
+      stdin.write("\u001b");
       await flushRender();
       rendered = "";
       stdin.write("Reply OK");
@@ -9007,6 +9158,112 @@ describe("App prompt submission", () => {
       instance.unmount();
       instance.cleanup();
       DharmaBridge.prototype.send = originalSend;
+    }
+  });
+
+  test("composer focus preserves j/k text while an operational pane is active", async () => {
+    const sentMessages: Array<{type: string; payload: Record<string, unknown>}> = [];
+    const originalSend = DharmaBridge.prototype.send;
+    const originalSendBackground = DharmaBridge.prototype.sendBackground;
+    const originalClose = DharmaBridge.prototype.close;
+    DharmaBridge.prototype.send = function mockedSend(type: string, payload: Record<string, unknown> = {}): string {
+      sentMessages.push({type, payload});
+      return String(sentMessages.length);
+    };
+    DharmaBridge.prototype.sendBackground = function mockedSendBackground(): string {
+      return "background";
+    };
+    DharmaBridge.prototype.close = function mockedClose(): void {};
+
+    const stdin = new TestStdin();
+    const instance = render(React.createElement(App), {
+      stdout: new TestStdout() as unknown as NodeJS.WriteStream,
+      stdin: stdin as unknown as NodeJS.ReadStream,
+      stderr: new TestStdout() as unknown as NodeJS.WriteStream,
+      debug: true,
+      patchConsole: false,
+      exitOnCtrlC: false,
+    });
+    try {
+      await flushRender();
+      stdin.write("\u001b");
+      await flushRender();
+      stdin.write("\u0012");
+      await flushRender();
+      stdin.write("\u001b");
+      await flushRender();
+      stdin.write("jigsaw and kites");
+      await flushRender();
+      stdin.write("\r");
+      await flushRender();
+
+      const bootstrap = sentMessages.find((message) => message.type === "session.bootstrap");
+      expect(bootstrap?.payload.prompt).toBe("jigsaw and kites");
+      expect(bootstrap?.payload.active_tab).toBe("repo");
+    } finally {
+      instance.unmount();
+      instance.cleanup();
+      DharmaBridge.prototype.send = originalSend;
+      DharmaBridge.prototype.sendBackground = originalSendBackground;
+      DharmaBridge.prototype.close = originalClose;
+    }
+  });
+
+  test("pane switcher consumes printable input instead of leaking into the composer", async () => {
+    const sentMessages: Array<{type: string; payload: Record<string, unknown>}> = [];
+    const originalSend = DharmaBridge.prototype.send;
+    const originalSendBackground = DharmaBridge.prototype.sendBackground;
+    const originalClose = DharmaBridge.prototype.close;
+    DharmaBridge.prototype.send = function mockedSend(type: string, payload: Record<string, unknown> = {}): string {
+      sentMessages.push({type, payload});
+      return String(sentMessages.length);
+    };
+    DharmaBridge.prototype.sendBackground = function mockedSendBackground(): string {
+      return "background";
+    };
+    DharmaBridge.prototype.close = function mockedClose(): void {};
+
+    const stdout = new TestStdout();
+    const stdin = new TestStdin();
+    let rendered = "";
+    stdout.on("data", (chunk) => {
+      rendered += chunk.toString("utf8");
+    });
+    const instance = render(React.createElement(App), {
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      stdin: stdin as unknown as NodeJS.ReadStream,
+      stderr: new TestStdout() as unknown as NodeJS.WriteStream,
+      debug: true,
+      patchConsole: false,
+      exitOnCtrlC: false,
+    });
+
+    try {
+      await flushRender();
+      stdin.write("\u001b");
+      await flushRender();
+      stdin.write("\u000b");
+      await flushRender();
+      stdin.write("leaked-jk");
+      await flushRender();
+      stdin.write("\u001b");
+      await flushRender();
+      stdin.write("\u001b");
+      await flushRender();
+      stdin.write("safe");
+      await flushRender();
+      stdin.write("\r");
+      await flushRender();
+
+      const bootstrap = sentMessages.find((message) => message.type === "session.bootstrap");
+      expect(bootstrap?.payload.prompt).toBe("safe");
+      expect(normalizeTerminalText(rendered)).toContain("zen/composer");
+    } finally {
+      instance.unmount();
+      instance.cleanup();
+      DharmaBridge.prototype.send = originalSend;
+      DharmaBridge.prototype.sendBackground = originalSendBackground;
+      DharmaBridge.prototype.close = originalClose;
     }
   });
 });
@@ -9248,6 +9505,112 @@ describe("model picker state", () => {
 });
 
 describe("typed session bridge handling", () => {
+  test("keeps prose-only Control and Repo refreshes display-only until typed authority arrives", () => {
+    let state: AppState = createInitialAppState(initialState);
+    const bridge = {
+      send() {
+        return "1";
+      },
+    } as unknown as DharmaBridge;
+    const handler = createBridgeEventHandler({
+      dispatch: (action) => {
+        state = reduceApp(state, action);
+      },
+      getState: () => state,
+      bridge,
+      pendingBootstraps: {current: {}},
+    });
+
+    handler({
+      type: "handshake.result",
+      default_provider: "codex",
+      providers: [{provider_id: "codex", default_model: "gpt-5.4"}],
+    });
+    handler({
+      type: "workspace.snapshot.result",
+      content: `# Workspace X-Ray
+Repo root: ${REPO_ROOT}
+Git: prose-only@abc1234 | staged 0 | unstaged 1 | untracked 0
+Git hotspots: terminal (1)
+Git changed paths: terminal/src/app.tsx
+
+## Topology
+- warning: prose_is_not_proof
+
+## Largest Python files
+- terminal/src/app.tsx | 1 lines | defs 0 | imports 0`,
+    });
+    handler({
+      type: "runtime.snapshot.result",
+      content: `# Runtime
+Runtime DB: /tmp/prose-only.db
+Sessions=1  Claims=0  ActiveClaims=0  AckedClaims=0  Runs=1  ActiveRuns=1
+Loop state: cycle 99 complete
+Loop decision: ready to stop`,
+    });
+    handler({
+      type: "action.result",
+      action_type: "surface.refresh",
+      surface: "repo",
+      output: "Git: action-prose@def5678 | staged 0 | unstaged 0 | untracked 0",
+    });
+    handler({
+      type: "action.result",
+      action_type: "surface.refresh",
+      surface: "control",
+      output: "Runtime DB: /tmp/runtime.db\nLoop decision: ready to stop",
+    });
+
+    expect(state.authoritativeSurfaces.repo).toBe(false);
+    expect(state.authoritativeSurfaces.control).toBe(false);
+    expect(state.liveRepoPreview?.Branch).toBe("action-prose");
+    expect(state.liveControlPreview?.["Runtime DB"]).toBe("/tmp/runtime.db");
+
+    handler({
+      type: "action.result",
+      action_type: "surface.refresh",
+      surface: "repo",
+      payload: {
+        version: "v1",
+        domain: "workspace_snapshot",
+        repo_root: REPO_ROOT,
+        git: {
+          branch: "typed-main",
+          head: "abc1234",
+          staged: 0,
+          unstaged: 0,
+          untracked: 0,
+          changed_hotspots: [],
+          changed_paths: [],
+          sync: {summary: "in sync", status: "tracking", ahead: 0, behind: 0},
+        },
+        topology: {warnings: [], repos: []},
+        inventory: {},
+        language_mix: [],
+        largest_python_files: [],
+        most_imported_modules: [],
+      },
+    });
+    handler({
+      type: "action.result",
+      action_type: "surface.refresh",
+      surface: "control",
+      payload: {
+        version: "v1",
+        domain: "runtime_snapshot",
+        snapshot: {
+          snapshot_id: "typed-runtime-authority",
+          loop_state: "cycle 100 verifying",
+        },
+      },
+    });
+
+    expect(state.authoritativeSurfaces.repo).toBe(true);
+    expect(state.authoritativeSurfaces.control).toBe(true);
+    expect(state.liveRepoPreview?.Branch).toBe("typed-main");
+    expect(state.liveControlPreview?.["Loop state"]).toBe("cycle 100 verifying");
+  });
+
   test("requests authoritative resync after handshake and reconnects after bridge exit", () => {
     let state: AppState = createInitialAppState(initialState);
     const sent: Array<{type: string; payload: Record<string, unknown>}> = [];
@@ -10163,6 +10526,8 @@ Workflows: 1
 
     try {
       await flushRender();
+      stdin.write("\u001b");
+      await flushRender();
       stdin.write("\u0012");
       await flushRender();
 
@@ -10469,6 +10834,8 @@ Workflows: 1
 
     try {
       await flushRender();
+      stdin.write("\u001b");
+      await flushRender();
       stdin.write("\u0012");
       await flushRender();
 
@@ -10682,7 +11049,7 @@ Git sync: origin/main | ahead 2 | behind 0
     expect(refreshedLines.some((line) => line.startsWith("Next "))).toBe(true);
   });
 
-  test("markdown workspace snapshots with hotspot detail sections clear repo resync without typed payloads", () => {
+  test("markdown workspace snapshots remain display-only even with complete-looking detail sections", () => {
     const stateDir = makeSupervisorStateDir();
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
 
@@ -10778,14 +11145,15 @@ Workflows: 1
 - terminal.src.app | inbound 44`,
     });
 
-    const markdownAuthoritativeLines = visibleLines(state);
-    expect(state.authoritativeSurfaces.repo).toBe(true);
-    expect(markdownAuthoritativeLines).toContain("Authority live | authoritative");
-    expect(markdownAuthoritativeLines).toContain("Authority resyncing | awaiting authoritative control refresh");
-    expect(markdownAuthoritativeLines).toContain("Warnings 1 (peer_branch_diverged)");
-    expect(markdownAuthoritativeLines).toContain("Members peer_branch_diverged");
-    expect(markdownAuthoritativeLines.some((line) => line.startsWith("Branch divergence local +2/-0"))).toBe(true);
-    expect(markdownAuthoritativeLines.some((line) => line.startsWith("Summary change terminal (274) | path terminal/src/app.tsx"))).toBe(true);
+    const markdownPreviewLines = visibleLines(state);
+    expect(state.authoritativeSurfaces.repo).toBe(false);
+    expect(markdownPreviewLines).toContain("Authority resyncing | awaiting authoritative repo refresh");
+    expect(markdownPreviewLines).toContain("Authority resyncing | awaiting authoritative control refresh");
+    expect(state.liveRepoPreview?.Staged).toBe("112");
+    expect(state.liveRepoPreview?.Unstaged).toBe("515");
+    expect(state.liveRepoPreview?.["Topology warnings"]).toBe("1 (peer_branch_diverged)");
+    expect(state.liveRepoPreview?.["Topology warning members"]).toBe("peer_branch_diverged");
+    expect(state.liveRepoPreview?.["Hotspot summary"]).toContain("paths terminal/src/app.tsx");
   });
 
   test("sparse reconnect runtime snapshots keep persisted control preview rows visible until authoritative control fields arrive", () => {
@@ -11155,6 +11523,93 @@ Git sync: origin/main | ahead 2 | behind 0`,
     expect(authoritativeLines.some((line) => line.startsWith("Summary change terminal (274) | path terminal/src/app.tsx"))).toBe(true);
   });
 
+  test("keeps session detail ownership correlated across selection changes and failed requests", () => {
+    let state: AppState = createInitialAppState(initialState);
+    const sent: Array<{id: string; type: string; payload: Record<string, unknown>}> = [];
+    const bridge = {
+      send(type: string, payload: Record<string, unknown> = {}) {
+        const id = `detail-${sent.length + 1}`;
+        sent.push({id, type, payload});
+        return id;
+      },
+    } as unknown as DharmaBridge;
+    const dispatch = (action: AppAction): void => {
+      state = reduceApp(state, action);
+    };
+    const handler = createBridgeEventHandler({
+      dispatch,
+      getState: () => state,
+      bridge,
+      pendingBootstraps: {current: {}},
+    });
+    const catalogPayload = {
+      version: "v1",
+      domain: "session_catalog",
+      count: 2,
+      sessions: ["session-a", "session-b"].map((sessionId) => ({
+        session: {
+          session_id: sessionId,
+          provider_id: "claude",
+          model_id: "claude-opus-4-8",
+          cwd: "/repo",
+          created_at: "2026-07-21T00:00:00Z",
+          updated_at: "2026-07-21T01:00:00Z",
+          status: "completed",
+        },
+        replay_ok: true,
+        replay_issues: [],
+        total_turns: 1,
+        total_cost_usd: 0,
+      })),
+    };
+
+    handler({type: "session.catalog.result", payload: catalogPayload});
+    expect(state.sessionPane.pendingDetailRequestsBySessionId["session-a"]?.requestId).toBe("detail-1");
+    dispatch({type: "session.select", sessionId: "session-b"});
+    handler({type: "session.catalog.result", payload: catalogPayload});
+    expect(state.sessionPane.pendingDetailRequestsBySessionId["session-b"]?.requestId).toBe("detail-2");
+    const continuityBefore = state.sessionContinuity;
+
+    handler({
+      type: "session.detail.result",
+      request_id: "detail-1",
+      session_id: "session-a",
+      payload: {
+        version: "v1",
+        domain: "session_detail",
+        session: catalogPayload.sessions[0]?.session,
+        replay_ok: true,
+        replay_issues: [],
+        compaction_preview: {},
+        recent_events: [],
+      },
+    });
+    expect(state.sessionPane.selectedSessionId).toBe("session-b");
+    expect(state.sessionPane.detailsBySessionId["session-a"]).toBeDefined();
+    expect(state.sessionContinuity).toBe(continuityBefore);
+
+    handler({
+      type: "session.detail.result",
+      request_id: "detail-2",
+      session_id: "session-b",
+      payload: {
+        version: "v1",
+        domain: "session_detail",
+        session: catalogPayload.sessions[0]?.session,
+      },
+    });
+    expect(state.sessionPane.detailsBySessionId["session-b"]).toBeUndefined();
+    expect(state.sessionPane.pendingDetailRequestsBySessionId["session-b"]?.requestId).toBe("detail-2");
+
+    handler({
+      type: "bridge.error",
+      request_id: "detail-2",
+      code: "session_detail_failed",
+      message: "detail unavailable",
+    });
+    expect(state.sessionPane.pendingDetailRequestsBySessionId["session-b"]).toBeUndefined();
+  });
+
   test("replaces the sessions tab from typed catalog/detail payloads and requests drilldown", () => {
     let state: AppState = createInitialAppState(initialState);
     const sent: Array<{type: string; payload: Record<string, unknown>}> = [];
@@ -11178,6 +11633,8 @@ Git sync: origin/main | ahead 2 | behind 0`,
       type: "session.catalog.result",
       content: "legacy catalog prose should be ignored",
       payload: {
+        version: "v1",
+        domain: "session_catalog",
         count: 1,
         sessions: [
           {
@@ -11211,8 +11668,12 @@ Git sync: origin/main | ahead 2 | behind 0`,
 
     handler({
       type: "session.detail.result",
+      request_id: "1",
+      session_id: "sess-1",
       content: "legacy detail prose should be ignored",
       payload: {
+        version: "v1",
+        domain: "session_detail",
         session: {
           session_id: "sess-1",
           provider_id: "codex",
