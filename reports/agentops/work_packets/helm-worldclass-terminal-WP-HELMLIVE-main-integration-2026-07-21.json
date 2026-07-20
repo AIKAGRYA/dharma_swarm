@@ -18,9 +18,6 @@
     "dharma_swarm/tui/engine/adapters/codex.py",
     "dharma_swarm/tui/engine/adapters/openrouter.py",
     "dharma_swarm/tui/engine/events.py",
-    "docs/docops/AUTO_INVENTORY.md",
-    "docs/docops/assertions.yaml",
-    "docs/governance/SOVEREIGN_MANIFEST.md",
     "scripts/start_terminal_tui_tmux.sh",
     "scripts/terminal_guardian_preflight.sh",
     "terminal/**",
@@ -109,6 +106,6 @@
       "Main's July golden receipt explicitly left live backend/provider behavior untested; this packet requires fresh live compact, wide, cancel, resume, and restart evidence before closeout."
     ],
     "rollback": "Revert the packet-scoped integration commit; no database migration is introduced and durable session records remain backward-readable.",
-    "packet_digest": "725182c0d17453f9c61dc0b0113583b06f62d0994e7e81dc2c6e291053085cbc"
+    "packet_digest": "b3bb10fcba319c3ccb3a4e7beb91ee9b2fd5ea672595b745a187059c51471573"
   }
 }
