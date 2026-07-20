@@ -36,7 +36,7 @@
   "gates": [
     {
       "name": "helm-runtime-regression",
-      "command": "python3 -m pytest -q tests/test_terminal_bridge.py tests/test_session_lifecycle.py tests/test_operator_core_session_views.py tests/test_operator_core_adapters.py tests/test_terminal_control.py tests/tui/test_claude_adapter_v11.py tests/tui/test_codex_adapter.py tests/tui/test_openrouter_adapter.py",
+      "command": "python3 -m pytest -p pytest_asyncio.plugin -q tests/test_terminal_bridge.py tests/test_session_lifecycle.py tests/test_operator_core_session_views.py tests/test_operator_core_adapters.py tests/test_terminal_control.py tests/tui/test_claude_adapter_v11.py tests/tui/test_codex_adapter.py tests/tui/test_openrouter_adapter.py",
       "expected_exit": 0,
       "timeout_seconds": 300
     },
@@ -55,8 +55,8 @@
   ],
   "negative_controls": [
     {
-      "name": "duplicate-session-finalization-detected",
-      "command": "python3 -c \"import pathlib, subprocess, sys; p=pathlib.Path('dharma_swarm/operator_core/session_lifecycle.py'); t=p.read_text(); old='        if self._finalization_attempted:\\n            return\\n'; new='        if False and self._finalization_attempted:\\n            return\\n'; (old in t) or sys.exit(3); p.write_text(t.replace(old,new,1)); sys.exit(subprocess.run([sys.executable,'-m','pytest','tests/test_session_lifecycle.py::test_completed_turn_accumulates_usage_and_finalizes_once','-q']).returncode)\"",
+      "name": "duplicate-session-terminal-detected",
+      "command": "python3 -c \"import pathlib, subprocess, sys; p=pathlib.Path('dharma_swarm/operator_core/session_lifecycle.py'); t=p.read_text(); old='        with self._lock:\\n            if self._terminal_event is not None:\\n                return None\\n            if isinstance(event, UserPrompt):\\n'; new='        with self._lock:\\n            if False and self._terminal_event is not None:\\n                return None\\n            if isinstance(event, UserPrompt):\\n'; (old in t) or sys.exit(3); p.write_text(t.replace(old,new,1)); sys.exit(subprocess.run([sys.executable,'-m','pytest','tests/test_session_lifecycle.py::test_completed_turn_accumulates_usage_and_finalizes_once','-q']).returncode)\"",
       "expected_exit": 1,
       "timeout_seconds": 120
     }
@@ -106,6 +106,6 @@
       "Main's July golden receipt explicitly left live backend/provider behavior untested; this packet requires fresh live compact, wide, cancel, resume, and restart evidence before closeout."
     ],
     "rollback": "Revert the packet-scoped integration commit; no database migration is introduced and durable session records remain backward-readable.",
-    "packet_digest": "b3bb10fcba319c3ccb3a4e7beb91ee9b2fd5ea672595b745a187059c51471573"
+    "packet_digest": "b25d1b9d27b0fd1bab65085c582a22a5269895c0917b2bf79f8200a6e93e99c7"
   }
 }
