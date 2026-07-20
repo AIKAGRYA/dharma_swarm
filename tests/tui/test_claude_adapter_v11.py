@@ -33,6 +33,17 @@ def _adapter() -> ClaudeAdapter:
     return ClaudeAdapter(config=ProviderConfig(provider_id="claude", default_model="claude-sonnet-4-5"))
 
 
+def test_build_command_is_permission_checked_by_default() -> None:
+    cmd = _adapter()._build_command(
+        CompletionRequest(messages=[{"role": "user", "content": "inspect the repo"}])
+    )
+
+    permission_index = cmd.index("--permission-mode")
+    assert cmd[permission_index + 1] == "default"
+    assert "--dangerously-skip-permissions" not in cmd
+    assert "--allowedTools" not in cmd
+
+
 @pytest.mark.asyncio
 async def test_list_models_and_profile() -> None:
     a = _adapter()

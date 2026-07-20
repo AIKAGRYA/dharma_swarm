@@ -98,7 +98,7 @@ class _FakeProc:
         self.returncode = -9
 
 
-def test_codex_build_command_uses_dangerous_bypass(tmp_path: Path) -> None:
+def test_codex_build_command_is_read_only_by_default(tmp_path: Path) -> None:
     adapter = CodexAdapter(
         config=ProviderConfig(provider_id="codex", default_model="gpt-5.4"),
         workdir=tmp_path,
@@ -110,7 +110,9 @@ def test_codex_build_command_uses_dangerous_bypass(tmp_path: Path) -> None:
     )
 
     assert cmd[:2] == ["codex", "exec"]
-    assert "--dangerously-bypass-approvals-and-sandbox" in cmd
+    assert "--dangerously-bypass-approvals-and-sandbox" not in cmd
+    sandbox_index = cmd.index("--sandbox")
+    assert cmd[sandbox_index + 1] == "read-only"
     assert "--json" in cmd
     assert "-m" in cmd
     assert "gpt-5.4" in cmd

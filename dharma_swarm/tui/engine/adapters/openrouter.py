@@ -53,6 +53,7 @@ class OpenRouterAdapter(ProviderAdapter):
             default_model=DEFAULT_MODELS[ProviderType.OPENROUTER],
         )
         self._cancelled = False
+        self._active_request_task: asyncio.Task[httpx.Response] | None = None
         self._profiles: dict[str, ModelProfile] = {
             DEFAULT_MODELS[ProviderType.OPENROUTER]: ModelProfile(
                 provider_id=self.provider_id,
@@ -144,18 +145,34 @@ class OpenRouterAdapter(ProviderAdapter):
             "Content-Type": "application/json",
         }
 
+        if self._cancelled:
+            yield self._cancelled_session_end(session_id)
+            return
+
         try:
             timeout = float(request.provider_options.get("timeout_sec", 120))
-            async with httpx.AsyncClient(timeout=timeout) as client:
-                resp = await client.post(url, headers=headers, json=payload)
-            if self._cancelled:
-                yield SessionEnd(
-                    provider_id=self.provider_id,
-                    session_id=session_id,
-                    success=False,
-                    error_code="cancelled",
-                    error_message="request cancelled",
+            request_task = asyncio.create_task(
+                self._post_completion(
+                    url=url,
+                    headers=headers,
+                    payload=payload,
+                    timeout=timeout,
                 )
+            )
+            self._active_request_task = request_task
+            try:
+                resp = await request_task
+            except asyncio.CancelledError:
+                if not self._cancelled:
+                    raise
+                yield self._cancelled_session_end(session_id)
+                return
+            finally:
+                if self._active_request_task is request_task:
+                    self._active_request_task = None
+
+            if self._cancelled:
+                yield self._cancelled_session_end(session_id)
                 return
 
             if resp.status_code >= 400:
@@ -232,12 +249,40 @@ class OpenRouterAdapter(ProviderAdapter):
 
     async def cancel(self) -> None:
         self._cancelled = True
-        # keep API parity with other adapters
-        await asyncio.sleep(0)
+        task = self._active_request_task
+        if task is None or task.done():
+            return
+        task.cancel()
+        try:
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+        finally:
+            if self._active_request_task is task and task.done():
+                self._active_request_task = None
 
     async def close(self) -> None:
-        with contextlib.suppress(Exception):
-            await self.cancel()
+        await self.cancel()
+
+    async def _post_completion(
+        self,
+        *,
+        url: str,
+        headers: dict[str, str],
+        payload: dict[str, Any],
+        timeout: float,
+    ) -> httpx.Response:
+        """Own the client inside the cancellable task so cleanup is awaited."""
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            return await client.post(url, headers=headers, json=payload)
+
+    def _cancelled_session_end(self, session_id: str) -> SessionEnd:
+        return SessionEnd(
+            provider_id=self.provider_id,
+            session_id=session_id,
+            success=False,
+            error_code="cancelled",
+            error_message="request cancelled",
+        )
 
 
 def _extract_content(data: Any) -> str:

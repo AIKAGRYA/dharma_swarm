@@ -35,7 +35,15 @@ def _event_compaction_preview(events: list[Any]) -> dict[str, Any]:
     compactable_ratio = (verbose_event_total / len(events)) if events else 0.0
     protected = [
         kind
-        for kind in ("session_start", "tool_call_complete", "tool_result", "usage", "session_end", "error")
+        for kind in (
+            "user_prompt",
+            "session_start",
+            "tool_call_complete",
+            "tool_result",
+            "usage",
+            "session_end",
+            "error",
+        )
         if counts.get(kind, 0) > 0
     ]
     return {
@@ -56,6 +64,8 @@ def build_session_catalog_payload(
     """Build a shell-neutral session catalog payload."""
 
     records: list[dict[str, Any]] = []
+    total_count = 0
+    page_limit = max(1, limit)
     for entry in reversed(store.list_sessions()):
         session_id = _string(entry.get("session_id"))
         if not session_id:
@@ -65,6 +75,9 @@ def build_session_catalog_payload(
         except Exception:
             continue
         if cwd and not cwd_matches(str(meta.get("cwd", "")), cwd):
+            continue
+        total_count += 1
+        if len(records) >= page_limit:
             continue
         replay_ok, replay_issues = store.verify_session_replay(session_id)
         records.append(
@@ -76,13 +89,14 @@ def build_session_catalog_payload(
                 "total_cost_usd": float(meta.get("total_cost_usd", 0.0) or 0.0),
             }
         )
-        if len(records) >= max(1, limit):
-            break
 
     return {
         "version": SESSION_PAYLOAD_VERSION,
         "domain": SESSION_CATALOG_DOMAIN,
-        "count": len(records),
+        "count": total_count,
+        "returned_count": len(records),
+        "limit": page_limit,
+        "has_more": total_count > len(records),
         "sessions": records,
     }
 

@@ -9,6 +9,9 @@ import os
 from pathlib import Path
 from typing import Any, AsyncIterator
 
+from dharma_swarm import model_pool as _model_pool
+from dharma_swarm.models import ProviderType
+
 from .base import Capability, CompletionRequest, ModelProfile, ProviderAdapter, ProviderConfig
 from ..events import (
     CanonicalEventType,
@@ -57,6 +60,19 @@ CLAUDE_CAPABILITIES = (
 )
 
 
+def _canonical_claude_model() -> str:
+    entry = _model_pool.get_entry("claude-opus-4.8")
+    if entry is not None:
+        for provider in (ProviderType.CLAUDE_CODE, ProviderType.ANTHROPIC):
+            for route in entry.routes:
+                if route.provider is provider:
+                    return route.model_id
+    raise AssertionError("model_pool has no Claude route for claude-opus-4.8")
+
+
+CLAUDE_DEFAULT_MODEL = _canonical_claude_model()
+
+
 def _capability_names(caps: Capability) -> list[str]:
     names: list[str] = []
     for cap in Capability:
@@ -78,12 +94,18 @@ class ClaudeAdapter(ProviderAdapter):
     ) -> None:
         self._config = config or ProviderConfig(
             provider_id=self.provider_id,
-            default_model="claude-sonnet-4-5",
+            default_model=CLAUDE_DEFAULT_MODEL,
         )
         self._cli_path = cli_path
         self._workdir = workdir or DHARMA_SWARM
         self._proc: asyncio.subprocess.Process | None = None
         self._profiles: dict[str, ModelProfile] = {
+            CLAUDE_DEFAULT_MODEL: ModelProfile(
+                provider_id=self.provider_id,
+                model_id=CLAUDE_DEFAULT_MODEL,
+                display_name="Claude Opus 4.8",
+                capabilities=CLAUDE_CAPABILITIES,
+            ),
             "claude-sonnet-4-5": ModelProfile(
                 provider_id=self.provider_id,
                 model_id="claude-sonnet-4-5",
@@ -120,8 +142,16 @@ class ClaudeAdapter(ProviderAdapter):
         return list(self._profiles.values())
 
     def get_profile(self, model_id: str | None = None) -> ModelProfile:
-        model = model_id or self._config.default_model or "claude-sonnet-4-5"
-        return self._profiles.get(model, next(iter(self._profiles.values())))
+        model = model_id or self._config.default_model or CLAUDE_DEFAULT_MODEL
+        profile = self._profiles.get(model)
+        if profile is not None:
+            return profile
+        return ModelProfile(
+            provider_id=self.provider_id,
+            model_id=model,
+            display_name=model,
+            capabilities=CLAUDE_CAPABILITIES,
+        )
 
     async def stream(
         self,
@@ -221,6 +251,7 @@ class ClaudeAdapter(ProviderAdapter):
         stream_limit = int(self._config.extra.get("stream_reader_limit", 2_000_000))
         return await asyncio.create_subprocess_exec(
             *cmd,
+            stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=str(self._workdir),
@@ -231,6 +262,12 @@ class ClaudeAdapter(ProviderAdapter):
     def _build_env(self, request: CompletionRequest) -> dict[str, str]:
         env = dict(os.environ)
         env.pop("CLAUDECODE", None)
+        if (
+            request.provider_options.get("scrub_metered_keys")
+            and env.get("DHARMA_FORCE_ANTHROPIC_API") != "1"
+        ):
+            env.pop("ANTHROPIC_API_KEY", None)
+            env.pop("ANTHROPIC_AUTH_TOKEN", None)
         internet_enabled = bool(request.provider_options.get("internet_enabled", True))
         if internet_enabled:
             env.pop("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", None)
@@ -258,8 +295,11 @@ class ClaudeAdapter(ProviderAdapter):
         if model:
             cmd.extend(["--model", model])
 
+        # Agent turns are untrusted until an operator/runtime authority grants
+        # more.  A missing option must therefore preserve Claude's permission
+        # checks; bypass remains available only as an explicit caller choice.
         permission_mode = str(
-            request.provider_options.get("permission_mode", "bypassPermissions")
+            request.provider_options.get("permission_mode", "default")
         )
         if permission_mode:
             cmd.extend(["--permission-mode", permission_mode])
@@ -269,6 +309,20 @@ class ClaudeAdapter(ProviderAdapter):
         max_turns = request.provider_options.get("max_turns")
         if isinstance(max_turns, int) and max_turns > 0:
             cmd.extend(["--max-turns", str(max_turns)])
+
+        tools_value = request.provider_options.get("tools")
+        if tools_value is not None:
+            cmd.extend(["--tools", str(tools_value)])
+        budget = request.provider_options.get("max_budget_usd")
+        if budget is not None:
+            cmd.extend(["--max-budget-usd", str(budget)])
+        if request.provider_options.get("strict_mcp_config"):
+            cmd.extend(
+                ["--strict-mcp-config", "--mcp-config", json.dumps({"mcpServers": {}})]
+            )
+        setting_sources = request.provider_options.get("setting_sources")
+        if setting_sources is not None:
+            cmd.extend(["--setting-sources", str(setting_sources)])
 
         if request.system_prompt:
             cmd.extend(["--append-system-prompt", request.system_prompt])

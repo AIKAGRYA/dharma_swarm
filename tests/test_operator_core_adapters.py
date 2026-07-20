@@ -28,7 +28,7 @@ from dharma_swarm.operator_core.contracts import (
     PermissionRisk,
     RuntimeHealth,
 )
-from dharma_swarm.tui.engine.events import PermissionDecisionEvent, PermissionResolutionEvent, ToolCallComplete, ToolResult
+from dharma_swarm.tui.engine.events import PermissionDecisionEvent, PermissionResolutionEvent, ToolCallComplete, ToolResult, UserPrompt
 from dharma_swarm.operator_core.permissions import GovernancePolicy
 from dharma_swarm.operator_core.session_store import SessionStore
 
@@ -55,6 +55,19 @@ class OperatorCoreAdapterTests(unittest.TestCase):
         self.assertEqual(envelope.payload["tool_name"], "Read")
         self.assertEqual(envelope.audience, EventAudience.TUI)
         self.assertEqual(envelope.transport, EventTransport.STDIO)
+
+    def test_user_prompt_envelope_preserves_operator_authority(self) -> None:
+        envelope = event_envelope_from_legacy_event(
+            UserPrompt(
+                session_id="sess-1",
+                provider_id="claude",
+                content="continue the audit",
+            )
+        )
+
+        self.assertEqual(envelope.event_type, "user_prompt")
+        self.assertEqual(str(envelope.source), "operator")
+        self.assertEqual(envelope.payload["content"], "continue the audit")
 
     def test_session_from_meta(self) -> None:
         session = session_from_meta(
