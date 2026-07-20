@@ -13,8 +13,13 @@
     "dharma_swarm/operator_core/session_payloads.py",
     "dharma_swarm/operator_core/session_store.py",
     "dharma_swarm/terminal_bridge.py",
+    "dharma_swarm/terminal_bridge_chat.py",
+    "dharma_swarm/terminal_bridge_session_runtime.py",
+    "dharma_swarm/terminal_bridge_session_types.py",
     "dharma_swarm/terminal_control.py",
     "dharma_swarm/tui/engine/adapters/claude.py",
+    "dharma_swarm/tui/engine/adapters/claude_cli.py",
+    "dharma_swarm/tui/engine/adapters/claude_process.py",
     "dharma_swarm/tui/engine/adapters/codex.py",
     "dharma_swarm/tui/engine/adapters/openrouter.py",
     "dharma_swarm/tui/engine/events.py",
@@ -43,7 +48,7 @@
     },
     {
       "name": "helm-runtime-ruff",
-      "command": "python3 -m ruff check dharma_swarm/operator_core/adapters.py dharma_swarm/operator_core/session_lifecycle.py dharma_swarm/operator_core/session_payloads.py dharma_swarm/operator_core/session_store.py dharma_swarm/tui/engine/adapters/claude.py dharma_swarm/tui/engine/adapters/codex.py dharma_swarm/tui/engine/adapters/openrouter.py dharma_swarm/tui/engine/events.py",
+      "command": "python3 -m ruff check dharma_swarm/operator_core/adapters.py dharma_swarm/operator_core/session_lifecycle.py dharma_swarm/operator_core/session_payloads.py dharma_swarm/operator_core/session_store.py dharma_swarm/terminal_bridge.py dharma_swarm/terminal_bridge_chat.py dharma_swarm/terminal_bridge_session_runtime.py dharma_swarm/terminal_bridge_session_types.py dharma_swarm/tui/engine/adapters/claude.py dharma_swarm/tui/engine/adapters/claude_cli.py dharma_swarm/tui/engine/adapters/claude_process.py dharma_swarm/tui/engine/adapters/codex.py dharma_swarm/tui/engine/adapters/openrouter.py dharma_swarm/tui/engine/events.py",
       "expected_exit": 0,
       "timeout_seconds": 300
     },
@@ -107,6 +112,6 @@
       "Main's July golden receipt explicitly left live backend/provider behavior untested; this packet requires fresh live compact, wide, cancel, resume, and restart evidence before closeout."
     ],
     "rollback": "Revert the packet-scoped integration commit; no database migration is introduced and durable session records remain backward-readable.",
-    "packet_digest": "c13424c67ee4d560781de302a7acecba64c59842ccc5e06d541b4a1669113bb1"
+    "packet_digest": "baeae4ce52047b06f2b94961e6c925310f1e9532a80b229922ee39309fcc59d0"
   }
 }

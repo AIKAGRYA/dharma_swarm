@@ -171,6 +171,34 @@ def test_bind_route_supports_buffered_fallback_before_projection(tmp_path: Path)
     assert store.load_meta(recorder.session_id)["model_id"] == "fallback/model"
 
 
+def test_bind_route_stays_coherent_when_snapshot_append_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    store, recorder = _begin(tmp_path)
+
+    def fail_snapshot(*args: object, **kwargs: object) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(store, "_append_session_snapshot", fail_snapshot)
+
+    with caplog.at_level("WARNING"):
+        assert recorder.bind_route(provider_id="openrouter", model_id="fallback/model")
+
+    meta = store.load_meta(recorder.session_id)
+    assert (recorder.provider_id, recorder.model_id) == (
+        meta["provider_id"],
+        meta["model_id"],
+    )
+    assert store._last_snapshot_failure == (
+        recorder.session_id,
+        "route_rebound",
+        "OSError",
+    )
+    assert "session route rebound snapshot failed" in caplog.text
+
+
 def test_exception_before_provider_start_records_honest_failed_terminal(tmp_path: Path) -> None:
     store, recorder = _begin(tmp_path)
 

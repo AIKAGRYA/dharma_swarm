@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import json
-import os
 from pathlib import Path
 from typing import Any, AsyncIterator
 
@@ -13,6 +11,8 @@ from dharma_swarm import model_pool as _model_pool
 from dharma_swarm.models import ProviderType
 
 from .base import Capability, CompletionRequest, ModelProfile, ProviderAdapter, ProviderConfig
+from .claude_cli import build_claude_command, build_claude_env, build_claude_prompt
+from .claude_process import drain_stderr_tail, terminate_process
 from ..events import (
     CanonicalEventType,
     ErrorEvent,
@@ -165,6 +165,13 @@ class ClaudeAdapter(ProviderAdapter):
 
         proc = await self._spawn_process(cmd, env)
         self._proc = proc
+        stderr_task = (
+            asyncio.create_task(drain_stderr_tail(proc.stderr))
+            if proc.stderr is not None
+            else None
+        )
+        stream_read_failed = False
+        stream_read_error = ""
 
         try:
             assert proc.stdout is not None
@@ -173,13 +180,15 @@ class ClaudeAdapter(ProviderAdapter):
                     line = await proc.stdout.readline()
                 except Exception as exc:
                     # Avoid hard-crashing provider runner on oversized/invalid stream lines.
+                    stream_read_error = f"{type(exc).__name__}: {exc}"
                     yield ErrorEvent(
                         provider_id=self.provider_id,
                         session_id=session_id,
                         code="stream_read_error",
-                        message=str(exc),
+                        message=stream_read_error,
                         retryable=True,
                     )
+                    stream_read_failed = True
                     break
                 if not line:
                     break
@@ -192,16 +201,25 @@ class ClaudeAdapter(ProviderAdapter):
                         emitted_session_end = True
                     yield event
 
+            if stream_read_failed:
+                await terminate_process(proc)
             exit_code = await proc.wait()
-            if exit_code != 0 and not emitted_session_end:
-                err_text = ""
-                if proc.stderr is not None:
-                    with contextlib.suppress(Exception):
-                        err_text = (
-                            (await proc.stderr.read())
-                            .decode("utf-8", errors="replace")
-                            .strip()
-                        )
+            err_text = ""
+            if stderr_task is not None:
+                stderr_result = (await asyncio.gather(stderr_task, return_exceptions=True))[0]
+                if isinstance(stderr_result, str):
+                    err_text = stderr_result
+                elif isinstance(stderr_result, BaseException):
+                    err_text = f"stderr read failed: {type(stderr_result).__name__}"
+            if stream_read_failed and not emitted_session_end:
+                yield SessionEnd(
+                    provider_id=self.provider_id,
+                    session_id=session_id,
+                    success=False,
+                    error_code="stream_read_error",
+                    error_message=stream_read_error,
+                )
+            elif exit_code != 0 and not emitted_session_end:
                 yield ErrorEvent(
                     provider_id=self.provider_id,
                     session_id=session_id,
@@ -223,20 +241,23 @@ class ClaudeAdapter(ProviderAdapter):
                     success=True,
                 )
         finally:
-            self._proc = None
+            await terminate_process(proc)
+            if stderr_task is not None:
+                if not stderr_task.done():
+                    stderr_task.cancel()
+                await asyncio.gather(stderr_task, return_exceptions=True)
+            if self._proc is proc:
+                self._proc = None
 
     async def cancel(self) -> None:
-        if self._proc is None or self._proc.returncode is not None:
+        proc = self._proc
+        if proc is None or proc.returncode is not None:
             return
-        self._proc.terminate()
         try:
-            await asyncio.wait_for(self._proc.wait(), timeout=5)
-        except asyncio.TimeoutError:
-            self._proc.kill()
-            with contextlib.suppress(Exception):
-                await self._proc.wait()
+            await terminate_process(proc)
         finally:
-            self._proc = None
+            if self._proc is proc:
+                self._proc = None
 
     async def close(self) -> None:
         await self.cancel()
@@ -260,99 +281,18 @@ class ClaudeAdapter(ProviderAdapter):
         )
 
     def _build_env(self, request: CompletionRequest) -> dict[str, str]:
-        env = dict(os.environ)
-        env.pop("CLAUDECODE", None)
-        if (
-            request.provider_options.get("scrub_metered_keys")
-            and env.get("DHARMA_FORCE_ANTHROPIC_API") != "1"
-        ):
-            env.pop("ANTHROPIC_API_KEY", None)
-            env.pop("ANTHROPIC_AUTH_TOKEN", None)
-        internet_enabled = bool(request.provider_options.get("internet_enabled", True))
-        if internet_enabled:
-            env.pop("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", None)
-        else:
-            env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
-        return env
+        return build_claude_env(request)
 
     def _build_command(self, request: CompletionRequest) -> list[str]:
-        prompt = self._build_prompt(request)
-        cmd = [
+        return build_claude_command(
             self._cli_path,
-            "-p",
-            prompt,
-            "--output-format",
-            "stream-json",
-            "--verbose",
-        ]
-
-        if request.resume_session_id:
-            cmd.extend(["--resume", request.resume_session_id])
-        elif request.provider_options.get("continue_last"):
-            cmd.append("--continue")
-
-        model = request.model or self._config.default_model
-        if model:
-            cmd.extend(["--model", model])
-
-        # Agent turns are untrusted until an operator/runtime authority grants
-        # more.  A missing option must therefore preserve Claude's permission
-        # checks; bypass remains available only as an explicit caller choice.
-        permission_mode = str(
-            request.provider_options.get("permission_mode", "default")
+            request,
+            default_model=self._config.default_model,
+            prompt=self._build_prompt(request),
         )
-        if permission_mode:
-            cmd.extend(["--permission-mode", permission_mode])
-            if permission_mode == "bypassPermissions":
-                cmd.extend(["--allowedTools", "*", "--dangerously-skip-permissions"])
-
-        max_turns = request.provider_options.get("max_turns")
-        if isinstance(max_turns, int) and max_turns > 0:
-            cmd.extend(["--max-turns", str(max_turns)])
-
-        tools_value = request.provider_options.get("tools")
-        if tools_value is not None:
-            cmd.extend(["--tools", str(tools_value)])
-        budget = request.provider_options.get("max_budget_usd")
-        if budget is not None:
-            cmd.extend(["--max-budget-usd", str(budget)])
-        if request.provider_options.get("strict_mcp_config"):
-            cmd.extend(
-                ["--strict-mcp-config", "--mcp-config", json.dumps({"mcpServers": {}})]
-            )
-        setting_sources = request.provider_options.get("setting_sources")
-        if setting_sources is not None:
-            cmd.extend(["--setting-sources", str(setting_sources)])
-
-        if request.system_prompt:
-            cmd.extend(["--append-system-prompt", request.system_prompt])
-
-        if request.enable_thinking:
-            cmd.append("--include-partial-messages")
-
-        return cmd
 
     def _build_prompt(self, request: CompletionRequest) -> str:
-        # Keep this intentionally simple and deterministic for adapter tests.
-        if request.messages:
-            rendered: list[str] = []
-            for msg in request.messages:
-                role = str(msg.get("role", "user")).title()
-                content = msg.get("content", "")
-                if isinstance(content, list):
-                    chunks: list[str] = []
-                    for part in content:
-                        if isinstance(part, dict):
-                            if isinstance(part.get("text"), str):
-                                chunks.append(part["text"])
-                        elif isinstance(part, str):
-                            chunks.append(part)
-                    content_text = "\n".join(chunks)
-                else:
-                    content_text = str(content)
-                rendered.append(f"{role}: {content_text}")
-            return "\n\n".join(rendered)
-        return "Hello."
+        return build_claude_prompt(request)
 
     def _normalize_line(
         self,
