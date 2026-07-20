@@ -13,6 +13,7 @@ build/
 
 # Local runtime state (machine-specific)
 terminal/.dharma-terminal-state.json
+terminal/.dharma-terminal-preview-cache.json
 .claude-flow/
 .claude/
 .swarm/
