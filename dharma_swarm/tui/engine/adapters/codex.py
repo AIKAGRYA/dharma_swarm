@@ -529,6 +529,15 @@ class CodexAdapter(ProviderAdapter):
                     )
                     message = str(item.get("message", "") or "").strip()
                     if message:
+                        if _is_nonfatal_advisory(message):
+                            events.append(
+                                ThinkingComplete(
+                                    **base,
+                                    content=f"Codex advisory: {message}",
+                                    is_redacted=False,
+                                )
+                            )
+                            return events
                         code, retryable = _classify_error(message)
                         events.append(
                             ErrorEvent(
@@ -608,6 +617,13 @@ def _classify_error(message: str) -> tuple[str, bool]:
     if "lookup address" in lower or "timed out" in lower or "disconnected" in lower:
         return ("transport_error", True)
     return ("codex_error", False)
+
+
+def _is_nonfatal_advisory(message: str) -> bool:
+    """Recognize CLI diagnostics that do not make the turn fail."""
+
+    normalized = message.strip().lower()
+    return normalized.startswith("skill descriptions were shortened to fit")
 
 
 def _extract_message_text(item: dict[str, Any]) -> str:

@@ -27,4 +27,4 @@ Chat [Mission] Repo Commands Models Ontology ▸
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >  Navigation active · Esc returns to composer                                                   │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
- navigate · Esc compose  ·  route claude:claude-opus-4.8  ·  ○ offline  ·  responsive
+ navigate · Esc compose  ·  route claude:claude-opus-4.8  ·  ○ offline  ·  responsive  ·  awaiting…

@@ -42,7 +42,7 @@ type ScrollStatusInput = {
 function gateToken(bridgeStatus: string): string {
   switch (bridgeStatus) {
     case "connected":
-      return "● live";
+      return "● bridge";
     case "degraded":
       return "⚠ degraded";
     case "offline":
@@ -52,14 +52,17 @@ function gateToken(bridgeStatus: string): string {
   }
 }
 
-// Closed: silence is health — zero telemetry while live, exactly one honest
-// token (○ offline / ◌ booting) when the bridge is not. Open: the drawer IS
-// the status row (still one row) — route, gate, route state, strategy.
+// Closed: silence is health only when transport and route are both ready.
+// Connected-but-unverified is visible rather than disappearing behind the
+// drawer. Open: the drawer IS the status row (still one row) — route, gate,
+// route state, strategy.
 export function scrollStatusLine(input: ScrollStatusInput): string {
   if (!input.drawerOpen) {
     const parts = ["the scroll"];
     if (input.bridgeStatus !== "connected") {
       parts.push(gateToken(input.bridgeStatus));
+    } else if (input.routeState !== "ready") {
+      parts.push(input.routeState);
     }
     parts.push("^D telemetry", "F2 zen");
     return parts.join("  ·  ");

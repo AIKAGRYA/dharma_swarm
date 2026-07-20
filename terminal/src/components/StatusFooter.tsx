@@ -20,7 +20,7 @@ type Gate = {glyph: string; word: string; color: string};
 function gateFor(bridgeStatus: string): Gate {
   switch (bridgeStatus) {
     case "connected":
-      return {glyph: "●", word: "live", color: THEME.moss};
+      return {glyph: "●", word: "bridge", color: THEME.moss};
     case "degraded":
       return {glyph: "⚠", word: "degraded", color: THEME.persimmon};
     case "offline":
@@ -34,7 +34,7 @@ function routeStateColor(routeState: string): string {
   if (routeState === "ready") {
     return THEME.moss;
   }
-  if (routeState === "degraded" || routeState === "slow") {
+  if (routeState === "unverified" || routeState === "degraded" || routeState === "slow") {
     return THEME.persimmon;
   }
   return THEME.vermilion;

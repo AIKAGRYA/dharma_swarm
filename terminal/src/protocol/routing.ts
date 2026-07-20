@@ -2,6 +2,8 @@ import {nonSelectableRouteTargets, routePolicyFromValue, selectableRouteTargets}
 import type {
   AgentRoutesPayload,
   CanonicalRoutingDecision,
+  ProviderRouteReceipt,
+  RoutePolicyState,
   RoutingDecisionPayload,
   TabPreview,
   TranscriptLine,
@@ -110,6 +112,53 @@ export function routingDecisionPayloadFromEvent(event: JsonRecord): RoutingDecis
     targets: asRecordList(payload.targets),
     fallback_targets: asRecordList(payload.fallback_targets),
   };
+}
+
+export function providerRouteReceiptFromEvent(value: unknown): ProviderRouteReceipt | undefined {
+  const event = asRecord(value);
+  if (
+    stringField(event, "type") !== "route.receipt"
+    || stringField(event, "evidence_kind") !== "provider_completion"
+    || event.success !== true
+  ) {
+    return undefined;
+  }
+  const requestId = stringField(event, "request_id");
+  const sessionId = stringField(event, "session_id");
+  const provider = stringField(event, "provider_id");
+  const model = stringField(event, "model_id");
+  const routeId = stringField(event, "route_id");
+  if (!requestId || !sessionId || !provider || !model || !routeId) {
+    return undefined;
+  }
+  return {
+    requestId,
+    sessionId,
+    provider,
+    model,
+    routeId,
+    evidenceKind: "provider_completion",
+  };
+}
+
+export function handshakeRouteConfigFromEvent(
+  value: unknown,
+  current: RoutePolicyState,
+): {provider: string; model: string; policy?: RoutePolicyState} {
+  const event = asRecord(value);
+  const providers = asRecordList(event.providers);
+  const defaultProviderId = stringField(event, "default_provider");
+  const selectedProvider = providers.find(
+    (entry) => stringField(entry, "provider_id") === defaultProviderId,
+  ) ?? providers[0];
+  const provider = selectedProvider ? stringField(selectedProvider, "provider_id", current.provider) : current.provider;
+  const model = selectedProvider ? stringField(selectedProvider, "default_model", current.model) : current.model;
+  const routingPayload = routingDecisionPayloadFromEvent(event);
+  const policyRecord = asRecord(event.policy);
+  const policy = routingPayload || Object.keys(policyRecord).length > 0
+    ? routePolicyFromValue(routingPayload ?? policyRecord, current)
+    : undefined;
+  return {provider, model, policy};
 }
 
 export function agentRoutesPayloadFromEvent(event: JsonRecord): AgentRoutesPayload | undefined {

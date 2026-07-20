@@ -9505,6 +9505,157 @@ describe("model picker state", () => {
 });
 
 describe("typed session bridge handling", () => {
+  test("applies handshake route authority without equating adapter inventory with readiness", () => {
+    let state: AppState = createInitialAppState(initialState);
+    const bridge = {
+      send() {
+        return "1";
+      },
+    } as unknown as DharmaBridge;
+    const handler = createBridgeEventHandler({
+      dispatch: (action) => {
+        state = reduceApp(state, action);
+      },
+      getState: () => state,
+      bridge,
+      pendingBootstraps: {current: {}},
+    });
+
+    handler({
+      type: "handshake.result",
+      default_provider: "codex",
+      default_model: "gpt-5.5",
+      providers: [{provider_id: "codex", default_model: "gpt-5.5"}],
+      payload: {
+        version: "v1",
+        domain: "routing_decision",
+        decision: {
+          route_id: "codex:gpt-5.5",
+          provider_id: "codex",
+          model_id: "gpt-5.5",
+          strategy: "responsive",
+          reason: "local CLI attempt authority",
+          fallback_chain: [],
+          degraded: true,
+          metadata: {
+            route_state: "unverified",
+            selectable: true,
+            availability_reason: "local_cli_auth_unverified",
+          },
+        },
+        strategies: ["responsive"],
+        targets: [{
+          alias: "gpt-5.5",
+          label: "GPT-5.5 (Codex)",
+          provider: "codex",
+          model: "gpt-5.5",
+          route_id: "codex:gpt-5.5",
+          route_state: "unverified",
+          picker_visible: true,
+          available: false,
+          availability_reason: "local_cli_auth_unverified",
+        }],
+        fallback_targets: [],
+      },
+    });
+
+    expect(state.bridgeStatus).toBe("connected");
+    expect(state.routePolicy.provider).toBe("codex");
+    expect(state.routePolicy.model).toBe("gpt-5.5");
+    expect(state.routePolicy.routeState).toBe("unverified");
+    expect(state.routePolicy.selectable).toBe(true);
+    expect(state.routePolicy.availabilityReason).toBe("local_cli_auth_unverified");
+  });
+
+  test("provider errors do not downgrade a healthy bridge transport", () => {
+    let state: AppState = {...createInitialAppState(initialState), bridgeStatus: "connected"};
+    const bridge = {
+      send() {
+        return "1";
+      },
+    } as unknown as DharmaBridge;
+    const handler = createBridgeEventHandler({
+      dispatch: (action) => {
+        state = reduceApp(state, action);
+      },
+      getState: () => state,
+      bridge,
+      pendingBootstraps: {current: {}},
+    });
+
+    handler({
+      type: "error",
+      provider_id: "codex",
+      code: "usage_exhausted",
+      message: "provider quota is exhausted",
+    });
+
+    expect(state.bridgeStatus).toBe("connected");
+    expect(state.statusLine).toContain("usage_exhausted");
+  });
+
+  test("only an exact typed provider-completion receipt promotes route readiness", () => {
+    let state: AppState = {
+      ...createInitialAppState(initialState),
+      bridgeStatus: "connected",
+      routePolicy: {
+        ...initialState.routePolicy,
+        routeId: "codex:gpt-5.5",
+        provider: "codex",
+        model: "gpt-5.5",
+        routeState: "unverified",
+        selectable: true,
+      },
+    };
+    const bridge = {send: () => "1"} as unknown as DharmaBridge;
+    const handler = createBridgeEventHandler({
+      dispatch: (action) => { state = reduceApp(state, action); },
+      getState: () => state,
+      bridge,
+      pendingBootstraps: {current: {}},
+    });
+
+    handler({type: "session_end", provider_id: "codex", success: true});
+    expect(state.routePolicy.routeState).toBe("unverified");
+
+    handler({
+      type: "route.receipt",
+      request_id: "request-wrong-model",
+      session_id: "session-wrong-model",
+      provider_id: "codex",
+      model_id: "gpt-5.4",
+      route_id: "codex:gpt-5.4",
+      evidence_kind: "provider_completion",
+      success: true,
+    });
+    expect(state.routePolicy.routeState).toBe("unverified");
+
+    handler({
+      type: "route.receipt",
+      request_id: "request-local",
+      session_id: "session-local",
+      provider_id: "codex",
+      model_id: "gpt-5.5",
+      route_id: "codex:gpt-5.5",
+      evidence_kind: "local_completion",
+      success: true,
+    });
+    expect(state.routePolicy.routeState).toBe("unverified");
+
+    handler({
+      type: "route.receipt",
+      request_id: "request-verified",
+      session_id: "session-verified",
+      provider_id: "codex",
+      model_id: "gpt-5.5",
+      route_id: "codex:gpt-5.5",
+      evidence_kind: "provider_completion",
+      success: true,
+    });
+    expect(state.routePolicy.routeState).toBe("ready");
+    expect(state.routePolicy.lastConfirmedRouteId).toBe("codex:gpt-5.5");
+  });
+
   test("keeps prose-only Control and Repo refreshes display-only until typed authority arrives", () => {
     let state: AppState = createInitialAppState(initialState);
     const bridge = {

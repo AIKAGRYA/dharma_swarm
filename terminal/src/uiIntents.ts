@@ -95,6 +95,20 @@ export function matchUiIntent(
     }
   }
 
+  // An exact pane-title command is already unambiguous, so it does not need a
+  // redundant pane noun: "open sessions", "show runtime", "go to agents".
+  // Keep this anchored and exact so conversational uses of pane-title words
+  // still fall through to chat.
+  const directPaneMatch = text.match(/^(?:open|show|go to|switch to|jump to|bring up)(?: the)? (.+)$/i);
+  if (directPaneMatch) {
+    const target = directPaneMatch[1] ?? "";
+    for (const pane of panes) {
+      if (target === normalize(pane.title) || target === normalize(pane.id)) {
+        return {kind: "pane", tabId: pane.id, title: pane.title};
+      }
+    }
+  }
+
   // Pane intents need an imperative + the pane's title + a pane noun
   // ("open the control panel pane for me", "show me the models tab").
   if (PANE_NOUN.test(text)) {

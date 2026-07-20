@@ -27,4 +27,4 @@
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >  Navigation active · Esc returns to composer                                                   │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
- agent route selection  ·  route claude:claude-opus-4.8  ·  ○ offline  ·  responsive
+ agent route selection  ·  route claude:claude-opus-4.8  ·  ○ offline  ·  responsive  ·  awaiting_…

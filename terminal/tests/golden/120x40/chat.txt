@@ -37,4 +37,4 @@
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >   Type a message · / commands · ? keys                                                                             │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
- zen/composer  ·  claude:claude-opus-4.8  ·  offline  ·  F2 cockpit · /tour
+ zen/composer  ·  claude:claude-opus-4.8 [unverified]  ·  bridge offline  ·  F2 cockpit · /tour

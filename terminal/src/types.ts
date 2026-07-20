@@ -73,7 +73,16 @@ export type ActiveTurnState =
   | {phase: "running"; requestId: string; sessionId?: string}
   | {phase: "cancelling"; requestId: string; cancelRequestId: string; sessionId?: string};
 
-export type RouteState = "ready" | "degraded" | "slow" | "unavailable" | "invalid";
+export type RouteState = "ready" | "unverified" | "degraded" | "slow" | "unavailable" | "invalid";
+
+export type ProviderRouteReceipt = {
+  requestId: string;
+  sessionId: string;
+  provider: string;
+  model: string;
+  routeId: string;
+  evidenceKind: "provider_completion";
+};
 
 export type SupervisorControlState = {
   stateDir: string;

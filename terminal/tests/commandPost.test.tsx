@@ -70,7 +70,7 @@ describe("StatusFooter — the ONE status row (F-110/F-164)", () => {
     expect(gateNode?.color).not.toBe(THEME.vermilion);
   });
 
-  test("connected renders ● live plus the route gate state exactly once", () => {
+  test("connected renders bridge transport plus the route gate state exactly once", () => {
     const footer = StatusFooter({
       mode: "session list",
       routeLabel: "anthropic:claude",
@@ -79,9 +79,9 @@ describe("StatusFooter — the ONE status row (F-110/F-164)", () => {
       strategy: "responsive",
     });
     const text = flattenText(footer);
-    expect(text).toContain("● live");
+    expect(text).toContain("● bridge");
     expect(text.split("ready").length - 1).toBe(1);
-    expect(text.split("live").length - 1).toBe(1);
+    expect(text).not.toContain("live");
   });
 
   test("the model name renders through the parchment identity accent", () => {

@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import uuid
@@ -264,6 +265,45 @@ class TerminalBridge:
     def _available_provider_ids(self) -> set[str]:
         return set(self._adapters)
 
+    def _local_cli_attempt_authorized(self, provider_id: str) -> bool:
+        """Whether an unverified local CLI lane may be attempted.
+
+        This is deliberately weaker than model availability. It grants only
+        execution authority while the canonical key oracle is unknown; the
+        route remains ``unverified`` until a real provider event succeeds.
+        Keyed HTTP adapters never receive this exception.
+        """
+
+        adapter = self._adapters.get(provider_id)
+        if adapter is None or provider_id not in {"claude", "codex"}:
+            return False
+        cli_path = str(getattr(adapter, "_cli_path", provider_id) or provider_id)
+        binary = shutil.which(cli_path)
+        if binary is None:
+            return False
+
+        if provider_id == "claude":
+            # Claude auth presence is insufficient: a logged-in Max client can
+            # still fail every headless request. Reuse the smoke-proven oracle.
+            from dharma_swarm import key_oracle
+
+            return key_oracle.is_provider_live("claude_code") is True
+
+        try:
+            result = subprocess.run(
+                [binary, "login", "status"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                stdin=subprocess.DEVNULL,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return False
+        # A successful local OAuth-status command permits an attempt, not a
+        # liveness claim. The first actual completion is still the proof.
+        return result.returncode == 0
+
     async def close(self) -> None:
         if self._closing:
             active = self._active_run
@@ -490,6 +530,12 @@ class TerminalBridge:
                     "stack": "python-textual",
                     "replacement_target": "bun-ink",
                 },
+                # Adapter inventory proves transport shape only. Ship the
+                # independently typed route policy in the same handshake so a
+                # connected bridge can never be rendered as a provider-ready
+                # claim before model.policy refresh completes.
+                "payload": build_routing_decision_payload(policy),
+                "policy": policy,
                 "adapter_boot_error": adapter_error,
             }
         )
@@ -948,6 +994,35 @@ class TerminalBridge:
         self._emit_recorded_session_event(run, accepted)
         return accepted
 
+    def _emit_provider_route_receipt(
+        self,
+        run: _ActiveSessionRun,
+        terminal: SessionEnd,
+    ) -> None:
+        """Emit liveness authority only for a real provider completion.
+
+        ``session_end`` is also used by local identity, memory, and command
+        paths, so it cannot itself prove that a model route executed.  This
+        receipt is emitted only by the two adapter-stream loops below.
+        """
+
+        if not terminal.success:
+            return
+        provider_id = run.lifecycle.provider_id
+        model_id = run.lifecycle.model_id
+        self._emit(
+            {
+                "type": "route.receipt",
+                "request_id": run.request_id,
+                "session_id": run.session_id,
+                "provider_id": provider_id,
+                "model_id": model_id,
+                "route_id": f"{provider_id}:{model_id}",
+                "evidence_kind": "provider_completion",
+                "success": True,
+            }
+        )
+
     async def _run_active_session(
         self,
         run: _ActiveSessionRun,
@@ -1113,7 +1188,9 @@ class TerminalBridge:
                 raise asyncio.CancelledError
             if isinstance(event, ToolCallComplete):
                 self._emit_permission_decision(request_id, event)
-            self._record_and_emit_session_event(run, event)
+            accepted = self._record_and_emit_session_event(run, event)
+            if isinstance(accepted, SessionEnd) and accepted.success:
+                self._emit_provider_route_receipt(run, accepted)
 
     async def _run_chat_turn(
         self,
@@ -1231,7 +1308,9 @@ class TerminalBridge:
                 run.phase = "finalizing"
                 run.lifecycle.bind_route(provider_id=provider_id, model_id=model_id)
                 for event in buffer:
-                    self._record_and_emit_session_event(run, event)
+                    accepted = self._record_and_emit_session_event(run, event)
+                    if isinstance(accepted, SessionEnd) and accepted.success:
+                        self._emit_provider_route_receipt(run, accepted)
                 self._remember_chat_exchange(prompt, "\n\n".join(reply_parts).strip())
                 return
             lane_failures.append(f"{provider_id}:{model_id} — {failure_text or 'failed'}")
@@ -2290,6 +2369,7 @@ class TerminalBridge:
                 status_by_model_id[route_status.model_id] = projected
 
         terminal_providers = self._available_provider_ids()
+        local_attempt_cache: dict[str, bool] = {}
         seen_routes: set[tuple[str, str]] = set()
         targets: list[dict[str, Any]] = []
         for target in model_routing.all_targets():
@@ -2314,10 +2394,27 @@ class TerminalBridge:
                 for route_status in route_statuses
             )
             adapter_available = provider_id in terminal_providers
-            selectable = model_available and adapter_available
-            if selectable:
+            oracle_unverified = bool(route_statuses) and all(
+                route_status.status == "unverified"
+                and route_status.reason == "key_status_unknown"
+                for route_status in route_statuses
+            )
+            local_attempt_authorized = False
+            if adapter_available and oracle_unverified:
+                if provider_id not in local_attempt_cache:
+                    local_attempt_cache[provider_id] = (
+                        self._local_cli_attempt_authorized(provider_id)
+                    )
+                local_attempt_authorized = local_attempt_cache[provider_id]
+            selectable = adapter_available and (
+                model_available or local_attempt_authorized
+            )
+            if model_available and adapter_available:
                 route_state = "ready"
                 availability_reason = None
+            elif local_attempt_authorized:
+                route_state = "unverified"
+                availability_reason = "local_cli_auth_unverified"
             elif model_available and not adapter_available:
                 route_state = "unavailable"
                 availability_reason = "terminal_adapter_missing"
@@ -2386,11 +2483,15 @@ class TerminalBridge:
             and bool(target.get("selectable"))
         ][:6]
         provider_counts: dict[str, int] = {}
+        attemptable_provider_counts: dict[str, int] = {}
         for target in targets:
-            if not bool(target.get("selectable")):
-                continue
             provider = str(target["provider"])
-            provider_counts[provider] = provider_counts.get(provider, 0) + 1
+            if bool(target.get("available")):
+                provider_counts[provider] = provider_counts.get(provider, 0) + 1
+            if bool(target.get("selectable")):
+                attemptable_provider_counts[provider] = (
+                    attemptable_provider_counts.get(provider, 0) + 1
+                )
         return {
             "schema_version": model_status.MODEL_STATUS_SCHEMA_VERSION,
             "oracle_state": projection.oracle_state,
@@ -2411,6 +2512,10 @@ class TerminalBridge:
             "available_providers": [
                 {"id": provider, "model_count": count}
                 for provider, count in sorted(provider_counts.items())
+            ],
+            "attemptable_providers": [
+                {"id": provider, "model_count": count}
+                for provider, count in sorted(attemptable_provider_counts.items())
             ],
         }
 

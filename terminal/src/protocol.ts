@@ -6,6 +6,8 @@ export {
   agentRoutesToPreview,
   modelPolicyToLines,
   modelPolicyToPreview,
+  handshakeRouteConfigFromEvent,
+  providerRouteReceiptFromEvent,
   routingDecisionPayloadFromEvent,
 } from "./protocol/routing";
 import type {

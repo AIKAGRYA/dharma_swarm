@@ -27,4 +27,4 @@
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >  Navigation active · Esc returns to composer                                                   │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
- session list  ·  route claude:claude-opus-4.8  ·  ○ offline  ·  responsive
+ session list  ·  route claude:claude-opus-4.8  ·  ○ offline  ·  responsive  ·  awaiting_bridge_po…

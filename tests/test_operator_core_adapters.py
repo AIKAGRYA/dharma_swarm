@@ -101,7 +101,13 @@ class OperatorCoreAdapterTests(unittest.TestCase):
                 "strategy": "responsive",
                 "active_label": "GPT-5.4",
                 "default_route": "codex:gpt-5.4",
-                "targets": [{"alias": "primary"}],
+                "targets": [{
+                    "alias": "primary",
+                    "provider": "codex",
+                    "model": "gpt-5.4",
+                    "route_state": "ready",
+                    "selectable": True,
+                }],
                 "fallback_chain": [
                     {"provider": "claude", "model": "sonnet-4.6"},
                     {"provider": "openrouter", "model": "qwen2.5-coder"},
@@ -113,6 +119,30 @@ class OperatorCoreAdapterTests(unittest.TestCase):
         self.assertEqual(decision.fallback_chain[0], "claude:sonnet-4.6")
         self.assertFalse(decision.degraded)
 
+    def test_routing_decision_preserves_unverified_modality(self) -> None:
+        decision = routing_decision_from_policy(
+            {
+                "selected_route": "codex:gpt-5.5",
+                "selected_provider": "codex",
+                "selected_model": "gpt-5.5",
+                "targets": [{
+                    "provider": "codex",
+                    "model": "gpt-5.5",
+                    "route_state": "unverified",
+                    "selectable": True,
+                    "availability_reason": "local_cli_auth_unverified",
+                }],
+            }
+        )
+
+        self.assertTrue(decision.degraded)
+        self.assertEqual(decision.metadata["route_state"], "unverified")
+        self.assertTrue(decision.metadata["selectable"])
+        self.assertEqual(
+            decision.metadata["availability_reason"],
+            "local_cli_auth_unverified",
+        )
+
     def test_build_routing_decision_payload_is_json_ready(self) -> None:
         payload = build_routing_decision_payload(
             {
@@ -122,7 +152,14 @@ class OperatorCoreAdapterTests(unittest.TestCase):
                 "strategy": "responsive",
                 "active_label": "GPT-5.4",
                 "default_route": "codex:gpt-5.4",
-                "targets": [{"alias": "primary", "provider": "codex", "model": "gpt-5.4", "label": "GPT-5.4"}],
+                "targets": [{
+                    "alias": "primary",
+                    "provider": "codex",
+                    "model": "gpt-5.4",
+                    "label": "GPT-5.4",
+                    "route_state": "ready",
+                    "selectable": True,
+                }],
                 "strategies": ["responsive", "genius"],
                 "fallback_chain": [{"provider": "claude", "model": "sonnet-4.6", "label": "Sonnet 4.6"}],
             }

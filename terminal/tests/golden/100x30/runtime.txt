@@ -27,4 +27,4 @@
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >  Navigation active · Esc returns to composer                                                   │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
- pane section focus  ·  route claude:claude-opus-4.8  ·  ○ offline  ·  responsive
+ pane section focus  ·  route claude:claude-opus-4.8  ·  ○ offline  ·  responsive  ·  awaiting_bri…

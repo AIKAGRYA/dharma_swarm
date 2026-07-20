@@ -29,7 +29,11 @@ export function ModelPicker({choices, selectedIndex, title = "Model Picker", com
           const active = actualIndex === selectedIndex;
           const routeState = choice.routeState;
           const stateColor =
-            routeState === "ready" ? THEME.moss : routeState === "degraded" || routeState === "slow" ? THEME.parchment : THEME.vermilion;
+            routeState === "ready"
+              ? THEME.moss
+              : routeState === "unverified" || routeState === "degraded" || routeState === "slow"
+                ? THEME.parchment
+                : THEME.vermilion;
           return (
             <Box key={`${choice.provider}:${choice.model}`} flexDirection="column" marginBottom={compact ? 0 : 1}>
               <Text color={active ? THEME.wave : THEME.foam} bold={active}>

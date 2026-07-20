@@ -77,6 +77,17 @@ describe("FACE-3 the scroll — one-row status drawer", () => {
     expect(status).not.toContain("codex");
   });
 
+  test("closed + connected keeps an unverified route visible", () => {
+    const status = scrollStatusLine({
+      drawerOpen: false,
+      routeLabel: "codex:gpt-5.5",
+      bridgeStatus: "connected",
+      routeState: "unverified",
+    });
+    expect(status).toContain("unverified");
+    expect(status).not.toContain("live");
+  });
+
   test("open drawer is the full telemetry row — route, gate, state, strategy", () => {
     const status = scrollStatusLine({
       drawerOpen: true,
@@ -86,7 +97,7 @@ describe("FACE-3 the scroll — one-row status drawer", () => {
       strategy: "balanced-throughput",
     });
     expect(status).toContain("route codex:gpt-5.4");
-    expect(status).toContain("● live");
+    expect(status).toContain("● bridge");
     expect(status).toContain("ready");
     expect(status).toContain("balanced-throughput");
     expect(status).toContain("^D close");

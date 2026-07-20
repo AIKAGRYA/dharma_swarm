@@ -11,6 +11,7 @@ const PANES = [
   {id: "models", title: "Models"},
   {id: "agents", title: "Agents"},
   {id: "runtime", title: "Runtime"},
+  {id: "sessions", title: "Sessions"},
 ];
 
 const TARGETS: RouteTarget[] = [
@@ -32,9 +33,16 @@ describe("F-066 natural-language UI intents", () => {
     expect(intent).toEqual({kind: "pane", tabId: "control", title: "Control"});
   });
 
-  test("pane intents need a pane noun — bare titles stay chat", () => {
+  test("exact pane-title commands resolve locally without a redundant pane noun", () => {
+    expect(matchUiIntent("open sessions", PANES, TARGETS)).toEqual({kind: "pane", tabId: "sessions", title: "Sessions"});
+    expect(matchUiIntent("show runtime", PANES, TARGETS)).toEqual({kind: "pane", tabId: "runtime", title: "Runtime"});
+    expect(matchUiIntent("go to agents", PANES, TARGETS)).toEqual({kind: "pane", tabId: "agents", title: "Agents"});
+  });
+
+  test("conversational pane-title uses still need a pane noun", () => {
     expect(matchUiIntent("show me the models tab", PANES, TARGETS)).toEqual({kind: "pane", tabId: "models", title: "Models"});
     expect(matchUiIntent("show me what control means in cybernetics", PANES, TARGETS)).toBeNull();
+    expect(matchUiIntent("show runtime behavior in the architecture", PANES, TARGETS)).toBeNull();
   });
 
   test("filler words ride between verb and 'to': change models to claude opus", () => {

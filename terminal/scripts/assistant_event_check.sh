@@ -63,8 +63,8 @@ tmux new-session -d -s "$SESS" -x 100 -y 30 \
   || fail "tmux session failed to start"
 
 wait_for "Dharma Terminal" "app boot frame"
-# FACE-1: the zen status line shows the durable "live" token once connected.
-wait_for "backend connected|bridge ready|resyncing|·  live  ·" "stub bridge handshake"
+# FACE-1: the zen status line names bridge connectivity without claiming provider liveness.
+wait_for "backend connected|bridge ready|resyncing|bridge connected|● bridge" "stub bridge handshake"
 
 # ---- turn 1: answered via the assistant event ----
 tmux send-keys -t "$SESS" -l "who are you and what can you do"

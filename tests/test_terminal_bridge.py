@@ -187,6 +187,69 @@ def test_model_policy_summary_uses_canonical_status_projection(monkeypatch, tmp_
         asyncio.run(bridge.close())
 
 
+def test_unknown_oracle_allows_only_authorized_local_cli_attempts(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr("dharma_swarm.key_oracle.live_providers", lambda: None)
+    monkeypatch.setattr("dharma_swarm.model_status._status_data", lambda: None)
+    monkeypatch.setenv(LIVE_CALL_MATRIX_DIR_ENV, str(tmp_path / "no-live-matrix"))
+    bridge = TerminalBridge()
+    monkeypatch.setattr(
+        bridge,
+        "_local_cli_attempt_authorized",
+        lambda provider_id: provider_id == "codex",
+    )
+
+    try:
+        policy = bridge._build_model_policy_summary(
+            selected_provider="claude",
+            selected_model="claude-opus-4.8",
+            strategy="responsive",
+        )
+        codex_targets = [target for target in policy["targets"] if target["provider"] == "codex"]
+        claude_targets = [target for target in policy["targets"] if target["provider"] == "claude"]
+        openrouter_targets = [target for target in policy["targets"] if target["provider"] == "openrouter"]
+
+        assert codex_targets
+        assert all(target["selectable"] is True for target in codex_targets)
+        assert all(target["available"] is False for target in codex_targets)
+        assert {target["route_state"] for target in codex_targets} == {"unverified"}
+        assert {target["availability_reason"] for target in codex_targets} == {
+            "local_cli_auth_unverified"
+        }
+        assert all(target["selectable"] is False for target in claude_targets)
+        assert all(target["selectable"] is False for target in openrouter_targets)
+        assert policy["selected_provider"] == "codex"
+        assert policy["available_providers"] == []
+        assert {entry["id"] for entry in policy["attemptable_providers"]} == {"codex"}
+        assert {lane[0] for lane in bridge._chat_lanes("claude", "claude-opus-4.8")} == {
+            "codex"
+        }
+    finally:
+        asyncio.run(bridge.close())
+
+
+def test_unknown_or_explicit_dead_oracle_never_admits_unproven_routes(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr("dharma_swarm.model_status._status_data", lambda: None)
+    monkeypatch.setenv(LIVE_CALL_MATRIX_DIR_ENV, str(tmp_path / "no-live-matrix"))
+    bridge = TerminalBridge()
+    monkeypatch.setattr(bridge, "_local_cli_attempt_authorized", lambda provider_id: False)
+
+    try:
+        monkeypatch.setattr("dharma_swarm.key_oracle.live_providers", lambda: None)
+        assert bridge._chat_lanes("claude", "claude-opus-4.8") == []
+
+        monkeypatch.setattr("dharma_swarm.key_oracle.live_providers", lambda: set())
+        monkeypatch.setattr(bridge, "_local_cli_attempt_authorized", lambda provider_id: True)
+        assert bridge._chat_lanes("claude", "claude-opus-4.8") == []
+    finally:
+        asyncio.run(bridge.close())
+
+
 def test_handshake_default_matches_canonical_selected_route(monkeypatch, tmp_path: Path, capsys) -> None:
     monkeypatch.setattr(
         "dharma_swarm.key_oracle.live_providers",
@@ -214,6 +277,9 @@ def test_handshake_default_matches_canonical_selected_route(monkeypatch, tmp_pat
             if provider["provider_id"] == event["default_provider"]
         )
         assert selected["default_model"] == event["default_model"]
+        assert event["payload"]["domain"] == "routing_decision"
+        assert event["payload"]["decision"]["route_id"] == policy["selected_route"]
+        assert event["policy"]["selected_route"] == policy["selected_route"]
     finally:
         asyncio.run(bridge.close())
 
@@ -246,10 +312,21 @@ def test_chat_route_identity_matches_ack_invocation_and_durable_metadata(tmp_pat
 
     emitted = [json.loads(line) for line in capsys.readouterr().out.splitlines() if line.strip()]
     ack = next(event for event in emitted if event["type"] == "session.ack")
+    receipt = next(event for event in emitted if event["type"] == "route.receipt")
     meta = bridge._session_store.load_meta(ack["session_id"])
 
     assert ack["provider"] == "codex"
     assert ack["model"] == "gpt-5.5"
+    assert receipt == {
+        "type": "route.receipt",
+        "request_id": "route-1",
+        "session_id": ack["session_id"],
+        "provider_id": "codex",
+        "model_id": "gpt-5.5",
+        "route_id": "codex:gpt-5.5",
+        "evidence_kind": "provider_completion",
+        "success": True,
+    }
     assert adapter.completion_models == ["gpt-5.5"]
     assert meta["provider_id"] == "codex"
     assert meta["model_id"] == "gpt-5.5"
@@ -271,6 +348,42 @@ def test_terminal_bridge_routes_tool_work_to_agent_lane() -> None:
         assert chat_intent["kind"] == "chat"
     finally:
         asyncio.run(bridge.close())
+
+
+def test_local_success_session_end_never_emits_provider_route_receipt(
+    tmp_path, capsys
+) -> None:
+    adapter = _ImmediateAdapter("codex")
+    bridge = TerminalBridge()
+    bridge._session_store = SessionStore(root=tmp_path)
+    bridge._adapters = {"codex": adapter}
+    bridge._completion_request_cls = _FakeCompletionRequest
+    bridge._adapter_boot_error = None
+
+    try:
+        asyncio.run(
+            bridge._handle_session_start(
+                "identity-local",
+                {
+                    "provider": "codex",
+                    "model": "gpt-5.5",
+                    "prompt": "who are you?",
+                    "bootstrap": {"intent": {"kind": "identity"}},
+                },
+            )
+        )
+    finally:
+        asyncio.run(bridge.close())
+
+    emitted = [
+        json.loads(line) for line in capsys.readouterr().out.splitlines() if line.strip()
+    ]
+    assert adapter.stream_calls == 0
+    assert any(
+        event.get("type") == "session_end" and event.get("success") is True
+        for event in emitted
+    )
+    assert all(event.get("type") != "route.receipt" for event in emitted)
 
 
 def test_session_start_creates_store_entry_before_tool_permissions(tmp_path, capsys) -> None:
@@ -435,6 +548,7 @@ def test_successful_agent_turn_persists_completed_replayable_session(tmp_path, c
 
     emitted = [json.loads(line) for line in capsys.readouterr().out.splitlines() if line.strip()]
     ack = next(event for event in emitted if event["type"] == "session.ack")
+    receipt = next(event for event in emitted if event["type"] == "route.receipt")
     session_id = ack["session_id"]
     reopened = SessionStore(root=tmp_path)
     meta = reopened.load_meta(session_id)
@@ -452,6 +566,12 @@ def test_successful_agent_turn_persists_completed_replayable_session(tmp_path, c
         "session_end",
     ]
     assert reopened.verify_session_replay(session_id) == (True, [])
+    assert receipt["request_id"] == "agent-start"
+    assert receipt["session_id"] == session_id
+    assert receipt["provider_id"] == "codex"
+    assert receipt["model_id"] == "gpt-5.4"
+    assert receipt["route_id"] == "codex:gpt-5.4"
+    assert receipt["evidence_kind"] == "provider_completion"
     assert build_session_catalog(reopened, cwd=str(bridge._repo_root))["sessions"][0]["total_turns"] == 1
     assert build_session_detail(reopened, session_id)["compaction_preview"]["event_count"] == 5
 

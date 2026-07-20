@@ -27,6 +27,60 @@ RESPONSE_TEXT = "The Helm hears you loud and clear."
 ASSISTANT_TEXT = "I am the Helm. Identity intents route straight through me."
 
 
+def model_policy():
+    target = {
+        "alias": "gpt-5.4",
+        "provider": "codex",
+        "model": "gpt-5.4",
+        "label": "Codex 5.4",
+        "route_id": "codex:gpt-5.4",
+        "route_state": "ready",
+        "picker_visible": True,
+        "selectable": True,
+        "available": True,
+        "availability_reason": None,
+    }
+    return {
+        "schema_version": "dharma.model_status.v1",
+        "oracle_state": "stub_verified",
+        "live_providers": ["codex"],
+        "selected_provider": "codex",
+        "selected_model": "gpt-5.4",
+        "selected_route": "codex:gpt-5.4",
+        "strategy": "responsive",
+        "strategies": ["responsive"],
+        "default_route": "codex:gpt-5.4",
+        "active_label": "Codex 5.4",
+        "fallback_chain": [],
+        "targets": [target],
+    }
+
+
+def routing_payload(policy):
+    return {
+        "version": "v1",
+        "domain": "routing_decision",
+        "decision": {
+            "route_id": policy["selected_route"],
+            "provider_id": policy["selected_provider"],
+            "model_id": policy["selected_model"],
+            "strategy": policy["strategy"],
+            "reason": "stub route proof",
+            "fallback_chain": [],
+            "degraded": False,
+            "metadata": {
+                "active_label": policy["active_label"],
+                "default_route": policy["default_route"],
+                "route_state": "ready",
+                "selectable": True,
+            },
+        },
+        "strategies": policy["strategies"],
+        "targets": policy["targets"],
+        "fallback_targets": [],
+    }
+
+
 def emit(payload):
     sys.stdout.write(json.dumps(payload) + "\n")
     sys.stdout.flush()
@@ -64,6 +118,7 @@ def main():
         if scenario == "quiet":
             continue
         if request_type == "handshake":
+            policy = model_policy()
             emit({
                 "type": "handshake.result",
                 "request_id": request_id,
@@ -73,8 +128,19 @@ def main():
                     "models": [{"id": "gpt-5.4", "display_name": "gpt-5.4", "capabilities": []}],
                 }],
                 "default_provider": "codex",
+                "default_model": "gpt-5.4",
+                "payload": routing_payload(policy),
+                "policy": policy,
                 "legacy_terminal": {"stack": "python-textual", "replacement_target": "bun-ink"},
                 "adapter_boot_error": None,
+            })
+        elif request_type == "model.policy":
+            policy = model_policy()
+            emit({
+                "type": "model.policy.result",
+                "request_id": request_id,
+                "payload": routing_payload(policy),
+                "policy": policy,
             })
         elif request_type == "status":
             emit({

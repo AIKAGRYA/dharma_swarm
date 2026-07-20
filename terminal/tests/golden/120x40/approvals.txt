@@ -37,4 +37,4 @@
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >  Navigation active · Esc returns to composer                                                                       │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
- approval queue  ·  route claude:claude-opus-4.8  ·  ○ offline  ·  responsive
+ approval queue  ·  route claude:claude-opus-4.8  ·  ○ offline  ·  responsive  ·  awaiting_bridge_policy

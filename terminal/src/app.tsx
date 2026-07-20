@@ -34,7 +34,7 @@ import {TranscriptPane} from "./components/TranscriptPane.tsx";
 import {closestCommand, helmDirectiveToIntent, matchUiIntent, parseHelmDirectives, tourLines, type HelmDirective, type UiIntent} from "./uiIntents.ts";
 import {REGISTERED_SLASH_COMMANDS} from "./commandRegistry.ts";
 import {parseControlPulsePreview, parseRuntimeFreshness} from "./freshness.ts";
-import {routeLabel, routePolicyFromValue, routeSummary, selectableRouteTargets} from "./routePolicy.ts";
+import {routeLabel, routePolicyFromValue, routePolicyWithSuccessfulReceipt, routeSummary, selectableRouteTargets} from "./routePolicy.ts";
 import {THEME} from "./theme.ts";
 import {manuscriptLines, scrollStatusLine} from "./scrollFace.ts";
 import {isPlainReturn, normalizeComposerInput} from "./inputPolicy.ts";
@@ -80,6 +80,8 @@ import {
   isWorkspaceSnapshotContent,
   modelPolicyToLines,
   modelPolicyToPreview,
+  handshakeRouteConfigFromEvent,
+  providerRouteReceiptFromEvent,
   permissionDecisionFromEvent,
   permissionHistoryFromEvent,
   permissionOutcomeFromEvent,
@@ -1564,9 +1566,11 @@ export function createBridgeEventHandler({
     }
     if (eventType === "session_end") {
       const requestId = String(typed.request_id ?? "");
-      if (requestId) {
-        apply([{type: "turn.finish", requestId}]);
-      }
+      if (requestId) apply([{type: "turn.finish", requestId}]);
+    }
+    if (eventType === "route.receipt") {
+      const receipt = providerRouteReceiptFromEvent(typed), routePolicy = getState().routePolicy;
+      if (receipt) apply([{type: "route.policy.set", policy: routePolicyWithSuccessfulReceipt(routePolicy, receipt)}]);
     }
     // Agent-action channel: the chat agent drives the Helm by emitting
     // ⟦helm:…⟧ directives in its reply. Parse them off the completed assistant
@@ -1591,7 +1595,7 @@ export function createBridgeEventHandler({
         {type: "status.set", value: "bridge ready"},
       ]);
     }
-    if (eventType === "bridge.error" || eventType === "error") {
+    if (eventType === "bridge.error") {
       const code = String(typed.code ?? "");
       const message = String(typed.message ?? typed.code ?? "bridge error");
       if (code === "session_detail_failed") {
@@ -1621,26 +1625,21 @@ export function createBridgeEventHandler({
         ]);
       }
     }
+    if (eventType === "error") {
+      const code = String(typed.code ?? "provider_error");
+      const message = String(typed.message ?? typed.code ?? "provider error");
+      apply([{type: "status.set", value: `${code}: ${message}`}]);
+    }
     if (eventType === "handshake.result") {
-      const providers = Array.isArray(typed.providers) ? typed.providers : [];
-      const defaultProviderId = String(typed.default_provider ?? "").trim();
-      const selectedProvider = providers.find(
-        (entry) =>
-          typeof entry === "object" &&
-          entry !== null &&
-          String((entry as {provider_id?: string}).provider_id ?? "") === defaultProviderId,
-      ) as {provider_id?: string; default_model?: string} | undefined;
-      const fallbackProvider = providers.find((entry) => typeof entry === "object" && entry !== null) as
-        | {provider_id?: string; default_model?: string}
-        | undefined;
-      const provider = selectedProvider?.provider_id ?? fallbackProvider?.provider_id ?? "claude";
-      const model = selectedProvider?.default_model ?? fallbackProvider?.default_model ?? "claude-opus-4.8";
+      const {provider, model, policy} = handshakeRouteConfigFromEvent(typed, state.routePolicy);
       apply([{
         type: "bridge.config",
         provider,
         model,
         strategy: state.routePolicy.strategy,
-      }]);
+      }, ...(policy
+        ? [{type: "route.policy.set", policy} as const]
+        : [])]);
       malformedBridgeEvents = 0;
       reconnectRequested = false;
       resetHandshakeBackoff?.();
@@ -3611,8 +3610,8 @@ export function App(): React.ReactElement {
     // "sidebar ->") must never churn the zen frame.
     const zenStatus = [
       `zen/${state.uiMode.keyboardFocus}`,
-      liveRouteLabel,
-      state.bridgeStatus === "connected" ? "live" : state.bridgeStatus,
+      `${routeLabel(state.routePolicy)} [${state.routePolicy.routeState}]`,
+      `bridge ${state.bridgeStatus}`,
       "F2 cockpit · /tour",
     ].join("  ·  ");
     // Claude-Code baseline (operator hard rule "full screen, just like claude
@@ -3672,7 +3671,7 @@ export function App(): React.ReactElement {
     const scrollMeasure = Math.min(terminalWidth, 84);
     const scrollStatus = `${state.uiMode.keyboardFocus} · ${scrollStatusLine({
       drawerOpen: scrollDrawerOpen,
-      routeLabel: liveRouteLabel,
+      routeLabel: routeLabel(state.routePolicy),
       bridgeStatus: state.bridgeStatus,
       routeState: state.routePolicy.routeState,
       strategy: state.routePolicy.strategy,

@@ -15,6 +15,7 @@ from dharma_swarm.tui.engine.events import (
     SessionEnd,
     SessionStart,
     TextComplete,
+    ThinkingComplete,
     ToolCallComplete,
     ToolResult,
     UsageReport,
@@ -98,7 +99,11 @@ class _FakeProc:
         self.returncode = -9
 
 
-def test_codex_build_command_is_read_only_by_default(tmp_path: Path) -> None:
+def test_codex_build_command_is_read_only_by_default(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("DGC_CODEX_REASONING_EFFORT", raising=False)
     adapter = CodexAdapter(
         config=ProviderConfig(provider_id="codex", default_model="gpt-5.4"),
         workdir=tmp_path,
@@ -116,6 +121,42 @@ def test_codex_build_command_is_read_only_by_default(tmp_path: Path) -> None:
     assert "--json" in cmd
     assert "-m" in cmd
     assert "gpt-5.4" in cmd
+    assert 'model_reasoning_effort="xhigh"' in cmd
+
+
+def test_codex_build_command_rejects_unsupported_inherited_effort(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DGC_CODEX_REASONING_EFFORT", "ultra")
+    adapter = CodexAdapter(workdir=tmp_path)
+
+    cmd = adapter._build_command(
+        CompletionRequest(messages=[{"role": "user", "content": "hello"}]),
+        output_path=tmp_path / "last.txt",
+    )
+
+    assert 'model_reasoning_effort="xhigh"' in cmd
+    assert all("ultra" not in part for part in cmd)
+
+
+def test_codex_nonfatal_skill_budget_advisory_is_not_a_provider_error() -> None:
+    adapter = CodexAdapter()
+
+    events = adapter._normalize_line(
+        _j({
+            "type": "item.completed",
+            "item": {
+                "type": "error",
+                "message": "Skill descriptions were shortened to fit the 2% skills context budget.",
+            },
+        }),
+        session_id="sid-advisory",
+        profile=adapter.get_profile("gpt-5.5"),
+    )
+
+    assert any(isinstance(event, ThinkingComplete) for event in events)
+    assert not any(isinstance(event, ErrorEvent) for event in events)
 
 
 @pytest.mark.asyncio

@@ -37,4 +37,4 @@
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >  Navigation active · Esc returns to composer                                                                       │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
- pane switcher  ·  route claude:claude-opus-4.8  ·  ○ offline  ·  responsive
+ pane switcher  ·  route claude:claude-opus-4.8  ·  ○ offline  ·  responsive  ·  awaiting_bridge_policy
