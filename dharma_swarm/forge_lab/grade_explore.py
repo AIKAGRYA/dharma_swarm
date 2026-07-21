@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 TIER_EXPLORE_FAST = "explore-fast-host-pytest"
+TIER_CONFIRM_SWEBENCH = "confirm-swebench-docker"
 
 
 @dataclass(frozen=True)
@@ -202,6 +203,7 @@ def grade_genome_explore(
     propose_timeout_s: int = 240,
     grade_timeout_s: int = 600,
     soft_token_cap: bool = True,
+    tier: str = TIER_EXPLORE_FAST,
 ) -> GradeOutcome:
     """Grade one genome on the generation's task slice. Never raises for
     per-task trouble — a failed observation is a row, not an exception."""
@@ -214,7 +216,7 @@ def grade_genome_explore(
     failures: list[dict[str, Any]] = []
     tokens_total = 0
     for task_id, (inst, ctx) in task_contexts.items():
-        row: dict[str, Any] = {"task_id": task_id, "resolved": False, "tier": TIER_EXPLORE_FAST}
+        row: dict[str, Any] = {"task_id": task_id, "resolved": False, "tier": tier}
         try:
             if getattr(budget, "invalid", False):
                 row["error"] = f"budget_invalid:{getattr(budget, 'invalid_reason', '')}"
@@ -258,8 +260,16 @@ def grade_genome_explore(
         per_task=per_task,
         budget=budget_dict,
         tokens_used=spent_tokens,
+        tier=tier,
         failures=failures,
     )
 
 
-__all__ = ["GradeSeams", "GradeOutcome", "production_seams", "grade_genome_explore", "TIER_EXPLORE_FAST"]
+__all__ = [
+    "GradeSeams",
+    "GradeOutcome",
+    "production_seams",
+    "grade_genome_explore",
+    "TIER_EXPLORE_FAST",
+    "TIER_CONFIRM_SWEBENCH",
+]
