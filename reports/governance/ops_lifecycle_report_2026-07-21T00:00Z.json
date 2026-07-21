@@ -1,0 +1,130 @@
+{
+  "run_timestamp": "2026-07-21T00:00Z",
+  "audit_sha": "88458e06f7504883ccf6c46d8c83fbbf8e28f2bc",
+  "mission_1_spine_adoption": {
+    "adoption_pct": 93.8,
+    "target_pct": 95.0,
+    "gap_pp": 1.2,
+    "joined_count": 13,
+    "adapter_ready_count": 2,
+    "legacy_count": 1,
+    "missing_count": 0,
+    "quarantine_count": 0,
+    "total_surfaces": 16,
+    "status_vs_previous": "UNCHANGED (93.8% -> 93.8%)",
+    "json_committed": false,
+    "json_commit_reason": "adoption_pct unchanged from HEAD; per policy only commit on pct change",
+    "spine_comment_posted_to": "PR #1066 (https://github.com/AmitabhainArunachala/dharma_swarm/pull/1066#issuecomment-5028619902)",
+    "surfaces_that_moved_status": [],
+    "top_saturation_targets": [
+      {
+        "id": "self_modification_loop",
+        "status": "adapter-ready",
+        "files": [
+          "dharma_swarm/diff_applier.py",
+          "dharma_swarm/evolution.py",
+          "dharma_swarm/self_improve.py"
+        ],
+        "missing_patterns": [
+          "try_begin_idempotent_side_effect on apply path in diff_applier.py"
+        ],
+        "open_pr": "#1060"
+      },
+      {
+        "id": "mcp_tool_access",
+        "status": "adapter-ready",
+        "files": [
+          "dharma_swarm/mcp_server.py",
+          "dharma_swarm/dharma_context_mcp.py"
+        ],
+        "missing_patterns": [
+          "ExecutionIdentity import",
+          "RuntimeStateStore wiring",
+          "record_side_effect receipts"
+        ],
+        "open_pr": "#1061"
+      },
+      {
+        "id": "legacy_no_identity_escape_hatch",
+        "status": "legacy",
+        "files": [
+          "dharma_swarm/runtime_state.py",
+          "tests/test_runtime_state_invariants.py"
+        ],
+        "note": "Intentional legacy surface; invariant-covered. Arithmetic ceiling preventing 95% with 16 surfaces."
+      }
+    ]
+  },
+  "mission_2_pr_lifecycle": {
+    "total_open_before": 27,
+    "total_open_after": 27,
+    "auto_closed_count": 0,
+    "auto_closed_prs": [],
+    "conflicting_prs_under_7d": [
+      {
+        "number": 1007,
+        "title": "governance(keel): bare-metal architecture audit as the KEEL companion findings ledger",
+        "created_at": "2026-07-17T17:20:24Z",
+        "age_hours": 78.7
+      },
+      {
+        "number": 996,
+        "title": "governance(safety): admit live-host and rollback proof surfaces",
+        "created_at": "2026-07-17T01:43:11Z",
+        "age_hours": 94.3
+      },
+      {
+        "number": 972,
+        "title": "feat(forge-lab): canonical exact-code RSI lab releases",
+        "created_at": "2026-07-15T15:52:06Z",
+        "age_hours": 128.1
+      },
+      {
+        "number": 949,
+        "title": "[impact-checked] Govern durable A2A operator slice",
+        "created_at": "2026-07-14T23:31:10Z",
+        "age_hours": 144.5,
+        "note": "Crosses 7d threshold in ~23.5h — rebase soon"
+      },
+      {
+        "number": 947,
+        "title": "[impact-checked] Add durable A2A presence and operator node",
+        "created_at": "2026-07-14T15:49:21Z",
+        "age_hours": 152.2,
+        "note": "Crosses 7d threshold in ~15.8h — rebase soon"
+      }
+    ],
+    "duplicate_autogrounding_prs": [],
+    "green_and_ready_prs": [
+      {"number": 1076, "title": "[impact-checked] governance(helm): reconcile golden-frame blocker"},
+      {"number": 1075, "title": "[impact-checked] ci(governance): fail closed without live parity proof"},
+      {"number": 1074, "title": "docs(arena): ratify PR 983 post-merge evidence boundary"},
+      {"number": 1070, "title": "fix(xray): make discover_files cap deterministic and proportional (#1057)"},
+      {"number": 1067, "title": "docs: record pre-constitutional founder direction"},
+      {"number": 1066, "title": "docs(governance): Tier-D findings — hot-path spine work needing operator packets"},
+      {"number": 1065, "title": "feat(traces): documented front door for operational trace writes (spine C2)"},
+      {"number": 1064, "title": "feat(intent-router): ADR-009 idempotency-key origin standard + contract tests (spine C1)"},
+      {"number": 1063, "title": "feat(store-sync): project ValueEvents — second ontology\u2192runtime pass (spine B2)"},
+      {"number": 1062, "title": "feat(episode-ledger): versioned validated Episode Ledger events \u2014 schema slice (spine B1)"},
+      {"number": 1061, "title": "feat(mcp-server): join the MCP tool boundary to the runtime spine (spine A2)"},
+      {"number": 1060, "title": "feat(diff-applier): idempotency-fence the consequential diff apply (spine A1)"},
+      {"number": 1056, "title": "feat(durable-invoker): mark fail-open dispatch receipts as unprotected (pre-1004 hardening, slice 1)"},
+      {"number": 1025, "title": "docs(architecture): NATS/A2A whole-system update specification 2026-07-18"},
+      {"number": 1024, "title": "feat(agents): register grok_build as Meghaforge display identity"},
+      {"number": 1013, "title": "feat(ops): bounded mobile recovery for Codex Composer"},
+      {"number": 1011, "title": "governance: admit current Codex Composer recovery slice"},
+      {"number": 1006, "title": "docs(plans): DharmaGraph Ascent master spec (C1\u2013C5)"},
+      {"number": 1004, "title": "docs(plans): THE KEEL v7.2 \u2014 verification lattice doctrine (single-file, Codex review adopted)"},
+      {"number": 987, "title": "chore(docops): reconcile generated counts"},
+      {"number": 930, "title": "feat(chamber): add exact-scope proof membrane v0"},
+      {"number": 904, "title": "feat(holon): authority-scoped remote fast path [impact-checked]"}
+    ],
+    "recommended_actions": [
+      "URGENT: PRs #947 (152h) and #949 (145h) CONFLICTING and cross 168h threshold in ~16h and ~24h respectively — rebase or close immediately",
+      "PR #972 CONFLICTING, 128h old — rebase before next run to avoid auto-close",
+      "Merge spine PRs #1060 (spine A1) + #1061 (spine A2) to promote both adapter-ready surfaces to joined (closes all saturation targets)",
+      "22 MERGEABLE PRs ready for operator review — spine series #1060-#1066 are highest-value batch",
+      "Consider operator decision on legacy_no_identity_escape_hatch to break through 93.8% ceiling"
+    ]
+  }
+}
