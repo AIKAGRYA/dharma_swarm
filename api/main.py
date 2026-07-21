@@ -1,18 +1,14 @@
 """DHARMA COMMAND — Dashboard API.
 
 FastAPI app with lifespan, CORS, WebSocket, and routers.
-
-Usage:
-    cd ~/dharma_swarm
-    uvicorn api.main:app --port 8000 --reload
 """
 
 from __future__ import annotations
 
+import asyncio
 import hmac
 import logging
 import os
-import asyncio
 from contextlib import asynccontextmanager, suppress
 from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
@@ -203,6 +199,7 @@ def _initialize_boardstore_shadow(swarm: Any) -> None:
     _state["boardstore_outbox"] = outbox
 
 
+# fmt: off
 def _initialize_agent_directory(swarm: Any) -> None:
     """Compose the credential-safe directory from existing control-plane stores."""
     from api.routers.fleet import _get_registry
@@ -216,11 +213,53 @@ def _initialize_agent_directory(swarm: Any) -> None:
     node_registry = _get_registry()
     _state["node_registry"] = node_registry
     _state["agent_directory"] = AgentDirectory(
-        card_registry=card_registry,
-        node_registry=node_registry,
-        dharma_home=dharma_state_dir("DHARMA_HOME"),
-        telemetry_store=getattr(swarm, "_telemetry", None),
+        card_registry=card_registry, node_registry=node_registry,
+        dharma_home=dharma_state_dir("DHARMA_HOME"), telemetry_store=getattr(swarm, "_telemetry", None),
     )
+
+
+async def _start_fleet_presence_consumer() -> asyncio.Task[None] | None:
+    """Start the opt-in presence projector and await broker readiness."""
+    if os.getenv("DHARMA_FLEET_PRESENCE_ENABLED") != "1":
+        return None
+    from dharma_swarm.a2a.fleet_presence import FleetPresenceConsumerConfig, FleetPresenceProjector, run_fleet_presence_consumer
+    from dharma_swarm.operator_core.runtime_truth import runtime_db_path_from_env
+    from dharma_swarm.runtime_state import RuntimeStateStore
+
+    cards = _state.get("card_registry")
+    nodes = _state.get("node_registry")
+    if cards is None or nodes is None:
+        raise RuntimeError("fleet presence requires initialized card and node registries")
+    config = FleetPresenceConsumerConfig.from_env()
+    projector = FleetPresenceProjector(
+        card_registry=cards, node_registry=nodes, runtime_state=RuntimeStateStore(runtime_db_path_from_env()),
+        compatibility_mode=config.compatibility_mode, max_future_skew_s=config.max_future_skew_s,
+    )
+    ready = asyncio.get_running_loop().create_future()
+    task = asyncio.create_task(run_fleet_presence_consumer(projector, config=config, ready=ready), name="fleet-presence-consumer")
+    _state["fleet_presence_task"] = task
+    try:
+        await ready
+    except BaseException:
+        if not task.done():
+            task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        _state.pop("fleet_presence_task", None)
+        raise
+    logger.info("Fleet presence consumer ready on %s", config.subject)
+    return task
+
+
+async def _stop_fleet_presence_consumer() -> None:
+    task = _state.pop("fleet_presence_task", None)
+    if task is None:
+        return
+    if not task.done():
+        task.cancel()
+    outcomes = await asyncio.gather(task, return_exceptions=True)
+    for outcome in outcomes:
+        if isinstance(outcome, Exception):
+            logger.error("Fleet presence consumer stopped after failure: %s", outcome)
 
 
 # ── Lifespan ──────────────────────────────────────────────────────
@@ -243,7 +282,6 @@ async def lifespan(app: FastAPI):
     operator_pid = os.getpid()
     _publish_operator_pid(operator_pid)
 
-    # Normalize dkeys/external env aliases before any provider resolution.
     aliased = normalize_env_aliases()
     if aliased:
         logger.info(
@@ -255,11 +293,9 @@ async def lifespan(app: FastAPI):
 
     get_shared_registry()
 
-    # Initialize trace store
     trace_store = get_trace_store()
     await trace_store.init()
 
-    # Initialize swarm (connects to existing daemon state)
     swarm = get_swarm()
     swarm_init_task: asyncio.Task[None] | None = None
     try:
@@ -269,10 +305,7 @@ async def lifespan(app: FastAPI):
         await asyncio.wait_for(asyncio.shield(swarm_init_task), timeout=init_timeout)
         _state.pop("swarm_init_task", None)
     except TimeoutError:
-        logger.warning(
-            "Swarm init exceeded %.1fs; cancelling warmup to keep dashboard API responsive",
-            init_timeout,
-        )
+        logger.warning("Swarm init exceeded %.1fs; cancelling warmup to keep dashboard API responsive", init_timeout)
         if swarm_init_task is not None and not swarm_init_task.done():
             swarm_init_task.cancel()
             with suppress(asyncio.CancelledError):
@@ -305,12 +338,14 @@ async def lifespan(app: FastAPI):
             "AgentDirectory init failed; existing registries remain active: %s", exc
         )
 
-    _log_auth_mode()
-    logger.info("DHARMA COMMAND API ready on port 8420")
     try:
+        await _start_fleet_presence_consumer()
+        _log_auth_mode()
+        logger.info("DHARMA COMMAND API ready on port 8420")
         yield
     finally:
         logger.info("DHARMA COMMAND API shutting down")
+        await _stop_fleet_presence_consumer()
         pending_swarm_init = _state.pop("swarm_init_task", None)
         if pending_swarm_init is not None and not pending_swarm_init.done():
             pending_swarm_init.cancel()
@@ -322,6 +357,7 @@ async def lifespan(app: FastAPI):
             set_organism(None)
         _state.clear()
         _clear_operator_pid(operator_pid)
+# fmt: on
 
 
 # ── Auth ──────────────────────────────────────────────────────────

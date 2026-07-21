@@ -8,14 +8,19 @@ Verifies:
 - Status default is "unknown" (health_check is the operational witness)
 - discover() finds hydrated agents by capability after status promotion
 """
+
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-from dharma_swarm.a2a.node_registry import NodeRegistry
+import dharma_swarm.a2a.node_registry as node_registry_module
+import dharma_swarm.a2a.registry_hydrator as hydrator_module
+from dharma_swarm.a2a.node_registry import NodeRegistry, RemoteNode
 from dharma_swarm.a2a.registry_hydrator import hydrate_from_receipts
 from dharma_swarm.roaming_onboarding import (
     RoamingAgentRegistration,
@@ -126,12 +131,28 @@ async def test_hydrate_then_discover(tmp_path: Path) -> None:
     # discover() filters by status; hydration defaults to "unknown"
     assert registry.discover("synthesis") == []
 
-    # Operational witness (health_check) would normally do this; for in-process
-    # use we promote manually
-    pc = registry.get("perplexity-computer")
-    assert pc is not None
-    pc.status = "online"
-    found = registry.discover("synthesis")
+    observed_at = datetime.now(timezone.utc).isoformat()
+    with pytest.raises(ValueError, match="observed"):
+        registry.update_status(
+            "perplexity-computer",
+            status="online",
+            witness="test-operational-witness",
+        )
+    with pytest.raises(ValueError, match="witness"):
+        registry.update_status(
+            "perplexity-computer",
+            status="online",
+            observed_at=observed_at,
+        )
+    updated = registry.update_status(
+        "perplexity-computer",
+        status="online",
+        observed_at=observed_at,
+        witness="test-operational-witness",
+    )
+    assert updated.metadata["status_witness"] == "test-operational-witness"
+    reloaded = NodeRegistry(nodes_path=tmp_path / "nodes.json")
+    found = reloaded.discover("synthesis")
     assert [n.node_id for n in found] == ["perplexity-computer"]
 
 
@@ -176,3 +197,197 @@ def test_hydrate_no_receipts_file_returns_empty(tmp_path: Path) -> None:
     nodes = hydrate_from_receipts(registry, dharma_home=home)
     assert nodes == []
     assert registry.count() == 0
+
+
+def test_duplicate_receipt_capability_update_persists_after_reload(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    home = tmp_path / ".dharma"
+    receipts = home / "onboarding" / "receipts.jsonl"
+    receipts.parent.mkdir(parents=True)
+    receipt = {"callsign": "agent", "agent_uid": "agent-uid"}
+    receipts.write_text(
+        f"{json.dumps(receipt)}\n{json.dumps(receipt)}\n",
+        encoding="utf-8",
+    )
+    capabilities = iter([["old-capability"], ["new-capability"]])
+    monkeypatch.setattr(
+        hydrator_module,
+        "_capabilities_from_card",
+        lambda *_args: next(capabilities),
+    )
+    path = tmp_path / "nodes.json"
+
+    hydrate_from_receipts(NodeRegistry(nodes_path=path), dharma_home=home)
+
+    reloaded = NodeRegistry(nodes_path=path).get("agent")
+    assert reloaded is not None
+    assert reloaded.capabilities == ["new-capability"]
+
+
+@pytest.mark.asyncio
+async def test_failed_health_check_demotes_online_node_without_heartbeat(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FailingClient:
+        async def __aenter__(self) -> FailingClient:
+            return self
+
+        async def __aexit__(self, *args: Any) -> None:
+            return None
+
+        async def get(self, *_args: Any, **_kwargs: Any) -> Any:
+            raise RuntimeError("health endpoint unavailable")
+
+    monkeypatch.setattr(
+        node_registry_module.httpx,
+        "AsyncClient",
+        lambda **_kwargs: FailingClient(),
+    )
+    path = tmp_path / "nodes.json"
+    registry = NodeRegistry(nodes_path=path)
+    registry.register(
+        RemoteNode(
+            node_id="online-without-heartbeat",
+            endpoint="https://node.invalid",
+            status="online",
+        )
+    )
+
+    result = await registry.health_check("online-without-heartbeat")
+
+    assert result.status in {"unknown", "offline"}
+    assert result.is_reachable() is False
+    persisted = NodeRegistry(nodes_path=path).get("online-without-heartbeat")
+    assert persisted is not None
+    assert persisted.status == result.status
+
+
+@pytest.mark.parametrize(
+    ("status", "age_seconds", "expected", "reachable"),
+    [
+        ("offline", 400, "offline", False),
+        ("unknown", 400, "unknown", False),
+        ("online", 400, "degraded", True),
+        ("degraded", 400, "degraded", True),
+        ("online", 1_000, "offline", False),
+        ("degraded", 1_000, "offline", False),
+        ("unknown", 1_000, "unknown", False),
+    ],
+)
+@pytest.mark.asyncio
+async def test_stale_projection_preserves_status_lattice_and_dispatch_safety(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    status: str,
+    age_seconds: int,
+    expected: str,
+    reachable: bool,
+) -> None:
+    now = datetime(2026, 7, 14, 22, 0, tzinfo=timezone.utc)
+    registry = NodeRegistry(
+        nodes_path=tmp_path / "nodes.json",
+        clock=lambda: now,
+    )
+    registry.register(
+        RemoteNode(
+            node_id="stale-node",
+            endpoint="https://node.invalid",
+            status=status,
+            last_heartbeat=(now - timedelta(seconds=age_seconds)).isoformat(),
+        )
+    )
+
+    projected = registry.get("stale-node")
+
+    assert projected is not None
+    assert projected.status == expected
+    assert projected.is_reachable() is reachable
+    if not reachable:
+        from api.routers import fleet
+
+        monkeypatch.setattr(fleet, "_get_registry", lambda: registry)
+        with pytest.raises(Exception) as blocked:
+            await fleet.dispatch_task(
+                {"node_id": "stale-node", "capability": "x", "message": "x"}
+            )
+        assert getattr(blocked.value, "status_code", None) == 503
+
+
+def test_future_heartbeat_boundaries_reject_direct_injection(
+    tmp_path: Path,
+) -> None:
+    now = datetime(2026, 7, 14, 22, 0, tzinfo=timezone.utc)
+    future = (now + timedelta(seconds=31)).isoformat()
+    registry = NodeRegistry(
+        nodes_path=tmp_path / "nodes.json",
+        clock=lambda: now,
+        max_future_skew_s=30,
+    )
+    with pytest.raises(ValueError, match="future"):
+        registry.register(
+            RemoteNode(
+                node_id="future-register",
+                status="online",
+                last_heartbeat=future,
+            )
+        )
+    registry.register(RemoteNode(node_id="known", status="unknown"))
+    with pytest.raises(ValueError, match="future"):
+        registry.record_heartbeat(
+            "known",
+            last_heartbeat=future,
+            status="online",
+            canonical_agent_uid="known-uid",
+        )
+    with pytest.raises(ValueError, match="future"):
+        registry.update_status(
+            "known",
+            status="online",
+            observed_at=future,
+            witness="direct-test",
+        )
+
+
+def test_loaded_future_heartbeat_projects_unknown_and_accepts_valid_recovery(
+    tmp_path: Path,
+) -> None:
+    now = datetime(2026, 7, 14, 22, 0, tzinfo=timezone.utc)
+    path = tmp_path / "nodes.json"
+    path.write_text(
+        json.dumps(
+            [
+                RemoteNode(
+                    node_id="future-loaded",
+                    status="online",
+                    last_heartbeat="2099-01-01T00:00:00+00:00",
+                    metadata={"agent_uid": "future-loaded-uid"},
+                ).to_dict()
+            ]
+        ),
+        encoding="utf-8",
+    )
+    registry = NodeRegistry(
+        nodes_path=path,
+        clock=lambda: now,
+        max_future_skew_s=30,
+    )
+
+    projected = registry.get("future-loaded")
+
+    assert projected is not None
+    assert projected.status == "unknown"
+    recovered = registry.record_heartbeat(
+        "future-loaded",
+        last_heartbeat=now.isoformat(),
+        status="online",
+        metadata={
+            "agent_uid": "future-loaded-uid",
+            "presence_message_id": "valid-recovery",
+        },
+        canonical_agent_uid="future-loaded-uid",
+    )
+    assert recovered.status == "online"
+    assert recovered.last_heartbeat == now.isoformat()
