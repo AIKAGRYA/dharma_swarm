@@ -19,10 +19,11 @@ RUN pip install --no-cache-dir -r requirements-ginko.txt
 # the /api/fleet healthcheck endpoint)
 COPY dharma_swarm/ /app/dharma_swarm/
 COPY api/ /app/api/
+COPY packages/ /app/packages/
 COPY pyproject.toml README.md ./
 # A dependency-resolution failure must fail the image build; the previous
 # editable-install fallback chain suppressed the first install's stderr.
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir .  && pip install --no-cache-dir -e /app/packages/telos-kernel
 
 # Create data directories
 RUN mkdir -p /root/.dharma/ginko/agents \

@@ -10,14 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Python deps first (cache layer)
 COPY pyproject.toml README.md ./
 COPY dharma_swarm/__init__.py dharma_swarm/
-# WP-0C2 (TIT-003): dependency-install failure fails the image build. The
-# previous fallback chain (2>/dev/null || ... || true) could boot the
-# Go-integrated daemon on an invalid Python environment.
-RUN pip install --no-cache-dir -e ".[dev]"
-
-# Repo-local packages required by runtime imports (telos_kernel, etc.)
-COPY packages/ /app/packages/
-RUN pip install --no-cache-dir -e /app/packages/telos-kernel
+RUN pip install --no-cache-dir -e ".[dev]" 2>/dev/null || pip install --no-cache-dir -e . || true
 
 # Full source
 COPY dharma_swarm/ /app/dharma_swarm/

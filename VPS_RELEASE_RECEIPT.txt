@@ -1,0 +1,27 @@
+timestamp=20260709T094542Z
+release=/root/dharma_releases/dharma_swarm_0beef75841844419a619b47ca1a64a74c23331f3_20260709T094542Z
+github_main=0beef75841844419a619b47ca1a64a74c23331f3
+actual=0beef75841844419a619b47ca1a64a74c23331f3
+vps_patch=loopback-only ports retained
+diff --git a/docker-compose.yml b/docker-compose.yml
+index 614718e0..d87a8f07 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -60,7 +60,7 @@ services:
+     build: .
+     container_name: dharmic-quant-web
+     ports:
+-      - "8080:8080"
++      - "127.0.0.1:8080:8080"
+     volumes:
+       - ginko-data:/root/.dharma/ginko
+     environment:
+@@ -81,7 +81,7 @@ services:
+       dockerfile: Dockerfile.swarm
+     container_name: dharma-swarm
+     ports:
+-      - "7433:7433"   # health API: curl http://localhost:7433/health
++      - "127.0.0.1:7433:7433"   # health API: curl http://localhost:7433/health
+     volumes:
+       - dharma-state:/root/.dharma
+       - ./dharma_swarm:/app/dharma_swarm:ro  # source is READ-ONLY (never mutable)

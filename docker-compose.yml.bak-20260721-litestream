@@ -142,7 +142,6 @@ services:
     volumes:
       - dharma-state:/data
       - ./scripts/ops/litestream.yml:/etc/litestream.yml:ro
-      - /root/backups/litestream:/backups
     environment:
       LITESTREAM_REPLICA_URL: ${LITESTREAM_REPLICA_URL:-}
       LITESTREAM_ACCESS_KEY_ID: ${LITESTREAM_ACCESS_KEY_ID:-}
