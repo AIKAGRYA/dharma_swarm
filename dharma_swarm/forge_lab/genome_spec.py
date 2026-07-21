@@ -28,11 +28,15 @@ DEFAULT_GENOME: dict[str, Any] = {
     "generator_model": "",  # filled from the live roster at experiment start
     "verifier_model": None,
     "k": 3,
-    # Lean default for the Meghadharma RSI lab. Larger contexts/tokens remain
-    # legal genes, but the seed should be cheap enough to serve as a valid
-    # baseline and let exploration spend extra compute intentionally.
-    "per_call_tokens": 3500,
-    "window_chars": 6000,
+    # Live SWE-bench repair prompts need enough context to include the relevant
+    # method body and enough output budget for reasoning-heavy coding lanes to
+    # finish the SEARCH/REPLACE block. The old 3500/6000 seed reproduced
+    # empty_patch on django__django-12209: the window ended mid-_save_table and
+    # kimi-code spent ~26k tokens across continuations without emitting a complete
+    # block. 16000/24000 is still bounded, but produced an applyable patch on the
+    # same instance.
+    "per_call_tokens": 16000,
+    "window_chars": 24000,
     "extra_instruction": "",
     "notes": "seed",
 }

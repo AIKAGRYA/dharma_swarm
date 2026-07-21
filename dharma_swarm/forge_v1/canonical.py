@@ -65,6 +65,7 @@ LEDGER = dharma_state_dir() / "forge_v1" / "FORGE_BUILD_LEDGER.md"
 # Models whose endpoints HANG on big prompts -> feed a windowed slice (see ledger I-3).
 WINDOW_MODELS = {
     FORGE_KIMI_CODE_MODEL_ID,
+    "kimi-code",
     FORGE_KIMI_27_CODE_LOGICAL_ID,
     FORGE_KIMI_27_CODE_CLOUD_MODEL_ID,
 }

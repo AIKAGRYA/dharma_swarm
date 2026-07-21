@@ -35,6 +35,11 @@ def test_default_genome_needs_only_a_generator_to_execute():
     assert checked.executable and not checked.reasons
 
 
+def test_default_genome_has_swebench_repair_headroom():
+    assert DEFAULT_GENOME["per_call_tokens"] >= 16000
+    assert DEFAULT_GENOME["window_chars"] >= 24000
+
+
 def test_malformed_genomes_block_with_reasons_not_exceptions():
     for genome, expected in (
         ("not a dict", "genome_not_a_dict"),
