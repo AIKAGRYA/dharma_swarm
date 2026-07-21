@@ -128,6 +128,19 @@ def _log(system: str, msg: str) -> None:
     logger.info("[%s] %s", system, msg)
 
 
+def _log_system_failure(system: str, exc: BaseException) -> None:
+    """Log a failed system loop WITH its full traceback.
+
+    A bare ``f"failed: {exc}"`` swallows the stack. The 2026-07-17
+    dispatch-dropoff outage ran 91h undiagnosed because the swarm loop's
+    import-time IndexError surfaced only as
+    ``System swarm failed: tuple index out of range`` with no frame info.
+    ``{exc!r}`` also keeps empty-message exceptions identifiable.
+    """
+    _log("orchestrator", f"System {system} failed: {exc!r}")
+    logger.error("System %s failed", system, exc_info=exc)
+
+
 def _tick_loop(supervisor: Any | None, name: str) -> None:
     """WP-LC1 per-iteration liveness tick; no-op when unsupervised."""
     if supervisor is not None:
@@ -2447,7 +2460,7 @@ async def orchestrate(background: bool = False) -> None:
 
                 exc = t.exception()
                 if exc is not None:
-                    _log("orchestrator", f"System {name} failed: {exc}")
+                    _log_system_failure(name, exc)
                     restart_queue.append(name)
                     continue
 
@@ -2467,6 +2480,12 @@ async def orchestrate(background: bool = False) -> None:
                     tasks[name] = asyncio.create_task(task_factories[name](), name=name)
                 else:
                     _log("orchestrator", f"System {name} exceeded max restarts, abandoning")
+                    logger.error(
+                        "System %s abandoned after %d failed restarts — daemon is degraded "
+                        "(check ops/loop_liveness.json)",
+                        name,
+                        max_restarts,
+                    )
                     abandoned_loops.add(name)
 
             _write_loop_liveness(restart_counts)
