@@ -53,6 +53,19 @@ can take 40-90+s or hang rather than fail fast with exit `2` — verified
 2026-07-02. Do not read a long hang as a hard failure; give it time or check
 egress before assuming the hub is unreachable.
 
+## Check AGNI hub readiness
+
+```bash
+python3 scripts/runtime/agni_hub_readiness.py --human
+python3 scripts/runtime/agni_hub_readiness.py --write  # writes ~/.dharma/ops/agni_hub_readiness.json
+```
+
+This is an AGNI-local preflight for hub work. It observes NATS monitor state,
+the local fleet API, required systemd services, host resources, and the AGNI
+bridge heartbeat. It is read-only unless `--write` is passed. Treat a
+`degraded` result as a planning gate: stale API rows, resource pressure, or
+bridge uncertainty must not be described as semantic peer liveness.
+
 ## Start the persistent agent
 
 ```bash
