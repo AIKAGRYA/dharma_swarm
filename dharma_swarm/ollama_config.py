@@ -16,11 +16,12 @@ OLLAMA_CLOUD_BASE_URL = "https://ollama.com"
 # OLLAMA_LOCAL_MODEL=<name> per machine. (2026-06-06: "available" must mean serveable.)
 OLLAMA_DEFAULT_LOCAL_MODEL = os.getenv("OLLAMA_LOCAL_MODEL", "mistral:latest")
 OLLAMA_DEFAULT_CLOUD_MODEL = DEFAULT_MODELS[ProviderType.OLLAMA]
+# Frontier open lanes that Ollama Cloud actually serves. Kimi Code K3 uses
+# api.kimi.com directly and therefore does not belong in this Ollama roster.
 OLLAMA_CLOUD_FRONTIER_MODELS = (
-    "glm-5:cloud",
-    "deepseek-v3.2:cloud",
-    "kimi-k2.5:cloud",
-    "minimax-m2.7:cloud",
+    "glm-5.2:cloud",
+    "deepseek-v4-pro:cloud",
+    "minimax-m3:cloud",
     "qwen3-coder:480b-cloud",
 )
 

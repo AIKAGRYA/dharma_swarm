@@ -36,7 +36,7 @@ class TestConstants:
         assert OLLAMA_CLOUD_BASE_URL == "https://ollama.com"
 
     def test_default_local_model(self):
-        assert OLLAMA_DEFAULT_LOCAL_MODEL == "llama3.2"
+        assert OLLAMA_DEFAULT_LOCAL_MODEL == "mistral:latest"
 
     def test_default_cloud_model(self):
         assert OLLAMA_DEFAULT_CLOUD_MODEL == DEFAULT_MODELS[ProviderType.OLLAMA]
@@ -44,7 +44,8 @@ class TestConstants:
     def test_frontier_models_tuple(self):
         assert isinstance(OLLAMA_CLOUD_FRONTIER_MODELS, tuple)
         assert len(OLLAMA_CLOUD_FRONTIER_MODELS) >= 2
-        assert "minimax-m2.7:cloud" in OLLAMA_CLOUD_FRONTIER_MODELS
+        assert OLLAMA_CLOUD_FRONTIER_MODELS[0] == "glm-5.2:cloud"
+        assert all("kimi-k2.7" not in model for model in OLLAMA_CLOUD_FRONTIER_MODELS)
 
 
 # ---------------------------------------------------------------------------

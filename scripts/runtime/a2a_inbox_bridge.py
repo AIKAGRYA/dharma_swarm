@@ -13,6 +13,7 @@ import argparse
 import asyncio
 import hashlib
 import json
+import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,7 +28,13 @@ from scripts.runtime.a2a_send import (  # noqa: E402
     ROUTE_AGENT_INBOX,
     resolve_agent_uid,
 )
-from scripts.runtime.pr_merge_control import stamp, utc_now  # noqa: E402
+from scripts.runtime.pr_merge_control import (  # noqa: E402
+    NATSConfig,
+    _nats_config,
+    _nats_tls_kwargs,
+    stamp,
+    utc_now,
+)
 
 DEFAULT_A2A_BUS = Path.home() / ".dharma" / "a2a_bus"
 DEFAULT_RECEIPT_DIR = REPO_ROOT / "reports" / "a2a" / "inbox_bridge_receipts"
@@ -69,6 +76,9 @@ class InboxBridgeConfig:
     receipt_dir: Path
     endpoint: str = "nats://127.0.0.1:4222"
     flush_timeout_s: float = 2.0
+    deliver_policy: str = "new"
+    max_deliver: int = 5
+    nats_config: NATSConfig | None = None
 
 
 def subject_for_agent(agent_uid: str) -> str:
@@ -122,12 +132,28 @@ def write_heartbeat(path: Path, config: InboxBridgeConfig, payload: dict[str, An
     _write_json_atomic(path, body)
 
 
-def _parse_envelope(message: NatsMessageLike) -> dict[str, Any]:
+def _parse_envelope(message: NatsMessageLike, config: InboxBridgeConfig) -> dict[str, Any]:
     payload = json.loads(message.data.decode("utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("A2A inbox payload must be a JSON object")
-    if not isinstance(payload.get("ack_subject"), str) or not payload["ack_subject"]:
-        raise ValueError("A2A inbox payload is missing ack_subject")
+    if str(payload.get("schema_version") or "") != "dharma.a2a.send.v1":
+        raise ValueError("A2A inbox payload must use schema dharma.a2a.send.v1")
+    packet_id = str(payload.get("packet_id") or "")
+    if not packet_id:
+        raise ValueError("A2A inbox payload is missing packet_id")
+    if str(message.subject) != config.subject:
+        raise ValueError("A2A inbox message subject does not match the configured inbox")
+    if str(payload.get("subject") or "") != config.subject:
+        raise ValueError("A2A inbox envelope subject does not match the configured inbox")
+    target_uid = str(payload.get("target_uid") or payload.get("to") or "")
+    if target_uid != config.agent_uid:
+        raise ValueError("A2A inbox envelope target does not match the configured agent")
+    expected_ack = f"{config.subject}.ack.{packet_id}"
+    if str(payload.get("ack_subject") or "") != expected_ack:
+        raise ValueError("A2A inbox payload ack_subject is not packet-bound to this inbox")
+    expected_reply = f"{config.subject}.reply.{packet_id}"
+    if str(payload.get("reply_subject") or "") != expected_reply:
+        raise ValueError("A2A inbox payload reply_subject is not packet-bound to this inbox")
     return payload
 
 
@@ -163,7 +189,7 @@ async def process_message(
 
     receipt = _base_receipt(config, message)
     try:
-        payload = _parse_envelope(message)
+        payload = _parse_envelope(message, config)
     except Exception as exc:
         envelope_sha = hashlib.sha256(message.data).hexdigest()
         try:
@@ -320,17 +346,35 @@ async def run_bridge_once(
             return [receipt]
         raise
 
+    runtime_nats = config.nats_config
     nc = await nats.connect(
         servers=[config.endpoint],
+        user=(runtime_nats.user or None) if runtime_nats else None,
+        password=(runtime_nats.credential or None) if runtime_nats else None,
         allow_reconnect=False,
         max_reconnect_attempts=0,
+        **(_nats_tls_kwargs(runtime_nats) if runtime_nats else {}),
     )
     try:
+        from nats.js.api import AckPolicy, ConsumerConfig, DeliverPolicy
+
         js = nc.jetstream()
+        deliver_policy = (
+            DeliverPolicy.NEW if config.deliver_policy == "new" else DeliverPolicy.ALL
+        )
+        consumer_config = ConsumerConfig(
+            durable_name=config.consumer,
+            filter_subject=config.subject,
+            ack_policy=AckPolicy.EXPLICIT,
+            ack_wait=60,
+            max_deliver=max(config.max_deliver, 1),
+            deliver_policy=deliver_policy,
+        )
         sub = await js.pull_subscribe(
             config.subject,
             durable=config.consumer,
             stream=config.stream,
+            config=consumer_config,
         )
         try:
             messages = await sub.fetch(max_messages, timeout=fetch_timeout_s)
@@ -393,6 +437,18 @@ def _build_config(args: argparse.Namespace) -> InboxBridgeConfig:
     agent_uid = resolve_agent_uid(args.agent_uid)
     subject = args.subject or subject_for_agent(agent_uid)
     inbox_dir = Path(args.inbox_dir) if args.inbox_dir else default_inbox_dir(agent_uid)
+    discovered_nats = _nats_config(dict(os.environ), require_devin_secrets=False)
+    endpoint = args.endpoint or discovered_nats.endpoint or "nats://127.0.0.1:4222"
+    runtime_nats = NATSConfig(
+        endpoint=endpoint,
+        user=discovered_nats.user,
+        credential=discovered_nats.credential,
+        missing=(),
+        ca_pem=discovered_nats.ca_pem,
+        ca_source=discovered_nats.ca_source,
+        tls_hostname=discovered_nats.tls_hostname,
+        credential_family=discovered_nats.credential_family,
+    )
     return InboxBridgeConfig(
         agent_uid=agent_uid,
         subject=subject,
@@ -400,8 +456,11 @@ def _build_config(args: argparse.Namespace) -> InboxBridgeConfig:
         consumer=args.consumer,
         inbox_dir=inbox_dir,
         receipt_dir=Path(args.receipt_dir),
-        endpoint=args.endpoint,
+        endpoint=endpoint,
         flush_timeout_s=args.flush_timeout,
+        deliver_policy=args.deliver_policy,
+        max_deliver=max(args.max_deliver, 1),
+        nats_config=runtime_nats,
     )
 
 
@@ -411,12 +470,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--consumer", required=True, help="durable pull consumer name")
     parser.add_argument("--subject", default="", help="override inbox subject")
     parser.add_argument("--stream", default="DHARMA_FLEET")
-    parser.add_argument("--endpoint", default="nats://127.0.0.1:4222")
+    parser.add_argument(
+        "--endpoint",
+        default="",
+        help="broker URL; defaults to canonical NATS environment, then localhost",
+    )
     parser.add_argument("--inbox-dir", default="")
     parser.add_argument("--receipt-dir", default=str(DEFAULT_RECEIPT_DIR))
     parser.add_argument("--max-messages", type=int, default=1)
     parser.add_argument("--fetch-timeout", type=float, default=2.0)
     parser.add_argument("--flush-timeout", type=float, default=2.0)
+    parser.add_argument("--deliver-policy", choices=["new", "all"], default="new")
+    parser.add_argument("--max-deliver", type=int, default=5)
     parser.add_argument("--loop", action="store_true", help="keep polling until interrupted")
     parser.add_argument("--poll-interval", type=float, default=1.0)
     parser.add_argument("--max-cycles", type=int, default=0)

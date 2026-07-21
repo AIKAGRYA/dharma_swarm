@@ -59,9 +59,11 @@ NIM_PRIORITY_MODELS: tuple[str, ...] = (
 DIRECT_KEY_CLUSTER_MODELS: dict[str, tuple[str, ...]] = {
     "zai_coding": ("z-ai/glm-5", "glm-5.2:cloud", "glm-5:cloud"),
     "zai_global": ("z-ai/glm-5",),
-    "kimi": ("moonshotai/kimi-k2.6", "kimi-k2.7-code:cloud", "kimi-k2.5:cloud"),
-    "minimax": ("minimaxai/minimax-m3", "minimax-m3:cloud", "minimax-m2.7:cloud"),
-    "deepseek": ("deepseek-ai/deepseek-v4-pro", "deepseek-v3.2:cloud", "deepseek-v3.1:671b-cloud"),
+    # Kimi Code K3 is the canonical direct route. The remaining entries are
+    # provider-specific compatibility fallbacks, not cross-provider aliases.
+    "kimi": ("k3", "moonshotai/kimi-k3", "moonshotai/kimi-k2.6", "kimi-k2.5:cloud"),
+    "minimax": ("minimax-m3:cloud", "minimaxai/minimax-m3", "minimax-m2.7:cloud"),
+    "deepseek": ("deepseek-v4-pro:cloud", "deepseek-ai/deepseek-v4-pro", "deepseek-v3.2:cloud"),
     "gemini": ("gemini-2.5-flash",),
 }
 

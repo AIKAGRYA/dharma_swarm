@@ -281,3 +281,71 @@ class TestGenerateProposalWiresDiff:
         assert proposal.diff  # Should have the diff from first pass
         # Only one LLM call — no second diff generation needed
         assert provider.complete.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_allow_unchanged_bypasses_file_hash_skip(self, engine, tmp_path):
+        """Repeated probes against the same file can still hit alternate lanes."""
+        source_file = tmp_path / "test_module.py"
+        source_file.write_text("def hello():\n    return 'world'\n")
+
+        first_response = LLMResponse(
+            content=(
+                "COMPONENT: test_module.py\n"
+                "CHANGE_TYPE: mutation\n"
+                "DESCRIPTION: Add type hints to hello function\n"
+                "THINK: Risk: minimal. Rollback: revert. Alternatives: none.\n"
+            ),
+            model="test-model",
+            provider="test",
+            usage={"total_tokens": 200},
+        )
+        second_response = LLMResponse(
+            content=VALID_DIFF,
+            model="test-model",
+            provider="test",
+            usage={"total_tokens": 100},
+        )
+        third_response = LLMResponse(
+            content=(
+                "COMPONENT: test_module.py\n"
+                "CHANGE_TYPE: mutation\n"
+                "DESCRIPTION: Add a docstring to hello function\n"
+                "THINK: Risk: minimal. Rollback: revert. Alternatives: none.\n"
+            ),
+            model="test-model",
+            provider="test",
+            usage={"total_tokens": 180},
+        )
+        fourth_response = LLMResponse(
+            content=VALID_DIFF,
+            model="test-model",
+            provider="test",
+            usage={"total_tokens": 90},
+        )
+
+        provider = AsyncMock()
+        provider.complete = AsyncMock(
+            side_effect=[
+                first_response,
+                second_response,
+                third_response,
+                fourth_response,
+            ]
+        )
+
+        proposal1 = await engine.generate_proposal(
+            provider=provider,
+            source_file=source_file,
+            model="test-model",
+        )
+        proposal2 = await engine.generate_proposal(
+            provider=provider,
+            source_file=source_file,
+            model="test-model",
+            allow_unchanged=True,
+        )
+
+        assert proposal1 is not None
+        assert proposal2 is not None
+        assert proposal2.description == "Add a docstring to hello function"
+        assert provider.complete.call_count == 4

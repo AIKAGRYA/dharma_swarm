@@ -1363,6 +1363,41 @@ _FREE_CODING_MODELS = (
     "deepseek/deepseek-chat-v3-0324:free",
 )
 
+
+async def _generate_grind_probe_proposal(
+    engine: DarwinEngine,
+    *,
+    source_root: Path,
+    target: str,
+    hunger: float,
+    provider: Any,
+    model: str,
+) -> Proposal | None:
+    """Generate a real grind-probe proposal with a concrete diff.
+
+    The grind loop used to construct placeholder ``Proposal`` objects with the
+    default empty ``diff`` field and pass them straight into
+    :meth:`DarwinEngine.run_cycle`. That path never invokes the LLM proposal
+    generator, so the archive filled with evaluated no-op entries. This helper
+    forces grind probes through ``generate_proposal()`` and drops any proposal
+    that still lacks a concrete diff.
+    """
+
+    proposal = await engine.generate_proposal(
+        provider=provider,
+        source_file=source_root / target,
+        model=model,
+        allow_unchanged=True,
+        context=(
+            f"Grind probe target for autonomous evolution. "
+            f"Hunger={hunger:.2f}. Return one concrete, minimal change with a real unified diff."
+        ),
+    )
+    if proposal is None or not proposal.diff.strip():
+        return None
+    proposal.spec_ref = "grind_probe"
+    return proposal
+
 # Core Python modules to target for evolution — actual testable source
 _GRIND_EVOLUTION_TARGETS = (
     "swarm.py", "orchestrator.py", "agent_runner.py", "providers.py",
@@ -1523,23 +1558,76 @@ async def run_free_evolution_grind(shutdown_event: asyncio.Event) -> None:
                 except Exception as exc:
                     _log("grind", f"Observation read error: {exc}")
 
-            # Phase 3: Always include a random core Python module target
-            # This ensures every cycle has at least one testable proposal
+            # Phase 3: Try to include one real grind-probe mutation.
+            # Placeholder proposals with empty diffs create archive theater, so
+            # only append a grind probe when we have a concrete generated diff.
             available_targets = [
                 t for t in _GRIND_EVOLUTION_TARGETS
                 if (_src_root / t).exists()
             ]
             if available_targets:
                 target = _grng.choice(available_targets)
-                proposals.append(Proposal(
-                    component=target,
-                    change_type="mutation",
-                    description=f"Grind probe: evolve {target} (hunger={hunger:.2f})",
-                    spec_ref="grind_probe",
-                ))
+                from dharma_swarm.providers import NVIDIANIMProvider, OllamaProvider, OpenRouterProvider
+                import os as _gos
+
+                _grind_lanes: list[tuple[str, str, Any]] = [
+                    ("ollama", "glm-5.2:cloud", OllamaProvider(model="glm-5.2:cloud")),
+                    ("nvidia_nim", "meta/llama-3.3-70b-instruct", NVIDIANIMProvider(default_model="meta/llama-3.3-70b-instruct")),
+                ]
+                if _gos.environ.get("OPENROUTER_API_KEY"):
+                    _grind_lanes.append(
+                        ("openrouter", _grng.choice(_FREE_CODING_MODELS), OpenRouterProvider())
+                    )
+
+                _generated_grind = False
+                for _lane_name, _grind_model, _provider in _grind_lanes:
+                    try:
+                        _grind_proposal = await _generate_grind_probe_proposal(
+                            engine,
+                            source_root=_src_root,
+                            target=target,
+                            hunger=hunger,
+                            provider=_provider,
+                            model=_grind_model,
+                        )
+                        if _grind_proposal is None:
+                            _log(
+                                "grind",
+                                f"Lane {_lane_name} returned no real diff for {target}",
+                            )
+                            continue
+                        proposals.append(_grind_proposal)
+                        _generated_grind = True
+                        _log(
+                            "grind",
+                            f"Generated grind probe via {_lane_name}/{_grind_model}: {target} "
+                            f"({len(_grind_proposal.diff.splitlines())} diff lines)",
+                        )
+                        break
+                    except Exception as exc:
+                        _log(
+                            "grind",
+                            f"Grind proposal generation error via {_lane_name} for {target}: {exc}",
+                        )
+                    finally:
+                        _close = getattr(_provider, "close", None)
+                        if callable(_close):
+                            try:
+                                import inspect as _inspect
+
+                                _close_result = _close()
+                                if _inspect.isawaitable(_close_result):
+                                    await _close_result
+                            except Exception:
+                                pass
+                if not _generated_grind:
+                    _log(
+                        "grind",
+                        f"Skipped grind probe for {target}: no real diff generated across providers",
+                    )
 
             # Phase 4: Run evolution cycle via DarwinEngine.run_cycle
-            # (takes proposals directly — no LLM needed for proposal gen)
+            # (pending proposals may already contain diffs; grind probes now do)
             result = await engine.run_cycle(proposals)
 
             # Phase 4b: LLM-powered evolution via Qwen3-coder:free (every 5th cycle)

@@ -1,0 +1,179 @@
+# Idea-Spark & Magpie track block — DRAFT, NOT READY TO PROMOTE
+#
+# Source: claude-code portfolio-queue assessment, 2026-07-11
+# Status: DRAFT — this is a salvage-or-retire proposal, not a build-more proposal.
+#   Do not promote to `active_tracks:` until reconciliation_triage_exists (below)
+#   is authored and shows the branch is still realistically rebasable. If the
+#   triage instead shows the gap is unrecoverable, withdraw this file and file
+#   a metabolize-only harvest note in the memory graph instead of promoting.
+#
+# Why this exists as a *draft* and not a promoted track (portfolio is
+# verified FULL at 11/11 active per docs/governance/ACTIVE_TRACK.yaml and
+# dharma_swarm/CLAUDE.md's own "WIP warn 11, max 11" — not the 10/10 figure
+# floated when this assessment was requested; trust the live file over any
+# prompt-carried count). Of those 11, 9 serve substrate-nativeness; revenue-
+# external-humans-served and research-depth have 1 each with room. This
+# theme's honest fit is substrate-nativeness (see rationale
+# below) — it does NOT clear the revenue objective's bar
+# ("external humans who read/replied/acted; first cash receipt") yet, so it
+# should not be mis-tagged into the underserved column just to look balanced.
+# That means promoting this now would compete with an already-crowded
+# objective. Hold as a reviewable draft; promote only if/when the operator
+# closes or supersedes an existing substrate-nativeness track, or explicitly
+# decides this reconciliation is more urgent than continued work on one of
+# the nine.
+#
+# What was actually found on 2026-07-11 (git-verified, not memory-recalled):
+#   - "GO_IDEA_SPARK_INGEST_SPINE" (Go/NATS world_radar ingest, PR #474) is a
+#     DIFFERENT, unrelated system that already SHIPPED to main 2026-06-06.
+#     Not part of this proposal's scope; no action needed.
+#   - brief-to-spec-seam (tools/build_protocol/brief_to_spec.py) is ALSO
+#     already on main (content-identical to the May branch tip). No action
+#     needed; the two stale branches base/brief-to-spec-seam-018ef60 and
+#     feat/brief-to-spec-seam-2026-05-07 are pure relics, safe to prune.
+#   - The real, unresolved asset is `dharma_swarm/idea_spark/` (13-module
+#     Python package: action_routing, chetana_adapter, cli, deepen,
+#     deepen_routing, fixtures, health, memory_bridge, orchestrator, paths,
+#     projection, retrieval, schemas, see_adapter, semantic_routing, store,
+#     triage) plus ~10 dedicated tests and
+#     docs/ops/OPERATOR_IDEA_SPARK_LIVE_INGEST.md, all on
+#     origin/feat/operator-idea-spark-ingest (pushed, 27 commits, PR0-PR16).
+#     Per memory this had 61+159 tests green and was validated against real
+#     content 2026-06-27 with known findings (F1 triage miscalib, F2 commons
+#     thin, F3 triage advisory-not-gate). It is NOT on origin/main.
+#   - That branch is now 590 commits / ~10 days behind origin/main (merge-base
+#     9c76b2106), with zero activity since 2026-07-01 and zero mentions in
+#     main's last 274 commits. Much of the *rest* of that branch's diff
+#     (semantic_commons.py, agent_admission.py, hybrid_retriever.py,
+#     cybernetics_codex.py, orientation_graph.py, telos_ai docs) has since
+#     been separately built and is already owned by other ACTIVE tracks
+#     (agent-admission-semantic-commons-2026-06, cybernetics-codex-stewardship
+#     -2026-06, orientation-graph-2026-06, telos-ai-morning-refinery-2026-06).
+#     This proposal's surface must NOT re-absorb those — only idea_spark/**.
+#   - THE MAGPIE (external-intake R&D organ, evidence-only L0) is real but
+#     tiny: 2 commits, 4 files, ~390 lines (docs/agents/magpie/**), seeded
+#     2026-06-26, one P1 pipeline run, then silent. Its one shipped artifact
+#     (the `roast` skill) already escaped and is live as a Claude Code skill
+#     independent of this repo — the highest-value bit already got out.
+#     The commits live buried inside `agent/magpie-seed`, a 2455-file/590-
+#     commit-behind branch that is really the unrelated holon/sarathi organism
+#     (already the concern of composer-holon-spine-longrun-2026-06's
+#     `dharma_swarm/holon_*.py` / `scripts/holon_*.py` surfaces) — this
+#     proposal's Magpie surface is only docs/agents/magpie/**, not the host
+#     branch's holon content.
+
+- id: idea-spark-magpie-2026-07
+  name: Idea-Spark & Magpie — reconcile or retire the stale ingest/mining assets
+  status: ACTIVE
+  opened_at: "2026-07-11"
+  verified_at: "2026-07-11"
+  ttl_days: 14
+  owner: "@AmitabhainArunachala"
+  serves: substrate-nativeness
+  complements:
+    - agent-admission-semantic-commons-2026-06
+    - composer-holon-spine-longrun-2026-06
+  owned_surfaces:
+    - dharma_swarm/idea_spark/**
+    - tests/test_idea_spark_*.py
+    - tests/test_operator_idea_spark_ingest_e2e.py
+    - tests/test_operator_input_*.py
+    - docs/ops/OPERATOR_IDEA_SPARK_LIVE_INGEST.md
+    - docs/agents/magpie/**
+    - reports/governance/idea_spark_magpie_reconciliation_triage.md
+
+  description: |
+    Operator input ingest (receipt -> candidate -> Chetana staging ->
+    MemoryKernel -> Semantic Commons route -> proposal/task/BetCard bridge,
+    keyed by correlation_id) plus THE MAGPIE external idea-miner (evidence-
+    only L0, feeds ARTHA_CREAM/tool_metabolism/find-skills) are both real,
+    partially-built assets sitting on pushed-but-unmerged branches with no
+    active owner for 10+ days. This track's job is NOT to build more feature
+    surface. It is to answer, with evidence, whether the existing
+    dharma_swarm/idea_spark/ package is still worth rebasing onto current
+    main (590 commits of drift and counting), and to make an explicit
+    continue-or-retire call on Magpie rather than let it silently rot a
+    second time.
+
+    Honest objective fit: this is substrate-nativeness (ingest/receipt/
+    routing plumbing that stays inside the house), not yet
+    revenue-external-humans-served — no external human has read, replied to,
+    or acted on anything either pipeline has produced, and Magpie is
+    explicitly evidence-only/manual-loop with no live A/B or promotion. If a
+    later track wants to claim the revenue objective, it must show an actual
+    external-acted receipt, not this track's existence.
+
+  prerequisites:
+    - id: idea_spark_branch_still_pushed
+      kind: file_exists
+      file: reports/governance/idea_spark_magpie_reconciliation_triage.md
+      # Gate: triage must exist and show the branch tip is still reachable
+      # on origin before any rebase work starts.
+
+  completion_criteria:
+    - id: reconciliation_triage_exists
+      kind: file_exists
+      file: reports/governance/idea_spark_magpie_reconciliation_triage.md
+      # First and only mandatory gate for a while: an honest read of whether
+      # origin/feat/operator-idea-spark-ingest is still realistically
+      # rebasable (conflict surface against agent_runner.py, orchestrator.py,
+      # semantic_commons.py-adjacent tracks), whether the 2026-06-27 findings
+      # (F1-F3) are still open, and an explicit recommendation: rebase-and-PR
+      # vs. harvest-and-drop.
+    - id: idea_spark_package_on_main
+      kind: file_exists
+      file: dharma_swarm/idea_spark/__init__.py
+      # Only meaningful if the triage recommends rebase; proves the package
+      # actually landed on origin/main, not just that it exists on a branch.
+    - id: idea_spark_e2e_test_on_main
+      kind: file_exists
+      file: tests/test_operator_idea_spark_ingest_e2e.py
+    - id: live_ingest_doc_on_main
+      kind: file_exists
+      file: docs/ops/OPERATOR_IDEA_SPARK_LIVE_INGEST.md
+    - id: magpie_disposition_recorded
+      kind: file_exists
+      file: docs/agents/magpie/DISPOSITION_2026-07.md
+      # Explicit continue-or-retire call on THE MAGPIE, written down, so the
+      # seed does not simply go quiet a second time with no record of why.
+
+  non_goals:
+    - Do not touch dharma_swarm/semantic_commons.py, scripts/governance/
+      agent_admission*.py, dharma_swarm/engine/hybrid_retriever.py,
+      dharma_swarm/cybernetics_codex.py, or scripts/governance/
+      orientation_graph.py in this track. Those surfaces belong to
+      agent-admission-semantic-commons-2026-06 / cybernetics-codex-
+      stewardship-2026-06 / orientation-graph-2026-06, which have already
+      built their own (different, newer) versions independently. If the
+      triage finds the idea-spark branch's copies are better, hand that
+      finding to the owning track — do not silently overwrite.
+    - Do not touch dharma_swarm/holon_*.py, scripts/holon_*.py, or anything
+      else under agent/magpie-seed beyond docs/agents/magpie/**. That branch's
+      bulk is the holon/sarathi organism, owned by
+      composer-holon-spine-longrun-2026-06.
+    - Do not claim external humans served or a cash receipt from either
+      pipeline in this track. If that becomes true later, it is a new track
+      against the revenue objective, evidenced by an
+      external_acted_receipt-kind criterion.
+    - Do not re-litigate the GO_IDEA_SPARK_INGEST_SPINE (Go/NATS world_radar)
+      system; it already shipped on main via PR #474 and is out of scope.
+    - Do not build new Magpie mining runs before the disposition record
+      exists. Retire-vs-continue is a decision, not a default-continue.
+
+  next_items:
+    - id: 1
+      what: "Author reports/governance/idea_spark_magpie_reconciliation_triage.md: confirm origin/feat/operator-idea-spark-ingest is still pushed and unchanged, run its test suite against a scratch rebase onto current origin/main, and record the conflict surface + whether the 2026-06-27 F1-F3 findings are still open."
+      kind: docs
+      blocker: true
+    - id: 2
+      what: "Branch on the triage verdict: if rebase-and-PR, open a draft PR for dharma_swarm/idea_spark/** + its tests only (not the co-mingled semantic_commons/agent_admission/telos_ai/cybernetics_codex/orientation_graph files already owned elsewhere); if harvest-and-drop, write the harvest note and mark the source branch archived."
+      kind: code
+      blocker: true
+    - id: 3
+      what: "Write docs/agents/magpie/DISPOSITION_2026-07.md: either restate the mining loop's evidence-only rails and schedule a second manual P2 run, or formally retire the seed with a one-paragraph why (roast skill already extracted counts as partial success either way)."
+      kind: docs
+      blocker: true
+    - id: 4
+      what: "If retired, prune base/brief-to-spec-seam-018ef60, feat/brief-to-spec-seam-2026-05-07, and (Magpie-only docs from) agent/magpie-seed from the live branch list per the housekeeping loop's drift monitor."
+      kind: governance
+      blocker: false

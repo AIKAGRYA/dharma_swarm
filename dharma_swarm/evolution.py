@@ -2887,6 +2887,7 @@ class DarwinEngine:
         source_file: Path,
         context: str = "",
         model: str = "",
+        allow_unchanged: bool = False,
     ) -> Proposal | None:
         """Use an LLM to generate an evolution proposal from a source file.
 
@@ -2898,6 +2899,9 @@ class DarwinEngine:
             source_file: Path to the Python file to improve.
             context: Optional extra context (e.g., recent failures, focus area).
             model: Model identifier for the provider.
+            allow_unchanged: When True, bypass the content-hash dedupe guard so
+                repeated calls can probe alternate provider lanes against the
+                same unchanged file.
 
         Returns:
             A Proposal ready for gate_check(), or None if the LLM says no-op.
@@ -2917,7 +2921,7 @@ class DarwinEngine:
         # Phase 4: content-hash skip — don't re-propose for unchanged files
         source_hash = hashlib.sha256(source.encode()).hexdigest()
         file_key = str(source_file.resolve())
-        if self._file_hashes.get(file_key) == source_hash:
+        if not allow_unchanged and self._file_hashes.get(file_key) == source_hash:
             logger.debug("Skipping unchanged file: %s", source_file.name)
             return None
         self._file_hashes[file_key] = source_hash

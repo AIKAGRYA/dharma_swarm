@@ -245,9 +245,10 @@ def provider_lane_role(provider: ProviderType) -> LaneRole:
 # Moved here from runtime_provider.py as the single source.
 
 DEFAULT_MODELS: dict[ProviderType, str] = {
-    # Free tier — frontier
-    ProviderType.OLLAMA: "glm-5:cloud",
-    ProviderType.NVIDIA_NIM: "meta/llama-3.3-70b-instruct",
+    # Free-tier Ollama fallback. Kimi Code K3 is a direct provider route and
+    # must not be represented as an Ollama tag (Ollama exposes no K3 route).
+    ProviderType.OLLAMA: "glm-5.2:cloud",
+    ProviderType.NVIDIA_NIM: "deepseek-ai/deepseek-v4-pro",
     ProviderType.GROQ: "qwen/qwen3-32b",
     ProviderType.CEREBRAS: "qwen-3-235b-a22b-instruct-2507",
     ProviderType.SILICONFLOW: "Qwen/Qwen3-Coder-480B-A35B-Instruct",
@@ -260,7 +261,7 @@ DEFAULT_MODELS: dict[ProviderType, str] = {
     ProviderType.CHUTES: "deepseek-ai/DeepSeek-R1",
     ProviderType.OPENROUTER_FREE: "meta-llama/llama-3.3-70b-instruct:free",
     # Paid tier
-    ProviderType.OPENROUTER: "moonshotai/kimi-k2.5",
+    ProviderType.OPENROUTER: "moonshotai/kimi-k3",
     ProviderType.OPENAI: "gpt-5",
     ProviderType.ANTHROPIC: "claude-opus-4-6",
     ProviderType.CLAUDE_CODE: "claude-opus-4-6",

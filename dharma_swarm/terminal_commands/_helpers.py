@@ -141,22 +141,24 @@ def _load_ouroboros_observation(
     return selected
 
 
-async def _get_swarm(state_dir: str = ".dharma"):
+async def _get_swarm(state_dir: str | Path | None = None):
     from dharma_swarm.swarm import SwarmManager
 
-    swarm = SwarmManager(state_dir=state_dir)
+    resolved_state_dir = Path(state_dir).expanduser() if state_dir is not None else DHARMA_STATE
+    swarm = SwarmManager(state_dir=str(resolved_state_dir))
     await swarm.init()
     return swarm
 
 
-async def _get_task_board(state_dir: str = ".dharma"):
+async def _get_task_board(state_dir: str | Path | None = None):
     """Thin path: open just the TaskBoard without booting the full swarm.
 
     Used by CLI task create/list/show to avoid spawning agents and seed tasks.
     """
     from dharma_swarm.task_board import TaskBoard
 
-    db_path = Path(state_dir) / "db" / "tasks.db"
+    resolved_state_dir = Path(state_dir).expanduser() if state_dir is not None else DHARMA_STATE
+    db_path = resolved_state_dir / "db" / "tasks.db"
     tb = TaskBoard(db_path)
     await tb.init_db()
     return tb

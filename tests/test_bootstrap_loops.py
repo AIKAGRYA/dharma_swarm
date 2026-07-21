@@ -443,6 +443,7 @@ async def test_task_failure_records_runtime_run(tmp_path: Path, monkeypatch: pyt
         AgentState,
         AgentStatus,
         TaskPriority,
+        TaskStatus,
     )
 
     state_dir = tmp_path / "state"
@@ -500,7 +501,13 @@ async def test_task_failure_records_runtime_run(tmp_path: Path, monkeypatch: pyt
 
     result = await orch.tick()
     assert result["dispatched"] >= 1
-    await asyncio.sleep(0.1)
+
+    refreshed = None
+    for _ in range(20):
+        await asyncio.sleep(0.05)
+        refreshed = await board.get(task.id)
+        if refreshed is not None and refreshed.status == TaskStatus.PENDING:
+            break
 
     assert _runtime_table_count(runtime_db_path, "task_claims") == 1
     assert _runtime_table_count(runtime_db_path, "delegation_runs") == 1
@@ -512,6 +519,24 @@ async def test_task_failure_records_runtime_run(tmp_path: Path, monkeypatch: pyt
     assert claim_status == "failed"
     assert run_status == "failed"
     assert failure_code == "execution_error"
+
+    assert refreshed is not None
+    assert refreshed.status == TaskStatus.PENDING
+    assert refreshed.assigned_to is None
+    assert refreshed.metadata["retry_count"] == 1
+    archived_identity = refreshed.metadata["retry_previous_attempt_identity"]
+    assert archived_identity["run_id"].startswith("run_")
+    assert archived_identity["claim_id"]
+    assert "execution_identity" in archived_identity
+    for key in (
+        "run_id",
+        "runtime_run_id",
+        "claim_id",
+        "idempotency_key",
+        "last_claim",
+        "execution_identity",
+    ):
+        assert key not in refreshed.metadata
 
 
 # ---------------------------------------------------------------------------

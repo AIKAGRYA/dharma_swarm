@@ -53,6 +53,17 @@ logger = logging.getLogger(__name__)
 
 _FALSE_ENV_VALUES = {"0", "false", "no", "off", "disabled"}
 _TASK_MEMORY_PALACE_INGEST_TIMEOUT_SECONDS = 15.0
+_ATTEMPT_IDENTITY_METADATA_KEYS = (
+    "runtime_run_id",
+    "run_id",
+    "idempotency_key",
+    "claim_id",
+    "active_claim",
+    "last_claim",
+    "claim_timeout_seconds",
+    "claim_expires_monotonic",
+    "claim_expires_at_epoch",
+)
 
 
 def _env_enabled(name: str, *, default: bool = True) -> bool:
@@ -81,6 +92,24 @@ def _task_memory_palace_ingest_timeout_seconds() -> float:
             _TASK_MEMORY_PALACE_INGEST_TIMEOUT_SECONDS,
         )
         return _TASK_MEMORY_PALACE_INGEST_TIMEOUT_SECONDS
+
+
+def _clear_attempt_identity_metadata(
+    meta: dict[str, Any],
+    *,
+    archive_key: str,
+) -> None:
+    """Remove per-attempt execution identity before a retry is requeued."""
+    previous = {
+        key: meta.pop(key)
+        for key in _ATTEMPT_IDENTITY_METADATA_KEYS
+        if key in meta
+    }
+    nested = meta.pop("execution_identity", None)
+    if isinstance(nested, dict) and nested:
+        previous["execution_identity"] = nested
+    if previous:
+        meta[archive_key] = previous
 
 
 def _run_memory_palace_ingest_sync(
@@ -2155,12 +2184,22 @@ class Orchestrator:
             else:
                 meta.pop("retry_not_before_epoch", None)
 
-            await self._safe_update_task(
-                td.task_id,
-                status=TaskStatus.FAILED,
-                result=error,
-                metadata=meta,
+            _clear_attempt_identity_metadata(
+                meta,
+                archive_key="retry_previous_attempt_identity",
             )
+            if task is not None and task.status == TaskStatus.RUNNING:
+                await self._safe_update_task(
+                    td.task_id,
+                    status=TaskStatus.FAILED,
+                    result=error,
+                    metadata=meta,
+                )
+            else:
+                await self._safe_update_task(
+                    td.task_id,
+                    metadata=meta,
+                )
             await self._safe_update_task(
                 td.task_id,
                 status=TaskStatus.PENDING,
