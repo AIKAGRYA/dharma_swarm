@@ -1,0 +1,142 @@
+{
+  "schema": "darshan.issue_one_receipt.v1",
+  "receipt_state": "DRAFT_PENDING_OPERATOR_PUBLICATION",
+  "track": "darshan-publication-2026-07",
+  "observed_at": "2026-07-21T15:03:29Z",
+  "issue": "Issue One",
+  "site": "https://amitabhainarunachala.github.io/darshan/",
+  "articles": [
+    {
+      "order": 1,
+      "slug": "2026-07-12-the-chamber",
+      "title": "The Chamber That Was Not Designed",
+      "repo_file": "reports/darshan/issue_one/articles/2026-07-12-the-chamber.md",
+      "source_draft": "~/.dharma/agents/darshan_fable/drafts/2026-07-12_the-chamber.md",
+      "discernment": "~/.dharma/agents/darshan_fable/discernment/2026-07-12_the-chamber.discernment.md",
+      "sha256_md": "e298a93997d41fb9d55bbdf6c888ba5ad92beabed7f487fed2abaa804f10eae2",
+      "published_url": "https://amitabhainarunachala.github.io/darshan/articles/2026-07-12-the-chamber.html",
+      "published": true,
+      "publication_evidence": "HTTP 200 verified 2026-07-21 (JST) from this machine",
+      "status": "LIVE since 2026-07-13 (darshan repo commit c40ae16), status: draft banner on page"
+    },
+    {
+      "order": 2,
+      "slug": "2026-07-12-the-silenced-no",
+      "title": "The Silenced No",
+      "repo_file": "reports/darshan/issue_one/articles/2026-07-12-the-silenced-no.md",
+      "source_draft": "~/.dharma/agents/darshan_fable/drafts/2026-07-12_the_silenced_no.md",
+      "discernment": "~/.dharma/agents/darshan_fable/discernment/2026-07-12_the_silenced_no.discernment.md",
+      "sha256_md": "7f37000a681c4b9c86dcd8bcbdc9a78694b395b5e1b0cdf9e993c1b7b49d67d3",
+      "published_url": "https://amitabhainarunachala.github.io/darshan/articles/2026-07-12-the-silenced-no.html",
+      "published": true,
+      "publication_evidence": "HTTP 200 verified 2026-07-21 (JST) from this machine",
+      "status": "LIVE since 2026-07-13 (darshan repo commit c40ae16), status: draft banner on page"
+    },
+    {
+      "order": 3,
+      "slug": "2026-07-12-one-idea-away",
+      "title": "One Idea Away",
+      "repo_file": "reports/darshan/issue_one/articles/2026-07-12-one-idea-away.md",
+      "source_draft": "~/.dharma/agents/darshan_fable/drafts/2026-07-12_instrument-one-idea-away.md",
+      "discernment": "~/.dharma/agents/darshan_fable/discernment/2026-07-12_instrument-one-idea-away.discernment.md",
+      "sha256_md": "c8297c2e32c99278a5c0138e0a17e3f459b449fe36f8219031e0c093fd380ff4",
+      "published_url": "https://amitabhainarunachala.github.io/darshan/articles/2026-07-12-one-idea-away.html",
+      "published": true,
+      "publication_evidence": "HTTP 200 verified 2026-07-21 (JST) from this machine",
+      "status": "LIVE since 2026-07-13 (darshan repo commit c40ae16), status: draft banner on page"
+    },
+    {
+      "order": 4,
+      "slug": "2026-07-13-whose-temples",
+      "title": "Who Is Buying the Ground Beneath the Panic?",
+      "repo_file": "reports/darshan/issue_one/articles/2026-07-13-whose-temples.md",
+      "source_draft": "~/.dharma/agents/darshan_fable/drafts/2026-07-12_china-land.md",
+      "discernment": "~/.dharma/agents/darshan_fable/discernment/2026-07-12_china-land.discernment.md",
+      "sha256_md": "18267a9e0d55c5b33e7ca1ca8a0097a2aaadaa3f615ba7e39e50318c9bd0c396",
+      "published_url": "https://amitabhainarunachala.github.io/darshan/articles/2026-07-13-whose-temples.html",
+      "published": false,
+      "publication_evidence": "PENDING \u2014 page does not exist until the operator merges darshan PR #1 (issue-one-20260721 -> main); verified 404 at assembly",
+      "status": "ASSEMBLED on branch issue-one-20260721 \u2014 awaiting operator read + merge"
+    },
+    {
+      "order": 5,
+      "slug": "2026-07-13-shape-of-a-silence",
+      "title": "The Shape of a Silence",
+      "repo_file": "reports/darshan/issue_one/articles/2026-07-13-shape-of-a-silence.md",
+      "source_draft": "~/.dharma/agents/darshan_fable/drafts/2026-07-12_tibet-silence.md",
+      "discernment": "~/.dharma/agents/darshan_fable/discernment/2026-07-12_tibet-silence.discernment.md",
+      "sha256_md": "9e24e3157c3fd57c6e2e046d0ee1f1dd1166664c67991484423eb7b8028ce988",
+      "published_url": "https://amitabhainarunachala.github.io/darshan/articles/2026-07-13-shape-of-a-silence.html",
+      "published": false,
+      "publication_evidence": "PENDING \u2014 page does not exist until the operator merges darshan PR #1 (issue-one-20260721 -> main); verified 404 at assembly",
+      "status": "ASSEMBLED on branch issue-one-20260721 \u2014 awaiting operator read + merge"
+    },
+    {
+      "order": 6,
+      "slug": "2026-07-13-gates-around-the-minds",
+      "title": "The Gates Around the Minds",
+      "repo_file": "reports/darshan/issue_one/articles/2026-07-13-gates-around-the-minds.md",
+      "source_draft": "~/.dharma/agents/darshan_fable/drafts/2026-07-12_gatekeeping.md",
+      "discernment": "~/.dharma/agents/darshan_fable/discernment/2026-07-12_gatekeeping.discernment.md",
+      "sha256_md": "93a9a4b141000aa881d802949a88a722f395987921e59070bfcf94f4bde2de80",
+      "published_url": "https://amitabhainarunachala.github.io/darshan/articles/2026-07-13-gates-around-the-minds.html",
+      "published": false,
+      "publication_evidence": "PENDING \u2014 page does not exist until the operator merges darshan PR #1 (issue-one-20260721 -> main); verified 404 at assembly",
+      "status": "ASSEMBLED on branch issue-one-20260721 \u2014 awaiting operator read + merge"
+    },
+    {
+      "order": 7,
+      "slug": "2026-07-13-nobody-knows-why",
+      "title": "Nobody Knows Why, and That Is the Story",
+      "repo_file": "reports/darshan/issue_one/articles/2026-07-13-nobody-knows-why.md",
+      "source_draft": "~/.dharma/agents/darshan_fable/drafts/2026-07-12_iran.md",
+      "discernment": "~/.dharma/agents/darshan_fable/discernment/2026-07-12_iran.discernment.md",
+      "sha256_md": "cba1b26a6a33564ed4ab4995e11c3a23268e72c491ded8e7473060a35a5b3edb",
+      "published_url": "https://amitabhainarunachala.github.io/darshan/articles/2026-07-13-nobody-knows-why.html",
+      "published": false,
+      "publication_evidence": "PENDING \u2014 page does not exist until the operator merges darshan PR #1 (issue-one-20260721 -> main); verified 404 at assembly",
+      "status": "ASSEMBLED on branch issue-one-20260721 \u2014 awaiting operator read + merge"
+    },
+    {
+      "order": 8,
+      "slug": "2026-07-13-age-of-iron",
+      "title": "The Age of Iron and the Machine That Has No Clock",
+      "repo_file": "reports/darshan/issue_one/articles/2026-07-13-age-of-iron.md",
+      "source_draft": "~/.dharma/agents/darshan_fable/drafts/2026-07-12_kali-yuga.md",
+      "discernment": "~/.dharma/agents/darshan_fable/discernment/2026-07-12_kali-yuga.discernment.md",
+      "sha256_md": "edad062dbeb292b34404553c68f7fcb0a037b3cb983746713549d097ce2182b0",
+      "published_url": "https://amitabhainarunachala.github.io/darshan/articles/2026-07-13-age-of-iron.html",
+      "published": false,
+      "publication_evidence": "PENDING \u2014 page does not exist until the operator merges darshan PR #1 (issue-one-20260721 -> main); verified 404 at assembly",
+      "status": "ASSEMBLED on branch issue-one-20260721 \u2014 awaiting operator read + merge"
+    }
+  ],
+  "content_digest": "fd2b746e20350993facf9abf5f7137f534e7e6e18737f84cca27cfd94ed2ce78",
+  "site_build_sha256": "a195c2a5c2f08a1e238f0260e9a5f03bb8228fd85a336516d00bcea3fd88528f",
+  "site_build_sha256_kind": "branch_build_provisional \u2014 stable_digest over {page_path: sha256} of the issue-one-20260721 branch build (python3 scripts/build.py, 0 parse failures). The seal script replaces this with a digest of the LIVE pages after merge.",
+  "editorial_law_passes": {
+    "both_fires": true,
+    "independent_discernment": true,
+    "discernment_notes": "All 8 pieces carry an independent discernment file (verdicts NEEDS_EDITS or HOLD) with the demanded edits applied per each draft's own header; iran was rebuilt after its HOLD and its header still requests re-discernment before external circulation.",
+    "operator_read": false,
+    "operator_read_evidence": "PENDING \u2014 the one remaining editorial-law gate"
+  },
+  "assembly": {
+    "assembled_at_jst": "2026-07-21 late evening",
+    "assembled_by": "fable (editor/assembler pass; zero body authorship)",
+    "bodies_byte_identical_to_seat_drafts": true,
+    "open_operator_directions": [
+      "2026-07-13 item 5: Tibet probe + Lobga Rangzen anchor not yet integrated into The Shape of a Silence",
+      "2026-07-13 item 4: 'Whose Temples, Whose Ground' reframe never drafted; piece 4 ships under its draft's own title"
+    ],
+    "pr_965_disposition": "The six ~900-word articles in closed PR #965 are a separate cursor-agent rewrite, closed by the operator 2026-07-16; preserved in PR history, not used here. This assembly revives the track freshly scoped outside One-Door, from the darshan_fable seat's own discerned drafts."
+  },
+  "pending_operator_actions": [
+    "Read Issue One (the 5 assembled pieces; 3 are already live)",
+    "Approve publication: merge darshan repo PR #1 (issue-one-20260721 -> main; Pages deploys from main)",
+    "Convene the merge gate on the dharma_swarm PR",
+    "Run reports/darshan/scripts/seal_issue_one_receipt.py --operator-read-confirmed '<own words>' to seal the canonical receipt"
+  ],
+  "digest": null,
+  "digest_policy": "digest stays null in this DRAFT. It is computed as stable_digest(receipt minus digest) by the seal script ONLY after live-URL verification of all 8 pieces and explicit operator-read confirmation \u2014 identical canonicalisation to scripts/governance/check_track_status.py. A receipt that asserts an unpublished issue must not validate; that is the point."
+}
