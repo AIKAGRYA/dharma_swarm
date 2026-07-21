@@ -28,8 +28,11 @@ DEFAULT_GENOME: dict[str, Any] = {
     "generator_model": "",  # filled from the live roster at experiment start
     "verifier_model": None,
     "k": 3,
-    "per_call_tokens": 6000,
-    "window_chars": 11000,
+    # Lean default for the Meghadharma RSI lab. Larger contexts/tokens remain
+    # legal genes, but the seed should be cheap enough to serve as a valid
+    # baseline and let exploration spend extra compute intentionally.
+    "per_call_tokens": 3500,
+    "window_chars": 6000,
     "extra_instruction": "",
     "notes": "seed",
 }

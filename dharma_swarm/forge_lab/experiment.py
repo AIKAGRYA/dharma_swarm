@@ -58,6 +58,8 @@ class ExperimentConfig:
     seed_genome: dict[str, Any] | None = None
     budget_cap_tokens: int = 120_000  # per candidate-grade
     budget_cap_usd: float = 2.0
+    soft_token_cap: bool = True
+    require_valid_seed: bool = True
     max_experiment_tokens: int = 600_000
     propose_timeout_s: int = 240
     grade_timeout_s: int = 600
@@ -256,6 +258,7 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
             budget_cap_usd=cfg.budget_cap_usd,
             propose_timeout_s=cfg.propose_timeout_s,
             grade_timeout_s=cfg.grade_timeout_s,
+            soft_token_cap=cfg.soft_token_cap,
         )
         tokens_spent_total += outcome.tokens_used
         envelope = FreeformExploreEnvelope(
@@ -306,9 +309,20 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
         seed, cid=seed_cid, parent_id=None, generation=0, loop_iteration=0,
         role="seed_baseline", contexts=contexts, notes="seed", raw="", op="seed",
     )
+    graded_after_seed = await store.graded_entries()
+    seed_row = next(
+        (CandidateStore._row(e) for e in graded_after_seed if CandidateStore._row(e).get("role") == "seed_baseline"),
+        {},
+    )
+    seed_budget = seed_row.get("budget") if isinstance(seed_row.get("budget"), dict) else {}
+    if cfg.require_valid_seed and seed_budget.get("hard_invalid"):
+        stopped_early = f"seed_baseline_hard_invalid:{seed_budget.get('hard_invalid_reason')}"
+    seed_soft_cap_exceeded = bool(seed_budget.get("soft_token_cap_exceeded"))
 
     # ---- generations ---------------------------------------------------------
     for gen in range(1, cfg.generations + 1):
+        if stopped_early:
+            break
         if tokens_spent_total >= cfg.max_experiment_tokens:
             stopped_early = f"token_ceiling_reached:{tokens_spent_total}"
             break
@@ -453,6 +467,9 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
             "best_pass_rate": best_rate,
             "tokens_spent_total": tokens_spent_total,
             "n_tasks_per_generation": cfg.tasks_per_generation,
+            "seed_soft_token_cap_exceeded": seed_soft_cap_exceeded,
+            "soft_token_cap": cfg.soft_token_cap,
+            "require_valid_seed": cfg.require_valid_seed,
             "note": "n is far below any powered claim; ranking signal only",
         },
         merkle_root={"verified": bool(chain_ok), "info": str(chain_info)},
