@@ -14,7 +14,18 @@ Consumers:
   the :func:`classify_pr` logic below so classification stays consistent.
 
 Categories (one PR may carry several):
-- ``green``           — all checks pass, mergeable.
+- ``green``           — positive evidence only: at least one check run concluded
+                        ``success`` on the head SHA, none failing, and no
+                        blocking merge state. Never assigned by fallback.
+- ``ci_never_ran``    — the head SHA has ZERO check runs. This is the bot-rebase
+                        stranding signature (GITHUB_TOKEN pushes never trigger
+                        workflows). Fail-closed: actionable, never green.
+- ``ci_pending``      — check runs exist but none has concluded ``success`` yet
+                        (queued/in-progress). Fail-closed placeholder that
+                        replaced the old zero-categories→green fallback.
+- ``merge_blocked``   — GitHub reports mergeable_state ``blocked`` (required
+                        checks missing/failing or required review absent).
+                        Previously unhandled, which fail-opened to green.
 - ``behind_main``     — branch is behind base; needs a clean rebase.
 - ``merge_conflict``  — branch conflicts with base; needs human/author attention.
 - ``docops_drift``    — DocOps integrity gate failed (count drift).
@@ -153,9 +164,26 @@ def classify_pr(pr: dict, check_runs: list[dict]) -> PRTriage:
         categories.append("behind_main")
     elif state == "dirty":
         categories.append("merge_conflict")
+    elif state == "blocked":
+        # GitHub computes "blocked" when required checks are missing/failing
+        # or a required review is absent. Left unhandled, a stranded PR
+        # (blocked + zero checks) fell through to the green fallback.
+        categories.append("merge_blocked")
+
+    if not latest:
+        # ZERO check runs on the head SHA: the bot-rebase stranding signature
+        # (GITHUB_TOKEN pushes never trigger workflows). Fail-closed —
+        # actionable, never green.
+        categories.append("ci_never_ran")
 
     if not categories:
-        categories = ["green"]
+        # Green requires positive evidence, not absence of failure evidence:
+        # at least one check run must have concluded "success". The old
+        # `not categories -> green` fallback reported zero-CI PRs as green.
+        if any(concl == "success" for concl in conclusions.values()):
+            categories = ["green"]
+        else:
+            categories = ["ci_pending"]
 
     # de-dup, stable order
     seen: dict[str, None] = {}
@@ -189,11 +217,17 @@ def render_markdown(rows: list[PRTriage]) -> str:
             f"{r.mergeable_state} | {', '.join(r.categories)} | {checks} |"
         )
     actionable = sum(1 for r in rows if r.actionable)
-    green = sum(1 for r in rows if r.categories == ['green'])
+    green = sum(1 for r in rows if r.categories == ["green"])
+    never_ran = sum(1 for r in rows if "ci_never_ran" in r.categories)
     lines.append("")
-    lines.append(
-        f"**{len(rows)} open PRs — {green} green, {actionable} actionable.**"
-    )
+    summary = f"**{len(rows)} open PRs — {green} green, {actionable} actionable"
+    if never_ran:
+        summary += (
+            f", {never_ran} ci_never_ran (zero check runs on head — "
+            "CI-stranded, never green)"
+        )
+    summary += ".**"
+    lines.append(summary)
     return "\n".join(lines)
 
 
