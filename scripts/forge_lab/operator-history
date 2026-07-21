@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Build the read-only, operator-facing projection without changing canonical
+# run receipts. All paths remain overridable for isolated checkouts/tests.
+base="${RSI_LAB_BASE:-/root/rsi-lab/current}"
+repo="${RSI_LAB_REPO:-${base}/repo}"
+python="${RSI_LAB_PYTHON:-${base}/.venv/bin/python}"
+pydeps="${RSI_LAB_PYDEPS:-${base}/pydeps}"
+state="${RSI_LAB_STATE:-${base}/state}"
+output="${RSI_OPERATOR_HISTORY:-/root/rsi-lab/operator-history}"
+
+if [[ ! -x "${python}" ]]; then
+    printf 'operator-history: canonical Python is not executable: %s\n' "${python}" >&2
+    exit 2
+fi
+
+export PYTHONPATH="${repo}:${pydeps}${PYTHONPATH:+:${PYTHONPATH}}"
+exec "${python}" -m dharma_swarm.forge_lab.operator_history \
+    --state-root "${state}" \
+    --output-root "${output}" \
+    "$@"

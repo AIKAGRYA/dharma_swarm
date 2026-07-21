@@ -1,0 +1,173 @@
+{
+  "schema_version": 1,
+  "captured_on": "2026-07-11",
+  "source_root": "/root/rsi-lab/bin",
+  "custody": "noncanonical_evidence",
+  "canonical_base": "/root/rsi-lab/current",
+  "canonical_launcher": "scripts/forge_lab/rsi",
+  "installable": false,
+  "executable": false,
+  "warning": "DO NOT EXECUTE, SOURCE, INSTALL, OR COPY THESE LEGACY SCRIPTS INTO PATH",
+  "capture": {
+    "verbatim": true,
+    "content_transformations": []
+  },
+  "files": [
+    {
+      "name": "rsi-attach",
+      "path": "rsi-attach",
+      "classification": "tmux_control",
+      "hazards": ["tmux"],
+      "source_mode": "0755",
+      "source_size_bytes": 188,
+      "archived_size_bytes": 188,
+      "source_sha256": "5f687e0bba2140f210c3fb3c4c43f13674b8a685e7cc20672cd4e8accd9fd2e1",
+      "archived_sha256": "5f687e0bba2140f210c3fb3c4c43f13674b8a685e7cc20672cd4e8accd9fd2e1",
+      "transformations": []
+    },
+    {
+      "name": "rsi-env",
+      "path": "rsi-env",
+      "classification": "environment_loader",
+      "hazards": ["secret", "environment_mutation"],
+      "source_mode": "0755",
+      "source_size_bytes": 1048,
+      "archived_size_bytes": 1048,
+      "source_sha256": "80052a4277e22a6e22f230da013f6db684c238ef46411916147523920b187745",
+      "archived_sha256": "80052a4277e22a6e22f230da013f6db684c238ef46411916147523920b187745",
+      "transformations": []
+    },
+    {
+      "name": "rsi-fix-substrate",
+      "path": "rsi-fix-substrate",
+      "classification": "live_substrate_mutator",
+      "hazards": ["secret", "live_network", "model_spend", "state_write", "git_mutation", "source_mutation"],
+      "source_mode": "0755",
+      "source_size_bytes": 4076,
+      "archived_size_bytes": 4076,
+      "source_sha256": "546023c6f3f2071e24c6880227d86b4220ee3ddf30d1db60ba8c30b3dc3a4d5f",
+      "archived_sha256": "546023c6f3f2071e24c6880227d86b4220ee3ddf30d1db60ba8c30b3dc3a4d5f",
+      "transformations": []
+    },
+    {
+      "name": "rsi-keys-refresh",
+      "path": "rsi-keys-refresh",
+      "classification": "live_provider_probe",
+      "hazards": ["secret", "live_network", "model_spend", "state_write"],
+      "source_mode": "0755",
+      "source_size_bytes": 1032,
+      "archived_size_bytes": 1032,
+      "source_sha256": "ed575012b9f8d3cb37999cf53f1575cabfe5ee911be144b1379f83cd0cd2b99e",
+      "archived_sha256": "ed575012b9f8d3cb37999cf53f1575cabfe5ee911be144b1379f83cd0cd2b99e",
+      "transformations": []
+    },
+    {
+      "name": "rsi-loop",
+      "path": "rsi-loop",
+      "classification": "live_launcher",
+      "hazards": ["secret", "live_network", "model_spend", "state_write", "tmux"],
+      "source_mode": "0755",
+      "source_size_bytes": 2495,
+      "archived_size_bytes": 2495,
+      "source_sha256": "717b7b4e275febb07067a5126b25f6ff75ef68616c799697d6aa470a41fe8ab0",
+      "archived_sha256": "717b7b4e275febb07067a5126b25f6ff75ef68616c799697d6aa470a41fe8ab0",
+      "transformations": []
+    },
+    {
+      "name": "rsi-mobile-help",
+      "path": "rsi-mobile-help",
+      "classification": "live_operations_documentation",
+      "hazards": ["live_operations_guidance"],
+      "source_mode": "0755",
+      "source_size_bytes": 1421,
+      "archived_size_bytes": 1421,
+      "source_sha256": "bcb2e70d75acd551826906ef40c27b83901e9011eb893fff07747468e29524f9",
+      "archived_sha256": "bcb2e70d75acd551826906ef40c27b83901e9011eb893fff07747468e29524f9",
+      "transformations": []
+    },
+    {
+      "name": "rsi-progress",
+      "path": "rsi-progress",
+      "classification": "state_observer",
+      "hazards": ["secret", "state_read"],
+      "source_mode": "0755",
+      "source_size_bytes": 2560,
+      "archived_size_bytes": 2560,
+      "source_sha256": "bd5e51022ed911f809ed28b896eaaa685415f78317f1335511ba7a80ef39595c",
+      "archived_sha256": "bd5e51022ed911f809ed28b896eaaa685415f78317f1335511ba7a80ef39595c",
+      "transformations": []
+    },
+    {
+      "name": "rsi-run",
+      "path": "rsi-run",
+      "classification": "live_launcher",
+      "hazards": ["secret", "live_network", "model_spend", "state_write", "tmux"],
+      "source_mode": "0755",
+      "source_size_bytes": 2428,
+      "archived_size_bytes": 2428,
+      "source_sha256": "28cf0f125120d5d572ba1ca85fc72b69544d0a4cf5c63e7c3ccfa33c0d19cfc2",
+      "archived_sha256": "28cf0f125120d5d572ba1ca85fc72b69544d0a4cf5c63e7c3ccfa33c0d19cfc2",
+      "transformations": []
+    },
+    {
+      "name": "rsi-selfcheck",
+      "path": "rsi-selfcheck",
+      "classification": "live_healthcheck",
+      "hazards": ["secret", "state_read", "tmux"],
+      "source_mode": "0755",
+      "source_size_bytes": 914,
+      "archived_size_bytes": 914,
+      "source_sha256": "61ce59a54a2cd7ee3bdf18b95480756be4e5e05d547280fad07a0ba7cfabd429",
+      "archived_sha256": "61ce59a54a2cd7ee3bdf18b95480756be4e5e05d547280fad07a0ba7cfabd429",
+      "transformations": []
+    },
+    {
+      "name": "rsi-status",
+      "path": "rsi-status",
+      "classification": "state_observer",
+      "hazards": ["secret", "state_read", "tmux"],
+      "source_mode": "0755",
+      "source_size_bytes": 2004,
+      "archived_size_bytes": 2004,
+      "source_sha256": "5442cc8b9dd03c173d5c328fb816a4c478cf70fb10b67e0caa6865bdffe3450e",
+      "archived_sha256": "5442cc8b9dd03c173d5c328fb816a4c478cf70fb10b67e0caa6865bdffe3450e",
+      "transformations": []
+    },
+    {
+      "name": "rsi-stop",
+      "path": "rsi-stop",
+      "classification": "tmux_control",
+      "hazards": ["tmux"],
+      "source_mode": "0755",
+      "source_size_bytes": 242,
+      "archived_size_bytes": 242,
+      "source_sha256": "8d5da6852bc4a424cbc908005d1cb31411737d0651c94081bdc0d76f19cefe2b",
+      "archived_sha256": "8d5da6852bc4a424cbc908005d1cb31411737d0651c94081bdc0d76f19cefe2b",
+      "transformations": []
+    },
+    {
+      "name": "rsi-tail",
+      "path": "rsi-tail",
+      "classification": "state_observer",
+      "hazards": ["secret", "state_read"],
+      "source_mode": "0755",
+      "source_size_bytes": 342,
+      "archived_size_bytes": 342,
+      "source_sha256": "52bfcb37e65336e4dd0bf8755627c95a688fcc5c506029424e577c4f4cce3953",
+      "archived_sha256": "52bfcb37e65336e4dd0bf8755627c95a688fcc5c506029424e577c4f4cce3953",
+      "transformations": []
+    },
+    {
+      "name": "rsi-update-main",
+      "path": "rsi-update-main",
+      "classification": "repository_mutator",
+      "hazards": ["secret", "live_network", "git_mutation", "source_mutation", "tmux"],
+      "source_mode": "0755",
+      "source_size_bytes": 782,
+      "archived_size_bytes": 782,
+      "source_sha256": "74c0c0fb6eb055dc5b681c479d49c082d965a663eb2be7087f26b90512855806",
+      "archived_sha256": "74c0c0fb6eb055dc5b681c479d49c082d965a663eb2be7087f26b90512855806",
+      "transformations": []
+    }
+  ]
+}

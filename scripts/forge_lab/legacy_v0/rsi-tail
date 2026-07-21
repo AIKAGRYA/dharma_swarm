@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source /root/rsi-lab/bin/rsi-env
+session=${1:-}
+if [ -z "$session" ]; then
+  log=$(ls -1t "$RSI_STATE/rsi_runs"/*.log 2>/dev/null | head -1 || true)
+else
+  log="$RSI_STATE/rsi_runs/$session.log"
+fi
+if [ -z "${log:-}" ] || [ ! -f "$log" ]; then echo "no log found"; exit 1; fi
+tail -n ${LINES:-80} "$log"

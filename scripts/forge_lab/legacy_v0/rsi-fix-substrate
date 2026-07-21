@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# Idempotently make the current-main run substrate actually able to spend tokens:
+#  1) stage the one live key (Moonshot/Kimi) into the lab HOME + secrets
+#  2) write a fresh keys_status.json liveness receipt (kimi row, TTL-aware)
+#  3) ensure origin/main ref exists in the run worktree
+#  4) apply the moonshot: routing patches (providers.py + runner_slots.py) if absent
+# Safe to re-run. Never touches /root/dharma_swarm (production docker checkout).
+set -euo pipefail
+BASE=/root/rsi-lab/current-main
+REPO="$BASE/repo"; STATE="$BASE/state"; PY="$BASE/.venv/bin/python3"
+PROD_ENV=/root/dharma_swarm/.env
+
+mkdir -p "$BASE/secrets" "$STATE/.dharma"
+MK=$(grep -E '^MOONSHOT_API_KEY=' "$PROD_ENV" | head -1 | cut -d= -f2- | tr -d '\r"')
+BUR=$(grep -E '^MOONSHOT_BASE_URL=' "$PROD_ENV" | head -1 | cut -d= -f2- | tr -d '\r"'); BUR=${BUR:-https://api.moonshot.ai/v1}
+if [ -z "$MK" ]; then echo "FATAL: no MOONSHOT_API_KEY in $PROD_ENV" >&2; exit 1; fi
+
+umask 077
+cat > "$BASE/secrets/keys.env" <<KEOF
+MOONSHOT_API_KEY=$MK
+MOONSHOT_BASE_URL=$BUR
+KIMI_API_KEY=$MK
+KIMI_BASE_URL=$BUR
+KEOF
+cp "$BASE/secrets/keys.env" "$STATE/.dharma/agent_keys.env"
+
+# liveness receipt (probe kimi-k2.7-code)
+code=$(curl -s -o /dev/null -w '%{http_code}' -m 25 "$BUR/chat/completions" \
+  -H "Authorization: Bearer $MK" -H 'Content-Type: application/json' \
+  -d '{"model":"kimi-k2.7-code","messages":[{"role":"user","content":"OK"}],"max_tokens":4}' || echo 000)
+glyph='✗'; [ "$code" = "200" ] && glyph='✓'
+ts=$(date +%s)
+cat > "$STATE/.dharma/keys_status.json" <<JEOF
+{"last_test_ts": $ts, "generated_at": $ts, "rows": [{"name": "kimi", "glyph": "$glyph", "status": "probe_http_$code"}, {"name": "moonshot", "glyph": "$glyph", "status": "probe_http_$code"}]}
+JEOF
+echo "keys_status.json refreshed: kimi probe http=$code glyph=$glyph"
+
+# origin/main ref in the run worktree (base_ref is hardcoded to origin/main)
+git -C "$REPO" update-ref refs/remotes/origin/main "$(git -C "$REPO" rev-parse HEAD)"
+echo "origin/main -> $(git -C "$REPO" rev-parse --short origin/main)"
+
+# routing patches
+"$PY" - <<'PYEOF'
+import pathlib
+prov = pathlib.Path("/root/rsi-lab/current-main/repo/dharma_swarm/forge_v1/providers.py")
+s = prov.read_text()
+a = '    elif mid in {"kimi-for-coding", "kimi-code"} or mid.startswith("kimi_code/") or mid.startswith("kimi-code/"):\n        provider_type = ProviderType.KIMI_CODE\n'
+inj = ('    elif mid.startswith("moonshot:"):\n'
+       '        provider_type = ProviderType.MOONSHOT  # RSI-LAB travel route\n'
+       '        model_id = model_id.split(":", 1)[1]\n'
+       '        mid = model_id.lower()\n')
+if "moonshot:" not in s and a in s:
+    prov.write_text(s.replace(a, inj + a)); print("providers.py patched")
+else:
+    print("providers.py already patched or anchor missing")
+
+rs = pathlib.Path("/root/rsi-lab/current-main/repo/dharma_swarm/forge_v1/forge_v2/runner_slots.py")
+t = rs.read_text()
+a1 = '    if mid in {"kimi-for-coding", "kimi-code"} or mid.startswith("kimi_code/") or mid.startswith("kimi-code/"):\n        return ProviderType.KIMI_CODE\n'
+i1 = '    if mid.startswith("moonshot:"):\n        return ProviderType.MOONSHOT  # RSI-LAB travel route\n'
+if "moonshot:" not in t and a1 in t:
+    t = t.replace(a1, i1 + a1)
+a2 = '    prov = _prefix_provider(model_id)\n    if prov is not None:\n        return _SimpleSlot(model_id, prov, "frontier")\n'
+i2 = ('    prov = _prefix_provider(model_id)\n'
+      '    if prov is not None:\n'
+      '        wire = model_id.split(":", 1)[1] if model_id.startswith("moonshot:") else model_id\n'
+      '        return _SimpleSlot(wire, prov, "frontier")\n')
+if a2 in t:
+    t = t.replace(a2, i2)
+rs.write_text(t)
+print("runner_slots.py patched" if "moonshot:" in rs.read_text() else "runner_slots.py anchor missing")
+PYEOF
+
+# dispatchable check
+set -a; . "$BASE/secrets/keys.env"; set +a
+HOME="$STATE" PYTHONPATH="$REPO:$BASE/pydeps" "$PY" - <<'PYEOF'
+from dharma_swarm.key_oracle import dispatchable_now
+print("dispatchable_now=", sorted(dispatchable_now()))
+PYEOF
+echo "substrate fix complete."
