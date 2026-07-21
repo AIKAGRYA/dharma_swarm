@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status a2a-status a2a-up a2a-send go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status agni-hub-readiness a2a-status a2a-up a2a-send go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently.
@@ -85,6 +85,7 @@ help:
 	@echo "  make agent-build-preflight Run onboarding + hygiene integrity before agent work"
 	@echo "  make agent-build-closeout Run hygiene scan + full governance bundle after agent work"
 	@echo "  make status       Quick cross-agent state snapshot (PRs, stale, hotlist, track)"
+	@echo "  make agni-hub-readiness Read-only AGNI hub preflight (NATS/API/services/resources)"
 	@echo "  make a2a-status   Connect to the AGNI hub: Devin identity + live fleet roster + inbox state"
 	@echo "  make a2a-up       Run the persistent Devin A2A agent (registers on fleet, drains inbox)"
 	@echo "  make a2a-send     Send a packet: make a2a-send TO=codex FILE=path/to/packet.md"
@@ -429,6 +430,9 @@ orient:
 # broken register, hotlist. Any agent on any platform can run this.
 status:
 	$(PYTHON) scripts/governance/repo_status.py
+
+agni-hub-readiness:
+	$(PYTHON) scripts/runtime/agni_hub_readiness.py $(ARGS)
 
 track-strength:
 	$(VENV_PYTHON) scripts/governance/track_acceptance_strength_report.py

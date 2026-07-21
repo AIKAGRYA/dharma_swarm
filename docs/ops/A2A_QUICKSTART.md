@@ -48,6 +48,19 @@ range), Devin inbox state (filter, pending, ack floor), and a live roster of
 who has published recently (by `from`/`kind`). Exit code `0` = connected,
 `2` = could not reach the hub (usually `DEVIN_NATS_PW` not set).
 
+## Check AGNI hub readiness
+
+```bash
+make agni-hub-readiness ARGS="--human"
+make agni-hub-readiness ARGS="--write"   # writes ~/.dharma/ops/agni_hub_readiness.json
+```
+
+This is an AGNI-local preflight for hub work. It observes NATS monitor state,
+the local fleet API, required systemd services, host resources, and the AGNI
+bridge heartbeat. It is read-only unless `--write` is passed. Treat a
+`degraded` result as a planning gate: stale API rows, resource pressure, or
+bridge uncertainty must not be described as semantic peer liveness.
+
 ## Start the persistent agent
 
 ```bash
