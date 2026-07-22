@@ -78,9 +78,96 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if ! command -v semgrep &>/dev/null; then
-  echo "semgrep not found on PATH — skipping (install with 'pip install semgrep' or 'brew install semgrep')" >&2
-  exit 0
+# WP-0C1 (TIT-004): required scans fail closed. A missing or wrong-version
+# scanner is a named nonzero failure, never a green skip. Advisory callers
+# opt out explicitly with DHARMA_SEMGREP_ALLOW_MISSING=1; the version pin is
+# enforced only when DHARMA_SEMGREP_EXPECTED_VERSION is set (the Makefile
+# required target pins the ratified 1.168.0; the CI container carries its
+# own image pin). DHARMA_SEMGREP_WALLCLOCK bounds both version probing and scan.
+sem_bin="${DHARMA_SEMGREP_BIN:-semgrep}"
+if ! command -v "${sem_bin}" &>/dev/null; then
+  if [[ "${DHARMA_SEMGREP_ALLOW_MISSING:-}" == "1" ]]; then
+    echo "SEMGREP_SKIPPED: '${sem_bin}' not found on PATH — advisory scan skipped by DHARMA_SEMGREP_ALLOW_MISSING=1" >&2
+    exit 0
+  fi
+  echo "SEMGREP_MISSING: '${sem_bin}' not found on PATH — required scan cannot run (install: pip install \"semgrep==${DHARMA_SEMGREP_EXPECTED_VERSION:-1.168.0}\")" >&2
+  exit 2
 fi
 
-exec semgrep "${args[@]}"
+# Use Python's cross-platform subprocess timeout rather than GNU `timeout`.
+# macOS does not ship coreutils timeout, and falling back to an unbounded exec
+# would recreate the exact hang/false-green class this packet is meant to close.
+if ! command -v python3 &>/dev/null; then
+  echo "SEMGREP_TIMEOUT_RUNNER_MISSING: python3 is required to enforce the scan wall clock" >&2
+  exit 2
+fi
+wallclock="${DHARMA_SEMGREP_WALLCLOCK:-900}"
+expected="${DHARMA_SEMGREP_EXPECTED_VERSION:-}"
+exec python3 - "${wallclock}" "${expected}" "${sem_bin}" "${args[@]}" <<'PY'
+import subprocess
+import sys
+
+raw_wallclock = sys.argv[1]
+expected = sys.argv[2]
+command = sys.argv[3:]
+try:
+    wallclock = float(raw_wallclock)
+except ValueError:
+    print(
+        f"SEMGREP_TIMEOUT_CONFIG_INVALID: DHARMA_SEMGREP_WALLCLOCK={raw_wallclock!r} "
+        "must be a positive number",
+        file=sys.stderr,
+    )
+    raise SystemExit(2)
+if wallclock <= 0:
+    print(
+        f"SEMGREP_TIMEOUT_CONFIG_INVALID: DHARMA_SEMGREP_WALLCLOCK={raw_wallclock!r} "
+        "must be a positive number",
+        file=sys.stderr,
+    )
+    raise SystemExit(2)
+
+if expected:
+    version_timeout = min(wallclock, 30.0)
+    try:
+        version_proc = subprocess.run(
+            [command[0], "--version"],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            timeout=version_timeout,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        print(
+            f"SEMGREP_VERSION_TIMEOUT: version probe exceeded {version_timeout:g}s "
+            "wall clock",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    first_line = version_proc.stdout.splitlines()[0] if version_proc.stdout else ""
+    found = "".join(first_line.split())
+    if version_proc.returncode != 0 or found != expected:
+        print(
+            f"SEMGREP_VERSION_MISMATCH: found {found or 'unknown'!r}, require "
+            f"{expected!r} (ratified pin; install: pip install \"semgrep=={expected}\")",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+
+try:
+    proc = subprocess.run(
+        command,
+        stdin=subprocess.DEVNULL,
+        timeout=wallclock,
+        check=False,
+    )
+except subprocess.TimeoutExpired:
+    print(
+        f"SEMGREP_TIMEOUT: scan exceeded {raw_wallclock}s wall clock "
+        "(named nonzero failure; raise DHARMA_SEMGREP_WALLCLOCK only with cause)",
+        file=sys.stderr,
+    )
+    raise SystemExit(2)
+raise SystemExit(proc.returncode)
+PY
