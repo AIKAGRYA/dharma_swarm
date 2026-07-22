@@ -130,3 +130,28 @@ def test_report_summary_counts_ci_never_ran_separately():
     assert "1 green" in md
     assert "1 actionable" in md
     assert "1 ci_never_ran" in md
+
+
+def test_startup_failure_and_stale_are_real_failures_even_with_other_success():
+    for conclusion in ("startup_failure", "stale"):
+        runs = [
+            {"name": "pytest (3.11)", "conclusion": "success"},
+            {"name": "required gate", "conclusion": conclusion},
+        ]
+        triage = classify_pr(_pr(1083), runs)
+        assert triage.categories == ["real_test_lint"]
+        assert triage.actionable is True
+
+
+def test_draft_with_passing_checks_is_not_green_or_actionable():
+    runs = [{"name": "pytest (3.11)", "conclusion": "success"}]
+    triage = classify_pr(_pr(1083, draft=True), runs)
+    assert triage.categories == ["draft"]
+    assert triage.actionable is False
+
+
+def test_unknown_merge_state_with_passing_checks_is_not_green():
+    runs = [{"name": "pytest (3.11)", "conclusion": "success"}]
+    triage = classify_pr(_pr(1083, state="unknown"), runs)
+    assert triage.categories == ["merge_unknown"]
+    assert triage.actionable is True
