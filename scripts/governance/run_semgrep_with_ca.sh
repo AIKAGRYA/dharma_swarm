@@ -95,8 +95,9 @@ if ! command -v "${sem_bin}" &>/dev/null; then
 fi
 
 # Use Python's cross-platform subprocess timeout rather than GNU `timeout`.
-# macOS does not ship coreutils timeout, and falling back to an unbounded exec
-# would recreate the exact hang/false-green class this packet is meant to close.
+# macOS does not ship coreutils timeout. Each command starts a new process
+# session so a timeout kills the complete scanner process group, not only its
+# parent while descendants keep CI pipes open.
 if ! command -v python3 &>/dev/null; then
   echo "SEMGREP_TIMEOUT_RUNNER_MISSING: python3 is required to enforce the scan wall clock" >&2
   exit 2
@@ -104,6 +105,8 @@ fi
 wallclock="${DHARMA_SEMGREP_WALLCLOCK:-900}"
 expected="${DHARMA_SEMGREP_EXPECTED_VERSION:-}"
 exec python3 - "${wallclock}" "${expected}" "${sem_bin}" "${args[@]}" <<'PY'
+import os
+import signal
 import subprocess
 import sys
 
@@ -127,16 +130,38 @@ if wallclock <= 0:
     )
     raise SystemExit(2)
 
+
+def run_bounded(argv, timeout, *, capture_output=False):
+    kwargs = {
+        "stdin": subprocess.DEVNULL,
+        "start_new_session": True,
+    }
+    if capture_output:
+        kwargs.update(stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        proc = subprocess.Popen(argv, **kwargs)
+    except OSError as exc:
+        print(f"SEMGREP_EXEC_FAILED: {exc}", file=sys.stderr)
+        raise SystemExit(2)
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            proc.kill()
+        proc.communicate()
+        raise
+    return subprocess.CompletedProcess(argv, proc.returncode, stdout, stderr)
+
+
 if expected:
     version_timeout = min(wallclock, 30.0)
     try:
-        version_proc = subprocess.run(
+        version_proc = run_bounded(
             [command[0], "--version"],
-            stdin=subprocess.DEVNULL,
+            version_timeout,
             capture_output=True,
-            text=True,
-            timeout=version_timeout,
-            check=False,
         )
     except subprocess.TimeoutExpired:
         print(
@@ -156,12 +181,7 @@ if expected:
         raise SystemExit(2)
 
 try:
-    proc = subprocess.run(
-        command,
-        stdin=subprocess.DEVNULL,
-        timeout=wallclock,
-        check=False,
-    )
+    proc = run_bounded(command, wallclock)
 except subprocess.TimeoutExpired:
     print(
         f"SEMGREP_TIMEOUT: scan exceeded {raw_wallclock}s wall clock "
