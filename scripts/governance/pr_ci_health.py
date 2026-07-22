@@ -15,8 +15,12 @@ Consumers:
 
 Categories (one PR may carry several):
 - ``green``           — positive evidence only: at least one check run concluded
-                        ``success`` on the head SHA, none failing, and no
-                        blocking merge state. Never assigned by fallback.
+                        ``success`` on the head SHA, none failing, the PR is not
+                        draft, and mergeability is known and non-blocking. Never
+                        assigned by fallback.
+- ``draft``           — checks may be healthy, but the PR remains intentionally
+                        non-merge-ready. A draft alone is not actionable; any
+                        accompanying failure/blocker remains actionable.
 - ``ci_never_ran``    — the head SHA has ZERO check runs. This is the bot-rebase
                         stranding signature (GITHUB_TOKEN pushes never trigger
                         workflows). Fail-closed: actionable, never green.
@@ -26,6 +30,8 @@ Categories (one PR may carry several):
 - ``merge_blocked``   — GitHub reports mergeable_state ``blocked`` (required
                         checks missing/failing or required review absent).
                         Previously unhandled, which fail-opened to green.
+- ``merge_unknown``   — GitHub has not computed a trustworthy merge state yet.
+                        Unknown state is never positive merge-readiness evidence.
 - ``behind_main``     — branch is behind base; needs a clean rebase.
 - ``merge_conflict``  — branch conflicts with base; needs human/author attention.
 - ``docops_drift``    — DocOps integrity gate failed (count drift).
@@ -76,7 +82,7 @@ class PRTriage:
 
     @property
     def actionable(self) -> bool:
-        return self.categories != ["green"] and self.categories != []
+        return any(category not in {"green", "draft"} for category in self.categories)
 
 
 def _have_gh() -> bool:
@@ -142,7 +148,15 @@ def classify_pr(pr: dict, check_runs: list[dict]) -> PRTriage:
     failing = sorted(
         name
         for name, concl in conclusions.items()
-        if concl in {"failure", "timed_out", "cancelled", "action_required"}
+        if concl
+        in {
+            "failure",
+            "timed_out",
+            "cancelled",
+            "action_required",
+            "startup_failure",
+            "stale",
+        }
     )
     triage.failing_checks = failing
 
@@ -169,6 +183,13 @@ def classify_pr(pr: dict, check_runs: list[dict]) -> PRTriage:
         # or a required review is absent. Left unhandled, a stranded PR
         # (blocked + zero checks) fell through to the green fallback.
         categories.append("merge_blocked")
+    elif state == "unknown":
+        # Mergeability is computed asynchronously. Until GitHub returns a known
+        # state, there is no positive evidence that the head is merge-ready.
+        categories.append("merge_unknown")
+
+    if triage.draft or state == "draft":
+        categories.append("draft")
 
     if not latest:
         # ZERO check runs on the head SHA: the bot-rebase stranding signature
