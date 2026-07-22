@@ -1,111 +1,149 @@
-# DharmaGraph Ascent — five sequential campaigns, one hill-climb (operator-ratified 2026-07-17)
+# DharmaGraph Ascent — parallel lanes, one hill, near-zero operator touch (v2)
 
-**You are a fresh Claude Code instance on `/home/user/dharma_swarm`.** This is the
-master spec for the post-Pregel-core ascent. Predecessor: the Pregel-core
-closure (PR #1002, 52.00 → 58.00, all six execution-core cards FULLY_PROVEN,
-custody anchor `claude-judge-c83df531c`). Its handoff —
-`docs/plans/handoffs/DHARMAGRAPH_HANDOFF_CLAUDE.md` — is the STYLE CONTRACT
-for every campaign here: machine-checkable done-blocks, one slice per
-iteration, append-only progress ledger, git-is-truth reconciliation, stop
-conditions where halting is success, builder/judge seat separation, custody
-reseal on every evidence commit. Campaign context:
-`docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md`; active track
-`dharmagraph-engine-2026-07` (`docs/governance/ACTIVE_TRACK.yaml`).
+**You are a fresh Claude Code instance on `/home/user/dharma_swarm`.** This is
+the master spec for the post-Pregel-core ascent. Predecessor: PR #1002
+(52.00 → 58.00, six execution-core cards FULLY_PROVEN, merged to main as
+`1d45916d`). Its handoff — `docs/plans/handoffs/DHARMAGRAPH_HANDOFF_CLAUDE.md`
+— is the STYLE CONTRACT for everything here: machine-checkable done-blocks,
+one slice per iteration, append-only ledgers, git-is-truth reconciliation,
+stop-conditions-as-success, builder/judge separation, custody reseal on
+evidence. Campaign context: `docs/plans/DHARMAGRAPH_PHASED_SPEC_2026-07-05.md`;
+active track `dharmagraph-engine-2026-07`.
 
-## 0. Operator ratification gate (nothing runs before this)
+**Design constraint (operator-declared 2026-07-17): the operator is
+time-poor.** Every gate in this spec is therefore designed so that agents
+proceed without waiting on a human wherever governance allows, human
+attention is batched, and the merge of the PR carrying this spec is itself
+the ratification act.
 
-This spec has NO authority until the operator:
+## 0. Ratification = merging this PR
 
-1. Adds it and the per-campaign surfaces to the track's `owned_surfaces`
-   (or opens a sibling track): this file, `docs/plans/handoffs/DHARMAGRAPH_ASCENT_*.md`,
-   `tests/oracle_support/scenarios.py`, `tests/oracle_support/outcomes.py`,
-   `dharma_swarm/graph/journal.py` (C2, new). C1's flag seam inside
-   `dharma_swarm/workflow.py` is already owned; `orchestrator.py`/`swarm.py`
-   edits are hot-path — see C1's impact-checked rule.
-2. Ratifies the two DECLARED HARNESS AMENDMENTS in §C1.4 and §C4.2 (the only
-   places this spec touches otherwise-frozen machinery, each with its own
-   judge-review requirement).
-3. Names the seats: one BUILDER per campaign; the independent judge seat
-   signs every reseal. A builder never cites its own judge emission as
-   closure evidence.
+The PR that introduces this file also carries the `ACTIVE_TRACK.yaml`
+update (ascent surfaces added to `owned_surfaces`, ascent lanes added to
+`next_items`, stale parity items reconciled to the post-#1002 receipt).
+**Merging that PR IS the §0 ratification.** No separate YAML surgery, no
+signature ceremony. Defaults that apply on merge:
 
-## 1. The hill and the ledger of record
+- **Builder seats:** any Claude Code session launched against a lane's
+  handoff (human-started or routine-started, §6).
+- **Judge seat:** the existing independent hourly verifier. Every reseal
+  needs its signature in `DHARMAGRAPH_JUDGE_RATIFICATIONS_V1.json` before
+  a lane PR leaves draft; a builder never cites its own judge emission.
+- **Merge authority:** the operator, or Merge Master Mike under the
+  standing conditions in §6.3. Builders NEVER merge.
+- **Declared harness amendments** (§C1.4, §C4.2 — the only two touches of
+  otherwise-frozen machinery): pre-authorized in principle by this merge,
+  but each still lands as its own judge-reviewed commit with the
+  only-this-diff rule; any wider diff = revert + STOP.
 
-One number climbs: the judge-receipt score in
-`reports/governance/dharmagraph_parity/judge_receipt.json`, measured ONLY by
-`python3 scripts/governance/dharmagraph_parity_gauntlet.py --check` at a
-clean committed head. Current: **58.00/100**. Frozen-rubric law from the
-predecessor spec §7 applies verbatim to V1+V2 until C4 mints V3.
+## 1. The hill and the lane DAG
 
-| Campaign | Name | Metric target | Gate to next |
-|---|---|---|---|
-| C1 | Organism wiring (Phase-2 crown + Art. 12 receipts) | 58.00 → 63.00 (+5.00: APP01–04 to 2/2) AND engine-adoption evidence | operator merge + judge reseal |
-| C2 | Reliability ring | 63.00 → 74.00 (+11.00: LG19/20/24/25/26 to 2/2) | operator merge + judge reseal |
-| C3 | Frontier scan (research) | dossier with ≥2 independent sources per claim; ≥3 chartered capability cards | operator picks the cards |
-| C4 | Rubric V3 @ langgraph 1.2.9 | V3 frozen-before-results; honest re-baseline emitted | operator merge + judge reseal |
-| C5 | Moat build (DST chaos, telos primitives) | per-card done-blocks written INTO the C5 handoff at charter time | operator merge |
+One number climbs: the judge-receipt score
+(`reports/governance/dharmagraph_parity/judge_receipt.json`), measured ONLY
+by `python3 scripts/governance/dharmagraph_parity_gauntlet.py --check` at a
+clean committed head. Current: **58.00/100**. Frozen-rubric law (predecessor
+§7) applies verbatim to V1+V2 until L-D mints V3.
 
-Campaigns run strictly in order. A campaign is DONE when its done-block
-exits 0 (or every unreached target has a STOPPED ledger entry naming the
-unsettled question — an honest miss beats a gamed hit, verbatim from the
-predecessor). Score numbers above are ceilings computed from the frozen
-weights (total weight 100; APP01 w4/APP02 w1/APP03 w2/APP04 w3 currently at
-1pt each; LG19 w1, LG20 w2, LG24 w4, LG25 w2 at 0pt; LG26 w4 at 1pt).
+Lanes are surface-disjoint and run **in parallel** — the serial C1→C5 of v1
+is replaced by this dependency DAG:
 
-## 2. The loop (identical for every campaign, every iteration)
+```
+ratification merge
+      ├── L-K  kernel extraction        (no deps; 1 slice)
+      ├── L-A  organism wiring          (no deps)          58→63
+      ├── L-B  reliability ring         (no deps)          63→74 *
+      └── L-C  frontier scan            (no deps; research)
+                 └── L-D  rubric V3 @ latest langgraph  (needs L-C addenda + L-A/L-B merged)
+                 └── L-E  moat build    (needs L-C cards; operator picks)
+```
 
-Boris-Cherny discipline: the agent re-derives ALL state from ground truth
-each iteration; nothing is remembered, everything is measured.
+\* Score deltas assume both land; L-A and L-B contribute independently
+(+5.00 and +11.00 against the frozen weights: APP01 w4 / APP02 w1 / APP03
+w2 / APP04 w3 all at 1pt; LG19 w1, LG20 w2, LG24 w4, LG25 w2 at 0pt; LG26
+w4 at 1pt; total weight 100).
+
+| Lane | Branch | Surfaces (disjoint by construction) |
+|---|---|---|
+| L-K | `claude/dharmagraph-ascent-lk` | `docs/governance/CAMPAIGN_KERNEL.md` (new; promoted from Appendix A) |
+| L-A | `claude/dharmagraph-ascent-la` | `tests/oracle_support/scenarios.py`, `tests/oracle_support/outcomes.py`, `dharma_swarm/workflow.py`, `docs/plans/handoffs/DHARMAGRAPH_ASCENT_LA.md` |
+| L-B | `claude/dharmagraph-ascent-lb` | `dharma_swarm/graph/**` (engine internals), `tests/test_graph_pregel_properties.py`, `docs/plans/handoffs/DHARMAGRAPH_ASCENT_LB.md` |
+| L-C | `claude/dharmagraph-ascent-lc` | `docs/plans/DHARMAGRAPH_FRONTIER_DOSSIER_*.md`, `docs/plans/handoffs/DHARMAGRAPH_ASCENT_LC.md` |
+| L-D | `claude/dharmagraph-ascent-ld` | rubric V3 file, gauntlet custody constants (§C4.2), `pyproject.toml` test-oracle pin |
+| L-E | `claude/dharmagraph-ascent-le` | chartered per card at L-E S0 |
+
+**Shared-file law (the one real coupling):** `tests/oracle_support/
+dharmagraph_gauntlet.py` (append-only extensions) and
+`reports/governance/dharmagraph_parity/**` (reseals) are touched by BOTH
+L-A and L-B. Rule: lanes develop in parallel, but **evidence commits
+serialize through main** — a lane reseals only at its own final head after
+rebasing onto current main (the predecessor's any-commit-after-emission
+rule already forces exactly this). Harness appends live in clearly bounded,
+lane-labeled sections at file end so rebase conflicts stay append/append.
+First lane to go Ready merges first; the second rebases, re-runs its
+VERIFY, re-emits, reseals. Never resolve a receipt conflict by hand-editing
+receipt JSON — always re-emit.
+
+## 2. The loop (every lane, every iteration — the Campaign Kernel)
 
 1. `cd /home/user/dharma_swarm && make onboard` — READY or fix/report.
-2. Read the campaign's handoff file (created at campaign S0 from this spec's
-   section), then its PROGRESS LEDGER (bottom of the same file, append-only,
-   one block per iteration: `slice / result / verify / learned / blocked`).
+2. Read the lane handoff (`docs/plans/handoffs/DHARMAGRAPH_ASCENT_<lane>.md`,
+   created at the lane's S0 from this spec's section), then its PROGRESS
+   LEDGER (bottom of the same file; append-only; one block per iteration:
+   `slice / result / verify / learned / blocked`).
 3. `git log --oneline -15 && git status && git branch --show-current` — git
    is truth, ledger is claim; reconcile, fix the ledger if they disagree.
-4. Run the campaign's VERIFY block. **If red, fixing red IS this
-   iteration's task.** Never start slice N+1 with slice N red.
+4. Run the lane's VERIFY block. **Red? Fixing red IS this iteration.**
 5. Else take the FIRST TODO slice whose deps are DONE. Do ONLY it.
-6. Verify → commit (`feat(graph): C<N>-S<M> <title>` + ledger in the same
-   commit) → score-probe (emit builder receipt, diff ONLY the expected rows,
-   `git checkout -- reports/governance/dharmagraph_parity/`) → append ledger
+6. Verify → commit (`feat(graph): <lane>-S<n> <title>`, ledger in the same
+   commit) → score-probe where evidence moved (emit builder receipt, diff
+   ONLY expected rows, `git checkout -- reports/governance/dharmagraph_parity/`)
    → push.
 7. Stop conditions (halting is success): 3 consecutive failed attempts on
-   one facet → STOPPED entry, move on. Metric flat for 2 green iterations →
-   the loop is spinning; STOP the campaign, write findings. A fix that
-   needs a hot-path file beyond the declared seam, another track's surface,
-   a new dependency, or any gate weakening → STOP and document. A design
-   question the rubric text + the pinned langgraph source + an empirical run
-   cannot settle → STOPPED entry with the question, next slice.
+   one facet → STOPPED ledger entry naming the unsettled question, move on.
+   Metric flat across 2 green iterations → lane is spinning; STOP, write
+   findings. A fix needing a hot-path file beyond a declared seam, another
+   track's surface, a new dependency, or any gate weakening → STOP and
+   document. A question the rubric + pinned langgraph source + an empirical
+   run cannot settle → STOPPED entry, next slice.
 
-PR discipline per campaign: ONE branch `claude/dharmagraph-ascent-c<N>`,
-ONE draft PR opened at S0 with all four Coherence Delta fields substantive,
-marked Ready only at the campaign's reseal, **NEVER self-merged**. Custody:
-any commit after a receipt emission re-emits builder then judge at the new
-head and recommits custody artifacts atomically (predecessor §4-S9 rule —
-it fired twice in PR #1002; it will fire here).
+PR discipline per lane: ONE branch, ONE draft PR opened at S0 (all four
+Coherence Delta fields substantive), Ready only after reseal + judge
+signature, **never self-merged**.
 
-Environment invariants (learned the hard way in PR #1002): unshallow the
-clone before any gauntlet run; `pip install -e ".[dev,test-oracle]"` with
-the debian-cryptography workaround; langgraph pin per campaign (1.2.4 for
-C1–C2, 1.2.9 from C4); every new module ≤500 lines (down-only ratchet —
-extract BEFORE crossing, as scheduler.py had to twice); cross-axis regression
-pins for every reviewer finding (typed×resume and sync×timeout taught us
-single-axis workloads miss seam bugs).
+Environment invariants (paid for in #1002): unshallow before any gauntlet
+run; `pip install -e ".[dev,test-oracle]"` (debian-cryptography workaround:
+`pip install --ignore-installed cryptography` first); langgraph pin 1.2.4
+until L-D re-pins; every module ≤500 lines — extract BEFORE crossing;
+cross-axis regression pins for every reviewer finding (typed×resume and
+sync×timeout proved single-axis workloads miss seam bugs); reviewer rounds
+after Ready are expected — fix, pin, reseal, per the predecessor's review
+round.
 
----
+## 3. Lane specs
 
-## C1 — Organism wiring: the engine becomes the substrate (58.00 → 63.00)
+### L-K — Campaign Kernel extraction (1 slice; unblocks the whole portfolio)
 
-**Mission.** The neutral engine is `claim_mode: candidate/test_only` — 58
-points of shelf inventory. C1 makes the application oracle and one real
-production dispatch path run ON the engine, and lands the receipt rung the
-EU AI Act Art. 12 clock (applicable 2026-08-02) is ticking for. All four APP
-rows currently fail exactly one facet family: `neutral_engine_integration`
-(APP04 adds `domain_isolation`, `memory_isolation`). Flipping them is
-+5.00 — and unlike every other row, these points MEASURE production truth.
+Promote Appendix A verbatim into `docs/governance/CAMPAIGN_KERNEL.md` with
+a short header naming #1002 as the proving run, and add a pointer line to
+`docs/governance/BUILD_SESSION_ENTRYPOINT.md`'s "Build-session flow" section
+ONLY if DocOps allows a one-line addition without count churn (else skip —
+the kernel doc stands alone). Done-block: file exists, `make docops-integrity`
+green, PR merged. This is the 1000x seed: every OTHER track can adopt the
+kernel without touching this campaign. **Why first-class:** the loop in §2
+is campaign-agnostic and now has one proven run; extraction makes it the
+repo's default operating system instead of DharmaGraph folklore.
 
-**Done-block (exit 0 at the campaign head):**
+### L-A — Organism wiring: the engine becomes the substrate (+5.00 → APP rows 2/2)
+
+**Mission.** The engine is `claim_mode: candidate/test_only` — 58 points of
+shelf inventory. All four APP rows fail exactly the
+`neutral_engine_integration` facet family (APP04 adds `domain_isolation`,
+`memory_isolation`): the application oracle still runs the clone lineage.
+Port it to the neutral engine, add a shadow-mode production seam, land the
+Art. 12 receipt rung (EU AI Act Art. 12 applicable **2026-08-02** — the
+one true deadline in this spec).
+
+**Done-block (exit 0 at lane head):**
 
 ```bash
 cd /home/user/dharma_swarm
@@ -121,217 +159,238 @@ ok = float(r["score"]["display"].split("/")[0]) >= 63.00
 missing = [c for c in core if rows[c].get("points") != 2]
 sys.exit(0 if ok and not missing else 1)
 EOF
-python3 -m pytest tests/test_workflow.py tests/test_graph_effects.py -q  # engine-backed workflow suite green
+python3 -m pytest tests/test_workflow.py -q
 ```
 
-**Slices.**
+**Slices.** S0 branch+handoff+draft-PR+baseline (STOP the lane if `--check`
+≠ PASS on clean main). S1 read `scenarios.py`/`outcomes.py` end to end and
+write (handoff, not code) the primitive→engine-surface map (handoff →
+interrupt/Command·resume, agent turn → node, transfer → goto, isolation →
+schema projections + subgraph); unmapped primitives become the S2 gap list.
+S2–S4 port swarm / supervisor / isolation scenario families one per slice —
+the EXISTING `diff_outcomes` comparisons against the real langgraph arm are
+the frozen referee and may not be edited. S5 production seam:
+`dharma_swarm/workflow.py` engine path behind `DHARMA_GRAPH_ENGINE=1`
+(default off), shadow mode: run legacy AND engine, compare final states,
+divergence receipts under `~/.dharma/` (never git). If the seam truly
+cannot land without `orchestrator.py`/`swarm.py`, that slice carries
+`[impact-checked]` + packet-bound preflight + a minimal call-site diff — or
+STOPs. S6 receipt rung: engine-executed supersteps emit `GraphRunEvent`
+into the spine receipt log via the existing `derive_graph_side_effect_key`
+vocabulary (`durable_invoker`) — wire, don't invent; evidence = replayed
+run's receipt chain digest-matches its checkpoint chain. S7 reseal + Ready.
 
-- **C1-S0** — branch, handoff file `docs/plans/handoffs/DHARMAGRAPH_ASCENT_C1.md`
-  (copy this section + ledger skeleton), draft PR, baseline probe. STOP THE
-  CAMPAIGN if `--check` is not PASS at 58.00 on clean main.
-- **C1-S1** — Read `tests/oracle_support/scenarios.py` + `outcomes.py` end to
-  end; write (in the handoff, not code) the mapping from each swarm/
-  supervisor scenario primitive to the engine surface that serves it
-  (handoff → interrupt/Command, agent turn → node, transfer → goto,
-  isolation → schema projections + subgraph). Any primitive with NO engine
-  surface → the gap list that drives S2's order. No code this slice.
-- **C1-S2..S4** — Port `run_dharma_swarm` / `run_dharma_supervisor` (and the
-  isolation scenarios) to build on `TypedStateGraph`/`CompiledGraph` instead
-  of the clone lineage — semantics pinned by the EXISTING outcome diffs
-  (`diff_outcomes` already compares against the real langgraph arm; those
-  comparisons are the frozen referee and may not be edited). One scenario
-  family per slice.
-- **C1-S5** — Production seam: `dharma_swarm/workflow.py` gains an
-  engine-backed execution path behind `DHARMA_GRAPH_ENGINE=1` (default off),
-  shadow mode first: run legacy AND engine, compare final states, emit a
-  divergence receipt under `~/.dharma/` (never git). The seam stays inside
-  `workflow.py` (owned); if it genuinely cannot land without editing
-  `orchestrator.py`/`swarm.py`, that slice carries `[impact-checked]`, the
-  packet-bound preflight (`make agent-build-preflight`), and the minimal
-  call-site diff — or STOPs.
-- **C1-S6** — Receipt rung (Art. 12): every engine-executed superstep emits
-  its `GraphRunEvent` into the spine receipt log via the EXISTING
-  `derive_graph_side_effect_key` vocabulary (`durable_invoker`) — no new
-  truth stores; wire, don't invent. Evidence: a replayed run's receipt chain
-  digest-matches the checkpoint chain.
-- **C1-S7** — Reseal + Ready (predecessor §4-S9 verbatim).
+**§C1.4 DECLARED HARNESS AMENDMENT (judge-reviewed commit).**
+`_finalize_rows` unconditionally appends the APP caveat "Existing
+application oracle exercises the clone lineage… row is capped below 2" —
+false once the oracle runs the neutral engine. Amendment: make the caveat
+conditional on the `neutral_engine_integration` facet actually failing.
+Own commit; judge review in-PR; before/after receipt diff must show the
+ONLY change is the caveat string on rows whose facets independently prove
+2/2. Wider diff = revert + STOP.
 
-**C1.4 — DECLARED HARNESS AMENDMENT (operator + judge review required).**
-`_finalize_rows` in `tests/oracle_support/dharmagraph_gauntlet.py`
-unconditionally appends the APP caveat "Existing application oracle
-exercises the clone lineage… row is capped below 2." Once the oracle runs
-the neutral engine, that sentence becomes FALSE. The amendment: make the
-caveat conditional on the `neutral_engine_integration` facet actually
-failing. This is a scoring-adjacent edit and therefore forbidden by default;
-it may land ONLY as its own commit, reviewed by the judge seat in the PR,
-with a before/after receipt diff showing the ONLY change is the caveat
-string on rows whose facets independently prove 2/2. Any other diff = revert
-and STOP.
+**Extra stop condition:** shadow-mode divergence tracing to a LEGACY bug →
+Discovered section, do not fix legacy, never bend the engine to reproduce a
+legacy defect — parity is with langgraph and correct outcomes.
 
-**C1 stop conditions (additional).** Shadow-mode divergence that traces to a
-LEGACY bug: document in the PR's Discovered section, do not fix the legacy
-side, do not "fix" the engine to reproduce a legacy bug — parity is with
-langgraph and with correct outcomes, not with legacy defects.
+### L-B — Reliability ring (+11.00 → LG19/20/24/25/26 2/2)
 
----
+**S0 is the debt, not a feature:** identity-preserving pending-write
+journal (`dharma_swarm/graph/journal.py`, new, ≤500) recording
+`(channel, value, node_id, task_seq)` — kills both recorded deviations from
+#1002 (failure-resume reducer interleave; ambiguous Send-multiplicity
+degradation). Property 3 tightens from "converges" to "byte-identical
+trace" in the same slice. Retries and timeouts stress exactly these paths;
+build on the fixed floor.
 
-## C2 — Reliability ring (63.00 → 74.00)
+**Then one row per slice, riskiest first, the #1002 recipe verbatim
+(empirical derivation from the pin → engine change → append-only two-arm
+workload → fail-closed applier):**
+S1 LG24 retries (`RetryPolicy`: max_attempts, backoff, jitter, retry_on —
+jitter MUST route through `effects.random()`, DST law). S2 LG25 timeouts
+(node/step timeout, heartbeat refresh, idle timeout on the S6
+`asyncio.timeout`+`to_thread` base). S3 LG19 `interrupt_before`/`after`
+(static, compile-time, on the S7 substrate). S4 LG20 dynamic suite
+(multiple interrupts, ordering, node re-execution, resume routing — frames
+already key by full task identity; prove the matrix). S5 LG26 remainder
+(`error_handler`, `sibling_cancellation`, `user_cancellation`). S6
+predecessor properties 6–8 (version monotonicity/exactly-once, quiescence,
+replay determinism) — deferred then, earning their keep here. S7 reseal +
+Ready.
 
-**Mission.** Close the five rows production dispatch will lean on hardest:
-LG24 retry policies (w4), LG25 timeouts/heartbeats (w2), LG19 static
-interrupts (w1), LG20 dynamic-interrupt suite (w2), LG26 remainder
-(`error_handler`, `sibling_cancellation`, `user_cancellation`; w4 at 1pt).
-+11.00 total — the largest remaining coherent block, and every facet is an
-execution-core-adjacent semantic the S2/S6/S7 primitives already carry.
+Done-block: C1-shape with `core = ["LG19","LG20","LG24","LG25","LG26"]`
+and `>= 74.00` — adjust the floor to `69.00` if L-A has not merged yet
+(the two lanes' gains are independent; the ledger records which floor was
+in force and why). Harness region 1580–1720 and all existing workloads
+stay untouched; error-parity-is-not-parity in every new applier.
 
-**Slice 0 is the debt, not a feature:** the identity-preserving pending-write
-journal (new `dharma_swarm/graph/journal.py`, ≤500): records
-`(channel, value, node_id, task_seq)` so failure-resume replays in canonical
-interleave order and Send-multiplicity partial records stop degrading to
-re-execution — the two recorded deviations from PR #1002. Retry/timeout
-semantics stress exactly these paths; build on the fixed floor. Property 3
-tightens from "converges" to "byte-identical trace" in the same slice.
+### L-C — Frontier scan (research; no engine code)
 
-**Then, in strict order (riskiest first, one row per slice, the
-pregel-core recipe verbatim):**
+Survey set (amend at S0): Temporal, Restate, DBOS, Inngest, Hatchet
+(durable execution); AutoGen, CrewAI, OpenAI Agents SDK, Pydantic-AI,
+Mastra (agent orchestration); +1 wildcard the scan surfaces. Loop variant:
+each iteration = one system: (a) primary-source sweep (docs/source/
+changelogs; marketing pages never sole-source); (b) extraction against a
+fixed frame (durability model, failure semantics, human-in-loop,
+timers/events, topology, observability, compliance story); (c) adversarial
+pass — attempt to REFUTE every "they have X we lack" claim from their
+source or our receipts; (d) cited ledger entry. Citation-or-silence with
+full force.
 
-- **C2-S1** — LG24 retries: derive `RetryPolicy` semantics empirically from
-  the pin (max_attempts, backoff, jitter, retry_on selection); jitter MUST
-  route through `effects.random()` (DST law: no ambient entropy). Two-arm
-  workload with a deterministic failure schedule.
-- **C2-S2** — LG25 timeouts: node/step timeout + heartbeat refresh + idle
-  timeout on the S6 `asyncio.timeout` + `to_thread` base.
-- **C2-S3** — LG19 `interrupt_before`/`interrupt_after` (compile-time static
-  interrupts) on the S7 interrupt substrate.
-- **C2-S4** — LG20 dynamic suite: multiple interrupts, interrupt ordering,
-  node re-execution discipline, resume-value routing — the S7 frames already
-  key by full task identity; this slice proves the full matrix.
-- **C2-S5** — LG26 remainder: `error_handler` hooks, sibling cancellation
-  observability, user cancellation (CancelledError path is already clean —
-  prove it two-arm).
-- **C2-S6** — properties 6–8 from the predecessor §3 land here (version
-  monotonicity/exactly-once, quiescence, replay determinism) — they were
-  deferred then; the reliability ring is where they earn their keep.
-- **C2-S7** — Reseal + Ready.
+Deliverables (their existence + review = done): the dossier
+(`docs/plans/DHARMAGRAPH_FRONTIER_DOSSIER_<date>.md`, ≥2 independent
+sources per load-bearing claim, an explicit refuted-claims section); ≥3
+chartered capability cards in done-block form ready for L-E (standing
+candidates to beat: durable timers, external event waits, human-task
+queues); a proposed V3 addendum list for L-D (proposals only; L-D
+freezes). Hard cap 10 iterations.
 
-Done-block: same shape as C1's with
-`core = ["LG19","LG20","LG24","LG25","LG26"]` and `>= 74.00`. Harness
-additions remain APPEND-ONLY; region 1580–1720 and all existing workloads
-untouched, error-parity-is-not-parity rule in every new applier.
+### L-D — Rubric V3 @ latest langgraph (honest re-baseline)
 
----
+S0: re-verify the latest release on PyPI (1.2.9 at authoring) and pin
+THAT; drift audit in a scratch venv — run EVERY existing workload arm pair,
+commit `DRIFT_AUDIT_<ver>.md` classifying each divergence as (i) langgraph
+behavior change (cite changelog/source), (ii) stale recorded deviation,
+(iii) new bug on either side. **The audit decides V3 content, never vice
+versa.** S1: author V3 (base V2 + drift corrections + L-C's ratified
+addenda), status `FROZEN_BEFORE_V3_RESULTS`, weighting assertion
+recomputed; freeze commit lands BEFORE any arm runs against it. **§C4.2
+DECLARED AMENDMENT:** the gauntlet script's custody constants (oracle pin,
+rubric path, freeze SHA) are trust-root edits — ONE judge-reviewed commit
+touching ONLY those strings. S2: full two-arm re-run + builder/judge
+reseal; the new score is whatever it honestly is; drift that lowers a
+previously-proven row gets a fix-or-STOPPED decision, never a workload
+adjustment. S3: retire the old pin everywhere (`pyproject.toml`, oracle
+skip-guards), one commit, full suite. Done-block: `--check` PASS on V3 +
+committed drift audit + freeze entry in the ratification registry.
 
-## C3 — Frontier scan (research campaign; no engine code)
+### L-E — Moat build (what none of them have)
 
-**Mission.** Map the 5–10 systems in this atmosphere and extract what the
-ORGANISM needs — not what langgraph has. Survey set (operator may amend at
-S0): Temporal, Restate, DBOS, Inngest, Hatchet (durable execution);
-AutoGen, CrewAI, OpenAI Agents SDK, Pydantic-AI, Mastra (agent
-orchestration); plus one wildcard the scan itself surfaces.
+Charter at S0 from: the standing candidates below + L-C's cards; the
+operator picks 2–3 **as part of one batched gate** (§6.4). Each card
+becomes its own handoff with a done-block BEFORE any code.
 
-**Loop shape (research variant of §2):** each iteration = one system:
-(a) primary-source sweep (docs, source, changelogs — no marketing pages as
-sole source); (b) capability extraction against a fixed comparison frame
-(durability model, failure semantics, human-in-loop, timers/events,
-multi-agent topology, observability, compliance story); (c) adversarial
-pass: for every "they have X we lack" claim, attempt to REFUTE it from
-their source or our receipt (we may already have X); (d) ledger entry with
-citations. Citation-or-silence applies with full force: every claim carries
-a URL/file:line or a runnable probe; uncited claims carry zero weight.
-
-**Deliverables (the done-block is their existence + review):**
-
-1. `docs/plans/DHARMAGRAPH_FRONTIER_DOSSIER_<date>.md` — per-system cards,
-   ≥2 independent sources per load-bearing claim, explicit refuted-claims
-   section (what we feared they had and they don't — as valuable as gaps).
-2. ≥3 **chartered capability cards**, each in done-block form (mission,
-   metric, verify command, owned surfaces, stop conditions) ready to drop
-   into C5 — ranked by organism need: the standing candidates to beat are
-   durable timers, external event waits, and human-task queues.
-3. A proposed V3 rubric addendum list for C4 (new rows the scan justifies,
-   with per-row weight arguments) — proposals only; C4 freezes.
-
-**Timebox:** hard cap 10 iterations. STOP conditions: a system with no
-primary sources reachable → one ledger line, skip; scan finding "we need
-architecture change X" → charter card, never inline work.
-
----
-
-## C4 — Rubric V3 against langgraph 1.2.9 (honest re-baseline)
-
-**Mission.** Re-pin the oracle to the current release (1.2.9 at authoring —
-S0 re-verifies latest on PyPI and pins THAT) and mint the V3 overlay. Prior
-scores are VOID on rubric edit by frozen-rubric law — this campaign
-re-earns the number honestly rather than dragging a stale pin.
-
-**Slices.**
-
-- **C4-S0** — pin + drift audit: install the new pin in a scratch venv; run
-  EVERY existing workload arm pair; commit
-  `reports/governance/dharmagraph_parity/DRIFT_AUDIT_<ver>.md` classifying
-  each divergence as (i) langgraph behavior change (cite changelog/source),
-  (ii) our recorded deviation now stale, or (iii) new bug on either side.
-  No rubric edit until the audit is complete — the audit DECIDES the V3
-  content, not vice versa.
-- **C4-S1** — author V3 overlay: base = V2, plus drift corrections, plus
-  C3's ratified addendum rows. Status `FROZEN_BEFORE_V3_RESULTS`, weighting
-  assertion recomputed, operator signs the freeze commit BEFORE any arm
-  runs against it. **C4.2 DECLARED AMENDMENT:** the gauntlet script's
-  custody constants (`_ORACLE_PIN`, rubric path, freeze-commit declaration)
-  are trust-root edits, forbidden by default; they land as ONE reviewed
-  commit whose diff touches ONLY the pin string, the V3 path, and the
-  declared freeze SHA — judge-reviewed like C1.4.
-- **C4-S2** — full two-arm re-run + builder/judge reseal on V3. The new
-  score is whatever it honestly is; if drift LOWERED a previously-proven
-  row, that row gets a STOPPED-or-fix decision in the ledger, never a
-  silent workload adjustment (existing workloads stay frozen; drift fixes
-  go through NEW workloads or engine changes).
-- **C4-S3** — retire the 1.2.4 pin everywhere (`pyproject.toml`
-  `test-oracle` extra, oracle test skip-guards), one commit, full suite.
-
-Done-block: `--check` PASS on V3 at the campaign head + drift audit
-committed + operator freeze signature in the ratification registry.
-
----
-
-## C5 — Moat build (what none of them have)
-
-**Mission.** Spend the parity dividend on capabilities where this repo is
-structurally ahead. Charter at S0 from: (a) the two standing candidates
-below, (b) C3's chartered cards, operator picks 2–3 total. Each card
-becomes its own handoff with a done-block BEFORE any code — this section
-deliberately does not pre-write them; C5-S0's first deliverable is the
-handoff files, reviewed by the operator, in the predecessor's format.
-
-**Standing candidate 1 — DST chaos gauntlet.** Grow `SimulatedEffects` into
-a fault-injection harness (torn checkpoint, crash-between-journal-and-apply,
-interrupt-during-retry, clock skew) with seeded, replayable fault schedules
-— Antithesis discipline on our own engine. Metric shape: N seeded fault
-schedules × M workloads, zero invariant violations (§3 properties as the
-invariant set), every violation a replayable seed. This also productizes
-C1's receipt rung: deterministic chaos evidence + Art. 12 receipts is a
-compliance story none of the frameworks in C3's set carry.
+**Standing candidate 1 — DST chaos gauntlet.** Grow `SimulatedEffects`
+into seeded fault-schedule injection (torn checkpoint, crash between
+journal and apply, interrupt-during-retry, clock skew): N schedules × M
+workloads, zero invariant violations (§2-properties as the invariant set),
+every violation a replayable seed. With L-A's receipt rung this is a
+compliance story (Art. 12 + deterministic chaos evidence) no system in
+L-C's survey carries.
 
 **Standing candidate 2 — Telos-gated execution.** Gates as first-class
-graph primitives: a node/edge can require a `TelosGatekeeper` verdict, with
-the gate check itself receipted in the run's chain. Read
-`docs/architecture/EVOLUTION_PROPOSAL_GATE_CONTRACT.md` FIRST (WS4
-hard-reject semantics); the gate battery count comes from `telos_gates.py`,
-never prose.
+graph primitives: nodes/edges requiring a `TelosGatekeeper` verdict, the
+check itself receipted in the run chain. Read
+`docs/architecture/EVOLUTION_PROPOSAL_GATE_CONTRACT.md` FIRST; the gate
+battery count comes from `telos_gates.py`, never prose.
+
+**Standing candidate 3 — The strange loop: campaigns as graphs.** Once
+L-A's seam is live, run ascent campaigns AS DharmaGraph graphs: operator
+gates = `interrupt()` → `Command(resume=)`, flaky slices = L-B retry
+policies, the ledger = the receipt chain, seat fan-out = `Send`. Every
+campaign iteration then doubles as an integration test of the engine
+under its most demanding real workload — the organism building itself
+with itself.
 
 **Explicit wall:** topology evolution (DarwinEngine mutating graph
-topologies) stays OUT of C5 — the Phase-6 wall is operator-gated per the
-track's claim boundary and `organism-rewire` D4. If a C5 card drifts toward
-it, that is a STOP, not a stretch goal.
+topologies) stays OUT — Phase-6 is operator-gated per the track's claim
+boundary and organism-rewire D4. Drift toward it = STOP, not stretch goal.
+
+## 6. Automation: the campaign runs itself
+
+### 6.1 Seat routines (arm AFTER the ratification merge)
+
+One recurring routine per active lane, **fresh session per firing**
+(create_new_session_on_fire), cadence 4h staggered, prompt fully
+standalone because each firing starts from nothing:
+
+> You are the BUILDER seat for lane <L-x> of the DharmaGraph Ascent.
+> Read `docs/plans/DHARMAGRAPH_ASCENT_SPEC_2026-07-17.md` §2 (the loop)
+> and §3 (<L-x>), then execute EXACTLY ONE iteration of the loop: onboard,
+> reconcile ledger vs git, verify, then either fix red or do the first
+> TODO slice. Commit, push, update the lane PR body, append the ledger.
+> If the lane is DONE or STOPPED, say so in the PR body and stop making
+> changes. NEVER merge. NEVER touch another lane's surfaces.
+
+The loop's own ground-truth re-derivation makes fresh-session amnesia
+safe — that is what §2 was designed for. A wedged lane self-reports via
+its stop conditions instead of spinning (the flat-metric rule).
+
+### 6.2 Judge cadence
+
+The independent hourly verifier already watches the repo. Lane PRs signal
+readiness in their body ("reseal at <sha>, awaiting judge"); the judge
+signs into the ratifications registry or files findings as PR comments.
+Builders react to findings like any review round (#1002 precedent: fix,
+pin, reseal).
+
+### 6.3 Merge without waiting (Mike)
+
+Lane PRs carry the `mike-watch` label. Standing conditions the operator
+sets ONCE (in Mike's own config, not this spec's surfaces): auto-merge a
+lane PR when (a) all required checks green, (b) judge signature present
+for any evidence commit, (c) diff confined to the lane's declared
+surfaces, (d) no hot-path file. PRs failing (c)/(d) wait for the human.
+This spec does not modify Mike; it only formats lane PRs to be
+Mike-mergeable.
+
+### 6.4 The operator's whole job (batched, ~15 min/week)
+
+One weekly pass: (1) glance at the scoreboard (§7) and any STOPPED
+entries; (2) answer accumulated `Open design questions` sections in lane
+PR bodies; (3) the two one-time picks — L-E card selection, L-D addenda
+ratification. Everything else proceeds without you; nothing waits on you
+except the things only you can decide.
+
+## 7. Scoreboard (definition of done, whole ascent)
+
+- L-K merged: kernel doc exists — the discipline is portable.
+- L-A + L-B merged with resealed custody: judge receipt ≥ 74.00, APP rows
+  and reliability rows 2/2 (or honest STOPPED entries naming the wall).
+- L-C dossier + ≥3 chartered cards delivered and refuted-claims section
+  non-empty (an honest "they don't have it either" is a finding).
+- L-D: V3 frozen-before-results, drift audit committed, honest new
+  baseline emitted.
+- L-E: chartered cards merged green against their own done-blocks.
+- Every lane ledger reconciles with `git log`; zero self-merges; every
+  unclosed target carries a STOPPED entry naming the unsettled question.
+- The organism runs its application scenarios on the engine it owns —
+  that, not the score, is what the hill was for.
 
 ---
 
-## 3. Definition of done (whole ascent)
+## Appendix A — The Campaign Kernel (verbatim source for L-K's promotion)
 
-C1, C2, C4 merged with resealed custody at ≥74.00 on V2-lineage and an
-honest V3 baseline; C3 dossier + ≥3 chartered cards delivered; C5's
-chartered cards merged with their own done-blocks green; every campaign's
-ledger reconciles with `git log`; zero self-merges; every unclosed target
-carries a STOPPED entry naming the unsettled question. The organism runs
-its application scenarios on the engine it owns — that, not the score, is
-what the hill was for.
+A campaign is a hill-climb executed by amnesiac agents. It needs exactly
+six properties; everything else is decoration:
+
+1. **A machine-checkable done-block.** A script that exits 0 when the
+   campaign is done, runnable by anyone, gameable by no one. Never weaken
+   its thresholds; adjust only if the measured artifact's schema itself
+   moved, and only so the check still finds its targets.
+2. **One slice per iteration.** An iteration = re-derive state from ground
+   truth (repo status, git log, the ledger), verify, then do the FIRST
+   undone slice — never two, never slice N+1 while N is red.
+3. **An append-only ledger** in a committed file: one block per iteration
+   (`slice / result / verify / learned / blocked`). Git is truth, the
+   ledger is claim; every iteration reconciles the two and fixes the
+   ledger, never history.
+4. **Stop conditions where halting is success.** Three strikes per target
+   → STOPPED with the unsettled question. Metric flat two green iterations
+   → the loop is spinning; stop and report. Out-of-authority fix (foreign
+   surface, hot path, new dependency, gate weakening) → stop and report.
+   An honest miss with a named question beats a gamed hit, always.
+5. **Evidence custody.** Where the campaign produces evidence (receipts,
+   scores, audits), it is emitted by a builder, verified by an independent
+   judge, sealed against the source digest, and re-emitted whenever any
+   commit follows an emission. Builders never cite their own judge run.
+6. **Verification before commitment.** The verify battery runs before
+   every commit; the commit message names the slice; the PR body stays
+   current every slice; reviewer findings get reproduced first, fixed
+   second, pinned with a regression test third.
+
+Proving run: dharma_swarm PR #1002 (52.00 → 58.00 in ten iterations plus
+an autonomous ten-finding review round, zero gamed numbers, two honest
+recorded deviations). Adopt by copying the loop, not the domain: write the
+done-block first, the slices second, the ledger skeleton third — then
+hand it to any agent.
