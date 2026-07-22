@@ -1,6 +1,6 @@
 {
   "id": "loop-closure-WP-LC1F1-clock-determinism-2026-07-22",
-  "base_ref": "af5bee75f77970755f16a190769707506c4dd77f",
+  "base_ref": "edf9dec1e6364209fce90e0fa2185ac41d480619",
   "branch": "loop-closure/WP-LC1-clock-determinism-20260722",
   "worktree": ".",
   "intent": "WP-LC1 follow-up: make the never-started escalation proof independent of hosted-runner uptime. The previous fixture subtracted 100 seconds from time.monotonic(); on a fresh VM with less than 100 seconds of uptime this made registered_at negative, so production's valid registered_at > 0 guard correctly suppressed the alert and ACTIVE_TRACK reported a false regression. Replace that ambient host-time assumption with a module-local deterministic clock while preserving the exact two-interval behavioral assertion and all production code.",
@@ -58,7 +58,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "af5bee75f77970755f16a190769707506c4dd77f",
+      "checked_at_sha": "edf9dec1e6364209fce90e0fa2185ac41d480619",
       "details": []
     },
     "interface_mismatches": [
