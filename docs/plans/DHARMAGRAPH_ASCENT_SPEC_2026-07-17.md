@@ -86,10 +86,15 @@ receipt JSON — always re-emit.
 ## 2. The loop (every lane, every iteration — the Campaign Kernel)
 
 1. `cd /home/user/dharma_swarm && make onboard` — READY or fix/report.
-2. Read the lane handoff (`docs/plans/handoffs/DHARMAGRAPH_ASCENT_<lane>.md`,
-   created at the lane's S0 from this spec's section), then its PROGRESS
-   LEDGER (bottom of the same file; append-only; one block per iteration:
-   `slice / result / verify / learned / blocked`).
+2. Read the lane handoff (`docs/plans/handoffs/DHARMAGRAPH_ASCENT_<lane>.md`),
+   then its PROGRESS LEDGER (bottom of the same file; append-only; one
+   block per iteration: `slice / result / verify / learned / blocked`).
+   **Bootstrap rule:** if the handoff file does not exist yet, THIS
+   iteration IS the lane's S0 — create the handoff from this spec's §3
+   lane section (mission, slices, VERIFY block, empty ledger skeleton),
+   create the lane branch, open the draft PR, append the first ledger
+   entry, and end the iteration there. A missing handoff is the start
+   signal, never a blocker.
 3. `git log --oneline -15 && git status && git branch --show-current` — git
    is truth, ledger is claim; reconcile, fix the ledger if they disagree.
 4. Run the lane's VERIFY block. **Red? Fixing red IS this iteration.**
@@ -124,14 +129,18 @@ round.
 ### L-K — Campaign Kernel extraction (1 slice; unblocks the whole portfolio)
 
 Promote Appendix A verbatim into `docs/governance/CAMPAIGN_KERNEL.md` with
-a short header naming #1002 as the proving run, and add a pointer line to
-`docs/governance/BUILD_SESSION_ENTRYPOINT.md`'s "Build-session flow" section
-ONLY if DocOps allows a one-line addition without count churn (else skip —
-the kernel doc stands alone). Done-block: file exists, `make docops-integrity`
-green, PR merged. This is the 1000x seed: every OTHER track can adopt the
-kernel without touching this campaign. **Why first-class:** the loop in §2
-is campaign-agnostic and now has one proven run; extraction makes it the
-repo's default operating system instead of DharmaGraph folklore.
+a short header naming #1002 as the proving run AND an explicit authority
+disclaimer: the kernel is REFERENCE material — a proven working pattern,
+not doctrine. It sits outside the canonical authority stack
+(`docs/AGENTS.md`; `CLAUDE.md` owns behavior, `ACTIVE_TRACK.yaml` owns
+scope) and grants nothing: a track adopts the kernel only through its own
+owner files and its own operator gates. No pointer edits to any canonical
+entrypoint doc (`BUILD_SESSION_ENTRYPOINT.md` is another owner's surface)
+— the kernel doc stands alone; adoption is pull, not push. Done-block:
+file exists with the disclaimer, `make docops-integrity` green, PR merged.
+This is still the 1000x seed — every OTHER track can copy the loop without
+touching this campaign — but as an offered pattern, never a shadow
+authority surface.
 
 ### L-A — Organism wiring: the engine becomes the substrate (+5.00 → APP rows 2/2)
 
@@ -243,7 +252,9 @@ sources per load-bearing claim, an explicit refuted-claims section); ≥3
 chartered capability cards in done-block form ready for L-E (standing
 candidates to beat: durable timers, external event waits, human-task
 queues); a proposed V3 addendum list for L-D (proposals only; L-D
-freezes). Hard cap 10 iterations.
+freezes). Hard cap 12 iterations (the survey set is 11 systems —
+5 durable-execution + 5 orchestration + 1 wildcard — plus one spare
+for a re-visit; trimming the set at S0 lowers the cap with it).
 
 ### L-D — Rubric V3 @ latest langgraph (honest re-baseline)
 
@@ -305,12 +316,18 @@ One recurring routine per active lane, **fresh session per firing**
 standalone because each firing starts from nothing:
 
 > You are the BUILDER seat for lane <L-x> of the DharmaGraph Ascent.
-> Read `docs/plans/DHARMAGRAPH_ASCENT_SPEC_2026-07-17.md` §2 (the loop)
-> and §3 (<L-x>), then execute EXACTLY ONE iteration of the loop: onboard,
-> reconcile ledger vs git, verify, then either fix red or do the first
-> TODO slice. Commit, push, update the lane PR body, append the ledger.
-> If the lane is DONE or STOPPED, say so in the PR body and stop making
-> changes. NEVER merge. NEVER touch another lane's surfaces.
+> Read `docs/plans/DHARMAGRAPH_ASCENT_SPEC_2026-07-17.md` §1 (lane DAG),
+> §2 (the loop), and §3 (<L-x>). FIRST verify §1's dependencies for your
+> lane are satisfied (deps merged / deliverables exist); if not, exit
+> WITHOUT changes — a dependency-blocked lane is idle, not TODO. Then
+> execute EXACTLY ONE iteration of the loop: onboard, reconcile ledger
+> vs git, verify, then either fix red or do the first TODO slice. If the
+> lane handoff file does not exist yet, this firing IS the lane's S0:
+> create it per §2's bootstrap rule (handoff + branch + draft PR) and end
+> the iteration there.
+> Commit, push, update the lane PR body, append the ledger. If the lane
+> is DONE or STOPPED, say so in the PR body and stop making changes.
+> NEVER merge. NEVER touch another lane's surfaces.
 
 The loop's own ground-truth re-derivation makes fresh-session amnesia
 safe — that is what §2 was designed for. A wedged lane self-reports via
@@ -326,13 +343,18 @@ pin, reseal).
 
 ### 6.3 Merge without waiting (Mike)
 
-Lane PRs carry the `mike-watch` label. Standing conditions the operator
-sets ONCE (in Mike's own config, not this spec's surfaces): auto-merge a
-lane PR when (a) all required checks green, (b) judge signature present
-for any evidence commit, (c) diff confined to the lane's declared
-surfaces, (d) no hot-path file. PRs failing (c)/(d) wait for the human.
-This spec does not modify Mike; it only formats lane PRs to be
-Mike-mergeable.
+Lane PRs carry `mike-watch` while in development (Mike runs the gate
+and posts status but never merges — `automerge.yml` sets
+`merge_when_clean=false` for this label by design). When a lane goes
+Ready for Review with reseal + judge signature in place, the builder
+ADDS the `automerge` label (or comments `@mike merge`) — that is the
+workflow's actual arming contract; `mike-watch` alone never auto-merges.
+Standing conditions the operator sets ONCE in Mike's own config:
+auto-merge a lane PR when (a) all required checks green, (b) judge
+signature present for any evidence commit, (c) diff confined to the
+lane's declared surfaces, (d) no hot-path file. PRs failing (c)/(d)
+wait for the human. This spec does not modify Mike; it only formats
+lane PRs to be Mike-mergeable.
 
 ### 6.4 The operator's whole job (batched, ~15 min/week)
 

@@ -952,6 +952,8 @@ active_tracks:
       - tests/test_dharmagraph_parity_gauntlet.py
       - docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json
       - docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json
+      - docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V3.json   # L-D output (frozen-before-results)
+      - docs/langgraph_parity/DHARMAGRAPH_JUDGE_RATIFICATIONS_V1.json      # judge-signature registry (reseals append here)
       - reports/governance/dharmagraph_parity/**
       - docs/plans/DHARMAGRAPH_ASCENT_SPEC_2026-07-17.md
       - docs/plans/handoffs/DHARMAGRAPH_ASCENT_*.md
