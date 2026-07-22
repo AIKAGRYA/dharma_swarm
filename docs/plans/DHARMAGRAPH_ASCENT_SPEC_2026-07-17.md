@@ -260,7 +260,9 @@ for a re-visit; trimming the set at S0 lowers the cap with it).
 
 S0: re-verify the latest release on PyPI (1.2.9 at authoring) and pin
 THAT; drift audit in a scratch venv — run EVERY existing workload arm pair,
-commit `DRIFT_AUDIT_<ver>.md` classifying each divergence as (i) langgraph
+commit `reports/governance/dharmagraph_parity/DRIFT_AUDIT_<ver>.md` (inside
+the track's existing `reports/governance/dharmagraph_parity/**` surface)
+classifying each divergence as (i) langgraph
 behavior change (cite changelog/source), (ii) stale recorded deviation,
 (iii) new bug on either side. **The audit decides V3 content, never vice
 versa.** S1: author V3 (base V2 + drift corrections + L-C's ratified
