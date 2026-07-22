@@ -1,0 +1,80 @@
+{
+  "id": "loop-closure-WP-LC1F1-clock-determinism-2026-07-22",
+  "base_ref": "af5bee75f77970755f16a190769707506c4dd77f",
+  "branch": "loop-closure/WP-LC1-clock-determinism-20260722",
+  "worktree": ".",
+  "intent": "WP-LC1 follow-up: make the never-started escalation proof independent of hosted-runner uptime. The previous fixture subtracted 100 seconds from time.monotonic(); on a fresh VM with less than 100 seconds of uptime this made registered_at negative, so production's valid registered_at > 0 guard correctly suppressed the alert and ACTIVE_TRACK reported a false regression. Replace that ambient host-time assumption with a module-local deterministic clock while preserving the exact two-interval behavioral assertion and all production code.",
+  "allowed_files": [
+    "tests/test_loop_supervisor_tristate.py",
+    "reports/agentops/work_packets/loop-closure-WP-LC1F1-clock-determinism-2026-07-22.json"
+  ],
+  "forbidden_files": [],
+  "gates": [
+    {
+      "name": "loop-supervisor-tristate-determinism",
+      "command": "python3 -m pytest tests/test_loop_supervisor_tristate.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 600
+    },
+    {
+      "name": "loop-supervisor-test-ruff",
+      "command": "python3 -m ruff check tests/test_loop_supervisor_tristate.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "clock-not-advanced-must-fail",
+      "command": "python3 -c \"import importlib,pathlib,tempfile; p=pathlib.Path('tests/test_loop_supervisor_tristate.py'); t=p.read_text(); anchor='        clock.now = 4.0'; assert anchor in t; p.write_text(t.replace(anchor,'        clock.now = 1.0',1)); m=importlib.import_module('tests.test_loop_supervisor_tristate'); setter=lambda target,*args: (setattr(importlib.import_module(target.rsplit('.',1)[0]),target.rsplit('.',1)[1],args[0]) if isinstance(target,str) else setattr(target,args[0],args[1])); MP=type('MP',(),{'setattr':staticmethod(setter)}); m.TestNeverStartedAlarm().test_alarm_after_two_intervals(pathlib.Path(tempfile.mkdtemp()),MP())\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "test(loop-closure): make never-started alarm clock deterministic"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.5",
+      "git": "2.47.3",
+      "make": "4.4.1"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-LC1F1",
+    "active_track": "loop-closure-2026-06",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "af5bee75f77970755f16a190769707506c4dd77f",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The committed ACTIVE_TRACK criterion loop_supervisor_tristate_honest regressed only on low-uptime hosted runners because its test fixture could manufacture a negative registered_at value; production behavior was unchanged."
+    ],
+    "closest_existing_implementation": [
+      "tests/test_loop_supervisor_tristate.py",
+      "dharma_swarm/loop_supervisor.py",
+      "reports/agentops/work_packets/loop-closure-WP-LC1-tristate-honesty-2026-07-19.json"
+    ],
+    "honest_blockers": [
+      "This is a test-determinism repair only. It makes no LOOP-1 CLOSED_LIVE, daemon-host, WP-LC3, WP-LC4, or Titanium closure claim.",
+      "The two deliberately red Loop-Closure consumption criteria remain INFO until their separately owned packets land; they are not weakened or removed here.",
+      "Exact-head hosted CI, independent review policy, and human merge authority remain required."
+    ],
+    "rollback": "Revert the deterministic clock fixture and this packet together. Do not restore a test whose result depends on hosted VM uptime.",
+    "packet_digest": "0b0c6862eff1ecf60c05887d4d39dcabe13987b4a27a2e36ad4032fe35773308"
+  }
+}

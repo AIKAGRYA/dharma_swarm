@@ -13,7 +13,9 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
+import dharma_swarm.loop_supervisor as loop_supervisor_module
 from dharma_swarm.loop_supervisor import (
     LoopHealth,
     LoopSupervisor,
@@ -79,9 +81,12 @@ class TestNeverStartedAlarm:
 
     def test_alarm_after_two_intervals(self, tmp_path, monkeypatch):
         monkeypatch.setattr("dharma_swarm.loop_supervisor.ALERT_FILE", tmp_path / "alert.md")
+        clock = SimpleNamespace(now=1.0)
+        fake_time = SimpleNamespace(monotonic=lambda: clock.now)
+        monkeypatch.setattr(loop_supervisor_module, "time", fake_time)
         sup = LoopSupervisor()
         sup.register_loop("dead", expected_interval=1.0)
-        sup._loops["dead"].registered_at = time.monotonic() - 100.0
+        clock.now = 4.0
         alerts = sup.tick()
         never_started = [a for a in alerts if a.alert_type == "LOOP_NEVER_STARTED"]
         assert len(never_started) == 1
