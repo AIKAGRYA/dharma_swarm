@@ -13,6 +13,7 @@ import shutil
 import stat
 import subprocess
 import textwrap
+import time
 from pathlib import Path
 
 import pytest
@@ -118,6 +119,7 @@ def test_version_mismatch_is_named_nonzero_failure(tmp_path):
 
 def test_version_probe_timeout_is_named_nonzero_failure(tmp_path):
     fake = _fake_hanging_version_semgrep(tmp_path)
+    started = time.monotonic()
     proc = _run_wrapper(
         ["--config", ".semgrep", "--error", "--metrics=off"],
         {
@@ -126,8 +128,10 @@ def test_version_probe_timeout_is_named_nonzero_failure(tmp_path):
             "DHARMA_SEMGREP_WALLCLOCK": "1",
         },
     )
+    elapsed = time.monotonic() - started
     assert proc.returncode == 2, proc.stderr
     assert "SEMGREP_VERSION_TIMEOUT" in proc.stderr
+    assert elapsed < 10, f"version timeout leaked descendants for {elapsed:.1f}s"
 
 
 def test_matching_version_execs_scanner_with_expanded_args(tmp_path):
@@ -153,12 +157,15 @@ def test_matching_version_execs_scanner_with_expanded_args(tmp_path):
 
 def test_wallclock_overrun_is_named_nonzero_failure(tmp_path):
     fake = _fake_semgrep(tmp_path, version=RATIFIED_PIN, body="sleep 30\nexit 0")
+    started = time.monotonic()
     proc = _run_wrapper(
         ["--config", ".semgrep", "--metrics=off"],
         {"DHARMA_SEMGREP_BIN": str(fake), "DHARMA_SEMGREP_WALLCLOCK": "1"},
     )
+    elapsed = time.monotonic() - started
     assert proc.returncode == 2, proc.stderr
     assert "SEMGREP_TIMEOUT" in proc.stderr
+    assert elapsed < 10, f"scan timeout leaked descendants for {elapsed:.1f}s"
 
 
 def test_invalid_wallclock_is_named_nonzero_failure(tmp_path):
