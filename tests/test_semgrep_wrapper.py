@@ -42,18 +42,15 @@ def _fake_semgrep(tmp_path: Path, *, version: str, body: str = "exit 0") -> Path
     bin_dir = tmp_path / "fakebin"
     bin_dir.mkdir(exist_ok=True)
     fake = bin_dir / "semgrep"
-    fake.write_text(
-        textwrap.dedent(
-            f"""\
-            #!/usr/bin/env bash
-            if [[ "${{1:-}}" == "--version" ]]; then
-              echo "{version}"
-              exit 0
-            fi
-            {body}
-            """
-        )
+    script = (
+        "#!/usr/bin/env bash\n"
+        'if [[ "${1:-}" == "--version" ]]; then\n'
+        f'  echo "{version}"\n'
+        "  exit 0\n"
+        "fi\n"
+        f"{body}\n"
     )
+    fake.write_text(script)
     fake.chmod(fake.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     return fake
 
