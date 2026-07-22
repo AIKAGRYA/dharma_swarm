@@ -48,12 +48,31 @@ def _env_impact_checked() -> bool:
 
 
 def _run_git(repo_root: Path, args: list[str]) -> str:
-    proc = subprocess.run(
-        ["git", "-C", str(repo_root), *args],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    # WP-0C1 (TIT-005): closed stdin (git must never wait on an inherited
+    # pipe) and a finite wall clock converted into a named failure.
+    timeout_seconds = 120.0
+    raw_timeout = os.environ.get("DHARMA_GIT_TIMEOUT", "").strip()
+    if raw_timeout:
+        try:
+            parsed = float(raw_timeout)
+            if parsed > 0:
+                timeout_seconds = parsed
+        except ValueError:
+            pass
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(repo_root), *args],
+            check=False,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise SystemExit(
+            f"GIT_TIMEOUT: git {' '.join(args)} exceeded {timeout_seconds:g}s "
+            "wall clock (named nonzero failure)"
+        ) from exc
     if proc.returncode != 0:
         detail = proc.stderr.strip() or proc.stdout.strip() or "git command failed"
         raise SystemExit(f"git {' '.join(args)} failed: {detail}")
