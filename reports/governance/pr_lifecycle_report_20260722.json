@@ -1,0 +1,141 @@
+{
+  "report_type": "pr_lifecycle",
+  "generated_at": "2026-07-22T00:00Z",
+  "audit_sha": "af5bee75f77970755f16a190769707506c4dd77f",
+  "summary": {
+    "total_open_before": 30,
+    "auto_closed": 0,
+    "total_open_after": 30,
+    "conflicting_prs": 2,
+    "green_and_ready_mergeable": 28,
+    "duplicate_auto_grounding_found": 0
+  },
+  "auto_close_scan": {
+    "criteria": "mergeable=CONFLICTING AND age > 7 days",
+    "eligible": [],
+    "near_threshold": [
+      {
+        "number": 996,
+        "title": "governance(safety): admit live-host and rollback proof surfaces",
+        "mergeable": "CONFLICTING",
+        "created_at": "2026-07-17T01:43:11Z",
+        "age_hours": 118.3,
+        "age_days": 4.93,
+        "auto_close_eligible_at": "2026-07-24T01:43Z",
+        "hours_until_eligible": 49.7,
+        "note": "4.93 days old. Will cross 7-day auto-close threshold ~2026-07-24T01:43Z. Rebase or operator close recommended."
+      },
+      {
+        "number": 1007,
+        "title": "governance(keel): bare-metal architecture audit as the KEEL companion findings ledger",
+        "mergeable": "CONFLICTING",
+        "created_at": "2026-07-17T17:20:24Z",
+        "age_hours": 102.7,
+        "age_days": 4.28,
+        "auto_close_eligible_at": "2026-07-24T17:20Z",
+        "hours_until_eligible": 65.3,
+        "note": "4.28 days old. Will cross 7-day auto-close threshold ~2026-07-24T17:20Z. Rebase or operator close recommended."
+      }
+    ],
+    "conflicting_not_yet_eligible": [
+      {
+        "number": 996,
+        "title": "governance(safety): admit live-host and rollback proof surfaces",
+        "mergeable": "CONFLICTING",
+        "created_at": "2026-07-17T01:43:11Z",
+        "age_days": 4.93,
+        "note": "Both CONFLICTING PRs are < 7 days old. No auto-closes triggered this run."
+      },
+      {
+        "number": 1007,
+        "title": "governance(keel): bare-metal architecture audit as the KEEL companion findings ledger",
+        "mergeable": "CONFLICTING",
+        "created_at": "2026-07-17T17:20:24Z",
+        "age_days": 4.28,
+        "note": "Both CONFLICTING PRs are < 7 days old. No auto-closes triggered this run."
+      }
+    ]
+  },
+  "duplicate_auto_grounding_scan": {
+    "duplicates_found": [],
+    "note": "No duplicate auto-grounding PRs targeting same PR number detected. PR #987 'chore(docops): reconcile generated counts' has a single open instance (prior instance #837 was closed before this report period)."
+  },
+  "open_prs": [
+    {"number": 1087, "mergeable": "MERGEABLE", "created_at": "2026-07-21T16:46:02Z", "title": "[impact-checked] feat(governance): WP-0C1 scanners fail closed", "additions": 685, "deletions": 28, "changedFiles": 7},
+    {"number": 1086, "mergeable": "MERGEABLE", "created_at": "2026-07-21T15:48:19Z", "title": "feat(ops): add AGNI hub readiness probe", "additions": 604, "deletions": 0, "changedFiles": 3},
+    {"number": 1085, "mergeable": "MERGEABLE", "created_at": "2026-07-21T15:12:38Z", "title": "fix(orchestrate_live): stop swallowing system-loop failure tracebacks (dispatch-dropoff outage hardening)", "additions": 70, "deletions": 1, "changedFiles": 2},
+    {"number": 1084, "mergeable": "MERGEABLE", "created_at": "2026-07-21T15:06:16Z", "title": "feat(darshan): Issue One assembled + honest DRAFT receipt + fail-closed seal script", "additions": 1376, "deletions": 0, "changedFiles": 11},
+    {"number": 1083, "mergeable": "MERGEABLE", "created_at": "2026-07-21T15:05:40Z", "title": "fix(ci-health): fail closed on bot-rebase CI stranding (ci_never_ran)", "additions": 137, "deletions": 8, "changedFiles": 3},
+    {"number": 1082, "mergeable": "MERGEABLE", "created_at": "2026-07-21T15:05:14Z", "title": "docs(ops): Backup Triad Runbook 2026-07-21 — megha off-host litestream, Mac fallback, restore drills", "additions": 67, "deletions": 0, "changedFiles": 1},
+    {"number": 1081, "mergeable": "MERGEABLE", "created_at": "2026-07-21T15:00:50Z", "title": "governance: TELOS canon reconciliation + honest re-admission candidate [BLOCKED-ON-OPERATOR-DECISION]", "additions": 197, "deletions": 0, "changedFiles": 2},
+    {"number": 1080, "mergeable": "MERGEABLE", "created_at": "2026-07-21T14:55:48Z", "title": "docs(governance): land REMOTE_HOLON_MESH v1.1 + Synadia CAR bridge spec + proposed tracks (sole-copy salvage)", "additions": 1722, "deletions": 0, "changedFiles": 4},
+    {"number": 1079, "mergeable": "MERGEABLE", "created_at": "2026-07-21T00:05:14Z", "title": "chore(governance): ops agent lifecycle report 2026-07-21T00:00Z [automated]", "additions": 130, "deletions": 0, "changedFiles": 1},
+    {"number": 1076, "mergeable": "MERGEABLE", "created_at": "2026-07-20T12:39:14Z", "title": "[impact-checked] governance(helm): reconcile golden-frame blocker", "additions": 123, "deletions": 19, "changedFiles": 4},
+    {"number": 1075, "mergeable": "MERGEABLE", "created_at": "2026-07-20T12:09:24Z", "title": "[impact-checked] ci(governance): fail closed without live parity proof", "additions": 127, "deletions": 21, "changedFiles": 3},
+    {"number": 1074, "mergeable": "MERGEABLE", "created_at": "2026-07-20T11:48:33Z", "title": "docs(arena): ratify PR 983 post-merge evidence boundary", "additions": 216, "deletions": 0, "changedFiles": 2},
+    {"number": 1070, "mergeable": "MERGEABLE", "created_at": "2026-07-20T03:31:32Z", "title": "fix(xray): make discover_files cap deterministic and proportional (#1057)", "additions": 162, "deletions": 6, "changedFiles": 3},
+    {"number": 1067, "mergeable": "MERGEABLE", "created_at": "2026-07-19T15:25:33Z", "title": "docs: record pre-constitutional founder direction", "additions": 379, "deletions": 4, "changedFiles": 3},
+    {"number": 1066, "mergeable": "MERGEABLE", "created_at": "2026-07-19T14:14:43Z", "title": "docs(governance): Tier-D findings — hot-path spine work needing operator packets", "additions": 106, "deletions": 0, "changedFiles": 1},
+    {"number": 1065, "mergeable": "MERGEABLE", "created_at": "2026-07-19T14:10:53Z", "title": "feat(traces): documented front door for operational trace writes (spine C2)", "additions": 89, "deletions": 0, "changedFiles": 2},
+    {"number": 1064, "mergeable": "MERGEABLE", "created_at": "2026-07-19T14:08:59Z", "title": "feat(intent-router): ADR-009 idempotency-key origin standard + contract tests (spine C1)", "additions": 95, "deletions": 0, "changedFiles": 3},
+    {"number": 1063, "mergeable": "MERGEABLE", "created_at": "2026-07-19T14:06:19Z", "title": "feat(store-sync): project ValueEvents — second ontology→runtime pass (spine B2)", "additions": 200, "deletions": 36, "changedFiles": 2},
+    {"number": 1062, "mergeable": "MERGEABLE", "created_at": "2026-07-19T14:02:57Z", "title": "feat(episode-ledger): versioned validated Episode Ledger events — schema slice (spine B1)", "additions": 508, "deletions": 2, "changedFiles": 4},
+    {"number": 1061, "mergeable": "MERGEABLE", "created_at": "2026-07-19T13:59:49Z", "title": "feat(mcp-server): join the MCP tool boundary to the runtime spine (spine A2)", "additions": 182, "deletions": 1, "changedFiles": 2},
+    {"number": 1060, "mergeable": "MERGEABLE", "created_at": "2026-07-19T13:53:22Z", "title": "feat(diff-applier): idempotency-fence the consequential diff apply (spine A1)", "additions": 290, "deletions": 121, "changedFiles": 3},
+    {"number": 1056, "mergeable": "MERGEABLE", "created_at": "2026-07-19T10:14:26Z", "title": "feat(durable-invoker): mark fail-open dispatch receipts as unprotected (pre-1004 hardening, slice 1)", "additions": 106, "deletions": 17, "changedFiles": 3},
+    {"number": 1025, "mergeable": "MERGEABLE", "created_at": "2026-07-18T07:37:40Z", "title": "docs(architecture): NATS/A2A whole-system update specification 2026-07-18", "additions": 1297, "deletions": 0, "changedFiles": 4},
+    {"number": 1024, "mergeable": "MERGEABLE", "created_at": "2026-07-18T06:57:04Z", "title": "feat(agents): register grok_build as Meghaforge display identity", "additions": 162, "deletions": 0, "changedFiles": 3},
+    {"number": 1013, "mergeable": "MERGEABLE", "created_at": "2026-07-17T20:02:35Z", "title": "feat(ops): bounded mobile recovery for Codex Composer", "additions": 5629, "deletions": 48, "changedFiles": 25},
+    {"number": 1011, "mergeable": "MERGEABLE", "created_at": "2026-07-17T18:16:28Z", "title": "governance: admit current Codex Composer recovery slice", "additions": 287, "deletions": 3, "changedFiles": 4},
+    {"number": 1007, "mergeable": "CONFLICTING", "created_at": "2026-07-17T17:20:24Z", "title": "governance(keel): bare-metal architecture audit as the KEEL companion findings ledger", "additions": 177, "deletions": 6, "changedFiles": 3},
+    {"number": 1006, "mergeable": "MERGEABLE", "created_at": "2026-07-17T16:59:30Z", "title": "docs(plans): DharmaGraph Ascent master spec (C1–C5)", "additions": 337, "deletions": 0, "changedFiles": 1},
+    {"number": 996, "mergeable": "CONFLICTING", "created_at": "2026-07-17T01:43:11Z", "title": "governance(safety): admit live-host and rollback proof surfaces", "additions": 272, "deletions": 5, "changedFiles": 5},
+    {"number": 987, "mergeable": "MERGEABLE", "created_at": "2026-07-16T06:44:10Z", "title": "chore(docops): reconcile generated counts", "additions": 23, "deletions": 23, "changedFiles": 2}
+  ],
+  "spine_prs_open": [
+    {"number": 1065, "title": "feat(traces): documented front door for operational trace writes (spine C2)", "mergeable": "MERGEABLE"},
+    {"number": 1064, "title": "feat(intent-router): ADR-009 idempotency-key origin standard + contract tests (spine C1)", "mergeable": "MERGEABLE"},
+    {"number": 1063, "title": "feat(store-sync): project ValueEvents — second ontology→runtime pass (spine B2)", "mergeable": "MERGEABLE"},
+    {"number": 1062, "title": "feat(episode-ledger): versioned validated Episode Ledger events — schema slice (spine B1)", "mergeable": "MERGEABLE"},
+    {"number": 1061, "title": "feat(mcp-server): join the MCP tool boundary to the runtime spine (spine A2)", "mergeable": "MERGEABLE"},
+    {"number": 1060, "title": "feat(diff-applier): idempotency-fence the consequential diff apply (spine A1)", "mergeable": "MERGEABLE"}
+  ],
+  "recommended_actions": [
+    {
+      "priority": 1,
+      "pr": 996,
+      "action": "CONFLICTING — 4.93 days old. Auto-close eligible at 2026-07-24T01:43Z (~49.7h). Rebase against main or operator-close before threshold. Branch preserved if auto-closed.",
+      "owner": "operator"
+    },
+    {
+      "priority": 2,
+      "pr": 1007,
+      "action": "CONFLICTING — 4.28 days old. Auto-close eligible at 2026-07-24T17:20Z (~65.3h). Rebase against main or operator-close before threshold. Branch preserved if auto-closed.",
+      "owner": "operator"
+    },
+    {
+      "priority": 3,
+      "pr": 1060,
+      "action": "SPINE A1 — MERGEABLE. Merging adds idempotency-gate to diff-apply path, moving self_modification_loop from adapter-ready toward joined. Directly unblocks spine adoption progress.",
+      "owner": "operator"
+    },
+    {
+      "priority": 4,
+      "pr": 1061,
+      "action": "SPINE A2 — MERGEABLE. Merging joins MCP tool boundary to runtime spine. Eliminates 3 missing joined-patterns in mcp_tool_access. Directly unblocks spine adoption progress.",
+      "owner": "operator"
+    },
+    {
+      "priority": 5,
+      "pr": 987,
+      "action": "chore(docops): reconcile generated counts — MERGEABLE but 5.7 days old. Low-risk doc count reconciliation. Recommend operator review and merge or explicit defer.",
+      "owner": "operator"
+    },
+    {
+      "priority": 6,
+      "pr": 1081,
+      "action": "TELOS canon reconciliation marked BLOCKED-ON-OPERATOR-DECISION. Requires explicit operator decision to proceed.",
+      "owner": "operator"
+    }
+  ]
+}
