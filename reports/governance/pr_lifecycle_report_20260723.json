@@ -1,0 +1,106 @@
+{
+  "report_type": "ops_agent_lifecycle_report",
+  "run_timestamp": "2026-07-23T12:00:59Z",
+  "audit_sha": "280fc251e99915062be19db48129b44d703402b1",
+  "mission_1_spine_adoption": {
+    "adoption_pct": 93.8,
+    "target_pct": 95.0,
+    "gap_pct": 1.2,
+    "joined_count": 13,
+    "adapter_ready_count": 2,
+    "missing_count": 0,
+    "quarantine_count": 0,
+    "legacy_count": 1,
+    "total_surfaces": 16,
+    "committed_adoption_pct": 93.8,
+    "changed_from_committed": false,
+    "commit_pushed": false,
+    "commit_skip_reason": "adoption_pct unchanged from committed baseline (93.8%)",
+    "non_joined_surfaces": [
+      {
+        "id": "self_modification_loop",
+        "status": "adapter-ready",
+        "missing_patterns": ["begin_idempotent"],
+        "related_open_pr": 1060,
+        "files": [
+          "dharma_swarm/diff_applier.py",
+          "dharma_swarm/evolution.py",
+          "dharma_swarm/self_improve.py"
+        ]
+      },
+      {
+        "id": "mcp_tool_access",
+        "status": "adapter-ready",
+        "missing_patterns": ["identity_import", "runtime_store", "side_effect_receipt"],
+        "related_open_pr": 1061,
+        "files": [
+          "dharma_swarm/mcp_server.py",
+          "dharma_swarm/dharma_context_mcp.py"
+        ]
+      },
+      {
+        "id": "legacy_no_identity_escape_hatch",
+        "status": "legacy",
+        "missing_patterns": [],
+        "related_open_pr": null,
+        "files": [
+          "dharma_swarm/runtime_state.py",
+          "tests/test_runtime_state_invariants.py"
+        ]
+      }
+    ],
+    "spine_comment_target_pr": 1065,
+    "celebration": false
+  },
+  "mission_2_pr_lifecycle": {
+    "observed_at": "2026-07-23T12:00:59Z",
+    "open_prs_before": 29,
+    "open_prs_after": 29,
+    "auto_closed_count": 0,
+    "auto_closed_prs": [],
+    "conflicting_prs": [
+      {
+        "number": 996,
+        "title": "governance(safety): admit live-host and rollback proof surfaces",
+        "createdAt": "2026-07-17T01:43:11Z",
+        "age_days": 6.43,
+        "auto_close_threshold_utc": "2026-07-24T01:43:11Z",
+        "hours_to_auto_close": 13.7,
+        "action": "WATCH — crosses threshold in ~13.7h at 2026-07-24T01:43Z"
+      },
+      {
+        "number": 1007,
+        "title": "governance(keel): bare-metal architecture audit as the KEEL companion findings ledger",
+        "createdAt": "2026-07-17T17:20:24Z",
+        "age_days": 5.78,
+        "auto_close_threshold_utc": "2026-07-24T17:20:24Z",
+        "hours_to_auto_close": 29.3,
+        "action": "WATCH — crosses threshold in ~29.3h at 2026-07-24T17:20Z"
+      },
+      {
+        "number": 1076,
+        "title": "[impact-checked] governance(helm): reconcile golden-frame blocker",
+        "createdAt": "2026-07-20T12:39:14Z",
+        "age_days": 2.97,
+        "auto_close_threshold_utc": "2026-07-27T12:39:14Z",
+        "hours_to_auto_close": 96.6,
+        "action": "MONITOR — threshold in ~4.0 days"
+      }
+    ],
+    "green_and_ready_prs": [
+      1088, 1086, 1085, 1084, 1082, 1081, 1080, 1075, 1074, 1070, 1067,
+      1066, 1065, 1064, 1063, 1062, 1061, 1060, 1056, 1025, 1024, 1013,
+      1011, 987, 930, 904
+    ],
+    "green_and_ready_count": 26,
+    "duplicate_auto_grounding_prs": [],
+    "duplicate_count": 0,
+    "recommended_actions": [
+      "URGENT: PR #996 crosses auto-close threshold in ~13.7h (2026-07-24T01:43Z) — operator should rebase or accept auto-close.",
+      "WATCH: PR #1007 crosses auto-close threshold in ~29.3h (2026-07-24T17:20Z) — same action.",
+      "SPINE: Merging PR #1060 (diff-applier idempotency) and PR #1061 (MCP spine) would advance adoption from 93.8% → 100% on those two surfaces.",
+      "GOVERNANCE: 26 MERGEABLE green PRs await operator review and merge authority action.",
+      "NO merges or approvals taken by this ops agent. Operator holds sole merge authority."
+    ]
+  }
+}
