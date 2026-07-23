@@ -19,6 +19,7 @@ import asyncio
 import ast
 import json
 import logging
+import os
 import subprocess
 import sys
 import time
@@ -963,11 +964,19 @@ class OvernightDirector:
     @staticmethod
     def _run_pytest_file(test_file: Path, timeout: float) -> tuple[bool, str]:
         """Run one test file and return success plus combined output."""
+        env = os.environ.copy()
+        # Verify generated tests against the staged project root.  The parent
+        # pytest process often has the canonical checkout on PYTHONPATH; if that
+        # leaks into an isolated temp repo whose ``dharma_swarm`` directory is a
+        # namespace package, imports resolve to the real checkout instead of the
+        # generated module under test.
+        env["PYTHONPATH"] = str(DHARMA_SWARM_ROOT)
         proc = subprocess.run(
             [sys.executable, "-m", "pytest", str(test_file), "-q", "--tb=short", "-x"],
             capture_output=True,
             text=True,
             cwd=str(DHARMA_SWARM_ROOT),
+            env=env,
             timeout=timeout,
         )
         output = proc.stdout + proc.stderr
