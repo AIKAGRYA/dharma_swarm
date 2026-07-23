@@ -1,0 +1,89 @@
+{
+ "allowed_files": [
+  "dharma_swarm/memory_kernel/write_policy.py",
+  "reports/agentops/work_packets/a2a-WP-A2ADLQ-semantic-responder-containment.json",
+  "reports/governance/store_inventory_census.json",
+  "scripts/runtime/codex_composer_semantic_inbox_drain.py",
+  "scripts/runtime/codex_composer_semantic_responder.py",
+  "tests/test_codex_composer_semantic_responder_dlq.py",
+  "tests/test_store_inventory_census.py"
+ ],
+ "approval": {
+  "before_commit": false,
+  "before_merge": true
+ },
+ "base_ref": "280fc251e99915062be19db48129b44d703402b1",
+ "branch": "agent/codex-composer-dlq-20260723",
+ "commit": {
+  "allowed": true,
+  "message": "a2a: bind semantic responder remediation packet"
+ },
+ "forbidden_files": [],
+ "gates": [
+  {
+   "command": "python3 -m pytest tests/test_codex_composer_semantic_responder_dlq.py -q",
+   "name": "semantic-responder-dlq-tests",
+   "timeout_seconds": 300
+  },
+  {
+   "command": "python3 scripts/governance/check_name_drift.py",
+   "name": "name-drift",
+   "timeout_seconds": 300
+  },
+  {
+   "command": "semgrep --config .semgrep --error --metrics=off --baseline-commit 280fc251e99915062be19db48129b44d703402b1",
+   "name": "semgrep-strict",
+   "timeout_seconds": 300
+  }
+ ],
+ "id": "a2a-WP-A2ADLQ-semantic-responder-containment",
+ "intent": "Promote the live codex_composer semantic responder onto canonical main and close the observed poison-packet amplification failure with a bounded publish retry budget, one immutable exact-once dead letter, an idempotent processed ledger transition, and an operator quarantine path that never reruns the semantic model. Preserve every historical receipt and the pinned semantic artifact. Type the terminal authority boundary explicitly: PublishExhaustedDLQ is evidence of local terminal handling only and cannot inhabit DomainPublished or EffectVerified.",
+ "negative_controls": [
+  {
+   "command": "python3 -c \"from scripts.runtime.codex_composer_semantic_responder import PENDING_PUBLISH_STATUS, should_mark_processed; raise SystemExit(0 if should_mark_processed(PENDING_PUBLISH_STATUS) else 1)\"",
+   "expected_exit": 1,
+   "name": "publish-pending-is-not-terminal",
+   "timeout_seconds": 60
+  }
+ ],
+ "session_entry": {
+  "active_track": "repository-titanium-hardening-2026-07",
+  "authority_precedence": [
+   "executable",
+   "tests",
+   "locks",
+   "git",
+   "owner_files"
+  ],
+  "closest_existing_implementation": [
+   "scripts/runtime/a2a_domain_reply_worker.py",
+   "scripts/runtime/codex_composer_semantic_inbox_drain.py",
+   "scripts/runtime/codex_composer_semantic_responder.py"
+  ],
+  "collision": {
+   "checked_at_sha": "280fc251e99915062be19db48129b44d703402b1",
+   "details": [],
+   "status": "clear"
+  },
+  "honest_blockers": [
+   "The launchd semantic responder remains deliberately unloaded until this remediation is merged and the deployed runtime is validated against that exact merged commit.",
+   "The terminal dead letter proves only local retry exhaustion or operator quarantine. It does not claim domain publication, remote receipt, or external effect.",
+   "The 11952 historical responder receipts remain immutable audit evidence and are intentionally not deleted or rewritten."
+  ],
+  "interface_mismatches": [
+   "The live launchd job referenced responder and inbox-drain files that existed only on a stale branch and were absent from canonical main at the remediation base.",
+   "Canonical main does not contain the optional holon projection modules used by that stale live branch; this promoted runtime therefore reports canonical projection as unavailable instead of inventing fleet truth."
+  ],
+  "owner": "@AmitabhainArunachala",
+  "packet_digest": "092caedbc0113335706054edc92ea0b2d32ead9be27e3736308695b746f0bf5b",
+  "rollback": "Unload the responder, revert the two remediation commits together, and leave the immutable dead letter, processed ledger entry, preserved semantic artifact, and historical receipts in place for audit. Do not restart the stale branch-only responder.",
+  "schema": "dharma_swarm.session_entry.v1",
+  "tool_versions": {
+   "git": "2.50.1",
+   "make": "3.81",
+   "python": "3.13.12"
+  },
+  "work_packet": "WP-A2ADLQ"
+ },
+ "worktree": "."
+}
