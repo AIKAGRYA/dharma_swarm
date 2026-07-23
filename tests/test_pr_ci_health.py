@@ -155,3 +155,18 @@ def test_unknown_merge_state_with_passing_checks_is_not_green():
     triage = classify_pr(_pr(1083, state="unknown"), runs)
     assert triage.categories == ["merge_unknown"]
     assert triage.actionable is True
+
+
+def test_workflow_accepts_existing_dispatch_pat_as_recovery_fallback():
+    workflow = (
+        Path(__file__).resolve().parents[1] / ".github" / "workflows" / "pr-ci-health.yml"
+    ).read_text(encoding="utf-8")
+
+    assert (
+        "secrets.PR_CI_HEALTH_PUSH_TOKEN || "
+        "secrets.MERGEMASTERMIKE_PAT || github.token"
+    ) in workflow
+    assert (
+        "secrets.PR_CI_HEALTH_PUSH_TOKEN != '' || "
+        "secrets.MERGEMASTERMIKE_PAT != ''"
+    ) in workflow
