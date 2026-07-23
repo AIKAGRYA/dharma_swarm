@@ -390,168 +390,6 @@ def _fail_not_implemented(command_path: str, as_json: bool) -> int:
     return NOT_IMPLEMENTED_EXIT
 
 
-def _emit_sync_payload(
-    command_path: str,
-    result: dict[str, Any],
-    *,
-    as_json: bool,
-    ok: bool = True,
-) -> None:
-    if as_json:
-        print(
-            json.dumps(
-                {
-                    "schema": CLI_RESULT_SCHEMA,
-                    "ok": ok,
-                    "command": command_path,
-                    "result": result,
-                },
-                sort_keys=True,
-            )
-        )
-        return
-    if command_path == "sync status":
-        print(f"status: {'IN_SYNC' if result['in_sync'] else 'DRIFT'}")
-        print(f"github: {result['canonical'].get('commit') or 'unavailable'}")
-        for node in ("mac", "meghadharma"):
-            identity = result.get(node, {}).get("identity") or {}
-            print(
-                f"{node}: {identity.get('commit') or 'unavailable'} "
-                f"clean={identity.get('repo_clean', False)}"
-            )
-        for failure in result.get("failures", []):
-            print(f"failure: {failure}")
-        return
-    if command_path == "sync plan":
-        print(f"commit: {result['plan']['commit']}")
-        print(f"plan: {result['plan']['plan_digest']}")
-        print(f"path: {result['path']}")
-        return
-    print(f"commit: {result['commit']}")
-    if result.get("plan_digest"):
-        print(f"plan: {result['plan_digest']}")
-    if result.get("receipt"):
-        print(f"receipt: {result['receipt']}")
-
-
-
-def _emit_provider_selftest_payload(result: dict[str, Any], *, as_json: bool) -> None:
-    if as_json:
-        print(
-            json.dumps(
-                {
-                    "schema": CLI_RESULT_SCHEMA,
-                    "ok": bool(result.get("ok")),
-                    "command": "provider selftest",
-                    "result": result,
-                },
-                sort_keys=True,
-            )
-        )
-        return
-    print(f"provider selftest: {'PASS' if result.get('ok') else 'FAIL'}")
-    print(f"profile: {result.get('profile')} live={result.get('live')}")
-    print(
-        "independent routes: "
-        f"{result.get('independent_route_count')}/{result.get('require_independent_routes')}"
-    )
-    if result.get("receipt"):
-        print(f"receipt: {result['receipt']}")
-    for failure in result.get("failures", []):
-        print(f"failure: {failure}")
-    for row in result.get("rows", []):
-        model = row.get("requested_model") or row.get("model_id")
-        provider = row.get("provider") or "unresolved"
-        stage = row.get("stage") or "unknown"
-        error = row.get("error_type") or ""
-        print(
-            f"row: model={model} provider={provider} "
-            f"callable={bool(row.get('callable'))} stage={stage} {error}".rstrip()
-        )
-
-
-def _dispatch_provider(args: argparse.Namespace) -> int:
-    command_path = args._command_path
-    if command_path != "provider selftest":  # pragma: no cover - parser owns this
-        return _fail_not_implemented(command_path, args.json)
-    try:
-        from dharma_swarm.forge_lab.provider_selftest import run_provider_selftest
-
-        result = run_provider_selftest(
-            profile=args.profile,
-            live=args.live,
-            require_independent_routes=args.require_independent_routes,
-            current_model=args.model,
-            timeout_s=args.timeout_s,
-        )
-    except ValueError as exc:
-        if args.json:
-            print(
-                json.dumps(
-                    {
-                        "schema": CLI_RESULT_SCHEMA,
-                        "ok": False,
-                        "command": command_path,
-                        "error": {"code": "INVALID_PROFILE", "message": str(exc)},
-                    },
-                    sort_keys=True,
-                )
-            )
-        print(f"rsi {command_path} failed [INVALID_PROFILE]: {exc}", file=sys.stderr)
-        return PROVIDER_FAILURE_EXIT
-    _emit_provider_selftest_payload(result, as_json=args.json)
-    return 0 if result.get("ok") else PROVIDER_FAILURE_EXIT
-
-def _dispatch_sync(args: argparse.Namespace) -> int:
-    from dharma_swarm.forge_lab import sync_orchestrator as sync_control
-
-    command_path = args._command_path
-    try:
-        if command_path == "sync status":
-            result = sync_control.sync_status(remote=args.remote)
-            _emit_sync_payload(
-                command_path, result, as_json=args.json, ok=result["in_sync"]
-            )
-            return 0 if result["in_sync"] else DRIFT_EXIT
-        if command_path == "sync plan":
-            plan, path = sync_control.create_plan()
-            result = {"plan": plan, "path": str(path)}
-        elif command_path == "sync apply":
-            plan, _ = sync_control.load_plan(args.manifest)
-            result = sync_control.apply_plan(
-                plan, request_id=args.request_id, remote=args.remote
-            )
-        elif command_path == "sync converge":
-            result = sync_control.converge(
-                request_id=args.request_id, remote=args.remote
-            )
-        elif command_path == "sync rollback":
-            result = sync_control.rollback(
-                args.release, request_id=args.request_id, remote=args.remote
-            )
-        else:  # pragma: no cover - parser owns the command set
-            raise sync_control.SyncError("UNKNOWN_SYNC_COMMAND", command_path)
-        _emit_sync_payload(command_path, result, as_json=args.json)
-        return 0
-    except sync_control.SyncError as exc:
-        message = str(exc)
-        if args.json:
-            print(
-                json.dumps(
-                    {
-                        "schema": CLI_RESULT_SCHEMA,
-                        "ok": False,
-                        "command": command_path,
-                        "error": {"code": exc.code, "message": message},
-                    },
-                    sort_keys=True,
-                )
-            )
-        print(f"rsi {command_path} failed [{exc.code}]: {message}", file=sys.stderr)
-        return SYNC_FAILURE_EXIT
-
-
-
 def _normalize_operator_argv(argv: list[str] | None) -> list[str] | None:
     """Accept operator shorthand such as ``RSILAB - NEWRUN``.
 
@@ -580,9 +418,13 @@ def main(argv: list[str] | None = None) -> int:
 
         return run_newrun(args)
     if command_path.startswith("provider "):
-        return _dispatch_provider(args)
+        from dharma_swarm.forge_lab.rsi_provider_cli import dispatch_provider
+
+        return dispatch_provider(args)
     if command_path.startswith("sync "):
-        return _dispatch_sync(args)
+        from dharma_swarm.forge_lab.rsi_sync_cli import dispatch_sync
+
+        return dispatch_sync(args)
     return _fail_not_implemented(command_path, args.json)
 
 

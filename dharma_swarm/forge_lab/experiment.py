@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import asyncio
 import random
-import subprocess
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -31,6 +30,7 @@ from dharma_swarm.forge_lab.freeform_explore import (
     validate_freeform_explore_envelope,
 )
 from dharma_swarm.forge_lab.genome_spec import check_genome, merged_with_defaults
+from dharma_swarm.forge_lab.run_identity import git_head_sha, git_identity
 from dharma_swarm.forge_lab.run_receipts import (
     AFTER_RUN_NOTES_SCHEMA,
     EXPLORE_CLOSEOUTS,
@@ -132,8 +132,8 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
     started_mono = time.monotonic()
     rng = random.Random(cfg.rng_seed)
     seams = (seams or Seams()).resolved(cfg)
-    git_identity = _git_identity(cfg.source_repo, dry_run=cfg.dry_run)
-    base_sha = git_identity["head_sha"]
+    git_identity_info = git_identity(cfg.source_repo, dry_run=cfg.dry_run)
+    base_sha = git_identity_info["head_sha"]
     exp_id = ids.experiment_id(
         category=cfg.category, benchmark=cfg.benchmark, started_at=started_at, base_sha=base_sha
     )
@@ -189,7 +189,7 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
         # Historical field retained for readers; it is now the actual source
         # HEAD used to run the experiment, not origin/main.
         "git_base_sha": base_sha,
-        "git_identity": git_identity,
+        "git_identity": git_identity_info,
         "mode": "shadow",
         "dry_run": cfg.dry_run,
         "started_at": started_at,
@@ -484,49 +484,8 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
     return closeout
 
 
-def _git(repo: Path, *args: str) -> str:
-    proc = subprocess.run(
-        ["git", "-C", str(repo), *args],
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
-    return proc.stdout.strip() if proc.returncode == 0 else ""
-
-
-def _git_identity(repo: Path, *, dry_run: bool = False) -> dict[str, Any]:
-    """Source-code identity for run receipts.
-
-    This is evidence metadata, not promotion authority.  Earlier forge_lab runs
-    recorded ``origin/main`` as ``git_base_sha`` even when the operator was
-    executing branch code via PYTHONPATH.  That made later receipts ambiguous.
-    Record the actual source HEAD first, plus origin/main only as comparison.
-    """
-
-    if dry_run:
-        return {
-            "repo": str(repo),
-            "head_sha": "dryrun",
-            "branch": "dryrun",
-            "dirty": False,
-            "dirty_short": "",
-            "origin_main_sha": "",
-        }
-    dirty_short = _git(repo, "status", "--short")
-    return {
-        "repo": str(repo),
-        "head_sha": _git(repo, "rev-parse", "HEAD") or "unknown",
-        "branch": _git(repo, "branch", "--show-current") or "detached",
-        "dirty": bool(dirty_short.strip()),
-        "dirty_short": dirty_short,
-        "origin_main_sha": _git(repo, "rev-parse", "origin/main"),
-    }
-
-
 def _git_sha(repo: Path) -> str:
-    """Compatibility wrapper: return the actual source HEAD used for the run."""
-
-    return str(_git_identity(repo).get("head_sha") or "unknown")
+    return git_head_sha(repo)
 
 
 __all__ = [
