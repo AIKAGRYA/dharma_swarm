@@ -23,6 +23,7 @@ from dharma_swarm.forge_lab.version import (
 NOT_IMPLEMENTED_EXIT = 3
 DRIFT_EXIT = 4
 SYNC_FAILURE_EXIT = 5
+PROVIDER_FAILURE_EXIT = 6
 
 
 def _json_flag(parser: argparse.ArgumentParser) -> None:
@@ -60,6 +61,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _json_flag(version)
 
+    newrun = _leaf(
+        commands,
+        "newrun",
+        command_path="newrun",
+        help_text="show or launch bleeding-edge Forge Lab EXPLORE runs",
+    )
+    from dharma_swarm.forge_lab.newrun import add_newrun_arguments
+
+    add_newrun_arguments(newrun)
+    _json_flag(newrun)
+
     doctor = _leaf(
         commands,
         "doctor",
@@ -79,6 +91,8 @@ def build_parser() -> argparse.ArgumentParser:
     provider_selftest.add_argument("--profile", required=True)
     provider_selftest.add_argument("--live", action="store_true")
     provider_selftest.add_argument("--require-independent-routes", type=int)
+    provider_selftest.add_argument("--model", help="current model id to include for current/newrun profiles")
+    provider_selftest.add_argument("--timeout-s", type=int, default=20, help="per-route live probe timeout")
     _json_flag(provider_selftest)
 
     taskpack = commands.add_parser("taskpack", help="manage evaluation taskpacks")
@@ -420,6 +434,74 @@ def _emit_sync_payload(
         print(f"receipt: {result['receipt']}")
 
 
+
+def _emit_provider_selftest_payload(result: dict[str, Any], *, as_json: bool) -> None:
+    if as_json:
+        print(
+            json.dumps(
+                {
+                    "schema": CLI_RESULT_SCHEMA,
+                    "ok": bool(result.get("ok")),
+                    "command": "provider selftest",
+                    "result": result,
+                },
+                sort_keys=True,
+            )
+        )
+        return
+    print(f"provider selftest: {'PASS' if result.get('ok') else 'FAIL'}")
+    print(f"profile: {result.get('profile')} live={result.get('live')}")
+    print(
+        "independent routes: "
+        f"{result.get('independent_route_count')}/{result.get('require_independent_routes')}"
+    )
+    if result.get("receipt"):
+        print(f"receipt: {result['receipt']}")
+    for failure in result.get("failures", []):
+        print(f"failure: {failure}")
+    for row in result.get("rows", []):
+        model = row.get("requested_model") or row.get("model_id")
+        provider = row.get("provider") or "unresolved"
+        stage = row.get("stage") or "unknown"
+        error = row.get("error_type") or ""
+        print(
+            f"row: model={model} provider={provider} "
+            f"callable={bool(row.get('callable'))} stage={stage} {error}".rstrip()
+        )
+
+
+def _dispatch_provider(args: argparse.Namespace) -> int:
+    command_path = args._command_path
+    if command_path != "provider selftest":  # pragma: no cover - parser owns this
+        return _fail_not_implemented(command_path, args.json)
+    try:
+        from dharma_swarm.forge_lab.provider_selftest import run_provider_selftest
+
+        result = run_provider_selftest(
+            profile=args.profile,
+            live=args.live,
+            require_independent_routes=args.require_independent_routes,
+            current_model=args.model,
+            timeout_s=args.timeout_s,
+        )
+    except ValueError as exc:
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "schema": CLI_RESULT_SCHEMA,
+                        "ok": False,
+                        "command": command_path,
+                        "error": {"code": "INVALID_PROFILE", "message": str(exc)},
+                    },
+                    sort_keys=True,
+                )
+            )
+        print(f"rsi {command_path} failed [INVALID_PROFILE]: {exc}", file=sys.stderr)
+        return PROVIDER_FAILURE_EXIT
+    _emit_provider_selftest_payload(result, as_json=args.json)
+    return 0 if result.get("ok") else PROVIDER_FAILURE_EXIT
+
 def _dispatch_sync(args: argparse.Namespace) -> int:
     from dharma_swarm.forge_lab import sync_orchestrator as sync_control
 
@@ -469,11 +551,36 @@ def _dispatch_sync(args: argparse.Namespace) -> int:
         return SYNC_FAILURE_EXIT
 
 
+
+def _normalize_operator_argv(argv: list[str] | None) -> list[str] | None:
+    """Accept operator shorthand such as ``RSILAB - NEWRUN``.
+
+    The canonical command remains ``rsi newrun``.  The shorthand exists because
+    the operator asked for a memorable one-command entrypoint and may type it
+    in uppercase with a visual dash separator.
+    """
+
+    if argv is None:
+        argv = sys.argv[1:]
+    else:
+        argv = list(argv)
+    if len(argv) >= 2 and argv[0] == "-" and argv[1].lower().replace("-", "") == "newrun":
+        return ["newrun", *argv[2:]]
+    if argv and argv[0].lower().replace("-", "") == "newrun":
+        return ["newrun", *argv[1:]]
+    return argv
+
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    args = build_parser().parse_args(_normalize_operator_argv(argv))
     command_path = args._command_path
     if command_path == "version":
         return _emit_version(args.json)
+    if command_path == "newrun":
+        from dharma_swarm.forge_lab.newrun import run_newrun
+
+        return run_newrun(args)
+    if command_path.startswith("provider "):
+        return _dispatch_provider(args)
     if command_path.startswith("sync "):
         return _dispatch_sync(args)
     return _fail_not_implemented(command_path, args.json)

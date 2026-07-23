@@ -174,6 +174,7 @@ def test_packet_a_registers_the_target_operator_command_tree() -> None:
     root = _subcommands(build_parser())
     assert set(root) == {
         "version",
+        "newrun",
         "doctor",
         "provider",
         "taskpack",
@@ -223,12 +224,97 @@ def test_repo_launcher_defaults_to_the_canonical_environment() -> None:
     assert 'pydeps="${RSI_LAB_PYDEPS:-${base}/pydeps}"' in launcher
     assert "export PYTHONDONTWRITEBYTECODE=1" in launcher
 
+    rsilab = (REPO_ROOT / "scripts" / "forge_lab" / "RSILAB").read_text(encoding="utf-8")
+    assert 'exec "${script_dir}/rsi" "$@"' in rsilab
+
+
+
+def test_newrun_menu_projects_bleeding_edge_options_without_live_imports() -> None:
+    result = _invoke(MODULE_COMMAND, "newrun", "--json", "--model", "glm-5.2")
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["schema"] == "rsi_lab.newrun_options.v1"
+    assert payload["ok"] is True
+    assert payload["current_model"] == "glm-5.2"
+    assert {preset["name"] for preset in payload["presets"]} == {
+        "fast",
+        "current",
+        "diverse",
+        "soak",
+    }
+    current = next(preset for preset in payload["presets"] if preset["name"] == "current")
+    assert current["solver_model"] == "glm-5.2"
+    assert current["mutator_model"] == "glm-5.2"
+    assert current["verifier_model"] == "kimi-code"
+    assert current["command"].startswith("python -m dharma_swarm.forge_lab.cli run --mode shadow")
+
+
+
+def test_newrun_accepts_operator_shorthand_dash_newrun() -> None:
+    result = _invoke(MODULE_COMMAND, "-", "NEWRUN", "--json", "--preset", "fast")
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["selected"]["name"] == "fast"
+
+
+def test_newrun_selected_preset_can_be_overridden_without_execute() -> None:
+    result = _invoke(
+        MODULE_COMMAND,
+        "newrun",
+        "--json",
+        "--preset",
+        "fast",
+        "--solver-model",
+        "qwen3-coder:480b-cloud",
+        "--generations",
+        "2",
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    selected = payload["selected"]
+    assert selected["name"] == "fast"
+    assert selected["solver_model"] == "qwen3-coder:480b-cloud"
+    assert selected["generations"] == 2
+    assert "--solver-model qwen3-coder:480b-cloud" in selected["command"]
+
+
+
+def test_provider_selftest_config_json_is_implemented() -> None:
+    result = _invoke(MODULE_COMMAND, "provider", "selftest", "--profile", "offline", "--json")
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["schema"] == "forge_lab.cli_result.v1"
+    assert payload["command"] == "provider selftest"
+    assert payload["result"]["schema"] == "rsi_lab.provider_selftest.v1"
+    assert payload["result"]["live"] is False
+
+
+def test_provider_selftest_route_requirement_fails_closed_without_live() -> None:
+    result = _invoke(
+        MODULE_COMMAND,
+        "provider",
+        "selftest",
+        "--profile",
+        "offline",
+        "--require-independent-routes",
+        "2",
+        "--json",
+    )
+
+    assert result.returncode != 0
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is False
+    assert payload["result"]["failures"] == ["live_probe_required_for_independent_routes"]
+
 
 @pytest.mark.parametrize(
     "args",
     [
         ("doctor",),
-        ("provider", "selftest", "--profile", "offline"),
         ("taskpack", "build", "--profile", "offline"),
         ("campaign", "plan", "--profile", "explore-open"),
         ("campaign", "run", "--manifest", "sha256:" + "0" * 64),
@@ -268,6 +354,8 @@ def test_repo_launcher_defaults_to_the_canonical_environment() -> None:
         ("archive", "inspect"),
     ],
 )
+
+
 def test_registered_operations_fail_closed_until_implemented(
     args: tuple[str, ...],
 ) -> None:
@@ -317,3 +405,110 @@ raise SystemExit(rsi_cli.main(['doctor']))
     assert result.returncode != 0
     assert "not implemented" in result.stderr.lower()
     assert "traceback" not in result.stderr.lower()
+
+
+def test_newrun_recommend_selects_fast_without_provider_health(tmp_path: Path) -> None:
+    archive = tmp_path / "archive" / "agent_evolution"
+    run_dir = archive / "exp_fast_latest"
+    run_dir.mkdir(parents=True)
+    (run_dir / "run_manifest.json").write_text(
+        json.dumps(
+            {
+                "experiment_id": "exp_fast_latest",
+                "config": {
+                    "solver_model": "kimi-code",
+                    "verifier_model": "glm-5.2",
+                    "mutator_model": "gemini-2.5-flash",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (run_dir / "closeout.json").write_text(
+        json.dumps(
+            {
+                "experiment_id": "exp_fast_latest",
+                "closeout_state": "inconclusive_low_power",
+                "stats": {"seed_pass_rate": 0.0, "best_pass_rate": 1.0},
+            }
+        ),
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    env["PYTHONPATH"] = _pythonpath(env)
+    env["RSI_LAB_REPO"] = str(REPO_ROOT)
+    env["RSI_LAB_PYTHON"] = sys.executable
+    env["RSI_LAB_PYDEPS"] = str(PYDEPS_ROOT)
+    env["RSILAB_EVOLUTION_ARCHIVE_ROOT"] = str(archive)
+    env["RSI_LAB_PROVIDER_SELFTEST_ROOT"] = str(tmp_path / "missing-provider-receipts")
+
+    result = subprocess.run(
+        [*MODULE_COMMAND, "newrun", "--recommend", "--json"],
+        cwd=REPO_ROOT,
+        env=env,
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["recommendation"]["selected_preset"] == "fast"
+    assert payload["selected"]["name"] == "fast"
+    assert "provider health" in payload["recommendation"]["reasons"][0]
+
+
+def test_newrun_recommend_selects_soak_after_provider_health_and_fast_movement(tmp_path: Path) -> None:
+    archive = tmp_path / "archive" / "agent_evolution"
+    run_dir = archive / "exp_fast_latest"
+    run_dir.mkdir(parents=True)
+    (run_dir / "run_manifest.json").write_text(
+        json.dumps(
+            {
+                "experiment_id": "exp_fast_latest",
+                "config": {
+                    "solver_model": "kimi-code",
+                    "verifier_model": "glm-5.2",
+                    "mutator_model": "gemini-2.5-flash",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (run_dir / "closeout.json").write_text(
+        json.dumps(
+            {
+                "experiment_id": "exp_fast_latest",
+                "closeout_state": "inconclusive_low_power",
+                "stats": {"seed_pass_rate": 0.0, "best_pass_rate": 1.0},
+            }
+        ),
+        encoding="utf-8",
+    )
+    provider_root = tmp_path / "provider"
+    provider_root.mkdir()
+    (provider_root / "20260723T000000Z__frontier__provider_selftest.json").write_text(
+        json.dumps({"ok": True, "independent_route_count": 2, "receipt": "test"}),
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    env["PYTHONPATH"] = _pythonpath(env)
+    env["RSI_LAB_REPO"] = str(REPO_ROOT)
+    env["RSI_LAB_PYTHON"] = sys.executable
+    env["RSI_LAB_PYDEPS"] = str(PYDEPS_ROOT)
+    env["RSILAB_EVOLUTION_ARCHIVE_ROOT"] = str(archive)
+    env["RSI_LAB_PROVIDER_SELFTEST_ROOT"] = str(provider_root)
+
+    result = subprocess.run(
+        [*MODULE_COMMAND, "newrun", "--recommend", "--json"],
+        cwd=REPO_ROOT,
+        env=env,
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["recommendation"]["selected_preset"] == "soak"
+    assert payload["selected"]["name"] == "soak"
