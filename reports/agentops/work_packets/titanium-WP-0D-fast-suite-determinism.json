@@ -1,9 +1,9 @@
 {
  "allowed_files": [
-  "reports/agentops/work_packets/titanium-WP-0D-fast-suite-determinism.json",
   "Makefile",
   "dharma_swarm/diff_applier.py",
   "dharma_swarm/sandbox.py",
+  "reports/agentops/work_packets/titanium-WP-0D-fast-suite-determinism.json",
   "tests/conformance/test_repo_ratchet_holds.py",
   "tests/conftest.py",
   "tests/test_agent_runner_memory.py",
@@ -11,6 +11,7 @@
   "tests/test_agent_work_packet.py",
   "tests/test_cascade.py",
   "tests/test_e2e_boot.py",
+  "tests/test_key_oracle_live_filter.py",
   "tests/test_memory_writer_sentinel.py",
   "tests/test_sandbox.py",
   "tests/test_xray.py"
@@ -49,7 +50,7 @@
   }
  ],
  "id": "titanium-WP-0D-fast-suite-determinism",
- "intent": "WP-0D fast-suite determinism: reproduce and kill test-fast's blanket 10s-per-test-budget suite-context timeout modes. Real bug fix: sandbox.py/diff_applier.py subprocess timeout enforcement did not bound wall-clock time when a shell test_command forked instead of exec'd (dash does not always exec-optimize a single command), fixed via start_new_session plus a shared process-group kill helper. Real hermeticity fix: an autouse conftest.py fixture stops AgentConfig/AgentRunner/AgentPool tests from falling back to this checkout's real, ambient repo-root .dharma/ontology.db. Aligned test-fast's marker filter with make test/CI. Per-test timeout overrides for genuinely repo-scale tests (quality ratchet, product score, e2e boot, memory writer sentinel, xray) rather than a slow marker, since that marker would silently drop them from every required gate. Narrowed a bytecode-pollution check in test_agent_work_packet.py that was catching the venv's own unavoidable bootstrap bytecode instead of real regressions.",
+ "intent": "WP-0D fast-suite determinism: reproduce and kill test-fast's blanket 10s-per-test-budget suite-context timeout modes. Real bug fix: sandbox.py/diff_applier.py subprocess timeout enforcement did not bound wall-clock time when a shell test_command forked instead of exec'd (dash does not always exec-optimize a single command), fixed via start_new_session plus a shared process-group kill helper. Real hermeticity fix: an autouse conftest.py fixture stops AgentConfig/AgentRunner/AgentPool tests from falling back to this checkout's real, ambient repo-root .dharma/ontology.db. Aligned test-fast's marker filter with make test/CI. Per-test timeout overrides for genuinely repo-scale tests (quality ratchet, product score, e2e boot, memory writer sentinel, xray) rather than a slow marker, since that marker would silently drop them from every required gate. Narrowed a bytecode-pollution check in test_agent_work_packet.py that was catching the venv's own unavoidable bootstrap bytecode instead of real regressions. Also fixed tests/test_key_oracle_live_filter.py: five tests reached key_oracle._detect_keyless_live() with a fresh status file and no mock, so whichever ran first in-process paid a real claude -p subprocess call (live API round-trip, since the claude binary is on PATH in this container) instead of the fast, hermetic check the file's own existing convention (see test_live_providers_all_dead_returns_real_empty_not_none) already established.",
  "negative_controls": [
   {
    "command": "python3 -c \"import asyncio, time\nasync def main():\n    t0 = time.monotonic()\n    proc = await asyncio.create_subprocess_shell('sleep 6', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)\n    try:\n        await asyncio.wait_for(proc.communicate(), timeout=0.3)\n    except asyncio.TimeoutError:\n        proc.kill()\n        await proc.wait()\n    elapsed = time.monotonic() - t0\n    assert elapsed > 2, f'expected unpatched kill-only-shell bug to reproduce, elapsed={elapsed:.2f}s'\nasyncio.run(main())\n\"",
@@ -77,7 +78,8 @@
    "dharma_swarm/sandbox.py",
    "dharma_swarm/diff_applier.py",
    "tests/conftest.py",
-   "Makefile"
+   "Makefile",
+   "dharma_swarm/key_oracle.py"
   ],
   "collision": {
    "checked_at_sha": "8be95c8c3c59e63f9c1547877b0eee5fab920306",
@@ -93,7 +95,7 @@
    "No open INTERFACE_MISMATCH_MAP.md entry for sandbox.py/diff_applier.py timeout enforcement or agent_runner._resolve_config_state_dir's CWD fallback at base_ref."
   ],
   "owner": "@AmitabhainArunachala",
-  "packet_digest": "ac6cf8c46dab8bcaf2e3c1b5092ff1d00a9029cdea96949adce630e228fb126f",
+  "packet_digest": "f90015bac88b3f3bd60fb0d47107c7f6c7dcc2a53241882ba3740a3aecebff74",
   "rollback": "Revert the WP-0D commit(s) together; each fix (sandbox/diff_applier process-group kill, conftest.py agent-state-dir isolation, Makefile marker filter, per-test timeout overrides, bytecode-check narrowing) is independently revertible with no cross-file coupling beyond sandbox.py/diff_applier.py sharing kill_process_group.",
   "schema": "dharma_swarm.session_entry.v1",
   "tool_versions": {
