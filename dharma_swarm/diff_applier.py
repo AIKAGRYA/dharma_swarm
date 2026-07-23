@@ -17,6 +17,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from dharma_swarm.runtime_state import RuntimeStateStore
+from dharma_swarm.sandbox import kill_process_group
 from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
 from dharma_swarm.spine.tollbooth import require_execution_tollbooth
 
@@ -399,13 +400,14 @@ class DiffApplier:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=str(self.workspace),
+                start_new_session=True,
             )
             try:
                 stdout_bytes, stderr_bytes = await asyncio.wait_for(
                     proc.communicate(), timeout=timeout
                 )
             except asyncio.TimeoutError:
-                proc.kill()
+                kill_process_group(proc)
                 await proc.wait()
                 # Rollback on timeout
                 await self.rollback(apply_result)

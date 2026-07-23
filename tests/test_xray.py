@@ -306,8 +306,16 @@ class TestRunXray:
         with pytest.raises(ValueError, match="Not a directory"):
             run_xray("/nonexistent/path/xyz")
 
+    @pytest.mark.timeout(60)
     def test_on_dharma_swarm(self):
-        """Smoke test: X-Ray the dharma_swarm repo itself."""
+        """Smoke test: X-Ray the dharma_swarm repo itself.
+
+        analyze_repo() walks the whole real tree, so cost scales with repo
+        size like the QL-R1 quality ratchet does; ~23s call time on this
+        checkout already crosses test-fast's blanket 10s budget (WP-0D
+        suite-context timeout). A per-test override, not a `slow` marker,
+        since both required CI and `make test` filter -m "not slow".
+        """
         dharma = Path(__file__).resolve().parent.parent
         report = analyze_repo(dharma)
         assert report.total_files > 50

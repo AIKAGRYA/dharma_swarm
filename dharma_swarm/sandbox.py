@@ -8,7 +8,9 @@ production usage should delegate safety checks to telos gates.
 from __future__ import annotations
 
 import asyncio
+import os
 import re
+import signal
 import tempfile
 import time
 from abc import ABC, abstractmethod
@@ -16,6 +18,18 @@ from pathlib import Path
 from typing import Optional
 
 from dharma_swarm.models import SandboxResult
+
+
+def kill_process_group(proc: "asyncio.subprocess.Process") -> None:
+    """Kill proc's whole process group (requires start_new_session=True at
+    spawn time). A lone proc.kill() only signals the shell; a test/build
+    command's non-exec'd grandchild can survive it, keep the piped
+    stdout/stderr open, and make proc.communicate() block for the child's
+    full natural runtime regardless of any `timeout` the caller passed."""
+    try:
+        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+    except (ProcessLookupError, PermissionError, OSError):
+        proc.kill()
 
 # Patterns that are always rejected before execution.
 # Intentionally conservative -- telos gates handle nuanced policy.
@@ -97,6 +111,7 @@ class LocalSandbox(Sandbox):
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=self._workdir,
+            start_new_session=True,
         )
         timed_out = False
         try:
@@ -104,7 +119,7 @@ class LocalSandbox(Sandbox):
                 proc.communicate(), timeout=timeout
             )
         except asyncio.TimeoutError:
-            proc.kill()
+            kill_process_group(proc)
             await proc.wait()
             raw_out = b""
             raw_err = b"Execution timed out"

@@ -369,8 +369,8 @@ async def test_leave_task_mark_best_effort(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_run_task_provider_success_increments_counters(fast_gate):
-    cfg = AgentConfig(name="ok-agent", role=AgentRole.CODER)
+async def test_run_task_provider_success_increments_counters(fast_gate, tmp_path):
+    cfg = _with_state_dir(AgentConfig(name="ok-agent", role=AgentRole.CODER), tmp_path)
     provider = AsyncMock()
     provider.complete = AsyncMock(return_value=LLMResponse(content="done", model="m"))
 
@@ -385,8 +385,8 @@ async def test_run_task_provider_success_increments_counters(fast_gate):
 
 
 @pytest.mark.asyncio
-async def test_run_task_calls_leave_mark_on_success(monkeypatch, fast_gate):
-    cfg = AgentConfig(name="mark-agent", role=AgentRole.CODER)
+async def test_run_task_calls_leave_mark_on_success(monkeypatch, fast_gate, tmp_path):
+    cfg = _with_state_dir(AgentConfig(name="mark-agent", role=AgentRole.CODER), tmp_path)
     provider = AsyncMock()
     provider.complete = AsyncMock(return_value=LLMResponse(content="ok", model="m"))
     leave = AsyncMock()
@@ -401,8 +401,8 @@ async def test_run_task_calls_leave_mark_on_success(monkeypatch, fast_gate):
 
 
 @pytest.mark.asyncio
-async def test_run_task_calls_leave_mark_on_failure(monkeypatch, fast_gate):
-    cfg = AgentConfig(name="mark-agent", role=AgentRole.CODER)
+async def test_run_task_calls_leave_mark_on_failure(monkeypatch, fast_gate, tmp_path):
+    cfg = _with_state_dir(AgentConfig(name="mark-agent", role=AgentRole.CODER), tmp_path)
     provider = AsyncMock()
     provider.complete = AsyncMock(return_value=LLMResponse(content="", model="m"))
     leave = AsyncMock()
@@ -418,8 +418,8 @@ async def test_run_task_calls_leave_mark_on_failure(monkeypatch, fast_gate):
 
 
 @pytest.mark.asyncio
-async def test_run_task_provider_empty_content_is_failure(fast_gate):
-    cfg = AgentConfig(name="bad-agent", role=AgentRole.CODER)
+async def test_run_task_provider_empty_content_is_failure(fast_gate, tmp_path):
+    cfg = _with_state_dir(AgentConfig(name="bad-agent", role=AgentRole.CODER), tmp_path)
     provider = AsyncMock()
     provider.complete = AsyncMock(return_value=LLMResponse(content="", model="m"))
 

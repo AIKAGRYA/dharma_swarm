@@ -1,6 +1,7 @@
 """Shared test fixtures for DHARMA SWARM."""
 
 import os
+from pathlib import Path
 
 import pytest
 
@@ -89,6 +90,36 @@ def _isolate_stigmergy(tmp_path, monkeypatch):
     monkeypatch.setattr("dharma_swarm.stigmergy._DEFAULT_BASE", test_base)
     # Reset module-level singleton so each test gets a fresh store with the redirected path
     monkeypatch.setattr("dharma_swarm.stigmergy._default_store", None)
+
+
+_REPO_ROOT_DHARMA = Path(__file__).resolve().parents[1] / ".dharma"
+
+
+@pytest.fixture(autouse=True)
+def _isolate_agent_state_dir(monkeypatch):
+    """Block agent_runner's CWD-based state fallback from ever resolving to
+    this checkout's real, ambient <repo>/.dharma/ (WP-0D: unisolated
+    AgentConfig/AgentRunner/AgentPool tests were a suite-context-only
+    timeout — the shared ontology.db that fallback resolves to grows with
+    every such test run, until writes against it cross test-fast's per-test
+    budget). Wraps the real resolver rather than reimplementing its
+    metadata-first logic, so a test that deliberately chdirs elsewhere
+    (e.g. to exercise the fallback itself against an isolated tmp_path)
+    keeps seeing real, unmodified behavior — only the literal repo-root
+    path is ever suppressed."""
+    import dharma_swarm.agent_runner as _agent_runner_mod
+
+    real_resolve = _agent_runner_mod._resolve_config_state_dir
+
+    def _guarded(config):
+        resolved = real_resolve(config)
+        if resolved is not None and resolved.resolve() == _REPO_ROOT_DHARMA.resolve():
+            return None
+        return resolved
+
+    monkeypatch.setattr(
+        "dharma_swarm.agent_runner._resolve_config_state_dir", _guarded
+    )
 
 
 @pytest.fixture
