@@ -359,7 +359,7 @@ test:
 	$(VENV_PYTHON) -m pytest tests/ -q --tb=short -x -m "not slow and not docker and not network"
 
 test-fast:
-	$(VENV_PYTHON) -m pytest tests/ -q --tb=line -x --timeout=10
+	$(VENV_PYTHON) -m pytest tests/ -q --tb=line -x --timeout=10 -m "not slow and not docker and not network"
 
 lint:
 	$(RUFF) check dharma_swarm/ --select=E,F,W --ignore=E501

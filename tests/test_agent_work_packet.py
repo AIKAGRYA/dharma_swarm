@@ -811,8 +811,20 @@ def test_runner_minimal_help_writes_no_repo_bytecode(tmp_path: Path) -> None:
     )
 
     assert result.returncode == 0, result.stderr
+    # PYTHONPYCACHEPREFIX mirrors REPO_ROOT, but interpreter startup itself
+    # (the uv-managed venv's _virtualenv.pth shim and the dharma_swarm
+    # editable-install finder, both under the gitignored .venv/) writes its
+    # own bytecode there before the runner's code ever executes — that is
+    # not "the runner polluting the repo". Only tracked source paths count.
     repo_cache = pycache_prefix / REPO_ROOT.as_posix().lstrip("/")
-    assert not repo_cache.exists()
+    tracked_bytecode = [
+        p
+        for p in repo_cache.rglob("*.pyc")
+        if ".venv" not in p.relative_to(repo_cache).parts
+    ] if repo_cache.exists() else []
+    assert not tracked_bytecode, (
+        f"runner wrote bytecode into tracked source paths: {tracked_bytecode}"
+    )
 
 
 def test_commit_policy_refuses_when_gates_fail(tmp_path: Path) -> None:

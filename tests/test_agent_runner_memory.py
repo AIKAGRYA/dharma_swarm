@@ -25,8 +25,19 @@ from dharma_swarm.models import (
 
 
 @pytest.fixture
-def config() -> AgentConfig:
-    return AgentConfig(name="mem-agent", role=AgentRole.CODER)
+def config(tmp_path: Path) -> AgentConfig:
+    # Without an explicit state_dir, AgentRunner falls back to the real,
+    # shared, cross-test-run `<cwd>/.dharma/ontology.db` whenever that
+    # directory happens to exist in the checkout (agent_runner.py's
+    # _resolve_config_state_dir CWD fallback) — tests then read/write real
+    # accumulated repo state instead of isolated fixtures, which is both a
+    # hermeticity gap and, once that file has enough rows, a >10s suite-context
+    # timeout (WP-0D) that a fresh clean-room clone would never reproduce.
+    return AgentConfig(
+        name="mem-agent",
+        role=AgentRole.CODER,
+        metadata={"memory_state_dir": str(tmp_path / "agent-state")},
+    )
 
 
 @pytest.fixture

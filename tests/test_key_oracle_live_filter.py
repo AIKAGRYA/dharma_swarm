@@ -53,7 +53,15 @@ def _row_with_name(name: str, glyph: str, *, status: str = "", env_var: str = "X
 # ---------------------------------------------------------------------------
 
 
-def test_live_providers_oauth_counts_live(tmp_path: Path) -> None:
+def test_live_providers_oauth_counts_live(tmp_path: Path, monkeypatch) -> None:
+    # Host-detected keyless providers (local/ollama/claude_code smoke) are
+    # intentionally environment-dependent; this test isolates oauth/key rows.
+    # Without this, _detect_keyless_live's claude_code branch shells out to a
+    # REAL `claude -p ...` subprocess whenever the claude binary is on PATH
+    # (true in this container, since Claude Code itself is `claude`) — a
+    # live network call costing ~9s (WP-0D suite-context timeout) instead of
+    # the fast, hermetic check this test's own docstring already promised.
+    monkeypatch.setattr("dharma_swarm.key_oracle._detect_keyless_live", lambda: set())
     _write_status(
         tmp_path,
         {
@@ -67,11 +75,10 @@ def test_live_providers_oauth_counts_live(tmp_path: Path) -> None:
     assert "anthropic" in live
     assert "claude_code" in live
     assert "codex" in live
-    # Host-detected keyless providers (local/ollama/claude_code smoke) are
-    # intentionally environment-dependent; this test isolates oauth/key rows.
 
 
-def test_live_providers_accepts_current_dkeys_array_rows(tmp_path: Path) -> None:
+def test_live_providers_accepts_current_dkeys_array_rows(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr("dharma_swarm.key_oracle._detect_keyless_live", lambda: set())
     target = tmp_path / ".dharma"
     target.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -91,8 +98,9 @@ def test_live_providers_accepts_current_dkeys_array_rows(tmp_path: Path) -> None
     assert "openrouter_free" not in live
 
 
-def test_live_providers_429_is_pruned(tmp_path: Path) -> None:
+def test_live_providers_429_is_pruned(tmp_path: Path, monkeypatch) -> None:
     """A 429 (~) row is NOT live (rate-limited; pruned-but-recoverable)."""
+    monkeypatch.setattr("dharma_swarm.key_oracle._detect_keyless_live", lambda: set())
     _write_status(
         tmp_path,
         {
@@ -106,7 +114,8 @@ def test_live_providers_429_is_pruned(tmp_path: Path) -> None:
     assert "openai" in live
 
 
-def test_live_providers_dead_glyphs_not_live(tmp_path: Path) -> None:
+def test_live_providers_dead_glyphs_not_live(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr("dharma_swarm.key_oracle._detect_keyless_live", lambda: set())
     _write_status(
         tmp_path,
         {
@@ -160,8 +169,9 @@ def test_live_providers_missing_file_returns_none(tmp_path: Path) -> None:
     assert live_providers(home=tmp_path) is None
 
 
-def test_live_providers_stale_returns_none(tmp_path: Path) -> None:
+def test_live_providers_stale_returns_none(tmp_path: Path, monkeypatch) -> None:
     """Stale (age > ttl) => None => callers keep env-presence behaviour."""
+    monkeypatch.setattr("dharma_swarm.key_oracle._detect_keyless_live", lambda: set())
     _write_status(
         tmp_path,
         {"openai": _row("✓", status="live")},
@@ -190,8 +200,9 @@ def test_live_providers_missing_rows_returns_none(tmp_path: Path) -> None:
     assert live_providers(home=tmp_path) is None
 
 
-def test_live_providers_future_timestamp_treated_fresh(tmp_path: Path) -> None:
+def test_live_providers_future_timestamp_treated_fresh(tmp_path: Path, monkeypatch) -> None:
     """Clock skew (future ts) must not be read as 'stale'."""
+    monkeypatch.setattr("dharma_swarm.key_oracle._detect_keyless_live", lambda: set())
     _write_status(
         tmp_path,
         {"openai": _row("✓", status="live")},
@@ -290,6 +301,7 @@ def test_prune_empty_chain_is_noop(monkeypatch) -> None:
 
 def test_prune_429_provider_dropped(monkeypatch, tmp_path: Path) -> None:
     """End-to-end via the real oracle: a 429 (~) provider is pruned."""
+    monkeypatch.setattr("dharma_swarm.key_oracle._detect_keyless_live", lambda: set())
     _write_status(
         tmp_path,
         {
