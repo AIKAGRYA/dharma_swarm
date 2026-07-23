@@ -952,7 +952,15 @@ active_tracks:
       - tests/test_dharmagraph_parity_gauntlet.py
       - docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json
       - docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json
+      - docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V3.json   # L-D output (frozen-before-results)
+      - docs/langgraph_parity/DHARMAGRAPH_JUDGE_RATIFICATIONS_V1.json      # judge-signature registry (reseals append here)
       - reports/governance/dharmagraph_parity/**
+      - docs/plans/DHARMAGRAPH_ASCENT_SPEC_2026-07-17.md
+      - docs/plans/handoffs/DHARMAGRAPH_ASCENT_*.md
+      - docs/plans/DHARMAGRAPH_FRONTIER_DOSSIER_*.md
+      - docs/governance/CAMPAIGN_KERNEL.md   # L-K promotion target (ascent spec Appendix A)
+      - tests/oracle_support/scenarios.py    # L-A: port application oracle to the neutral engine
+      - tests/oracle_support/outcomes.py     # L-A: outcome frame (diff_outcomes referee stays frozen)
     moves_vital_signs:
       - quality_gates
       - eval_coverage
@@ -1067,11 +1075,11 @@ active_tracks:
         kind: ops
         blocker: false
       - id: 6
-        what: "BLOCKER: parity gauntlet judge-signed at 100/100 (or operator-ratified non-goal set) — closeout blocked below the bar. Judge-signed grade 2026-07-12: 31.00/100 (builder and judge receipts reconcile MATCH; digest-sealed under reports/governance/dharmagraph_parity/; replay: scripts/governance/run_python_with_repo_env.sh scripts/governance/dharmagraph_parity_gauntlet.py --check). Rubric frozen before results (V2 at 7b8662ed5); all pre-2026-07-11 parity scores are VOID (self-graded, real langgraph never installed — see rubric preamble). Full evidence per cell: reports/governance/dharmagraph_parity/PARITY_MATRIX.md. The gap cards below (ids 7-45) are the complete work list; N/A requires operator ratification, self-declared rationales score 0."
+        what: "BLOCKER: parity gauntlet judge-signed at 100/100 (or operator-ratified non-goal set) — closeout blocked below the bar. Judge-signed grade 2026-07-17: 58.00/100 — execution-core ceiling; six core cards LG01/LG04/LG06/LG07/LG08/LG09 all 2/2 FULLY_PROVEN (PR #1002, custody anchor claude-judge-c83df531c; builder and judge receipts reconcile MATCH; digest-sealed under reports/governance/dharmagraph_parity/; replay: scripts/governance/run_python_with_repo_env.sh scripts/governance/dharmagraph_parity_gauntlet.py --check). Rubric frozen before results (V2 at 7b8662ed5); all pre-2026-07-11 parity scores are VOID (self-graded, real langgraph never installed — see rubric preamble). Full evidence per cell: reports/governance/dharmagraph_parity/PARITY_MATRIX.md. The gap cards below (ids 7-45) are the complete work list; N/A requires operator ratification, self-declared rationales score 0."
         kind: code
         blocker: true
       - id: 7
-        what: "parity-gap-lg01-schemas: LG01 State, input, output, and context schemas with partial updates — 1/2 points at weight 4. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        what: "DONE 2026-07-17 (PR #1002, merged): parity-gap-lg01-schemas: LG01 State, input, output, and context schemas with partial updates — 2/2 points at weight 4 — FULLY_PROVEN in the resealed judge receipt (58.00/100); independent judge rerun remains the closure evidence of record."
         kind: code
         blocker: false
       - id: 8
@@ -1083,23 +1091,23 @@ active_tracks:
         kind: code
         blocker: false
       - id: 10
-        what: "parity-gap-lg04-topology: LG04 Static topology, sequence, entry/finish, and ALL barrier edges — 1/2 points at weight 2. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        what: "DONE 2026-07-17 (PR #1002, merged): parity-gap-lg04-topology: LG04 Static topology, sequence, entry/finish, and ALL barrier edges — 2/2 points at weight 2 — FULLY_PROVEN in the resealed judge receipt (58.00/100); independent judge rerun remains the closure evidence of record."
         kind: code
         blocker: false
       - id: 11
-        what: "parity-gap-lg06-supersteps: LG06 Bulk-synchronous parallel supersteps and step atomicity — 1/2 points at weight 2. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        what: "DONE 2026-07-17 (PR #1002, merged): parity-gap-lg06-supersteps: LG06 Bulk-synchronous parallel supersteps and step atomicity — 2/2 points at weight 2 — FULLY_PROVEN in the resealed judge receipt (58.00/100); independent judge rerun remains the closure evidence of record."
         kind: code
         blocker: false
       - id: 12
-        what: "parity-gap-lg07-send: LG07 Dynamic Send fan-out and map-reduce — 1/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        what: "DONE 2026-07-17 (PR #1002, merged): parity-gap-lg07-send: LG07 Dynamic Send fan-out and map-reduce — 2/2 points at weight 1 — FULLY_PROVEN in the resealed judge receipt (58.00/100); independent judge rerun remains the closure evidence of record."
         kind: code
         blocker: false
       - id: 13
-        what: "parity-gap-lg08-command: LG08 Command update, multi-target goto, parent routing, and resume — 1/2 points at weight 2. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        what: "DONE 2026-07-17 (PR #1002, merged): parity-gap-lg08-command: LG08 Command update, multi-target goto, parent routing, and resume — 2/2 points at weight 2 — FULLY_PROVEN in the resealed judge receipt (58.00/100); independent judge rerun remains the closure evidence of record."
         kind: code
         blocker: false
       - id: 14
-        what: "parity-gap-lg09-cycles: LG09 Cycles, recursion caps, and managed remaining-step state — 1/2 points at weight 1. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        what: "DONE 2026-07-17 (PR #1002, merged): parity-gap-lg09-cycles: LG09 Cycles, recursion caps, and managed remaining-step state — 2/2 points at weight 1 — FULLY_PROVEN in the resealed judge receipt (58.00/100); independent judge rerun remains the closure evidence of record."
         kind: code
         blocker: false
       - id: 15
@@ -1244,6 +1252,30 @@ active_tracks:
         blocker: false
       - id: 49
         what: "Cross-surface coordination (council P1, session-entry/checker surfaces): parity_gauntlet_check_passes fake-fails on any checkout without the repo venv (run_python_with_repo_env.sh falls back to bare python3 = macOS 3.9; active-track CI installs only pyyaml so the published generated/status baseline will record the criterion FAILED — split-brain vs full-venv machines). Fix belongs in check_track_status.check_command_passes (export DHARMA_PYTHON=sys.executable; wrapper already honors it) and/or the active-track.yml environment; coordinate with the current surface owner before editing."
+        kind: code
+        blocker: false
+      - id: 50
+        what: "ASCENT L-K (kernel): promote the ascent spec's Appendix A verbatim to docs/governance/CAMPAIGN_KERNEL.md — the reusable campaign loop (done-block, one-slice iterations, append-only ledger, stop-conditions-as-success, evidence custody) proven by PR #1002. Master spec: docs/plans/DHARMAGRAPH_ASCENT_SPEC_2026-07-17.md §3 L-K."
+        kind: docs
+        blocker: false
+      - id: 51
+        what: "ASCENT L-A (organism wiring, 58→63): port the application oracle (tests/oracle_support/scenarios.py) to the neutral engine — APP01-04 fail exactly the neutral_engine_integration facet family; shadow-mode production seam in workflow.py behind DHARMA_GRAPH_ENGINE=1; Art. 12 receipt rung (deadline 2026-08-02). Spec §3 L-A; declared harness amendment §C1.4 (judge-reviewed)."
+        kind: code
+        blocker: false
+      - id: 52
+        what: "ASCENT L-B (reliability ring, +11.00): S0 identity-preserving pending-write journal (graph/journal.py — kills both PR #1002 recorded deviations), then LG24 retries, LG25 timeouts, LG19/LG20 interrupts, LG26 remainder, one row per slice; predecessor properties 6-8 land here. Spec §3 L-B."
+        kind: code
+        blocker: false
+      - id: 53
+        what: "ASCENT L-C (frontier scan, research-only): Temporal/Restate/DBOS/Inngest/Hatchet + AutoGen/CrewAI/OpenAI-Agents/Pydantic-AI/Mastra; adversarial refute-pass per claim; deliverables = cited dossier + ≥3 chartered capability cards + V3 addendum proposals. Hard cap 10 iterations. Spec §3 L-C."
+        kind: docs
+        blocker: false
+      - id: 54
+        what: "ASCENT L-D (rubric V3 @ latest langgraph; needs L-C addenda + L-A/L-B merged): drift audit FIRST (audit decides V3, never vice versa), freeze-before-results, honest re-baseline; trust-root pin edit is declared amendment §C4.2 (judge-reviewed). Spec §3 L-D."
+        kind: code
+        blocker: false
+      - id: 55
+        what: "ASCENT L-E (moat build; needs L-C cards + operator pick at the weekly gate): DST chaos gauntlet / telos-gated execution / campaigns-as-graphs strange loop — 2-3 cards chartered with done-blocks before any code. Topology evolution stays behind the Phase-6 operator wall. Spec §3 L-E."
         kind: code
         blocker: false
 
