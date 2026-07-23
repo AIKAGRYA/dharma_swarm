@@ -263,7 +263,9 @@ def test_tfidf_embedder_move_keeps_registered_writer_spec() -> None:
     assert tfidf_write.matched_writer_ids == ("vector_store.tfidf_state",)
 
 
+@pytest.mark.timeout(60)
 def test_writer_sentinel_cli_ci_profile_runs_discovery_and_gates(capsys) -> None:
+    """Same real repo-wide scan cost as the other tests above (WP-0D)."""
     repo_root = Path(__file__).resolve().parents[1]
 
     assert writer_sentinel_cli_main(["--repo-root", str(repo_root), "--ci"]) == 0
@@ -274,7 +276,9 @@ def test_writer_sentinel_cli_ci_profile_runs_discovery_and_gates(capsys) -> None
     assert '"unregistered_surface_count": 0' in out
 
 
+@pytest.mark.timeout(60)
 def test_writer_sentinel_cli_writes_markdown_report(tmp_path: Path, capsys) -> None:
+    """Same real repo-wide --discover scan cost as the other tests above (WP-0D)."""
     repo_root = Path(__file__).resolve().parents[1]
     report_path = tmp_path / "writer_report.md"
 
