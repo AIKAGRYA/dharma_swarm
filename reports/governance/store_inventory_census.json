@@ -177,6 +177,7 @@
     "predictions.jsonl",
     "predictor.jsonl",
     "predictor_data.jsonl",
+    "processed_deliveries.jsonl",
     "progress_ledger.jsonl",
     "promises.jsonl",
     "promotion_decisions.jsonl",
@@ -295,7 +296,7 @@
   ],
   "summary": {
     "distinct_db_names": 39,
-    "distinct_jsonl_names": 215,
+    "distinct_jsonl_names": 216,
     "ledger_classes": 11,
     "ledger_modules": 12
   }
