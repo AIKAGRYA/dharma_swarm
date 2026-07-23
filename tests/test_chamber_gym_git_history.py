@@ -158,16 +158,7 @@ def test_scorer_rejects_non_applying_diff(fixture_repo, tmp_path):
     assert res.errored and "apply" in res.detail
 
 
-@pytest.mark.timeout(90)
 def test_run_gym_end_to_end_writes_traces_and_receipt(fixture_repo, tmp_path):
-    # run_gym scores each task/seat by shelling out to a fresh
-    # `python3 -m pytest` subprocess (gym_git_history.py:275) — real
-    # interpreter+pytest startup cost x4 here (2 tasks x 2 seats). That's
-    # ~13s standalone on this checkout, already past test-fast's blanket
-    # 10s budget; under full-suite CPU contention it's worse (WP-0D
-    # suite-context timeout). A per-test override keeps it running
-    # everywhere with headroom instead of masking it with a slow marker
-    # (both required CI and make test filter -m "not slow").
     pack = build_taskpack(fixture_repo, _head(fixture_repo), holdout_fraction=0)
     answers = {
         t.task_id: {"seat_good": _landed_source_diff(fixture_repo, t),

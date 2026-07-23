@@ -1,0 +1,107 @@
+{
+ "allowed_files": [
+  "reports/agentops/work_packets/titanium-WP-0D-fast-suite-determinism.json",
+  "Makefile",
+  "dharma_swarm/diff_applier.py",
+  "dharma_swarm/sandbox.py",
+  "tests/conformance/test_repo_ratchet_holds.py",
+  "tests/conftest.py",
+  "tests/test_agent_runner_memory.py",
+  "tests/test_agent_runner_quality_track.py",
+  "tests/test_agent_work_packet.py",
+  "tests/test_cascade.py",
+  "tests/test_e2e_boot.py",
+  "tests/test_memory_writer_sentinel.py",
+  "tests/test_sandbox.py",
+  "tests/test_xray.py"
+ ],
+ "approval": {
+  "before_commit": false,
+  "before_merge": true
+ },
+ "base_ref": "8be95c8c3c59e63f9c1547877b0eee5fab920306",
+ "branch": "claude/titanium-hardening-merge-strategy-r9bxft",
+ "commit": {
+  "allowed": true,
+  "message": "fix(titanium): WP-0D fast-suite determinism"
+ },
+ "forbidden_files": [],
+ "gates": [
+  {
+   "command": "python3 -m pytest tests/test_sandbox.py tests/test_diff_applier.py -q",
+   "name": "sandbox-and-diff-applier-tests",
+   "timeout_seconds": 300
+  },
+  {
+   "command": "python3 -m pytest tests/test_agent_runner_memory.py tests/test_agent_runner_quality_track.py -q",
+   "name": "agent-runner-hermeticity-tests",
+   "timeout_seconds": 300
+  },
+  {
+   "command": "python3 -m pytest tests/conformance/test_repo_ratchet_holds.py tests/test_cascade.py tests/test_xray.py tests/test_memory_writer_sentinel.py tests/test_e2e_boot.py -q",
+   "name": "repo-scale-timeout-override-tests",
+   "timeout_seconds": 300
+  },
+  {
+   "command": "python3 -m pytest tests/test_agent_work_packet.py -q",
+   "name": "agent-work-packet-bytecode-check",
+   "timeout_seconds": 300
+  }
+ ],
+ "id": "titanium-WP-0D-fast-suite-determinism",
+ "intent": "WP-0D fast-suite determinism: reproduce and kill test-fast's blanket 10s-per-test-budget suite-context timeout modes. Real bug fix: sandbox.py/diff_applier.py subprocess timeout enforcement did not bound wall-clock time when a shell test_command forked instead of exec'd (dash does not always exec-optimize a single command), fixed via start_new_session plus a shared process-group kill helper. Real hermeticity fix: an autouse conftest.py fixture stops AgentConfig/AgentRunner/AgentPool tests from falling back to this checkout's real, ambient repo-root .dharma/ontology.db. Aligned test-fast's marker filter with make test/CI. Per-test timeout overrides for genuinely repo-scale tests (quality ratchet, product score, e2e boot, memory writer sentinel, xray) rather than a slow marker, since that marker would silently drop them from every required gate. Narrowed a bytecode-pollution check in test_agent_work_packet.py that was catching the venv's own unavoidable bootstrap bytecode instead of real regressions.",
+ "negative_controls": [
+  {
+   "command": "python3 -c \"import asyncio, time\nasync def main():\n    t0 = time.monotonic()\n    proc = await asyncio.create_subprocess_shell('sleep 6', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)\n    try:\n        await asyncio.wait_for(proc.communicate(), timeout=0.3)\n    except asyncio.TimeoutError:\n        proc.kill()\n        await proc.wait()\n    elapsed = time.monotonic() - t0\n    assert elapsed > 2, f'expected unpatched kill-only-shell bug to reproduce, elapsed={elapsed:.2f}s'\nasyncio.run(main())\n\"",
+   "expected_exit": 0,
+   "name": "kill-only-shell-leaves-grandchild-alive",
+   "timeout_seconds": 60
+  },
+  {
+   "command": "python3 -c \"import asyncio, os, signal, time\nasync def main():\n    t0 = time.monotonic()\n    proc = await asyncio.create_subprocess_shell('sleep 6', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, start_new_session=True)\n    try:\n        await asyncio.wait_for(proc.communicate(), timeout=0.3)\n    except asyncio.TimeoutError:\n        try:\n            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)\n        except (ProcessLookupError, PermissionError, OSError):\n            proc.kill()\n        await proc.wait()\n    elapsed = time.monotonic() - t0\n    assert elapsed < 2, f'process-group kill should bound wall-clock time, elapsed={elapsed:.2f}s'\nasyncio.run(main())\n\"",
+   "expected_exit": 0,
+   "name": "process-group-kill-bounds-walltime",
+   "timeout_seconds": 60
+  }
+ ],
+ "session_entry": {
+  "active_track": "repository-titanium-hardening-2026-07",
+  "authority_precedence": [
+   "executable",
+   "tests",
+   "locks",
+   "git",
+   "owner_files"
+  ],
+  "closest_existing_implementation": [
+   "dharma_swarm/sandbox.py",
+   "dharma_swarm/diff_applier.py",
+   "tests/conftest.py",
+   "Makefile"
+  ],
+  "collision": {
+   "checked_at_sha": "8be95c8c3c59e63f9c1547877b0eee5fab920306",
+   "details": [],
+   "status": "clear"
+  },
+  "honest_blockers": [
+   "The full non--x two-consecutive-clean make test-fast sweep and tests/test_fast_suite_isolation.py are not part of this packet; iterative -x diagnostic sweeps found and fixed each suite-context timeout mode one at a time, but a from-scratch full pass has not yet completed cleanly twice in a row.",
+   "Three pre-existing, out-of-scope failures were found and deliberately left untouched: tests/test_evolution_safety.py::test_evaluator_readonly_with_sha_is_protected and test_source_mount_readonly_safer_but_not_sufficient (chmod-based read-only simulation is a no-op for root, and this container runs as root); tests/test_make_onboarding_contract.py::test_make_agentops_bootstrap_preserves_external_venv_dependencies (assumes sys.path has a dependency root outside the checkout, which does not hold when .venv lives inside the repo root).",
+   "This packet's preflight/closeout were run after the fix commits, not before, since the packet-bound workflow was not bound at session start."
+  ],
+  "interface_mismatches": [
+   "No open INTERFACE_MISMATCH_MAP.md entry for sandbox.py/diff_applier.py timeout enforcement or agent_runner._resolve_config_state_dir's CWD fallback at base_ref."
+  ],
+  "owner": "@AmitabhainArunachala",
+  "packet_digest": "ac6cf8c46dab8bcaf2e3c1b5092ff1d00a9029cdea96949adce630e228fb126f",
+  "rollback": "Revert the WP-0D commit(s) together; each fix (sandbox/diff_applier process-group kill, conftest.py agent-state-dir isolation, Makefile marker filter, per-test timeout overrides, bytecode-check narrowing) is independently revertible with no cross-file coupling beyond sandbox.py/diff_applier.py sharing kill_process_group.",
+  "schema": "dharma_swarm.session_entry.v1",
+  "tool_versions": {
+   "git": "2.43.0",
+   "make": "4.3",
+   "python": "3.11.15"
+  },
+  "work_packet": "WP-0D"
+ },
+ "worktree": "."
+}
