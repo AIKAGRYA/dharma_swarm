@@ -269,6 +269,48 @@ def test_gate_pressure_paths_match():
     )
 
 
+def test_archaeology_env_gate_prevents_task_construction(monkeypatch):
+    """The launchd disable gate must remove archaeology before its body starts."""
+    from dharma_swarm.orchestrate_live import _apply_runtime_loop_env_gates
+    from dharma_swarm.loop_supervisor import LoopSupervisor
+
+    supervisor = LoopSupervisor()
+    supervisor.register_loop("archaeology", expected_interval=1800)
+    factories = {
+        "swarm": object(),
+        "archaeology": object(),
+    }
+    monkeypatch.setenv("DGC_ARCHAEOLOGY_INGESTION", "0")
+
+    _apply_runtime_loop_env_gates(factories, supervisor)
+
+    assert set(factories) == {"swarm"}
+    archaeology = supervisor._loops["archaeology"]
+    assert archaeology.state == "DISABLED"
+    assert archaeology.disabled_reason == "DGC_ARCHAEOLOGY_INGESTION=0"
+
+
+@pytest.mark.parametrize("value", [None, "1", "true", "yes", "on"])
+def test_archaeology_env_gate_defaults_enabled(monkeypatch, value):
+    """Unset or affirmative values preserve the existing enabled behavior."""
+    from dharma_swarm.orchestrate_live import _apply_runtime_loop_env_gates
+    from dharma_swarm.loop_supervisor import LoopSupervisor
+
+    if value is None:
+        monkeypatch.delenv("DGC_ARCHAEOLOGY_INGESTION", raising=False)
+    else:
+        monkeypatch.setenv("DGC_ARCHAEOLOGY_INGESTION", value)
+    supervisor = LoopSupervisor()
+    supervisor.register_loop("archaeology", expected_interval=1800)
+    factory = object()
+    factories = {"archaeology": factory}
+
+    _apply_runtime_loop_env_gates(factories, supervisor)
+
+    assert factories["archaeology"] is factory
+    assert supervisor._loops["archaeology"].state == "NEVER_STARTED"
+
+
 # ---------------------------------------------------------------------------
 # orchestrate function signature
 # ---------------------------------------------------------------------------
