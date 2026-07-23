@@ -35,7 +35,7 @@ from scripts.store_inventory_census import (  # noqa: E402
 # PR to silently re-grow into. Consolidation LOWERS a baseline; a genuinely new
 # store must be justified in review before RAISING one.
 BASELINE_DB_NAMES = 39
-BASELINE_JSONL_NAMES = 215
+BASELINE_JSONL_NAMES = 216
 BASELINE_LEDGER_MODULES = 11
 BASELINE_LEDGER_CLASSES = 11
 

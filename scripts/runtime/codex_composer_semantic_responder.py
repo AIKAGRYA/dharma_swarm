@@ -25,14 +25,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-try:  # These projection modules are not yet present on canonical main.
-    from dharma_swarm.holon_canonical_state import (  # noqa: E402
-        project_canonical_holon_state,
-    )
-    from dharma_swarm.holon_service_liveness import record_service_heartbeat  # noqa: E402
-except ModuleNotFoundError:  # pragma: no cover - exercised through the availability flag
-    project_canonical_holon_state = None
-    record_service_heartbeat = None
+from dharma_swarm.daemon_config import dharma_state_dir  # noqa: E402
 from scripts.runtime.a2a_domain_reply_worker import (  # noqa: E402
     DEFAULT_OUTBOX_ROOT,
     DEFAULT_RECEIPT_DIR as DEFAULT_DOMAIN_REPLY_RECEIPT_DIR,
@@ -48,7 +41,7 @@ from scripts.runtime.codex_composer_semantic_inbox_drain import (  # noqa: E402
 from scripts.runtime.pr_merge_control import _nats_config, stamp, utc_now  # noqa: E402
 
 DEFAULT_AGENT_UID = "codex_composer"
-DEFAULT_DHARMA_HOME = Path.home() / ".dharma"
+DEFAULT_DHARMA_HOME = dharma_state_dir("DHARMA_STATE_DIR", "DHARMA_HOME")
 DEFAULT_INBOX_DIR = DEFAULT_DHARMA_HOME / "a2a_bus" / "inboxes" / DEFAULT_AGENT_UID
 DEFAULT_SEND_RECEIPT_ROOT = REPO_ROOT / "reports" / "a2a" / "send_receipts"
 DEFAULT_STATE_DIR = (
@@ -69,9 +62,7 @@ CANONICAL_PROJECTION_SCHEMA_VERSION = (
 )
 RESPONDER_SERVICE_ID = "codex-composer-semantic-responder"
 RESPONDER_LAUNCHD_LABEL = "com.dharma.codex-composer-semantic-responder"
-CANONICAL_PROJECTION_AVAILABLE = (
-    project_canonical_holon_state is not None and record_service_heartbeat is not None
-)
+CANONICAL_PROJECTION_AVAILABLE = False
 NO_PENDING_DELIVERIES_STATUS = "NO_PENDING_DELIVERIES"
 DELIVERIES_LEASE_HELD_STATUS = "PENDING_DELIVERIES_LEASE_HELD"
 # A semantic drain succeeded (model-authored artifact exists) but the domain
@@ -333,65 +324,19 @@ def project_canonical_responder_state(
     state_dir: Path,
     latest_receipt: dict[str, Any] | None = None,
 ) -> Path:
-    """Project responder liveness into canonical fleet truth."""
-    if not CANONICAL_PROJECTION_AVAILABLE:
-        raise RuntimeError(
-            "canonical holon projection modules are unavailable on this checkout"
-        )
-    assert record_service_heartbeat is not None
-    assert project_canonical_holon_state is not None
-    path = canonical_state_path.expanduser().resolve()
-    existing = _read_json_or_empty(path)
-    _assert_safe_canonical_target(path, agent_uid, existing)
-    loop_status = str(heartbeat.get("loop_status") or "unknown")
-    runtime_status = _responder_runtime_status(loop_status)
-    latest_processed = _latest_processed_delivery(state_dir)
-    latest_refs = _latest_receipt_refs(latest_receipt)
-    agents_root = path.parent.parent.parent / "agents"
-    record_service_heartbeat(
+    """Fail honestly until canonical main supplies the projection modules."""
+    del (
+        canonical_state_path,
+        heartbeat,
         agent_uid,
-        agents_root=agents_root,
-        service_id=RESPONDER_SERVICE_ID,
-        status="idle" if runtime_status in {
-            "idle",
-            "processed_delivery",
-            "waiting_on_delivery_lease",
-            "baselined_existing_backlog",
-        } else "error",
-        runtime_ref={
-            "loop_status": loop_status,
-            "runtime_status": runtime_status,
-            "pending_delivery_count": int(heartbeat.get("pending_delivery_count") or 0),
-            "provider": provider,
-            "model": model,
-        },
-        proof_ref={
-            "kind": "codex_composer_semantic_responder_loop",
-            "local_heartbeat_path": str(heartbeat.get("heartbeat_path") or ""),
-            "latest_receipt": latest_refs,
-        },
-        claim_scope={
-            "semantic_responder_fresh": True,
-            "last_processed_delivery_status": str(latest_processed.get("status") or loop_status),
-            "no_pending_deliveries": loop_status == NO_PENDING_DELIVERIES_STATUS,
-            "handler_ack_is_semantic_cognition": False,
-            "live_model_call_claimed": False,
-        },
+        provider,
+        model,
+        state_dir,
+        latest_receipt,
     )
-
-    project_canonical_holon_state(
-        agent_uid,
-        agents_root=agents_root,
-        a2a_bus=path.parent.parent,
-        semantic_responder_state_dir=state_dir,
-        provider=provider,
-        model=model,
-        service_id=RESPONDER_SERVICE_ID,
-        launchd_label=RESPONDER_LAUNCHD_LABEL,
-        pid=int(heartbeat.get("pid") or os.getpid()),
-        live_model_call_claimed=False,
+    raise RuntimeError(
+        "canonical holon projection modules are unavailable on this checkout"
     )
-    return path
 
 
 CanonicalProjector = Callable[..., Path]
