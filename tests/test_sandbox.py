@@ -1,5 +1,7 @@
 """Tests for dharma_swarm.sandbox."""
 
+import time
+
 import pytest
 
 from dharma_swarm.sandbox import LocalSandbox, SandboxError, SandboxManager
@@ -27,8 +29,31 @@ async def test_execute_python():
 @pytest.mark.asyncio
 async def test_execute_timeout():
     sb = LocalSandbox()
+    started = time.monotonic()
     result = await sb.execute("sleep 10", timeout=0.5)
+    elapsed = time.monotonic() - started
     assert result.timed_out
+    # A lone proc.kill() only signals the shell; without killing the whole
+    # process group a non-exec'd grandchild survives it, keeps the piped
+    # stdout/stderr open, and execute() silently blocks for the full 10s
+    # instead of honoring `timeout` -- result.timed_out alone doesn't catch
+    # that, only wall-clock does.
+    assert elapsed < 5, f"execute() took {elapsed:.1f}s, timeout=0.5 was not enforced"
+    await sb.cleanup()
+
+
+@pytest.mark.asyncio
+async def test_execute_timeout_kills_non_exec_grandchild():
+    """dash doesn't always exec-replace a single command, so a plain
+    proc.kill() can leave the real work alive under a dead shell PID."""
+    sb = LocalSandbox()
+    started = time.monotonic()
+    result = await sb.execute(
+        'python3 -c "import time; time.sleep(10)"', timeout=0.5
+    )
+    elapsed = time.monotonic() - started
+    assert result.timed_out
+    assert elapsed < 5, f"execute() took {elapsed:.1f}s, timeout=0.5 was not enforced"
     await sb.cleanup()
 
 

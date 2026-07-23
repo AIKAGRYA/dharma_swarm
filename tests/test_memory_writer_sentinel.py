@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from dharma_swarm.memory_kernel import (
     DiscoveredWriteStatus,
     DiscoveryTriageCategory,
@@ -174,7 +176,9 @@ def test_writer_sentinel_cli_reports_summary(capsys) -> None:
     assert '"unregistered_surface_count"' in out
 
 
+@pytest.mark.timeout(60)
 def test_writer_sentinel_cli_reports_discovery_summary(capsys) -> None:
+    """Same real repo-wide scan cost as the sibling test below (WP-0D)."""
     repo_root = Path(__file__).resolve().parents[1]
 
     assert writer_sentinel_cli_main(["--repo-root", str(repo_root), "--discover"]) == 0
@@ -185,7 +189,13 @@ def test_writer_sentinel_cli_reports_discovery_summary(capsys) -> None:
     assert '"by_triage"' in out
 
 
+@pytest.mark.timeout(60)
 def test_writer_sentinel_cli_action_required_gate_passes_for_triaged_repo(capsys) -> None:
+    """discover_write_paths scans the whole real repo tree, so cost scales
+    with repo size like the QL-R1 quality ratchet does; ~14s call time on
+    this checkout already crosses test-fast's blanket 10s budget (WP-0D
+    suite-context timeout). A per-test override, not a `slow` marker, since
+    both required CI and `make test` filter -m "not slow"."""
     repo_root = Path(__file__).resolve().parents[1]
 
     assert (
@@ -253,7 +263,9 @@ def test_tfidf_embedder_move_keeps_registered_writer_spec() -> None:
     assert tfidf_write.matched_writer_ids == ("vector_store.tfidf_state",)
 
 
+@pytest.mark.timeout(60)
 def test_writer_sentinel_cli_ci_profile_runs_discovery_and_gates(capsys) -> None:
+    """Same real repo-wide scan cost as the other tests above (WP-0D)."""
     repo_root = Path(__file__).resolve().parents[1]
 
     assert writer_sentinel_cli_main(["--repo-root", str(repo_root), "--ci"]) == 0
@@ -264,7 +276,9 @@ def test_writer_sentinel_cli_ci_profile_runs_discovery_and_gates(capsys) -> None
     assert '"unregistered_surface_count": 0' in out
 
 
+@pytest.mark.timeout(60)
 def test_writer_sentinel_cli_writes_markdown_report(tmp_path: Path, capsys) -> None:
+    """Same real repo-wide --discover scan cost as the other tests above (WP-0D)."""
     repo_root = Path(__file__).resolve().parents[1]
     report_path = tmp_path / "writer_report.md"
 

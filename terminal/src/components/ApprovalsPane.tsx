@@ -27,14 +27,14 @@ export function ApprovalsPane({title, approvalPane}: Props): React.ReactElement 
   const selected = selectedApprovalEntry(approvalPane);
 
   return (
-    <Box flexGrow={1} borderStyle="round" borderColor={THEME.vermilion} paddingX={1} flexDirection="column">
-      <Text color={THEME.vermilion} bold>{title}</Text>
+    <Box flexGrow={1} borderStyle="round" borderColor={THEME.ridge} paddingX={1} flexDirection="column">
+      <Text color={THEME.wave} bold>{title}</Text>
       <Text color={THEME.stone}>
         {approvalPane.historyBacked ? "history-backed" : "provisional-live"} | pending {pending.length} | tracked {entries.length}
       </Text>
       <Box marginTop={1}>
-        <Box width="35%" flexDirection="column" borderStyle="single" borderColor={THEME.ink} paddingX={1}>
-          <Text color={THEME.parchment} bold>Queue</Text>
+        <Box width="35%" flexDirection="column" paddingX={1}>
+          <Text color={THEME.mist} bold>Queue</Text>
           <Text color={THEME.stone}>pending-first operator decisions</Text>
           {entries.length === 0 ? (
             <Text color={THEME.stone}>No approvals.</Text>
@@ -43,8 +43,8 @@ export function ApprovalsPane({title, approvalPane}: Props): React.ReactElement 
               const active = approvalPane.selectedActionId === entry.decision.action_id;
               const tone = active ? THEME.wave : entry.pending ? THEME.parchment : THEME.stone;
               return (
-                <Box key={entry.decision.action_id} flexDirection="column" marginTop={1} borderStyle={active ? "round" : undefined} borderColor={active ? THEME.wave : undefined} paddingX={active ? 1 : 0}>
-                  <Text color={tone} bold={active}>
+                <Box key={entry.decision.action_id} flexDirection="column" marginTop={1}>
+                  <Text color={tone} bold={active} backgroundColor={active ? THEME.harbor : undefined}>
                     {active ? "◆ " : "• "}
                     {entry.decision.tool_name} | {entry.status}
                   </Text>
@@ -56,8 +56,8 @@ export function ApprovalsPane({title, approvalPane}: Props): React.ReactElement 
             })
           )}
         </Box>
-        <Box width="65%" marginLeft={1} flexDirection="column" borderStyle="single" borderColor={THEME.ink} paddingX={1}>
-          <Text color={THEME.wave} bold>Selected</Text>
+        <Box width="65%" marginLeft={1} flexDirection="column" paddingX={1}>
+          <Text color={THEME.mist} bold>Selected</Text>
           <Text color={THEME.stone}>decision, resolution, and runtime trace</Text>
           {!selected ? (
             <Text color={THEME.stone}>No selected approval.</Text>
@@ -67,17 +67,17 @@ export function ApprovalsPane({title, approvalPane}: Props): React.ReactElement 
               <Text color={THEME.stone}>status {selected.status} | risk {selected.decision.risk}</Text>
               <Text color={THEME.stone}>session {String(selected.decision.metadata.session_id ?? "none")} | provider {String(selected.decision.metadata.provider_id ?? "unknown")}</Text>
               <Text color={THEME.stone}>action {selected.decision.action_id} | tool call {String(selected.decision.metadata.tool_call_id ?? "none")}</Text>
-              <Text color={THEME.parchment} bold>Rationale</Text>
+              <Text color={THEME.mist} bold>Rationale</Text>
               <Text color={THEME.foam}>{selected.decision.rationale}</Text>
               {selected.resolution ? (
                 <>
-                  <Text color={THEME.parchment} bold>Resolution</Text>
+                  <Text color={THEME.mist} bold>Resolution</Text>
                   <Text color={THEME.foam}>{selected.resolution.resolution} | {selected.resolution.enforcement_state}</Text>
                 </>
               ) : null}
               {selected.outcome ? (
                 <>
-                  <Text color={THEME.parchment} bold>Runtime outcome</Text>
+                  <Text color={THEME.mist} bold>Runtime outcome</Text>
                   <Text color={THEME.foam}>{selected.outcome.outcome} | {selected.outcome.source}</Text>
                 </>
               ) : null}

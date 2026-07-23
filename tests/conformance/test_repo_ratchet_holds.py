@@ -26,8 +26,20 @@ counters_mod = _load_hygiene_module("ratchet_counters")
 ratchet = _load_hygiene_module("ratchet")
 
 
+@pytest.mark.timeout(60)
 def test_repo_quality_ratchet_has_no_regressions() -> None:
-    """QL-R1: every tracked quality counter must respect its stored bound."""
+    """QL-R1: every tracked quality counter must respect its stored bound.
+
+    A repo-wide AST/quality sweep (~7-8s standalone on this checkout) scales
+    with repo size; under the full ``tests/`` collection (14k+ items) its
+    wall time crosses ``test-fast``'s blanket 10s budget even though nothing
+    regressed (WP-0D suite-context timeout). ``@pytest.mark.slow`` was
+    rejected here: both required CI contexts and ``make test`` filter with
+    ``-m "not slow"`` (``.github/workflows/tests.yml``, ``Makefile``), so
+    that marker would silently drop this ratchet from every automated gate
+    instead of fixing its timing. A per-test override keeps it running
+    everywhere with headroom proportional to repo growth instead.
+    """
     baseline_path = REPO_ROOT / ratchet.BASELINE_PATH
     try:
         baselines = ratchet.load_baselines(baseline_path)

@@ -4,6 +4,9 @@ import React from "react";
 import {RepoPane, buildRepoPaneSections, sectionCardSummaries} from "../src/components/RepoPane";
 import {workspacePayloadToPreview, workspacePreviewToLines, workspaceSnapshotToPreview} from "../src/protocol";
 import type {TabPreview, TranscriptLine, WorkspaceSnapshotPayload} from "../src/types";
+import path from "node:path";
+
+const REPO_ROOT = path.resolve(import.meta.dir, "..", "..");
 
 function flattenElementText(node: React.ReactNode): string[] {
   if (node === null || node === undefined || typeof node === "boolean") {
@@ -24,7 +27,7 @@ function flattenElementText(node: React.ReactNode): string[] {
 describe("buildRepoPaneSections", () => {
   test("renders live workspace snapshot facts in the visible repo pane", () => {
     const workspaceSnapshot = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 0 | unstaged 517 | untracked 46
 Git hotspots: terminal (281); .dharma_psmv_hyperfile_branch (147); dharma_swarm (93)
 Git changed paths: terminal/src/app.tsx; terminal/src/components/RepoPane.tsx; terminal/tests/repoPane.test.ts
@@ -83,7 +86,7 @@ Workflows: 1
       "Snapshot truth branch main@95210b1 | dirty staged 0 | unstaged 517 | untracked 46 | warn sab_canonical_repo_missing | hotspot change terminal (281); .dharma_psmv_hyperfile_branch (147); dharma_swarm (93)",
     );
     expect(visibleText).toContain("Snapshot repo risk tracking origin/main in sync | sab_canonical_repo_missing");
-    expect(visibleText).toContain("Snapshot focus Root /Users/dhyana/dharma_swarm | lead terminal/src/app.tsx");
+    expect(visibleText).toContain(`Snapshot focus Root ${REPO_ROOT} | lead terminal/src/app.tsx`);
     expect(visibleText).toContain(
       "Snapshot topology pulse Topology pressure dharma_swarm Δ563 (517 modified, 46 untracked); dgc-core clean | peers 2",
     );
@@ -100,7 +103,7 @@ Workflows: 1
     const sections = buildRepoPaneSections(
       {
         Authority: "placeholder | bridge offline | awaiting authoritative repo refresh",
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "95210b1",
         "Branch status": "tracking origin/main in sync",
@@ -137,7 +140,7 @@ Workflows: 1
   test("prefers an explicit repo truth preview over recomputing snapshot truth rows", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "804d5d1",
         "Repo truth preview": "branch main@804d5d1 | dirty compact | warn sab_canonical_repo_missing | hotspot terminal focus",
@@ -162,7 +165,7 @@ Workflows: 1
   test("prefers explicit branch divergence and detached peer fields when present", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "804d5d1",
         "Branch status": "tracking origin/main ahead 2",
@@ -190,7 +193,7 @@ Workflows: 1
   test("derives dirty counts from compact repo truth previews when expanded git count rows are absent", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "804d5d1",
         "Branch status": "tracking origin/main ahead 2",
@@ -218,7 +221,7 @@ Workflows: 1
   test("derives topology warnings and hotspot rows from compact repo truth previews when expanded rows are absent", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         "Branch status": "tracking origin/main ahead 2",
         Sync: "origin/main | ahead 2 | behind 0",
         Ahead: "2",
@@ -258,7 +261,7 @@ Workflows: 1
   test("counts semicolon-delimited topology warnings from compact repo truth previews", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         "Branch status": "tracking origin/main [ahead 2, behind 1]",
         "Repo truth preview":
           "branch main@804d5d1 | dirty staged 112 | unstaged 545 | untracked 112 | warn peer_branch_diverged; sab_canonical_repo_missing | hotspot change terminal (281)",
@@ -276,7 +279,7 @@ Workflows: 1
   test("synthesizes topology counts and runtime summary from compact repo/control previews", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         "Repo/control preview":
           "fresh | task terminal-repo-pane | branch feature/repo-pane@804d5d1 | tracking origin/main ahead 2 | warn peer_branch_diverged; sab_canonical_repo_missing | peers dharma_swarm (canonical_core, main...origin/main, dirty True); dgc-core (operator_shell, detached, dirty True) | dirty staged 112 | unstaged 545 | untracked 112 | hotspot change terminal (281) | path terminal/src/components/RepoPane.tsx | dep dharma_swarm.models | inbound 159 | db /Users/dhyana/.dharma/state/runtime.db | activity Sessions=18 Runs=2 ActiveRuns=1 | artifacts Artifacts=7 ContextBundles=1 | verify tsc=ok",
       },
@@ -295,7 +298,7 @@ Workflows: 1
   test("keeps multi-warning members in operator snapshot rows when only repo/control preview is persisted", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         "Repo/control preview":
           "fresh | task terminal-repo-pane | branch main@804d5d1 | diverged from origin/main (+2/-1) | warn peer_branch_diverged; sab_canonical_repo_missing | peers dharma_swarm (canonical_core, main...origin/main [ahead 2, behind 1], dirty true); dgc-core (operator_shell, detached, dirty true) | drift dharma_swarm drift main...origin/main [ahead 2, behind 1] | detached dgc-core detached | dirty staged 112 | unstaged 557 | untracked 136 | hotspot change terminal (77) | path terminal/src/components/RepoPane.tsx | dep dharma_swarm.models | inbound 161 | db /Users/dhyana/.dharma/state/runtime.db | activity Sessions=20 Runs=0 | artifacts Artifacts=0 ContextBundles=0 | verify tsc=ok",
       },
@@ -316,7 +319,7 @@ Workflows: 1
   test("derives branch and head labels from compact repo truth previews when explicit git rows are absent", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         "Branch status": "tracking origin/main ahead 2",
         Sync: "origin/main | ahead 2 | behind 0",
         Ahead: "2",
@@ -342,7 +345,7 @@ Workflows: 1
   test("derives branch sync details from compact branch sync previews when expanded git sync rows are absent", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "804d5d1",
         "Branch sync preview": "tracking origin/main ahead 2 | +2/-0 | topology sab_canonical_repo_missing; high (656 local changes)",
@@ -369,7 +372,7 @@ Workflows: 1
   test("derives branch sync counts from git-status branch sync previews without a +N/-M token", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "804d5d1",
         "Branch sync preview": "main...origin/main [ahead 2]",
@@ -395,7 +398,7 @@ Workflows: 1
   test("prefers an explicit control truth preview over recomputing control snapshot truth rows", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "804d5d1",
       },
@@ -418,7 +421,7 @@ Workflows: 1
   test("derives repo control snapshot rows from compact control freshness when expanded verification fields are absent", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "804d5d1",
       },
@@ -460,7 +463,7 @@ Workflows: 1
   test("derives compact runtime activity labels from partial live control state rows", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "804d5d1",
         "Branch status": "tracking origin/main ahead 2",
@@ -510,7 +513,7 @@ Workflows: 1
   test("enriches compact repo/control snapshot truth rows with repo facts", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "abc123",
         "Repo/control preview":
@@ -532,7 +535,7 @@ Workflows: 1
   test("derives compact runtime activity labels from runtime summary when detailed control rows are absent", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "804d5d1",
         "Branch status": "tracking origin/main ahead 2",
@@ -580,7 +583,7 @@ Workflows: 1
   test("derives control outcome from compact pulse previews when explicit outcome rows are absent", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "804d5d1",
         "Branch status": "tracking origin/main ahead 2",
@@ -619,7 +622,7 @@ Workflows: 1
   test("preserves stored repo/control preview when the live control preview is only a placeholder", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "95210b1",
         "Branch status": "tracking origin/main in sync",
@@ -681,7 +684,7 @@ Workflows: 1
   test("reconstructs snapshot task rows from compact repo/control previews during placeholder-only control intervals", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "95210b1",
         "Branch status": "tracking origin/main in sync",
@@ -725,7 +728,7 @@ Workflows: 1
   test("promotes live snapshot rows to the top of the snapshot section before structural detail rows", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "804d5d1",
         "Branch status": "tracking origin/main ahead 2",
@@ -783,7 +786,7 @@ Workflows: 1
       "Snapshot topology degraded (1 warning, 1 peer) | warnings 1 (sab_canonical_repo_missing)",
       "Snapshot warning members sab_canonical_repo_missing",
     ]);
-    expect(snapshotRows.indexOf("Root /Users/dhyana/dharma_swarm")).toBeGreaterThan(
+    expect(snapshotRows.indexOf(`Root ${REPO_ROOT}`)).toBeGreaterThan(
       snapshotRows.indexOf(
         "Snapshot repo/control stale | task terminal-repo-pane | branch main@804d5d1 | tracking origin/main ahead 2 | dirty staged 97 | unstaged 505 | untracked 54 | warn 1 (sab_canonical_repo_missing) | peer dharma_swarm (canonical_core, main...origin/main, dirty True) | peers dharma_swarm (canonical_core, main...origin/main, dirty True) | drift dharma_swarm track main...origin/main | markers dharma_swarm track main...origin/main | divergence local +2/-0 | peer dharma_swarm track main...origin/main | hotspot terminal (281) | path terminal/src/components/RepoPane.tsx | dep dharma_swarm.models | inbound 159 | cycle 19 running | updated 2026-04-03T02:16:08Z | verify tsc=ok | cycle_acceptance=ok",
       ),
@@ -794,7 +797,7 @@ Workflows: 1
     const pane = RepoPane({
       title: "Repo",
       preview: {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "95210b1",
         "Branch status": "tracking origin/main in sync",
@@ -827,13 +830,13 @@ Workflows: 1
     expect(visibleText).toContain(
       "Snapshot repo/control stale | task terminal-repo-pane | branch main@95210b1 | tracking origin/main in sync | sab_canonical_repo_missing | dirty high (552 local changes) | hotspot change terminal (274) | path terminal/src/app.tsx | dep dharma_swarm.models | inbound 159 | cycle 13 ready | updated 2026-04-03T01:15:00Z | verify tsc=ok",
     );
-    expect(visibleText).not.toContain("  Root /Users/dhyana/dharma_swarm");
+    expect(visibleText).not.toContain(`  Root ${REPO_ROOT}`);
   });
 
   test("surfaces runtime rows from stored repo/control previews during placeholder-only control intervals", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "95210b1",
         "Branch status": "tracking origin/main in sync",
@@ -883,7 +886,7 @@ Workflows: 1
   test("prefers live runtime inventory over stale repo/control runtime counts during partial control refreshes", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "804d5d1",
         "Branch status": "tracking origin/main ahead 2",
@@ -919,7 +922,7 @@ Workflows: 1
     const pane = RepoPane({
       title: "Repo",
       preview: {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "95210b1",
         Upstream: "origin/main",
@@ -976,7 +979,7 @@ Workflows: 1
     const pane = RepoPane({
       title: "Repo",
       preview: {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "95210b1",
         Upstream: "origin/main",
@@ -1066,7 +1069,7 @@ Workflows: 1
 
   test("renders structured repo sections from preview fields", () => {
     const preview: TabPreview = {
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "95210b1",
       Upstream: "origin/main",
@@ -1164,7 +1167,7 @@ Workflows: 1
       "Snapshot branch sync tracking origin/main in sync | +0/-0 | topology sab_canonical_repo_missing; high (552 local changes)",
       "Snapshot dirty high (552 local changes) | staged 0 | unstaged 510 | untracked 42",
     ]);
-    expect(sections[1]?.rows).toContain("Root /Users/dhyana/dharma_swarm");
+    expect(sections[1]?.rows).toContain(`Root ${REPO_ROOT}`);
     expect(sections[1]?.rows).toContain(
       "Snapshot truth tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=ok | cycle 23 running | next n/a",
     );
@@ -1308,7 +1311,7 @@ Workflows: 1
 
   test("fills missing repo and control fields from transcript lines", () => {
     const repoLines: TranscriptLine[] = [
-      {id: "1", kind: "system", text: "Repo root: /Users/dhyana/dharma_swarm"},
+      {id: "1", kind: "system", text: `Repo root: ${REPO_ROOT}`},
       {id: "2", kind: "system", text: "Branch: main"},
       {id: "3", kind: "system", text: "Head: 95210b1"},
       {id: "4", kind: "system", text: "Upstream: origin/main"},
@@ -1379,7 +1382,7 @@ Workflows: 1
 
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
       },
       repoLines,
@@ -1533,7 +1536,7 @@ Workflows: 1
   test("derives hotspot summary fallback in repo sections from partial live hotspot fields", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "95210b1",
         "Branch status": "tracking origin/main in sync",
@@ -1578,7 +1581,7 @@ Workflows: 1
   test("normalizes compact hotspot labels before repo summary rows add change prefixes", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         "Dirty pressure": "high (7 local changes)",
         "Repo risk": "topology peer_branch_diverged; high (7 local changes)",
         "Repo/control preview":
@@ -1598,7 +1601,7 @@ Workflows: 1
   test("surfaces detached peer anomalies separately from branch divergence", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "95210b1",
         Upstream: "origin/main",
@@ -1639,7 +1642,7 @@ Workflows: 1
 
   test("surfaces the warning-bearing peer in repo sections when workspace snapshot topology warnings point away from the first peer", () => {
     const preview = workspaceSnapshotToPreview(`# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 1 | unstaged 2 | untracked 3
 Git hotspots: terminal (4)
 Git changed paths: terminal/src/components/RepoPane.tsx
@@ -1662,7 +1665,7 @@ Git sync: origin/main | ahead 2 | behind 1
 
   test("surfaces detached warning-bearing peer facts in section rail summaries", () => {
     const preview = workspaceSnapshotToPreview(`# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 1 | unstaged 2 | untracked 3
 Git hotspots: terminal (4)
 Git changed paths: terminal/src/components/RepoPane.tsx
@@ -1684,7 +1687,7 @@ Git sync: origin/main | ahead 2 | behind 1
 
   test("promotes detached divergence and topology pressure into snapshot rail summaries", () => {
     const preview = workspaceSnapshotToPreview(`# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 1 | unstaged 2 | untracked 3
 Git hotspots: terminal (4)
 Git changed paths: terminal/src/components/RepoPane.tsx
@@ -1710,7 +1713,7 @@ Git sync: origin/main | ahead 2 | behind 1
   test("promotes dirty and hotspot signal into snapshot rail summaries when topology is stable", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "804d5d1",
         Upstream: "origin/main",
@@ -1778,7 +1781,7 @@ Git sync: origin/main | ahead 2 | behind 1
   test("derives topology warning and peer rows from repo risk preview when topology preview is absent", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "95210b1",
         Upstream: "origin/main",
@@ -1807,7 +1810,7 @@ Git sync: origin/main | ahead 2 | behind 1
   test("derives branch divergence and detached peer rows from compact repo/control preview alone", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         "Repo/control preview":
         "stale | task terminal-repo-pane | branch main@804d5d1 | tracking origin/main ahead 2 | dirty high (656 local changes) | warn peer_branch_diverged | peer dharma_swarm (canonical_core, main...origin/main, dirty True) | peers dharma_swarm (canonical_core, main...origin/main, dirty True); dgc-core (operator_shell, detached, dirty True) | drift dharma_swarm drift main...origin/main | markers dharma_swarm drift main...origin/main; dgc-core n/a | divergence local +2/-1 | peer dharma_swarm drift main...origin/main | detached dgc-core detached | hotspot change terminal (281) | cycle 8 running | updated 2026-04-03T02:16:08Z | verify tsc=ok | cycle_acceptance=fail",
       },
@@ -1837,7 +1840,7 @@ Git sync: origin/main | ahead 2 | behind 1
   test("derives branch and head rows from compact repo/control preview alone", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         "Repo/control preview":
           "stale | task terminal-repo-pane | branch main@804d5d1 | tracking origin/main ahead 2 | dirty high (656 local changes) | hotspot change terminal (281)",
       },
@@ -1853,7 +1856,7 @@ Git sync: origin/main | ahead 2 | behind 1
   test("derives ahead and behind counts from human branch-status phrasing inside compact repo/control previews", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         "Repo/control preview":
           "stale | task terminal-repo-pane | branch main@804d5d1 | ahead of origin/main by 2 | dirty high (7 local changes) | hotspot change terminal (4)",
       },
@@ -1872,7 +1875,7 @@ Git sync: origin/main | ahead 2 | behind 1
   test("derives ahead and behind counts from git bracket branch-status phrasing inside compact repo/control previews", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         "Repo/control preview":
           "stale | task terminal-repo-pane | branch main@804d5d1 | main...origin/main [ahead 2, behind 1] | dirty high (7 local changes) | hotspot change terminal (4)",
       },
@@ -1889,7 +1892,7 @@ Git sync: origin/main | ahead 2 | behind 1
   test("uses numeric compact peer counts from repo/control preview in topology rows", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         "Repo/control preview":
           "stale | task terminal-repo-pane | branch main@804d5d1 | tracking origin/main ahead 2 | warn peer_branch_diverged | peers 2 | divergence local +2/-1 | hotspot change terminal (281)",
       },
@@ -1905,7 +1908,7 @@ Git sync: origin/main | ahead 2 | behind 1
   test("derives dirty and hotspot rows from compact repo/control preview alone", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         "Dirty pressure": "high (656 local changes)",
         "Repo risk": "topology sab_canonical_repo_missing; high (656 local changes)",
         "Repo/control preview":
@@ -1940,7 +1943,7 @@ Git sync: origin/main | ahead 2 | behind 1
 
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "95210b1",
         Upstream: "origin/main",
@@ -2008,7 +2011,7 @@ Git sync: origin/main | ahead 2 | behind 1
     expect(sections[0]?.rows).toContain(
       "Dirty staged 0 | unstaged 517 | untracked 46 | topo 1 (sab_canonical_repo_missing) | lead terminal (274)",
     );
-    expect(sections[0]?.rows).toContain("Snapshot focus Root /Users/dhyana/dharma_swarm | lead terminal/src/app.tsx");
+    expect(sections[0]?.rows).toContain(`Snapshot focus Root ${REPO_ROOT} | lead terminal/src/app.tsx`);
     expect(sections[0]?.rows).toContain(
       "Snapshot topology pulse Topology pressure dharma_swarm Δ563 (517 modified, 46 untracked) | peers 1",
     );
@@ -2104,7 +2107,7 @@ Git sync: origin/main | ahead 2 | behind 1
   test("derives repo/control freshness from runtime freshness when updated is absent", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "804d5d1",
         "Branch status": "tracking origin/main ahead 2",
@@ -2159,7 +2162,7 @@ Git sync: origin/main | ahead 2 | behind 1
   test("promotes fallback runtime and verification rows into snapshot card summaries", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "95210b1",
         "Branch status": "tracking origin/main in sync",
@@ -2224,7 +2227,7 @@ Git sync: origin/main | ahead 2 | behind 1
   test("promotes live control runtime and verification rows into snapshot and repo rail summaries", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "804d5d1",
         "Branch status": "tracking origin/main ahead 2",
@@ -2281,7 +2284,7 @@ Git sync: origin/main | ahead 2 | behind 1
   test("carries hotspot summary into repo/control correlation rows", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "804d5d1",
         "Branch status": "tracking origin/main ahead 2",
@@ -2313,7 +2316,7 @@ Git sync: origin/main | ahead 2 | behind 1
 
   test("derives missing topology rows from partial live repo previews", () => {
     const preview: TabPreview = {
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "95210b1",
       Ahead: "0",
@@ -2368,7 +2371,7 @@ Git sync: origin/main | ahead 2 | behind 1
   test("synthesizes numeric peer counts into live repo/control preview when peer roster is absent", () => {
     const sections = buildRepoPaneSections(
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         Head: "804d5d1",
         "Branch status": "tracking origin/main ahead 2",

@@ -37,6 +37,15 @@ class SessionStart(CanonicalEvent):
 
 
 @dataclass(slots=True)
+class UserPrompt(CanonicalEvent):
+    """Operator-origin prompt accepted for one canonical session turn."""
+
+    type: str = "user_prompt"
+    content: str = ""
+    role: str = "user"
+
+
+@dataclass(slots=True)
 class SessionEnd(CanonicalEvent):
     type: str = "session_end"
     success: bool = True
@@ -208,6 +217,7 @@ class PermissionOutcomeEvent(CanonicalEvent):
 
 EVENT_TYPES: dict[str, type[CanonicalEvent]] = {
     "session_start": SessionStart,
+    "user_prompt": UserPrompt,
     "session_end": SessionEnd,
     "text_delta": TextDelta,
     "text_complete": TextComplete,
@@ -232,6 +242,7 @@ EVENT_TYPES: dict[str, type[CanonicalEvent]] = {
 
 CanonicalEventType = (
     SessionStart
+    | UserPrompt
     | SessionEnd
     | TextDelta
     | TextComplete

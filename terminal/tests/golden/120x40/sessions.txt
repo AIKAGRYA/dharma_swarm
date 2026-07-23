@@ -1,0 +1,40 @@
+ ◆ DHARMA COMMAND POST  ·  Sessions  ·  panes 15  ·  F2 zen · ^K panes
+ loop unknown   verify unknown   runtime idle   approvals clear   sessions 0
+◂ Ontology Runtime [Sessions] Approvals Control Agents ▸
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Sessions                                                                                                             │
+│ 0 shown of 0 | rows 0 | next fresh | j/k select | Enter detail | r resume | f fresh                                  │
+│                                                                                                                      │
+│  Catalog                                  Drilldown                                                                  │
+│  id · route · status                      identity, replay, and typed conversation                                   │
+│  No sessions.                             No selected session.                                                       │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ >  Navigation active · Esc returns to composer                                                                       │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ session list  ·  route claude:claude-opus-4.8  ·  ○ offline  ·  responsive  ·  awaiting_bridge_policy

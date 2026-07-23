@@ -1,3 +1,13 @@
+// F-022: compactShell <=90 regression fence. The compact layout must keep
+// rendering after the F-021 one-line tab bar change — this file pins the
+// degradation markers (compact header brand, compact status label, one-line
+// tab bar, borderless summary strip) and the exact <=90 threshold.
+//
+// Width mechanism (the non-obvious part): App computes terminalWidth from
+// process.stdout.columns ?? Number(COLUMNS) (src/app.tsx) — NOT from the
+// stdout handed to ink's render(). Under bun test process.stdout is piped so
+// .columns is normally undefined, but we stub it explicitly (defineProperty,
+// restored after every test) so the lever holds even under a TTY runner.
 import {afterEach, expect, test} from "bun:test";
 import {PassThrough} from "node:stream";
 import React from "react";
@@ -68,14 +78,15 @@ class TestStdin extends PassThrough {
   }
 }
 
-const restores: Array<() => void> = [];
-
 function stripAnsi(value: string): string {
   return value.replace(/\u001B\[[0-?]*[ -/]*[@-~]/g, "");
 }
 
+const restores: Array<() => void> = [];
+
 function stubOwnProperty(target: object, key: string, value: unknown): void {
-  const descriptor = Object.getOwnPropertyDescriptor(target, key);
+  const had = Object.prototype.hasOwnProperty.call(target, key);
+  const descriptor = had ? Object.getOwnPropertyDescriptor(target, key) : undefined;
   Object.defineProperty(target, key, {configurable: true, writable: true, value});
   restores.push(() => {
     if (descriptor) {
@@ -104,15 +115,21 @@ afterEach(() => {
   }
 });
 
-async function renderShellAt(columns: number, rows: number): Promise<string> {
+async function renderShellAt(
+  columns: number,
+  rows: number,
+  settled: (frame: string) => boolean,
+): Promise<string> {
   stubOwnProperty(process.stdout, "columns", columns);
   stubOwnProperty(process.stdout, "rows", rows);
-  stubEnv("DHARMA_PYTHON", "/nonexistent/dharma-terminal-compact-shell-python");
+  // Deterministic offline: the spawn fails instantly, so bridgeStatus reaches
+  // "offline" within the poll budget.
+  stubEnv("DHARMA_PYTHON", "/nonexistent/python-f022");
 
   const originalSend = DharmaBridge.prototype.send;
   const originalClose = DharmaBridge.prototype.close;
   DharmaBridge.prototype.send = function mockedSend(): string {
-    return "compact-shell-test";
+    return "1";
   };
   DharmaBridge.prototype.close = function mockedClose(): void {};
   restores.push(() => {
@@ -137,48 +154,95 @@ async function renderShellAt(columns: number, rows: number): Promise<string> {
   });
 
   try {
-    const deadline = Date.now() + 3000;
-    const tabMarker = columns <= 90 ? "[Chat]" : "◆ Chat";
-    while (Date.now() < deadline) {
-      const frame = stripAnsi(rendered);
-      if (frame.includes("DHARMA") && frame.includes(tabMarker) && frame.includes("keys")) {
-        return frame;
-      }
+    // Zen is the boot default; the compact-shell contract under test is
+    // cockpit furniture, so the driver enters cockpit as an operator would.
+    await Bun.sleep(150);
+    stdin.write("/cockpit");
+    await Bun.sleep(50);
+    stdin.write("\r");
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline && !settled(stripAnsi(rendered))) {
       await Bun.sleep(50);
     }
-    return stripAnsi(rendered);
   } finally {
     instance.unmount();
     instance.cleanup();
   }
+
+  return stripAnsi(rendered);
 }
 
-test("80x24 uses the compact shell without wide-only chrome", async () => {
-  const frame = await renderShellAt(80, 24);
+function summaryStripLines(frame: string): string[] {
+  // "loop unknown" is boot-deterministic in an empty supervisor state and
+  // exists only in cockpit chrome, so it also proves cockpit arrival.
+  return frame.split("\n").filter((line) => line.includes("loop unknown"));
+}
 
-  expect(frame).toContain("DHARMA");
-  expect(frame).not.toContain("DHARMA TERMINAL");
+function cockpitSettled(frame: string): boolean {
+  return frame.includes("loop unknown") && frame.includes("offline");
+}
 
+test("80x24 uses compact cockpit chrome", async () => {
+  const frame = await renderShellAt(80, 24, cockpitSettled);
+
+  expect(frame).toContain("◆ DHARMA");
+  expect(frame).not.toContain("COMMAND POST");
+  expect(frame).toContain("○ offline");
+  expect(frame).not.toContain("OFFLINE");
   const tabLine = frame.split("\n").find((line) => line.includes("[Chat]"));
   expect(tabLine).toBeDefined();
   expect(tabLine).toContain("Mission");
-  expect(tabLine).toContain("Repo");
-
-  expect(frame).toContain("keys");
-  expect(frame).toContain("Tab tabs");
-  expect(frame).not.toContain("mode  tab navigation");
+  expect(frame).not.toContain("|  route ");
+  expect(frame).not.toContain("|  panes ");
+  const stripLines = summaryStripLines(frame);
+  expect(stripLines.length).toBeGreaterThan(0);
+  for (const line of stripLines) {
+    expect(line.trimStart().startsWith("│")).toBe(false);
+  }
 });
 
-test("width 90 remains compact and width 91 restores the wide header", async () => {
-  const compact = await renderShellAt(90, 24);
-  const wide = await renderShellAt(91, 24);
+test("width 90 remains compact (inclusive boundary)", async () => {
+  const frame = await renderShellAt(90, 24, cockpitSettled);
 
-  expect(compact).toContain("DHARMA");
-  expect(compact).not.toContain("TERMINAL");
-  expect(compact).not.toContain("mode  tab navigation");
+  expect(frame).toContain("◆ DHARMA");
+  expect(frame).not.toContain("COMMAND POST");
+  const stripLines = summaryStripLines(frame);
+  expect(stripLines.length).toBeGreaterThan(0);
+  for (const line of stripLines) {
+    expect(line.trimStart().startsWith("│")).toBe(false);
+  }
+});
 
-  expect(wide).toContain("DHARMA");
-  expect(wide).toContain("◆ Chat");
-  expect(wide).toContain("TERMINAL");
-  expect(wide).toContain("mode  tab navigation");
+test("width 91 restores wide cockpit chrome", async () => {
+  const frame = await renderShellAt(
+    91,
+    24,
+    (current) => cockpitSettled(current) && current.includes("COMMAND POST"),
+  );
+
+  expect(frame).toContain("◆ DHARMA");
+  expect(frame).toContain("COMMAND POST");
+  const stripLines = summaryStripLines(frame);
+  expect(stripLines.length).toBeGreaterThan(0);
+  for (const line of stripLines) {
+    expect(line.trimStart().startsWith("│")).toBe(false);
+  }
+});
+
+test("wide cockpit sanity check reaches App", async () => {
+  const frame = await renderShellAt(
+    220,
+    60,
+    (current) => cockpitSettled(current) && current.includes("COMMAND POST"),
+  );
+
+  expect(frame).toContain("COMMAND POST");
+  expect(frame).toContain("○ offline");
+  expect(frame).not.toContain("OFFLINE");
+  expect(frame).not.toContain("DHARMA TERMINAL");
+  const stripLines = summaryStripLines(frame);
+  expect(stripLines.length).toBeGreaterThan(0);
+  for (const line of stripLines) {
+    expect(line.trimStart().startsWith("│")).toBe(false);
+  }
 });

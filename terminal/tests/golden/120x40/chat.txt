@@ -1,40 +1,40 @@
-╭────────╮ ╭─────────╮ ╭──────╮ ╭──────────╮ ╭────────╮ ╭──────────╮ ╭─────────╮ ╭──────────╮ ╭───────────╮ ╭─────────╮
-│ ◆ Chat │ │ Mission │ │ Repo │ │ Commands │ │ Models │ │ Ontology │ │ Runtime │ │ Sessions │ │ Approvals │ │ Control │
-╰────────╯ ╰─────────╯ ╰──────╯ ╰──────────╯ ╰────────╯ ╰──────────╯ ╰─────────╯ ╰──────────╯ ╰───────────╯ ╰─────────╯
-
-╭────────╮ ╭───────────╮ ╭──────────╮ ╭───────╮ ╭──────────╮
-│ Agents │ │ Evolution │ │ Thinking │ │ Tools │ │ Timeline │
-╰────────╯ ╰───────────╯ ╰──────────╯ ╰───────╯ ╰──────────╯
 
 
-   ▁▁                  ▁▁
-     ▄▄▄                   ▂▄▆▆▄▂
-   ▄█████▄ ▁▁▁▁▁         ▄████████▄                        ▂▄▂
-  ▐███████▌ ▔▔▔▔▔▔        ▟██▄▄▄▄▄▄▄▄██▙               ▗▄██▄▖
-   ▀█████▀        ▟████████▀▀████████▙            ▗██████▖
- ≋ ≋ ≋ ≋    ▐███████ ███████▌        ▐█▟██▙
- ▂▃▄▂▃▄▂▃▄▂▃▄▂▃▄   ▀███▄▄███▀        ▜████▛
-▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅ ▔▔▔   ▆▅▆▅▆▅▆▅▆▅▆▅
 
-╭──╮ ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│T │ │ Chat                                                                                                            │
-│  │ │ Live operator exchange, assistant output, and command spillover that still belongs in chat.                     │
-│  │ │                                                                                                                 │
-│  │ │ Dharma Terminal                                                                                                 │
-│  │ │ Keyboard-first operator shell. Backend bridged over stdio.                                                      │
-│  │ │ Use plain prompts or slash commands. Chat carries the conversation; the surrounding tabs expose runtime, tools, │
-│  │ │ and system state.                                                                                               │
-╰──╯ ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ Dharma Terminal
+ Type a message below · F2 opens the cockpit
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Operator Prompt                                                                                                      │
-│ >                                                                                                                    │
+│ >   Type a message · / commands · ? keys                                                                             │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-
-╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ status  backend offline, retrying                                                                                    │
-│ route  ready | codex:gpt-5.4                                                                                         │
-│ mode  tab navigation                                                                                                 │
-│ keys  Keys: Tab/Shift-Tab tabs | ←/→ tabs | ^K switch panes | ^B sidebar | 1/2/3 sidebar | ^G ^R ^O ^M ^A ^P ^E ^T   │
-│ ^Y panes | ^H ^J ^N transparency | ↑/↓ scroll | ^L refresh shell | ^U compact trace | ^I raw on                      │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ zen/composer  ·  claude:claude-opus-4.8 [unverified]  ·  bridge offline  ·  F2 cockpit · /tour

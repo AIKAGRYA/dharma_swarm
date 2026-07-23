@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean bootstrap install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agentops-report-root-check agent-build-preflight agent-build-closeout spine-check onboard onboarding-macos-compatibility organism-status orient agent-register agent-onboard status a2a-status a2a-up a2a-send go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test slop-ratchet slop-baseline
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean bootstrap install docker-up docker-down gh-auth semgrep semgrep-advisory semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agentops-report-root-check agent-build-preflight agent-build-closeout spine-check onboard onboarding-macos-compatibility organism-status orient agent-register agent-onboard status a2a-status a2a-up a2a-send go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test slop-ratchet slop-baseline
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently. Freeze a
@@ -33,6 +33,7 @@ UV_VERSION ?= 0.11.2
 GO ?= go
 GOFMT ?= gofmt
 SEMGREP ?= scripts/governance/run_semgrep_with_ca.sh
+GITLEAKS ?= gitleaks
 SWARM_PLIST := $(HOME)/Library/LaunchAgents/com.dharma.swarm.plist
 STATE_DIR    := $(HOME)/.dharma
 GO_EVIDENCE_MODULE := tools/evidence_ingestor_go
@@ -358,7 +359,7 @@ test:
 	$(VENV_PYTHON) -m pytest tests/ -q --tb=short -x -m "not slow and not docker and not network"
 
 test-fast:
-	$(VENV_PYTHON) -m pytest tests/ -q --tb=line -x --timeout=10
+	$(VENV_PYTHON) -m pytest tests/ -q --tb=line -x --timeout=10 -m "not slow and not docker and not network"
 
 lint:
 	$(RUFF) check dharma_swarm/ --select=E,F,W --ignore=E501
@@ -420,19 +421,31 @@ docker-logs:
 # Governance targets (Phase 1)
 # ============================================================================
 
+# WP-0C1 (TIT-004): `make semgrep` is the strict REQUIRED scan. It runs the
+# security ruleset that WP-0C1R proved clean on merged main and fails closed:
+# an absent scanner, a version off the ratified pin, or a wall-clock overrun
+# is a named nonzero failure, never a green skip. The former warn-only
+# behavior lives in `semgrep-advisory` (anti-slop rules; the OWNER_DEFERRED
+# findings recorded in reports/governance/titanium/
+# wp0c1r_semgrep_adjudication_2026-07-18.md stay visible there and in
+# semgrep-strict — they are never baselined into the required scan).
+# The wrapper expands --config .semgrep to production configs only;
+# .semgrep/tests remains reserved for explicit rule-test runs.
+SEMGREP_PIN ?= 1.168.0
 semgrep:
-	# Phase 1 is warn-only locally so the install does not block on the
-	# 4 pre-existing real findings (3 shell=True + 1 eval). CI (Phase 2)
-	# uses the stricter mode below; Phase 4 promotes anti-slop rules to ERROR.
-	# The wrapper expands --config .semgrep to production configs only;
-	# .semgrep/tests remains reserved for explicit rule-test runs.
-	$(SEMGREP) --config .semgrep --metrics=off
+	DHARMA_SEMGREP_EXPECTED_VERSION=$(SEMGREP_PIN) $(SEMGREP) --config .semgrep/security.yml --error --metrics=off
+
+semgrep-advisory:
+	DHARMA_SEMGREP_ALLOW_MISSING=1 $(SEMGREP) --config .semgrep/dharma-anti-slop.yml --metrics=off
 
 semgrep-strict:
 	$(SEMGREP) --config .semgrep --error --metrics=off
 
 gitleaks:
-	gitleaks detect --source . --redact --no-banner --exit-code 1
+	@command -v $(GITLEAKS) >/dev/null 2>&1 || { \
+		echo "GITLEAKS_MISSING: '$(GITLEAKS)' not found on PATH — required secrets scan cannot run (install: https://github.com/gitleaks/gitleaks/releases)" >&2; \
+		exit 2; }
+	$(GITLEAKS) detect --source . --redact --no-banner --exit-code 1 < /dev/null
 
 precommit-install:
 	pre-commit install --install-hooks

@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import json
-import os
 from pathlib import Path
 from typing import Any, AsyncIterator
 
+from dharma_swarm import model_pool as _model_pool
+from dharma_swarm.models import ProviderType
+
 from .base import Capability, CompletionRequest, ModelProfile, ProviderAdapter, ProviderConfig
+from .claude_cli import build_claude_command, build_claude_env, build_claude_prompt
+from .claude_process import drain_stderr_tail, terminate_process
 from ..events import (
     CanonicalEventType,
     ErrorEvent,
@@ -57,6 +60,19 @@ CLAUDE_CAPABILITIES = (
 )
 
 
+def _canonical_claude_model() -> str:
+    entry = _model_pool.get_entry("claude-opus-4.8")
+    if entry is not None:
+        for provider in (ProviderType.CLAUDE_CODE, ProviderType.ANTHROPIC):
+            for route in entry.routes:
+                if route.provider is provider:
+                    return route.model_id
+    raise AssertionError("model_pool has no Claude route for claude-opus-4.8")
+
+
+CLAUDE_DEFAULT_MODEL = _canonical_claude_model()
+
+
 def _capability_names(caps: Capability) -> list[str]:
     names: list[str] = []
     for cap in Capability:
@@ -78,12 +94,18 @@ class ClaudeAdapter(ProviderAdapter):
     ) -> None:
         self._config = config or ProviderConfig(
             provider_id=self.provider_id,
-            default_model="claude-sonnet-4-5",
+            default_model=CLAUDE_DEFAULT_MODEL,
         )
         self._cli_path = cli_path
         self._workdir = workdir or DHARMA_SWARM
         self._proc: asyncio.subprocess.Process | None = None
         self._profiles: dict[str, ModelProfile] = {
+            CLAUDE_DEFAULT_MODEL: ModelProfile(
+                provider_id=self.provider_id,
+                model_id=CLAUDE_DEFAULT_MODEL,
+                display_name="Claude Opus 4.8",
+                capabilities=CLAUDE_CAPABILITIES,
+            ),
             "claude-sonnet-4-5": ModelProfile(
                 provider_id=self.provider_id,
                 model_id="claude-sonnet-4-5",
@@ -120,8 +142,16 @@ class ClaudeAdapter(ProviderAdapter):
         return list(self._profiles.values())
 
     def get_profile(self, model_id: str | None = None) -> ModelProfile:
-        model = model_id or self._config.default_model or "claude-sonnet-4-5"
-        return self._profiles.get(model, next(iter(self._profiles.values())))
+        model = model_id or self._config.default_model or CLAUDE_DEFAULT_MODEL
+        profile = self._profiles.get(model)
+        if profile is not None:
+            return profile
+        return ModelProfile(
+            provider_id=self.provider_id,
+            model_id=model,
+            display_name=model,
+            capabilities=CLAUDE_CAPABILITIES,
+        )
 
     async def stream(
         self,
@@ -135,6 +165,13 @@ class ClaudeAdapter(ProviderAdapter):
 
         proc = await self._spawn_process(cmd, env)
         self._proc = proc
+        stderr_task = (
+            asyncio.create_task(drain_stderr_tail(proc.stderr))
+            if proc.stderr is not None
+            else None
+        )
+        stream_read_failed = False
+        stream_read_error = ""
 
         try:
             assert proc.stdout is not None
@@ -143,13 +180,15 @@ class ClaudeAdapter(ProviderAdapter):
                     line = await proc.stdout.readline()
                 except Exception as exc:
                     # Avoid hard-crashing provider runner on oversized/invalid stream lines.
+                    stream_read_error = f"{type(exc).__name__}: {exc}"
                     yield ErrorEvent(
                         provider_id=self.provider_id,
                         session_id=session_id,
                         code="stream_read_error",
-                        message=str(exc),
+                        message=stream_read_error,
                         retryable=True,
                     )
+                    stream_read_failed = True
                     break
                 if not line:
                     break
@@ -162,16 +201,25 @@ class ClaudeAdapter(ProviderAdapter):
                         emitted_session_end = True
                     yield event
 
+            if stream_read_failed:
+                await terminate_process(proc)
             exit_code = await proc.wait()
-            if exit_code != 0 and not emitted_session_end:
-                err_text = ""
-                if proc.stderr is not None:
-                    with contextlib.suppress(Exception):
-                        err_text = (
-                            (await proc.stderr.read())
-                            .decode("utf-8", errors="replace")
-                            .strip()
-                        )
+            err_text = ""
+            if stderr_task is not None:
+                stderr_result = (await asyncio.gather(stderr_task, return_exceptions=True))[0]
+                if isinstance(stderr_result, str):
+                    err_text = stderr_result
+                elif isinstance(stderr_result, BaseException):
+                    err_text = f"stderr read failed: {type(stderr_result).__name__}"
+            if stream_read_failed and not emitted_session_end:
+                yield SessionEnd(
+                    provider_id=self.provider_id,
+                    session_id=session_id,
+                    success=False,
+                    error_code="stream_read_error",
+                    error_message=stream_read_error,
+                )
+            elif exit_code != 0 and not emitted_session_end:
                 yield ErrorEvent(
                     provider_id=self.provider_id,
                     session_id=session_id,
@@ -193,20 +241,23 @@ class ClaudeAdapter(ProviderAdapter):
                     success=True,
                 )
         finally:
-            self._proc = None
+            await terminate_process(proc)
+            if stderr_task is not None:
+                if not stderr_task.done():
+                    stderr_task.cancel()
+                await asyncio.gather(stderr_task, return_exceptions=True)
+            if self._proc is proc:
+                self._proc = None
 
     async def cancel(self) -> None:
-        if self._proc is None or self._proc.returncode is not None:
+        proc = self._proc
+        if proc is None or proc.returncode is not None:
             return
-        self._proc.terminate()
         try:
-            await asyncio.wait_for(self._proc.wait(), timeout=5)
-        except asyncio.TimeoutError:
-            self._proc.kill()
-            with contextlib.suppress(Exception):
-                await self._proc.wait()
+            await terminate_process(proc)
         finally:
-            self._proc = None
+            if self._proc is proc:
+                self._proc = None
 
     async def close(self) -> None:
         await self.cancel()
@@ -221,6 +272,7 @@ class ClaudeAdapter(ProviderAdapter):
         stream_limit = int(self._config.extra.get("stream_reader_limit", 2_000_000))
         return await asyncio.create_subprocess_exec(
             *cmd,
+            stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=str(self._workdir),
@@ -229,76 +281,18 @@ class ClaudeAdapter(ProviderAdapter):
         )
 
     def _build_env(self, request: CompletionRequest) -> dict[str, str]:
-        env = dict(os.environ)
-        env.pop("CLAUDECODE", None)
-        internet_enabled = bool(request.provider_options.get("internet_enabled", True))
-        if internet_enabled:
-            env.pop("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", None)
-        else:
-            env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
-        return env
+        return build_claude_env(request)
 
     def _build_command(self, request: CompletionRequest) -> list[str]:
-        prompt = self._build_prompt(request)
-        cmd = [
+        return build_claude_command(
             self._cli_path,
-            "-p",
-            prompt,
-            "--output-format",
-            "stream-json",
-            "--verbose",
-        ]
-
-        if request.resume_session_id:
-            cmd.extend(["--resume", request.resume_session_id])
-        elif request.provider_options.get("continue_last"):
-            cmd.append("--continue")
-
-        model = request.model or self._config.default_model
-        if model:
-            cmd.extend(["--model", model])
-
-        permission_mode = str(
-            request.provider_options.get("permission_mode", "bypassPermissions")
+            request,
+            default_model=self._config.default_model,
+            prompt=self._build_prompt(request),
         )
-        if permission_mode:
-            cmd.extend(["--permission-mode", permission_mode])
-            if permission_mode == "bypassPermissions":
-                cmd.extend(["--allowedTools", "*", "--dangerously-skip-permissions"])
-
-        max_turns = request.provider_options.get("max_turns")
-        if isinstance(max_turns, int) and max_turns > 0:
-            cmd.extend(["--max-turns", str(max_turns)])
-
-        if request.system_prompt:
-            cmd.extend(["--append-system-prompt", request.system_prompt])
-
-        if request.enable_thinking:
-            cmd.append("--include-partial-messages")
-
-        return cmd
 
     def _build_prompt(self, request: CompletionRequest) -> str:
-        # Keep this intentionally simple and deterministic for adapter tests.
-        if request.messages:
-            rendered: list[str] = []
-            for msg in request.messages:
-                role = str(msg.get("role", "user")).title()
-                content = msg.get("content", "")
-                if isinstance(content, list):
-                    chunks: list[str] = []
-                    for part in content:
-                        if isinstance(part, dict):
-                            if isinstance(part.get("text"), str):
-                                chunks.append(part["text"])
-                        elif isinstance(part, str):
-                            chunks.append(part)
-                    content_text = "\n".join(chunks)
-                else:
-                    content_text = str(content)
-                rendered.append(f"{role}: {content_text}")
-            return "\n\n".join(rendered)
-        return "Hello."
+        return build_claude_prompt(request)
 
     def _normalize_line(
         self,
