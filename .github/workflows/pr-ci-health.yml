@@ -20,9 +20,10 @@ name: pr-ci-health
 #                never trigger workflows, so a bot-rebased head gets ZERO check
 #                runs and the PR strands (ci_never_ran). The rebase push only
 #                happens when the operator-configured PR_CI_HEALTH_PUSH_TOKEN
-#                secret (fine-grained PAT, contents:write on this repo only) is
-#                present — PAT pushes DO trigger workflows. Without the secret,
-#                the rebase is skipped and the PR is labeled
+#                secret (preferred: fine-grained PAT, contents:write on this
+#                repo only) or the already-provisioned MERGEMASTERMIKE_PAT is
+#                present — PAT pushes DO trigger workflows. Without either
+#                trusted secret, the rebase is skipped and the PR is labeled
 #                `ci-stranded-rebase-skipped` instead of being silently
 #                stranded.
 #
@@ -66,11 +67,11 @@ jobs:
           # pr_ci_safe_rebase.py pushes via `git push origin`, which uses the
           # credentials this checkout persists. github.token pushes never
           # trigger workflows (rebased heads strand with zero check runs), so
-          # when the operator has configured PR_CI_HEALTH_PUSH_TOKEN
-          # (fine-grained PAT, contents:write on this repo only) we persist it
-          # here so rebase pushes trigger CI. Without it the rebase step below
-          # refuses to push at all (fail-closed).
-          token: ${{ secrets.PR_CI_HEALTH_PUSH_TOKEN || github.token }}
+          # Prefer the dedicated least-privilege token. MERGEMASTERMIKE_PAT is
+          # an existing PAT already used by this repo to trigger workflows and
+          # is the recovery fallback while the dedicated token is provisioned.
+          # Without either PAT the rebase step refuses to push (fail-closed).
+          token: ${{ secrets.PR_CI_HEALTH_PUSH_TOKEN || secrets.MERGEMASTERMIKE_PAT || github.token }}
 
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
@@ -123,11 +124,11 @@ jobs:
         if: env.MODE == 'all' || env.MODE == 'rebase'
         continue-on-error: true
         env:
-          # 'true' only when the operator has configured the fine-grained PAT
-          # secret (contents:write on this repo only). PAT pushes trigger
-          # workflows; github.token pushes do not — a github.token rebase push
-          # strands the PR head with zero check runs (ci_never_ran).
-          HAS_PUSH_TOKEN: ${{ secrets.PR_CI_HEALTH_PUSH_TOKEN != '' }}
+          # 'true' only when a trusted PAT is available. The dedicated
+          # least-privilege token wins; MERGEMASTERMIKE_PAT is the provisioned
+          # workflow-dispatch recovery fallback. github.token pushes do not trigger
+          # workflows and would strand the head with zero check runs.
+          HAS_PUSH_TOKEN: ${{ secrets.PR_CI_HEALTH_PUSH_TOKEN != '' || secrets.MERGEMASTERMIKE_PAT != '' }}
           STRAND_LABEL: ci-stranded-rebase-skipped
         run: |
           set -uo pipefail
@@ -140,7 +141,7 @@ jobs:
           # race re-reads, PR-number ref fetch, and explicit force-with-lease.
           git fetch origin main
           if [ "$HAS_PUSH_TOKEN" != "true" ]; then
-            echo "PR_CI_HEALTH_PUSH_TOKEN not configured: rebase pushes are DISABLED (fail-closed)."
+            echo "No trusted PR CI-health push token is configured: rebase pushes are DISABLED (fail-closed)."
             echo "A github.token push never triggers workflows; the rebased head would strand with zero check runs."
             gh label create "$STRAND_LABEL" --repo "$REPO" \
               --description "pr-ci-health skipped an auto-rebase: pushing with github.token would strand this PR with zero CI runs" \
@@ -166,20 +167,20 @@ jobs:
               # FAIL-CLOSED: no push token, no push. Label + comment once so
               # the stranding is visible instead of silent (the 2026-07-20
               # 23:27Z rebase wave stranded 14 open PRs with zero check runs).
-              echo "PR #$pr: SKIPPING auto-rebase (fail-closed; no PR_CI_HEALTH_PUSH_TOKEN)"
+              echo "PR #$pr: SKIPPING auto-rebase (fail-closed; no trusted push token)"
               if gh api "repos/$REPO/issues/$pr" --jq '.labels[].name' | grep -qxF "$STRAND_LABEL"; then
                 echo "PR #$pr: already labeled $STRAND_LABEL"
               else
                 gh api -X POST "repos/$REPO/issues/$pr/labels" -f "labels[]=$STRAND_LABEL" \
                   || echo "PR #$pr: labeling failed"
-                gh pr comment "$pr" --repo "$REPO" --body "pr-ci-health: this PR is behind \`main\`, but the hourly auto-rebase was **skipped (fail-closed)**. No \`PR_CI_HEALTH_PUSH_TOKEN\` secret is configured, and a rebase pushed with the default \`GITHUB_TOKEN\` never triggers workflows — the rebased head would have zero check runs (\`ci_never_ran\`). Rebase manually (any author/PAT push re-triggers CI), or have the operator configure the push token secret." \
+                gh pr comment "$pr" --repo "$REPO" --body "pr-ci-health: this PR is behind \`main\`, but the hourly auto-rebase was **skipped (fail-closed)**. No trusted PAT secret is configured, and a rebase pushed with the default \`GITHUB_TOKEN\` never triggers workflows — the rebased head would have zero check runs (\`ci_never_ran\`). Rebase manually (any author/PAT push re-triggers CI), or have the operator configure \`PR_CI_HEALTH_PUSH_TOKEN\`." \
                   || echo "PR #$pr: comment failed"
               fi
               continue
             fi
             # Guard + rebase + restore: never inline PR-head fetch/rebase/push.
             # The push inside the helper uses the checkout-persisted
-            # PR_CI_HEALTH_PUSH_TOKEN, so the rebased head triggers CI.
+            # trusted PAT selected above, so the rebased head triggers CI.
             python3 scripts/governance/pr_ci_safe_rebase.py \
               --repo "$REPO" \
               --pr "$pr" \
