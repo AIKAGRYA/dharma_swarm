@@ -31,9 +31,12 @@ CURRENT_MODEL_ENV_KEYS = (
 DEFAULT_FAST_SOLVER = "kimi-code"
 DEFAULT_FAST_VERIFIER = "glm-5.2"
 DEFAULT_FAST_MUTATOR = "gemini-2.5-flash"
-DEFAULT_DIVERSE_SOLVER = "deepseek-v4-pro"
-DEFAULT_DIVERSE_VERIFIER = "minimax-m3"
-DEFAULT_DIVERSE_MUTATOR = "kimi-k2.7-code"
+# The broad diversity preset must use exact slot-resolvable route IDs. Bare
+# deepseek-v4-pro/minimax-m3 route through the OpenAI-compatible fallback and 404
+# on this Mac; the :cloud IDs are the verified Ollama Cloud frontier routes.
+DEFAULT_DIVERSE_SOLVER = "deepseek-v4-pro:cloud"
+DEFAULT_DIVERSE_VERIFIER = "minimax-m3:cloud"
+DEFAULT_DIVERSE_MUTATOR = "kimi-k2.7-code:cloud"
 
 
 @dataclass(frozen=True)

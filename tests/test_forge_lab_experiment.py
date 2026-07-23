@@ -127,6 +127,10 @@ async def test_dry_loop_end_to_end(cfg, tmp_path):
 
     manifest = json.loads((exp_dir / "run_manifest.json").read_text())
     assert manifest["mode"] == "shadow"
+    assert manifest["git_base_sha"] == "dryrun"
+    assert manifest["git_identity"]["head_sha"] == "dryrun"
+    assert manifest["git_identity"]["branch"] == "dryrun"
+    assert manifest["git_identity"]["dirty"] is False
     assert manifest["archive_fitness_authority"] == "one_wire_disabled_explicit_lab_shadow"
     assert all(manifest["membrane"].values()), "membrane must be fully recorded"
     assert manifest["cost_estimate"]["planned_candidate_grades"] == 1 + 3 * 2

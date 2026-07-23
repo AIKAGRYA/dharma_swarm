@@ -3,6 +3,11 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from dharma_swarm.forge_lab import provider_selftest
+from dharma_swarm.forge_lab.newrun import (
+    DEFAULT_DIVERSE_MUTATOR,
+    DEFAULT_DIVERSE_SOLVER,
+    DEFAULT_DIVERSE_VERIFIER,
+)
 from dharma_swarm.models import ProviderType
 
 
@@ -27,6 +32,19 @@ def test_provider_selftest_config_mode_resolves_without_live_probe(monkeypatch):
     assert payload["live"] is False
     assert [row["slot_resolved"] for row in payload["rows"]] == [True, True]
     assert [row["outcome"] for row in payload["rows"]] == ["not_probed", "not_probed"]
+
+
+def test_diverse_profile_defaults_are_slot_resolvable_in_config_mode():
+    payload = provider_selftest.run_provider_selftest(profile="newrun", live=False)
+
+    rows = {row["model_id"]: row for row in payload["rows"]}
+    for model_id in (
+        DEFAULT_DIVERSE_SOLVER,
+        DEFAULT_DIVERSE_VERIFIER,
+        DEFAULT_DIVERSE_MUTATOR,
+    ):
+        assert rows[model_id]["slot_resolved"] is True
+        assert "error_type" not in rows[model_id]
 
 
 def test_provider_selftest_requires_live_for_independent_route_claim(monkeypatch):

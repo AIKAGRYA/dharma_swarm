@@ -28,6 +28,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -42,6 +43,7 @@ from dharma_swarm.forge_v1 import swebench_real
 from dharma_swarm.forge_v1.autoloop_context import pull_context
 from dharma_swarm.forge_lab.genome_spec import DEFAULT_GENOME
 from dharma_swarm.forge_lab.grade_explore import (
+    GradeSeams,
     TIER_CONFIRM_SWEBENCH,
     grade_genome_explore,
     production_seams,
@@ -84,6 +86,26 @@ def _write_receipt(run_id: str, payload: dict[str, Any]) -> Path:
     return path
 
 
+def _patch_metadata(run_id: str, instance_id: str, patch: str) -> dict[str, Any]:
+    """Persist and fingerprint the generated patch for confirm-tier evidence."""
+
+    patch = patch or ""
+    metadata: dict[str, Any] = {
+        "non_empty_patch": bool(patch.strip()),
+        "patch_len": len(patch),
+        "patch_sha256": hashlib.sha256(patch.encode("utf-8")).hexdigest() if patch else None,
+        "patch_path": None,
+    }
+    if patch.strip():
+        out_dir = CONFIRM_ROOT / run_id
+        out_dir.mkdir(parents=True, exist_ok=True)
+        safe_instance = instance_id.replace("/", "_").replace(":", "_")
+        path = out_dir / f"{safe_instance}.candidate.patch"
+        path.write_text(patch, encoding="utf-8")
+        metadata["patch_path"] = str(path)
+    return metadata
+
+
 def _control(inst: dict, image_key: str, run_id: str) -> dict[str, Any]:
     """Grade the GOLD patch (expect resolved=True) and the EMPTY patch (expect
     False) DIRECTLY via the grade seam — never the solver. This is the
@@ -121,7 +143,25 @@ def _candidate(inst: dict, ctx: dict, image_key: str, run_id: str, solver_model:
     """Grade one real solver genome against the instance on the confirm tier."""
     genome = dict(DEFAULT_GENOME)
     genome["generator_model"] = solver_model
-    seams = production_seams()
+    base_seams = production_seams()
+    generated_patches: list[str] = []
+
+    def capture_propose_slot(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        rec = base_seams.propose_slot(*args, **kwargs)
+        patch = str(rec.get("patch") or "")
+        if patch.strip():
+            generated_patches.append(patch)
+        return rec
+
+    seams = GradeSeams(
+        slot_for_id=base_seams.slot_for_id,
+        propose_slot=capture_propose_slot,
+        self_moa_arm=base_seams.self_moa_arm,
+        verify_chain_arm=base_seams.verify_chain_arm,
+        mixed_moa_arm=base_seams.mixed_moa_arm,
+        grade_task=base_seams.grade_task,
+        budget_factory=base_seams.budget_factory,
+    )
     outcome = grade_genome_explore(
         genome,
         {inst["instance_id"]: (inst, ctx)},
@@ -133,6 +173,9 @@ def _candidate(inst: dict, ctx: dict, image_key: str, run_id: str, solver_model:
         soft_token_cap=True,
         tier=TIER_CONFIRM_SWEBENCH,
     )
+    patch = generated_patches[-1] if generated_patches else ""
+    patch_meta = _patch_metadata(run_id, inst["instance_id"], patch)
+    per_task = [dict(row, **patch_meta) for row in outcome.per_task]
     return {
         "schema": "forge_lab.confirm_swebench.candidate.v0",
         "run_id": run_id,
@@ -140,9 +183,10 @@ def _candidate(inst: dict, ctx: dict, image_key: str, run_id: str, solver_model:
         "image_key": image_key,
         "tier": outcome.tier,
         "solver_model": solver_model,
+        **patch_meta,
         "pass_rate": outcome.pass_rate,
         "tokens_used": outcome.tokens_used,
-        "per_task": outcome.per_task,
+        "per_task": per_task,
         "budget": outcome.budget,
     }
 
