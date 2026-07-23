@@ -1,0 +1,84 @@
+{
+  "id": "titanium-hardening-WP-PRCI3-trusted-pat-recovery",
+  "base_ref": "280fc251e99915062be19db48129b44d703402b1",
+  "branch": "agent/pr-ci-token-recovery-20260723",
+  "worktree": ".",
+  "intent": "Restore the fail-closed PR CI-health rebase path by preferring a dedicated least-privilege token, accepting the repository's existing workflow-dispatch PAT as a recovery fallback, and keeping the default GITHUB_TOKEN ineligible for rebase pushes.",
+  "allowed_files": [
+    ".github/workflows/pr-ci-health.yml",
+    "tests/test_pr_ci_health.py",
+    "reports/agentops/work_packets/titanium-hardening-WP-PRCI3-trusted-pat-recovery.json"
+  ],
+  "forbidden_files": [],
+  "gates": [
+    {
+      "name": "pr-ci-health-token-selection-tests",
+      "command": "python3 -m pytest tests/test_pr_ci_health.py tests/test_pr_ci_safe_rebase.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 600
+    },
+    {
+      "name": "pr-ci-health-token-test-ruff",
+      "command": "python3 -m ruff check tests/test_pr_ci_health.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "removing-recovery-pat-fallback-breaks-binding-test",
+      "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('.github/workflows/pr-ci-health.yml'); t=p.read_text(); old='secrets.PR_CI_HEALTH_PUSH_TOKEN || secrets.MERGEMASTERMIKE_PAT || github.token'; assert old in t; p.write_text(t.replace(old,'secrets.PR_CI_HEALTH_PUSH_TOKEN || github.token',1)); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_pr_ci_health.py::test_workflow_accepts_existing_dispatch_pat_as_recovery_fallback'],check=False); sys.exit(r.returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": false,
+    "message": "fix(ci-health): reuse trusted PAT for recovery rebases"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-PRCI3",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "280fc251e99915062be19db48129b44d703402b1",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The hourly PR-health workflow requires a PAT-backed push to trigger exact-head CI, but it ignored the already-provisioned workflow-dispatch PAT and therefore skipped every otherwise-admissible recovery rebase."
+    ],
+    "closest_existing_implementation": [
+      ".github/workflows/pr-ci-health.yml",
+      "scripts/governance/pr_ci_safe_rebase.py",
+      "tests/test_pr_ci_health.py",
+      "tests/test_pr_ci_safe_rebase.py",
+      "reports/agentops/work_packets/titanium-hardening-WP-PRCI2-ci-stranding-fail-closed.json"
+    ],
+    "honest_blockers": [
+      "This Session Entry packet was appended after implementation because exact-head CI correctly rejected the high-risk workflow change for lacking a packet; it proves committed-range scope and is not represented as pre-edit admission.",
+      "GitHub exposes repository-secret names and update times but not PAT scope metadata. MERGEMASTERMIKE_PAT is already used by this repository for workflow dispatch; a dedicated fine-grained contents-write token remains the preferred authority.",
+      "The recovery fallback has no effect until this PR lands on main and a workflow_dispatch rebase run proves that a PAT-backed push creates exact-head CI.",
+      "Hosted exact-head CI, independent review, and human merge authority remain required."
+    ],
+    "rollback": "Revert the workflow, regression test, and this packet together. The workflow then returns to fail-closed rebase skipping when PR_CI_HEALTH_PUSH_TOKEN is absent.",
+    "packet_digest": "a442033bd7529ea68241c09d53642800ac532ec8d6a002b62373f17761b079ea"
+  }
+}
