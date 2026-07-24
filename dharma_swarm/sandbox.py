@@ -14,22 +14,69 @@ import signal
 import tempfile
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Awaitable
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TypeVar
 
 from dharma_swarm.models import SandboxResult
 
+_T = TypeVar("_T")
+
+
+def _kill_process(proc: "asyncio.subprocess.Process") -> None:
+    """Best-effort single-process fallback that never masks cleanup."""
+    try:
+        proc.kill()
+    except (ProcessLookupError, PermissionError, OSError):
+        return
+
 
 def kill_process_group(proc: "asyncio.subprocess.Process") -> None:
-    """Kill proc's whole process group (requires start_new_session=True at
-    spawn time). A lone proc.kill() only signals the shell; a test/build
-    command's non-exec'd grandchild can survive it, keep the piped
-    stdout/stderr open, and make proc.communicate() block for the child's
-    full natural runtime regardless of any `timeout` the caller passed."""
+    """Kill *proc* and its process group when the host supports it.
+
+    ``start_new_session=True`` makes the spawned pid the process-group id.
+    Killing only the shell can leave a non-exec'd descendant alive, including
+    after the session leader has already exited. Signal the known PGID directly
+    rather than asking ``getpgid`` about a leader that may already be reaped.
+    Hosts without ``killpg`` or ``SIGKILL`` fall back to the process handle.
+    """
+    killpg = getattr(os, "killpg", None)
+    sigkill = getattr(signal, "SIGKILL", None)
+    if killpg is None or sigkill is None:
+        _kill_process(proc)
+        return
+
     try:
-        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-    except (ProcessLookupError, PermissionError, OSError):
-        proc.kill()
+        killpg(proc.pid, sigkill)
+    except (AttributeError, ProcessLookupError, PermissionError, OSError):
+        _kill_process(proc)
+
+
+async def await_cleanup(awaitable: Awaitable[_T]) -> _T:
+    """Finish cleanup, then preserve any cancellation received meanwhile."""
+    task = asyncio.ensure_future(awaitable)
+    cancelled = False
+    while not task.done():
+        try:
+            await asyncio.shield(task)
+        except asyncio.CancelledError:
+            cancelled = True
+            continue
+    result = task.result()
+    if cancelled:
+        raise asyncio.CancelledError
+    return result
+
+
+async def terminate_process_group(proc: "asyncio.subprocess.Process") -> None:
+    """Terminate and reap a managed subprocess despite caller cancellation."""
+    kill_process_group(proc)
+    try:
+        await await_cleanup(proc.wait())
+    except (ProcessLookupError, ChildProcessError, OSError):
+        # The process may have been reaped concurrently. Cleanup is complete.
+        return
+
 
 # Patterns that are always rejected before execution.
 # Intentionally conservative -- telos gates handle nuanced policy.
@@ -119,11 +166,13 @@ class LocalSandbox(Sandbox):
                 proc.communicate(), timeout=timeout
             )
         except asyncio.TimeoutError:
-            kill_process_group(proc)
-            await proc.wait()
+            await terminate_process_group(proc)
             raw_out = b""
             raw_err = b"Execution timed out"
             timed_out = True
+        except asyncio.CancelledError:
+            await terminate_process_group(proc)
+            raise
 
         duration = time.monotonic() - start
         return SandboxResult(

@@ -1,0 +1,121 @@
+{
+  "allowed_files": [
+    "dharma_swarm/diff_applier.py",
+    "dharma_swarm/sandbox.py",
+    "reports/agentops/work_packets/titanium-WP-0D1-cancellation-cleanup.json",
+    "tests/test_subprocess_cancellation.py"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "e1bb3d7b1cdf7bcc42a008cec6708acb2e471214",
+  "branch": "agent/titanium-wp0d1-cancellation-cleanup-20260724",
+  "commit": {
+    "allowed": true,
+    "message": "fix(titanium): clean up cancelled subprocesses and rollback"
+  },
+  "forbidden_files": [],
+  "gates": [
+    {
+      "command": "python3 -m pytest tests/test_sandbox.py tests/test_diff_applier.py tests/test_subprocess_cancellation.py -q",
+      "expected_exit": 0,
+      "name": "subprocess-cleanup-and-regression-tests",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "python3 -m ruff check dharma_swarm/sandbox.py dharma_swarm/diff_applier.py tests/test_subprocess_cancellation.py",
+      "expected_exit": 0,
+      "name": "touched-files-ruff",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "git diff --check e1bb3d7b1cdf7bcc42a008cec6708acb2e471214..HEAD",
+      "expected_exit": 0,
+      "name": "committed-diff-whitespace",
+      "timeout_seconds": 120
+    }
+  ],
+  "id": "titanium-WP-0D1-cancellation-cleanup",
+  "intent": "WP-0D1 corrective slice after merged PR #1092: make process-group termination capability-safe, preserve cancellation that arrives during cleanup, clean up LocalSandbox commands on caller cancellation, and make DiffApplier rollback remove only files actually created by the apply without following replacement symlinks. This closes only the reproduced cleanup defects; it does not claim full WP-0D or Titanium closure.",
+  "negative_controls": [
+    {
+      "command": "python3 -c 'from pathlib import Path; import subprocess,sys; p=Path('\"'\"'dharma_swarm/sandbox.py'\"'\"'); t=p.read_text(); anchor='\"'\"'    killpg = getattr(os, \"killpg\", None)'\"'\"'; t.count(anchor)==1 or sys.exit(3); p.write_text(t.replace(anchor,'\"'\"'    if proc.returncode is not None:\\n        return\\n\\n    killpg = getattr(os, \"killpg\", None)'\"'\"',1)); r=subprocess.run([sys.executable,'\"'\"'-m'\"'\"','\"'\"'pytest'\"'\"','\"'\"'-q'\"'\"','\"'\"'tests/test_subprocess_cancellation.py::test_kill_process_group_signals_group_after_shell_exit'\"'\"'],check=False); sys.exit(r.returncode)'",
+      "expected_exit": 1,
+      "name": "exited-shell-early-return-must-fail",
+      "timeout_seconds": 60
+    },
+    {
+      "command": "python3 -c 'from pathlib import Path; import subprocess,sys; p=Path('\"'\"'dharma_swarm/sandbox.py'\"'\"'); t=p.read_text(); anchor='\"'\"'        except asyncio.CancelledError:\\n            await terminate_process_group(proc)\\n            raise'\"'\"'; t.count(anchor)==1 or sys.exit(3); p.write_text(t.replace(anchor,'\"'\"'        except asyncio.CancelledError:\\n            raise'\"'\"',1)); r=subprocess.run([sys.executable,'\"'\"'-m'\"'\"','\"'\"'pytest'\"'\"','\"'\"'-q'\"'\"','\"'\"'tests/test_subprocess_cancellation.py::test_local_sandbox_cancellation_kills_delayed_child'\"'\"'],check=False); sys.exit(r.returncode)'",
+      "expected_exit": 1,
+      "name": "sandbox-cancellation-cleanup-removal-must-fail",
+      "timeout_seconds": 60
+    },
+    {
+      "command": "python3 -c 'from pathlib import Path; import subprocess,sys; p=Path('\"'\"'dharma_swarm/diff_applier.py'\"'\"'); t=p.read_text(); anchor='\"'\"'        except asyncio.CancelledError:\\n            try:\\n                if proc is not None:\\n                    await terminate_process_group(proc)\\n            finally:\\n                await await_cleanup(self.rollback(apply_result))\\n            raise'\"'\"'; t.count(anchor)==1 or sys.exit(3); p.write_text(t.replace(anchor,'\"'\"'        except asyncio.CancelledError:\\n            raise'\"'\"',1)); r=subprocess.run([sys.executable,'\"'\"'-m'\"'\"','\"'\"'pytest'\"'\"','\"'\"'-q'\"'\"','\"'\"'tests/test_subprocess_cancellation.py::test_repeated_cancellation_cannot_interrupt_rollback'\"'\"'],check=False); sys.exit(r.returncode)'",
+      "expected_exit": 1,
+      "name": "diff-applier-cancellation-rollback-removal-must-fail",
+      "timeout_seconds": 60
+    },
+    {
+      "command": "python3 -c 'from pathlib import Path; import subprocess,sys; p=Path('\"'\"'dharma_swarm/diff_applier.py'\"'\"'); t=p.read_text(); anchor='\"'\"'        for relative in result.created_files:'\"'\"'; t.count(anchor)==1 or sys.exit(3); p.write_text(t.replace(anchor,'\"'\"'        for relative in result.files_changed:'\"'\"',1)); r=subprocess.run([sys.executable,'\"'\"'-m'\"'\"','\"'\"'pytest'\"'\"','\"'\"'-q'\"'\"','\"'\"'tests/test_subprocess_cancellation.py::test_dry_run_rollback_does_not_delete_existing_file'\"'\"'],check=False); sys.exit(r.returncode)'",
+      "expected_exit": 1,
+      "name": "dry-run-created-file-inference-must-fail",
+      "timeout_seconds": 60
+    },
+    {
+      "command": "python3 -c 'from pathlib import Path; import subprocess,sys; p=Path('\"'\"'dharma_swarm/diff_applier.py'\"'\"'); t=p.read_text(); anchor='\"'\"'            (parent / candidate.name).unlink(missing_ok=True)'\"'\"'; t.count(anchor)==1 or sys.exit(3); p.write_text(t.replace(anchor,'\"'\"'            candidate.resolve().unlink(missing_ok=True)'\"'\"',1)); r=subprocess.run([sys.executable,'\"'\"'-m'\"'\"','\"'\"'pytest'\"'\"','\"'\"'-q'\"'\"','\"'\"'tests/test_subprocess_cancellation.py::test_rollback_unlinks_created_symlink_not_target'\"'\"'],check=False); sys.exit(r.returncode)'",
+      "expected_exit": 1,
+      "name": "symlink-target-follow-must-fail",
+      "timeout_seconds": 60
+    },
+    {
+      "command": "python3 -c 'from pathlib import Path; import subprocess,sys; p=Path('\"'\"'dharma_swarm/sandbox.py'\"'\"'); t=p.read_text(); anchor='\"'\"'    result = task.result()\\n    if cancelled:\\n        raise asyncio.CancelledError\\n    return result'\"'\"'; t.count(anchor)==1 or sys.exit(3); p.write_text(t.replace(anchor,'\"'\"'    return task.result()'\"'\"',1)); r=subprocess.run([sys.executable,'\"'\"'-m'\"'\"','\"'\"'pytest'\"'\"','\"'\"'-q'\"'\"','\"'\"'tests/test_subprocess_cancellation.py::test_cancellation_during_timeout_cleanup_propagates'\"'\"'],check=False); sys.exit(r.returncode)'",
+      "expected_exit": 1,
+      "name": "cleanup-cancellation-swallow-must-fail",
+      "timeout_seconds": 60
+    }
+  ],
+  "session_entry": {
+    "active_track": "repository-titanium-hardening-2026-07",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/sandbox.py",
+      "dharma_swarm/diff_applier.py",
+      "tests/test_sandbox.py",
+      "tests/test_diff_applier.py",
+      "reports/agentops/work_packets/titanium-WP-0D-fast-suite-determinism.json"
+    ],
+    "collision": {
+      "checked_at_sha": "e1bb3d7b1cdf7bcc42a008cec6708acb2e471214",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "Open PR #1060 also edits dharma_swarm/diff_applier.py. It must not merge on its current head and must be rebuilt after this corrective slice lands.",
+      "Issue #1105 tracks a one-day-stale read-only Cybernetics Codex audit receipt that currently makes ACTIVE_TRACK red repository-wide; that independent Loop Closure evidence refresh must not be folded into this four-file Titanium packet.",
+      "This packet closes only the reproduced subprocess and rollback cleanup defects from PR #1092. It does not close issue #1090, all WP-0D acceptance predicates, PR #1060 idempotency semantics, or Titanium Phase 0.",
+      "Hosted exact-head CI, independent review, resolution of every blocking thread, and human merge authority remain required."
+    ],
+    "interface_mismatches": [
+      "Merged PR #1092 introduced process-group timeout cleanup but cancellation arriving during cleanup could be swallowed, and rollback inferred created files from files_changed, allowing dry-run deletion and symlink-target deletion."
+    ],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "2237bd4a19fd6107c63b93f5ae26a3ad4c6ca2e8c2c64678291e167d345fe5ff",
+    "rollback": "Revert sandbox.py, diff_applier.py, the focused cancellation regression test, and this packet together. Rollback restores the known cancellation and rollback defects and must not be represented as safe subprocess cleanup.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.43.0",
+      "make": "4.3",
+      "python": "3.14.4"
+    },
+    "work_packet": "WP-0D1"
+  },
+  "worktree": "."
+}
