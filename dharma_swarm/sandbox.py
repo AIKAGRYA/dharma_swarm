@@ -25,7 +25,7 @@ def _kill_process(proc: "asyncio.subprocess.Process") -> None:
     try:
         proc.kill()
     except (ProcessLookupError, PermissionError, OSError):
-        pass
+        return
 
 
 def kill_process_group(proc: "asyncio.subprocess.Process") -> None:
@@ -60,7 +60,7 @@ async def terminate_process_group(proc: "asyncio.subprocess.Process") -> None:
         await asyncio.shield(proc.wait())
     except (ProcessLookupError, ChildProcessError, OSError):
         # The process may have been reaped concurrently. Cleanup is complete.
-        pass
+        return
 
 
 # Patterns that are always rejected before execution.
