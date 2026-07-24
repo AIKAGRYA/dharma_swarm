@@ -40,6 +40,19 @@ def _delayed_marker_command(started: Path, survived: Path) -> str:
     return f"{shlex.quote(sys.executable)} -c {shlex.quote(code)}"
 
 
+def _exited_parent_with_delayed_child(survived: Path) -> str:
+    child = (
+        "from pathlib import Path; import time; "
+        "time.sleep(2); "
+        f"Path({str(survived)!r}).write_text('survived', encoding='utf-8')"
+    )
+    parent = (
+        "import subprocess, sys; "
+        f"subprocess.Popen([sys.executable, '-c', {child!r}])"
+    )
+    return f"{shlex.quote(sys.executable)} -c {shlex.quote(parent)}"
+
+
 class _FallbackProcess:
     pid = 123456
     returncode = None
@@ -59,6 +72,42 @@ def test_kill_process_group_falls_back_without_posix_apis(monkeypatch):
     kill_process_group(proc)  # type: ignore[arg-type]
 
     assert proc.killed is True
+
+
+def test_kill_process_group_signals_group_after_shell_exit(monkeypatch):
+    proc = _FallbackProcess()
+    proc.returncode = 0
+    calls: list[tuple[int, signal.Signals]] = []
+    monkeypatch.setattr(os, "getpgid", lambda pid: pid)
+    monkeypatch.setattr(os, "killpg", lambda pgid, sig: calls.append((pgid, sig)))
+
+    kill_process_group(proc)  # type: ignore[arg-type]
+
+    assert calls == [(proc.pid, signal.SIGKILL)]
+    assert proc.killed is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    not _process_groups_supported(),
+    reason="process-group cancellation proof requires POSIX group APIs",
+)
+async def test_timeout_kills_descendant_after_session_leader_exits(tmp_path: Path):
+    survived = tmp_path / "exited-parent-survived"
+    sandbox = LocalSandbox(workdir=tmp_path)
+    started_at = time.monotonic()
+
+    try:
+        result = await sandbox.execute(
+            _exited_parent_with_delayed_child(survived), timeout=0.3
+        )
+        elapsed = time.monotonic() - started_at
+        assert result.timed_out is True
+        assert elapsed < 1.5
+        await asyncio.sleep(2.2)
+        assert not survived.exists(), "descendant survived its exited session leader"
+    finally:
+        await sandbox.cleanup()
 
 
 @pytest.mark.asyncio
@@ -87,6 +136,18 @@ async def test_local_sandbox_cancellation_kills_delayed_child(tmp_path: Path):
         await sandbox.cleanup()
 
 
+def _existing_file_diff() -> str:
+    return (
+        "--- a/hello.py\n"
+        "+++ b/hello.py\n"
+        "@@ -1,3 +1,3 @@\n"
+        " # header\n"
+        "-old_value = 1\n"
+        "+new_value = 2\n"
+        " # footer\n"
+    )
+
+
 @pytest.mark.asyncio
 @pytest.mark.skipif(
     not _process_groups_supported(),
@@ -100,20 +161,11 @@ async def test_diff_applier_cancellation_kills_child_and_rolls_back(
     target.write_text(original, encoding="utf-8")
     started = tmp_path / "diff-started"
     survived = tmp_path / "diff-survived"
-    diff = (
-        "--- a/hello.py\n"
-        "+++ b/hello.py\n"
-        "@@ -1,3 +1,3 @@\n"
-        " # header\n"
-        "-old_value = 1\n"
-        "+new_value = 2\n"
-        " # footer\n"
-    )
     applier = DiffApplier(workspace=tmp_path)
 
     task = asyncio.create_task(
         applier.apply_and_test(
-            diff,
+            _existing_file_diff(),
             test_command=_delayed_marker_command(started, survived),
             timeout=30,
         )
@@ -129,3 +181,47 @@ async def test_diff_applier_cancellation_kills_child_and_rolls_back(
     assert not target.with_suffix(".py.bak").exists()
     await asyncio.sleep(2.2)
     assert not survived.exists(), "cancelled test command continued running"
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    not _process_groups_supported(),
+    reason="process-group cancellation proof requires POSIX group APIs",
+)
+async def test_repeated_cancellation_cannot_interrupt_rollback(
+    tmp_path: Path, monkeypatch
+):
+    target = tmp_path / "hello.py"
+    original = "# header\nold_value = 1\n# footer\n"
+    target.write_text(original, encoding="utf-8")
+    started = tmp_path / "repeat-started"
+    survived = tmp_path / "repeat-survived"
+    rollback_started = asyncio.Event()
+    applier = DiffApplier(workspace=tmp_path)
+    original_rollback = applier.rollback
+
+    async def delayed_rollback(result):
+        rollback_started.set()
+        await asyncio.sleep(0.25)
+        await original_rollback(result)
+
+    monkeypatch.setattr(applier, "rollback", delayed_rollback)
+    task = asyncio.create_task(
+        applier.apply_and_test(
+            _existing_file_diff(),
+            test_command=_delayed_marker_command(started, survived),
+            timeout=30,
+        )
+    )
+    await _wait_for_path(started)
+    task.cancel()
+    await asyncio.wait_for(rollback_started.wait(), timeout=3)
+    task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert target.read_text(encoding="utf-8") == original
+    assert not target.with_suffix(".py.bak").exists()
+    await asyncio.sleep(2.2)
+    assert not survived.exists(), "repeated cancellation left child work running"
