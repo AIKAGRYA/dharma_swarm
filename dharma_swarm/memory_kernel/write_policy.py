@@ -434,6 +434,7 @@ def default_reviewed_write_baseline() -> tuple[ReviewedWriteBaselineEntry, ...]:
         ReviewedWriteBaselineEntry('scripts/overnight_autopilot.py', 'main', 'path_write', 'bb376ba4fa8b', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/rebind_cybernetics_directive.py', '_amain', 'path_write', '9cf7924d9d6d', 'operational_state', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/regression_guard.py', 'main', 'path_write', '332dd97b1a0f', 'operational_state', occurrences=1),
+        ReviewedWriteBaselineEntry('scripts/runtime/codex_composer_semantic_inbox_drain.py', 'drain_semantic_inbox', 'path_write', 'cee8def16f72', 'generated_artifact', occurrences=1, review_note='Semantic drain writes one task-scoped prompt file under its operator-provided temporary work directory; it does not write canonical memory or claim publication.'),
         ReviewedWriteBaselineEntry('scripts/seed_cybernetics_directive.py', '_amain', 'path_write', '405197978dba', 'operational_state', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/seed_cybernetics_population_cycle.py', '_amain', 'path_write', '1596e5fe1cc1', 'operational_state', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/seed_cybernetics_population_cycle.py', '_amain', 'path_write', '3dce95c52e97', 'operational_state', occurrences=1),
