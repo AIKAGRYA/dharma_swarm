@@ -46,6 +46,12 @@ class TestStatusMapping:
     def test_completed_maps_to_done(self):
         assert _TASK_TO_CARD_STATUS[TaskStatus.COMPLETED] == "done"
 
+    def test_quarantined_fake_result_maps_to_quarantined(self):
+        assert (
+            _TASK_TO_CARD_STATUS[TaskStatus.QUARANTINED_FAKE_RESULT]
+            == "quarantined"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Unit: ID mapping
@@ -215,7 +221,7 @@ async def test_adapter_sync_one(board, tmp_path):
 
 @pytest.mark.asyncio
 async def test_adapter_sync_incremental(board, tmp_path):
-    task = await board.create("Incremental")
+    await board.create("Incremental")
 
     adapter = TaskBoardAdapter(board, BoardEventLog(path=tmp_path / "incr_events.db"))
     await adapter.sync_all()
