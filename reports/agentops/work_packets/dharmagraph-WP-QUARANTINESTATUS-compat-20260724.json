@@ -1,7 +1,7 @@
 {
   "id": "dharmagraph-WP-QUARANTINESTATUS-compat-20260724",
-  "base_ref": "b5ec7a82e7bee6c51a63d472a5d2fd3979e63468",
-  "branch": "agent/quarantine-status-compat-20260724",
+  "base_ref": "2447ca565bfbd80258f7acfafb6121da7ab20886",
+  "branch": "agent/quarantine-status-main-followup-20260724",
   "worktree": ".",
   "intent": "Restore swarm tick liveness without rewriting audited runtime data by recognizing the persisted quarantined_fake_result task status as a first-class terminal state, preserving it through TaskBoard reads and board projections, excluding it from ready work, and rejecting every outgoing transition.",
   "allowed_files": [
@@ -211,7 +211,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "b5ec7a82e7bee6c51a63d472a5d2fd3979e63468",
+      "checked_at_sha": "2447ca565bfbd80258f7acfafb6121da7ab20886",
       "details": []
     },
     "interface_mismatches": [
@@ -226,10 +226,11 @@
     "honest_blockers": [
       "This compatibility status is intentionally terminal and readable; it does not authorize requeue, scheduling, dependency satisfaction, or reverse projection into executable TaskStatus.",
       "The historical live rows and their audit metadata remain untouched; this packet performs no database migration or rewrite.",
-      "The branch is stacked on the deployed runtime-controls commit so the immutable recovery release contains both changes; integration order must remain coordinated.",
+      "The branch is rebound directly to current main after stacked PR #1106 merged only into the runtime-controls branch; this PR carries the quarantine compatibility independently.",
+      "TaskBoard.update_task parses raw status values at the API boundary so audit-only quarantine assignment and unknown status strings both fail closed without mutating the task row.",
       "Exact-head hosted CI, independent review policy, and human merge authority remain required."
     ],
     "rollback": "Revert the terminal enum, transition mapping, board projection mapping, regression tests, and this packet together; do not rewrite or delete the quarantined database rows.",
-    "packet_digest": "39ec06263ea304879a7fe383c83ea2416d43a65f34627e824acf20a55bbc9d77"
+    "packet_digest": "03911620b5620e23d917c169b308d40eeaf316e4c74101fc98e16d8f153d5490"
   }
 }
