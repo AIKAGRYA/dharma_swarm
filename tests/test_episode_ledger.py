@@ -312,6 +312,19 @@ def test_writer_recovers_from_corrupt_lines(tmp_path: Path):
     assert writer.append(_event("review_recorded", 2, reviewer="codex")) is True
 
 
+def test_squatted_event_id_cannot_suppress_the_real_event(tmp_path: Path):
+    """A malformed line that merely CLAIMS a valid event_id must not poison
+    write-side dedup: after restart, appending the genuine event still
+    persists it (silent evidence loss is worse than a rejected duplicate)."""
+    path = tmp_path / "episodes.jsonl"
+    obs = _event("observation_recorded", 1, note="fine")
+    path.write_text(json.dumps({"event_id": obs.event_id}) + "\n")
+    writer = EpisodeLedgerWriter(path)
+    assert writer.append(obs) is True, "squatted id suppressed the real event"
+    persisted = [json.loads(x) for x in path.read_text().splitlines()]
+    assert any(r.get("schema_version") == EPISODE_EVENT_SCHEMA_VERSION for r in persisted)
+
+
 def test_writer_recovers_from_valid_json_non_object_lines(tmp_path: Path):
     """A line that parses as JSON but is not an object (null, number, string,
     array) must be skipped like any other corrupt line, not crash rehydration."""

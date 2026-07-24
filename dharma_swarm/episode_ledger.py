@@ -293,9 +293,20 @@ class EpisodeLedgerWriter:
                     self.path,
                 )
                 continue
-            event_id = str(record.get("event_id", ""))
-            if event_id:
-                self._seen.add(event_id)
+            # Full schema + tamper validation before trusting the claimed id:
+            # a malformed line that merely SQUATS a valid event_id must not
+            # poison dedup and silently suppress the genuine event forever.
+            # Readers validate too, so a later valid append under the same id
+            # is unambiguous — only one line passes from_dict.
+            try:
+                event = EpisodeEvent.from_dict(record)
+            except LedgerValidationError:
+                logger.warning(
+                    "episode_ledger: skipping invalid record in %s during rehydrate",
+                    self.path,
+                )
+                continue
+            self._seen.add(event.event_id)
 
     def append(self, event: EpisodeEvent) -> bool:
         """Append one event; returns False when the event_id was already
