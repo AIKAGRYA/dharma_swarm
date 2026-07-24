@@ -58,16 +58,26 @@ def _canonical(payload: dict[str, Any]) -> str:
 
 
 def redact_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Mask secret-like keys recursively; persistence never sees raw secrets."""
+    """Mask secret-like keys recursively; persistence never sees raw secrets.
+
+    Lists are containers, not leaves: a secret inside e.g.
+    ``{"messages": [{"api_key": ...}]}`` is masked at any depth.
+    """
     redacted: dict[str, Any] = {}
     for key, value in payload.items():
         if any(marker in key.lower() for marker in _REDACT_KEY_MARKERS):
             redacted[key] = _REDACTED
-        elif isinstance(value, dict):
-            redacted[key] = redact_payload(value)
         else:
-            redacted[key] = value
+            redacted[key] = _redact_value(value)
     return redacted
+
+
+def _redact_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        return redact_payload(value)
+    if isinstance(value, (list, tuple)):
+        return [_redact_value(item) for item in value]
+    return value
 
 
 @dataclass(frozen=True)
@@ -217,6 +227,12 @@ def project_episode(events: list[EpisodeEvent]) -> EpisodeState:
     dedup by event_id, conflicting observations kept visible (never
     last-write-wins), and fail-closed closure — an episode_closed with zero
     observations AND zero reviews is closed but NOT valid (missing evidence)."""
+    episode_ids = sorted({e.episode_id for e in events})
+    if len(episode_ids) > 1:
+        raise LedgerValidationError(
+            f"project_episode projects ONE episode but got events from "
+            f"{len(episode_ids)}: {episode_ids}"
+        )
     state = EpisodeState()
     seen: set[str] = set()
     ordered: list[EpisodeEvent] = []
@@ -227,6 +243,10 @@ def project_episode(events: list[EpisodeEvent]) -> EpisodeState:
         seen.add(event.event_id)
         ordered.append(event)
     state.events = ordered
+    # Closure validity is decided by the evidence present AT each close, in
+    # sequence order — evidence appended after a close cannot retroactively
+    # validate it, and any close without prior evidence fails the episode.
+    closes_valid: list[bool] = []
     for event in ordered:
         state.episode_id = state.episode_id or event.episode_id
         if event.event_type == "observation_recorded":
@@ -237,7 +257,8 @@ def project_episode(events: list[EpisodeEvent]) -> EpisodeState:
             state.effects.append(event)
         elif event.event_type == "episode_closed":
             state.closed = True
-    state.closure_valid = state.closed and bool(state.observations or state.reviews)
+            closes_valid.append(bool(state.observations or state.reviews))
+    state.closure_valid = state.closed and all(closes_valid)
     return state
 
 
@@ -283,6 +304,10 @@ class EpisodeLedgerWriter:
             return False
         record = event.to_dict()
         record["payload"] = redact_payload(event.payload)
+        # Content-addressed tamper check at the write boundary: a payload
+        # mutated after construction no longer matches the already-computed
+        # event_id and must not be persisted under that stale identity.
+        EpisodeEvent.from_dict(record)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.path, "a", encoding="utf-8") as f:
             f.write(json.dumps(record, ensure_ascii=True, default=str) + "\n")

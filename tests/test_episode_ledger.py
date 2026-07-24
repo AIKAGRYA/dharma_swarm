@@ -76,6 +76,23 @@ def test_unknown_event_type_fails_closed():
         EpisodeEvent.from_dict(payload)
 
 
+def test_redaction_reaches_secrets_nested_in_lists():
+    """Lists are not opaque leaves: a secret-like key inside a dict nested in a
+    list (e.g. messages=[{"api_key": ...}]) must be masked before persistence,
+    at any depth."""
+    event = _event(
+        "observation_recorded",
+        1,
+        messages=[{"api_key": "sk-live-1", "note": "ok"}],
+        batches=[[{"token": "t0p"}]],
+        plain=["keep", 1],
+    )
+    assert event.payload["messages"][0]["api_key"] == "[REDACTED]"
+    assert event.payload["messages"][0]["note"] == "ok"
+    assert event.payload["batches"][0][0]["token"] == "[REDACTED]"
+    assert event.payload["plain"] == ["keep", 1]
+
+
 def test_from_dict_requires_event_id():
     """A stored record with no event_id must fail closed, not silently mint a
     fresh identity — otherwise dedup and the tamper check cannot distinguish
@@ -189,6 +206,35 @@ def test_closure_without_evidence_fails_closed():
     assert project_episode(with_evidence).closure_valid is True
 
 
+def test_late_evidence_cannot_validate_an_earlier_close():
+    """Evidence appended AFTER episode_closed must not retroactively turn a
+    close-without-evidence into a valid closure — ordering cannot be bypassed."""
+    state = project_episode(
+        [
+            _event("episode_opened", 0),
+            _event("episode_closed", 1, outcome="ok"),
+            _event("observation_recorded", 2, note="late"),
+        ]
+    )
+    assert state.closed is True
+    assert state.closure_valid is False, "late evidence validated an earlier close"
+
+
+def test_projection_rejects_mixed_episode_ids():
+    """project_episode projects ONE episode; silently blending events from two
+    episodes could let one episode's evidence validate another's closure."""
+    mine = _event("episode_opened", 0)
+    other = EpisodeEvent.new(
+        event_type="episode_closed",
+        episode_id="ep_other000000001",
+        attempt_id="at_other000000001",
+        sequence=1,
+        payload={"outcome": "ok"},
+    )
+    with pytest.raises(LedgerValidationError, match="episode"):
+        project_episode([mine, other])
+
+
 # ---------------------------------------------------------------------------
 # Persistence wrapper: append-only JSONL, redaction, write-side dedup
 # ---------------------------------------------------------------------------
@@ -230,6 +276,18 @@ def test_persisted_events_round_trip_through_from_dict(tmp_path: Path):
     writer.append(original)
     rebuilt = EpisodeEvent.from_dict(json.loads(path.read_text().splitlines()[0]))
     assert rebuilt == original
+
+
+def test_append_refuses_payload_mutated_after_construction(tmp_path: Path):
+    """The ledger is content-addressed: a payload mutated between construction
+    and append no longer matches the already-computed event_id and must be
+    refused, not persisted under a stale identity."""
+    writer = EpisodeLedgerWriter(tmp_path / "episodes.jsonl")
+    event = _event("observation_recorded", 1, note="ok")
+    event.payload["note"] = "tampered"
+    with pytest.raises(LedgerValidationError, match="altered"):
+        writer.append(event)
+    assert not (tmp_path / "episodes.jsonl").exists(), "tampered event was persisted"
 
 
 def test_writer_survives_restart_dedup(tmp_path: Path):
