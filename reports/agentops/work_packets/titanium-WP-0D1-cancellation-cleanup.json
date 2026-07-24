@@ -40,7 +40,7 @@
   "intent": "WP-0D1 corrective slice after merged PR #1092: make process-group termination capability-safe, clean up LocalSandbox commands on caller cancellation, and make DiffApplier cancellation terminate the test process and restore the workspace before preserving CancelledError. This closes only the three reproduced P1 cleanup defects; it does not claim full WP-0D or Titanium closure.",
   "negative_controls": [
     {
-      "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('dharma_swarm/sandbox.py'); t=p.read_text(); anchor='    getpgid = getattr(os, \\\"getpgid\\\", None)'; assert anchor in t; p.write_text(t.replace(anchor,'    if proc.returncode is not None:\\\\n        return\\\\n\\\\n'+anchor,1)); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_subprocess_cancellation.py::test_kill_process_group_signals_group_after_shell_exit'],check=False); sys.exit(r.returncode)\"",
+      "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('dharma_swarm/sandbox.py'); t=p.read_text(); anchor='    killpg = getattr(os, \\\"killpg\\\", None)'; assert anchor in t; p.write_text(t.replace(anchor,'    if proc.returncode is not None:\\\\n        return\\\\n\\\\n'+anchor,1)); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_subprocess_cancellation.py::test_kill_process_group_signals_group_after_shell_exit'],check=False); sys.exit(r.returncode)\"",
       "expected_exit": 1,
       "name": "exited-shell-early-return-must-fail",
       "timeout_seconds": 60
@@ -96,7 +96,7 @@
       "python": "3.14.4"
     },
     "work_packet": "WP-0D1",
-    "packet_digest": "a1e751fa3e836770062e5766831beb89665336a6196ae5f7cd05af64991a9e62"
+    "packet_digest": "d5910ae4655f010c9594aaa8f006ed7d439cc3f2e278bb6cd1f1271d6532910e"
   },
   "worktree": "."
 }
