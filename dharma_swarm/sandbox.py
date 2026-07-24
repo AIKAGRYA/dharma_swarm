@@ -53,14 +53,19 @@ def kill_process_group(proc: "asyncio.subprocess.Process") -> None:
 
 
 async def await_cleanup(awaitable: Awaitable[_T]) -> _T:
-    """Finish cleanup even when the outer task is cancelled repeatedly."""
+    """Finish cleanup, then preserve any cancellation received meanwhile."""
     task = asyncio.ensure_future(awaitable)
+    cancelled = False
     while not task.done():
         try:
             await asyncio.shield(task)
         except asyncio.CancelledError:
+            cancelled = True
             continue
-    return task.result()
+    result = task.result()
+    if cancelled:
+        raise asyncio.CancelledError
+    return result
 
 
 async def terminate_process_group(proc: "asyncio.subprocess.Process") -> None:
