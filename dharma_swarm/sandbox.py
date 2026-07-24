@@ -34,25 +34,20 @@ def _kill_process(proc: "asyncio.subprocess.Process") -> None:
 def kill_process_group(proc: "asyncio.subprocess.Process") -> None:
     """Kill *proc* and its process group when the host supports it.
 
-    ``start_new_session=True`` gives POSIX children their own process group, so
-    killing only the shell can leave a non-exec'd grandchild alive. Windows
-    and constrained Python builds may not expose ``getpgid``/``killpg`` or
-    ``SIGKILL``; those hosts fall back to the process handle rather than
-    raising ``AttributeError`` and skipping cleanup entirely.
-
-    The session leader may already have exited while descendants still hold its
-    pipes. Its pid remains the process-group id, so a non-``None`` return code
-    is not evidence that the group is empty.
+    ``start_new_session=True`` makes the spawned pid the process-group id.
+    Killing only the shell can leave a non-exec'd descendant alive, including
+    after the session leader has already exited. Signal the known PGID directly
+    rather than asking ``getpgid`` about a leader that may already be reaped.
+    Hosts without ``killpg`` or ``SIGKILL`` fall back to the process handle.
     """
-    getpgid = getattr(os, "getpgid", None)
     killpg = getattr(os, "killpg", None)
     sigkill = getattr(signal, "SIGKILL", None)
-    if getpgid is None or killpg is None or sigkill is None:
+    if killpg is None or sigkill is None:
         _kill_process(proc)
         return
 
     try:
-        killpg(getpgid(proc.pid), sigkill)
+        killpg(proc.pid, sigkill)
     except (AttributeError, ProcessLookupError, PermissionError, OSError):
         _kill_process(proc)
 
