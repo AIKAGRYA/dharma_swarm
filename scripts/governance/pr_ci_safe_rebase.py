@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Sequence
 
 PACKET_PREFIX = "reports/agentops/work_packets/"
+WORKFLOW_PREFIX = ".github/workflows/"
 MAX_ENUMERABLE_CHANGED_FILES = 3000
 FILES_PER_PAGE = 100
 EXPECTED_BASE = "main"
@@ -58,6 +59,10 @@ class LocalError(Exception):
 
 def is_protected_path(path: str) -> bool:
     return path.startswith(PACKET_PREFIX) and path.endswith(".json")
+
+
+def is_workflow_path(path: str) -> bool:
+    return path.startswith(WORKFLOW_PREFIX)
 
 
 def default_runner(argv: list[str]) -> CmdResult:
@@ -251,6 +256,18 @@ def _protected_paths(entries: Sequence[dict[str, Any]]) -> list[str]:
     return hits
 
 
+def _workflow_paths(entries: Sequence[dict[str, Any]]) -> list[str]:
+    hits: list[str] = []
+    for entry in entries:
+        filename = entry.get("filename")
+        if isinstance(filename, str) and is_workflow_path(filename):
+            hits.append(filename)
+        prev = entry.get("previous_filename")
+        if isinstance(prev, str) and is_workflow_path(prev):
+            hits.append(prev)
+    return hits
+
+
 def _validate_branch_name(runner: Runner, head_ref: str) -> None:
     result = _run(runner, ["git", "check-ref-format", "--branch", head_ref])
     if result.returncode != 0:
@@ -315,6 +332,13 @@ def safe_rebase(
             raise Skip(
                 "changes a Session Entry packet under "
                 f"{PACKET_PREFIX}*.json ({len(protected)} path(s))"
+            )
+        workflows = _workflow_paths(entries)
+        if workflows:
+            raise Skip(
+                "changes a GitHub Actions workflow under "
+                f"{WORKFLOW_PREFIX} ({len(workflows)} path(s)); "
+                "workflow-write authority is not proven"
             )
 
         # --- race re-read before any PR-head git mutation ---

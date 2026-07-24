@@ -157,7 +157,7 @@ def test_unknown_merge_state_with_passing_checks_is_not_green():
     assert triage.actionable is True
 
 
-def test_workflow_accepts_existing_dispatch_pat_as_recovery_fallback():
+def test_workflow_validates_push_authority_before_rebase():
     workflow = (
         Path(__file__).resolve().parents[1] / ".github" / "workflows" / "pr-ci-health.yml"
     ).read_text(encoding="utf-8")
@@ -167,6 +167,13 @@ def test_workflow_accepts_existing_dispatch_pat_as_recovery_fallback():
         "secrets.MERGEMASTERMIKE_PAT || github.token"
     ) in workflow
     assert (
-        "secrets.PR_CI_HEALTH_PUSH_TOKEN != '' || "
-        "secrets.MERGEMASTERMIKE_PAT != ''"
+        "PUSH_TOKEN: ${{ secrets.PR_CI_HEALTH_PUSH_TOKEN || "
+        "secrets.MERGEMASTERMIKE_PAT }}"
     ) in workflow
+    assert "Validate trusted rebase push authority" in workflow
+    assert ".permissions.push // false" in workflow
+    assert 'echo "HAS_PUSH_TOKEN=$has_push_token" >> "$GITHUB_ENV"' in workflow
+    assert (
+        "HAS_PUSH_TOKEN: ${{ secrets.PR_CI_HEALTH_PUSH_TOKEN != '' || "
+        "secrets.MERGEMASTERMIKE_PAT != '' }}"
+    ) not in workflow

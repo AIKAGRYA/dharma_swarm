@@ -1,6 +1,6 @@
 """Tests for dharma_swarm.models — Pydantic data models."""
 
-from datetime import datetime, timezone
+from datetime import timezone
 
 from dharma_swarm.models import (
     AgentConfig,
@@ -117,7 +117,7 @@ def test_llm_response():
 
 
 def test_all_enums():
-    assert len(TaskStatus) == 6
+    assert len(TaskStatus) == 7
     assert len(AgentRole) == 19  # 6 base + 6 PSMV cognitive + 6 constitutional + WORKER
     assert len(MemoryLayer) == 5
     assert {topology.value for topology in TopologyType} == {
