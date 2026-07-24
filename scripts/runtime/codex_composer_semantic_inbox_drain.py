@@ -11,6 +11,7 @@ import argparse
 import json
 import os
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -19,18 +20,16 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.runtime.a2a_domain_reply_artifact import (  # noqa: E402
-    DEFAULT_ARTIFACT_RECEIPT_DIR,
     artifact_path_for,
     build_domain_reply_artifact,
+    validate_packet_id,
     write_artifact_author_receipt,
 )
-from scripts.runtime.a2a_domain_reply_worker import DEFAULT_OUTBOX_ROOT  # noqa: E402
-from scripts.runtime.model_critic_runner import DEFAULT_OUT_DIR as DEFAULT_SEMANTIC_RECEIPT_DIR  # noqa: E402
 from scripts.runtime.model_critic_runner import run_model_critic  # noqa: E402
 from scripts.runtime.pr_merge_control import stamp, utc_now  # noqa: E402
+from dharma_swarm.daemon_config import dharma_state_dir  # noqa: E402
 from dharma_swarm.models import ProviderType  # noqa: E402
 from dharma_swarm.runtime_provider import (  # noqa: E402
-    PREFERRED_LOW_COST_RUNTIME_PROVIDERS,
     preferred_runtime_provider_configs,
     resolve_runtime_provider_config,
 )
@@ -39,16 +38,51 @@ DEFAULT_DRAIN_RECEIPT_DIR = REPO_ROOT / "reports" / "a2a" / "semantic_inbox_drai
 DEFAULT_AGENT_UID = "codex_composer"
 LEGACY_SCHEMA_VERSION = "dharma.a2a.codex_composer_semantic_inbox_drain.v1"
 GENERIC_SCHEMA_VERSION = "dharma.a2a.semantic_inbox_drain.v1"
-_DIRECT_RUNTIME_PROVIDER_ORDER = tuple(
-    provider
-    for provider in PREFERRED_LOW_COST_RUNTIME_PROVIDERS
-    if provider
-    not in {
-        ProviderType.OLLAMA,
-        ProviderType.CLAUDE_CODE,
-        ProviderType.CODEX,
-    }
-)
+_DIRECT_RUNTIME_PROVIDER_ORDER = (ProviderType.OLLAMA,)
+_SUPPORTED_CRITIC_PROVIDERS = frozenset(_DIRECT_RUNTIME_PROVIDER_ORDER)
+
+
+@dataclass(frozen=True)
+class SemanticResponderRuntimePaths:
+    state_dir: Path
+    outbox_root: Path
+    semantic_receipt_dir: Path
+    artifact_receipt_dir: Path
+    drain_receipt_dir: Path
+    domain_reply_receipt_dir: Path
+
+
+def semantic_responder_runtime_paths(
+    *,
+    agent_uid: str,
+    state_dir: Path | None = None,
+) -> SemanticResponderRuntimePaths:
+    """Resolve every always-on responder output beneath canonical state."""
+
+    if state_dir is None:
+        dharma_root = dharma_state_dir(
+            "DHARMA_STATE_DIR",
+            "DHARMA_HOME",
+        ).expanduser().resolve()
+        responder_root = (
+            dharma_root
+            / "external_agents"
+            / agent_uid
+            / "nest"
+            / "semantic_responder"
+        )
+        outbox_root = dharma_root / "a2a_bus" / "outboxes"
+    else:
+        responder_root = state_dir.expanduser().resolve()
+        outbox_root = responder_root / "outboxes"
+    return SemanticResponderRuntimePaths(
+        state_dir=responder_root,
+        outbox_root=outbox_root,
+        semantic_receipt_dir=responder_root / "semantic_receipts",
+        artifact_receipt_dir=responder_root / "artifact_author_receipts",
+        drain_receipt_dir=responder_root / "drain_receipts",
+        domain_reply_receipt_dir=responder_root / "domain_reply_receipts",
+    )
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -61,10 +95,40 @@ def _read_json(path: Path) -> dict[str, Any]:
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     data = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode("utf-8")
-    fd = os.open(path, os.O_CREAT | os.O_TRUNC | os.O_WRONLY, 0o600)
+    flags = os.O_CREAT | os.O_TRUNC | os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(path, flags, 0o600)
     with os.fdopen(fd, "wb") as handle:
         handle.write(data)
     path.chmod(0o600)
+
+
+def _write_json_exclusive(path: Path, payload: dict[str, Any]) -> bool:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    data = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    try:
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError:
+        return False
+    with os.fdopen(fd, "wb") as handle:
+        handle.write(data)
+    path.chmod(0o600)
+    return True
+
+
+def _write_unique_receipt(
+    receipt_dir: Path,
+    *,
+    stem: str,
+    payload: dict[str, Any],
+    path_field: str,
+) -> Path:
+    for suffix in range(10_000):
+        discriminator = "" if suffix == 0 else f"-{suffix}"
+        path = receipt_dir / f"{stem}{discriminator}.json"
+        payload[path_field] = str(path)
+        if _write_json_exclusive(path, payload):
+            return path
+    raise RuntimeError("could not allocate a unique semantic-drain receipt path")
 
 
 def _safe_token(value: object, *, fallback: str = "unknown") -> str:
@@ -150,6 +214,10 @@ def _resolve_runtime_critic_defaults(
             provider_type = ProviderType(provider)
         except ValueError as exc:
             raise ValueError(f"unsupported runtime provider: {provider}") from exc
+        if provider_type not in _SUPPORTED_CRITIC_PROVIDERS:
+            raise ValueError(
+                f"provider {provider!r} is not supported by the model critic"
+            )
         cfg = resolve_runtime_provider_config(provider_type, model=model or None)
         if not cfg.available:
             raise RuntimeError(f"semantic inbox provider is not available: {provider}")
@@ -163,7 +231,7 @@ def _resolve_runtime_critic_defaults(
         provider_order=_DIRECT_RUNTIME_PROVIDER_ORDER,
     )
     if not configs:
-        raise RuntimeError("no direct API runtime provider available for semantic inbox drain")
+        raise RuntimeError("no supported runtime provider available for semantic inbox drain")
     cfg = configs[0]
     resolved_model = cfg.default_model or model
     if not resolved_model:
@@ -177,10 +245,11 @@ def drain_semantic_inbox(
     send_receipt_path: Path | None = None,
     prompt_file: Path | None = None,
     mock_response_file: Path | None = None,
-    outbox_root: Path = DEFAULT_OUTBOX_ROOT,
-    semantic_receipt_dir: Path = DEFAULT_SEMANTIC_RECEIPT_DIR,
-    artifact_receipt_dir: Path = DEFAULT_ARTIFACT_RECEIPT_DIR,
-    drain_receipt_dir: Path = DEFAULT_DRAIN_RECEIPT_DIR,
+    state_dir: Path | None = None,
+    outbox_root: Path | None = None,
+    semantic_receipt_dir: Path | None = None,
+    artifact_receipt_dir: Path | None = None,
+    drain_receipt_dir: Path | None = None,
     agent_uid: str = DEFAULT_AGENT_UID,
     provider: str | None = None,
     model: str | None = None,
@@ -193,8 +262,34 @@ def drain_semantic_inbox(
     target_uid = str(delivery_record.get("agent_uid") or envelope.get("target_uid") or "")
     if target_uid != agent_uid:
         raise ValueError(f"delivery target {target_uid!r} is not {agent_uid!r}")
-    if not packet_id or not reply_subject:
-        raise ValueError("delivery envelope must include packet_id and reply_subject")
+    packet_id = validate_packet_id(packet_id)
+    if not reply_subject:
+        raise ValueError("delivery envelope must include reply_subject")
+
+    runtime_paths = semantic_responder_runtime_paths(
+        agent_uid=agent_uid,
+        state_dir=state_dir,
+    )
+    outbox_root = (
+        outbox_root.expanduser().resolve()
+        if outbox_root is not None
+        else runtime_paths.outbox_root
+    )
+    semantic_receipt_dir = (
+        semantic_receipt_dir.expanduser().resolve()
+        if semantic_receipt_dir is not None
+        else runtime_paths.semantic_receipt_dir
+    )
+    artifact_receipt_dir = (
+        artifact_receipt_dir.expanduser().resolve()
+        if artifact_receipt_dir is not None
+        else runtime_paths.artifact_receipt_dir
+    )
+    drain_receipt_dir = (
+        drain_receipt_dir.expanduser().resolve()
+        if drain_receipt_dir is not None
+        else runtime_paths.drain_receipt_dir
+    )
 
     if prompt_file is None:
         prompt_file = _prompt_path_for(drain_receipt_dir, packet_id)
@@ -303,9 +398,12 @@ def drain_semantic_inbox(
         ),
     }
     drain_receipt_dir.mkdir(parents=True, exist_ok=True)
-    drain_receipt_path = drain_receipt_dir / f"{stamp()}-{_safe_token(agent_uid)}-{_safe_token(packet_id)}.json"
-    _write_json(drain_receipt_path, drain_receipt)
-    drain_receipt["drain_receipt_path"] = str(drain_receipt_path)
+    _write_unique_receipt(
+        drain_receipt_dir,
+        stem=f"{stamp()}-{_safe_token(agent_uid)}-{_safe_token(packet_id)}",
+        payload=drain_receipt,
+        path_field="drain_receipt_path",
+    )
     return drain_receipt
 
 
@@ -315,10 +413,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--send-receipt", default="")
     parser.add_argument("--prompt-file", default="")
     parser.add_argument("--mock-response-file", default="")
-    parser.add_argument("--outbox-root", default=str(DEFAULT_OUTBOX_ROOT))
-    parser.add_argument("--semantic-receipt-dir", default=str(DEFAULT_SEMANTIC_RECEIPT_DIR))
-    parser.add_argument("--artifact-receipt-dir", default=str(DEFAULT_ARTIFACT_RECEIPT_DIR))
-    parser.add_argument("--drain-receipt-dir", default=str(DEFAULT_DRAIN_RECEIPT_DIR))
+    parser.add_argument("--state-dir", default="")
+    parser.add_argument("--outbox-root", default="")
+    parser.add_argument("--semantic-receipt-dir", default="")
+    parser.add_argument("--artifact-receipt-dir", default="")
+    parser.add_argument("--drain-receipt-dir", default="")
     parser.add_argument("--agent-uid", default=DEFAULT_AGENT_UID)
     parser.add_argument("--provider", default="")
     parser.add_argument("--model", default="")
@@ -331,10 +430,17 @@ def main(argv: list[str] | None = None) -> int:
             send_receipt_path=Path(args.send_receipt) if args.send_receipt else None,
             prompt_file=Path(args.prompt_file) if args.prompt_file else None,
             mock_response_file=Path(args.mock_response_file) if args.mock_response_file else None,
-            outbox_root=Path(args.outbox_root),
-            semantic_receipt_dir=Path(args.semantic_receipt_dir),
-            artifact_receipt_dir=Path(args.artifact_receipt_dir),
-            drain_receipt_dir=Path(args.drain_receipt_dir),
+            state_dir=Path(args.state_dir) if args.state_dir else None,
+            outbox_root=Path(args.outbox_root) if args.outbox_root else None,
+            semantic_receipt_dir=(
+                Path(args.semantic_receipt_dir) if args.semantic_receipt_dir else None
+            ),
+            artifact_receipt_dir=(
+                Path(args.artifact_receipt_dir) if args.artifact_receipt_dir else None
+            ),
+            drain_receipt_dir=(
+                Path(args.drain_receipt_dir) if args.drain_receipt_dir else None
+            ),
             agent_uid=args.agent_uid,
             provider=args.provider or None,
             model=args.model or None,

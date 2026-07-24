@@ -1,0 +1,82 @@
+{
+ "allowed_files": [
+  "reports/agentops/work_packets/a2a-WP-A2ARELOAD-semantic-responder-postmerge-hardening.json",
+  "scripts/runtime/a2a_domain_reply_artifact.py",
+  "scripts/runtime/codex_composer_semantic_inbox_drain.py",
+  "scripts/runtime/codex_composer_semantic_responder.py",
+  "tests/test_a2a_domain_reply_artifact.py",
+  "tests/test_codex_composer_semantic_responder_dlq.py"
+ ],
+ "approval": {
+  "before_commit": false,
+  "before_merge": true
+ },
+ "base_ref": "2bde232e1d9dcfe16a0fa7cceef13979e215dc9e",
+ "branch": "agent/codex-composer-postmerge-hardening-20260723",
+ "commit": {
+  "allowed": true,
+  "message": "a2a: harden semantic responder restart boundary"
+ },
+ "forbidden_files": [],
+ "gates": [
+  {
+   "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest tests/test_codex_composer_semantic_responder_dlq.py tests/test_a2a_domain_reply_artifact.py -q",
+   "expected_exit": 0,
+   "name": "semantic-responder-adversarial-tests",
+   "timeout_seconds": 600
+  }
+ ],
+ "id": "a2a-WP-A2ARELOAD-semantic-responder-postmerge-hardening",
+ "intent": "Close every reproducible late-review defect from PR #1095 before the codex_composer semantic responder can be reloaded: make publication crash uncertainty terminal and non-replayable, replace pathname lease stealing with OS-backed ownership, preserve pinned artifacts under --no-publish, confine packet-derived paths, select only supported critic providers, root live outputs under DHARMA_STATE_DIR, make receipts collision-proof, and terminalize typed semantic failures. The authority boundary remains explicit: an unknown publication outcome or typed semantic failure is local terminal evidence only, never DomainPublished or EffectVerified.",
+ "negative_controls": [
+  {
+   "command": "python3 -c \"from scripts.runtime.codex_composer_semantic_responder import PENDING_PUBLISH_STATUS, should_mark_processed; raise SystemExit(0 if not should_mark_processed(PENDING_PUBLISH_STATUS) else 1)\"",
+   "expected_exit": 0,
+   "name": "publish-pending-remains-nonterminal",
+   "timeout_seconds": 60
+  }
+ ],
+ "session_entry": {
+  "active_track": "repository-titanium-hardening-2026-07",
+  "authority_precedence": [
+   "executable",
+   "tests",
+   "locks",
+   "git",
+   "owner_files"
+  ],
+  "closest_existing_implementation": [
+   "scripts/runtime/a2a_domain_reply_worker.py",
+   "scripts/runtime/a2a_domain_reply_artifact.py",
+   "scripts/runtime/codex_composer_semantic_inbox_drain.py",
+   "scripts/runtime/codex_composer_semantic_responder.py"
+  ],
+  "collision": {
+   "checked_at_sha": "2bde232e1d9dcfe16a0fa7cceef13979e215dc9e",
+   "details": [],
+   "status": "clear"
+  },
+  "honest_blockers": [
+   "The launchd semantic responder remains deliberately unloaded until this follow-up is merged, deployed from merged main, and one fresh benign packet proves SemanticSuccess without receipt or poison growth.",
+   "A PUBLISH_OUTCOME_UNKNOWN_DLQ receipt records uncertainty after a possible external effect. It intentionally forbids automatic replay and makes no claim that publication succeeded or failed.",
+   "The historical poison packet, immutable dead letter, processed-ledger row, pinned artifact evidence, and 9817 pending receipts remain untouched."
+  ],
+  "interface_mismatches": [
+   "The publisher has an external side effect but the responder previously persisted terminal delivery state only after publication returned, allowing crash replay.",
+   "The responder lease used unlinkable TTL pathnames instead of process-lifetime ownership, allowing an ABA race between stale and new owners.",
+   "The semantic drain default provider order excluded Ollama even though the critic runner currently supports only Ollama.",
+   "Packet identifiers crossed into artifact paths without a strict lexical and resolved-path confinement contract."
+  ],
+  "owner": "@AmitabhainArunachala",
+  "packet_digest": "6e1a9d862ae44c034c003eb758d045003392683600e9d65e59ac7aa1f224b87b",
+  "rollback": "Keep the responder unloaded, revert the packet-scoped follow-up commit, and preserve every immutable runtime receipt, pending artifact, in-flight marker, dead letter, and processed-ledger row for audit. Never restart the pre-hardening responder.",
+  "schema": "dharma_swarm.session_entry.v1",
+  "tool_versions": {
+   "git": "2.50.1",
+   "make": "3.81",
+   "python": "3.13.12"
+  },
+  "work_packet": "WP-A2ARELOAD"
+ },
+ "worktree": "."
+}
