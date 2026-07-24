@@ -193,7 +193,6 @@ class DiffApplier:
         self._runtime_state = runtime_state
         self._require_identity = require_identity
 
-    # -- public API ---------------------------------------------------------
 
     async def apply(
         self,
@@ -282,7 +281,6 @@ class DiffApplier:
 
         for patch in patches:
             target = self.workspace / patch.target_path
-            target_existed = target.exists()
 
             # Validate: if not a new file, the target must exist
             if not patch.is_new_file and not target.exists():
@@ -299,7 +297,6 @@ class DiffApplier:
                     error=f"Target file does not exist: {patch.target_path}",
                     files_changed=files_changed,
                     backup_paths=backup_paths,
-                    created_files=created_files,
                 )
 
             if dry_run:
@@ -329,11 +326,10 @@ class DiffApplier:
                     error=f"Failed applying patch to {patch.target_path}: {exc}",
                     files_changed=files_changed,
                     backup_paths=backup_paths,
-                    created_files=created_files,
                 )
 
             files_changed.append(patch.target_path)
-            if patch.is_new_file and not target_existed:
+            if patch.is_new_file and str(target) not in backup_paths:
                 created_files.append(patch.target_path)
 
         if identity is not None and self._runtime_state is not None:
@@ -352,12 +348,7 @@ class DiffApplier:
         )
 
     async def rollback(self, result: ApplyResult) -> None:
-        """Restore backups and remove only paths created by this apply.
-
-        The final created-path component is deliberately not resolved: if a test
-        replaced it with a symlink, rollback removes the symlink rather than its
-        target. Parent resolution still enforces the workspace boundary.
-        """
+        """Restore backups and unlink only paths created by this apply."""
         for original, backup in result.backup_paths.items():
             backup_path = Path(backup)
             original_path = Path(original)
@@ -365,18 +356,13 @@ class DiffApplier:
                 shutil.copy2(str(backup_path), str(original_path))
                 backup_path.unlink()
                 logger.debug("Rolled back %s from %s", original, backup)
-
-        workspace = self.workspace.resolve()
         for relative in result.created_files:
             candidate = self.workspace / relative
             parent = candidate.parent.resolve(strict=False)
-            if not parent.is_relative_to(workspace):
-                logger.error(
-                    "Refusing to remove created path outside workspace: %s",
-                    candidate,
-                )
-                continue
-            (parent / candidate.name).unlink(missing_ok=True)
+            if parent.is_relative_to(self.workspace):
+                # Do not resolve the final component: unlink a replacement
+                # symlink itself, never the file it points at.
+                (parent / candidate.name).unlink(missing_ok=True)
 
     async def apply_and_test(
         self,
@@ -404,7 +390,6 @@ class DiffApplier:
                 files_changed=[],
             )
 
-        # Run tests
         proc: asyncio.subprocess.Process | None = None
         try:
             proc = await asyncio.create_subprocess_shell(
@@ -422,8 +407,6 @@ class DiffApplier:
                 if proc is not None:
                     await terminate_process_group(proc)
             finally:
-                # A cancellation that arrives during process reaping must not
-                # bypass rollback; await_cleanup preserves it after cleanup.
                 await await_cleanup(self.rollback(apply_result))
             return ApplyTestResult(
                 applied=True,
@@ -457,7 +440,6 @@ class DiffApplier:
         returncode = proc.returncode if proc.returncode is not None else -1
 
         if returncode == 0:
-            # Tests passed -- clean up backups
             for backup in apply_result.backup_paths.values():
                 Path(backup).unlink(missing_ok=True)
             return ApplyTestResult(
@@ -467,7 +449,6 @@ class DiffApplier:
                 files_changed=apply_result.files_changed,
             )
 
-        # Tests failed -- rollback
         await await_cleanup(self.rollback(apply_result))
         return ApplyTestResult(
             applied=True,
