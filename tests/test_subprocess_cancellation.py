@@ -12,6 +12,8 @@ from pathlib import Path
 
 import pytest
 
+import dharma_swarm.diff_applier as diff_applier_module
+import dharma_swarm.sandbox as sandbox_module
 from dharma_swarm.diff_applier import DiffApplier
 from dharma_swarm.sandbox import LocalSandbox, kill_process_group
 
@@ -134,6 +136,47 @@ async def test_local_sandbox_cancellation_kills_delayed_child(tmp_path: Path):
         await sandbox.cleanup()
 
 
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    not _process_groups_supported(),
+    reason="process-group cancellation proof requires POSIX group APIs",
+)
+async def test_cancellation_during_timeout_cleanup_propagates(
+    tmp_path: Path, monkeypatch
+):
+    started = tmp_path / "timeout-cleanup-started"
+    survived = tmp_path / "timeout-cleanup-survived"
+    cleanup_started = asyncio.Event()
+    release_cleanup = asyncio.Event()
+    real_terminate = sandbox_module.terminate_process_group
+    sandbox = LocalSandbox(workdir=tmp_path)
+
+    async def paused_terminate(proc):
+        cleanup_started.set()
+        try:
+            await sandbox_module.await_cleanup(release_cleanup.wait())
+        finally:
+            await real_terminate(proc)
+
+    monkeypatch.setattr(sandbox_module, "terminate_process_group", paused_terminate)
+    task = asyncio.create_task(
+        sandbox.execute(_delayed_marker_command(started, survived), timeout=0.1)
+    )
+    try:
+        await asyncio.wait_for(cleanup_started.wait(), timeout=3)
+        task.cancel()
+        release_cleanup.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        await asyncio.sleep(2.2)
+        assert not survived.exists(), "timeout-cleanup cancellation was swallowed"
+    finally:
+        if not task.done():
+            task.cancel()
+        release_cleanup.set()
+        await sandbox.cleanup()
+
+
 def _existing_file_diff() -> str:
     return (
         "--- a/hello.py\n"
@@ -219,6 +262,93 @@ async def test_diff_applier_cancellation_removes_new_file(tmp_path: Path):
     assert not target.exists(), "cancellation left a newly created file behind"
     await asyncio.sleep(2.2)
     assert not survived.exists(), "cancelled test command continued running"
+
+
+@pytest.mark.asyncio
+async def test_dry_run_rollback_does_not_delete_existing_file(tmp_path: Path):
+    target = tmp_path / "hello.py"
+    original = "# header\nold_value = 1\n# footer\n"
+    target.write_text(original, encoding="utf-8")
+    applier = DiffApplier(workspace=tmp_path)
+
+    result = await applier.apply(_existing_file_diff(), dry_run=True)
+    assert result.created_files == []
+
+    await applier.rollback(result)
+
+    assert target.read_text(encoding="utf-8") == original
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    not hasattr(os, "symlink"),
+    reason="symlink rollback proof requires os.symlink",
+)
+async def test_rollback_unlinks_created_symlink_not_target(tmp_path: Path):
+    target = tmp_path / "brand_new.py"
+    victim = tmp_path / "victim.py"
+    victim.write_text("keep = True\n", encoding="utf-8")
+    applier = DiffApplier(workspace=tmp_path)
+
+    result = await applier.apply(_new_file_diff())
+    assert result.created_files == ["brand_new.py"]
+    target.unlink()
+    target.symlink_to(victim)
+
+    await applier.rollback(result)
+
+    assert victim.read_text(encoding="utf-8") == "keep = True\n"
+    assert not target.is_symlink()
+    assert not target.exists()
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    not _process_groups_supported(),
+    reason="process-group cancellation proof requires POSIX group APIs",
+)
+async def test_diff_timeout_cleanup_cancellation_rolls_back(
+    tmp_path: Path, monkeypatch
+):
+    target = tmp_path / "hello.py"
+    original = "# header\nold_value = 1\n# footer\n"
+    target.write_text(original, encoding="utf-8")
+    started = tmp_path / "diff-timeout-started"
+    survived = tmp_path / "diff-timeout-survived"
+    cleanup_started = asyncio.Event()
+    release_cleanup = asyncio.Event()
+    real_terminate = sandbox_module.terminate_process_group
+    applier = DiffApplier(workspace=tmp_path)
+
+    async def paused_terminate(proc):
+        cleanup_started.set()
+        try:
+            await sandbox_module.await_cleanup(release_cleanup.wait())
+        finally:
+            await real_terminate(proc)
+
+    monkeypatch.setattr(
+        diff_applier_module, "terminate_process_group", paused_terminate
+    )
+    task = asyncio.create_task(
+        applier.apply_and_test(
+            _existing_file_diff(),
+            test_command=_delayed_marker_command(started, survived),
+            timeout=0.1,
+        )
+    )
+    await asyncio.wait_for(cleanup_started.wait(), timeout=3)
+    assert "new_value = 2" in target.read_text(encoding="utf-8")
+    task.cancel()
+    release_cleanup.set()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert target.read_text(encoding="utf-8") == original
+    assert not target.with_suffix(".py.bak").exists()
+    await asyncio.sleep(2.2)
+    assert not survived.exists(), "timeout cleanup skipped process termination"
 
 
 @pytest.mark.asyncio
