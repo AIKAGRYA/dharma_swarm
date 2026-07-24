@@ -17,9 +17,9 @@ from dharma_swarm.sandbox import LocalSandbox, kill_process_group
 
 
 def _process_groups_supported() -> bool:
-    return all(
-        callable(getattr(os, name, None)) for name in ("getpgid", "killpg")
-    ) and getattr(signal, "SIGKILL", None) is not None
+    return callable(getattr(os, "killpg", None)) and getattr(
+        signal, "SIGKILL", None
+    ) is not None
 
 
 async def _wait_for_path(path: Path, *, timeout: float = 5.0) -> None:
@@ -66,7 +66,6 @@ class _FallbackProcess:
 
 def test_kill_process_group_falls_back_without_posix_apis(monkeypatch):
     proc = _FallbackProcess()
-    monkeypatch.delattr(os, "getpgid", raising=False)
     monkeypatch.delattr(os, "killpg", raising=False)
 
     kill_process_group(proc)  # type: ignore[arg-type]
@@ -78,7 +77,6 @@ def test_kill_process_group_signals_group_after_shell_exit(monkeypatch):
     proc = _FallbackProcess()
     proc.returncode = 0
     calls: list[tuple[int, signal.Signals]] = []
-    monkeypatch.setattr(os, "getpgid", lambda pid: pid)
     monkeypatch.setattr(os, "killpg", lambda pgid, sig: calls.append((pgid, sig)))
 
     kill_process_group(proc)  # type: ignore[arg-type]
@@ -148,6 +146,16 @@ def _existing_file_diff() -> str:
     )
 
 
+def _new_file_diff() -> str:
+    return (
+        "--- /dev/null\n"
+        "+++ b/brand_new.py\n"
+        "@@ -0,0 +1,2 @@\n"
+        "+created = True\n"
+        "+print(created)\n"
+    )
+
+
 @pytest.mark.asyncio
 @pytest.mark.skipif(
     not _process_groups_supported(),
@@ -179,6 +187,36 @@ async def test_diff_applier_cancellation_kills_child_and_rolls_back(
 
     assert target.read_text(encoding="utf-8") == original
     assert not target.with_suffix(".py.bak").exists()
+    await asyncio.sleep(2.2)
+    assert not survived.exists(), "cancelled test command continued running"
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    not _process_groups_supported(),
+    reason="process-group cancellation proof requires POSIX group APIs",
+)
+async def test_diff_applier_cancellation_removes_new_file(tmp_path: Path):
+    target = tmp_path / "brand_new.py"
+    started = tmp_path / "new-file-started"
+    survived = tmp_path / "new-file-survived"
+    applier = DiffApplier(workspace=tmp_path)
+
+    task = asyncio.create_task(
+        applier.apply_and_test(
+            _new_file_diff(),
+            test_command=_delayed_marker_command(started, survived),
+            timeout=30,
+        )
+    )
+    await _wait_for_path(started)
+    assert target.exists()
+
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert not target.exists(), "cancellation left a newly created file behind"
     await asyncio.sleep(2.2)
     assert not survived.exists(), "cancelled test command continued running"
 
