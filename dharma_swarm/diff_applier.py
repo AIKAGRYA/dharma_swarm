@@ -365,21 +365,8 @@ class DiffApplier:
     ) -> ApplyTestResult:
         """Apply a diff, run tests, and rollback on failure.
 
-        1. Apply the diff.
-        2. Run *test_command* via subprocess.
-        3. If tests pass (exit code 0): keep changes, return success.
-        4. If tests fail: rollback and return failure with test output.
-
         Caller cancellation terminates the test process, restores the workspace,
         and then propagates ``CancelledError`` to the orchestrator.
-
-        Args:
-            diff_text: Unified diff text.
-            test_command: Shell command to validate the change.
-            timeout: Maximum seconds to wait for the test command.
-
-        Returns:
-            An ``ApplyTestResult`` describing the outcome.
         """
         apply_result = await self.apply(diff_text)
         if not apply_result.success:
