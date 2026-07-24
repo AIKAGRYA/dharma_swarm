@@ -35,6 +35,7 @@ class ApplyResult(BaseModel):
     success: bool
     files_changed: list[str] = []
     backup_paths: dict[str, str] = {}  # original -> backup
+    created_files: list[str] = []
     error: str = ""
 
 
@@ -277,9 +278,11 @@ class DiffApplier:
 
         files_changed: list[str] = []
         backup_paths: dict[str, str] = {}
+        created_files: list[str] = []
 
         for patch in patches:
             target = self.workspace / patch.target_path
+            target_existed = target.exists()
 
             # Validate: if not a new file, the target must exist
             if not patch.is_new_file and not target.exists():
@@ -296,6 +299,7 @@ class DiffApplier:
                     error=f"Target file does not exist: {patch.target_path}",
                     files_changed=files_changed,
                     backup_paths=backup_paths,
+                    created_files=created_files,
                 )
 
             if dry_run:
@@ -325,9 +329,12 @@ class DiffApplier:
                     error=f"Failed applying patch to {patch.target_path}: {exc}",
                     files_changed=files_changed,
                     backup_paths=backup_paths,
+                    created_files=created_files,
                 )
 
             files_changed.append(patch.target_path)
+            if patch.is_new_file and not target_existed:
+                created_files.append(patch.target_path)
 
         if identity is not None and self._runtime_state is not None:
             self._runtime_state.record_self_mod_receipt_sync(
@@ -341,11 +348,16 @@ class DiffApplier:
             success=True,
             files_changed=files_changed,
             backup_paths=backup_paths,
+            created_files=created_files,
         )
 
     async def rollback(self, result: ApplyResult) -> None:
-        """Restore backed-up files and remove files created by this apply."""
-        backed_up = {Path(original).resolve() for original in result.backup_paths}
+        """Restore backups and remove only paths created by this apply.
+
+        The final created-path component is deliberately not resolved: if a test
+        replaced it with a symlink, rollback removes the symlink rather than its
+        target. Parent resolution still enforces the workspace boundary.
+        """
         for original, backup in result.backup_paths.items():
             backup_path = Path(backup)
             original_path = Path(original)
@@ -353,10 +365,18 @@ class DiffApplier:
                 shutil.copy2(str(backup_path), str(original_path))
                 backup_path.unlink()
                 logger.debug("Rolled back %s from %s", original, backup)
-        for relative in result.files_changed:
-            target = (self.workspace / relative).resolve()
-            if target.is_relative_to(self.workspace) and target not in backed_up:
-                target.unlink(missing_ok=True)
+
+        workspace = self.workspace.resolve()
+        for relative in result.created_files:
+            candidate = self.workspace / relative
+            parent = candidate.parent.resolve(strict=False)
+            if not parent.is_relative_to(workspace):
+                logger.error(
+                    "Refusing to remove created path outside workspace: %s",
+                    candidate,
+                )
+                continue
+            (parent / candidate.name).unlink(missing_ok=True)
 
     async def apply_and_test(
         self,
@@ -398,10 +418,13 @@ class DiffApplier:
                 proc.communicate(), timeout=timeout
             )
         except asyncio.TimeoutError:
-            if proc is not None:
-                await terminate_process_group(proc)
-            # Rollback on timeout
-            await self.rollback(apply_result)
+            try:
+                if proc is not None:
+                    await terminate_process_group(proc)
+            finally:
+                # A cancellation that arrives during process reaping must not
+                # bypass rollback; await_cleanup preserves it after cleanup.
+                await await_cleanup(self.rollback(apply_result))
             return ApplyTestResult(
                 applied=True,
                 tests_passed=False,
@@ -418,7 +441,7 @@ class DiffApplier:
                 await await_cleanup(self.rollback(apply_result))
             raise
         except OSError as exc:
-            await self.rollback(apply_result)
+            await await_cleanup(self.rollback(apply_result))
             return ApplyTestResult(
                 applied=True,
                 tests_passed=False,
@@ -445,7 +468,7 @@ class DiffApplier:
             )
 
         # Tests failed -- rollback
-        await self.rollback(apply_result)
+        await await_cleanup(self.rollback(apply_result))
         return ApplyTestResult(
             applied=True,
             tests_passed=False,
@@ -458,7 +481,7 @@ class DiffApplier:
 
     @staticmethod
     def _apply_patch(target: Path, patch: FilePatch) -> None:
-        """Apply all hunks from *patch* to *target*.
+        """Apply all hunks from *patch* to *target.
 
         For new files, creates the file with added lines.
         For existing files, applies hunks in reverse order to preserve
