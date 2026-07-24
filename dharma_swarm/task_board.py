@@ -30,6 +30,7 @@ _TRANSITIONS: dict[TaskStatus, set[TaskStatus]] = {
     TaskStatus.COMPLETED: set(),
     TaskStatus.FAILED: {TaskStatus.PENDING},
     TaskStatus.CANCELLED: {TaskStatus.PENDING},
+    TaskStatus.QUARANTINED_FAKE_RESULT: set(),
 }
 
 _CREATE_TASKS = """
@@ -579,6 +580,10 @@ class TaskBoard:
                     task_id,
                     reason=fields.get("result", ""),
                     metadata=fields.get("metadata"),
+                )
+            elif status == TaskStatus.QUARANTINED_FAKE_RESULT:
+                raise TaskBoardError(
+                    "quarantined_fake_result is an audit-only terminal status"
                 )
         elif fields:
             # Raw column update (no status change)
