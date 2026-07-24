@@ -40,13 +40,19 @@
   "intent": "WP-0D1 corrective slice after merged PR #1092: make process-group termination capability-safe, clean up LocalSandbox commands on caller cancellation, and make DiffApplier cancellation terminate the test process and restore the workspace before preserving CancelledError. This closes only the three reproduced P1 cleanup defects; it does not claim full WP-0D or Titanium closure.",
   "negative_controls": [
     {
+      "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('dharma_swarm/sandbox.py'); t=p.read_text(); anchor='    getpgid = getattr(os, \\\"getpgid\\\", None)'; assert anchor in t; p.write_text(t.replace(anchor,'    if proc.returncode is not None:\\\\n        return\\\\n\\\\n'+anchor,1)); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_subprocess_cancellation.py::test_kill_process_group_signals_group_after_shell_exit'],check=False); sys.exit(r.returncode)\"",
+      "expected_exit": 1,
+      "name": "exited-shell-early-return-must-fail",
+      "timeout_seconds": 60
+    },
+    {
       "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('dharma_swarm/sandbox.py'); t=p.read_text(); old='        except asyncio.CancelledError:\\n            await terminate_process_group(proc)\\n            raise'; new='        except asyncio.CancelledError:\\n            raise'; assert old in t; p.write_text(t.replace(old,new,1)); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_subprocess_cancellation.py::test_local_sandbox_cancellation_kills_delayed_child'],check=False); sys.exit(r.returncode)\"",
       "expected_exit": 1,
       "name": "sandbox-cancellation-cleanup-removal-must-fail",
       "timeout_seconds": 60
     },
     {
-      "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('dharma_swarm/diff_applier.py'); t=p.read_text(); old='        except asyncio.CancelledError:\\n            if proc is not None:\\n                await terminate_process_group(proc)\\n            await asyncio.shield(self.rollback(apply_result))\\n            raise'; new='        except asyncio.CancelledError:\\n            raise'; assert old in t; p.write_text(t.replace(old,new,1)); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_subprocess_cancellation.py::test_diff_applier_cancellation_kills_child_and_rolls_back'],check=False); sys.exit(r.returncode)\"",
+      "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('dharma_swarm/diff_applier.py'); t=p.read_text(); old='        except asyncio.CancelledError:\\\\n            try:\\\\n                if proc is not None:\\\\n                    await terminate_process_group(proc)\\\\n            finally:\\\\n                await await_cleanup(self.rollback(apply_result))\\\\n            raise'; new='        except asyncio.CancelledError:\\\\n            raise'; assert old in t; p.write_text(t.replace(old,new,1)); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_subprocess_cancellation.py::test_repeated_cancellation_cannot_interrupt_rollback'],check=False); sys.exit(r.returncode)\"",
       "expected_exit": 1,
       "name": "diff-applier-cancellation-rollback-removal-must-fail",
       "timeout_seconds": 60
@@ -82,15 +88,15 @@
       "Merged PR #1092 introduced process-group timeout cleanup but current main still raises AttributeError when POSIX group APIs are absent and lets caller cancellation bypass child termination; DiffApplier cancellation can additionally bypass rollback after applying files."
     ],
     "owner": "@AmitabhainArunachala",
-    "packet_digest": "f0729b5729577f3ee4e7e49dbffce33b483acb40a816f424f3f95704d5194926",
     "rollback": "Revert sandbox.py, diff_applier.py, the focused cancellation regression test, and this packet together. Rollback restores the known cancellation leak and must not be represented as safe subprocess cleanup.",
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
       "git": "2.43.0",
       "make": "4.3",
-      "python": "3.11.15"
+      "python": "3.14.4"
     },
-    "work_packet": "WP-0D1"
+    "work_packet": "WP-0D1",
+    "packet_digest": "5e3a0462e5506e782186c19896bca079e30e6b3fdc24ccc0fc2e61511f31eb9d"
   },
   "worktree": "."
 }
