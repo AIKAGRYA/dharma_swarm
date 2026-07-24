@@ -14,10 +14,13 @@ import signal
 import tempfile
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Awaitable
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TypeVar
 
 from dharma_swarm.models import SandboxResult
+
+_T = TypeVar("_T")
 
 
 def _kill_process(proc: "asyncio.subprocess.Process") -> None:
@@ -36,10 +39,11 @@ def kill_process_group(proc: "asyncio.subprocess.Process") -> None:
     and constrained Python builds may not expose ``getpgid``/``killpg`` or
     ``SIGKILL``; those hosts fall back to the process handle rather than
     raising ``AttributeError`` and skipping cleanup entirely.
-    """
-    if proc.returncode is not None:
-        return
 
+    The session leader may already have exited while descendants still hold its
+    pipes. Its pid remains the process-group id, so a non-``None`` return code
+    is not evidence that the group is empty.
+    """
     getpgid = getattr(os, "getpgid", None)
     killpg = getattr(os, "killpg", None)
     sigkill = getattr(signal, "SIGKILL", None)
@@ -53,11 +57,22 @@ def kill_process_group(proc: "asyncio.subprocess.Process") -> None:
         _kill_process(proc)
 
 
+async def await_cleanup(awaitable: Awaitable[_T]) -> _T:
+    """Finish cleanup even when the outer task is cancelled repeatedly."""
+    task = asyncio.ensure_future(awaitable)
+    while not task.done():
+        try:
+            await asyncio.shield(task)
+        except asyncio.CancelledError:
+            continue
+    return task.result()
+
+
 async def terminate_process_group(proc: "asyncio.subprocess.Process") -> None:
     """Terminate and reap a managed subprocess despite caller cancellation."""
     kill_process_group(proc)
     try:
-        await asyncio.shield(proc.wait())
+        await await_cleanup(proc.wait())
     except (ProcessLookupError, ChildProcessError, OSError):
         # The process may have been reaped concurrently. Cleanup is complete.
         return
