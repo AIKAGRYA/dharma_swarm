@@ -193,7 +193,6 @@ class DiffApplier:
         self._runtime_state = runtime_state
         self._require_identity = require_identity
 
-
     async def apply(
         self,
         diff_text: str,
