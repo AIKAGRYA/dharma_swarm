@@ -1165,7 +1165,7 @@ def build_loop_statuses(
                 evidence.append("bounded_replays.loop1")
             if loop1_has_later_routing:
                 evidence.append("runtime.provider_truth.routing_adaptation")
-            if total_runs == 0:
+            if total_runs == 0 and not loop1_harness_proven:
                 status = "UNKNOWN"
                 blocker = "no delegation runs found"
             elif loop1_closed_live:
