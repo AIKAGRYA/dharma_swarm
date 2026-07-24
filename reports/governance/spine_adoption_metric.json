@@ -1,5 +1,5 @@
 {
-  "audit_sha": "9b67ed5baa8d707a0da02ca48d993efcdd02d8ed",
+  "audit_sha": "2bde232e1d9dcfe16a0fa7cceef13979e215dc9e",
   "classification_rule": "joined requires all joined evidence patterns; adapter-ready requires all adapter evidence patterns when joined is incomplete; quarantine and legacy require explicit source markers; missing means no tracked surface or insufficient evidence.",
   "classification_vocabulary": [
     "joined",
@@ -116,7 +116,7 @@
           "description": "runtime store symbol is present",
           "hits": [
             {
-              "line": 1197,
+              "line": 1209,
               "path": "dharma_swarm/runtime_state.py",
               "text": "class RuntimeStateStore:"
             }
@@ -136,7 +136,7 @@
           "description": "RuntimeStateStore type exists",
           "hits": [
             {
-              "line": 1197,
+              "line": 1209,
               "path": "dharma_swarm/runtime_state.py",
               "text": "class RuntimeStateStore:"
             }
@@ -188,7 +188,7 @@
           "description": "run ledger query exists",
           "hits": [
             {
-              "line": 3781,
+              "line": 3814,
               "path": "dharma_swarm/runtime_state.py",
               "text": "async def get_run_ledger(self, run_id: str) -> dict[str, Any]:"
             }
@@ -204,7 +204,7 @@
           "description": "legacy identity bypass flag is present",
           "hits": [
             {
-              "line": 1042,
+              "line": 1054,
               "path": "dharma_swarm/runtime_state.py",
               "text": "\"legacy_no_identity_allowed\": True,"
             }
@@ -326,7 +326,7 @@
           "description": "task create path exists",
           "hits": [
             {
-              "line": 287,
+              "line": 311,
               "path": "dharma_swarm/task_board.py",
               "text": "async def create("
             }
@@ -346,7 +346,7 @@
           "description": "identity imported",
           "hits": [
             {
-              "line": 22,
+              "line": 23,
               "path": "dharma_swarm/task_board.py",
               "text": "from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity"
             }
@@ -359,7 +359,7 @@
           "description": "required identity option exists",
           "hits": [
             {
-              "line": 88,
+              "line": 85,
               "path": "dharma_swarm/task_board.py",
               "text": "require_identity: bool = False,"
             }
@@ -372,7 +372,7 @@
           "description": "runtime store accepted",
           "hits": [
             {
-              "line": 17,
+              "line": 18,
               "path": "dharma_swarm/task_board.py",
               "text": "from dharma_swarm.runtime_state import RuntimeStateStore"
             }
@@ -385,7 +385,7 @@
           "description": "task receipts are written to the ledger",
           "hits": [
             {
-              "line": 271,
+              "line": 295,
               "path": "dharma_swarm/task_board.py",
               "text": "await self._runtime_state.record_receipt_for_identity("
             }
@@ -431,7 +431,7 @@
           "description": "dispatch attaches identity",
           "hits": [
             {
-              "line": 2254,
+              "line": 2253,
               "path": "dharma_swarm/orchestrator.py",
               "text": "self._runtime_lifecycle.ensure_execution_identity(td, task=task_for_gate)"
             }
@@ -444,7 +444,7 @@
           "description": "dispatch records task claims",
           "hits": [
             {
-              "line": 2041,
+              "line": 2040,
               "path": "dharma_swarm/orchestrator.py",
               "text": "await self._runtime_lifecycle.record_task_claim("
             }
@@ -457,7 +457,7 @@
           "description": "dispatch records delegation runs",
           "hits": [
             {
-              "line": 2048,
+              "line": 2047,
               "path": "dharma_swarm/orchestrator.py",
               "text": "await self._runtime_lifecycle.record_delegation_run("
             }
@@ -483,7 +483,7 @@
           "description": "event table exists",
           "hits": [
             {
-              "line": 68,
+              "line": 72,
               "path": "dharma_swarm/message_bus.py",
               "text": "CREATE TABLE IF NOT EXISTS events ("
             }
@@ -503,7 +503,7 @@
           "description": "identity imported",
           "hits": [
             {
-              "line": 32,
+              "line": 35,
               "path": "dharma_swarm/message_bus.py",
               "text": "from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity"
             }
@@ -516,7 +516,7 @@
           "description": "required identity option exists",
           "hits": [
             {
-              "line": 132,
+              "line": 136,
               "path": "dharma_swarm/message_bus.py",
               "text": "require_identity: bool = False,"
             }
@@ -529,7 +529,7 @@
           "description": "idempotency is checked before send/emit side effects",
           "hits": [
             {
-              "line": 247,
+              "line": 332,
               "path": "dharma_swarm/message_bus.py",
               "text": "should_execute = await self._runtime_state.try_begin_idempotent_side_effect("
             }
@@ -542,7 +542,7 @@
           "description": "idempotency completion is recorded",
           "hits": [
             {
-              "line": 293,
+              "line": 286,
               "path": "dharma_swarm/message_bus.py",
               "text": "await self._runtime_state.complete_idempotent_side_effect("
             }
@@ -555,7 +555,7 @@
           "description": "message consumption receipt exists",
           "hits": [
             {
-              "line": 852,
+              "line": 950,
               "path": "dharma_swarm/message_bus.py",
               "text": "receipt_type=\"message_consumed\","
             }
@@ -1072,7 +1072,7 @@
           "description": "apply/test phase exists",
           "hits": [
             {
-              "line": 359,
+              "line": 366,
               "path": "dharma_swarm/diff_applier.py",
               "text": "async def apply_and_test("
             },
@@ -1122,7 +1122,7 @@
           "description": "self-modification receives execution identity",
           "hits": [
             {
-              "line": 20,
+              "line": 21,
               "path": "dharma_swarm/diff_applier.py",
               "text": "from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity"
             }
@@ -1651,7 +1651,7 @@
           "description": "legacy bypass must stay explicit",
           "hits": [
             {
-              "line": 1042,
+              "line": 1054,
               "path": "dharma_swarm/runtime_state.py",
               "text": "\"legacy_no_identity_allowed\": True,"
             },
@@ -1747,5 +1747,5 @@
       "status": "legacy"
     }
   ],
-  "tracked_file_count": 4890
+  "tracked_file_count": 5171
 }
