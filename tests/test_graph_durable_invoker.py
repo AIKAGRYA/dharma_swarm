@@ -538,6 +538,67 @@ async def test_fail_open_without_store_executes_inner():
     assert invoker.memo_hit is False
 
 
+async def test_fail_open_receipt_is_marked_unprotected():
+    """A fail-open (unfenced) dispatch must TAG its receipt so the fleet can
+    COUNT how often a consequential call runs without idempotency protection —
+    the observable prerequisite to a data-driven fail-closed decision
+    (pre-1004 hardening: observe blind spots before fencing them)."""
+    inner = StubInner()
+    invoker = wrap_invoker(inner, store=None, identity=_identity(), side_effect_key=KEY)
+    receipt = await _invoke(invoker)
+    assert inner.calls == 1
+    assert receipt.attributes.get("unprotected_dispatch") is True
+    assert receipt.attributes.get("unprotected_reason") == "no_capable_store"
+
+
+class BeginLostStore:
+    """Capable-shaped store whose atomic begin LOSES the claim (returns None)
+    and whose record fetch cannot recover it (returns None or raises)."""
+
+    def __init__(self, db_path: Path, *, record_fetch_raises: bool = False) -> None:
+        self.db_path = db_path
+        self._record_fetch_raises = record_fetch_raises
+
+    async def init_db(self) -> None:
+        return None
+
+    async def try_begin_idempotent_side_effect_with_token(self, *args, **kwargs):
+        return None
+
+    async def try_reclaim_idempotent_side_effect_with_token(self, *args, **kwargs):
+        raise AssertionError("reclaim must not be attempted without a record")
+
+    async def complete_idempotent_side_effect(self, *args, **kwargs):
+        raise AssertionError("unfenced completion must be refused before the store")
+
+    async def get_idempotency_record(self, *args, **kwargs):
+        if self._record_fetch_raises:
+            raise RuntimeError("record fetch failed")
+        return None
+
+
+@pytest.mark.parametrize("record_fetch_raises", [False, True])
+async def test_begin_lost_unreclaimed_dispatch_is_marked_unprotected(
+    tmp_path: Path, record_fetch_raises: bool
+):
+    """Begin loses the race (returns None) AND the record is unrecoverable:
+    the dispatch still executes (fail-open) but ran with no idempotency fence
+    and its completion is refused. That unfenced call must be stamped like the
+    other three fail-open branches or the fleet count undercounts exactly the
+    store-failure/race blind spots it exists to measure."""
+    inner = StubInner()
+    store = BeginLostStore(
+        tmp_path / "runtime.db", record_fetch_raises=record_fetch_raises
+    )
+    invoker = wrap_invoker(inner, store=store, identity=_identity(), side_effect_key=KEY)
+    receipt = await _invoke(invoker)
+    assert inner.calls == 1
+    assert receipt.attributes.get("unprotected_dispatch") is True
+    assert receipt.attributes.get("unprotected_reason") == "begin_lost_unreclaimed"
+    # The unfenced completion was refused and counted, never sent to the store.
+    assert invoker.audit_failures == 1
+
+
 def test_graph_side_effect_key_stability_and_retry_increment():
     base = derive_graph_side_effect_key("run-1", 3, "node-a", 0)
     assert base == derive_graph_side_effect_key("run-1", 3, "node-a", 0)
