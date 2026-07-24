@@ -1,0 +1,76 @@
+{
+  "generated_at": "2026-07-24T00:00:24Z",
+  "audit_sha": "e1bb3d7b1cdf7bcc42a008cec6708acb2e471214",
+  "report_type": "pr_lifecycle",
+  "summary": {
+    "total_open_before": 30,
+    "total_open_after": 30,
+    "auto_closed": 0,
+    "green_and_ready": 26,
+    "conflicting": 4,
+    "approaching_7day_threshold": 2
+  },
+  "auto_closed_prs": [],
+  "conflicting_prs": [
+    {
+      "number": 1097,
+      "title": "fix(forge_lab): harden RSI run evidence routes",
+      "createdAt": "2026-07-23T15:42:05Z",
+      "age_days": 0.35,
+      "action": "no_action_too_new"
+    },
+    {
+      "number": 1076,
+      "title": "[impact-checked] governance(helm): reconcile golden-frame blocker",
+      "createdAt": "2026-07-20T12:39:14Z",
+      "age_days": 3.48,
+      "action": "no_action_not_yet_7d"
+    },
+    {
+      "number": 1007,
+      "title": "governance(keel): bare-metal architecture audit as the KEEL companion findings ledger",
+      "createdAt": "2026-07-17T17:20:24Z",
+      "age_days": 6.28,
+      "action": "watch_threshold_within_24h"
+    },
+    {
+      "number": 996,
+      "title": "governance(safety): admit live-host and rollback proof surfaces",
+      "createdAt": "2026-07-17T01:43:11Z",
+      "age_days": 6.93,
+      "action": "watch_threshold_within_24h"
+    }
+  ],
+  "duplicate_auto_grounding_prs": [],
+  "green_and_ready_prs": [
+    1099, 1098, 1096, 1086, 1085, 1084, 1082, 1081, 1080,
+    1075, 1074, 1070, 1067, 1066, 1065, 1064, 1063, 1062,
+    1061, 1060, 1025, 1013, 1011, 987, 930, 904
+  ],
+  "recommended_actions": [
+    {
+      "priority": "HIGH",
+      "prs": [1007, 996],
+      "action": "OPERATOR_REBASE_OR_CLOSE",
+      "reason": "CONFLICTING PRs will cross 7-day auto-close threshold within 24 hours. Rebase and reopen if needed, or they will be auto-closed next run."
+    },
+    {
+      "priority": "HIGH",
+      "prs": [1081],
+      "action": "OPERATOR_DECISION_REQUIRED",
+      "reason": "PR marked [BLOCKED-ON-OPERATOR-DECISION] — TELOS canon reconciliation awaiting operator review."
+    },
+    {
+      "priority": "MEDIUM",
+      "prs": [1060, 1061],
+      "action": "OPERATOR_MERGE_CANDIDATE",
+      "reason": "Spine A1 and A2 PRs are green and ready. Merging would complete self_modification_loop and mcp_tool_access joins, pushing spine adoption from 93.8% to 100%."
+    },
+    {
+      "priority": "LOW",
+      "prs": [904, 930, 987],
+      "action": "OPERATOR_REVIEW_AGED",
+      "reason": "PRs are MERGEABLE but aged (>10 days). Operator may want to confirm these are still intended for merge."
+    }
+  ]
+}
