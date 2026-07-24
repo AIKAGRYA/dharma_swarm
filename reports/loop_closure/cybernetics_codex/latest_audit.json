@@ -1,409 +1,243 @@
 {
+  "schema_version": "cybernetics_codex.audit.v3",
+  "observed_at": "2026-07-24T07:24:03Z",
+  "audit_scope": {
+    "mode": "repository_only_read_only_refresh",
+    "base_sha": "e1bb3d7b1cdf7bcc42a008cec6708acb2e471214",
+    "live_host_state_mounted": false,
+    "runtime_db_read": false,
+    "external_services_contacted": false,
+    "claim_boundary": "This refresh re-verifies committed bounded-replay and repository governance evidence only. It does not refresh or replace live daemon, runtime database, One Wire, archive, or registration evidence. Absence of mounted host state can never establish CLOSED_LIVE."
+  },
   "active_track": {
-    "cybernetics_codex_criteria": [
-      "cybernetics_codex_manifest_registered",
-      "cybernetics_codex_seed_exists",
-      "cybernetics_codex_soul_exists",
-      "cybernetics_codex_context_desk_exists",
-      "cybernetics_codex_audit_script_exists",
-      "cybernetics_codex_registration_script_exists",
-      "cybernetics_codex_latest_audit_exists",
-      "cybernetics_codex_latest_audit_valid",
-      "cybernetics_codex_loop_verdict_map_matches_claim_boundary",
-      "cybernetics_codex_live_owner_criteria_declared",
-      "cybernetics_codex_closed_live_count_zero",
-      "cybernetics_codex_harness_proven_count_11",
-      "cybernetics_codex_blocked_count_2",
-      "cybernetics_codex_loop3_receipt_valid",
-      "cybernetics_codex_loop4_receipt_valid",
-      "cybernetics_codex_loop7_receipt_valid",
-      "cybernetics_codex_loop8_receipt_valid",
-      "cybernetics_codex_loop9_receipt_valid",
-      "cybernetics_codex_loop10_receipt_valid",
-      "cybernetics_codex_loop11_receipt_valid",
-      "cybernetics_codex_one_wire_guard_test_exists",
-      "cybernetics_codex_one_wire_guard_test_passes",
-      "cybernetics_codex_loop12_13_guard_receipt_exists",
-      "cybernetics_codex_loop12_13_guard_receipt_valid"
-    ],
     "exists": true,
     "loop_track_found": true,
+    "path": "$REPO_ROOT/docs/governance/ACTIVE_TRACK.yaml",
+    "status": "ACTIVE",
     "owned_surfaces": [
       "reports/loop_closure/**",
-      "CYBERNETIC_LOOP_MAP.md"
-    ],
-    "path": "$REPO_ROOT/docs/governance/ACTIVE_TRACK.yaml",
-    "status": "ACTIVE"
+      "CYBERNETIC_LOOP_MAP.md",
+      "docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md",
+      "scripts/governance/loop1_consumption_check.py",
+      "tests/test_loop_supervisor_tristate.py",
+      "tests/test_loop1_consumption.py",
+      "tests/test_loop1_consumption_check.py"
+    ]
   },
-  "agent": {
+  "manifest_registration": {
+    "exists": true,
+    "registered": true,
+    "path": "$REPO_ROOT/ACTIVE_SURFACE_MANIFEST.yaml",
+    "module": "dharma_swarm/cybernetics_codex.py",
+    "status": "shadow",
+    "priority": "p0"
+  },
+  "seed_registration": {
+    "exists": true,
+    "registered": true,
+    "path": "$REPO_ROOT/docs/agents/cybernetics_codex/agent.seed.yaml",
+    "agent_uid": "cybernetics_codex",
     "callsign": "cybernetics-codex",
-    "forbidden_actions": [
-      "read or write provider secrets outside the declared key owner",
-      "spend money or touch live external accounts",
-      "weaken AHIMSA/SATYA/telos gates",
-      "mutate archive fitness or mark One Wire quorum as satisfied",
-      "dispatch agents or tasks without an explicit operator/build warrant",
-      "claim production closure from smoke tests, demos, or prose handoffs",
-      "edit hot-path files without an active track warrant and independent review"
+    "claim_boundary": "Repository registration only; no live process registration is claimed."
+  },
+  "runtime": {
+    "path": "$DHARMA_STATE/state/runtime.db",
+    "exists": false,
+    "read_ok": false,
+    "scope": {
+      "since": null,
+      "environment": "repository-only GitHub refresh"
+    },
+    "tables": {},
+    "delegation_runs": {},
+    "failure_codes": [],
+    "quarantine": {},
+    "receipt_json": {},
+    "provider_truth": {},
+    "blocker": "No live host state or runtime database was mounted for this repository-only refresh."
+  },
+  "live_registration": {
+    "registered": false,
+    "state_dir": "$DHARMA_STATE",
+    "nats_runtime_status": "not_observed",
+    "missing": [
+      "external_registration",
+      "living_agent",
+      "a2a_card",
+      "last_onboarding_receipt"
     ],
-    "id": "cybernetics_codex",
-    "label": "Cybernetics Codex Steward",
-    "mode": "read_only_verifier",
-    "owned_surfaces": [
-      "docs/ops/CYBERNETICS_CODEX.md",
-      "docs/agents/cybernetics_codex/**",
-      "dharma_swarm/cybernetics_codex.py",
-      "scripts/governance/cybernetics_codex_audit.py",
-      "scripts/governance/register_cybernetics_codex.py",
-      "tests/test_cybernetics_codex.py",
-      "reports/loop_closure/cybernetics_codex/**",
-      "$HOME/cybernetics_codex_note.md"
-    ],
-    "repo_agent_home": "$REPO_ROOT/docs/agents/cybernetics_codex",
-    "vsm_role": "S3*/S5 steward for cybernetic closure claims"
+    "blocker": "Live registration surfaces were not mounted; no live registration inference is made."
+  },
+  "one_wire": {
+    "exists": false,
+    "eligible": false,
+    "eligible_to_set_archive_fitness": false,
+    "fitness_authority_granted": false,
+    "archive_fitness_changed": false,
+    "blocker": "No live One Wire guardian receipt was mounted. Loops 12 and 13 remain BLOCKED rather than inferring quorum from stale evidence.",
+    "prior_committed_observation": {
+      "observed_at": "2026-07-02T13:47:19.525013Z",
+      "confirmed": 3,
+      "required_confirmed": 5,
+      "domains": 1,
+      "required_domains": 3,
+      "fitness_authority_granted": false
+    }
+  },
+  "evolution_archive": {
+    "path": "$DHARMA_STATE/evolution/archive.jsonl",
+    "exists": false,
+    "entries": 0,
+    "positive_internal_fitness_risk": 0,
+    "external_authority_markers": 0,
+    "latest_timestamp": null,
+    "blocker": "The live archive was not mounted; zeroes describe the audit environment, not the operator host."
   },
   "bounded_replays": {
     "loop1": {
-      "blocker": "",
-      "closed": true,
-      "closed_live": false,
-      "completed_runs_with_truth": 999,
-      "delegation_receipts_with_truth": 26,
-      "dispatch_dropoffs": 0,
-      "evidence_receipts": 3,
-      "evidence_receipts_ok": 3,
       "exists": true,
-      "harness_proven": true,
-      "model": "llama3.2:latest",
-      "ollama_force_local": "1",
       "path": "$REPO_ROOT/reports/loop_closure/cybernetics_codex/2026-06-23_loop1_ollama_fresh_spine_dispatch.json",
-      "provider": "ollama",
-      "read_only_boot": "1",
-      "served_provider_sample": {
-        "receipt_id": "rr_run_ds_goal_90a1b20964b59586d28f465d_ds_goal_completed",
-        "run_id": "run_ds_goal_90a1b20964b59586d28f465d",
-        "served_model": "glm-5:cloud",
-        "served_provider": "ollama"
-      },
-      "spine_dispatch": "1",
-      "state_dir": "$DHARMA_STATE",
+      "closed": true,
+      "harness_proven": true,
+      "closed_live": false,
+      "tasks_requested": 3,
       "tasks_completed": 3,
       "tasks_failed": 0,
-      "tasks_requested": 3,
-      "tick_errors": 0
-    },
-    "loop10": {
-      "adapt_proof": {
-        "after": "1c4db89bb0f858b1e2469a6617866809257a63533ad5bc176106ee1acdec0cb3",
-        "before": "missing",
-        "fed_forward": true,
-        "field": "memory-aware context package checksum, then later context/package read",
-        "package_path": "$TMPDIR/dharma_loop4_10_memory_context_closure_state/context/packages/loop4_10_memory_context.md"
-      },
-      "adapt_real": true,
-      "blocker": "",
-      "closed": true,
-      "closed_live": false,
-      "cycles": 2,
-      "exists": true,
-      "harness_proven": true,
-      "loop_id": "context_agent",
-      "path": "$REPO_ROOT/reports/loop_closure/cybernetics_codex/2026-07-01_loop10_context_agent_closure.json",
+      "dispatch_dropoffs": 0,
       "tick_errors": 0,
-      "transitions_ok": true
-    },
-    "loop11": {
-      "adapt_proof": {
-        "after": {
-          "child_agent_name": "replication_monitor_closure_analyst_g1_20260701",
-          "dynamic_roster_has_child": true,
-          "materialized_count": 1,
-          "pending_count": 0,
-          "probation_has_child": true,
-          "witness_entries": 4
-        },
-        "before": {
-          "dynamic_roster_count": 0,
-          "pending_count": 1,
-          "witness_entries": 0
-        },
-        "fed_forward": true,
-        "field": "ReplicationProtocol durable proposals/dynamic_roster/probation state",
-        "later_cycle_read": {
-          "child_loaded_from_restarted_roster": true,
-          "materialized_statuses": 1,
-          "pending_after": 0,
-          "pending_before": 1,
-          "probation_loaded_for_child": true,
-          "witness_events_after": [
-            "G1_PASS",
-            "S_PASS",
-            "G2_PASS",
-            "M_MATERIALIZED"
-          ]
-        }
-      },
-      "adapt_real": true,
-      "blocker": "",
-      "closed": true,
-      "closed_live": false,
-      "cycles": 2,
-      "exists": true,
-      "harness_proven": true,
-      "loop_id": "replication_monitor",
-      "path": "$REPO_ROOT/reports/loop_closure/cybernetics_codex/2026-07-01_loop11_replication_monitor_closure.json",
-      "tick_errors": 0,
-      "transitions_ok": true
+      "evidence_receipts": 3,
+      "evidence_receipts_ok": 3,
+      "completed_runs_with_truth": 999,
+      "blocker": ""
     },
     "loop2": {
-      "adapt_proof": {
-        "after": 6,
-        "before": 0,
-        "fed_forward": true,
-        "field": "algedonic_activation.recent_activations (adaptive memory the next cycle consults)",
-        "total_actions": 3
-      },
-      "adapt_real": true,
-      "blocker": "",
+      "exists": true,
+      "path": "$REPO_ROOT/reports/loop_closure/cybernetics_codex/2026-06-23_loop2_heartbeat_closure.json",
       "closed": true,
+      "harness_proven": true,
       "closed_live": false,
       "cycles": 3,
-      "exists": true,
-      "harness_proven": true,
-      "loop_id": "organism_heartbeat",
-      "path": "$REPO_ROOT/reports/loop_closure/cybernetics_codex/2026-06-23_loop2_heartbeat_closure.json",
+      "transitions_ok": true,
+      "adapt_real": true,
       "tick_errors": 0,
-      "transitions_ok": true
+      "blocker": ""
     },
     "loop3": {
-      "adapt_proof": {
-        "after": {
-          "archive_entries": 1,
-          "prediction": 0.6189,
-          "predictor_outcomes": 1
-        },
-        "archive_entry_id": "711b67ef16364515",
-        "before": {
-          "archive_entries": 0,
-          "prediction": 0.55,
-          "predictor_outcomes": 0
-        },
-        "fed_forward": true,
-        "field": "scratch Darwin predictor history + archive parent selection read by the later proposal cycle"
-      },
-      "adapt_real": true,
-      "blocker": "",
+      "exists": true,
+      "path": "$REPO_ROOT/reports/loop_closure/cybernetics_codex/2026-07-01_loop3_evolution_closure.json",
       "closed": true,
+      "harness_proven": true,
       "closed_live": false,
       "cycles": 2,
-      "exists": true,
-      "harness_proven": true,
-      "loop_id": "evolution_loop",
-      "path": "$REPO_ROOT/reports/loop_closure/cybernetics_codex/2026-07-01_loop3_evolution_closure.json",
+      "transitions_ok": true,
+      "adapt_real": true,
       "tick_errors": 0,
-      "transitions_ok": true
+      "blocker": ""
     },
     "loop4": {
-      "adapt_proof": {
-        "after": 1,
-        "before": 0,
-        "fed_forward": true,
-        "field": "StrangeLoopMemory META consolidation count, then later memory/context readers",
-        "memory_rows_after": 5,
-        "memory_rows_before": 0,
-        "meta_entry_id": "5747db9cf2444ee4"
-      },
-      "adapt_real": true,
-      "blocker": "",
+      "exists": true,
+      "path": "$REPO_ROOT/reports/loop_closure/cybernetics_codex/2026-07-01_loop4_memory_context_closure.json",
       "closed": true,
+      "harness_proven": true,
       "closed_live": false,
       "cycles": 2,
-      "exists": true,
-      "harness_proven": true,
-      "loop_id": "consolidation_memory",
-      "path": "$REPO_ROOT/reports/loop_closure/cybernetics_codex/2026-07-01_loop4_memory_context_closure.json",
+      "transitions_ok": true,
+      "adapt_real": true,
       "tick_errors": 0,
-      "transitions_ok": true
+      "blocker": ""
     },
     "loop5": {
-      "adapt_proof": {
-        "after": "external_strict",
-        "before": "internal_yolo",
-        "fed_forward": true,
-        "field": "TelosGatekeeper resolved trust_mode via gate_pressure.json (S4->S3 override the next gate check consults)",
-        "total_real_blocks": 8
-      },
-      "adapt_real": true,
-      "blocker": "",
+      "exists": true,
+      "path": "$REPO_ROOT/reports/loop_closure/cybernetics_codex/2026-06-23_loop5_zeitgeist_closure.json",
       "closed": true,
+      "harness_proven": true,
       "closed_live": false,
       "cycles": 2,
-      "exists": true,
-      "harness_proven": true,
-      "loop_id": "zeitgeist_internal_pressure",
-      "path": "$REPO_ROOT/reports/loop_closure/cybernetics_codex/2026-06-23_loop5_zeitgeist_closure.json",
+      "transitions_ok": true,
+      "adapt_real": true,
       "tick_errors": 0,
-      "transitions_ok": true
+      "blocker": ""
     },
     "loop6": {
-      "adapt_proof": {
-        "after": 28,
-        "before": 12,
-        "fed_forward": true,
-        "field": "stigmergy governance channel marks authored by 'witness' (strictly-growing adaptive state governance + downstream loops consult)",
-        "total_actionable": 16
-      },
-      "adapt_real": true,
-      "blocker": "",
+      "exists": true,
+      "path": "$REPO_ROOT/reports/loop_closure/cybernetics_codex/2026-06-23_loop6_witness_closure.json",
       "closed": true,
+      "harness_proven": true,
       "closed_live": false,
       "cycles": 4,
-      "exists": true,
-      "harness_proven": true,
-      "loop_id": "witness_auditor",
-      "path": "$REPO_ROOT/reports/loop_closure/cybernetics_codex/2026-06-23_loop6_witness_closure.json",
+      "transitions_ok": true,
+      "adapt_real": true,
       "tick_errors": 0,
-      "transitions_ok": true
+      "blocker": ""
     },
     "loop7": {
-      "adapt_proof": {
-        "after": {
-          "pattern_count": 1,
-          "prompt_sha256": "6c9dd6eeccc99f8700e4007056ad7e66e514a4591efc04a458bd4bf86614f759",
-          "reinforced_section": true
-        },
-        "before": {
-          "pattern_count": 0,
-          "prompt_sha256": "1f82c6bffde8d4cb12a87a1e01cf2ebadd66e2a8ed7244e13989aeac06e12e0a",
-          "reinforced_section": false
-        },
-        "fed_forward": true,
-        "field": "StrategyReinforcer persisted patterns -> fresh later-cycle build_reinforced_prompt() strategy injection"
-      },
-      "adapt_real": true,
-      "blocker": "",
+      "exists": true,
+      "path": "$REPO_ROOT/reports/loop_closure/cybernetics_codex/2026-07-01_loop7_training_flywheel_closure.json",
       "closed": true,
+      "harness_proven": true,
       "closed_live": false,
       "cycles": 1,
-      "exists": true,
-      "harness_proven": true,
-      "loop_id": "training_flywheel",
-      "path": "$REPO_ROOT/reports/loop_closure/cybernetics_codex/2026-07-01_loop7_training_flywheel_closure.json",
+      "transitions_ok": true,
+      "adapt_real": true,
       "tick_errors": 0,
-      "transitions_ok": true
+      "blocker": ""
     },
     "loop8": {
-      "adapt_proof": {
-        "after": {
-          "context_chars": 24812,
-          "context_sha256": "64cd13000c8b280f96868c0ec46f835305c8da421e18433ad0fbd213e518f7eb",
-          "marker_present": true,
-          "recognition_seed_present": true
-        },
-        "before": {
-          "context_chars": 23823,
-          "context_sha256": "6e61c6bb69ba47dc5d84899e95dabe329652247a9efdcc24bbcdf59cab964b44",
-          "marker_present": false,
-          "recognition_seed_present": false
-        },
-        "fed_forward": true,
-        "field": "recognition_seed.md -> later build_agent_context() L9 block",
-        "seed_path": "$TMPDIR/dharma_loop8_recognition_closure/2026-07-01_loop8_recognition_closure/meta/recognition_seed.md"
-      },
-      "adapt_real": true,
-      "blocker": "",
+      "exists": true,
+      "path": "$REPO_ROOT/reports/loop_closure/cybernetics_codex/2026-07-01_loop8_recognition_closure.json",
       "closed": true,
+      "harness_proven": true,
       "closed_live": false,
       "cycles": 2,
-      "exists": true,
-      "harness_proven": true,
-      "loop_id": "recognition_eigenform",
-      "path": "$REPO_ROOT/reports/loop_closure/cybernetics_codex/2026-07-01_loop8_recognition_closure.json",
+      "transitions_ok": true,
+      "adapt_real": true,
       "tick_errors": 0,
-      "transitions_ok": true
+      "blocker": ""
     },
     "loop9": {
-      "adapt_proof": {
-        "after": {
-          "identity_evolution": {
-            "enabled": true,
-            "interval_s": 3600.0,
-            "run_count": 1
-          },
-          "inbox_check": {
-            "enabled": true,
-            "interval_s": 300.0,
-            "run_count": 1
-          },
-          "memory_consolidation": {
-            "enabled": true,
-            "interval_s": 7200.0,
-            "run_count": 1
-          },
-          "stigmergy_scan": {
-            "enabled": true,
-            "interval_s": 600.0,
-            "run_count": 1
-          }
-        },
-        "before": {
-          "identity_evolution": {
-            "enabled": true,
-            "interval_s": 3600.0,
-            "run_count": 0
-          },
-          "inbox_check": {
-            "enabled": true,
-            "interval_s": 300.0,
-            "run_count": 0
-          },
-          "memory_consolidation": {
-            "enabled": true,
-            "interval_s": 7200.0,
-            "run_count": 0
-          },
-          "stigmergy_scan": {
-            "enabled": true,
-            "interval_s": 600.0,
-            "run_count": 0
-          }
-        },
-        "fed_forward": true,
-        "field": "PersistentAgent AgentCronScheduler run_count/last_run state",
-        "later_cycle_read": {
-          "immediate_second_tick_jobs_fired": 0,
-          "queued_tasks_from_cron": 1,
-          "suppressed_by_last_run": true
-        }
-      },
-      "adapt_real": true,
-      "blocker": "",
+      "exists": true,
+      "path": "$REPO_ROOT/reports/loop_closure/cybernetics_codex/2026-07-01_loop9_conductor_closure.json",
       "closed": true,
+      "harness_proven": true,
       "closed_live": false,
       "cycles": 2,
-      "exists": true,
-      "harness_proven": true,
-      "loop_id": "conductors",
-      "path": "$REPO_ROOT/reports/loop_closure/cybernetics_codex/2026-07-01_loop9_conductor_closure.json",
+      "transitions_ok": true,
+      "adapt_real": true,
       "tick_errors": 0,
-      "transitions_ok": true
+      "blocker": ""
+    },
+    "loop10": {
+      "exists": true,
+      "path": "$REPO_ROOT/reports/loop_closure/cybernetics_codex/2026-07-01_loop10_context_agent_closure.json",
+      "closed": true,
+      "harness_proven": true,
+      "closed_live": false,
+      "cycles": 2,
+      "transitions_ok": true,
+      "adapt_real": true,
+      "tick_errors": 0,
+      "blocker": ""
+    },
+    "loop11": {
+      "exists": true,
+      "path": "$REPO_ROOT/reports/loop_closure/cybernetics_codex/2026-07-01_loop11_replication_monitor_closure.json",
+      "closed": true,
+      "harness_proven": true,
+      "closed_live": false,
+      "cycles": 2,
+      "transitions_ok": true,
+      "adapt_real": true,
+      "tick_errors": 0,
+      "blocker": ""
     }
   },
-  "closure_rule": "A production-live loop is closed only when sense -> interpret -> constrain -> act -> adapt all fire on live owner-surface data, every transition emits a receipt to that owner surface, and a fresh agent can replay an automated check. Scratch or self-seeded bounded replays are HARNESS_PROVEN, not CLOSED_LIVE.",
-  "evolution_archive": {
-    "entries": 12273,
-    "exists": true,
-    "external_authority_markers": 0,
-    "latest_timestamp": "2026-07-02T03:55:16.975226+00:00",
-    "path": "$DHARMA_STATE/evolution/archive.jsonl",
-    "positive_internal_fitness_risk": 11391
+  "verdict_tiers": {
+    "HARNESS_PROVEN": "A bounded replay/regression harness proves sense -> interpret -> constrain -> act -> adapt. It is not production-live closure.",
+    "CLOSED_LIVE": "The loop is proven from its declared live owner surface with a later causal read and replayable evidence.",
+    "BLOCKED": "A declared external or authority prerequisite is not presently verified."
   },
   "live_owner_surface_criteria": {
     "loop1": "runtime.delegation_runs/runtime_receipts in the audited daemon scope show real completed provider work, zero dispatch_dropoff, and a later routing/adaptation read caused by that work",
-    "loop10": "live context-package owner surface shows production memory inputs changing a served context package later read by an agent",
-    "loop11": "live replication owner surface shows a real proposal materialized into roster/probation state and observed by a later monitor cycle",
-    "loop12": "One Wire quorum N>=5, M>=3, and explicit archive-fitness authority",
-    "loop13": "One Wire quorum N>=5, M>=3, and explicit archive-fitness authority",
     "loop2": "standing organism pulse/algedonic owner surface shows a non-scratch daemon cycle whose adaptive state is consumed by a later daemon cycle",
     "loop3": "live DarwinEngine/evolution archive owner surface shows a governed non-scratch proposal outcome consumed by a later predictor/archive selection without internal fitness contamination",
     "loop4": "live memory owner surface shows external/completed work, not the closure script itself, consolidated and consumed by later context",
@@ -411,460 +245,137 @@
     "loop6": "live witness/runtime receipt owner surface shows production completions audited and governance marks consumed by downstream routing",
     "loop7": "live trajectory owner surface contains non-synthetic recent trajectories that the flywheel scores and persists into later strategy selection",
     "loop8": "live recognition/context owner surface shows non-scratch loop-history receipts generating a seed later consumed by an agent context build",
-    "loop9": "live conductor/cron owner surface shows production scheduler state changed by observed signals and suppressing/altering a later tick"
+    "loop9": "live conductor/cron owner surface shows production scheduler state changed by observed signals and suppressing/altering a later tick",
+    "loop10": "live context-package owner surface shows production memory inputs changing a served context package later read by an agent",
+    "loop11": "live replication owner surface shows a real proposal materialized into roster/probation state and observed by a later monitor cycle",
+    "loop12": "One Wire quorum N>=5, M>=3, and explicit archive-fitness authority",
+    "loop13": "One Wire quorum N>=5, M>=3, and explicit archive-fitness authority"
   },
-  "live_registration": {
-    "a2a_endpoint": "pending://manual",
-    "a2a_status": "starting",
-    "authority": "external_worker_evidence_only",
-    "dock_status": "starting",
-    "dock_updated_at": "2026-06-18T16:28:42.845459+00:00",
-    "exists": {
-      "a2a_card": true,
-      "external_registration": true,
-      "last_onboarding_receipt": true,
-      "living_agent": true
-    },
-    "external_updated_at": "2026-06-18T16:28:42.845207+00:00",
-    "last_receipt_created_at": "2026-06-18T16:28:42.845459+00:00",
-    "last_receipt_id": "onboard-cybernetics_codex-1781800122",
-    "last_receipt_path": "$DHARMA_STATE/onboarding/receipts/onboard-cybernetics_codex-1781800122.json",
-    "mailbox": "nats://dharma.agent.cybernetics_codex.inbox",
-    "memory_namespace": "agent:cybernetics_codex",
-    "missing": [],
-    "nats_runtime_status": "declared_not_started",
-    "nats_subject": "dharma.agent.cybernetics_codex.inbox",
-    "paths": {
-      "a2a_card": "$DHARMA_STATE/a2a/cards/cybernetics-codex.json",
-      "external_registration": "$DHARMA_STATE/external_agents/cybernetics_codex/registration.json",
-      "last_onboarding_receipt": "$DHARMA_STATE/agents/cybernetics_codex/last_receipt.json",
-      "living_agent": "$DHARMA_STATE/agents/cybernetics_codex/living_agent.json"
-    },
-    "registered": true,
-    "registration_source": "cybernetics_codex_registration",
-    "state_dir": "$DHARMA_STATE"
-  },
-  "loop1_acceptance_rule": "A2A-surface rows may legitimately leave delegation_runs.receipt_json empty; the production truth this audit requires is actual served provider/model on delegation metadata or runtime_receipts, with no dispatch_dropoff in the audited scope.",
   "loop_statuses": [
     {
-      "blocker": "bounded replay proves current Loop 1 harness (3/3 completed, dispatch_dropoff=0, evidence_receipts_ok=3, served_provider_truth=999); not CLOSED_LIVE: dispatch_dropoff=2191; no later correlated routing/adaptation read after served-provider truth",
-      "evidence": [
-        "runtime.delegation_runs",
-        "runtime.runtime_receipts",
-        "runtime.provider_truth",
-        "runtime.failure_codes",
-        "bounded_replays.loop1"
-      ],
+      "number": 1,
       "id": "swarm_task_loop",
       "label": "Swarm Task Loop",
-      "live_owner_surface_criterion": "runtime.delegation_runs/runtime_receipts in the audited daemon scope show real completed provider work, zero dispatch_dropoff, and a later routing/adaptation read caused by that work",
-      "number": 1,
-      "verdict": "HARNESS_PROVEN"
+      "verdict": "HARNESS_PROVEN",
+      "evidence": [
+        "bounded_replays.loop1"
+      ],
+      "blocker": "Committed bounded replay remains structurally green; live runtime state was not mounted, so CLOSED_LIVE cannot be evaluated or claimed.",
+      "live_owner_surface_criterion": "runtime.delegation_runs/runtime_receipts in the audited daemon scope show real completed provider work, zero dispatch_dropoff, and a later routing/adaptation read caused by that work"
     },
     {
-      "blocker": "bounded closure replay proves the loop 2 harness (cycles=3, all transitions receipted, adapt change fed the next cycle); not CLOSED_LIVE until live owner-surface criterion passes",
-      "evidence": [
-        "bounded_replays.loop2"
-      ],
+      "number": 2,
       "id": "organism_heartbeat",
       "label": "Organism Heartbeat",
-      "live_owner_surface_criterion": "standing organism pulse/algedonic owner surface shows a non-scratch daemon cycle whose adaptive state is consumed by a later daemon cycle",
-      "number": 2,
-      "verdict": "HARNESS_PROVEN"
+      "verdict": "HARNESS_PROVEN",
+      "evidence": ["bounded_replays.loop2"],
+      "blocker": "Bounded replay is proven; live owner-surface criterion remains unverified.",
+      "live_owner_surface_criterion": "standing organism pulse/algedonic owner surface shows a non-scratch daemon cycle whose adaptive state is consumed by a later daemon cycle"
     },
     {
-      "blocker": "bounded closure replay proves the loop 3 harness (cycles=2, all transitions receipted, adapt change fed the next cycle); not CLOSED_LIVE until live owner-surface criterion passes",
-      "evidence": [
-        "bounded_replays.loop3"
-      ],
+      "number": 3,
       "id": "evolution_loop",
       "label": "Evolution Loop / DarwinEngine",
-      "live_owner_surface_criterion": "live DarwinEngine/evolution archive owner surface shows a governed non-scratch proposal outcome consumed by a later predictor/archive selection without internal fitness contamination",
-      "number": 3,
-      "verdict": "HARNESS_PROVEN"
+      "verdict": "HARNESS_PROVEN",
+      "evidence": ["bounded_replays.loop3"],
+      "blocker": "Bounded replay is proven; live owner-surface criterion remains unverified.",
+      "live_owner_surface_criterion": "live DarwinEngine/evolution archive owner surface shows a governed non-scratch proposal outcome consumed by a later predictor/archive selection without internal fitness contamination"
     },
     {
-      "blocker": "bounded closure replay proves the loop 4 harness (cycles=2, all transitions receipted, adapt change fed the next cycle); not CLOSED_LIVE until live owner-surface criterion passes",
-      "evidence": [
-        "bounded_replays.loop4"
-      ],
+      "number": 4,
       "id": "consolidation_memory",
       "label": "Consolidation Loop / Memory",
-      "live_owner_surface_criterion": "live memory owner surface shows external/completed work, not the closure script itself, consolidated and consumed by later context",
-      "number": 4,
-      "verdict": "HARNESS_PROVEN"
+      "verdict": "HARNESS_PROVEN",
+      "evidence": ["bounded_replays.loop4"],
+      "blocker": "Bounded replay is proven; live owner-surface criterion remains unverified.",
+      "live_owner_surface_criterion": "live memory owner surface shows external/completed work, not the closure script itself, consolidated and consumed by later context"
     },
     {
-      "blocker": "bounded closure replay proves the loop 5 harness (cycles=2, all transitions receipted, adapt change fed the next cycle); not CLOSED_LIVE until live owner-surface criterion passes",
-      "evidence": [
-        "bounded_replays.loop5"
-      ],
+      "number": 5,
       "id": "zeitgeist_scanner",
       "label": "Zeitgeist Scanner",
-      "live_owner_surface_criterion": "live zeitgeist/environment owner surface shows non-synthetic external signals changing a later gate/priority decision",
-      "number": 5,
-      "verdict": "HARNESS_PROVEN"
+      "verdict": "HARNESS_PROVEN",
+      "evidence": ["bounded_replays.loop5"],
+      "blocker": "Bounded replay is proven; live owner-surface criterion remains unverified.",
+      "live_owner_surface_criterion": "live zeitgeist/environment owner surface shows non-synthetic external signals changing a later gate/priority decision"
     },
     {
-      "blocker": "bounded closure replay proves the loop 6 harness (cycles=4, all transitions receipted, adapt change fed the next cycle); not CLOSED_LIVE until live owner-surface criterion passes",
-      "evidence": [
-        "bounded_replays.loop6"
-      ],
+      "number": 6,
       "id": "witness_auditor",
       "label": "Witness Auditor",
-      "live_owner_surface_criterion": "live witness/runtime receipt owner surface shows production completions audited and governance marks consumed by downstream routing",
-      "number": 6,
-      "verdict": "HARNESS_PROVEN"
+      "verdict": "HARNESS_PROVEN",
+      "evidence": ["bounded_replays.loop6"],
+      "blocker": "Bounded replay is proven; live owner-surface criterion remains unverified.",
+      "live_owner_surface_criterion": "live witness/runtime receipt owner surface shows production completions audited and governance marks consumed by downstream routing"
     },
     {
-      "blocker": "bounded closure replay proves the loop 7 harness (cycles=1, all transitions receipted, adapt change fed the next cycle); not CLOSED_LIVE until live owner-surface criterion passes",
-      "evidence": [
-        "bounded_replays.loop7"
-      ],
+      "number": 7,
       "id": "training_flywheel",
       "label": "Training Flywheel",
-      "live_owner_surface_criterion": "live trajectory owner surface contains non-synthetic recent trajectories that the flywheel scores and persists into later strategy selection",
-      "number": 7,
-      "verdict": "HARNESS_PROVEN"
+      "verdict": "HARNESS_PROVEN",
+      "evidence": ["bounded_replays.loop7"],
+      "blocker": "Bounded replay is proven; live owner-surface criterion remains unverified.",
+      "live_owner_surface_criterion": "live trajectory owner surface contains non-synthetic recent trajectories that the flywheel scores and persists into later strategy selection"
     },
     {
-      "blocker": "bounded closure replay proves the loop 8 harness (cycles=2, all transitions receipted, adapt change fed the next cycle); not CLOSED_LIVE until live owner-surface criterion passes",
-      "evidence": [
-        "bounded_replays.loop8"
-      ],
+      "number": 8,
       "id": "recognition_eigenform",
       "label": "Recognition Loop / eigenform",
-      "live_owner_surface_criterion": "live recognition/context owner surface shows non-scratch loop-history receipts generating a seed later consumed by an agent context build",
-      "number": 8,
-      "verdict": "HARNESS_PROVEN"
+      "verdict": "HARNESS_PROVEN",
+      "evidence": ["bounded_replays.loop8"],
+      "blocker": "Bounded replay is proven; live owner-surface criterion remains unverified.",
+      "live_owner_surface_criterion": "live recognition/context owner surface shows non-scratch loop-history receipts generating a seed later consumed by an agent context build"
     },
     {
-      "blocker": "bounded closure replay proves the loop 9 harness (cycles=2, all transitions receipted, adapt change fed the next cycle); not CLOSED_LIVE until live owner-surface criterion passes",
-      "evidence": [
-        "bounded_replays.loop9"
-      ],
+      "number": 9,
       "id": "conductors",
       "label": "Conductors",
-      "live_owner_surface_criterion": "live conductor/cron owner surface shows production scheduler state changed by observed signals and suppressing/altering a later tick",
-      "number": 9,
-      "verdict": "HARNESS_PROVEN"
+      "verdict": "HARNESS_PROVEN",
+      "evidence": ["bounded_replays.loop9"],
+      "blocker": "Bounded replay is proven; live owner-surface criterion remains unverified.",
+      "live_owner_surface_criterion": "live conductor/cron owner surface shows production scheduler state changed by observed signals and suppressing/altering a later tick"
     },
     {
-      "blocker": "bounded closure replay proves the loop 10 harness (cycles=2, all transitions receipted, adapt change fed the next cycle); not CLOSED_LIVE until live owner-surface criterion passes",
-      "evidence": [
-        "bounded_replays.loop10"
-      ],
+      "number": 10,
       "id": "context_agent",
       "label": "Context Agent",
-      "live_owner_surface_criterion": "live context-package owner surface shows production memory inputs changing a served context package later read by an agent",
-      "number": 10,
-      "verdict": "HARNESS_PROVEN"
+      "verdict": "HARNESS_PROVEN",
+      "evidence": ["bounded_replays.loop10"],
+      "blocker": "Bounded replay is proven; live owner-surface criterion remains unverified.",
+      "live_owner_surface_criterion": "live context-package owner surface shows production memory inputs changing a served context package later read by an agent"
     },
     {
-      "blocker": "bounded closure replay proves the loop 11 harness (cycles=2, all transitions receipted, adapt change fed the next cycle); not CLOSED_LIVE until live owner-surface criterion passes",
-      "evidence": [
-        "bounded_replays.loop11"
-      ],
+      "number": 11,
       "id": "replication_monitor",
       "label": "Replication Monitor",
-      "live_owner_surface_criterion": "live replication owner surface shows a real proposal materialized into roster/probation state and observed by a later monitor cycle",
-      "number": 11,
-      "verdict": "HARNESS_PROVEN"
+      "verdict": "HARNESS_PROVEN",
+      "evidence": ["bounded_replays.loop11"],
+      "blocker": "Bounded replay is proven; live owner-surface criterion remains unverified.",
+      "live_owner_surface_criterion": "live replication owner surface shows a real proposal materialized into roster/probation state and observed by a later monitor cycle"
     },
     {
-      "blocker": "guardian quorum below threshold: N=3/5, M=1/3",
-      "evidence": [
-        "one_wire.guardian_receipt",
-        "evolution_archive"
-      ],
+      "number": 12,
       "id": "self_improvement",
       "label": "Self-Improvement",
-      "live_owner_surface_criterion": "One Wire quorum N>=5, M>=3, and explicit archive-fitness authority",
-      "number": 12,
-      "verdict": "BLOCKED"
+      "verdict": "BLOCKED",
+      "evidence": ["one_wire"],
+      "blocker": "No fresh mounted One Wire quorum or archive-fitness authority evidence; remain blocked.",
+      "live_owner_surface_criterion": "One Wire quorum N>=5, M>=3, and explicit archive-fitness authority"
     },
     {
-      "blocker": "guardian quorum below threshold: N=3/5, M=1/3",
-      "evidence": [
-        "one_wire.guardian_receipt",
-        "evolution_archive"
-      ],
+      "number": 13,
       "id": "free_evolution_grind",
       "label": "Free Evolution Grind",
-      "live_owner_surface_criterion": "One Wire quorum N>=5, M>=3, and explicit archive-fitness authority",
-      "number": 13,
-      "verdict": "BLOCKED"
+      "verdict": "BLOCKED",
+      "evidence": ["one_wire"],
+      "blocker": "No fresh mounted One Wire quorum or archive-fitness authority evidence; remain blocked.",
+      "live_owner_surface_criterion": "One Wire quorum N>=5, M>=3, and explicit archive-fitness authority"
     }
   ],
-  "manifest_registration": {
-    "exists": true,
-    "health_check_ids": [
-      "module_file_exists",
-      "test_file_exists"
-    ],
-    "module": "dharma_swarm/cybernetics_codex.py",
-    "path": "$REPO_ROOT/ACTIVE_SURFACE_MANIFEST.yaml",
-    "priority": "p0",
-    "registered": true,
-    "status": "shadow"
-  },
+  "closure_rule": "A production-live loop is closed only when sense -> interpret -> constrain -> act -> adapt all fire on live owner-surface data, every transition emits a receipt to that owner surface, and a fresh agent can replay an automated check. Scratch, committed replay, or repository-only evidence is HARNESS_PROVEN, not CLOSED_LIVE.",
   "next_build_packet": [
-    "Keep Loop 1 bounded replay green; do not claim all-history cleanliness while historical dispatch_dropoff remains.",
+    "Re-run this audit on the operator host with the live state directory mounted before making any live-runtime claim.",
     "Promote HARNESS_PROVEN loops to CLOSED_LIVE only after one live-owner-surface criterion passes per loop.",
-    "Add an audit mode that can re-execute replay commands or record why re-execution was skipped.",
-    "Add One Wire archive-fitness guard tests before enabling Loops 12/13.",
-    "Regenerate the loop map from a live projection instead of hand-editing stale prose."
-  ],
-  "observed_at": "2026-07-02T13:47:19.525013Z",
-  "one_wire": {
-    "archive_fitness_changed": false,
-    "blocker": "guardian quorum below threshold: N=3/5, M=1/3",
-    "confirmed": 3,
-    "domains": 1,
-    "eligible": false,
-    "eligible_to_set_archive_fitness": false,
-    "exists": true,
-    "fitness_authority_granted": false,
-    "guardian_receipt": "$DHARMA_STATE/forge_measurement_guardian/cycle-003-fitness-quorum-guard.json",
-    "observed_domains": [
-      "external_code_contribution"
-    ],
-    "payload_keys": [
-      "actor",
-      "authority_result",
-      "crosschecks",
-      "cycle",
-      "direct_candidates",
-      "guardrails",
-      "mission",
-      "observed_at_utc",
-      "prior_guardian_artifacts",
-      "recorded_at",
-      "same_day_author_merge_crosscheck",
-      "schema_version",
-      "source_manifest",
-      "status_smoke",
-      "summary",
-      "summary_verdict",
-      "threshold_guard"
-    ],
-    "required_confirmed": 5,
-    "required_domains": 3
-  },
-  "repo_root": "$REPO_ROOT",
-  "runtime": {
-    "delegation_runs": {
-      "claimed": 1,
-      "completed": 4184,
-      "failed": 4532,
-      "first_started": "2026-04-27T08:11:17.993165+00:00",
-      "last_seen": "2026-07-02T05:27:35.269943+00:00",
-      "running": 120,
-      "total": 8837
-    },
-    "exists": true,
-    "failure_codes": [
-      {
-        "count": 2191,
-        "failure_code": "dispatch_dropoff",
-        "last_seen": "2026-07-01T16:45:35.404089+00:00"
-      },
-      {
-        "count": 1611,
-        "failure_code": "execution_error",
-        "last_seen": "2026-07-02T00:08:40.338020+00:00"
-      },
-      {
-        "count": 380,
-        "failure_code": "long_timeout",
-        "last_seen": "2026-07-02T05:27:35.269943+00:00"
-      },
-      {
-        "count": 195,
-        "failure_code": "timeout",
-        "last_seen": "2026-05-11T06:39:46.022854+00:00"
-      },
-      {
-        "count": 135,
-        "failure_code": "connection_transient",
-        "last_seen": "2026-07-02T02:14:08.657617+00:00"
-      },
-      {
-        "count": 13,
-        "failure_code": "claim_timeout",
-        "last_seen": "2026-07-02T04:16:52.605959+00:00"
-      },
-      {
-        "count": 6,
-        "failure_code": "",
-        "last_seen": "2026-06-13T17:14:12.351499+00:00"
-      },
-      {
-        "count": 1,
-        "failure_code": "temporal_live_smoke_aborted",
-        "last_seen": "2026-05-25T14:58:45.412174+00:00"
-      }
-    ],
-    "path": "$DHARMA_STATE/state/runtime.db",
-    "provider_truth": {
-      "definition": "Counts rows carrying actual served provider/model truth. A2A runtime_receipts are canonical even when receipt_json is empty.",
-      "delegation_runs": {
-        "completed": 4184,
-        "completed_with_served_provider_model": 1943,
-        "latest_truth_run": "2026-07-02T05:27:35.269943+00:00",
-        "rows_with_served_provider_model": 2593,
-        "sample": {
-          "run_id": "run_892fe59dfcf74add",
-          "served_model": "glm-5:cloud",
-          "served_provider": "ollama"
-        },
-        "total": 8837
-      },
-      "routing_adaptation": {
-        "has_later_causal_read": false,
-        "latest_served_truth": "2026-07-02T05:27:35.306458+00:00",
-        "tables": {
-          "external_outcomes": {
-            "correlated_rows_after_served_truth": 0,
-            "exists": true,
-            "latest": "2026-07-02T05:22:46.686033+00:00",
-            "rows": 18683,
-            "rows_after_served_truth": 0,
-            "timestamp_column": "created_at"
-          },
-          "model_routing_outcomes": {
-            "correlated_rows_after_served_truth": 0,
-            "exists": true,
-            "latest": null,
-            "rows": 0,
-            "rows_after_served_truth": 0,
-            "timestamp_column": "created_at"
-          },
-          "routing_decisions": {
-            "correlated_rows_after_served_truth": 0,
-            "exists": true,
-            "latest": "2026-07-02T04:50:52.679998+00:00",
-            "rows": 9087,
-            "rows_after_served_truth": 0,
-            "timestamp_column": "created_at"
-          }
-        },
-        "truth_run_ids_sample": [
-          "loop1_live_provider_dispatch_20260629T155250Z_a4c2e8b9",
-          "loop1_live_provider_dispatch_20260629T170233Z_eff00f54",
-          "run_0005d24db57c4b80",
-          "run_0018ed87cdf24a5a",
-          "run_001e7807187646d0",
-          "run_0035dd63e5ad4c0f",
-          "run_00856afbb0d54f64",
-          "run_00a332aebf7b4dbd",
-          "run_00b30debb6174477",
-          "run_00c18492dd3242f5",
-          "run_00dc3477fd724080",
-          "run_010013f6680a4d92",
-          "run_01031ddeb79049a4",
-          "run_0105c0367a1542b2",
-          "run_01434d1e8522452f",
-          "run_017316d5c37040f9",
-          "run_0179fda3bccc4bc1",
-          "run_019ab81c897a4d96",
-          "run_01b1802b99e5450e",
-          "run_01b1a9a6600c464a"
-        ]
-      },
-      "runtime_receipts": {
-        "latest_truth_receipt": "2026-07-02T05:27:35.306458+00:00",
-        "rows_with_served_provider_model": 24700,
-        "sample": {
-          "receipt_id": "rr_ae570e0c646d409b",
-          "run_id": "run_892fe59dfcf74add",
-          "served_model": "glm-5:cloud",
-          "served_provider": "ollama"
-        },
-        "total": 105029,
-        "unique_runs_with_served_provider_model": 2287
-      }
-    },
-    "read_ok": true,
-    "receipt_json": {
-      "a2a_empty_is_success": true,
-      "latest_receipt_run": "2026-07-02T05:27:35.269943+00:00",
-      "rows_with_receipt_json": 2683,
-      "surface": "orchestrator",
-      "total": 8837
-    },
-    "scope": {
-      "since": null
-    },
-    "tables": {
-      "delegation_runs": {
-        "exists": true,
-        "latest": "2026-07-02T05:22:34.403224+00:00",
-        "rows": 8837
-      },
-      "external_outcomes": {
-        "exists": true,
-        "latest": "2026-07-02T05:22:46.686033+00:00",
-        "rows": 18683
-      },
-      "model_routing_outcomes": {
-        "exists": true,
-        "latest": null,
-        "rows": 0
-      },
-      "provider_attempts": {
-        "exists": true,
-        "latest": "2026-07-02T05:22:46.686033+00:00",
-        "rows": 5564
-      },
-      "routing_decisions": {
-        "exists": true,
-        "latest": "2026-07-02T04:50:52.679998+00:00",
-        "rows": 9087
-      },
-      "runtime_receipts": {
-        "exists": true,
-        "latest": "2026-07-02T13:15:59.355236+00:00",
-        "rows": 105029
-      }
-    }
-  },
-  "schema_version": "cybernetics_codex.audit.v3",
-  "seed_registration": {
-    "a2a_route": "agent-inbox",
-    "agent_uid": "cybernetics_codex",
-    "authority": "external_worker_evidence_only",
-    "callsign": "cybernetics-codex",
-    "exists": true,
-    "missing_files": [],
-    "nats_runtime_status": "declared_not_started",
-    "nats_subject": "dharma.agent.cybernetics_codex.inbox",
-    "path": "$REPO_ROOT/docs/agents/cybernetics_codex/agent.seed.yaml",
-    "read_ok": true,
-    "registered": true,
-    "required_files": {
-      "context_engineering": "$REPO_ROOT/docs/agents/cybernetics_codex/CONTEXT_ENGINEERING.md",
-      "memory": "$REPO_ROOT/docs/agents/cybernetics_codex/MEMORY.md",
-      "protocols": "$REPO_ROOT/docs/agents/cybernetics_codex/PROTOCOLS.md",
-      "receipts_readme": "$REPO_ROOT/docs/agents/cybernetics_codex/receipts/README.md",
-      "seed": "$REPO_ROOT/docs/agents/cybernetics_codex/agent.seed.yaml",
-      "soul": "$REPO_ROOT/docs/agents/cybernetics_codex/SOUL.md",
-      "wake_context": "$REPO_ROOT/docs/agents/cybernetics_codex/WAKE_CONTEXT.md"
-    }
-  },
-  "state_dir": "$DHARMA_STATE",
-  "verdict_tiers": {
-    "CLOSED_LIVE": "The loop is proven from its declared live owner surface, with no scratch-only or self-seeded evidence standing in for production state.",
-    "HARNESS_PROVEN": "A bounded replay/regression harness proves the loop can execute sense -> interpret -> constrain -> act -> adapt, but the evidence may be scratch or manufactured by the harness and is not production-live closure."
-  },
-  "verifier_commands": [
-    "make onboard",
-    "make orient",
-    ".venv/bin/dgc status",
-    ".venv/bin/dgc loop-status",
-    "bash scripts/runtime/codex_toolbelt_status.sh",
-    "python3 scripts/governance/cybernetics_codex_audit.py --json",
-    "python3 scripts/governance/register_cybernetics_codex.py --dry-run",
-    "pytest -q tests/test_cybernetics_codex.py tests/test_manifest_health.py"
+    "Keep Loops 12 and 13 blocked until a fresh One Wire quorum and explicit archive-fitness authority are observed."
   ]
 }
