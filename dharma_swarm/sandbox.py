@@ -189,7 +189,7 @@ class SandboxManager:
     Three-layer isolation stack (auto-selects strongest available):
         Layer 3: DockerSandbox (container isolation, network policies)
         Layer 2: LocalSandbox (subprocess with regex safety checks)
-        Layer 1: LocalSandbox (same -- always available as fallback)
+        Layer 1: LocalSandbox (same — always available as fallback)
 
     Set ``prefer_docker=True`` (default) to auto-select Docker when
     the daemon is reachable. Falls back to LocalSandbox transparently.
@@ -198,14 +198,13 @@ class SandboxManager:
     def __init__(self, prefer_docker: bool = True) -> None:
         self._active: dict[int, Sandbox] = {}
         self._prefer_docker = prefer_docker
-        self._docker_available: Optional[bool] = None
+        self._docker_available: Optional[bool] = None  # Cached after first check
 
     async def _check_docker(self) -> bool:
         """Check Docker availability (cached)."""
         if self._docker_available is None:
             try:
                 from dharma_swarm.docker_sandbox import DockerSandbox
-
                 self._docker_available = await DockerSandbox.docker_available()
             except ImportError:
                 self._docker_available = False
@@ -216,9 +215,16 @@ class SandboxManager:
         sandbox_type: str = "local",
         workdir: Optional[Path] = None,
     ) -> Sandbox:
-        """Create a sandbox (synchronous -- always returns LocalSandbox).
+        """Create a sandbox (synchronous — always returns LocalSandbox).
 
         For Docker sandboxes, use :meth:`create_async` instead.
+
+        Args:
+            sandbox_type: ``"local"`` or ``"docker"`` (docker raises if unavailable).
+            workdir: Optional working directory override.
+
+        Returns:
+            A ready-to-use :class:`Sandbox` instance.
         """
         if sandbox_type == "docker":
             raise SandboxError(
@@ -236,7 +242,17 @@ class SandboxManager:
         workdir: Optional[Path] = None,
         docker_config: Optional[object] = None,
     ) -> Sandbox:
-        """Create a sandbox, auto-selecting Docker when available."""
+        """Create a sandbox, auto-selecting Docker when available.
+
+        Args:
+            sandbox_type: ``"auto"`` (default), ``"docker"``, or ``"local"``.
+            workdir: Working directory for local sandboxes.
+            docker_config: Optional :class:`ContainerConfig` for Docker sandboxes.
+
+        Returns:
+            A :class:`DockerSandbox` if Docker is available and preferred,
+            otherwise a :class:`LocalSandbox`.
+        """
         use_docker = False
 
         if sandbox_type == "docker":
@@ -247,19 +263,14 @@ class SandboxManager:
         if use_docker:
             try:
                 from dharma_swarm.docker_sandbox import DockerSandbox, ContainerConfig
-
-                config = (
-                    docker_config
-                    if isinstance(docker_config, ContainerConfig)
-                    else ContainerConfig()
-                )
+                config = docker_config if isinstance(docker_config, ContainerConfig) else ContainerConfig()
                 sb: Sandbox = DockerSandbox(config=config)
                 self._active[id(sb)] = sb
                 return sb
             except ImportError:
-                pass
+                pass  # Fall through to local
             except SandboxError:
-                pass
+                pass  # Docker unavailable, fall through
 
         sb = LocalSandbox(workdir=workdir)
         self._active[id(sb)] = sb
