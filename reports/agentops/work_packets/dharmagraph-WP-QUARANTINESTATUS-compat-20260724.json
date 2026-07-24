@@ -1,6 +1,6 @@
 {
   "id": "dharmagraph-WP-QUARANTINESTATUS-compat-20260724",
-  "base_ref": "2447ca565bfbd80258f7acfafb6121da7ab20886",
+  "base_ref": "2154aa100b03a80f9192d644207227ee773a8126",
   "branch": "agent/quarantine-status-main-followup-20260724",
   "worktree": ".",
   "intent": "Restore swarm tick liveness without rewriting audited runtime data by recognizing the persisted quarantined_fake_result task status as a first-class terminal state, preserving it through TaskBoard reads and board projections, excluding it from ready work, and rejecting every outgoing transition.",
@@ -211,7 +211,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "2447ca565bfbd80258f7acfafb6121da7ab20886",
+      "checked_at_sha": "2154aa100b03a80f9192d644207227ee773a8126",
       "details": []
     },
     "interface_mismatches": [
@@ -231,6 +231,6 @@
       "Exact-head hosted CI, independent review policy, and human merge authority remain required."
     ],
     "rollback": "Revert the terminal enum, transition mapping, board projection mapping, regression tests, and this packet together; do not rewrite or delete the quarantined database rows.",
-    "packet_digest": "03911620b5620e23d917c169b308d40eeaf316e4c74101fc98e16d8f153d5490"
+    "packet_digest": "b7e7548809083a008396dddd9e32dd5957711a2f7648fe4721db68f217d9d93f"
   }
 }
