@@ -1,0 +1,98 @@
+{
+  "id": "titanium-WP-0F1B-hosted-live-parity-fail-closed",
+  "base_ref": "8965ffa93a593c760ead6a76c94c4bc489e5cf93",
+  "branch": "agent/mike-live-parity-closeout-20260720",
+  "worktree": ".",
+  "intent": "WP-0F1B/WP-0F2 external-gate closeout: preserve the landed set-agnostic Mike consumer proofs from PRs #1031, #1050, and #1054 while changing only the smallest Titanium-owned hosted parity surface so a missing or unauthorized CI_PARITY_ADMIN_READ_TOKEN makes the ci-parity job fail closed after a structural precheck instead of succeeding on structural-only evidence. Do not choose a final required-check set, change branch protection, edit ACTIVE_TRACK, or reuse the operator's local OAuth credential.",
+  "allowed_files": [
+    ".github/workflows/ci-parity.yml",
+    "tests/governance/test_ci_parity_guard.py",
+    "reports/agentops/work_packets/titanium-WP-0F1B-hosted-live-parity-fail-closed.json"
+  ],
+  "forbidden_files": [
+    "dharma_swarm/chamber/**",
+    "dharma_swarm/coordination/**",
+    "dharma_swarm/council/**",
+    "dharma_swarm/graph/**",
+    "dharma_swarm/world_radar/**",
+    "packages/telos-kernel/**",
+    "scripts/governance/hygiene/**"
+  ],
+  "gates": [
+    {
+      "name": "ci-parity-and-mike-consumer-contracts",
+      "command": "python3 -m pytest -q tests/governance/test_ci_parity_guard.py tests/test_pr_merge_control.py tests/test_pr_merge_control_github_reviews.py",
+      "expected_exit": 0,
+      "timeout_seconds": 1200
+    },
+    {
+      "name": "touched-test-ruff",
+      "command": "python3 -m ruff check tests/governance/test_ci_parity_guard.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "working-tree-whitespace",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "github-token-fallback-reintroduction-detected",
+      "command": "python3 -c \"from pathlib import Path; import subprocess, sys; p=Path('.github/workflows/ci-parity.yml'); t=p.read_text(); anchor='GH_TOKEN: ${{ secrets.CI_PARITY_ADMIN_READ_TOKEN }}'; (t.count(anchor) == 1) or sys.exit(3); p.write_text(t.replace(anchor, 'GH_TOKEN: ${{ secrets.CI_PARITY_ADMIN_READ_TOKEN || github.token }}', 1)); sys.exit(subprocess.run([sys.executable, '-m', 'pytest', '-q', 'tests/governance/test_ci_parity_guard.py']).returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 600
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "ci(governance): fail closed without live parity proof"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-0F1B",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "8965ffa93a593c760ead6a76c94c4bc489e5cf93",
+      "details": []
+    },
+    "interface_mismatches": [
+      "Hosted ci-parity run 29725285630 succeeded after its live fetch failed with HTTP 403 and the workflow selected --allow-missing-live; the green job therefore proved structure only, not live branch-protection parity. Reproduce without exposing credentials: gh run view 29725285630 --repo AmitabhainArunachala/dharma_swarm --json jobs,url."
+    ],
+    "closest_existing_implementation": [
+      ".github/workflows/ci-parity.yml",
+      "tests/governance/test_ci_parity_guard.py",
+      "scripts/governance/check_ci_parity.py",
+      "tests/test_pr_merge_control.py",
+      "tests/test_pr_merge_control_github_reviews.py"
+    ],
+    "honest_blockers": [
+      "A repository Actions secret containing a dedicated fine-grained token with bounded Administration:read access must be provisioned by the operator before the hosted live-parity job can pass. The candidate deliberately stays red without that credential.",
+      "The local gh credential can read main branch protection and proves the current six contexts equal scripts/governance/ci_parity_manifest.json at this point in time; it is not copied, printed, tokenized, or repurposed as an Actions secret.",
+      "The final WP-0F1 required-check set remains an operator ratification decision. This packet preserves the current six and does not alter branch protection, the manifest, CI Truth, or ACTIVE_TRACK.",
+      "PRs #1031, #1050, and #1054 already landed duplicate-key rejection, real CI Truth repro commands, and set-agnostic fail-closed Mike consumer tests. No Mike-owned runtime or test edit is needed for this external-gate repair."
+    ],
+    "rollback": "Revert the workflow, its focused contract test, and this packet together. Rollback restores the structural-only hosted false green and must not be treated as parity evidence.",
+    "packet_digest": "326da8073994a433603c7d0f5167acbdc259972adbfc608036c6d29da77ca5d8"
+  }
+}

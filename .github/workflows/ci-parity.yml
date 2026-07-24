@@ -6,8 +6,9 @@ name: ci-parity
 # context maps to a real producing job, and that no required job has become a
 # false-green sensor (job-level continue-on-error, a regression-sensitive job
 # that swallows errors, or a regression-sensitive job that self-skips on
-# merge_group). Advisory until an Administration:read token lets the live
-# fetch run in CI; see the PR body for the Operator decision.
+# merge_group). The hosted check fails closed unless a dedicated
+# Administration:read token can read live branch protection; structural-only
+# evidence is diagnostic and can never turn this job green by itself.
 
 on:
   pull_request:
@@ -35,31 +36,25 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Run CI parity guard (structural precheck)
+        run: |
+          python3 scripts/governance/check_ci_parity.py --allow-missing-live
+
       - name: Fetch live branch protection
-        id: fetch
-        continue-on-error: true
         env:
-          GH_TOKEN: ${{ secrets.CI_PARITY_ADMIN_READ_TOKEN || github.token }}
+          GH_TOKEN: ${{ secrets.CI_PARITY_ADMIN_READ_TOKEN }}
         run: |
           set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::error title=ci-parity::CI_PARITY_ADMIN_READ_TOKEN is required; structural-only evidence cannot verify live branch-protection parity."
+            exit 1
+          fi
           branch="${{ github.event.repository.default_branch }}"
           if [ -z "${branch}" ]; then branch="main"; fi
-          if gh api "repos/${{ github.repository }}/branches/${branch}/protection" \
-              > protection.json 2> fetch_err.txt; then
-            echo "have_protection=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "have_protection=false" >> "$GITHUB_OUTPUT"
-            echo "::warning title=ci-parity::Could not read live branch protection (token lacks Administration: read). Running structural checks only; live required-check parity NOT verified. Provision a token with Administration: read to enforce parity."
-            cat fetch_err.txt || true
-          fi
+          gh api "repos/${{ github.repository }}/branches/${branch}/protection" \
+            > protection.json
 
       - name: Run CI parity guard (live)
-        if: steps.fetch.outputs.have_protection == 'true'
         run: |
           python3 scripts/governance/check_ci_parity.py \
             --protection-json protection.json
-
-      - name: Run CI parity guard (structural only)
-        if: steps.fetch.outputs.have_protection == 'false'
-        run: |
-          python3 scripts/governance/check_ci_parity.py --allow-missing-live
