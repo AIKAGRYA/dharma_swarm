@@ -2533,6 +2533,13 @@ def test_execution_rechecks_external_packet_custody_after_gates(
         )
 
 
+# Subprocess-heavy integration test: ~15s solo (measured 2026-07-23), which
+# under 2-core CI suite contention exceeds the workflow's 30s per-test budget
+# (.github/workflows/tests.yml --timeout=30) — it timed out on 4 of the day's
+# suite runs across three PRs while passing alone every time. The marker
+# overrides the CLI budget for THIS test only; the root cause is CPU
+# contention on a fixed-cost test, not a leak or hang.
+@pytest.mark.timeout(90)
 def test_external_entry_packet_bootstrap_and_digest_binding(tmp_path: Path) -> None:
     repo = init_session_repo(tmp_path)
     payload = seal_packet(session_packet(repo))
