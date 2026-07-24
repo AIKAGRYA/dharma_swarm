@@ -70,9 +70,22 @@ def test_help_available() -> None:
     assert "CI parity guard" in result.stdout
 
 
-def test_workflow_fetch_uses_admin_read_secret() -> None:
+def test_workflow_live_fetch_requires_dedicated_admin_read_secret() -> None:
     workflow = (WORKFLOWS / "ci-parity.yml").read_text(encoding="utf-8")
-    assert "secrets.CI_PARITY_ADMIN_READ_TOKEN || github.token" in workflow
+    secret_binding = "GH_TOKEN: ${{ secrets.CI_PARITY_ADMIN_READ_TOKEN }}"
+    assert workflow.count(secret_binding) == 1
+    assert "CI_PARITY_ADMIN_READ_TOKEN || github.token" not in workflow
+    assert "continue-on-error: true" not in workflow
+    assert "CI_PARITY_ADMIN_READ_TOKEN is required" in workflow
+    assert "structural-only evidence cannot verify" in workflow
+    assert "Run CI parity guard (structural precheck)" in workflow
+    assert "Run CI parity guard (structural only)" not in workflow
+    assert "steps.fetch.outputs.have_protection" not in workflow
+
+    structural = workflow.index("Run CI parity guard (structural precheck)")
+    fetch = workflow.index("Fetch live branch protection")
+    live = workflow.index("Run CI parity guard (live)")
+    assert structural < fetch < live
 
 
 def test_aligned_state_is_green(tmp_path: Path) -> None:
