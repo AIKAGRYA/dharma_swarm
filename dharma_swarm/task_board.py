@@ -553,6 +553,10 @@ class TaskBoard:
         """
         status = fields.pop("status", None)
         if status is not None:
+            try:
+                status = TaskStatus(status)
+            except (TypeError, ValueError) as exc:
+                raise TaskBoardError(f"Invalid task status: {status!r}") from exc
             if status == TaskStatus.ASSIGNED:
                 await self.assign(
                     task_id,

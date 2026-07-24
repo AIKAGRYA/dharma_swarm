@@ -99,11 +99,28 @@ async def test_persisted_quarantined_fake_result_is_readable_and_terminal(
         match="Invalid transition: quarantined_fake_result -> pending",
     ):
         await board._set_status(task_id, TaskStatus.PENDING)
-    with pytest.raises(TaskBoardError, match="audit-only terminal status"):
-        await board.update_task(
-            task_id,
-            status=TaskStatus.QUARANTINED_FAKE_RESULT,
-        )
+    for status in (
+        TaskStatus.QUARANTINED_FAKE_RESULT,
+        TaskStatus.QUARANTINED_FAKE_RESULT.value,
+    ):
+        with pytest.raises(TaskBoardError, match="audit-only terminal status"):
+            await board.update_task(task_id, status=status)
+
+    unchanged = await board.get(task_id)
+    assert unchanged is not None
+    assert unchanged.status == TaskStatus.QUARANTINED_FAKE_RESULT
+
+
+@pytest.mark.asyncio
+async def test_update_task_rejects_unknown_raw_status_without_mutating(board):
+    task = await board.create("Reject unknown status")
+
+    with pytest.raises(TaskBoardError, match="Invalid task status"):
+        await board.update_task(task.id, status="not_a_real_status")
+
+    unchanged = await board.get(task.id)
+    assert unchanged is not None
+    assert unchanged.status == TaskStatus.PENDING
 
 
 @pytest.mark.asyncio
