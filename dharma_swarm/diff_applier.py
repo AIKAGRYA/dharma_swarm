@@ -344,11 +344,8 @@ class DiffApplier:
         )
 
     async def rollback(self, result: ApplyResult) -> None:
-        """Restore files from backups recorded in *result*.
-
-        Args:
-            result: A previous ``ApplyResult`` whose backups should be restored.
-        """
+        """Restore backed-up files and remove files created by this apply."""
+        backed_up = {Path(original).resolve() for original in result.backup_paths}
         for original, backup in result.backup_paths.items():
             backup_path = Path(backup)
             original_path = Path(original)
@@ -356,6 +353,10 @@ class DiffApplier:
                 shutil.copy2(str(backup_path), str(original_path))
                 backup_path.unlink()
                 logger.debug("Rolled back %s from %s", original, backup)
+        for relative in result.files_changed:
+            target = (self.workspace / relative).resolve()
+            if target.is_relative_to(self.workspace) and target not in backed_up:
+                target.unlink(missing_ok=True)
 
     async def apply_and_test(
         self,
