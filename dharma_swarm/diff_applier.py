@@ -17,7 +17,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from dharma_swarm.runtime_state import RuntimeStateStore
-from dharma_swarm.sandbox import terminate_process_group
+from dharma_swarm.sandbox import await_cleanup, terminate_process_group
 from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
 from dharma_swarm.spine.tollbooth import require_execution_tollbooth
 
@@ -410,9 +410,11 @@ class DiffApplier:
                 error=f"Test command timed out after {timeout}s",
             )
         except asyncio.CancelledError:
-            if proc is not None:
-                await terminate_process_group(proc)
-            await asyncio.shield(self.rollback(apply_result))
+            try:
+                if proc is not None:
+                    await terminate_process_group(proc)
+            finally:
+                await await_cleanup(self.rollback(apply_result))
             raise
         except OSError as exc:
             await self.rollback(apply_result)
