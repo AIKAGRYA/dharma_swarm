@@ -20,16 +20,48 @@ from typing import Optional
 from dharma_swarm.models import SandboxResult
 
 
-def kill_process_group(proc: "asyncio.subprocess.Process") -> None:
-    """Kill proc's whole process group (requires start_new_session=True at
-    spawn time). A lone proc.kill() only signals the shell; a test/build
-    command's non-exec'd grandchild can survive it, keep the piped
-    stdout/stderr open, and make proc.communicate() block for the child's
-    full natural runtime regardless of any `timeout` the caller passed."""
+def _kill_process(proc: "asyncio.subprocess.Process") -> None:
+    """Best-effort single-process fallback that never masks cleanup."""
     try:
-        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-    except (ProcessLookupError, PermissionError, OSError):
         proc.kill()
+    except (ProcessLookupError, PermissionError, OSError):
+        pass
+
+
+def kill_process_group(proc: "asyncio.subprocess.Process") -> None:
+    """Kill *proc* and its process group when the host supports it.
+
+    ``start_new_session=True`` gives POSIX children their own process group, so
+    killing only the shell can leave a non-exec'd grandchild alive. Windows
+    and constrained Python builds may not expose ``getpgid``/``killpg`` or
+    ``SIGKILL``; those hosts fall back to the process handle rather than
+    raising ``AttributeError`` and skipping cleanup entirely.
+    """
+    if proc.returncode is not None:
+        return
+
+    getpgid = getattr(os, "getpgid", None)
+    killpg = getattr(os, "killpg", None)
+    sigkill = getattr(signal, "SIGKILL", None)
+    if getpgid is None or killpg is None or sigkill is None:
+        _kill_process(proc)
+        return
+
+    try:
+        killpg(getpgid(proc.pid), sigkill)
+    except (AttributeError, ProcessLookupError, PermissionError, OSError):
+        _kill_process(proc)
+
+
+async def terminate_process_group(proc: "asyncio.subprocess.Process") -> None:
+    """Terminate and reap a managed subprocess despite caller cancellation."""
+    kill_process_group(proc)
+    try:
+        await asyncio.shield(proc.wait())
+    except (ProcessLookupError, ChildProcessError, OSError):
+        # The process may have been reaped concurrently. Cleanup is complete.
+        pass
+
 
 # Patterns that are always rejected before execution.
 # Intentionally conservative -- telos gates handle nuanced policy.
@@ -119,11 +151,13 @@ class LocalSandbox(Sandbox):
                 proc.communicate(), timeout=timeout
             )
         except asyncio.TimeoutError:
-            kill_process_group(proc)
-            await proc.wait()
+            await terminate_process_group(proc)
             raw_out = b""
             raw_err = b"Execution timed out"
             timed_out = True
+        except asyncio.CancelledError:
+            await terminate_process_group(proc)
+            raise
 
         duration = time.monotonic() - start
         return SandboxResult(
@@ -155,7 +189,7 @@ class SandboxManager:
     Three-layer isolation stack (auto-selects strongest available):
         Layer 3: DockerSandbox (container isolation, network policies)
         Layer 2: LocalSandbox (subprocess with regex safety checks)
-        Layer 1: LocalSandbox (same — always available as fallback)
+        Layer 1: LocalSandbox (same -- always available as fallback)
 
     Set ``prefer_docker=True`` (default) to auto-select Docker when
     the daemon is reachable. Falls back to LocalSandbox transparently.
@@ -164,13 +198,14 @@ class SandboxManager:
     def __init__(self, prefer_docker: bool = True) -> None:
         self._active: dict[int, Sandbox] = {}
         self._prefer_docker = prefer_docker
-        self._docker_available: Optional[bool] = None  # Cached after first check
+        self._docker_available: Optional[bool] = None
 
     async def _check_docker(self) -> bool:
         """Check Docker availability (cached)."""
         if self._docker_available is None:
             try:
                 from dharma_swarm.docker_sandbox import DockerSandbox
+
                 self._docker_available = await DockerSandbox.docker_available()
             except ImportError:
                 self._docker_available = False
@@ -181,16 +216,9 @@ class SandboxManager:
         sandbox_type: str = "local",
         workdir: Optional[Path] = None,
     ) -> Sandbox:
-        """Create a sandbox (synchronous — always returns LocalSandbox).
+        """Create a sandbox (synchronous -- always returns LocalSandbox).
 
         For Docker sandboxes, use :meth:`create_async` instead.
-
-        Args:
-            sandbox_type: ``"local"`` or ``"docker"`` (docker raises if unavailable).
-            workdir: Optional working directory override.
-
-        Returns:
-            A ready-to-use :class:`Sandbox` instance.
         """
         if sandbox_type == "docker":
             raise SandboxError(
@@ -208,17 +236,7 @@ class SandboxManager:
         workdir: Optional[Path] = None,
         docker_config: Optional[object] = None,
     ) -> Sandbox:
-        """Create a sandbox, auto-selecting Docker when available.
-
-        Args:
-            sandbox_type: ``"auto"`` (default), ``"docker"``, or ``"local"``.
-            workdir: Working directory for local sandboxes.
-            docker_config: Optional :class:`ContainerConfig` for Docker sandboxes.
-
-        Returns:
-            A :class:`DockerSandbox` if Docker is available and preferred,
-            otherwise a :class:`LocalSandbox`.
-        """
+        """Create a sandbox, auto-selecting Docker when available."""
         use_docker = False
 
         if sandbox_type == "docker":
@@ -229,14 +247,19 @@ class SandboxManager:
         if use_docker:
             try:
                 from dharma_swarm.docker_sandbox import DockerSandbox, ContainerConfig
-                config = docker_config if isinstance(docker_config, ContainerConfig) else ContainerConfig()
+
+                config = (
+                    docker_config
+                    if isinstance(docker_config, ContainerConfig)
+                    else ContainerConfig()
+                )
                 sb: Sandbox = DockerSandbox(config=config)
                 self._active[id(sb)] = sb
                 return sb
             except ImportError:
-                pass  # Fall through to local
+                pass
             except SandboxError:
-                pass  # Docker unavailable, fall through
+                pass
 
         sb = LocalSandbox(workdir=workdir)
         self._active[id(sb)] = sb
