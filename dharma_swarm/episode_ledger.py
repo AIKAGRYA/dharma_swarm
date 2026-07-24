@@ -161,7 +161,12 @@ class EpisodeEvent:
             payload=payload,
         )
         stored_id = str(data.get("event_id", ""))
-        if stored_id and stored_id != rebuilt.event_id:
+        if not stored_id:
+            raise LedgerValidationError(
+                "event_id is required; refusing to mint a fresh identity for a "
+                "stored record"
+            )
+        if stored_id != rebuilt.event_id:
             raise LedgerValidationError(
                 f"event_id mismatch for {data.get('event_type')!r}: content was altered"
             )
@@ -184,11 +189,10 @@ def _validate(
         )
     if not str(episode_id).strip():
         raise LedgerValidationError("episode_id is required")
-    try:
-        if int(sequence) < 0:
-            raise LedgerValidationError("sequence must be a non-negative integer")
-    except (TypeError, ValueError) as exc:
-        raise LedgerValidationError("sequence must be a non-negative integer") from exc
+    # Strict integer check: int() would silently truncate 1.9 to 1 and misorder
+    # a malformed event instead of failing the validated schema closed.
+    if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 0:
+        raise LedgerValidationError("sequence must be a non-negative integer")
     if event_type in _EFFECT_EVENT_TYPES and not str(payload.get("idempotency_key", "")).strip():
         raise LedgerValidationError(f"{event_type} requires payload.idempotency_key")
 
@@ -259,6 +263,12 @@ class EpisodeLedgerWriter:
             except (TypeError, ValueError):
                 logger.warning(
                     "episode_ledger: skipping corrupt line in %s during rehydrate",
+                    self.path,
+                )
+                continue
+            if not isinstance(record, dict):
+                logger.warning(
+                    "episode_ledger: skipping non-object line in %s during rehydrate",
                     self.path,
                 )
                 continue

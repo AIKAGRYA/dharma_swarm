@@ -76,6 +76,37 @@ def test_unknown_event_type_fails_closed():
         EpisodeEvent.from_dict(payload)
 
 
+def test_from_dict_requires_event_id():
+    """A stored record with no event_id must fail closed, not silently mint a
+    fresh identity — otherwise dedup and the tamper check cannot distinguish
+    malformed historical data from valid events."""
+    record = _event("observation_recorded", 1, note="ok").to_dict()
+    del record["event_id"]
+    with pytest.raises(LedgerValidationError, match="event_id"):
+        EpisodeEvent.from_dict(record)
+    record["event_id"] = ""
+    with pytest.raises(LedgerValidationError, match="event_id"):
+        EpisodeEvent.from_dict(record)
+
+
+def test_fractional_sequence_fails_closed():
+    """int() truncation must not launder sequence=1.9 into 1 — a non-integer
+    sequence is a malformed event, and misordering it violates the validated
+    schema."""
+    with pytest.raises(LedgerValidationError, match="sequence"):
+        EpisodeEvent.new(
+            event_type="observation_recorded",
+            episode_id="ep_test0000000001",
+            attempt_id="at_test0000000001",
+            sequence=1.9,  # type: ignore[arg-type]
+            payload={"note": "x"},
+        )
+    record = _event("observation_recorded", 1, note="x").to_dict()
+    record["sequence"] = 1.9
+    with pytest.raises(LedgerValidationError, match="sequence"):
+        EpisodeEvent.from_dict(record)
+
+
 def test_missing_episode_id_fails_closed():
     with pytest.raises(LedgerValidationError, match="episode_id"):
         EpisodeEvent.new(
@@ -218,6 +249,19 @@ def test_writer_recovers_from_corrupt_lines(tmp_path: Path):
     EpisodeLedgerWriter(path).append(obs)
     with open(path, "a") as f:
         f.write("{torn json\n")
+    writer = EpisodeLedgerWriter(path)
+    assert writer.append(obs) is False
+    assert writer.append(_event("review_recorded", 2, reviewer="codex")) is True
+
+
+def test_writer_recovers_from_valid_json_non_object_lines(tmp_path: Path):
+    """A line that parses as JSON but is not an object (null, number, string,
+    array) must be skipped like any other corrupt line, not crash rehydration."""
+    path = tmp_path / "episodes.jsonl"
+    obs = _event("observation_recorded", 1, note="fine")
+    EpisodeLedgerWriter(path).append(obs)
+    with open(path, "a") as f:
+        f.write("null\n42\n\"x\"\n[]\n")
     writer = EpisodeLedgerWriter(path)
     assert writer.append(obs) is False
     assert writer.append(_event("review_recorded", 2, reviewer="codex")) is True
