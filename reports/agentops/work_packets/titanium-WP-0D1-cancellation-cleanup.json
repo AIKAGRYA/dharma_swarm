@@ -1,0 +1,96 @@
+{
+  "allowed_files": [
+    "dharma_swarm/diff_applier.py",
+    "dharma_swarm/sandbox.py",
+    "reports/agentops/work_packets/titanium-WP-0D1-cancellation-cleanup.json",
+    "tests/test_subprocess_cancellation.py"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "e1bb3d7b1cdf7bcc42a008cec6708acb2e471214",
+  "branch": "agent/titanium-wp0d1-cancellation-cleanup-20260724",
+  "commit": {
+    "allowed": true,
+    "message": "fix(titanium): clean up cancelled subprocesses and rollback"
+  },
+  "forbidden_files": [],
+  "gates": [
+    {
+      "command": "python3 -m pytest tests/test_sandbox.py tests/test_diff_applier.py tests/test_subprocess_cancellation.py -q",
+      "expected_exit": 0,
+      "name": "subprocess-cleanup-and-regression-tests",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "python3 -m ruff check dharma_swarm/sandbox.py dharma_swarm/diff_applier.py tests/test_subprocess_cancellation.py",
+      "expected_exit": 0,
+      "name": "touched-files-ruff",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "name": "working-tree-whitespace",
+      "timeout_seconds": 120
+    }
+  ],
+  "id": "titanium-WP-0D1-cancellation-cleanup",
+  "intent": "WP-0D1 corrective slice after merged PR #1092: make process-group termination capability-safe, clean up LocalSandbox commands on caller cancellation, and make DiffApplier cancellation terminate the test process and restore the workspace before preserving CancelledError. This closes only the three reproduced P1 cleanup defects; it does not claim full WP-0D or Titanium closure.",
+  "negative_controls": [
+    {
+      "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('dharma_swarm/sandbox.py'); t=p.read_text(); old='        except asyncio.CancelledError:\\n            await terminate_process_group(proc)\\n            raise'; new='        except asyncio.CancelledError:\\n            raise'; assert old in t; p.write_text(t.replace(old,new,1)); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_subprocess_cancellation.py::test_local_sandbox_cancellation_kills_delayed_child'],check=False); sys.exit(r.returncode)\"",
+      "expected_exit": 1,
+      "name": "sandbox-cancellation-cleanup-removal-must-fail",
+      "timeout_seconds": 60
+    },
+    {
+      "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('dharma_swarm/diff_applier.py'); t=p.read_text(); old='        except asyncio.CancelledError:\\n            if proc is not None:\\n                await terminate_process_group(proc)\\n            await asyncio.shield(self.rollback(apply_result))\\n            raise'; new='        except asyncio.CancelledError:\\n            raise'; assert old in t; p.write_text(t.replace(old,new,1)); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_subprocess_cancellation.py::test_diff_applier_cancellation_kills_child_and_rolls_back'],check=False); sys.exit(r.returncode)\"",
+      "expected_exit": 1,
+      "name": "diff-applier-cancellation-rollback-removal-must-fail",
+      "timeout_seconds": 60
+    }
+  ],
+  "session_entry": {
+    "active_track": "repository-titanium-hardening-2026-07",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/sandbox.py",
+      "dharma_swarm/diff_applier.py",
+      "tests/test_sandbox.py",
+      "tests/test_diff_applier.py",
+      "reports/agentops/work_packets/titanium-WP-0D-fast-suite-determinism.json"
+    ],
+    "collision": {
+      "checked_at_sha": "e1bb3d7b1cdf7bcc42a008cec6708acb2e471214",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "Open PR #1060 also edits dharma_swarm/diff_applier.py. It must not merge on its current stale head and must be rebuilt after this corrective slice lands.",
+      "This packet closes only the reproduced POSIX-fallback and cancellation-cleanup defects from PR #1092. It does not close issue #1090, all WP-0D acceptance predicates, PR #1060 idempotency semantics, or Titanium Phase 0.",
+      "Hosted exact-head CI, independent review, resolution of every P0/P1 thread, and human merge authority remain required."
+    ],
+    "interface_mismatches": [
+      "Merged PR #1092 introduced process-group timeout cleanup but current main still raises AttributeError when POSIX group APIs are absent and lets caller cancellation bypass child termination; DiffApplier cancellation can additionally bypass rollback after applying files."
+    ],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "f0729b5729577f3ee4e7e49dbffce33b483acb40a816f424f3f95704d5194926",
+    "rollback": "Revert sandbox.py, diff_applier.py, the focused cancellation regression test, and this packet together. Rollback restores the known cancellation leak and must not be represented as safe subprocess cleanup.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.43.0",
+      "make": "4.3",
+      "python": "3.11.15"
+    },
+    "work_packet": "WP-0D1"
+  },
+  "worktree": "."
+}
