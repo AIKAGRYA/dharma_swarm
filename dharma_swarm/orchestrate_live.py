@@ -250,6 +250,32 @@ async def _wait_or_shutdown(shutdown_event: asyncio.Event, delay: float) -> bool
         return shutdown_event.is_set()
 
 
+_RUNTIME_LOOP_ENV_GATES = {
+    "archaeology": "DGC_ARCHAEOLOGY_INGESTION",
+}
+
+
+def _apply_runtime_loop_env_gates(
+    task_factories: dict[str, Any],
+    supervisor: Any,
+) -> None:
+    """Remove explicitly disabled loops before their task bodies can start.
+
+    These gates are evaluated at task construction rather than inside a loop
+    body.  That distinction matters for loops whose constructors call
+    synchronous native libraries: an in-body timeout cannot fire while the
+    event-loop thread is blocked.
+    """
+    false_values = {"0", "false", "no", "off"}
+    for loop_name, env_name in _RUNTIME_LOOP_ENV_GATES.items():
+        raw_value = os.environ.get(env_name)
+        if raw_value is None or raw_value.strip().lower() not in false_values:
+            continue
+        task_factories.pop(loop_name, None)
+        supervisor.mark_disabled(loop_name, f"{env_name}={raw_value}")
+        _log("orchestrator", f"Loop {loop_name} disabled by {env_name}")
+
+
 async def run_swarm_loop(
     shutdown_event: asyncio.Event,
     signal_bus: "Any | None" = None,
@@ -2331,6 +2357,7 @@ async def orchestrate(background: bool = False) -> None:
             room_bridge,
             supervisor=_supervisor,
         )
+    _apply_runtime_loop_env_gates(task_factories, _supervisor)
     optional_clean_exit = {"pulse"}
     tasks = {
         name: asyncio.create_task(factory(), name=name)
