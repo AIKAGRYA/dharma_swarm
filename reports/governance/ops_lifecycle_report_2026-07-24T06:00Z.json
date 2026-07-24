@@ -1,0 +1,141 @@
+{
+  "run_timestamp": "2026-07-24T06:00Z",
+  "audit_sha": "e1bb3d7b1cdf7bcc42a008cec6708acb2e471214",
+  "mission_1_spine_adoption": {
+    "adoption_pct": 93.8,
+    "target_pct": 95.0,
+    "gap_pp": 1.2,
+    "joined_count": 13,
+    "adapter_ready_count": 2,
+    "legacy_count": 1,
+    "missing_count": 0,
+    "quarantine_count": 0,
+    "total_surfaces": 16,
+    "status_vs_previous": "UNCHANGED (93.8% -> 93.8%)",
+    "json_committed": false,
+    "json_commit_reason": "adoption_pct unchanged from HEAD; per policy only commit on pct change; audit_sha and line numbers updated on disk only",
+    "spine_comment_posted_to": "PR #1066 (https://github.com/AmitabhainArunachala/dharma_swarm/pull/1066#issuecomment-5066658641)",
+    "note": "Most recent open spine PR is #1066 (docs(governance): Tier-D findings — hot-path spine work needing operator packets, 2026-07-19T14:14:43Z)",
+    "top_saturation_targets": [
+      {
+        "id": "self_modification_loop",
+        "status": "adapter-ready",
+        "files": [
+          "dharma_swarm/diff_applier.py",
+          "dharma_swarm/evolution.py",
+          "dharma_swarm/self_improve.py"
+        ],
+        "missing_patterns": [
+          "try_begin_idempotent_side_effect on apply path in diff_applier.py"
+        ],
+        "open_pr": "PR #1060 (spine A1 — idempotency-fence diff apply, MERGEABLE)"
+      },
+      {
+        "id": "mcp_tool_access",
+        "status": "adapter-ready",
+        "files": [
+          "dharma_swarm/mcp_server.py",
+          "dharma_swarm/dharma_context_mcp.py"
+        ],
+        "missing_patterns": [
+          "ExecutionIdentity import",
+          "RuntimeStateStore wiring",
+          "record_side_effect receipts"
+        ],
+        "open_pr": "PR #1061 (spine A2 — MCP tool boundary, MERGEABLE)"
+      },
+      {
+        "id": "legacy_no_identity_escape_hatch",
+        "status": "legacy",
+        "files": [
+          "dharma_swarm/runtime_state.py",
+          "tests/test_runtime_state_invariants.py"
+        ],
+        "note": "Intentional legacy surface; invariant-covered; operator decision required to remove"
+      }
+    ]
+  },
+  "mission_2_pr_lifecycle": {
+    "total_open_before": 31,
+    "total_open_after": 30,
+    "auto_closed_count": 1,
+    "auto_closed_prs": [
+      {
+        "number": 996,
+        "title": "governance(safety): admit live-host and rollback proof surfaces",
+        "created_at": "2026-07-17T01:43:11Z",
+        "age_days": 7.18,
+        "age_hours": 172.3,
+        "reason": "CONFLICTING + older than 7 days",
+        "comment_url": "https://github.com/AmitabhainArunachala/dharma_swarm/pull/996#issuecomment-5066659623"
+      }
+    ],
+    "conflicting_prs_under_7d": [
+      {
+        "number": 1097,
+        "title": "fix(forge_lab): harden RSI run evidence routes",
+        "created_at": "2026-07-23T15:42:05Z",
+        "age_hours": 14.3,
+        "will_cross_threshold_in_hours": 153.7
+      },
+      {
+        "number": 1076,
+        "title": "[impact-checked] governance(helm): reconcile golden-frame blocker",
+        "created_at": "2026-07-20T12:39:14Z",
+        "age_hours": 89.4,
+        "will_cross_threshold_in_hours": 78.6
+      },
+      {
+        "number": 1007,
+        "title": "governance(keel): bare-metal architecture audit as the KEEL companion findings ledger",
+        "created_at": "2026-07-17T17:20:24Z",
+        "age_hours": 156.7,
+        "will_cross_threshold_in_hours": 11.3,
+        "urgency": "URGENT — crosses 7d threshold in ~11h"
+      }
+    ],
+    "duplicate_autogrounding_prs": [],
+    "green_and_ready_prs": [
+      {"number": 1102, "title": "fix(titanium): clean up cancelled subprocesses and rollback"},
+      {"number": 1099, "title": "fix(tests): per-test timeout for suite-context-slow external-entry packet test"},
+      {"number": 1098, "title": "chore(governance): ops agent lifecycle report 2026-07-23T18:00Z [automated]"},
+      {"number": 1096, "title": "fix(runtime): honor archaeology disable gate before startup"},
+      {"number": 1086, "title": "feat(ops): add AGNI hub readiness probe"},
+      {"number": 1085, "title": "fix(orchestrate_live): stop swallowing system-loop failure tracebacks (dispatch-dropoff outage hardening)"},
+      {"number": 1084, "title": "feat(darshan): Issue One assembled + honest DRAFT receipt + fail-closed seal script"},
+      {"number": 1082, "title": "docs(ops): Backup Triad Runbook 2026-07-21 — megha off-host litestream, Mac fallback, restore drills"},
+      {"number": 1081, "title": "governance: TELOS canon reconciliation + honest re-admission candidate [BLOCKED-ON-OPERATOR-DECISION]"},
+      {"number": 1080, "title": "docs(governance): land REMOTE_HOLON_MESH v1.1 + Synadia CAR bridge spec + proposed tracks (sole-copy salvage)"},
+      {"number": 1075, "title": "[impact-checked] ci(governance): fail closed without live parity proof"},
+      {"number": 1074, "title": "docs(arena): ratify PR 983 post-merge evidence boundary"},
+      {"number": 1070, "title": "fix(xray): make discover_files cap deterministic and proportional (#1057)"},
+      {"number": 1067, "title": "docs: record pre-constitutional founder direction"},
+      {"number": 1066, "title": "docs(governance): Tier-D findings — hot-path spine work needing operator packets"},
+      {"number": 1065, "title": "feat(traces): documented front door for operational trace writes (spine C2)"},
+      {"number": 1064, "title": "feat(intent-router): ADR-009 idempotency-key origin standard + contract tests (spine C1)"},
+      {"number": 1063, "title": "feat(store-sync): project ValueEvents — second ontology→runtime pass (spine B2)"},
+      {"number": 1062, "title": "feat(episode-ledger): versioned validated Episode Ledger events — schema slice (spine B1)"},
+      {"number": 1061, "title": "feat(mcp-server): join the MCP tool boundary to the runtime spine (spine A2)"},
+      {"number": 1060, "title": "feat(diff-applier): idempotency-fence the consequential diff apply (spine A1)"},
+      {"number": 1025, "title": "docs(architecture): NATS/A2A whole-system update specification 2026-07-18"},
+      {"number": 1013, "title": "feat(ops): bounded mobile recovery for Codex Composer"},
+      {"number": 1011, "title": "governance: admit current Codex Composer recovery slice"},
+      {"number": 987, "title": "chore(docops): reconcile generated counts"},
+      {"number": 930, "title": "feat(chamber): add exact-scope proof membrane v0"},
+      {"number": 904, "title": "feat(holon): authority-scoped remote fast path [impact-checked]"}
+    ],
+    "long_lived_mergeable_prs": [
+      {"number": 904, "title": "feat(holon): authority-scoped remote fast path [impact-checked]", "age_days": 11.6, "note": "11+ days old, operator review strongly recommended"},
+      {"number": 930, "title": "feat(chamber): add exact-scope proof membrane v0", "age_days": 10.3, "note": "10+ days old"},
+      {"number": 987, "title": "chore(docops): reconcile generated counts", "age_days": 7.97, "note": "8+ days old"},
+      {"number": 1011, "title": "governance: admit current Codex Composer recovery slice", "age_days": 6.5},
+      {"number": 1013, "title": "feat(ops): bounded mobile recovery for Codex Composer", "age_days": 6.4}
+    ],
+    "recommended_actions": [
+      "URGENT: Resolve merge conflict on PR #1007 (governance/keel) — crosses 7d auto-close threshold in ~11h",
+      "Watch: PR #1076 (governance/helm) — crosses 7d threshold in ~79h",
+      "Merge PR #1060 (spine A1) or PR #1061 (spine A2) to push spine adoption to 95%+ target",
+      "Review long-lived MERGEABLE PRs #904 (11.6d), #930 (10.3d), #987 (8d) — all aging without merge"
+    ]
+  }
+}
