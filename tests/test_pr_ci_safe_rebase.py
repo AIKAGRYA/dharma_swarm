@@ -18,6 +18,10 @@ SHA_A, SHA_B = "a" * 40, "b" * 40
 RESTORE = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
 PACKET = "reports/agentops/work_packets/example.json"
 SESSION = "changes a Session Entry packet under reports/agentops/work_packets/*.json"
+WORKFLOW = (
+    "changes a GitHub Actions workflow under .github/workflows/ "
+    "(1 path(s)); workflow-write authority is not proven"
+)
 MUTATION = {"fetch", "checkout", "rebase", "push", "branch", "switch", "reset", "merge"}
 
 def _load_helper():
@@ -296,6 +300,18 @@ def test_page_two_rename_away_previous_filename_packet_skips() -> None:
                {1: _entries(100), 2: [_fe("docs/moved.json", previous=PACKET)]})
     code, out = _run(r)
     _skip(code, out, r.calls, reason=f"{SESSION} (1 path(s))", meta=1, files=2, git=0)
+
+
+def test_workflow_path_and_rename_skip_before_git() -> None:
+    entries = [
+        _fe(".github/workflows/new.yml"),
+        _fe("docs/renamed.yml", previous=".github/workflows/old.yml"),
+    ]
+    for entry in entries:
+        r = _ready(_pr_payload(), {1: [entry]})
+        code, out = _run(r)
+        _skip(code, out, r.calls, reason=WORKFLOW, meta=1, files=1, git=0)
+
 
 def test_changed_files_count_mismatch_skips() -> None:
     r = _ready(_pr_payload(changed_files=2), {1: [_fe("a.py")]})
