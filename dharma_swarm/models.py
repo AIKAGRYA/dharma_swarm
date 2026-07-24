@@ -23,6 +23,7 @@ class TaskStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
+    QUARANTINED_FAKE_RESULT = "quarantined_fake_result"
 
 
 class TaskPriority(str, Enum):
