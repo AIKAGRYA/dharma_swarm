@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 import pytest
 
+from dharma_swarm.episode_ledger import EVENT_TYPES, EpisodeEvent
 from dharma_swarm.runtime_state import (
     ContextBundleRecord,
     MemoryFact,
@@ -14,6 +15,7 @@ from dharma_swarm.runtime_state import (
     SessionState,
     SessionEventRecord,
     TopologyStateRecord,
+    _EPISODE_OUTBOX_EVENT_TYPES,
     build_session_event_from_ledger_record,
 )
 from dharma_swarm.spine.identity import ExecutionIdentity
@@ -308,15 +310,14 @@ def test_episode_outbox_redacts_nested_secrets_before_sqlite_and_replays(
     )
 
     assert replay == first
-    assert first.payload == {
-        "messages": [
-            {
-                "api_key": "[REDACTED]",
-                "nested": {"Authorization": "[REDACTED]"},
-            }
-        ],
-        "safe": "retained",
-    }
+    expected = EpisodeEvent.new(
+        event_type="attempt_started",
+        episode_id="ep-redacted",
+        attempt_id="at-redacted",
+        sequence=0,
+        payload=raw_payload,
+    )
+    assert first.payload == expected.payload
     sqlite_bytes = b"".join(
         path.read_bytes()
         for path in tmp_path.iterdir()
@@ -324,6 +325,43 @@ def test_episode_outbox_redacts_nested_secrets_before_sqlite_and_replays(
     )
     assert b"sk-deep-secret" not in sqlite_bytes
     assert b"hidden-secret" not in sqlite_bytes
+
+
+def test_episode_outbox_schema_matches_episode_event_vocabulary(tmp_path) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+
+    assert _EPISODE_OUTBOX_EVENT_TYPES == EVENT_TYPES
+    for index, event_type in enumerate(EVENT_TYPES):
+        payload = (
+            {"idempotency_key": f"effect-{index}"}
+            if event_type in {"effect_requested", "effect_resolved"}
+            else {}
+        )
+        stored = store.enqueue_episode_event_sync(
+            delivery_key=f"schema-parity:{event_type}",
+            episode_id="ep-schema-parity",
+            attempt_id="at-schema-parity",
+            event_type=event_type,
+            payload=payload,
+        )
+        expected = EpisodeEvent.new(
+            event_type=event_type,
+            episode_id="ep-schema-parity",
+            attempt_id="at-schema-parity",
+            sequence=0,
+            payload=payload,
+        )
+        assert stored.payload == expected.payload
+
+    with pytest.raises(ValueError, match="requires payload.idempotency_key"):
+        store.enqueue_episode_event_sync(
+            delivery_key="schema-parity:invalid-effect",
+            episode_id="ep-schema-parity",
+            attempt_id="at-schema-parity",
+            event_type="effect_requested",
+            payload={},
+        )
+    assert store.get_episode_outbox_sync("schema-parity:invalid-effect") is None
 
 
 def test_invalid_episode_type_rolls_back_session_event_and_outbox(tmp_path) -> None:

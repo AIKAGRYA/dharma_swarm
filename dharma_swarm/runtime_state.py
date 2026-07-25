@@ -25,10 +25,70 @@ from dharma_swarm.engine.event_memory import (
     ensure_memory_plane_schema_async,
     ensure_memory_plane_schema_sync,
 )
-from dharma_swarm.episode_ledger import EpisodeEvent
 from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
 
 DEFAULT_RUNTIME_DB = Path.home() / ".dharma" / "state" / "runtime.db"
+
+_EPISODE_OUTBOX_EVENT_TYPES = (
+    "episode_opened",
+    "attempt_started",
+    "observation_recorded",
+    "effect_requested",
+    "effect_resolved",
+    "review_recorded",
+    "episode_closed",
+    "post_merge_observation",
+)
+_EPISODE_OUTBOX_EFFECT_EVENT_TYPES = frozenset(("effect_requested", "effect_resolved"))
+_EPISODE_OUTBOX_REDACT_KEY_MARKERS = (
+    "secret",
+    "token",
+    "password",
+    "api_key",
+    "authorization",
+    "credential",
+)
+_EPISODE_OUTBOX_REDACTED = "[REDACTED]"
+
+
+def _redact_episode_outbox_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        redacted: dict[str, Any] = {}
+        for key, item in value.items():
+            if any(marker in key.lower() for marker in _EPISODE_OUTBOX_REDACT_KEY_MARKERS):
+                redacted[key] = _EPISODE_OUTBOX_REDACTED
+            else:
+                redacted[key] = _redact_episode_outbox_value(item)
+        return redacted
+    if isinstance(value, (list, tuple)):
+        return [_redact_episode_outbox_value(item) for item in value]
+    return value
+
+
+def _normalize_episode_outbox_payload(
+    *,
+    event_type: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    """Apply the Episode Event persistence boundary before durable enqueue.
+
+    Runtime state intentionally does not import ``episode_ledger``: doing so
+    makes the high-fanout runtime spine depend on the low-level episode schema.
+    The parity test in ``test_runtime_state`` locks this vocabulary and
+    recursive redaction result to ``EpisodeEvent.new``.
+    """
+    if event_type not in _EPISODE_OUTBOX_EVENT_TYPES:
+        raise ValueError(
+            f"unknown event_type {event_type!r}; the lifecycle vocabulary is "
+            f"{_EPISODE_OUTBOX_EVENT_TYPES}"
+        )
+    redacted = _redact_episode_outbox_value(dict(payload))
+    if event_type in _EPISODE_OUTBOX_EFFECT_EVENT_TYPES and not str(
+        redacted.get("idempotency_key", "")
+    ).strip():
+        raise ValueError(f"{event_type} requires payload.idempotency_key")
+    return redacted
+
 
 _SESSIONS_DDL = """
 CREATE TABLE IF NOT EXISTS sessions (
@@ -1473,17 +1533,13 @@ class RuntimeStateStore:
         event_type = str(event_type).strip()
         if not delivery_key or not episode_id or not event_type:
             raise ValueError("delivery_key, episode_id, and event_type are required")
-        # The outbox is durable episode-ledger state, so apply the same
-        # validation and recursive secret redaction before SQLite sees the
-        # payload. Sequence zero is validation-only; the ledger allocates the
-        # durable sequence while holding its append lock.
-        payload = EpisodeEvent.new(
+        # The outbox is durable episode-ledger state, so validate and
+        # recursively redact before SQLite sees the payload. The ledger
+        # allocates the durable sequence while holding its append lock.
+        payload = _normalize_episode_outbox_payload(
             event_type=event_type,
-            episode_id=episode_id,
-            attempt_id=attempt_id,
-            sequence=0,
             payload=payload,
-        ).payload
+        )
         created_at = _utc_now_iso()
         db.execute(
             "INSERT INTO episode_event_outbox"
