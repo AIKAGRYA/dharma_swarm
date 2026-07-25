@@ -279,6 +279,109 @@ def test_episode_outbox_is_durable_idempotent_and_acknowledged(tmp_path) -> None
         )
 
 
+@pytest.mark.parametrize("changed_value", [1.0, True])
+def test_episode_outbox_compares_json_distinct_scalars(
+    tmp_path,
+    changed_value,
+) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+    store.enqueue_episode_event_sync(
+        delivery_key="json-distinct",
+        episode_id="ep-json-distinct",
+        attempt_id="at-json-distinct",
+        event_type="observation_recorded",
+        payload={"value": 1},
+    )
+
+    with pytest.raises(ValueError, match="different content"):
+        store.enqueue_episode_event_sync(
+            delivery_key="json-distinct",
+            episode_id="ep-json-distinct",
+            attempt_id="at-json-distinct",
+            event_type="observation_recorded",
+            payload={"value": changed_value},
+        )
+
+
+def test_episode_outbox_ack_is_scoped_to_destination(tmp_path) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+    first = store.enqueue_episode_event_sync(
+        delivery_key="episode:ep-destination:opened",
+        destination_id="destination-a",
+        episode_id="ep-destination",
+        attempt_id="",
+        event_type="episode_opened",
+        payload={"session_id": "sess-destination"},
+    )
+    second = store.enqueue_episode_event_sync(
+        delivery_key="episode:ep-destination:opened",
+        destination_id="destination-b",
+        episode_id="ep-destination",
+        attempt_id="",
+        event_type="episode_opened",
+        payload={"session_id": "sess-destination"},
+    )
+    acked = store.ack_episode_event_sync(
+        first.delivery_key,
+        destination_id=first.destination_id,
+        episode_event_id="ev-destination-a",
+    )
+
+    assert first.outbox_id != second.outbox_id
+    assert first.storage_key != second.storage_key
+    assert acked.acked_at is not None
+    assert store.get_episode_outbox_sync(
+        second.delivery_key,
+        destination_id=second.destination_id,
+    ).acked_at is None
+    with pytest.raises(ValueError, match="destination_id is required"):
+        store.get_episode_outbox_sync(first.delivery_key)
+
+
+def test_episode_outbox_destination_columns_migrate_additively(tmp_path) -> None:
+    db_path = tmp_path / "runtime.db"
+    with sqlite3.connect(db_path) as db:
+        db.execute(
+            "CREATE TABLE episode_event_outbox ("
+            " outbox_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            " delivery_key TEXT NOT NULL UNIQUE,"
+            " episode_id TEXT NOT NULL,"
+            " attempt_id TEXT NOT NULL DEFAULT '',"
+            " event_type TEXT NOT NULL,"
+            " payload_json TEXT NOT NULL DEFAULT '{}',"
+            " session_event_id TEXT NOT NULL DEFAULT '',"
+            " created_at TEXT NOT NULL,"
+            " acked_at TEXT,"
+            " episode_event_id TEXT NOT NULL DEFAULT '')"
+        )
+        db.execute(
+            "INSERT INTO episode_event_outbox"
+            " (delivery_key, episode_id, event_type, created_at)"
+            " VALUES ('legacy-delivery', 'ep-legacy', 'episode_opened',"
+            " '2026-07-25T00:00:00+00:00')"
+        )
+
+    store = RuntimeStateStore(db_path)
+    migrated = store.enqueue_episode_event_sync(
+        delivery_key="episode:ep-migrated:opened",
+        destination_id="destination-migrated",
+        episode_id="ep-migrated",
+        attempt_id="",
+        event_type="episode_opened",
+        payload={"session_id": "sess-migrated"},
+    )
+
+    assert migrated.destination_id == "destination-migrated"
+    legacy = store.get_episode_outbox_sync("legacy-delivery")
+    assert legacy is not None
+    assert legacy.delivery_key == "legacy-delivery"
+    with sqlite3.connect(db_path) as db:
+        columns = {
+            row[1] for row in db.execute("PRAGMA table_info(episode_event_outbox)")
+        }
+    assert {"logical_delivery_key", "destination_id"} <= columns
+
+
 def test_episode_outbox_redacts_nested_secrets_before_sqlite_and_replays(
     tmp_path,
 ) -> None:

@@ -2,6 +2,9 @@
 
 import hashlib
 import json
+import sqlite3
+
+import pytest
 
 from dharma_swarm.episode_ledger import EpisodeEvent, project_episode
 from dharma_swarm.runtime_state import RuntimeStateStore
@@ -114,6 +117,141 @@ def test_session_ledger_episode_is_stable_but_attempts_are_distinct(tmp_path):
         first.attempt_id,
         second.attempt_id,
     ]
+
+
+def test_constructor_drains_every_backlog_page_before_new_attempt(
+    tmp_path,
+    monkeypatch,
+):
+    runtime_db = tmp_path / "runtime.db"
+    session_id = "sess-paged-backlog"
+    session_dir = tmp_path / session_id
+    episode_path = session_dir / "episode_ledger.jsonl"
+    episode_id = f"ep_{hashlib.sha256(session_id.encode()).hexdigest()[:16]}"
+    destination_id = (
+        "dst_"
+        + hashlib.sha256(
+            str(episode_path.resolve(strict=False)).encode()
+        ).hexdigest()[:32]
+    )
+    store = RuntimeStateStore(runtime_db)
+    for index in range(5):
+        store.enqueue_episode_event_sync(
+            delivery_key=f"backlog:{index}",
+            destination_id=destination_id,
+            episode_id=episode_id,
+            attempt_id=f"at-backlog-{index}",
+            event_type="attempt_started",
+            payload={"index": index},
+        )
+
+    original_list = RuntimeStateStore.list_pending_episode_events_sync
+    page_calls = 0
+
+    def two_at_a_time(store_self, **kwargs):
+        nonlocal page_calls
+        page_calls += 1
+        return original_list(store_self, limit=2, **kwargs)
+
+    monkeypatch.setattr(
+        RuntimeStateStore,
+        "list_pending_episode_events_sync",
+        two_at_a_time,
+    )
+    ledger = SessionLedger(
+        base_dir=tmp_path,
+        session_id=session_id,
+        runtime_db_path=runtime_db,
+    )
+
+    events = _read_episode_events(episode_path)
+    assert page_calls >= 5
+    assert any(
+        event.event_type == "attempt_started"
+        and event.attempt_id == ledger.attempt_id
+        for event in events
+    )
+    assert store.list_pending_episode_events_sync(
+        episode_id=episode_id,
+        destination_id=destination_id,
+    ) == []
+
+
+@pytest.mark.parametrize("failed_event_type", ["episode_opened", "attempt_started"])
+def test_constructor_aborts_when_required_lifecycle_staging_fails(
+    tmp_path,
+    monkeypatch,
+    failed_event_type,
+):
+    original_enqueue = RuntimeStateStore.enqueue_episode_event_sync
+
+    def fail_selected(store_self, **kwargs):
+        if kwargs["event_type"] == failed_event_type:
+            raise sqlite3.OperationalError("transient lifecycle staging failure")
+        return original_enqueue(store_self, **kwargs)
+
+    monkeypatch.setattr(
+        RuntimeStateStore,
+        "enqueue_episode_event_sync",
+        fail_selected,
+    )
+    with pytest.raises(
+        RuntimeError,
+        match=f"failed to stage required {failed_event_type} delivery",
+    ):
+        SessionLedger(
+            base_dir=tmp_path,
+            session_id=f"sess-stage-{failed_event_type}",
+            runtime_db_path=tmp_path / f"{failed_event_type}.db",
+        )
+
+
+def test_same_session_in_new_destination_receives_stable_open(tmp_path):
+    runtime_db = tmp_path / "runtime.db"
+    first = SessionLedger(
+        base_dir=tmp_path / "first",
+        session_id="sess-destination-move",
+        runtime_db_path=runtime_db,
+    )
+    second = SessionLedger(
+        base_dir=tmp_path / "second",
+        session_id="sess-destination-move",
+        runtime_db_path=runtime_db,
+    )
+
+    second_events = _read_episode_events(second.episode_path)
+    assert first.episode_destination_id != second.episode_destination_id
+    assert second_events[0].event_type == "episode_opened"
+    assert second_events[1].event_type == "attempt_started"
+    assert (
+        RuntimeStateStore(runtime_db)
+        .get_episode_outbox_sync(
+            f"episode:{second.episode_id}:opened",
+            destination_id=second.episode_destination_id,
+        )
+        .acked_at
+        is not None
+    )
+
+
+def test_deleted_destination_requeues_stable_open_before_new_attempt(tmp_path):
+    runtime_db = tmp_path / "runtime.db"
+    kwargs = {
+        "base_dir": tmp_path,
+        "session_id": "sess-destination-recreated",
+        "runtime_db_path": runtime_db,
+    }
+    first = SessionLedger(**kwargs)
+    first.episode_path.unlink()
+    second = SessionLedger(**kwargs)
+
+    recreated = _read_episode_events(second.episode_path)
+    assert second.episode_destination_id == first.episode_destination_id
+    assert [event.event_type for event in recreated] == [
+        "episode_opened",
+        "attempt_started",
+    ]
+    assert recreated[1].attempt_id == second.attempt_id
 
 
 def test_session_ledger_sequence_uses_highest_valid_event_not_line_count(tmp_path):

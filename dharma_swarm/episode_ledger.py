@@ -272,6 +272,14 @@ def _thread_lock_for(path: Path) -> threading.RLock:
         return _THREAD_LOCKS.setdefault(key, threading.RLock())
 
 
+def _fsync_parent_directory(path: Path) -> None:
+    directory_fd = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
+
+
 def _logical_key_from_event(event: EpisodeEvent) -> str:
     explicit = str(event.payload.get(LOGICAL_DELIVERY_KEY_FIELD, "")).strip()
     if explicit:
@@ -287,10 +295,10 @@ def _logical_key_from_event(event: EpisodeEvent) -> str:
     return ""
 
 
-def _logical_content(event: EpisodeEvent) -> tuple[str, str, str, dict[str, Any]]:
+def _logical_content(event: EpisodeEvent) -> tuple[str, str, str, str]:
     payload = dict(event.payload)
     payload.pop(LOGICAL_DELIVERY_KEY_FIELD, None)
-    return event.event_type, event.episode_id, event.attempt_id, payload
+    return event.event_type, event.episode_id, event.attempt_id, _canonical(payload)
 
 
 class EpisodeLedgerWriter:
@@ -319,9 +327,14 @@ class EpisodeLedgerWriter:
     def _locked_stream(self) -> Iterator[BinaryIO]:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._thread_lock:
+            created = not self.path.exists()
             with open(self.path, "a+b") as stream:
                 fcntl.flock(stream.fileno(), fcntl.LOCK_EX)
                 try:
+                    if created:
+                        stream.flush()
+                        os.fsync(stream.fileno())
+                        _fsync_parent_directory(self.path.parent)
                     yield stream
                 finally:
                     fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
@@ -445,6 +458,19 @@ class EpisodeLedgerWriter:
         with self._locked_stream() as stream:
             self._sync_from_disk_locked(stream)
             return self._append_event_locked(stream, event)
+
+    def has_logical_delivery(self, delivery_key: str) -> bool:
+        """Return whether this destination contains one unconflicted delivery."""
+        delivery_key = str(delivery_key).strip()
+        if not delivery_key:
+            raise LedgerValidationError("delivery_key is required")
+        with self._locked_stream() as stream:
+            self._sync_from_disk_locked(stream)
+            if delivery_key in self._logical_conflicts:
+                raise LedgerValidationError(
+                    f"logical delivery_key {delivery_key!r} has conflicting records"
+                )
+            return delivery_key in self._logical_events
 
     def append_delivery(
         self,

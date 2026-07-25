@@ -578,6 +578,47 @@ def test_logical_delivery_key_reuse_with_different_content_fails_closed(tmp_path
     assert EpisodeEvent.from_dict(json.loads(path.read_text())).event_id == first.event_id
 
 
+@pytest.mark.parametrize("changed_value", [1.0, True])
+def test_logical_delivery_compares_json_distinct_scalars(
+    tmp_path: Path,
+    changed_value: object,
+):
+    path = tmp_path / "json-distinct.jsonl"
+    writer = EpisodeLedgerWriter(path)
+    writer.append_delivery(
+        delivery_key="json-distinct",
+        event_type="observation_recorded",
+        episode_id="ep-json-distinct",
+        attempt_id="at-json-distinct",
+        payload={"value": 1},
+    )
+
+    with pytest.raises(LedgerValidationError, match="different content"):
+        EpisodeLedgerWriter(path).append_delivery(
+            delivery_key="json-distinct",
+            event_type="observation_recorded",
+            episode_id="ep-json-distinct",
+            attempt_id="at-json-distinct",
+            payload={"value": changed_value},
+        )
+
+
+def test_first_file_creation_fsyncs_parent_directory(tmp_path: Path, monkeypatch):
+    path = tmp_path / "durable-directory-entry.jsonl"
+    synced_directories: list[Path] = []
+
+    monkeypatch.setattr(
+        "dharma_swarm.episode_ledger._fsync_parent_directory",
+        lambda directory: synced_directories.append(directory),
+    )
+    writer = EpisodeLedgerWriter(path)
+    assert writer.append(_event("observation_recorded", 1, note="first")) is True
+    assert synced_directories == [tmp_path]
+
+    assert writer.append(_event("review_recorded", 2, reviewer="codex")) is True
+    assert synced_directories == [tmp_path]
+
+
 def test_rehydrated_conflicting_logical_records_poison_replay(tmp_path: Path):
     path = tmp_path / "episodes.jsonl"
     first = EpisodeEvent.new(

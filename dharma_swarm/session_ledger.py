@@ -64,6 +64,10 @@ class SessionLedger:
         self.episode_id = f"ep_{digest[:16]}"
         self.attempt_id = new_attempt_id()
         self.episode_path = self.session_dir / "episode_ledger.jsonl"
+        destination_digest = hashlib.sha256(
+            str(self.episode_path.resolve(strict=False)).encode("utf-8")
+        ).hexdigest()
+        self.episode_destination_id = f"dst_{destination_digest[:32]}"
         self.episode_ledger_failures = 0
         self._episode_writer: EpisodeLedgerWriter | None = None
 
@@ -76,20 +80,35 @@ class SessionLedger:
         # Replay older unacked deliveries before recording this runtime's
         # attempt. File append precedes DB ack; logical-key dedupe makes a
         # crash in that gap exactly-once on the next drain.
-        self._drain_episode_outbox()
-        self._enqueue_episode_event(
-            delivery_key=f"episode:{self.episode_id}:opened",
+        self._drain_episode_outbox(require_complete=self._episode_writer is not None)
+        opened_delivery_key = f"episode:{self.episode_id}:opened"
+        self._require_episode_event(
+            delivery_key=opened_delivery_key,
             event_type="episode_opened",
             attempt_id="",
             payload={"session_id": self.session_id},
         )
-        self._enqueue_episode_event(
+        if (
+            self._episode_writer is not None
+            and not self._episode_writer.has_logical_delivery(opened_delivery_key)
+        ):
+            try:
+                self._runtime_state.requeue_episode_event_sync(
+                    opened_delivery_key,
+                    destination_id=self.episode_destination_id,
+                )
+            except Exception as exc:
+                self.episode_ledger_failures += 1
+                raise RuntimeError(
+                    "failed to requeue the required episode_opened delivery"
+                ) from exc
+        self._require_episode_event(
             delivery_key=f"attempt:{self.attempt_id}:started",
             event_type="attempt_started",
             attempt_id=self.attempt_id,
             payload={"session_id": self.session_id},
         )
-        self._drain_episode_outbox()
+        self._drain_episode_outbox(require_complete=self._episode_writer is not None)
 
     def task_event(self, event: str, **payload: Any) -> None:
         self._append(self.task_path, "task", event, payload)
@@ -137,6 +156,7 @@ class SessionLedger:
                 attempt_id=self.attempt_id,
                 event_type="observation_recorded",
                 payload=episode_payload,
+                destination_id=self.episode_destination_id,
             )
         except Exception:
             return
@@ -153,6 +173,7 @@ class SessionLedger:
         try:
             self._runtime_state.enqueue_episode_event_sync(
                 delivery_key=delivery_key,
+                destination_id=self.episode_destination_id,
                 episode_id=self.episode_id,
                 attempt_id=attempt_id,
                 event_type=event_type,
@@ -163,41 +184,69 @@ class SessionLedger:
             self.episode_ledger_failures += 1
             return False
 
-    def _drain_episode_outbox(self) -> int:
+    def _require_episode_event(
+        self,
+        *,
+        delivery_key: str,
+        event_type: str,
+        attempt_id: str,
+        payload: dict[str, Any],
+    ) -> None:
+        if not self._enqueue_episode_event(
+            delivery_key=delivery_key,
+            event_type=event_type,
+            attempt_id=attempt_id,
+            payload=payload,
+        ):
+            raise RuntimeError(f"failed to stage required {event_type} delivery")
+
+    def _drain_episode_outbox(self, *, require_complete: bool = False) -> int:
         """Append pending deliveries in durable enqueue order, then ack.
 
         Stop at the first failure so later evidence never overtakes an older
-        pending lifecycle event.
+        pending lifecycle event. Fetch pages until this destination is empty.
         """
 
         if self._episode_writer is None:
             return 0
-        try:
-            pending = self._runtime_state.list_pending_episode_events_sync(
-                episode_id=self.episode_id,
-            )
-        except Exception:
-            self.episode_ledger_failures += 1
-            return 0
         delivered = 0
-        for item in pending:
+        while True:
             try:
-                persisted = self._episode_writer.append_delivery(
-                    delivery_key=item.delivery_key,
-                    event_type=item.event_type,
-                    episode_id=item.episode_id,
-                    attempt_id=item.attempt_id,
-                    payload=item.payload,
-                    fixed_sequence=0
-                    if item.event_type == "episode_opened"
-                    else None,
+                pending = self._runtime_state.list_pending_episode_events_sync(
+                    episode_id=self.episode_id,
+                    destination_id=self.episode_destination_id,
                 )
-                self._runtime_state.ack_episode_event_sync(
-                    item.delivery_key,
-                    episode_event_id=persisted.event_id,
-                )
-            except Exception:
+            except Exception as exc:
                 self.episode_ledger_failures += 1
-                break
-            delivered += 1
-        return delivered
+                if require_complete:
+                    raise RuntimeError(
+                        "failed to inspect the pending episode delivery backlog"
+                    ) from exc
+                return delivered
+            if not pending:
+                return delivered
+            for item in pending:
+                try:
+                    persisted = self._episode_writer.append_delivery(
+                        delivery_key=item.delivery_key,
+                        event_type=item.event_type,
+                        episode_id=item.episode_id,
+                        attempt_id=item.attempt_id,
+                        payload=item.payload,
+                        fixed_sequence=0
+                        if item.event_type == "episode_opened"
+                        else None,
+                    )
+                    self._runtime_state.ack_episode_event_sync(
+                        item.delivery_key,
+                        episode_event_id=persisted.event_id,
+                        destination_id=self.episode_destination_id,
+                    )
+                except Exception as exc:
+                    self.episode_ledger_failures += 1
+                    if require_complete:
+                        raise RuntimeError(
+                            "failed to drain the pending episode delivery backlog"
+                        ) from exc
+                    return delivered
+                delivered += 1

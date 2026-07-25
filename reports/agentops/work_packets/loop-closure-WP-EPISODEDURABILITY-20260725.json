@@ -3,7 +3,7 @@
   "base_ref": "bb3eb9f4fb9f3ccd413eadd55cfada1b92354287",
   "branch": "agent/session-ledger-durable-sequence-20260725",
   "worktree": ".",
-  "intent": "Correct merged PR #1112 by moving Episode Ledger sequence allocation into an interprocess-locked writer, rehydrating event IDs, logical delivery keys, and per-episode high-water marks in one pass, and extending the canonical RuntimeStateStore with a transactional durable episode-event outbox so session-event persistence and observation enqueue are atomic and append-before-ack replay is exactly once across failures and restarts while preserving torn-tail recovery. Consolidate the new synchronous outbox operations through the pre-existing ledger-anchored connection site and preserve the committed DharmaGraph seam ledger byte-for-byte.",
+  "intent": "Correct merged PR #1112 by moving Episode Ledger sequence allocation into an interprocess-locked writer, rehydrating event IDs, logical delivery keys, and per-episode high-water marks in one pass, and extending the canonical RuntimeStateStore with a transactional durable episode-event outbox so session-event persistence and observation enqueue are atomic and append-before-ack replay is exactly once across failures and restarts while preserving torn-tail recovery. Consolidate the new synchronous outbox operations through the pre-existing ledger-anchored connection site and preserve the committed DharmaGraph seam ledger byte-for-byte. Close the exact-head Codex review by exhausting every pending page before a new attempt, failing construction closed when required lifecycle staging fails, scoping acknowledgements to the canonical ledger destination, requeuing a missing stable open, fsyncing a newly created file's parent directory, and comparing idempotent content by canonical JSON.",
   "allowed_files": [
     "dharma_swarm/episode_ledger.py",
     "dharma_swarm/runtime_state.py",
@@ -84,7 +84,12 @@
       "PR #1112 SessionLedger instances cache independent next-sequence values for one stable episode, so concurrent writers can persist distinct events at the same sequence.",
       "PR #1112 commits a runtime-state session event before its Episode Ledger observation append without a durable retry record, so append failure or process exit can permanently lose the observation.",
       "PR #1112 rehydrates EpisodeLedgerWriter and then separately rescans the complete JSONL history for the next sequence, doubling unbounded startup work.",
-      "The durable outbox initially raised the DharmaGraph SQLite inventory from 98 to 103 sites; route every new operation through the pre-existing sqlite3.connect effect at runtime_state.py:1404:13 and place additive blocks after ledger-anchored code so the committed effect inventory remains byte-identical."
+      "The durable outbox initially raised the DharmaGraph SQLite inventory from 98 to 103 sites; route every new operation through the pre-existing sqlite3.connect effect at runtime_state.py:1404:13 and place additive blocks after ledger-anchored code so the committed effect inventory remains byte-identical.",
+      "Exact-head Codex review found that two default 1000-row drains can strand the current attempt behind a backlog; exhaust destination-scoped pages before staging the attempt.",
+      "Exact-head Codex review found that a global delivery acknowledgement can suppress the stable open after a base-directory move or ledger-file deletion; bind physical outbox keys and acknowledgements to a hashed canonical destination and requeue a missing open.",
+      "Exact-head Codex review found that file fsync alone does not make a newly created directory entry durable; fsync the parent directory before the append can be acknowledged.",
+      "Exact-head Codex review found that Python equality conflates JSON-distinct scalars such as 1, 1.0, and true; compare canonical JSON at both file and SQLite idempotency fences.",
+      "Exact-head Codex review found that ignored lifecycle-enqueue failures leave a usable attempt with no staged attempt_started event; abort construction when either required lifecycle row cannot be staged."
     ],
     "closest_existing_implementation": [
       "dharma_swarm/episode_ledger.py:EpisodeLedgerWriter",
@@ -99,7 +104,7 @@
       "Exact-head hosted CI and independent review remain required before integration.",
       "Human merge authority remains required; this branch must not self-merge."
     ],
-    "rollback": "Revert the additive outbox schema and methods, shared sync-transaction layout, locked writer allocation, SessionLedger drain path, focused tests, and this packet together. Existing session_events and Episode Ledger JSONL rows remain readable; no destructive migration or runtime-data rewrite is part of the packet.",
-    "packet_digest": "d309bd3a94f0d6f46d9e9870dcb2fd63ce5a80a15ea5bf3acc50a8c60189ab9c"
+    "rollback": "Revert the additive destination-scoped outbox schema and migrations, shared sync-transaction layout, locked writer allocation and parent-directory sync, exhaustive SessionLedger drain and lifecycle staging path, focused tests, and this packet together. Existing session_events and Episode Ledger JSONL rows remain readable; no destructive migration or runtime-data rewrite is part of the packet.",
+    "packet_digest": "38de30df5eb4bc235219373c20831e6b23ede82fe77644705a8e5ffb18a941e9"
   }
 }
