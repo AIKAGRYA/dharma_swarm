@@ -16,7 +16,8 @@ Design:
 - Idempotent: re-running sync is safe (skips already-materialized records).
 - Read-only on ontology.db (never mutates the typed model).
 - Best-effort: sync failures are logged, never raised.
-- Incremental: tracks a high-water mark to avoid re-scanning the full set.
+- Atomic disposition: INSERT OR IGNORE decides created versus skipped without
+  a pre-insert existence race between concurrent sync workers.
 """
 
 from __future__ import annotations
@@ -67,8 +68,9 @@ def _sync_type_to_artifacts(
     """Shared idempotent projection pass: one ontology type → artifact_records.
 
     Returns ``(scanned, created, skipped, errors)``. Read-only on ontology.db;
-    best-effort (failures logged, never raised); INSERT OR IGNORE + existence
-    probe keep re-runs no-ops.
+    best-effort (failures logged, never raised). The atomic INSERT OR IGNORE
+    result, rather than a racy pre-insert probe, determines whether this worker
+    created the artifact or encountered an already-materialized row.
     """
     from dharma_swarm.ontology_runtime import get_shared_registry
     from dharma_swarm.runtime_state import ensure_runtime_state_schema_sync
@@ -107,19 +109,8 @@ def _sync_type_to_artifacts(
         scanned += 1
         artifact_id = f"{id_prefix}{obj.id}"
         try:
-            row = db.execute(
-                "SELECT artifact_id FROM artifact_records WHERE artifact_id = ?",
-                (artifact_id,),
-            ).fetchone()
-            if row is not None:
-                skipped += 1
-                continue
-        except Exception:
-            pass
-
-        try:
             now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-            db.execute(
+            cursor = db.execute(
                 "INSERT OR IGNORE INTO artifact_records"
                 " (artifact_id, session_id, task_id, run_id, artifact_kind,"
                 "  manifest_path, payload_path, checksum, parent_artifact_id,"
@@ -138,7 +129,10 @@ def _sync_type_to_artifacts(
                 ),
             )
             db.commit()
-            created += 1
+            if cursor.rowcount > 0:
+                created += 1
+            else:
+                skipped += 1
         except Exception as exc:
             logger.debug("store_sync: failed to materialize %s: %s", obj.id, exc)
             errors += 1
