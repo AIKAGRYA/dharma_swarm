@@ -297,6 +297,15 @@ def run_memory_metabolism(
     receipt_path = out_dir / f"MEMORY_COMMON_METABOLISM_{stamp}.json"
     receipt["receipt_path"] = str(receipt_path)
     receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    # Status reads gate scores only from *_FINAL.json receipts, so each
+    # metabolism run refreshes them — otherwise the scores stay null forever.
+    for name, payload in (
+        (f"WIKI_VECTOR_LIVE_GATE_{stamp}_FINAL.json", receipt["wiki_gate"]),
+        (f"MEMORY_RETRIEVAL_SYSTEM_GATE_{stamp}_FINAL.json", receipt["system_gate"]),
+    ):
+        (out_dir / name).write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
     return receipt
 
 
@@ -425,26 +434,21 @@ def render_memory_common_command(
 
 
 def _latest_gate_score(pattern: str, *, state_dir: Path | None = None) -> float | None:
-    resolved_state_dir = Path(state_dir or DEFAULT_STATE_DIR).expanduser()
-    # New receipt home first; legacy in-repo reports dir second so the 26
-    # historical metabolism receipts stay readable until new runs land.
-    report_dirs = (
-        resolved_state_dir / "reports" / "memory_kernel",
-        Path(__file__).resolve().parents[1] / "reports" / "memory_kernel",
+    report_dir = (
+        Path(state_dir or DEFAULT_STATE_DIR).expanduser() / "reports" / "memory_kernel"
     )
-    for report_dir in report_dirs:
+    try:
+        paths = sorted(
+            report_dir.glob(pattern), key=lambda path: path.stat().st_mtime, reverse=True
+        )
+    except OSError:
+        return None
+    for path in paths:
         try:
-            paths = sorted(
-                report_dir.glob(pattern), key=lambda path: path.stat().st_mtime, reverse=True
-            )
-        except OSError:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
             continue
-        for path in paths:
-            try:
-                payload = json.loads(path.read_text(encoding="utf-8"))
-            except Exception:
-                continue
-            score = payload.get("score")
-            if isinstance(score, (int, float)):
-                return float(score)
+        score = payload.get("score")
+        if isinstance(score, (int, float)):
+            return float(score)
     return None

@@ -1,17 +1,31 @@
 from __future__ import annotations
 
+import json
+import os
 from pathlib import Path
 
 from dharma_swarm.memory_common import (
+    _latest_gate_score,
     create_memory_common_cron_job,
     memory_common_cron_run_fn,
+    memory_common_summary,
     render_agent_memory_pack,
     render_memory_common_command,
     render_memory_common_status,
     render_memory_query,
     render_memory_schedule,
+    run_memory_metabolism,
 )
 from dharma_swarm.vector_store import VectorStore
+
+
+class _StubGateReceipt:
+    def __init__(self, payload: dict, *, passed: bool = True) -> None:
+        self._payload = payload
+        self.passed = passed
+
+    def to_json(self) -> dict:
+        return self._payload
 
 
 def _seed_state(tmp_path: Path) -> Path:
@@ -159,6 +173,80 @@ def test_memory_common_cron_run_fn_uses_metabolism_receipt(monkeypatch, tmp_path
     assert error is None
     assert "# Memory Metabolism" in output
     assert "Passed: `True`" in output
+
+
+def test_run_memory_metabolism_receipts_land_under_state_dir(monkeypatch, tmp_path: Path) -> None:
+    import scripts.memory_retrieval_system_gate as system_gate_mod
+    import scripts.wiki_vector_live_gate as wiki_gate_mod
+    from dharma_swarm import wiki_vector_ingest
+
+    state_dir = _seed_state(tmp_path)
+    monkeypatch.setattr(
+        wiki_vector_ingest,
+        "ingest_wiki_concepts",
+        lambda **_: _StubGateReceipt({"discovered_files": 1}),
+        raising=True,
+    )
+    monkeypatch.setattr(
+        wiki_gate_mod,
+        "run_gate",
+        lambda **_: _StubGateReceipt({"score": 96.0, "passed": True}),
+        raising=True,
+    )
+    monkeypatch.setattr(
+        system_gate_mod,
+        "run_system_gate",
+        lambda **_: {"score": 88.0, "max_score": 100, "passed": True},
+        raising=True,
+    )
+
+    receipt = run_memory_metabolism(state_dir=state_dir, top_k=2)
+
+    sink = state_dir / "reports" / "memory_kernel"
+    receipt_path = Path(receipt["receipt_path"])
+    assert receipt_path.parent == sink
+    assert receipt_path.exists()
+    assert receipt["passed"] is True
+    assert list(sink.glob("WIKI_VECTOR_LIVE_GATE_*FINAL.json"))
+    assert list(sink.glob("MEMORY_RETRIEVAL_SYSTEM_GATE_*FINAL.json"))
+
+    summary = memory_common_summary(state_dir=state_dir)
+    assert summary.wiki_gate_score == 96.0
+    assert summary.system_gate_score == 88.0
+
+
+def test_memory_common_summary_gate_scores_null_without_receipts(tmp_path: Path) -> None:
+    summary = memory_common_summary(state_dir=tmp_path / ".dharma")
+
+    assert summary.wiki_gate_score is None
+    assert summary.system_gate_score is None
+
+
+def test_latest_gate_score_skips_malformed_and_uses_newest_valid(tmp_path: Path) -> None:
+    state_dir = tmp_path / ".dharma"
+    sink = state_dir / "reports" / "memory_kernel"
+    sink.mkdir(parents=True)
+    valid = sink / "WIKI_VECTOR_LIVE_GATE_20260101T000000Z_FINAL.json"
+    valid.write_text(json.dumps({"score": 50.0}), encoding="utf-8")
+    malformed = sink / "WIKI_VECTOR_LIVE_GATE_20260201T000000Z_FINAL.json"
+    malformed.write_text("not json", encoding="utf-8")
+    os.utime(valid, (1, 1))
+
+    score = _latest_gate_score("WIKI_VECTOR_LIVE_GATE_*FINAL.json", state_dir=state_dir)
+
+    assert score == 50.0
+
+
+def test_memory_common_command_rejects_unknown_mode(tmp_path: Path) -> None:
+    rendered = render_memory_common_command("bogus", state_dir=tmp_path / ".dharma")
+
+    assert "Unknown memory mode: `bogus`" in rendered
+
+
+def test_memory_common_command_reports_parse_error(tmp_path: Path) -> None:
+    rendered = render_memory_common_command("query 'unterminated", state_dir=tmp_path / ".dharma")
+
+    assert "Memory command parse error" in rendered
 
 
 def test_memory_common_cron_run_fn_fails_when_gate_receipt_fails(monkeypatch) -> None:
