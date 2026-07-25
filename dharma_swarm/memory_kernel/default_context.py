@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import os
+import time
 from dataclasses import dataclass
 from typing import Any, Iterable
 
@@ -17,6 +19,7 @@ from dharma_swarm.memory_kernel import (
     MemoryQuery,
     MemoryScope,
     TruthState,
+    preview_memory_pack,
 )
 from dharma_swarm.memory_kernel.topology_policy import (
     SUPERVISOR_SCOPED,
@@ -30,6 +33,16 @@ logger = logging.getLogger(__name__)
 # Pre-typed isolation vocabulary, kept ONLY for the one-release
 # DHARMA_MEMORY_KERNEL_ISOLATION_LEGACY=1 escape hatch. Remove with it.
 _LEGACY_TOPOLOGY_MODES = {"swarm", "supervisor", "subagents_as_tools"}
+
+# Ops kill switch for the ranked retrieval shadow. Default ON (the shadow
+# phase exists to collect receipts); set to 0 only if shadow latency pushes
+# bundle compiles toward the orchestrator timeout.
+RANKED_SHADOW_ENV = "DHARMA_MEMORY_KERNEL_RANKED_SHADOW"
+
+
+def _ranked_shadow_enabled() -> bool:
+    raw = os.environ.get(RANKED_SHADOW_ENV, "1")
+    return raw.strip().lower() not in {"0", "false", "no", "off"}
 
 
 @dataclass(frozen=True)
@@ -162,8 +175,32 @@ def build_memory_kernel_default_context(
         None
     )
     isolation_mode = "unrestricted" if isolation_legacy_enabled() else "scoped"
+    atom_budget = max(4, min(24, int(token_budget) // 100))
+    budget = MemoryContextBudget(
+        max_candidate_atoms=atom_budget,
+        max_admitted_atoms=max(1, min(8, atom_budget)),
+        max_total_chars=max(600, min(2400, int(token_budget) * 2)),
+        max_atom_chars=420,
+        include_content=True,
+        require_context_admissible=False,
+        allow_projections=False,
+        allow_high_risk=False,
+        reject_stale=True,
+        require_source_digest=True,
+        require_source_row_key=True,
+        block_tool_exposure=True,
+        isolation_mode=isolation_mode,
+        allowed_scopes=resolved_isolation.allowed_scopes,
+        allowed_agent_ids=resolved_isolation.allowed_agent_ids,
+        allowed_memory_lanes=resolved_isolation.allowed_memory_lanes,
+        allowed_truth_states=(
+            TruthState.OBSERVED,
+            TruthState.CLAIMED,
+            TruthState.CURATED,
+            TruthState.CANONICAL,
+        ),
+    )
     try:
-        atom_budget = max(4, min(24, int(token_budget) // 100))
         pack = memory_kernel.preview_memory_pack(
             query=MemoryQuery(
                 text_query=recall_query or None,
@@ -178,30 +215,7 @@ def build_memory_kernel_default_context(
                 require_source_digest=True,
                 require_source_row_key=True,
             ),
-            budget=MemoryContextBudget(
-                max_candidate_atoms=atom_budget,
-                max_admitted_atoms=max(1, min(8, atom_budget)),
-                max_total_chars=max(600, min(2400, int(token_budget) * 2)),
-                max_atom_chars=420,
-                include_content=True,
-                require_context_admissible=False,
-                allow_projections=False,
-                allow_high_risk=False,
-                reject_stale=True,
-                require_source_digest=True,
-                require_source_row_key=True,
-                block_tool_exposure=True,
-                isolation_mode=isolation_mode,
-                allowed_scopes=resolved_isolation.allowed_scopes,
-                allowed_agent_ids=resolved_isolation.allowed_agent_ids,
-                allowed_memory_lanes=resolved_isolation.allowed_memory_lanes,
-                allowed_truth_states=(
-                    TruthState.OBSERVED,
-                    TruthState.CLAIMED,
-                    TruthState.CURATED,
-                    TruthState.CANONICAL,
-                ),
-            ),
+            budget=budget,
         )
     except Exception as exc:
         logger.debug("Memory Kernel default context failed", exc_info=True)
@@ -216,6 +230,15 @@ def build_memory_kernel_default_context(
     metadata["query_present"] = bool(recall_query)
     metadata["text_query_applied"] = bool(recall_query)
     metadata.update(resolved_isolation.metadata())
+    metadata.update(
+        _ranked_retrieval_shadow(
+            memory_kernel,
+            recall_query=recall_query,
+            legacy_pack=pack,
+            budget=budget,
+            top_k=atom_budget,
+        )
+    )
     return (
         ContextSection(
             name="Memory Kernel",
@@ -226,6 +249,114 @@ def build_memory_kernel_default_context(
         ),
         metadata,
     )
+
+
+def _ranked_retrieval_shadow(
+    memory_kernel: Any,
+    *,
+    recall_query: str,
+    legacy_pack: Any,
+    budget: MemoryContextBudget,
+    top_k: int,
+) -> dict[str, Any]:
+    """Run the ranked retrieval door in shadow and record divergence metrics.
+
+    MEMORY_FIRST_TOKEN_SPEC sequencing: shadow -> receipts -> flip. The legacy
+    scan keeps serving; this only stamps metadata. Any failure is captured as
+    ``shadow_error`` — the shadow must never break bundle compilation.
+    """
+
+    shadow: dict[str, Any] = {
+        "memory_kernel_candidate_source": "legacy_scan+ranked_shadow",
+        "shadow_overlap_at_k": None,
+        "shadow_admitted_delta": None,
+    }
+    detail: dict[str, Any] = {"status": "unavailable", "top_k": top_k}
+    shadow["ranked_shadow"] = detail
+
+    if not _ranked_shadow_enabled():
+        detail["status"] = "disabled"
+        detail["reason"] = f"{RANKED_SHADOW_ENV}=0"
+        return shadow
+    query_door = getattr(memory_kernel, "query", None)
+    atoms_door = getattr(memory_kernel, "atoms_for_candidates", None)
+    if not callable(query_door) or not callable(atoms_door):
+        detail["reason"] = "ranked_door_unavailable"
+        return shadow
+    if not (recall_query or "").strip():
+        detail["status"] = "skipped"
+        detail["reason"] = "empty_recall_query"
+        return shadow
+
+    shadow_t0 = time.perf_counter()
+    try:
+        result = query_door(recall_query, top_k=top_k)
+        candidates = tuple(getattr(result, "candidates", ()) or ())
+        shadow_atoms = tuple(atoms_door(candidates))
+        shadow_pack = preview_memory_pack(shadow_atoms, budget=budget)
+        legacy_keys = _legacy_pack_identity_keys(legacy_pack)
+        overlap_count = sum(
+            1
+            for candidate in candidates
+            if _candidate_identity_keys(candidate) & legacy_keys
+        )
+        detail["status"] = "recorded"
+        detail["candidate_count"] = len(candidates)
+        detail["shadow_admitted_count"] = shadow_pack.admitted_count
+        detail["legacy_candidate_count"] = int(
+            getattr(legacy_pack, "candidate_count", 0) or 0
+        )
+        detail["legacy_admitted_count"] = int(
+            getattr(legacy_pack, "admitted_count", 0) or 0
+        )
+        detail["overlap_count"] = overlap_count
+        detail["shadow_omission_reason_counts"] = _count_reasons(
+            reason
+            for item in shadow_pack.items
+            if not item.admitted
+            for reason in item.omission_reasons
+        )
+        shadow["shadow_overlap_at_k"] = (
+            round(overlap_count / len(candidates), 4) if candidates else 0.0
+        )
+        shadow["shadow_admitted_delta"] = shadow_pack.admitted_count - int(
+            getattr(legacy_pack, "admitted_count", 0) or 0
+        )
+    except Exception as exc:
+        logger.debug("Ranked retrieval shadow failed", exc_info=True)
+        detail["status"] = "error"
+        shadow_error = f"{type(exc).__name__}: {str(exc)[:200]}"
+        detail["shadow_error"] = shadow_error
+        shadow["shadow_error"] = shadow_error
+    detail["shadow_elapsed_ms"] = round((time.perf_counter() - shadow_t0) * 1000.0, 3)
+    return shadow
+
+
+def _legacy_pack_identity_keys(pack: Any) -> set[str]:
+    keys: set[str] = set()
+    for item in getattr(pack, "items", ()) or ():
+        values = (
+            getattr(item, "atom_id", ""),
+            getattr(item, "content_ref", ""),
+            *tuple(getattr(item, "source_refs", ()) or ()),
+        )
+        for value in values:
+            key = _clean_text(value)
+            if key:
+                keys.add(key)
+    return keys
+
+
+def _candidate_identity_keys(candidate: Any) -> set[str]:
+    values = [
+        getattr(candidate, "doc_id", ""),
+        getattr(candidate, "source", ""),
+    ]
+    candidate_metadata = getattr(candidate, "metadata", None) or {}
+    if isinstance(candidate_metadata, dict):
+        for meta_key in ("atom_id", "source_path", "path"):
+            values.append(candidate_metadata.get(meta_key, ""))
+    return {key for key in (_clean_text(value) for value in values) if key}
 
 
 def memory_kernel_pack_metadata(pack: MemoryContextPack) -> dict[str, Any]:

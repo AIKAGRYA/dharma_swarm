@@ -32,6 +32,10 @@ from dharma_swarm.memory_kernel import (
     preview_memory_pack,
 )
 from dharma_swarm.memory_kernel.adapters import ReadOnlyAdapterConfig
+from dharma_swarm.memory_kernel.default_context import (
+    build_memory_kernel_default_context,
+    memory_kernel_isolation_policy_from_metadata,
+)
 
 
 def _compiler(memory_kernel: object) -> ContextCompiler:
@@ -701,3 +705,168 @@ async def test_context_compiler_falls_back_when_memory_kernel_fails() -> None:
     metadata = bundle.metadata["memory_kernel_default"]
     assert metadata["status"] == "failed"
     assert metadata["error_type"] == "RuntimeError"
+
+
+class _ShadowRankedMemoryKernel(_FakeMemoryKernel):
+    def __init__(
+        self,
+        pack: SimpleNamespace,
+        *,
+        candidates: tuple[SimpleNamespace, ...] = (),
+        shadow_atoms: tuple[MemoryAtom, ...] = (),
+        query_error: Exception | None = None,
+    ) -> None:
+        super().__init__(pack)
+        self.candidates = candidates
+        self.shadow_atoms = shadow_atoms
+        self.query_error = query_error
+        self.query_calls: list[tuple[str, int]] = []
+
+    def query(self, text: str, *, top_k: int = 10, **_: object) -> SimpleNamespace:
+        self.query_calls.append((text, top_k))
+        if self.query_error is not None:
+            raise self.query_error
+        return SimpleNamespace(candidates=self.candidates)
+
+    def atoms_for_candidates(self, candidates: object) -> tuple[MemoryAtom, ...]:
+        return self.shadow_atoms
+
+
+@pytest.mark.asyncio
+async def test_memory_kernel_shadow_unavailable_when_ranked_door_missing() -> None:
+    compiler = _compiler(_FakeMemoryKernel(_pack()))
+
+    bundle = await compiler.compile_bundle(
+        session_id="sess_shadow_unavailable",
+        task_id="task_shadow_unavailable",
+        task_description="Use governed memory.",
+        query="governed memory",
+        token_budget=1200,
+    )
+
+    metadata = bundle.metadata["memory_kernel_default"]
+    assert metadata["status"] == "used"
+    assert metadata["memory_kernel_candidate_source"] == "legacy_scan+ranked_shadow"
+    assert metadata["shadow_overlap_at_k"] is None
+    assert metadata["shadow_admitted_delta"] is None
+    assert metadata["ranked_shadow"]["status"] == "unavailable"
+    assert metadata["ranked_shadow"]["reason"] == "ranked_door_unavailable"
+    assert "shadow_error" not in metadata
+
+
+def test_memory_kernel_shadow_records_divergence_metrics() -> None:
+    overlapping = SimpleNamespace(
+        doc_id="doc-overlap",
+        source="memory_kernel:home.witness",
+        metadata={},
+    )
+    novel = SimpleNamespace(
+        doc_id="doc-novel",
+        source="receipt:unrelated-lane",
+        metadata={},
+    )
+    kernel = _ShadowRankedMemoryKernel(
+        _pack(),
+        candidates=(overlapping, novel),
+        shadow_atoms=(
+            _memory_atom(
+                "shadow ranked project memory alpha", scope=MemoryScope.PROJECT
+            ),
+            _memory_atom(
+                "shadow ranked project memory beta", scope=MemoryScope.PROJECT
+            ),
+        ),
+    )
+    policy = memory_kernel_isolation_policy_from_metadata(
+        {"topology": "supervisor", "agent_id": "agent-alpha"}
+    )
+
+    section, metadata = build_memory_kernel_default_context(
+        kernel,
+        recall_query="governed memory",
+        token_budget=1200,
+        isolation_policy=policy,
+    )
+
+    assert section is not None
+    # Legacy still serves: the rendered section comes from the legacy pack
+    # only; shadow atoms never reach prompt content in the shadow phase.
+    assert "safe witness note" in section.content
+    assert "shadow ranked project memory alpha" not in section.content
+    assert metadata["memory_kernel_candidate_source"] == "legacy_scan+ranked_shadow"
+    assert metadata["shadow_overlap_at_k"] == 0.5
+    assert metadata["shadow_admitted_delta"] == 1
+    assert "shadow_error" not in metadata
+    detail = metadata["ranked_shadow"]
+    assert detail["status"] == "recorded"
+    assert detail["top_k"] == 12
+    assert detail["candidate_count"] == 2
+    assert detail["overlap_count"] == 1
+    assert detail["shadow_admitted_count"] == 2
+    assert detail["legacy_admitted_count"] == 1
+    assert detail["shadow_omission_reason_counts"] == {}
+    assert kernel.query_calls == [("governed memory", 12)]
+
+
+def test_memory_kernel_shadow_kill_switch_disables_shadow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DHARMA_MEMORY_KERNEL_RANKED_SHADOW", "0")
+    kernel = _ShadowRankedMemoryKernel(_pack())
+
+    section, metadata = build_memory_kernel_default_context(
+        kernel,
+        recall_query="governed memory",
+        token_budget=1200,
+    )
+
+    assert section is not None
+    assert metadata["memory_kernel_candidate_source"] == "legacy_scan+ranked_shadow"
+    assert metadata["shadow_overlap_at_k"] is None
+    assert metadata["shadow_admitted_delta"] is None
+    assert metadata["ranked_shadow"]["status"] == "disabled"
+    assert kernel.query_calls == []
+
+
+def test_memory_kernel_shadow_skips_empty_recall_query() -> None:
+    kernel = _ShadowRankedMemoryKernel(_pack())
+
+    section, metadata = build_memory_kernel_default_context(
+        kernel,
+        recall_query="",
+        token_budget=1200,
+    )
+
+    assert section is not None
+    assert metadata["shadow_overlap_at_k"] is None
+    assert metadata["shadow_admitted_delta"] is None
+    assert metadata["ranked_shadow"]["status"] == "skipped"
+    assert metadata["ranked_shadow"]["reason"] == "empty_recall_query"
+    assert kernel.query_calls == []
+
+
+@pytest.mark.asyncio
+async def test_memory_kernel_shadow_error_never_breaks_compile() -> None:
+    kernel = _ShadowRankedMemoryKernel(
+        _pack(),
+        query_error=RuntimeError("ranked door down"),
+    )
+    compiler = _compiler(kernel)
+
+    bundle = await compiler.compile_bundle(
+        session_id="sess_shadow_error",
+        task_id="task_shadow_error",
+        task_description="Use governed memory.",
+        query="governed memory",
+        token_budget=1200,
+    )
+
+    assert "## Memory Kernel" in bundle.rendered_text
+    assert "safe witness note" in bundle.rendered_text
+    metadata = bundle.metadata["memory_kernel_default"]
+    assert metadata["status"] == "used"
+    assert metadata["memory_kernel_candidate_source"] == "legacy_scan+ranked_shadow"
+    assert metadata["shadow_overlap_at_k"] is None
+    assert metadata["shadow_admitted_delta"] is None
+    assert metadata["shadow_error"].startswith("RuntimeError")
+    assert metadata["ranked_shadow"]["status"] == "error"
