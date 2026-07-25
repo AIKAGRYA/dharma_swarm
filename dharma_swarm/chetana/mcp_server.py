@@ -170,19 +170,26 @@ def _current_kernel_signature() -> str:
     return placeholder
 
 
-def tool_verify(path: str | None = None) -> dict:
+def tool_verify(path: str | None = None, mode: str = "compat") -> dict:
     """Round-trip axiom signatures against the current kernel.
 
     Args:
         path: Optional atom path. If None or ".", verifies all trusted atoms.
+        mode: "compat" (verdict fails only on zero-sig/schema-error — the
+            legacy rule) or "production" (fail-closed: verdict also fails on
+            no-provenance, kernel-drift, unapproved review_status, or an
+            unavailable kernel).
 
-    Returns four buckets: verified, zero-sig, kernel-drift, no-provenance,
-    schema-error.
+    Returns the five signature buckets (verified, zero-sig, kernel-drift,
+    no-provenance, schema-error) plus the overlapping ``unapproved`` list,
+    and a ``verdict`` field: "pass" | "fail" with ``verdict_reasons``.
     """
-    from .provenance import parse_frontmatter, signature_matches
+    from .provenance import production_verdict, scan_verify_targets
     from .staging import list_trusted
 
-    placeholder = "0" * 64
+    if mode not in {"compat", "production"}:
+        raise ValueError(f"unknown verify mode: {mode!r} (expected 'compat' or 'production')")
+
     current_kernel_sig = _current_kernel_signature()
 
     if path and path != ".":
@@ -190,51 +197,32 @@ def tool_verify(path: str | None = None) -> dict:
     else:
         targets = list_trusted()
 
-    buckets: dict[str, list[str]] = {
-        "verified": [],
-        "zero-sig": [],
-        "kernel-drift": [],
-        "no-provenance": [],
-        "schema-error": [],
-    }
-    for p in targets:
-        try:
-            text = p.read_text(encoding="utf-8")
-            try:
-                schema, body = parse_frontmatter(text, source_path=str(p))
-            except Exception:
-                if text.lstrip().startswith("---"):
-                    buckets["no-provenance"].append(str(p))
-                else:
-                    buckets["schema-error"].append(str(p))
-                continue
+    buckets, unapproved = scan_verify_targets(targets, kernel_signature=current_kernel_sig)
 
-            if schema.provenance is None:
-                buckets["no-provenance"].append(str(p))
-                continue
-
-            stored = schema.provenance.axiom_signature or ""
-            if stored == placeholder:
-                buckets["zero-sig"].append(str(p))
-                continue
-
-            if signature_matches(stored, schema, body, current_kernel_sig):
-                buckets["verified"].append(str(p))
-            elif signature_matches(stored, schema, body, placeholder):
-                buckets["zero-sig"].append(str(p))
-            else:
-                buckets["kernel-drift"].append(str(p))
-        except Exception:
-            buckets["schema-error"].append(str(p))
+    if mode == "production":
+        verdict, reasons = production_verdict(
+            buckets, unapproved, kernel_signature=current_kernel_sig
+        )
+    else:
+        reasons = [
+            f"{label}: {len(buckets[label])}"
+            for label in ("zero-sig", "schema-error")
+            if buckets[label]
+        ]
+        verdict = "pass" if not reasons else "fail"
 
     return {
         "kernel_signature": current_kernel_sig,
+        "mode": mode,
+        "verdict": verdict,
+        "verdict_reasons": reasons,
         "verified_count": len(buckets["verified"]),
         "zero_sig_count": len(buckets["zero-sig"]),
         "kernel_drift_count": len(buckets["kernel-drift"]),
         "no_provenance_count": len(buckets["no-provenance"]),
         "schema_error_count": len(buckets["schema-error"]),
-        "buckets": buckets,
+        "unapproved_count": len(unapproved),
+        "buckets": {**buckets, "unapproved": unapproved},
     }
 
 

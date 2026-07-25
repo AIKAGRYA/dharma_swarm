@@ -294,6 +294,93 @@ def signature_matches(
     return compute_axiom_signature(body, kernel_signature) == stored
 
 
+PLACEHOLDER_SIGNATURE = "0" * 64
+
+VERIFY_BUCKETS = ("verified", "zero-sig", "kernel-drift", "no-provenance", "schema-error")
+
+# Buckets that fail `verify --mode production`. Compat mode fails only on
+# zero-sig/schema-error so the ~251 pre-chetana wiki pages stay reportable.
+PRODUCTION_FAIL_BUCKETS = ("zero-sig", "kernel-drift", "no-provenance", "schema-error")
+
+
+def classify_atom_text(
+    text: str, *, kernel_signature: str, source_path: str | None = None
+) -> tuple[str, str | None]:
+    """Classify one atom's verification bucket under the given kernel.
+
+    Returns ``(bucket, review_status)`` where bucket ∈ VERIFY_BUCKETS and
+    review_status is None unless the atom carries parseable provenance.
+    Shared by the CLI and MCP verify surfaces so the two can never disagree.
+    """
+    try:
+        schema, body = parse_frontmatter(text, source_path=source_path)
+    except Exception:
+        # Most likely a v1 wiki atom missing chetana-strict fields.
+        # Distinguish that from genuinely malformed content.
+        if text.lstrip().startswith("---"):
+            return "no-provenance", None
+        return "schema-error", None
+    if schema is None:
+        return "schema-error", None
+    if schema.provenance is None:
+        return "no-provenance", None
+    review_status = schema.provenance.review_status
+    stored = schema.provenance.axiom_signature or ""
+    if not stored or stored == PLACEHOLDER_SIGNATURE:
+        return "zero-sig", review_status
+    if signature_matches(stored, schema, body, kernel_signature):
+        return "verified", review_status
+    if signature_matches(stored, schema, body, PLACEHOLDER_SIGNATURE):
+        return "zero-sig", review_status
+    return "kernel-drift", review_status
+
+
+def scan_verify_targets(
+    targets: list, *, kernel_signature: str
+) -> tuple[dict[str, list[str]], list[str]]:
+    """Bucket every target path, plus the overlapping ``unapproved`` list.
+
+    ``unapproved`` collects atoms whose provenance parsed but whose
+    review_status is not "approved" — an independent axis from the signature
+    buckets (a verified auto_promoted atom is verified AND unapproved).
+    """
+    buckets: dict[str, list[str]] = {label: [] for label in VERIFY_BUCKETS}
+    unapproved: list[str] = []
+    for p in targets:
+        try:
+            text = p.read_text(encoding="utf-8")
+        except Exception:
+            buckets["schema-error"].append(str(p))
+            continue
+        bucket, review_status = classify_atom_text(
+            text, kernel_signature=kernel_signature, source_path=str(p)
+        )
+        buckets[bucket].append(str(p))
+        if review_status is not None and review_status != "approved":
+            unapproved.append(str(p))
+    return buckets, unapproved
+
+
+def production_verdict(
+    buckets: dict[str, list[str]], unapproved: list[str], *, kernel_signature: str
+) -> tuple[str, list[str]]:
+    """Fail-closed verdict for production mode: ("pass"|"fail", reasons).
+
+    Fails on any PRODUCTION_FAIL_BUCKETS hit, any unapproved review_status,
+    or an unavailable kernel (placeholder signature makes verification
+    meaningless, so an empty/clean scan must not pass on it).
+    """
+    reasons: list[str] = []
+    if kernel_signature == PLACEHOLDER_SIGNATURE:
+        reasons.append("kernel-unavailable")
+    for label in PRODUCTION_FAIL_BUCKETS:
+        if buckets.get(label):
+            reasons.append(f"{label}: {len(buckets[label])}")
+    if unapproved:
+        reasons.append(f"unapproved review_status: {len(unapproved)}")
+    return ("pass" if not reasons else "fail"), reasons
+
+
 def validate_frontmatter(fm: dict[str, Any]) -> FrontmatterSchema:
     """Validate a parsed frontmatter dict. Raises pydantic ValidationError on failure."""
     return FrontmatterSchema.model_validate(fm)
